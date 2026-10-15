@@ -1,21 +1,8 @@
 /**
- * BoardCanvas port — the narrow Board surface for Canvas callers (issue #861).
- *
- * Canvas `board-session` orchestrates one open Board on top of this port:
- * snapshot facts, local persistence, revision-gated sync, preview
- * rendering, and media-ref extraction. It must NOT reach the Board barrel
- * (`features/board` index: catalog gallery presentation, collaboration
- * workflows, server hydrate facades) directly — every Canvas-needed Board
- * capability is curated here so the coupling stays explicit and minimal.
- *
- * This port re-exports Board-owned implementations without copying them;
- * behavior and ownership stay in `board/core` and `board/session`.
+ * Pure Board document contracts for Canvas graph and workflow callers.
+ * Browser persistence, catalog, and synchronization live in canvasSession.
  */
 
-// Durable snapshot facts, pure validation, and media-ref extraction
-// (extraction feeds backend refcount and GC lock). Canvas graph and workflow
-// code also consumes these Board-owned pure document contracts; the explicit
-// list keeps the port narrower than the full Board barrel.
 export {
   FUSION_SLOT_LAYOUT,
   areFusionBlendPointsEqual,
@@ -93,20 +80,3 @@ export {
   type PromptAspectRatio,
 } from '../core/document/promptAspectRatio'
 export { rebuildBoardMediaRefs } from '../core/media/references'
-
-// Local persistence and document adapters.
-export { loadBoardState, setBoardState } from '../session/persistence/state'
-export { serializeBoardState } from '../session/persistence/boardStateSerialization'
-
-// Catalog and revision-gated sync use cases.
-export { getBoardById, normalizeBoardName, touchBoard } from '../session/catalog/boards'
-export { useBoardRepository, type BoardRepository } from '../session/catalog/repository'
-export {
-  fetchBoardArchivedAt,
-  isBoardArchivedError,
-  isBoardSyncConflictError,
-  markBoardArchivedLocally,
-  syncBoardToServer,
-  syncRestoreBoardToServer,
-  type BoardSyncConflictKind,
-} from '../session/sync/boardSync'

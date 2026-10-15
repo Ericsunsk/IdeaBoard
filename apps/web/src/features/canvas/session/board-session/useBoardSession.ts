@@ -1,9 +1,6 @@
+import type { BoardSnapshot } from '../../../board/ports/canvas'
 import { computed, type ComputedRef } from 'vue'
-import {
-  isBoardArchivedError,
-  isBoardSyncConflictError,
-  type BoardSnapshot,
-} from '../../../board/ports/canvas'
+import { isBoardArchivedError, isBoardSyncConflictError } from '../../../board/ports/canvasSession'
 import { i18n } from '../../../../core/i18n'
 import {
   createBoardSessionRepository,

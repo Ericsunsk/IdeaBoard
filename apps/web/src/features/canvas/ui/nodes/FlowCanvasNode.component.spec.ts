@@ -152,11 +152,6 @@ describe('FlowCanvasNode prompt rendering', () => {
 
     expect(view.getAllByTestId('flow-node-handles')).toHaveLength(1)
     expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
-    expect(
-      view.container
-        .querySelector<HTMLElement>('.flow-canvas-node')
-        ?.style.getPropertyValue('--canvas-node-ui-scale'),
-    ).toBe('1')
     expect(view.getByLabelText('Send')).not.toBeDisabled()
   })
 

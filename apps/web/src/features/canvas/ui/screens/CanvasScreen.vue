@@ -47,6 +47,7 @@
     <div
       ref="canvasWrapRef"
       class="canvas-flow-wrap page-dot-bg"
+      :style="nodeUiStyle"
       @dragover.prevent="onCanvasDragOver"
       @drop.prevent="onCanvasDrop"
       @pointerdown.capture="onCanvasPointerDownCapture"
@@ -120,12 +121,13 @@ import { PanOnScrollMode, useVueFlow, VueFlow, type FlowProps } from '@vue-flow/
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useCanvasImageLightbox } from './useCanvasImageLightbox'
-import { provideCanvasHandleProximityCoordinator } from '../../session/flow-adapter'
-import { provideCanvasNodeUiStateContext } from '../../session/flow-adapter'
-import { provideCanvasViewportContext } from '../../session/flow-adapter'
 import { CanvasGroupPresentation } from '../nodes/groups'
 import {
   createCanvasConnectionDropLifecycle,
+  provideCanvasHandleProximityCoordinator,
+  provideCanvasNodeUiStateContext,
+  provideCanvasViewportContext,
+  resolveCanvasNodeUiScale,
   useCanvasVueFlowHandleGeometryAdapter,
   useVueFlowAdapter,
 } from '../../session/flow-adapter'
@@ -309,6 +311,9 @@ const canvasChromeAccount = computed<CanvasChromeAccountState>(() => ({
   menuItems: accountControls.viewModel.menuItems.value,
 }))
 const { zoomLevel, qualityZoomLevel } = viewModel.viewportControls
+const nodeUiStyle = computed(() => ({
+  '--canvas-node-ui-scale': String(resolveCanvasNodeUiScale(zoomLevel.value)),
+}))
 const {
   onZoomIn,
   onZoomOut,

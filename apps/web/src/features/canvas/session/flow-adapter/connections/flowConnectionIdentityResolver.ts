@@ -172,7 +172,7 @@ export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentit
     options.candidates.map(({ edge }) => edge),
   )
 
-  function claimConnectionId(edge: TFlowEdge, connectionId: number) {
+  function claimConnectionId(connectionId: number) {
     claimedConnectionIds.add(connectionId)
     const endpointKey = endpointByBaseConnectionId.get(connectionId)
     if (endpointKey) {
@@ -205,7 +205,7 @@ export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentit
     const { edge } = candidate
     const connectionId = claimCandidateConnectionId(candidate, cursor)
 
-    if (connectionId !== null) claimConnectionId(edge, connectionId)
+    if (connectionId !== null) claimConnectionId(connectionId)
     connectionIdByFlowEdge.set(edge, connectionId)
     if (!connectionIdByFlowEdgeId.has(edge.id)) {
       connectionIdByFlowEdgeId.set(edge.id, connectionId)

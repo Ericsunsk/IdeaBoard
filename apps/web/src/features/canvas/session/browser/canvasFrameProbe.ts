@@ -24,6 +24,9 @@ type CanvasFrameProbeSummary = {
   frameBudgetMs: number
   metadata?: CanvasFrameProbeMetadata
   marks: CanvasFrameProbeMark[]
+  p50FrameMs: number
+  retainedSampleCount: number
+  droppedMarkCount: number
 }
 
 export type CanvasFrameProbeSession = {
@@ -34,6 +37,16 @@ export type CanvasFrameProbeSession = {
 }
 
 const FRAME_BUDGET_MS = 1000 / 60
+const FRAME_SAMPLE_LIMIT = 4096
+const MARK_LIMIT = 256
+
+type FrameStatistics = {
+  count: number
+  totalMs: number
+  maxMs: number
+  droppedFrames: number
+  droppedMarkCount: number
+}
 
 type AnimationFrameApis = {
   request: (callback: FrameRequestCallback) => number
@@ -91,33 +104,29 @@ function percentile(sortedValues: number[], percentileValue: number): number {
   return sortedValues[Math.max(0, Math.min(index, sortedValues.length - 1))] ?? 0
 }
 
-function countDroppedFrames(frameDeltas: number[]): number {
-  return frameDeltas.reduce((total, deltaMs) => {
-    const expectedFrames = Math.max(1, Math.round(deltaMs / FRAME_BUDGET_MS))
-    return total + expectedFrames - 1
-  }, 0)
-}
-
 function summarizeFrameProbe(
   scene: CanvasFrameProbeScene,
   durationMs: number,
   frameDeltas: number[],
   metadata: CanvasFrameProbeMetadata | undefined,
   marks: CanvasFrameProbeMark[],
+  statistics: FrameStatistics,
 ): CanvasFrameProbeSummary {
   const sortedFrameDeltas = [...frameDeltas].sort((left, right) => left - right)
-  const sampleCount = frameDeltas.length
-  const totalFrameMs = frameDeltas.reduce((total, deltaMs) => total + deltaMs, 0)
+  const sampleCount = statistics.count
   const summary: CanvasFrameProbeSummary = {
     scene,
     durationMs: roundMs(durationMs),
-    avgFrameMs: sampleCount > 0 ? roundMs(totalFrameMs / sampleCount) : 0,
+    avgFrameMs: sampleCount > 0 ? roundMs(statistics.totalMs / sampleCount) : 0,
     p95FrameMs: roundMs(percentile(sortedFrameDeltas, 0.95)),
-    maxFrameMs: roundMs(sortedFrameDeltas.at(-1) ?? 0),
-    droppedFrames: countDroppedFrames(frameDeltas),
+    maxFrameMs: roundMs(statistics.maxMs),
+    droppedFrames: statistics.droppedFrames,
     sampleCount,
     frameBudgetMs: roundMs(FRAME_BUDGET_MS),
     marks: [...marks],
+    p50FrameMs: roundMs(percentile(sortedFrameDeltas, 0.5)),
+    retainedSampleCount: frameDeltas.length,
+    droppedMarkCount: statistics.droppedMarkCount,
   }
   if (metadata) summary.metadata = metadata
   return summary
@@ -138,6 +147,13 @@ export function beginCanvasFrameProbe(
 
   const startedAt = now()
   const startMetadata = resolveMetadata(metadata)
+  const statistics: FrameStatistics = {
+    count: 0,
+    totalMs: 0,
+    maxMs: 0,
+    droppedFrames: 0,
+    droppedMarkCount: 0,
+  }
   const frameDeltas: number[] = []
   const marks: CanvasFrameProbeMark[] = []
   let isActive = true
@@ -163,7 +179,11 @@ export function beginCanvasFrameProbe(
     if (lastFrameAt !== undefined) {
       const deltaMs = timestamp - lastFrameAt
       if (Number.isFinite(deltaMs) && deltaMs >= 0) {
-        frameDeltas.push(deltaMs)
+        frameDeltas[statistics.count % FRAME_SAMPLE_LIMIT] = deltaMs
+        statistics.count += 1
+        statistics.totalMs += deltaMs
+        statistics.maxMs = Math.max(statistics.maxMs, deltaMs)
+        statistics.droppedFrames += Math.max(1, Math.round(deltaMs / FRAME_BUDGET_MS)) - 1
       }
     }
     lastFrameAt = timestamp
@@ -176,6 +196,10 @@ export function beginCanvasFrameProbe(
     scene,
     mark(name, markMetadata) {
       if (!isActive) return
+      if (marks.length >= MARK_LIMIT) {
+        statistics.droppedMarkCount += 1
+        return
+      }
       const resolvedMetadata = resolveMetadata(markMetadata)
       const mark: CanvasFrameProbeMark = {
         name,
@@ -192,6 +216,7 @@ export function beginCanvasFrameProbe(
         frameDeltas,
         mergeMetadata(startMetadata, endMetadata),
         marks,
+        statistics,
       )
       console.info(`[canvas:perf] frame ${scene} ${summary.durationMs}ms`, summary)
       return summary

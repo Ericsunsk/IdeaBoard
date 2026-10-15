@@ -342,13 +342,14 @@ describe('Board Sync Coordinator', () => {
       },
     ]
     harness.currentSnapshot.value = captured
+    let saveOwnedSnapshot!: BoardSnapshot
     let resolveSave!: (result: BoardSessionSaveResult) => void
-    vi.mocked(harness.boardSession.save).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveSave = resolve
-        }),
-    )
+    vi.mocked(harness.boardSession.save).mockImplementationOnce((snapshot) => {
+      saveOwnedSnapshot = snapshot
+      return new Promise((resolve) => {
+        resolveSave = resolve
+      })
+    })
 
     const save = harness.coordinator.saveCurrentBoardSnapshot()
     await Promise.resolve()
@@ -356,10 +357,9 @@ describe('Board Sync Coordinator', () => {
     advanced.promptNodes[0]!.text = 'newer edit'
     harness.currentSnapshot.value = advanced
     harness.graphRevision.value += 1
-    const stabilized = structuredClone(captured)
-    stabilized.imageNodes[0]!.sourceImageUrl = '/uploads/stable.png'
-    stabilized.imageNodes[0]!.sourceMediaAssetId = 42
-    resolveSave({ snapshot: stabilized, remoteSync: { isOk: true } })
+    saveOwnedSnapshot.imageNodes[0]!.sourceImageUrl = '/uploads/stable.png'
+    saveOwnedSnapshot.imageNodes[0]!.sourceMediaAssetId = 42
+    resolveSave({ snapshot: saveOwnedSnapshot, remoteSync: { isOk: true } })
 
     const result = await save
     expect(result.reconciliation?.hasLocalDraftAdvanced).toBe(true)

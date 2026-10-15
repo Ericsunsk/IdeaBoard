@@ -1,7 +1,4 @@
-import {
-  isCanvasInteractionBenchmarkActive,
-  recordCanvasInteractionTiming,
-} from './canvasInteractionMetrics'
+import { beginCanvasInteractionTiming } from './canvasInteractionMetrics'
 
 type CanvasPerfMetadata = Record<string, string | number | boolean | null | undefined>
 
@@ -46,14 +43,14 @@ export function measureCanvasPerf<T>(
   minDurationMs?: number,
 ): T {
   const isPerfProbeEnabled = isCanvasPerfProbeEnabled()
-  const isBenchmarkActive = isCanvasInteractionBenchmarkActive()
-  if (!isPerfProbeEnabled && !isBenchmarkActive) return task()
-  const startedAt = now()
+  const finishTiming = beginCanvasInteractionTiming(label)
+  if (!isPerfProbeEnabled && !finishTiming) return task()
+  const startedAt = isPerfProbeEnabled ? now() : 0
   try {
     return task()
   } finally {
-    const durationMs = now() - startedAt
-    if (isBenchmarkActive) recordCanvasInteractionTiming(label, durationMs)
+    const durationMs = isPerfProbeEnabled ? now() - startedAt : 0
+    finishTiming?.()
     if (isPerfProbeEnabled) logCanvasPerf(label, durationMs, metadata, minDurationMs)
   }
 }
@@ -65,14 +62,14 @@ export async function measureCanvasPerfAsync<T>(
   minDurationMs?: number,
 ): Promise<T> {
   const isPerfProbeEnabled = isCanvasPerfProbeEnabled()
-  const isBenchmarkActive = isCanvasInteractionBenchmarkActive()
-  if (!isPerfProbeEnabled && !isBenchmarkActive) return task()
-  const startedAt = now()
+  const finishTiming = beginCanvasInteractionTiming(label)
+  if (!isPerfProbeEnabled && !finishTiming) return task()
+  const startedAt = isPerfProbeEnabled ? now() : 0
   try {
     return await task()
   } finally {
-    const durationMs = now() - startedAt
-    if (isBenchmarkActive) recordCanvasInteractionTiming(label, durationMs)
+    const durationMs = isPerfProbeEnabled ? now() - startedAt : 0
+    finishTiming?.()
     if (isPerfProbeEnabled) logCanvasPerf(label, durationMs, metadata, minDurationMs)
   }
 }

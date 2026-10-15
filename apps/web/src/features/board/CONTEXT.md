@@ -34,9 +34,10 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 - `createCatalog` / `useCatalog` / `BoardsPage` — gallery page, controller, and views (via root `board/index.ts`) in `ui/gallery`. Cards render `SceneThumbnail` (SVG geometry plus token classes); theme switches re-map tokens only.
 - Gallery copy keys are canonical under `board.*` in the locale bundles (including the h1: `board.title`). New callers use `board.*`; existing `workspace.boards.*` aliases have matching locale values.
 - `board/testing` — Board-internal factories and sync fixtures; never enters the production barrel.
-- `board/ports/testing.ts` — test-only snapshot/state factories for other contexts; production callers use `board/ports/canvas.ts`.
-- `board/index.ts` — public entry for non-Canvas consumers and route composition; Canvas uses the narrow port below.
-- `board/ports/canvas.ts` — narrow BoardCanvas port for Canvas callers (issue #861): snapshot facts, local persistence, revision-gated sync, and media-ref extraction only. Canvas saves documents only and never renders gallery previews; Canvas production code must use this subpath, never the full barrel.
+- `board/ports/testing.ts` — test-only snapshot/state factories for other contexts; production Canvas callers use the document or session ports below.
+- `board/index.ts` — public entry for non-Canvas consumers and route composition; Canvas uses the curated ports below.
+- `board/ports/canvas.ts` — pure Board document contracts, validation, geometry, and media-ref extraction for Canvas graph and workflow callers. This port imports no browser persistence, catalog, or sync runtime.
+- `board/ports/canvasSession.ts` — browser persistence, catalog, and revision-gated sync for Canvas Board Sessions. Canvas saves documents only and never renders gallery previews; Canvas production code uses these curated ports, never the full barrel.
 
 ## Sync / Query Ownership (ADR-0014)
 

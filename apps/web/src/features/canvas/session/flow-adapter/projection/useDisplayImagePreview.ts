@@ -7,6 +7,7 @@ import {
   watch,
   type MaybeRefOrGetter,
 } from 'vue'
+import { beginCanvasInteractionTiming } from '../../browser/canvasInteractionMetrics'
 import { parseImageUrlPathname } from '../../media/canvasMediaIo.ts'
 import { createDisplayPreviewResources } from './displayImagePreviewResources'
 import {
@@ -43,29 +44,41 @@ function supportsImageDecode() {
   return typeof Image !== 'undefined' && typeof Image.prototype.decode === 'function'
 }
 
-async function canDisplayImage(url: string, signal?: AbortSignal): Promise<boolean> {
-  if (signal?.aborted) return false
-  if (!supportsImageDecode()) return true
-  const image = new Image()
-  image.src = url
-  try {
-    await image.decode()
-    if (signal?.aborted) return false
-    return true
-  } catch {
-    return false
-  } finally {
-    try {
-      image.src = ''
-    } catch {
-      // ignore cleanup failures
+function canDisplayImage(url: string, signal: AbortSignal, metricName: string): Promise<boolean> {
+  if (signal.aborted) return Promise.resolve(false)
+  if (!supportsImageDecode()) return Promise.resolve(true)
+  return new Promise((resolve) => {
+    const finishTiming = beginCanvasInteractionTiming(metricName)
+    const image = new Image()
+    let isSettled = false
+    const finish = (isDisplayable: boolean) => {
+      if (isSettled) return
+      isSettled = true
+      signal.removeEventListener('abort', handleAbort)
+      try {
+        image.src = ''
+        image.removeAttribute?.('src')
+      } catch {
+        // Some image implementations do not support clearing their source.
+      }
+      finishTiming?.({
+        count: `${metricName}${signal.aborted ? 'Cancelled' : isDisplayable ? 'Ready' : 'Failed'}`,
+        shouldRecordTiming: isDisplayable,
+      })
+      resolve(isDisplayable)
     }
+    const handleAbort = () => finish(false)
+    signal.addEventListener('abort', handleAbort, { once: true })
     try {
-      ;(image as unknown as { removeAttribute?: (name: string) => void }).removeAttribute?.('src')
+      image.src = url
+      void image.decode().then(
+        () => finish(!signal.aborted),
+        () => finish(false),
+      )
     } catch {
-      // ignore cleanup failures
+      finish(false)
     }
-  }
+  })
 }
 
 export function useDisplayImagePreview(
@@ -210,11 +223,13 @@ export function useDisplayImagePreview(
         return
       }
 
-      void canDisplayImage(nextUrl, signal).then(async (isDisplayable) => {
+      const decodeMetric =
+        resolvedAssetId.value === null ? 'displayImageFallbackDecode' : 'displayImageManagedDecode'
+      void canDisplayImage(nextUrl, signal, decodeMetric).then(async (isDisplayable) => {
         let decodedUrl = isDisplayable ? nextUrl : ''
         const fallbackUrl = contentFallbackUrl.value
         if (!decodedUrl && fallbackUrl && fallbackUrl !== nextUrl && !signal.aborted) {
-          if (await canDisplayImage(fallbackUrl, signal)) decodedUrl = fallbackUrl
+          if (await canDisplayImage(fallbackUrl, signal, decodeMetric)) decodedUrl = fallbackUrl
         }
         if (
           !decodedUrl ||

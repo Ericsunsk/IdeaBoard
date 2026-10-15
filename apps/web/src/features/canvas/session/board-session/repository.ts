@@ -1,3 +1,8 @@
+import {
+  InvalidBoardStateError,
+  type BoardSnapshot,
+  type BoardState,
+} from '../../../board/ports/canvas'
 import { getCurrentScope, onScopeDispose } from 'vue'
 import {
   syncBoardToServer,
@@ -7,10 +12,7 @@ import {
   loadBoardState,
   serializeBoardState,
   setBoardState,
-  InvalidBoardStateError,
-  type BoardSnapshot,
-  type BoardState,
-} from '../../../board/ports/canvas'
+} from '../../../board/ports/canvasSession'
 
 export type BoardSessionRepository = {
   exists: (boardId: string) => boolean

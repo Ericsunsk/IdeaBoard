@@ -2,7 +2,7 @@
 
 此文件是 Frontend public Seam 的当前治理契约。`json seam-inventory` block 是 dependency boundary、public API surface 和 Knip governance 共用的 machine source of truth。
 
-当前包含 272 个可用入口。Inventory 记录当前 ownership、exports、consumers 和 dependency contracts。Nested ownership scopes 可以重叠，fan-in/out 不得直接加总。
+当前包含 273 个可用入口。Inventory 记录当前 ownership、exports、consumers 和 dependency contracts。Nested ownership scopes 可以重叠，fan-in/out 不得直接加总。
 
 ## Schema
 
@@ -16626,9 +16626,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 50,
-      "measuredFanOut": 58,
+      "measuredFanOut": 59,
       "targetFanIn": 50,
-      "targetFanOut": 58,
+      "targetFanOut": 59,
       "ownershipScope": ["src/features/board/"],
       "publicExports": [
         "BOARD_DOCUMENT_REPLACE_COALESCE_MS",
@@ -16831,6 +16831,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/jest-dom/vitest.js",
+        "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vueuse/core/dist/index.js",
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
@@ -16996,7 +16997,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         {
           "from": "src/features/canvas/session/board-session/useBoardSession.ts",
           "to": "src/features/board/ports/canvas.ts",
-          "kind": "runtime"
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/execution/application/canvasExecutionRecoveryCoordinator.ts",
@@ -17264,16 +17265,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/ui/chrome/useBoardHeaderActions.ts",
-          "to": "src/features/board/ports/canvas.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/chrome/useBoardHeaderActions.unit.spec.ts",
-          "to": "src/features/board/ports/canvas.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/ui/nodes/canvasNodePresentation.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
@@ -17379,16 +17370,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 93,
-      "measuredFanOut": 58,
-      "targetFanIn": 93,
-      "targetFanOut": 58,
+      "measuredFanIn": 91,
+      "measuredFanOut": 59,
+      "targetFanIn": 91,
+      "targetFanOut": 59,
       "ownershipScope": ["src/features/board/"],
       "publicExports": [
-        "BoardRepository",
         "BoardSnapshot",
         "BoardState",
-        "BoardSyncConflictKind",
         "CANVAS_NODE_REGISTRY_LIST",
         "CanvasConnection",
         "CanvasConnectionContractNode",
@@ -17429,8 +17418,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "constrainFusionBlendPoint",
         "createEmptyBoardSnapshot",
         "createTypedCanvasNodeSnapshot",
-        "fetchBoardArchivedAt",
-        "getBoardById",
         "getCanvasNodeImageInputLimit",
         "getCanvasNodePortInputLimit",
         "getCanvasNodePrimaryOutputPort",
@@ -17441,14 +17428,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "getFusionLineAnchors",
         "getFusionSlotAnchor",
         "getFusionSlotAnchors",
-        "isBoardArchivedError",
-        "isBoardSyncConflictError",
         "isCanvasConnectionNodeType",
         "isCanvasExecutionOutputNodeType",
         "isCanvasImageInputSourceNodeType",
-        "loadBoardState",
-        "markBoardArchivedLocally",
-        "normalizeBoardName",
         "normalizeFusionBlendPoint",
         "normalizePromptAspectRatio",
         "rebuildBoardMediaRefs",
@@ -17458,13 +17440,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "resolveImageNodeLatestOutput",
         "resolveImageNodeStageHeight",
         "resolvePromptAspectRatioValue",
-        "resolveWorkflowNodeOutputStatus",
-        "serializeBoardState",
-        "setBoardState",
-        "syncBoardToServer",
-        "syncRestoreBoardToServer",
-        "touchBoard",
-        "useBoardRepository"
+        "resolveWorkflowNodeOutputStatus"
       ],
       "targetFanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
@@ -17472,6 +17448,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/jest-dom/vitest.js",
+        "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vueuse/core/dist/index.js",
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
@@ -17526,7 +17503,119 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "url",
         "vitest/browser"
       ],
-      "notes": "Narrow Board-to-Canvas port; Canvas board-session orchestrates through this port rather than the Board root."
+      "notes": "Pure Board document contracts, validation, geometry, and media-ref extraction for Canvas graph and workflow callers; no browser persistence, catalog, or sync runtime."
+    },
+    {
+      "path": "src/features/board/ports/canvasSession.ts",
+      "kind": "canonical",
+      "owner": "board",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/canvas/session/board-session/repository.ts",
+          "to": "src/features/board/ports/canvasSession.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/board-session/useBoardSession.ts",
+          "to": "src/features/board/ports/canvasSession.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/chrome/useBoardHeaderActions.ts",
+          "to": "src/features/board/ports/canvasSession.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/chrome/useBoardHeaderActions.unit.spec.ts",
+          "to": "src/features/board/ports/canvasSession.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 4,
+      "measuredFanOut": 59,
+      "targetFanIn": 4,
+      "targetFanOut": 59,
+      "ownershipScope": ["src/features/board/"],
+      "publicExports": [
+        "BoardRepository",
+        "BoardSyncConflictKind",
+        "fetchBoardArchivedAt",
+        "getBoardById",
+        "isBoardArchivedError",
+        "isBoardSyncConflictError",
+        "loadBoardState",
+        "markBoardArchivedLocally",
+        "normalizeBoardName",
+        "serializeBoardState",
+        "setBoardState",
+        "syncBoardToServer",
+        "syncRestoreBoardToServer",
+        "touchBoard",
+        "useBoardRepository"
+      ],
+      "targetFanOutTargets": [
+        "../api/internal/boards/previewscene/testdata/mixed.json",
+        "fs",
+        "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/@testing-library/jest-dom/vitest.js",
+        "node_modules/@testing-library/vue/dist/index.js",
+        "node_modules/@vueuse/core/dist/index.js",
+        "node_modules/valibot/dist/index.mjs",
+        "node_modules/vitest/dist/index.js",
+        "node_modules/vue-i18n/index.js",
+        "node_modules/vue-router/index.cjs",
+        "node_modules/vue/index.js",
+        "path",
+        "src/api/generated-query/public/boards/boards.ts",
+        "src/api/generated-query/public/model/board.ts",
+        "src/api/generated-query/public/model/boardDocument.ts",
+        "src/api/idempotencyKey.ts",
+        "src/api/mediaAssetMetadata.ts",
+        "src/api/stripUndefined.ts",
+        "src/api/workspaceEventStream.ts",
+        "src/app/style.css",
+        "src/components/ui/button/index.ts",
+        "src/components/ui/dialog/index.ts",
+        "src/components/ui/dropdown-menu/index.ts",
+        "src/components/ui/select/index.ts",
+        "src/components/ui/spinner/index.ts",
+        "src/core/composables/useAppToast.ts",
+        "src/core/composables/useOverlayInteractionLifecycle.ts",
+        "src/core/config/pagination.ts",
+        "src/core/config/runtimeUrls.ts",
+        "src/core/contracts/generationContract.ts",
+        "src/core/errors/errorCatalog.ts",
+        "src/core/i18n/formatters.ts",
+        "src/core/i18n/index.ts",
+        "src/core/media/imageDimensions.ts",
+        "src/core/media/mediaRef.ts",
+        "src/core/query/queryClient.ts",
+        "src/core/query/queryDefaults.ts",
+        "src/core/utils/auth.ts",
+        "src/core/utils/guards.ts",
+        "src/core/utils/ids.ts",
+        "src/core/utils/number.ts",
+        "src/core/utils/opaqueIds.ts",
+        "src/core/utils/polling.ts",
+        "src/core/utils/request.ts",
+        "src/core/utils/storage.ts",
+        "src/core/utils/workspaceId.ts",
+        "src/features/canvas/session/board-session/index.ts",
+        "src/features/workspace/index.ts",
+        "src/features/workspace/routePaths.ts",
+        "src/lib/utils.ts",
+        "src/test/deferred.ts",
+        "src/test/factories/index.ts",
+        "src/test/render.ts",
+        "src/test/toast.ts",
+        "src/theme/appOverlayMenu.ts",
+        "src/theme/dialogMask.ts",
+        "url",
+        "vitest/browser"
+      ],
+      "notes": "Browser persistence, catalog, and revision-gated sync use cases for Canvas Board Sessions; pure document contracts stay in ports/canvas.ts."
     },
     {
       "path": "src/features/board/ports/testing.ts",
@@ -18393,9 +18482,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 9,
-      "measuredFanOut": 18,
+      "measuredFanOut": 19,
       "targetFanIn": 9,
-      "targetFanOut": 18,
+      "targetFanOut": 19,
       "ownershipScope": ["src/features/canvas/session/board-session/"],
       "publicExports": [
         "BOARD_SESSION_AUTH_UNAVAILABLE_CODE",
@@ -18427,6 +18516,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/utils/auth.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
+        "src/features/board/ports/canvasSession.ts",
         "src/features/board/ports/testing.ts",
         "src/features/canvas/session/browser/canvasInteractionMetrics.ts",
         "src/features/canvas/session/browser/canvasPerfProbe.ts",
@@ -19285,9 +19375,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 61,
-      "measuredFanOut": 31,
+      "measuredFanOut": 32,
       "targetFanIn": 61,
-      "targetFanOut": 31,
+      "targetFanOut": 32,
       "ownershipScope": ["src/features/canvas/session/flow-adapter/"],
       "publicExports": [
         "CanvasFlowViewportControls",
@@ -19391,7 +19481,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/session/execution/index.ts",
         "src/features/canvas/session/execution/pending-execution/core.ts",
         "src/features/canvas/session/media/canvasMediaIo.ts",
-        "src/features/canvas/session/media/displayImagePreviewEncoding.ts"
+        "src/features/canvas/session/media/displayImagePreviewEncoding.ts",
+        "src/test/deferred.ts"
       ],
       "notes": ""
     },
@@ -20178,9 +20269,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 16,
-      "measuredFanOut": 31,
+      "measuredFanOut": 33,
       "targetFanIn": 16,
-      "targetFanOut": 31,
+      "targetFanOut": 33,
       "ownershipScope": ["src/features/canvas/tools/retouch/"],
       "publicExports": [
         "ImageRetouchKind",
@@ -20239,6 +20330,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/core/graph/index.ts",
         "src/features/canvas/session/browser/animationFrame.ts",
+        "src/features/canvas/session/browser/canvasInteractionMetrics.ts",
         "src/features/canvas/session/browser/canvasViewportStorage.ts",
         "src/features/canvas/session/browser/domEventTargets.ts",
         "src/features/canvas/session/browser/interaction/usePointerDragSession.ts",
@@ -20250,6 +20342,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/tools/image-tools/ui/chrome.ts",
         "src/features/canvas/tools/outpaint/core/geometry.ts",
         "src/features/canvas/ui/nodes/primitives/index.ts",
+        "src/test/deferred.ts",
         "src/test/render.ts",
         "vitest/browser"
       ],
@@ -22781,8 +22874,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue`            | canonical | admin         | 2       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue`                | canonical | admin         | 1       | 2 → 2                    | 3 → 3                     |
 | `src/features/auth/index.ts`                                                 | canonical | auth          | 28      | 28 → 28                  | 46 → 46                   |
-| `src/features/board/index.ts`                                                | canonical | board         | 193     | 50 → 50                  | 58 → 58                   |
-| `src/features/board/ports/canvas.ts`                                         | canonical | board         | 80      | 93 → 93                  | 58 → 58                   |
+| `src/features/board/index.ts`                                                | canonical | board         | 193     | 50 → 50                  | 59 → 59                   |
+| `src/features/board/ports/canvas.ts`                                         | canonical | board         | 65      | 91 → 91                  | 59 → 59                   |
+| `src/features/board/ports/canvasSession.ts`                                  | canonical | board         | 15      | 4 → 4                    | 59 → 59                   |
 | `src/features/board/ports/testing.ts`                                        | canonical | board         | 2       | 5 → 5                    | 1 → 1                     |
 | `src/features/board/testing/index.ts`                                        | canonical | board         | 11      | 18 → 18                  | 5 → 5                     |
 | `src/features/canvas/core/graph/canvasGraphStoreWriter.ts`                   | canonical | canvas        | 1       | 3 → 3                    | 2 → 2                     |
@@ -22791,11 +22885,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/core/graph/index.ts`                                    | canonical | canvas        | 58      | 63 → 63                  | 4 → 4                     |
 | `src/features/canvas/core/nodes/imageActions.ts`                             | canonical | canvas        | 1       | 7 → 7                    | 1 → 1                     |
 | `src/features/canvas/core/nodes/serviceLabelKey.ts`                          | canonical | canvas        | 1       | 5 → 5                    | 1 → 1                     |
-| `src/features/canvas/session/board-session/index.ts`                         | canonical | canvas        | 14      | 9 → 9                    | 18 → 18                   |
+| `src/features/canvas/session/board-session/index.ts`                         | canonical | canvas        | 14      | 9 → 9                    | 19 → 19                   |
 | `src/features/canvas/session/execution/board-attachment/index.ts`            | canonical | canvas        | 2       | 13 → 13                  | 0 → 0                     |
 | `src/features/canvas/session/execution/index.ts`                             | canonical | canvas        | 64      | 31 → 31                  | 46 → 46                   |
 | `src/features/canvas/session/execution/pending-execution/core.ts`            | canonical | canvas        | 17      | 14 → 14                  | 7 → 7                     |
-| `src/features/canvas/session/flow-adapter/index.ts`                          | canonical | canvas        | 69      | 61 → 61                  | 31 → 31                   |
+| `src/features/canvas/session/flow-adapter/index.ts`                          | canonical | canvas        | 69      | 61 → 61                  | 32 → 32                   |
 | `src/features/canvas/session/graph-editing/groupContracts.ts`                | canonical | canvas        | 1       | 2 → 2                    | 1 → 1                     |
 | `src/features/canvas/session/graph-editing/index.ts`                         | canonical | canvas        | 18      | 12 → 12                  | 35 → 35                   |
 | `src/features/canvas/session/image-workflow/index.ts`                        | canonical | canvas        | 3       | 4 → 4                    | 22 → 22                   |
@@ -22808,7 +22902,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/tools/image-tools/ui/chrome.ts`                         | canonical | canvas        | 1       | 2 → 2                    | 1 → 1                     |
 | `src/features/canvas/tools/image-tools/ui/stage.ts`                          | canonical | canvas        | 1       | 1 → 1                    | 1 → 1                     |
 | `src/features/canvas/tools/inpaint/index.ts`                                 | canonical | canvas        | 6       | 8 → 8                    | 15 → 15                   |
-| `src/features/canvas/tools/retouch/index.ts`                                 | canonical | canvas        | 36      | 16 → 16                  | 31 → 31                   |
+| `src/features/canvas/tools/retouch/index.ts`                                 | canonical | canvas        | 36      | 16 → 16                  | 33 → 33                   |
 | `src/features/canvas/tools/retouch/testing/browser.ts`                       | canonical | canvas        | 2       | 1 → 1                    | 4 → 4                     |
 | `src/features/canvas/ui/chrome/components/index.ts`                          | canonical | canvas        | 6       | 1 → 1                    | 12 → 12                   |
 | `src/features/canvas/ui/nodes/groups/index.ts`                               | canonical | canvas        | 4       | 4 → 4                    | 8 → 8                     |

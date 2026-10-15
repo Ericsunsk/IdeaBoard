@@ -6987,12 +6987,6 @@
         "evidence": ["src/features/board/index.ts#rebuildBoardMediaRefs"]
       }
     },
-    "src/features/board/core/preview/renderer.ts": {
-      "SCENE_THUMBNAIL_MAX_RASTERS_PER_CARD": {
-        "kind": "test-contract",
-        "evidence": ["src/features/board/core/preview/renderer.unit.spec.ts"]
-      }
-    },
     "src/features/board/core/schema/boardStateEnvelopeContract.ts": {
       "BoardStateEnvelopeContract": {
         "kind": "canonical-origin",
@@ -8010,12 +8004,6 @@
       }
     },
     "src/features/board/ports/canvas.ts": {
-      "BoardRepository": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#BoardRepository"
-        ]
-      },
       "BoardSnapshot": {
         "kind": "canonical-public",
         "evidence": [
@@ -8026,12 +8014,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#BoardState"
-        ]
-      },
-      "BoardSyncConflictKind": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#BoardSyncConflictKind"
         ]
       },
       "CANVAS_NODE_REGISTRY_LIST": {
@@ -8274,18 +8256,6 @@
           "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#createTypedCanvasNodeSnapshot"
         ]
       },
-      "fetchBoardArchivedAt": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#fetchBoardArchivedAt"
-        ]
-      },
-      "getBoardById": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#getBoardById"
-        ]
-      },
       "getCanvasNodeImageInputLimit": {
         "kind": "canonical-public",
         "evidence": [
@@ -8346,18 +8316,6 @@
           "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#getFusionSlotAnchors"
         ]
       },
-      "isBoardArchivedError": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#isBoardArchivedError"
-        ]
-      },
-      "isBoardSyncConflictError": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#isBoardSyncConflictError"
-        ]
-      },
       "isCanvasConnectionNodeType": {
         "kind": "canonical-public",
         "evidence": [
@@ -8374,24 +8332,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#isCanvasImageInputSourceNodeType"
-        ]
-      },
-      "loadBoardState": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#loadBoardState"
-        ]
-      },
-      "markBoardArchivedLocally": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#markBoardArchivedLocally"
-        ]
-      },
-      "normalizeBoardName": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#normalizeBoardName"
         ]
       },
       "normalizeFusionBlendPoint": {
@@ -8453,41 +8393,97 @@
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#resolveWorkflowNodeOutputStatus"
         ]
+      }
+    },
+    "src/features/board/ports/canvasSession.ts": {
+      "BoardRepository": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#BoardRepository"
+        ]
+      },
+      "BoardSyncConflictKind": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#BoardSyncConflictKind"
+        ]
+      },
+      "fetchBoardArchivedAt": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#fetchBoardArchivedAt"
+        ]
+      },
+      "getBoardById": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#getBoardById"
+        ]
+      },
+      "isBoardArchivedError": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#isBoardArchivedError"
+        ]
+      },
+      "isBoardSyncConflictError": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#isBoardSyncConflictError"
+        ]
+      },
+      "loadBoardState": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#loadBoardState"
+        ]
+      },
+      "markBoardArchivedLocally": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#markBoardArchivedLocally"
+        ]
+      },
+      "normalizeBoardName": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#normalizeBoardName"
+        ]
       },
       "serializeBoardState": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#serializeBoardState"
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#serializeBoardState"
         ]
       },
       "setBoardState": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#setBoardState"
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#setBoardState"
         ]
       },
       "syncBoardToServer": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#syncBoardToServer"
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#syncBoardToServer"
         ]
       },
       "syncRestoreBoardToServer": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#syncRestoreBoardToServer"
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#syncRestoreBoardToServer"
         ]
       },
       "touchBoard": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#touchBoard"
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#touchBoard"
         ]
       },
       "useBoardRepository": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#useBoardRepository"
+          "docs/frontend-seam-inventory.md: src/features/board/ports/canvasSession.ts#useBoardRepository"
         ]
       }
     },

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { cleanup } from '@testing-library/vue'
 import { defineComponent, h } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderWithUser, waitFor } from '../../../../test/render'
@@ -288,7 +289,7 @@ describe('SceneThumbnail', () => {
     expect(view.container.querySelectorAll('.scene-frame')).toHaveLength(12)
     expect(view.container.querySelector('image')).toBe(original)
     expect(mediaMocks.readMetadata).toHaveBeenCalledTimes(12)
-    view.unmount()
+    cleanup()
     expect(resizeObservers.every((observer) => observer.disconnect.mock.calls.length > 0)).toBe(
       true,
     )

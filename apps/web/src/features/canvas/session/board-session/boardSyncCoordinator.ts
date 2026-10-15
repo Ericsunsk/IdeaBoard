@@ -63,8 +63,7 @@ export type BoardSaveResult = {
 }
 
 function cloneBoardSnapshot(snapshot: BoardSnapshot): BoardSnapshot {
-  // Canvas snapshots are JSON domain data. structuredClone also unwraps any Vue
-  // proxies that reached this boundary without retaining references to live state.
+  // Upload stabilization mutates media fields; reconciliation needs their original values.
   return structuredClone(toRaw(snapshot) as BoardSnapshot)
 }
 
@@ -397,7 +396,9 @@ export function createBoardSyncCoordinator(
       : 'pending'
     try {
       const snapshot = buildCurrentBoardSnapshot()
-      const capturedSnapshot = cloneBoardSnapshot(snapshot)
+      const capturedSnapshot = measureCanvasPerf('board.save.captureSnapshot', undefined, () =>
+        cloneBoardSnapshot(snapshot),
+      )
       const { snapshot: stabilizedSnapshot, remoteSync } = await measureCanvasPerfAsync(
         'board.save.session',
         () => ({

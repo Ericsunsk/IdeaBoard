@@ -3,17 +3,54 @@ import { drawComposingOrb } from './composingRenderer'
 
 function createCanvasContext() {
   const arcs: Array<[number, number, number]> = []
+  const colors: string[] = []
   const context = {
     fillStyle: '',
     beginPath: vi.fn(),
-    arc: vi.fn((x: number, y: number, radius: number) => arcs.push([x, y, radius])),
+    arc: vi.fn((x: number, y: number, radius: number) => {
+      arcs.push([x, y, radius])
+      colors.push(String(context.fillStyle))
+    }),
     fill: vi.fn(),
   } as unknown as CanvasRenderingContext2D
 
-  return { arcs, context }
+  return { arcs, colors, context }
 }
 
 describe('composing orb renderer', () => {
+  it('keeps geometry and paint order stable after other frames, sizes, and contexts', () => {
+    const first = createCanvasContext()
+    const second = createCanvasContext()
+    drawComposingOrb(first.context, 171, 1.25)
+    const expectedArcs = [...first.arcs]
+    const expectedColors = [...first.colors]
+
+    drawComposingOrb(first.context, 300, 8.5)
+    drawComposingOrb(second.context, 100, 0)
+    first.arcs.length = 0
+    first.colors.length = 0
+    drawComposingOrb(first.context, 171, 1.25)
+
+    expect(first.arcs).toEqual(expectedArcs)
+    expect(first.colors).toEqual(expectedColors)
+    expect(second.arcs).toHaveLength(566)
+  })
+
+  it('changes the animated geometry and its depth-dependent colors between frames', () => {
+    const frame = createCanvasContext()
+    drawComposingOrb(frame.context, 171, 0)
+    const initialArcs = [...frame.arcs]
+    const initialColors = [...frame.colors]
+
+    frame.arcs.length = 0
+    frame.colors.length = 0
+    drawComposingOrb(frame.context, 171, 1.25)
+
+    expect(frame.arcs).toHaveLength(566)
+    expect(frame.arcs).not.toEqual(initialArcs)
+    expect(frame.colors).not.toEqual(initialColors)
+  })
+
   it('renders the tuned 171px composing preset with finite geometry', () => {
     const { arcs, context } = createCanvasContext()
 

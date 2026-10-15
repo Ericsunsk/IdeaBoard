@@ -187,6 +187,11 @@ const VueFlowStub = defineComponent({
           selected: false,
           dragging: false,
         } satisfies Partial<NodeProps>),
+        h('div', { class: 'vue-flow__edge', 'data-testid': 'edge-region' }),
+        h('div', {
+          class: 'vue-flow__nodesselection-rect',
+          'data-testid': 'selected-overlay-region',
+        }),
         slots.default?.(),
       ])
     }
@@ -208,6 +213,7 @@ const NodeStub = defineComponent({
         {
           type: 'button',
           'data-testid': 'node-region',
+          class: 'vue-flow__node',
           onClick: () => {
             emit('node-intent', { type: 'delete-requested', nodeId: 'node-a' })
             emit('node-mousedown', 'node-a', new MouseEvent('mousedown'))
@@ -659,13 +665,11 @@ describe('CanvasScreen', () => {
     expect(view.queryByTestId('node-context-menu')).not.toBeInTheDocument()
   })
 
-  it.each(['vue-flow__node', 'vue-flow__edge', 'vue-flow__nodesselection-rect'])(
+  it.each(['node-region', 'edge-region', 'selected-overlay-region'])(
     'preserves native %s context routing and ignores its pan callback',
-    async (className) => {
+    async (region) => {
       const view = renderScreen()
-      const target = document.createElement('div')
-      target.className = className
-      view.getByTestId('flow-region').append(target)
+      const target = view.getByTestId(region)
       const contextMenu = new MouseEvent('contextmenu', { bubbles: true, button: 2 })
       target.dispatchEvent(contextMenu)
       expect(mocks.groupContextMenu).toHaveBeenCalledExactlyOnceWith(contextMenu)
@@ -716,9 +720,7 @@ describe('CanvasScreen', () => {
         view.harness.runtime.viewModel.imageWorkflow.tools.locks.isCanvasLocked.value = true
       else view.harness.runtime.viewModel.boardChrome.isBoardArchived.value = true
       await nextTick()
-      const target = document.createElement('div')
-      target.className = 'vue-flow__node'
-      view.getByTestId('flow-region').append(target)
+      const target = view.getByTestId('node-region')
       const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 1 })
       const onMouseDown = vi.fn()
       target.addEventListener('mousedown', onMouseDown)
@@ -727,6 +729,18 @@ describe('CanvasScreen', () => {
       expect(onMouseDown).not.toHaveBeenCalled()
     },
   )
+
+  it('updates the shared node UI scale without changing image quality during zoom', async () => {
+    const view = renderScreen()
+    const surface = view.container.querySelector<HTMLElement>('.canvas-flow-wrap')!
+    expect(surface.style.getPropertyValue('--canvas-node-ui-scale')).toBe('1')
+
+    view.harness.runtime.viewModel.viewportControls.zoomLevel.value = 50
+    await nextTick()
+
+    expect(surface.style.getPropertyValue('--canvas-node-ui-scale')).toBe('2')
+    expect(view.harness.runtime.viewModel.viewportControls.qualityZoomLevel.value).toBe(100)
+  })
 
   it('highlights outgoing edges as their source selection changes without selecting the edges', () => {
     renderScreen()

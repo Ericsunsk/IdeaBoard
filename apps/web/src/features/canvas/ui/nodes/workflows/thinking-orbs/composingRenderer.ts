@@ -13,7 +13,7 @@ type Dot = {
   alpha: number
 }
 
-type Projector = (x: number, y: number, z: number) => [number, number, number]
+type Projector = (dot: Dot, x: number, y: number, z: number) => void
 
 const composingOptions = {
   bandMultiplier: 3.9,
@@ -38,18 +38,43 @@ function fibonacciDirection(index: number, count: number): [number, number, numb
   return [radialDistance * Math.cos(angle), y, radialDistance * Math.sin(angle)]
 }
 
+const ghostDirections = Array.from({ length: composingOptions.ghostCount }, (_, index) =>
+  fibonacciDirection(index, composingOptions.ghostCount),
+)
+const segmentDirections = Array.from({ length: composingOptions.segments }, (_, index) => {
+  const angle = (index / composingOptions.segments) * 2 * Math.PI
+  return { angle, x: Math.cos(angle), y: Math.sin(angle) }
+})
+const laneCount = Math.max(1, Math.round(composingOptions.lanes * composingOptions.bandMultiplier))
+const dotBuffers = new WeakMap<CanvasRenderingContext2D, { dots: Dot[]; paintOrder: Dot[] }>()
+
+function getDotBuffer(context: CanvasRenderingContext2D) {
+  let buffer = dotBuffers.get(context)
+  if (!buffer) {
+    const dots = Array.from(
+      { length: composingOptions.ghostCount + laneCount * composingOptions.segments },
+      () => ({ x: 0, y: 0, z: 0, r: 0, white: 0, alpha: 0 }),
+    )
+    buffer = { dots, paintOrder: [...dots] }
+    dotBuffers.set(context, buffer)
+  }
+  return buffer
+}
+
 function createProjector(yaw: number, tilt: number, centerX: number, centerY: number): Projector {
   const sinTilt = Math.sin(tilt)
   const cosTilt = Math.cos(tilt)
   const sinYaw = Math.sin(yaw)
   const cosYaw = Math.cos(yaw)
 
-  return (x, y, z) => {
+  return (dot, x, y, z) => {
     const rotatedX = x * cosYaw + z * sinYaw
     const rotatedZ = -x * sinYaw + z * cosYaw
     const rotatedY = y * cosTilt - rotatedZ * sinTilt
     const depth = y * sinTilt + rotatedZ * cosTilt
-    return [centerX + rotatedX, centerY - rotatedY, depth]
+    dot.x = centerX + rotatedX
+    dot.y = centerY - rotatedY
+    dot.z = depth
   }
 }
 
@@ -87,24 +112,16 @@ export function drawComposingOrb(
     centerY,
   )
   const radiusScale = resolveRadiusScale(size)
-  const dots: Dot[] = []
+  const { dots, paintOrder } = getDotBuffer(context)
 
   for (let index = 0; index < composingOptions.ghostCount; index += 1) {
-    const direction = fibonacciDirection(index, composingOptions.ghostCount)
-    const [x, y, z] = projector(
-      direction[0] * orbRadius,
-      direction[1] * orbRadius,
-      direction[2] * orbRadius,
-    )
-    const depth = (z / orbRadius + 1) / 2
-    dots.push({
-      x,
-      y,
-      z,
-      r: 0.8 * radiusScale,
-      white: 0.78,
-      alpha: 0.1 + 0.22 * depth,
-    })
+    const dot = dots[index]!
+    const direction = ghostDirections[index]!
+    projector(dot, direction[0] * orbRadius, direction[1] * orbRadius, direction[2] * orbRadius)
+    const depth = (dot.z / orbRadius + 1) / 2
+    dot.r = 0.8 * radiusScale
+    dot.white = 0.78
+    dot.alpha = 0.1 + 0.22 * depth
   }
 
   const rotation = timeSeconds * 0.24 * composingOptions.spin
@@ -117,46 +134,34 @@ export function drawComposingOrb(
   const normalX = -axisZ * crossY
   const normalY = axisZ * crossX - axisX * crossZ
   const normalZ = axisX * crossY
-  const laneCount = Math.max(
-    1,
-    Math.round(composingOptions.lanes * composingOptions.bandMultiplier),
-  )
 
   for (let lane = 0; lane < laneCount; lane += 1) {
     const laneOffset = (lane - (laneCount - 1) / 2) * 0.075
     const edgeDistance = Math.abs(lane - (laneCount - 1) / 2) / Math.max(1, (laneCount - 1) / 2)
 
     for (let segment = 0; segment < composingOptions.segments; segment += 1) {
-      const angle = (segment / composingOptions.segments) * 2 * Math.PI
+      const dot = dots[composingOptions.ghostCount + lane * composingOptions.segments + segment]!
+      const { angle, x: segmentX, y: segmentY } = segmentDirections[segment]!
       const wobble =
         (0.16 * Math.sin(angle * 3 - timeSeconds * 1.7 + lane * 0.22) +
           0.07 * Math.sin(angle * 5 + timeSeconds * 1.1)) *
         composingOptions.wobbleMultiplier
       const offset = laneOffset + wobble
-      const x = axisX * Math.cos(angle) + crossX * Math.sin(angle) + normalX * offset
-      const y = crossY * Math.sin(angle) + normalY * offset
-      const z = axisZ * Math.cos(angle) + crossZ * Math.sin(angle) + normalZ * offset
+      const x = axisX * segmentX + crossX * segmentY + normalX * offset
+      const y = crossY * segmentY + normalY * offset
+      const z = axisZ * segmentX + crossZ * segmentY + normalZ * offset
       const length = Math.sqrt(x * x + y * y + z * z)
-      const [projectedX, projectedY, projectedDepth] = projector(
-        (x / length) * orbRadius,
-        (y / length) * orbRadius,
-        (z / length) * orbRadius,
-      )
-      const depth = (projectedDepth / orbRadius + 1) / 2
-
-      dots.push({
-        x: projectedX,
-        y: projectedY,
-        z: projectedDepth,
-        r:
-          (composingOptions.radiusBase + composingOptions.radiusDepth * depth) *
-          (1 - 0.25 * edgeDistance) *
-          radiusScale,
-        white: 0.52 - 0.44 * depth + 0.18 * edgeDistance,
-        alpha: 0.4 + 0.6 * depth,
-      })
+      projector(dot, (x / length) * orbRadius, (y / length) * orbRadius, (z / length) * orbRadius)
+      const depth = (dot.z / orbRadius + 1) / 2
+      dot.r =
+        (composingOptions.radiusBase + composingOptions.radiusDepth * depth) *
+        (1 - 0.25 * edgeDistance) *
+        radiusScale
+      dot.white = 0.52 - 0.44 * depth + 0.18 * edgeDistance
+      dot.alpha = 0.4 + 0.6 * depth
     }
   }
 
-  paintDots(context, dots)
+  for (let index = 0; index < dots.length; index += 1) paintOrder[index] = dots[index]!
+  paintDots(context, paintOrder)
 }

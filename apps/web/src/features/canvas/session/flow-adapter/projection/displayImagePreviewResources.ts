@@ -1,3 +1,9 @@
+import {
+  beginCanvasInteractionTiming,
+  isCanvasInteractionBenchmarkActive,
+  recordCanvasInteractionCount,
+  recordCanvasInteractionGauge,
+} from '../../browser/canvasInteractionMetrics'
 import { canvasToBlob, fetchImageBlobFromUrl, resolveFetchUrl } from '../../media/canvasMediaIo.ts'
 import {
   detectCanvasTransparency,
@@ -12,6 +18,8 @@ interface PreviewResource {
   users: number
   controller: AbortController
   result: Promise<string | null>
+  pixels: number
+  encodedBytes: number
 }
 
 const PREVIEW_CACHE_LIMIT = 80
@@ -22,6 +30,25 @@ const resourcesByUrl = new Map<string, PreviewResource>()
 const pendingPreviewTasks: Array<() => void> = []
 let activePreviewTasks = 0
 
+function recordPreviewResources() {
+  if (!isCanvasInteractionBenchmarkActive()) return
+  let pinned = 0
+  let pixels = 0
+  let encodedBytes = 0
+  for (const resource of previewCache.values()) {
+    if (resource.users > 0) pinned += 1
+    pixels += resource.pixels
+    encodedBytes += resource.encodedBytes
+  }
+  recordCanvasInteractionGauge('displayPreviewRetainedResources', previewCache.size)
+  recordCanvasInteractionGauge('displayPreviewPinnedResources', pinned)
+  recordCanvasInteractionGauge('displayPreviewReusableResources', previewCache.size - pinned)
+  recordCanvasInteractionGauge('displayPreviewEstimatedPixels', pixels)
+  recordCanvasInteractionGauge('displayPreviewEncodedBytes', encodedBytes)
+  recordCanvasInteractionGauge('displayPreviewActiveTasks', activePreviewTasks)
+  recordCanvasInteractionGauge('displayPreviewQueuedTasks', pendingPreviewTasks.length)
+}
+
 function trimPreviewCache() {
   for (const [key, resource] of previewCache) {
     if (previewCache.size <= PREVIEW_CACHE_LIMIT) break
@@ -30,6 +57,7 @@ function trimPreviewCache() {
     resources.delete(key)
     resourcesByUrl.delete(resource.url)
     URL.revokeObjectURL(resource.url)
+    recordCanvasInteractionCount('displayPreviewCacheEviction')
   }
 }
 
@@ -40,6 +68,7 @@ function releaseResource(resource: PreviewResource) {
     if (resources.get(resource.key) === resource) resources.delete(resource.key)
   }
   trimPreviewCache()
+  recordPreviewResources()
 }
 
 function acquireResource(sourceUrl: string, maxSide: number): PreviewResource {
@@ -47,33 +76,44 @@ function acquireResource(sourceUrl: string, maxSide: number): PreviewResource {
   const existing = resources.get(key)
   if (existing) {
     existing.users += 1
+    recordCanvasInteractionCount(
+      existing.url ? 'displayPreviewCacheHit' : 'displayPreviewGenerationJoin',
+    )
     if (existing.url) {
       previewCache.delete(key)
       previewCache.set(key, existing)
     }
+    recordPreviewResources()
     return existing
   }
 
+  recordCanvasInteractionCount('displayPreviewCacheMiss')
   const controller = new AbortController()
   const resource: PreviewResource = {
     key,
     url: null,
     users: 1,
+    pixels: 0,
+    encodedBytes: 0,
     controller,
     result: enqueuePreviewTask(
       () => createPreviewObjectUrl(sourceUrl, maxSide, controller.signal),
       controller.signal,
     )
-      .then((url) => {
-        if (!url) return null
+      .then((preview) => {
+        if (!preview) return null
+        const { url, pixels, encodedBytes } = preview
         if (controller.signal.aborted) {
           URL.revokeObjectURL(url)
           return null
         }
         resource.url = url
+        resource.pixels = pixels
+        resource.encodedBytes = encodedBytes
         previewCache.set(key, resource)
         resourcesByUrl.set(url, resource)
         trimPreviewCache()
+        recordPreviewResources()
         return url
       })
       .catch(() => null)
@@ -106,6 +146,7 @@ export function createDisplayPreviewResources() {
     }
     for (const resource of displayed) releaseResource(resource)
     displayed = next
+    recordPreviewResources()
   }
 
   function dispose() {
@@ -143,11 +184,15 @@ function enqueuePreviewTask<T>(taskFactory: () => Promise<T>, signal: AbortSigna
         return
       }
       activePreviewTasks += 1
+      recordPreviewResources()
+      const finishTiming = beginCanvasInteractionTiming('displayPreviewGeneration')
       void taskFactory()
         .then(wrappedResolve)
         .catch(wrappedReject)
         .finally(() => {
           activePreviewTasks = Math.max(0, activePreviewTasks - 1)
+          finishTiming?.()
+          recordPreviewResources()
           runNextPreviewTask()
         })
     }
@@ -155,11 +200,13 @@ function enqueuePreviewTask<T>(taskFactory: () => Promise<T>, signal: AbortSigna
       const pendingIndex = pendingPreviewTasks.indexOf(run)
       if (pendingIndex >= 0) {
         pendingPreviewTasks.splice(pendingIndex, 1)
+        recordPreviewResources()
         wrappedReject(new DOMException('Aborted', 'AbortError'))
       }
     }
     signal.addEventListener('abort', handleAbort, { once: true })
     pendingPreviewTasks.push(run)
+    recordPreviewResources()
     runNextPreviewTask()
   })
 }
@@ -193,11 +240,18 @@ function resolvePreviewRenderSize(
   }
 }
 
+interface EncodedPreview {
+  url: string
+  pixels: number
+  encodedBytes: number
+}
+
 async function renderPreviewObjectUrl(
   sourceBlob: Blob,
   maxSide: number,
   signal: AbortSignal,
-): Promise<string | null> {
+): Promise<EncodedPreview | null> {
+  let canvas: HTMLCanvasElement | null = null
   let bitmap: ImageBitmap | null = null
   try {
     try {
@@ -208,7 +262,7 @@ async function renderPreviewObjectUrl(
     if (signal.aborted) return null
     const size = resolvePreviewRenderSize(bitmap, maxSide)
     if (!size) return null
-    const canvas = document.createElement('canvas')
+    canvas = document.createElement('canvas')
     canvas.width = size.width
     canvas.height = size.height
     const ctx = canvas.getContext('2d', { willReadFrequently: true })
@@ -225,9 +279,17 @@ async function renderPreviewObjectUrl(
       previewMime === WEBP_PREVIEW_MIME_TYPE ? WEBP_PREVIEW_QUALITY : undefined,
     )
     if (signal.aborted) return null
-    return URL.createObjectURL(previewBlob)
+    return {
+      url: URL.createObjectURL(previewBlob),
+      pixels: size.width * size.height,
+      encodedBytes: previewBlob.size,
+    }
   } finally {
     bitmap?.close()
+    if (canvas) {
+      canvas.width = 0
+      canvas.height = 0
+    }
   }
 }
 
@@ -235,7 +297,7 @@ async function createPreviewObjectUrl(
   sourceUrl: string,
   maxSide: number,
   signal: AbortSignal,
-): Promise<string | null> {
+): Promise<EncodedPreview | null> {
   if (signal.aborted) return null
   const sourceBlob = await fetchPreviewSourceBlob(sourceUrl, signal)
   if (!sourceBlob || signal.aborted) return null

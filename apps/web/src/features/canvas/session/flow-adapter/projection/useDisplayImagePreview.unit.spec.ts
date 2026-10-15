@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, test, vi } from 'vitest'
+import { createDeferred } from '../../../../../test/deferred'
 import { effectScope, nextTick, ref } from 'vue'
 
 const canvasMediaIOMocks = vi.hoisted(() => ({
@@ -106,6 +107,7 @@ async function waitForPreviewWork() {
 
 describe('useDisplayImagePreview', () => {
   beforeEach(() => {
+    delete window.__canvasInteractionBenchmarkCounters
     setMediaWorkspaceIdResolver(() => 'ws_test123')
     vi.resetModules()
     vi.stubGlobal('Image', class {})
@@ -150,6 +152,7 @@ describe('useDisplayImagePreview', () => {
   })
 
   afterEach(() => {
+    delete window.__canvasInteractionBenchmarkCounters
     resetMediaWorkspaceIdResolver()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
@@ -492,6 +495,138 @@ describe('useDisplayImagePreview', () => {
     scope.stop()
   })
 
+  it('clears obsolete decode sources immediately and preserves the last-good frame', async () => {
+    window.__canvasInteractionBenchmarkCounters = {}
+    const images: Array<{ src: string; finish: () => void }> = []
+    class DeferredImage {
+      src = ''
+      finish: () => void = () => undefined
+
+      decode() {
+        images.push(this)
+        return new Promise<void>((resolve) => {
+          this.finish = resolve
+        })
+      }
+    }
+    vi.stubGlobal('Image', DeferredImage)
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const source = ref('/uploads/first.png')
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview(source, { maxSide: null, shouldKeepPreviousOnSourceChange: true }),
+    )
+    images[0]?.finish()
+    await flushPreviewTasks()
+    expect(preview?.displayUrl.value).toBe('/uploads/first.png')
+
+    source.value = '/uploads/second.png'
+    await nextTick()
+    expect(images[1]?.src).toBe('/uploads/second.png')
+    source.value = '/uploads/third.png'
+    await nextTick()
+    expect(images[1]?.src).toBe('')
+    expect(preview?.displayUrl.value).toBe('/uploads/first.png')
+    images[1]?.finish()
+    await flushPreviewTasks()
+    expect(preview?.displayUrl.value).toBe('/uploads/first.png')
+    scope.stop()
+    expect(images[2]?.src).toBe('')
+    expect(window.__canvasInteractionBenchmarkCounters.displayImageFallbackDecodeReady).toBe(1)
+    expect(window.__canvasInteractionBenchmarkCounters.displayImageFallbackDecodeCancelled).toBe(2)
+    images[2]?.finish()
+    await flushPreviewTasks()
+    expect(preview?.displayUrl.value).toBe('/uploads/first.png')
+  })
+
+  test.each(
+    ['replace', 'delete-reinstall', 'enable-later'].flatMap((reset) =>
+      ['ready', 'failed', 'cancelled'].map((outcome) => ({ reset, outcome })),
+    ),
+  )('isolates deferred decode $outcome metrics after $reset', async ({ reset, outcome }) => {
+    if (reset !== 'enable-later') window.__canvasInteractionBenchmarkCounters = {}
+    const decode = createDeferred<void>()
+    const decodeStarted = vi.fn()
+    class DeferredImage {
+      src = ''
+      decode() {
+        decodeStarted()
+        return decode.promise
+      }
+    }
+    vi.stubGlobal('Image', DeferredImage)
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview('/uploads/deferred.png', { maxSide: null }),
+    )
+    expect(decodeStarted).toHaveBeenCalledTimes(1)
+    if (reset === 'delete-reinstall') delete window.__canvasInteractionBenchmarkCounters
+    const replacement = (window.__canvasInteractionBenchmarkCounters = {})
+
+    if (outcome === 'cancelled') scope.stop()
+    if (outcome === 'failed') decode.reject(new Error('decode failed'))
+    else decode.resolve()
+    await flushPreviewTasks()
+
+    expect(replacement).not.toHaveProperty('runtimeTimingMs')
+    for (const suffix of ['Ready', 'Failed', 'Cancelled']) {
+      expect(replacement).not.toHaveProperty(`displayImageFallbackDecode${suffix}`)
+    }
+    expect(preview?.displayUrl.value).toBe(outcome === 'ready' ? '/uploads/deferred.png' : '')
+    scope.stop()
+  })
+
+  test('isolates managed delivery decode completion after collection replacement', async () => {
+    window.__canvasInteractionBenchmarkCounters = {}
+    const decode = createDeferred<void>()
+    const decodeStarted = vi.fn()
+    class DeferredImage {
+      src = ''
+      decode() {
+        decodeStarted()
+        return decode.promise
+      }
+    }
+    vi.stubGlobal('Image', DeferredImage)
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview('/uploads/managed.png', { maxSide: 640, assetId: 'asset-42' }),
+    )
+    await vi.waitFor(() => expect(decodeStarted).toHaveBeenCalledTimes(1))
+    const replacement = (window.__canvasInteractionBenchmarkCounters = {})
+    decode.resolve()
+    await vi.waitFor(() => expect(preview?.displayUrl.value).toContain('/derivatives/preview'))
+    expect(replacement).not.toHaveProperty('runtimeTimingMs')
+    expect(replacement).not.toHaveProperty('displayImageManagedDecodeReady')
+    scope.stop()
+  })
+
+  test.each(['replace', 'delete-reinstall', 'enable-later'])(
+    'isolates deferred preview generation timing after %s',
+    async (reset) => {
+      if (reset !== 'enable-later') window.__canvasInteractionBenchmarkCounters = {}
+      const encoding = createDeferred<Blob>()
+      canvasMediaIOMocks.canvasToBlob.mockReturnValueOnce(encoding.promise)
+      const { useDisplayImagePreview } = await importPreviewModule()
+      const scope = effectScope()
+      const preview = scope.run(() =>
+        useDisplayImagePreview('/uploads/deferred-encode.png', { maxSide: 640 }),
+      )
+      await vi.waitFor(() => expect(canvasMediaIOMocks.canvasToBlob).toHaveBeenCalledTimes(1))
+      if (reset === 'delete-reinstall') delete window.__canvasInteractionBenchmarkCounters
+      window.__canvasInteractionBenchmarkCounters = {}
+      encoding.resolve(new Blob(['preview'], { type: 'image/webp' }))
+      await vi.waitFor(() => expect(preview?.displayUrl.value).toBe('blob:7'))
+      expect(window.__canvasInteractionBenchmarkCounters.runtimeTimingMs).toBeUndefined()
+      expect(
+        window.__canvasInteractionBenchmarkCounters.gauges?.displayPreviewRetainedResources,
+      ).toBe(1)
+      scope.stop()
+    },
+  )
+
   it('falls back to the original managed upload when browser preview fails', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response)
     const sourceUrl = ref('/uploads/tasks/U123/board/content/fallback.png')
@@ -543,7 +678,49 @@ describe('useDisplayImagePreview', () => {
     scope.stop()
   })
 
+  it('reports shared preview work and retained pixel estimates only when opted in', async () => {
+    window.__canvasInteractionBenchmarkCounters = {}
+    const counters = window.__canvasInteractionBenchmarkCounters
+    const { createDisplayPreviewResources } = await import('./displayImagePreviewResources')
+    const first = createDisplayPreviewResources()
+    const second = createDisplayPreviewResources()
+    const firstLoad = first.load('https://example.com/measured.jpg', 640)
+    const secondLoad = second.load('https://example.com/measured.jpg', 640)
+    const url = await firstLoad
+    expect(await secondLoad).toBe(url)
+    await flushPreviewTasks()
+    expect(counters.displayPreviewCacheMiss).toBe(1)
+    expect(counters.displayPreviewGenerationJoin).toBe(1)
+    expect(counters.gauges).toMatchObject({
+      displayPreviewRetainedResources: 1,
+      displayPreviewPinnedResources: 1,
+      displayPreviewReusableResources: 0,
+      displayPreviewEstimatedPixels: 640 * 320,
+      displayPreviewEncodedBytes: 7,
+      displayPreviewActiveTasks: 0,
+      displayPreviewQueuedTasks: 0,
+    })
+    expect(canvasMediaIOMocks.canvasToBlob.mock.calls[0]?.[0]).toMatchObject({
+      width: 0,
+      height: 0,
+    })
+    first.display(url ?? '')
+    await first.load('', null)
+    second.dispose()
+    expect(counters.gauges?.displayPreviewPinnedResources).toBe(1)
+    first.dispose()
+    expect(counters.gauges).toMatchObject({
+      displayPreviewPinnedResources: 0,
+      displayPreviewReusableResources: 1,
+    })
+    const cached = createDisplayPreviewResources()
+    expect(await cached.load('https://example.com/measured.jpg', 640)).toBe(url)
+    expect(counters.displayPreviewCacheHit).toBe(1)
+    cached.dispose()
+  })
+
   it('keeps live resources usable when cache capacity is exceeded', async () => {
+    window.__canvasInteractionBenchmarkCounters = {}
     let blobCounter = 0
     vi.mocked(URL.createObjectURL).mockImplementation(() => `blob:owned-${(blobCounter += 1)}`)
     const { createDisplayPreviewResources } = await import('./displayImagePreviewResources')
@@ -557,6 +734,12 @@ describe('useDisplayImagePreview', () => {
     }
     expect(URL.revokeObjectURL).not.toHaveBeenCalled()
     for (const consumer of consumers) consumer.dispose()
+    expect(window.__canvasInteractionBenchmarkCounters.displayPreviewCacheEviction).toBe(5)
+    expect(window.__canvasInteractionBenchmarkCounters.gauges).toMatchObject({
+      displayPreviewRetainedResources: 80,
+      displayPreviewPinnedResources: 0,
+      displayPreviewReusableResources: 80,
+    })
     expect(URL.revokeObjectURL).toHaveBeenCalled()
   })
 

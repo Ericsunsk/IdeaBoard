@@ -5,14 +5,14 @@ import {
   fetchBoardArchivedAt,
   syncRestoreBoardToServer,
   type BoardRepository,
-} from '../../../board/ports/canvas'
+} from '../../../board/ports/canvasSession'
 import { createBoardRepository, replaceBoards } from '../../../board'
 import { clearStoredAuth, setStoredAuth } from '../../../../core/utils/auth'
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { useBoardHeaderActions } from './useBoardHeaderActions'
 
-vi.mock('../../../board/ports/canvas', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../board/ports/canvas')>()
+vi.mock('../../../board/ports/canvasSession', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../board/ports/canvasSession')>()
   return {
     ...actual,
     fetchBoardArchivedAt: vi.fn(async () => null),

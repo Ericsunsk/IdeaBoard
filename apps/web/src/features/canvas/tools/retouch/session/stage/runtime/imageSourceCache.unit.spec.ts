@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, test, vi } from 'vitest'
+import { createDeferred } from '../../../../../../../test/deferred'
 import { ImageSourceCache } from './imageSourceCache'
 
 const fetchMock = vi.fn()
 const createImageBitmapMock = vi.fn()
 
 afterEach(() => {
+  delete window.__canvasInteractionBenchmarkCounters
   vi.restoreAllMocks()
   fetchMock.mockReset()
   createImageBitmapMock.mockReset()
@@ -57,6 +59,7 @@ function installImageMocks(width = 4, height = 2) {
 
 describe('ImageSourceCache', () => {
   it('reuses cached full-size sources without fetching or decoding twice', async () => {
+    window.__canvasInteractionBenchmarkCounters = {}
     const { contexts } = installCanvasMocks()
     installImageMocks()
     const cache = new ImageSourceCache({ maxEntries: 2 })
@@ -65,6 +68,11 @@ describe('ImageSourceCache', () => {
     const second = await cache.getFullSizeSource('https://example.com/source.png')
 
     expect(second).toBe(first)
+    expect(window.__canvasInteractionBenchmarkCounters.retouchSourceCacheMiss).toBe(1)
+    expect(window.__canvasInteractionBenchmarkCounters.retouchSourceCacheHit).toBe(1)
+    expect(
+      window.__canvasInteractionBenchmarkCounters.runtimeTimingMs?.retouchSourceLoad?.count,
+    ).toBe(1)
     expect(first?.width).toBe(4)
     expect(first?.height).toBe(2)
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -77,6 +85,33 @@ describe('ImageSourceCache', () => {
       2,
     )
   })
+
+  test.each(['replace', 'delete-reinstall', 'enable-later'])(
+    'isolates deferred source-load timing after %s',
+    async (reset) => {
+      if (reset !== 'enable-later') window.__canvasInteractionBenchmarkCounters = {}
+      installCanvasMocks()
+      installImageMocks()
+      const decoding = createDeferred<{ width: number; height: number; close: () => void }>()
+      createImageBitmapMock.mockReturnValueOnce(decoding.promise)
+      const cache = new ImageSourceCache({ maxEntries: 2 })
+      const loading = cache.getFullSizeSource('https://example.com/deferred.png')
+      await waitForImageBitmapRequest()
+      if (reset === 'delete-reinstall') delete window.__canvasInteractionBenchmarkCounters
+      const replacement = (window.__canvasInteractionBenchmarkCounters = {})
+      const bitmap = { width: 4, height: 2, close: vi.fn() }
+      decoding.resolve(bitmap)
+      expect(await loading).toMatchObject({ width: 4, height: 2 })
+      expect(bitmap.close).toHaveBeenCalledTimes(1)
+      expect(replacement).toEqual({})
+
+      await cache.getFullSizeSource('https://example.com/new-collection.png')
+      expect(
+        window.__canvasInteractionBenchmarkCounters.runtimeTimingMs?.retouchSourceLoad?.count,
+      ).toBe(1)
+      cache.dispose()
+    },
+  )
 
   it('resizes maxSide sources and caches them separately from full-size sources', async () => {
     const { contexts } = installCanvasMocks()
@@ -207,6 +242,47 @@ describe('ImageSourceCache', () => {
     expect(disposed?.canvas.height).toBe(0)
   })
 
+  it('aborts pending fetches when disposed without starting bitmap decode', async () => {
+    installCanvasMocks()
+    installImageMocks()
+    fetchMock.mockImplementationOnce(
+      (_url: string, { signal }: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+        }),
+    )
+    const cache = new ImageSourceCache()
+    const source = cache.getFullSizeSource('https://example.com/pending.png')
+    const signal = fetchMock.mock.calls[0]?.[1]?.signal as AbortSignal
+    expect(signal.aborted).toBe(false)
+    cache.dispose()
+    expect(signal.aborted).toBe(true)
+    await expect(source).rejects.toMatchObject({ code: 'disposed' })
+    expect(createImageBitmapMock).not.toHaveBeenCalled()
+  })
+
+  it('skips decoding bytes that finish reading after disposal', async () => {
+    installCanvasMocks()
+    installImageMocks()
+    let finishBlob!: (blob: Blob) => void
+    const blob = vi.fn(
+      () =>
+        new Promise<Blob>((resolve) => {
+          finishBlob = resolve
+        }),
+    )
+    const response = new Response()
+    vi.spyOn(response, 'blob').mockImplementation(blob)
+    fetchMock.mockResolvedValueOnce(response)
+    const cache = new ImageSourceCache()
+    const source = cache.getFullSizeSource('https://example.com/pending-body.png')
+    await vi.waitFor(() => expect(blob).toHaveBeenCalledTimes(1))
+    cache.dispose()
+    finishBlob(new Blob(['source'], { type: 'image/png' }))
+    await expect(source).rejects.toMatchObject({ code: 'disposed' })
+    expect(createImageBitmapMock).not.toHaveBeenCalled()
+  })
+
   it('releases a full-size canvas if the cache is disposed while decode is in flight', async () => {
     const { canvases } = installCanvasMocks()
     fetchMock.mockResolvedValue({
@@ -239,8 +315,7 @@ describe('ImageSourceCache', () => {
       message: 'disposed',
     })
     expect(bitmap.close).toHaveBeenCalledTimes(1)
-    expect(canvases.at(-1)?.width).toBe(0)
-    expect(canvases.at(-1)?.height).toBe(0)
+    expect(canvases).toHaveLength(0)
     await expect(cache.getFullSizeSource('https://example.com/next.png')).rejects.toMatchObject({
       code: 'disposed',
     })

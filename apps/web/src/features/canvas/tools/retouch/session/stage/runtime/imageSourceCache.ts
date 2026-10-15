@@ -1,3 +1,7 @@
+import {
+  beginCanvasInteractionTiming,
+  recordCanvasInteractionCount,
+} from '../../../../../session/browser/canvasInteractionMetrics'
 import { resolveFetchUrl } from '../../../../../session/media/canvasMediaIo.ts'
 import { isAnimatedImageBlob } from '../../../core/media.ts'
 
@@ -71,7 +75,7 @@ export class ImageSourceCache {
   private readonly maxEntries: number
   private readonly entries = new Map<string, ImageSourceCacheEntry>()
   private readonly inFlight = new Map<string, Promise<ImageSourceCacheEntry | null>>()
-  private isDisposed = false
+  private readonly controller = new AbortController()
 
   constructor(options: ImageSourceCacheOptions = {}) {
     this.maxEntries = Math.max(
@@ -110,7 +114,7 @@ export class ImageSourceCache {
   }
 
   dispose() {
-    this.isDisposed = true
+    this.controller.abort()
     for (const entry of this.entries.values()) {
       releaseImageSourceCanvas(entry)
     }
@@ -122,25 +126,31 @@ export class ImageSourceCache {
     sourceUrl: string,
     options: LoadImageSourceOptions,
   ): Promise<ImageSourceCacheEntry | null> {
-    if (this.isDisposed) throw createCacheError('disposed')
+    if (this.controller.signal.aborted) throw createCacheError('disposed')
 
     const cacheKey = createImageSourceCacheKey(sourceUrl, options)
     const cached = this.entries.get(cacheKey)
     if (cached) {
+      recordCanvasInteractionCount('retouchSourceCacheHit')
       this.entries.delete(cacheKey)
       this.entries.set(cacheKey, cached)
       return cached
     }
 
     const inFlight = this.inFlight.get(cacheKey)
-    if (inFlight) return inFlight
+    if (inFlight) {
+      recordCanvasInteractionCount('retouchSourceCacheJoin')
+      return inFlight
+    }
 
-    const task = loadImageSourceCanvas(sourceUrl, { ...options, cacheKey })
+    recordCanvasInteractionCount('retouchSourceCacheMiss')
+    const finishTiming = beginCanvasInteractionTiming('retouchSourceLoad')
+    const task = loadImageSourceCanvas(sourceUrl, { ...options, cacheKey }, this.controller.signal)
       .then((entry) => {
         if (!entry) return null
-        if (this.isDisposed || this.maxEntries === 0) {
+        if (this.controller.signal.aborted || this.maxEntries === 0) {
           releaseImageSourceCanvas(entry)
-          if (this.isDisposed) throw createCacheError('disposed')
+          if (this.controller.signal.aborted) throw createCacheError('disposed')
           return null
         }
         this.entries.set(cacheKey, entry)
@@ -149,6 +159,7 @@ export class ImageSourceCache {
       })
       .finally(() => {
         this.inFlight.delete(cacheKey)
+        finishTiming?.()
       })
 
     this.inFlight.set(cacheKey, task)
@@ -161,6 +172,7 @@ export class ImageSourceCache {
       if (!oldestKey) break
       const oldest = this.entries.get(oldestKey)
       this.entries.delete(oldestKey)
+      recordCanvasInteractionCount('retouchSourceCacheEviction')
       releaseImageSourceCanvas(oldest ?? null)
     }
   }
@@ -181,20 +193,25 @@ export function releaseImageSourceCanvas(source: ImageSourceCacheEntry | null | 
 async function loadImageSourceCanvas(
   sourceUrl: string,
   options: LoadImageSourceOptions & { readonly cacheKey: string },
+  signal: AbortSignal,
 ): Promise<ImageSourceCacheEntry | null> {
   try {
     const fetchUrl = resolveFetchUrl(sourceUrl, options.resolveOptions)
     if (!fetchUrl) throw createCacheError('invalid-url')
 
-    const response = await fetch(fetchUrl, { credentials: 'include' })
+    const response = await fetch(fetchUrl, { credentials: 'include', signal })
+    signal.throwIfAborted()
     if (!response.ok || response.status === 202) throw createCacheError('fetch-failed')
 
     const blob = await response.blob()
+    signal.throwIfAborted()
     if (!blob.type.startsWith('image/')) throw createCacheError('not-image')
     if (await isAnimatedImageBlob(blob)) throw createCacheError('animated-image')
+    signal.throwIfAborted()
 
     const bitmap = await createImageBitmap(blob)
     try {
+      signal.throwIfAborted()
       const { width, height } = resolveTargetSize(bitmap, options)
       const canvas = document.createElement('canvas')
       try {
@@ -221,6 +238,7 @@ async function loadImageSourceCanvas(
       bitmap.close()
     }
   } catch (error) {
+    if (signal.aborted) throw createCacheError('disposed')
     const normalizedError =
       error instanceof ImageSourceCacheError ? error : createCacheError('decode-failed')
     throw normalizedError

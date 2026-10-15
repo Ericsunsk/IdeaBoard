@@ -11,11 +11,11 @@ export const authDialogContentClass =
   'w-[min(390px,calc(100vw-32px))] overflow-visible border-0 bg-transparent p-0 shadow-none'
 
 const authModalShellBaseClass =
-  'relative overflow-hidden rounded-overlay border border-[var(--color-auth-shell-border)] bg-[var(--color-auth-shell)] backdrop-blur-xl px-5 text-[var(--color-auth-text)] shadow-auth-shell sm:px-7'
+  'relative overflow-hidden rounded-overlay border border-[var(--color-auth-shell-border)] px-5 text-[var(--color-auth-text)] shadow-auth-shell sm:px-7'
 
-export const authModalShellClass = `${authModalShellBaseClass} py-6 sm:py-7`
+export const authModalShellClass = `${authModalShellBaseClass} bg-popover py-6 sm:py-7`
 
-export const authCompactModalShellClass = `${authModalShellBaseClass} py-5 sm:py-6`
+export const authCompactModalShellClass = `${authModalShellBaseClass} bg-[var(--color-auth-shell)] backdrop-blur-xl py-5 sm:py-6`
 
 export const authModalBackdropClass =
   'pointer-events-none absolute inset-0 bg-gradient-to-tr from-[var(--color-auth-backdrop-from)] via-[var(--color-auth-backdrop-via)] to-[var(--color-auth-backdrop-to)]'

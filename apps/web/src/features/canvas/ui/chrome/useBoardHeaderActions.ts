@@ -6,8 +6,9 @@ import {
   markBoardArchivedLocally,
   normalizeBoardName,
   syncRestoreBoardToServer,
-} from '../../../board/ports/canvas'
-import { useBoardRepository, type BoardRepository } from '../../../board/ports/canvas'
+  useBoardRepository,
+  type BoardRepository,
+} from '../../../board/ports/canvasSession'
 import { USER_CANVAS_PATH } from '../../../workspace/routePaths'
 import { i18n } from '../../../../core/i18n'
 

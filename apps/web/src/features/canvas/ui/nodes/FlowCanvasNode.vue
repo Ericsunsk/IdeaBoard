@@ -4,7 +4,6 @@
     class="flow-canvas-node"
     :data-flow-node-id="props.nodeId"
     :class="[`is-${data.kind}`, { 'is-selected': selected, 'is-running': isNodeRunning }]"
-    :style="nodeStyle"
   >
     <div
       v-if="shouldShowDefaultDragZone"
@@ -139,7 +138,6 @@ import type { CanvasNodePresentationIntent } from './canvasNodePresentation'
 import type { FusionNodePresentationBinding } from './fusionNodePresentation'
 import type { ImageNodePresentationBinding } from './imageNodePresentation'
 import { useFlowCanvasNodeIntents } from './useFlowCanvasNodeIntents'
-import { resolveCanvasNodeUiScale, useCanvasViewportContext } from '../../session/flow-adapter'
 import { useCanvasNodeUiStateContext } from '../../session/flow-adapter'
 import FlowCanvasNodeHandleRail from './FlowCanvasNodeHandleRail.vue'
 import { FusionNode, ImageNode, PromptNode } from './workflows'
@@ -188,10 +186,6 @@ const { t } = useI18n()
 const shouldShowDefaultDragZone = false
 const flowCanvasNodeRef = ref<HTMLElement | null>(null)
 const isRetouchActive = computed(() => props.imagePresentation.stageBinding?.mode != null)
-const { zoomLevel } = useCanvasViewportContext()
-const nodeStyle = computed(() => ({
-  '--canvas-node-ui-scale': String(resolveCanvasNodeUiScale(zoomLevel.value)),
-}))
 
 // Per-node uiState subscription: resolving the shared cache here keeps the
 // dependency inside this node's own render effect instead of the parent

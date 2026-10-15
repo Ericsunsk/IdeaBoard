@@ -82,6 +82,9 @@ describe('canvasFrameProbe', () => {
       maxFrameMs: 34,
       droppedFrames: 1,
       sampleCount: 2,
+      retainedSampleCount: 2,
+      droppedMarkCount: 0,
+      p50FrameMs: 16,
       frameBudgetMs: 16.7,
       metadata: { nodeCount: 3, isCommitted: true },
       marks: [{ name: 'pointermove', atMs: 20, metadata: { selectedCount: 2 } }],
@@ -114,6 +117,30 @@ describe('canvasFrameProbe', () => {
     expect(frame.requestAnimationFrameMock).toHaveBeenCalledTimes(requestCountAfterCleanup)
     expect(session.end()).toBeUndefined()
     expect(info).not.toHaveBeenCalled()
+  })
+
+  it('bounds retained samples and marks during long user-driven traces', async () => {
+    vi.doMock('./canvasPerfProbe', () => ({ isCanvasPerfProbeEnabled: () => true }))
+    const frame = installAnimationFrameMock()
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    const { beginCanvasFrameProbe } = await import('./canvasFrameProbe')
+    const session = beginCanvasFrameProbe('pan')
+    frame.flush(0)
+    frame.flush(1000)
+    for (let index = 1; index <= 5000; index += 1) frame.flush(1000 + index * 16)
+    const metadata = vi.fn(() => ({ phase: 'move' }))
+    for (let index = 0; index < 300; index += 1) session.mark('move', metadata)
+    const summary = session.end()
+    expect(summary).toMatchObject({
+      sampleCount: 5001,
+      retainedSampleCount: 4096,
+      p50FrameMs: 16,
+      p95FrameMs: 16,
+      maxFrameMs: 1000,
+      droppedMarkCount: 44,
+    })
+    expect(summary?.marks).toHaveLength(256)
+    expect(metadata).toHaveBeenCalledTimes(256)
   })
 
   it('stays inert when requestAnimationFrame is unavailable', async () => {
