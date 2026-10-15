@@ -86,10 +86,10 @@ describe('AdminDialogShell', () => {
     renderShell()
 
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
-    expect(dialog).toHaveClass('bg-admin-card-strong')
+    expect(dialog).toHaveClass('bg-popover')
     for (const region of ['header', 'content', 'footer']) {
       expect(dialog.querySelector(`[data-admin-dialog-region="${region}"]`)).toHaveClass(
-        'bg-admin-card-strong',
+        'bg-popover',
       )
     }
     const scrollViewport = dialog.querySelector('[data-admin-dialog-region="content"] > div')

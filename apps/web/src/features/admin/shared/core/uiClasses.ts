@@ -86,14 +86,14 @@ export const adminDialogFormBodyClass = 'flex flex-col gap-3.5'
 
 export const adminDialogFooterActionsClass = 'flex w-full flex-wrap items-center justify-end gap-2'
 
-// 全局唯一 Admin 弹窗 chrome：使用标准语义卡片与边框。
+// 全局唯一 Admin 弹窗 chrome：使用标准语义浮层与边框。
 export const adminOverlayMaskClass =
   'fixed inset-0 z-admin-dialog bg-scrim backdrop-blur-xs overlay-mask-motion'
 
 export const adminDialogChromeClass =
-  'rounded-overlay border border-border bg-admin-card-strong text-card-foreground shadow-admin-dialog'
+  'rounded-overlay border border-border bg-popover text-card-foreground shadow-admin-dialog'
 
-export const adminDialogChromeHeaderClass = '!py-4.5 border-b border-border bg-admin-card-strong'
+export const adminDialogChromeHeaderClass = '!py-4.5 border-b border-border bg-popover'
 
 export const adminDialogChromeHeaderSplitClass =
   '!flex-row !items-center !justify-between !gap-2 !pr-0'
@@ -102,10 +102,9 @@ export const adminDialogChromeTitleClass =
   '!text-admin-title !font-bold text-foreground tracking-tight'
 
 export const adminDialogChromeContentClass =
-  '!overflow-hidden !px-6 !py-6 bg-admin-card-strong text-card-foreground'
+  '!overflow-hidden !px-6 !py-6 bg-popover text-card-foreground'
 
-export const adminDialogChromeFooterClass =
-  '!px-6 !py-4 border-t border-border bg-admin-card-strong'
+export const adminDialogChromeFooterClass = '!px-6 !py-4 border-t border-border bg-popover'
 
 export const adminDialogChromeCloseClass = 'text-muted-foreground hover:text-foreground'
 

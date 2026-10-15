@@ -3,7 +3,7 @@
     <AlertDialogPortal>
       <AlertDialogOverlay :class="adminOverlayMaskClass" />
       <AlertDialogContent
-        class="fixed top-[50%] left-[50%] z-admin-dialog grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 rounded-overlay border border-border bg-admin-card-strong text-card-foreground p-6 shadow-admin-dialog overlay-dialog-motion"
+        class="fixed top-[50%] left-[50%] z-admin-dialog grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 rounded-overlay border border-border bg-popover text-card-foreground p-6 shadow-admin-dialog overlay-dialog-motion"
       >
         <div class="flex flex-col gap-2">
           <AlertDialogTitle class="text-admin-title font-bold text-foreground">

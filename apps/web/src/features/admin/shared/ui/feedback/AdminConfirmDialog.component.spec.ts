@@ -30,7 +30,7 @@ describe('AdminConfirmDialog', () => {
     const rejectedConfirm = confirmPromise.catch((reason: unknown) => reason)
     const { user } = renderWithUser(AdminConfirmDialog)
 
-    expect(await screen.findByRole('alertdialog')).toHaveClass('bg-admin-card-strong')
+    expect(await screen.findByRole('alertdialog')).toHaveClass('bg-popover')
     await user.click(await screen.findByRole('button', { name: '删除' }))
 
     await expect(rejectedConfirm).resolves.toBe(error)
