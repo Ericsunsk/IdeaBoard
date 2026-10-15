@@ -55,6 +55,7 @@ function mountLifecycle(query: Record<string, string | undefined>) {
           onEscape: () => false,
           onPanViewport: vi.fn() as never,
           setActiveTool: vi.fn(),
+          onSpacePressedChange: vi.fn(),
         },
         benchmark,
       })

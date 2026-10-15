@@ -19285,9 +19285,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 61,
-      "measuredFanOut": 30,
+      "measuredFanOut": 31,
       "targetFanIn": 61,
-      "targetFanOut": 30,
+      "targetFanOut": 31,
       "ownershipScope": ["src/features/canvas/session/flow-adapter/"],
       "publicExports": [
         "CanvasFlowViewportControls",
@@ -19386,6 +19386,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/session/browser/canvasInteractionMetrics.ts",
         "src/features/canvas/session/browser/canvasPerfProbe.ts",
         "src/features/canvas/session/browser/canvasViewportPersistence.ts",
+        "src/features/canvas/session/browser/canvasViewportStorage.ts",
         "src/features/canvas/session/browser/interaction/useRafScheduler.ts",
         "src/features/canvas/session/execution/index.ts",
         "src/features/canvas/session/execution/pending-execution/core.ts",
@@ -20177,9 +20178,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 16,
-      "measuredFanOut": 30,
+      "measuredFanOut": 31,
       "targetFanIn": 16,
-      "targetFanOut": 30,
+      "targetFanOut": 31,
       "ownershipScope": ["src/features/canvas/tools/retouch/"],
       "publicExports": [
         "ImageRetouchKind",
@@ -20238,6 +20239,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/core/graph/index.ts",
         "src/features/canvas/session/browser/animationFrame.ts",
+        "src/features/canvas/session/browser/canvasViewportStorage.ts",
         "src/features/canvas/session/browser/domEventTargets.ts",
         "src/features/canvas/session/browser/interaction/usePointerDragSession.ts",
         "src/features/canvas/session/browser/interaction/useRafScheduler.ts",
@@ -22793,7 +22795,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/session/execution/board-attachment/index.ts`            | canonical | canvas        | 2       | 13 → 13                  | 0 → 0                     |
 | `src/features/canvas/session/execution/index.ts`                             | canonical | canvas        | 64      | 31 → 31                  | 46 → 46                   |
 | `src/features/canvas/session/execution/pending-execution/core.ts`            | canonical | canvas        | 17      | 14 → 14                  | 7 → 7                     |
-| `src/features/canvas/session/flow-adapter/index.ts`                          | canonical | canvas        | 69      | 61 → 61                  | 30 → 30                   |
+| `src/features/canvas/session/flow-adapter/index.ts`                          | canonical | canvas        | 69      | 61 → 61                  | 31 → 31                   |
 | `src/features/canvas/session/graph-editing/groupContracts.ts`                | canonical | canvas        | 1       | 2 → 2                    | 1 → 1                     |
 | `src/features/canvas/session/graph-editing/index.ts`                         | canonical | canvas        | 18      | 12 → 12                  | 35 → 35                   |
 | `src/features/canvas/session/image-workflow/index.ts`                        | canonical | canvas        | 3       | 4 → 4                    | 22 → 22                   |
@@ -22806,7 +22808,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/tools/image-tools/ui/chrome.ts`                         | canonical | canvas        | 1       | 2 → 2                    | 1 → 1                     |
 | `src/features/canvas/tools/image-tools/ui/stage.ts`                          | canonical | canvas        | 1       | 1 → 1                    | 1 → 1                     |
 | `src/features/canvas/tools/inpaint/index.ts`                                 | canonical | canvas        | 6       | 8 → 8                    | 15 → 15                   |
-| `src/features/canvas/tools/retouch/index.ts`                                 | canonical | canvas        | 36      | 16 → 16                  | 30 → 30                   |
+| `src/features/canvas/tools/retouch/index.ts`                                 | canonical | canvas        | 36      | 16 → 16                  | 31 → 31                   |
 | `src/features/canvas/tools/retouch/testing/browser.ts`                       | canonical | canvas        | 2       | 1 → 1                    | 4 → 4                     |
 | `src/features/canvas/ui/chrome/components/index.ts`                          | canonical | canvas        | 6       | 1 → 1                    | 12 → 12                   |
 | `src/features/canvas/ui/nodes/groups/index.ts`                               | canonical | canvas        | 4       | 4 → 4                    | 8 → 8                     |

@@ -231,7 +231,7 @@ describe('useCanvasGroupPresentationInteraction', () => {
       clientY: 120,
     }) as MouseEvent
 
-    harness.runtime.onCanvasContextMenuCapture(event)
+    expect(harness.runtime.onCanvasContextMenuCapture(event)).toBe(true)
 
     expect(event.preventDefault).toHaveBeenCalled()
     expect(event.stopPropagation).toHaveBeenCalled()

@@ -272,6 +272,7 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
       shouldHideStrength: false,
     })
     isSelectionGroupActionMenuOpen.value = true
+    return true
   }
 
   function onGroupResizeStart(payload: CanvasGroupResizeStartPayload) {

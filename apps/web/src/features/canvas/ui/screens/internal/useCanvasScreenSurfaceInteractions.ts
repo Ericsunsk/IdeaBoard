@@ -136,6 +136,51 @@ function useScreenNodeDragInteractions(
   return { onNodeDragStart, onNodeDragStop }
 }
 
+function createScreenBackgroundNavigation(
+  isPanEnabled: ComputedRef<boolean>,
+  groupPresentation: ReturnType<typeof useScreenGrouping>,
+  shell: ReturnType<typeof useFlowCanvasShellInteractions>,
+) {
+  function isBackgroundContextMenu(event: MouseEvent) {
+    return (
+      event.target instanceof Element &&
+      (event.target.classList.contains('vue-flow__pane') ||
+        event.target.classList.contains('canvas-group-frame-body'))
+    )
+  }
+
+  function onPaneContextMenu(event: MouseEvent) {
+    if (!isBackgroundContextMenu(event)) return
+    if (groupPresentation.onCanvasContextMenuCapture(event)) return
+    shell.onPaneContextMenu(event)
+  }
+
+  function onCanvasContextMenuCapture(event: MouseEvent) {
+    if (isPanEnabled.value && isBackgroundContextMenu(event)) {
+      // Vue Flow resolves right click versus pan on release. Keyboard and
+      // Ctrl-click menus have no pan gesture and use the same routing.
+      event.preventDefault()
+      if (event.button !== 2 || event.ctrlKey) onPaneContextMenu(event)
+      return
+    }
+    groupPresentation.onCanvasContextMenuCapture(event)
+  }
+
+  function onCanvasMouseDownCapture(event: MouseEvent) {
+    // Ctrl-click belongs to the context menu even while Space is held.
+    // Vue Flow also admits middle-button graph drags before checking panOnDrag.
+    if (
+      (event.ctrlKey && isBackgroundContextMenu(event)) ||
+      (event.button === 1 && !isPanEnabled.value)
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+  }
+
+  return { onCanvasContextMenuCapture, onCanvasMouseDownCapture, onPaneContextMenu }
+}
+
 export function useCanvasScreenSurfaceInteractions(options: CanvasScreenSurfaceInteractionOptions) {
   const { workspace, flowPaneAdapter } = options
   const { viewModel, commands } = workspace
@@ -228,6 +273,12 @@ export function useCanvasScreenSurfaceInteractions(options: CanvasScreenSurfaceI
       viewModel.boardChrome.isBoardMenuOpen.value || viewModel.boardChrome.isRenamingBoard.value,
   })
 
+  const isPanEnabled = computed(
+    () => !isFlowCanvasLocked.value && !viewModel.boardChrome.isBoardArchived.value,
+  )
+
+  const navigation = createScreenBackgroundNavigation(isPanEnabled, groupPresentation, shell)
+
   const closePolicyHandlers = groupPresentation.bindClosePolicyHandlers({
     onCanvasWheel: imageTools.commands.editor.onCanvasWheel,
     onFlowMoveStart: commands.viewportControls.onFlowMoveStart,
@@ -238,7 +289,6 @@ export function useCanvasScreenSurfaceInteractions(options: CanvasScreenSurfaceI
       selection.commands.onPaneClick()
     },
     toggleCanvasMinimap: toggleCanvasMinimapBase,
-    onPaneContextMenu: shell.onPaneContextMenu,
     setActiveTool: shell.setActiveTool,
     onCanvasDragOver: shell.onCanvasDragOver,
   })
@@ -261,6 +311,8 @@ export function useCanvasScreenSurfaceInteractions(options: CanvasScreenSurfaceI
     nodeInteractions,
     vueFlowSelectionBindings: selection.vueFlowSelectionBindings,
     onFlowNodeMouseDown: selection.commands.onFlowNodeMouseDown,
+    onCanvasPointerDownCapture: groupPresentation.onCanvasPointerDownCapture,
+    ...navigation,
     groupPresentation,
     onFlowNodeClick,
     onDeleteInlineSelection,

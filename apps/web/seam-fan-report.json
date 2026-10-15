@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "b2f92ad625b02c44f2e347a26ad1c31512d2d10d",
+  "checkpointSha": "bb6f74c11f6741f3ee9f66fd417d76536731b32e",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -28077,7 +28077,7 @@
         }
       ],
       "fanIn": 61,
-      "fanOut": 30,
+      "fanOut": 31,
       "fanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/@vueuse/core/dist/index.js",
@@ -28104,6 +28104,7 @@
         "src/features/canvas/session/browser/canvasInteractionMetrics.ts",
         "src/features/canvas/session/browser/canvasPerfProbe.ts",
         "src/features/canvas/session/browser/canvasViewportPersistence.ts",
+        "src/features/canvas/session/browser/canvasViewportStorage.ts",
         "src/features/canvas/session/browser/interaction/useRafScheduler.ts",
         "src/features/canvas/session/execution/index.ts",
         "src/features/canvas/session/execution/pending-execution/core.ts",
@@ -28997,6 +28998,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/flow-adapter/viewport/useCanvasViewportRuntime.ts",
+          "to": "src/features/canvas/session/browser/canvasViewportStorage.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/flow-adapter/viewport/useCanvasViewportRuntime.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -29062,7 +29068,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 61,
-      "targetFanOut": 30,
+      "targetFanOut": 31,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -32060,7 +32066,7 @@
         }
       ],
       "fanIn": 16,
-      "fanOut": 30,
+      "fanOut": 31,
       "fanOutTargets": [
         "fs",
         "node_modules/@iconoir/vue/dist/index.js",
@@ -32080,6 +32086,7 @@
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/core/graph/index.ts",
         "src/features/canvas/session/browser/animationFrame.ts",
+        "src/features/canvas/session/browser/canvasViewportStorage.ts",
         "src/features/canvas/session/browser/domEventTargets.ts",
         "src/features/canvas/session/browser/interaction/usePointerDragSession.ts",
         "src/features/canvas/session/browser/interaction/useRafScheduler.ts",
@@ -32412,6 +32419,11 @@
         {
           "from": "src/features/canvas/tools/retouch/session/useRetouchCoordinateAdapter.ts",
           "to": "src/features/canvas/session/browser/animationFrame.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/retouch/session/useRetouchCoordinateAdapter.ts",
+          "to": "src/features/canvas/session/browser/canvasViewportStorage.ts",
           "kind": "runtime"
         },
         {
@@ -32960,7 +32972,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 16,
-      "targetFanOut": 30,
+      "targetFanOut": 31,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -35834,7 +35846,7 @@
         {
           "from": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",
           "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/ui/screens/CanvasScreen.component.spec.ts",

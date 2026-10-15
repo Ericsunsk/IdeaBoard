@@ -1,13 +1,22 @@
-import { computed, defineComponent, h, reactive, ref, type PropType } from 'vue'
-import type { FlowProps, GraphEdge, GraphNode, NodeProps } from '@vue-flow/core'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { computed, defineComponent, h, nextTick, reactive, ref, type PropType } from 'vue'
+import {
+  VueFlow,
+  type FlowProps,
+  type GraphEdge,
+  type GraphNode,
+  type NodeProps,
+} from '@vue-flow/core'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { render } from '../../../../test/render'
 import CanvasScreen from './CanvasScreen.vue'
 
 type KeyboardOptions = {
   onSave: () => void
+  onToolHand: () => void
+  onToolSelect: () => void
   onDeleteInlineSelection: () => boolean
+  onSpacePressedChange: (isPressed: boolean) => void
 }
 type LeaveGuardOptions = { onLeave: () => Promise<unknown> | unknown }
 type GroupOptions = { grouping: { onAction: () => void } }
@@ -22,6 +31,9 @@ const mocks = vi.hoisted(() => ({
   dragEvents: [] as string[],
   useCanvasWorkspaceRuntime: vi.fn(),
   defaultEdgeOptions: undefined as FlowProps['defaultEdgeOptions'],
+  flowProps: {} as Partial<FlowProps>,
+  emitPaneContextMenu: (_event: MouseEvent) => {},
+  groupContextMenu: vi.fn(),
 }))
 
 vi.mock('../../session/workspace', () => ({
@@ -30,6 +42,7 @@ vi.mock('../../session/workspace', () => ({
 
 vi.mock('../../session/flow-adapter', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../session/flow-adapter')>()),
+  provideCanvasViewportContext: vi.fn(),
   createCanvasConnectionDropLifecycle: () => ({
     onConnectStart: vi.fn(),
     onConnectEnd: vi.fn(),
@@ -87,10 +100,6 @@ vi.mock('./useCanvasImageLightbox', () => ({
   }),
 }))
 
-vi.mock('../../session/flow-adapter/viewport/useCanvasViewportContext.ts', () => ({
-  provideCanvasViewportContext: vi.fn(),
-}))
-
 vi.mock('../nodes/groups', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../nodes/groups')>()
   return {
@@ -102,7 +111,7 @@ vi.mock('../nodes/groups', async (importOriginal) => {
           ...handlers,
           onCanvasPaneClick: handlers.onCanvasPaneClick,
         }),
-        onCanvasContextMenuCapture: vi.fn(),
+        onCanvasContextMenuCapture: mocks.groupContextMenu,
         onCanvasPointerDownCapture: vi.fn(),
       }
     },
@@ -135,9 +144,11 @@ const ChromeStub = defineComponent({
 const VueFlowStub = defineComponent({
   emits: ['nodes-change', 'pane-click', 'pane-context-menu', 'node-drag-start', 'node-drag-stop'],
   setup(_, { emit, slots, attrs }) {
+    mocks.emitPaneContextMenu = (event) => emit('pane-context-menu', event)
     mocks.defaultEdgeOptions = attrs.defaultEdgeOptions as FlowProps['defaultEdgeOptions']
-    return () =>
-      h('section', { 'data-testid': 'flow-region' }, [
+    return () => {
+      mocks.flowProps = attrs as Partial<FlowProps>
+      return h('section', { 'data-testid': 'flow-region', class: 'vue-flow__pane' }, [
         h(
           'button',
           {
@@ -151,11 +162,12 @@ const VueFlowStub = defineComponent({
           'button',
           {
             type: 'button',
-            onClick: () =>
-              emit(
-                'pane-context-menu',
-                new MouseEvent('contextmenu', { clientX: 12, clientY: 24 }),
-              ),
+            onClick: () => {
+              const event = new MouseEvent('mouseup', { clientX: 12, clientY: 24 })
+              document.querySelector('[data-testid="flow-region"]')?.dispatchEvent(event)
+              event.stopPropagation()
+              emit('pane-context-menu', event)
+            },
           },
           '打开节点菜单',
         ),
@@ -177,12 +189,13 @@ const VueFlowStub = defineComponent({
         } satisfies Partial<NodeProps>),
         slots.default?.(),
       ])
+    }
   },
 })
 
 const GroupStub = defineComponent({
   setup() {
-    return () => h('section', { 'data-testid': 'group-region' })
+    return () => h('section', { 'data-testid': 'group-region', class: 'canvas-group-frame-body' })
   },
 })
 
@@ -438,6 +451,7 @@ function createRuntime() {
 
 function renderScreen(
   route: RouteLocationNormalizedLoaded = { query: {} } as RouteLocationNormalizedLoaded,
+  isNativeFlow = false,
 ) {
   const harness = createRuntime()
   mocks.useCanvasWorkspaceRuntime.mockReturnValue(harness.runtime)
@@ -452,7 +466,7 @@ function renderScreen(
     global: {
       stubs: {
         CanvasChrome: ChromeStub,
-        VueFlow: VueFlowStub,
+        VueFlow: isNativeFlow ? VueFlow : VueFlowStub,
         CanvasGroupPresentation: GroupStub,
         FlowCanvasNode: NodeStub,
         CanvasChromeMiniMap: MiniMapStub,
@@ -474,7 +488,245 @@ describe('CanvasScreen', () => {
     mocks.groupOptions = null
     mocks.dragEvents.length = 0
     mocks.defaultEdgeOptions = undefined
+    mocks.flowProps = {}
   })
+
+  it('uses direct trackpad navigation and middle/right panning in select mode', () => {
+    renderScreen()
+    expect(mocks.flowProps).toMatchObject({
+      panOnDrag: [1, 2],
+      panOnScroll: true,
+      panOnScrollSpeed: 1.2,
+      autoPanSpeed: 15,
+      zoomOnScroll: false,
+      zoomOnPinch: true,
+      zoomOnDoubleClick: false,
+      minZoom: 0.15,
+      maxZoom: 2,
+      nodesDraggable: true,
+      elementsSelectable: true,
+    } satisfies Partial<FlowProps>)
+  })
+
+  it('enables all mouse buttons in hand mode while disabling graph editing', async () => {
+    renderScreen()
+    mocks.keyboardOptions!.onToolHand()
+    await nextTick()
+    expect(mocks.flowProps).toMatchObject({
+      panOnDrag: [0, 1, 2],
+      nodesDraggable: false,
+      nodesConnectable: false,
+      elementsSelectable: false,
+      selectionKeyCode: false,
+    } satisfies Partial<FlowProps>)
+    mocks.keyboardOptions!.onToolSelect()
+    await nextTick()
+    expect(mocks.flowProps.panOnDrag).toEqual([1, 2])
+  })
+
+  it.each(['locked', 'archived'] as const)('disables navigation for %s boards', async (state) => {
+    const view = renderScreen()
+    if (state === 'archived')
+      view.harness.runtime.viewModel.boardChrome.isBoardArchived.value = true
+    else view.harness.runtime.viewModel.imageWorkflow.tools.locks.isCanvasLocked.value = true
+    await nextTick()
+    expect(mocks.flowProps).toMatchObject({
+      panOnDrag: false,
+      panOnScroll: false,
+      zoomOnPinch: false,
+      zoomOnDoubleClick: false,
+      nodesDraggable: false,
+      elementsSelectable: false,
+    } satisfies Partial<FlowProps>)
+  })
+
+  it('uses temporary Space Hand mode and restores the selected tool on release', async () => {
+    renderScreen()
+    mocks.keyboardOptions!.onSpacePressedChange(true)
+    await nextTick()
+    expect(mocks.flowProps).toMatchObject({
+      panOnDrag: [0, 1, 2],
+      nodesDraggable: false,
+      selectionKeyCode: false,
+      panActivationKeyCode: null,
+    } satisfies Partial<FlowProps>)
+    mocks.keyboardOptions!.onSpacePressedChange(false)
+    await nextTick()
+    expect(mocks.flowProps.panOnDrag).toEqual([1, 2])
+    mocks.keyboardOptions!.onToolHand()
+    mocks.keyboardOptions!.onSpacePressedChange(true)
+    mocks.keyboardOptions!.onSpacePressedChange(false)
+    await nextTick()
+    expect(mocks.flowProps.panOnDrag).toEqual([0, 1, 2])
+  })
+
+  describe.each(['pane', 'group'] as const)('native %s pan gestures', (target) => {
+    afterEach(async () => {
+      // D3 releases post-drag click suppression on the next task.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    })
+    function nativeHarness() {
+      const view = renderScreen(undefined, true)
+      const element =
+        target === 'pane'
+          ? view.container.getElementsByClassName('vue-flow__pane')[0]!
+          : view.getByTestId('group-region')
+      const mouse = (type: string, x = 20, y = 30, init: MouseEventInit = {}) => {
+        const event = new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          buttons: type === 'mouseup' ? 0 : 2,
+          clientX: x,
+          clientY: y,
+          view: window,
+          ...init,
+        })
+        element.dispatchEvent(event)
+        return event
+      }
+      return { ...view, mouse }
+    }
+
+    it.each(['press', 'release'])(
+      'opens one settled menu across %s-time contextmenu ordering',
+      async (timing) => {
+        const view = nativeHarness()
+        await nextTick()
+        view.mouse('mousedown')
+        if (timing === 'press') view.mouse('contextmenu')
+        expect(mocks.groupContextMenu).not.toHaveBeenCalled()
+        view.mouse('mouseup')
+        if (timing === 'release') view.mouse('contextmenu')
+        await nextTick()
+        expect(mocks.groupContextMenu).toHaveBeenCalledTimes(1)
+        expect(mocks.groupContextMenu.mock.calls[0]?.[0].type).toBe('mouseup')
+        expect(view.getByTestId('node-context-menu')).toBeInTheDocument()
+      },
+    )
+
+    it.each(['press', 'release'])(
+      'does not open a menu after right panning with %s-time contextmenu',
+      async (timing) => {
+        const view = nativeHarness()
+        await nextTick()
+        view.mouse('mousedown')
+        if (timing === 'press') view.mouse('contextmenu')
+        view.mouse('mousemove', 60, 70)
+        view.mouse('mousemove')
+        view.mouse('mouseup')
+        if (timing === 'release') view.mouse('contextmenu')
+        await nextTick()
+        expect(mocks.groupContextMenu).not.toHaveBeenCalled()
+        expect(view.queryByTestId('node-context-menu')).not.toBeInTheDocument()
+      },
+    )
+
+    it('pans with temporary Space Hand while Ctrl+Space prioritizes context', async () => {
+      const view = nativeHarness()
+      await nextTick()
+      mocks.keyboardOptions!.onSpacePressedChange(true)
+      await nextTick()
+      view.mouse('mousedown', 20, 30, { button: 0, buttons: 1 })
+      view.mouse('mousemove', 60, 70, { button: 0, buttons: 1 })
+      view.mouse('mouseup', 60, 70, { button: 0 })
+      await nextTick()
+      const onMove = view.harness.runtime.commands.viewportControls.onFlowMove
+      expect(onMove).toHaveBeenCalled()
+      onMove.mockClear()
+
+      view.mouse('mousedown', 20, 30, { ctrlKey: true })
+      view.mouse('contextmenu', 20, 30, { ctrlKey: true })
+      view.mouse('mousemove', 60, 70, { ctrlKey: true })
+      view.mouse('mouseup', 60, 70, { ctrlKey: true })
+      await nextTick()
+      expect(onMove).not.toHaveBeenCalled()
+      expect(mocks.groupContextMenu).toHaveBeenCalledTimes(1)
+      expect(view.getByTestId('node-context-menu')).toBeInTheDocument()
+      mocks.keyboardOptions!.onSpacePressedChange(false)
+    })
+  })
+
+  it('lets a selected group handle the settled callback without opening the creation menu', async () => {
+    const view = renderScreen()
+    const event = new MouseEvent('mouseup', { button: 2 })
+    view.getByTestId('flow-region').dispatchEvent(event)
+    event.stopPropagation()
+    mocks.groupContextMenu.mockReturnValueOnce(true)
+    mocks.emitPaneContextMenu(event)
+    await nextTick()
+    expect(mocks.groupContextMenu).toHaveBeenCalledWith(event)
+    expect(view.queryByTestId('node-context-menu')).not.toBeInTheDocument()
+  })
+
+  it.each(['vue-flow__node', 'vue-flow__edge', 'vue-flow__nodesselection-rect'])(
+    'preserves native %s context routing and ignores its pan callback',
+    async (className) => {
+      const view = renderScreen()
+      const target = document.createElement('div')
+      target.className = className
+      view.getByTestId('flow-region').append(target)
+      const contextMenu = new MouseEvent('contextmenu', { bubbles: true, button: 2 })
+      target.dispatchEvent(contextMenu)
+      expect(mocks.groupContextMenu).toHaveBeenCalledExactlyOnceWith(contextMenu)
+      const event = new MouseEvent('mouseup', { button: 2 })
+      target.dispatchEvent(event)
+      mocks.emitPaneContextMenu(event)
+      await nextTick()
+      expect(mocks.groupContextMenu).toHaveBeenCalledTimes(1)
+      expect(view.queryByTestId('node-context-menu')).not.toBeInTheDocument()
+    },
+  )
+
+  it('opens keyboard context menus without waiting for a pointer gesture', async () => {
+    const view = renderScreen()
+    const target = view.getByTestId('flow-region')
+    target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: 2 }))
+    target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: 0 }))
+    await nextTick()
+    expect(mocks.groupContextMenu).toHaveBeenCalledTimes(1)
+    expect(view.getByTestId('node-context-menu')).toBeInTheDocument()
+  })
+
+  it.each([0, 2])('prioritizes Ctrl context over background button %i panning', async (button) => {
+    const view = renderScreen()
+    const target = view.getByTestId('flow-region')
+    const onMouseDown = vi.fn()
+    target.addEventListener('mousedown', onMouseDown)
+    const mouseDown = new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button,
+      ctrlKey: true,
+    })
+    target.dispatchEvent(mouseDown)
+    expect(mouseDown.defaultPrevented).toBe(true)
+    expect(onMouseDown).not.toHaveBeenCalled()
+    target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: 2, ctrlKey: true }))
+    await nextTick()
+    expect(mocks.groupContextMenu).toHaveBeenCalledTimes(1)
+    expect(view.getByTestId('node-context-menu')).toBeInTheDocument()
+  })
+
+  it.each(['locked', 'archived'] as const)(
+    'blocks upstream middle-button graph navigation when %s',
+    async (state) => {
+      const view = renderScreen()
+      if (state === 'locked')
+        view.harness.runtime.viewModel.imageWorkflow.tools.locks.isCanvasLocked.value = true
+      else view.harness.runtime.viewModel.boardChrome.isBoardArchived.value = true
+      await nextTick()
+      const target = document.createElement('div')
+      target.className = 'vue-flow__node'
+      view.getByTestId('flow-region').append(target)
+      const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 1 })
+      const onMouseDown = vi.fn()
+      target.addEventListener('mousedown', onMouseDown)
+      target.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(true)
+      expect(onMouseDown).not.toHaveBeenCalled()
+    },
+  )
 
   it('highlights outgoing edges as their source selection changes without selecting the edges', () => {
     renderScreen()

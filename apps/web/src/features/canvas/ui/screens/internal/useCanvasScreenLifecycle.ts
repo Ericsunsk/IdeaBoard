@@ -32,6 +32,7 @@ export function useCanvasScreenLifecycle(options: {
     onEscape: () => boolean
     onPanViewport: CanvasWorkspaceRuntime['commands']['viewportControls']['onPanViewport']
     setActiveTool: (tool: 'select' | 'hand') => void
+    onSpacePressedChange: (isPressed: boolean) => void
   }
   benchmark: {
     connectIntent: CanvasWorkspaceRuntime['commands']['flowPane']['connectionAdapter']['connectIntent']
@@ -56,6 +57,7 @@ export function useCanvasScreenLifecycle(options: {
     onPanViewport: options.keyboard.onPanViewport,
     onToolSelect: () => options.keyboard.setActiveTool('select'),
     onToolHand: () => options.keyboard.setActiveTool('hand'),
+    onSpacePressedChange: options.keyboard.onSpacePressedChange,
     onDuplicateModifierChange: (isPressed) => {
       options.isDuplicateModifierPressed.value = isPressed
     },

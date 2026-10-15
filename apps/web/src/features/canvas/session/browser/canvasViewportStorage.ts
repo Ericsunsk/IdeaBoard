@@ -16,7 +16,7 @@ export type CanvasViewportStorageIdentity = {
   boardId: string | null | undefined
 }
 
-export const CANVAS_VIEWPORT_MIN_ZOOM = 0.1
+export const CANVAS_VIEWPORT_MIN_ZOOM = 0.15
 export const CANVAS_VIEWPORT_MAX_ZOOM = 2
 const DEFAULT_CANVAS_VIEWPORT: CanvasFlowViewportState = Object.freeze({
   x: 0,

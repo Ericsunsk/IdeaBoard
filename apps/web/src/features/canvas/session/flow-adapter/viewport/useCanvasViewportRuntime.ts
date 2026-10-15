@@ -10,6 +10,7 @@ import {
   type CanvasViewportPersistence,
   type CanvasViewportPersistenceIdentity,
 } from '../../browser/canvasViewportPersistence.ts'
+import { CANVAS_VIEWPORT_MIN_ZOOM } from '../../browser/canvasViewportStorage'
 import type { BoardLoadResult } from '../../board-session'
 import { useCanvasImageQualityZoom } from './useCanvasImageQualityZoom'
 
@@ -101,7 +102,10 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
 
   const zoomLevel = computed(() => {
     const zoom = options.viewport.value.zoom
-    return Math.max(10, Math.round((Number.isFinite(zoom) && zoom > 0 ? zoom : 1) * 100))
+    return Math.max(
+      CANVAS_VIEWPORT_MIN_ZOOM * 100,
+      Math.round((Number.isFinite(zoom) && zoom > 0 ? zoom : 1) * 100),
+    )
   })
   const imageQualityZoom = useCanvasImageQualityZoom(zoomLevel, () =>
     JSON.stringify([options.getUserUid(), options.currentBoardId.value]),

@@ -1,6 +1,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import { useEventListener, useResizeObserver } from '@vueuse/core'
+import { CANVAS_VIEWPORT_MIN_ZOOM } from '../../../session/browser/canvasViewportStorage'
 import { IMAGE_TOOL_CHROME_LAYOUT } from '../../image-tools/core'
 import { useRafScheduler } from '../../../session/browser/interaction/useRafScheduler.ts'
 import { waitForNextAnimationFrame } from '../../../session/browser/animationFrame.ts'
@@ -41,7 +42,6 @@ type UseRetouchCoordinateAdapterOptions = {
 } & CanvasFlowViewportControls
 
 const RETOUCH_FOCUS_MAX_ZOOM = 2
-const RETOUCH_FOCUS_MIN_ZOOM = 0.1
 const CANVAS_OVERSCROLL_GUARD_CLASS = 'canvas-overscroll-guard'
 
 function setCanvasOverscrollGuard(enabled: boolean) {
@@ -167,7 +167,7 @@ export function useRetouchCoordinateAdapter(options: UseRetouchCoordinateAdapter
       availableHeight / flowImageHeight,
     )
     const zoom = Math.max(
-      RETOUCH_FOCUS_MIN_ZOOM,
+      CANVAS_VIEWPORT_MIN_ZOOM,
       Math.min(
         RETOUCH_FOCUS_MAX_ZOOM,
         Number.isFinite(fitZoom) && fitZoom > 0 ? fitZoom : RETOUCH_FOCUS_MAX_ZOOM,

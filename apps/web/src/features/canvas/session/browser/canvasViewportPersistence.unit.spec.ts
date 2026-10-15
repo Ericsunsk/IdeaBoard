@@ -67,6 +67,27 @@ describe('createCanvasViewportPersistence', () => {
     expect(harness.viewport).toEqual({ x: 0, y: 0, zoom: 1 })
   })
 
+  it('clamps restored and persisted views to the supported zoom range', async () => {
+    localStorage.setItem(
+      'ideaboard:canvas:view:user-uid:board-a',
+      JSON.stringify({
+        x: 12,
+        y: 24,
+        zoom: 0.1,
+        updatedAt: 10,
+      }),
+    )
+    const harness = createPersistenceHarness()
+    await harness.persistence.restore()
+    expect(harness.viewport).toEqual({ x: 12, y: 24, zoom: 0.15 })
+    harness.viewport = { x: 12, y: 24, zoom: 0.01 }
+    harness.persistence.persistNow()
+    expect(readStoredViewport()?.zoom).toBe(0.15)
+    harness.viewport = { x: 12, y: 24, zoom: 4 }
+    harness.persistence.persistNow()
+    expect(readStoredViewport()?.zoom).toBe(2)
+  })
+
   it('scopes delayed writes to the user and board that produced the event', () => {
     vi.useFakeTimers()
     const harness = createPersistenceHarness()

@@ -50,6 +50,7 @@
       @dragover.prevent="onCanvasDragOver"
       @drop.prevent="onCanvasDrop"
       @pointerdown.capture="onCanvasPointerDownCapture"
+      @mousedown.capture="onCanvasMouseDownCapture"
       @contextmenu.capture="onCanvasContextMenuCapture"
       @wheel="onCanvasWheel"
     >
@@ -182,7 +183,14 @@ const handleProximityGeometry = useCanvasVueFlowHandleGeometryAdapter()
 const handleProximitySurface = provideCanvasHandleProximityCoordinator(handleProximityGeometry)
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
-const activeTool = ref<'select' | 'hand'>('select')
+const selectedTool = ref<'select' | 'hand'>('select')
+const isSpacePressed = ref(false)
+const activeTool = computed({
+  get: () => (isSpacePressed.value ? 'hand' : selectedTool.value),
+  set: (tool: 'select' | 'hand') => {
+    selectedTool.value = tool
+  },
+})
 const isCanvasMinimapEnabled = ref(false)
 const isDuplicateModifierPressed = ref(false)
 const canvasLibrary = useCanvasLibraryIsland()
@@ -362,13 +370,17 @@ const {
     onNodeDragStart,
     onCanvasPaneClick,
     toggleCanvasMinimap,
-    onPaneContextMenu,
     setActiveTool,
     onCanvasDragOver,
     onEscapeShortcut,
   },
 } = surface
-const { onCanvasContextMenuCapture, onCanvasPointerDownCapture } = groupPresentation
+const {
+  onCanvasContextMenuCapture,
+  onCanvasPointerDownCapture,
+  onCanvasMouseDownCapture,
+  onPaneContextMenu,
+} = surface
 const nodePresentation = createCanvasScreenNodePresentation({
   workspace,
   activePanels: imageToolUi.activePanels,
@@ -428,7 +440,7 @@ const vueFlowProps = computed(() => {
   const isCanvasLocked = isFlowCanvasLocked.value || isBoardArchived.value
 
   return {
-    panOnDrag: !isCanvasLocked && isHandTool,
+    panOnDrag: isCanvasLocked ? false : isHandTool ? [0, 1, 2] : [1, 2],
     nodesDraggable: !isCanvasLocked && !isHandTool,
     nodesConnectable: !isCanvasLocked && !isHandTool,
     elementsSelectable: !isCanvasLocked && !isHandTool,
@@ -449,6 +461,10 @@ const vueFlowProps = computed(() => {
     maxZoom: CANVAS_VIEWPORT_MAX_ZOOM,
     zoomOnScroll: false,
     panOnScroll: !isCanvasLocked,
+    panActivationKeyCode: null,
+    panOnScrollSpeed: 1.2,
+    autoPanSpeed: 15,
+    zoomOnDoubleClick: false,
     zoomOnPinch: !isCanvasLocked,
     panOnScrollMode: PanOnScrollMode.Free,
     onlyRenderVisibleElements: false,
@@ -497,6 +513,9 @@ useCanvasScreenLifecycle({
     onEscape: onEscapeShortcut,
     onPanViewport,
     setActiveTool,
+    onSpacePressedChange: (isPressed) => {
+      isSpacePressed.value = isPressed
+    },
   },
   benchmark: {
     connectIntent: connectionAdapter.connectIntent,
