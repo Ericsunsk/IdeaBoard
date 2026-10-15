@@ -36,7 +36,14 @@ describe('useCanvasViewportContext', () => {
     }
     const Parent = defineComponent({
       setup() {
-        provideCanvasViewportContext({ zoomLevel, qualityZoomLevel })
+        provideCanvasViewportContext({
+          zoomLevel,
+          imageQuality: {
+            zoomLevel: qualityZoomLevel,
+            isSettled: ref(true),
+            requestSettle: () => {},
+          },
+        })
         return () => h(Child)
       },
     })
@@ -48,9 +55,9 @@ describe('useCanvasViewportContext', () => {
 
     zoomLevel.value = 80
     expect(observedContext.value?.zoomLevel.value).toBe(80)
-    expect(observedContext.value?.qualityZoomLevel.value).toBe(100)
+    expect(observedContext.value?.imageQuality.zoomLevel.value).toBe(100)
     qualityZoomLevel.value = 80
-    expect(observedContext.value?.qualityZoomLevel.value).toBe(80)
+    expect(observedContext.value?.imageQuality.zoomLevel.value).toBe(80)
     app.unmount()
   })
 })

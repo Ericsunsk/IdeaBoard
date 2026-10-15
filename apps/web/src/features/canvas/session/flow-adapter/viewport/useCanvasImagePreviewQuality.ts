@@ -1,4 +1,5 @@
-import { computed, type MaybeRefOrGetter, toValue } from 'vue'
+import { computed, readonly, ref, type MaybeRefOrGetter, toValue, watch } from 'vue'
+import type { CanvasImageQuality } from './useCanvasImageQualityZoom'
 
 const CANVAS_IMAGE_PREVIEW_MAX_SIDE = {
   compact: 256,
@@ -16,7 +17,7 @@ type ResolveCanvasImagePreviewMaxSideOptions = {
 }
 
 type UseCanvasImagePreviewQualityOptions = {
-  zoomLevel: MaybeRefOrGetter<number>
+  imageQuality: CanvasImageQuality
   shouldForceFullQuality?: MaybeRefOrGetter<boolean>
 }
 
@@ -32,12 +33,28 @@ export function resolveCanvasImagePreviewMaxSide(
 }
 
 export function useCanvasImagePreviewQuality(options: UseCanvasImagePreviewQualityOptions) {
-  const maxSide = computed(() =>
+  const { imageQuality } = options
+  const shouldForceFullQuality = computed(() => !!toValue(options.shouldForceFullQuality))
+  if (shouldForceFullQuality.value) imageQuality.requestSettle()
+  watch(shouldForceFullQuality, imageQuality.requestSettle, { flush: 'sync' })
+  const requestedMaxSide = computed(() =>
     resolveCanvasImagePreviewMaxSide({
-      zoomLevel: toValue(options.zoomLevel),
-      shouldForceFullQuality: toValue(options.shouldForceFullQuality),
+      zoomLevel: imageQuality.zoomLevel.value,
+      shouldForceFullQuality: shouldForceFullQuality.value,
     }),
   )
+  const maxSide = ref(
+    imageQuality.isSettled.value
+      ? requestedMaxSide.value
+      : resolveCanvasImagePreviewMaxSide({ zoomLevel: imageQuality.zoomLevel.value }),
+  )
+  watch(
+    [imageQuality.isSettled, requestedMaxSide],
+    ([isSettled, requested]) => {
+      if (isSettled) maxSide.value = requested
+    },
+    { flush: 'sync' },
+  )
 
-  return { maxSide }
+  return { maxSide: readonly(maxSide) }
 }

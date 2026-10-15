@@ -102,7 +102,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
   const imageWorkflow = createCanvasWorkspaceImageWorkflow({
     board,
     graph,
-    flowPaneAdapter: options.flowPaneAdapter,
+    flowPaneAdapter: { ...options.flowPaneAdapter, ...viewport.viewportCommands },
     flushAutosave: flushAutosaveWithViewportPersistence,
     openImageUrlPreview: options.openImageUrlPreview,
     ui: options.imageWorkflowUi,

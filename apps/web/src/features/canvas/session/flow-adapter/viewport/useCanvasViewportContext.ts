@@ -8,6 +8,8 @@ import {
   type Ref,
 } from 'vue'
 
+import type { CanvasImageQuality } from './useCanvasImageQualityZoom'
+
 export const DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL = 100
 
 export function resolveCanvasNodeUiScale(zoomLevel: number): number {
@@ -17,20 +19,28 @@ export function resolveCanvasNodeUiScale(zoomLevel: number): number {
 
 export type CanvasViewportContext = {
   zoomLevel: Readonly<Ref<number>>
-  qualityZoomLevel: Readonly<Ref<number>>
+  imageQuality: CanvasImageQuality
 }
 
 const CANVAS_VIEWPORT_CONTEXT_KEY: InjectionKey<CanvasViewportContext> = Symbol('canvas:viewport')
 
 const defaultCanvasViewportContext: CanvasViewportContext = {
   zoomLevel: readonly(ref(DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL)),
-  qualityZoomLevel: readonly(ref(DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL)),
+  imageQuality: {
+    zoomLevel: readonly(ref(DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL)),
+    isSettled: readonly(ref(true)),
+    requestSettle: () => {},
+  },
 }
 
 export function provideCanvasViewportContext(context: CanvasViewportContext) {
   provide(CANVAS_VIEWPORT_CONTEXT_KEY, {
     zoomLevel: readonly(context.zoomLevel),
-    qualityZoomLevel: readonly(context.qualityZoomLevel),
+    imageQuality: {
+      zoomLevel: readonly(context.imageQuality.zoomLevel),
+      isSettled: readonly(context.imageQuality.isSettled),
+      requestSettle: context.imageQuality.requestSettle,
+    },
   })
 }
 

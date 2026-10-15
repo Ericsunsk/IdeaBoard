@@ -224,7 +224,7 @@ const shouldForceFullPreviewQuality = computed(
 )
 const canvasViewport = useCanvasViewportContext()
 const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
-  zoomLevel: canvasViewport.qualityZoomLevel,
+  imageQuality: canvasViewport.imageQuality,
   shouldForceFullQuality: shouldForceFullPreviewQuality,
 })
 const {

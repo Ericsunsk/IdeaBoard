@@ -1,5 +1,11 @@
 import { onScopeDispose, readonly, ref, watch, type Ref } from 'vue'
 
+export type CanvasImageQuality = {
+  zoomLevel: Readonly<Ref<number>>
+  isSettled: Readonly<Ref<boolean>>
+  requestSettle: () => void
+}
+
 const IMAGE_QUALITY_SETTLE_DELAY_MS = 80
 
 export function useCanvasImageQualityZoom(
@@ -7,6 +13,7 @@ export function useCanvasImageQualityZoom(
   getScopeKey: () => string,
 ) {
   const qualityZoomLevel = ref(zoomLevel.value)
+  const isSettled = ref(true)
   const movements = new Set<symbol>()
   let settleTimer: ReturnType<typeof setTimeout> | undefined
   let isDisposed = false
@@ -18,15 +25,19 @@ export function useCanvasImageQualityZoom(
 
   function scheduleSettle() {
     clearSettleTimer()
-    if (isDisposed || movements.size > 0 || qualityZoomLevel.value === zoomLevel.value) return
+    if (isDisposed) return
+    isSettled.value = false
+    if (movements.size > 0) return
     settleTimer = setTimeout(() => {
       settleTimer = undefined
       qualityZoomLevel.value = zoomLevel.value
+      isSettled.value = true
     }, IMAGE_QUALITY_SETTLE_DELAY_MS)
   }
 
   function beginMovement() {
     clearSettleTimer()
+    isSettled.value = false
     const movement = Symbol()
     movements.add(movement)
     return () => {
@@ -41,6 +52,7 @@ export function useCanvasImageQualityZoom(
       clearSettleTimer()
       movements.clear()
       qualityZoomLevel.value = zoomLevel.value
+      isSettled.value = true
     },
     { flush: 'sync' },
   )
@@ -50,5 +62,10 @@ export function useCanvasImageQualityZoom(
     movements.clear()
   })
 
-  return { qualityZoomLevel: readonly(qualityZoomLevel), beginMovement }
+  const imageQuality: CanvasImageQuality = {
+    zoomLevel: readonly(qualityZoomLevel),
+    isSettled: readonly(isSettled),
+    requestSettle: scheduleSettle,
+  }
+  return { imageQuality, beginMovement }
 }

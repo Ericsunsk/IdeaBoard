@@ -66,7 +66,10 @@ function renderHandles(props: { kind: NodeKind; isDisabled?: boolean }) {
   const Host = defineComponent({
     setup() {
       proximitySurface = provideCanvasHandleProximityCoordinator(geometry, coordinator)
-      provideCanvasViewportContext({ zoomLevel, qualityZoomLevel: ref(100) })
+      provideCanvasViewportContext({
+        zoomLevel,
+        imageQuality: { zoomLevel: ref(100), isSettled: ref(true), requestSettle: vi.fn() },
+      })
       return () =>
         h('div', { ref: interactionRoot, 'data-testid': 'interaction-root' }, [
           h(FlowCanvasNodeHandleRail, {

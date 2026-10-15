@@ -1,6 +1,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import { useEventListener, useResizeObserver } from '@vueuse/core'
+import { resolveMotionTiming } from '../../../../../core/motion/motionPolicy'
 import { CANVAS_VIEWPORT_MIN_ZOOM } from '../../../session/browser/canvasViewportStorage'
 import { IMAGE_TOOL_CHROME_LAYOUT } from '../../image-tools/core'
 import { useRafScheduler } from '../../../session/browser/interaction/useRafScheduler.ts'
@@ -196,7 +197,7 @@ export function useRetouchCoordinateAdapter(options: UseRetouchCoordinateAdapter
     if (!target || !isRetouchFocusRequestCurrent(nodeId, requestId)) return
     await options.setCenter(target.x, target.y, {
       zoom: target.zoom,
-      duration: 220,
+      duration: resolveMotionTiming('enter').durationMs,
       interpolate: 'smooth',
     })
   }
@@ -217,7 +218,10 @@ export function useRetouchCoordinateAdapter(options: UseRetouchCoordinateAdapter
     const viewport = retouchReturnViewport
     if (!viewport) return
     retouchReturnViewport = null
-    void options.setViewport({ ...viewport }, { duration: 220, interpolate: 'smooth' })
+    void options.setViewport(
+      { ...viewport },
+      { duration: resolveMotionTiming('exit').durationMs, interpolate: 'smooth' },
+    )
     scheduleRetouchChromeAnchorUpdate()
   }
 

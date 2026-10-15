@@ -28,7 +28,7 @@ export function createCanvasWorkspaceRuntimeFacade(
       persistence: { history: persistence.history },
       viewportControls: {
         zoomLevel: viewport.zoomLevel,
-        qualityZoomLevel: viewport.qualityZoomLevel,
+        imageQuality: viewport.imageQuality,
       },
       graphEditing: graph.viewModel,
       imageWorkflow: imageWorkflow.viewModel,

@@ -1,7 +1,12 @@
 import type { Actions, Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import type { CanvasFlowViewport } from './viewport/useCanvasViewportRuntime'
 import type { CanvasRendererMetricsPort } from './viewport/canvasRendererMetrics'
+
+export type CanvasFlowViewport = {
+  x: number
+  y: number
+  zoom: number
+}
 
 type ValueRef<T> = {
   readonly value: T

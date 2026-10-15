@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { effectScope, ref } from 'vue'
-import { useCanvasViewportRuntime, type CanvasFlowViewport } from './useCanvasViewportRuntime'
+import { effectScope, ref, watch } from 'vue'
+import { useCanvasImagePreviewQuality } from './useCanvasImagePreviewQuality'
+import { useCanvasViewportRuntime } from './useCanvasViewportRuntime'
+import type { CanvasFlowViewport } from '../adapterContracts'
 import type { CanvasViewportPersistence } from '../../browser/canvasViewportPersistence.ts'
 
 const frameProbeMocks = vi.hoisted(() => ({
@@ -137,15 +139,111 @@ describe('useCanvasViewportRuntime', () => {
       harness.viewport.value = { x: 0, y: 0, zoom }
       harness.runtime.onFlowMove({ flowTransform: harness.viewport.value })
       vi.advanceTimersByTime(150)
-      expect(harness.runtime.qualityZoomLevel.value).toBe(100)
+      expect(harness.runtime.imageQuality.zoomLevel.value).toBe(100)
     }
     harness.viewport.value = { x: 0, y: 0, zoom: 2 }
     expect(harness.runtime.zoomLevel.value).toBe(200)
-    expect(harness.runtime.qualityZoomLevel.value).toBe(100)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(100)
 
     harness.runtime.onFlowMoveEnd({ flowTransform: harness.viewport.value })
     vi.advanceTimersByTime(80)
-    expect(harness.runtime.qualityZoomLevel.value).toBe(200)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(200)
+    harness.scope.stop()
+  })
+
+  it.each(['setCenter', 'setViewport'] as const)(
+    'holds tool quality until %s completes without a native move-end event',
+    async (command) => {
+      vi.useFakeTimers()
+      const harness = createViewportRuntimeHarness()
+      const shouldForceFullQuality = ref(false)
+      const changedTier = vi.fn()
+      const preview = harness.scope.run(() => {
+        const quality = useCanvasImagePreviewQuality({
+          imageQuality: harness.runtime.imageQuality,
+          shouldForceFullQuality,
+        })
+        watch(quality.maxSide, changedTier, { flush: 'sync' })
+        return quality
+      })
+      let finishCommand: (() => void) | undefined
+      harness[command].mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishCommand = resolve
+          }),
+      )
+      shouldForceFullQuality.value = true
+      const completion =
+        command === 'setCenter'
+          ? harness.runtime.viewportCommands.setCenter(100, 100, { duration: 220, zoom: 2 })
+          : harness.runtime.viewportCommands.setViewport(
+              { x: 100, y: 100, zoom: 2 },
+              { duration: 220 },
+            )
+      for (const zoom of [1.2, 1.6, 2]) {
+        harness.viewport.value = { x: 0, y: 0, zoom }
+        harness.runtime.onFlowMove({ flowTransform: harness.viewport.value })
+        vi.advanceTimersByTime(150)
+        expect(preview?.maxSide.value).toBe(640)
+      }
+      finishCommand?.()
+      await completion
+      vi.advanceTimersByTime(79)
+      expect(preview?.maxSide.value).toBe(640)
+      vi.advanceTimersByTime(1)
+      expect(preview?.maxSide.value).toBeNull()
+      expect(changedTier).toHaveBeenCalledOnce()
+      harness.scope.stop()
+    },
+  )
+
+  it('releases an interrupted focus when a new viewport command replaces it', async () => {
+    vi.useFakeTimers()
+    const harness = createViewportRuntimeHarness()
+    harness.setCenter.mockImplementationOnce(() => new Promise<void>(() => {}))
+    const focus = harness.runtime.viewportCommands.setCenter(100, 100, { duration: 220, zoom: 2 })
+    harness.viewport.value = { x: 0, y: 0, zoom: 1.5 }
+    harness.runtime.onFlowMove({ flowTransform: harness.viewport.value })
+    await harness.runtime.viewportCommands.setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 220 })
+    await expect(focus).resolves.toBe(false)
+    vi.advanceTimersByTime(80)
+    expect(harness.runtime.imageQuality.isSettled.value).toBe(true)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(100)
+    harness.scope.stop()
+  })
+
+  it('retains the native movement lock when it interrupts a focus command', async () => {
+    vi.useFakeTimers()
+    const harness = createViewportRuntimeHarness()
+    harness.setCenter.mockImplementationOnce(() => new Promise<void>(() => {}))
+    const focus = harness.runtime.viewportCommands.setCenter(100, 100, { duration: 220, zoom: 2 })
+    harness.runtime.onFlowMoveStart()
+    harness.viewport.value = { x: 0, y: 0, zoom: 1.5 }
+    harness.runtime.onFlowMove({
+      event: { sourceEvent: new WheelEvent('wheel') },
+      flowTransform: harness.viewport.value,
+    })
+    await expect(focus).resolves.toBe(false)
+    vi.advanceTimersByTime(500)
+    expect(harness.runtime.imageQuality.isSettled.value).toBe(false)
+    harness.runtime.onFlowMoveEnd({ flowTransform: harness.viewport.value })
+    vi.advanceTimersByTime(80)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(150)
+    harness.scope.stop()
+  })
+
+  it('releases programmatic movement when a viewport command fails', async () => {
+    vi.useFakeTimers()
+    const harness = createViewportRuntimeHarness()
+    harness.setCenter.mockImplementationOnce(() => Promise.reject(new Error('camera failed')))
+    await expect(harness.runtime.viewportCommands.setCenter(100, 100)).rejects.toThrow(
+      'camera failed',
+    )
+    harness.viewport.value = { x: 0, y: 0, zoom: 2 }
+    vi.advanceTimersByTime(80)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(200)
+    expect(harness.runtime.imageQuality.isSettled.value).toBe(true)
     harness.scope.stop()
   })
 
@@ -157,9 +255,9 @@ describe('useCanvasViewportRuntime', () => {
       harness.viewport.value = { x: 0, y: 0, zoom }
       expect(harness.runtime.zoomLevel.value).toBe(Math.round(zoom * 100))
       vi.advanceTimersByTime(79)
-      expect(harness.runtime.qualityZoomLevel.value).toBe(100)
+      expect(harness.runtime.imageQuality.zoomLevel.value).toBe(100)
       vi.advanceTimersByTime(1)
-      expect(harness.runtime.qualityZoomLevel.value).toBe(zoom * 100)
+      expect(harness.runtime.imageQuality.zoomLevel.value).toBe(zoom * 100)
       harness.scope.stop()
     },
   )
@@ -171,15 +269,15 @@ describe('useCanvasViewportRuntime', () => {
     harness.viewport.value = { x: 0, y: 0, zoom: 1.5 }
     harness.runtime.onFlowMove({ flowTransform: harness.viewport.value })
     harness.currentBoardId.value = 'board-b'
-    expect(harness.runtime.qualityZoomLevel.value).toBe(150)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(150)
     harness.runtime.onFlowMoveStart()
     harness.viewport.value = { x: 0, y: 0, zoom: 2 }
     harness.runtime.onFlowMove({ flowTransform: harness.viewport.value })
     vi.advanceTimersByTime(500)
-    expect(harness.runtime.qualityZoomLevel.value).toBe(150)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(150)
     harness.runtime.onFlowMoveEnd({ flowTransform: harness.viewport.value })
     vi.advanceTimersByTime(80)
-    expect(harness.runtime.qualityZoomLevel.value).toBe(200)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(200)
     harness.scope.stop()
   })
 
@@ -190,7 +288,7 @@ describe('useCanvasViewportRuntime', () => {
     harness.runtime.onZoomIn()
     await flushPromises()
     vi.advanceTimersByTime(80)
-    expect(harness.runtime.qualityZoomLevel.value).toBe(125)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(125)
     harness.scope.stop()
   })
 
@@ -200,10 +298,10 @@ describe('useCanvasViewportRuntime', () => {
     harness.runtime.onFlowMoveStart()
     harness.viewport.value = { x: 0, y: 0, zoom: 2 }
     vi.advanceTimersByTime(80)
-    expect(harness.runtime.qualityZoomLevel.value).toBe(200)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(200)
     harness.viewport.value = { x: 0, y: 0, zoom: 1 }
     vi.advanceTimersByTime(80)
-    expect(harness.runtime.qualityZoomLevel.value).toBe(100)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(100)
     harness.scope.stop()
   })
 
@@ -213,9 +311,9 @@ describe('useCanvasViewportRuntime', () => {
     harness.runtime.onNodeDragStart()
     harness.runtime.onZoomIn()
     await flushPromises()
-    expect(harness.runtime.qualityZoomLevel.value).toBe(100)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(100)
     vi.advanceTimersByTime(80)
-    expect(harness.runtime.qualityZoomLevel.value).toBe(125)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(125)
 
     localStorage.setItem(
       'ideaboard:canvas:view:user-uid:board-a',
@@ -224,7 +322,7 @@ describe('useCanvasViewportRuntime', () => {
     await harness.runtime.loadBoardAndProbe()
     expect(harness.runtime.zoomLevel.value).toBe(200)
     vi.advanceTimersByTime(80)
-    expect(harness.runtime.qualityZoomLevel.value).toBe(200)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(200)
     harness.runtime.onNodeDragStop()
     harness.scope.stop()
   })
@@ -243,13 +341,13 @@ describe('useCanvasViewportRuntime', () => {
     harness.runtime.onZoomIn()
     vi.advanceTimersByTime(500)
     expect(harness.runtime.zoomLevel.value).toBe(150)
-    expect(harness.runtime.qualityZoomLevel.value).toBe(100)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(100)
 
     finishAnimation()
     await flushPromises()
     expect(harness.runtime.zoomLevel.value).toBe(200)
     vi.advanceTimersByTime(80)
-    expect(harness.runtime.qualityZoomLevel.value).toBe(200)
+    expect(harness.runtime.imageQuality.zoomLevel.value).toBe(200)
     harness.scope.stop()
   })
 

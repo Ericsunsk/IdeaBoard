@@ -10793,6 +10793,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/tools/retouch/session/useRetouchCoordinateAdapter.ts",
+          "to": "src/core/motion/motionPolicy.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.vue",
           "to": "src/core/motion/motionPolicy.ts",
           "kind": "runtime"
@@ -10801,11 +10806,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
           "to": "src/core/motion/motionPolicy.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/useCanvasImageLightbox.ts",
+          "to": "src/core/motion/motionPolicy.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 6,
+      "measuredFanIn": 8,
       "measuredFanOut": 0,
-      "targetFanIn": 6,
+      "targetFanIn": 8,
       "targetFanOut": 0,
       "ownershipScope": ["src/core/motion/motionPolicy.ts"],
       "publicExports": [
@@ -20313,9 +20323,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 16,
-      "measuredFanOut": 33,
+      "measuredFanOut": 34,
       "targetFanIn": 16,
-      "targetFanOut": 33,
+      "targetFanOut": 34,
       "ownershipScope": ["src/features/canvas/tools/retouch/"],
       "publicExports": [
         "ImageRetouchKind",
@@ -20370,6 +20380,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/mediaAssetDelivery.ts",
         "src/app/style.css",
         "src/core/i18n/index.ts",
+        "src/core/motion/motionPolicy.ts",
         "src/core/utils/number.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/core/graph/index.ts",
@@ -20993,9 +21004,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 45,
+      "measuredFanOut": 46,
       "targetFanIn": 1,
-      "targetFanOut": 45,
+      "targetFanOut": 46,
       "ownershipScope": ["src/features/canvas/ui/screens/"],
       "publicExports": ["CanvasScreen"],
       "targetFanOutTargets": [
@@ -21018,6 +21029,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/interaction/pointerDrag.ts",
         "src/core/interaction/pointerDropTargets.ts",
         "src/core/media/imageDimensions.ts",
+        "src/core/motion/motionPolicy.ts",
         "src/core/router/queryParams.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/core/graph/index.ts",
@@ -22832,7 +22844,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/media/visionIngressPolicy.ts`                                      | canonical | core          | 8       | 6 → 6                    | 2 → 2                     |
 | `src/core/motion/chartMotion.ts`                                             | canonical | core          | 1       | 3 → 3                    | 2 → 2                     |
 | `src/core/motion/dialogMotion.ts`                                            | canonical | core          | 1       | 1 → 1                    | 1 → 1                     |
-| `src/core/motion/motionPolicy.ts`                                            | canonical | core          | 6       | 6 → 6                    | 0 → 0                     |
+| `src/core/motion/motionPolicy.ts`                                            | canonical | core          | 6       | 8 → 8                    | 0 → 0                     |
 | `src/core/motion/popoverMotion.ts`                                           | canonical | core          | 3       | 6 → 6                    | 2 → 2                     |
 | `src/core/query/queryClient.ts`                                              | canonical | core          | 2       | 16 → 16                  | 1 → 1                     |
 | `src/core/query/queryDefaults.ts`                                            | canonical | core          | 5       | 18 → 18                  | 0 → 0                     |
@@ -22957,7 +22969,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/tools/image-tools/ui/chrome.ts`                         | canonical | canvas        | 1       | 2 → 2                    | 1 → 1                     |
 | `src/features/canvas/tools/image-tools/ui/stage.ts`                          | canonical | canvas        | 1       | 1 → 1                    | 1 → 1                     |
 | `src/features/canvas/tools/inpaint/index.ts`                                 | canonical | canvas        | 6       | 8 → 8                    | 15 → 15                   |
-| `src/features/canvas/tools/retouch/index.ts`                                 | canonical | canvas        | 36      | 16 → 16                  | 33 → 33                   |
+| `src/features/canvas/tools/retouch/index.ts`                                 | canonical | canvas        | 36      | 16 → 16                  | 34 → 34                   |
 | `src/features/canvas/tools/retouch/testing/browser.ts`                       | canonical | canvas        | 2       | 1 → 1                    | 4 → 4                     |
 | `src/features/canvas/ui/chrome/components/index.ts`                          | canonical | canvas        | 6       | 1 → 1                    | 12 → 12                   |
 | `src/features/canvas/ui/nodes/groups/index.ts`                               | canonical | canvas        | 4       | 4 → 4                    | 8 → 8                     |
@@ -22968,7 +22980,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/ui/overlays/index.ts`                                   | canonical | canvas        | 5       | 9 → 9                    | 14 → 14                   |
 | `src/features/canvas/ui/pages/CanvasLandingPage.vue`                         | canonical | canvas        | 1       | 3 → 3                    | 10 → 10                   |
 | `src/features/canvas/ui/pages/CanvasPage.vue`                                | canonical | canvas        | 1       | 3 → 3                    | 4 → 4                     |
-| `src/features/canvas/ui/screens/index.ts`                                    | canonical | canvas        | 1       | 1 → 1                    | 45 → 45                   |
+| `src/features/canvas/ui/screens/index.ts`                                    | canonical | canvas        | 1       | 1 → 1                    | 46 → 46                   |
 | `src/features/canvas/ui/screens/useFlowActiveNodePanels.ts`                  | canonical | canvas        | 4       | 5 → 5                    | 1 → 1                     |
 | `src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts`            | canonical | canvas        | 2       | 4 → 4                    | 1 → 1                     |
 | `src/features/legal/index.ts`                                                | canonical | legal         | 7       | 0 → 0                    | 6 → 6                     |

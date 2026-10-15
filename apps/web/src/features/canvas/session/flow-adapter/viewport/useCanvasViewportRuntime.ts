@@ -12,13 +12,8 @@ import {
 } from '../../browser/canvasViewportPersistence.ts'
 import { CANVAS_VIEWPORT_MIN_ZOOM } from '../../browser/canvasViewportStorage'
 import type { BoardLoadResult } from '../../board-session'
+import type { CanvasFlowViewport, CanvasFlowViewportControls } from '../adapterContracts'
 import { useCanvasImageQualityZoom } from './useCanvasImageQualityZoom'
-
-export type CanvasFlowViewport = {
-  x: number
-  y: number
-  zoom: number
-}
 
 export type CanvasFlowMovePayload = {
   flowTransform?: {
@@ -26,6 +21,7 @@ export type CanvasFlowMovePayload = {
     y?: number
     zoom?: number
   }
+  event?: { sourceEvent?: unknown }
 }
 
 type CanvasViewportRuntimeInteraction = 'flow-viewport' | 'viewport-pan' | 'node-drag'
@@ -52,16 +48,6 @@ export type UseCanvasViewportRuntimeOptions = {
   currentBoardId: ReadonlyValueRef<string | null>
   getUserUid: () => string
   viewport: Readonly<Ref<CanvasFlowViewport>>
-  getViewport: () => CanvasFlowViewport
-  setViewport: (
-    viewport: CanvasFlowViewport,
-    options?: { duration?: number },
-  ) => Promise<unknown> | unknown
-  setCenter: (
-    x: number,
-    y: number,
-    options?: { duration?: number; zoom?: number },
-  ) => Promise<unknown> | unknown
   zoomIn: () => Promise<unknown> | unknown
   zoomOut: () => Promise<unknown> | unknown
   panBy: (delta: { x: number; y: number }) => boolean
@@ -70,7 +56,7 @@ export type UseCanvasViewportRuntimeOptions = {
   startCanvasInteraction: (key: CanvasViewportRuntimeInteraction) => void
   stopCanvasInteraction: (key: CanvasViewportRuntimeInteraction) => void
   viewportPersistence?: CanvasViewportPersistence | undefined
-}
+} & Pick<CanvasFlowViewportControls, 'getViewport' | 'setViewport' | 'setCenter'>
 
 function viewportKey(viewport: CanvasFlowViewport) {
   return `${viewport.x}:${viewport.y}:${viewport.zoom}`
@@ -90,6 +76,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   let lastRequestedMiniMapViewportKey: string | null = null
   let lastSuccessfulMiniMapViewportKey: string | null = null
   let programmaticViewportCommitDepth = 0
+  let cancelViewportCommand: (() => void) | undefined
   let viewportMoveStartZoom: number | null = null
   let finishFlowQualityMovement: (() => void) | undefined
 
@@ -113,7 +100,14 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     getViewportScopeKey,
   )
 
-  watch(getViewportScopeKey, finishFlowMovement, { flush: 'sync' })
+  watch(
+    getViewportScopeKey,
+    () => {
+      cancelViewportCommand?.()
+      finishFlowMovement()
+    },
+    { flush: 'sync' },
+  )
 
   function getViewportScopeKey() {
     return JSON.stringify([options.getUserUid(), options.currentBoardId.value])
@@ -155,16 +149,25 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   async function runAndPersistViewportCommand(run: () => Promise<unknown> | unknown) {
+    cancelViewportCommand?.()
+    let cancelCommand: () => void = () => {}
+    const interrupted = new Promise<false>((resolve) => {
+      cancelCommand = () => resolve(false)
+    })
+    cancelViewportCommand = cancelCommand
     const finishQualityMovement = imageQualityZoom.beginMovement()
     programmaticViewportCommitDepth += 1
     try {
-      const result = await run()
-      if (result === false) return
-
-      viewportPersistence.scheduleDelayedPersist()
+      const result = await Promise.race([run(), interrupted])
+      if (result !== false) viewportPersistence.scheduleDelayedPersist()
+      return result
     } finally {
+      if (cancelViewportCommand === cancelCommand) cancelViewportCommand = undefined
       programmaticViewportCommitDepth -= 1
       finishQualityMovement()
+      if (programmaticViewportCommitDepth === 0 && !finishFlowQualityMovement) {
+        endViewportFrameProbe('viewport-command-end')
+      }
     }
   }
 
@@ -403,13 +406,16 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   function onFlowMoveStart() {
+    cancelViewportCommand?.()
     viewportMoveStartZoom = options.viewport.value.zoom
     options.closeBoardHeaderEditing()
     options.startCanvasInteraction('flow-viewport')
   }
 
   function onFlowMove(payload: CanvasFlowMovePayload) {
-    finishFlowQualityMovement ??= imageQualityZoom.beginMovement()
+    if (programmaticViewportCommitDepth === 0 || payload.event?.sourceEvent) {
+      finishFlowQualityMovement ??= imageQualityZoom.beginMovement()
+    }
     observeViewportMove(payload.flowTransform)
   }
 
@@ -442,6 +448,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   function cleanupFrameProbes() {
+    cancelViewportCommand?.()
     finishFlowMovement()
     clearPendingMiniMapDragFrame()
     isPendingMiniMapDragEnd = false
@@ -462,7 +469,13 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
 
   return {
     zoomLevel,
-    qualityZoomLevel: imageQualityZoom.qualityZoomLevel,
+    imageQuality: imageQualityZoom.imageQuality,
+    viewportCommands: {
+      setViewport: (...args: Parameters<CanvasFlowViewportControls['setViewport']>) =>
+        runAndPersistViewportCommand(() => options.setViewport(...args)),
+      setCenter: (...args: Parameters<CanvasFlowViewportControls['setCenter']>) =>
+        runAndPersistViewportCommand(() => options.setCenter(...args)),
+    },
     onZoomIn,
     onZoomOut,
     onPanViewport,

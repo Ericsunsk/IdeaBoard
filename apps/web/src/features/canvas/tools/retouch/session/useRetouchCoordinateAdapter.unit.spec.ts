@@ -1,6 +1,6 @@
 import type { Node } from '@vue-flow/core'
 import { effectScope, nextTick, ref, shallowRef, type Ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useRetouchCoordinateAdapter } from './useRetouchCoordinateAdapter'
 
 type Rect = { left: number; top: number; width: number; height: number }
@@ -94,6 +94,17 @@ function createHarness(
 }
 
 describe('useRetouchCoordinateAdapter', () => {
+  beforeEach(() => {
+    document.documentElement.style.setProperty('--motion-enter-duration', '280ms')
+    document.documentElement.style.setProperty('--motion-exit-duration', '280ms')
+  })
+
+  afterEach(() => {
+    document.documentElement.style.removeProperty('--motion-enter-duration')
+    document.documentElement.style.removeProperty('--motion-exit-duration')
+    vi.restoreAllMocks()
+  })
+
   it('keeps contained editor geometry and chrome anchoring stable at a non-default zoom', async () => {
     const harness = createHarness()
 
@@ -119,7 +130,7 @@ describe('useRetouchCoordinateAdapter', () => {
       expect(harness.setCenter).toHaveBeenCalledWith(
         expect.any(Number),
         212.5,
-        expect.objectContaining({ duration: 220, interpolate: 'smooth' }),
+        expect.objectContaining({ duration: 280, interpolate: 'smooth' }),
       )
     } finally {
       harness.scope.stop()
@@ -221,7 +232,54 @@ describe('useRetouchCoordinateAdapter', () => {
 
       expect(harness.setViewport).toHaveBeenCalledWith(
         { x: 12, y: 24, zoom: 0.8 },
-        { duration: 220, interpolate: 'smooth' },
+        { duration: 280, interpolate: 'smooth' },
+      )
+    } finally {
+      harness.scope.stop()
+    }
+  })
+
+  it('reads enter and exit motion tokens when each viewport command runs', async () => {
+    const harness = createHarness()
+
+    try {
+      document.documentElement.style.setProperty('--motion-enter-duration', '0.34s')
+      await harness.adapter.focusRetouchAndShowChrome('image-1')
+      expect(harness.setCenter).toHaveBeenLastCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        expect.objectContaining({ duration: 340 }),
+      )
+
+      document.documentElement.style.setProperty('--motion-exit-duration', '180ms')
+      harness.retouchState.value = null
+      await nextTick()
+      expect(harness.setViewport).toHaveBeenLastCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ duration: 180 }),
+      )
+    } finally {
+      harness.scope.stop()
+    }
+  })
+
+  it('disables focus and restore animation under reduced motion', async () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
+    const harness = createHarness()
+
+    try {
+      await harness.adapter.focusRetouchAndShowChrome('image-1')
+      expect(harness.setCenter).toHaveBeenLastCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        expect.objectContaining({ duration: 0 }),
+      )
+
+      harness.retouchState.value = null
+      await nextTick()
+      expect(harness.setViewport).toHaveBeenLastCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ duration: 0 }),
       )
     } finally {
       harness.scope.stop()

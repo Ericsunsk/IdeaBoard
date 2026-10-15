@@ -67,6 +67,7 @@ export { releaseCanvasGraphDeleteExecutions } from './projection/flowGraphDelete
 export { useFlowNodeInternalsRefreshQueue } from './handles/useFlowNodeInternalsRefreshQueue'
 export { patchFlowSnapshotParam } from './projection/flowSnapshotParamMutations'
 export { FLOW_NODE_DRAG_HANDLE } from './projection/flowNodeDragHandle'
+export type { CanvasImageQuality } from './viewport/useCanvasImageQualityZoom'
 export { useCanvasViewportRuntime } from './viewport/useCanvasViewportRuntime'
 export {
   useCanvasNodeUiStateContext,

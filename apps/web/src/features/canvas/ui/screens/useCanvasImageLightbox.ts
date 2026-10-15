@@ -9,6 +9,7 @@ import {
   resolveMediaAssetOriginalURL,
 } from '../../../../api/mediaAssetDelivery.ts'
 import { readImageNaturalSize } from '../../../../core/media/imageDimensions.ts'
+import { resolveMotionTiming } from '../../../../core/motion/motionPolicy'
 import PhotoSwipeLightbox from 'photoswipe/lightbox'
 import 'photoswipe/style.css'
 
@@ -133,16 +134,25 @@ export function useCanvasImageLightbox() {
   let previewRequestId = 0
 
   function ensureLightbox(): PhotoSwipeLightbox {
-    if (lightbox) return lightbox
-    lightbox = new PhotoSwipeLightbox({
-      dataSource: [],
-      pswpModule: () => import('photoswipe'),
-      bgOpacity: 0.9,
-      wheelToZoom: true,
-      pinchToClose: true,
-      showHideAnimationType: 'zoom',
+    if (!lightbox) {
+      lightbox = new PhotoSwipeLightbox({
+        dataSource: [],
+        pswpModule: () => import('photoswipe'),
+        bgOpacity: 0.9,
+        wheelToZoom: true,
+        pinchToClose: true,
+        showHideAnimationType: 'zoom',
+      })
+      lightbox.init()
+    }
+    const enter = resolveMotionTiming('enter')
+    const exit = resolveMotionTiming('exit')
+    Object.assign(lightbox.options, {
+      showAnimationDuration: enter.durationMs,
+      hideAnimationDuration: exit.durationMs,
+      zoomAnimationDuration: enter.durationMs,
+      easing: enter.easing,
     })
-    lightbox.init()
     return lightbox
   }
 

@@ -301,7 +301,10 @@ function createRuntimeViewModel() {
       boardOptions: ref([]),
     },
     persistence: { history: { undo: vi.fn(), redo: vi.fn() } },
-    viewportControls: { zoomLevel: ref(100), qualityZoomLevel: ref(100) },
+    viewportControls: {
+      zoomLevel: ref(100),
+      imageQuality: { zoomLevel: ref(100), isSettled: ref(true), requestSettle: vi.fn() },
+    },
     graphEditing: {
       hasSelectedFlowNodes: ref(false),
       isFlowInteractionActive: ref(false),
@@ -739,7 +742,7 @@ describe('CanvasScreen', () => {
     await nextTick()
 
     expect(surface.style.getPropertyValue('--canvas-node-ui-scale')).toBe('2')
-    expect(view.harness.runtime.viewModel.viewportControls.qualityZoomLevel.value).toBe(100)
+    expect(view.harness.runtime.viewModel.viewportControls.imageQuality.zoomLevel.value).toBe(100)
   })
 
   it('highlights outgoing edges as their source selection changes without selecting the edges', () => {

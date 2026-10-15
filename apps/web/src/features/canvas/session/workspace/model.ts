@@ -2,7 +2,7 @@ import type { Edge, EdgeChange, GraphNode, Node, NodeChange } from '@vue-flow/co
 import type { ComputedRef, Ref } from 'vue'
 import type { CanvasCreatableNodeKind, CanvasNodeItemByKind } from '../../../board/ports/canvas'
 import type { CanvasGroupRuntimeCommands, CanvasGroupRuntimeView } from '../graph-editing'
-import type { CanvasVueFlowConnectionAdapter } from '../../session/flow-adapter'
+import type { CanvasImageQuality, CanvasVueFlowConnectionAdapter } from '../../session/flow-adapter'
 import type { CanvasGraphNodeIdForKind } from '../../core/graph'
 import type { CanvasImageWorkflow } from '../image-workflow'
 import type {
@@ -64,7 +64,7 @@ type CanvasWorkspaceRuntimeViewModel = {
   }
   viewportControls: {
     zoomLevel: ComputedRef<number>
-    qualityZoomLevel: Readonly<Ref<number>>
+    imageQuality: CanvasImageQuality
   }
   graphEditing: {
     hasSelectedFlowNodes: ComputedRef<boolean>

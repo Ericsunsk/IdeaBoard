@@ -46,7 +46,7 @@
               :class="[
                 effectiveCollapsed
                   ? 'pointer-events-none opacity-0 -translate-x-3 duration-[var(--motion-exit-duration)] ease-[var(--motion-exit-easing)]'
-                  : 'opacity-100 translate-x-0 delay-75 duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]',
+                  : 'opacity-100 translate-x-0 duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]',
               ]"
             >
               {{ projectName || 'IdeaBoard' }}
@@ -124,7 +124,7 @@
                 :class="[
                   effectiveCollapsed
                     ? 'pointer-events-none opacity-0 -translate-x-3 -translate-y-1.5 scale-95 duration-[var(--motion-exit-duration)] ease-[var(--motion-exit-easing)]'
-                    : 'opacity-100 translate-x-0 translate-y-0 scale-100 delay-75 duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]',
+                    : 'opacity-100 translate-x-0 translate-y-0 scale-100 duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]',
                 ]"
               >
                 {{ item.label }}

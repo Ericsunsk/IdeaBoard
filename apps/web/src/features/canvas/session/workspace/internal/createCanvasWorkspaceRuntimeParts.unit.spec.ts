@@ -345,7 +345,8 @@ function createWorkspacePartsHarness() {
   const events: string[] = []
   const viewportRuntime = {
     zoomLevel: ref(100),
-    qualityZoomLevel: ref(100),
+    viewportCommands: { setViewport: vi.fn(), setCenter: vi.fn() },
+    imageQuality: { zoomLevel: ref(100), isSettled: ref(true), requestSettle: vi.fn() },
     flushViewportPersistence: vi.fn(() => events.push('viewport')),
     loadBoardAndProbe: vi.fn(),
   }
@@ -368,7 +369,8 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     vi.clearAllMocks()
     mocks.useCanvasViewportRuntime.mockReturnValue({
       zoomLevel: ref(100),
-      qualityZoomLevel: ref(100),
+      viewportCommands: { setViewport: vi.fn(), setCenter: vi.fn() },
+      imageQuality: { zoomLevel: ref(100), isSettled: ref(true), requestSettle: vi.fn() },
       flushViewportPersistence: vi.fn(),
       loadBoardAndProbe: vi.fn(),
     })
@@ -479,7 +481,10 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(mocks.createCanvasWorkspaceImageWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({
         board,
-        flowPaneAdapter: runtimeOptions.flowPaneAdapter,
+        flowPaneAdapter: {
+          ...runtimeOptions.flowPaneAdapter,
+          ...mocks.useCanvasViewportRuntime.mock.results[0]?.value.viewportCommands,
+        },
         flushAutosave: runtime.persistence.flushAutosave,
         openImageUrlPreview: runtimeOptions.openImageUrlPreview,
         ui: runtimeOptions.imageWorkflowUi,

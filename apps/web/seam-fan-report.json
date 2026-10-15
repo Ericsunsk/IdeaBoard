@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "b1d62474235865f0f6e88bdfbc339e16b9624397",
+  "checkpointSha": "696a80a364937d91cfbe6979745ed0523f63ec67",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -12196,6 +12196,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/tools/retouch/session/useRetouchCoordinateAdapter.ts",
+          "to": "src/core/motion/motionPolicy.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.vue",
           "to": "src/core/motion/motionPolicy.ts",
           "kind": "runtime"
@@ -12204,9 +12209,14 @@
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
           "to": "src/core/motion/motionPolicy.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/useCanvasImageLightbox.ts",
+          "to": "src/core/motion/motionPolicy.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 6,
+      "fanIn": 8,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -12214,7 +12224,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 6,
+      "targetFanIn": 8,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -33136,7 +33146,7 @@
         }
       ],
       "fanIn": 16,
-      "fanOut": 33,
+      "fanOut": 34,
       "fanOutTargets": [
         "fs",
         "node_modules/@iconoir/vue/dist/index.js",
@@ -33152,6 +33162,7 @@
         "src/api/mediaAssetDelivery.ts",
         "src/app/style.css",
         "src/core/i18n/index.ts",
+        "src/core/motion/motionPolicy.ts",
         "src/core/utils/number.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/core/graph/index.ts",
@@ -33501,6 +33512,11 @@
         {
           "from": "src/features/canvas/tools/retouch/session/useRetouchCoordinateAdapter.ts",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/retouch/session/useRetouchCoordinateAdapter.ts",
+          "to": "src/core/motion/motionPolicy.ts",
           "kind": "runtime"
         },
         {
@@ -34059,7 +34075,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 16,
-      "targetFanOut": 33,
+      "targetFanOut": 34,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -36891,7 +36907,7 @@
         }
       ],
       "fanIn": 1,
-      "fanOut": 45,
+      "fanOut": 46,
       "fanOutTargets": [
         "node_modules/@testing-library/jest-dom/vitest.js",
         "node_modules/@vue-flow/core/dist/style.css",
@@ -36912,6 +36928,7 @@
         "src/core/interaction/pointerDrag.ts",
         "src/core/interaction/pointerDropTargets.ts",
         "src/core/media/imageDimensions.ts",
+        "src/core/motion/motionPolicy.ts",
         "src/core/router/queryParams.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/core/graph/index.ts",
@@ -37442,6 +37459,11 @@
         },
         {
           "from": "src/features/canvas/ui/screens/useCanvasImageLightbox.ts",
+          "to": "src/core/motion/motionPolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/useCanvasImageLightbox.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
         },
@@ -37561,7 +37583,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 1,
-      "targetFanOut": 45,
+      "targetFanOut": 46,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
