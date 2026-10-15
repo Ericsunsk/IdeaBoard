@@ -10,13 +10,9 @@ import {
 
 export const DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL = 100
 
-export function resolveCanvasViewportZoomScale(zoomLevel: number): number {
-  const normalizedZoom = Number(zoomLevel) / DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL
-  return Number.isFinite(normalizedZoom) && normalizedZoom > 0 ? normalizedZoom : 1
-}
-
 export function resolveCanvasNodeUiScale(zoomLevel: number): number {
-  return 1 / resolveCanvasViewportZoomScale(zoomLevel)
+  const normalizedZoom = Number(zoomLevel) / DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL
+  return Number.isFinite(normalizedZoom) && normalizedZoom > 0 ? 1 / normalizedZoom : 1
 }
 
 export type CanvasViewportContext = {

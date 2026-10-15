@@ -11,10 +11,7 @@ function createHarness() {
     const quality = useCanvasImageQualityZoom(zoomLevel, () => boardId.value)
     const shouldForceFullQuality = ref(false)
     const preview = useCanvasImagePreviewQuality({
-      stageWidth: 800,
-      stageHeight: 600,
       zoomLevel: quality.qualityZoomLevel,
-      devicePixelRatio: 1,
       shouldForceFullQuality,
     })
     const changedTier = vi.fn()
@@ -36,14 +33,14 @@ describe('useCanvasImageQualityZoom', () => {
     vi.advanceTimersByTime(500)
     harness.zoomLevel.value = 160
     vi.advanceTimersByTime(500)
-    expect(harness.maxSide.value).toBe(320)
+    expect(harness.maxSide.value).toBe(256)
     expect(harness.changedTier).not.toHaveBeenCalled()
 
     finish()
-    vi.advanceTimersByTime(199)
-    expect(harness.maxSide.value).toBe(320)
+    vi.advanceTimersByTime(79)
+    expect(harness.maxSide.value).toBe(256)
     vi.advanceTimersByTime(1)
-    expect(harness.maxSide.value).toBeNull()
+    expect(harness.maxSide.value).toBe(1280)
     expect(harness.changedTier).toHaveBeenCalledOnce()
     harness.scope.stop()
   })
@@ -53,15 +50,15 @@ describe('useCanvasImageQualityZoom', () => {
     const finish = harness.beginMovement()
     harness.zoomLevel.value = 80
     finish()
-    vi.advanceTimersByTime(150)
+    vi.advanceTimersByTime(60)
     const finishNext = harness.beginMovement()
     harness.zoomLevel.value = 120
     vi.advanceTimersByTime(300)
     expect(harness.qualityZoomLevel.value).toBe(30)
     finishNext()
-    vi.advanceTimersByTime(150)
+    vi.advanceTimersByTime(60)
     harness.zoomLevel.value = 160
-    vi.advanceTimersByTime(199)
+    vi.advanceTimersByTime(79)
     expect(harness.qualityZoomLevel.value).toBe(30)
     vi.advanceTimersByTime(1)
     expect(harness.qualityZoomLevel.value).toBe(160)
@@ -79,17 +76,17 @@ describe('useCanvasImageQualityZoom', () => {
     harness.shouldForceFullQuality.value = true
     expect(harness.maxSide.value).toBeNull()
     harness.shouldForceFullQuality.value = false
-    expect(harness.maxSide.value).toBe(320)
+    expect(harness.maxSide.value).toBe(256)
     finishSecond()
-    vi.advanceTimersByTime(200)
-    expect(harness.maxSide.value).toBe(1280)
+    vi.advanceTimersByTime(80)
+    expect(harness.maxSide.value).toBe(640)
     harness.scope.stop()
   })
 
   it('does not publish a tier change when the settled zoom stays in the same tier', () => {
     const harness = createHarness()
     harness.zoomLevel.value = 25
-    vi.advanceTimersByTime(200)
+    vi.advanceTimersByTime(80)
     expect(harness.qualityZoomLevel.value).toBe(25)
     expect(harness.changedTier).not.toHaveBeenCalled()
     harness.scope.stop()

@@ -1,4 +1,4 @@
-export const motionIntents = ['control', 'enter', 'exit', 'feedback'] as const
+export const motionIntents = ['control', 'enter', 'exit', 'feedback', 'image'] as const
 
 export type MotionIntent = (typeof motionIntents)[number]
 export type MotionPreference = 'no-preference' | 'reduce'
@@ -12,6 +12,8 @@ type MotionCssVariableName =
   | '--motion-exit-easing'
   | '--motion-feedback-duration'
   | '--motion-feedback-easing'
+  | '--motion-image-duration'
+  | '--motion-image-easing'
 
 type MotionCss = Readonly<{
   duration: `var(${MotionCssVariableName})`
@@ -39,6 +41,10 @@ const motionCssByIntent: Record<MotionIntent, MotionCss> = {
   exit: {
     duration: 'var(--motion-exit-duration)',
     easing: 'var(--motion-exit-easing)',
+  },
+  image: {
+    duration: 'var(--motion-image-duration)',
+    easing: 'var(--motion-image-easing)',
   },
   feedback: {
     duration: 'var(--motion-feedback-duration)',

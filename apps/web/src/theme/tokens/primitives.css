@@ -227,6 +227,8 @@
   --primitive-z-1200: 1200;
   --primitive-z-2000: 2000;
   --primitive-duration-160: 160ms;
+  --primitive-duration-200: 200ms;
+  --primitive-easing-image: cubic-bezier(0.16, 1, 0.3, 1);
   --primitive-easing-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
   --primitive-duration-220: 220ms;
   --primitive-duration-0: 0ms;

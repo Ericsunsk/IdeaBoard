@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "1a230dc02ca098ef175deb094c67e5dfab5ab31c",
+  "checkpointSha": "6dc2e68f23814e4d67454a65a1360c310c82d427",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -12199,9 +12199,14 @@
           "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.vue",
           "to": "src/core/motion/motionPolicy.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
+          "to": "src/core/motion/motionPolicy.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 5,
+      "fanIn": 6,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -12209,7 +12214,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 5,
+      "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -23836,11 +23841,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.ts",
-          "to": "src/features/board/ports/canvas.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/graph-editing/groups/groupMembershipRuntime.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
@@ -24081,7 +24081,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 91,
+      "fanIn": 90,
       "fanOut": 59,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
@@ -25015,7 +25015,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 91,
+      "targetFanIn": 90,
       "targetFanOut": 59,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -29968,11 +29968,6 @@
         {
           "from": "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.ts",
           "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.ts",
-          "to": "src/features/board/ports/canvas.ts",
           "kind": "runtime"
         },
         {
@@ -35431,6 +35426,11 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
+          "to": "src/core/motion/motionPolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
         },
@@ -36313,6 +36313,11 @@
         {
           "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
+          "to": "src/core/motion/motionPolicy.ts",
           "kind": "runtime"
         },
         {

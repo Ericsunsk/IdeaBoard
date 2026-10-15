@@ -5,7 +5,6 @@ import {
   type CanvasViewportContext,
   provideCanvasViewportContext,
   resolveCanvasNodeUiScale,
-  resolveCanvasViewportZoomScale,
   useCanvasViewportContext,
 } from './useCanvasViewportContext'
 
@@ -19,17 +18,6 @@ describe('useCanvasViewportContext', () => {
     expect(resolveCanvasNodeUiScale(-100)).toBe(1)
     expect(resolveCanvasNodeUiScale(Number.NaN)).toBe(1)
     expect(resolveCanvasNodeUiScale(Number.POSITIVE_INFINITY)).toBe(1)
-  })
-
-  it('normalizes valid viewport percentages and falls back safely', () => {
-    expect(resolveCanvasViewportZoomScale(50)).toBe(0.5)
-    expect(resolveCanvasViewportZoomScale(100)).toBe(1)
-    expect(resolveCanvasViewportZoomScale(150)).toBe(1.5)
-    expect(resolveCanvasViewportZoomScale(200)).toBe(2)
-    expect(resolveCanvasViewportZoomScale(0)).toBe(1)
-    expect(resolveCanvasViewportZoomScale(-100)).toBe(1)
-    expect(resolveCanvasViewportZoomScale(Number.NaN)).toBe(1)
-    expect(resolveCanvasViewportZoomScale(Number.POSITIVE_INFINITY)).toBe(1)
   })
 
   it('uses the default viewport context outside a provider', () => {

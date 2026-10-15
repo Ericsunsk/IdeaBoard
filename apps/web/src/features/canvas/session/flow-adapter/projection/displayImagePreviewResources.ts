@@ -149,13 +149,26 @@ export function createDisplayPreviewResources() {
     recordPreviewResources()
   }
 
+  function retain(url: string): () => void {
+    const resource = resourcesByUrl.get(url)
+    if (!resource) return () => {}
+    resource.users += 1
+    recordPreviewResources()
+    let isRetained = true
+    return () => {
+      if (!isRetained) return
+      isRetained = false
+      releaseResource(resource)
+    }
+  }
+
   function dispose() {
     if (generated) releaseResource(generated)
     generated = null
     display()
   }
 
-  return { load, display, dispose }
+  return { load, display, retain, dispose }
 }
 
 function runNextPreviewTask() {

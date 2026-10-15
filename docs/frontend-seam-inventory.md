@@ -10796,11 +10796,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.vue",
           "to": "src/core/motion/motionPolicy.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ImageNodeStage.vue",
+          "to": "src/core/motion/motionPolicy.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 6,
       "targetFanOut": 0,
       "ownershipScope": ["src/core/motion/motionPolicy.ts"],
       "publicExports": [
@@ -17157,11 +17162,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.ts",
-          "to": "src/features/board/ports/canvas.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/graph-editing/groups/groupMembershipRuntime.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
@@ -17402,9 +17402,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 91,
+      "measuredFanIn": 90,
       "measuredFanOut": 59,
-      "targetFanIn": 91,
+      "targetFanIn": 90,
       "targetFanOut": 59,
       "ownershipScope": ["src/features/board/"],
       "publicExports": [
@@ -22815,7 +22815,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/media/visionIngressPolicy.ts`                                      | canonical | core          | 8       | 6 → 6                    | 2 → 2                     |
 | `src/core/motion/chartMotion.ts`                                             | canonical | core          | 1       | 3 → 3                    | 2 → 2                     |
 | `src/core/motion/dialogMotion.ts`                                            | canonical | core          | 1       | 1 → 1                    | 1 → 1                     |
-| `src/core/motion/motionPolicy.ts`                                            | canonical | core          | 6       | 5 → 5                    | 0 → 0                     |
+| `src/core/motion/motionPolicy.ts`                                            | canonical | core          | 6       | 6 → 6                    | 0 → 0                     |
 | `src/core/motion/popoverMotion.ts`                                           | canonical | core          | 3       | 6 → 6                    | 2 → 2                     |
 | `src/core/query/queryClient.ts`                                              | canonical | core          | 2       | 16 → 16                  | 1 → 1                     |
 | `src/core/query/queryDefaults.ts`                                            | canonical | core          | 5       | 18 → 18                  | 0 → 0                     |
@@ -22913,7 +22913,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue`                | canonical | admin         | 1       | 2 → 2                    | 3 → 3                     |
 | `src/features/auth/index.ts`                                                 | canonical | auth          | 28      | 28 → 28                  | 46 → 46                   |
 | `src/features/board/index.ts`                                                | canonical | board         | 193     | 50 → 50                  | 59 → 59                   |
-| `src/features/board/ports/canvas.ts`                                         | canonical | board         | 65      | 91 → 91                  | 59 → 59                   |
+| `src/features/board/ports/canvas.ts`                                         | canonical | board         | 65      | 90 → 90                  | 59 → 59                   |
 | `src/features/board/ports/canvasSession.ts`                                  | canonical | board         | 15      | 4 → 4                    | 59 → 59                   |
 | `src/features/board/ports/testing.ts`                                        | canonical | board         | 2       | 5 → 5                    | 1 → 1                     |
 | `src/features/board/testing/index.ts`                                        | canonical | board         | 11      | 18 → 18                  | 5 → 5                     |

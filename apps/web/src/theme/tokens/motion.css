@@ -1,5 +1,5 @@
 /*
- * Motion intent tokens: control/enter/exit/feedback durations and easings.
+ * Motion intent tokens: control/enter/exit/feedback/image durations and easings.
  *
  * Single CSS/JS policy owner with `core/motion/motionPolicy.ts`: CSS
  * transitions and JS timing readers consume these `var()` tokens, and the
@@ -18,6 +18,8 @@
     --motion-exit-easing: var(--primitive-easing-standard);
     --motion-feedback-duration: var(--primitive-duration-160);
     --motion-feedback-easing: var(--primitive-easing-standard);
+    --motion-image-duration: var(--primitive-duration-200);
+    --motion-image-easing: var(--primitive-easing-image);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -26,6 +28,7 @@
       --motion-enter-duration: var(--primitive-duration-0);
       --motion-exit-duration: var(--primitive-duration-0);
       --motion-feedback-duration: var(--primitive-duration-0);
+      --motion-image-duration: var(--primitive-duration-0);
     }
   }
 }

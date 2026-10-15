@@ -135,6 +135,7 @@ describe('useCanvasViewportRuntime', () => {
     harness.runtime.onFlowMoveStart()
     for (let zoom = 1.2; zoom < 2; zoom += 0.2) {
       harness.viewport.value = { x: 0, y: 0, zoom }
+      harness.runtime.onFlowMove({ flowTransform: harness.viewport.value })
       vi.advanceTimersByTime(150)
       expect(harness.runtime.qualityZoomLevel.value).toBe(100)
     }
@@ -143,7 +144,41 @@ describe('useCanvasViewportRuntime', () => {
     expect(harness.runtime.qualityZoomLevel.value).toBe(100)
 
     harness.runtime.onFlowMoveEnd({ flowTransform: harness.viewport.value })
-    vi.advanceTimersByTime(200)
+    vi.advanceTimersByTime(80)
+    expect(harness.runtime.qualityZoomLevel.value).toBe(200)
+    harness.scope.stop()
+  })
+
+  it.each([0.76999, 0.77, 1.37999, 1.38])(
+    'preserves exact image quality zoom at %s while the UI percent stays rounded',
+    (zoom) => {
+      vi.useFakeTimers()
+      const harness = createViewportRuntimeHarness()
+      harness.viewport.value = { x: 0, y: 0, zoom }
+      expect(harness.runtime.zoomLevel.value).toBe(Math.round(zoom * 100))
+      vi.advanceTimersByTime(79)
+      expect(harness.runtime.qualityZoomLevel.value).toBe(100)
+      vi.advanceTimersByTime(1)
+      expect(harness.runtime.qualityZoomLevel.value).toBe(zoom * 100)
+      harness.scope.stop()
+    },
+  )
+
+  it('starts a fresh native movement lock after the board changes during a gesture', () => {
+    vi.useFakeTimers()
+    const harness = createViewportRuntimeHarness()
+    harness.runtime.onFlowMoveStart()
+    harness.viewport.value = { x: 0, y: 0, zoom: 1.5 }
+    harness.runtime.onFlowMove({ flowTransform: harness.viewport.value })
+    harness.currentBoardId.value = 'board-b'
+    expect(harness.runtime.qualityZoomLevel.value).toBe(150)
+    harness.runtime.onFlowMoveStart()
+    harness.viewport.value = { x: 0, y: 0, zoom: 2 }
+    harness.runtime.onFlowMove({ flowTransform: harness.viewport.value })
+    vi.advanceTimersByTime(500)
+    expect(harness.runtime.qualityZoomLevel.value).toBe(150)
+    harness.runtime.onFlowMoveEnd({ flowTransform: harness.viewport.value })
+    vi.advanceTimersByTime(80)
     expect(harness.runtime.qualityZoomLevel.value).toBe(200)
     harness.scope.stop()
   })
@@ -154,7 +189,7 @@ describe('useCanvasViewportRuntime', () => {
     harness.runtime.onFlowMoveStart()
     harness.runtime.onZoomIn()
     await flushPromises()
-    vi.advanceTimersByTime(200)
+    vi.advanceTimersByTime(80)
     expect(harness.runtime.qualityZoomLevel.value).toBe(125)
     harness.scope.stop()
   })
@@ -164,10 +199,10 @@ describe('useCanvasViewportRuntime', () => {
     const harness = createViewportRuntimeHarness()
     harness.runtime.onFlowMoveStart()
     harness.viewport.value = { x: 0, y: 0, zoom: 2 }
-    vi.advanceTimersByTime(200)
+    vi.advanceTimersByTime(80)
     expect(harness.runtime.qualityZoomLevel.value).toBe(200)
     harness.viewport.value = { x: 0, y: 0, zoom: 1 }
-    vi.advanceTimersByTime(200)
+    vi.advanceTimersByTime(80)
     expect(harness.runtime.qualityZoomLevel.value).toBe(100)
     harness.scope.stop()
   })
@@ -179,7 +214,7 @@ describe('useCanvasViewportRuntime', () => {
     harness.runtime.onZoomIn()
     await flushPromises()
     expect(harness.runtime.qualityZoomLevel.value).toBe(100)
-    vi.advanceTimersByTime(200)
+    vi.advanceTimersByTime(80)
     expect(harness.runtime.qualityZoomLevel.value).toBe(125)
 
     localStorage.setItem(
@@ -188,7 +223,7 @@ describe('useCanvasViewportRuntime', () => {
     )
     await harness.runtime.loadBoardAndProbe()
     expect(harness.runtime.zoomLevel.value).toBe(200)
-    vi.advanceTimersByTime(200)
+    vi.advanceTimersByTime(80)
     expect(harness.runtime.qualityZoomLevel.value).toBe(200)
     harness.runtime.onNodeDragStop()
     harness.scope.stop()
@@ -213,7 +248,7 @@ describe('useCanvasViewportRuntime', () => {
     finishAnimation()
     await flushPromises()
     expect(harness.runtime.zoomLevel.value).toBe(200)
-    vi.advanceTimersByTime(200)
+    vi.advanceTimersByTime(80)
     expect(harness.runtime.qualityZoomLevel.value).toBe(200)
     harness.scope.stop()
   })

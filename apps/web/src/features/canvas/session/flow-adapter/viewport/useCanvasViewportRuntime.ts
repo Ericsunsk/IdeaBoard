@@ -1,4 +1,4 @@
-import { computed, getCurrentScope, onScopeDispose, type Ref } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, watch, type Ref } from 'vue'
 import {
   beginCanvasFrameProbe,
   isCanvasFrameProbeEnabled,
@@ -91,6 +91,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   let lastSuccessfulMiniMapViewportKey: string | null = null
   let programmaticViewportCommitDepth = 0
   let viewportMoveStartZoom: number | null = null
+  let finishFlowQualityMovement: (() => void) | undefined
 
   const viewportPersistence =
     options.viewportPersistence ??
@@ -107,9 +108,21 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
       Math.round((Number.isFinite(zoom) && zoom > 0 ? zoom : 1) * 100),
     )
   })
-  const imageQualityZoom = useCanvasImageQualityZoom(zoomLevel, () =>
-    JSON.stringify([options.getUserUid(), options.currentBoardId.value]),
+  const imageQualityZoom = useCanvasImageQualityZoom(
+    computed(() => options.viewport.value.zoom * 100),
+    getViewportScopeKey,
   )
+
+  watch(getViewportScopeKey, finishFlowMovement, { flush: 'sync' })
+
+  function getViewportScopeKey() {
+    return JSON.stringify([options.getUserUid(), options.currentBoardId.value])
+  }
+
+  function finishFlowMovement() {
+    finishFlowQualityMovement?.()
+    finishFlowQualityMovement = undefined
+  }
 
   function getCanvasFrameProbeMetadata() {
     const viewport = options.viewport.value
@@ -396,6 +409,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   function onFlowMove(payload: CanvasFlowMovePayload) {
+    finishFlowQualityMovement ??= imageQualityZoom.beginMovement()
     observeViewportMove(payload.flowTransform)
   }
 
@@ -406,6 +420,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     } finally {
       endViewportFrameProbe('move-end')
       options.stopCanvasInteraction('flow-viewport')
+      finishFlowMovement()
     }
   }
 
@@ -427,6 +442,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   function cleanupFrameProbes() {
+    finishFlowMovement()
     clearPendingMiniMapDragFrame()
     isPendingMiniMapDragEnd = false
     isMiniMapDragActive = false

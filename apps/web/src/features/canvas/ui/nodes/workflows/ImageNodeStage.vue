@@ -22,10 +22,7 @@
     @contextmenu.prevent.stop="onStageContextMenu"
   >
     <template v-if="stageDisplayImage && renderedStageUrl">
-      <StagePresentation
-        v-if="imageToolStageBinding && stageDisplayUrl"
-        :binding="imageToolStageBinding"
-      >
+      <StagePresentation v-if="presentedToolBinding" :binding="presentedToolBinding">
         <img
           :src="renderedStageUrl"
           :loading="isStageVisible ? 'eager' : 'lazy'"
@@ -44,24 +41,35 @@
           @keydown.space.prevent="emit('append-to-canvas')"
         />
       </StagePresentation>
-      <img
-        v-else
-        :src="renderedStageUrl"
-        :loading="isStageVisible ? 'eager' : 'lazy'"
-        decoding="async"
-        class="image-node-stage-image"
-        :class="{ 'is-dragging': isDragging, 'is-tier-loading': !isStageImageLoaded }"
-        :alt="t('canvas.controls.stagePreviewAlt')"
-        draggable="false"
-        role="button"
-        tabindex="0"
-        :aria-label="t('canvas.controls.stagePreviewHint')"
-        @load="onStageImageLoad"
-        @error="onStageImageError"
-        @dblclick="emit('append-to-canvas')"
-        @keydown.enter.prevent="emit('open-preview')"
-        @keydown.space.prevent="emit('append-to-canvas')"
-      />
+      <div v-else :key="presentationKey" class="image-node-stage-media">
+        <Transition
+          name="canvas-image"
+          :css="!shouldForceFullPreviewQuality && getMotionPreference() !== 'reduce'"
+          @before-leave="disableLeavingImage"
+          @after-leave="releaseLeavingImage"
+          @leave-cancelled="releaseLeavingImage"
+        >
+          <img
+            ref="stageImageRef"
+            :key="shouldForceFullPreviewQuality ? 'tool' : renderedStageUrl"
+            :src="renderedStageUrl"
+            :loading="isStageVisible ? 'eager' : 'lazy'"
+            decoding="async"
+            class="image-node-stage-image"
+            :class="{ 'is-dragging': isDragging, 'is-tier-loading': !isStageImageLoaded }"
+            :alt="t('canvas.controls.stagePreviewAlt')"
+            draggable="false"
+            role="button"
+            tabindex="0"
+            :aria-label="t('canvas.controls.stagePreviewHint')"
+            @load="onStageImageLoad"
+            @error="onStageImageError"
+            @dblclick="emit('append-to-canvas')"
+            @keydown.enter.prevent="emit('open-preview')"
+            @keydown.space.prevent="emit('append-to-canvas')"
+          />
+        </Transition>
+      </div>
       <ImageOutpaintOverlay
         v-if="stageDisplayUrl && isOutpaintModeActive && outpaintOverlayStyle"
         :overlay-style="outpaintOverlayStyle"
@@ -135,7 +143,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
+import { getMotionPreference } from '../../../../../core/motion/motionPolicy'
 import { useI18n } from 'vue-i18n'
 import { useElementVisibility } from '@vueuse/core'
 import { useCanvasViewportContext } from '../../../session/flow-adapter'
@@ -215,18 +224,19 @@ const shouldForceFullPreviewQuality = computed(
 )
 const canvasViewport = useCanvasViewportContext()
 const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
-  stageWidth: () => props.stageWidth,
-  stageHeight: () => props.stageHeight,
   zoomLevel: canvasViewport.qualityZoomLevel,
   shouldForceFullQuality: shouldForceFullPreviewQuality,
 })
-const { displayUrl: stageDisplayUrl, contentFallbackUrl: stageContentFallbackUrl } =
-  useDisplayImagePreview(sourceDisplayUrl, {
-    maxSide: previewMaxSide,
-    assetId: () => stageDisplayImage.value?.assetId,
-    isVisible: isStageVisible,
-    shouldKeepPreviousOnSourceChange: true,
-  })
+const {
+  displayUrl: stageDisplayUrl,
+  contentFallbackUrl: stageContentFallbackUrl,
+  retainDisplayUrl,
+} = useDisplayImagePreview(sourceDisplayUrl, {
+  maxSide: previewMaxSide,
+  assetId: () => stageDisplayImage.value?.assetId,
+  isVisible: isStageVisible,
+  shouldKeepPreviousOnSourceChange: true,
+})
 // Media assets are authenticated API resources. Do not bind their API URL as
 // an optimistic <img> fallback while the signed delivery URL is loading: the
 // API URL is not a durable cross-origin image source and can fail before the
@@ -245,6 +255,47 @@ const {
   sourceDisplayUrl.value,
   stageDisplayImage.value?.assetId,
 ])
+const presentationSource = ref(sourceDisplayUrl.value)
+const presentationKey = computed(() =>
+  JSON.stringify([sourceDisplayUrl.value, presentationSource.value]),
+)
+const presentedToolBinding = computed(() =>
+  stageDisplayUrl.value ? props.imageToolStageBinding : null,
+)
+const stageImageRef = ref<HTMLImageElement | null>(null)
+const leavingImageReleases = new Map<Element, () => void>()
+watch(
+  renderedStageUrl,
+  (next, previous) => {
+    const source = sourceDisplayUrl.value
+    if (presentationSource.value !== source) {
+      presentationSource.value = source
+      return
+    }
+    const image = stageImageRef.value
+    const renderedUrl = image?.getAttribute('src')
+    if (!image || !renderedUrl || presentedToolBinding.value) return
+    if (next === renderedUrl) {
+      releaseLeavingImage(image)
+    } else if (
+      next &&
+      previous &&
+      !leavingImageReleases.has(image) &&
+      !shouldForceFullPreviewQuality.value &&
+      getMotionPreference() !== 'reduce'
+    ) {
+      leavingImageReleases.set(image, retainDisplayUrl(renderedUrl))
+    }
+  },
+  { flush: 'sync' },
+)
+watch(
+  [sourceDisplayUrl, shouldForceFullPreviewQuality, presentedToolBinding],
+  releaseLeavingImages,
+  { flush: 'sync' },
+)
+onScopeDispose(releaseLeavingImages)
+
 const isMediaAssetPending = computed(
   () => !!stageDisplayImage.value?.assetId && !stageDisplayUrl.value,
 )
@@ -264,6 +315,22 @@ defineExpose({
     return stageFrameRef.value?.stageElement ?? null
   },
 })
+
+function releaseLeavingImages() {
+  for (const release of leavingImageReleases.values()) release()
+  leavingImageReleases.clear()
+}
+
+function releaseLeavingImage(element: Element) {
+  leavingImageReleases.get(element)?.()
+  leavingImageReleases.delete(element)
+}
+
+function disableLeavingImage(element: Element) {
+  element.setAttribute('aria-hidden', 'true')
+  element.setAttribute('tabindex', '-1')
+  element.setAttribute('inert', '')
+}
 
 function onStageDragOver(event: DragEvent) {
   event.preventDefault()
@@ -291,6 +358,12 @@ function submitOutpaint(prompt: string) {
 </script>
 
 <style scoped>
+.image-node-stage-media {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .image-node-stage-image {
   width: 100%;
   height: 100%;
@@ -303,6 +376,33 @@ function submitOutpaint(prompt: string) {
 
 .image-node-stage-image.is-tier-loading {
   filter: blur(12px);
+}
+
+.canvas-image-enter-active,
+.canvas-image-leave-active {
+  transition: opacity var(--motion-image-duration) var(--motion-image-easing);
+}
+
+.canvas-image-leave-active {
+  position: absolute;
+  inset: 0;
+  filter: blur(14px);
+  transform: scale(1.1);
+  pointer-events: none;
+}
+
+.canvas-image-enter-from,
+.canvas-image-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-image-enter-active,
+  .canvas-image-leave-active {
+    transition: none;
+    filter: none;
+    transform: none;
+  }
 }
 
 .image-node-stage-import-failure {

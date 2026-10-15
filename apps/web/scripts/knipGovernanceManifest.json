@@ -11143,12 +11143,6 @@
       }
     },
     "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.ts": {
-      "CANVAS_IMAGE_PREVIEW_MAX_SIDE": {
-        "kind": "test-contract",
-        "evidence": [
-          "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.unit.spec.ts"
-        ]
-      },
       "resolveCanvasImagePreviewMaxSide": {
         "kind": "test-contract",
         "evidence": [

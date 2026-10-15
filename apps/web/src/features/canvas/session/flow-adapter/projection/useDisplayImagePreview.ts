@@ -260,5 +260,6 @@ export function useDisplayImagePreview(
   return {
     displayUrl,
     contentFallbackUrl,
+    retainDisplayUrl: previewResources.retain,
   }
 }

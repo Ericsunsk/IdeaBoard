@@ -33,7 +33,7 @@ const sourceExtensions = new Set(['.css', '.ts', '.vue'])
 
 export const primitiveReferencePattern = /var\(\s*--(?:primitive|palette)-[a-z0-9-]+(?=\s*[,)])/g
 export const rawMotionUtilityPattern =
-  /(?:duration-\[(?!var\(--motion-(?:control|enter|exit|feedback)-duration\)\])|ease-\[(?!var\(--motion-(?:control|enter|exit|feedback)-easing\)\])|animate-\[)[^\]]+\]/g
+  /(?:duration-\[(?!var\(--motion-(?:control|enter|exit|feedback|image)-duration\)\])|ease-\[(?!var\(--motion-(?:control|enter|exit|feedback|image)-easing\)\])|animate-\[)[^\]]+\]/g
 
 const styleCountRules = [
   {

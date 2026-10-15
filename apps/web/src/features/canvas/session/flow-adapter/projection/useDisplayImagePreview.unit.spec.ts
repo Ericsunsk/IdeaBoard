@@ -775,6 +775,26 @@ describe('useDisplayImagePreview', () => {
     }
   }
 
+  it('pins an outgoing frame through cache pressure until its transition releases it', async () => {
+    let previewNumber = 0
+    vi.mocked(URL.createObjectURL).mockImplementation(() => `blob:preview-${++previewNumber}`)
+    const { createDisplayPreviewResources } = await import('./displayImagePreviewResources')
+    const consumer = createDisplayPreviewResources()
+    const outgoing = await consumer.load('/uploads/transition.jpg', 256)
+    if (!outgoing) throw new Error('outgoing preview was not generated')
+    consumer.display(outgoing)
+    const release = consumer.retain(outgoing)
+    const next = await consumer.load('/uploads/transition.jpg', 640)
+    consumer.display(next ?? '')
+    await fillPreviewCache()
+    expect(URL.revokeObjectURL).not.toHaveBeenCalledWith(outgoing)
+    release()
+    release()
+    await fillPreviewCache()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(outgoing)
+    consumer.dispose()
+  })
+
   it('keeps shared generation alive when its first consumer is disposed', async () => {
     let finishFetch: ((response: Response) => void) | undefined
     vi.mocked(fetch).mockImplementationOnce(

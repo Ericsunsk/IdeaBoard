@@ -1,6 +1,6 @@
 import { onScopeDispose, readonly, ref, watch, type Ref } from 'vue'
 
-const IMAGE_QUALITY_SETTLE_DELAY_MS = 200
+const IMAGE_QUALITY_SETTLE_DELAY_MS = 80
 
 export function useCanvasImageQualityZoom(
   zoomLevel: Readonly<Ref<number>>,
