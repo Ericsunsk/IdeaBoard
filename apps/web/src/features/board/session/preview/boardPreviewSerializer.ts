@@ -21,6 +21,7 @@ import { isDarkModeActive } from '../../../../theme/composables/useTheme'
 import { clamp } from '../../../../core/utils/number'
 import { isRecord } from '../../../../core/utils/guards'
 import { withAlpha } from '../../../../core/lib/chartPrimitives'
+import { buildMediaBrowserURL, isMediaRef } from '../../../../core/media/mediaRef'
 
 interface BoardPreviewFrame {
   key: string
@@ -59,6 +60,7 @@ interface NodeLike {
   title?: unknown
   outputImages?: unknown
   sourceImageUrl?: unknown
+  sourceMediaRef?: unknown
   sourceImageRatio?: unknown
   inputImages?: unknown
   blendPoint?: unknown
@@ -135,9 +137,10 @@ function getLatestOutputPreview(node: NodeLike): NodeImagePreview | null {
   for (let i = rawOutputs.length - 1; i >= 0; i -= 1) {
     const output = rawOutputs[i]
     if (!isRecord(output)) continue
-    if (typeof output.url !== 'string' || !output.url) continue
+    const url = resolvePreviewUrl(output.url, output.mediaRef)
+    if (!url) continue
     return {
-      url: output.url,
+      url,
       ratio: isFiniteNumber(output.ratio) && output.ratio > 0 ? output.ratio : 1,
     }
   }
@@ -145,14 +148,20 @@ function getLatestOutputPreview(node: NodeLike): NodeImagePreview | null {
 }
 
 function getSourcePreview(node: NodeLike): NodeImagePreview | null {
-  if (typeof node.sourceImageUrl !== 'string' || !node.sourceImageUrl) return null
+  const url = resolvePreviewUrl(node.sourceImageUrl, node.sourceMediaRef)
+  if (!url) return null
   return {
-    url: node.sourceImageUrl,
+    url,
     ratio:
       isFiniteNumber(node.sourceImageRatio) && node.sourceImageRatio > 0
         ? node.sourceImageRatio
         : 1,
   }
+}
+
+function resolvePreviewUrl(url: unknown, mediaRef: unknown): string {
+  if (isMediaRef(mediaRef)) return buildMediaBrowserURL(mediaRef)
+  return typeof url === 'string' ? url.trim() : ''
 }
 
 function resolveNodePreview(node: NodeLike): NodeImagePreview | null {
@@ -164,7 +173,7 @@ function getFusionInputPreviewUrls(node: NodeLike): string[] {
   return node.inputImages
     .map((raw) => {
       if (!isRecord(raw)) return null
-      const url = typeof raw.url === 'string' ? raw.url.trim() : ''
+      const url = resolvePreviewUrl(raw.url, raw.mediaRef)
       return url || null
     })
     .filter((url): url is string => !!url)

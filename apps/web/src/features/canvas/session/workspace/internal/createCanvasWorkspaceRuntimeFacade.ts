@@ -26,7 +26,10 @@ export function createCanvasWorkspaceRuntimeFacade(
         renderEdges: board.flowPane.renderEdges,
       },
       persistence: { history: persistence.history },
-      viewportControls: { zoomLevel: viewport.zoomLevel },
+      viewportControls: {
+        zoomLevel: viewport.zoomLevel,
+        qualityZoomLevel: viewport.qualityZoomLevel,
+      },
       graphEditing: graph.viewModel,
       imageWorkflow: imageWorkflow.viewModel,
     },

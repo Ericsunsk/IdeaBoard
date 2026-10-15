@@ -300,7 +300,7 @@ const canvasChromeAccount = computed<CanvasChromeAccountState>(() => ({
   balance: accountControls.viewModel.balance.value,
   menuItems: accountControls.viewModel.menuItems.value,
 }))
-const { zoomLevel } = viewModel.viewportControls
+const { zoomLevel, qualityZoomLevel } = viewModel.viewportControls
 const {
   onZoomIn,
   onZoomOut,
@@ -311,7 +311,7 @@ const {
   onMiniMapDragMove,
   onMiniMapDragEnd,
 } = commands.viewportControls
-provideCanvasViewportContext({ zoomLevel })
+provideCanvasViewportContext({ zoomLevel, qualityZoomLevel })
 provideCanvasNodeUiStateContext({
   getFlowNodeUiState: (...args) => commands.graphEditing.getFlowNodeUiStateCached(...args),
 })

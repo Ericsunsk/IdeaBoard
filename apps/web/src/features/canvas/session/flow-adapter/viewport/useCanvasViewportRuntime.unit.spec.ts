@@ -57,6 +57,9 @@ function createViewportRuntimeHarness(
     viewport.value = nextViewport
   })
   const loadInitialOrRouteBoard = vi.fn(async () => ({ status: 'not-found' as const }))
+  const zoomIn = vi.fn<() => Promise<unknown> | unknown>(() => {
+    viewport.value = { ...viewport.value, zoom: viewport.value.zoom + 0.25 }
+  })
 
   const scope = effectScope()
   const runtime = scope.run(() =>
@@ -69,9 +72,7 @@ function createViewportRuntimeHarness(
       getViewport: () => viewport.value,
       setViewport,
       setCenter,
-      zoomIn: vi.fn(() => {
-        viewport.value = { ...viewport.value, zoom: viewport.value.zoom + 0.25 }
-      }),
+      zoomIn,
       zoomOut: vi.fn(() => {
         viewport.value = { ...viewport.value, zoom: viewport.value.zoom - 0.25 }
       }),
@@ -92,6 +93,7 @@ function createViewportRuntimeHarness(
     userUid,
     viewport,
     panBy,
+    zoomIn,
     setViewport,
     setCenter,
     loadInitialOrRouteBoard,
@@ -124,6 +126,95 @@ describe('useCanvasViewportRuntime', () => {
     harness.runtime.onFlowMove({ flowTransform: { x: 24, y: 32, zoom: 1.5 } })
 
     expect(readStoredViewport()).toBeNull()
+    harness.scope.stop()
+  })
+
+  it('keeps image quality stable through flow zoom while geometry zoom remains live', () => {
+    vi.useFakeTimers()
+    const harness = createViewportRuntimeHarness()
+    harness.runtime.onFlowMoveStart()
+    for (let zoom = 1.2; zoom < 2; zoom += 0.2) {
+      harness.viewport.value = { x: 0, y: 0, zoom }
+      vi.advanceTimersByTime(150)
+      expect(harness.runtime.qualityZoomLevel.value).toBe(100)
+    }
+    harness.viewport.value = { x: 0, y: 0, zoom: 2 }
+    expect(harness.runtime.zoomLevel.value).toBe(200)
+    expect(harness.runtime.qualityZoomLevel.value).toBe(100)
+
+    harness.runtime.onFlowMoveEnd({ flowTransform: harness.viewport.value })
+    vi.advanceTimersByTime(200)
+    expect(harness.runtime.qualityZoomLevel.value).toBe(200)
+    harness.scope.stop()
+  })
+
+  it('settles zoom controls after a zero-movement flow start with no matching end', async () => {
+    vi.useFakeTimers()
+    const harness = createViewportRuntimeHarness()
+    harness.runtime.onFlowMoveStart()
+    harness.runtime.onZoomIn()
+    await flushPromises()
+    vi.advanceTimersByTime(200)
+    expect(harness.runtime.qualityZoomLevel.value).toBe(125)
+    harness.scope.stop()
+  })
+
+  it('settles after a gesture returns to its starting transform without a move end', () => {
+    vi.useFakeTimers()
+    const harness = createViewportRuntimeHarness()
+    harness.runtime.onFlowMoveStart()
+    harness.viewport.value = { x: 0, y: 0, zoom: 2 }
+    vi.advanceTimersByTime(200)
+    expect(harness.runtime.qualityZoomLevel.value).toBe(200)
+    harness.viewport.value = { x: 0, y: 0, zoom: 1 }
+    vi.advanceTimersByTime(200)
+    expect(harness.runtime.qualityZoomLevel.value).toBe(100)
+    harness.scope.stop()
+  })
+
+  it('settles zoom controls and restored viewports without waiting for unrelated node dragging', async () => {
+    vi.useFakeTimers()
+    const harness = createViewportRuntimeHarness()
+    harness.runtime.onNodeDragStart()
+    harness.runtime.onZoomIn()
+    await flushPromises()
+    expect(harness.runtime.qualityZoomLevel.value).toBe(100)
+    vi.advanceTimersByTime(200)
+    expect(harness.runtime.qualityZoomLevel.value).toBe(125)
+
+    localStorage.setItem(
+      'ideaboard:canvas:view:user-uid:board-a',
+      JSON.stringify({ x: 0, y: 0, zoom: 2, updatedAt: Date.now() }),
+    )
+    await harness.runtime.loadBoardAndProbe()
+    expect(harness.runtime.zoomLevel.value).toBe(200)
+    vi.advanceTimersByTime(200)
+    expect(harness.runtime.qualityZoomLevel.value).toBe(200)
+    harness.runtime.onNodeDragStop()
+    harness.scope.stop()
+  })
+
+  it('holds image quality until an asynchronous viewport command completes', async () => {
+    vi.useFakeTimers()
+    const harness = createViewportRuntimeHarness()
+    let finishAnimation = () => {}
+    harness.zoomIn.mockImplementationOnce(async () => {
+      harness.viewport.value = { x: 0, y: 0, zoom: 1.5 }
+      await new Promise<void>((resolve) => {
+        finishAnimation = resolve
+      })
+      harness.viewport.value = { x: 0, y: 0, zoom: 2 }
+    })
+    harness.runtime.onZoomIn()
+    vi.advanceTimersByTime(500)
+    expect(harness.runtime.zoomLevel.value).toBe(150)
+    expect(harness.runtime.qualityZoomLevel.value).toBe(100)
+
+    finishAnimation()
+    await flushPromises()
+    expect(harness.runtime.zoomLevel.value).toBe(200)
+    vi.advanceTimersByTime(200)
+    expect(harness.runtime.qualityZoomLevel.value).toBe(200)
     harness.scope.stop()
   })
 

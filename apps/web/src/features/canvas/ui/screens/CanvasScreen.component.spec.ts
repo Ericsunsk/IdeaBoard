@@ -282,7 +282,7 @@ function createRuntimeViewModel() {
       boardOptions: ref([]),
     },
     persistence: { history: { undo: vi.fn(), redo: vi.fn() } },
-    viewportControls: { zoomLevel: ref(100) },
+    viewportControls: { zoomLevel: ref(100), qualityZoomLevel: ref(100) },
     graphEditing: {
       hasSelectedFlowNodes: ref(false),
       isFlowInteractionActive: ref(false),

@@ -76,6 +76,8 @@ Library asset drops use the shared Pointer Events controller and explicit Canvas
 
 The Flow adapter keeps the complete canonical node/edge set in controlled arrays, preserves unchanged object identities, and applies incremental updates. Viewport changes only update the transform; they never replace graph arrays or trigger graph projection. `onlyRenderVisibleElements` stays disabled to keep connected edges and MiniMap bounds stable.
 
+Image preview quality uses a central settled zoom snapshot, separate from the live viewport zoom used by geometry and screen-sized controls. Zoom changes publish after a 200 ms idle window that coalesces wheel/pinch bursts; asynchronous programmatic viewport commands also hold the snapshot until completion. Board or user changes invalidate pending movements; disposal cancels pending updates. New images use the available snapshot, image tools can request full quality immediately, and existing delivery cancellation, caching and decode-before-swap remain authoritative.
+
 - Node drag batches native position/selection events per frame and commits the final position once. Renderer-only measurements, geometry, and interaction fields stay outside the controlled domain model.
 - Connect normalizes endpoints and creates a canonical `connection-*` ID in one transaction. Endpoints are immutable; repositioning requires delete then connect with independent transaction/history boundaries.
 - Native disconnect/delete/batch-delete coalesce into one matching transaction; deleting a node removes its connected edges atomically.

@@ -217,7 +217,7 @@ const canvasViewport = useCanvasViewportContext()
 const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
   stageWidth: () => props.stageWidth,
   stageHeight: () => props.stageHeight,
-  zoomLevel: canvasViewport.zoomLevel,
+  zoomLevel: canvasViewport.qualityZoomLevel,
   shouldForceFullQuality: shouldForceFullPreviewQuality,
 })
 const { displayUrl: stageDisplayUrl, contentFallbackUrl: stageContentFallbackUrl } =

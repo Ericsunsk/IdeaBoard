@@ -40,6 +40,7 @@ describe('useCanvasViewportContext', () => {
 
   it('provides a readonly reactive viewport context', () => {
     const zoomLevel = ref(125)
+    const qualityZoomLevel = ref(100)
     const observedContext: { value: CanvasViewportContext | null } = { value: null }
     const Child: FunctionalComponent = () => {
       observedContext.value = useCanvasViewportContext()
@@ -47,7 +48,7 @@ describe('useCanvasViewportContext', () => {
     }
     const Parent = defineComponent({
       setup() {
-        provideCanvasViewportContext({ zoomLevel })
+        provideCanvasViewportContext({ zoomLevel, qualityZoomLevel })
         return () => h(Child)
       },
     })
@@ -59,6 +60,9 @@ describe('useCanvasViewportContext', () => {
 
     zoomLevel.value = 80
     expect(observedContext.value?.zoomLevel.value).toBe(80)
+    expect(observedContext.value?.qualityZoomLevel.value).toBe(100)
+    qualityZoomLevel.value = 80
+    expect(observedContext.value?.qualityZoomLevel.value).toBe(80)
     app.unmount()
   })
 })

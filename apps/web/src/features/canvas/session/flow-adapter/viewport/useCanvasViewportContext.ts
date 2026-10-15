@@ -21,17 +21,20 @@ export function resolveCanvasNodeUiScale(zoomLevel: number): number {
 
 export type CanvasViewportContext = {
   zoomLevel: Readonly<Ref<number>>
+  qualityZoomLevel: Readonly<Ref<number>>
 }
 
 const CANVAS_VIEWPORT_CONTEXT_KEY: InjectionKey<CanvasViewportContext> = Symbol('canvas:viewport')
 
 const defaultCanvasViewportContext: CanvasViewportContext = {
   zoomLevel: readonly(ref(DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL)),
+  qualityZoomLevel: readonly(ref(DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL)),
 }
 
-export function provideCanvasViewportContext(context: { zoomLevel: Ref<number> }) {
+export function provideCanvasViewportContext(context: CanvasViewportContext) {
   provide(CANVAS_VIEWPORT_CONTEXT_KEY, {
     zoomLevel: readonly(context.zoomLevel),
+    qualityZoomLevel: readonly(context.qualityZoomLevel),
   })
 }
 

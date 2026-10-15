@@ -345,6 +345,7 @@ function createWorkspacePartsHarness() {
   const events: string[] = []
   const viewportRuntime = {
     zoomLevel: ref(100),
+    qualityZoomLevel: ref(100),
     flushViewportPersistence: vi.fn(() => events.push('viewport')),
     loadBoardAndProbe: vi.fn(),
   }
@@ -367,6 +368,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     vi.clearAllMocks()
     mocks.useCanvasViewportRuntime.mockReturnValue({
       zoomLevel: ref(100),
+      qualityZoomLevel: ref(100),
       flushViewportPersistence: vi.fn(),
       loadBoardAndProbe: vi.fn(),
     })

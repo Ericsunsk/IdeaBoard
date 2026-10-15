@@ -11,6 +11,7 @@ import {
   type CanvasViewportPersistenceIdentity,
 } from '../../browser/canvasViewportPersistence.ts'
 import type { BoardLoadResult } from '../../board-session'
+import { useCanvasImageQualityZoom } from './useCanvasImageQualityZoom'
 
 export type CanvasFlowViewport = {
   x: number
@@ -102,6 +103,9 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     const zoom = options.viewport.value.zoom
     return Math.max(10, Math.round((Number.isFinite(zoom) && zoom > 0 ? zoom : 1) * 100))
   })
+  const imageQualityZoom = useCanvasImageQualityZoom(zoomLevel, () =>
+    JSON.stringify([options.getUserUid(), options.currentBoardId.value]),
+  )
 
   function getCanvasFrameProbeMetadata() {
     const viewport = options.viewport.value
@@ -123,15 +127,18 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   async function restoreViewportForCurrentBoard() {
+    const finishQualityMovement = imageQualityZoom.beginMovement()
     programmaticViewportCommitDepth += 1
     try {
       await viewportPersistence.restore()
     } finally {
       programmaticViewportCommitDepth -= 1
+      finishQualityMovement()
     }
   }
 
   async function runAndPersistViewportCommand(run: () => Promise<unknown> | unknown) {
+    const finishQualityMovement = imageQualityZoom.beginMovement()
     programmaticViewportCommitDepth += 1
     try {
       const result = await run()
@@ -140,6 +147,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
       viewportPersistence.scheduleDelayedPersist()
     } finally {
       programmaticViewportCommitDepth -= 1
+      finishQualityMovement()
     }
   }
 
@@ -434,6 +442,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
 
   return {
     zoomLevel,
+    qualityZoomLevel: imageQualityZoom.qualityZoomLevel,
     onZoomIn,
     onZoomOut,
     onPanViewport,

@@ -64,6 +64,7 @@ type CanvasWorkspaceRuntimeViewModel = {
   }
   viewportControls: {
     zoomLevel: ComputedRef<number>
+    qualityZoomLevel: Readonly<Ref<number>>
   }
   graphEditing: {
     hasSelectedFlowNodes: ComputedRef<boolean>
