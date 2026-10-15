@@ -70,6 +70,38 @@ function stubIntersectionObserver(isIntersecting: boolean) {
   )
 }
 
+let viewport = { width: 240, height: 180 }
+const resizeObservers: Array<{
+  resize: () => void
+  disconnect: ReturnType<typeof vi.fn>
+}> = []
+
+function stubResizeObserver() {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      disconnect = vi.fn()
+      constructor(callback: (entries: Array<{ contentRect: typeof viewport }>) => void) {
+        resizeObservers.push({
+          resize: () => callback([{ contentRect: viewport }]),
+          disconnect: this.disconnect,
+        })
+      }
+      observe() {
+        resizeObservers.at(-1)!.resize()
+      }
+      unobserve() {}
+    },
+  )
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => viewport.width)
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(() => viewport.height)
+}
+
+function resizeThumbnail(width: number, height: number) {
+  viewport = { width, height }
+  for (const observer of resizeObservers) observer.resize()
+}
+
 function thumbnailProps(sceneName = 'mixed', overrides: Record<string, unknown> = {}) {
   return {
     scene: loadScene(sceneName),
@@ -81,6 +113,9 @@ function thumbnailProps(sceneName = 'mixed', overrides: Record<string, unknown> 
 }
 
 beforeEach(() => {
+  viewport = { width: 240, height: 180 }
+  resizeObservers.length = 0
+  stubResizeObserver()
   stubIntersectionObserver(true)
   mediaMocks.readMetadata.mockImplementation(async (_ws: string, assetId: string) =>
     readyMetadata(assetId),
@@ -90,6 +125,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.clearAllMocks()
+  vi.restoreAllMocks()
 })
 
 describe('SceneThumbnail', () => {
@@ -216,6 +252,63 @@ describe('SceneThumbnail', () => {
     await Promise.resolve()
     expect(mediaMocks.readMetadata).not.toHaveBeenCalled()
     expect(view.container.querySelectorAll('.scene-frame')).toHaveLength(3)
+  })
+
+  test('starts no media reads before positive size measurement, then loads after resize', async () => {
+    viewport = { width: 0, height: 0 }
+    const view = renderWithUser(SceneThumbnail, { props: thumbnailProps() })
+    await Promise.resolve()
+    expect(mediaMocks.readMetadata).not.toHaveBeenCalled()
+    expect(view.container.querySelectorAll('.scene-frame')).toHaveLength(3)
+    resizeThumbnail(240, 180)
+    await waitFor(() => expect(view.container.querySelectorAll('image')).toHaveLength(1))
+  })
+
+  test('loads every eligible image and retains mounts when card size changes', async () => {
+    const scene = loadScene('image-input-output')
+    const image = scene.nodes[0]!
+    scene.extent = { width: 1, height: 1 }
+    scene.nodes = Array.from({ length: 12 }, (_, index) => ({
+      ...image,
+      id: `image-${index}`,
+      width: index === 11 ? 0.05 : 0.2,
+      height: 0.2,
+      media: [{ ...image.media[0]!, asset: `asset_resize_${index}` }],
+    }))
+    const view = renderWithUser(SceneThumbnail, { props: thumbnailProps('mixed', { scene }) })
+    await waitFor(() => expect(view.container.querySelectorAll('image')).toHaveLength(11))
+    const original = view.container.querySelector('image')!
+    expect(mediaMocks.readMetadata).toHaveBeenCalledTimes(11)
+    resizeThumbnail(480, 360)
+    await waitFor(() => expect(view.container.querySelectorAll('image')).toHaveLength(12))
+    expect(view.container.querySelector('image')).toBe(original)
+    expect(mediaMocks.readMetadata).toHaveBeenCalledTimes(12)
+    resizeThumbnail(240, 180)
+    await waitFor(() => expect(view.container.querySelectorAll('image')).toHaveLength(11))
+    expect(view.container.querySelectorAll('.scene-frame')).toHaveLength(12)
+    expect(view.container.querySelector('image')).toBe(original)
+    expect(mediaMocks.readMetadata).toHaveBeenCalledTimes(12)
+    view.unmount()
+    expect(resizeObservers.every((observer) => observer.disconnect.mock.calls.length > 0)).toBe(
+      true,
+    )
+  })
+
+  test('cancels pending media when resize removes raster eligibility', async () => {
+    const signals: AbortSignal[] = []
+    mediaMocks.readMetadata.mockImplementation(
+      (_ws: string, _assetId: string, options: { signal: AbortSignal }) => {
+        signals.push(options.signal)
+        return new Promise(() => {})
+      },
+    )
+    const view = renderWithUser(SceneThumbnail, { props: thumbnailProps() })
+    await waitFor(() => expect(signals).toHaveLength(1))
+    expect(signals[0]?.aborted).toBe(false)
+    resizeThumbnail(0, 0)
+    await waitFor(() => expect(signals[0]?.aborted).toBe(true))
+    expect(view.container.querySelectorAll('.scene-frame')).toHaveLength(3)
+    expect(view.container.querySelectorAll('image')).toHaveLength(0)
   })
 
   test('reloads rasters when the content version changes', async () => {

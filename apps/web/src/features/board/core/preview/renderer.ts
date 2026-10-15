@@ -11,8 +11,8 @@ import type {
 /** Fixed thumbnail delivery tier: independent of the canvas zoom quality. */
 export const SCENE_THUMBNAIL_TIER = 'preview'
 
-/** Maximum rasters per card in stable Scene order; remaining geometry stays visible. */
-export const SCENE_THUMBNAIL_MAX_RASTERS_PER_CARD = 6
+/** Both raster dimensions must remain discernible at thumbnail size, in CSS pixels. */
+const MIN_RASTER_SIZE = 16
 
 type SceneThumbnailRect = { x: number; y: number; width: number; height: number }
 
@@ -183,17 +183,16 @@ function composeFusion(node: PreviewSceneNode) {
   }
 }
 
-function composeNode(node: PreviewSceneNode, remainingRasters: number) {
+function composeNode(node: PreviewSceneNode, scale: number) {
   const frame = frameOf(node)
   const fusion = composeFusion(node)
   const rasters: SceneThumbnailRaster[] = []
   const display = node.kind === 'image' ? pickSceneDisplayMedia(node) : fusion.output
-  if (display && remainingRasters > 0) {
+  if (display) {
     const raster = rasterOf(node, display, frame)
     if (raster) rasters.push(raster)
   } else {
     fusion.inputs.forEach((media, index) => {
-      if (rasters.length >= remainingRasters) return
       const raster = rasterOf(node, media, fusion.slots[index]!)
       if (raster) rasters.push(raster)
     })
@@ -208,18 +207,30 @@ function composeNode(node: PreviewSceneNode, remainingRasters: number) {
     blend: fusion.blend,
     spokes: fusion.spokes,
     glyphTransform: node.kind === 'image' || fusion.output ? imageGlyphTransform(frame) : null,
-    rasters: rasters.map((raster) => ({ ...raster, radius: cornerRadius(raster.frame) })),
+    rasters: rasters
+      .filter(
+        ({ frame }) =>
+          frame.width * scale >= MIN_RASTER_SIZE && frame.height * scale >= MIN_RASTER_SIZE,
+      )
+      .map((raster) => ({ ...raster, radius: cornerRadius(raster.frame) })),
   }
 }
 
-/** Complete presentation in Scene node paint order; capped raster reads preserve all geometry. */
-export function composeSceneThumbnail(scene: PreviewScene) {
-  let remaining = SCENE_THUMBNAIL_MAX_RASTERS_PER_CARD
-  const nodes = scene.nodes.map((node) => {
-    const presentation = composeNode(node, remaining)
-    remaining -= presentation.rasters.length
-    return presentation
-  })
+/** Complete geometry in Scene paint order; raster eligibility follows SVG xMidYMid meet scaling. */
+export function composeSceneThumbnail(
+  scene: PreviewScene,
+  viewport: { width: number; height: number },
+) {
+  const scale =
+    Number.isFinite(viewport.width) &&
+    Number.isFinite(viewport.height) &&
+    viewport.width > 0 &&
+    viewport.height > 0 &&
+    scene.extent.width > 0 &&
+    scene.extent.height > 0
+      ? Math.min(viewport.width / scene.extent.width, viewport.height / scene.extent.height)
+      : 0
+  const nodes = scene.nodes.map((node) => composeNode(node, scale))
   return {
     viewBox: sceneViewBox(scene),
     groups: scene.groups.map((group) => ({ ...group, radius: cornerRadius(group) })),

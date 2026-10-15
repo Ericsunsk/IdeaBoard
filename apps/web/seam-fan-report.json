@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "ae0a0c8b90c3144705a01fb7cec488ab5f864b29",
+  "checkpointSha": "b2f92ad625b02c44f2e347a26ad1c31512d2d10d",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -22613,13 +22613,14 @@
         }
       ],
       "fanIn": 50,
-      "fanOut": 57,
+      "fanOut": 58,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
         "fs",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/jest-dom/vitest.js",
+        "node_modules/@vueuse/core/dist/index.js",
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
@@ -23391,6 +23392,11 @@
         },
         {
           "from": "src/features/board/ui/gallery/SceneThumbnail.vue",
+          "to": "node_modules/@vueuse/core/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.vue",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
@@ -23535,7 +23541,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 50,
-      "targetFanOut": 57,
+      "targetFanOut": 58,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -24035,13 +24041,14 @@
         }
       ],
       "fanIn": 93,
-      "fanOut": 57,
+      "fanOut": 58,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
         "fs",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/jest-dom/vitest.js",
+        "node_modules/@vueuse/core/dist/index.js",
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
@@ -24813,6 +24820,11 @@
         },
         {
           "from": "src/features/board/ui/gallery/SceneThumbnail.vue",
+          "to": "node_modules/@vueuse/core/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.vue",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
@@ -24957,7 +24969,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 93,
-      "targetFanOut": 57,
+      "targetFanOut": 58,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

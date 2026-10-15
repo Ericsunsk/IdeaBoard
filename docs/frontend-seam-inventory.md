@@ -16626,9 +16626,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 50,
-      "measuredFanOut": 57,
+      "measuredFanOut": 58,
       "targetFanIn": 50,
-      "targetFanOut": 57,
+      "targetFanOut": 58,
       "ownershipScope": ["src/features/board/"],
       "publicExports": [
         "BOARD_DOCUMENT_REPLACE_COALESCE_MS",
@@ -16831,6 +16831,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/jest-dom/vitest.js",
+        "node_modules/@vueuse/core/dist/index.js",
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
@@ -17379,9 +17380,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 93,
-      "measuredFanOut": 57,
+      "measuredFanOut": 58,
       "targetFanIn": 93,
-      "targetFanOut": 57,
+      "targetFanOut": 58,
       "ownershipScope": ["src/features/board/"],
       "publicExports": [
         "BoardRepository",
@@ -17471,6 +17472,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/jest-dom/vitest.js",
+        "node_modules/@vueuse/core/dist/index.js",
         "node_modules/valibot/dist/index.mjs",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
@@ -22777,8 +22779,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue`            | canonical | admin         | 2       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue`                | canonical | admin         | 1       | 2 → 2                    | 3 → 3                     |
 | `src/features/auth/index.ts`                                                 | canonical | auth          | 28      | 28 → 28                  | 46 → 46                   |
-| `src/features/board/index.ts`                                                | canonical | board         | 193     | 50 → 50                  | 57 → 57                   |
-| `src/features/board/ports/canvas.ts`                                         | canonical | board         | 80      | 93 → 93                  | 57 → 57                   |
+| `src/features/board/index.ts`                                                | canonical | board         | 193     | 50 → 50                  | 58 → 58                   |
+| `src/features/board/ports/canvas.ts`                                         | canonical | board         | 80      | 93 → 93                  | 58 → 58                   |
 | `src/features/board/ports/testing.ts`                                        | canonical | board         | 2       | 5 → 5                    | 1 → 1                     |
 | `src/features/board/testing/index.ts`                                        | canonical | board         | 11      | 18 → 18                  | 5 → 5                     |
 | `src/features/canvas/core/graph/canvasGraphStoreWriter.ts`                   | canonical | canvas        | 1       | 3 → 3                    | 2 → 2                     |

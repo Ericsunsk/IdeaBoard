@@ -150,6 +150,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useResizeObserver } from '@vueuse/core'
 import type { PreviewScene } from '../../core/preview/scene'
 import { composeSceneThumbnail } from '../../core/preview/renderer'
 import SceneRasterImage from './SceneRasterImage.vue'
@@ -162,7 +163,13 @@ const props = defineProps<{
   contentVersion: string
 }>()
 
-const presentation = computed(() => composeSceneThumbnail(props.scene))
+const rootEl = ref<HTMLElement | null>(null)
+const viewport = ref({ width: 0, height: 0 })
+useResizeObserver(rootEl, ([entry]) => {
+  if (entry) viewport.value = { width: entry.contentRect.width, height: entry.contentRect.height }
+})
+
+const presentation = computed(() => composeSceneThumbnail(props.scene, viewport.value))
 const clips = computed(() =>
   presentation.value.nodes.flatMap((node) =>
     node.rasters.map((raster) => ({
@@ -177,7 +184,6 @@ function clipIdFor(rasterKey: string): string {
   return `thumb-${props.boardId}-${rasterKey}`
 }
 
-const rootEl = ref<HTMLElement | null>(null)
 // Decide at setup: when intersection observation exists, cards start hidden
 // so below-fold mounts never start media reads before the observer reports.
 // Environments without IntersectionObserver keep media enabled.
@@ -186,6 +192,9 @@ const isCardVisible = ref(typeof IntersectionObserver === 'undefined')
 let observer: IntersectionObserver | null = null
 
 onMounted(() => {
+  if (rootEl.value) {
+    viewport.value = { width: rootEl.value.clientWidth, height: rootEl.value.clientHeight }
+  }
   // Cards below the fold never start media reads: rasters mount only while
   // the card intersects (with a preload margin). Environments without
   // IntersectionObserver keep media enabled.

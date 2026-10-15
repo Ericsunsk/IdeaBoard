@@ -3,11 +3,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import { parsePreviewScene, type PreviewScene } from './scene'
-import {
-  composeSceneThumbnail,
-  SCENE_THUMBNAIL_MAX_RASTERS_PER_CARD,
-  SCENE_THUMBNAIL_TIER,
-} from './renderer'
+import { composeSceneThumbnail, SCENE_THUMBNAIL_TIER } from './renderer'
+
+const VIEWPORT = { width: 240, height: 180 }
 
 const FIXTURE_DIR = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -36,14 +34,14 @@ describe('scene thumbnail renderer', () => {
 
   test('empty boards yield no viewBox and no rasters', () => {
     const scene = loadScene('empty')
-    expect(composeSceneThumbnail(scene).viewBox).toBeNull()
-    expect(composeSceneThumbnail(scene).nodes.flatMap((node) => node.rasters)).toEqual([])
+    expect(composeSceneThumbnail(scene, VIEWPORT).viewBox).toBeNull()
+    expect(composeSceneThumbnail(scene, VIEWPORT).nodes.flatMap((node) => node.rasters)).toEqual([])
   })
 
   test('image nodes prefer the latest output over the source', () => {
     const scene = loadScene('image-input-output')
-    expect(composeSceneThumbnail(scene).viewBox).toBe('0 0 0.6666666666666667 1')
-    const rasters = composeSceneThumbnail(scene).nodes.flatMap((node) => node.rasters)
+    expect(composeSceneThumbnail(scene, VIEWPORT).viewBox).toBe('0 0 0.6666666666666667 1')
+    const rasters = composeSceneThumbnail(scene, VIEWPORT).nodes.flatMap((node) => node.rasters)
     expect(rasters).toHaveLength(1)
     expect(rasters[0]).toMatchObject({
       key: 'image-1-output-0',
@@ -54,19 +52,21 @@ describe('scene thumbnail renderer', () => {
   test('falls back to the source when no output is displayable', () => {
     const scene = loadScene('image-input-output')
     scene.nodes[0]!.media = scene.nodes[0]!.media.filter((media) => media.role === 'source')
-    expect(composeSceneThumbnail(scene).nodes.flatMap((node) => node.rasters)).toMatchObject([
-      { assetId: 'asset_src_1' },
-    ])
+    expect(
+      composeSceneThumbnail(scene, VIEWPORT).nodes.flatMap((node) => node.rasters),
+    ).toMatchObject([{ assetId: 'asset_src_1' }])
   })
 
   test('numeric-only media never resolves to a raster', () => {
     const scene = loadScene('groups-connections')
     // image-1 carries a numeric-only source; image-2 carries no media at all.
-    expect(composeSceneThumbnail(scene).nodes.flatMap((node) => node.rasters)).toEqual([])
+    expect(composeSceneThumbnail(scene, VIEWPORT).nodes.flatMap((node) => node.rasters)).toEqual([])
     const fusion = loadScene('fusion')
     // fusion-7 inputs and output are all numeric-only: slots keep geometry,
     // but no raster is fabricated for them.
-    expect(composeSceneThumbnail(fusion).nodes.flatMap((node) => node.rasters)).toEqual([])
+    expect(composeSceneThumbnail(fusion, VIEWPORT).nodes.flatMap((node) => node.rasters)).toEqual(
+      [],
+    )
     expect(fusion.nodes.find((node) => node.id === 'fusion-7')?.blend).toEqual({
       x: 0.3,
       y: 0.7,
@@ -75,9 +75,9 @@ describe('scene thumbnail renderer', () => {
 
   test('canonical Fusion inputs render without an output', () => {
     const scene = loadScene('fusion-input-mediaref')
-    expect(composeSceneThumbnail(scene).nodes.flatMap((node) => node.rasters)).toMatchObject([
-      { assetId: 'asset_fusion_input', key: 'fusion-1-input-0' },
-    ])
+    expect(
+      composeSceneThumbnail(scene, VIEWPORT).nodes.flatMap((node) => node.rasters),
+    ).toMatchObject([{ assetId: 'asset_fusion_input', key: 'fusion-1-input-0' }])
   })
 
   test.each([0, 1, 4])('Fusion %i inputs align placeholders and rasters', (count) => {
@@ -89,7 +89,7 @@ describe('scene thumbnail renderer', () => {
       index,
       asset: `asset_${index}`,
     }))
-    const view = composeSceneThumbnail(scene).nodes[0]!
+    const view = composeSceneThumbnail(scene, VIEWPORT).nodes[0]!
     expect(view.slots).toHaveLength(count || 2)
     expect(view.spokes).toHaveLength(count || 2)
     expect(view.rasters).toHaveLength(count)
@@ -106,7 +106,7 @@ describe('scene thumbnail renderer', () => {
     const scene = loadScene('fusion-input-mediaref')
     const node = scene.nodes[0]!
     node.media.push({ ...node.media[0]!, role: 'output', asset: 'asset_output' })
-    const view = composeSceneThumbnail(scene).nodes[0]!
+    const view = composeSceneThumbnail(scene, VIEWPORT).nodes[0]!
     expect(view.slots).toEqual([])
     expect(view.blend).toBeNull()
     expect(view.rasters).toMatchObject([
@@ -114,7 +114,7 @@ describe('scene thumbnail renderer', () => {
     ])
     node.media[1]!.asset = ''
     node.media[1]!.assetNumeric = 123
-    const pending = composeSceneThumbnail(scene).nodes[0]!
+    const pending = composeSceneThumbnail(scene, VIEWPORT).nodes[0]!
     expect(pending.slots).toHaveLength(1)
     expect(pending.rasters).toMatchObject([{ assetId: 'asset_fusion_input' }])
   })
@@ -127,7 +127,7 @@ describe('scene thumbnail renderer', () => {
       const to = byId.get(connection.to)!
       expect(connection.start).toEqual({ x: from.x + from.width, y: from.y + from.height / 2 })
       expect(connection.end).toEqual({ x: to.x, y: to.y + to.height / 2 })
-      const path = composeSceneThumbnail(scene).edges[index]!.d
+      const path = composeSceneThumbnail(scene, VIEWPORT).edges[index]!.d
       expect(path.startsWith(`M ${connection.start.x} ${connection.start.y} C`)).toBe(true)
       expect(path.endsWith(`${connection.end.x} ${connection.end.y}`)).toBe(true)
     }
@@ -135,8 +135,8 @@ describe('scene thumbnail renderer', () => {
 
   test('mixed boards keep negative-coord shift, overlap order, and aspect', () => {
     const scene = loadScene('mixed')
-    expect(composeSceneThumbnail(scene).viewBox).toBe('0 0 1 0.81')
-    const view = composeSceneThumbnail(scene)
+    expect(composeSceneThumbnail(scene, VIEWPORT).viewBox).toBe('0 0 1 0.81')
+    const view = composeSceneThumbnail(scene, VIEWPORT)
     expect(view.nodes.flatMap((node) => node.rasters).map((raster) => raster.assetId)).toEqual([
       'asset_out_m',
     ])
@@ -149,18 +149,20 @@ describe('scene thumbnail renderer', () => {
   })
 
   test('theme-switch scenes project identically to mixed scenes', () => {
-    expect(composeSceneThumbnail(loadScene('theme-switch'))).toEqual(
-      composeSceneThumbnail(loadScene('mixed')),
+    expect(composeSceneThumbnail(loadScene('theme-switch'), VIEWPORT)).toEqual(
+      composeSceneThumbnail(loadScene('mixed'), VIEWPORT),
     )
   })
 
   test('prompt nodes never expose text to the thumbnail view-model', () => {
     const scenes = ['mixed', 'fusion', 'theme-switch'].map(loadScene)
-    const payload = JSON.stringify(scenes.map(composeSceneThumbnail)).toLowerCase()
+    const payload = JSON.stringify(
+      scenes.map((scene) => composeSceneThumbnail(scene, VIEWPORT)),
+    ).toLowerCase()
     expect(payload).not.toContain('secret')
     for (const scene of scenes) {
       expect(
-        composeSceneThumbnail(scene)
+        composeSceneThumbnail(scene, VIEWPORT)
           .nodes.filter((node) => node.kind === 'prompt')
           .every((node) => node.rasters.length === 0),
       ).toBe(true)
@@ -178,28 +180,87 @@ describe('scene thumbnail renderer', () => {
     expect(scene.truncated).toBe(true)
     expect(scene.nodes.map((node) => node.id)).toEqual(['image-1'])
     expect(scene.connections).toEqual([])
-    expect(composeSceneThumbnail(scene).viewBox).toBe('0 0 1 0.81')
-    expect(composeSceneThumbnail(scene).nodes.flatMap((node) => node.rasters)).toHaveLength(1)
+    expect(composeSceneThumbnail(scene, VIEWPORT).viewBox).toBe('0 0 1 0.81')
+    expect(
+      composeSceneThumbnail(scene, VIEWPORT).nodes.flatMap((node) => node.rasters),
+    ).toHaveLength(1)
   })
 
-  test('raster loads stay bounded while geometry stays complete', () => {
+  test('every discernible image remains eligible beyond six, in Scene paint order', () => {
     const scene = loadScene('image-input-output')
     const image = scene.nodes[0]!
-    scene.nodes = Array.from({ length: 40 }, (_, index) => ({
+    scene.extent = { width: 1, height: 1 }
+    scene.nodes = Array.from({ length: 30 }, (_, index) => ({
       ...image,
       id: `image-${index + 1}`,
-      x: index / 40,
+      x: (index % 6) / 6,
+      y: Math.floor(index / 6) / 5,
+      width: 0.15,
+      height: 0.18,
       media: [{ ...image.media[0]!, asset: `asset_board_${index + 1}` }],
     }))
-    expect(scene.nodes).toHaveLength(40)
-    const rasters = composeSceneThumbnail(scene).nodes.flatMap((node) => node.rasters)
-    expect(rasters).toHaveLength(SCENE_THUMBNAIL_MAX_RASTERS_PER_CARD)
-    expect(rasters.map((raster) => raster.assetId)).toEqual(
-      Array.from(
-        { length: SCENE_THUMBNAIL_MAX_RASTERS_PER_CARD },
-        (_, index) => `asset_board_${index + 1}`,
-      ),
+    const view = composeSceneThumbnail(scene, VIEWPORT)
+    expect(view.nodes).toHaveLength(30)
+    expect(view.nodes.flatMap((node) => node.rasters).map((raster) => raster.assetId)).toEqual(
+      scene.nodes.map((_, index) => `asset_board_${index + 1}`),
     )
+  })
+
+  test.each([
+    { width: 0, height: 180 },
+    { width: 240, height: 0 },
+    { width: -1, height: 180 },
+    { width: NaN, height: 180 },
+    { width: 240, height: Infinity },
+  ])('keeps geometry without rasters for invalid viewport $width x $height', (viewport) => {
+    const scene = loadScene('mixed')
+    const view = composeSceneThumbnail(scene, viewport)
+    expect(view.nodes).toHaveLength(scene.nodes.length)
+    expect(view.edges).toHaveLength(scene.connections.length)
+    expect(view.groups).toHaveLength(scene.groups.length)
+    expect(view.nodes.flatMap((node) => node.rasters)).toEqual([])
+  })
+
+  test.each([
+    { extent: { width: 4, height: 1 }, width: 0.2, height: 0.5 },
+    { extent: { width: 1, height: 4 }, width: 0.5, height: 0.3 },
+    { extent: { width: 1, height: 1 }, width: 0.01, height: 1 },
+    { extent: { width: 1, height: 1 }, width: 1, height: 0.01 },
+  ])('filters small or thin rasters using meet scaling: %o', ({ extent, width, height }) => {
+    const scene = loadScene('image-input-output')
+    scene.extent = extent
+    Object.assign(scene.nodes[0]!, { width, height })
+    const view = composeSceneThumbnail(scene, VIEWPORT)
+    expect(view.nodes[0]!.rasters).toEqual([])
+    expect(view.nodes[0]!).toMatchObject({ width, height })
+    expect(view.nodes[0]!.glyphTransform).not.toBeNull()
+  })
+
+  test('includes both dimensions at 16 CSS px and re-evaluates with card resize', () => {
+    const scene = loadScene('image-input-output')
+    scene.extent = { width: 1, height: 1 }
+    Object.assign(scene.nodes[0]!, { width: 0.1, height: 0.1 })
+    expect(composeSceneThumbnail(scene, { width: 240, height: 159 }).nodes[0]!.rasters).toEqual([])
+    const view = composeSceneThumbnail(scene, { width: 240, height: 160 })
+    expect(view.nodes[0]!.rasters).toHaveLength(1)
+    expect(composeSceneThumbnail(scene, VIEWPORT).nodes[0]!.rasters[0]!.key).toBe(
+      view.nodes[0]!.rasters[0]!.key,
+    )
+  })
+
+  test('measures Fusion slots rather than admitting them by the parent frame', () => {
+    const scene = loadScene('fusion-input-mediaref')
+    scene.extent = { width: 1, height: 1 }
+    const node = scene.nodes[0]!
+    Object.assign(node, { width: 0.2, height: 0.2 })
+    node.media = Array.from({ length: 4 }, (_, index) => ({ ...node.media[0]!, index }))
+    const view = composeSceneThumbnail(scene, VIEWPORT).nodes[0]!
+    expect(view.rasters).toEqual([])
+    expect(view.slots).toHaveLength(4)
+    expect(view.spokes).toHaveLength(4)
+    expect(
+      composeSceneThumbnail(scene, { width: 480, height: 360 }).nodes[0]!.rasters,
+    ).toHaveLength(4)
   })
 
   test('shared fixture payloads stay within the recorded client budgets', () => {
