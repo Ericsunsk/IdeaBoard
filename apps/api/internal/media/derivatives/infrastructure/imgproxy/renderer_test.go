@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -49,6 +50,45 @@ func TestRendererWorkspaceImage(t *testing.T) {
 	image, err := imgproxy.NewRenderer(rendererConfig(upstream.URL), nil).WorkspaceTier(context.Background(), "uploads/ws/test/image.png", "thumb")
 	if err != nil || image.MIMEType != "image/webp" || string(image.Data) != "rendered image" {
 		t.Fatalf("image = %#v, error = %v", image, err)
+	}
+}
+
+func TestRendererFilenameEncoding(t *testing.T) {
+	for _, filename := range []string{"image.png", "截屏2026-06-22.webp", "image with space.png", "100%.png", "literal%2Fname.png", "image#1.png"} {
+		t.Run(filename, func(t *testing.T) {
+			key := "uploads/ws/test/" + filename
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				signature, path, ok := strings.Cut(strings.TrimPrefix(r.URL.EscapedPath(), "/"), "/")
+				want, err := rendererConfig("").SignPath("/" + path)
+				if !ok || err != nil || signature != want {
+					http.Error(w, "Invalid signature", http.StatusForbidden)
+					return
+				}
+				_, escapedSource, ok := strings.Cut(path, "/plain/")
+				source, err := url.PathUnescape(strings.TrimSuffix(escapedSource, "@webp"))
+				if !ok || err != nil || source != "local:///"+key {
+					t.Error("source key changed during HTTP transport")
+					http.NotFound(w, r)
+					return
+				}
+				w.Header().Set("Content-Type", "image/webp")
+				_, _ = w.Write([]byte("rendered image"))
+			}))
+			defer upstream.Close()
+			renderer := imgproxy.NewRenderer(rendererConfig(upstream.URL), &activeProfile{
+				profile: &storagedomain.StorageProfile{Provider: storagedomain.StorageProviderLocal, Enabled: true},
+			})
+			for _, render := range []func() (imgproxy.Image, error){
+				func() (imgproxy.Image, error) { return renderer.WorkspaceTier(context.Background(), key, "thumb") },
+				func() (imgproxy.Image, error) { return renderer.Avatar(context.Background(), key, 64) },
+				func() (imgproxy.Image, error) { return renderer.Logo(context.Background(), key) },
+			} {
+				image, err := render()
+				if err != nil || image.MIMEType != "image/webp" || string(image.Data) != "rendered image" {
+					t.Fatalf("image = %#v, error = %v", image, err)
+				}
+			}
+		})
 	}
 }
 

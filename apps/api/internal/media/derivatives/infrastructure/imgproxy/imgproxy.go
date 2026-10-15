@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -106,7 +107,7 @@ func (c Config) signWithExpiry(path string, expires time.Time) (string, error) {
 	if expires.IsZero() {
 		return "", fmt.Errorf("imgproxy expiry is required")
 	}
-	path = fmt.Sprintf("/exp:%d%s", expires.Unix(), path)
+	path = (&url.URL{Path: fmt.Sprintf("/exp:%d%s", expires.Unix(), path)}).EscapedPath()
 	signature, err := c.SignPath(path)
 	if err != nil {
 		return "", err
