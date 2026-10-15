@@ -84,7 +84,7 @@ Token ownership:
   referencing Tier 2 only, including workspace, tool, text, tooltip, and
   progress roles.
 - Motion (`tokens/motion.css` + `core/motion/motionPolicy.ts`): single
-  control/enter/exit/feedback/image policy (160/220/220/160/200ms); CSS, JS, and
+  control/enter/exit/feedback/image policy (160/280/280/160/200ms); CSS, JS, and
   reduced-motion stay in sync.
   Reka overlays share the mask/dialog/popover/drawer classes in
   `theme/atoms/overlay-motion.css`; distinct enter/exit keyframes retain

@@ -8,14 +8,14 @@
 
     <!-- 🌟 主视窗容器：当左侧素材库浮岛展开时，右侧紧贴浮岛右侧保留标准 24px 呼吸间距；全屏展开时 1:1 物理被顶出右侧屏幕 -->
     <main
-      class="relative z-content mt-12 will-change-[transform,margin,padding] transition-[transform,margin,padding] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] [transform:translateZ(0)]"
+      class="relative z-content mt-12 transition-[translate] motion-reduce:transition-none"
       :class="[
         isLibraryIslandOpen && !isLibraryIslandExpanded
           ? 'ml-0 md:ml-[350px] mr-auto max-w-[1600px] pl-0 md:pl-6 lg:pl-8'
           : 'mx-auto max-w-[1600px] pl-0',
         isLibraryIslandOpen && isLibraryIslandExpanded
-          ? 'translate-x-[100vw] pointer-events-none'
-          : '',
+          ? 'translate-x-[100vw] pointer-events-none duration-[var(--motion-exit-duration)] ease-[var(--motion-exit-easing)]'
+          : 'duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]',
       ]"
     >
       <!-- 🌟 核心吸顶搜索控制中心 (保持原始呼吸间距，向下滚动时悬浮吸顶) -->
@@ -199,7 +199,7 @@
 
       <div
         v-if="isLoading && results.length === 0"
-        class="mt-4 transition-[column-gap] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)]"
+        class="mt-4"
         :class="[
           isLibraryIslandOpen && !isLibraryIslandExpanded
             ? 'columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-4 gap-3.5'

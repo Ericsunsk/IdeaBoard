@@ -174,8 +174,8 @@ describe('BoardCard motion browser contract', () => {
       const leavingStyle = styleOf(leaving)
       expect(leavingStyle.transitionProperty).toContain('opacity')
       expect(leavingStyle.transitionProperty).toContain('transform')
-      expect(durationsOf(leaving)).toEqual(['0.22s', '0.22s'])
-      expect(leavingStyle.transitionTimingFunction).toContain(CONTROL_EASING)
+      expect(durationsOf(leaving)).toEqual(['0.28s', '0.28s'])
+      expect(leavingStyle.transitionTimingFunction).toContain('cubic-bezier(0.2, 0, 0.2, 1)')
 
       await expect.poll(() => article()).toBeNull()
     } finally {
@@ -221,7 +221,7 @@ describe('BoardCard motion browser contract', () => {
       expect(styleOf(probe!).transform).toBe('none')
       probe!.classList.remove('board-card-leave-to')
 
-      // Real removal completes without the 220ms exit transition.
+      // Real removal completes without the exit transition.
       await expect.poll(() => styleOf(listArticle()!).opacity).toBe('1')
       shouldShow.value = false
       await expect.poll(() => listArticle()).toBeNull()

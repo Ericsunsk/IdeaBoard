@@ -204,7 +204,9 @@ function getUtilitySource(sourcePath: string, content: string) {
 
 function isAppMotionPolicyProperty(sourcePath: string, property: string) {
   if (sourcePath === 'src/theme/tokens/primitives.css') {
-    return /^--primitive-(?:duration-(?:0|160|200|220)|easing-(?:standard|image))$/.test(property)
+    return /^--primitive-(?:duration-(?:0|160|200|220|280)|easing-(?:standard|image|presence))$/.test(
+      property,
+    )
   }
   return (
     (sourcePath === 'src/app/style.css' ||

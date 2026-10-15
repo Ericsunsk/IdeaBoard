@@ -78,7 +78,7 @@ describe('LibraryAssetGallery browser contract', () => {
     const assets = Array.from({ length: 9 }, (_, index) => asset(index))
     const { root, rerender, unmount } = renderGallery(assets)
     try {
-      await expect.poll(() => assertRoundRobinLayout(root, 2, 8)).toBeUndefined()
+      await expect.poll(() => assertRoundRobinLayout(root, 3, 8)).toBeUndefined()
       const article = cards(root)[3]!
       const viewer = within(article).getByRole('button', { name: 'View Reference 3' })
       const localState = { draft: 'asset-local browser state' }
@@ -107,10 +107,10 @@ describe('LibraryAssetGallery browser contract', () => {
     )
     const { root, rerender, unmount } = renderGallery(assets)
     try {
-      await expect.poll(() => assertRoundRobinLayout(root, 2, 8)).toBeUndefined()
+      await expect.poll(() => assertRoundRobinLayout(root, 3, 8)).toBeUndefined()
       const failedCard = cards(root)[0]!
       within(failedCard).getByRole('img').dispatchEvent(new Event('error'))
-      await expect.poll(() => assertRoundRobinLayout(root, 2, 8)).toBeUndefined()
+      await expect.poll(() => assertRoundRobinLayout(root, 3, 8)).toBeUndefined()
       expect(failedCard.getBoundingClientRect().height).toBeGreaterThanOrEqual(96)
       for (const [windowWidth, count] of [
         [600, 2],

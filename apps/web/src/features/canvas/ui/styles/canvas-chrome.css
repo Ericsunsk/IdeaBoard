@@ -1,32 +1,16 @@
-.canvas-chrome-region {
+.canvas-chrome-region,
+.canvas-chrome-library {
   --canvas-chrome-inset: var(--spacing-page-chrome-inset);
   --canvas-chrome-control-gap: 12px;
   --canvas-chrome-minimap-height: 134px;
   --canvas-chrome-library-clearance: 20px;
   --canvas-chrome-icon-size: 19px;
-  --canvas-chrome-presence-duration: var(--motion-enter-duration);
-  --canvas-chrome-presence-easing: var(--motion-enter-easing);
   --canvas-chrome-z-index: 100;
   z-index: var(--canvas-chrome-z-index);
-  opacity: 1;
-  filter: blur(0);
-  transform-origin: center;
-  transition:
-    opacity var(--canvas-chrome-presence-duration) var(--canvas-chrome-presence-easing),
-    filter var(--canvas-chrome-presence-duration) var(--canvas-chrome-presence-easing),
-    transform var(--canvas-chrome-presence-duration) var(--canvas-chrome-presence-easing);
-  will-change: transform, opacity, filter;
-}
-
-.canvas-chrome-region.is-hidden {
-  --canvas-chrome-presence-duration: var(--motion-exit-duration);
-  --canvas-chrome-presence-easing: var(--motion-exit-easing);
-  opacity: 0;
-  filter: blur(5px);
-  pointer-events: none;
 }
 
 .canvas-chrome-region--top {
+  --chrome-presence-hidden-transform: translateY(-82px);
   pointer-events: none;
   position: absolute;
   top: var(--canvas-chrome-inset);
@@ -39,6 +23,8 @@
 }
 
 .canvas-chrome-region--left {
+  --chrome-presence-transform: translateY(-50%);
+  --chrome-presence-hidden-transform: translate(-76px, -50%);
   position: absolute;
   top: 50%;
   left: var(--canvas-chrome-inset);
@@ -49,10 +35,10 @@
   border-radius: 0;
   background: transparent;
   padding: 0;
-  transform: translateY(-50%);
 }
 
 .canvas-chrome-region--status {
+  --chrome-presence-hidden-transform: translateY(76px);
   pointer-events: auto;
   position: absolute;
   right: var(--canvas-chrome-inset);
@@ -67,9 +53,36 @@
   position: absolute;
   bottom: var(--canvas-chrome-inset);
   left: var(--canvas-chrome-inset);
+  opacity: 1;
+  filter: blur(0);
+  transform-origin: center;
+  transition:
+    opacity var(--motion-minimap-duration) var(--motion-minimap-easing),
+    filter var(--motion-minimap-duration) var(--motion-minimap-easing),
+    transform var(--motion-minimap-duration) var(--motion-minimap-easing);
+  will-change: transform, opacity, filter;
 }
 
-.canvas-chrome-region--library {
+.canvas-chrome-region--minimap.is-hidden {
+  opacity: 0;
+  filter: blur(5px);
+  transform: translateY(76px) scale(0.985);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-chrome-region--minimap {
+    filter: none;
+    transition: none;
+    will-change: auto;
+  }
+
+  .canvas-chrome-region--minimap.is-hidden {
+    transform: none;
+  }
+}
+
+.canvas-chrome-library {
   position: absolute;
   top: 84px;
   bottom: calc(
@@ -90,28 +103,8 @@
   pointer-events: auto;
 }
 
-.canvas-chrome-region--library:not(.is-open) {
+.canvas-chrome-library:not(.is-open) {
   pointer-events: none;
-}
-
-.canvas-chrome-region--top.is-hidden {
-  transform: translateY(-82px) scale(0.985);
-}
-
-.canvas-chrome-region--left.is-hidden {
-  transform: translate(-76px, -50%) scale(0.985);
-}
-
-.canvas-chrome-region--status.is-hidden {
-  transform: translateY(76px) scale(0.985);
-}
-
-.canvas-chrome-region--minimap.is-hidden {
-  transform: translateY(76px) scale(0.985);
-}
-
-.canvas-chrome-region--library.is-hidden {
-  transform: translateX(-76px) scale(0.985);
 }
 
 .canvas-chrome-board-stack {
@@ -309,26 +302,4 @@
   background: var(--color-page-chrome-bg-hover);
   box-shadow: 0 0 0 3px var(--color-page-chrome-focus-ring);
   color: var(--control-icon-hover);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .canvas-chrome-region {
-    filter: none;
-    transition: none;
-    will-change: auto;
-  }
-
-  .canvas-chrome-region--top.is-hidden,
-  .canvas-chrome-region--status.is-hidden,
-  .canvas-chrome-region--minimap.is-hidden {
-    transform: none;
-  }
-
-  .canvas-chrome-region--left.is-hidden {
-    transform: translateY(-50%);
-  }
-
-  .canvas-chrome-region--library.is-hidden {
-    transform: none;
-  }
 }

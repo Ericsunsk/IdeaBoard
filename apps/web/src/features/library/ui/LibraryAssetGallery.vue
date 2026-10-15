@@ -8,7 +8,7 @@
     <!-- 骨架加载状态 -->
     <div
       v-if="isLoading && assets.length === 0"
-      class="grid h-full min-h-40 grid-cols-2 gap-2 overflow-hidden"
+      class="grid h-full min-h-40 grid-cols-3 gap-2 overflow-hidden"
       aria-busy="true"
     >
       <div v-for="n in 6" :key="n" class="h-28 animate-pulse rounded-panel bg-muted"></div>
@@ -206,7 +206,7 @@ function scrollToTop() {
 }
 
 const columnCount = computed(() => {
-  if (!props.isExpanded) return 2
+  if (!props.isExpanded) return 3
   const w = props.windowWidth
   if (w < 640) return 2
   if (w < 768) return 3
@@ -253,9 +253,7 @@ onBeforeUnmount(() => {
   if (measurementFrame !== null) cancelAnimationFrame(measurementFrame)
 })
 
-// Keep every keyed card under one parent: changing lanes must only change
-// geometry, never remount an asset's DOM or discard its focus/local state.
-// Placement retains the original round-robin masonry and per-lane heights.
+// Keep every keyed card under one parent so resizing preserves its focus and local state.
 const galleryLayout = computed(() => {
   const count = columnCount.value
   const gap = galleryGap.value

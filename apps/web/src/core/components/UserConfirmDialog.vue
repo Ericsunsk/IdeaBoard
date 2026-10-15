@@ -3,7 +3,7 @@
     <DialogPortal>
       <DialogOverlay :class="ibDialogMaskClass" @click="handleMaskClick" />
       <DialogContent
-        :class="dialogContentBaseClass"
+        class="bg-popover"
         :style="{ width: 'min(420px, calc(100vw - 32px))' }"
         :aria-label="props.title"
         :aria-busy="props.isLoading || undefined"
@@ -63,7 +63,6 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { dialogContentBaseClass } from '@/components/ui/dialog'
 import { ibDialogMaskClass } from '../../theme/dialogMask'
 import {
   defineDialogSurfaceIntent,

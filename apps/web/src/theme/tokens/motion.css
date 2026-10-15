@@ -1,5 +1,5 @@
 /*
- * Motion intent tokens: control/enter/exit/feedback/image durations and easings.
+ * Motion intent tokens and independent minimap presence timing.
  *
  * Single CSS/JS policy owner with `core/motion/motionPolicy.ts`: CSS
  * transitions and JS timing readers consume these `var()` tokens, and the
@@ -12,10 +12,12 @@
   :root {
     --motion-control-duration: var(--primitive-duration-160);
     --motion-control-easing: var(--primitive-easing-standard);
-    --motion-enter-duration: var(--primitive-duration-220);
-    --motion-enter-easing: var(--primitive-easing-standard);
-    --motion-exit-duration: var(--primitive-duration-220);
-    --motion-exit-easing: var(--primitive-easing-standard);
+    --motion-enter-duration: var(--primitive-duration-280);
+    --motion-enter-easing: var(--primitive-easing-presence);
+    --motion-exit-duration: var(--primitive-duration-280);
+    --motion-exit-easing: var(--primitive-easing-presence);
+    --motion-minimap-duration: var(--primitive-duration-220);
+    --motion-minimap-easing: var(--primitive-easing-standard);
     --motion-feedback-duration: var(--primitive-duration-160);
     --motion-feedback-easing: var(--primitive-easing-standard);
     --motion-image-duration: var(--primitive-duration-200);
@@ -27,6 +29,7 @@
       --motion-control-duration: var(--primitive-duration-0);
       --motion-enter-duration: var(--primitive-duration-0);
       --motion-exit-duration: var(--primitive-duration-0);
+      --motion-minimap-duration: var(--primitive-duration-0);
       --motion-feedback-duration: var(--primitive-duration-0);
       --motion-image-duration: var(--primitive-duration-0);
     }

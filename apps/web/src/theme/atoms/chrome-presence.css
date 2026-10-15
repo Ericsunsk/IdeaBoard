@@ -1,0 +1,35 @@
+@layer components {
+  .chrome-presence {
+    visibility: visible;
+    transform: var(--chrome-presence-transform, none);
+    transition:
+      visibility var(--motion-enter-duration),
+      transform var(--motion-enter-duration) var(--motion-enter-easing);
+  }
+
+  .chrome-presence.is-hidden,
+  .chrome-presence-leave-active {
+    transition:
+      visibility var(--motion-exit-duration),
+      transform var(--motion-exit-duration) var(--motion-exit-easing);
+  }
+
+  .chrome-presence.is-hidden,
+  .chrome-presence-enter-from,
+  .chrome-presence-leave-to {
+    transform: var(--chrome-presence-hidden-transform, none);
+    pointer-events: none;
+  }
+
+  .chrome-presence.is-hidden {
+    visibility: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chrome-presence,
+    .chrome-presence.is-hidden,
+    .chrome-presence-leave-active {
+      transition: none;
+    }
+  }
+}

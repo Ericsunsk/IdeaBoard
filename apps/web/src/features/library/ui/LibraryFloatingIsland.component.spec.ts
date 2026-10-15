@@ -1,7 +1,7 @@
 import { mediaDisplayFixture } from '../../../test/mediaDisplay'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, nextTick, ref } from 'vue'
-import { render, screen, waitFor } from '../../../test/render'
+import { render, screen, userEvent, waitFor } from '../../../test/render'
 import LibraryFloatingIsland from './LibraryFloatingIsland.vue'
 import { createPointerDropTargets } from '../../../core/interaction/pointerDropTargets'
 import type { LibraryDragPayload } from '../core/drag'
@@ -75,11 +75,11 @@ function workspaceState() {
   return workspace
 }
 
-function mountIsland() {
+function mountIsland(presentation: 'search' | 'canvas' = 'search', isTransitionEnabled = false) {
   const targets = createPointerDropTargets<LibraryDragPayload>()
   const publishMutation = vi.fn(async () => {})
   const props: Partial<IslandProps> = {
-    presentation: 'search',
+    presentation,
     workspaceId: 'ws_test123',
     folderFacts: {} as LibraryFolderFacts,
     mutationPublisher: {
@@ -94,6 +94,7 @@ function mountIsland() {
     props: props as IslandProps,
     global: {
       stubs: {
+        transition: !isTransitionEnabled,
         LibraryAssetGallery: true,
         LibraryAssetLightbox: true,
         LibraryFolderDialogs: true,
@@ -117,6 +118,69 @@ describe('Library pointer reference receiving', () => {
     )
   })
   afterEach(() => vi.restoreAllMocks())
+
+  it('keeps the expanded Search layout until its closing transition finishes', async () => {
+    const { container, rerender } = mountIsland('search', true)
+    const panel = container.querySelector('aside')!
+    panel.style.transition = 'transform 0.22s'
+    await userEvent.click(screen.getByRole('button', { name: 'Expand library' }))
+    expect(panel.classList.contains('sm:w-[calc(100vw-48px)]')).toBe(true)
+
+    const props: Partial<IslandProps> = {}
+    props.open = false
+    await rerender(props)
+    expect(panel.classList.contains('sm:w-[calc(100vw-48px)]')).toBe(true)
+    expect(panel).not.toHaveStyle({ display: 'none' })
+
+    await waitFor(() => expect(panel).toHaveStyle({ display: 'none' }))
+    await waitFor(() => expect(panel.classList.contains('sm:w-[350px]')).toBe(true))
+
+    props.open = true
+    await rerender(props)
+    expect(panel.classList.contains('sm:w-[350px]')).toBe(true)
+  })
+
+  it('preserves the expanded layout when reopening during its closing transition', async () => {
+    const { container, rerender } = mountIsland('search', true)
+    const panel = container.querySelector('aside')!
+    panel.style.transition = 'transform 0.22s'
+    await userEvent.click(screen.getByRole('button', { name: 'Expand library' }))
+
+    const props: Partial<IslandProps> = {}
+    props.open = false
+    await rerender(props)
+    props.open = true
+    await rerender(props)
+
+    await waitFor(() =>
+      expect(panel.classList.contains('chrome-presence-leave-active')).toBe(false),
+    )
+    expect(panel.classList.contains('sm:w-[calc(100vw-48px)]')).toBe(true)
+    expect(panel).not.toHaveStyle({ display: 'none' })
+  })
+
+  it.each(['search', 'canvas'] as const)(
+    'retains the %s gallery when closing and reopening',
+    async (presentation) => {
+      const { container, rerender } = mountIsland(presentation)
+      const panel = container.querySelector('aside')!
+      const gallery = panel.querySelector('library-asset-gallery-stub')!
+      expect(gallery).not.toBeNull()
+
+      const props: Partial<IslandProps> = {}
+      props.open = false
+      await rerender(props)
+      expect(panel).toHaveStyle({ display: 'none' })
+      expect(panel.contains(gallery)).toBe(true)
+
+      props.open = true
+      await rerender(props)
+      expect(container.querySelector('aside')).toBe(panel)
+      expect(panel.querySelector('library-asset-gallery-stub')).toBe(gallery)
+      expect(panel).not.toHaveStyle({ display: 'none' })
+      expect(mocks.workspace?.initialize).toHaveBeenCalledOnce()
+    },
+  )
 
   it('receives a folder drop through the existing Library receiver', async () => {
     const { targets, publishMutation } = mountIsland()

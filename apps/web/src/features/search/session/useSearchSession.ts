@@ -30,7 +30,6 @@ function useLibraryIslandState(cacheScope: string, isAuthenticated: () => boolea
   const libraryIslandExpanded = ref(isAuthenticated() && islandState.expanded)
   function closeLibraryIsland(): void {
     libraryIslandOpen.value = false
-    libraryIslandExpanded.value = false
   }
 
   function toggleLibraryIsland(): void {
@@ -42,7 +41,7 @@ function useLibraryIslandState(cacheScope: string, isAuthenticated: () => boolea
   }
 
   watch([libraryIslandOpen, libraryIslandExpanded], ([open, expanded]) => {
-    setLibraryIslandState({ open, expanded }, cacheScope)
+    setLibraryIslandState({ open, expanded: open && expanded }, cacheScope)
   })
 
   return { libraryIslandOpen, libraryIslandExpanded, closeLibraryIsland, toggleLibraryIsland }

@@ -8,6 +8,7 @@ import {
   setPendingSearchAuthAction,
 } from './adapters/authContinuation'
 import { createSearchLibraryCoordinator } from './adapters/libraryCoordinator'
+import { getLibraryIslandState } from './adapters/libraryIslandPersistence'
 
 const mocks = vi.hoisted(() => ({
   route: { query: {} as Record<string, string | string[]> },
@@ -144,9 +145,12 @@ describe('useSearchSession', () => {
 
     session.library.toggle()
     expect(session.library.open.value).toBe(true)
+    session.library.expanded.value = true
     session.library.close()
     expect(session.library.open.value).toBe(false)
-    expect(session.library.expanded.value).toBe(false)
+    expect(session.library.expanded.value).toBe(true)
+    await nextTick()
+    expect(getLibraryIslandState().expanded).toBe(false)
   })
 
   it('opens Library after a gated anonymous action resumes', async () => {

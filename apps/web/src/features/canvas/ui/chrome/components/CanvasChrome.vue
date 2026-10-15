@@ -1,6 +1,6 @@
 <template>
   <header
-    class="canvas-chrome-region canvas-chrome-region--top"
+    class="chrome-presence canvas-chrome-region canvas-chrome-region--top"
     :class="{ 'is-hidden': isHidden }"
     :inert="isInert"
     @wheel.prevent.stop
@@ -53,7 +53,7 @@
   </header>
 
   <aside
-    class="canvas-chrome-region canvas-chrome-region--left"
+    class="chrome-presence canvas-chrome-region canvas-chrome-region--left"
     :class="{ 'is-hidden': isHidden }"
     :inert="isInert"
     @wheel.prevent.stop
@@ -101,8 +101,8 @@
 
   <section
     v-if="tools.isLibraryMounted"
-    class="canvas-chrome-region canvas-chrome-region--library"
-    :class="{ 'is-hidden': isHidden, 'is-open': tools.isLibraryOpen }"
+    class="canvas-chrome-library"
+    :class="{ 'is-open': tools.isLibraryOpen && !isHidden }"
     :inert="isInert"
     @focusin="emit('library-focus-change', true)"
     @focusout="handleLibraryFocusOut"
@@ -111,7 +111,7 @@
   </section>
 
   <section
-    class="canvas-chrome-region canvas-chrome-region--status"
+    class="chrome-presence canvas-chrome-region canvas-chrome-region--status"
     :class="{ 'is-hidden': isHidden }"
     :inert="isInert"
     @wheel.prevent.stop

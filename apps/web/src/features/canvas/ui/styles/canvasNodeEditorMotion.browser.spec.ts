@@ -124,24 +124,34 @@ describe('Canvas Node and editor motion browser contract', () => {
   it('maps Node and editor presentation to the semantic Motion Policy tokens', async () => {
     const host = mountHost(`
       <div class="workflow-node-header">Title</div>
-      <div class="canvas-chrome-region"><div class="canvas-chrome-region--top"></div></div>
+      <div class="chrome-presence canvas-chrome-region canvas-chrome-region--top"></div>
+      <div class="canvas-chrome-region canvas-chrome-region--minimap"></div>
       <div class="canvas-tool-tooltip-trigger"><span class="canvas-tool-tooltip">Tip</span></div>
     `)
     try {
       const header = host.query('.workflow-node-header')!
-      const chrome = host.query('.canvas-chrome-region')!
+      const chrome = host.query('.canvas-chrome-region--top')!
+      const minimap = host.query('.canvas-chrome-region--minimap')!
       const tooltip = host.query('.canvas-tool-tooltip')!
       const rootStyle = styleOf(document.documentElement)
 
-      // Resting paints ride the live tokens (control 160ms, enter 220ms,
+      // Resting paints ride the live tokens (control 160ms, enter 280ms,
       // feedback 160ms) — a hardcoded duration cannot satisfy this.
       expect(rootStyle.getPropertyValue('--motion-control-duration').trim()).toBe('160ms')
-      expect(rootStyle.getPropertyValue('--motion-enter-duration').trim()).toBe('220ms')
-      expect(rootStyle.getPropertyValue('--motion-exit-duration').trim()).toBe('220ms')
+      expect(rootStyle.getPropertyValue('--motion-enter-duration').trim()).toBe('280ms')
+      expect(rootStyle.getPropertyValue('--motion-exit-duration').trim()).toBe('280ms')
       expect(rootStyle.getPropertyValue('--motion-feedback-duration').trim()).toBe('160ms')
       expect(durationsOf(header)).toEqual(['0.16s', '0.16s'])
       expect(styleOf(header).transitionTimingFunction).toContain(CONTROL_EASING)
-      expect(durationsOf(chrome)).toEqual(['0.22s', '0.22s', '0.22s'])
+      expect(durationsOf(chrome)).toEqual(['0.28s', '0.28s'])
+      expect(styleOf(chrome).transitionProperty).toBe('visibility, transform')
+      expect(styleOf(chrome).transitionTimingFunction).toBe('ease, cubic-bezier(0.2, 0, 0.2, 1)')
+      expect(styleOf(chrome).opacity).toBe('1')
+      expect(styleOf(chrome).filter).toBe('none')
+      expect(durationsOf(minimap)).toEqual(['0.22s', '0.22s', '0.22s'])
+      expect(styleOf(minimap).transitionTimingFunction).toBe(
+        [CONTROL_EASING, CONTROL_EASING, CONTROL_EASING].join(', '),
+      )
       expect(durationsOf(tooltip)).toEqual(['0.16s', '0.16s'])
 
       // Provenance: moving the control token moves the Node paint, so a
@@ -157,12 +167,30 @@ describe('Canvas Node and editor motion browser contract', () => {
         expect(durationsOf(tooltip)).toEqual(['0.999s', '0.999s'])
       })
 
-      // The hidden chrome state rides the exit token, not the enter one.
-      chrome.classList.add('is-hidden')
-      expect(durationsOf(chrome)).toEqual(['0.22s', '0.22s', '0.22s'])
-      withToken('--motion-exit-duration', '999ms', () => {
-        expect(durationsOf(chrome)).toEqual(['0.999s', '0.999s', '0.999s'])
+      withToken('--motion-enter-duration', '999ms', () => {
+        expect(durationsOf(chrome)).toEqual(['0.999s', '0.999s'])
+        expect(durationsOf(minimap)).toEqual(['0.22s', '0.22s', '0.22s'])
       })
+
+      // Hidden controls use exit timing; minimap retains its own motion.
+      chrome.classList.add('is-hidden')
+      minimap.classList.add('is-hidden')
+      expect(durationsOf(chrome)).toEqual(['0.28s', '0.28s'])
+      expect(styleOf(chrome).transitionTimingFunction).toBe('ease, cubic-bezier(0.2, 0, 0.2, 1)')
+      withToken('--motion-exit-duration', '999ms', () => {
+        expect(durationsOf(chrome)).toEqual(['0.999s', '0.999s'])
+        expect(durationsOf(minimap)).toEqual(['0.22s', '0.22s', '0.22s'])
+      })
+      await Promise.all(chrome.getAnimations().map((animation) => animation.finished))
+      expect(styleOf(chrome).visibility).toBe('hidden')
+      expect(styleOf(chrome).transform).toBe('matrix(1, 0, 0, 1, 0, -82)')
+
+      await setMotion(true)
+      expect(styleOf(chrome).transitionProperty).toBe('none')
+      expect(styleOf(minimap).transitionProperty).toBe('none')
+      expect(styleOf(chrome).visibility).toBe('hidden')
+      chrome.classList.remove('is-hidden')
+      expect(styleOf(chrome).visibility).toBe('visible')
     } finally {
       host.unmount()
     }

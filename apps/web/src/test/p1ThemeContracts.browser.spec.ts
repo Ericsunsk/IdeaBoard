@@ -62,12 +62,17 @@ describe('P1 theme, control state and focus browser contracts', () => {
     document.body.append(host)
     const normal = styleOf(host)
     expect(normal.getPropertyValue('--motion-control-duration').trim()).toBe('160ms')
-    expect(normal.getPropertyValue('--motion-enter-duration').trim()).toBe('220ms')
-    expect(normal.getPropertyValue('--motion-exit-duration').trim()).toBe('220ms')
+    expect(normal.getPropertyValue('--motion-enter-duration').trim()).toBe('280ms')
+    expect(normal.getPropertyValue('--motion-exit-duration').trim()).toBe('280ms')
     expect(normal.getPropertyValue('--motion-feedback-duration').trim()).toBe('160ms')
-    for (const intent of ['control', 'enter', 'exit', 'feedback']) {
+    for (const intent of ['control', 'feedback']) {
       expect(normal.getPropertyValue(`--motion-${intent}-easing`).trim()).toBe(
         'cubic-bezier(0.2, 0.8, 0.2, 1)',
+      )
+    }
+    for (const intent of ['enter', 'exit']) {
+      expect(normal.getPropertyValue(`--motion-${intent}-easing`).trim()).toBe(
+        'cubic-bezier(0.2, 0, 0.2, 1)',
       )
     }
     // The built CSS must not recreate deprecated aliases in the runtime cascade.
@@ -127,13 +132,13 @@ describe('P1 theme, control state and focus browser contracts', () => {
     isShown.value = true
     await nextTick()
     const dialog = screen.getByTestId('motion-dialog')
-    expect(entered?.duration).toBe('0.22s, 0.22s')
-    expect(entered?.easing).toBe('cubic-bezier(0.2, 0.8, 0.2, 1), cubic-bezier(0.2, 0.8, 0.2, 1)')
+    expect(entered?.duration).toBe('0.28s, 0.28s')
+    expect(entered?.easing).toBe('cubic-bezier(0.2, 0, 0.2, 1), cubic-bezier(0.2, 0, 0.2, 1)')
     expect(styleOf(dialog).transform).toBe('matrix(1, 0, 0, 1, 0, 8)')
     isShown.value = false
     await nextTick()
-    expect(left?.duration).toBe('0.22s, 0.22s')
-    expect(left?.easing).toBe('cubic-bezier(0.2, 0.8, 0.2, 1), cubic-bezier(0.2, 0.8, 0.2, 1)')
+    expect(left?.duration).toBe('0.28s, 0.28s')
+    expect(left?.easing).toBe('cubic-bezier(0.2, 0, 0.2, 1), cubic-bezier(0.2, 0, 0.2, 1)')
     await waitFor(() => expect(screen.queryByTestId('motion-dialog')).toBeNull())
     await setMotion(true)
     isShown.value = true

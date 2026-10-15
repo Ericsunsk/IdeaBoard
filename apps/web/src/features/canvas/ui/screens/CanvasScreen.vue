@@ -32,7 +32,7 @@
       <template #library>
         <CanvasLibraryFloatingIsland
           presentation="canvas"
-          :open="canvasLibrary.view.isOpen.value"
+          :open="canvasLibrary.view.isOpen.value && !isRetouchChromeHidden"
           :workspace-id="canvasWorkspaceId"
           :drop-targets="libraryDropTargets"
           :folder-facts="canvasLibrary.view.folderFacts"

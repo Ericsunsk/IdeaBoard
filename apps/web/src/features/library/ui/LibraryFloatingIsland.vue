@@ -1,10 +1,9 @@
 <template>
-  <Transition name="library-island">
+  <Transition name="chrome-presence" appear @after-leave="handleAfterLeave">
     <aside
-      v-if="presentation === 'canvas' || open"
       v-show="open"
       v-library-drop
-      class="border border-page-chrome-border bg-popover shadow-page-chrome z-40 flex flex-col overflow-hidden rounded-overlay p-5 text-foreground will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
+      class="chrome-presence library-island border border-page-chrome-border bg-popover shadow-page-chrome z-40 flex flex-col overflow-hidden rounded-overlay p-5 text-foreground max-w-[calc(100vw-32px)]"
       :class="[
         isCanvasPresentation ? 'relative h-full w-full' : searchIslandClass,
         isPanelHovered ? 'ring-2 ring-primary' : '',
@@ -143,7 +142,6 @@
         </button>
       </div>
 
-      <!-- 🌟 2. 纯净 18px 物理圆角裁剪画廊视口 (双列/多列瀑布流) -->
       <LibraryAssetGallery
         ref="galleryRef"
         :assets="workspace.assets.value"
@@ -447,12 +445,15 @@ function handleWindowResize() {
   windowWidth.value = window.innerWidth
 }
 
+function handleAfterLeave() {
+  if (!props.open && !isCanvasPresentation.value) isExpanded.value = false
+}
+
 watch(
   () => props.open,
   (isOpen) => {
     if (!isOpen) {
       closeFolderMenu()
-      if (!isCanvasPresentation.value) isExpanded.value = false
     }
     if (isOpen && !initialized.value) {
       initialized.value = true
@@ -498,28 +499,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.library-island-enter-active {
-  transition:
-    opacity var(--motion-enter-duration) var(--motion-enter-easing),
-    transform var(--motion-enter-duration) var(--motion-enter-easing);
-  will-change: opacity, transform;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transform-style: preserve-3d;
-}
-
-.library-island-leave-active {
-  transition:
-    opacity var(--motion-exit-duration) var(--motion-exit-easing),
-    transform var(--motion-exit-duration) var(--motion-exit-easing);
-  will-change: opacity, transform;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.library-island-enter-from,
-.library-island-leave-to {
-  opacity: 0;
-  transform: translate3d(calc(-100% - 32px), 0, 0);
+.library-island {
+  --chrome-presence-hidden-transform: translateX(calc(-100% - 96px));
 }
 </style>
