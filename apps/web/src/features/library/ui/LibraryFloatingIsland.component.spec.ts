@@ -1,3 +1,4 @@
+import { mediaDisplayFixture } from '../../../test/mediaDisplay'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, nextTick, ref } from 'vue'
 import { render, screen, waitFor } from '../../../test/render'
@@ -52,6 +53,7 @@ function workspaceState() {
         workspaceId: 'ws_test123',
         name: 'Destination',
         createdAt: '',
+        display: mediaDisplayFixture(),
         updatedAt: '',
       },
     ]),

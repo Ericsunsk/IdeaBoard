@@ -1,5 +1,5 @@
+import { isRecord } from '../../../../core/utils/guards'
 import type { CachedVisionReference } from '../../ports/persistencePort'
-import type { VisionReference } from '../../core/models'
 import { searchScopedStorageKey } from './browserPersistence'
 import {
   readSessionStorageItem,
@@ -9,39 +9,51 @@ import {
 
 const VISION_REF_CACHE_KEY = 'ideaboard:search:vision_refs'
 
+function isCachedVisionReference(value: unknown): value is CachedVisionReference {
+  if (!isRecord(value) || typeof value.key !== 'string' || typeof value.previewUrl !== 'string') {
+    return false
+  }
+  if (value.previewExpiresAt != null && typeof value.previewExpiresAt !== 'string') return false
+  if (value.libraryAssetID != null && typeof value.libraryAssetID !== 'string') return false
+  if (value.externalReference != null) {
+    const external = value.externalReference
+    if (
+      !isRecord(external) ||
+      typeof external.provider !== 'string' ||
+      typeof external.id !== 'string' ||
+      typeof external.preview_url !== 'string'
+    )
+      return false
+  }
+  return Boolean(value.libraryAssetID || value.externalReference)
+}
+
 /** Library-backed and External references are reloadable; local File/blob state remains in memory. */
 export function getCachedVisionReferences(scope = 'anonymous'): CachedVisionReference[] {
   try {
     const raw = readSessionStorageItem(searchScopedStorageKey(VISION_REF_CACHE_KEY, scope))
     if (!raw) return []
-    return (JSON.parse(raw) as CachedVisionReference[]).filter((reference) =>
-      Boolean(reference.libraryAssetID || reference.externalReference),
-    )
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(isCachedVisionReference).map((reference) => ({
+      key: reference.key,
+      previewUrl: reference.previewUrl,
+      previewExpiresAt: reference.previewExpiresAt,
+      libraryAssetID: reference.libraryAssetID,
+      externalReference: reference.externalReference,
+    }))
   } catch {
     return []
   }
 }
 
 export function setCachedVisionReferences(
-  references: VisionReference[],
+  references: CachedVisionReference[],
   scope = 'anonymous',
 ): void {
   try {
-    const serializable = references
-      .filter(
-        (reference) =>
-          !reference.file &&
-          !reference.previewUrl.startsWith('blob:') &&
-          (reference.libraryAssetID || reference.externalReference),
-      )
-      .map((reference) => ({
-        key: reference.key,
-        previewUrl: reference.previewUrl,
-        libraryAssetID: reference.libraryAssetID,
-        externalReference: reference.externalReference,
-      }))
     const storageKey = searchScopedStorageKey(VISION_REF_CACHE_KEY, scope)
-    if (serializable.length > 0) writeSessionStorageItem(storageKey, JSON.stringify(serializable))
+    if (references.length > 0) writeSessionStorageItem(storageKey, JSON.stringify(references))
     else removeSessionStorageItem(storageKey)
   } catch {
     // Persistence is optional and must not affect the active query.

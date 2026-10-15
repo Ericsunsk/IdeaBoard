@@ -60,6 +60,7 @@ import (
 	libraryapplication "ideaboard/api/internal/library/application"
 	librarydomain "ideaboard/api/internal/library/domain"
 	libraryports "ideaboard/api/internal/library/ports"
+	mediadomain "ideaboard/api/internal/media/derivatives/domain"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
 
@@ -101,6 +102,7 @@ type ContractV1LibraryDeps struct {
 	// path fail-closed (404 without spawning); composition injects
 	// the typed service built over the store/materializer/executor.
 	ReadThrough *libraryapplication.ReadThroughService
+	Sources     *libraryapplication.SourceResolver
 }
 
 func (d *ContractV1LibraryDeps) normalize() {
@@ -128,6 +130,7 @@ func (h *contractV1Handler) registerLibraryRoutes(group *gin.RouterGroup) {
 	group.PATCH("/workspaces/:workspace_id/library/folders/:folder_id", h.renameLibraryFolder)
 	group.DELETE("/workspaces/:workspace_id/library/folders/:folder_id", h.deleteLibraryFolder)
 	group.GET("/workspaces/:workspace_id/library/assets", h.listLibraryAssets)
+	group.GET("/workspaces/:workspace_id/library/assets/:asset_id/derivatives/:tier", h.derivativeLibraryAsset)
 	group.POST("/workspaces/:workspace_id/library/assets", h.saveLibraryAsset)
 	group.PATCH("/workspaces/:workspace_id/library/assets/:asset_id", h.moveLibraryAsset)
 	group.DELETE("/workspaces/:workspace_id/library/assets/:asset_id", h.deleteLibraryAsset)
@@ -232,20 +235,21 @@ func toLibraryFolderDTO(workspacePublicID string, folder *librarydomain.V1Folder
 }
 
 type v1LibraryAssetDTO struct {
-	ID          string `json:"id"`
-	WorkspaceID string `json:"workspace_id"`
-	FolderID    string `json:"folder_id,omitempty"`
-	Provider    string `json:"provider"`
-	SourceID    string `json:"source_id"`
-	SourceURL   string `json:"source_url"`
-	PreviewURL  string `json:"preview_url"`
-	OriginalURL string `json:"original_url"`
-	Title       string `json:"title,omitempty"`
-	Author      string `json:"author,omitempty"`
-	Width       int32  `json:"width"`
-	Height      int32  `json:"height"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	ID          string               `json:"id"`
+	WorkspaceID string               `json:"workspace_id"`
+	FolderID    string               `json:"folder_id,omitempty"`
+	Provider    string               `json:"provider"`
+	SourceID    string               `json:"source_id"`
+	SourceURL   string               `json:"source_url"`
+	PreviewURL  string               `json:"preview_url"`
+	OriginalURL string               `json:"original_url"`
+	Title       string               `json:"title,omitempty"`
+	Author      string               `json:"author,omitempty"`
+	Width       int32                `json:"width"`
+	Height      int32                `json:"height"`
+	CreatedAt   string               `json:"created_at"`
+	UpdatedAt   string               `json:"updated_at"`
+	Display     *mediadomain.Display `json:"display,omitempty"`
 }
 
 func toLibraryAssetDTO(workspacePublicID string, asset *librarydomain.V1Asset) v1LibraryAssetDTO {
@@ -255,6 +259,7 @@ func toLibraryAssetDTO(workspacePublicID string, asset *librarydomain.V1Asset) v
 		SourceURL: asset.SourceURL, PreviewURL: asset.PreviewURL, OriginalURL: asset.OriginalURL,
 		Title: asset.Title, Author: asset.Author, Width: asset.Width, Height: asset.Height,
 		CreatedAt: v1FormatTime(asset.CreatedAt), UpdatedAt: v1FormatTime(asset.UpdatedAt),
+		Display: libraryDisplay(workspacePublicID, asset),
 	}
 }
 

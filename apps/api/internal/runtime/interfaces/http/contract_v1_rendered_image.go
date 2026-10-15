@@ -21,6 +21,10 @@ func writeRenderedImage(c *gin.Context, image imgproxy.Image, err error, cacheCo
 		renderV1BinaryError(c, status)
 		return
 	}
+	writeRenderedImageBytes(c, image, cacheControl)
+}
+
+func writeRenderedImageBytes(c *gin.Context, image imgproxy.Image, cacheControl string) {
 	c.Header("Cache-Control", cacheControl)
 	c.Header("Content-Disposition", "inline")
 	c.Header("X-Content-Type-Options", "nosniff")

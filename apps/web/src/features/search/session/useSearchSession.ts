@@ -1,3 +1,4 @@
+import { isMediaDisplayExpired } from '../../../core/media/mediaDisplay'
 import { computed, ref, watch, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../workspace/routePaths'
@@ -269,7 +270,18 @@ export function useSearchSession(options: SearchSessionOptions) {
     void feed.load(true)
   })
 
-  watch(feed.results, clearSelection)
+  watch(feed.results, (items) => {
+    clearSelection()
+    const byKey = new Map(items.map((item) => [libraryAssetKey(item.provider, item.id), item]))
+    vision.refreshReferencePresentation(items)
+    const active = lightbox.activeResult.value
+    if (active) {
+      const fresh = byKey.get(libraryAssetKey(active.provider, active.id))
+      if (fresh || isMediaDisplayExpired(active.display)) {
+        lightbox.activeResult.value = { ...active, display: fresh?.display }
+      }
+    }
+  })
 
   watch(vision.error, (message) => {
     if (message) toast.error(message)

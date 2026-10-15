@@ -98,6 +98,8 @@ type RequestOptions struct {
 	// Target names this egress in logs/metrics; empty defaults to the
 	// request host.
 	Target string
+	// PublicHosts restricts HTTPS hosts on every hop without granting private egress.
+	PublicHosts []string
 }
 
 // Client is the standard outbound HTTP client.
@@ -238,7 +240,7 @@ func (c *Client) Do(ctx context.Context, req *http.Request, opts RequestOptions)
 			cancel()
 			return nil, c.finishWithLatency(target, attemptExhaustedError(callCtx, ctx, err), time.Since(startedAt))
 		}
-		resp, err := c.sendOnce(callCtx, req, body, timeout, opts.AllowHosts)
+		resp, err := c.sendOnce(callCtx, req, body, timeout, opts.AllowHosts, opts.PublicHosts)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
 				cancel()
@@ -406,7 +408,7 @@ func readStatusBodyPreview(body io.Reader) string {
 // client timeout. The parent callCtx already bounds the whole call; the
 // per-attempt http.Client timeout keeps a single hung socket from eating
 // the full budget silently.
-func (c *Client) sendOnce(ctx context.Context, req *http.Request, body []byte, attemptTimeout time.Duration, allowHosts []string) (*http.Response, error) {
+func (c *Client) sendOnce(ctx context.Context, req *http.Request, body []byte, attemptTimeout time.Duration, allowHosts, publicHosts []string) (*http.Response, error) {
 	attempt := req.Clone(ctx)
 	if body != nil {
 		attempt.Body = io.NopCloser(bytes.NewReader(body))
@@ -423,6 +425,19 @@ func (c *Client) sendOnce(ctx context.Context, req *http.Request, body []byte, a
 			return nil, fmt.Errorf("outbound request body replay failed: %w", err)
 		}
 		attempt.Body = freshBody
+	}
+	if len(publicHosts) > 0 {
+		response, err := safehttp.DoPublicRequest(ctx, attempt, attemptTimeout, publicHosts)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			if errors.Is(err, safehttp.ErrPolicyViolation) {
+				return nil, safehttp.ErrPolicyViolation
+			}
+			return nil, errors.New("public outbound request failed")
+		}
+		return response, nil
 	}
 	return safehttp.DoRequestWithAllowHosts(ctx, attempt, attemptTimeout, allowHosts...)
 }

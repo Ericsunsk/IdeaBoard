@@ -1,5 +1,6 @@
+import { mediaDisplayFixture } from '../../../test/mediaDisplay'
 import { describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import { createSearchFeed, type SearchFeedDependencies } from './feed'
 import type { SearchFeedPersistence } from '../ports/persistencePort'
 import type { SearchPage, SearchResult } from '../core/models'
@@ -17,6 +18,7 @@ const result = (id: string): SearchResult => ({
   width: 100,
   height: 100,
   media_kind: 'image',
+  display: mediaDisplayFixture(),
 })
 
 function persistence(overrides: Partial<SearchFeedPersistence> = {}): SearchFeedPersistence {
@@ -47,10 +49,10 @@ function page(results: SearchResult[], nextCursor = '', hasMore = false): Search
   return { query: 'cafe', results, next_cursor: nextCursor, has_more: hasMore }
 }
 
-function createFeed(deps: SearchFeedDependencies, query = 'cafe') {
+function createFeed(deps: SearchFeedDependencies, query: string | Ref<string> = 'cafe') {
   return createSearchFeed(
     {
-      submittedQuery: ref(query),
+      submittedQuery: typeof query === 'string' ? ref(query) : query,
       keepResultsOnNextLoad: ref(false),
       cacheScope: 'user-1',
       workspaceId: 'ws_test123',
@@ -317,5 +319,71 @@ describe('createSearchFeed interface', () => {
 
     expect(feed.failedImages.value).toEqual(new Set())
     expect(feed.imageRetryCount('image-1')).toBe(1)
+  })
+})
+
+describe('Search display expiry lifecycle', () => {
+  it('refreshes once before expiry and does not retry-loop after failure', async () => {
+    vi.useFakeTimers()
+    try {
+      const initial = result('initial')
+      initial.display = {
+        ...mediaDisplayFixture(),
+        expires_at: new Date(Date.now() + 120_000).toISOString(),
+      }
+      const search = vi
+        .fn()
+        .mockResolvedValueOnce(page([initial]))
+        .mockRejectedValueOnce(new Error('offline'))
+      const feed = createFeed(dependencies({ search }))
+      await feed.load(true)
+      await vi.advanceTimersByTimeAsync(59_999)
+      expect(search).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(search).toHaveBeenCalledTimes(2)
+      expect(feed.results.value).toEqual([initial])
+      expect(feed.hasError.value).toBe(true)
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000)
+      expect(search).toHaveBeenCalledTimes(2)
+      feed.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('cancels expiry work on clear and rejects obsolete refresh results after a query change', async () => {
+    vi.useFakeTimers()
+    try {
+      const initial = result('initial')
+      initial.display = {
+        ...mediaDisplayFixture(),
+        expires_at: new Date(Date.now() + 120_000).toISOString(),
+      }
+      let finishRefresh!: (page: SearchPage) => void
+      const pending = new Promise<SearchPage>((resolve) => {
+        finishRefresh = resolve
+      })
+      const search = vi
+        .fn()
+        .mockResolvedValueOnce(page([initial]))
+        .mockReturnValueOnce(pending)
+        .mockResolvedValueOnce(page([result('new-query')]))
+      const submittedQuery = ref('old-query')
+      const feed = createFeed(dependencies({ search }), submittedQuery)
+      await feed.load(true)
+      await vi.advanceTimersByTimeAsync(60_000)
+      submittedQuery.value = 'new-query'
+      await feed.load(true)
+      finishRefresh(page([result('obsolete')]))
+      await Promise.resolve()
+      expect(feed.results.value.map((item) => item.id)).toEqual(['new-query'])
+      expect(search.mock.calls[1]?.[0].signal.aborted).toBe(true)
+      feed.clear()
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000)
+      expect(search).toHaveBeenCalledTimes(3)
+      feed.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

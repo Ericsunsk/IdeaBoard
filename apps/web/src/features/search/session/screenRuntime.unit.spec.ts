@@ -1,3 +1,4 @@
+import { mediaDisplayFixture } from '../../../test/mediaDisplay'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, nextTick, ref } from 'vue'
 import { mockAppToast } from '../../../test/toast'
@@ -168,6 +169,7 @@ function dragResult(): SearchResult {
     width: 1200,
     height: 800,
     media_kind: 'image',
+    display: mediaDisplayFixture(),
   }
 }
 

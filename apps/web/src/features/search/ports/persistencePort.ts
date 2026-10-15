@@ -1,4 +1,4 @@
-import type { SearchResult, VisionExternalReference } from '../core/models'
+import type { SearchResult, VisionReference } from '../core/models'
 
 export type SearchFeedSnapshot = {
   query: string
@@ -15,11 +15,9 @@ export type SearchFeedPersistence = {
   scheduleWrite: (write: () => void) => () => void
 }
 
-export type CachedVisionReference = {
-  key: string
-  previewUrl: string
-  libraryAssetID?: string
-  externalReference?: VisionExternalReference
-}
+export type CachedVisionReference = Pick<
+  VisionReference,
+  'key' | 'previewUrl' | 'libraryAssetID' | 'externalReference' | 'previewExpiresAt'
+>
 
 export type LibraryIslandState = { open: boolean; expanded: boolean }

@@ -914,3 +914,30 @@ func publicIDs(records []*domain.V1Materialization) []string {
 	}
 	return out
 }
+
+func TestLibraryServiceManagedDisplayLinkIsWorkspaceScoped(t *testing.T) {
+	env := openLibraryTestEnv(t)
+	ctx := context.Background()
+	mediaID := mustSeedMediaAsset(t, ctx, env, env.wsA, "display-link")
+	assetID, err := domain.NewV1AssetPublicID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, _, err := env.svc.SaveManagedMediaAsset(ctx, env.wsA, "task-output", mediaID, assetID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := env.svc.FindManagedMedia(ctx, env.wsA, saved.PublicID)
+	if err != nil || got != mediaID {
+		t.Fatalf("managed link=%q, error=%v", got, err)
+	}
+	if _, err := env.svc.FindManagedMedia(ctx, env.wsB, saved.PublicID); !errors.Is(err, domain.ErrV1AssetNotFound) {
+		t.Fatal("cross-workspace managed link exposed")
+	}
+	if err := env.svc.DeleteAsset(ctx, env.wsA, saved.PublicID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.svc.FindManagedMedia(ctx, env.wsA, saved.PublicID); !errors.Is(err, domain.ErrV1AssetNotFound) {
+		t.Fatal("deleted managed link exposed")
+	}
+}

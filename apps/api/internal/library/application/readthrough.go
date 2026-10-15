@@ -9,7 +9,6 @@ import (
 	"ideaboard/api/internal/library/domain"
 	"ideaboard/api/internal/library/ports"
 	materializerassets "ideaboard/api/internal/media/assets"
-	"ideaboard/api/internal/platform/contract"
 )
 
 // Library materialization read-through orchestration (issue #908).
@@ -120,56 +119,8 @@ func NewReadThroughService(store ReadThroughStore, materializer materializerasse
 	return &ReadThroughService{store: store, materializer: materializer, executor: executor, timeout: timeout}
 }
 
-// FindCompletedMedia scans one workspace job listing for the newest
-// completed link for the library asset. Malformed media links read
-// as a miss (never handed to the media store or the fetcher, both
-// of which require asset_ shape).
-func FindCompletedMedia(jobs []*domain.V1Materialization, assetPublicID string) (string, bool) {
-	trimmed := strings.TrimSpace(assetPublicID)
-	for index := len(jobs) - 1; index >= 0; index-- {
-		job := jobs[index]
-		if job == nil || job.AssetPublicID != trimmed {
-			continue
-		}
-		if job.Status != domain.V1MaterializationCompleted {
-			continue
-		}
-		if !contract.IsAssetID(strings.TrimSpace(job.MediaAssetID)) {
-			continue
-		}
-		return strings.TrimSpace(job.MediaAssetID), true
-	}
-	return "", false
-}
-
-// StoreReplay backs the media fetcher's replay seam by scanning the
-// owned store's job listing for a completed link, so repeat fetches
-// converge on the same asset_ id without refetching. Its method set
-// matches media/assets.MaterializationReplayStore structurally, so
-// composition can wire it without this package importing HTTP.
-type StoreReplay struct {
-	Store ReadThroughStore
-}
-
-// FindCompletedMaterializationMedia implements the replay seam.
-func (r *StoreReplay) FindCompletedMaterializationMedia(ctx context.Context, workspacePublicID, assetPublicID string) (string, bool, error) {
-	if r == nil || r.Store == nil {
-		return "", false, nil
-	}
-	jobs, err := r.Store.ListMaterializations(ctx, strings.TrimSpace(workspacePublicID))
-	if err != nil {
-		return "", false, err
-	}
-	mediaID, found := FindCompletedMedia(jobs, assetPublicID)
-	return mediaID, found, nil
-}
-
-// Resolve serves the read-through synchronously: owned library asset
-// plus the newest completed media link. It returns the stored asset
-// (nil when unknown) and the linked media id. ok=false is a miss:
-// the caller triggers and answers 404. Media existence itself is
-// verified by the caller through its media store; a dangling link
-// reads as a miss here only after that check fails.
+// Resolve reads completed remote materializations. Workspace Media references
+// are not read-through inputs: their canonical link is used only by display.
 func (s *ReadThroughService) Resolve(ctx context.Context, workspacePublicID, assetPublicID string) (stored *domain.V1Asset, mediaAssetID string, found bool) {
 	if s == nil || s.store == nil {
 		return nil, "", false
@@ -181,15 +132,8 @@ func (s *ReadThroughService) Resolve(ctx context.Context, workspacePublicID, ass
 	if strings.TrimSpace(stored.Provider) == domain.ProviderWorkspaceMedia {
 		return stored, "", false
 	}
-	jobs, err := s.store.ListMaterializations(ctx, workspacePublicID)
-	if err != nil {
-		return stored, "", false
-	}
-	mediaID, ok := FindCompletedMedia(jobs, assetPublicID)
-	if !ok {
-		return stored, "", false
-	}
-	return stored, mediaID, true
+	mediaAssetID, found, err = (&SourceResolver{Store: s.store}).FindCompletedMaterializationMedia(ctx, workspacePublicID, assetPublicID)
+	return stored, mediaAssetID, err == nil && found
 }
 
 // Request fires the best-effort async fetch for a known remote

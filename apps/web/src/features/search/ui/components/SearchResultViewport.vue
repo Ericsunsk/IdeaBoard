@@ -6,6 +6,7 @@
       :item="entry.item"
       :index="entry.index"
       :style="entry.style"
+      :width="laneWidth"
     />
   </div>
 </template>

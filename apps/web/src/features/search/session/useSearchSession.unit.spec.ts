@@ -1,5 +1,7 @@
+import { mediaDisplayFixture } from '../../../test/mediaDisplay'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { nextTick, ref, type Ref } from 'vue'
+import type { SearchResult, VisionReference } from '../core/models'
 import { useSearchSession } from './useSearchSession'
 import {
   clearPendingSearchAuthAction,
@@ -17,9 +19,11 @@ const mocks = vi.hoisted(() => ({
   markUnsaved: vi.fn(),
   clearReferences: vi.fn(),
   resetExtraction: vi.fn(),
+  refreshReferencePresentation: vi.fn(),
   submit: vi.fn(async () => undefined),
   resumeAfterAuthentication: vi.fn(async () => undefined),
-  references: { value: [] as { key: string }[] },
+  references: { value: [] as VisionReference[] },
+  feedResults: null as Ref<SearchResult[]> | null,
   state: { value: 'idle' as 'idle' | 'extracting' | 'ready' },
   error: { value: '' },
 }))
@@ -32,7 +36,7 @@ vi.mock('vue-router', () => ({
 vi.mock('./feed', () => ({
   createSearchFeed: () => ({
     load: mocks.load,
-    results: { value: [] },
+    results: mocks.feedResults!,
     markSaved: mocks.markSaved,
     markSavedKey: mocks.markSavedKey,
     markUnsaved: mocks.markUnsaved,
@@ -46,6 +50,7 @@ vi.mock('./useVisionQueryLifecycle', () => ({
     error: mocks.error,
     clearReferences: mocks.clearReferences,
     resetExtraction: mocks.resetExtraction,
+    refreshReferencePresentation: mocks.refreshReferencePresentation,
     submit: mocks.submit,
     resumeAfterAuthentication: mocks.resumeAfterAuthentication,
   }),
@@ -55,6 +60,7 @@ describe('useSearchSession', () => {
   beforeEach(() => {
     mocks.route.query = {}
     mocks.references.value = []
+    mocks.feedResults = ref([])
     mocks.state.value = 'idle'
     clearPendingSearchAuthAction()
     vi.clearAllMocks()
@@ -87,7 +93,7 @@ describe('useSearchSession', () => {
       query: { q: 'product display' },
     })
 
-    mocks.references.value = [{ key: 'unsplash:1' }]
+    mocks.references.value = [{ key: 'unsplash:1', previewUrl: '' }]
     await session.submitQuery()
     expect(mocks.submit).toHaveBeenCalledOnce()
   })
@@ -127,6 +133,7 @@ describe('useSearchSession', () => {
       width: 1200,
       height: 800,
       media_kind: 'image',
+      display: mediaDisplayFixture(),
     } as const
 
     session.batch.toggle(result)
@@ -156,7 +163,7 @@ describe('useSearchSession', () => {
   })
 
   it('restores cached Vision references for editing without auto-submitting a billed extraction', async () => {
-    mocks.references.value = [{ key: 'unsplash:cached-reference' }]
+    mocks.references.value = [{ key: 'unsplash:cached-reference', previewUrl: '' }]
 
     useSearchSession({
       libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }),
@@ -164,6 +171,48 @@ describe('useSearchSession', () => {
     })
     await nextTick()
 
+    expect(mocks.submit).not.toHaveBeenCalled()
+  })
+})
+
+describe('Search session display refresh', () => {
+  it('coordinates fresh results with Vision and refreshes the active lightbox', async () => {
+    const result: SearchResult = {
+      provider: 'unsplash',
+      id: 'photo-refresh',
+      title: 'Photo',
+      author: 'Author',
+      author_url: '',
+      source_url: '',
+      original_url: 'https://images.unsplash.com/original',
+      preview_url: 'https://images.unsplash.com/preview',
+      thumbnail_url: '',
+      width: 100,
+      height: 200,
+      media_kind: 'image',
+      display: mediaDisplayFixture('old'),
+    }
+    const externalReference = {
+      provider: result.provider,
+      id: result.id,
+      preview_url: result.preview_url,
+    }
+    const reference = {
+      key: 'unsplash:photo-refresh',
+      externalReference,
+      previewUrl: '/api/media/previews/old/thumb',
+      previewExpiresAt: new Date(Date.now() - 1).toISOString(),
+    }
+    mocks.feedResults = ref([])
+    mocks.references.value = [reference]
+    const session = useSearchSession({
+      libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }),
+    })
+    session.lightbox.open(result)
+    mocks.feedResults.value = [{ ...result, display: mediaDisplayFixture('fresh') }]
+    await nextTick()
+    expect(mocks.refreshReferencePresentation).toHaveBeenCalledWith(mocks.feedResults.value)
+    expect(session.lightbox.activeResult.value?.display).toEqual(mediaDisplayFixture('fresh'))
     expect(mocks.submit).not.toHaveBeenCalled()
   })
 })

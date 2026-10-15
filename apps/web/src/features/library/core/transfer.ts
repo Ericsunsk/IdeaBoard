@@ -1,3 +1,4 @@
+import { resolveMediaDisplayUrl } from '../../../core/media/mediaDisplay'
 import type { WorkspaceLibraryAsset } from './validators'
 
 export type LibraryAssetView = WorkspaceLibraryAsset
@@ -16,7 +17,7 @@ export function toCanvasLibraryImportDescriptor(
   return {
     assetId: asset.id,
     title: asset.title ?? '',
-    previewUrl: asset.previewUrl,
+    previewUrl: resolveMediaDisplayUrl(asset.display, 640),
     width: asset.width,
     height: asset.height,
   }

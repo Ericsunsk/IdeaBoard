@@ -1,3 +1,4 @@
+import { mediaDisplayFixture } from '../../../../test/mediaDisplay'
 import { describe, expect, it } from 'vitest'
 import { render, screen, waitFor } from '../../../../test/render'
 import userEvent from '@testing-library/user-event'
@@ -13,6 +14,7 @@ const mockItem: SearchResult = {
   author: 'John Doe',
   author_url: 'https://example.com/author',
   media_kind: 'image',
+  display: mediaDisplayFixture(),
   source_url: 'https://example.com/source',
   thumbnail_url: 'https://example.com/thumb.jpg',
   preview_url: 'https://example.com/preview.jpg',
@@ -32,7 +34,10 @@ describe('Search presentation subcomponents', () => {
       })
       expect(screen.getByText('Mountain Sunset')).toBeInTheDocument()
       expect(screen.getByText(/John Doe/)).toBeInTheDocument()
-      expect(screen.getByRole('img')).toHaveAttribute('src', 'https://example.com/orig.jpg')
+      expect(screen.getByRole('img')).toHaveAttribute(
+        'src',
+        '/api/media/previews/fixture/large-preview',
+      )
     })
 
     it('keeps a visible focus ring on the close button over the dark backdrop', () => {
@@ -137,7 +142,7 @@ describe('Search presentation subcomponents', () => {
         },
       })
       const img = screen.getByAltText('Mountain Sunset')
-      expect(img).toHaveAttribute('src', 'https://example.com/preview.jpg')
+      expect(img).toHaveAttribute('src', '/api/media/previews/fixture/large-preview')
       const zoomBtn = screen.getByRole('button', { name: /view|查看/i })
       await user.click(zoomBtn)
       expect(lightboxOpened).toBe(true)

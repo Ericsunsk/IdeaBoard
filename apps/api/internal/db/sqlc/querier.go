@@ -275,6 +275,7 @@ type Querier interface {
 	GetLibraryAssetByWorkspaceSource(ctx context.Context, arg GetLibraryAssetByWorkspaceSourceParams) (GetLibraryAssetByWorkspaceSourceRow, error)
 	GetLibraryFolderByPublicID(ctx context.Context, arg GetLibraryFolderByPublicIDParams) (LibraryFolder, error)
 	GetLibraryFolderByWorkspaceAndNameCI(ctx context.Context, arg GetLibraryFolderByWorkspaceAndNameCIParams) (LibraryFolder, error)
+	GetLibraryManagedMediaPublicID(ctx context.Context, arg GetLibraryManagedMediaPublicIDParams) (string, error)
 	GetLibraryMaterializationByPublicID(ctx context.Context, arg GetLibraryMaterializationByPublicIDParams) (GetLibraryMaterializationByPublicIDRow, error)
 	// GetMediaAssetByPublicID returns the asset row including archived
 	// ones (archived assets stay metadata-readable; bytes go 410).

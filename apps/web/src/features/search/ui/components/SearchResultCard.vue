@@ -18,10 +18,9 @@
         :style="{ aspectRatio: `${result.width} / ${result.height}` }"
       >
         <img
+          v-if="displayUrl"
           :key="`${result.provider}:${result.id}:${imageRetryCount}`"
-          :src="result.preview_url || result.thumbnail_url"
-          :srcset="`${result.thumbnail_url} 400w, ${result.preview_url} 1200w`"
-          sizes="(min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 100vw"
+          :src="displayUrl"
           :alt="result.title || t('search.fallbackTitle')"
           :loading="index < 4 ? 'eager' : 'lazy'"
           :fetchpriority="index < 2 ? 'high' : 'auto'"
@@ -110,7 +109,7 @@
     </div>
 
     <div
-      v-if="hasImageError"
+      v-if="hasImageError || !displayUrl"
       class="grid place-items-center gap-2 bg-muted/30 px-4 py-5 text-center"
     >
       <span class="text-xs font-semibold text-muted-foreground">{{
@@ -129,8 +128,9 @@ import { useI18n } from 'vue-i18n'
 import { BookmarkSolid, Check, Plus, Search } from '@iconoir/vue'
 import { Button } from '@/components/ui/button'
 import type { SearchResult } from '../../core/models'
+import { useMediaDisplayUrl } from '../../../../core/media/useMediaDisplayUrl'
 
-defineProps<{
+const props = defineProps<{
   result: SearchResult
   index: number
   cardStyle?: CSSProperties | undefined
@@ -139,6 +139,7 @@ defineProps<{
   isSaved: boolean
   hasImageError: boolean
   imageRetryCount: number
+  displayWidth?: number | undefined
 }>()
 
 defineEmits<{
@@ -152,4 +153,12 @@ defineEmits<{
 }>()
 
 const { t } = useI18n()
+const displayUrl = useMediaDisplayUrl(
+  () => props.result.display,
+  () => {
+    const width = props.displayWidth ?? 1280
+    const ratio = props.result.width > 0 ? props.result.height / props.result.width : 1
+    return { width, height: width * ratio }
+  },
+)
 </script>

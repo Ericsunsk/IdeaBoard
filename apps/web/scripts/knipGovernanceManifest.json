@@ -12586,10 +12586,6 @@
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#requireWorkspaceId"]
       },
-      "resolveLibraryAssetCardURL": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/library/index.ts#resolveLibraryAssetCardURL"]
-      },
       "toWorkspaceLibraryAsset": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#toWorkspaceLibraryAsset"]
@@ -12900,12 +12896,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#requireWorkspaceId"
-        ]
-      },
-      "resolveLibraryAssetCardURL": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#resolveLibraryAssetCardURL"
         ]
       },
       "saveWorkspaceSearchReference": {
@@ -15993,6 +15983,10 @@
       "sha256": "62e7f3b9643f1423e7c7a6fef396bfbaff3d32d2806cbd44538ee7c353f418b8",
       "exports": ["DeletedEnvelopeData"]
     },
+    "src/api/generated-query/public/model/derivativeWorkspaceLibraryAssetParams.ts": {
+      "sha256": "9db106c5c8b9043f329c1c7f9eb3848a19950d5a1ee0509f51f8812aa5f7c802",
+      "exports": ["DerivativeWorkspaceLibraryAssetParams"]
+    },
     "src/api/generated-query/public/model/errorEnvelope.ts": {
       "sha256": "ff18abaeb053d7b4c2cfccb473d741b436ebf5005a88e57f17fd95c9ace7aba4",
       "exports": ["ErrorEnvelope"]
@@ -16042,7 +16036,7 @@
       "exports": ["IfMatchParameter"]
     },
     "src/api/generated-query/public/model/index.ts": {
-      "sha256": "a249bf362962b13fd369d94aafc9c6a6a641a9c88ab175105d6800ef9d328a01",
+      "sha256": "96ee6d314765068376bd037aa07af267ef9ba693a221e38d6d8fa0eead389a17",
       "exports": []
     },
     "src/api/generated-query/public/model/joinBoardRequest.ts": {
@@ -16054,7 +16048,7 @@
       "exports": ["JoinBoardRequestData"]
     },
     "src/api/generated-query/public/model/libraryAsset.ts": {
-      "sha256": "876b8ea5a534786aba7f23d1b4c0a0f94baa8752a6731bfb074117d4479a76f0",
+      "sha256": "97ffd03263b5156b7fbf94b6911e19998af2ad76cda429d703e1d05638ca81cd",
       "exports": ["LibraryAsset"]
     },
     "src/api/generated-query/public/model/libraryAssetEnvelope.ts": {
@@ -16160,6 +16154,22 @@
     "src/api/generated-query/public/model/mediaDerivativeStatus.ts": {
       "sha256": "d7a63de7de27755ef632f7c3f7f5aab20494fd4e2c3a30b5c4a3253b8ef63453",
       "exports": ["MediaDerivativeStatus"]
+    },
+    "src/api/generated-query/public/model/mediaDisplay.ts": {
+      "sha256": "3b2a34a1406aad0d478e7ef90f43c67a9fcdf68e1b3339fd2eee18ccf7af6b4e",
+      "exports": ["MediaDisplay"]
+    },
+    "src/api/generated-query/public/model/mediaDisplayVariant.ts": {
+      "sha256": "708c96382ab659fdf3a463c40dac5af9dd05aaa6ea264207cc2cd129db9f1748",
+      "exports": ["MediaDisplayVariant"]
+    },
+    "src/api/generated-query/public/model/mediaDisplayVariantMaxSide.ts": {
+      "sha256": "60aa7c19599c752eb384a24381fb1d3b45725d54f4668043fa371cf1134fd1be",
+      "exports": ["MediaDisplayVariantMaxSide"]
+    },
+    "src/api/generated-query/public/model/mediaDisplayVariantTier.ts": {
+      "sha256": "a6473569a7c051006d7d22711a9267e0ee9313637df1024b49b3574733567ddc",
+      "exports": ["MediaDisplayVariantTier"]
     },
     "src/api/generated-query/public/model/membershipRole.ts": {
       "sha256": "af1ac52587d90c07f3e30a51308d69055dcd111f50d7130ecc9bcedb89af8ba5",
@@ -16630,7 +16640,7 @@
       "exports": ["WorkspaceRewardRedemptionHistoryItem"]
     },
     "src/api/generated-query/public/model/workspaceSearchResult.ts": {
-      "sha256": "95c9879492fed122777529425973729bcf6b9403e5fd66799c7720ae39e3222c",
+      "sha256": "367eeaea8fdc4aa0d20eaad7bbea4588d1431086d7a71e424c360fb2db3599a8",
       "exports": ["WorkspaceSearchResult"]
     },
     "src/api/generated-query/public/model/workspaceTask.ts": {
@@ -16875,7 +16885,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-library/workspace-library.ts": {
-      "sha256": "1a9fff528db2d35c4c9130182269bcbc3f0276cda329040dc3ab61f4ba4456cd",
+      "sha256": "84b04ff5730e06616e55aa79a902e05c0e87167b0d0e8edd4ecd92da99d4a4ec",
       "exports": [
         "CreateWorkspaceLibraryFolderMutationBody",
         "CreateWorkspaceLibraryFolderMutationError",
@@ -16887,6 +16897,8 @@
         "DeleteWorkspaceLibraryFolderMutationError",
         "DeleteWorkspaceLibraryFolderMutationResult",
         "DeleteWorkspaceLibraryFolderMutationVariables",
+        "DerivativeWorkspaceLibraryAssetQueryError",
+        "DerivativeWorkspaceLibraryAssetQueryResult",
         "ListWorkspaceLibraryAssetsQueryError",
         "ListWorkspaceLibraryAssetsQueryResult",
         "ListWorkspaceLibraryFoldersQueryError",
@@ -16910,6 +16922,7 @@
         "createWorkspaceLibraryFolder",
         "deleteWorkspaceLibraryAsset",
         "deleteWorkspaceLibraryFolder",
+        "derivativeWorkspaceLibraryAsset",
         "getCreateWorkspaceLibraryFolderMutationKey",
         "getCreateWorkspaceLibraryFolderMutationOptions",
         "getCreateWorkspaceLibraryFolderUrl",
@@ -16919,6 +16932,9 @@
         "getDeleteWorkspaceLibraryFolderMutationKey",
         "getDeleteWorkspaceLibraryFolderMutationOptions",
         "getDeleteWorkspaceLibraryFolderUrl",
+        "getDerivativeWorkspaceLibraryAssetQueryKey",
+        "getDerivativeWorkspaceLibraryAssetQueryOptions",
+        "getDerivativeWorkspaceLibraryAssetUrl",
         "getListWorkspaceLibraryAssetsQueryKey",
         "getListWorkspaceLibraryAssetsQueryOptions",
         "getListWorkspaceLibraryAssetsUrl",
@@ -16946,6 +16962,7 @@
         "useCreateWorkspaceLibraryFolder",
         "useDeleteWorkspaceLibraryAsset",
         "useDeleteWorkspaceLibraryFolder",
+        "useDerivativeWorkspaceLibraryAsset",
         "useListWorkspaceLibraryAssets",
         "useListWorkspaceLibraryFolders",
         "useMoveWorkspaceLibraryAsset",
@@ -17359,6 +17376,10 @@
         "src/features/admin/settings/ui/pages/AdminSettingsUnifiedPage.component.spec.ts"
       ]
     },
+    "src/features/admin/shared/ui/popover/adminPopoverAtoms.ts": {
+      "kind": "retained-public-or-test-support",
+      "evidence": ["src/features/admin/shared/ui/popover/AdminPopover.component.spec.ts"]
+    },
     "src/features/admin/shared/ui/table/AdminTableCaption.vue": {
       "kind": "retained-public-or-test-support",
       "evidence": ["src/features/admin/shared/ui/table/adminTableAtoms.ts"]
@@ -17367,13 +17388,13 @@
       "kind": "retained-public-or-test-support",
       "evidence": ["src/features/admin/shared/ui/table/adminTableAtoms.ts"]
     },
-    "src/features/admin/shared/ui/popover/adminPopoverAtoms.ts": {
-      "kind": "retained-public-or-test-support",
-      "evidence": ["src/features/admin/shared/ui/popover/AdminPopover.component.spec.ts"]
-    },
     "src/features/admin/shared/ui/table/adminTableAtoms.ts": {
       "kind": "retained-public-or-test-support",
       "evidence": ["src/features/admin/shared/ui/table/AdminTable.component.spec.ts"]
+    },
+    "src/features/board/ports/testing.ts": {
+      "kind": "test-support",
+      "evidence": ["src/features/canvas/ui/pages/CanvasPage.component.spec.ts"]
     },
     "src/features/board/testing/factories.ts": {
       "kind": "test-support",
@@ -17402,6 +17423,10 @@
         "src/features/canvas/session/media/serviceImageActionText.unit.spec.ts",
         "src/shared/domain/serviceRegistry.shim.ts"
       ]
+    },
+    "src/features/canvas/tools/retouch/testing/browser.ts": {
+      "kind": "test-support",
+      "evidence": ["src/test/touchTarget.browser.spec.ts"]
     },
     "src/features/legal/index.ts": {
       "kind": "canonical-public-file",
@@ -17459,6 +17484,14 @@
     "src/test/factories/user.ts": {
       "kind": "test-support",
       "evidence": ["src/test/factories/index.ts"]
+    },
+    "src/test/mediaDisplay.ts": {
+      "kind": "test-support",
+      "evidence": [
+        "src/core/media/mediaDisplay.unit.spec.ts",
+        "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+        "src/features/search/ui/components/SearchResultCard.component.spec.ts"
+      ]
     },
     "src/test/msw.ts": {
       "kind": "test-support",
@@ -17692,14 +17725,6 @@
         "src/shared/theme/composables/themeKeyboard.shim.ts",
         "src/theme/composables/themeKeyboard.contract.spec.ts"
       ]
-    },
-    "src/features/board/ports/testing.ts": {
-      "kind": "test-support",
-      "evidence": ["src/features/canvas/ui/pages/CanvasPage.component.spec.ts"]
-    },
-    "src/features/canvas/tools/retouch/testing/browser.ts": {
-      "kind": "test-support",
-      "evidence": ["src/test/touchTarget.browser.spec.ts"]
     }
   }
 }

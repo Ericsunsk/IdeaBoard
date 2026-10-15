@@ -137,7 +137,7 @@ func newV1ReadThroughFixture(t *testing.T, fetcher interface {
 	// owns lifecycle + replay; Media owns download + writes. The stub
 	// fetcher rides a real LibraryMaterializer so the tests keep
 	// covering the production download->ingest path with fake bytes.
-	replay := &libraryapplication.StoreReplay{Store: lib}
+	replay := &libraryapplication.SourceResolver{Store: lib}
 	rawMaterializer, err := materializerassets.NewLibraryMaterializer(materializerassets.LibraryMaterializerDeps{
 		Media: media, Objects: objects, Fetcher: fetcher, Replay: replay,
 	})

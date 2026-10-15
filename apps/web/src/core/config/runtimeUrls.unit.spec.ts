@@ -28,7 +28,9 @@ describe('runtime URL helpers', () => {
 
     const { resolveAuthUrl } = await import('./runtimeUrls')
 
-    expect(resolveAuthUrl('/api/auth/get-session')).toBe('/api/auth/get-session')
+    expect(resolveAuthUrl('/api/auth/get-session')).toBe(
+      'https://api.example.com/api/auth/get-session',
+    )
   })
 
   it('forces same-origin API and asset bases for production builds', async () => {

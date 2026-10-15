@@ -1,3 +1,4 @@
+import { resolveMediaDisplayUrl } from '../../../core/media/mediaDisplay'
 import {
   computed,
   effectScope,
@@ -352,7 +353,7 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
       handleCardPointerDown(event: PointerEvent, result: SearchResult) {
         startPointerDrag(event, {
           payload: { kind: 'reference', reference: session().toLibraryReference(result) },
-          previewUrl: result.thumbnail_url || result.preview_url,
+          previewUrl: resolveMediaDisplayUrl(result.display, 256),
           targets: dropTargets,
           onEnd: () => {
             clearAutoOpenTimer()

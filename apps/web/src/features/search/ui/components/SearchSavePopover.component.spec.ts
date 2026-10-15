@@ -1,3 +1,4 @@
+import { mediaDisplayFixture } from '../../../../test/mediaDisplay'
 import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
@@ -32,6 +33,7 @@ const result: SearchResult = {
   width: 100,
   height: 100,
   media_kind: 'image',
+  display: mediaDisplayFixture(),
 }
 const Host = defineComponent({
   components: { SearchSavePopover },

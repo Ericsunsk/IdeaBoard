@@ -19,6 +19,7 @@ import (
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	materializerassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
+	"ideaboard/api/internal/media/derivatives/infrastructure/preview"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
@@ -118,16 +119,22 @@ func newAppRouter(
 	// requests/responses. A materializer build failure fails startup
 	// (fail closed) instead of serving silent 404s.
 	libraryStore := librarypostgres.NewService(repos.db)
+	librarySources := &libraryapplication.SourceResolver{Store: libraryStore, ManagedMedia: libraryStore}
 	libraryMaterializer, err := materializerassets.NewLibraryMaterializer(materializerassets.LibraryMaterializerDeps{
 		Media: taskServices.workspaceTaskMedia, Objects: services.storageService,
 		Fetcher: materializerassets.RemoteLibrarySourceFetcher{},
-		Replay:  &libraryapplication.StoreReplay{Store: libraryStore},
+		Replay:  librarySources,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize library materializer: %w", err)
 	}
 	libraryReadThrough := libraryapplication.NewReadThroughService(
 		libraryStore, libraryMaterializer, libraryapplication.GoroutineExecutor{}, libraryapplication.DefaultReadThroughTimeout)
+	mediaRenderer := imgproxy.NewRenderer(imgproxyConfigFromApp(cfg), services.storageService)
+	mediaPreviews, err := preview.NewService(imgproxyConfigFromApp(cfg), configinfra.RuntimeUploadDir, mediaRenderer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize media previews: %w", err)
+	}
 	// Panic recovery, access logging and request IDs are registered in
 	// registerGlobalMiddleware so every route shares the error envelope.
 	registerHTTPRoutes(router, httpapi.Dependencies{
@@ -153,11 +160,13 @@ func newAppRouter(
 			Library: httpapi.ContractV1LibraryDeps{
 				Store:       libraryStore,
 				ReadThrough: libraryReadThrough,
+				Sources:     librarySources,
 			},
 			Media: taskServices.workspaceTaskMedia,
 			// Binary reads ride the storage service.
 			MediaObjects:  services.storageService,
-			MediaRenderer: imgproxy.NewRenderer(imgproxyConfigFromApp(cfg), services.storageService),
+			MediaRenderer: mediaRenderer,
+			MediaPreviews: mediaPreviews,
 			// #821 (#809 Phase 4-04): workspace-scoped task postgres
 			// store + production settlement adapters. Task routes
 			// are live: Quote via the billing catalog, Hold/Capture/
@@ -284,7 +293,7 @@ func newAppRouter(
 			TxScope: newControlTxScope(repos.db),
 			TxAudit: controlAuditTxSink,
 		},
-		PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()})),
+		PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()}), mediaPreviews),
 		PaymentWebhook:      paymentWebhookHandler,
 		Internal:            httpapi.InternalRouteDeps{UserHandler: identityhttp.NewInternalHandler(repos.userRepo, cfg.Auth.InternalAPIKey)},
 		CORSMiddleware:      httpinfra.BuildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),

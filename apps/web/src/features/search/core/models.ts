@@ -1,3 +1,4 @@
+import type { MediaDisplay } from '../../../core/media/mediaDisplay'
 import { type ExternalImageProvider } from '../../../core/contracts/externalImageProviders'
 export type SearchCatalogProvider = ExternalImageProvider
 
@@ -16,6 +17,7 @@ export type SearchResult = {
   width: number
   height: number
   media_kind: 'image'
+  display?: MediaDisplay | undefined
 }
 
 export type SearchPage = {
@@ -37,4 +39,5 @@ export type VisionReference = {
   externalReference?: VisionExternalReference | undefined
   previewUrl: string
   key: string
+  previewExpiresAt?: string | undefined
 }

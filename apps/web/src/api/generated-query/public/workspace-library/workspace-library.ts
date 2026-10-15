@@ -31,7 +31,9 @@ import type {
   ConflictResponse,
   CreateLibraryFolderRequest,
   DeletedEnvelope,
+  DerivativeWorkspaceLibraryAssetParams,
   LibraryAssetEnvelope,
+  LibraryAssetId,
   LibraryFolderEnvelope,
   ListWorkspaceLibraryAssetsParams,
   ListWorkspaceLibraryFoldersParams,
@@ -969,6 +971,153 @@ export const useDeleteWorkspaceLibraryAsset = <
 > => {
   return useMutation(getDeleteWorkspaceLibraryAssetMutationOptions(options), queryClient)
 }
+export const getDerivativeWorkspaceLibraryAssetUrl = (
+  workspaceId: string,
+  assetId: LibraryAssetId,
+  tier: 'thumb' | 'preview' | 'large-preview',
+  params: DerivativeWorkspaceLibraryAssetParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/workspaces/${encodeURIComponent(String(workspaceId))}/library/assets/${encodeURIComponent(String(assetId))}/derivatives/${encodeURIComponent(String(tier))}?${stringifiedParams}`
+    : `/workspaces/${encodeURIComponent(String(workspaceId))}/library/assets/${encodeURIComponent(String(assetId))}/derivatives/${encodeURIComponent(String(tier))}`
+}
+
+/**
+ * Resolves a stored preview or existing managed link without materialization. Returns WebP bytes.
+ * @summary Read a library display rendition (members only)
+ */
+export const derivativeWorkspaceLibraryAsset = async (
+  workspaceId: string,
+  assetId: LibraryAssetId,
+  tier: 'thumb' | 'preview' | 'large-preview',
+  params: DerivativeWorkspaceLibraryAssetParams,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<Blob> => {
+  return publicMutator<Blob>(
+    getDerivativeWorkspaceLibraryAssetUrl(workspaceId, assetId, tier, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getDerivativeWorkspaceLibraryAssetQueryKey = (
+  workspaceId: MaybeRefOrGetter<string>,
+  assetId: MaybeRefOrGetter<LibraryAssetId>,
+  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview'>,
+  params?: MaybeRefOrGetter<DerivativeWorkspaceLibraryAssetParams>,
+) => {
+  return [
+    'workspaces',
+    workspaceId,
+    'library',
+    'assets',
+    assetId,
+    'derivatives',
+    tier,
+    ...(params ? [params] : []),
+  ] as const
+}
+
+export const getDerivativeWorkspaceLibraryAssetQueryOptions = <
+  TData = Awaited<ReturnType<typeof derivativeWorkspaceLibraryAsset>>,
+  TError = void,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  assetId: MaybeRefOrGetter<LibraryAssetId>,
+  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview'>,
+  params: MaybeRefOrGetter<DerivativeWorkspaceLibraryAssetParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof derivativeWorkspaceLibraryAsset>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getDerivativeWorkspaceLibraryAssetQueryKey(workspaceId, assetId, tier, params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof derivativeWorkspaceLibraryAsset>>> = ({
+    signal,
+  }) =>
+    derivativeWorkspaceLibraryAsset(
+      toValue(workspaceId),
+      toValue(assetId),
+      toValue(tier),
+      toValue(params),
+      { signal, ...requestOptions },
+    )
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(workspaceId) !== null &&
+        toValue(workspaceId) !== undefined &&
+        toValue(assetId) !== null &&
+        toValue(assetId) !== undefined &&
+        toValue(tier) !== null &&
+        toValue(tier) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof derivativeWorkspaceLibraryAsset>>, TError, TData>
+}
+
+export type DerivativeWorkspaceLibraryAssetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof derivativeWorkspaceLibraryAsset>>
+>
+export type DerivativeWorkspaceLibraryAssetQueryError = void
+
+/**
+ * @summary Read a library display rendition (members only)
+ */
+
+export function useDerivativeWorkspaceLibraryAsset<
+  TData = Awaited<ReturnType<typeof derivativeWorkspaceLibraryAsset>>,
+  TError = void,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  assetId: MaybeRefOrGetter<LibraryAssetId>,
+  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview'>,
+  params: MaybeRefOrGetter<DerivativeWorkspaceLibraryAssetParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof derivativeWorkspaceLibraryAsset>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDerivativeWorkspaceLibraryAssetQueryOptions(
+    workspaceId,
+    assetId,
+    tier,
+    params,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
 export const getResolveWorkspaceLibraryAssetsUrl = (workspaceId: string) => {
   return `/workspaces/${encodeURIComponent(String(workspaceId))}/library/asset-resolutions`
 }

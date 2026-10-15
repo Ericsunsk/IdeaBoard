@@ -17,7 +17,7 @@ func TestSearchHandlersFailClosedWithoutDependencies(t *testing.T) {
 
 	t.Run("search service", func(t *testing.T) {
 		router := gin.New()
-		router.GET("/search", NewSearchHandler(nil).Search)
+		router.GET("/search", NewSearchHandler(nil, nil).Search)
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/search?q=test", nil))
 		if recorder.Code != http.StatusServiceUnavailable {

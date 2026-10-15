@@ -7,8 +7,7 @@ import (
 	"testing"
 )
 
-// Every outbound call must pin egress through the safehttp SSRF allowlist.
-// A RequestOptions literal without AllowHosts silently widens egress.
+// Every outbound call must declare private-egress allowances or a stricter public-host restriction.
 func TestOutboundCallsPinAllowHosts(t *testing.T) {
 	root := "../../.."
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
@@ -27,8 +26,8 @@ func TestOutboundCallsPinAllowHosts(t *testing.T) {
 			t.Fatalf("read %s: %v", path, err)
 		}
 		for _, literal := range extractRequestOptionsLiterals(string(raw)) {
-			if !strings.Contains(literal, "AllowHosts") {
-				t.Errorf("production file %s builds outboundhttp.RequestOptions without AllowHosts", path)
+			if !strings.Contains(literal, "AllowHosts") && !strings.Contains(literal, "PublicHosts") {
+				t.Errorf("production file %s builds outboundhttp.RequestOptions without an explicit egress policy", path)
 			}
 		}
 		return nil

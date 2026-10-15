@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import { mediaDisplayFixture } from '../../../test/mediaDisplay'
+import type { SearchResult } from '../core/models'
 import { createVisionReferenceCollection, MAX_REFERENCE_COUNT } from './visionReferenceCollection'
 import {
   VISION_REFERENCE_MAX_BYTES,
@@ -73,5 +75,114 @@ describe('visionReferenceCollection', () => {
     expect(sharedPreview.references.value).toHaveLength(1)
     expect(revoke).not.toHaveBeenCalledWith('blob:shared')
     revoke.mockRestore()
+  })
+
+  it('normalizes preview policy on every ingress and retains durable reference identity', () => {
+    const externalReference = {
+      provider: 'unsplash',
+      id: 'photo',
+      preview_url: 'https://images.unsplash.com/original',
+    }
+    const valid = {
+      key: 'unsplash:photo',
+      externalReference,
+      previewUrl: '/api/media/previews/valid/thumb',
+      previewExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    }
+    const collection = createVisionReferenceCollection([
+      { ...valid, previewUrl: externalReference.preview_url },
+      { ...valid, key: 'invalid-expiry', previewExpiresAt: 'invalid' },
+    ])
+    collection.add({ ...valid, key: 'expired', previewExpiresAt: new Date(0).toISOString() })
+    collection.add({ ...valid, key: 'valid' })
+    expect(collection.references.value.map((item) => item.previewUrl)).toEqual([
+      '',
+      '',
+      '',
+      valid.previewUrl,
+    ])
+    expect(
+      collection.references.value.every(
+        (item) => item.externalReference?.preview_url === externalReference.preview_url,
+      ),
+    ).toBe(true)
+  })
+
+  it('expires missing external previews without touching local or Library presentation', () => {
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    const expiresAt = Date.now() + 60_000
+    vi.spyOn(Date, 'now').mockReturnValue(expiresAt - 1)
+    const collection = createVisionReferenceCollection([
+      {
+        key: 'unsplash:photo',
+        externalReference: {
+          provider: 'unsplash',
+          id: 'photo',
+          preview_url: 'https://images.unsplash.com/input',
+        },
+        previewUrl: '/api/media/previews/old/thumb',
+        previewExpiresAt: new Date(expiresAt).toISOString(),
+      },
+      { key: 'local', file: new File(['local'], 'photo.jpg'), previewUrl: 'blob:local' },
+      { key: 'library', libraryAssetID: 'lasset_1', previewUrl: '/api/v1/library/thumb' },
+    ])
+    vi.spyOn(Date, 'now').mockReturnValue(expiresAt)
+    collection.refreshPresentation([])
+    expect(collection.references.value.map((item) => item.previewUrl)).toEqual([
+      '',
+      'blob:local',
+      '/api/v1/library/thumb',
+    ])
+    expect(collection.persistableReferences.value.map((item) => item.key)).toEqual([
+      'unsplash:photo',
+      'library',
+    ])
+    const transferred = collection.take()
+    collection.clear()
+    expect(revoke).not.toHaveBeenCalled()
+    const next = createVisionReferenceCollection(transferred)
+    next.clear()
+    expect(revoke).toHaveBeenCalledExactlyOnceWith('blob:local')
+    vi.restoreAllMocks()
+  })
+
+  it('refreshes only matching external presentation and serializes expiry without provider display fallback', () => {
+    const externalReference = {
+      provider: 'unsplash',
+      id: 'photo',
+      preview_url: 'https://images.unsplash.com/input',
+    }
+    const collection = createVisionReferenceCollection([
+      { key: 'unsplash:photo', externalReference, previewUrl: '' },
+    ])
+    const fresh: SearchResult = {
+      provider: 'unsplash',
+      id: 'photo',
+      title: 'Photo',
+      author: 'Author',
+      author_url: '',
+      source_url: '',
+      thumbnail_url: '',
+      original_url: 'https://images.unsplash.com/original',
+      width: 100,
+      height: 200,
+      media_kind: 'image',
+      preview_url: 'https://images.unsplash.com/replacement-input',
+      display: {
+        ...mediaDisplayFixture('fresh'),
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      },
+    }
+    collection.refreshPresentation([fresh])
+    expect(collection.references.value[0]?.externalReference).toEqual(externalReference)
+    expect(collection.persistableReferences.value[0]).toEqual({
+      key: 'unsplash:photo',
+      externalReference,
+      previewUrl: '/api/media/previews/fresh/thumb',
+      previewExpiresAt: fresh.display?.expires_at,
+    })
+    collection.refreshPresentation([{ ...fresh, display: undefined }])
+    expect(collection.references.value[0]?.previewUrl).toBe('')
+    expect(collection.references.value[0]?.externalReference).toEqual(externalReference)
   })
 })

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "42d79c6847e7ef0f93f349cd16de47c6f8ec3440",
+  "checkpointSha": "1a230dc02ca098ef175deb094c67e5dfab5ab31c",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -2600,7 +2600,7 @@
         }
       ],
       "fanIn": 19,
-      "fanOut": 241,
+      "fanOut": 246,
       "fanOutTargets": [
         "src/api/generated-query/public/model/addBoardMemberRequest.ts",
         "src/api/generated-query/public/model/addBoardMemberRequestData.ts",
@@ -2673,6 +2673,7 @@
         "src/api/generated-query/public/model/cursorParameter.ts",
         "src/api/generated-query/public/model/deletedEnvelope.ts",
         "src/api/generated-query/public/model/deletedEnvelopeData.ts",
+        "src/api/generated-query/public/model/derivativeWorkspaceLibraryAssetParams.ts",
         "src/api/generated-query/public/model/errorEnvelope.ts",
         "src/api/generated-query/public/model/errorEnvelopeError.ts",
         "src/api/generated-query/public/model/errorEnvelopeErrorDetails.ts",
@@ -2714,6 +2715,10 @@
         "src/api/generated-query/public/model/mediaAssetStatus.ts",
         "src/api/generated-query/public/model/mediaDerivative.ts",
         "src/api/generated-query/public/model/mediaDerivativeStatus.ts",
+        "src/api/generated-query/public/model/mediaDisplay.ts",
+        "src/api/generated-query/public/model/mediaDisplayVariant.ts",
+        "src/api/generated-query/public/model/mediaDisplayVariantMaxSide.ts",
+        "src/api/generated-query/public/model/mediaDisplayVariantTier.ts",
         "src/api/generated-query/public/model/membershipRole.ts",
         "src/api/generated-query/public/model/moveLibraryAssetRequest.ts",
         "src/api/generated-query/public/model/moveLibraryAssetRequestData.ts",
@@ -3202,6 +3207,11 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/derivativeWorkspaceLibraryAssetParams.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/errorEnvelope.ts",
           "kind": "runtime"
         },
@@ -3403,6 +3413,26 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/mediaDerivativeStatus.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/mediaDisplayVariant.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/mediaDisplayVariantMaxSide.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/mediaDisplayVariantTier.ts",
           "kind": "runtime"
         },
         {
@@ -4056,7 +4086,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 19,
-      "targetFanOut": 241,
+      "targetFanOut": 246,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -9329,6 +9359,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/core/media/mediaDisplay.ts",
+          "to": "src/core/config/runtimeUrls.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/monitor/core/taskResultImages.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
@@ -9374,12 +9409,22 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+          "to": "src/core/config/runtimeUrls.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/visionReferenceCollection.ts",
+          "to": "src/core/config/runtimeUrls.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 18,
+      "fanIn": 21,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -9387,7 +9432,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 18,
+      "targetFanIn": 21,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -38052,7 +38097,7 @@
         }
       ],
       "fanIn": 23,
-      "fanOut": 41,
+      "fanOut": 44,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@testing-library/vue/dist/index.js",
@@ -38081,12 +38126,15 @@
         "src/core/interaction/menuKeyboardNavigation.ts",
         "src/core/interaction/pointerDrag.ts",
         "src/core/interaction/pointerDropTargets.ts",
+        "src/core/media/mediaDisplay.ts",
+        "src/core/media/useMediaDisplayUrl.ts",
         "src/core/router/queryParams.ts",
         "src/core/utils/guards.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/opaqueIds.ts",
         "src/core/utils/request.ts",
         "src/core/utils/workspaceId.ts",
+        "src/test/mediaDisplay.ts",
         "src/test/msw.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
@@ -38103,13 +38151,28 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/library/core/transfer.ts",
+          "to": "src/core/media/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/core/transfer.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
+          "from": "src/features/library/core/transfer.unit.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/core/validators.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/core/validators.ts",
+          "to": "src/core/media/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -38284,6 +38347,11 @@
         },
         {
           "from": "src/features/library/session/useLibraryWorkspace.unit.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/useLibraryWorkspace.unit.spec.ts",
           "to": "src/test/toast.ts",
           "kind": "runtime"
         },
@@ -38304,6 +38372,11 @@
         },
         {
           "from": "src/features/library/session/workspace.contract.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/workspace.contract.spec.ts",
           "to": "src/test/msw.ts",
           "kind": "runtime"
         },
@@ -38315,6 +38388,16 @@
         {
           "from": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
           "to": "src/app/style.css",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+          "to": "src/core/config/runtimeUrls.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.browser.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -38335,6 +38418,11 @@
         {
           "from": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -38363,8 +38451,18 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/library/ui/LibraryAssetGallery.vue",
+          "to": "src/core/media/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/ui/LibraryAssetLightbox.vue",
           "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetLightbox.vue",
+          "to": "node_modules/@vueuse/core/dist/index.js",
           "kind": "runtime"
         },
         {
@@ -38375,6 +38473,16 @@
         {
           "from": "src/features/library/ui/LibraryAssetLightbox.vue",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetLightbox.vue",
+          "to": "src/core/media/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryAssetLightbox.vue",
+          "to": "src/core/media/useMediaDisplayUrl.ts",
           "kind": "runtime"
         },
         {
@@ -38395,6 +38503,11 @@
         {
           "from": "src/features/library/ui/LibraryFloatingIsland.component.spec.ts",
           "to": "src/core/interaction/pointerDropTargets.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.component.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -38445,6 +38558,11 @@
         {
           "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/interaction/pointerDropTargets.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "src/core/media/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -38533,7 +38651,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 23,
-      "targetFanOut": 41,
+      "targetFanOut": 44,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -38558,7 +38676,7 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 44,
+      "fanOut": 48,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-virtual/dist/cjs/index.cjs",
@@ -38581,12 +38699,15 @@
         "src/components/ui/popover/index.ts",
         "src/components/ui/spinner/index.ts",
         "src/core/composables/useAppToast.ts",
+        "src/core/config/runtimeUrls.ts",
         "src/core/contracts/externalImageProviders.ts",
         "src/core/errors/errorCatalog.ts",
         "src/core/i18n/index.ts",
         "src/core/i18n/userIdeaCurrency.ts",
         "src/core/interaction/pointerDrag.ts",
         "src/core/interaction/pointerDropTargets.ts",
+        "src/core/media/mediaDisplay.ts",
+        "src/core/media/useMediaDisplayUrl.ts",
         "src/core/media/visionIngressPolicy.ts",
         "src/core/router/queryParams.ts",
         "src/core/utils/guards.ts",
@@ -38599,6 +38720,7 @@
         "src/features/library/index.ts",
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
+        "src/test/mediaDisplay.ts",
         "src/test/msw.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
@@ -38614,6 +38736,11 @@
         {
           "from": "src/features/search/core/models.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/search/core/models.ts",
+          "to": "src/core/media/mediaDisplay.ts",
           "kind": "type-only"
         },
         {
@@ -38678,6 +38805,11 @@
         },
         {
           "from": "src/features/search/searchChromeStyle.browser.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/searchChromeStyle.browser.spec.ts",
           "to": "src/test/render.ts",
           "kind": "runtime"
         },
@@ -38708,12 +38840,27 @@
         },
         {
           "from": "src/features/search/session/adapters/feedPersistence.ts",
+          "to": "src/core/media/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/feedPersistence.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/search/session/adapters/feedPersistence.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/feedPersistence.unit.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/libraryBridge.ts",
+          "to": "src/core/media/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -38747,6 +38894,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/search/session/adapters/libraryCoordinator.unit.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/search/session/adapters/libraryIslandPersistence.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
@@ -38769,6 +38921,11 @@
         {
           "from": "src/features/search/session/adapters/resource.ts",
           "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/resource.ts",
+          "to": "src/core/media/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -38808,7 +38965,17 @@
         },
         {
           "from": "src/features/search/session/adapters/visionReferencePersistence.ts",
+          "to": "src/core/utils/guards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/visionReferencePersistence.ts",
           "to": "src/core/utils/storage.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/visionReferencePersistence.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
@@ -38848,6 +39015,11 @@
         },
         {
           "from": "src/features/search/session/adapters/workspace.ts",
+          "to": "src/core/media/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/workspace.ts",
           "to": "src/core/utils/guards.ts",
           "kind": "runtime"
         },
@@ -38878,6 +39050,11 @@
         },
         {
           "from": "src/features/search/session/feed.ts",
+          "to": "src/core/media/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/feed.ts",
           "to": "src/features/library/index.ts",
           "kind": "runtime"
         },
@@ -38889,6 +39066,11 @@
         {
           "from": "src/features/search/session/feed.unit.spec.ts",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/feed.unit.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -38914,6 +39096,11 @@
         {
           "from": "src/features/search/session/screenRuntime.ts",
           "to": "src/core/interaction/pointerDropTargets.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/screenRuntime.ts",
+          "to": "src/core/media/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -38944,6 +39131,11 @@
         {
           "from": "src/features/search/session/screenRuntime.unit.spec.ts",
           "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/screenRuntime.unit.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -38988,6 +39180,11 @@
         },
         {
           "from": "src/features/search/session/useSearchSession.ts",
+          "to": "src/core/media/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
         },
@@ -39009,6 +39206,11 @@
         {
           "from": "src/features/search/session/useSearchSession.unit.spec.ts",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/useSearchSession.unit.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -39083,12 +39285,22 @@
         },
         {
           "from": "src/features/search/session/useVisionQueryLifecycle.unit.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/useVisionQueryLifecycle.unit.spec.ts",
           "to": "src/test/toast.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/search/session/visionReferenceCollection.ts",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/visionReferenceCollection.ts",
+          "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
         {
@@ -39099,6 +39311,11 @@
         {
           "from": "src/features/search/session/visionReferenceCollection.unit.spec.ts",
           "to": "src/core/media/visionIngressPolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/visionReferenceCollection.unit.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -39138,12 +39355,27 @@
         },
         {
           "from": "src/features/search/ui/components/SearchLightboxModal.vue",
+          "to": "node_modules/@vueuse/core/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchLightboxModal.vue",
           "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
         },
         {
           "from": "src/features/search/ui/components/SearchLightboxModal.vue",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchLightboxModal.vue",
+          "to": "src/core/media/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchLightboxModal.vue",
+          "to": "src/core/media/useMediaDisplayUrl.ts",
           "kind": "runtime"
         },
         {
@@ -39159,6 +39391,11 @@
         {
           "from": "src/features/search/ui/components/SearchResultCard.component.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchResultCard.component.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -39187,6 +39424,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/search/ui/components/SearchResultCard.vue",
+          "to": "src/core/media/useMediaDisplayUrl.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/search/ui/components/SearchResultViewport.browser.spec.ts",
           "to": "node_modules/@testing-library/vue/dist/index.js",
           "kind": "runtime"
@@ -39199,6 +39441,11 @@
         {
           "from": "src/features/search/ui/components/SearchResultViewport.browser.spec.ts",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchResultViewport.browser.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -39229,6 +39476,11 @@
         {
           "from": "src/features/search/ui/components/SearchSavePopover.component.spec.ts",
           "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/SearchSavePopover.component.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -39279,6 +39531,11 @@
         {
           "from": "src/features/search/ui/components/searchComponents.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/searchComponents.unit.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
           "kind": "runtime"
         },
         {
@@ -39352,7 +39609,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 44,
+      "targetFanOut": 48,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

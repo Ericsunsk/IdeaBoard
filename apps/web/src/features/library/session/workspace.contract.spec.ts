@@ -1,3 +1,4 @@
+import { mediaDisplayFixture } from '../../../test/mediaDisplay'
 import { describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import {
@@ -6,7 +7,6 @@ import {
   assertWorkspaceId,
   libraryAssetKey,
   mapWorkspaceLibraryProvider,
-  resolveLibraryAssetCardURL,
   toWorkspaceLibraryAsset,
   toWorkspaceLibraryAssetInput,
   toWorkspaceLibraryFolder,
@@ -84,6 +84,7 @@ function assetFixture(overrides: Record<string, unknown> = {}): Record<string, u
     width: 100,
     height: 80,
     created_at: '2026-09-23T00:00:00Z',
+    display: mediaDisplayFixture(),
     updated_at: '2026-09-23T00:00:00Z',
     ...overrides,
   }
@@ -301,22 +302,6 @@ describe('workspace library intent helpers', () => {
 
   it('uses one saved identity key format for lookup and UI state', () => {
     expect(libraryAssetKey('pexels', '123')).toBe('pexels:123')
-  })
-
-  it('bounds provider preview delivery for Library cards', () => {
-    expect(
-      resolveLibraryAssetCardURL({
-        provider: 'unsplash',
-        previewUrl: 'https://images.unsplash.com/photo-1?ixid=abc&w=1080',
-      }),
-    ).toBe('https://images.unsplash.com/photo-1?ixid=abc&w=480&auto=format&fit=crop&q=75')
-
-    expect(
-      resolveLibraryAssetCardURL({
-        provider: 'pexels',
-        previewUrl: 'https://images.pexels.com/photos/1.jpeg?w=1200',
-      }),
-    ).toBe('https://images.pexels.com/photos/1.jpeg?w=480&auto=compress&cs=tinysrgb')
   })
 })
 

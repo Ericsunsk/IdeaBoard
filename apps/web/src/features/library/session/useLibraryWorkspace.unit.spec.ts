@@ -1,3 +1,4 @@
+import { mediaDisplayFixture } from '../../../test/mediaDisplay'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { mockAppToast } from '../../../test/toast'
@@ -79,6 +80,7 @@ function asset(overrides: Partial<WorkspaceLibraryAsset> = {}): WorkspaceLibrary
     width: 100,
     height: 100,
     createdAt: '2026-09-24T00:00:00Z',
+    display: mediaDisplayFixture(),
     updatedAt: '2026-09-24T00:00:00Z',
     ...overrides,
   }

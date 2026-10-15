@@ -1,3 +1,4 @@
+import { toMediaDisplay, type MediaDisplay } from '../../../../core/media/mediaDisplay'
 import {
   isExternalImageProvider,
   type ExternalImageProvider,
@@ -88,6 +89,7 @@ export type WorkspaceSearchResult = {
   originalUrl: string
   width: number
   height: number
+  display?: MediaDisplay | undefined
 }
 
 export function toWorkspaceSearchResult(raw: unknown): WorkspaceSearchResult {
@@ -102,6 +104,7 @@ export function toWorkspaceSearchResult(raw: unknown): WorkspaceSearchResult {
     originalUrl: requiredString(raw.original_url, 'original_url'),
     width: requiredNumber(raw.width, 'width'),
     height: requiredNumber(raw.height, 'height'),
+    display: toMediaDisplay(raw.display),
   }
 }
 

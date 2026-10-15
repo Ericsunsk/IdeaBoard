@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { mediaDisplayFixture } from '../../../test/mediaDisplay'
+import { describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { render, within } from '../../../test/render'
 import '../../../app/style.css'
 import LibraryAssetGallery from './LibraryAssetGallery.vue'
 import type { LibraryAssetView } from '../core/transfer'
+
+vi.mock('../../../core/config/runtimeUrls', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../core/config/runtimeUrls')>()),
+  resolveApiUrl: () =>
+    'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/%3E',
+}))
 
 const image =
   'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/%3E'
@@ -21,6 +28,7 @@ function asset(index: number, height = 600): LibraryAssetView {
     width: 800,
     height,
     createdAt: '2026-09-24T00:00:00Z',
+    display: mediaDisplayFixture(),
     updatedAt: '2026-09-24T00:00:00Z',
   }
 }

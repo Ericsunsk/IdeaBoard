@@ -206,6 +206,7 @@
 </template>
 
 <script setup lang="ts">
+import { resolveMediaDisplayUrl } from '../../../core/media/mediaDisplay'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -294,7 +295,7 @@ function handleAssetPointerDown(event: PointerEvent, asset: LibraryAssetView) {
   disposeAssetDrag?.()
   disposeAssetDrag = startPointerDrag(event, {
     payload: { kind: 'asset', asset: toCanvasLibraryImportDescriptor(asset) },
-    previewUrl: asset.previewUrl,
+    previewUrl: resolveMediaDisplayUrl(asset.display, 256),
     targets: dropTargets,
   })
 }

@@ -8,7 +8,7 @@
     // the node project must see DOM globals. No runtime behavior change.
     "lib": ["ES2023", "DOM"],
     "module": "ESNext",
-    "types": ["node"],
+    "types": ["node", "vite/client"],
     "skipLibCheck": true,
 
     /* Bundler mode */

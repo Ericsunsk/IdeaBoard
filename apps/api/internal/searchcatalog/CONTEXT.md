@@ -22,6 +22,12 @@ SearchCatalog is the image-search context with two subdomains: web image search 
 - `VisionSearchService.Extract` is the vision extraction seam; the model comes only from the AI Gateway vision mapping and is never defaulted in code.
 - Vision executes through `VisionGatewayClient` on the central AI Gateway; no endpoint or key exists in vision settings — those belong to AI Gateway.
 - `searchcatalog` never imports the runtime transport; composition injects adapters.
+- HTTP Search projections append Media-owned inline display variants. Public Search
+  receives opaque 24-hour preview capabilities only for provider-returned image
+  references; source/original URLs remain provenance and import facts. Display
+  reads never save a Library reference or materialize a Media Asset. Runtime Media
+  HTTP adapters deliver preview bytes and own capability error/cache projection;
+  SearchCatalog issues descriptors without rendering images.
 
 ## Invariants
 

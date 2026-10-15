@@ -36,7 +36,7 @@
         :style="{ height: `${galleryHeight}px` }"
       >
         <article
-          v-for="{ asset, style } in positionedAssets"
+          v-for="{ asset, style, displayUrl } in positionedAssets"
           :key="asset.id"
           ref="cardElements"
           :data-asset-id="asset.id"
@@ -64,14 +64,14 @@
               }"
             >
               <div
-                v-if="failedImages.has(asset.id)"
+                v-if="failedImages.has(asset.id) || !displayUrl"
                 class="grid min-h-24 place-items-center px-2 text-center text-xs text-muted-foreground"
               >
                 {{ t('library.states.imageUnavailable') }}
               </div>
               <img
                 v-else
-                :src="resolveLibraryAssetCardURL(asset)"
+                :src="displayUrl"
                 :alt="asset.title || t('library.states.savedReference')"
                 loading="lazy"
                 class="h-full w-full object-cover"
@@ -157,10 +157,11 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useResizeObserver } from '@vueuse/core'
+import { useDevicePixelRatio, useResizeObserver } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { Check, Plus, Search, Xmark } from '@iconoir/vue'
-import { libraryAssetKey, resolveLibraryAssetCardURL } from '../core/validators'
+import { libraryAssetKey } from '../core/validators'
+import { resolveMediaDisplayUrl } from '../../../core/media/mediaDisplay'
 import type { LibraryAssetView } from '../core/transfer'
 import {
   toCanvasLibraryImportDescriptor,
@@ -189,6 +190,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { pixelRatio } = useDevicePixelRatio()
 const scrollAreaRef = ref<HTMLElement | null>(null)
 const failedImages = ref(new Set<string>())
 
@@ -272,6 +274,10 @@ const galleryLayout = computed(() => {
     bottoms[lane] = top + height + gap
     return {
       asset,
+      displayUrl: resolveMediaDisplayUrl(
+        asset.display,
+        Math.max(1, width, imageHeight) * pixelRatio.value,
+      ),
       style: {
         position: 'absolute' as const,
         top: `${top}px`,

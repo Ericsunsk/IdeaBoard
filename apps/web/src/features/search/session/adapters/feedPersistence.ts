@@ -1,3 +1,4 @@
+import { isMediaDisplayExpired, toMediaDisplay } from '../../../../core/media/mediaDisplay'
 import type { SearchFeedSnapshot, SearchFeedPersistence } from '../../ports/persistencePort'
 import { searchScopedStorageKey } from './browserPersistence'
 import {
@@ -42,7 +43,12 @@ export function createBrowserSearchFeedPersistence(): SearchFeedPersistence {
       if (!raw) return null
       try {
         const snapshot = JSON.parse(raw) as PersistedSnapshot
-        if (snapshot.query !== query || Date.now() - snapshot.timestamp > MAX_CACHE_AGE_MS) {
+        if (
+          snapshot.query !== query ||
+          Date.now() - snapshot.timestamp > MAX_CACHE_AGE_MS ||
+          !Array.isArray(snapshot.results) ||
+          snapshot.results.some((result) => isMediaDisplayExpired(toMediaDisplay(result.display)))
+        ) {
           if (Date.now() - snapshot.timestamp > MAX_CACHE_AGE_MS) removeSessionStorageItem(cacheKey)
           return null
         }

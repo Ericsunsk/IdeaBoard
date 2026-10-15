@@ -1,3 +1,4 @@
+import { mediaDisplayFixture } from '../../../../test/mediaDisplay'
 import { describe, expect, it } from 'vitest'
 import { fireEvent } from '@testing-library/vue'
 import { render, screen } from '../../../../test/render'
@@ -17,6 +18,7 @@ const result: SearchResult = {
   width: 1200,
   height: 800,
   media_kind: 'image',
+  display: mediaDisplayFixture(),
 }
 
 function renderCard() {
@@ -34,6 +36,27 @@ function renderCard() {
 }
 
 describe('Search result drag source', () => {
+  it('selects bounded display tiers from measured layout and preserves provider identity', async () => {
+    const view = renderCard()
+    const image = screen.getByRole('img', { name: 'Warm light' })
+    await view.rerender({ displayWidth: 120 })
+    expect(image).toHaveAttribute('src', '/api/media/previews/fixture/thumb')
+    await view.rerender({ displayWidth: 320 })
+    expect(image).toHaveAttribute('src', '/api/media/previews/fixture/preview')
+    await view.rerender({ displayWidth: 2000 })
+    expect(image).toHaveAttribute('src', '/api/media/previews/fixture/large-preview')
+    expect(image).not.toHaveAttribute('srcset')
+    expect(image).toHaveAttribute('loading', 'eager')
+    expect(result.original_url).toBe('https://example.com/original.jpg')
+  })
+
+  it('shows unavailable display without requesting the provider original', async () => {
+    const view = renderCard()
+    await view.rerender({ result: { ...result, display: undefined }, hasImageError: false })
+    expect(screen.queryByRole('img')).toBeNull()
+    expect(screen.getByText('The image could not be loaded. Try again.')).toBeInTheDocument()
+  })
+
   it('prepares pointer dragging from the image and preserves ordinary preview clicks', async () => {
     const { emitted } = renderCard()
     const imageButton = screen.getByRole('img', { name: 'Warm light' }).closest('button')!

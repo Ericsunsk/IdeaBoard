@@ -11,6 +11,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { LibraryAssetProvider } from './libraryAssetProvider'
+import type { MediaDisplay } from './mediaDisplay'
 
 export interface WorkspaceSearchResult {
   provider: LibraryAssetProvider
@@ -24,4 +25,5 @@ export interface WorkspaceSearchResult {
   width: number
   /** @minimum 0 */
   height: number
+  display?: MediaDisplay
 }

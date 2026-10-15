@@ -618,6 +618,27 @@ func (q *Queries) GetLibraryFolderByWorkspaceAndNameCI(ctx context.Context, arg 
 	return i, err
 }
 
+const getLibraryManagedMediaPublicID = `-- name: GetLibraryManagedMediaPublicID :one
+SELECT ma.public_id
+FROM library_assets AS a
+INNER JOIN workspaces AS w ON w.internal_id = a.workspace_id
+INNER JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id AND ma.workspace_id = a.workspace_id
+WHERE w.public_id = $1
+  AND a.public_id = $2
+`
+
+type GetLibraryManagedMediaPublicIDParams struct {
+	WorkspacePublicID string `json:"workspace_public_id"`
+	AssetPublicID     string `json:"asset_public_id"`
+}
+
+func (q *Queries) GetLibraryManagedMediaPublicID(ctx context.Context, arg GetLibraryManagedMediaPublicIDParams) (string, error) {
+	row := q.db.QueryRow(ctx, getLibraryManagedMediaPublicID, arg.WorkspacePublicID, arg.AssetPublicID)
+	var public_id string
+	err := row.Scan(&public_id)
+	return public_id, err
+}
+
 const getLibraryMaterializationByPublicID = `-- name: GetLibraryMaterializationByPublicID :one
 SELECT m.internal_id, m.public_id, m.workspace_id, m.library_asset_id,
   a.public_id AS asset_public_id,

@@ -1,3 +1,4 @@
+import { mediaDisplayFixture } from '../../../test/mediaDisplay'
 import { describe, expect, it } from 'vitest'
 import { toCanvasLibraryImportDescriptor, type LibraryAssetView } from './transfer'
 
@@ -15,6 +16,7 @@ const asset: LibraryAssetView = {
   height: 800,
   folderId: 'lfolder_folder0001',
   createdAt: '2026-08-22T00:00:00Z',
+  display: mediaDisplayFixture(),
   updatedAt: '2026-08-22T00:00:00Z',
 }
 
@@ -23,7 +25,7 @@ describe('Canvas import descriptor', () => {
     expect(toCanvasLibraryImportDescriptor(asset)).toEqual({
       assetId: asset.id,
       title: asset.title,
-      previewUrl: asset.previewUrl,
+      previewUrl: '/api/media/previews/fixture/preview',
       width: asset.width,
       height: asset.height,
     })

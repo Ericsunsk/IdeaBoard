@@ -385,3 +385,16 @@ func (s *Service) ResolveAssets(ctx context.Context, workspacePublicID string, i
 	}
 	return results, nil
 }
+
+// FindManagedMedia resolves the stored canonical media link without materialization.
+func (s *Service) FindManagedMedia(ctx context.Context, workspacePublicID, assetPublicID string) (string, error) {
+	q, err := s.dbWithContext(ctx).queries()
+	if err != nil {
+		return "", err
+	}
+	id, err := q.GetLibraryManagedMediaPublicID(ctx, dbsqlc.GetLibraryManagedMediaPublicIDParams{WorkspacePublicID: workspacePublicID, AssetPublicID: assetPublicID})
+	if database.IsNotFound(err) {
+		return "", domain.ErrV1AssetNotFound
+	}
+	return id, err
+}

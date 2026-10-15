@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
+import { mediaDisplayFixture } from '../../../test/mediaDisplay'
+import type { SearchResult } from '../core/models'
 import { mockAppToast } from '../../../test/toast'
 import {
   clearCachedVisionReferences,
+  getCachedVisionReferences,
   setCachedVisionReferences,
 } from './adapters/visionReferencePersistence'
 import { useVisionQueryLifecycle } from './useVisionQueryLifecycle'
@@ -58,6 +61,24 @@ const libraryAsset = {
   provider: 'unsplash',
   sourceId: 'photo-1',
   previewUrl: 'https://images.example/photo-1.jpg',
+}
+
+function searchResult(key: string, expiresAt = Date.now() + 86_400_000): SearchResult {
+  return {
+    provider: 'unsplash',
+    id: 'photo-1',
+    title: 'Photo',
+    author: 'Author',
+    author_url: '',
+    source_url: '',
+    original_url: 'https://images.unsplash.com/original',
+    preview_url: 'https://images.unsplash.com/input',
+    thumbnail_url: '',
+    width: 100,
+    height: 200,
+    media_kind: 'image',
+    display: { ...mediaDisplayFixture(key), expires_at: new Date(expiresAt).toISOString() },
+  }
 }
 
 describe('useVisionQueryLifecycle', () => {
@@ -237,6 +258,87 @@ describe('useVisionQueryLifecycle', () => {
     expect(lifecycle.references.value).toHaveLength(2)
     lifecycle.clearReferences()
     expect(lifecycle.references.value).toEqual([])
+    lifecycle.dispose()
+  })
+
+  it('restores expired presentation as unavailable while preserving usable paid input identity', async () => {
+    const externalReference = {
+      provider: 'unsplash',
+      id: 'photo-1',
+      preview_url: 'https://images.unsplash.com/input',
+    }
+    setCachedVisionReferences([
+      {
+        key: 'unsplash:photo-1',
+        externalReference,
+        previewUrl: '/api/media/previews/expired/thumb',
+        previewExpiresAt: new Date(Date.now() - 1).toISOString(),
+      },
+    ])
+    const { lifecycle } = createLifecycle()
+    expect(lifecycle.references.value[0]?.previewUrl).toBe('')
+    expect(lifecycle.references.value[0]?.externalReference).toEqual(externalReference)
+    expect(mocks.createVisionQuery).not.toHaveBeenCalled()
+    mocks.createVisionQuery.mockResolvedValue({ status: 'succeeded', query: 'cafe' })
+    await lifecycle.submit()
+    expect(mocks.createVisionQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ imageUrls: [externalReference.preview_url] }),
+      expect.anything(),
+    )
+    lifecycle.dispose()
+  })
+
+  it('refreshes presentation and persistence without changing query, quote or paid request identity', async () => {
+    const { lifecycle, draftQuery, submittedQuery } = createLifecycle()
+    lifecycle.addSearchResult(searchResult('old'))
+    await nextTick()
+    mocks.createVisionQuery.mockResolvedValue({ status: 'succeeded', query: 'cafe' })
+    await lifecycle.submit()
+    const [request, requestOptions] = mocks.createVisionQuery.mock.calls[0]!
+    const externalReference = lifecycle.references.value[0]?.externalReference
+    const quoteCount = mocks.fetchPrice.mock.calls.length
+    const refreshed = searchResult('fresh')
+    lifecycle.refreshReferencePresentation([refreshed])
+    await nextTick()
+
+    expect(lifecycle.references.value[0]?.previewUrl).toBe('/api/media/previews/fresh/thumb')
+    expect(lifecycle.references.value[0]?.externalReference).toBe(externalReference)
+    expect(getCachedVisionReferences()[0]?.previewUrl).toBe('/api/media/previews/fresh/thumb')
+    expect(getCachedVisionReferences()[0]?.externalReference).toEqual(externalReference)
+    expect(mocks.fetchPrice).toHaveBeenCalledTimes(quoteCount)
+    expect(mocks.createVisionQuery).toHaveBeenCalledOnce()
+    expect(draftQuery.value).toBe('warm cafe')
+    expect(submittedQuery.value).toBe('cafe')
+    expect(lifecycle.state.value).toBe('ready')
+    await lifecycle.submit()
+    expect(mocks.createVisionQuery.mock.calls[1]?.[0]).toEqual(request)
+    expect(mocks.createVisionQuery.mock.calls[1]?.[1].idempotencyKey).toBe(
+      requestOptions.idempotencyKey,
+    )
+    lifecycle.dispose()
+  })
+
+  it('keeps an active extraction alive during presentation refresh', async () => {
+    let finish!: (value: { status: string; query: string }) => void
+    mocks.createVisionQuery.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    const { lifecycle, loadResults } = createLifecycle()
+    lifecycle.addSearchResult(searchResult('old'))
+    const pending = lifecycle.submit()
+    await Promise.resolve()
+    const signal: AbortSignal = mocks.createVisionQuery.mock.calls[0]?.[1].signal
+    lifecycle.refreshReferencePresentation([searchResult('new')])
+    expect(lifecycle.submit()).toBe(pending)
+    expect(signal.aborted).toBe(false)
+    expect(lifecycle.state.value).toBe('extracting')
+    finish({ status: 'succeeded', query: 'cafe' })
+    await pending
+    expect(loadResults).toHaveBeenCalledOnce()
+    expect(mocks.createVisionQuery).toHaveBeenCalledOnce()
     lifecycle.dispose()
   })
 })

@@ -1,3 +1,4 @@
+import { mediaDisplayFixture } from '../../test/mediaDisplay'
 import '@testing-library/jest-dom/vitest'
 
 // Search chrome computed-style browser contract.
@@ -154,6 +155,7 @@ const searchResult: SearchResult = {
   width: 100,
   height: 100,
   media_kind: 'image',
+  display: mediaDisplayFixture(),
 }
 
 const PopoverHost = defineComponent({

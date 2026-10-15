@@ -6,17 +6,23 @@ import (
 	"strconv"
 	"strings"
 
+	"ideaboard/api/internal/media/derivatives/domain"
+	"ideaboard/api/internal/media/derivatives/infrastructure/preview"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/searchcatalog/application"
+	searchdomain "ideaboard/api/internal/searchcatalog/domain"
 
 	"github.com/gin-gonic/gin"
 )
 
-type SearchHandler struct{ service *application.SearchService }
+type SearchHandler struct {
+	service  *application.SearchService
+	previews *preview.Service
+}
 
-func NewSearchHandler(service *application.SearchService) *SearchHandler {
-	return &SearchHandler{service: service}
+func NewSearchHandler(service *application.SearchService, previews *preview.Service) *SearchHandler {
+	return &SearchHandler{service: service, previews: previews}
 }
 
 func (h *SearchHandler) Search(c *gin.Context) {
@@ -47,5 +53,18 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		contract.RenderError(c, http.StatusBadGateway, contract.CodeSearchUnavailable, msgSearchUnavailable2)
 		return
 	}
-	contract.RenderSuccess(c, result)
+	type displayResult struct {
+		searchdomain.Result
+		Display *domain.Display `json:"display,omitempty"`
+	}
+	results := make([]displayResult, 0, len(result.Results))
+	for _, item := range result.Results {
+		results = append(results, displayResult{Result: item, Display: h.previews.SearchDisplay(string(item.Provider), item.ID, item.PreviewURL)})
+	}
+	contract.RenderSuccess(c, struct {
+		Query      string          `json:"query"`
+		Results    []displayResult `json:"results"`
+		NextCursor string          `json:"next_cursor,omitempty"`
+		HasMore    bool            `json:"has_more"`
+	}{result.Query, results, result.NextCursor, result.HasMore})
 }

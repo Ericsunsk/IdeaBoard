@@ -66,10 +66,12 @@
           @click.stop
         >
           <img
-            :src="activeResult.original_url || activeResult.preview_url"
+            v-if="displayUrl"
+            :src="displayUrl"
             :alt="activeResult.title || t('search.fallbackTitle')"
             class="max-h-[82vh] max-w-full object-contain rounded-overlay shadow-2xl border-0 ring-0 outline-none select-none"
           />
+          <p v-else class="text-sm text-white">{{ t('common.errors.imageLoadFailed') }}</p>
         </div>
       </div>
     </Transition>
@@ -77,6 +79,9 @@
 </template>
 
 <script setup lang="ts">
+import { useWindowSize } from '@vueuse/core'
+import { useMediaDisplayUrl } from '../../../../core/media/useMediaDisplayUrl'
+import { fitMediaDisplaySize } from '../../../../core/media/mediaDisplay'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Xmark } from '@iconoir/vue'
@@ -96,6 +101,12 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { width, height } = useWindowSize()
+const displayUrl = useMediaDisplayUrl(
+  () => props.activeResult?.display,
+  () =>
+    fitMediaDisplaySize(props.activeResult, Math.min(1152, width.value - 32), height.value * 0.82),
+)
 const dialogRef = ref<HTMLElement | null>(null)
 const closeButtonRef = ref<HTMLButtonElement | null>(null)
 const isOpen = computed(() => props.visible && props.activeResult !== null)

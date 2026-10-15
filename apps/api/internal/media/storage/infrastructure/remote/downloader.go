@@ -80,16 +80,14 @@ const remoteImageTarget = "remote-image"
 // error, exactly like the single-shot response it replaces, so the
 // status-to-error mapping below keeps working. Only transport/timeout
 // failures surface as errors.
-func remoteImageResponse(ctx context.Context, remoteURL string, allowHosts []string) (*http.Response, error) {
+func remoteImageResponse(ctx context.Context, remoteURL string, opts outboundhttp.RequestOptions) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, remoteURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := remoteImageOutbound.Do(ctx, req, outboundhttp.RequestOptions{
-		Timeout:    outboundhttp.DefaultTimeout,
-		AllowHosts: allowHosts,
-		Target:     remoteImageTarget,
-	})
+	opts.Timeout = outboundhttp.DefaultTimeout
+	opts.Target = remoteImageTarget
+	resp, err := remoteImageOutbound.Do(ctx, req, opts)
 	if err != nil {
 		var statusErr *outboundhttp.HTTPStatusError
 		if errors.As(err, &statusErr) {
@@ -109,10 +107,22 @@ func remoteImageResponse(ctx context.Context, remoteURL string, allowHosts []str
 }
 
 func DownloadImageWithLimit(ctx context.Context, remoteURL string, allowHosts []string, maxSize int64) (*ImageFile, error) {
+	return downloadImage(ctx, remoteURL, outboundhttp.RequestOptions{AllowHosts: allowHosts}, maxSize)
+}
+
+// DownloadPublicImage restricts preview fetches to public HTTPS provider hosts on every hop.
+func DownloadPublicImage(ctx context.Context, remoteURL string, hosts []string, maxSize int64) (*ImageFile, error) {
+	if len(hosts) == 0 {
+		return nil, errors.New("public image hosts are required")
+	}
+	return downloadImage(ctx, remoteURL, outboundhttp.RequestOptions{PublicHosts: hosts}, maxSize)
+}
+
+func downloadImage(ctx context.Context, remoteURL string, opts outboundhttp.RequestOptions, maxSize int64) (*ImageFile, error) {
 	if maxSize <= 0 {
 		maxSize = MaxRemoteFileSize
 	}
-	resp, err := remoteImageResponse(ctx, remoteURL, allowHosts)
+	resp, err := remoteImageResponse(ctx, remoteURL, opts)
 	if err != nil {
 		return nil, fmt.Errorf(msgDownloadImageWithLimit, err)
 	}

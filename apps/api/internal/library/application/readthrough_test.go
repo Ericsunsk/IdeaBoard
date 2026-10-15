@@ -300,3 +300,34 @@ func TestFindCompletedMediaPinsNewest(t *testing.T) {
 		t.Fatal("malformed link replayed, want miss")
 	}
 }
+
+// workspaceReadThroughStore exposes a direct reference without a writable fixture row.
+type workspaceReadThroughStore struct {
+	ReadThroughStore
+	asset *domain.V1Asset
+	t     *testing.T
+}
+
+func (s workspaceReadThroughStore) GetAsset(context.Context, string, string) (*domain.V1Asset, error) {
+	return s.asset, nil
+}
+
+func (s workspaceReadThroughStore) ListMaterializations(context.Context, string) ([]*domain.V1Materialization, error) {
+	s.t.Fatal("workspace_media read-through consulted remote materializations")
+	return nil, nil
+}
+
+func TestReadThroughWorkspaceMediaRemainsMissWithoutTrigger(t *testing.T) {
+	store := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
+	asset := &domain.V1Asset{PublicID: "lasset_workspace", Provider: domain.ProviderWorkspaceMedia}
+	fetcher := &fakeOrchestratorMaterializer{mediaID: "asset_unused000000001"}
+	svc := NewReadThroughService(workspaceReadThroughStore{ReadThroughStore: store, asset: asset, t: t}, fetcher, inlineExecutor(), 0)
+	stored, mediaID, found := svc.Resolve(context.Background(), "ws_workspace", asset.PublicID)
+	if stored != asset || mediaID != "" || found {
+		t.Fatal("workspace_media reference became a read-through hit")
+	}
+	svc.Request(context.Background(), "ws_workspace", stored, 42)
+	if len(orchestratorJobs(t, store, "ws_workspace")) != 0 || fetcher.calls != 0 {
+		t.Fatal("workspace_media reference triggered materialization")
+	}
+}

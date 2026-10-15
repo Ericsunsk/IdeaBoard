@@ -316,3 +316,11 @@ LEFT JOIN media_assets AS ma ON ma.internal_id = m.media_asset_id
 WHERE m.workspace_id = sqlc.arg(workspace_id)
 ORDER BY m.created_at ASC, m.internal_id ASC
 LIMIT sqlc.arg(row_limit);
+
+-- name: GetLibraryManagedMediaPublicID :one
+SELECT ma.public_id
+FROM library_assets AS a
+INNER JOIN workspaces AS w ON w.internal_id = a.workspace_id
+INNER JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id AND ma.workspace_id = a.workspace_id
+WHERE w.public_id = sqlc.arg(workspace_public_id)
+  AND a.public_id = sqlc.arg(asset_public_id);

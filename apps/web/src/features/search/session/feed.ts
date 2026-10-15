@@ -1,3 +1,4 @@
+import { isMediaDisplayExpired } from '../../../core/media/mediaDisplay'
 import { nextTick, ref, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useTimeoutFn } from '@vueuse/core'
 import { libraryAssetKey, lookupWorkspaceSavedAssetKeys } from '../../library'
@@ -79,6 +80,27 @@ export function createSearchFeed(
     150,
     { immediate: false },
   )
+  const displayRefreshDelay = ref(0)
+  const { start: startDisplayRefresh, stop: stopDisplayRefresh } = useTimeoutFn(
+    () => {
+      if (!disposed) void reload()
+    },
+    displayRefreshDelay,
+    { immediate: false },
+  )
+
+  function scheduleDisplayRefresh(): void {
+    stopDisplayRefresh()
+    const expiries = results.value
+      .flatMap((result) =>
+        result.display?.expires_at ? [Date.parse(result.display.expires_at)] : [],
+      )
+      .filter((expiry) => Number.isFinite(expiry) && expiry > Date.now())
+    if (!expiries.length) return
+    displayRefreshDelay.value = Math.max(1000, Math.min(...expiries) - Date.now() - 60_000)
+    startDisplayRefresh()
+  }
+
   let savedMutationRevision = 0
   const savedKeyMutationRevisions = new Map<string, number>()
 
@@ -140,6 +162,7 @@ export function createSearchFeed(
 
   function hydrate(snapshot: SearchFeedSnapshot): void {
     results.value = snapshot.results
+    scheduleDisplayRefresh()
     nextCursor.value = snapshot.nextCursor
     hasMore.value = snapshot.hasMore
     loading.value = false
@@ -155,6 +178,7 @@ export function createSearchFeed(
   }
 
   function beginResetLoad(): SearchFeedSnapshot | null {
+    stopDisplayRefresh()
     controller?.abort()
     cancelCacheWrite()
     cancelScrollWrite()
@@ -191,6 +215,7 @@ export function createSearchFeed(
     if (generation !== loadGeneration) return
     const nextResults = reset ? page.results : [...results.value, ...page.results]
     results.value = nextResults
+    scheduleDisplayRefresh()
     nextCursor.value = page.next_cursor || ''
     hasMore.value = page.has_more
     scheduleCacheWrite(
@@ -289,6 +314,10 @@ export function createSearchFeed(
   }
 
   function retryImage(id: string): void {
+    if (isMediaDisplayExpired(results.value.find((result) => result.id === id)?.display)) {
+      void reload()
+      return
+    }
     const nextRetries = new Map(imageRetryCounts.value)
     nextRetries.set(id, (nextRetries.get(id) ?? 0) + 1)
     imageRetryCounts.value = nextRetries
@@ -302,6 +331,7 @@ export function createSearchFeed(
   }
 
   function clear(): void {
+    stopDisplayRefresh()
     loadGeneration += 1
     controller?.abort()
     cancelCacheWrite()

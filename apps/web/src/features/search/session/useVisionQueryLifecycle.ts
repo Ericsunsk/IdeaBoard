@@ -59,12 +59,7 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
   // persisted edit draft that belongs to the identity being entered.
   const initialReferences = options.initialReferences?.length
     ? options.initialReferences
-    : cachedReferences.map((cached) => ({
-        key: cached.key,
-        previewUrl: cached.previewUrl,
-        libraryAssetID: cached.libraryAssetID,
-        externalReference: cached.externalReference,
-      }))
+    : cachedReferences
   const collection = createVisionReferenceCollection(initialReferences)
   const { references } = collection
   const fileInput = ref<HTMLInputElement | null>(null)
@@ -362,11 +357,14 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     collection.clear()
   }
 
-  watch(references, (current) => setCachedVisionReferences(current, cacheScope), { deep: true })
-  watch(references, refreshPrice, { deep: true, immediate: true })
+  watch(collection.persistableReferences, (current) =>
+    setCachedVisionReferences(current, cacheScope),
+  )
+  watch(() => references.value.map((reference) => reference.key), refreshPrice, { immediate: true })
 
   return {
     references,
+    refreshReferencePresentation: collection.refreshPresentation,
     referenceSlotCount,
     canAddReference,
     fileInput,

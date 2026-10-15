@@ -479,3 +479,14 @@ func TestParseRetryAfter(t *testing.T) {
 		}
 	}
 }
+
+func TestDoPublicHostsRejectsAndRedactsSource(t *testing.T) {
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://127.0.0.1/private-source?signature=private-test-value", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = NewClient(Config{}).Do(context.Background(), request, RequestOptions{PublicHosts: []string{"127.0.0.1"}, Target: "preview-test"})
+	if !errors.Is(err, safehttp.ErrPolicyViolation) || strings.Contains(err.Error(), "private-source") || strings.Contains(err.Error(), "private-test-value") {
+		t.Fatalf("source URL leaked or policy rejection lost: %v", err)
+	}
+}

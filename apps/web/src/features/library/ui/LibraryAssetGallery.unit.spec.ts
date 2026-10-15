@@ -1,3 +1,4 @@
+import { mediaDisplayFixture } from '../../../test/mediaDisplay'
 import { describe, expect, it } from 'vitest'
 import { fireEvent } from '@testing-library/vue'
 import { render, screen, within } from '../../../test/render'
@@ -20,6 +21,7 @@ function galleryAsset(index: number): LibraryAssetView {
     width: 800,
     height: 600,
     createdAt: '2026-09-24T00:00:00Z',
+    display: mediaDisplayFixture(),
     updatedAt: '2026-09-24T00:00:00Z',
   }
 }
@@ -35,6 +37,19 @@ const baseProps = (assets: LibraryAssetView[]) => ({
 })
 
 describe('LibraryAssetGallery', () => {
+  it('uses only server display URLs and retains lazy loading', async () => {
+    const asset = galleryAsset(0)
+    const view = render(LibraryAssetGallery, { props: baseProps([asset]) })
+    const image = screen.getByRole('img', { name: 'Reference 0' })
+    expect(image).toHaveAttribute('src', '/api/media/previews/fixture/thumb')
+    expect(image).toHaveAttribute('loading', 'lazy')
+    expect(image).not.toHaveAttribute('srcset')
+    await view.rerender(baseProps([{ ...asset, display: undefined }]))
+    expect(screen.queryByRole('img')).toBeNull()
+    expect(screen.getByText('Image unavailable')).toBeInTheDocument()
+    expect(asset.originalUrl).toBe('https://images.unsplash.com/photo-0')
+  })
+
   it('starts pointer dragging only from the preview and prevents native dragging', async () => {
     const asset = galleryAsset(0)
     const view = render(LibraryAssetGallery, { props: baseProps([asset]) })

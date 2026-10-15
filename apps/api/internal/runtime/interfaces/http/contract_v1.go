@@ -15,6 +15,7 @@ import (
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identityports "ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
+	"ideaboard/api/internal/media/derivatives/infrastructure/preview"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/tasking/workspacetasks"
@@ -105,6 +106,7 @@ type ContractV1Deps struct {
 	// AvatarProfile persists uploads and projects the user record on session reads.
 	// Nil omits the read projection and fails avatar uploads closed with 503.
 	AvatarProfile V1AvatarProfileDirectory
+	MediaPreviews *preview.Service
 }
 
 // requireV1IdempotencyKey enforces the shared header-only idempotency contract

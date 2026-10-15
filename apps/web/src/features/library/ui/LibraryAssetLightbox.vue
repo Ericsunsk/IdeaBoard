@@ -59,10 +59,12 @@
           @click.stop
         >
           <img
-            :src="asset.originalUrl || asset.previewUrl"
+            v-if="displayUrl"
+            :src="displayUrl"
             :alt="asset.title || t('library.states.savedReference')"
             class="max-h-[82vh] max-w-full object-contain rounded-overlay shadow-2xl border-0 ring-0 outline-none select-none"
           />
+          <p v-else class="text-sm text-white">{{ t('library.states.imageUnavailable') }}</p>
         </div>
       </div>
     </Transition>
@@ -70,6 +72,9 @@
 </template>
 
 <script setup lang="ts">
+import { useWindowSize } from '@vueuse/core'
+import { useMediaDisplayUrl } from '../../../core/media/useMediaDisplayUrl'
+import { fitMediaDisplaySize } from '../../../core/media/mediaDisplay'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Xmark } from '@iconoir/vue'
@@ -85,6 +90,11 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { width, height } = useWindowSize()
+const displayUrl = useMediaDisplayUrl(
+  () => props.asset?.display,
+  () => fitMediaDisplaySize(props.asset, Math.min(1152, width.value - 32), height.value * 0.82),
+)
 
 function handleKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && props.asset) {

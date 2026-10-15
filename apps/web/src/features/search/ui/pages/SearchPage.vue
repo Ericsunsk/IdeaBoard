@@ -48,13 +48,16 @@
                     @click="removeReference(reference.key)"
                   >
                     <img
+                      v-if="reference.previewUrl"
                       :src="reference.previewUrl"
                       :alt="t('search.reference.imageAlt')"
                       class="size-full object-cover select-none pointer-events-none"
                     />
+                    <Camera v-else class="size-4 text-muted-foreground" aria-hidden="true" />
                   </button>
 
                   <div
+                    v-if="reference.previewUrl"
                     class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-4 z-50 w-14 opacity-0 scale-95 transition-[opacity,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover/thumb:opacity-100 group-hover/thumb:scale-100 origin-bottom"
                   >
                     <div class="size-14 shrink-0 overflow-hidden rounded-control bg-card shadow-md">
@@ -238,11 +241,12 @@
         @load-next-page="loadNextPage"
         @scroll-position="recordScroll"
       >
-        <template #default="{ item: result, index, style }">
+        <template #default="{ item: result, index, style, width }">
           <SearchResultCard
             :result="result"
             :index="index"
             :card-style="style"
+            :display-width="width"
             :is-selected="isResultSelected(result)"
             :is-used-as-reference="
               references.some((ref) => ref.key === searchReferenceKey(result.provider, result.id))

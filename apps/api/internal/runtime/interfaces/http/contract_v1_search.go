@@ -65,6 +65,7 @@ import (
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/identity/principal"
 	libraryports "ideaboard/api/internal/library/ports"
+	mediadomain "ideaboard/api/internal/media/derivatives/domain"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/searchcatalog"
@@ -204,23 +205,25 @@ func renderSearchError(c *gin.Context, err error) {
 }
 
 type v1SearchResultDTO struct {
-	Provider    string `json:"provider"`
-	SourceID    string `json:"source_id"`
-	Title       string `json:"title,omitempty"`
-	Author      string `json:"author,omitempty"`
-	SourceURL   string `json:"source_url"`
-	PreviewURL  string `json:"preview_url"`
-	OriginalURL string `json:"original_url"`
-	Width       int    `json:"width"`
-	Height      int    `json:"height"`
+	Provider    string               `json:"provider"`
+	SourceID    string               `json:"source_id"`
+	Title       string               `json:"title,omitempty"`
+	Author      string               `json:"author,omitempty"`
+	SourceURL   string               `json:"source_url"`
+	PreviewURL  string               `json:"preview_url"`
+	OriginalURL string               `json:"original_url"`
+	Width       int                  `json:"width"`
+	Height      int                  `json:"height"`
+	Display     *mediadomain.Display `json:"display,omitempty"`
 }
 
-func toSearchResultDTO(result searchcatalog.V1SearchResult) v1SearchResultDTO {
+func (h *contractV1Handler) toSearchResultDTO(result searchcatalog.V1SearchResult) v1SearchResultDTO {
 	return v1SearchResultDTO{
 		Provider: result.Provider, SourceID: result.SourceID,
 		Title: result.Title, Author: result.Author,
 		SourceURL: result.SourceURL, PreviewURL: result.PreviewURL, OriginalURL: result.OriginalURL,
 		Width: result.Width, Height: result.Height,
+		Display: h.deps.MediaPreviews.SearchDisplay(result.Provider, result.SourceID, result.PreviewURL),
 	}
 }
 
@@ -263,7 +266,7 @@ func (h *contractV1Handler) searchWorkspace(c *gin.Context) {
 		}
 		page := make([]v1SearchResultDTO, 0, len(items))
 		for _, item := range items {
-			page = append(page, toSearchResultDTO(item))
+			page = append(page, h.toSearchResultDTO(item))
 		}
 		contract.RenderPaginated(c, page, contract.NewPageMeta(nextCursor, hasMore))
 	})

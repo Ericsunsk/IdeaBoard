@@ -1,3 +1,4 @@
+import { mediaDisplayFixture } from '../../../../test/mediaDisplay'
 import { h } from 'vue'
 import { render } from '@testing-library/vue'
 import { page } from 'vitest/browser'
@@ -19,6 +20,7 @@ function results(count: number): SearchResult[] {
     width: index % 3 === 0 ? 1200 : 900,
     height: index % 3 === 0 ? 900 : 1200,
     media_kind: 'image',
+    display: mediaDisplayFixture(),
   }))
 }
 

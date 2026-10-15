@@ -19,7 +19,6 @@ export {
   mapWorkspaceLibraryProvider,
   mapWorkspaceLibraryResolveStatus,
   requireWorkspaceId,
-  resolveLibraryAssetCardURL,
   toWorkspaceLibraryAsset,
   toWorkspaceLibraryAssetInput,
   toWorkspaceLibraryFolder,

@@ -158,8 +158,32 @@ func DoRequestWithAllowHosts(
 	timeout time.Duration,
 	allowHosts ...string,
 ) (*http.Response, error) {
+	return doRequest(ctx, req, timeout, allowHosts, nil)
+}
+
+// DoPublicRequest restricts every URL hop to an exact HTTPS host without granting private-IP access.
+func DoPublicRequest(ctx context.Context, req *http.Request, timeout time.Duration, hosts []string) (*http.Response, error) {
+	validate := func(target *url.URL) error {
+		if target.Scheme == "https" && target.User == nil && target.Fragment == "" && (target.Port() == "" || target.Port() == "443") {
+			for _, host := range hosts {
+				if target.Hostname() == host {
+					return nil
+				}
+			}
+		}
+		return ErrPolicyViolation
+	}
+	return doRequest(ctx, req, timeout, nil, validate)
+}
+
+func doRequest(ctx context.Context, req *http.Request, timeout time.Duration, allowHosts []string, validate func(*url.URL) error) (*http.Response, error) {
 	if req == nil || req.URL == nil {
 		return nil, errors.New(msgDoRequestWithAllowHosts)
+	}
+	if validate != nil {
+		if err := validate(req.URL); err != nil {
+			return nil, err
+		}
 	}
 	ctx = nonNilContext(ctx)
 	policy, err := resolvePolicy(ctx, req.URL.String(), allowHosts...)
@@ -178,6 +202,11 @@ func DoRequestWithAllowHosts(
 		Timeout:   effectiveTimeout(timeout),
 		Transport: transport,
 		CheckRedirect: func(next *http.Request, via []*http.Request) error {
+			if validate != nil {
+				if err := validate(next.URL); err != nil {
+					return err
+				}
+			}
 			// Same 3-hop cap as DoWithAllowHosts (see above).
 			if len(via) >= 3 {
 				return errors.New(msgDoWithAllowHosts2)

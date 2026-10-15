@@ -81,7 +81,7 @@ func classifyContractRoute(path string) (contractInventoryBucket, bool) {
 	case path == ContractV1GroupPath || strings.HasPrefix(path, ContractV1GroupPath+"/"):
 		return bucketPublic, true
 	case path == "/api/health" || path == "/api/livez" || path == "/api/readyz" ||
-		path == "/api/settings/branding" || path == "/api/search":
+		path == "/api/settings/branding" || path == "/api/search" || path == "/api/media/previews/:token/:tier":
 		return bucketPublic, true
 	case path == "/api/auth" || strings.HasPrefix(path, "/api/auth/"):
 		return bucketAuth, true

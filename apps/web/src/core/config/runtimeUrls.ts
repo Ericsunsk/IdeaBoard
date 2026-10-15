@@ -49,13 +49,7 @@ function defaultAuthBaseURL(): string {
 // API overrides in production so a stale Pages environment variable cannot
 // silently reintroduce browser CORS requests. Local/dev builds may still point
 // at a remote API when explicitly configured for development.
-type RuntimeImportMetaEnv = {
-  readonly PROD?: boolean
-  readonly MODE?: string
-  readonly VITE_API_BASE_URL?: string
-}
-
-const runtimeEnv = (import.meta as ImportMeta & { readonly env: RuntimeImportMetaEnv }).env
+const runtimeEnv = import.meta.env
 const isProductionBuild = runtimeEnv.PROD === true || runtimeEnv.MODE === 'production'
 const configuredAPIBaseURL = normalizeBaseURL(runtimeEnv.VITE_API_BASE_URL, '/api')
 export const API_BASE_URL = isProductionBuild ? '/api' : configuredAPIBaseURL

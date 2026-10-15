@@ -73,6 +73,7 @@ const (
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {
 	registerGlobalMiddleware(r, deps)
 	registerPublicRoutes(r, deps.Branding, deps.PublicSearchHandler, deps.ReadyChecker)
+	registerPublicMediaRoutes(r, deps.ContractV1.MediaPreviews)
 	registerPaymentWebhookRoutes(r, deps.PaymentWebhook)
 	registerInternalRoutes(r, deps.Internal)
 	// Contract kernel v1 routes (issue #800 kernel, #801 handlers):

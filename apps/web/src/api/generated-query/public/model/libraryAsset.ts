@@ -13,6 +13,7 @@
 import type { LibraryAssetId } from './libraryAssetId'
 import type { LibraryAssetProvider } from './libraryAssetProvider'
 import type { LibraryFolderId } from './libraryFolderId'
+import type { MediaDisplay } from './mediaDisplay'
 import type { WorkspaceId } from './workspaceId'
 
 export interface LibraryAsset {
@@ -39,4 +40,5 @@ export interface LibraryAsset {
   height: number
   created_at: string
   updated_at: string
+  display?: MediaDisplay
 }

@@ -36,6 +36,7 @@ Provider IDs and recognition share the pure `core/contracts/externalImageProvide
 - Every operation resolves its workspace id per call from `features/workspace` selection (store or `useWorkspaceSelection`); Library never duplicates the selection store; missing workspace fails closed.
 - Writes must broadcast via the mutation publisher; surfaces react per `galleryEffect`; never full-reload on every change.
 - Canvas consumption of Library assets must materialize; Search bridging passes only references (`libraryCoordinator`) and never reads/writes gallery directly.
+- Browsing consumes inline `display` variants without materialization or per-card metadata requests. Cards, lightboxes, drag ghosts and Search reference previews share `core/media` tier selection; same-origin derivative bytes remain Workspace-authorized. Provider URLs retain source/import identity and attribution, never a display fallback or client-side thumbnail transform.
 - Folder deletion requires danger confirmation; deleting the selected folder falls back to `all`, never dangles.
 - The `activeAsset` lightbox stays internal.
 - Pointer drag payloads use the shared typed contracts; native file drops remain a separate browser input path.

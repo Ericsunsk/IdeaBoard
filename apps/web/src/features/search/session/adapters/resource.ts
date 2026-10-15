@@ -1,3 +1,4 @@
+import { toMediaDisplay } from '../../../../core/media/mediaDisplay'
 import type { SearchPage } from '../../core/models'
 import { api } from '../../../../api/client'
 import { withSignal } from '../../../../core/utils/request'
@@ -77,9 +78,17 @@ export async function searchInspiration(input: {
       },
     ),
     i18n.global.t('search.loadFailed'),
-  ).finally(() => {
-    if (inFlightRequests.get(key)?.promise === request) inFlightRequests.delete(key)
-  })
+  )
+    .then((page) => ({
+      ...page,
+      results: page.results.map((result) => ({
+        ...result,
+        display: toMediaDisplay(result.display),
+      })),
+    }))
+    .finally(() => {
+      if (inFlightRequests.get(key)?.promise === request) inFlightRequests.delete(key)
+    })
   inFlightRequests.set(key, { promise: request, signal: input.signal })
   return request
 }

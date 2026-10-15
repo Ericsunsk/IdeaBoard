@@ -3058,6 +3058,49 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/library/assets/{asset_id}/derivatives/{tier}:
+    get:
+      tags: [WorkspaceLibrary]
+      operationId: derivativeWorkspaceLibraryAsset
+      summary: Read a library display rendition (members only)
+      description: Resolves a stored preview or existing managed link without materialization. Returns WebP bytes.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - name: asset_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LibraryAssetId"
+        - name: tier
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [thumb, preview, large-preview]
+        - name: v
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Source version returned in the display descriptor URL.
+      responses:
+        "200":
+          description: Rendered image bytes; Cache-Control is private, max-age=300.
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid display tier (plain status).
+        "401":
+          description: Authentication required (plain status).
+        "404":
+          description: Workspace, asset or source version not found (plain status).
+        "409":
+          description: Image source unavailable (plain status).
+        "503":
+          description: Renderer unavailable (plain status).
   /workspaces/{workspace_id}/library/asset-resolutions:
     post:
       tags: [WorkspaceLibrary]
@@ -5399,6 +5442,34 @@ components:
       type: string
       enum: [unsplash, pexels]
       description: Saved reference provider.
+    MediaDisplay:
+      type: object
+      required: [variants]
+      additionalProperties: false
+      description: Same-origin display renditions. max_side is a size bound, not a srcset width descriptor.
+      properties:
+        variants:
+          type: array
+          items:
+            $ref: "#/components/schemas/MediaDisplayVariant"
+        expires_at:
+          type: string
+          format: date-time
+          description: Public preview capability expiration. Refresh result pages before reusing expired descriptors.
+    MediaDisplayVariant:
+      type: object
+      required: [tier, max_side, url]
+      additionalProperties: false
+      properties:
+        tier:
+          type: string
+          enum: [thumb, preview, large-preview]
+        max_side:
+          type: integer
+          enum: [256, 640, 1280]
+        url:
+          type: string
+          description: Same-origin image byte URL; never an original or processing input reference.
     LibraryAsset:
       type: object
       required: [id, workspace_id, provider, source_id, source_url, preview_url, original_url, width, height, created_at, updated_at]
@@ -5446,6 +5517,8 @@ components:
         updated_at:
           type: string
           format: date-time
+        display:
+          $ref: '#/components/schemas/MediaDisplay'
     LibraryAssetEnvelope:
       type: object
       required: [data]
@@ -5602,6 +5675,8 @@ components:
         height:
           type: integer
           minimum: 0
+        display:
+          $ref: '#/components/schemas/MediaDisplay'
     PaginatedWorkspaceSearchResults:
       type: object
       required: [data, meta]
