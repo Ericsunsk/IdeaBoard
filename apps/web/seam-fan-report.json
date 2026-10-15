@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "6dc2e68f23814e4d67454a65a1360c310c82d427",
+  "checkpointSha": "b1d62474235865f0f6e88bdfbc339e16b9624397",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -25040,6 +25040,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
+          "to": "src/features/board/ports/canvasSession.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/chrome/useBoardHeaderActions.ts",
           "to": "src/features/board/ports/canvasSession.ts",
           "kind": "runtime"
@@ -25050,7 +25055,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 4,
+      "fanIn": 5,
       "fanOut": 59,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
@@ -25984,7 +25989,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 59,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -26014,6 +26019,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
+          "to": "src/features/board/ports/testing.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/graph-editing/inputs/useFlowNodeMediaInputs.unit.spec.ts",
           "to": "src/features/board/ports/testing.ts",
           "kind": "runtime"
@@ -26024,7 +26034,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 5,
+      "fanIn": 6,
       "fanOut": 1,
       "fanOutTargets": ["src/features/board/testing/index.ts"],
       "outboundEdges": [
@@ -26038,7 +26048,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 5,
+      "targetFanIn": 6,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -30225,7 +30235,7 @@
         }
       ],
       "fanIn": 12,
-      "fanOut": 35,
+      "fanOut": 37,
       "fanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/vitest/dist/index.js",
@@ -30242,6 +30252,7 @@
         "src/core/utils/polling.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
+        "src/features/board/ports/canvasSession.ts",
         "src/features/board/ports/testing.ts",
         "src/features/canvas/core/graph/canvasGraphStoreWriter.ts",
         "src/features/canvas/core/graph/canvasGraphValueEquality.ts",
@@ -30261,7 +30272,8 @@
         "src/features/canvas/tools/retouch/index.ts",
         "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
         "src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts",
-        "src/features/library/index.ts"
+        "src/features/library/index.ts",
+        "src/test/msw.ts"
       ],
       "outboundEdges": [
         {
@@ -30601,6 +30613,16 @@
         },
         {
           "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
+          "to": "src/features/board/ports/canvasSession.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
+          "to": "src/features/board/ports/testing.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
           "to": "src/features/canvas/core/nodes/flowTypes.ts",
           "kind": "type-only"
         },
@@ -30612,6 +30634,16 @@
         {
           "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
+          "to": "src/test/msw.ts",
           "kind": "runtime"
         },
         {
@@ -31265,7 +31297,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 12,
-      "targetFanOut": 35,
+      "targetFanOut": 37,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -33288,8 +33320,13 @@
         },
         {
           "from": "src/features/canvas/tools/retouch/session/chromeSource.ts",
+          "to": "node_modules/@vueuse/core/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/tools/retouch/session/chromeSource.ts",
           "to": "node_modules/vue/index.js",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/tools/retouch/session/chromeSource.unit.spec.ts",
@@ -37986,6 +38023,11 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/graph-editing/mutations/useCanvasGraphEditing.ts",
           "to": "src/features/library/index.ts",
           "kind": "type-only"
@@ -38101,7 +38143,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 23,
+      "fanIn": 24,
       "fanOut": 44,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -38655,7 +38697,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 23,
+      "targetFanIn": 24,
       "targetFanOut": 44,
       "advisories": {
         "fanInTargetMismatch": false,

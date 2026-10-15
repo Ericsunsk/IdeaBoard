@@ -197,7 +197,7 @@ async function resolveMaterializedMedia(
     throw new Error(fallback)
   }
   return {
-    mediaAssetId: assetId,
+    mediaAssetId: metadata.asset_id,
     url: resolveAssetUrl(deliveryUrl),
     width: metadata.width,
     height: metadata.height,

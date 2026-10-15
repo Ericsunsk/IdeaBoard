@@ -48,6 +48,7 @@ describe('CanvasLibraryImportState', () => {
     })
     expect(retried.libraryImport).toEqual(createPendingLibraryImportFact(LIBRARY_ASSET_ID))
     expect(materialized).toMatchObject({
+      sourceMediaRef: { assetId: 'asset_media0042', derivativeTier: 'preview' },
       sourceImageUrl: 'https://app.example/media/42',
       sourceImageRatio: 0.5,
       outputStatus: 'ready',

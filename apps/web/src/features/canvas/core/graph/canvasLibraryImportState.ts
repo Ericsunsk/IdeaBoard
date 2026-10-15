@@ -55,15 +55,11 @@ export function materializeLibraryImport(
     Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
       ? height / width
       : fallbackRatio
-  // The workspace media identity (`asset_...`) has no numeric legacy form,
-  // so no `sourceMediaAssetId` is recorded here: persisting one would fail
-  // board snapshot validation. The node keeps working as a URL-addressed
-  // image; a durable media link needs the board media-identity migration
-  // (Phase 4 residual).
   const { libraryImport: _fact, ...readySnapshot } = snapshot
   return {
     ...readySnapshot,
     sourceMediaAssetId: undefined,
+    sourceMediaRef: { assetId: materialized.mediaAssetId.trim(), derivativeTier: 'preview' },
     width: resolveImageNodeFrameSize(ratio, true).width,
     sourceImageUrl: materialized.url.trim(),
     sourceImageRatio: ratio,

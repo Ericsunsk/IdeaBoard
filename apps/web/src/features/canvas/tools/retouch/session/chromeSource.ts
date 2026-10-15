@@ -1,11 +1,12 @@
-import type { ComputedRef, Ref } from 'vue'
+import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { useEventListener } from '@vueuse/core'
 import type { RetouchEffectLayer, RetouchLayer } from '../core/model.ts'
 import {
   resolveDomTextureImage,
   useZeroCopyRetouchStage,
   type ZeroCopyStageHandle,
 } from './stage/useZeroCopyRetouchStage.ts'
-import { useStableSourceImage } from './histogram/stableSourceImage.ts'
+import { resolveStableSourceKey, useStableSourceImage } from './histogram/stableSourceImage.ts'
 import { useRetouchHistogramSource } from './histogram/useRetouchHistogramSource'
 
 /**
@@ -45,6 +46,8 @@ export type RetouchChromeSource = {
 export function createRetouchChromeSource(
   options: RetouchChromeSourceOptions,
 ): RetouchChromeSource {
+  const decodedSourceKey = ref('')
+
   // Zero-copy GPU stage (issues #672, #673): the mounted canvas IS the render
   // target. Texture binding uses the DOM image already on screen directly.
   const retouchStage = useZeroCopyRetouchStage({
@@ -55,12 +58,28 @@ export function createRetouchChromeSource(
 
   // Shared DOM source: the raw on-screen node image, before any GPU effect.
   function resolveStageDomImage(): HTMLImageElement | null {
-    const stageElement = options.getStageElement()
-    return (
-      resolveDomTextureImage(retouchStage.canvasRef.value?.parentElement ?? null) ??
-      resolveDomTextureImage(stageElement)
-    )
+    void decodedSourceKey.value
+    return resolveDomTextureImage(options.getStageElement())
   }
+
+  useEventListener(
+    () => {
+      void options.sessionKey.value
+      return options.isAdjustMode.value ? options.getStageElement() : null
+    },
+    'load',
+    (event) => {
+      const image = event.target
+      if (
+        options.isAdjustMode.value &&
+        image instanceof HTMLImageElement &&
+        image === resolveStageDomImage()
+      ) {
+        decodedSourceKey.value = resolveStableSourceKey(image)
+      }
+    },
+    { capture: true },
+  )
 
   // Histogram input is the stable pre-effect source (Lightroom semantics):
   // the mountain shows the selected layer's input and never moves while its
@@ -70,9 +89,7 @@ export function createRetouchChromeSource(
     isAdjustMode: options.isAdjustMode,
     resolveDomImage: () => resolveStageDomImage(),
     refreshSource: options.layers,
-    // Freeze the mountain per panel session: mount and first-drag DOM picks
-    // may resolve different imgs, which jittered the peak once per session.
-    sessionKey: options.sessionKey,
+    sessionKey: computed(() => JSON.stringify([options.sessionKey.value, decodedSourceKey.value])),
   })
   const { retouchHistogramSource } = useRetouchHistogramSource({
     isAdjustMode: options.isAdjustMode,

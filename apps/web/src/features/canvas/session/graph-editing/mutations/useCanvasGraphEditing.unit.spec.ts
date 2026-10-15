@@ -138,6 +138,7 @@ function createHarness(initialNodes: Node[] = []) {
 
   return {
     editing,
+    graphSession,
     nodes,
     pickedFile,
     droppedFile,
@@ -320,12 +321,24 @@ describe('useCanvasGraphEditing', () => {
         (harness.nodes.value[0]?.data?.snapshotNode as ImageNodeItem).libraryImport?.state,
       ).toBe('pending')
       expect(harness.feedback.operationWarning).not.toHaveBeenCalled()
+      const onCommit = vi.fn()
+      const unsubscribe = harness.graphSession.subscribe(onCommit)
       await vi.advanceTimersByTimeAsync(10_000)
+      unsubscribe()
+      expect(onCommit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sideEffects: expect.objectContaining({ shouldMarkDirty: true }),
+        }),
+      )
 
       expect(harness.feedback.operationWarning).not.toHaveBeenCalled()
       expect(harness.nodes.value).toHaveLength(1)
       const snapshot = harness.nodes.value[0]?.data?.snapshotNode as ImageNodeItem
       expect(snapshot.libraryImport).toBeUndefined()
+      expect(snapshot.sourceMediaRef).toEqual({
+        assetId: 'asset_media0043',
+        derivativeTier: 'preview',
+      })
       expect(snapshot.sourceImageUrl).toBe(
         '/api/v1/workspaces/ws_test123/media-assets/asset_media0043/content',
       )

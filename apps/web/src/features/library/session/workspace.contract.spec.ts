@@ -440,7 +440,7 @@ describe('workspace library use cases', () => {
     expect(mediaMetadataMock).toHaveBeenCalledTimes(1)
     expect(mediaMetadataMock.mock.calls[0]?.slice(0, 2)).toEqual([WORKSPACE_ID, ASSET_ID])
     expect(media).toMatchObject({
-      mediaAssetId: ASSET_ID,
+      mediaAssetId: 'asset_media0001',
       url: '/api/v1/workspaces/ws_abc123/media-assets/asset_media0001/content',
       width: 400,
       height: 200,

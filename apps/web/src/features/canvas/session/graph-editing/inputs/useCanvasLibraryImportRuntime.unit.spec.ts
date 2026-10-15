@@ -2,6 +2,10 @@ import type { Edge, Node } from '@vue-flow/core'
 import { effectScope, ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../../../board'
+import { serializeBoardState } from '../../../../board/ports/canvasSession'
+import { makeBoardState } from '../../../../board/ports/testing'
+import { materializeLibraryAssetForCanvas } from '../../../../library'
+import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 import type { BoardAttachment } from '../../execution/board-attachment'
 import { useCanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
@@ -113,6 +117,57 @@ function createHarness(
 }
 
 describe('useCanvasLibraryImportRuntime', () => {
+  it('preserves the managed Media identity from a saved Search reference through Board save', async () => {
+    const workspaceId = 'ws_thumbnail'
+    const libraryAssetId = 'lasset_thumbnail'
+    const mediaAssetId = 'asset_thumbnail'
+    const contentUrl = `/api/v1/workspaces/${workspaceId}/media-assets/${mediaAssetId}/content`
+    useMswHandlers(
+      http.get(`/api/v1/workspaces/${workspaceId}/media-assets/${libraryAssetId}`, () =>
+        HttpResponse.json({
+          data: {
+            id: mediaAssetId,
+            status: 'ready',
+            mime_type: 'image/png',
+            width: 400,
+            height: 200,
+            size_bytes: 1000,
+            content_url: contentUrl,
+            derivatives: {},
+          },
+        }),
+      ),
+    )
+    const harness = createHarness()
+    const materialized = deferred<void>()
+    harness.materialize.mockImplementation(async (assetId: string) => {
+      const result = await materializeLibraryAssetForCanvas(workspaceId, assetId)
+      materialized.resolve()
+      return result
+    })
+    await harness.imports.start(
+      {
+        assetId: libraryAssetId,
+        title: 'Search reference',
+        previewUrl: '/preview.png',
+        width: 400,
+        height: 200,
+      },
+      { x: 100, y: 200 },
+    )
+    await materialized.promise
+    await flushPromises()
+    const snapshot = (harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem
+    const saved = serializeBoardState(makeBoardState({ imageNodes: [snapshot] }), 'remote-envelope')
+    expect(saved.imageNodes[0]?.sourceMediaRef).toEqual({
+      assetId: mediaAssetId,
+      derivativeTier: 'preview',
+    })
+    expect(saved.imageNodes[0]?.libraryImport).toBeUndefined()
+    expect(saved.imageNodes[0]).not.toHaveProperty('libraryImportPreviewUrl')
+    expect(harness.updateImageSnapshot).toHaveBeenCalledTimes(1)
+  })
+
   it('waits for the Library preview to decode before creating a node', async () => {
     const request = deferred<boolean>()
     const harness = createHarness([], () => request.promise)

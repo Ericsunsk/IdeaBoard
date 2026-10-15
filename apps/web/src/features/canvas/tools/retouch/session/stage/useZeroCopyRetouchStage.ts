@@ -248,7 +248,7 @@ export function useZeroCopyRetouchStage(
       }
     },
   )
-  watch([canvasRef, () => options.isAdjustMode.value], () => {
+  watch([canvasRef, () => options.isAdjustMode.value, readSourceKey], () => {
     if (!options.isAdjustMode.value) {
       textureReady.value = false
       cancelScheduledDraw()
@@ -256,6 +256,13 @@ export function useZeroCopyRetouchStage(
     }
     ensureRenderer()
   })
+
+  function readSourceKey(): string {
+    const image = options.resolveDomImage()
+    return image
+      ? `${image.currentSrc || image.src} ${image.naturalWidth}x${image.naturalHeight}`
+      : ''
+  }
 
   onBeforeUnmount(() => {
     const canvas = canvasRef.value
