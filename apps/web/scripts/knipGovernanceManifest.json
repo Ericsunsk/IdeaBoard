@@ -6987,6 +6987,12 @@
         "evidence": ["src/features/board/index.ts#rebuildBoardMediaRefs"]
       }
     },
+    "src/features/board/core/preview/renderer.ts": {
+      "SCENE_THUMBNAIL_MAX_RASTERS_PER_CARD": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/core/preview/renderer.unit.spec.ts"]
+      }
+    },
     "src/features/board/core/schema/boardStateEnvelopeContract.ts": {
       "BoardStateEnvelopeContract": {
         "kind": "canonical-origin",
@@ -7054,12 +7060,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/board/index.ts#BoardOptimisticRenameResult"
-        ]
-      },
-      "BoardPreviewRefreshQueue": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/index.ts#BoardPreviewRefreshQueue"
         ]
       },
       "BoardRenameRemoteResult": {
@@ -7574,12 +7574,6 @@
           "docs/frontend-seam-inventory.md: src/features/board/index.ts#createBoardFeedback"
         ]
       },
-      "createBoardPreviewRefreshQueue": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/index.ts#createBoardPreviewRefreshQueue"
-        ]
-      },
       "createBoardRepository": {
         "kind": "canonical-public",
         "evidence": [
@@ -7878,12 +7872,6 @@
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/features/board/index.ts#renameBoard"]
       },
-      "renderBoardPreviewDataUrl": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/index.ts#renderBoardPreviewDataUrl"
-        ]
-      },
       "replaceBoardStateMap": {
         "kind": "canonical-public",
         "evidence": [
@@ -7954,12 +7942,6 @@
           "docs/frontend-seam-inventory.md: src/features/board/index.ts#setBoardArchivedAt"
         ]
       },
-      "setBoardPreviewSnapshot": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/index.ts#setBoardPreviewSnapshot"
-        ]
-      },
       "setBoardRevision": {
         "kind": "canonical-public",
         "evidence": [
@@ -8028,12 +8010,6 @@
       }
     },
     "src/features/board/ports/canvas.ts": {
-      "BOARD_PREVIEW_RENDERER_VERSION": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#BOARD_PREVIEW_RENDERER_VERSION"
-        ]
-      },
       "BoardRepository": {
         "kind": "canonical-public",
         "evidence": [
@@ -8436,12 +8412,6 @@
           "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#rebuildBoardMediaRefs"
         ]
       },
-      "renderBoardPreviewDataUrl": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#renderBoardPreviewDataUrl"
-        ]
-      },
       "requireImageNodeOutputCount": {
         "kind": "canonical-public",
         "evidence": [
@@ -8488,12 +8458,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#serializeBoardState"
-        ]
-      },
-      "setBoardPreviewSnapshot": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/ports/canvas.ts#setBoardPreviewSnapshot"
         ]
       },
       "setBoardState": {
@@ -8754,41 +8718,27 @@
         "kind": "canonical-origin",
         "evidence": ["src/features/board/index.ts#replaceBoardStateMap"]
       },
-      "setBoardPreviewSnapshot": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/board/index.ts#setBoardPreviewSnapshot"]
-      },
       "setBoardState": {
         "kind": "canonical-origin",
         "evidence": ["src/features/board/index.ts#setBoardState"]
       }
     },
-    "src/features/board/session/preview/boardPreviewRefreshQueue.ts": {
-      "BoardPreviewRefreshQueue": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/board/index.ts#BoardPreviewRefreshQueue"]
+    "src/features/board/session/preview/thumbnailMedia.ts": {
+      "SceneThumbnailMediaTransport": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/session/preview/thumbnailMedia.unit.spec.ts"]
       },
-      "createBoardPreviewRefreshQueue": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/board/index.ts#createBoardPreviewRefreshQueue"]
-      }
-    },
-    "src/features/board/session/preview/boardPreviewSerializer.ts": {
-      "renderBoardPreviewDataUrl": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/board/index.ts#renderBoardPreviewDataUrl"]
-      }
-    },
-    "src/features/board/session/preview/boardPreviewStyle.ts": {
-      "blankBoardPreviewSurfaceClass": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/board/index.ts#blankBoardPreviewSurfaceClass"]
-      }
-    },
-    "src/features/board/session/preview/boardPreviewVersion.ts": {
-      "BOARD_PREVIEW_RENDERER_VERSION": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/board/ports/canvas.ts#BOARD_PREVIEW_RENDERER_VERSION"]
+      "THUMBNAIL_MEDIA_MAX_ATTEMPTS": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/session/preview/thumbnailMedia.unit.spec.ts"]
+      },
+      "THUMBNAIL_MEDIA_READ_TIMEOUT_MS": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/session/preview/thumbnailMedia.unit.spec.ts"]
+      },
+      "isTerminalThumbnailMediaError": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/session/preview/thumbnailMedia.unit.spec.ts"]
       }
     },
     "src/features/board/session/share-join/joinSharedBoardWorkflow.ts": {
@@ -8799,6 +8749,12 @@
       "joinSharedBoardByToken": {
         "kind": "canonical-origin",
         "evidence": ["src/features/board/index.ts#joinSharedBoardByToken"]
+      }
+    },
+    "src/features/board/ui/gallery/skin.ts": {
+      "blankBoardPreviewSurfaceClass": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/board/index.ts#blankBoardPreviewSurfaceClass"]
       }
     },
     "src/features/board/session/sync/boardSync.ts": {
@@ -15605,7 +15561,7 @@
       "exports": ["UploadControlBrandingLogoBody"]
     },
     "src/api/generated-query/public/boards/boards.ts": {
-      "sha256": "1a9cd3c49b4ab2a64e01a6cb5059cc25accb583e2aa8e9623b175a14aa80e761",
+      "sha256": "03bc235bb846e86a0b4f0ad6d43989c8c7232446cba384236e567f6168df712a",
       "exports": [
         "AddBoardMemberMutationBody",
         "AddBoardMemberMutationError",
@@ -15810,11 +15766,11 @@
       "exports": ["BillingRecordKind"]
     },
     "src/api/generated-query/public/model/board.ts": {
-      "sha256": "f7a879caa3019244774d7065d0cfe34877c0097935785a6306be6ab4e43dae37",
+      "sha256": "3a97835093a265d6191d2ca997907451a47839ca8826b8226ddc384a2bdd3fe4",
       "exports": ["Board"]
     },
     "src/api/generated-query/public/model/boardDocument.ts": {
-      "sha256": "d0e7ef67b06b9f8f7a2bf263f3beac9da4660de1575d407ff7278b2a1f6e1d94",
+      "sha256": "de1c5fb5e280b58709bea30a94eb098f7c81d5b1218142f452268514bc98936d",
       "exports": ["BoardDocument"]
     },
     "src/api/generated-query/public/model/boardDocumentDocument.ts": {
@@ -15824,6 +15780,10 @@
     "src/api/generated-query/public/model/boardDocumentEnvelope.ts": {
       "sha256": "26e875de1ed448ed3e142a6dda3ce0c7195a5a78c89b88b91e9f7fa5c2c42bb5",
       "exports": ["BoardDocumentEnvelope"]
+    },
+    "src/api/generated-query/public/model/boardDocumentPreviewScene.ts": {
+      "sha256": "4282c71437152a28c743889cda54e54a10c69df511cf7967cacbf8192dfa3d60",
+      "exports": ["BoardDocumentPreviewScene"]
     },
     "src/api/generated-query/public/model/boardEnvelope.ts": {
       "sha256": "06fc674e1677f705269202012f9a5f7315e4ca893117df45d36305ae15c3bb21",
@@ -15844,6 +15804,10 @@
     "src/api/generated-query/public/model/boardMemberList.ts": {
       "sha256": "0b609f5ad4830947af5a836edcd69c7b3eff905c1edc8d07922cd31a76332f29",
       "exports": ["BoardMemberList"]
+    },
+    "src/api/generated-query/public/model/boardPreviewScene.ts": {
+      "sha256": "b94745b680f660491939ac1cd36ac21510cb4784225a2384ebf38fed0d20b7da",
+      "exports": ["BoardPreviewScene"]
     },
     "src/api/generated-query/public/model/boardRevision.ts": {
       "sha256": "38dc472f243900cd6b9147387e50d8940918e4416a7ac0403679d13b16a3b541",
@@ -16082,7 +16046,7 @@
       "exports": ["IfMatchParameter"]
     },
     "src/api/generated-query/public/model/index.ts": {
-      "sha256": "388a8ed16220711920a0863fc07ce0637c3cf29ab70007e18ba101de538661c0",
+      "sha256": "a249bf362962b13fd369d94aafc9c6a6a641a9c88ab175105d6800ef9d328a01",
       "exports": []
     },
     "src/api/generated-query/public/model/joinBoardRequest.ts": {
@@ -17428,7 +17392,8 @@
         "src/features/board/core/schema/boardStateEnvelopeContract.unit.spec.ts",
         "src/features/board/core/schema/stateSchema.unit.spec.ts",
         "src/features/board/session/persistence/boardStateSerialization.unit.spec.ts",
-        "src/features/board/session/preview/boardPreviewSerializer.unit.spec.ts"
+        "src/features/board/session/adapters/boardsResource.unit.spec.ts",
+        "src/features/board/ui/gallery/useCatalog.contract.spec.ts"
       ]
     },
     "src/features/board/testing/syncFixtures.ts": {

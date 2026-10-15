@@ -28,8 +28,8 @@ func TestV1BoardLifecycle(t *testing.T) {
 		t.Fatal("ETag must be the revision counter")
 	}
 
-	boards, err := store.ListBoards(ctx, "ws_test", false)
-	if err != nil || len(boards) != 1 {
+	boards, err := store.ListBoardCatalog(ctx, "ws_test", false, 1, "owner", V1BoardCatalogPageRequest{Limit: 100})
+	if err != nil || len(boards.Entries) != 1 {
 		t.Fatalf("list = %v, %v; want 1 board", boards, err)
 	}
 
@@ -42,8 +42,8 @@ func TestV1BoardLifecycle(t *testing.T) {
 	if err != nil || archived.ArchivedAt == nil {
 		t.Fatalf("archive = %v, %v", archived, err)
 	}
-	visible, err := store.ListBoards(ctx, "ws_test", false)
-	if err != nil || len(visible) != 0 {
+	visible, err := store.ListBoardCatalog(ctx, "ws_test", false, 1, "owner", V1BoardCatalogPageRequest{Limit: 100})
+	if err != nil || len(visible.Entries) != 0 {
 		t.Fatalf("archived boards must be excluded, got %v", visible)
 	}
 	if _, err := store.ReplaceDocument(ctx, "ws_test", boardID, 1, 1, 1, V1InitialDocument()); err != ErrV1Archived {

@@ -10,11 +10,6 @@ import {
   isBoardSessionRemoteSyncError,
   type BoardSessionRepository,
 } from './repository'
-import {
-  defaultBoardSessionPreviewRenderer,
-  refreshBoardSessionPreview,
-  type BoardSessionPreviewRenderer,
-} from './preview'
 import { createBoardSessionUploadLifecycle } from './uploadLifecycle'
 
 type BoardSessionIdentity = {
@@ -78,10 +73,6 @@ type BoardSessionMessage = {
   warning: (message: string) => void
 }
 
-type BoardSessionSaveOptions = {
-  shouldWaitForPreview?: boolean | undefined
-}
-
 type BoardSessionRemoteSyncFailureReason = 'sync-failed' | 'conflict' | 'archived'
 
 type BoardSessionRemoteSyncResult =
@@ -96,11 +87,7 @@ export type BoardSession = {
   currentBoardId: ComputedRef<string | null>
   exists: (boardId?: string | null) => boolean
   load: (boardId?: string | null) => Promise<BoardSnapshot | null>
-  save: (
-    snapshot: BoardSnapshot,
-    options?: BoardSessionSaveOptions,
-  ) => Promise<BoardSessionSaveResult>
-  refreshPreview: (boardId: string, snapshot: BoardSnapshot) => Promise<void>
+  save: (snapshot: BoardSnapshot) => Promise<BoardSessionSaveResult>
 }
 
 type UseBoardSessionOptions = {
@@ -108,7 +95,6 @@ type UseBoardSessionOptions = {
   getUserIdentity: () => BoardSessionIdentity
   getWorkspaceId?: (() => string) | undefined
   repository?: BoardSessionRepository
-  previewRenderer?: BoardSessionPreviewRenderer
   message: BoardSessionMessage
   isDraftDirty?: (boardId: string) => boolean
 }
@@ -126,7 +112,6 @@ function classifyRemoteSyncFailure(error: unknown): BoardSessionRemoteSyncFailur
 
 export function useBoardSession(options: BoardSessionTestOptions): BoardSession {
   const repository = options.repository ?? createBoardSessionRepository(options.isDraftDirty)
-  const previewRenderer = options.previewRenderer ?? defaultBoardSessionPreviewRenderer
   const createUploadLifecycle = options.createUploadLifecycle ?? createBoardSessionUploadLifecycle
 
   const currentBoardId = computed(() => resolveBoardIdFromQueryValue(options.getBoardIdQuery()))
@@ -151,10 +136,7 @@ export function useBoardSession(options: BoardSessionTestOptions): BoardSession 
     return repository.load(normalized)
   }
 
-  async function save(
-    snapshot: BoardSnapshot,
-    saveOptions: BoardSessionSaveOptions = {},
-  ): Promise<BoardSessionSaveResult> {
+  async function save(snapshot: BoardSnapshot): Promise<BoardSessionSaveResult> {
     const boardId = currentBoardId.value
     if (!boardId) {
       throw new Error(i18n.global.t('canvas.session.missingBoardIdSave'))
@@ -204,24 +186,9 @@ export function useBoardSession(options: BoardSessionTestOptions): BoardSession 
         },
       }
     }
-    const previewRefreshTask = refreshPreview(boardId, stabilizedSnapshot).catch((error) => {
-      console.warn('[canvas] refresh board preview after save failed', boardId, error)
-    })
-    if (saveOptions.shouldWaitForPreview) {
-      await previewRefreshTask
-    }
+    // Canvas only saves the document: gallery previews are server Scene
+    // projections now, so saving never renders or syncs a preview snapshot.
     return { snapshot: stabilizedSnapshot, remoteSync: { isOk: true } }
-  }
-
-  async function refreshPreview(boardId: string, snapshot: BoardSnapshot): Promise<void> {
-    const normalized = boardId.trim()
-    if (!normalized) return
-    await refreshBoardSessionPreview({
-      boardId: normalized,
-      snapshot,
-      repository,
-      renderer: previewRenderer,
-    })
   }
 
   return {
@@ -229,7 +196,6 @@ export function useBoardSession(options: BoardSessionTestOptions): BoardSession 
     exists,
     load,
     save,
-    refreshPreview,
   }
 }
 

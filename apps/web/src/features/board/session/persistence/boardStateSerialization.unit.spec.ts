@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { makeBoardState } from '../../testing'
-import { BOARD_STATE_SCHEMA_VERSION } from '../../core/document/nodes'
+import {
+  BOARD_STATE_SCHEMA_VERSION,
+  stripLegacyBoardPreviewFields,
+} from '../../core/document/nodes'
 import {
   deserializeRemoteBoardStateEnvelope,
   normalizeBoardState,
@@ -8,34 +11,31 @@ import {
 } from './boardStateSerialization'
 
 describe('boardStateSerialization', () => {
-  it('serializes a local preview fallback without preview data', () => {
-    const state = makeBoardState({
-      updatedAt: 200,
-      mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }],
+  it('strips the retired preview cache while preserving document content', () => {
+    const legacy = {
+      ...makeBoardState({ updatedAt: 200 }),
       previewSnapshotDataUrl: 'data:image/webp;base64,preview',
       previewSnapshotUpdatedAt: 201,
       previewSnapshotVersion: 3,
-    })
+    }
 
-    const fallback = serializeBoardState(state, 'local-preview-fallback')
+    // The strict schema rejects the legacy envelope outright...
+    expect(normalizeBoardState(legacy)).toBeNull()
 
-    expect(fallback.updatedAt).toBe(200)
-    expect(fallback.mediaRefs).toEqual([
-      { mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' },
-    ])
-    expect(fallback).not.toHaveProperty('previewSnapshotDataUrl')
-    expect(fallback).not.toHaveProperty('previewSnapshotUpdatedAt')
-    expect(fallback).not.toHaveProperty('previewSnapshotVersion')
-    expect(fallback).not.toHaveProperty('viewport')
+    // ...so storage boundaries strip it first; content survives, the cache
+    // never reads back.
+    const cleaned = stripLegacyBoardPreviewFields(legacy)
+    expect(cleaned).not.toHaveProperty('previewSnapshotDataUrl')
+    expect(cleaned).not.toHaveProperty('previewSnapshotUpdatedAt')
+    expect(cleaned).not.toHaveProperty('previewSnapshotVersion')
+    const normalized = normalizeBoardState(cleaned)
+    expect(normalized?.updatedAt).toBe(200)
   })
 
-  it('serializes a board session snapshot without local or preview metadata', () => {
+  it('serializes a board session snapshot without local metadata', () => {
     const state = makeBoardState({
       updatedAt: 200,
       mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1' }],
-      previewSnapshotDataUrl: 'data:image/webp;base64,preview',
-      previewSnapshotUpdatedAt: 201,
-      previewSnapshotVersion: 3,
     })
 
     const snapshot = serializeBoardState(state, 'session-snapshot')
@@ -44,7 +44,6 @@ describe('boardStateSerialization', () => {
       { mediaAssetId: 12, refType: 'board_node', refId: 'image-1' },
     ])
     expect(snapshot).not.toHaveProperty('updatedAt')
-    expect(snapshot).not.toHaveProperty('previewSnapshotDataUrl')
     expect(snapshot).not.toHaveProperty('viewport')
   })
 

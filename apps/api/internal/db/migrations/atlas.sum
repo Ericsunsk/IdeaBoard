@@ -1,4 +1,4 @@
-h1:qMHmDcTPLAjsM94Z6of4K/EfsGcUy5jtAQOnLoAWBc0=
+h1:uHMdGjLdBD8H2Asi4g319uuU6jJI+Ki4mMyl8ewsMzk=
 20261002000002_baseline.sql h1:QrRMRLgqJ/RtZtUHa4XJbjIgNNfNbR58uzalezdG0fY=
 20261004000001_identity_admin_reconciliation.sql h1:r6u4xOO8911aXjSyewmJ9GQcA6zDkc16L8VeDFu3abU=
 20261004000002_payment_webhook_claim.sql h1:ysUQ0skK119SMlO+hBDRmsl5qCpWkzudbKXNnFD3eSw=
@@ -14,3 +14,4 @@ h1:qMHmDcTPLAjsM94Z6of4K/EfsGcUy5jtAQOnLoAWBc0=
 20261014173117_drop_media_legacy_shells.sql h1:OnhndukR+LNb8/+5xtNlocUuP2J1brlqykIg0BbdJ+o=
 20261014180000_avatar_keyspace_unification.sql h1:r4vBJ+yjvWkv/15T7tTsEjPHAnyF3fYDNz4fkxu8iDE=
 20261015090000_branding_logo_keyspace_unification.sql h1:wRa5/FF7Ls4W8NOWQ7XbawpgqyC4PX9BwaQiN1So1pY=
+20261015120000_board_preview_scene.sql h1:i6mfNnEswIyYSnH4qkyFKF7bKxSEhxim+Ph5RWhK+pE=

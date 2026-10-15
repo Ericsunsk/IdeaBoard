@@ -336,7 +336,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
       savedSnapshots.push(nextSnapshot)
       return { snapshot: nextSnapshot, remoteSync: { isOk: true as const } }
     }),
-    refreshPreview: vi.fn(),
   }
 
   const runtimeOptions: UseFlowCanvasRuntimeOptions = {

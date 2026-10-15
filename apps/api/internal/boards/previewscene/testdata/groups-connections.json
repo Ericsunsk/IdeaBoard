@@ -1,0 +1,176 @@
+{
+  "name": "groups-connections",
+  "notes": "Two overlapping image nodes (one without any media), one valid and one dangling connection, one populated and one empty group. The dangling edge is dropped; the empty group is carried with is_empty. Group rects may exceed the unit range and never stretch the layout bounds.",
+  "content_version": "cv-fixture-groups-01",
+  "snapshot": {
+    "schemaVersion": 4,
+    "imageNodes": [
+      {
+        "id": 1,
+        "type": "image-node",
+        "x": 0,
+        "y": 0,
+        "width": 280,
+        "sourceImageUrl": "https://cdn.example.com/one.jpg",
+        "sourceMediaAssetId": 31,
+        "sourceImageRatio": 1,
+        "outputStatus": "idle",
+        "outputImages": []
+      },
+      {
+        "id": 2,
+        "type": "image-node",
+        "x": 300,
+        "y": 100,
+        "width": 280,
+        "sourceImageUrl": "",
+        "sourceImageRatio": 1,
+        "outputStatus": "idle",
+        "outputImages": []
+      }
+    ],
+    "promptNodes": [],
+    "fusionNodes": [],
+    "connections": [
+      {
+        "id": 5,
+        "fromNodeType": "image",
+        "fromNodeId": 1,
+        "fromPort": "image",
+        "toNodeType": "image",
+        "toNodeId": 2,
+        "toPort": "image"
+      },
+      {
+        "id": 6,
+        "fromNodeType": "image",
+        "fromNodeId": 1,
+        "fromPort": "image",
+        "toNodeType": "prompt",
+        "toNodeId": 99,
+        "toPort": "prompt"
+      }
+    ],
+    "groups": [
+      {
+        "id": "group-1",
+        "nodeIds": [
+          "image-1",
+          "image-2"
+        ],
+        "x": -10,
+        "y": -10,
+        "width": 600,
+        "height": 420
+      },
+      {
+        "id": "group-2",
+        "nodeIds": [],
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 100
+      }
+    ]
+  },
+  "scene": {
+    "version": 1,
+    "content_version": "cv-fixture-groups-01",
+    "bounds": {
+      "min_x": 0,
+      "min_y": 0,
+      "max_x": 580,
+      "max_y": 380,
+      "width": 580,
+      "height": 380
+    },
+    "extent": {
+      "width": 1,
+      "height": 0.6551724137931034
+    },
+    "nodes": [
+      {
+        "id": "image-1",
+        "kind": "image",
+        "x": 0,
+        "y": 0,
+        "width": 0.48275862068965514,
+        "height": 0.48275862068965514,
+        "aspect": 1,
+        "media": [
+          {
+            "asset": "",
+            "asset_numeric": 31,
+            "tier": "preview",
+            "role": "source",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "image-2",
+        "kind": "image",
+        "x": 0.5172413793103449,
+        "y": 0.1724137931034483,
+        "width": 0.48275862068965514,
+        "height": 0.48275862068965514,
+        "aspect": 1,
+        "media": []
+      }
+    ],
+    "connections": [
+      {
+        "key": "connection-5-0",
+        "from": "image-1",
+        "to": "image-2",
+        "from_port": "image",
+        "to_port": "image",
+        "start": {
+          "x": 0.48275862068965514,
+          "y": 0.24137931034482757
+        },
+        "end": {
+          "x": 0.5172413793103449,
+          "y": 0.41379310344827586
+        }
+      }
+    ],
+    "groups": [
+      {
+        "id": "group-1",
+        "members": [
+          "image-1",
+          "image-2"
+        ],
+        "x": -0.017241379310344827,
+        "y": -0.017241379310344827,
+        "width": 1.0344827586206897,
+        "height": 0.7241379310344828,
+        "is_empty": false
+      },
+      {
+        "id": "group-2",
+        "members": [],
+        "x": 0,
+        "y": 0,
+        "width": 0.1724137931034483,
+        "height": 0.1724137931034483,
+        "is_empty": true
+      }
+    ],
+    "budgets": {
+      "max_nodes": null,
+      "max_connections": null,
+      "max_media_refs": null,
+      "max_scene_bytes": null
+    },
+    "omitted": {
+      "nodes": 0,
+      "connections": 0,
+      "media_refs": 0,
+      "groups": 0,
+      "group_members": 0
+    },
+    "truncated": false
+  }
+}

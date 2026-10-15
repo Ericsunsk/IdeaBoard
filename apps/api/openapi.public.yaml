@@ -715,7 +715,9 @@ paths:
       summary: List accessible boards of a workspace with cursor pagination
       description: >-
         Lists non-archived boards the caller holds an explicit board role
-        on (owner, editor, or viewer). Workspace membership alone never
+        on (owner, editor, or viewer). Each card carries metadata plus the
+        stored preview scene projection (content_version, preview_scene)
+        without a document fetch. Workspace membership alone never
         grants board access: boards without a grant stay invisible and are
         excluded, never 403. Hidden workspaces converge to 404
         workspace_not_found.
@@ -3891,6 +3893,25 @@ components:
           type: integer
           format: int32
           minimum: 1
+        content_version:
+          type: string
+          minLength: 8
+          maxLength: 128
+          nullable: true
+          description: >-
+            Opaque identity of the accepted persisted content (hex SHA-256
+            of the canonical document, assigned in the accepting
+            transaction). Metadata renames and archive transitions never
+            change it. Null when a content identity has not been assigned.
+        preview_scene:
+          type: object
+          nullable: true
+          description: >-
+            Stored versioned Board Preview Scene projection (contract:
+            apps/api/internal/boards/previewscene/contract.md). Gallery
+            catalog cards carry it without a document fetch; null when the
+            document schema is not extractable or the stored projection
+            is absent.
         archived_at:
           type: string
           format: date-time
@@ -3978,6 +3999,23 @@ components:
           type: integer
           format: int32
           minimum: 1
+        content_version:
+          type: string
+          minLength: 8
+          maxLength: 128
+          nullable: true
+          description: >-
+            Opaque identity of the accepted persisted content (hex SHA-256
+            of the canonical document). Derived on read when the stored
+            identity is absent.
+        preview_scene:
+          type: object
+          nullable: true
+          description: >-
+            Stored versioned Board Preview Scene projection, derived from
+            the canonical document on read when the stored projection is
+            absent (contract:
+            apps/api/internal/boards/previewscene/contract.md).
         document:
           type: object
           description: Canonical snapshot payload object.

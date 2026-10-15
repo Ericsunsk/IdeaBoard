@@ -75,7 +75,7 @@ export const getListBoardsUrl = (workspaceId: string, params?: ListBoardsParams)
 }
 
 /**
- * Lists non-archived boards the caller holds an explicit board role on (owner, editor, or viewer). Workspace membership alone never grants board access: boards without a grant stay invisible and are excluded, never 403. Hidden workspaces converge to 404 workspace_not_found.
+ * Lists non-archived boards the caller holds an explicit board role on (owner, editor, or viewer). Each card carries metadata plus the stored preview scene projection (content_version, preview_scene) without a document fetch. Workspace membership alone never grants board access: boards without a grant stay invisible and are excluded, never 403. Hidden workspaces converge to 404 workspace_not_found.
  * @summary List accessible boards of a workspace with cursor pagination
  */
 export const listBoards = async (

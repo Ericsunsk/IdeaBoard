@@ -1,0 +1,275 @@
+{
+  "name": "theme-switch",
+  "notes": "Theme invariance: byte-identical snapshot and content version to the mixed fixture. The scene carries no theme, color, or token fields, so extraction must produce the identical scene; only the renderer maps theme tokens. Test suites assert this scene deep-equals the mixed scene.",
+  "content_version": "cv-fixture-mixed-01",
+  "snapshot": {
+    "schemaVersion": 4,
+    "imageNodes": [
+      {
+        "id": 1,
+        "type": "image-node",
+        "x": -120,
+        "y": -80,
+        "width": 280,
+        "sourceImageUrl": "https://cdn.example.com/wide.jpg",
+        "sourceMediaRef": {
+          "assetId": "asset_src_m",
+          "derivativeTier": "preview"
+        },
+        "sourceMediaAssetId": 41,
+        "sourceImageRatio": 1,
+        "outputStatus": "ready",
+        "outputImages": [
+          {
+            "url": "https://cdn.example.com/wide-out.jpg",
+            "ratio": 0.5,
+            "mediaRef": {
+              "assetId": "asset_out_m",
+              "derivativeTier": "preview"
+            }
+          }
+        ]
+      }
+    ],
+    "promptNodes": [
+      {
+        "id": 2,
+        "type": "prompt",
+        "x": 200,
+        "y": -80,
+        "width": 280,
+        "text": "mixed board secret wording",
+        "aspectRatio": "1:1",
+        "inputImages": [
+          {
+            "url": "https://cdn.example.com/p-in.jpg",
+            "ratio": 1,
+            "mediaAssetId": 42,
+            "id": "p-in",
+            "sourceType": "node",
+            "sourceId": "image-1"
+          }
+        ]
+      }
+    ],
+    "fusionNodes": [
+      {
+        "id": 4,
+        "type": "fusion",
+        "x": 40,
+        "y": 120,
+        "width": 286,
+        "prompt": "mixed fusion secret",
+        "inputImages": [
+          {
+            "url": "https://cdn.example.com/f-a.jpg",
+            "ratio": 1,
+            "mediaAssetId": 43,
+            "id": "f-a",
+            "sourceType": "external",
+            "sourceId": "ext-a"
+          },
+          {
+            "url": "https://cdn.example.com/f-b.jpg",
+            "ratio": 1,
+            "mediaAssetId": 44,
+            "id": "f-b",
+            "sourceType": "external",
+            "sourceId": "ext-b"
+          }
+        ],
+        "outputStatus": "idle",
+        "outputImages": []
+      }
+    ],
+    "connections": [
+      {
+        "id": 10,
+        "fromNodeType": "image",
+        "fromNodeId": 1,
+        "fromPort": "image",
+        "toNodeType": "prompt",
+        "toNodeId": 2,
+        "toPort": "prompt"
+      },
+      {
+        "id": 11,
+        "fromNodeType": "fusion",
+        "fromNodeId": 4,
+        "fromPort": "image",
+        "toNodeType": "prompt",
+        "toNodeId": 2,
+        "toPort": "prompt"
+      }
+    ],
+    "groups": [
+      {
+        "id": "group-1",
+        "nodeIds": [
+          "image-1",
+          "prompt-2",
+          "fusion-4"
+        ],
+        "x": -130,
+        "y": -90,
+        "width": 620,
+        "height": 506
+      }
+    ]
+  },
+  "scene": {
+    "version": 1,
+    "content_version": "cv-fixture-mixed-01",
+    "bounds": {
+      "min_x": -120,
+      "min_y": -80,
+      "max_x": 480,
+      "max_y": 406,
+      "width": 600,
+      "height": 486
+    },
+    "extent": {
+      "width": 1,
+      "height": 0.81
+    },
+    "nodes": [
+      {
+        "id": "image-1",
+        "kind": "image",
+        "x": 0,
+        "y": 0,
+        "width": 0.4666666666666667,
+        "height": 0.23333333333333334,
+        "aspect": 2,
+        "media": [
+          {
+            "asset": "asset_src_m",
+            "asset_numeric": 41,
+            "tier": "preview",
+            "role": "source",
+            "index": 0
+          },
+          {
+            "asset": "asset_out_m",
+            "asset_numeric": null,
+            "tier": "preview",
+            "role": "output",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "prompt-2",
+        "kind": "prompt",
+        "x": 0.5333333333333333,
+        "y": 0,
+        "width": 0.4666666666666667,
+        "height": 0.4666666666666667,
+        "aspect": 1,
+        "media": [
+          {
+            "asset": "",
+            "asset_numeric": 42,
+            "tier": "preview",
+            "role": "input",
+            "index": 0
+          }
+        ],
+        "prompt": {
+          "aspect_ratio": "1:1",
+          "has_inputs": true
+        }
+      },
+      {
+        "id": "fusion-4",
+        "kind": "fusion",
+        "x": 0.26666666666666666,
+        "y": 0.33333333333333337,
+        "width": 0.4766666666666667,
+        "height": 0.4766666666666667,
+        "aspect": 1,
+        "media": [
+          {
+            "asset": "",
+            "asset_numeric": 43,
+            "tier": "preview",
+            "role": "input",
+            "index": 0
+          },
+          {
+            "asset": "",
+            "asset_numeric": 44,
+            "tier": "preview",
+            "role": "input",
+            "index": 1
+          }
+        ],
+        "blend": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      }
+    ],
+    "connections": [
+      {
+        "key": "connection-10-0",
+        "from": "image-1",
+        "to": "prompt-2",
+        "from_port": "image",
+        "to_port": "prompt",
+        "start": {
+          "x": 0.4666666666666667,
+          "y": 0.11666666666666667
+        },
+        "end": {
+          "x": 0.5333333333333333,
+          "y": 0.23333333333333334
+        }
+      },
+      {
+        "key": "connection-11-1",
+        "from": "fusion-4",
+        "to": "prompt-2",
+        "from_port": "image",
+        "to_port": "prompt",
+        "start": {
+          "x": 0.7433333333333334,
+          "y": 0.5716666666666667
+        },
+        "end": {
+          "x": 0.5333333333333333,
+          "y": 0.23333333333333334
+        }
+      }
+    ],
+    "groups": [
+      {
+        "id": "group-1",
+        "members": [
+          "image-1",
+          "prompt-2",
+          "fusion-4"
+        ],
+        "x": -0.016666666666666666,
+        "y": -0.016666666666666666,
+        "width": 1.0333333333333334,
+        "height": 0.8433333333333334,
+        "is_empty": false
+      }
+    ],
+    "budgets": {
+      "max_nodes": null,
+      "max_connections": null,
+      "max_media_refs": null,
+      "max_scene_bytes": null
+    },
+    "omitted": {
+      "nodes": 0,
+      "connections": 0,
+      "media_refs": 0,
+      "groups": 0,
+      "group_members": 0
+    },
+    "truncated": false
+  }
+}

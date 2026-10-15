@@ -11,11 +11,12 @@
     <div
       class="relative z-0 flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,var(--color-board-card-preview-from)_0%,var(--color-board-card-preview-to)_100%)]"
     >
-      <img
-        v-if="previewSnapshotDataUrl"
-        :src="previewSnapshotDataUrl"
-        class="block h-full w-full object-cover"
-        alt=""
+      <SceneThumbnail
+        v-if="sceneEntry?.scene && workspaceId"
+        :scene="sceneEntry.scene"
+        :workspace-id="workspaceId"
+        :board-id="board.id"
+        :content-version="sceneEntry.contentVersion"
       />
       <div
         v-else
@@ -98,11 +99,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useI18n } from 'vue-i18n'
 import type { CatalogEntry } from './contract'
+import type { BoardListSceneEntry } from '../../session/sync/boardQueries'
+import SceneThumbnail from './SceneThumbnail.vue'
 import { blankBoardPreviewSurfaceClass } from './skin'
 
 const props = defineProps<{
   board: CatalogEntry
-  previewSnapshotDataUrl: string
+  sceneEntry: BoardListSceneEntry | null
+  workspaceId: string | null
   isRenaming: boolean
   renameDraft: string
   isMenuOpen: boolean

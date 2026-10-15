@@ -11,6 +11,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BoardDocumentDocument } from './boardDocumentDocument'
+import type { BoardDocumentPreviewScene } from './boardDocumentPreviewScene'
 import type { BoardId } from './boardId'
 
 export interface BoardDocument {
@@ -19,6 +20,18 @@ export interface BoardDocument {
   revision: number
   /** @minimum 1 */
   schema_version: number
+  /**
+   * Opaque identity of the accepted persisted content (hex SHA-256 of the canonical document). Derived on read when the stored identity is absent.
+   * @minLength 8
+   * @maxLength 128
+   * @nullable
+   */
+  content_version?: string | null
+  /**
+   * Stored versioned Board Preview Scene projection, derived from the canonical document on read when the stored projection is absent (contract: apps/api/internal/boards/previewscene/contract.md).
+   * @nullable
+   */
+  preview_scene?: BoardDocumentPreviewScene
   /** Canonical snapshot payload object. */
   document: BoardDocumentDocument
   updated_at: string

@@ -32,7 +32,8 @@ const CONTROL_EASING = 'cubic-bezier(0.2, 0.8, 0.2, 1)'
 function cardProps() {
   return {
     board: { id: 'board-1', name: 'Campaign', createdAt: 1, updatedAt: 2 },
-    previewSnapshotDataUrl: '',
+    sceneEntry: null,
+    workspaceId: null,
     isRenaming: false,
     renameDraft: '',
     isMenuOpen: false,

@@ -13,8 +13,7 @@ import {
 } from '../../core/document/nodes'
 import { type BoardStateEnvelopeContract } from '../../core/schema/boardStateEnvelopeContract'
 
-export type BoardStateSerializationTarget =
-  'local-state' | 'local-preview-fallback' | 'session-snapshot' | 'remote-envelope'
+export type BoardStateSerializationTarget = 'local-state' | 'session-snapshot' | 'remote-envelope'
 
 export type BoardStateSerializationResult<Target extends BoardStateSerializationTarget> =
   Target extends 'session-snapshot'
@@ -28,8 +27,6 @@ export function serializeBoardState<Target extends BoardStateSerializationTarget
   target: Target,
 ): BoardStateSerializationResult<Target> {
   switch (target) {
-    case 'local-preview-fallback':
-      return stripPreviewSnapshot(state) as BoardStateSerializationResult<Target>
     case 'session-snapshot':
       return toSessionSnapshot(state) as BoardStateSerializationResult<Target>
     case 'remote-envelope':
@@ -87,22 +84,5 @@ function toSessionSnapshot(state: BoardState): BoardSnapshot {
       mediaRefs: normalized.mediaRefs,
     },
     'session-snapshot',
-  )
-}
-
-function stripPreviewSnapshot(state: BoardState): BoardState {
-  const normalized = assertLatestBoardState(state, 'local-preview-fallback')
-  return assertLatestBoardState(
-    {
-      schemaVersion: BOARD_STATE_SCHEMA_VERSION,
-      imageNodes: normalized.imageNodes,
-      promptNodes: normalized.promptNodes,
-      fusionNodes: normalized.fusionNodes,
-      connections: normalized.connections,
-      groups: normalized.groups,
-      mediaRefs: normalized.mediaRefs,
-      updatedAt: normalized.updatedAt,
-    },
-    'local-preview-fallback',
   )
 }

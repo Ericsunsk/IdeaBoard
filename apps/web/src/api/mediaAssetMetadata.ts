@@ -1,3 +1,4 @@
+import { scheduleMediaRead } from '../core/media/mediaReadScheduler'
 import { resolveAssetUrl } from '../core/config/runtimeUrls'
 import { MEDIA_METADATA_TTL_MS } from '../core/config/timing'
 import { subscribeAuthStateReset } from '../core/utils/auth'
@@ -89,7 +90,8 @@ const metadataCache = new Map<string, CachedMetadata>()
 type InFlightMetadataRequest = {
   promise: Promise<MediaAssetDeliveryMetadata>
   controller: AbortController
-  force: boolean
+  isForced: boolean
+  consumers: number
 }
 const metadataRequests = new Map<string, InFlightMetadataRequest>()
 const metadataBatchControllers = new Set<AbortController>()
@@ -125,6 +127,16 @@ function clearCachedMetadata(workspaceId: string | null, assetId: string): void 
 function notifyAssetInvalidated(workspaceId: string | null, assetId: MediaAssetId) {
   const key = normalizeMediaAssetId(assetId) ?? ''
   clearCachedMetadata(workspaceId, key)
+  for (const [requestKey, request] of metadataRequests) {
+    if (
+      workspaceId
+        ? requestKey === metadataCacheKey(workspaceId, key)
+        : requestKey.endsWith(`:${key}`)
+    ) {
+      metadataRequests.delete(requestKey)
+      request.controller.abort()
+    }
+  }
   for (const listener of invalidationListeners.get(key) ?? []) listener()
 }
 
@@ -212,6 +224,23 @@ export function invalidateMediaAssetMetadata(assetId?: MediaAssetId) {
     return
   }
   notifyAssetInvalidated(null, assetId)
+}
+
+export function refreshWorkspaceMediaAssetMetadata(
+  workspaceId: string,
+  assetId: MediaAssetId,
+  options: {
+    signal?: AbortSignal | undefined
+    staleMetadata?: MediaAssetDeliveryMetadata | undefined
+  } = {},
+): Promise<MediaAssetDeliveryMetadata> {
+  if (
+    !options.signal?.aborted &&
+    (!options.staleMetadata || getCachedMetadata(workspaceId, assetId) === options.staleMetadata)
+  ) {
+    clearCachedMetadata(workspaceId, assetId)
+  }
+  return getWorkspaceMediaAssetMetadata(workspaceId, assetId, options)
 }
 
 /**
@@ -329,22 +358,31 @@ function assertMetadataBatchActive(epoch: number, signal: AbortSignal): void {
 // fetch continues for joiners. Previously the first caller's signal rode
 // the shared fetch, so one component unmount aborted every joined load.
 function joinMetadataRequest(
-  shared: Promise<MediaAssetDeliveryMetadata>,
+  request: InFlightMetadataRequest,
   signal?: AbortSignal,
 ): Promise<MediaAssetDeliveryMetadata> {
-  if (!signal) return shared
-  if (signal.aborted) return Promise.reject(createMetadataAbortError())
+  if (signal?.aborted) return Promise.reject(createMetadataAbortError())
+  request.consumers += 1
   return new Promise<MediaAssetDeliveryMetadata>((resolve, reject) => {
-    const onAbort = () => reject(createMetadataAbortError())
-    signal.addEventListener('abort', onAbort, { once: true })
-    shared.then(
+    let isSettled = false
+    const release = () => {
+      if (isSettled) return false
+      isSettled = true
+      signal?.removeEventListener('abort', onAbort)
+      request.consumers -= 1
+      if (request.consumers === 0) request.controller.abort()
+      return true
+    }
+    const onAbort = () => {
+      if (release()) reject(createMetadataAbortError())
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+    request.promise.then(
       (metadata) => {
-        signal.removeEventListener('abort', onAbort)
-        resolve(metadata)
+        if (release()) resolve(metadata)
       },
       (error) => {
-        signal.removeEventListener('abort', onAbort)
-        reject(error)
+        if (release()) reject(error)
       },
     )
   })
@@ -375,12 +413,14 @@ export async function getWorkspaceMediaAssetMetadata(
     const cached = getCachedMetadata(workspace, assetId)
     if (cached) return cached
     const existing = metadataRequests.get(requestKey)
-    if (existing) return joinMetadataRequest(existing.promise, options.signal)
+    if (existing && !existing.controller.signal.aborted)
+      return joinMetadataRequest(existing, options.signal)
   } else {
     // `force` bypasses the cache. Replace a non-force in-flight read, while
     // concurrent force callers share the same fresh transport.
     const stale = metadataRequests.get(requestKey)
-    if (stale?.force) return joinMetadataRequest(stale.promise, options.signal)
+    if (stale?.isForced && !stale.controller.signal.aborted)
+      return joinMetadataRequest(stale, options.signal)
     if (stale) {
       stale.controller.abort()
       metadataRequests.delete(requestKey)
@@ -388,7 +428,9 @@ export async function getWorkspaceMediaAssetMetadata(
   }
 
   const controller = new AbortController()
-  const request = getWorkspaceMediaAsset(workspace, normalized, { signal: controller.signal })
+  const request = scheduleMediaRead(controller.signal, () =>
+    getWorkspaceMediaAsset(workspace, normalized, { signal: controller.signal }),
+  )
     .then((envelope) => toDeliveryMetadata(envelope.data))
     .then((metadata) => {
       // A force-superseded read must not poison the cache when its
@@ -406,8 +448,9 @@ export async function getWorkspaceMediaAssetMetadata(
         metadataRequests.delete(requestKey)
       }
     })
-  metadataRequests.set(requestKey, { promise: request, controller, force: options.force === true })
-  return joinMetadataRequest(request, options.signal)
+  const entry = { promise: request, controller, isForced: options.force === true, consumers: 0 }
+  metadataRequests.set(requestKey, entry)
+  return joinMetadataRequest(entry, options.signal)
 }
 
 /**

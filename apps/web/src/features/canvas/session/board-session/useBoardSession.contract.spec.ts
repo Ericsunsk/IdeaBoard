@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BoardSnapshot, BoardState } from '../../../board'
 import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import { makeBoardSnapshot, makeBoardState } from '../../../board/ports/testing'
-import type { BoardSessionPreviewRenderer } from './preview'
 import { BoardSessionRemoteSyncError, type BoardSessionRepository } from './repository'
 import {
   BOARD_SESSION_AUTH_UNAVAILABLE_CODE,
@@ -32,29 +31,12 @@ function makeState(snapshot: BoardSnapshot): BoardState {
   return makeBoardState({ ...snapshot, updatedAt: 1_000 })
 }
 
-function createDeferred<T = void>() {
-  let resolve!: (value: T | PromiseLike<T>) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise
-    reject = rejectPromise
-  })
-  return { promise, resolve, reject }
-}
-
-async function flushMicrotasks(times = 5) {
-  for (let index = 0; index < times; index += 1) {
-    await Promise.resolve()
-  }
-}
-
 function createRepository(overrides: Partial<BoardSessionRepository> = {}): BoardSessionRepository {
   return {
     exists: vi.fn(() => true),
     load: vi.fn(async () => makeSnapshot(100)),
     saveLocal: vi.fn(async (_boardId: string, snapshot: BoardSnapshot) => makeState(snapshot)),
     save: vi.fn(async (_boardId: string, snapshot: BoardSnapshot) => makeState(snapshot)),
-    setPreview: vi.fn(() => makeState(makeSnapshot(100))),
     sync: vi.fn(async () => undefined),
     ...overrides,
   }
@@ -65,7 +47,7 @@ describe('useBoardSession', () => {
     vi.clearAllMocks()
   })
 
-  it('stabilizes, saves, refreshes preview, and returns the stabilized snapshot', async () => {
+  it('stabilizes, saves once, and returns the stabilized snapshot', async () => {
     const events: string[] = []
     const warning = vi.fn()
     const snapshot = makeSnapshot(100)
@@ -85,44 +67,20 @@ describe('useBoardSession', () => {
         expect(received).toBe(stabilizedSnapshot)
         return makeState(received)
       }),
-      setPreview: vi.fn(
-        (
-          boardId: string,
-          previewSnapshotDataUrl: string | undefined,
-          previewSnapshotUpdatedAt: number | undefined,
-          previewSnapshotVersion: number | undefined,
-        ) => {
-          events.push('repository.setPreview')
-          expect(boardId).toBe('board-a')
-          expect(previewSnapshotDataUrl).toBe('data:image/webp;base64,preview')
-          expect(previewSnapshotUpdatedAt).toEqual(expect.any(Number))
-          expect(previewSnapshotVersion).toBe(42)
-          return makeState(stabilizedSnapshot)
-        },
-      ),
       sync: vi.fn(async (boardId: string) => {
         events.push('repository.sync')
         expect(boardId).toBe('board-a')
       }),
     })
-    const previewRenderer: BoardSessionPreviewRenderer = {
-      rendererVersion: 42,
-      render: vi.fn(async (received: BoardSnapshot) => {
-        events.push('renderer.render')
-        expect(received).toBe(stabilizedSnapshot)
-        return 'data:image/webp;base64,preview'
-      }),
-    }
     const session = useBoardSession({
       getBoardIdQuery: () => '  board-a  ',
       getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
       repository,
-      previewRenderer,
       message: { warning },
       createUploadLifecycle,
     })
 
-    const result = await session.save(snapshot, { shouldWaitForPreview: true })
+    const result = await session.save(snapshot)
 
     expect(result.snapshot).toBe(stabilizedSnapshot)
     expect(result.remoteSync).toEqual({ isOk: true })
@@ -131,13 +89,10 @@ describe('useBoardSession', () => {
       boardId: 'board-a',
       warning,
     })
-    expect(events).toEqual([
-      'stabilize',
-      'repository.save',
-      'renderer.render',
-      'repository.setPreview',
-      'repository.sync',
-    ])
+    // Canvas only saves the document: no preview render, no preview write,
+    // and no second sync ride the save.
+    expect(events).toEqual(['stabilize', 'repository.save'])
+    expect(repository.sync).not.toHaveBeenCalled()
   })
 
   it('rejects with BOARD_NOT_FOUND before creating an upload lifecycle', async () => {
@@ -150,10 +105,6 @@ describe('useBoardSession', () => {
       getBoardIdQuery: () => 'missing-board',
       getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
       repository,
-      previewRenderer: {
-        rendererVersion: 1,
-        render: vi.fn(async () => 'data:image/webp;base64,preview'),
-      },
       message: { warning: vi.fn() },
       createUploadLifecycle,
     })
@@ -172,10 +123,6 @@ describe('useBoardSession', () => {
       getBoardIdQuery: () => 'board-a',
       getUserIdentity: () => ({ userId: 0, userUid: '' }),
       repository,
-      previewRenderer: {
-        rendererVersion: 1,
-        render: vi.fn(async () => 'data:image/webp;base64,preview'),
-      },
       message: { warning: vi.fn() },
       createUploadLifecycle,
     })
@@ -216,10 +163,6 @@ describe('useBoardSession', () => {
       getBoardIdQuery: () => 'board-a',
       getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
       repository,
-      previewRenderer: {
-        rendererVersion: 1,
-        render: vi.fn(async () => 'data:image/webp;base64,preview'),
-      },
       message: { warning: vi.fn() },
       createUploadLifecycle: vi.fn(() => lifecycle),
     })
@@ -251,10 +194,6 @@ describe('useBoardSession', () => {
       getBoardIdQuery: () => 'board-a',
       getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
       repository,
-      previewRenderer: {
-        rendererVersion: 1,
-        render: vi.fn(async () => 'data:image/webp;base64,preview'),
-      },
       message: { warning: vi.fn() },
       createUploadLifecycle: vi.fn(() => lifecycle),
     })
@@ -265,45 +204,28 @@ describe('useBoardSession', () => {
     expect(repository.save).not.toHaveBeenCalled()
   })
 
-  it('waits for preview renderer and repository sync when shouldWaitForPreview is enabled', async () => {
-    const syncGate = createDeferred<void>()
+  it('resolves the save without a second sync once the document persists', async () => {
     const lifecycle = {
       stabilizeSnapshotForSave: vi.fn(async () => makeSnapshot(250)),
     }
     const createUploadLifecycle = vi.fn(() => lifecycle)
-    const repository = createRepository({
-      sync: vi.fn(() => syncGate.promise),
-    })
-    const previewRenderer: BoardSessionPreviewRenderer = {
-      rendererVersion: 1,
-      render: vi.fn(async () => 'data:image/webp;base64,preview'),
-    }
+    const repository = createRepository()
     const session = useBoardSession({
       getBoardIdQuery: () => 'board-a',
       getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
       repository,
-      previewRenderer,
       message: { warning: vi.fn() },
       createUploadLifecycle,
     })
-    let isResolved = false
 
-    const savePromise = session.save(makeSnapshot(100), { shouldWaitForPreview: true }).then(() => {
-      isResolved = true
-    })
-    await flushMicrotasks()
+    const result = await session.save(makeSnapshot(100))
 
-    expect(previewRenderer.render).toHaveBeenCalledOnce()
-    expect(repository.sync).toHaveBeenCalledOnce()
-    expect(isResolved).toBe(false)
-
-    syncGate.resolve()
-    await savePromise
-
-    expect(isResolved).toBe(true)
+    expect(result.remoteSync).toEqual({ isOk: true })
+    expect(repository.save).toHaveBeenCalledOnce()
+    expect(repository.sync).not.toHaveBeenCalled()
   })
 
-  it('returns a recoverable remote sync failure without refreshing the preview', async () => {
+  it('returns a recoverable remote sync failure without a second sync', async () => {
     const snapshot = makeSnapshot(100)
     const stabilizedSnapshot = makeSnapshot(250)
     const savedState = makeState(stabilizedSnapshot)
@@ -317,26 +239,20 @@ describe('useBoardSession', () => {
       }),
       sync: vi.fn(async () => undefined),
     })
-    const previewRenderer: BoardSessionPreviewRenderer = {
-      rendererVersion: 1,
-      render: vi.fn(async () => 'data:image/webp;base64,preview'),
-    }
     const session = useBoardSession({
       getBoardIdQuery: () => 'board-a',
       getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
       repository,
-      previewRenderer,
       message: { warning: vi.fn() },
       createUploadLifecycle: vi.fn(() => lifecycle),
     })
 
-    const result = await session.save(snapshot, { shouldWaitForPreview: true })
+    const result = await session.save(snapshot)
 
     expect(result).toEqual({
       snapshot: stabilizedSnapshot,
       remoteSync: { isOk: false, reason: 'sync-failed', error: remoteError },
     })
-    expect(previewRenderer.render).not.toHaveBeenCalled()
     expect(repository.sync).not.toHaveBeenCalled()
   })
 
@@ -357,23 +273,17 @@ describe('useBoardSession', () => {
       }),
       sync: vi.fn(async () => undefined),
     })
-    const previewRenderer: BoardSessionPreviewRenderer = {
-      rendererVersion: 1,
-      render: vi.fn(async () => 'data:image/webp;base64,preview'),
-    }
     const session = useBoardSession({
       getBoardIdQuery: () => 'board-a',
       getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
       repository,
-      previewRenderer,
       message: { warning: vi.fn() },
       createUploadLifecycle: vi.fn(() => lifecycle),
     })
 
-    const result = await session.save(snapshot, { shouldWaitForPreview: true })
+    const result = await session.save(snapshot)
 
     expect(result.remoteSync).toEqual({ isOk: false, reason: 'archived', error: archivedError })
-    expect(previewRenderer.render).not.toHaveBeenCalled()
     expect(repository.sync).not.toHaveBeenCalled()
   })
 
@@ -397,23 +307,17 @@ describe('useBoardSession', () => {
       }),
       sync: vi.fn(async () => undefined),
     })
-    const previewRenderer: BoardSessionPreviewRenderer = {
-      rendererVersion: 1,
-      render: vi.fn(async () => 'data:image/webp;base64,preview'),
-    }
     const session = useBoardSession({
       getBoardIdQuery: () => 'board-a',
       getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
       repository,
-      previewRenderer,
       message: { warning: vi.fn() },
       createUploadLifecycle: vi.fn(() => lifecycle),
     })
 
-    const result = await session.save(snapshot, { shouldWaitForPreview: true })
+    const result = await session.save(snapshot)
 
     expect(result.remoteSync).toEqual({ isOk: false, reason: 'conflict', error: conflictError })
-    expect(previewRenderer.render).not.toHaveBeenCalled()
     expect(repository.sync).not.toHaveBeenCalled()
   })
 
@@ -426,10 +330,6 @@ describe('useBoardSession', () => {
       getBoardIdQuery: () => ['  route-board  '],
       getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
       repository,
-      previewRenderer: {
-        rendererVersion: 1,
-        render: vi.fn(async () => 'data:image/webp;base64,preview'),
-      },
       message: { warning: vi.fn() },
       createUploadLifecycle: vi.fn(),
     })
@@ -452,10 +352,6 @@ describe('useBoardSession', () => {
       getBoardIdQuery: () => '   ',
       getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
       repository: blankRepository,
-      previewRenderer: {
-        rendererVersion: 1,
-        render: vi.fn(async () => 'data:image/webp;base64,preview'),
-      },
       message: { warning: vi.fn() },
       createUploadLifecycle: vi.fn(),
     })

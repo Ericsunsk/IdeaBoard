@@ -329,7 +329,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
   const saveCurrentBoardSnapshot = async (
     saveOptions: {
-      shouldWaitForPreview?: boolean | undefined
       isSilent?: boolean | undefined
     } = {},
   ) => {
@@ -349,7 +348,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     canRun: () => !nodeDragLifecycle.isActive(),
     save: (autosaveOptions?: { isSilent?: boolean | undefined }) =>
       saveCurrentBoardSnapshot({
-        shouldWaitForPreview: false,
         isSilent: autosaveOptions?.isSilent,
       }),
   })

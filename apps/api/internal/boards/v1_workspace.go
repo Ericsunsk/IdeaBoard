@@ -38,6 +38,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"ideaboard/api/internal/boards/previewscene"
 	"ideaboard/api/internal/platform/contract"
 )
 
@@ -45,7 +46,9 @@ var (
 	// ErrV1LastOwner blocks removing or demoting the last board owner.
 	ErrV1LastOwner = errors.New("board last owner cannot be removed or demoted")
 	// ErrV1Archived reports a write against an archived board.
-	ErrV1Archived = errors.New("board is archived")
+	ErrV1Archived      = errors.New("board is archived")
+	ErrV1CatalogPage   = errors.New("invalid board catalog page")
+	ErrV1CatalogOffset = errors.New("invalid board catalog offset")
 	// ErrV1ShareTokenExpired reports a join against an expired token.
 	ErrV1ShareTokenExpired = errors.New("share token expired")
 )
@@ -62,7 +65,12 @@ const (
 )
 
 // V1Board is one workspace-rooted board: the revision counter doubles as the
-// ETag value for optimistic document writes.
+// ETag value for optimistic document writes. ContentVersion is the opaque
+// identity of the accepted persisted content (hex SHA-256 of the canonical
+// document envelope, computed in the accepting transaction; metadata
+// renames and archive transitions never change it). PreviewScene is the
+// stored versioned scene projection (nil when the document schema is not
+// extractable); the Gallery catalog reads it without fetching documents.
 type V1Board struct {
 	WorkspacePublicID string
 	PublicID          string
@@ -70,11 +78,53 @@ type V1Board struct {
 	Revision          int64
 	SchemaVersion     int32
 	Document          json.RawMessage
+	ContentVersion    string
+	PreviewScene      json.RawMessage
 	ArchivedAt        *time.Time
 	OwnerUserID       int64
 	CreatedBy         int64
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+}
+
+// V1BoardCatalogEntry is one Gallery catalog card: board metadata plus the
+// stored scene projection, WITHOUT the full document. Served by
+// ListBoardCatalog in a single query that never reads snapshot_data.
+type V1BoardCatalogEntry struct {
+	WorkspacePublicID string
+	PublicID          string
+	Name              string
+	Revision          int64
+	SchemaVersion     int32
+	ContentVersion    string
+	PreviewScene      json.RawMessage
+	ArchivedAt        *time.Time
+	OwnerUserID       int64
+	CreatedBy         int64
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+type V1BoardCatalogPageRequest struct {
+	Offset int
+	Limit  int
+}
+
+type V1BoardCatalogPage struct {
+	Entries []*V1BoardCatalogEntry
+	HasMore bool
+}
+
+const maxBoardCatalogRows = 500
+
+func (page V1BoardCatalogPageRequest) validate() error {
+	if page.Offset < 0 || page.Offset > maxBoardCatalogRows {
+		return ErrV1CatalogOffset
+	}
+	if page.Limit < 1 || page.Limit > 100 {
+		return ErrV1CatalogPage
+	}
+	return nil
 }
 
 // V1BoardMember is one explicit board grant. The board creator/owner is an
@@ -132,7 +182,7 @@ type V1Revision struct {
 // boards. Repository methods take context.Context first.
 type WorkspaceBoardStore interface {
 	CreateBoard(ctx context.Context, workspacePublicID string, creatorUserID int64, name, publicID string) (*V1Board, error)
-	ListBoards(ctx context.Context, workspacePublicID string, includeArchived bool) ([]*V1Board, error)
+	ListBoardCatalog(ctx context.Context, workspacePublicID string, includeArchived bool, userID int64, workspaceRole string, page V1BoardCatalogPageRequest) (V1BoardCatalogPage, error)
 	GetBoard(ctx context.Context, workspacePublicID, boardPublicID string) (*V1Board, error)
 	RenameBoard(ctx context.Context, workspacePublicID, boardPublicID, name string) (*V1Board, error)
 	ArchiveBoard(ctx context.Context, workspacePublicID, boardPublicID string) (*V1Board, error)
@@ -332,6 +382,11 @@ func copyV1Board(board *V1Board) *V1Board {
 		copy(document, board.Document)
 		out.Document = document
 	}
+	if len(board.PreviewScene) > 0 {
+		scene := make(json.RawMessage, len(board.PreviewScene))
+		copy(scene, board.PreviewScene)
+		out.PreviewScene = scene
+	}
 	return &out
 }
 
@@ -364,6 +419,36 @@ func copyV1ShareToken(token *V1ShareToken) *V1ShareToken {
 	}
 	out.AuditTrail = append([]V1AuditEvent(nil), token.AuditTrail...)
 	return &out
+}
+
+// v1BoardCatalogEntryOf projects one board to its Gallery catalog card:
+// metadata plus the stored scene projection, never the full document.
+func v1BoardCatalogEntryOf(board *V1Board) *V1BoardCatalogEntry {
+	if board == nil {
+		return nil
+	}
+	out := &V1BoardCatalogEntry{
+		WorkspacePublicID: board.WorkspacePublicID,
+		PublicID:          board.PublicID,
+		Name:              board.Name,
+		Revision:          board.Revision,
+		SchemaVersion:     board.SchemaVersion,
+		ContentVersion:    board.ContentVersion,
+		OwnerUserID:       board.OwnerUserID,
+		CreatedBy:         board.CreatedBy,
+		CreatedAt:         board.CreatedAt,
+		UpdatedAt:         board.UpdatedAt,
+	}
+	if board.ArchivedAt != nil {
+		archived := *board.ArchivedAt
+		out.ArchivedAt = &archived
+	}
+	if len(board.PreviewScene) > 0 {
+		scene := make(json.RawMessage, len(board.PreviewScene))
+		copy(scene, board.PreviewScene)
+		out.PreviewScene = scene
+	}
+	return out
 }
 
 func (s *InMemoryWorkspaceBoardStore) getBoardLocked(key, boardPublicID string) (*V1Board, error) {
@@ -434,6 +519,7 @@ func (s *InMemoryWorkspaceBoardStore) CreateBoard(ctx context.Context, workspace
 	}
 	now := s.clock()
 	document := V1InitialDocument()
+	version, scene, _ := previewscene.DeriveCatalog(document)
 	board := &V1Board{
 		WorkspacePublicID: workspacePublicID,
 		PublicID:          trimmedID,
@@ -441,6 +527,8 @@ func (s *InMemoryWorkspaceBoardStore) CreateBoard(ctx context.Context, workspace
 		Revision:          1,
 		SchemaVersion:     v1InitialSchemaVerion,
 		Document:          document,
+		ContentVersion:    version,
+		PreviewScene:      scene,
 		OwnerUserID:       creatorUserID,
 		CreatedBy:         creatorUserID,
 		CreatedAt:         now,
@@ -462,27 +550,44 @@ func (s *InMemoryWorkspaceBoardStore) CreateBoard(ctx context.Context, workspace
 	return copyV1Board(board), nil
 }
 
-// ListBoards lists workspace boards ordered by updated_at desc (stable by
-// public id); archived rows are excluded unless includeArchived.
-func (s *InMemoryWorkspaceBoardStore) ListBoards(ctx context.Context, workspacePublicID string, includeArchived bool) ([]*V1Board, error) {
+// ListBoardCatalog selects authorized cards before pagination, ordered by
+// updated_at descending and public id ascending.
+func (s *InMemoryWorkspaceBoardStore) ListBoardCatalog(ctx context.Context, workspacePublicID string, includeArchived bool, userID int64, workspaceRole string, page V1BoardCatalogPageRequest) (V1BoardCatalogPage, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return V1BoardCatalogPage{}, err
+	}
+	if err := page.validate(); err != nil {
+		return V1BoardCatalogPage{}, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var out []*V1Board
+	var eligible []*V1Board
 	for _, board := range s.boards[workspacePublicID] {
 		if board.ArchivedAt != nil && !includeArchived {
 			continue
 		}
-		out = append(out, copyV1Board(board))
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].UpdatedAt.Equal(out[j].UpdatedAt) {
-			return out[i].PublicID < out[j].PublicID
+		if _, ok := s.boardRoleLocked(v1BoardKey(workspacePublicID, board.PublicID), board, userID, workspaceRole); !ok {
+			continue
 		}
-		return out[i].UpdatedAt.After(out[j].UpdatedAt)
+		eligible = append(eligible, board)
+	}
+	sort.Slice(eligible, func(i, j int) bool {
+		if eligible[i].UpdatedAt.Equal(eligible[j].UpdatedAt) {
+			return eligible[i].PublicID < eligible[j].PublicID
+		}
+		return eligible[i].UpdatedAt.After(eligible[j].UpdatedAt)
 	})
+	if len(eligible) > maxBoardCatalogRows {
+		eligible = eligible[:maxBoardCatalogRows]
+	}
+	if page.Offset > len(eligible) {
+		return V1BoardCatalogPage{}, ErrV1CatalogOffset
+	}
+	end := min(page.Offset+page.Limit, len(eligible))
+	out := V1BoardCatalogPage{Entries: make([]*V1BoardCatalogEntry, 0, end-page.Offset), HasMore: end < len(eligible)}
+	for _, board := range eligible[page.Offset:end] {
+		out.Entries = append(out.Entries, v1BoardCatalogEntryOf(board))
+	}
 	return out, nil
 }
 
@@ -586,9 +691,12 @@ func (s *InMemoryWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 	}
 	document := make(json.RawMessage, len(snapshot))
 	copy(document, snapshot)
+	version, scene, _ := previewscene.DeriveCatalog(document)
 	board.Revision++
 	board.SchemaVersion = schemaVersion
 	board.Document = document
+	board.ContentVersion = version
+	board.PreviewScene = scene
 	board.UpdatedAt = s.clock()
 	key := v1BoardKey(workspacePublicID, board.PublicID)
 	s.nextRevID++

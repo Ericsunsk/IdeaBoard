@@ -6,7 +6,6 @@ import {
   touchBoard,
   loadBoardState,
   serializeBoardState,
-  setBoardPreviewSnapshot,
   setBoardState,
   InvalidBoardStateError,
   type BoardSnapshot,
@@ -18,12 +17,6 @@ export type BoardSessionRepository = {
   load: (boardId: string) => Promise<BoardSnapshot | null>
   saveLocal: (boardId: string, snapshot: BoardSnapshot) => Promise<BoardState>
   save: (boardId: string, snapshot: BoardSnapshot) => Promise<BoardState>
-  setPreview: (
-    boardId: string,
-    previewSnapshotDataUrl: string | undefined,
-    previewSnapshotUpdatedAt: number | undefined,
-    previewSnapshotVersion: number | undefined,
-  ) => BoardState | null
   sync: (boardId: string, stateOverride?: BoardState | null) => Promise<void>
 }
 
@@ -110,7 +103,6 @@ export function createBoardSessionRepository(
     load,
     saveLocal,
     save,
-    setPreview: setBoardPreviewSnapshot,
     sync: syncBoardToServer,
   }
 }

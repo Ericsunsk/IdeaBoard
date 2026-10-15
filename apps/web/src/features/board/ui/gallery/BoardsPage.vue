@@ -122,7 +122,8 @@
             v-for="board in visibleBoards"
             :key="board.id"
             :board="board"
-            :preview-snapshot-data-url="boardPreviewMap[board.id] || ''"
+            :scene-entry="sceneMap[board.id] ?? null"
+            :workspace-id="workspaceId"
             :is-renaming="renamingBoardId === board.id"
             :rename-draft="renameDraft"
             :is-menu-open="activeMenuBoardId === board.id"
@@ -261,7 +262,8 @@ const controller = useCatalog({
 })
 const {
   visibleBoards,
-  previewMap: boardPreviewMap,
+  sceneMap,
+  workspaceId,
   isBoardsLoading,
   catalogHydrationFailed,
   searchKeyword,

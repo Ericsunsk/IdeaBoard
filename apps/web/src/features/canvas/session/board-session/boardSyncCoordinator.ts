@@ -20,7 +20,6 @@ export type SaveStatus =
 type SaveFailureKind = 'sync-failed' | 'conflict' | 'archived' | 'save-failed'
 type ValueRef<T> = { value: T }
 type SaveCurrentBoardSnapshotOptions = {
-  shouldWaitForPreview?: boolean | undefined
   isSilent?: boolean | undefined
 }
 
@@ -406,12 +405,8 @@ export function createBoardSyncCoordinator(
           promptNodes: snapshot.promptNodes.length,
           fusionNodes: snapshot.fusionNodes.length,
           connections: snapshot.connections.length,
-          shouldWaitForPreview: !!saveOptions.shouldWaitForPreview,
         }),
-        () =>
-          options.boardSession.save(snapshot, {
-            shouldWaitForPreview: saveOptions.shouldWaitForPreview,
-          }),
+        () => options.boardSession.save(snapshot),
         50,
       )
       if (remoteSync.isOk) {

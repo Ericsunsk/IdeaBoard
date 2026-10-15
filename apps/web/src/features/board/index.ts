@@ -49,15 +49,10 @@ export * from './session/sync/boardQueryKeys'
 export * from './session/sync/boardQueries'
 export * from './session/sync/boardSseInvalidation'
 export * from './session/share-join/joinSharedBoardWorkflow'
-// Stable adapters for persistence and preview boundaries.
+// Stable adapters for persistence and gallery scene boundaries.
 export * from './session/persistence/state'
 export * from './session/persistence/boardStateSerialization'
-export {
-  createBoardPreviewRefreshQueue,
-  type BoardPreviewRefreshQueue,
-} from './session/preview/boardPreviewRefreshQueue'
-export { renderBoardPreviewDataUrl } from './session/preview/boardPreviewSerializer'
-export { blankBoardPreviewSurfaceClass } from './session/preview/boardPreviewStyle'
+export { blankBoardPreviewSurfaceClass } from './ui/gallery/skin'
 // Catalog presentation composition (route-level public surface).
 export type {
   CatalogEntry,

@@ -8,7 +8,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { queryClient } from '../../../../core/query/queryClient'
 import type { BoardRepository } from '../catalog/repository'
 import type { BoardMeta } from '../catalog/boards'
-import type { BoardPreviewRefreshQueue } from '../preview/boardPreviewRefreshQueue'
 import { createGalleryController } from '../../ui/gallery/controller'
 import { makeBoardMeta as makeBoard } from '../../testing'
 import { createBoardAutosavePolicy, useBoardAutosave } from '../../../canvas/session/board-session'
@@ -38,16 +37,13 @@ function createHarness() {
     },
     dispose: vi.fn(),
   }
-  const preview: BoardPreviewRefreshQueue = {
-    previewMap: ref({}),
-    reloadFromLocal: vi.fn(),
-    schedule: vi.fn(),
-    invalidate: vi.fn(),
-    dispose: vi.fn(),
+  const scenes = {
+    sceneMap: ref({}),
+    workspaceId: ref(null),
   }
   const controller = createGalleryController({
     catalog,
-    preview,
+    scenes,
     navigation: { openBoard: vi.fn() },
     feedback: {
       createFailed: vi.fn(),

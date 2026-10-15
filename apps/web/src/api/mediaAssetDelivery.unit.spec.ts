@@ -17,6 +17,8 @@ import {
 
 const WORKSPACE_ID = 'ws_test123'
 const ASSET_ID = 'asset_uid42'
+const refreshOptions: NonNullable<Parameters<typeof getWorkspaceMediaAssetMetadata>[2]> = {}
+refreshOptions.force = true
 
 const mocks = vi.hoisted(() => ({
   request: vi.fn(),
@@ -198,6 +200,31 @@ describe('workspace mediaAssetDelivery', () => {
     await expect(second).resolves.toMatchObject({ asset_id: ASSET_ID })
   })
 
+  it('starts a fresh force transport when the previous only consumer aborts in the same turn', async () => {
+    mocks.request
+      .mockImplementationOnce(
+        (_path: string, options: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            options.signal.addEventListener(
+              'abort',
+              () => reject(new DOMException('Aborted', 'AbortError')),
+              { once: true },
+            )
+          }),
+      )
+      .mockResolvedValueOnce(assetEnvelope('ready'))
+    const controller = new AbortController()
+    const first = getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID, {
+      ...refreshOptions,
+      signal: controller.signal,
+    })
+    controller.abort()
+    const second = getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID, refreshOptions)
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(second).resolves.toMatchObject({ asset_id: ASSET_ID })
+    expect(mocks.request).toHaveBeenCalledTimes(2)
+  })
+
   it('replaces a stale read and shares concurrent force reads', async () => {
     const resolvers: Array<(envelope: unknown) => void> = []
     const deferred = () =>
@@ -206,8 +233,8 @@ describe('workspace mediaAssetDelivery', () => {
       })
     mocks.request.mockReturnValueOnce(deferred()).mockReturnValueOnce(deferred())
     const stale = getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID)
-    const fresh = getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID, { force: true })
-    const joined = getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID, { force: true })
+    const fresh = getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID, refreshOptions)
+    const joined = getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID, refreshOptions)
     expect(mocks.request).toHaveBeenCalledTimes(2)
 
     const staleSignal = mocks.request.mock.calls[0]?.[1] as { signal?: AbortSignal }

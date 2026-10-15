@@ -1,0 +1,39 @@
+{
+  "name": "empty",
+  "notes": "Empty board: no nodes, connections, or groups. Scene carries null bounds and a zero extent; the renderer draws the blank surface.",
+  "content_version": "cv-fixture-empty-01",
+  "snapshot": {
+    "schemaVersion": 4,
+    "imageNodes": [],
+    "promptNodes": [],
+    "fusionNodes": [],
+    "connections": [],
+    "groups": []
+  },
+  "scene": {
+    "version": 1,
+    "content_version": "cv-fixture-empty-01",
+    "bounds": null,
+    "extent": {
+      "width": 0,
+      "height": 0
+    },
+    "nodes": [],
+    "connections": [],
+    "groups": [],
+    "budgets": {
+      "max_nodes": null,
+      "max_connections": null,
+      "max_media_refs": null,
+      "max_scene_bytes": null
+    },
+    "omitted": {
+      "nodes": 0,
+      "connections": 0,
+      "media_refs": 0,
+      "groups": 0,
+      "group_members": 0
+    },
+    "truncated": false
+  }
+}

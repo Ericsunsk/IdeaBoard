@@ -77,9 +77,9 @@ func TestPostgresWorkspaceBoardStoreLifecycle(t *testing.T) {
 		t.Fatalf("renamed = %q rev %d, want Renamed/1", renamed.Name, renamed.Revision)
 	}
 
-	listed, err := store.ListBoards(ctx, ws.PublicID, false)
-	if err != nil || len(listed) != 1 {
-		t.Fatalf("list = %d boards err %v, want 1", len(listed), err)
+	listed, err := store.ListBoardCatalog(ctx, ws.PublicID, false, postgresStoreOwner, "owner", V1BoardCatalogPageRequest{Limit: 100})
+	if err != nil || len(listed.Entries) != 1 {
+		t.Fatalf("list = %d boards err %v, want 1", len(listed.Entries), err)
 	}
 
 	archived, err := store.ArchiveBoard(ctx, ws.PublicID, boardID)
@@ -92,13 +92,13 @@ func TestPostgresWorkspaceBoardStoreLifecycle(t *testing.T) {
 	if _, err := store.RenameBoard(ctx, ws.PublicID, boardID, "Nope"); !errors.Is(err, ErrV1Archived) {
 		t.Fatalf("rename archived err = %v, want ErrV1Archived", err)
 	}
-	visible, err := store.ListBoards(ctx, ws.PublicID, false)
-	if err != nil || len(visible) != 0 {
-		t.Fatalf("list live = %d err %v, want 0", len(visible), err)
+	visible, err := store.ListBoardCatalog(ctx, ws.PublicID, false, postgresStoreOwner, "owner", V1BoardCatalogPageRequest{Limit: 100})
+	if err != nil || len(visible.Entries) != 0 {
+		t.Fatalf("list live = %d err %v, want 0", len(visible.Entries), err)
 	}
-	all, err := store.ListBoards(ctx, ws.PublicID, true)
-	if err != nil || len(all) != 1 {
-		t.Fatalf("list all = %d err %v, want 1", len(all), err)
+	all, err := store.ListBoardCatalog(ctx, ws.PublicID, true, postgresStoreOwner, "owner", V1BoardCatalogPageRequest{Limit: 100})
+	if err != nil || len(all.Entries) != 1 {
+		t.Fatalf("list all = %d err %v, want 1", len(all.Entries), err)
 	}
 	if _, err := store.RestoreBoard(ctx, ws.PublicID, boardID); err != nil {
 		t.Fatalf("restore failed: %v", err)
@@ -332,8 +332,8 @@ func TestPostgresWorkspaceBoardStoreCrossWorkspaceInvisible(t *testing.T) {
 	} else if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("foreign role err = %v, want ErrNotFound", err)
 	}
-	if _, err := store.ListBoards(ctx, other.PublicID, true); err != nil {
-		t.Fatalf("foreign list err = %v", err)
+	if page, err := store.ListBoardCatalog(ctx, other.PublicID, true, postgresStoreOutsider, "owner", V1BoardCatalogPageRequest{Limit: 100}); err != nil || len(page.Entries) != 0 {
+		t.Fatalf("foreign catalog = %v, %v; want no entries", page, err)
 	}
 
 	tokenID, err := NewV1ShareTokenID()

@@ -139,7 +139,7 @@ Deliberately kept, not omissions:
   presentation mapping, auth shell skin (`modalUi.ts`,
   `RegisterAuthPanel.vue`), canvas chrome identity (`canvas-chrome.css`,
   pinned by `canvasSurfaceSkin.contract.spec.ts`), board thumbnail bake
-  (`boardPreviewStyle.ts`, `BoardCard.vue` preview gradients).
+  (gallery `skin.ts` empty-card surface, `BoardCard.vue` preview gradients).
 - Private resolution infrastructure: runtime role declarations in
   `src/theme/tokens/semantic.css` / `src/theme/tokens/admin.css` / `src/theme/tokens/canvas.css`,
   utility keys in `src/theme/theme.css`, and the

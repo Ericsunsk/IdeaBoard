@@ -5,8 +5,7 @@ import { makeBoardMeta as makeBoard } from '../../testing'
 describe('Boards Catalog public interface', () => {
   afterEach(() => {
     vi.doUnmock('../../session/catalog/repository')
-    vi.doUnmock('../../session/preview/boardPreviewRefreshQueue')
-    vi.doUnmock('./feedback/useFeedback')
+    vi.doUnmock('./useBoardFeedback')
     vi.resetModules()
   })
 
@@ -41,13 +40,6 @@ describe('Boards Catalog public interface', () => {
       isOk: true as const,
       isRemoteWasMissing: false,
     })
-    const preview = {
-      previewMap: ref<Record<string, string>>({}),
-      reloadFromLocal: vi.fn(),
-      schedule: vi.fn(),
-      invalidate: vi.fn(),
-      dispose: vi.fn(),
-    }
     const feedback = {
       createFailed: vi.fn(),
       renameValidationFailed: vi.fn(),
@@ -73,9 +65,6 @@ describe('Boards Catalog public interface', () => {
         dispose: vi.fn(),
       }),
     }))
-    vi.doMock('../../session/preview/boardPreviewRefreshQueue', () => ({
-      createBoardPreviewRefreshQueue: () => preview,
-    }))
     vi.doMock('./useBoardFeedback', () => ({ useBoardFeedback: () => feedback }))
 
     const { createCatalog } = await import('./useCatalog')
@@ -83,7 +72,6 @@ describe('Boards Catalog public interface', () => {
 
     await catalog.commands.initialize()
     expect(hydrate).toHaveBeenCalledOnce()
-    expect(preview.reloadFromLocal).toHaveBeenCalledWith(boards.value)
 
     catalog.commands.setSearchKeyword('original')
     expect(catalog.viewModel.visibleBoards.value.map((board) => board.id)).toEqual(['board-1'])
@@ -116,6 +104,122 @@ describe('Boards Catalog public interface', () => {
     expect(feedback.deleted).toHaveBeenCalledOnce()
 
     catalog.dispose()
-    expect(preview.dispose).toHaveBeenCalledOnce()
+  })
+})
+
+async function sceneCatalogFixture() {
+  const { parsePreviewScene } = await import('../../core/preview/scene')
+  const fixture =
+    await import('../../../../../../api/internal/boards/previewscene/testdata/mixed.json')
+  const scene = parsePreviewScene(fixture.scene)!
+  return {
+    id: 'board-1',
+    name: 'Board',
+    revision: 1,
+    schemaVersion: 4,
+    createdAt: 1,
+    updatedAt: 1,
+    contentVersion: 'cv-1',
+    previewScene: scene,
+  }
+}
+
+describe('Catalog scene reads', () => {
+  it('reacts to Query-only scene changes, preserves identities, and isolates scope', async () => {
+    const { shallowRef, nextTick } = await import('vue')
+    const { queryClient } = await import('../../../../core/query/queryClient')
+    const { seedBoardListQuery } = await import('../../session/sync/boardQueries')
+    const { primeAuthenticatedWorkspace } = await import('../../testing')
+    const { getBoardScope, boardScopeKey, isCompleteBoardScope, subscribeBoardScopeChange } =
+      await import('../../session/catalog/scope')
+    const { getWorkspaceSelectionStore } = await import('../../../workspace')
+    const { setStoredAuth } = await import('../../../../core/utils/auth')
+    const meta = await sceneCatalogFixture()
+    const scene = meta.previewScene
+    primeAuthenticatedWorkspace('ws_first')
+    const boards = shallowRef([makeBoard('board-1'), makeBoard('offline')])
+    const captured = getBoardScope()
+    const scope = ref<string | null>(
+      isCompleteBoardScope(captured) ? boardScopeKey(captured) : null,
+    )
+    const stopScope = subscribeBoardScopeChange((next) => {
+      scope.value = isCompleteBoardScope(next) ? boardScopeKey(next) : null
+    })
+    seedBoardListQuery('ws_first', [meta, { ...meta, id: 'invisible' }])
+    vi.doMock('../../session/catalog/repository', () => ({
+      useBoardRepository: () => ({
+        viewModel: { boards, scope, byId: computed(() => new Map()) },
+        commands: { hydrate: vi.fn(async () => ({ isOk: true })) },
+      }),
+    }))
+    vi.doMock('./useBoardFeedback', () => ({ useBoardFeedback: () => ({}) }))
+    const read = vi.spyOn(queryClient, 'fetchQuery')
+    const { createCatalog } = await import('./useCatalog')
+    const catalog = createCatalog({ navigation: { openBoard: vi.fn() } })
+    try {
+      expect(catalog.viewModel.workspaceId.value).toBe('ws_first')
+      const first = catalog.viewModel.sceneMap.value['board-1']
+      expect(first?.scene).toEqual(scene)
+      expect(catalog.viewModel.sceneMap.value['offline']).toEqual({
+        contentVersion: '',
+        scene: null,
+      })
+      expect(catalog.viewModel.sceneMap.value['invisible']).toBeUndefined()
+      seedBoardListQuery('ws_first', [{ ...meta, updatedAt: 2, previewScene: { ...scene } }])
+      await nextTick()
+      expect(catalog.viewModel.sceneMap.value['board-1']).toBe(first)
+      seedBoardListQuery('ws_first', [
+        { ...meta, contentVersion: 'cv-2', previewScene: { ...scene, contentVersion: 'cv-2' } },
+      ])
+      await nextTick()
+      expect(catalog.viewModel.sceneMap.value['board-1']?.contentVersion).toBe('cv-2')
+      expect(catalog.viewModel.sceneMap.value['board-1']).not.toBe(first)
+      seedBoardListQuery('ws_first', [{ ...meta, contentVersion: 'cv-2', previewScene: null }])
+      await nextTick()
+      expect(catalog.viewModel.sceneMap.value['board-1']?.scene).toBeNull()
+      seedBoardListQuery('ws_first', [
+        { ...meta, contentVersion: 'cv-2', previewScene: { ...scene, contentVersion: 'cv-2' } },
+      ])
+      await nextTick()
+      expect(catalog.viewModel.sceneMap.value['board-1']?.scene).not.toBeNull()
+      expect(boards.value).toHaveLength(2)
+      expect(read).not.toHaveBeenCalled()
+      getWorkspaceSelectionStore().select('ws_second')
+      expect(catalog.viewModel.workspaceId.value).toBe('ws_second')
+      expect(catalog.viewModel.sceneMap.value['board-1']?.scene).toBeNull()
+      seedBoardListQuery('ws_first', [{ ...meta, contentVersion: 'late' }])
+      await nextTick()
+      expect(catalog.viewModel.sceneMap.value['board-1']?.scene).toBeNull()
+      seedBoardListQuery('ws_second', [meta])
+      await nextTick()
+      expect(catalog.viewModel.sceneMap.value['board-1']).not.toBe(first)
+      expect(catalog.viewModel.sceneMap.value['board-1']?.scene).toEqual(scene)
+      const second = catalog.viewModel.sceneMap.value['board-1']
+      setStoredAuth({
+        public_id: '00000000-0000-0000-0000-000000000002',
+        display_name: 'other',
+        avatar: '',
+        role: 'user',
+      })
+      expect(catalog.viewModel.sceneMap.value['board-1']).not.toBe(second)
+      expect(catalog.viewModel.sceneMap.value['board-1']?.scene).toEqual(scene)
+      getWorkspaceSelectionStore().clear()
+      expect(catalog.viewModel.workspaceId.value).toBeNull()
+      expect(catalog.viewModel.sceneMap.value).toEqual({})
+    } finally {
+      catalog.dispose()
+      expect(
+        queryClient
+          .getQueryCache()
+          .find({ queryKey: ['boards', 'ws_second', 'list'] })
+          ?.getObserversCount(),
+      ).toBe(0)
+      stopScope()
+      queryClient.clear()
+      read.mockRestore()
+      vi.doUnmock('../../session/catalog/repository')
+      vi.doUnmock('./useBoardFeedback')
+      vi.resetModules()
+    }
   })
 })

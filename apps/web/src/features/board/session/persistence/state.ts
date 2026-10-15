@@ -1,11 +1,12 @@
 import { InvalidBoardStateError } from '../../core/document/latestBoardState'
 import {
   BOARD_STATE_SCHEMA_VERSION,
+  stripLegacyBoardPreviewFields,
   type BoardSnapshot,
   type BoardState,
 } from '../../core/document/nodes'
 import { readLocalStorageItem, writeLocalStorageItem } from '../../../../core/utils/storage'
-import { normalizeBoardState, serializeBoardState } from './boardStateSerialization'
+import { normalizeBoardState } from './boardStateSerialization'
 import { scopedBoardStorageKey } from '../catalog/scope'
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boardStates.v2'
@@ -25,24 +26,19 @@ function toValidBoardState(
   boundary: string,
   options: { throwOnInvalid?: boolean; boardId?: string } = {},
 ): BoardState | null {
-  const result = normalizeBoardState(item, { mode: 'result', boundary })
+  // One-way cleanup: drafts persisted by old clients still carry the retired
+  // preview cache. Strip it before strict validation so content survives;
+  // the cache itself is never read back (see `stripLegacyBoardPreviewFields`).
+  const result = normalizeBoardState(stripLegacyBoardPreviewFields(item), {
+    mode: 'result',
+    boundary,
+  })
   if (result.isOk) return result.value
   console.warn('[canvas] invalid board state rejected', options.boardId, result.error)
   if (options.throwOnInvalid) {
     throw new InvalidBoardStateError(result.error)
   }
   return null
-}
-
-function stripPreviewSnapshotsFromStateMap(
-  stateMap: Record<string, BoardState>,
-): Record<string, BoardState> {
-  return Object.fromEntries(
-    Object.entries(stateMap).map(([boardId, state]) => [
-      boardId,
-      serializeBoardState(state, 'local-preview-fallback'),
-    ]),
-  )
 }
 
 function readRawStateMap(
@@ -93,14 +89,6 @@ function writeRawStateMap(stateMap: Record<string, BoardState>): boolean {
   return tryWriteRawStateMap(stateMap)
 }
 
-function writeRawStateMapWithPreviewFallback(
-  stateMap: Record<string, BoardState>,
-): Record<string, BoardState> | null {
-  if (tryWriteRawStateMap(stateMap)) return stateMap
-  const compactStateMap = stripPreviewSnapshotsFromStateMap(stateMap)
-  return tryWriteRawStateMap(compactStateMap) ? compactStateMap : null
-}
-
 export function replaceBoardStateMap(stateMap: Record<string, BoardState>) {
   const normalized: Record<string, BoardState> = {}
   Object.entries(stateMap).forEach(([boardId, state]) => {
@@ -144,14 +132,10 @@ export function setBoardState(boardId: string, state: BoardSnapshot): BoardState
   const id = normalizeBoardId(boardId)
   if (!id) return null
   const stateMap = readRawStateMap()
-  const existing = stateMap[id]
   const validState = toValidBoardState(
     {
       ...state,
       schemaVersion: BOARD_STATE_SCHEMA_VERSION,
-      previewSnapshotDataUrl: existing?.previewSnapshotDataUrl,
-      previewSnapshotUpdatedAt: existing?.previewSnapshotUpdatedAt,
-      previewSnapshotVersion: existing?.previewSnapshotVersion,
       updatedAt: Date.now(),
     },
     'board-save',
@@ -159,35 +143,10 @@ export function setBoardState(boardId: string, state: BoardSnapshot): BoardState
   )
   if (!validState) return null
   stateMap[id] = validState
-  const persistedStateMap = writeRawStateMapWithPreviewFallback(stateMap)
-  return persistedStateMap?.[id] ?? serializeBoardState(validState, 'local-preview-fallback')
-}
-
-export function setBoardPreviewSnapshot(
-  boardId: string,
-  previewSnapshotDataUrl: string | undefined,
-  previewSnapshotUpdatedAt: number | undefined,
-  previewSnapshotVersion: number | undefined,
-): BoardState | null {
-  const id = normalizeBoardId(boardId)
-  if (!id) return null
-  const stateMap = readRawStateMap()
-  const existing = stateMap[id]
-  if (!existing) return null
-  const validState = toValidBoardState(
-    {
-      ...existing,
-      previewSnapshotDataUrl,
-      previewSnapshotUpdatedAt,
-      previewSnapshotVersion,
-      updatedAt: existing.updatedAt,
-    },
-    'preview-refresh',
-    { boardId: id },
-  )
-  if (!validState) return null
-  stateMap[id] = validState
-  writeRawStateMap(stateMap)
+  // Gallery previews no longer ride the document: without the retired base64
+  // cache, a quota failure has nothing left to shed, so it fails closed and
+  // the caller surfaces the write error instead of persisting silently.
+  if (!writeRawStateMap(stateMap)) return null
   return validState
 }
 

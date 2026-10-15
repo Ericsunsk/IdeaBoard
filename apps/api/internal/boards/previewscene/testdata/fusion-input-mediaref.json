@@ -1,0 +1,95 @@
+{
+  "name": "fusion-input-mediaref",
+  "content_version": "cv-fixture-fusion-input-mediaref",
+  "snapshot": {
+    "schemaVersion": 4,
+    "imageNodes": [],
+    "promptNodes": [],
+    "fusionNodes": [
+      {
+        "id": 1,
+        "type": "fusion",
+        "x": 0,
+        "y": 0,
+        "width": 286,
+        "blendPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "inputImages": [
+          {
+            "id": "in-a",
+            "sourceType": "external",
+            "sourceId": "ext-a",
+            "url": "https://cdn.example.com/input.jpg",
+            "ratio": 1,
+            "mediaRef": {
+              "assetId": "asset_fusion_input",
+              "derivativeTier": "thumb"
+            }
+          }
+        ],
+        "outputImages": [],
+        "outputStatus": "idle"
+      }
+    ],
+    "connections": [],
+    "groups": []
+  },
+  "scene": {
+    "version": 1,
+    "content_version": "cv-fixture-fusion-input-mediaref",
+    "bounds": {
+      "min_x": 0,
+      "min_y": 0,
+      "max_x": 286,
+      "max_y": 286,
+      "width": 286,
+      "height": 286
+    },
+    "extent": {
+      "width": 1,
+      "height": 1
+    },
+    "nodes": [
+      {
+        "id": "fusion-1",
+        "kind": "fusion",
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "aspect": 1,
+        "media": [
+          {
+            "asset": "asset_fusion_input",
+            "asset_numeric": null,
+            "tier": "thumb",
+            "role": "input",
+            "index": 0
+          }
+        ],
+        "blend": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      }
+    ],
+    "connections": [],
+    "groups": [],
+    "budgets": {
+      "max_nodes": null,
+      "max_connections": null,
+      "max_media_refs": null,
+      "max_scene_bytes": null
+    },
+    "omitted": {
+      "nodes": 0,
+      "connections": 0,
+      "media_refs": 0,
+      "groups": 0,
+      "group_members": 0
+    },
+    "truncated": false
+  }
+}

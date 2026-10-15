@@ -283,7 +283,8 @@ func (q *Queries) GetBoardShareTokenBySecret(ctx context.Context, arg GetBoardSh
 const getWorkspaceBoard = `-- name: GetWorkspaceBoard :one
 SELECT b.internal_id, b.public_id, w.public_id AS workspace_public_id,
   b.owner_user_id, b.title, b.created_at, b.updated_at, b.archived_at,
-  d.document_version, (d.snapshot_data ->> 'schema_version')::INT AS schema_version, d.snapshot_data
+  d.document_version, d.schema_version, d.snapshot_data,
+  d.content_version, d.preview_scene
 FROM boards AS b
 INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
 INNER JOIN board_documents AS d ON d.board_id = b.internal_id
@@ -308,6 +309,8 @@ type GetWorkspaceBoardRow struct {
 	DocumentVersion   int32              `json:"document_version"`
 	SchemaVersion     int32              `json:"schema_version"`
 	SnapshotData      []byte             `json:"snapshot_data"`
+	ContentVersion    pgtype.Text        `json:"content_version"`
+	PreviewScene      []byte             `json:"preview_scene"`
 }
 
 func (q *Queries) GetWorkspaceBoard(ctx context.Context, arg GetWorkspaceBoardParams) (GetWorkspaceBoardRow, error) {
@@ -325,6 +328,8 @@ func (q *Queries) GetWorkspaceBoard(ctx context.Context, arg GetWorkspaceBoardPa
 		&i.DocumentVersion,
 		&i.SchemaVersion,
 		&i.SnapshotData,
+		&i.ContentVersion,
+		&i.PreviewScene,
 	)
 	return i, err
 }
@@ -363,15 +368,18 @@ func (q *Queries) IncrementBoardShareTokenUsage(ctx context.Context, internalID 
 }
 
 const insertBoardDocument = `-- name: InsertBoardDocument :exec
-INSERT INTO board_documents (board_id, document_version, snapshot_data, etag)
-VALUES ($1, $2, $3, $4)
+INSERT INTO board_documents (board_id, document_version, snapshot_data, schema_version, etag, content_version, preview_scene)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
 type InsertBoardDocumentParams struct {
-	BoardID         int64  `json:"board_id"`
-	DocumentVersion int32  `json:"document_version"`
-	SnapshotData    []byte `json:"snapshot_data"`
-	Etag            string `json:"etag"`
+	BoardID         int64       `json:"board_id"`
+	DocumentVersion int32       `json:"document_version"`
+	SnapshotData    []byte      `json:"snapshot_data"`
+	SchemaVersion   int32       `json:"schema_version"`
+	Etag            string      `json:"etag"`
+	ContentVersion  pgtype.Text `json:"content_version"`
+	PreviewScene    []byte      `json:"preview_scene"`
 }
 
 func (q *Queries) InsertBoardDocument(ctx context.Context, arg InsertBoardDocumentParams) error {
@@ -379,7 +387,10 @@ func (q *Queries) InsertBoardDocument(ctx context.Context, arg InsertBoardDocume
 		arg.BoardID,
 		arg.DocumentVersion,
 		arg.SnapshotData,
+		arg.SchemaVersion,
 		arg.Etag,
+		arg.ContentVersion,
+		arg.PreviewScene,
 	)
 	return err
 }
@@ -609,6 +620,112 @@ func (q *Queries) ListBoardShareTokens(ctx context.Context, arg ListBoardShareTo
 	return items, nil
 }
 
+const listWorkspaceBoardCatalog = `-- name: ListWorkspaceBoardCatalog :many
+WITH authorized AS MATERIALIZED (
+  SELECT b.internal_id, b.updated_at, b.public_id
+  FROM boards AS b
+  INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+  INNER JOIN board_documents AS d ON d.board_id = b.internal_id
+  LEFT JOIN board_memberships AS m ON m.board_id = b.internal_id AND m.user_id = $1
+  WHERE w.public_id = $2
+    AND (b.archived_at IS NULL OR $3)
+    AND b.owner_user_id IS NOT NULL
+    AND (
+      b.owner_user_id = $1
+      OR (m.user_id IS NOT NULL AND btrim(m.role) IN ('owner', 'editor', 'viewer'))
+      OR (m.user_id IS NULL AND $4::text IN ('owner', 'admin', 'member'))
+    )
+  ORDER BY b.updated_at DESC, b.public_id ASC
+  LIMIT $5
+), page AS (
+  SELECT internal_id FROM authorized
+  ORDER BY updated_at DESC, public_id ASC
+  LIMIT $7 OFFSET $6
+), total AS (
+  SELECT count(*) AS total_count FROM authorized
+)
+SELECT total.total_count,
+  b.internal_id, b.public_id, w.public_id AS workspace_public_id,
+  b.owner_user_id, b.title, b.created_at, b.updated_at, b.archived_at,
+  d.document_version, d.schema_version, d.content_version, d.preview_scene
+FROM total
+LEFT JOIN page ON true
+LEFT JOIN boards AS b ON b.internal_id = page.internal_id
+LEFT JOIN workspaces AS w ON w.internal_id = b.workspace_id
+LEFT JOIN board_documents AS d ON d.board_id = b.internal_id
+ORDER BY b.updated_at DESC, b.public_id ASC
+`
+
+type ListWorkspaceBoardCatalogParams struct {
+	UserID            int64       `json:"user_id"`
+	WorkspacePublicID string      `json:"workspace_public_id"`
+	IncludeArchived   interface{} `json:"include_archived"`
+	WorkspaceRole     string      `json:"workspace_role"`
+	CatalogLimit      int32       `json:"catalog_limit"`
+	RowOffset         int32       `json:"row_offset"`
+	RowLimit          int32       `json:"row_limit"`
+}
+
+type ListWorkspaceBoardCatalogRow struct {
+	TotalCount        int64              `json:"total_count"`
+	InternalID        pgtype.Int8        `json:"internal_id"`
+	PublicID          pgtype.Text        `json:"public_id"`
+	WorkspacePublicID pgtype.Text        `json:"workspace_public_id"`
+	OwnerUserID       pgtype.Int8        `json:"owner_user_id"`
+	Title             pgtype.Text        `json:"title"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
+	DocumentVersion   pgtype.Int4        `json:"document_version"`
+	SchemaVersion     pgtype.Int4        `json:"schema_version"`
+	ContentVersion    pgtype.Text        `json:"content_version"`
+	PreviewScene      []byte             `json:"preview_scene"`
+}
+
+// Limit authorized identifiers before joining scene bodies. The count row
+// preserves offset validation even when the requested page is empty.
+func (q *Queries) ListWorkspaceBoardCatalog(ctx context.Context, arg ListWorkspaceBoardCatalogParams) ([]ListWorkspaceBoardCatalogRow, error) {
+	rows, err := q.db.Query(ctx, listWorkspaceBoardCatalog,
+		arg.UserID,
+		arg.WorkspacePublicID,
+		arg.IncludeArchived,
+		arg.WorkspaceRole,
+		arg.CatalogLimit,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListWorkspaceBoardCatalogRow
+	for rows.Next() {
+		var i ListWorkspaceBoardCatalogRow
+		if err := rows.Scan(
+			&i.TotalCount,
+			&i.InternalID,
+			&i.PublicID,
+			&i.WorkspacePublicID,
+			&i.OwnerUserID,
+			&i.Title,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ArchivedAt,
+			&i.DocumentVersion,
+			&i.SchemaVersion,
+			&i.ContentVersion,
+			&i.PreviewScene,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWorkspaceBoardMemberships = `-- name: ListWorkspaceBoardMemberships :many
 SELECT m.user_id, m.role, m.created_at
 FROM board_memberships AS m
@@ -643,71 +760,6 @@ func (q *Queries) ListWorkspaceBoardMemberships(ctx context.Context, arg ListWor
 	for rows.Next() {
 		var i ListWorkspaceBoardMembershipsRow
 		if err := rows.Scan(&i.UserID, &i.Role, &i.CreatedAt); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listWorkspaceBoards = `-- name: ListWorkspaceBoards :many
-SELECT b.internal_id, b.public_id, w.public_id AS workspace_public_id,
-  b.owner_user_id, b.title, b.created_at, b.updated_at, b.archived_at,
-  d.document_version, (d.snapshot_data ->> 'schema_version')::INT AS schema_version, d.snapshot_data
-FROM boards AS b
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-INNER JOIN board_documents AS d ON d.board_id = b.internal_id
-WHERE w.public_id = $1
-  AND (b.archived_at IS NULL OR $2)
-ORDER BY b.updated_at DESC, b.public_id ASC
-LIMIT $3
-`
-
-type ListWorkspaceBoardsParams struct {
-	WorkspacePublicID string      `json:"workspace_public_id"`
-	IncludeArchived   interface{} `json:"include_archived"`
-	RowLimit          int32       `json:"row_limit"`
-}
-
-type ListWorkspaceBoardsRow struct {
-	InternalID        int64              `json:"internal_id"`
-	PublicID          string             `json:"public_id"`
-	WorkspacePublicID string             `json:"workspace_public_id"`
-	OwnerUserID       pgtype.Int8        `json:"owner_user_id"`
-	Title             string             `json:"title"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
-	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
-	DocumentVersion   int32              `json:"document_version"`
-	SchemaVersion     int32              `json:"schema_version"`
-	SnapshotData      []byte             `json:"snapshot_data"`
-}
-
-func (q *Queries) ListWorkspaceBoards(ctx context.Context, arg ListWorkspaceBoardsParams) ([]ListWorkspaceBoardsRow, error) {
-	rows, err := q.db.Query(ctx, listWorkspaceBoards, arg.WorkspacePublicID, arg.IncludeArchived, arg.RowLimit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListWorkspaceBoardsRow
-	for rows.Next() {
-		var i ListWorkspaceBoardsRow
-		if err := rows.Scan(
-			&i.InternalID,
-			&i.PublicID,
-			&i.WorkspacePublicID,
-			&i.OwnerUserID,
-			&i.Title,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.ArchivedAt,
-			&i.DocumentVersion,
-			&i.SchemaVersion,
-			&i.SnapshotData,
-		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -825,6 +877,43 @@ func (q *Queries) RevokeBoardShareToken(ctx context.Context, arg RevokeBoardShar
 	return result.RowsAffected(), nil
 }
 
+const scanBoardDocumentsMissingPreview = `-- name: ScanBoardDocumentsMissingPreview :many
+SELECT d.board_id, d.snapshot_data
+FROM board_documents AS d
+WHERE d.content_version IS NULL
+ORDER BY d.board_id ASC
+LIMIT $1
+`
+
+type ScanBoardDocumentsMissingPreviewRow struct {
+	BoardID      int64  `json:"board_id"`
+	SnapshotData []byte `json:"snapshot_data"`
+}
+
+// Operator backfill sweep (backfill-board-previews): internal-id ordered
+// pages of rows whose content identity was never assigned. Internal-id
+// keyed like TouchWorkspaceBoard/InsertBoardDocument: ids come from the
+// scan itself, never from caller input (see the scope-check allowlist).
+func (q *Queries) ScanBoardDocumentsMissingPreview(ctx context.Context, rowLimit int32) ([]ScanBoardDocumentsMissingPreviewRow, error) {
+	rows, err := q.db.Query(ctx, scanBoardDocumentsMissingPreview, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ScanBoardDocumentsMissingPreviewRow
+	for rows.Next() {
+		var i ScanBoardDocumentsMissingPreviewRow
+		if err := rows.Scan(&i.BoardID, &i.SnapshotData); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const touchWorkspaceBoard = `-- name: TouchWorkspaceBoard :exec
 UPDATE boards SET updated_at = now() WHERE internal_id = $1
 `
@@ -836,26 +925,57 @@ func (q *Queries) TouchWorkspaceBoard(ctx context.Context, internalID int64) err
 
 const updateBoardDocument = `-- name: UpdateBoardDocument :execrows
 UPDATE board_documents
-SET document_version = $1, snapshot_data = $2, etag = $3, updated_at = now()
-WHERE board_id = $4 AND document_version = $5
+SET document_version = $1, snapshot_data = $2, schema_version = $3, etag = $4,
+  content_version = $5, preview_scene = $6, updated_at = now()
+WHERE board_id = $7 AND document_version = $8
 `
 
 type UpdateBoardDocumentParams struct {
-	DocumentVersion int32  `json:"document_version"`
-	SnapshotData    []byte `json:"snapshot_data"`
-	Etag            string `json:"etag"`
-	BoardID         int64  `json:"board_id"`
-	ExpectedVersion int32  `json:"expected_version"`
+	DocumentVersion int32       `json:"document_version"`
+	SnapshotData    []byte      `json:"snapshot_data"`
+	SchemaVersion   int32       `json:"schema_version"`
+	Etag            string      `json:"etag"`
+	ContentVersion  pgtype.Text `json:"content_version"`
+	PreviewScene    []byte      `json:"preview_scene"`
+	BoardID         int64       `json:"board_id"`
+	ExpectedVersion int32       `json:"expected_version"`
 }
 
 func (q *Queries) UpdateBoardDocument(ctx context.Context, arg UpdateBoardDocumentParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateBoardDocument,
 		arg.DocumentVersion,
 		arg.SnapshotData,
+		arg.SchemaVersion,
 		arg.Etag,
+		arg.ContentVersion,
+		arg.PreviewScene,
 		arg.BoardID,
 		arg.ExpectedVersion,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateBoardDocumentPreview = `-- name: UpdateBoardDocumentPreview :execrows
+UPDATE board_documents
+SET content_version = $1, preview_scene = $2
+WHERE board_id = $3 AND content_version IS NULL
+`
+
+type UpdateBoardDocumentPreviewParams struct {
+	ContentVersion pgtype.Text `json:"content_version"`
+	PreviewScene   []byte      `json:"preview_scene"`
+	BoardID        int64       `json:"board_id"`
+}
+
+// Operator backfill write: assigns the content identity (and the scene
+// when the stored document is extractable) without touching the document
+// version, the snapshot bytes, or board ordering. Internal-id keyed like
+// UpdateBoardDocument.
+func (q *Queries) UpdateBoardDocumentPreview(ctx context.Context, arg UpdateBoardDocumentPreviewParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateBoardDocumentPreview, arg.ContentVersion, arg.PreviewScene, arg.BoardID)
 	if err != nil {
 		return 0, err
 	}

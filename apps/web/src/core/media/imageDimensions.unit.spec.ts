@@ -48,6 +48,30 @@ describe('readImageNaturalSize', () => {
     await expect(readImageNaturalSize('https://example.com/missing.png')).resolves.toBeNull()
   })
 
+  it('cancels one joined consumer without cancelling another image load', async () => {
+    class PendingImage extends LoadedImage {
+      override set src(_value: string) {}
+    }
+    const image = new PendingImage()
+    vi.stubGlobal(
+      'Image',
+      vi.fn(function () {
+        return image
+      }),
+    )
+    const firstController = new AbortController()
+    const first = readImageNaturalSize(
+      'https://example.com/shared.png',
+      1_800,
+      firstController.signal,
+    )
+    const second = readImageNaturalSize('https://example.com/shared.png')
+    firstController.abort()
+    await expect(first).resolves.toBeNull()
+    image.onload?.()
+    await expect(second).resolves.toEqual({ width: 800, height: 600 })
+  })
+
   it('caches successful probes per URL', async () => {
     vi.stubGlobal('Image', LoadedImage)
     const first = await readImageNaturalSize('https://example.com/photo.png')

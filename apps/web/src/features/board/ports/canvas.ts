@@ -94,15 +94,9 @@ export {
 } from '../core/document/promptAspectRatio'
 export { rebuildBoardMediaRefs } from '../core/media/references'
 
-// Local persistence and preview adapters.
-export {
-  loadBoardState,
-  setBoardPreviewSnapshot,
-  setBoardState,
-} from '../session/persistence/state'
+// Local persistence and document adapters.
+export { loadBoardState, setBoardState } from '../session/persistence/state'
 export { serializeBoardState } from '../session/persistence/boardStateSerialization'
-export { BOARD_PREVIEW_RENDERER_VERSION } from '../session/preview/boardPreviewVersion'
-export { renderBoardPreviewDataUrl } from '../session/preview/boardPreviewSerializer'
 
 // Catalog and revision-gated sync use cases.
 export { getBoardById, normalizeBoardName, touchBoard } from '../session/catalog/boards'

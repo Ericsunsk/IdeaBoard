@@ -11,6 +11,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BoardId } from './boardId'
+import type { BoardPreviewScene } from './boardPreviewScene'
 import type { WorkspaceId } from './workspaceId'
 
 export interface Board {
@@ -28,6 +29,18 @@ export interface Board {
   revision: number
   /** @minimum 1 */
   schema_version: number
+  /**
+   * Opaque identity of the accepted persisted content (hex SHA-256 of the canonical document, assigned in the accepting transaction). Metadata renames and archive transitions never change it. Null when a content identity has not been assigned.
+   * @minLength 8
+   * @maxLength 128
+   * @nullable
+   */
+  content_version?: string | null
+  /**
+   * Stored versioned Board Preview Scene projection (contract: apps/api/internal/boards/previewscene/contract.md). Gallery catalog cards carry it without a document fetch; null when the document schema is not extractable or the stored projection is absent.
+   * @nullable
+   */
+  preview_scene?: BoardPreviewScene
   /**
    * RFC3339 UTC timestamp; null unless archived.
    * @nullable

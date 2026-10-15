@@ -1,0 +1,99 @@
+{
+  "name": "image-input-output",
+  "notes": "Single image node at negative coords. Latest output (ratio 1.5) wins over the source for geometry; both media identities are projected. Runtime URLs in the snapshot must not appear in the scene.",
+  "content_version": "cv-fixture-image-01",
+  "snapshot": {
+    "schemaVersion": 4,
+    "imageNodes": [
+      {
+        "id": 1,
+        "type": "image-node",
+        "x": -40,
+        "y": -20,
+        "width": 280,
+        "sourceImageUrl": "https://cdn.example.com/src.jpg",
+        "sourceMediaRef": {
+          "assetId": "asset_src_1",
+          "derivativeTier": "preview"
+        },
+        "sourceMediaAssetId": 101,
+        "sourceImageRatio": 2,
+        "outputStatus": "ready",
+        "outputImages": [
+          {
+            "url": "https://cdn.example.com/out.jpg",
+            "ratio": 1.5,
+            "mediaRef": {
+              "assetId": "asset_out_9",
+              "derivativeTier": "large-preview"
+            },
+            "mediaAssetId": 109
+          }
+        ]
+      }
+    ],
+    "promptNodes": [],
+    "fusionNodes": [],
+    "connections": [],
+    "groups": []
+  },
+  "scene": {
+    "version": 1,
+    "content_version": "cv-fixture-image-01",
+    "bounds": {
+      "min_x": -40,
+      "min_y": -20,
+      "max_x": 240,
+      "max_y": 400,
+      "width": 280,
+      "height": 420
+    },
+    "extent": {
+      "width": 0.6666666666666667,
+      "height": 1
+    },
+    "nodes": [
+      {
+        "id": "image-1",
+        "kind": "image",
+        "x": 0,
+        "y": 0,
+        "width": 0.6666666666666667,
+        "height": 1,
+        "aspect": 0.6666666666666666,
+        "media": [
+          {
+            "asset": "asset_src_1",
+            "asset_numeric": 101,
+            "tier": "preview",
+            "role": "source",
+            "index": 0
+          },
+          {
+            "asset": "asset_out_9",
+            "asset_numeric": 109,
+            "tier": "large-preview",
+            "role": "output",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "connections": [],
+    "groups": [],
+    "budgets": {
+      "max_nodes": null,
+      "max_connections": null,
+      "max_media_refs": null,
+      "max_scene_bytes": null
+    },
+    "omitted": {
+      "nodes": 0,
+      "connections": 0,
+      "media_refs": 0,
+      "groups": 0,
+      "group_members": 0
+    },
+    "truncated": false
+  }
+}

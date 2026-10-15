@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createBoardRepository, type BoardRepository } from '../../session/catalog/repository'
 import { makeBoardMeta as makeBoard } from '../../testing'
 import type { BoardMeta } from '../../session/catalog/boards'
-import type { BoardPreviewRefreshQueue } from '../../session/preview/boardPreviewRefreshQueue'
 import type { CatalogNavigation } from './contract'
 import type { BoardFeedback } from './useBoardFeedback'
 import { createGalleryController } from './controller'
@@ -40,12 +39,9 @@ function createHarness(
     },
     dispose: vi.fn(),
   }
-  const preview: BoardPreviewRefreshQueue = {
-    previewMap: ref({}),
-    reloadFromLocal: vi.fn(),
-    schedule: vi.fn(),
-    invalidate: vi.fn(),
-    dispose: vi.fn(),
+  const scenes = {
+    sceneMap: ref({}),
+    workspaceId: ref(null),
   }
   const navigation: CatalogNavigation = {
     openBoard: vi.fn(),
@@ -65,14 +61,14 @@ function createHarness(
   const warn = vi.fn()
   const controller = createGalleryController({
     catalog: repository ?? catalog,
-    preview,
+    scenes,
     navigation,
     feedback,
     warn,
   })
   disposeControllers.push(controller.dispose)
 
-  return { boards, scope, catalog, preview, navigation, feedback, warn, controller }
+  return { boards, scope, catalog, scenes, navigation, feedback, warn, controller }
 }
 
 describe('createGalleryController', () => {
@@ -200,15 +196,13 @@ describe('createGalleryController', () => {
     expect(harness.feedback.deleted).toHaveBeenCalledOnce()
   })
 
-  it('owns loading, filtering, sorting, and the preview queue lifecycle', async () => {
+  it('owns loading, filtering, and sorting', async () => {
     const harness = createHarness([
       makeBoard('older', 'Alpha', 10),
       makeBoard('newer', 'Beta Canvas', 20),
     ])
 
     await nextTick()
-    expect(harness.preview.reloadFromLocal).toHaveBeenLastCalledWith(harness.boards.value)
-    expect(harness.preview.schedule).toHaveBeenLastCalledWith(harness.boards.value)
     expect(harness.controller.viewModel.visibleBoards.value.map((board) => board.id)).toEqual([
       'newer',
       'older',
@@ -241,13 +235,6 @@ describe('createGalleryController', () => {
     await harness.controller.commands.reloadCatalog()
     expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(false)
     expect(harness.feedback.catalogReloaded).toHaveBeenCalledOnce()
-
-    harness.controller.dispose()
-    expect(harness.preview.dispose).toHaveBeenCalledOnce()
-    vi.mocked(harness.preview.schedule).mockClear()
-    harness.boards.value = [makeBoard('after-dispose')]
-    await nextTick()
-    expect(harness.preview.schedule).not.toHaveBeenCalled()
   })
 
   it('keeps create and duplicate failure feedback behind catalog command results', async () => {
@@ -306,20 +293,15 @@ describe('createGalleryController', () => {
     expect(harness.controller.viewModel.catalogRecoveryBoardId.value).toBeNull()
     expect(harness.controller.viewModel.deleteDialogVisible.value).toBe(false)
     expect(harness.controller.viewModel.pendingDeleteBoard.value).toBeNull()
-    expect(harness.preview.invalidate).toHaveBeenCalledOnce()
   })
 
-  it('notifies preview of theme changes when theme dependency is provided', async () => {
-    const isDark = ref(false)
+  it('exposes scene state without any theme-driven reprojection', async () => {
     const boards = ref([makeBoard('board-1')])
-    const handleThemeChange = vi.fn()
-    const preview: BoardPreviewRefreshQueue = {
-      previewMap: ref({}),
-      reloadFromLocal: vi.fn(),
-      schedule: vi.fn(),
-      handleThemeChange,
-      invalidate: vi.fn(),
-      dispose: vi.fn(),
+    const sceneMap = ref({ 'board-1': { contentVersion: 'cv-1', scene: null } })
+    const workspaceId = ref<string | null>('ws_1')
+    const scenes = {
+      sceneMap,
+      workspaceId,
     }
     const catalog: BoardRepository = {
       viewModel: {
@@ -337,9 +319,11 @@ describe('createGalleryController', () => {
       dispose: vi.fn(),
     }
 
+    // Theme switches only re-map tokens in CSS: the controller takes no theme
+    // input and never re-indexes scenes for it.
     const controller = createGalleryController({
       catalog,
-      preview,
+      scenes,
       navigation: { openBoard: vi.fn() },
       feedback: {
         createFailed: vi.fn(),
@@ -353,17 +337,11 @@ describe('createGalleryController', () => {
         catalogSyncFailed: vi.fn(),
         catalogReloaded: vi.fn(),
       },
-      theme: { isDark },
       warn: vi.fn(),
     })
 
-    expect(handleThemeChange).not.toHaveBeenCalled()
-    isDark.value = true
-    await nextTick()
-
-    expect(handleThemeChange).toHaveBeenCalledWith(true, [
-      expect.objectContaining({ id: 'board-1' }),
-    ])
+    expect(controller.viewModel.sceneMap.value).toEqual(sceneMap.value)
+    expect(controller.viewModel.workspaceId.value).toBe('ws_1')
 
     controller.dispose()
   })

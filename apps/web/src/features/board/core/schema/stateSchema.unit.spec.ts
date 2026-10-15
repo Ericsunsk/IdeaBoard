@@ -70,13 +70,12 @@ describe('boardStateSchema', () => {
             inputImages: [],
           },
         ],
-        previewSnapshotVersion: 2,
       }),
     )
     expect(parsed.success).toBe(true)
     if (parsed.success) {
       expect(parsed.output.promptNodes[0]?.title).toBe('Custom Prompt')
-      expect(parsed.output.previewSnapshotVersion).toBe(2)
+      expect(parsed.output).not.toHaveProperty('previewSnapshotDataUrl')
     }
   })
 

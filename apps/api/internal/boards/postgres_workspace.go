@@ -53,11 +53,13 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/boards/previewscene"
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -127,7 +129,7 @@ func mapPostgresBoardRow(row dbsqlc.GetWorkspaceBoardRow) (*V1Board, error) {
 	}
 	document := make(json.RawMessage, len(row.SnapshotData))
 	copy(document, row.SnapshotData)
-	return &V1Board{
+	board := &V1Board{
 		WorkspacePublicID: row.WorkspacePublicID,
 		PublicID:          row.PublicID,
 		Name:              row.Title,
@@ -139,7 +141,53 @@ func mapPostgresBoardRow(row dbsqlc.GetWorkspaceBoardRow) (*V1Board, error) {
 		CreatedBy:         row.OwnerUserID.Int64,
 		CreatedAt:         dbutil.TimeValue(row.CreatedAt),
 		UpdatedAt:         dbutil.TimeValue(row.UpdatedAt),
-	}, nil
+	}
+	if row.ContentVersion.Valid {
+		board.ContentVersion = row.ContentVersion.String
+	}
+	if len(row.PreviewScene) > 0 {
+		scene := make(json.RawMessage, len(row.PreviewScene))
+		copy(scene, row.PreviewScene)
+		board.PreviewScene = scene
+	}
+	return board, nil
+}
+
+func mapPostgresBoardCatalogRow(row dbsqlc.ListWorkspaceBoardCatalogRow) (*V1BoardCatalogEntry, error) {
+	if !row.OwnerUserID.Valid {
+		// Owner-less rows predate the owner column: fail closed.
+		return nil, ErrNotFound
+	}
+	entry := &V1BoardCatalogEntry{
+		WorkspacePublicID: row.WorkspacePublicID.String,
+		PublicID:          row.PublicID.String,
+		Name:              row.Title.String,
+		Revision:          int64(row.DocumentVersion.Int32),
+		SchemaVersion:     row.SchemaVersion.Int32,
+		ArchivedAt:        dbutil.TimePtr(row.ArchivedAt),
+		OwnerUserID:       row.OwnerUserID.Int64,
+		CreatedBy:         row.OwnerUserID.Int64,
+		CreatedAt:         dbutil.TimeValue(row.CreatedAt),
+		UpdatedAt:         dbutil.TimeValue(row.UpdatedAt),
+	}
+	if row.ContentVersion.Valid {
+		entry.ContentVersion = row.ContentVersion.String
+	}
+	if len(row.PreviewScene) > 0 {
+		scene := make(json.RawMessage, len(row.PreviewScene))
+		copy(scene, row.PreviewScene)
+		entry.PreviewScene = scene
+	}
+	return entry, nil
+}
+
+// previewDocumentColumns derives the persisted projection inputs for
+// accepted document bytes: always the content version, plus the scene
+// when the document schema is extractable (nil otherwise, without
+// failing the write).
+func previewDocumentColumns(document json.RawMessage) (pgtype.Text, []byte) {
+	version, scene, _ := previewscene.DeriveCatalog(document)
+	return pgtype.Text{String: version, Valid: version != ""}, []byte(scene)
 }
 
 // getBoardTx reads one workspace-scoped board inside or outside a tx.
@@ -239,11 +287,15 @@ func (s *PostgresWorkspaceBoardStore) CreateBoard(ctx context.Context, workspace
 			return err
 		}
 		document := V1InitialDocument()
+		contentVersion, previewScene := previewDocumentColumns(document)
 		if err := q.InsertBoardDocument(ctx, dbsqlc.InsertBoardDocumentParams{
 			BoardID:         row.InternalID,
 			DocumentVersion: 1,
 			SnapshotData:    []byte(document),
+			SchemaVersion:   v1InitialSchemaVerion,
 			Etag:            boardDocumentETag(1, document),
+			ContentVersion:  contentVersion,
+			PreviewScene:    previewScene,
 		}); err != nil {
 			return err
 		}
@@ -277,28 +329,41 @@ func (s *PostgresWorkspaceBoardStore) CreateBoard(ctx context.Context, workspace
 	return created, nil
 }
 
-// ListBoards lists workspace boards ordered by updated_at desc (stable by
-// public id); archived rows are excluded unless includeArchived.
-// Owner-less legacy rows are skipped (fail-closed without failing the list).
-func (s *PostgresWorkspaceBoardStore) ListBoards(ctx context.Context, workspacePublicID string, includeArchived bool) ([]*V1Board, error) {
+// ListBoardCatalog reads only the requested authorized cards and a bounded
+// total count, without loading full documents or out-of-page scene bodies.
+func (s *PostgresWorkspaceBoardStore) ListBoardCatalog(ctx context.Context, workspacePublicID string, includeArchived bool, userID int64, workspaceRole string, page V1BoardCatalogPageRequest) (V1BoardCatalogPage, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return V1BoardCatalogPage{}, err
 	}
-	rows, err := s.dbWithContext(ctx).q.ListWorkspaceBoards(ctx, dbsqlc.ListWorkspaceBoardsParams{
+	if err := page.validate(); err != nil {
+		return V1BoardCatalogPage{}, err
+	}
+	rows, err := s.dbWithContext(ctx).q.ListWorkspaceBoardCatalog(ctx, dbsqlc.ListWorkspaceBoardCatalogParams{
 		WorkspacePublicID: strings.TrimSpace(workspacePublicID),
 		IncludeArchived:   includeArchived,
-		RowLimit:          maxWorkspaceBoardRows,
+		CatalogLimit:      maxBoardCatalogRows,
+		RowOffset:         int32(page.Offset),
+		RowLimit:          int32(page.Limit),
+		UserID:            userID,
+		WorkspaceRole:     strings.TrimSpace(workspaceRole),
 	})
 	if err != nil {
-		return nil, err
+		return V1BoardCatalogPage{}, err
 	}
-	out := make([]*V1Board, 0, len(rows))
+	out := V1BoardCatalogPage{Entries: make([]*V1BoardCatalogEntry, 0, len(rows))}
 	for _, row := range rows {
-		board, err := mapPostgresBoardRow(dbsqlc.GetWorkspaceBoardRow(row))
-		if err != nil {
+		if int64(page.Offset) > row.TotalCount {
+			return V1BoardCatalogPage{}, ErrV1CatalogOffset
+		}
+		out.HasMore = int64(page.Offset+page.Limit) < row.TotalCount
+		if !row.InternalID.Valid {
 			continue
 		}
-		out = append(out, board)
+		entry, err := mapPostgresBoardCatalogRow(row)
+		if err != nil {
+			return V1BoardCatalogPage{}, err
+		}
+		out.Entries = append(out.Entries, entry)
 	}
 	return out, nil
 }
@@ -432,6 +497,9 @@ func (s *PostgresWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 		nextRevision := expectedRevision + 1
 		document := make(json.RawMessage, len(snapshot))
 		copy(document, snapshot)
+		// Document accept, content identity, and projection publish in
+		// the SAME row update: 409/conflict returns above commit nothing.
+		contentVersion, previewScene := previewDocumentColumns(document)
 		if _, err := q.InsertBoardRevision(ctx, dbsqlc.InsertBoardRevisionParams{
 			PublicID:         revisionPublicID,
 			BoardID:          locked.InternalID,
@@ -448,7 +516,10 @@ func (s *PostgresWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 		affected, err := q.UpdateBoardDocument(ctx, dbsqlc.UpdateBoardDocumentParams{
 			DocumentVersion: int32(nextRevision),
 			SnapshotData:    []byte(document),
+			SchemaVersion:   schemaVersion,
 			Etag:            boardDocumentETag(nextRevision, document),
+			ContentVersion:  contentVersion,
+			PreviewScene:    previewScene,
 			BoardID:         locked.InternalID,
 			ExpectedVersion: locked.DocumentVersion,
 		})

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "18b236d777b5702321422ca8b3bf275e2b1a30cf",
+  "checkpointSha": "ae0a0c8b90c3144705a01fb7cec488ab5f864b29",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -2404,15 +2404,21 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 2,
+      "fanOut": 3,
       "fanOutTargets": [
         "src/api/generated-query/public/model/boardId.ts",
+        "src/api/generated-query/public/model/boardPreviewScene.ts",
         "src/api/generated-query/public/model/workspaceId.ts"
       ],
       "outboundEdges": [
         {
           "from": "src/api/generated-query/public/model/board.ts",
           "to": "src/api/generated-query/public/model/boardId.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/api/generated-query/public/model/board.ts",
+          "to": "src/api/generated-query/public/model/boardPreviewScene.ts",
           "kind": "type-only"
         },
         {
@@ -2426,7 +2432,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 2,
+      "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -2456,15 +2462,21 @@
         }
       ],
       "fanIn": 3,
-      "fanOut": 2,
+      "fanOut": 3,
       "fanOutTargets": [
         "src/api/generated-query/public/model/boardDocumentDocument.ts",
+        "src/api/generated-query/public/model/boardDocumentPreviewScene.ts",
         "src/api/generated-query/public/model/boardId.ts"
       ],
       "outboundEdges": [
         {
           "from": "src/api/generated-query/public/model/boardDocument.ts",
           "to": "src/api/generated-query/public/model/boardDocumentDocument.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/api/generated-query/public/model/boardDocument.ts",
+          "to": "src/api/generated-query/public/model/boardDocumentPreviewScene.ts",
           "kind": "type-only"
         },
         {
@@ -2478,7 +2490,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 3,
-      "targetFanOut": 2,
+      "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -2588,7 +2600,7 @@
         }
       ],
       "fanIn": 19,
-      "fanOut": 239,
+      "fanOut": 241,
       "fanOutTargets": [
         "src/api/generated-query/public/model/addBoardMemberRequest.ts",
         "src/api/generated-query/public/model/addBoardMemberRequestData.ts",
@@ -2607,11 +2619,13 @@
         "src/api/generated-query/public/model/boardDocument.ts",
         "src/api/generated-query/public/model/boardDocumentDocument.ts",
         "src/api/generated-query/public/model/boardDocumentEnvelope.ts",
+        "src/api/generated-query/public/model/boardDocumentPreviewScene.ts",
         "src/api/generated-query/public/model/boardEnvelope.ts",
         "src/api/generated-query/public/model/boardId.ts",
         "src/api/generated-query/public/model/boardMember.ts",
         "src/api/generated-query/public/model/boardMemberEnvelope.ts",
         "src/api/generated-query/public/model/boardMemberList.ts",
+        "src/api/generated-query/public/model/boardPreviewScene.ts",
         "src/api/generated-query/public/model/boardRevision.ts",
         "src/api/generated-query/public/model/boardRevisionDetail.ts",
         "src/api/generated-query/public/model/boardRevisionDetailEnvelope.ts",
@@ -2918,6 +2932,11 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/boardDocumentPreviewScene.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/boardEnvelope.ts",
           "kind": "runtime"
         },
@@ -2939,6 +2958,11 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/boardMemberList.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/boardPreviewScene.ts",
           "kind": "runtime"
         },
         {
@@ -4032,7 +4056,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 19,
-      "targetFanOut": 239,
+      "targetFanOut": 241,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -9320,7 +9344,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
@@ -9933,6 +9957,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/session/sync/boardSync.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
@@ -10028,7 +10057,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 30,
+      "fanIn": 31,
       "fanOut": 1,
       "fanOutTargets": ["src/core/i18n/index.ts"],
       "outboundEdges": [
@@ -10042,7 +10071,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 30,
+      "targetFanIn": 31,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -11605,14 +11634,9 @@
           "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.ts",
           "to": "src/core/lib/chartPrimitives.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
-          "to": "src/core/lib/chartPrimitives.ts",
-          "kind": "runtime"
         }
       ],
-      "fanIn": 12,
+      "fanIn": 11,
       "fanOut": 3,
       "fanOutTargets": [
         "node_modules/chart.js/dist/chart.cjs",
@@ -11640,7 +11664,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 12,
+      "targetFanIn": 11,
       "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -11817,6 +11841,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/preview/thumbnailMedia.unit.spec.ts",
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/media/imageSize.ts",
           "to": "src/core/media/imageDimensions.ts",
           "kind": "runtime"
@@ -11832,16 +11866,22 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 4,
-      "fanOut": 0,
-      "fanOutTargets": [],
-      "outboundEdges": [],
+      "fanIn": 6,
+      "fanOut": 1,
+      "fanOutTargets": ["src/core/media/mediaReadScheduler.ts"],
+      "outboundEdges": [
+        {
+          "from": "src/core/media/imageDimensions.ts",
+          "to": "src/core/media/mediaReadScheduler.ts",
+          "kind": "runtime"
+        }
+      ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 4,
-      "targetFanOut": 0,
+      "targetFanIn": 6,
+      "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -12269,12 +12309,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/board-session/repository.contract.spec.ts",
           "to": "src/core/query/queryClient.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 15,
+      "fanIn": 16,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/@tanstack/vue-query/build/legacy/index.cjs"],
       "outboundEdges": [
@@ -12288,7 +12333,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 15,
+      "targetFanIn": 16,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -12811,6 +12856,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/board-session/repository.contract.spec.ts",
           "to": "src/core/utils/auth.ts",
           "kind": "runtime"
@@ -12826,7 +12876,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 25,
+      "fanIn": 26,
       "fanOut": 4,
       "fanOutTargets": [
         "src/api/sessionUserType.ts",
@@ -12861,7 +12911,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 25,
+      "targetFanIn": 26,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13262,11 +13312,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
-          "to": "src/core/utils/number.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/browser/canvasViewportStorage.ts",
           "to": "src/core/utils/number.ts",
           "kind": "runtime"
@@ -13327,7 +13372,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 15,
+      "fanIn": 14,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -13335,7 +13380,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 15,
+      "targetFanIn": 14,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13424,6 +13469,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
+          "to": "src/core/utils/polling.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/result-nodes/resultDisplay.ts",
           "to": "src/core/utils/polling.ts",
           "kind": "runtime"
@@ -13434,7 +13484,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 5,
+      "fanIn": 6,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -13442,7 +13492,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 5,
+      "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13484,11 +13534,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewThemeStorage.ts",
-          "to": "src/core/utils/storage.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/browser/canvasViewportStorage.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
@@ -13519,7 +13564,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 14,
+      "fanIn": 13,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -13527,7 +13572,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 14,
+      "targetFanIn": 13,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -22568,8 +22613,10 @@
         }
       ],
       "fanIn": 50,
-      "fanOut": 52,
+      "fanOut": 57,
       "fanOutTargets": [
+        "../api/internal/boards/previewscene/testdata/mixed.json",
+        "fs",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/jest-dom/vitest.js",
@@ -22578,10 +22625,12 @@
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "path",
         "src/api/generated-query/public/boards/boards.ts",
         "src/api/generated-query/public/model/board.ts",
         "src/api/generated-query/public/model/boardDocument.ts",
         "src/api/idempotencyKey.ts",
+        "src/api/mediaAssetMetadata.ts",
         "src/api/stripUndefined.ts",
         "src/api/workspaceEventStream.ts",
         "src/app/style.css",
@@ -22598,7 +22647,7 @@
         "src/core/errors/errorCatalog.ts",
         "src/core/i18n/formatters.ts",
         "src/core/i18n/index.ts",
-        "src/core/lib/chartPrimitives.ts",
+        "src/core/media/imageDimensions.ts",
         "src/core/media/mediaRef.ts",
         "src/core/query/queryClient.ts",
         "src/core/query/queryDefaults.ts",
@@ -22607,6 +22656,7 @@
         "src/core/utils/ids.ts",
         "src/core/utils/number.ts",
         "src/core/utils/opaqueIds.ts",
+        "src/core/utils/polling.ts",
         "src/core/utils/request.ts",
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
@@ -22619,8 +22669,8 @@
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
-        "src/theme/composables/useTheme.ts",
         "src/theme/dialogMask.ts",
+        "url",
         "vitest/browser"
       ],
       "outboundEdges": [
@@ -22652,6 +22702,51 @@
         {
           "from": "src/features/board/core/media/references.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/renderer.unit.spec.ts",
+          "to": "fs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/renderer.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/renderer.unit.spec.ts",
+          "to": "path",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/renderer.unit.spec.ts",
+          "to": "url",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/scene.ts",
+          "to": "src/core/utils/guards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/scene.unit.spec.ts",
+          "to": "fs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/scene.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/scene.unit.spec.ts",
+          "to": "path",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/scene.unit.spec.ts",
+          "to": "url",
           "kind": "runtime"
         },
         {
@@ -22722,6 +22817,26 @@
         {
           "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.unit.spec.ts",
+          "to": "fs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.unit.spec.ts",
+          "to": "path",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.unit.spec.ts",
+          "to": "url",
           "kind": "runtime"
         },
         {
@@ -22830,63 +22945,58 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.ts",
-          "to": "src/theme/composables/useTheme.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
+          "to": "src/api/mediaAssetMetadata.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.unit.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
-          "to": "src/core/lib/chartPrimitives.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
+          "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
-          "to": "src/core/utils/guards.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
+          "to": "src/core/media/imageDimensions.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
-          "to": "src/core/utils/number.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
+          "to": "src/core/utils/polling.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
-          "to": "src/theme/composables/useTheme.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.unit.spec.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewThemeStorage.ts",
-          "to": "src/core/utils/storage.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewThemeStorage.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
+          "from": "src/features/board/session/preview/thumbnailMedia.unit.spec.ts",
+          "to": "src/api/mediaAssetMetadata.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/preview/thumbnailMedia.unit.spec.ts",
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/preview/thumbnailMedia.unit.spec.ts",
+          "to": "src/test/deferred.ts",
           "kind": "runtime"
         },
         {
@@ -22967,7 +23077,12 @@
         {
           "from": "src/features/board/session/sync/boardQueries.ts",
           "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-          "kind": "type-only"
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardQueries.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
         },
         {
           "from": "src/features/board/session/sync/boardQueries.ts",
@@ -23235,6 +23350,51 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/SceneRasterImage.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "fs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "path",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "src/api/mediaAssetMetadata.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "url",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
           "to": "node_modules/@iconoir/vue/dist/index.js",
           "kind": "runtime"
@@ -23336,6 +23496,11 @@
         },
         {
           "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
+          "to": "../api/internal/boards/previewscene/testdata/mixed.json",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
@@ -23345,13 +23510,23 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/ui/gallery/useCatalog.ts",
-          "to": "node_modules/vue/index.js",
+          "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/board/ui/gallery/useCatalog.ts",
-          "to": "src/theme/composables/useTheme.ts",
+          "to": "node_modules/vue/index.js",
           "kind": "runtime"
         }
       ],
@@ -23360,7 +23535,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 50,
-      "targetFanOut": 52,
+      "targetFanOut": 57,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -23460,11 +23635,6 @@
         },
         {
           "from": "src/features/canvas/session/board-session/boardSyncMediaReconciliation.ts",
-          "to": "src/features/board/ports/canvas.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/board-session/preview.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "runtime"
         },
@@ -23864,9 +24034,11 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 94,
-      "fanOut": 52,
+      "fanIn": 93,
+      "fanOut": 57,
       "fanOutTargets": [
+        "../api/internal/boards/previewscene/testdata/mixed.json",
+        "fs",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/jest-dom/vitest.js",
@@ -23875,10 +24047,12 @@
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "path",
         "src/api/generated-query/public/boards/boards.ts",
         "src/api/generated-query/public/model/board.ts",
         "src/api/generated-query/public/model/boardDocument.ts",
         "src/api/idempotencyKey.ts",
+        "src/api/mediaAssetMetadata.ts",
         "src/api/stripUndefined.ts",
         "src/api/workspaceEventStream.ts",
         "src/app/style.css",
@@ -23895,7 +24069,7 @@
         "src/core/errors/errorCatalog.ts",
         "src/core/i18n/formatters.ts",
         "src/core/i18n/index.ts",
-        "src/core/lib/chartPrimitives.ts",
+        "src/core/media/imageDimensions.ts",
         "src/core/media/mediaRef.ts",
         "src/core/query/queryClient.ts",
         "src/core/query/queryDefaults.ts",
@@ -23904,6 +24078,7 @@
         "src/core/utils/ids.ts",
         "src/core/utils/number.ts",
         "src/core/utils/opaqueIds.ts",
+        "src/core/utils/polling.ts",
         "src/core/utils/request.ts",
         "src/core/utils/storage.ts",
         "src/core/utils/workspaceId.ts",
@@ -23916,8 +24091,8 @@
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
-        "src/theme/composables/useTheme.ts",
         "src/theme/dialogMask.ts",
+        "url",
         "vitest/browser"
       ],
       "outboundEdges": [
@@ -23949,6 +24124,51 @@
         {
           "from": "src/features/board/core/media/references.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/renderer.unit.spec.ts",
+          "to": "fs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/renderer.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/renderer.unit.spec.ts",
+          "to": "path",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/renderer.unit.spec.ts",
+          "to": "url",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/scene.ts",
+          "to": "src/core/utils/guards.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/scene.unit.spec.ts",
+          "to": "fs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/scene.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/scene.unit.spec.ts",
+          "to": "path",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/core/preview/scene.unit.spec.ts",
+          "to": "url",
           "kind": "runtime"
         },
         {
@@ -24019,6 +24239,26 @@
         {
           "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.unit.spec.ts",
+          "to": "fs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.unit.spec.ts",
+          "to": "path",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardsResource.unit.spec.ts",
+          "to": "url",
           "kind": "runtime"
         },
         {
@@ -24127,63 +24367,58 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.ts",
-          "to": "src/theme/composables/useTheme.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
+          "to": "src/api/mediaAssetMetadata.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.unit.spec.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
-          "to": "src/core/lib/chartPrimitives.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
+          "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
-          "to": "src/core/utils/guards.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
+          "to": "src/core/media/imageDimensions.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
-          "to": "src/core/utils/number.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.ts",
+          "to": "src/core/utils/polling.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
-          "to": "src/theme/composables/useTheme.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.unit.spec.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewThemeStorage.ts",
-          "to": "src/core/utils/storage.ts",
+          "from": "src/features/board/session/preview/thumbnailMedia.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewThemeStorage.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
+          "from": "src/features/board/session/preview/thumbnailMedia.unit.spec.ts",
+          "to": "src/api/mediaAssetMetadata.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/preview/thumbnailMedia.unit.spec.ts",
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/preview/thumbnailMedia.unit.spec.ts",
+          "to": "src/test/deferred.ts",
           "kind": "runtime"
         },
         {
@@ -24264,7 +24499,12 @@
         {
           "from": "src/features/board/session/sync/boardQueries.ts",
           "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-          "kind": "type-only"
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/sync/boardQueries.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
         },
         {
           "from": "src/features/board/session/sync/boardQueries.ts",
@@ -24532,6 +24772,51 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/SceneRasterImage.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "fs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "path",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "src/api/mediaAssetMetadata.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.component.spec.ts",
+          "to": "url",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/SceneThumbnail.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/boardCardMotion.browser.spec.ts",
           "to": "node_modules/@iconoir/vue/dist/index.js",
           "kind": "runtime"
@@ -24633,6 +24918,11 @@
         },
         {
           "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
+          "to": "../api/internal/boards/previewscene/testdata/mixed.json",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
@@ -24642,13 +24932,23 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/ui/gallery/useCatalog.ts",
-          "to": "node_modules/vue/index.js",
+          "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
+          "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
+          "to": "src/core/utils/auth.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/board/ui/gallery/useCatalog.ts",
-          "to": "src/theme/composables/useTheme.ts",
+          "to": "node_modules/vue/index.js",
           "kind": "runtime"
         }
       ],
@@ -24656,8 +24956,8 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 94,
-      "targetFanOut": 52,
+      "targetFanIn": 93,
+      "targetFanOut": 57,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -24745,6 +25045,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/session/adapters/boardsResource.unit.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/session/catalog/commands.contract.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
@@ -24761,16 +25066,6 @@
         },
         {
           "from": "src/features/board/session/persistence/boardStateSerialization.unit.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.unit.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.unit.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
         },
@@ -24820,7 +25115,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 19,
+      "fanIn": 18,
       "fanOut": 5,
       "fanOutTargets": [
         "src/core/utils/auth.ts",
@@ -24865,7 +25160,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 19,
+      "targetFanIn": 18,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -25765,11 +26060,6 @@
         },
         {
           "from": "src/features/canvas/session/board-session/boardSyncMediaReconciliation.ts",
-          "to": "src/features/board/ports/canvas.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/board-session/preview.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "runtime"
         },
@@ -28636,6 +28926,21 @@
         },
         {
           "from": "src/features/canvas/session/flow-adapter/viewport/useCanvasImagePreviewQuality.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/viewport/useCanvasImageQualityZoom.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/viewport/useCanvasImageQualityZoom.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/flow-adapter/viewport/useCanvasImageQualityZoom.unit.spec.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
@@ -38082,6 +38387,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/useCatalog.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/board-session/repository.contract.spec.ts",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
@@ -38127,7 +38437,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 20,
+      "fanIn": 21,
       "fanOut": 53,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -38710,7 +39020,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 20,
+      "targetFanIn": 21,
       "targetFanOut": 53,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -39477,21 +39787,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/session/preview/boardPreviewRefreshQueue.ts",
-          "to": "src/theme/composables/useTheme.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/session/preview/boardPreviewSerializer.ts",
-          "to": "src/theme/composables/useTheme.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/useCatalog.ts",
-          "to": "src/theme/composables/useTheme.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/test/p1ThemeContracts.browser.spec.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
@@ -39502,7 +39797,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 10,
+      "fanIn": 7,
       "fanOut": 3,
       "fanOutTargets": [
         "node_modules/@vueuse/core/dist/index.js",
@@ -39530,7 +39825,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 10,
+      "targetFanIn": 7,
       "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,

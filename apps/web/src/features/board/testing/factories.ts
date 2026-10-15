@@ -326,21 +326,12 @@ export function makeBoardSnapshot(overrides: Partial<BoardSnapshot> = {}): Board
 }
 
 export function makeBoardState(overrides: Partial<BoardState> = {}): BoardState {
-  const {
-    updatedAt,
-    previewSnapshotDataUrl,
-    previewSnapshotUpdatedAt,
-    previewSnapshotVersion,
-    ...snapshotOverrides
-  } = overrides
+  const { updatedAt, ...snapshotOverrides } = overrides
   return assertLatestBoardState(
     {
       ...createEmptyBoardSnapshot(),
       ...snapshotOverrides,
       updatedAt: updatedAt ?? 1,
-      previewSnapshotDataUrl,
-      previewSnapshotUpdatedAt,
-      previewSnapshotVersion,
     },
     'test-fixture-state',
   )

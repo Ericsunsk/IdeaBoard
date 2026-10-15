@@ -30,12 +30,9 @@ function renderCatalog(mode: CatalogSortMode) {
       },
       dispose: vi.fn(),
     },
-    preview: {
-      previewMap: ref({}),
-      reloadFromLocal: vi.fn(),
-      schedule: vi.fn(),
-      invalidate: vi.fn(),
-      dispose: vi.fn(),
+    scenes: {
+      sceneMap: ref({}),
+      workspaceId: ref(null),
     },
     feedback: {
       createFailed: vi.fn(),

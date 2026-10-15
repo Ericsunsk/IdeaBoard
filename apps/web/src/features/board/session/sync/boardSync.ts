@@ -38,7 +38,11 @@ import {
   InvalidBoardStateError,
   type BoardStateValidationErrorContext,
 } from '../../core/document/latestBoardState'
-import { createEmptyBoardState, type BoardState } from '../../core/document/nodes'
+import {
+  createEmptyBoardState,
+  stripLegacyBoardPreviewFields,
+  type BoardState,
+} from '../../core/document/nodes'
 import { queryClient } from '../../../../core/query/queryClient'
 import { QueryObserver } from '@tanstack/vue-query'
 import { workspaceQueryKeys } from '../../../workspace'
@@ -122,7 +126,7 @@ function toLocalState(boardId: string, document: WorkspaceBoardDocument): BoardS
       ? (snapshot.payload as Record<string, unknown>)
       : null
   const payload = { ...(nested ?? snapshot ?? {}), schemaVersion: document.schemaVersion }
-  const result = normalizeBoardState(payload, {
+  const result = normalizeBoardState(stripLegacyBoardPreviewFields(payload), {
     mode: 'result',
     boundary: 'server-hydration',
   })
@@ -154,9 +158,6 @@ function toGeneratedBoardStateProjection(state: BoardState): BoardState {
       nodeIds: [...group.nodeIds],
     })),
     mediaRefs: envelope.mediaRefs?.map((ref) => stripUndefined({ ...ref })),
-    previewSnapshotDataUrl: envelope.previewSnapshotDataUrl,
-    previewSnapshotUpdatedAt: envelope.previewSnapshotUpdatedAt,
-    previewSnapshotVersion: envelope.previewSnapshotVersion,
     updatedAt: envelope.updatedAt,
   })
 }

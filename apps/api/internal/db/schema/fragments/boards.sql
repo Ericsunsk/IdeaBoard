@@ -26,14 +26,31 @@ CREATE INDEX idx_boards_archived ON boards (workspace_id, archived_at DESC) WHER
 -- Board document snapshots with optimistic concurrency. The etag is a hash
 -- of (document_version || snapshot_data) for conflict detection. Document
 -- schema evolution uses a versioned discriminated union (not modeled here).
+-- content_version is the opaque identity of the accepted persisted content
+-- (hex SHA-256 of the exact stored envelope bytes, assigned in the
+-- accepting transaction; see boards/previewscene/contract.md §7).
+-- preview_scene is the stored versioned Board Preview Scene projection for
+-- the Gallery catalog (NULL when the document schema is not extractable;
+-- backfilled or derived on read for pre-cutover rows). The catalog list
+-- reads these two columns and never snapshot_data.
 CREATE TABLE board_documents (
   board_id BIGINT PRIMARY KEY REFERENCES boards(internal_id) ON DELETE CASCADE,
   document_version INT NOT NULL DEFAULT 1,
   snapshot_data JSONB NOT NULL,
+  -- Envelope schema version denormalized from snapshot_data: the Gallery
+  -- catalog serves it without reading (detoasting) full documents.
+  -- Assigned in the accepting transaction from the validated envelope;
+  -- pre-cutover rows are backfilled from the canonical bytes by the
+  -- migration that adds the column.
+  schema_version INT NOT NULL,
   etag TEXT NOT NULL,
+  content_version TEXT NULL,
+  preview_scene JSONB NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT chk_board_documents_version_positive CHECK (document_version > 0),
-  CONSTRAINT chk_board_documents_etag CHECK (length(etag) BETWEEN 8 AND 128)
+  CONSTRAINT chk_board_documents_schema_version_positive CHECK (schema_version > 0),
+  CONSTRAINT chk_board_documents_etag CHECK (length(etag) BETWEEN 8 AND 128),
+  CONSTRAINT chk_board_documents_content_version CHECK (content_version IS NULL OR length(content_version) BETWEEN 8 AND 128)
 );
 
 -- Immutable revision history. Each write creates a new revision referencing

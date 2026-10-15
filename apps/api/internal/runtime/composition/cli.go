@@ -23,6 +23,7 @@ func newRootCommand() *cobra.Command {
 		newInitAdminCommand(),
 		newFinalizeMigrateCommand(),
 		newInitCreditWalletsCommand(),
+		newBackfillBoardPreviewsCommand(),
 	)
 	return root
 }

@@ -50,7 +50,6 @@ function createHarness() {
       snapshot,
       remoteSync: { isOk: true as const },
     })),
-    refreshPreview: vi.fn(),
   }
   const coordinator = createBoardSyncCoordinator({
     buildCurrentSnapshot: () => currentSnapshot.value,

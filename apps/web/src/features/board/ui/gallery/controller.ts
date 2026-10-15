@@ -1,17 +1,15 @@
-import { computed, readonly, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { computed, readonly, ref, watch, type Ref } from 'vue'
 import type { BoardRepository } from '../../session/catalog/repository'
-import type { BoardPreviewRefreshQueue } from '../../session/preview/boardPreviewRefreshQueue'
 import type { CatalogEntry, CatalogSortMode, Catalog, CatalogNavigation } from './contract'
 import type { BoardFeedback } from './useBoardFeedback'
 import { createCommandHandlers } from './commandHandlers'
 
 type GalleryControllerDependencies = {
   catalog: BoardRepository
-  preview: BoardPreviewRefreshQueue
+  scenes: Pick<Catalog['viewModel'], 'sceneMap' | 'workspaceId'>
   navigation: CatalogNavigation
   feedback: BoardFeedback
   warn: (...data: unknown[]) => void
-  theme?: { isDark: Ref<boolean> | ComputedRef<boolean> }
 }
 
 function filterAndSortBoards(
@@ -28,42 +26,6 @@ function filterAndSortBoards(
     return [...filtered].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
   }
   return [...filtered].sort((a, b) => b.updatedAt - a.updatedAt)
-}
-
-function setupCatalogWatchers(
-  boards: ComputedRef<readonly CatalogEntry[]>,
-  scope: Ref<string | null>,
-  isDarkRef: Ref<boolean> | ComputedRef<boolean> | undefined,
-  preview: BoardPreviewRefreshQueue,
-  onScopeReset: () => void,
-) {
-  const stopPreviewWatch = watch(
-    boards,
-    (nextBoards) => {
-      const snapshot = [...nextBoards]
-      preview.reloadFromLocal(snapshot)
-      preview.schedule(snapshot)
-    },
-    { immediate: true },
-  )
-
-  const stopThemeWatch = isDarkRef
-    ? watch(isDarkRef, (isDark) => {
-        preview.handleThemeChange?.(isDark, [...boards.value])
-      })
-    : undefined
-
-  const stopScopeWatch = watch(scope, () => {
-    preview.invalidate()
-    onScopeReset()
-  })
-
-  return () => {
-    stopPreviewWatch()
-    stopScopeWatch()
-    stopThemeWatch?.()
-    preview.dispose()
-  }
 }
 
 function setupCatalogRefresh(refresh: {
@@ -147,18 +109,12 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
     filterAndSortBoards(boards.value, searchKeyword.value, sortMode.value),
   )
 
-  const disposeWatchers = setupCatalogWatchers(
-    boards,
-    dependencies.catalog.viewModel.scope,
-    dependencies.theme?.isDark,
-    dependencies.preview,
-    () => {
-      activeMenuBoardId.value = null
-      clearRename(false)
-      catalogRecoveryBoardId.value = null
-      resetDeleteState()
-    },
-  )
+  const stopScopeWatch = watch(dependencies.catalog.viewModel.scope, () => {
+    activeMenuBoardId.value = null
+    clearRename(false)
+    catalogRecoveryBoardId.value = null
+    resetDeleteState()
+  })
 
   const commandHandlers = createCommandHandlers({
     ...dependencies,
@@ -258,7 +214,8 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
   return {
     viewModel: {
       visibleBoards,
-      previewMap: readonly(dependencies.preview.previewMap),
+      sceneMap: computed(() => dependencies.scenes.sceneMap.value),
+      workspaceId: computed(() => dependencies.scenes.workspaceId.value),
       isBoardsLoading: hydration.viewModel.isBoardsLoading,
       catalogHydrationFailed: hydration.viewModel.catalogHydrationFailed,
       searchKeyword: readonly(searchKeyword),
@@ -293,7 +250,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
     },
     dispose() {
       hydration.dispose()
-      disposeWatchers()
+      stopScopeWatch()
       disposeRefresh()
     },
   }

@@ -34,6 +34,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/boards/previewscene"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
@@ -246,25 +247,29 @@ func logBoardAudit(op string, operatorUserID int64, target, reason, outcome stri
 }
 
 type v1BoardDTO struct {
-	ID            string  `json:"id"`
-	WorkspaceID   string  `json:"workspace_id"`
-	Name          string  `json:"name"`
-	Revision      int64   `json:"revision"`
-	SchemaVersion int32   `json:"schema_version"`
-	ArchivedAt    *string `json:"archived_at,omitempty"`
-	CreatedAt     string  `json:"created_at"`
-	UpdatedAt     string  `json:"updated_at"`
+	ID             string          `json:"id"`
+	WorkspaceID    string          `json:"workspace_id"`
+	Name           string          `json:"name"`
+	Revision       int64           `json:"revision"`
+	SchemaVersion  int32           `json:"schema_version"`
+	ContentVersion string          `json:"content_version,omitempty"`
+	PreviewScene   json.RawMessage `json:"preview_scene,omitempty"`
+	ArchivedAt     *string         `json:"archived_at,omitempty"`
+	CreatedAt      string          `json:"created_at"`
+	UpdatedAt      string          `json:"updated_at"`
 }
 
 func toBoardDTO(board *boards.V1Board) v1BoardDTO {
 	dto := v1BoardDTO{
-		ID:            board.PublicID,
-		WorkspaceID:   board.WorkspacePublicID,
-		Name:          board.Name,
-		Revision:      board.Revision,
-		SchemaVersion: board.SchemaVersion,
-		CreatedAt:     v1FormatTime(board.CreatedAt),
-		UpdatedAt:     v1FormatTime(board.UpdatedAt),
+		ID:             board.PublicID,
+		WorkspaceID:    board.WorkspacePublicID,
+		Name:           board.Name,
+		Revision:       board.Revision,
+		SchemaVersion:  board.SchemaVersion,
+		ContentVersion: board.ContentVersion,
+		PreviewScene:   board.PreviewScene,
+		CreatedAt:      v1FormatTime(board.CreatedAt),
+		UpdatedAt:      v1FormatTime(board.UpdatedAt),
 	}
 	if board.ArchivedAt != nil {
 		archived := v1FormatTime(*board.ArchivedAt)
@@ -273,70 +278,102 @@ func toBoardDTO(board *boards.V1Board) v1BoardDTO {
 	return dto
 }
 
-func boardPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta, bool) {
+// toBoardCatalogDTO renders one Gallery catalog card: metadata plus the
+// stored scene projection, never the full document.
+func toBoardCatalogDTO(entry *boards.V1BoardCatalogEntry) v1BoardDTO {
+	dto := v1BoardDTO{
+		ID:             entry.PublicID,
+		WorkspaceID:    entry.WorkspacePublicID,
+		Name:           entry.Name,
+		Revision:       entry.Revision,
+		SchemaVersion:  entry.SchemaVersion,
+		ContentVersion: entry.ContentVersion,
+		PreviewScene:   entry.PreviewScene,
+		CreatedAt:      v1FormatTime(entry.CreatedAt),
+		UpdatedAt:      v1FormatTime(entry.UpdatedAt),
+	}
+	if entry.ArchivedAt != nil {
+		archived := v1FormatTime(*entry.ArchivedAt)
+		dto.ArchivedAt = &archived
+	}
+	return dto
+}
+
+func boardPageRequest(c *gin.Context) (boards.V1BoardCatalogPageRequest, bool) {
 	pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
 	if err != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest31)
 		c.Abort()
-		return nil, contract.PageMeta{}, false
+		return boards.V1BoardCatalogPageRequest{}, false
 	}
-	offset := 0
+	page := boards.V1BoardCatalogPageRequest{Limit: pageSize}
 	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
 		cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
 		if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
-			c.Abort()
-			return nil, contract.PageMeta{}, false
+			renderBoardCursorInvalid(c)
+			return boards.V1BoardCatalogPageRequest{}, false
 		}
-		offset = cursor.Offset
+		page.Offset = cursor.Offset
 	}
-	if offset > len(items) {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
+	return page, true
+}
+
+func renderBoardCursorInvalid(c *gin.Context) {
+	contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
+	c.Abort()
+}
+
+func boardPageMeta(c *gin.Context, nextOffset int, hasMore bool) (contract.PageMeta, bool) {
+	if !hasMore {
+		return contract.NewPageMeta("", false), true
+	}
+	next, err := contract.EncodeCursor(v1ListCursor{Offset: nextOffset})
+	if err != nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable46)
 		c.Abort()
+		return contract.PageMeta{}, false
+	}
+	return contract.NewPageMeta(next, true), true
+}
+
+func boardPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta, bool) {
+	page, ok := boardPageRequest(c)
+	if !ok {
 		return nil, contract.PageMeta{}, false
 	}
-	end := offset + pageSize
-	if end > len(items) {
-		end = len(items)
+	if page.Offset > len(items) {
+		renderBoardCursorInvalid(c)
+		return nil, contract.PageMeta{}, false
 	}
-	meta := contract.NewPageMeta("", false)
-	if end < len(items) {
-		next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: end})
-		if encodeErr != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable46)
-			c.Abort()
-			return nil, contract.PageMeta{}, false
-		}
-		meta = contract.NewPageMeta(next, true)
-	}
-	return items[offset:end], meta, true
+	end := min(page.Offset+page.Limit, len(items))
+	meta, ok := boardPageMeta(c, end, end < len(items))
+	return items[page.Offset:end], meta, ok
 }
 
 func (h *contractV1Handler) listBoards(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
-		identityPrincipal := wctx.Principal
-		workspace := wctx.Workspace
-		workspaceRole := wctx.Role
-		all, err := h.deps.Boards.ListBoards(c.Request.Context(), workspace.PublicID, false)
+		request, ok := boardPageRequest(c)
+		if !ok {
+			return
+		}
+		page, err := h.deps.Boards.ListBoardCatalog(c.Request.Context(), wctx.Workspace.PublicID, false, wctx.Principal.UserID(), wctx.Role, request)
+		if errors.Is(err, boards.ErrV1CatalogOffset) {
+			renderBoardCursorInvalid(c)
+			return
+		}
 		if err != nil {
 			renderBoardError(c, err)
 			return
 		}
-		// Visible workspace members default to viewer (owners to owner);
-		// explicit board rows override: only boards with an effective role
-		// are enumerable.
-		page := make([]v1BoardDTO, 0, len(all))
-		for _, board := range all {
-			if _, ok, roleErr := h.deps.Boards.GetBoardRole(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), workspaceRole); roleErr != nil || !ok {
-				continue
-			}
-			page = append(page, toBoardDTO(board))
-		}
-		slice, meta, ok := boardPageSlice(page, c)
+		meta, ok := boardPageMeta(c, request.Offset+len(page.Entries), page.HasMore)
 		if !ok {
 			return
 		}
-		contract.RenderPaginated(c, slice, meta)
+		data := make([]v1BoardDTO, 0, len(page.Entries))
+		for _, entry := range page.Entries {
+			data = append(data, toBoardCatalogDTO(entry))
+		}
+		contract.RenderPaginated(c, data, meta)
 	})
 }
 
@@ -524,11 +561,13 @@ func (h *contractV1Handler) restoreBoard(c *gin.Context) {
 }
 
 type v1BoardDocumentDTO struct {
-	BoardID       string          `json:"board_id"`
-	Revision      int64           `json:"revision"`
-	SchemaVersion int32           `json:"schema_version"`
-	Document      json.RawMessage `json:"document"`
-	UpdatedAt     string          `json:"updated_at"`
+	BoardID        string          `json:"board_id"`
+	Revision       int64           `json:"revision"`
+	SchemaVersion  int32           `json:"schema_version"`
+	ContentVersion string          `json:"content_version,omitempty"`
+	PreviewScene   json.RawMessage `json:"preview_scene,omitempty"`
+	Document       json.RawMessage `json:"document"`
+	UpdatedAt      string          `json:"updated_at"`
 }
 
 func toBoardDocumentDTO(board *boards.V1Board) v1BoardDocumentDTO {
@@ -536,13 +575,29 @@ func toBoardDocumentDTO(board *boards.V1Board) v1BoardDocumentDTO {
 	if len(document) == 0 {
 		document = boards.V1InitialDocument()
 	}
-	return v1BoardDocumentDTO{
-		BoardID:       board.PublicID,
-		Revision:      board.Revision,
-		SchemaVersion: board.SchemaVersion,
-		Document:      document,
-		UpdatedAt:     v1FormatTime(board.UpdatedAt),
+	dto := v1BoardDocumentDTO{
+		BoardID:        board.PublicID,
+		Revision:       board.Revision,
+		SchemaVersion:  board.SchemaVersion,
+		ContentVersion: board.ContentVersion,
+		PreviewScene:   board.PreviewScene,
+		Document:       document,
+		UpdatedAt:      v1FormatTime(board.UpdatedAt),
 	}
+	if len(dto.PreviewScene) == 0 || dto.ContentVersion == "" {
+		// Rows without a stored projection derive it
+		// deterministically from the canonical document on read. Pure
+		// function of the stored bytes — nothing is persisted here and
+		// the content identity never advances on a read.
+		version, scene, _ := previewscene.DeriveCatalog(board.Document)
+		if len(dto.PreviewScene) == 0 && len(scene) > 0 {
+			dto.PreviewScene = scene
+		}
+		if dto.ContentVersion == "" && version != "" {
+			dto.ContentVersion = version
+		}
+	}
+	return dto
 }
 
 func (h *contractV1Handler) getBoardDocument(c *gin.Context) {

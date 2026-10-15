@@ -16,6 +16,7 @@ import { withSignal } from '../../../../core/utils/request'
 import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../core/utils/workspaceId'
 import { PAGE_SIZES } from '../../../../core/config/pagination'
 import { getWorkspaceSelectionStore } from '../../../workspace'
+import { parsePreviewScene, type PreviewScene } from '../../core/preview/scene'
 import type { BoardState } from '../../core/document/nodes'
 
 // Workspace board transport (Public Data Plane, `/api/v1`).
@@ -75,6 +76,17 @@ export type WorkspaceBoardMeta = {
   archivedAt?: string | undefined
   createdAt: number
   updatedAt: number
+  /**
+   * Opaque content identity for the accepted persisted snapshot. Gallery
+   * skips re-render when it is unchanged; empty when the server omits it.
+   */
+  contentVersion: string
+  /**
+   * Strict-parsed server Scene projection (contract v1). Null when the
+   * server omits the scene or when it fails closed validation — the card
+   * then renders the empty layout state, never a guessed projection.
+   */
+  previewScene: PreviewScene | null
 }
 
 export type WorkspaceBoardDocument = {
@@ -134,6 +146,8 @@ function toWorkspaceBoardMeta(board: Board): WorkspaceBoardMeta {
       : { archivedAt: board.archived_at }),
     createdAt: toTimestampMs(board.created_at, 'created_at'),
     updatedAt: toTimestampMs(board.updated_at, 'updated_at'),
+    contentVersion: typeof board.content_version === 'string' ? board.content_version : '',
+    previewScene: parsePreviewScene(board.preview_scene ?? null),
   }
 }
 

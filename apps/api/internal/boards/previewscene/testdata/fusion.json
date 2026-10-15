@@ -1,0 +1,188 @@
+{
+  "name": "fusion",
+  "notes": "Fusion node with three numeric-only inputs plus a latest output, and a prompt node with an aspect ratio. Prompt/fusion full text in the snapshot must not appear in the scene; the prompt projects to a simplified shape only.",
+  "content_version": "cv-fixture-fusion-01",
+  "snapshot": {
+    "schemaVersion": 4,
+    "imageNodes": [],
+    "promptNodes": [
+      {
+        "id": 3,
+        "type": "prompt",
+        "x": 500,
+        "y": 60,
+        "width": 280,
+        "text": "gallery must never reveal this sentence",
+        "aspectRatio": "16:9",
+        "inputImages": []
+      }
+    ],
+    "fusionNodes": [
+      {
+        "id": 7,
+        "type": "fusion",
+        "x": 100,
+        "y": 50,
+        "width": 286,
+        "prompt": "top secret fusion prompt",
+        "blendPoint": {
+          "x": 0.3,
+          "y": 0.7
+        },
+        "inputImages": [
+          {
+            "url": "https://cdn.example.com/a.jpg",
+            "ratio": 1,
+            "mediaAssetId": 11,
+            "id": "in-a",
+            "sourceType": "external",
+            "sourceId": "ext-a"
+          },
+          {
+            "url": "https://cdn.example.com/b.jpg",
+            "ratio": 1,
+            "mediaAssetId": 12,
+            "id": "in-b",
+            "sourceType": "external",
+            "sourceId": "ext-b"
+          },
+          {
+            "url": "https://cdn.example.com/c.jpg",
+            "ratio": 1,
+            "mediaAssetId": 13,
+            "id": "in-c",
+            "sourceType": "external",
+            "sourceId": "ext-c"
+          }
+        ],
+        "outputStatus": "ready",
+        "outputImages": [
+          {
+            "url": "https://cdn.example.com/out.jpg",
+            "ratio": 1,
+            "mediaAssetId": 21
+          }
+        ]
+      }
+    ],
+    "connections": [
+      {
+        "id": 1,
+        "fromNodeType": "fusion",
+        "fromNodeId": 7,
+        "fromPort": "image",
+        "toNodeType": "prompt",
+        "toNodeId": 3,
+        "toPort": "prompt"
+      }
+    ],
+    "groups": []
+  },
+  "scene": {
+    "version": 1,
+    "content_version": "cv-fixture-fusion-01",
+    "bounds": {
+      "min_x": 100,
+      "min_y": 50,
+      "max_x": 780,
+      "max_y": 340,
+      "width": 680,
+      "height": 290
+    },
+    "extent": {
+      "width": 1,
+      "height": 0.4264705882352941
+    },
+    "nodes": [
+      {
+        "id": "prompt-3",
+        "kind": "prompt",
+        "x": 0.5882352941176471,
+        "y": 0.014705882352941176,
+        "width": 0.4117647058823529,
+        "height": 0.4117647058823529,
+        "aspect": 1,
+        "media": [],
+        "prompt": {
+          "aspect_ratio": "16:9",
+          "has_inputs": false
+        }
+      },
+      {
+        "id": "fusion-7",
+        "kind": "fusion",
+        "x": 0,
+        "y": 0,
+        "width": 0.42058823529411765,
+        "height": 0.42058823529411765,
+        "aspect": 1,
+        "media": [
+          {
+            "asset": "",
+            "asset_numeric": 11,
+            "tier": "preview",
+            "role": "input",
+            "index": 0
+          },
+          {
+            "asset": "",
+            "asset_numeric": 12,
+            "tier": "preview",
+            "role": "input",
+            "index": 1
+          },
+          {
+            "asset": "",
+            "asset_numeric": 13,
+            "tier": "preview",
+            "role": "input",
+            "index": 2
+          },
+          {
+            "asset": "",
+            "asset_numeric": 21,
+            "tier": "preview",
+            "role": "output",
+            "index": 0
+          }
+        ],
+        "blend": {
+          "x": 0.3,
+          "y": 0.7
+        }
+      }
+    ],
+    "connections": [
+      {
+        "key": "connection-1-0",
+        "from": "fusion-7",
+        "to": "prompt-3",
+        "from_port": "image",
+        "to_port": "prompt",
+        "start": {
+          "x": 0.42058823529411765,
+          "y": 0.21029411764705883
+        },
+        "end": {
+          "x": 0.5882352941176471,
+          "y": 0.22058823529411764
+        }
+      }
+    ],
+    "groups": [],
+    "budgets": {
+      "max_nodes": null,
+      "max_connections": null,
+      "max_media_refs": null,
+      "max_scene_bytes": null
+    },
+    "omitted": {
+      "nodes": 0,
+      "connections": 0,
+      "media_refs": 0,
+      "groups": 0,
+      "group_members": 0
+    },
+    "truncated": false
+  }
+}

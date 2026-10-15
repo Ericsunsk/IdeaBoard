@@ -8,9 +8,6 @@ describe('boardStateEnvelopeContract', () => {
     const envelope = makeBoardState({
       updatedAt: 123,
       mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }],
-      previewSnapshotDataUrl: 'data:image/webp;base64,preview',
-      previewSnapshotUpdatedAt: 124,
-      previewSnapshotVersion: 2,
     })
 
     const parsed = parseBoardStateEnvelopeContract(envelope)
@@ -23,12 +20,10 @@ describe('boardStateEnvelopeContract', () => {
         fusionNodes: expect.any(Array),
         connections: expect.any(Array),
         mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }],
-        previewSnapshotDataUrl: 'data:image/webp;base64,preview',
-        previewSnapshotUpdatedAt: 124,
-        previewSnapshotVersion: 2,
         updatedAt: 123,
       }),
     )
+    expect(parsed).not.toHaveProperty('previewSnapshotDataUrl')
   })
 
   it('rejects unknown top-level fields, including viewport', () => {
@@ -47,11 +42,12 @@ describe('boardStateEnvelopeContract', () => {
     ).toBeNull()
   })
 
-  it('rejects invalid optional preview metadata', () => {
+  it('rejects the retired preview cache instead of carrying it', () => {
     const parsed = parseBoardStateEnvelopeContract({
       ...makeBoardState(),
-      previewSnapshotUpdatedAt: Number.NaN,
-      previewSnapshotVersion: 0,
+      previewSnapshotDataUrl: 'data:image/webp;base64,preview',
+      previewSnapshotUpdatedAt: 124,
+      previewSnapshotVersion: 2,
     })
 
     expect(parsed).toBeNull()

@@ -12,7 +12,8 @@
 // local write-back of the minted/renamed meta. No optimistic document
 // content is ever written.
 
-import type { QueryFunctionContext } from '@tanstack/vue-query'
+import { QueryObserver, type QueryFunctionContext } from '@tanstack/vue-query'
+import { computed, onScopeDispose, shallowRef, watch, type Ref } from 'vue'
 import { queryClient } from '../../../../core/query/queryClient'
 import { accountScoped } from '../../../../core/query/queryDefaults'
 import {
@@ -21,7 +22,73 @@ import {
   type WorkspaceBoardDocument,
   type WorkspaceBoardMeta,
 } from '../adapters/boardsResource'
+import type { PreviewScene } from '../../core/preview/scene'
 import { boardQueryKeys } from './boardQueryKeys'
+import { getBoardScope, isCompleteBoardScope, subscribeBoardScopeChange } from '../catalog/scope'
+
+/** Gallery scene projection carried inline on one catalog list item. */
+export type BoardListSceneEntry = {
+  contentVersion: string
+  scene: PreviewScene | null
+}
+
+/** Reactive, list-only Gallery projection; Query owns every server snapshot. */
+export function useBoardCatalogScenes(boards: Readonly<Ref<readonly { id: string }[]>>) {
+  const scope = shallowRef(getBoardScope())
+  const snapshot = shallowRef<WorkspaceBoardMeta[]>([])
+  const stopScope = subscribeBoardScopeChange((next) => {
+    scope.value = next
+  })
+  const stopQuery = watch(
+    scope,
+    (captured, _, onCleanup) => {
+      snapshot.value = []
+      if (!isCompleteBoardScope(captured)) return
+      const observer = new QueryObserver(queryClient, {
+        ...boardListOptions(captured.workspaceId),
+        enabled: false,
+      })
+      onCleanup(observer.subscribe((result) => (snapshot.value = result.data ?? [])))
+      snapshot.value = observer.getCurrentResult().data ?? []
+    },
+    { immediate: true, flush: 'sync' },
+  )
+  onScopeDispose(() => {
+    stopScope()
+    stopQuery()
+  })
+  const projection = computed(
+    (previous?: {
+      userScope: string | null
+      workspaceId: string | null
+      sceneMap: Record<string, BoardListSceneEntry>
+    }) => {
+      const captured = scope.value
+      const workspaceId = isCompleteBoardScope(captured) ? captured.workspaceId : null
+      const sceneMap: Record<string, BoardListSceneEntry> = {}
+      if (workspaceId) {
+        const visibleIds = new Set(boards.value.map((board) => board.id))
+        const canReuse =
+          previous?.userScope === captured.userScope && previous?.workspaceId === workspaceId
+        for (const meta of snapshot.value) {
+          if (!visibleIds.delete(meta.id)) continue
+          const cached = canReuse ? previous.sceneMap[meta.id] : undefined
+          sceneMap[meta.id] =
+            cached?.contentVersion === meta.contentVersion &&
+            (cached.scene === null) === (meta.previewScene === null)
+              ? cached
+              : { contentVersion: meta.contentVersion, scene: meta.previewScene }
+        }
+        for (const id of visibleIds) sceneMap[id] = { contentVersion: '', scene: null }
+      }
+      return { userScope: captured.userScope, workspaceId, sceneMap }
+    },
+  )
+  return {
+    sceneMap: computed(() => projection.value.sceneMap),
+    workspaceId: computed(() => projection.value.workspaceId),
+  }
+}
 
 /** Catalog list: server board metas, 15s freshness across navigation. */
 export function boardListOptions(workspaceId: string) {

@@ -951,15 +951,12 @@ describe('boardSync', () => {
     expect(listBoards()[0]?.revision).toBe(9)
   })
 
-  it('syncs the shared remote envelope shape without viewport', async () => {
+  it('syncs the shared remote envelope shape without viewport or preview cache', async () => {
     replaceBoards([{ id: 'board-1', name: 'Envelope Board', createdAt: 100, updatedAt: 3_000 }])
     replaceBoardStateMap({
       'board-1': makeBoardState({
         updatedAt: 2_000,
         mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }],
-        previewSnapshotDataUrl: 'data:image/webp;base64,preview',
-        previewSnapshotUpdatedAt: 2_001,
-        previewSnapshotVersion: 4,
       }),
     })
     addRemoteBoard({
@@ -980,13 +977,36 @@ describe('boardSync', () => {
         fusionNodes: expect.any(Array),
         connections: expect.any(Array),
         mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }],
-        previewSnapshotDataUrl: 'data:image/webp;base64,preview',
-        previewSnapshotUpdatedAt: 2_001,
-        previewSnapshotVersion: 4,
         updatedAt: 2_000,
       }),
     )
     expect(payload.data?.payload).not.toHaveProperty('viewport')
+    expect(payload.data?.payload).not.toHaveProperty('previewSnapshotDataUrl')
+    expect(payload.data?.payload).not.toHaveProperty('previewSnapshotUpdatedAt')
+    expect(payload.data?.payload).not.toHaveProperty('previewSnapshotVersion')
+  })
+
+  it('hydrates server documents that still carry the retired preview cache', async () => {
+    replaceBoards([{ id: 'board-1', name: 'Legacy Board', createdAt: 100, updatedAt: 1_000 }])
+    const legacyState = {
+      ...makeState(1_000, 'legacy-content'),
+      previewSnapshotDataUrl: 'data:image/webp;base64,preview',
+      previewSnapshotUpdatedAt: 1_001,
+      previewSnapshotVersion: 4,
+    }
+    addRemoteBoard({
+      id: 'board-1',
+      name: 'Legacy Board',
+      createdAt: 100,
+      updatedAt: 1_000,
+      state: legacyState as never,
+    })
+
+    const result = await hydrateBoardsFromServer({ shouldPreserveLocalNewer: false })
+
+    expect(result.isOk).toBe(true)
+    expect(getPromptText('board-1')).toBe('legacy-content')
+    expect(getBoardState('board-1')).not.toHaveProperty('previewSnapshotDataUrl')
   })
 
   it('archives the board on the v1 delete path', async () => {

@@ -185,9 +185,6 @@ function makeSnapshot(promptText: string): BoardSnapshot {
 function makeState(updatedAt: number, promptText: string): BoardState {
   return makeBoardState({
     ...makeSnapshot(promptText),
-    previewSnapshotDataUrl: 'data:image/webp;base64,preview',
-    previewSnapshotUpdatedAt: updatedAt,
-    previewSnapshotVersion: 1,
     updatedAt,
   })
 }
@@ -216,43 +213,27 @@ describe('createBoardSessionRepository', () => {
     resetMediaWorkspaceIdResolver()
   })
 
-  it('drops preview data and still syncs remotely when localStorage write throws', async () => {
+  it('fails closed when the localStorage write throws', async () => {
     const board = createBoard('Quota Test')
     replaceBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
     const repository = createBoardSessionRepository()
-    const originalSetItem = localStorage.setItem.bind(localStorage)
-    let setItemCalls = 0
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const setItemSpy = vi
-      .spyOn(localStorage, 'setItem')
-      .mockImplementation((key: string, value: string) => {
-        setItemCalls += 1
-        if (setItemCalls === 1) {
-          throw new Error('quota exceeded')
-        }
-        return originalSetItem(key, value)
-      })
+    const setItemSpy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('quota exceeded')
+    })
 
     try {
-      await repository.save(board.id, makeSnapshot('saved'))
+      // Without the retired preview cache there is nothing left to shed on
+      // quota failure, so the save rejects before any remote call.
+      await expect(repository.save(board.id, makeSnapshot('saved'))).rejects.toThrow(
+        'SET_BOARD_STATE_FAILED',
+      )
     } finally {
       setItemSpy.mockRestore()
-      warnSpy.mockRestore()
     }
 
     const savedState = getBoardState(board.id)
-    expect(savedState?.promptNodes[0]?.text).toBe('saved')
-    expect(savedState).not.toHaveProperty('viewport')
-    expect(savedState?.previewSnapshotDataUrl).toBeUndefined()
-    // Ordinary document saves only replace the document (PUT) + read back
-    // the meta (GET); they never PATCH the board name.
-    expect(mocks.request).toHaveBeenCalledTimes(2)
-    expect(patchCallsFor(board.id)).toEqual([])
-    const documentBody = readPutDocumentBody(board.id)
-    expect(documentBody?.schema_version).toBe(BOARD_STATE_SCHEMA_VERSION)
-    expect(documentBody?.payload?.promptNodes[0]?.text).toBe('saved')
-    expect(documentBody?.payload).not.toHaveProperty('viewport')
-    expect(documentBody?.payload?.previewSnapshotDataUrl).toBeUndefined()
+    expect(savedState?.promptNodes[0]?.text).toBe('initial')
+    expect(mocks.request).not.toHaveBeenCalled()
   })
 
   it('keeps a collaborator rename on ordinary save instead of PATCHing the stale local name', async () => {
@@ -370,16 +351,13 @@ describe('createBoardSessionRepository', () => {
     expect(mocks.request).not.toHaveBeenCalled()
   })
 
-  it('loads a session snapshot without preview or local metadata', async () => {
+  it('loads a session snapshot without local metadata', async () => {
     const board = createBoard('Load Snapshot')
     replaceBoardStateMap({
       [board.id]: makeBoardState({
         ...makeSnapshot('loaded'),
         updatedAt: 2_000,
         mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1' }],
-        previewSnapshotDataUrl: 'data:image/webp;base64,preview',
-        previewSnapshotUpdatedAt: 2_001,
-        previewSnapshotVersion: 2,
       }),
     })
     const repository = createBoardSessionRepository()

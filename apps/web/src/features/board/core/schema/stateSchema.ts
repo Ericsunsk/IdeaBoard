@@ -123,6 +123,7 @@ const boardStateMediaRefSchema = v.strictObject({
 })
 
 const promptNodeInputImageSchema = v.strictObject({
+  mediaRef: v.optional(mediaRefSchema),
   url: nonEmptyStringSchema,
   ratio: positiveFiniteNumberSchema,
   mediaAssetId: v.optional(positiveIntegerSchema),
@@ -233,9 +234,6 @@ const boardStateShape = v.strictObject({
   connections: v.array(canvasConnectionSchema),
   groups: v.array(canvasGroupSchema),
   mediaRefs: v.optional(v.array(boardStateMediaRefSchema)),
-  previewSnapshotDataUrl: v.optional(nonEmptyStringSchema),
-  previewSnapshotUpdatedAt: v.optional(finiteNumberSchema),
-  previewSnapshotVersion: v.optional(positiveIntegerSchema),
   updatedAt: finiteNumberSchema,
 })
 

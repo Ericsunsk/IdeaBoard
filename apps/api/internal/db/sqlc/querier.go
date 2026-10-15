@@ -442,8 +442,10 @@ type Querier interface {
 	ListUserPendingPaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error)
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	// Limit authorized identifiers before joining scene bodies. The count row
+	// preserves offset validation even when the requested page is empty.
+	ListWorkspaceBoardCatalog(ctx context.Context, arg ListWorkspaceBoardCatalogParams) ([]ListWorkspaceBoardCatalogRow, error)
 	ListWorkspaceBoardMemberships(ctx context.Context, arg ListWorkspaceBoardMembershipsParams) ([]ListWorkspaceBoardMembershipsRow, error)
-	ListWorkspaceBoards(ctx context.Context, arg ListWorkspaceBoardsParams) ([]ListWorkspaceBoardsRow, error)
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]WorkspaceMembership, error)
 	ListWorkspaceTaskOutputs(ctx context.Context, arg ListWorkspaceTaskOutputsParams) ([]TaskOutput, error)
 	// ListWorkspaceTaskOutputsByTaskIDs batches output reads for list pages
@@ -513,6 +515,11 @@ type Querier interface {
 	// in the workflow_input envelope.
 	RetryWorkspaceTask(ctx context.Context, arg RetryWorkspaceTaskParams) (Task, error)
 	RevokeBoardShareToken(ctx context.Context, arg RevokeBoardShareTokenParams) (int64, error)
+	// Operator backfill sweep (backfill-board-previews): internal-id ordered
+	// pages of rows whose content identity was never assigned. Internal-id
+	// keyed like TouchWorkspaceBoard/InsertBoardDocument: ids come from the
+	// scan itself, never from caller input (see the scope-check allowlist).
+	ScanBoardDocumentsMissingPreview(ctx context.Context, rowLimit int32) ([]ScanBoardDocumentsMissingPreviewRow, error)
 	SetCurrentStorageProfile(ctx context.Context, arg SetCurrentStorageProfileParams) (int64, error)
 	SetTaskRoutingSnapshot(ctx context.Context, arg SetTaskRoutingSnapshotParams) (int64, error)
 	// Transitions read their result back through the data-modifying
@@ -525,6 +532,11 @@ type Querier interface {
 	TouchWorkspaceBoard(ctx context.Context, internalID int64) error
 	TryAbandonStaleControlIdempotency(ctx context.Context, arg TryAbandonStaleControlIdempotencyParams) (int64, error)
 	UpdateBoardDocument(ctx context.Context, arg UpdateBoardDocumentParams) (int64, error)
+	// Operator backfill write: assigns the content identity (and the scene
+	// when the stored document is extractable) without touching the document
+	// version, the snapshot bytes, or board ordering. Internal-id keyed like
+	// UpdateBoardDocument.
+	UpdateBoardDocumentPreview(ctx context.Context, arg UpdateBoardDocumentPreviewParams) (int64, error)
 	// UpdateMediaAssetMetadata refreshes dimensions and merges metadata
 	// (read-modify-write merge: unknown keys from other writers survive).
 	UpdateMediaAssetMetadata(ctx context.Context, arg UpdateMediaAssetMetadataParams) (MediaAsset, error)

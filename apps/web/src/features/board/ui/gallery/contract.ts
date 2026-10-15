@@ -1,4 +1,5 @@
 import type { ComputedRef, Ref } from 'vue'
+import type { BoardListSceneEntry } from '../../session/sync/boardQueries'
 
 export type CatalogEntry = {
   id: string
@@ -16,7 +17,8 @@ export type CatalogNavigation = {
 export type Catalog = {
   viewModel: {
     visibleBoards: ComputedRef<readonly CatalogEntry[]>
-    previewMap: Readonly<Ref<Record<string, string>>>
+    sceneMap: Readonly<Ref<Record<string, BoardListSceneEntry>>>
+    workspaceId: Readonly<Ref<string | null>>
     isBoardsLoading: Readonly<Ref<boolean>>
     catalogHydrationFailed: Readonly<Ref<boolean>>
     searchKeyword: Readonly<Ref<string>>

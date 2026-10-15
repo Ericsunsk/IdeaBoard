@@ -1,6 +1,5 @@
-import { blankBoardPreviewSurfaceClass } from '../../session/preview/boardPreviewStyle'
-
-export { blankBoardPreviewSurfaceClass }
+export const blankBoardPreviewSurfaceClass =
+  'bg-[radial-gradient(circle,var(--color-page-dot)_1px,transparent_1px),linear-gradient(var(--color-board-card-preview-from),var(--color-board-card-preview-to))] [background-size:12px_12px,cover]'
 
 export const catalogClasses = {
   page: 'app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain bg-background px-[var(--spacing-page-chrome-inset)] pt-[var(--spacing-page-chrome-inset)] pb-10 text-foreground [box-sizing:border-box] [-webkit-overflow-scrolling:touch] md:pb-16',

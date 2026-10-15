@@ -45,6 +45,8 @@ function makeDeps(): BoardCommandDependencies {
       schemaVersion: 4,
       createdAt: 100,
       updatedAt: 200,
+      contentVersion: '',
+      previewScene: null,
     })),
     archiveServerBoard: vi.fn(async () => ({
       id: 'board-server-1',
@@ -53,6 +55,8 @@ function makeDeps(): BoardCommandDependencies {
       schemaVersion: 4,
       createdAt: 100,
       updatedAt: 200,
+      contentVersion: '',
+      previewScene: null,
     })),
     registerServerBoard: vi.fn((input: { id: string; name: string; revision?: number }) =>
       makeBoard(input.id, input.name),

@@ -216,17 +216,12 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Account usage chart palette is a domain visual contract for chart series colors.',
   },
-  'src/features/board/session/preview/boardPreviewSerializer.ts': {
+  'src/features/board/ui/gallery/skin.ts': {
     counts: {
-      'hex-color': 26,
+      'hex-color': 0,
     },
-    reason: 'Serialized board thumbnail palette is baked into exported thumbnails, not app chrome.',
-  },
-  'src/features/board/session/preview/boardPreviewStyle.ts': {
-    counts: {
-      'hex-color': 4,
-    },
-    reason: 'Serialized board thumbnail palette is baked into exported thumbnails, not app chrome.',
+    reason:
+      'Board empty-card preview surface keeps the exact retired serializer surface (no hex); the allowance stays registered at zero so reintroduction is caught as an overage.',
   },
   'src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue': {
     counts: {
@@ -381,11 +376,12 @@ const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = 
     reason:
       'Cleared: divide tint and hover border now use border-border. Allowance stays registered at zero so reintroduction is caught as an overage.',
   },
-  'src/features/board/session/preview/boardPreviewStyle.ts': {
+  'src/features/board/ui/gallery/skin.ts': {
     counts: {
       'legacy-token': 2,
     },
-    reason: 'Serialized board thumbnail palette is baked into exported thumbnails, not app chrome.',
+    reason:
+      'Board empty-card preview surface mirrors the retired serialized thumbnail surface (moved from the deleted serializer style module, not new chrome).',
   },
   'src/features/board/ui/gallery/BoardCard.vue': {
     counts: {

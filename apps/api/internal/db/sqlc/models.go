@@ -127,7 +127,10 @@ type BoardDocument struct {
 	BoardID         int64              `json:"board_id"`
 	DocumentVersion int32              `json:"document_version"`
 	SnapshotData    []byte             `json:"snapshot_data"`
+	SchemaVersion   int32              `json:"schema_version"`
 	Etag            string             `json:"etag"`
+	ContentVersion  pgtype.Text        `json:"content_version"`
+	PreviewScene    []byte             `json:"preview_scene"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 

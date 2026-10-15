@@ -78,7 +78,6 @@ async function renderCanvasPage() {
     load: vi.fn(async () => snapshot),
     saveLocal: vi.fn(async (_boardId: string, saved: BoardSnapshot) => makeBoardState(saved)),
     save: vi.fn(async (_boardId: string, saved: BoardSnapshot) => makeBoardState(saved)),
-    setPreview: vi.fn(() => makeBoardState(snapshot)),
     sync: vi.fn(async () => undefined),
   }
   const stabilizeSnapshotForSave = vi.fn(async (saved: BoardSnapshot) => saved)
@@ -88,7 +87,6 @@ async function renderCanvasPage() {
     getUserIdentity,
     getWorkspaceId: () => 'ws_test123',
     repository,
-    previewRenderer: { rendererVersion: 1, render: vi.fn(async () => '') },
     createUploadLifecycle,
     message: { warning: vi.fn() },
   })
@@ -126,7 +124,7 @@ describe('CanvasPage', () => {
     const { snapshot, repository, session, createUploadLifecycle, stabilizeSnapshotForSave } =
       await renderCanvasPage()
 
-    const result = await session.save(snapshot, { shouldWaitForPreview: true })
+    const result = await session.save(snapshot)
 
     expect(result.remoteSync).toEqual({ isOk: true })
     expect(createUploadLifecycle).toHaveBeenCalledWith({
@@ -156,7 +154,7 @@ describe('CanvasPage', () => {
     expect(createUploadLifecycle).not.toHaveBeenCalled()
 
     userStore.setAuth(makeSessionUser({ storage_namespace: 'USER01' }))
-    const recovered = await session.save(snapshot, { shouldWaitForPreview: true })
+    const recovered = await session.save(snapshot)
 
     expect(recovered.remoteSync).toEqual({ isOk: true })
     expect(repository.save).toHaveBeenCalledWith('board-a', snapshot)
