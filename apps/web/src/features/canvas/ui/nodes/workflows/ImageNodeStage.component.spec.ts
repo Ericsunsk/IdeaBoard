@@ -1,7 +1,10 @@
-import { computed, nextTick, reactive, ref, toValue } from 'vue'
+import { computed, defineComponent, h, nextTick, reactive, ref, toValue } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent } from '@testing-library/vue'
 import type { ImageToolStageBinding } from '../../../tools/image-tools'
+import { provideCanvasViewportContext } from '../../../session/flow-adapter'
+import { useCanvasImageQualityZoom } from '../../../session/flow-adapter/viewport/useCanvasImageQualityZoom'
+import { useDisplayImagePreview } from '../../../session/flow-adapter/projection/useDisplayImagePreview'
 import ImageNodeStage from './ImageNodeStage.vue'
 import { render } from '../../../../../test/render'
 
@@ -37,17 +40,19 @@ vi.mock('@vueuse/core', async (importOriginal) => {
 })
 
 vi.mock('../../../session/flow-adapter/projection/useDisplayImagePreview', () => ({
-  useDisplayImagePreview: (
-    sourceUrl: Parameters<typeof toValue>[0],
-    options?: { assetId?: Parameters<typeof toValue>[0] },
-  ) => ({
-    displayUrl: computed(() => {
-      if (toValue(options?.assetId)) return previewState.displayUrl ?? ''
-      return previewState.displayUrl ?? toValue(sourceUrl) ?? ''
+  useDisplayImagePreview: vi.fn(
+    (
+      sourceUrl: Parameters<typeof toValue>[0],
+      options?: { assetId?: Parameters<typeof toValue>[0] },
+    ) => ({
+      displayUrl: computed(() => {
+        if (toValue(options?.assetId)) return previewState.displayUrl ?? ''
+        return previewState.displayUrl ?? toValue(sourceUrl) ?? ''
+      }),
+      contentFallbackUrl: computed(() => previewState.contentFallbackUrl),
+      retainDisplayUrl: previewState.retainDisplayUrl,
     }),
-    contentFallbackUrl: computed(() => previewState.contentFallbackUrl),
-    retainDisplayUrl: previewState.retainDisplayUrl,
-  }),
+  ),
 }))
 
 function renderImageStage(isToolActive: boolean) {
@@ -73,6 +78,84 @@ function renderImageStage(isToolActive: boolean) {
     },
   })
 }
+
+describe('ImageNodeStage image tool quality', () => {
+  it.each(['adjust', 'inpaint', 'outpaint'] as const)(
+    'waits for both entry and exit movements on repeated %s sessions',
+    async (tool) => {
+      vi.useFakeTimers()
+      const zoomLevel = ref(30)
+      const isToolActive = ref(false)
+      let beginMovement: (() => () => void) | undefined
+      const Harness = defineComponent({
+        setup() {
+          const quality = useCanvasImageQualityZoom(zoomLevel, () => 'board-1')
+          beginMovement = quality.beginMovement
+          provideCanvasViewportContext({ zoomLevel, imageQuality: quality.imageQuality })
+          return () =>
+            h(ImageNodeStage, {
+              nodeId: 'image-1',
+              stageWidth: 280,
+              stageHeight: 280,
+              displayImage: { url: 'https://provider.example/image.png' },
+              imageToolStageBinding:
+                tool === 'outpaint'
+                  ? null
+                  : ({
+                      isActive: isToolActive.value,
+                      mode: tool,
+                    } as ImageToolStageBinding),
+              isOutpaintModeActive: tool === 'outpaint' && isToolActive.value,
+              isActive: false,
+              isDragging: false,
+            })
+        },
+      })
+      const view = render(Harness, {
+        global: {
+          stubs: {
+            StagePresentation: { template: '<div><slot /></div>' },
+            NodeStageFrame: { template: '<div><slot /></div>' },
+          },
+        },
+      })
+      try {
+        const options = vi.mocked(useDisplayImagePreview).mock.lastCall?.[1]
+        if (!options || !beginMovement) throw new Error('Image quality was not initialized')
+        expect(toValue(options.maxSide)).toBe(256)
+        for (let entry = 0; entry < 3; entry += 1) {
+          const finishEntry = beginMovement()
+          isToolActive.value = true
+          zoomLevel.value = 200
+          await nextTick()
+          await vi.advanceTimersByTimeAsync(500)
+          expect(toValue(options.maxSide)).toBe(256)
+          expect(toValue(options.isDisplayCommitEnabled)).toBe(false)
+          finishEntry()
+          await vi.advanceTimersByTimeAsync(79)
+          expect(toValue(options.maxSide)).toBe(256)
+          await vi.advanceTimersByTimeAsync(1)
+          expect(toValue(options.maxSide)).toBeNull()
+          expect(toValue(options.isDisplayCommitEnabled)).toBe(true)
+
+          const finishExit = beginMovement()
+          isToolActive.value = false
+          zoomLevel.value = 30
+          await nextTick()
+          await vi.advanceTimersByTimeAsync(500)
+          expect(toValue(options.maxSide)).toBeNull()
+          expect(toValue(options.isDisplayCommitEnabled)).toBe(false)
+          finishExit()
+          await vi.advanceTimersByTimeAsync(80)
+          expect(toValue(options.maxSide)).toBe(256)
+          expect(toValue(options.isDisplayCommitEnabled)).toBe(true)
+        }
+      } finally {
+        view.unmount()
+      }
+    },
+  )
+})
 
 describe('ImageNodeStage disabled state', () => {
   it('disables file selection while an image action is generating', () => {

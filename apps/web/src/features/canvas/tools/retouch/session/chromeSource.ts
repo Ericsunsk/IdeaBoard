@@ -6,7 +6,7 @@ import {
   useZeroCopyRetouchStage,
   type ZeroCopyStageHandle,
 } from './stage/useZeroCopyRetouchStage.ts'
-import { resolveStableSourceKey, useStableSourceImage } from './histogram/stableSourceImage.ts'
+import { useStableSourceImage } from './histogram/stableSourceImage.ts'
 import { useRetouchHistogramSource } from './histogram/useRetouchHistogramSource'
 
 /**
@@ -46,7 +46,7 @@ export type RetouchChromeSource = {
 export function createRetouchChromeSource(
   options: RetouchChromeSourceOptions,
 ): RetouchChromeSource {
-  const decodedSourceKey = ref('')
+  const decodedSourceRevision = ref(0)
 
   // Zero-copy GPU stage (issues #672, #673): the mounted canvas IS the render
   // target. Texture binding uses the DOM image already on screen directly.
@@ -58,7 +58,7 @@ export function createRetouchChromeSource(
 
   // Shared DOM source: the raw on-screen node image, before any GPU effect.
   function resolveStageDomImage(): HTMLImageElement | null {
-    void decodedSourceKey.value
+    void decodedSourceRevision.value
     return resolveDomTextureImage(options.getStageElement())
   }
 
@@ -75,7 +75,7 @@ export function createRetouchChromeSource(
         image instanceof HTMLImageElement &&
         image === resolveStageDomImage()
       ) {
-        decodedSourceKey.value = resolveStableSourceKey(image)
+        decodedSourceRevision.value += 1
       }
     },
     { capture: true },
@@ -89,7 +89,9 @@ export function createRetouchChromeSource(
     isAdjustMode: options.isAdjustMode,
     resolveDomImage: () => resolveStageDomImage(),
     refreshSource: options.layers,
-    sessionKey: computed(() => JSON.stringify([options.sessionKey.value, decodedSourceKey.value])),
+    sessionKey: computed(() =>
+      JSON.stringify([options.sessionKey.value, decodedSourceRevision.value]),
+    ),
   })
   const { retouchHistogramSource } = useRetouchHistogramSource({
     isAdjustMode: options.isAdjustMode,

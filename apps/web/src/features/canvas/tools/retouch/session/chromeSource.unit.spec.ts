@@ -163,6 +163,35 @@ describe('createRetouchChromeSource histogram base', () => {
 })
 
 describe('createRetouchChromeSource decoded image quality', () => {
+  it('upgrades the same original on repeated entries after the Canvas tier changes outside Retouch', async () => {
+    const { source, stageElement, isAdjustMode, unmount } = mountChromeSource()
+    try {
+      for (let entry = 0; entry < 3; entry += 1) {
+        isAdjustMode.value = false
+        source.retouchStage.setCanvasRef(null)
+        await nextTick()
+        const thumbnail = readyImage('https://example.com/thumb.webp', 256, 192)
+        stageElement.replaceChildren(thumbnail)
+        thumbnail.dispatchEvent(new Event('load'))
+        const canvas = document.createElement('canvas')
+        stageElement.appendChild(canvas)
+        isAdjustMode.value = true
+        source.retouchStage.setCanvasRef(canvas)
+        await nextTick()
+        expect(rendererMocks.updateSourceImage).toHaveBeenLastCalledWith(thumbnail, 256, 192)
+
+        const original = readyImage('https://example.com/original.webp', 4000, 3000)
+        stageElement.replaceChild(original, thumbnail)
+        original.dispatchEvent(new Event('load'))
+        await nextTick()
+        expect(rendererMocks.updateSourceImage).toHaveBeenLastCalledWith(original, 4000, 3000)
+        expect(source.retouchStage.stageStatus.value).toBe('ready')
+      }
+    } finally {
+      unmount()
+    }
+  })
+
   it('rebinds the original image after entering Retouch from a low-resolution Canvas tier', async () => {
     const { source, sessionApi, stageElement, drawImage, unmount } = mountChromeSource()
     try {
