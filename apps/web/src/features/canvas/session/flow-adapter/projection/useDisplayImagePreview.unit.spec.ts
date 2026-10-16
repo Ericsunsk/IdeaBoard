@@ -105,6 +105,20 @@ async function waitForPreviewWork() {
   }
 }
 
+function stubDeferredImageDecode() {
+  const decodes: Array<() => void> = []
+  vi.stubGlobal(
+    'Image',
+    class {
+      src = ''
+      decode() {
+        return new Promise<void>((resolve) => decodes.push(resolve))
+      }
+    },
+  )
+  return decodes
+}
+
 describe('useDisplayImagePreview', () => {
   beforeEach(() => {
     delete window.__canvasInteractionBenchmarkCounters
@@ -152,6 +166,7 @@ describe('useDisplayImagePreview', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     delete window.__canvasInteractionBenchmarkCounters
     resetMediaWorkspaceIdResolver()
     vi.restoreAllMocks()
@@ -314,6 +329,126 @@ describe('useDisplayImagePreview', () => {
     scope.stop()
   })
 
+  it('holds a late decoded derivative until display commits resume without decoding again', async () => {
+    const decodes = stubDeferredImageDecode()
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const maxSide = ref<number | null>(256)
+    const isDisplayCommitEnabled = ref(true)
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview('/uploads/image.png', {
+        maxSide,
+        assetId: 'asset-42',
+        isDisplayCommitEnabled,
+      }),
+    )!
+    await vi.waitFor(() => expect(decodes).toHaveLength(1))
+    decodes[0]!()
+    await flushPreviewTasks()
+    const previousUrl = preview.displayUrl.value
+    expect(previousUrl).toContain('/derivatives/thumb')
+
+    maxSide.value = null
+    await vi.waitFor(() => expect(decodes).toHaveLength(2))
+    isDisplayCommitEnabled.value = false
+    decodes[1]!()
+    await flushPreviewTasks()
+    expect(preview.displayUrl.value).toBe(previousUrl)
+
+    isDisplayCommitEnabled.value = true
+    expect(preview.displayUrl.value).toContain('/content')
+    expect(decodes).toHaveLength(2)
+    scope.stop()
+  })
+
+  it('discards a held decoded candidate when the requested tier changes before resuming', async () => {
+    const decodes = stubDeferredImageDecode()
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const maxSide = ref<number | null>(256)
+    const isDisplayCommitEnabled = ref(true)
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview('/uploads/image.png', {
+        maxSide,
+        assetId: 'asset-42',
+        isDisplayCommitEnabled,
+      }),
+    )!
+    await vi.waitFor(() => expect(decodes).toHaveLength(1))
+    decodes[0]!()
+    await flushPreviewTasks()
+    const previousUrl = preview.displayUrl.value
+
+    maxSide.value = null
+    await vi.waitFor(() => expect(decodes).toHaveLength(2))
+    isDisplayCommitEnabled.value = false
+    decodes[1]!()
+    await flushPreviewTasks()
+    maxSide.value = 640
+    isDisplayCommitEnabled.value = true
+    expect(preview.displayUrl.value).toBe(previousUrl)
+    await vi.waitFor(() => expect(decodes).toHaveLength(3))
+    decodes[2]!()
+    await flushPreviewTasks()
+    expect(preview.displayUrl.value).toContain('/derivatives/preview')
+    scope.stop()
+  })
+
+  it('holds an entry decode throughout exit movement and settle, then keeps the final zoom tier', async () => {
+    const decodes = stubDeferredImageDecode()
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const { useCanvasImageQualityZoom } = await import('../viewport/useCanvasImageQualityZoom')
+    const { useCanvasImagePreviewQuality } =
+      await import('../viewport/useCanvasImagePreviewQuality')
+    const zoomLevel = ref(30)
+    const shouldForceFullQuality = ref(false)
+    const scope = effectScope()
+    const state = scope.run(() => {
+      const quality = useCanvasImageQualityZoom(zoomLevel, () => 'board-a')
+      const { maxSide } = useCanvasImagePreviewQuality({
+        imageQuality: quality.imageQuality,
+        shouldForceFullQuality,
+      })
+      return {
+        ...quality,
+        preview: useDisplayImagePreview('/uploads/image.png', {
+          maxSide,
+          assetId: 'asset-42',
+          isDisplayCommitEnabled: quality.imageQuality.isSettled,
+        }),
+      }
+    })!
+    await vi.waitFor(() => expect(decodes).toHaveLength(1))
+    decodes[0]!()
+    await flushPreviewTasks()
+    const previousUrl = state.preview.displayUrl.value
+    expect(previousUrl).toContain('/derivatives/thumb')
+
+    vi.useFakeTimers()
+    const finishEntry = state.beginMovement()
+    shouldForceFullQuality.value = true
+    zoomLevel.value = 200
+    finishEntry()
+    await vi.advanceTimersByTimeAsync(80)
+    expect(decodes).toHaveLength(2)
+
+    const finishExit = state.beginMovement()
+    shouldForceFullQuality.value = false
+    zoomLevel.value = 30
+    decodes[1]!()
+    await flushPreviewTasks()
+    expect(state.preview.displayUrl.value).toBe(previousUrl)
+    finishExit()
+    await vi.advanceTimersByTimeAsync(79)
+    expect(state.imageQuality.isSettled.value).toBe(false)
+    expect(state.preview.displayUrl.value).toBe(previousUrl)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(state.imageQuality.isSettled.value).toBe(true)
+    expect(state.preview.displayUrl.value).toBe(previousUrl)
+    expect(decodes).toHaveLength(2)
+    scope.stop()
+  })
+
   it.each([2048, null])('resolves full quality (%s) to the content route', async (maxSide) => {
     const sourceUrl = ref('/uploads/tasks/U123/board/content/image.png')
     const { useDisplayImagePreview } = await importPreviewModule()
@@ -357,6 +492,154 @@ describe('useDisplayImagePreview', () => {
         '/api/v1/workspaces/ws_test123/media-assets/asset-42/content',
       ),
     )
+    scope.stop()
+  })
+
+  it('retries a temporarily failed zoom-tier decode while retaining the previous frame', async () => {
+    let originalAttempts = 0
+    vi.stubGlobal(
+      'Image',
+      class {
+        src = ''
+        decode() {
+          if (this.src.endsWith('/content') && originalAttempts++ === 0) {
+            return Promise.reject(new Error('Image temporarily unavailable'))
+          }
+          return Promise.resolve()
+        }
+      },
+    )
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const maxSide = ref<number | null>(256)
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview('/uploads/image.png', { maxSide, assetId: 'asset-42' }),
+    )!
+    await vi.waitFor(() => expect(preview.displayUrl.value).toContain('/derivatives/thumb'))
+    const previousUrl = preview.displayUrl.value
+
+    vi.useFakeTimers()
+    maxSide.value = null
+    await flushPreviewTasks()
+    expect(originalAttempts).toBe(1)
+    expect(preview.displayUrl.value).toBe(previousUrl)
+    await vi.advanceTimersByTimeAsync(800)
+    expect(originalAttempts).toBe(2)
+    expect(preview.displayUrl.value).toContain('/content')
+    scope.stop()
+  })
+
+  it('recovers the requested derivative after it and the original fail without swapping during movement', async () => {
+    const decodedUrls: string[] = []
+    let isRecovered = false
+    vi.stubGlobal(
+      'Image',
+      class {
+        src = ''
+        decode() {
+          decodedUrls.push(this.src)
+          return this.src.endsWith('/thumb') || isRecovered
+            ? Promise.resolve()
+            : Promise.reject(new Error('Image temporarily unavailable'))
+        }
+      },
+    )
+    const { useDisplayImagePreview } = await importPreviewModule()
+    const maxSide = ref<number | null>(256)
+    const isDisplayCommitEnabled = ref(true)
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview('/uploads/image.png', {
+        maxSide,
+        assetId: 'asset-42',
+        isDisplayCommitEnabled,
+      }),
+    )!
+    await vi.waitFor(() => expect(preview.displayUrl.value).toContain('/derivatives/thumb'))
+    const previousUrl = preview.displayUrl.value
+    const previewUrl = previousUrl.replace('/thumb', '/preview')
+    const originalUrl = previousUrl.replace('/derivatives/thumb', '/content')
+
+    vi.useFakeTimers()
+    maxSide.value = 640
+    await flushPreviewTasks()
+    expect(decodedUrls).toEqual([previousUrl, previewUrl, originalUrl])
+    expect(preview.displayUrl.value).toBe(previousUrl)
+
+    isDisplayCommitEnabled.value = false
+    isRecovered = true
+    await vi.advanceTimersByTimeAsync(800)
+    expect(decodedUrls).toEqual([previousUrl, previewUrl, originalUrl, previewUrl])
+    expect(preview.displayUrl.value).toBe(previousUrl)
+
+    isDisplayCommitEnabled.value = true
+    expect(preview.displayUrl.value).toBe(previewUrl)
+    scope.stop()
+  })
+
+  it.each(['tier change', 'source change', 'dispose'])(
+    'cancels a pending decode retry on %s',
+    async (action) => {
+      let originalAttempts = 0
+      vi.stubGlobal(
+        'Image',
+        class {
+          src = ''
+          decode() {
+            if (this.src.endsWith('/content')) {
+              originalAttempts += 1
+              return Promise.reject(new Error('Image temporarily unavailable'))
+            }
+            return Promise.resolve()
+          }
+        },
+      )
+      const { useDisplayImagePreview } = await importPreviewModule()
+      const maxSide = ref<number | null>(256)
+      const sourceUrl = ref('/uploads/image.png')
+      const scope = effectScope()
+      const preview = scope.run(() =>
+        useDisplayImagePreview(sourceUrl, { maxSide, assetId: 'asset-42' }),
+      )!
+      await vi.waitFor(() => expect(preview.displayUrl.value).toContain('/derivatives/thumb'))
+      vi.useFakeTimers()
+      maxSide.value = null
+      await flushPreviewTasks()
+      expect(originalAttempts).toBe(1)
+
+      if (action === 'dispose') scope.stop()
+      else if (action === 'source change') sourceUrl.value = ''
+      else maxSide.value = 640
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(originalAttempts).toBe(1)
+      if (action === 'tier change') {
+        expect(preview.displayUrl.value).toContain('/derivatives/preview')
+      }
+      scope.stop()
+    },
+  )
+
+  it('bounds retries when an image remains unavailable', async () => {
+    const decode = vi.fn().mockRejectedValue(new Error('Image unavailable'))
+    vi.stubGlobal(
+      'Image',
+      class {
+        src = ''
+        decode() {
+          return decode()
+        }
+      },
+    )
+    const { useDisplayImagePreview } = await importPreviewModule()
+    vi.useFakeTimers()
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview('/uploads/image.png', { maxSide: null, assetId: 'asset-42' }),
+    )!
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(decode).toHaveBeenCalledTimes(4)
+    expect(preview.displayUrl.value).toBe('')
+    expect(vi.getTimerCount()).toBe(0)
     scope.stop()
   })
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { effectScope, ref } from 'vue'
+import { effectScope, nextTick, ref } from 'vue'
 import {
   MediaWorkspaceUnavailableError,
   WORKSPACE_MEDIA_BATCH_MAX_ITEMS,
@@ -148,6 +148,90 @@ describe('workspace mediaAssetDelivery', () => {
     await vi.waitFor(() => expect(delivery.url.value).toBe('/api/v1/preview.webp'))
     expect(mocks.request).toHaveBeenCalledTimes(2)
     scope.stop()
+  })
+
+  it('recovers a zoom-tier read after a transient metadata failure', async () => {
+    vi.useFakeTimers()
+    const tier = ref<'thumb' | 'large-preview'>('thumb')
+    mocks.request
+      .mockResolvedValueOnce(assetEnvelope('ready'))
+      .mockRejectedValueOnce(Object.assign(new Error('Service unavailable'), { status: 503 }))
+      .mockResolvedValueOnce(assetEnvelope('ready'))
+    const scope = effectScope()
+    try {
+      const delivery = scope.run(() => useMediaAssetDelivery(ref(ASSET_ID), tier))
+      if (!delivery) throw new Error('delivery composable was not created')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(delivery.url.value).toBe('/api/v1/preview.webp')
+
+      invalidateMediaAssetMetadata()
+      tier.value = 'large-preview'
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(delivery.status.value).toBe('error')
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(delivery.url.value).toBe('/api/v1/large.webp')
+      expect(mocks.request).toHaveBeenCalledTimes(3)
+    } finally {
+      scope.stop()
+      vi.useRealTimers()
+    }
+  })
+
+  it.each([undefined, 408, 429, 503])('bounds retries for delivery status %s', async (status) => {
+    vi.useFakeTimers()
+    mocks.request.mockRejectedValue(Object.assign(new Error('Read failed'), { status }))
+    const scope = effectScope()
+    try {
+      const delivery = scope.run(() => useMediaAssetDelivery(ref(ASSET_ID), ref('preview')))
+      if (!delivery) throw new Error('delivery composable was not created')
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(delivery.status.value).toBe('error')
+      expect(mocks.request).toHaveBeenCalledTimes(4)
+    } finally {
+      scope.stop()
+      vi.useRealTimers()
+    }
+  })
+
+  it.each([401, 403, 404, 422])('does not retry permanent delivery status %s', async (status) => {
+    vi.useFakeTimers()
+    mocks.request.mockRejectedValue(Object.assign(new Error('Read denied'), { status }))
+    const scope = effectScope()
+    try {
+      const delivery = scope.run(() => useMediaAssetDelivery(ref(ASSET_ID), ref('preview')))
+      if (!delivery) throw new Error('delivery composable was not created')
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(delivery.status.value).toBe('error')
+      expect(mocks.request).toHaveBeenCalledTimes(1)
+    } finally {
+      scope.stop()
+      vi.useRealTimers()
+    }
+  })
+
+  it('cancels a scheduled delivery retry when disabled', async () => {
+    vi.useFakeTimers()
+    mocks.request.mockRejectedValue(Object.assign(new Error('Read failed'), { status: 503 }))
+    const scope = effectScope()
+    const isEnabled = ref(true)
+    try {
+      const delivery = scope.run(() =>
+        useMediaAssetDelivery(ref(ASSET_ID), ref('preview'), { isEnabled }),
+      )
+      if (!delivery) throw new Error('delivery composable was not created')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(delivery.status.value).toBe('error')
+      isEnabled.value = false
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(delivery.status.value).toBe('idle')
+      expect(mocks.request).toHaveBeenCalledTimes(1)
+    } finally {
+      scope.stop()
+      vi.useRealTimers()
+    }
   })
 
   it('cancels delivery while the asset is not visible', async () => {

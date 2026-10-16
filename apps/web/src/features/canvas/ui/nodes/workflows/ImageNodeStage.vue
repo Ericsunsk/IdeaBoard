@@ -236,6 +236,7 @@ const {
   assetId: () => stageDisplayImage.value?.assetId,
   isVisible: isStageVisible,
   shouldKeepPreviousOnSourceChange: true,
+  isDisplayCommitEnabled: canvasViewport.imageQuality.isSettled,
 })
 // Media assets are authenticated API resources. Do not bind their API URL as
 // an optimistic <img> fallback while the signed delivery URL is loading: the

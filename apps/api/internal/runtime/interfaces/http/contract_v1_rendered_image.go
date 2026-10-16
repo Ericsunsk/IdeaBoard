@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -9,8 +10,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const statusClientClosedRequest = 499
+
 func writeRenderedImage(c *gin.Context, image imgproxy.Image, err error, cacheControl string) {
 	if err != nil {
+		if errors.Is(err, context.Canceled) && errors.Is(c.Request.Context().Err(), context.Canceled) {
+			c.Status(statusClientClosedRequest)
+			c.Abort()
+			return
+		}
 		status := http.StatusServiceUnavailable
 		switch {
 		case errors.Is(err, imgproxy.ErrSource):

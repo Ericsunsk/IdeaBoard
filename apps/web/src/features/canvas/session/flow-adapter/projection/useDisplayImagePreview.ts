@@ -28,6 +28,7 @@ interface PreviewOptions {
   assetId?: MaybeRefOrGetter<MediaAssetId | null | undefined>
   isVisible?: MaybeRefOrGetter<boolean>
   shouldKeepPreviousOnSourceChange?: boolean
+  isDisplayCommitEnabled?: MaybeRefOrGetter<boolean>
 }
 
 const DEFAULT_MAX_SIDE = 1280
@@ -81,6 +82,37 @@ function canDisplayImage(url: string, signal: AbortSignal, metricName: string): 
   })
 }
 
+function waitForDisplayRetry(delayMs: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.resolve()
+  return new Promise((resolve) => {
+    const finish = () => {
+      window.clearTimeout(timer)
+      signal.removeEventListener('abort', finish)
+      resolve()
+    }
+    const timer = window.setTimeout(finish, delayMs)
+    signal.addEventListener('abort', finish, { once: true })
+  })
+}
+
+async function decodeDisplayCandidate(
+  url: string,
+  fallbackUrl: () => string,
+  signal: AbortSignal,
+  metricName: string,
+): Promise<string> {
+  for (const delayMs of [0, 800, 1600, 2000]) {
+    if (delayMs) await waitForDisplayRetry(delayMs, signal)
+    if (signal.aborted) return ''
+    if (await canDisplayImage(url, signal, metricName)) return url
+    const fallback = fallbackUrl()
+    if (fallback && fallback !== url && (await canDisplayImage(fallback, signal, metricName))) {
+      return fallback
+    }
+  }
+  return ''
+}
+
 export function useDisplayImagePreview(
   sourceUrl: MaybeRefOrGetter<string | null | undefined>,
   options: PreviewOptions = {},
@@ -115,6 +147,7 @@ export function useDisplayImagePreview(
   const previewUrl = ref<string | null>(null)
   const isResolved = ref(false)
   const displayedUrl = ref('')
+  const decodedCandidate = ref<{ url: string; maxSide: number | null } | null>(null)
   const displayedSource = ref('')
   let requestToken = 0
   let activeSource = ''
@@ -196,6 +229,8 @@ export function useDisplayImagePreview(
     [resolvedSourceUrl, candidateUrl],
     ([currentSource, nextUrl]) => {
       displayRequestToken += 1
+      decodedCandidate.value = null
+      const maxSide = resolvedMaxSide.value
       const token = displayRequestToken
       displayController?.abort()
       displayController = new AbortController()
@@ -225,12 +260,12 @@ export function useDisplayImagePreview(
 
       const decodeMetric =
         resolvedAssetId.value === null ? 'displayImageFallbackDecode' : 'displayImageManagedDecode'
-      void canDisplayImage(nextUrl, signal, decodeMetric).then(async (isDisplayable) => {
-        let decodedUrl = isDisplayable ? nextUrl : ''
-        const fallbackUrl = contentFallbackUrl.value
-        if (!decodedUrl && fallbackUrl && fallbackUrl !== nextUrl && !signal.aborted) {
-          if (await canDisplayImage(fallbackUrl, signal, decodeMetric)) decodedUrl = fallbackUrl
-        }
+      void decodeDisplayCandidate(
+        nextUrl,
+        () => contentFallbackUrl.value,
+        signal,
+        decodeMetric,
+      ).then((decodedUrl) => {
         if (
           !decodedUrl ||
           token !== displayRequestToken ||
@@ -239,11 +274,22 @@ export function useDisplayImagePreview(
         ) {
           return
         }
-        displayedUrl.value = decodedUrl
-        previewResources.display(decodedUrl)
+        decodedCandidate.value = { url: decodedUrl, maxSide }
       })
     },
     { immediate: true, flush: 'sync' },
+  )
+
+  watch(
+    [decodedCandidate, resolvedMaxSide, () => toValue(options.isDisplayCommitEnabled) !== false],
+    ([candidate, maxSide, isCommitEnabled]) => {
+      if (!candidate || candidate.maxSide !== maxSide || (!isCommitEnabled && displayedUrl.value)) {
+        return
+      }
+      displayedUrl.value = candidate.url
+      previewResources.display(candidate.url)
+    },
+    { flush: 'sync' },
   )
 
   const displayUrl = computed(() => displayedUrl.value)

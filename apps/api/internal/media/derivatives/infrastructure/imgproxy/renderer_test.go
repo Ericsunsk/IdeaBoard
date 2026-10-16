@@ -150,7 +150,7 @@ func TestRendererCancellation(t *testing.T) {
 	}()
 	<-started
 	cancel()
-	if err := <-done; !errors.Is(err, imgproxy.ErrUnavailable) {
+	if err := <-done; !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancel error = %v", err)
 	}
 }

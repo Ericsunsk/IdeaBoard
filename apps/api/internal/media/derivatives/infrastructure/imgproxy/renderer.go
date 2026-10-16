@@ -119,6 +119,9 @@ func (r *Renderer) fetch(ctx context.Context, target string) (Image, error) {
 	}
 	response, err := r.client.Do(request)
 	if err != nil {
+		if ctx.Err() != nil {
+			return Image{}, ctx.Err()
+		}
 		return Image{}, ErrUnavailable
 	}
 	defer response.Body.Close()
@@ -133,7 +136,13 @@ func (r *Renderer) fetch(ctx context.Context, target string) (Image, error) {
 		return Image{}, ErrUnavailable
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxImageBytes+1))
-	if err != nil || len(data) == 0 || len(data) > maxImageBytes {
+	if err != nil {
+		if ctx.Err() != nil {
+			return Image{}, ctx.Err()
+		}
+		return Image{}, ErrUnavailable
+	}
+	if len(data) == 0 || len(data) > maxImageBytes {
 		return Image{}, ErrUnavailable
 	}
 	return Image{Data: data, MIMEType: mime}, nil

@@ -45,6 +45,20 @@ function resolveVariant(metadata: MediaAssetDeliveryMetadata, tier: MediaAssetDe
   return tier === 'original' ? metadata.original : metadata.derivatives[tier]
 }
 
+function isTransientDeliveryError(error: unknown): boolean {
+  if (!(error instanceof Error) || !('status' in error)) return false
+  const status = error.status
+  return (
+    status == null ||
+    status === 408 ||
+    status === 425 ||
+    status === 429 ||
+    (typeof status === 'number' && status >= 500 && status < 600)
+  )
+}
+
+const MAX_DELIVERY_ERROR_RETRIES = 3
+
 export function useMediaAssetDelivery(
   assetId: MaybeRefOrGetter<MediaAssetId | null | undefined>,
   tier: MaybeRefOrGetter<MediaAssetDeliveryTier>,
@@ -62,12 +76,14 @@ export function useMediaAssetDelivery(
   let unsubscribeInvalidation: (() => void) | null = null
   let releaseWorkspaceSubscription: (() => void) | null = null
   let retryTimer = 0
+  let errorRetries = 0
   const retryDelay = createPollDelay({ initialDelayMs: 800, maxDelayMs: 2_000, backoffFactor: 2 })
 
   function reset() {
     window.clearTimeout(retryTimer)
     retryTimer = 0
     retryDelay.reset()
+    errorRetries = 0
     metadata.value = null
     url.value = ''
     status.value = 'idle'
@@ -132,6 +148,8 @@ export function useMediaAssetDelivery(
 
   async function load(currentAssetId: string, currentTier: MediaAssetDeliveryTier, force = false) {
     const token = requestToken
+    window.clearTimeout(retryTimer)
+    retryTimer = 0
     abortController?.abort()
     const controller = new AbortController()
     abortController = controller
@@ -143,6 +161,7 @@ export function useMediaAssetDelivery(
         force,
       })
       if (token !== requestToken || controller.signal.aborted) return
+      errorRetries = 0
       metadata.value = nextMetadata
       const variant = resolveVariant(nextMetadata, currentTier)
       const nextStatus = (variant?.status || nextMetadata.status) as MediaAssetDeliveryStatus
@@ -152,6 +171,10 @@ export function useMediaAssetDelivery(
       status.value = 'error'
       error.value = loadError
       url.value = ''
+      if (isTransientDeliveryError(loadError) && errorRetries < MAX_DELIVERY_ERROR_RETRIES) {
+        errorRetries += 1
+        scheduleDeliveryRetry(currentAssetId, currentTier)
+      }
     }
   }
 
