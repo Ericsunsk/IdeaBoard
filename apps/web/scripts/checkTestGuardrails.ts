@@ -245,6 +245,12 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies provider status color transitions and absence of row opacity changes while toggles settle.',
     },
   ],
+  'src/features/library/ui/LibraryFloatingIsland.component.spec.ts': [
+    {
+      reason:
+        'Verifies the expanded Search island layout widths (collapsed 350px vs expanded viewport-relative) across close/reopen transitions.',
+    },
+  ],
   'src/features/admin/settings/ui/cards/mail/AdminMailConfigCard.component.spec.ts': [
     {
       reason:

@@ -58,11 +58,17 @@ export function resolveMediaDisplayUrl(
 }
 
 export function fitMediaDisplaySize(
-  source: { width: number; height: number } | null,
+  source: { width: number | null; height: number | null } | null,
   maxWidth: number,
   maxHeight: number,
 ): { width: number; height: number } {
-  if (!source || source.width <= 0 || source.height <= 0) {
+  if (
+    !source ||
+    source.width == null ||
+    source.height == null ||
+    source.width <= 0 ||
+    source.height <= 0
+  ) {
     return { width: maxWidth, height: maxHeight }
   }
   const scale = Math.min(maxWidth / source.width, maxHeight / source.height)

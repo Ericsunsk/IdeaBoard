@@ -115,26 +115,6 @@ func TestV1LibraryDisplayUsesCompletedManagedLink(t *testing.T) {
 	}
 }
 
-type displayDirectStore struct {
-	*librarymemory.InMemoryWorkspaceLibraryStore
-}
-
-func (s displayDirectStore) GetAsset(ctx context.Context, workspaceID, assetID string) (*librarydomain.V1Asset, error) {
-	asset, err := s.InMemoryWorkspaceLibraryStore.GetAsset(ctx, workspaceID, assetID)
-	if asset != nil {
-		copy := *asset
-		copy.Provider = librarydomain.ProviderWorkspaceMedia
-		asset = &copy
-	}
-	return asset, err
-}
-
-type displayManagedReader struct{ mediaID string }
-
-func (r displayManagedReader) FindManagedMedia(context.Context, string, string) (string, error) {
-	return r.mediaID, nil
-}
-
 func TestV1LibraryDisplayDirectManagedLinks(t *testing.T) {
 	f := newV1MediaFixture(t)
 	lib := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
@@ -142,12 +122,21 @@ func TestV1LibraryDisplayDirectManagedLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	asset, _, err := lib.SaveAsset(context.Background(), f.ws.PublicID, librarydomain.V1SaveAssetInput{Asset: librarydomain.AssetInput{Provider: "unsplash", SourceID: "direct", SourceURL: "https://unsplash.com/direct", PreviewURL: "https://images.unsplash.com/preview", OriginalURL: "https://images.unsplash.com/original"}}, id)
+	managed, err := workspacemedia.IngestImage(context.Background(), f.media, f.objects, workspacemedia.IngestImageParams{WorkspaceID: f.ws.PublicID, OwnerUserID: f.owner, FilenameStem: "direct", Data: readThroughPNGBytes(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	asset.Provider = librarydomain.ProviderWorkspaceMedia
-	managed, err := workspacemedia.IngestImage(context.Background(), f.media, f.objects, workspacemedia.IngestImageParams{WorkspaceID: f.ws.PublicID, OwnerUserID: f.owner, FilenameStem: "direct", Data: readThroughPNGBytes(t)})
+	lib.RegisterManagedMediaForTests(f.ws.PublicID, managed.ID, nil, nil, false)
+	lib.RegisterManagedMediaForTests(f.ws.PublicID, "asset_dangling000000001", nil, nil, false)
+	asset, _, err := lib.SaveManagedMediaAsset(context.Background(), f.ws.PublicID, librarydomain.V1SaveManagedAssetInput{MediaAssetID: managed.ID, OperatorUserID: f.owner}, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	danglingID, err := librarydomain.NewV1AssetPublicID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dangling, _, err := lib.SaveManagedMediaAsset(context.Background(), f.ws.PublicID, librarydomain.V1SaveManagedAssetInput{MediaAssetID: "asset_dangling000000001", OperatorUserID: f.owner}, danglingID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,18 +148,16 @@ func TestV1LibraryDisplayDirectManagedLinks(t *testing.T) {
 	}
 	for _, tt := range []struct {
 		name   string
-		reader libraryapplication.ManagedMediaReader
+		target *librarydomain.V1Asset
 		status int
 	}{
-		{"ready canonical asset", displayManagedReader{managed.ID}, http.StatusOK},
-		{"dangling canonical asset", displayManagedReader{"asset_dangling000000001"}, http.StatusNotFound},
-		{"empty canonical asset", displayManagedReader{}, http.StatusNotFound},
-		{"unwired canonical reader", nil, http.StatusServiceUnavailable},
+		{"ready canonical asset", asset, http.StatusOK},
+		{"dangling canonical asset", dangling, http.StatusNotFound},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			sources := &libraryapplication.SourceResolver{Store: displayDirectStore{lib}, ManagedMedia: tt.reader}
+			sources := &libraryapplication.SourceResolver{Store: lib}
 			engine := newV1MediaTestEngine(f.store, f.dir, ContractV1Deps{Media: f.media, MediaObjects: f.objects, MediaRenderer: renderer, MediaPreviews: previews, Library: ContractV1LibraryDeps{Store: lib, Sources: sources}})
-			status, headers, _ := doV1RoundTrip(t, engine, v1Call{method: "GET", path: libraryDisplay(f.ws.PublicID, asset).Variants[0].URL, userID: f.member}, "library-direct-")
+			status, headers, _ := doV1RoundTrip(t, engine, v1Call{method: "GET", path: libraryDisplay(f.ws.PublicID, tt.target).Variants[0].URL, userID: f.member}, "library-direct-")
 			if status != tt.status {
 				t.Fatalf("status = %d, want %d", status, tt.status)
 			}

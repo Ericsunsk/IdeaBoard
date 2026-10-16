@@ -136,7 +136,7 @@ Better Auth Service 负责登录、注册、session、身份侧字段和凭据�
 
 Media context 拥有 object storage provider/profile、upload serving、upload authorization、media references、image format validation 和 bundled business assets。Local 与 S3-compatible storage 是同一抽象下的 provider choice。
 
-Library Asset 是外部图片收藏引用；Media Asset 是 Workspace 内具有稳定 identity 与原图事实的受管素材；Stored Object 是存储中的图片 bytes。Library materialization 通过 Media 建立受管素材，不把收藏记录、素材 identity 和 Object Key 混为一体。Workspace Media 固定使用 `builtin-local`；Avatar 与 Branding Logo 使用 active Storage Profile。Browser 的原图与 Display Tier 经同源 API 获取，imgproxy 的签名地址仅供内部渲染请求使用。
+Library Asset 是工作区收藏引用（按 source 区分外部图片引用与受管 Media 保存，Media 尺寸由 Media 侧投射、任务来源仅作 lineage）；Media Asset 是 Workspace 内具有稳定 identity 与原图事实的受管素材；Stored Object 是存储中的图片 bytes。Library materialization 通过 Media 建立受管素材，不把收藏记录、素材 identity 和 Object Key 混为一体。Workspace Media 固定使用 `builtin-local`；Avatar 与 Branding Logo 使用 active Storage Profile。Browser 的原图与 Display Tier 经同源 API 获取，imgproxy 的签名地址仅供内部渲染请求使用。
 
 上传结果、provider output 和用户素材都必须通过 Media/Storage 边界进入业务语义。不要让无关 feature 直接拼接 storage secret、bucket URL 或本地文件路径。
 
@@ -189,7 +189,7 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | [AI Gateway](./apps/api/internal/aigateway/CONTEXT.md)        | `internal/aigateway`                                  | 唯一 AI 出口的配置面：gateway connection、model catalog、Vision mapping、route preview 与探测；不拥有 Wallet、Ledger、价格或 Service Model Pool   |
 | Boards                                                        | `internal/boards`                                     | board ownership、access checks、board management API                                                                                              |
 | Media                                                         | `internal/media`                                      | storage、assets、derivatives、media refs、image format validation                                                                                 |
-| Library                                                       | `internal/library`                                    | 外部灵感素材收藏、Folder、幂等保存与 cursor 分页；只保存 provider URL 和 source metadata                                                          |
+| Library                                                       | `internal/library`                                    | 按 source 区分的收藏引用（外部灵感素材与受管 Media 保存）、Folder、按来源幂等保存与 cursor 分页；外部行保存 provider URL 和 source metadata，Media 行只存 Media 身份并按需投射尺寸 |
 | [SearchCatalog](./apps/api/internal/searchcatalog/CONTEXT.md) | `internal/searchcatalog`                              | 图片搜索：Unsplash/Pexels provider key 生命周期与 Vision Search（独立计费）；Vision 模型只来自 AI Gateway vision mapping                          |
 | Workflow/Prompts                                              | `internal/workflow`, `internal/prompts`               | executable feature contract、task params、prompt templates、prompt assembly；只做 feature 编译与参数 shaping，从不选 Model                        |
 | Generation                                                    | `internal/generation`                                 | Service Model Pool 的 `routing`（纯领域：eligibility、确定性选型、retry candidate、`RoutingSnapshot`）与 `catalog`（pool 持久化、快照 save/load） |

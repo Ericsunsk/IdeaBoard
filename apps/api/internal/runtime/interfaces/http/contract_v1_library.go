@@ -33,11 +33,15 @@ package httpapi
 // RenderError; cursor pagination via cursor/page_size; POST/DELETE
 // require the Idempotency-Key header (scope library:<op>; reuse with a
 // different request hash renders 409 library_idempotency_conflict).
-// Save is additionally idempotent on (workspace, provider, source_id):
-// re-saving returns the existing asset with 200 instead of 201.
+// Save is additionally idempotent per source: external re-saving on
+// (workspace, provider, source_id) and media re-saving on
+// (workspace, media_asset_id) return the existing asset with 200
+// instead of 201, without touching its folder or metadata.
 //
-// Assets NEVER store bytes: provider URL + source metadata only (the
-// store reuses the legacy provider-allowlist URL gate). Asset
+// Assets NEVER store bytes. External rows keep provider URL + source
+// metadata (the store reuses the provider-allowlist URL gate); media
+// rows keep the managed Media identity with no provider/URL keys and
+// project dimensions from Media at read time. Asset
 // resolution is a typed batch lookup (max 20) against saved workspace
 // assets only — NOT a general proxy; unknown references report
 // unresolved per item.
@@ -235,32 +239,50 @@ func toLibraryFolderDTO(workspacePublicID string, folder *librarydomain.V1Folder
 }
 
 type v1LibraryAssetDTO struct {
-	ID          string               `json:"id"`
-	WorkspaceID string               `json:"workspace_id"`
-	FolderID    string               `json:"folder_id,omitempty"`
-	Provider    string               `json:"provider"`
-	SourceID    string               `json:"source_id"`
-	SourceURL   string               `json:"source_url"`
-	PreviewURL  string               `json:"preview_url"`
-	OriginalURL string               `json:"original_url"`
-	Title       string               `json:"title,omitempty"`
-	Author      string               `json:"author,omitempty"`
-	Width       int32                `json:"width"`
-	Height      int32                `json:"height"`
-	CreatedAt   string               `json:"created_at"`
-	UpdatedAt   string               `json:"updated_at"`
-	Display     *mediadomain.Display `json:"display,omitempty"`
+	ID              string               `json:"id"`
+	WorkspaceID     string               `json:"workspace_id"`
+	FolderID        string               `json:"folder_id,omitempty"`
+	Source          string               `json:"source"`
+	Provider        string               `json:"provider,omitempty"`
+	SourceID        string               `json:"source_id,omitempty"`
+	SourceURL       string               `json:"source_url,omitempty"`
+	PreviewURL      string               `json:"preview_url,omitempty"`
+	OriginalURL     string               `json:"original_url,omitempty"`
+	MediaAssetID    string               `json:"media_asset_id,omitempty"`
+	Title           string               `json:"title,omitempty"`
+	Author          string               `json:"author,omitempty"`
+	Width           *int32               `json:"width"`
+	Height          *int32               `json:"height"`
+	TaskID          string               `json:"task_id,omitempty"`
+	TaskResultIndex *int32               `json:"task_result_index,omitempty"`
+	CreatedAt       string               `json:"created_at"`
+	UpdatedAt       string               `json:"updated_at"`
+	Display         *mediadomain.Display `json:"display,omitempty"`
 }
 
 func toLibraryAssetDTO(workspacePublicID string, asset *librarydomain.V1Asset) v1LibraryAssetDTO {
-	return v1LibraryAssetDTO{
+	dto := v1LibraryAssetDTO{
 		ID: asset.PublicID, WorkspaceID: workspacePublicID, FolderID: asset.FolderPublicID,
-		Provider: asset.Provider, SourceID: asset.SourceID,
-		SourceURL: asset.SourceURL, PreviewURL: asset.PreviewURL, OriginalURL: asset.OriginalURL,
-		Title: asset.Title, Author: asset.Author, Width: asset.Width, Height: asset.Height,
+		Source: string(asset.Source),
+		Title:  asset.Title, Author: asset.Author, Width: asset.Width, Height: asset.Height,
 		CreatedAt: v1FormatTime(asset.CreatedAt), UpdatedAt: v1FormatTime(asset.UpdatedAt),
 		Display: libraryDisplay(workspacePublicID, asset),
 	}
+	if asset.Source == librarydomain.AssetSourceMedia {
+		dto.MediaAssetID = asset.MediaAssetID
+		if asset.Lineage != nil {
+			dto.TaskID = asset.Lineage.TaskID
+			index := asset.Lineage.ResultIndex
+			dto.TaskResultIndex = &index
+		}
+		return dto
+	}
+	dto.Provider = asset.Provider
+	dto.SourceID = asset.SourceID
+	dto.SourceURL = asset.SourceURL
+	dto.PreviewURL = asset.PreviewURL
+	dto.OriginalURL = asset.OriginalURL
+	return dto
 }
 
 func libraryPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta, bool) {
@@ -487,16 +509,18 @@ func (h *contractV1Handler) listLibraryAssets(c *gin.Context) {
 
 type v1SaveLibraryAssetBody struct {
 	Data struct {
-		Provider    string `json:"provider"`
-		SourceID    string `json:"source_id"`
-		SourceURL   string `json:"source_url"`
-		PreviewURL  string `json:"preview_url"`
-		OriginalURL string `json:"original_url"`
-		Title       string `json:"title"`
-		Author      string `json:"author"`
-		Width       int32  `json:"width"`
-		Height      int32  `json:"height"`
-		FolderID    string `json:"folder_id"`
+		Source       string `json:"source"`
+		Provider     string `json:"provider"`
+		SourceID     string `json:"source_id"`
+		SourceURL    string `json:"source_url"`
+		PreviewURL   string `json:"preview_url"`
+		OriginalURL  string `json:"original_url"`
+		MediaAssetID string `json:"media_asset_id"`
+		Title        string `json:"title"`
+		Author       string `json:"author"`
+		Width        *int32 `json:"width"`
+		Height       *int32 `json:"height"`
+		FolderID     string `json:"folder_id"`
 	} `json:"data"`
 }
 
@@ -513,54 +537,115 @@ func (h *contractV1Handler) saveLibraryAsset(c *gin.Context) {
 			writeV1InputError(c)
 			return
 		}
-		input := librarydomain.V1SaveAssetInput{
-			FolderPublicID: strings.TrimSpace(body.Data.FolderID),
-			Asset: librarydomain.AssetInput{
-				Provider: body.Data.Provider, SourceID: body.Data.SourceID,
-				SourceURL: body.Data.SourceURL, PreviewURL: body.Data.PreviewURL, OriginalURL: body.Data.OriginalURL,
-				Title: body.Data.Title, Author: body.Data.Author,
-				Width: body.Data.Width, Height: body.Data.Height,
-			},
-		}
+		source := librarydomain.AssetSource(strings.TrimSpace(body.Data.Source))
 		// Folder binding is validated up front so unknown folders 404 before
 		// any idempotency state is recorded.
-		if input.FolderPublicID != "" {
-			if _, ok := h.libraryFolderByID(c, workspace, input.FolderPublicID); !ok {
+		folderPublicID := strings.TrimSpace(body.Data.FolderID)
+		if folderPublicID != "" {
+			if _, ok := h.libraryFolderByID(c, workspace, folderPublicID); !ok {
 				return
 			}
 		}
 		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-		hash := contract.HashIdempotencyRequest("library:asset-save", workspace.PublicID,
-			strings.ToLower(strings.TrimSpace(body.Data.Provider)), strings.TrimSpace(body.Data.SourceID), input.FolderPublicID)
-		result, _, fnErr, ok := h.libraryDo(c, externalUser, identityPrincipal.UserID(), "asset-save", key, hash, func() (any, error) {
-			publicID, mintErr := librarydomain.NewV1AssetPublicID()
-			if mintErr != nil {
-				return nil, mintErr
-			}
-			saved, created, saveErr := h.deps.Library.Store.SaveAsset(c.Request.Context(), workspace.PublicID, input, publicID)
-			if saveErr != nil {
-				return nil, saveErr
-			}
-			return &v1SavedAsset{Asset: saved, Created: created}, nil
-		})
-		if !ok {
-			return
+		switch source {
+		case librarydomain.AssetSourceExternal:
+			h.saveExternalLibraryAsset(c, wctx, body, folderPublicID, externalUser, identityPrincipal.UserID(), key)
+		case librarydomain.AssetSourceMedia:
+			h.saveManagedLibraryAsset(c, wctx, body, folderPublicID, externalUser, identityPrincipal.UserID(), key)
+		default:
+			renderLibraryError(c, librarydomain.ErrInvalidSource)
 		}
-		if fnErr != nil {
-			renderLibraryError(c, fnErr)
-			return
-		}
-		saved, ok := result.(*v1SavedAsset)
-		if !ok || saved == nil || saved.Asset == nil {
-			renderLibraryError(c, errors.New("library: asset-save type mismatch"))
-			return
-		}
-		if saved.Created {
-			contract.RenderCreated(c, toLibraryAssetDTO(workspace.PublicID, saved.Asset))
-			return
-		}
-		contract.RenderSuccess(c, toLibraryAssetDTO(workspace.PublicID, saved.Asset))
 	})
+}
+
+func (h *contractV1Handler) saveExternalLibraryAsset(c *gin.Context, wctx v1WorkspaceCtx, body v1SaveLibraryAssetBody, folderPublicID, externalUser string, operatorUserID int64, key string) {
+	workspace := wctx.Workspace
+	if strings.TrimSpace(body.Data.MediaAssetID) != "" {
+		renderLibraryError(c, librarydomain.ErrInvalidSource)
+		return
+	}
+	var width, height int32
+	if body.Data.Width != nil {
+		width = *body.Data.Width
+	}
+	if body.Data.Height != nil {
+		height = *body.Data.Height
+	}
+	input := librarydomain.V1SaveAssetInput{
+		FolderPublicID: folderPublicID,
+		Asset: librarydomain.AssetInput{
+			Provider: body.Data.Provider, SourceID: body.Data.SourceID,
+			SourceURL: body.Data.SourceURL, PreviewURL: body.Data.PreviewURL, OriginalURL: body.Data.OriginalURL,
+			Title: body.Data.Title, Author: body.Data.Author,
+			Width: width, Height: height,
+		},
+		OperatorUserID: operatorUserID,
+	}
+	hash := contract.HashIdempotencyRequest("library:asset-save", workspace.PublicID, "external",
+		strings.ToLower(strings.TrimSpace(body.Data.Provider)), strings.TrimSpace(body.Data.SourceID), folderPublicID)
+	result, _, fnErr, ok := h.libraryDo(c, externalUser, operatorUserID, "asset-save", key, hash, func() (any, error) {
+		publicID, mintErr := librarydomain.NewV1AssetPublicID()
+		if mintErr != nil {
+			return nil, mintErr
+		}
+		saved, created, saveErr := h.deps.Library.Store.SaveAsset(c.Request.Context(), workspace.PublicID, input, publicID)
+		if saveErr != nil {
+			return nil, saveErr
+		}
+		return &v1SavedAsset{Asset: saved, Created: created}, nil
+	})
+	h.renderSavedLibraryAsset(c, workspace, result, fnErr, ok)
+}
+
+func (h *contractV1Handler) saveManagedLibraryAsset(c *gin.Context, wctx v1WorkspaceCtx, body v1SaveLibraryAssetBody, folderPublicID, externalUser string, operatorUserID int64, key string) {
+	workspace := wctx.Workspace
+	if strings.TrimSpace(body.Data.Provider) != "" || strings.TrimSpace(body.Data.SourceID) != "" ||
+		strings.TrimSpace(body.Data.SourceURL) != "" || strings.TrimSpace(body.Data.PreviewURL) != "" ||
+		strings.TrimSpace(body.Data.OriginalURL) != "" || body.Data.Width != nil || body.Data.Height != nil {
+		renderLibraryError(c, librarydomain.ErrInvalidSource)
+		return
+	}
+	input := librarydomain.V1SaveManagedAssetInput{
+		FolderPublicID: folderPublicID,
+		MediaAssetID:   strings.TrimSpace(body.Data.MediaAssetID),
+		Title:          body.Data.Title,
+		Author:         body.Data.Author,
+		OperatorUserID: operatorUserID,
+	}
+	hash := contract.HashIdempotencyRequest("library:asset-save", workspace.PublicID, "media",
+		strings.TrimSpace(body.Data.MediaAssetID), folderPublicID)
+	result, _, fnErr, ok := h.libraryDo(c, externalUser, operatorUserID, "asset-save", key, hash, func() (any, error) {
+		publicID, mintErr := librarydomain.NewV1AssetPublicID()
+		if mintErr != nil {
+			return nil, mintErr
+		}
+		saved, created, saveErr := h.deps.Library.Store.SaveManagedMediaAsset(c.Request.Context(), workspace.PublicID, input, publicID)
+		if saveErr != nil {
+			return nil, saveErr
+		}
+		return &v1SavedAsset{Asset: saved, Created: created}, nil
+	})
+	h.renderSavedLibraryAsset(c, workspace, result, fnErr, ok)
+}
+
+func (h *contractV1Handler) renderSavedLibraryAsset(c *gin.Context, workspace *tenancy.Workspace, result any, fnErr error, ok bool) {
+	if !ok {
+		return
+	}
+	if fnErr != nil {
+		renderLibraryError(c, fnErr)
+		return
+	}
+	saved, ok := result.(*v1SavedAsset)
+	if !ok || saved == nil || saved.Asset == nil {
+		renderLibraryError(c, errors.New("library: asset-save type mismatch"))
+		return
+	}
+	if saved.Created {
+		contract.RenderCreated(c, toLibraryAssetDTO(workspace.PublicID, saved.Asset))
+		return
+	}
+	contract.RenderSuccess(c, toLibraryAssetDTO(workspace.PublicID, saved.Asset))
 }
 
 type v1SavedAsset struct {
@@ -695,49 +780,3 @@ func (h *contractV1Handler) resolveLibraryAssets(c *gin.Context) {
 		contract.RenderSuccess(c, dto)
 	})
 }
-
-// OpenAPI deltas for the merger (DO NOT edit apps/api/openapi*.yaml here).
-// Add under paths (tags: WorkspaceLibrary), reusing components parameters
-// Cursor/PageSize/WorkspaceId/IdempotencyKey/RequestId and responses
-// BadRequest/Unauthorized/Forbidden/NotFound/Conflict/UnprocessableEntity:
-//
-//	/workspaces/{workspace_id}/library/folders:
-//	  get: {operationId: listWorkspaceLibraryFolders, parameters: [WorkspaceId, Cursor, PageSize]}
-//	  post: {operationId: createWorkspaceLibraryFolder, parameters: [WorkspaceId, IdempotencyKey]}
-//	/workspaces/{workspace_id}/library/folders/{folder_id}:
-//	  patch: {operationId: renameWorkspaceLibraryFolder, parameters: [WorkspaceId, {name: folder_id, in: path, required: true, schema: {type: string, pattern: '^lfolder_'}}]}
-//	  delete: {operationId: deleteWorkspaceLibraryFolder, parameters: [WorkspaceId, {folder_id path}, IdempotencyKey]}
-//	/workspaces/{workspace_id}/library/assets:
-//	  get: {operationId: listWorkspaceLibraryAssets, parameters: [WorkspaceId, Cursor, PageSize, {name: folder_id, in: query, schema: {type: string}}]}
-//	  post: {operationId: saveWorkspaceLibraryAsset, parameters: [WorkspaceId, IdempotencyKey]}
-//	/workspaces/{workspace_id}/library/assets/{asset_id}:
-//	  patch: {operationId: moveWorkspaceLibraryAsset, parameters: [WorkspaceId, {name: asset_id, in: path, required: true, schema: {type: string, pattern: '^lasset_'}}]}
-//	  delete: {operationId: deleteWorkspaceLibraryAsset, parameters: [WorkspaceId, {asset_id path}, IdempotencyKey]}
-//	/workspaces/{workspace_id}/library/asset-resolutions:
-//	  post: {operationId: resolveWorkspaceLibraryAssets, parameters: [WorkspaceId]}
-//
-// Materialization paths REMOVED (owner hard cut, internal-only now):
-// former POST /workspaces/{workspace_id}/library/materializations
-// (createWorkspaceLibraryMaterialization) and GET
-// /workspaces/{workspace_id}/library/materializations/{materialization_id}
-// (getWorkspaceLibraryMaterialization) are deleted; the merger must
-// drop them (and the LibraryMaterialization schema) from openapi YAMLs.
-//
-// Schemas (assets are provider URL + source metadata only, never bytes):
-//
-//	LibraryFolder: {id: {pattern: '^lfolder_'}, workspace_id, name: {minLength: 1, maxLength: 100}, created_at: date-time, updated_at: date-time}
-//	LibraryAsset: {id: {pattern: '^lasset_'}, workspace_id, folder_id?: {pattern: '^lfolder_'}, provider: {enum: [unsplash, pexels]}, source_id, source_url: uri, preview_url: uri, original_url: uri, title?, author?, width: int32>=0, height: int32>=0, created_at, updated_at}
-//	SaveLibraryAssetRequest: {data: {provider, source_id, source_url?: uri, preview_url?: uri, original_url?: uri, title?, author?, width?, height?, folder_id?}} (dedup on provider+source_id: 200 existing vs 201 created)
-//	ResolveLibraryAssetsRequest: {data: {items: {type: array, maxItems: 20, items: {provider, source_id?, source_url?}}}}; ResolveLibraryAssetsResponse: {items: [{provider, source_id?, status: {enum: [resolved, unresolved]}, asset?: LibraryAsset}]}
-//	LibraryMaterialization schema REMOVED with the HTTP materialization
-//	surface (internal-only now; lmat_ records stay store-level only).
-//
-// Error codes frozen: library_folder_not_found (404), library_asset_not_found (404),
-// library_idempotency_conflict (409); reused kernel codes
-// workspace_not_found/workspace_forbidden/pagination_cursor_invalid/bad_request/conflict/
-// validation_failed/idempotency_key_required/service_unavailable.
-// (library_materialization_not_found stays frozen in the kernel error-code
-// registry for internal tooling; this surface no longer renders it.)
-//
-// Integer-ID note for #809: v1 rejects legacy integer ids as malformed 404;
-// integer-ID tolerance removal from the legacy handlers is NOT executed here.

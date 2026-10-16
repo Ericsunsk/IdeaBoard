@@ -251,7 +251,7 @@
             :is-used-as-reference="
               references.some((ref) => ref.key === searchReferenceKey(result.provider, result.id))
             "
-            :is-saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
+            :is-saved="savedKeys.has(libraryAssetKeyFor({ source: 'external', provider: result.provider, sourceId: result.id }))"
             :has-image-error="failedImages.has(result.id)"
             :image-retry-count="imageRetryCount(result.id)"
             @card-pointer-down="handleCardPointerDown($event, result)"
@@ -285,6 +285,7 @@
       :workspace-id="libraryWorkspaceId"
       :folder-facts="libraryFolderFacts"
       :mutation-publisher="libraryMutationPublisher"
+      :save-module="librarySaveModule"
       :drop-targets="dropTargets"
       :reference-keys="references.map((reference) => reference.key)"
       @close="closeLibraryIsland"
@@ -333,7 +334,7 @@ import SearchResultViewport from '../components/SearchResultViewport.vue'
 import SearchResultCard from '../components/SearchResultCard.vue'
 import SearchEmptyState from '../components/SearchEmptyState.vue'
 import SearchLightboxModal from '../components/SearchLightboxModal.vue'
-import { libraryAssetKey, loadLibraryFloatingIsland } from '../../../library'
+import { libraryAssetKeyFor, loadLibraryFloatingIsland } from '../../../library'
 import { searchReferenceKey } from '../../session/adapters/libraryBridge'
 import { screenRuntime } from '../../session/screenRuntime'
 
@@ -398,6 +399,7 @@ const {
   isExpanded: isLibraryIslandExpanded,
   folderFacts: libraryFolderFacts,
   mutationPublisher: libraryMutationPublisher,
+  saveModule: librarySaveModule,
   isMounted: isLibraryIslandMounted,
   isDropTarget: isTriggerHoveredDuringDrag,
 } = library

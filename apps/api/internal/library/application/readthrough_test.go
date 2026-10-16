@@ -221,7 +221,7 @@ func TestReadThroughRequestGuards(t *testing.T) {
 	svc.Request(ctx, "ws_guards", saved, 0)
 	svc.Request(ctx, "ws_guards", saved, -1)
 	workspaceMedia := *saved
-	workspaceMedia.Provider = domain.ProviderWorkspaceMedia
+	workspaceMedia.Source = domain.AssetSourceMedia
 	svc.Request(ctx, "ws_guards", &workspaceMedia, 42)
 	if all := orchestratorJobs(t, store, "ws_guards"); len(all) != 0 {
 		t.Fatalf("jobs = %d, want 0 (guards fail closed)", len(all))
@@ -313,21 +313,21 @@ func (s workspaceReadThroughStore) GetAsset(context.Context, string, string) (*d
 }
 
 func (s workspaceReadThroughStore) ListMaterializations(context.Context, string) ([]*domain.V1Materialization, error) {
-	s.t.Fatal("workspace_media read-through consulted remote materializations")
+	s.t.Fatal("media read-through consulted remote materializations")
 	return nil, nil
 }
 
-func TestReadThroughWorkspaceMediaRemainsMissWithoutTrigger(t *testing.T) {
+func TestReadThroughMediaResolvesWithoutTrigger(t *testing.T) {
 	store := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
-	asset := &domain.V1Asset{PublicID: "lasset_workspace", Provider: domain.ProviderWorkspaceMedia}
+	asset := &domain.V1Asset{PublicID: "lasset_workspace", Source: domain.AssetSourceMedia, MediaAssetID: "asset_workspace0000001"}
 	fetcher := &fakeOrchestratorMaterializer{mediaID: "asset_unused000000001"}
 	svc := NewReadThroughService(workspaceReadThroughStore{ReadThroughStore: store, asset: asset, t: t}, fetcher, inlineExecutor(), 0)
 	stored, mediaID, found := svc.Resolve(context.Background(), "ws_workspace", asset.PublicID)
-	if stored != asset || mediaID != "" || found {
-		t.Fatal("workspace_media reference became a read-through hit")
+	if stored != asset || mediaID != asset.MediaAssetID || !found {
+		t.Fatal("media reference did not resolve its existing managed link")
 	}
 	svc.Request(context.Background(), "ws_workspace", stored, 42)
 	if len(orchestratorJobs(t, store, "ws_workspace")) != 0 || fetcher.calls != 0 {
-		t.Fatal("workspace_media reference triggered materialization")
+		t.Fatal("media reference triggered materialization")
 	}
 }

@@ -1,7 +1,7 @@
 import { isMediaDisplayExpired } from '../../../core/media/mediaDisplay'
 import { nextTick, ref, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useTimeoutFn } from '@vueuse/core'
-import { libraryAssetKey, lookupWorkspaceSavedAssetKeys } from '../../library'
+import { libraryAssetKeyFor, lookupWorkspaceSavedAssetKeys } from '../../library'
 import { type SearchResult } from '../core/models'
 import { generateRandomInspirationCursor, searchInspiration } from './adapters/resource'
 import { createBrowserSearchFeedPersistence } from './adapters/feedPersistence'
@@ -301,11 +301,11 @@ export function createSearchFeed(
   }
 
   function markSaved(result: SearchResult): void {
-    markSavedKey(libraryAssetKey(result.provider, result.id))
+    markSavedKey(libraryAssetKeyFor({ source: 'external', provider: result.provider, sourceId: result.id }))
   }
 
   function markUnsaved(result: SearchResult): void {
-    markUnsavedKey(libraryAssetKey(result.provider, result.id))
+    markUnsavedKey(libraryAssetKeyFor({ source: 'external', provider: result.provider, sourceId: result.id }))
   }
 
   function markImageError(id: string): void {

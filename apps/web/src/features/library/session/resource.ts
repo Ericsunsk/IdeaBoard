@@ -16,7 +16,8 @@ import { type ExternalImageProvider } from '../../../core/contracts/externalImag
 //   `quick-saves`, no asset counts. The island synthesizes the virtual
 //   `all` aggregate client-side; saving without a folder leaves the asset
 //   unfiled (visible under `all`). Deleting a folder unfiles its assets.
-// - Asset save is idempotent on `(workspace, provider, source_id)`.
+// - Asset save is idempotent on `(workspace, provider, source_id)` for
+//   external rows and on `(workspace, media_asset_id)` for media rows.
 // - Materialization runs internal-only on the backend (no public job
 //   routes); Canvas resolves managed media through the shared workspace
 //   media delivery boundary (see `./libraryUseCases`).
@@ -32,6 +33,7 @@ import {
   resolveWorkspaceLibraryAssets as resolveWorkspaceLibraryAssetsTransport,
   saveWorkspaceLibraryAsset as saveWorkspaceLibraryAssetTransport,
 } from '../../../api/generated-query/public/workspace-library/workspace-library'
+import type { SaveLibraryAssetRequest } from '../../../api/generated-query/public/model/saveLibraryAssetRequest'
 import { buildContractRequestHeaders, requireContractData } from '../../../api/contractKernel'
 import type { AuthFailureMode } from '../../../api/client'
 import { withSignal } from '../../../core/utils/request'
@@ -197,18 +199,31 @@ export const workspaceLibraryApi = {
     options: WorkspaceLibraryRequestOptions = {},
   ): Promise<WorkspaceLibraryAsset> => {
     const effective = withLibraryIdempotency(options, 'library:asset-save')
-    const data: { provider: ExternalImageProvider; source_id: string } & Record<string, unknown> = {
-      provider: input.provider,
-      source_id: input.sourceId,
-    }
-    if (input.sourceUrl != null) data.source_url = input.sourceUrl
-    if (input.previewUrl != null) data.preview_url = input.previewUrl
-    if (input.originalUrl != null) data.original_url = input.originalUrl
-    if (input.title != null) data.title = input.title
-    if (input.author != null) data.author = input.author
-    if (input.width != null) data.width = input.width
-    if (input.height != null) data.height = input.height
-    if (input.folderId != null) data.folder_id = assertLibraryFolderId(input.folderId)
+    // The wire carries the `source` discriminator: external saves send the
+    // provider/source identity plus URLs, media saves send only the uploaded
+    // Media Asset identity (dimensions project server-side; no URL keys, no
+    // task lineage, no operator identity, author display-only).
+    const data: SaveLibraryAssetRequest['data'] =
+      input.source === 'media'
+        ? {
+            source: 'media',
+            media_asset_id: input.mediaAssetId,
+            ...(input.title != null ? { title: input.title } : {}),
+            ...(input.folderId != null ? { folder_id: assertLibraryFolderId(input.folderId) } : {}),
+          }
+        : {
+            source: 'external',
+            provider: input.provider,
+            source_id: input.sourceId,
+            ...(input.sourceUrl != null ? { source_url: input.sourceUrl } : {}),
+            ...(input.previewUrl != null ? { preview_url: input.previewUrl } : {}),
+            ...(input.originalUrl != null ? { original_url: input.originalUrl } : {}),
+            ...(input.title != null ? { title: input.title } : {}),
+            ...(input.author != null ? { author: input.author } : {}),
+            ...(input.width != null ? { width: input.width } : {}),
+            ...(input.height != null ? { height: input.height } : {}),
+            ...(input.folderId != null ? { folder_id: assertLibraryFolderId(input.folderId) } : {}),
+          }
     const envelope = await saveWorkspaceLibraryAssetTransport(
       assertWorkspaceId(workspaceId),
       { data },

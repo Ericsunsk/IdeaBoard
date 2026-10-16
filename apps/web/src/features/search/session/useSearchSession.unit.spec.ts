@@ -153,6 +153,69 @@ describe('useSearchSession', () => {
     expect(getLibraryIslandState().expanded).toBe(false)
   })
 
+  it('leaves feed saved-state updates to Library publications after saving', async () => {
+    const coordinator = createSearchLibraryCoordinator({ workspaceId: 'ws_test123' })
+    const result: SearchResult = {
+      provider: 'unsplash',
+      id: 'photo-1',
+      title: 'Warm light',
+      author: '',
+      author_url: '',
+      source_url: 'https://example.com/photo-1',
+      preview_url: 'https://example.com/photo-1.jpg',
+      thumbnail_url: '',
+      original_url: 'https://example.com/photo-1.jpg',
+      width: 1200,
+      height: 800,
+      media_kind: 'image',
+    }
+    const asset = {
+      source: 'external' as const,
+      id: 'lasset_photo0001',
+      workspaceId: 'ws_test123',
+      provider: result.provider,
+      sourceId: result.id,
+      sourceUrl: result.source_url,
+      previewUrl: result.preview_url,
+      originalUrl: result.original_url,
+      width: result.width,
+      height: result.height,
+      createdAt: '2026-10-16T00:00:00Z',
+      updatedAt: '2026-10-16T00:00:00Z',
+    }
+    vi.spyOn(coordinator, 'saveReference').mockResolvedValue({ asset })
+    vi.spyOn(coordinator, 'saveReferences').mockResolvedValue({
+      operationId: 'op-1',
+      status: 'succeeded',
+      items: [
+        {
+          id: 'item-1',
+          kind: 'external',
+          title: result.title,
+          status: 'saved',
+          attempts: 1,
+          asset,
+        },
+      ],
+    })
+    const session = useSearchSession({ libraryCoordinator: coordinator })
+    await nextTick()
+
+    expect(
+      await session.library.saveReferenceToQuickSaves(session.toLibraryReference(result)),
+    ).toBe(true)
+    session.batch.toggle(result)
+    await session.batch.saveAllToLibrary()
+
+    expect(coordinator.saveReference).toHaveBeenCalledOnce()
+    expect(coordinator.saveReferences).toHaveBeenCalledOnce()
+    expect(session.batch.selected.value).toEqual([])
+    expect(mocks.markSavedKey).not.toHaveBeenCalled()
+    session.library.markAssetSaved('unsplash:photo-1')
+    expect(mocks.markSavedKey).toHaveBeenCalledExactlyOnceWith('unsplash:photo-1')
+    coordinator.dispose()
+  })
+
   it('opens Library after a gated anonymous action resumes', async () => {
     setPendingSearchAuthAction({ kind: 'open-library' })
     const session = useSearchSession({

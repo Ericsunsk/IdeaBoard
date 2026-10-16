@@ -9,10 +9,13 @@ package httpapi
 // gate.
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"image"
+	"image/png"
 	"net/http"
 	"strconv"
 	"strings"
@@ -146,15 +149,14 @@ func (f *v1MediaGapsFixture) assetsPath() string {
 	return "/api/v1/workspaces/" + f.ws.PublicID + "/media-assets"
 }
 
-// v1GapsPNGBytes builds deterministic sniff-valid PNG bytes of exactly
-// size bytes (magic header + zero body). The complete gate sniffs
-// staged bytes, so fixtures must carry real format magic.
+// v1GapsPNGBytes pads a valid PNG to the requested size.
 func v1GapsPNGBytes(size int) []byte {
-	if size < 8 {
-		size = 8
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, image.NewRGBA(image.Rect(0, 0, 2, 3))); err != nil {
+		panic(err)
 	}
-	out := make([]byte, size)
-	copy(out, []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'})
+	out := make([]byte, max(size, encoded.Len()))
+	copy(out, encoded.Bytes())
 	return out
 }
 
@@ -255,6 +257,15 @@ func TestV1UploadBytesFullLifecycle(t *testing.T) {
 	uploadID := v1GapsDeclare(t, f.engine, f.uploadsPath(), f.owner, "gaps-life-create", "photo.png", staged)
 	v1GapsStage(t, f.engine, f.uploadsPath()+"/"+uploadID+"/bytes", staged, f.member, "gaps-life-stage")
 	assetID := v1GapsComplete(t, f.engine, f.uploadsPath()+"/"+uploadID+"/complete", staged, f.member, "gaps-life-complete")
+	status, _, payload := doV1(t, f.engine, v1Call{method: "GET",
+		path: f.assetsPath() + "/" + assetID, userID: f.member})
+	if status != http.StatusOK {
+		t.Fatalf("asset metadata = %d %v, want 200", status, payload)
+	}
+	dto := v1Data(t, payload).(map[string]any)
+	if dto["width"] != float64(2) || dto["height"] != float64(3) {
+		t.Fatalf("asset dimensions = %v x %v, want staged 2 x 3 instead of declared 100 x 80", dto["width"], dto["height"])
+	}
 
 	status, _, body := doV1RoundTrip(t, f.engine, v1Call{method: "GET",
 		path: f.assetsPath() + "/" + assetID + "/content", userID: f.member}, "test-gaps-")
@@ -265,7 +276,7 @@ func TestV1UploadBytesFullLifecycle(t *testing.T) {
 		f.assetsPath()+"/"+assetID+"/derivatives/thumb", f.member,
 		derivativedomain.TierThumb, derivativedomain.TierSpecs[derivativedomain.TierThumb].MaxSide)
 
-	status, _, payload := doV1(t, f.engine, v1Call{method: "POST", path: f.assetsPath() + "/" + assetID + "/archive",
+	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.assetsPath() + "/" + assetID + "/archive",
 		userID: f.owner, headers: map[string]string{"Idempotency-Key": "gaps-life-archive"}})
 	if status != http.StatusOK {
 		t.Fatalf("archive = %d %v, want 200", status, payload)

@@ -1,7 +1,7 @@
 import { type ExternalImageProvider } from '../../../core/contracts/externalImageProviders'
 import { ref, shallowRef, type Ref, type ShallowRef } from 'vue'
 import { i18n } from '../../../core/i18n'
-import { libraryAssetKey, type WorkspaceLibraryFolder } from '../core/validators'
+import { libraryAssetKeyFor, type WorkspaceLibraryFolder } from '../core/validators'
 
 export type LibraryFolderView = WorkspaceLibraryFolder
 
@@ -27,6 +27,24 @@ export type LibraryGalleryEffect = 'none' | 'reload-current' | 'selection-will-r
 export type LibraryMutationOutcome =
   | {
       kind: 'asset-saved'
+      source: 'external'
+      provider: ExternalImageProvider
+      sourceID: string
+      assetKey: string
+      affectedFolderKeys: string[]
+      galleryEffect: LibraryGalleryEffect
+    }
+  | {
+      kind: 'asset-saved'
+      source: 'media'
+      mediaAssetId: string
+      assetKey: string
+      affectedFolderKeys: string[]
+      galleryEffect: LibraryGalleryEffect
+    }
+  | {
+      kind: 'asset-removed'
+      source: 'external'
       provider: ExternalImageProvider
       sourceID: string
       assetKey: string
@@ -35,8 +53,8 @@ export type LibraryMutationOutcome =
     }
   | {
       kind: 'asset-removed'
-      provider: ExternalImageProvider
-      sourceID: string
+      source: 'media'
+      mediaAssetId: string
       assetKey: string
       affectedFolderKeys: string[]
       galleryEffect: LibraryGalleryEffect
@@ -55,17 +73,26 @@ export type LibraryMutationOutcome =
 export type LibraryMutationPublisher = {
   publishMutation: (outcome: LibraryMutationOutcome) => Promise<void>
   publishMutations: (outcomes: LibraryMutationOutcome[]) => Promise<void>
-  subscribe: (listener: (outcome: LibraryMutationOutcome) => void) => () => void
+  subscribe: (
+    listener: (outcomes: readonly LibraryMutationOutcome[]) => void | Promise<void>,
+  ) => () => void
 }
 
 // Committed writes own asset identities and affected folders.
 // Surfaces choose galleryEffect: reload-current, selection-will-reload, or none.
 
-export type LibraryAssetFact = {
-  provider: ExternalImageProvider
-  sourceId: string
-  folderId?: string | null | undefined
-}
+export type LibraryAssetFact =
+  | {
+      source: 'external'
+      provider: ExternalImageProvider
+      sourceId: string
+      folderId?: string | null | undefined
+    }
+  | {
+      source: 'media'
+      mediaAssetId: string
+      folderId?: string | null | undefined
+    }
 
 /** `all` plus the concrete folder when the asset is filed. */
 export function libraryAffectedFolderKeysForAsset(folderId?: string | null | undefined): string[] {
@@ -82,32 +109,34 @@ export function uniqueLibraryFolderKeys(keys: Array<string | null | undefined>):
   return [...seen]
 }
 
+function buildLibraryAssetOutcome(
+  kind: 'asset-saved' | 'asset-removed',
+  asset: LibraryAssetFact,
+  galleryEffect: LibraryGalleryEffect,
+): LibraryMutationOutcome {
+  const shared = {
+    kind,
+    assetKey: libraryAssetKeyFor(asset),
+    affectedFolderKeys: libraryAffectedFolderKeysForAsset(asset.folderId),
+    galleryEffect,
+  }
+  return asset.source === 'media'
+    ? { ...shared, source: 'media', mediaAssetId: asset.mediaAssetId }
+    : { ...shared, source: 'external', provider: asset.provider, sourceID: asset.sourceId }
+}
+
 export function buildLibraryAssetSavedOutcome(
   asset: LibraryAssetFact,
   galleryEffect: LibraryGalleryEffect,
 ): LibraryMutationOutcome {
-  return {
-    kind: 'asset-saved',
-    provider: asset.provider,
-    sourceID: asset.sourceId,
-    assetKey: libraryAssetKey(asset.provider, asset.sourceId),
-    affectedFolderKeys: libraryAffectedFolderKeysForAsset(asset.folderId),
-    galleryEffect,
-  }
+  return buildLibraryAssetOutcome('asset-saved', asset, galleryEffect)
 }
 
 export function buildLibraryAssetRemovedOutcome(
   asset: LibraryAssetFact,
   galleryEffect: LibraryGalleryEffect,
 ): LibraryMutationOutcome {
-  return {
-    kind: 'asset-removed',
-    provider: asset.provider,
-    sourceID: asset.sourceId,
-    assetKey: libraryAssetKey(asset.provider, asset.sourceId),
-    affectedFolderKeys: libraryAffectedFolderKeysForAsset(asset.folderId),
-    galleryEffect,
-  }
+  return buildLibraryAssetOutcome('asset-removed', asset, galleryEffect)
 }
 
 export function buildLibraryAssetMovedOutcome(
@@ -136,24 +165,36 @@ export function buildLibraryFolderOutcome(
 export function createLibraryMutationPublisher(
   folderFacts: LibraryFolderFacts,
 ): LibraryMutationPublisher {
-  const listeners = new Set<(outcome: LibraryMutationOutcome) => void>()
+  const listeners = new Set<(outcomes: readonly LibraryMutationOutcome[]) => void | Promise<void>>()
 
   async function publishMutations(outcomes: LibraryMutationOutcome[]): Promise<void> {
     if (outcomes.length === 0) return
 
-    // Resource mutations are already committed when they reach this boundary.
-    // Refreshing Folder facts must never delay or hide their coordination outcome.
-    for (const outcome of outcomes) {
-      for (const listener of listeners) listener(outcome)
+    const notifications = [...listeners].map(async (listener) => {
+      try {
+        await listener(outcomes)
+      } catch {
+        console.warn('[library] mutation observer failed')
+      }
+    })
+    await Promise.all([...notifications, refreshFolderFacts()])
+  }
+
+  async function refreshFolderFacts(): Promise<void> {
+    try {
+      await folderFacts.refresh()
+    } catch {
+      console.warn('[library] Folder refresh failed')
     }
-    await folderFacts.refresh()
   }
 
   function publishMutation(outcome: LibraryMutationOutcome): Promise<void> {
     return publishMutations([outcome])
   }
 
-  function subscribe(listener: (outcome: LibraryMutationOutcome) => void) {
+  function subscribe(
+    listener: (outcomes: readonly LibraryMutationOutcome[]) => void | Promise<void>,
+  ) {
     listeners.add(listener)
     return () => listeners.delete(listener)
   }

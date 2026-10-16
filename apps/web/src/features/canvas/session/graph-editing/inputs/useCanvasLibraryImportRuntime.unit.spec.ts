@@ -6,6 +6,7 @@ import { serializeBoardState } from '../../../../board/ports/canvasSession'
 import { makeBoardState } from '../../../../board/ports/testing'
 import { materializeLibraryAssetForCanvas } from '../../../../library'
 import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
+import * as imageDimensions from '../../../../../core/media/imageDimensions'
 import type { BoardAttachment } from '../../execution/board-attachment'
 import { useCanvasVueFlowGraphAdapter } from '../../../session/flow-adapter'
 import type { FlowNodeData } from '../../../core/nodes/flowTypes.ts'
@@ -117,6 +118,69 @@ function createHarness(
 }
 
 describe('useCanvasLibraryImportRuntime', () => {
+  it('uses the decoded image aspect ratio when existing Media metadata has no dimensions', async () => {
+    const readSize = vi
+      .spyOn(imageDimensions, 'readImageNaturalSize')
+      .mockResolvedValueOnce({ width: 240, height: 360 })
+    try {
+      const harness = createHarness()
+      harness.materialize.mockResolvedValue({
+        mediaAssetId: 'asset_media0042',
+        url: '/media/42',
+        width: 0,
+        height: 0,
+      })
+      await harness.imports.start(
+        {
+          assetId: 'lasset_asset0007',
+          title: 'Portrait',
+          previewUrl: '/preview.png',
+          width: null,
+          height: null,
+        },
+        { x: 100, y: 200 },
+      )
+      await flushPromises()
+
+      const snapshot = (harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem
+      const saved = serializeBoardState(
+        makeBoardState({ imageNodes: [snapshot] }),
+        'remote-envelope',
+      )
+      expect(readSize).toHaveBeenCalledExactlyOnceWith('/media/42')
+      expect(saved.imageNodes[0]).toMatchObject({ width: 260, sourceImageRatio: 1.5 })
+      expect(saved.imageNodes[0]?.libraryImport).toBeUndefined()
+    } finally {
+      readSize.mockRestore()
+    }
+  })
+
+  it('discards dimensions decoded after the Board attachment changes', async () => {
+    const dimensions = deferred<{ width: number; height: number } | null>()
+    const readSize = vi
+      .spyOn(imageDimensions, 'readImageNaturalSize')
+      .mockReturnValueOnce(dimensions.promise)
+    try {
+      const harness = createHarness([pendingNode()])
+      harness.materialize.mockResolvedValue({
+        mediaAssetId: 'asset_media0042',
+        url: '/media/42',
+        width: 0,
+        height: 0,
+      })
+      harness.imports.resumePending()
+      await flushPromises()
+      harness.currentAttachment.value = attachment()
+      dimensions.resolve({ width: 240, height: 360 })
+      await flushPromises()
+
+      expect(harness.updateImageSnapshot).not.toHaveBeenCalled()
+      expect(harness.onWarning).not.toHaveBeenCalled()
+    } finally {
+      readSize.mockRestore()
+    }
+  })
+
   it('preserves the managed Media identity from a saved Search reference through Board save', async () => {
     const workspaceId = 'ws_thumbnail'
     const libraryAssetId = 'lasset_thumbnail'
@@ -129,8 +193,8 @@ describe('useCanvasLibraryImportRuntime', () => {
             id: mediaAssetId,
             status: 'ready',
             mime_type: 'image/png',
-            width: 400,
-            height: 200,
+            width: 240,
+            height: 360,
             size_bytes: 1000,
             content_url: contentUrl,
             derivatives: {},
@@ -150,8 +214,8 @@ describe('useCanvasLibraryImportRuntime', () => {
         assetId: libraryAssetId,
         title: 'Search reference',
         previewUrl: '/preview.png',
-        width: 400,
-        height: 200,
+        width: null,
+        height: null,
       },
       { x: 100, y: 200 },
     )
@@ -163,6 +227,7 @@ describe('useCanvasLibraryImportRuntime', () => {
       assetId: mediaAssetId,
       derivativeTier: 'preview',
     })
+    expect(saved.imageNodes[0]).toMatchObject({ width: 260, sourceImageRatio: 1.5 })
     expect(saved.imageNodes[0]?.libraryImport).toBeUndefined()
     expect(saved.imageNodes[0]).not.toHaveProperty('libraryImportPreviewUrl')
     expect(harness.updateImageSnapshot).toHaveBeenCalledTimes(1)

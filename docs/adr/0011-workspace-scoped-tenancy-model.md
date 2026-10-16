@@ -24,16 +24,20 @@ Workspace 是 Boards、Tasks、Library Assets 与 Media Assets 的租户隔离�
    Quote, Credit Hold, Task insert, Routing Snapshot persistence, and River
    enqueue commit together. Missing transaction seams fail closed. Terminal
    Task transitions converge Capture/Release in the same transaction.
-5. Library assets store provider URL + source metadata only (never bytes);
-   Media owns managed bytes and materialization. Task outputs reference Media Assets by `asset_…` public id or
-   by the explicit remote-output contract (URL + checksum, no storage internals).
+5. Library Assets are Workspace-scoped references with an explicit Source:
+   external references store provider URLs and source metadata; managed saves
+   store the Media Asset identity. Media owns managed bytes, ingestion, and
+   dimension facts. Managed saves deduplicate by Workspace + Media Asset identity;
+   Task lineage is provenance only. Task outputs reference Media Assets by
+   `asset_…` public id or by the explicit remote-output contract
+   (URL + checksum, no storage internals).
 
 ## Consequences
 
 Workspace 隔离由 HTTP membership/capability 检查与持久化查询的 scope 共同保证。
 Task submission 与结算依赖同一 PostgreSQL transaction，不能拆成跨库 dual write。
-Library 保存外部引用不等于 Media 已准备完成；materialization 由 Media 完成原图入库，
-Display Tier 在读取时渲染。Workspace worker 只消费已固定的 Routing Snapshot。
+Library 保存外部引用不等于 Media 已准备完成；materialization 由 Media 完成原图入库。
+受管收藏复用已有 Media identity，尺寸从 Media 投射；Display Tier 在读取时渲染。Workspace worker 只消费已固定的 Routing Snapshot。
 
 ## Status
 

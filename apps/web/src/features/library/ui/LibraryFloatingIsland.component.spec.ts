@@ -5,9 +5,10 @@ import { render, screen, userEvent, waitFor } from '../../../test/render'
 import LibraryFloatingIsland from './LibraryFloatingIsland.vue'
 import { createPointerDropTargets } from '../../../core/interaction/pointerDropTargets'
 import type { LibraryDragPayload } from '../core/drag'
-import type { LibraryFolderFacts } from '../session/folderFacts'
+import { createLibraryFolderFacts, createLibraryMutationPublisher } from '../session/folderFacts'
 import type { LibrarySearchReference } from '../core/validators'
 import type { useLibraryWorkspace } from '../session/useLibraryWorkspace'
+import type { LibrarySaveOperationState } from '../session/librarySaveModule'
 
 type IslandProps = {
   -readonly [Key in keyof InstanceType<typeof LibraryFloatingIsland>['$props']]: InstanceType<
@@ -17,19 +18,15 @@ type IslandProps = {
 
 const mocks = vi.hoisted(() => ({
   workspace: null as ReturnType<typeof workspaceState> | null,
-  saveReference: vi.fn(),
+  submit: vi.fn(),
 }))
 
 vi.mock('../session/useLibraryWorkspace', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../session/useLibraryWorkspace')>()),
   useLibraryWorkspace: () => mocks.workspace,
 }))
-vi.mock('../session/libraryUseCases', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../session/libraryUseCases')>()),
-  saveWorkspaceSearchReference: mocks.saveReference,
-}))
 vi.mock('../../../core/composables/useAppToast', () => ({
-  useAppToast: () => ({ error: vi.fn(), success: vi.fn() }),
+  useAppToast: () => ({ error: vi.fn(), success: vi.fn(), warning: vi.fn(), info: vi.fn() }),
 }))
 
 const reference: LibrarySearchReference = {
@@ -67,6 +64,7 @@ function workspaceState() {
     assets: ref([]),
     activeAsset: ref(null),
     initialize: vi.fn(),
+    loadAssets: vi.fn(),
     selectFolder: vi.fn(),
     moveSelectedAsset: vi.fn(),
   }
@@ -77,16 +75,21 @@ function workspaceState() {
 
 function mountIsland(presentation: 'search' | 'canvas' = 'search', isTransitionEnabled = false) {
   const targets = createPointerDropTargets<LibraryDragPayload>()
-  const publishMutation = vi.fn(async () => {})
+  const folderFacts = createLibraryFolderFacts(async () => [])
+  const mutationPublisher = createLibraryMutationPublisher(folderFacts)
+  const saveModule = {
+    operations: ref<LibrarySaveOperationState[]>([]),
+    submit: mocks.submit,
+    retryOperation: vi.fn(),
+    clear: vi.fn(),
+    dispose: vi.fn(),
+  }
   const props: Partial<IslandProps> = {
     presentation,
     workspaceId: 'ws_test123',
-    folderFacts: {} as LibraryFolderFacts,
-    mutationPublisher: {
-      publishMutation,
-      publishMutations: vi.fn(),
-      subscribe: vi.fn(() => () => {}),
-    },
+    folderFacts,
+    mutationPublisher,
+    saveModule,
     dropTargets: targets,
   }
   props.open = true
@@ -103,21 +106,110 @@ function mountIsland(presentation: 'search' | 'canvas' = 'search', isTransitionE
       },
     },
   })
-  return { ...view, targets, publishMutation }
+  return { ...view, targets, mutationPublisher, saveModule }
 }
 
 describe('Library pointer reference receiving', () => {
   beforeEach(() => {
     mocks.workspace = workspaceState()
-    mocks.saveReference.mockReset().mockResolvedValue({
-      asset: { provider: 'unsplash', sourceId: 'image-1', folderId: 'lfolder_folder0007' },
-      affectedFolderKeys: ['all', 'lfolder_folder0007'],
+    mocks.submit.mockReset().mockResolvedValue({
+      operationId: 'op-1',
+      status: 'succeeded',
+      items: [
+        {
+          id: 'item-1',
+          kind: 'external',
+          title: 'Image',
+          status: 'saved',
+          attempts: 1,
+          asset: { folderId: 'lfolder_folder0007' },
+          assetKey: 'unsplash:image-1',
+        },
+      ],
     })
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
       new DOMRect(0, 0, 100, 100),
     )
   })
   afterEach(() => vi.restoreAllMocks())
+
+  it.each(['search', 'canvas'] as const)(
+    'shows save progress and retries failures in the %s island',
+    async (presentation) => {
+      const { saveModule } = mountIsland(presentation)
+      saveModule.operations.value = [
+        {
+          id: 'op-retry',
+          status: 'running',
+          items: [
+            {
+              id: 'item-1',
+              kind: 'media',
+              title: 'Dropped image',
+              status: 'preparing',
+              attempts: 1,
+            },
+          ],
+        },
+      ]
+      await nextTick()
+      expect(screen.getByText(/Dropped image/)).toBeVisible()
+      expect(screen.getByText('0/1')).toBeVisible()
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+
+      saveModule.operations.value = [
+        {
+          id: 'op-retry',
+          status: 'failed',
+          items: [
+            {
+              id: 'item-1',
+              kind: 'media',
+              title: 'Dropped image',
+              status: 'failed',
+              attempts: 1,
+              error: 'Upload failed',
+            },
+          ],
+        },
+      ]
+      await nextTick()
+      await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+      expect(saveModule.retryOperation).toHaveBeenCalledExactlyOnceWith('op-retry')
+    },
+  )
+
+  it('reloads the current gallery once for a committed batch and ignores unrelated folders', async () => {
+    const { mutationPublisher } = mountIsland()
+    mocks.workspace!.selectedFolder!.value = 'lfolder_folder0007'
+    await mutationPublisher.publishMutations([
+      {
+        kind: 'asset-moved',
+        affectedFolderKeys: ['all', 'lfolder_folder0007'],
+        galleryEffect: 'reload-current',
+      },
+      {
+        kind: 'asset-moved',
+        affectedFolderKeys: ['all', 'lfolder_folder0007'],
+        galleryEffect: 'reload-current',
+      },
+    ])
+    expect(mocks.workspace?.loadAssets).toHaveBeenCalledExactlyOnceWith(true)
+
+    await mutationPublisher.publishMutations([
+      {
+        kind: 'asset-moved',
+        affectedFolderKeys: ['all', 'lfolder_other0001'],
+        galleryEffect: 'reload-current',
+      },
+      {
+        kind: 'asset-moved',
+        affectedFolderKeys: ['all', 'lfolder_folder0007'],
+        galleryEffect: 'selection-will-reload',
+      },
+    ])
+    expect(mocks.workspace?.loadAssets).toHaveBeenCalledOnce()
+  })
 
   it('keeps the expanded Search layout until its closing transition finishes', async () => {
     const { container, rerender } = mountIsland('search', true)
@@ -183,7 +275,7 @@ describe('Library pointer reference receiving', () => {
   )
 
   it('receives a folder drop through the existing Library receiver', async () => {
-    const { targets, publishMutation } = mountIsland()
+    const { targets } = mountIsland()
     const folder = screen.getByRole('tab', { name: 'Destination' })
     vi.spyOn(document, 'elementFromPoint').mockReturnValue(folder)
     targets.update(10, 10, { kind: 'reference', reference })
@@ -194,12 +286,12 @@ describe('Library pointer reference receiving', () => {
       expect(mocks.workspace?.selectFolder).toHaveBeenCalledWith('lfolder_folder0007'),
     )
 
-    expect(mocks.saveReference).toHaveBeenCalledExactlyOnceWith(
-      'ws_test123',
-      reference,
-      'lfolder_folder0007',
+    // Drops delegate to the shared save module with the pill target; the
+    // module owns upload, publication, and notification.
+    expect(mocks.submit).toHaveBeenCalledExactlyOnceWith(
+      { source: 'external', reference },
+      { folderId: 'lfolder_folder0007', galleryEffect: 'selection-will-reload' },
     )
-    expect(publishMutation).toHaveBeenCalledOnce()
     expect(mocks.workspace?.selectFolder).toHaveBeenCalledWith('lfolder_folder0007')
   })
 
@@ -215,10 +307,9 @@ describe('Library pointer reference receiving', () => {
       expect(mocks.workspace?.selectFolder).toHaveBeenCalledWith('lfolder_folder0007'),
     )
 
-    expect(mocks.saveReference).toHaveBeenCalledExactlyOnceWith(
-      'ws_test123',
-      reference,
-      'lfolder_folder0007',
+    expect(mocks.submit).toHaveBeenCalledExactlyOnceWith(
+      { source: 'external', reference },
+      { folderId: 'lfolder_folder0007', galleryEffect: 'selection-will-reload' },
     )
   })
 
@@ -246,7 +337,7 @@ describe('Library pointer reference receiving', () => {
         'lfolder_folder0007',
       ),
     )
-    expect(mocks.saveReference).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
   })
 
   it('keeps drops on All as no-ops even when the panel selects a concrete folder', async () => {
@@ -270,7 +361,7 @@ describe('Library pointer reference receiving', () => {
     )
     await nextTick()
     expect(mocks.workspace?.moveSelectedAsset).not.toHaveBeenCalled()
-    expect(mocks.saveReference).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
   })
 
   it('unregisters receiving regions when the island closes or unmounts', async () => {
@@ -285,6 +376,6 @@ describe('Library pointer reference receiving', () => {
     unmount()
     targets.drop({ kind: 'reference', reference }, 10, 10)
 
-    expect(mocks.saveReference).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
   })
 })

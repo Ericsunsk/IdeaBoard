@@ -280,6 +280,7 @@ function createRuntimeViewModel() {
   const imageToolsViewModel = {
     active: { nodeId: ref(null), maskNodeId: ref(null) },
     locks: { isChromeHidden: ref(false), isCanvasLocked: ref(false) },
+    retouch: { isApplying: ref(false) },
     nodeBindings: {
       stageFor: vi.fn(() => null),
       actionFor: vi.fn((nodeId: string) => ({ nodeId })),

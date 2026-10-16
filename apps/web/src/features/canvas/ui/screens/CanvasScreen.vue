@@ -31,12 +31,14 @@
     >
       <template #library>
         <CanvasLibraryFloatingIsland
+          ref="canvasLibraryIslandRef"
           presentation="canvas"
           :open="canvasLibrary.view.isOpen.value && !isRetouchChromeHidden"
           :workspace-id="canvasWorkspaceId"
           :drop-targets="libraryDropTargets"
           :folder-facts="canvasLibrary.view.folderFacts"
           :mutation-publisher="canvasLibrary.view.mutationPublisher"
+          :save-module="canvasLibrary.view.saveModule"
           @add-to-canvas="addLibraryAssetToCanvas"
           @close="canvasLibrary.commands.close"
           @focus-scope-change="canvasLibrary.commands.setFocusWithin"
@@ -153,6 +155,7 @@ import { useWorkspaceAccountControls, type WorkspaceNavigationAdapter } from '..
 import { getWorkspaceSelectionStore } from '../../../workspace'
 import { useCanvasScreenImageToolUi } from './internal/useCanvasScreenImageToolUi'
 import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSurfaceInteractions'
+import type { CanvasScreenLibrarySaveBridge } from './internal/useCanvasScreenSurfaceInteractions'
 import { createCanvasScreenNodePresentation } from './internal/createCanvasScreenNodePresentation'
 import { useCanvasScreenLifecycle } from './internal/useCanvasScreenLifecycle'
 import { useCanvasLibraryIsland } from './internal/useCanvasLibraryIsland'
@@ -161,8 +164,10 @@ import {
   loadLibraryFloatingIsland,
   materializeLibraryAssetForCanvas,
   requireWorkspaceId,
+  type LibraryDropHit,
 } from '../../../library'
 import type { CanvasLibraryImportDescriptor } from '../../../library'
+import { useAppToast } from '../../../../core/composables/useAppToast'
 
 const props = defineProps<{
   route: RouteLocationNormalizedLoaded
@@ -196,6 +201,7 @@ const activeTool = computed({
 const isCanvasMinimapEnabled = ref(false)
 const isDuplicateModifierPressed = ref(false)
 const canvasLibrary = useCanvasLibraryIsland()
+const toast = useAppToast()
 // Workspace id comes from the shared selection store (primed from persisted
 // selection); no workspace query is issued from the Canvas screen.
 const workspaceSelectionStore = getWorkspaceSelectionStore()
@@ -347,6 +353,12 @@ const libraryDropTargets = useCanvasLibraryDrop({
   add: (asset, point) => commands.graphEditing.libraryImport.add(asset, point),
 })
 const { isFlowInteractionActive, isFlowViewportPanInteractionActive } = viewModel.graphEditing
+type CanvasLibraryIslandInstance = {
+  setExternalDragHover: (hit: LibraryDropHit | null) => void
+  getSelectedFolderKey: () => string
+  isFolderKnown: (key: string) => boolean
+} | null
+const canvasLibraryIslandRef = ref<CanvasLibraryIslandInstance>(null)
 const surface = useCanvasScreenSurfaceInteractions({
   workspace,
   flowPaneAdapter,
@@ -355,6 +367,14 @@ const surface = useCanvasScreenSurfaceInteractions({
   isCanvasMinimapEnabled,
   isDuplicateModifierPressed,
   activePanels: imageToolUi.activePanels,
+  librarySave: {
+    saveModule: canvasLibrary.view.saveModule,
+    isIslandOpen: () => canvasLibrary.view.isOpen.value,
+    setIslandHover: (hit) => canvasLibraryIslandRef.value?.setExternalDragHover(hit),
+    getSelectedFolderKey: () => canvasLibraryIslandRef.value?.getSelectedFolderKey() ?? 'all',
+    isFolderKnown: (key) => canvasLibraryIslandRef.value?.isFolderKnown(key) ?? false,
+    notifyError: (message) => toast.error(message),
+  } satisfies CanvasScreenLibrarySaveBridge,
 })
 const {
   nodeContextMenu,

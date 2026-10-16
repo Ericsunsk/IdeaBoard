@@ -16,6 +16,7 @@ const image =
   'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/%3E'
 function asset(index: number, height = 600): LibraryAssetView {
   return {
+    source: 'external',
     id: `lasset_browser${index}`,
     workspaceId: 'ws_test0001',
     provider: 'unsplash',

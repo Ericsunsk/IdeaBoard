@@ -139,6 +139,7 @@ func testLibraryAsset() *domain.V1Asset {
 	return &domain.V1Asset{
 		WorkspacePublicID: "ws_library_test",
 		PublicID:          "lasset_testmaterial01",
+		Source:            domain.AssetSourceExternal,
 		Provider:          domain.ProviderUnsplash,
 		SourceID:          "photo-test-1",
 		SourceURL:         providerURL,
@@ -146,10 +147,15 @@ func testLibraryAsset() *domain.V1Asset {
 		OriginalURL:       providerURL,
 		Title:             "dunes",
 		Author:            "a",
-		Width:             100,
-		Height:            80,
+		Width:             &testMaterialWidth,
+		Height:            &testMaterialHeight,
 	}
 }
+
+var (
+	testMaterialWidth  int32 = 100
+	testMaterialHeight int32 = 80
+)
 
 func newLibraryMaterializerForTest(t *testing.T, fetcher *stubLibraryFetcher, replay *fakeLibraryReplay) (*LibraryMaterializer, *workspacemedia.InMemoryWorkspaceMediaStore, *fakeLibraryObjects) {
 	t.Helper()
@@ -249,16 +255,18 @@ func TestLibraryMaterializeProviderDeniedFailsClosed(t *testing.T) {
 	}
 }
 
-func TestLibraryMaterializeWorkspaceMediaProviderDenied(t *testing.T) {
+func TestLibraryMaterializeMediaSourceDenied(t *testing.T) {
 	stubLibraryEgress(t, []string{"images.unsplash.com"})
 	fetcher := &stubLibraryFetcher{data: testLibraryPNG(t)}
 	materializer, _, _ := newLibraryMaterializerForTest(t, fetcher, nil)
 
 	asset := testLibraryAsset()
-	asset.Provider = domain.ProviderWorkspaceMedia
+	asset.Source = domain.AssetSourceMedia
+	asset.Provider = ""
+	asset.MediaAssetID = "asset_managed0000000001"
 	ctx := WithLibraryMaterializationOwner(context.Background(), 42)
 	if _, err := materializer.MaterializeWorkspaceAsset(ctx, "ws_library_test", asset); err == nil {
-		t.Fatal("workspace_media provider must fail closed")
+		t.Fatal("media source must fail closed")
 	} else if !strings.Contains(err.Error(), "cannot be fetched") {
 		t.Fatalf("err = %v, want cannot-be-fetched failure", err)
 	}

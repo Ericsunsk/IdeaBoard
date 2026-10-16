@@ -1,30 +1,28 @@
 package domain
 
-// Workspace-scoped library for the Public API v1 (issue #806).
-//
-// Additive only: the legacy user-scoped tables (library_folders,
-// library_assets keyed by integer ids + owner_user_id) were removed
-// in #809. This file owns the V1 value types, public-id
-// helpers, and lifecycle words. Persistence lives behind ports
-// (WorkspaceLibraryStore); the postgres sibling lives in
-// infrastructure/postgres and the test-only in-memory sibling stays in
-// the library root package.
+// Workspace-scoped library for the Public API v1. This file owns the V1
+// value types, public-id helpers, and lifecycle words. Persistence lives
+// behind WorkspaceLibraryStore in infrastructure/postgres and the
+// test-only infrastructure/memory store.
 //
 // Invariants owned here:
 //   - External ids mint lfolder_/lasset_/lmat_ via contract.MintPublicID,
 //     matching the workspace library tables' public_id CHECKs
-//     (lfolder_% / lasset_% / lmat_%, #809); integer database ids are
-//     never exposed. v1 lookups reject legacy integer ids as malformed
+//     (lfolder_% / lasset_% / lmat_%); integer database ids are
+//     never exposed. v1 lookups reject integer ids as malformed
 //     (404, never a distinct status).
-//   - Assets are saved external references ONLY: provider URL + source
-//     metadata. No bytes are stored, fetched, or proxied here. Asset
+//   - Assets never store bytes. External rows are provider references
+//     (provider URL + source metadata); media rows are managed saves
+//     (Media Asset identity, no provider/URL keys, dimensions projected
+//     from Media at read time, task provenance as lineage). Asset
 //     resolution matches already-saved workspace assets by
 //     (provider, source_id) or exact known URL; unknown references report
 //     unresolved per item instead of fetching (provider lookup only, NOT
-//     a general proxy; live provider fetch needs Control provider config
-//     and is #808-owned).
-//   - Save is idempotent on (workspace, provider, source_id): re-saving
-//     the same reference returns the existing asset (created=false).
+//     a general proxy; live provider fetch needs Control provider config).
+//   - Save is idempotent per source: external re-saving on
+//     (workspace, provider, source_id) and media re-saving on
+//     (workspace, media_asset_id) return the existing asset
+//     (created=false) without touching its folder or metadata.
 //   - Materializations are status-addressable records
 //     (pending -> running -> completed|failed); terminal states are
 //     immutable. The result links a media asset_... id produced by the
@@ -79,9 +77,8 @@ func IsV1MaterializationID(id string) bool {
 	return contract.IsValidPublicID(V1MaterializationPrefix, id)
 }
 
-// V1Folder is one workspace-scoped collection. Assets without a folder
-// are unfiled (FolderPublicID "") rather than forced into a system
-// folder; the legacy quick-saves concept stays on the old surface.
+// V1Folder is one workspace-scoped collection. The public read shape
+// represents unfiled assets with FolderPublicID "" and hides system folders.
 type V1Folder struct {
 	WorkspacePublicID string
 	PublicID          string
@@ -90,22 +87,29 @@ type V1Folder struct {
 	UpdatedAt         time.Time
 }
 
-// V1Asset is one saved library reference. External rows carry provider URLs;
-// task output rows use ProviderWorkspaceMedia and point at media_assets through
-// the database-managed media_asset_id column, without storing bytes in Library.
+// V1Asset is one saved library reference. Source discriminates the
+// shape: external rows carry provider/source identity plus real URLs;
+// media rows carry a Media Asset identity and no provider/URL keys.
+// Media display dimensions are projected from the managed Media row
+// (Media owns the fact); Width/Height are paired (both nil = unknown,
+// else both positive). Lineage is task provenance only (never a dedup
+// key); the server-side operator identity is never serialized.
 type V1Asset struct {
 	WorkspacePublicID string
 	PublicID          string
 	FolderPublicID    string
+	Source            AssetSource
 	Provider          string
 	SourceID          string
 	SourceURL         string
 	PreviewURL        string
 	OriginalURL       string
+	MediaAssetID      string
 	Title             string
 	Author            string
-	Width             int32
-	Height            int32
+	Width             *int32
+	Height            *int32
+	Lineage           *TaskLineage
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
@@ -179,12 +183,27 @@ type V1Materialization struct {
 	UpdatedAt         time.Time
 }
 
-// V1SaveAssetInput carries one save: optional folder binding plus the
-// provider reference payload (validated like the legacy surface,
-// including the provider-allowlisted https URL gate).
+// V1SaveAssetInput carries one external save: optional folder binding
+// plus the provider reference payload (validated including the
+// provider-allowlisted https URL gate). OperatorUserID is the
+// server-side operator identity (persisted, never serialized).
 type V1SaveAssetInput struct {
 	FolderPublicID string
 	Asset          AssetInput
+	OperatorUserID int64
+}
+
+// V1SaveManagedAssetInput carries one managed save into the single
+// managed-save use case (manual and task-auto entries converge here):
+// the Media Asset identity, display metadata, task provenance, and the
+// server-side operator. FolderPublicID "" targets Quick Saves.
+type V1SaveManagedAssetInput struct {
+	FolderPublicID string
+	MediaAssetID   string
+	Title          string
+	Author         string
+	Lineage        *TaskLineage
+	OperatorUserID int64
 }
 
 // V1ResolveItem is one typed batch-resolve entry: provider plus either

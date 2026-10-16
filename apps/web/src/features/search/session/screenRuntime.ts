@@ -12,7 +12,11 @@ import {
 import { useAppToast } from '../../../core/composables/useAppToast'
 import { useAuthOverlay } from '../../auth'
 import { useRoute, useRouter } from 'vue-router'
-import { libraryAssetKey, loadLibraryFloatingIsland, type LibraryDragPayload } from '../../library'
+import {
+  libraryAssetKeyFor,
+  loadLibraryFloatingIsland,
+  type LibraryDragPayload,
+} from '../../library'
 import { type SearchAuthAction } from '../core/authAction'
 import {
   peekPendingSearchAuthAction,
@@ -104,6 +108,7 @@ function createSearchScreenView(
       }),
       folderFacts: libraryCoordinator.folderFacts,
       mutationPublisher: libraryCoordinator,
+      saveModule: libraryCoordinator.saveModule,
       isMounted: libraryIslandMounted,
       isDropTarget: isTriggerHoveredDuringDrag,
     },
@@ -215,13 +220,10 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
   const savePopover = shallowRef<SearchSavePopoverController | null>(null)
   const savePopoverAnchor = ref<HTMLElement | null>(null)
   let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
-  const unsubscribeLibraryMutation = libraryCoordinator.subscribe((outcome) => {
-    if (outcome.kind === 'asset-saved') {
-      session().library.markAssetSaved(outcome.assetKey)
-      return
-    }
-    if (outcome.kind === 'asset-removed') {
-      session().library.markAssetUnsaved(outcome.assetKey)
+  const unsubscribeLibraryMutation = libraryCoordinator.subscribe((outcomes) => {
+    for (const outcome of outcomes) {
+      if (outcome.kind === 'asset-saved') session().library.markAssetSaved(outcome.assetKey)
+      if (outcome.kind === 'asset-removed') session().library.markAssetUnsaved(outcome.assetKey)
     }
   })
 
@@ -330,7 +332,13 @@ export function screenRuntime(options: SearchScreenRuntimeOptions) {
         savePopoverAnchor.value = anchor
         const request: SearchSavePopoverRequest = {
           result,
-          isSaved: session().feed.savedKeys.value.has(libraryAssetKey(result.provider, result.id)),
+          isSaved: session().feed.savedKeys.value.has(
+            libraryAssetKeyFor({
+              source: 'external',
+              provider: result.provider,
+              sourceId: result.id,
+            }),
+          ),
           isAuthenticated: options.isAuthenticated(),
         }
         savePopover.value?.toggle(event, request)

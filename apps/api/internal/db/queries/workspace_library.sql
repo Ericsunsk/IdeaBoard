@@ -20,23 +20,29 @@
 -- Assets always live in a folder (folder_id NOT NULL): the workspace
 -- Quick Saves system folder is the unfiled bucket. Save/move callers
 -- pass an empty folder to mean Quick Saves and the store ensures it.
--- Title/author have no durable columns (the workspace tables keep
--- provider URL + source metadata only); they are validated by the seam
--- and intentionally not persisted here.
+-- Title/author are durable display metadata; task_id/task_result_index
+-- are task provenance (paired, never a dedup key); saved_by_user_id is
+-- the server-side operator identity (never serialized on the wire).
+-- Source is derived (media_asset_id IS NOT NULL -> 'media', else
+-- 'external'); there is no source column. Media display dimensions are
+-- projected at read time from the joined media_assets row (Media owns
+-- the fact; library width/height stay NULL on media rows), paired by
+-- the seam (either both set or both NULL).
+-- Dedup identity: external rows (workspace_id, provider, source_id)
+-- WHERE media_asset_id IS NULL; media rows (workspace_id, media_asset_id)
+-- WHERE NOT NULL. Asset reads LEFT JOIN media_assets for the managed
+-- link identity + dimension projection in one round trip.
 
--- name: CreateManagedLibraryAsset :one
+-- name: CreateMediaLibraryAsset :one
 INSERT INTO library_assets (
-  public_id, workspace_id, folder_id, provider, source_id,
-  source_url, preview_url, original_url, media_asset_id, width, height
+  public_id, workspace_id, folder_id, media_asset_id,
+  title, author, task_id, task_result_index, saved_by_user_id
 )
-SELECT
-  sqlc.arg(public_id), sqlc.arg(workspace_id), sqlc.arg(folder_id), 'workspace_media', sqlc.arg(source_id),
-  '', '', '', sqlc.arg(media_asset_id), ma.width, ma.height
-FROM media_assets AS ma
-WHERE ma.internal_id = sqlc.arg(media_asset_id)
-  AND ma.workspace_id = sqlc.arg(workspace_id)
-  AND ma.archived_at IS NULL
-RETURNING internal_id, public_id, workspace_id, folder_id, provider, source_id, source_url, preview_url, original_url, media_asset_id, width, height, created_at, updated_at;
+VALUES (
+  sqlc.arg(public_id), sqlc.arg(workspace_id), sqlc.arg(folder_id), sqlc.arg(media_asset_id),
+  sqlc.arg(title), sqlc.arg(author), sqlc.arg(task_id), sqlc.arg(task_result_index), sqlc.arg(saved_by_user_id)
+)
+RETURNING internal_id, public_id, workspace_id, folder_id, provider, source_id, source_url, preview_url, original_url, media_asset_id, title, author, width, height, task_id, task_result_index, saved_by_user_id, created_at, updated_at;
 
 -- name: CreateLibraryFolder :one
 INSERT INTO library_folders (public_id, workspace_id, name, is_system, is_default)
@@ -102,78 +108,93 @@ WHERE f.workspace_id = sqlc.arg(workspace_id)
 -- name: CreateLibraryAsset :one
 INSERT INTO library_assets (
   public_id, workspace_id, folder_id, provider, source_id,
-  source_url, preview_url, original_url, media_asset_id, width, height
+  source_url, preview_url, original_url, title, author, width, height, saved_by_user_id
 )
 VALUES (
   sqlc.arg(public_id), sqlc.arg(workspace_id), sqlc.arg(folder_id), sqlc.arg(provider), sqlc.arg(source_id),
-  sqlc.arg(source_url), sqlc.arg(preview_url), sqlc.arg(original_url), NULL, sqlc.arg(width), sqlc.arg(height)
+  sqlc.arg(source_url), sqlc.arg(preview_url), sqlc.arg(original_url), sqlc.arg(title), sqlc.arg(author), sqlc.arg(width), sqlc.arg(height), sqlc.arg(saved_by_user_id)
 )
-RETURNING internal_id, public_id, workspace_id, folder_id, provider, source_id, source_url, preview_url, original_url, media_asset_id, width, height, created_at, updated_at;
+RETURNING internal_id, public_id, workspace_id, folder_id, provider, source_id, source_url, preview_url, original_url, media_asset_id, title, author, width, height, task_id, task_result_index, saved_by_user_id, created_at, updated_at;
 
 -- name: GetLibraryAssetByPublicID :one
-SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
+SELECT sqlc.embed(a),
   f.public_id AS folder_public_id,
-  a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
+  ma.public_id AS media_asset_public_id,
+  ma.width AS media_width, ma.height AS media_height
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id
 WHERE a.workspace_id = sqlc.arg(workspace_id)
   AND a.public_id = sqlc.arg(public_id)
 LIMIT 1;
 
 -- name: GetLibraryAssetByWorkspaceSource :one
-SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
+SELECT sqlc.embed(a),
   f.public_id AS folder_public_id,
-  a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
+  ma.public_id AS media_asset_public_id,
+  ma.width AS media_width, ma.height AS media_height
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id
 WHERE a.workspace_id = sqlc.arg(workspace_id)
+  AND a.media_asset_id IS NULL
   AND a.provider = sqlc.arg(provider)
   AND a.source_id = sqlc.arg(source_id)
 LIMIT 1;
 
--- name: ListLibraryAssets :many
-SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
+-- name: GetLibraryAssetByWorkspaceMedia :one
+SELECT sqlc.embed(a),
   f.public_id AS folder_public_id,
-  a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
+  ma.public_id AS media_asset_public_id,
+  ma.width AS media_width, ma.height AS media_height
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id
 WHERE a.workspace_id = sqlc.arg(workspace_id)
-ORDER BY a.created_at ASC, a.internal_id ASC
-LIMIT sqlc.arg(row_limit);
+  AND a.media_asset_id = sqlc.arg(media_asset_id)
+LIMIT 1;
 
--- name: ListLibraryAssetsByFolder :many
-SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
+-- name: ListLibraryAssets :many
+SELECT sqlc.embed(a),
   f.public_id AS folder_public_id,
-  a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
+  ma.public_id AS media_asset_public_id,
+  ma.width AS media_width, ma.height AS media_height
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id
 WHERE a.workspace_id = sqlc.arg(workspace_id)
-  AND a.folder_id = sqlc.arg(folder_id)
 ORDER BY a.created_at ASC, a.internal_id ASC
 LIMIT sqlc.arg(row_limit);
 
 -- name: ListLibraryAssetsByWorkspaceProvider :many
-SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
+SELECT sqlc.embed(a),
   f.public_id AS folder_public_id,
-  a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.width, a.height, a.created_at, a.updated_at
+  ma.public_id AS media_asset_public_id,
+  ma.width AS media_width, ma.height AS media_height
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id
 WHERE a.workspace_id = sqlc.arg(workspace_id)
+  AND a.media_asset_id IS NULL
   AND a.provider = sqlc.arg(provider)
 ORDER BY a.created_at ASC, a.internal_id ASC
 LIMIT sqlc.arg(row_limit);
 
 -- name: MoveLibraryAsset :one
-UPDATE library_assets AS a
-SET folder_id = sqlc.arg(folder_id), updated_at = now()
-WHERE a.workspace_id = sqlc.arg(workspace_id)
-  AND a.public_id = sqlc.arg(public_id)
-RETURNING a.internal_id, a.public_id, a.workspace_id, a.folder_id, a.provider, a.source_id, a.source_url, a.preview_url, a.original_url, a.media_asset_id, a.width, a.height, a.created_at, a.updated_at;
+WITH moved AS (
+  UPDATE library_assets AS a
+  SET folder_id = sqlc.arg(folder_id), updated_at = now()
+  WHERE a.workspace_id = sqlc.arg(workspace_id)
+    AND a.public_id = sqlc.arg(public_id)
+  RETURNING a.*
+)
+SELECT sqlc.embed(a),
+  f.public_id AS folder_public_id,
+  ma.public_id AS media_asset_public_id,
+  ma.width AS media_width, ma.height AS media_height
+FROM moved AS a
+INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id;
 
 -- name: DeleteLibraryAsset :execrows
 DELETE FROM library_assets AS a
@@ -316,11 +337,3 @@ LEFT JOIN media_assets AS ma ON ma.internal_id = m.media_asset_id
 WHERE m.workspace_id = sqlc.arg(workspace_id)
 ORDER BY m.created_at ASC, m.internal_id ASC
 LIMIT sqlc.arg(row_limit);
-
--- name: GetLibraryManagedMediaPublicID :one
-SELECT ma.public_id
-FROM library_assets AS a
-INNER JOIN workspaces AS w ON w.internal_id = a.workspace_id
-INNER JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id AND ma.workspace_id = a.workspace_id
-WHERE w.public_id = sqlc.arg(workspace_public_id)
-  AND a.public_id = sqlc.arg(asset_public_id);

@@ -19,6 +19,7 @@ import type { CanvasLibraryImportDescriptor } from '../../../../library'
 import type { LibraryAssetMaterializer } from '../../../../library'
 import { preloadImage } from '../../../session/media/preloadImage'
 import { createPollDelay, sleep } from '../../../../../core/utils/polling'
+import { readImageNaturalSize } from '../../../../../core/media/imageDimensions'
 
 type UseCanvasLibraryImportRuntimeOptions = {
   nodes: Ref<Node[]>
@@ -230,8 +231,12 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     activeNodeIdsByAttachment.set(attachment, activeNodeIds)
 
     void waitForMaterializedMedia(nodeId, libraryAssetId, attachment)
-      .then((materialized) => {
+      .then(async (materialized) => {
         if (!materialized) return
+        if (!(materialized.width > 0 && materialized.height > 0)) {
+          const size = await readImageNaturalSize(materialized.url)
+          if (size) materialized = { ...materialized, ...size }
+        }
         clearFactWithMaterializedMedia(
           nodeId,
           libraryAssetId,

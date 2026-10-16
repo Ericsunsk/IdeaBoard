@@ -3,25 +3,31 @@ import type { SearchLibraryCoordinator } from '../../ports/libraryCoordinatorPor
 import { inject, provide, toValue, type InjectionKey, type MaybeRefOrGetter } from 'vue'
 import {
   buildLibraryAssetRemovedOutcome,
-  buildLibraryAssetSavedOutcome,
   createLibraryFolderFacts,
   createLibraryMutationPublisher,
+  createLibrarySaveModule,
   listAllWorkspaceLibraryFolders,
   removeWorkspaceSearchReference,
   requireWorkspaceId,
-  saveWorkspaceSearchReference,
+  type LibrarySaveModule,
+  type LibrarySaveSubmitResult,
   type WorkspaceLibraryAsset,
   type WorkspaceLibraryFolder,
 } from '../../../library'
+import { useAppToast } from '../../../../core/composables/useAppToast'
 import type { LibrarySearchReference } from '../../core/authAction'
 
 export type SearchLibraryCoordinatorOptions = {
   workspaceId: MaybeRefOrGetter<string | null | undefined>
+  /** Test seam: inject a stub save module; production always builds its own. */
+  saveModule?: LibrarySaveModule | undefined
 }
 
 /**
- * The Search screen's one coordination boundary for Library Folder facts and
- * mutations. Library still owns its resource operations and asset gallery.
+ * The Search screen's one coordination boundary for Library saves, Folder
+ * facts, and mutations. Saves delegate to the shared Library save module
+ * (upload-once, idempotent retry, batch publication and notifications); this
+ * adapter only shapes Search inputs and keeps the Search-facing interface.
  * The workspace id resolves per call from `features/workspace` selection so
  * workspace switches never reuse a stale id.
  */
@@ -32,6 +38,14 @@ export function createSearchLibraryCoordinator(
     listAllWorkspaceLibraryFolders(requireWorkspaceId(toValue(options.workspaceId))),
   )
   const mutationPublisher = createLibraryMutationPublisher(folderFacts)
+  const toast = useAppToast()
+  const saveModule =
+    options.saveModule ??
+    createLibrarySaveModule({
+      workspaceId: options.workspaceId,
+      mutationPublisher,
+      notify: toast,
+    })
 
   function resolveWorkspaceId(): string {
     return requireWorkspaceId(toValue(options.workspaceId))
@@ -41,23 +55,36 @@ export function createSearchLibraryCoordinator(
     reference: LibrarySearchReference,
     folderID?: string,
     newFolderName?: string,
+    successMessage?: string,
   ): Promise<{ asset: WorkspaceLibraryAsset; createdFolder?: WorkspaceLibraryFolder | undefined }> {
-    // The committed save result owns the actual target: `affectedFolderKeys`
-    // must come from `result` (asset + created folder), never from the input
-    // `folderID`. `galleryEffect` stays a Search-surface policy.
-    const result = await saveWorkspaceSearchReference(
-      resolveWorkspaceId(),
-      reference,
-      folderID,
-      newFolderName,
+    // The committed save result owns the actual target: callers read the
+    // stored asset (and created folder) back, never their input `folderID`.
+    // `galleryEffect` stays a Search-surface policy.
+    resolveWorkspaceId()
+    const result = await saveModule.submit(
+      {
+        source: 'external',
+        reference,
+      },
+      {
+        ...(folderID == null ? {} : { folderId: folderID }),
+        ...(newFolderName == null ? {} : { newFolderName }),
+        galleryEffect: 'reload-current',
+        ...(successMessage == null ? {} : { successMessage }),
+      },
     )
-    await mutationPublisher.publishMutation({
-      ...buildLibraryAssetSavedOutcome(result.asset, 'reload-current'),
-      affectedFolderKeys: result.affectedFolderKeys,
-    })
+    const saved = result.items[0]
+    if (!saved || saved.status !== 'saved' || !saved.asset) {
+      throw new Error(saved?.error ?? 'Could not save the asset')
+    }
+    const createdFolderId = result.createdFolderId
+    const createdFolder =
+      createdFolderId == null
+        ? undefined
+        : folderFacts.folders.value.find((folder) => folder.id === createdFolderId)
     return {
-      asset: result.asset,
-      ...(result.createdFolder == null ? {} : { createdFolder: result.createdFolder }),
+      asset: saved.asset,
+      ...(createdFolder == null ? {} : { createdFolder }),
     }
   }
 
@@ -78,42 +105,44 @@ export function createSearchLibraryCoordinator(
     }
     await mutationPublisher.publishMutation(
       buildLibraryAssetRemovedOutcome(
-        { provider, sourceId: sourceID, folderId: undefined },
+        { source: 'external', provider, sourceId: sourceID, folderId: undefined },
         'reload-current',
       ),
     )
     return { asset: null }
   }
 
-  async function saveReferences(references: LibrarySearchReference[]) {
-    const workspaceId = resolveWorkspaceId()
-    const results = await Promise.allSettled(
-      references.map((reference) => saveWorkspaceSearchReference(workspaceId, reference)),
+  async function saveReferences(
+    references: LibrarySearchReference[],
+  ): Promise<LibrarySaveSubmitResult> {
+    resolveWorkspaceId()
+    return saveModule.submit(
+      references.map((reference) => ({ source: 'external' as const, reference })),
+      { galleryEffect: 'reload-current' },
     )
-    const outcomes = results.flatMap((result) =>
-      result.status === 'fulfilled'
-        ? [
-            {
-              ...buildLibraryAssetSavedOutcome(result.value.asset, 'reload-current'),
-              affectedFolderKeys: result.value.affectedFolderKeys,
-            },
-          ]
-        : [],
-    )
-    await mutationPublisher.publishMutations(outcomes)
-    return results
+  }
+
+  function reset(): void {
+    saveModule.clear()
+    folderFacts.reset()
+  }
+
+  function dispose(): void {
+    saveModule.dispose()
+    folderFacts.dispose()
   }
 
   return {
     folderFacts,
+    saveModule,
     saveReference,
     saveReferences,
     removeReference,
     publishMutation: mutationPublisher.publishMutation,
     publishMutations: mutationPublisher.publishMutations,
     subscribe: mutationPublisher.subscribe,
-    reset: folderFacts.reset,
-    dispose: folderFacts.dispose,
+    reset,
+    dispose,
   }
 }
 

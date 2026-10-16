@@ -17,20 +17,16 @@ type SourceStore interface {
 	ListMaterializations(context.Context, string) ([]*domain.V1Materialization, error)
 }
 
-type ManagedMediaReader interface {
-	FindManagedMedia(context.Context, string, string) (string, error)
-}
-
 // SourceResolver selects canonical managed links or the stored provider preview.
 // It neither creates materializations nor verifies managed Media readiness.
 type SourceResolver struct {
-	Store        SourceStore
-	ManagedMedia ManagedMediaReader
+	Store SourceStore
 }
 
 // Resolve returns the owned reference and its managed Media ID, when available.
-// An empty Media ID selects the stored provider preview. Direct managed-link
-// failures remain errors; a failed completed-job lookup leaves a provider preview.
+// Media rows carry their managed link directly (no second lookup); an empty
+// Media ID selects the stored provider preview. Malformed managed links read
+// as not found (never handed to the media store, which requires asset_ shape).
 func (r *SourceResolver) Resolve(ctx context.Context, workspacePublicID, assetPublicID string) (*domain.V1Asset, string, error) {
 	if r == nil || r.Store == nil {
 		return nil, "", ErrSourceUnavailable
@@ -39,18 +35,12 @@ func (r *SourceResolver) Resolve(ctx context.Context, workspacePublicID, assetPu
 	if err != nil || asset == nil {
 		return nil, "", err
 	}
-	if strings.TrimSpace(asset.Provider) == domain.ProviderWorkspaceMedia {
-		if r.ManagedMedia == nil {
-			return asset, "", ErrSourceUnavailable
-		}
-		mediaID, err := r.ManagedMedia.FindManagedMedia(ctx, workspacePublicID, asset.PublicID)
-		if err != nil {
-			return asset, "", err
-		}
-		if !contract.IsAssetID(strings.TrimSpace(mediaID)) {
+	if asset.Source == domain.AssetSourceMedia {
+		mediaID := strings.TrimSpace(asset.MediaAssetID)
+		if !contract.IsAssetID(mediaID) {
 			return asset, "", domain.ErrV1AssetNotFound
 		}
-		return asset, strings.TrimSpace(mediaID), nil
+		return asset, mediaID, nil
 	}
 	mediaID, _, _ := r.FindCompletedMaterializationMedia(ctx, workspacePublicID, asset.PublicID)
 	return asset, mediaID, nil

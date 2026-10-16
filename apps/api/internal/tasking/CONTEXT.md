@@ -39,6 +39,10 @@ An Execution Plan belongs to Canvas and may produce multiple Tasks. A Routing Sn
 - PostgreSQL and River are the task facts and queue source; NATS is event-only.
 - Terminal success captures Credits; failure, cancellation, and timeout release
   the hold atomically with the task transition.
+- After completion commits, managed Task Outputs are saved in Library Quick
+  Saves by Workspace and Media Asset identity. Each save is best-effort and
+  idempotent; failure never changes Task settlement or requeues execution.
+  Completed-task redelivery replays the saves without rerunning the provider.
 - Raw task rows live at most the retention window (default 7 days, terminal
   statuses only): each purge freezes statistics into task_daily_stats first,
   then deletes tasks in one transaction. Billing snapshots/settlements/claims,

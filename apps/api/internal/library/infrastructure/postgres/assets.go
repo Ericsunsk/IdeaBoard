@@ -8,14 +8,22 @@ import (
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/library/domain"
-	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// SaveAsset validates the provider reference (provider-allowlisted
-// https URLs; never bytes) and dedups on
+// savedBy maps a server-side operator identity to the durable column:
+// unknown operators persist NULL (never a zero id).
+func savedBy(operatorUserID int64) pgtype.Int8 {
+	if operatorUserID <= 0 {
+		return pgtype.Int8{}
+	}
+	return pgtype.Int8{Int64: operatorUserID, Valid: true}
+}
+
+// SaveAsset validates the external provider reference
+// (provider-allowlisted https URLs; never bytes) and dedups on
 // (workspace, provider, source_id): re-saving returns the existing
 // asset with created=false. An unknown folder binding 404s. An empty
 // folder binding saves into Quick Saves.
@@ -42,35 +50,31 @@ func (s *Service) SaveAsset(ctx context.Context, workspacePublicID string, input
 		}
 		return nil, false, err
 	}
-	folderInternalID, err := resolveAssetFolderInternal(ctx, q, workspaceInternalID, input.FolderPublicID)
+	folder, err := resolveAssetFolder(ctx, q, workspaceInternalID, input.FolderPublicID)
 	if err != nil {
 		return nil, false, err
 	}
 	if existing, err := q.GetLibraryAssetByWorkspaceSource(ctx, dbsqlc.GetLibraryAssetByWorkspaceSourceParams{
-		WorkspaceID: workspaceInternalID, Provider: normalized.Provider, SourceID: normalized.SourceID,
+		WorkspaceID: workspaceInternalID, Provider: textParam(normalized.Provider), SourceID: textParam(normalized.SourceID),
 	}); err == nil {
-		return assetFromWorkspaceSourceRow(strings.TrimSpace(workspacePublicID), existing), false, nil
+		return assetFromRow(strings.TrimSpace(workspacePublicID), dbsqlc.GetLibraryAssetByPublicIDRow(existing)), false, nil
 	} else if !database.IsNotFound(err) {
 		return nil, false, err
 	}
 	minted := strings.TrimSpace(publicID)
 	for attempt := 0; attempt < mintAttempts; attempt++ {
 		row, err := q.CreateLibraryAsset(ctx, dbsqlc.CreateLibraryAssetParams{
-			PublicID: minted, WorkspaceID: workspaceInternalID, FolderID: folderInternalID,
-			Provider: normalized.Provider, SourceID: normalized.SourceID,
-			SourceUrl: normalized.SourceURL, PreviewUrl: normalized.PreviewURL, OriginalUrl: normalized.OriginalURL,
-			Width: normalized.Width, Height: normalized.Height,
+			PublicID: minted, WorkspaceID: workspaceInternalID, FolderID: folder.InternalID,
+			Provider: textParam(normalized.Provider), SourceID: textParam(normalized.SourceID),
+			SourceUrl: textParam(normalized.SourceURL), PreviewUrl: textParam(normalized.PreviewURL), OriginalUrl: textParam(normalized.OriginalURL),
+			Title: normalized.Title, Author: normalized.Author,
+			Width: int4Param(normalized.Width), Height: int4Param(normalized.Height),
+			SavedByUserID: savedBy(input.OperatorUserID),
 		})
 		if err == nil {
-			folderPublicID := strings.TrimSpace(input.FolderPublicID)
-			if folderPublicID == "" {
-				quickSaves, qsErr := q.GetQuickSavesFolder(ctx, workspaceInternalID)
-				if qsErr != nil {
-					return nil, false, qsErr
-				}
-				folderPublicID = quickSaves.PublicID
-			}
-			return assetFromLibraryAsset(strings.TrimSpace(workspacePublicID), folderPublicID, row), true, nil
+			return assetFromRow(strings.TrimSpace(workspacePublicID), dbsqlc.GetLibraryAssetByPublicIDRow{
+				LibraryAsset: row, FolderPublicID: folder.PublicID,
+			}), true, nil
 		}
 		if !database.IsDuplicateConstraintError(err) {
 			return nil, false, fmt.Errorf("save library asset: %w", err)
@@ -85,21 +89,24 @@ func (s *Service) SaveAsset(ctx context.Context, workspacePublicID string, input
 		// (workspace, provider, source_id) lost a concurrent save:
 		// read back the winner so replays converge.
 		existing, getErr := q.GetLibraryAssetByWorkspaceSource(ctx, dbsqlc.GetLibraryAssetByWorkspaceSourceParams{
-			WorkspaceID: workspaceInternalID, Provider: normalized.Provider, SourceID: normalized.SourceID,
+			WorkspaceID: workspaceInternalID, Provider: textParam(normalized.Provider), SourceID: textParam(normalized.SourceID),
 		})
 		if getErr != nil {
 			return nil, false, fmt.Errorf("save library asset: %w", err)
 		}
-		return assetFromWorkspaceSourceRow(strings.TrimSpace(workspacePublicID), existing), false, nil
+		return assetFromRow(strings.TrimSpace(workspacePublicID), dbsqlc.GetLibraryAssetByPublicIDRow(existing)), false, nil
 	}
 	return nil, false, errors.New("library: asset public id mint collision, retry the request")
 }
 
-// SaveManagedMediaAsset creates the workspace library reference for a task
-// output. The reference is keyed by (workspace, ProviderWorkspaceMedia,
-// sourceID), lives in Quick Saves, and points to an existing ready media asset.
-// Replays return the existing row with created=false.
-func (s *Service) SaveManagedMediaAsset(ctx context.Context, workspacePublicID, sourceID, mediaAssetID, publicID string) (*domain.V1Asset, bool, error) {
+// SaveManagedMediaAsset is the managed-save use case for manual and
+// task-auto entries. The reference
+// is keyed by (workspace, media asset) and lives in Quick Saves unless
+// an explicit folder binds it. The media row must exist in the same
+// workspace and stay readable (cross-workspace, archived, or missing
+// media fails closed with no row written). Replays return the existing
+// row with created=false without touching its folder or metadata.
+func (s *Service) SaveManagedMediaAsset(ctx context.Context, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, false, err
 	}
@@ -108,10 +115,14 @@ func (s *Service) SaveManagedMediaAsset(ctx context.Context, workspacePublicID, 
 	if err != nil {
 		return nil, false, err
 	}
-	sourceID = strings.TrimSpace(sourceID)
-	mediaAssetID = strings.TrimSpace(mediaAssetID)
-	publicID = strings.TrimSpace(publicID)
-	if sourceID == "" || len(sourceID) > 255 || !contract.IsAssetID(mediaAssetID) || !domain.IsV1AssetID(publicID) {
+	normalized, err := domain.NormalizeAndValidateManagedAsset(input)
+	if err != nil {
+		return nil, false, err
+	}
+	if input.OperatorUserID <= 0 {
+		return nil, false, fmt.Errorf("save managed library asset: server-side operator required")
+	}
+	if !domain.IsV1AssetID(strings.TrimSpace(publicID)) {
 		return nil, false, domain.ErrV1AssetNotFound
 	}
 	workspaceInternalID, err := resolveWorkspaceInternal(ctx, q, workspacePublicID)
@@ -121,15 +132,8 @@ func (s *Service) SaveManagedMediaAsset(ctx context.Context, workspacePublicID, 
 		}
 		return nil, false, err
 	}
-	if existing, err := q.GetLibraryAssetByWorkspaceSource(ctx, dbsqlc.GetLibraryAssetByWorkspaceSourceParams{
-		WorkspaceID: workspaceInternalID, Provider: domain.ProviderWorkspaceMedia, SourceID: sourceID,
-	}); err == nil {
-		return assetFromWorkspaceSourceRow(strings.TrimSpace(workspacePublicID), existing), false, nil
-	} else if !database.IsNotFound(err) {
-		return nil, false, err
-	}
 	media, err := q.GetMediaAssetByPublicID(ctx, dbsqlc.GetMediaAssetByPublicIDParams{
-		WorkspacePublicID: strings.TrimSpace(workspacePublicID), PublicID: mediaAssetID,
+		WorkspacePublicID: strings.TrimSpace(workspacePublicID), PublicID: normalized.MediaAssetID,
 	})
 	if database.IsNotFound(err) {
 		return nil, false, domain.ErrV1AssetNotFound
@@ -137,26 +141,51 @@ func (s *Service) SaveManagedMediaAsset(ctx context.Context, workspacePublicID, 
 	if err != nil {
 		return nil, false, err
 	}
-	folder, err := ensureQuickSavesFolderRow(ctx, q, workspaceInternalID)
+	if media.ArchivedAt.Valid {
+		return nil, false, domain.ErrV1AssetNotFound
+	}
+	if existing, err := q.GetLibraryAssetByWorkspaceMedia(ctx, dbsqlc.GetLibraryAssetByWorkspaceMediaParams{
+		WorkspaceID: workspaceInternalID, MediaAssetID: pgtype.Int8{Int64: media.InternalID, Valid: true},
+	}); err == nil {
+		return assetFromRow(strings.TrimSpace(workspacePublicID), dbsqlc.GetLibraryAssetByPublicIDRow(existing)), false, nil
+	} else if !database.IsNotFound(err) {
+		return nil, false, err
+	}
+	folder, err := resolveAssetFolder(ctx, q, workspaceInternalID, input.FolderPublicID)
 	if err != nil {
 		return nil, false, err
 	}
-	row, err := q.CreateManagedLibraryAsset(ctx, dbsqlc.CreateManagedLibraryAssetParams{
+	var taskID pgtype.Text
+	var taskResultIndex pgtype.Int4
+	if normalized.Lineage != nil {
+		taskID = pgtype.Text{String: normalized.Lineage.TaskID, Valid: true}
+		taskResultIndex = pgtype.Int4{Int32: normalized.Lineage.ResultIndex, Valid: true}
+	}
+	row, err := q.CreateMediaLibraryAsset(ctx, dbsqlc.CreateMediaLibraryAssetParams{
 		PublicID: publicID, WorkspaceID: workspaceInternalID, FolderID: folder.InternalID,
-		SourceID: sourceID, MediaAssetID: pgtype.Int8{Int64: media.InternalID, Valid: true},
+		MediaAssetID: pgtype.Int8{Int64: media.InternalID, Valid: true},
+		Title:        normalized.Title, Author: normalized.Author,
+		TaskID: taskID, TaskResultIndex: taskResultIndex,
+		SavedByUserID: savedBy(input.OperatorUserID),
 	})
 	if err == nil {
-		return assetFromLibraryAsset(strings.TrimSpace(workspacePublicID), folder.PublicID, row), true, nil
+		return assetFromRow(strings.TrimSpace(workspacePublicID), dbsqlc.GetLibraryAssetByPublicIDRow{
+			LibraryAsset: row, FolderPublicID: folder.PublicID,
+			MediaAssetPublicID: pgtype.Text{String: media.PublicID, Valid: true},
+			MediaWidth:         media.Width, MediaHeight: media.Height,
+		}), true, nil
 	}
 	if isAssetPublicIDConflict(err) {
 		return nil, false, fmt.Errorf("save managed library asset: public id collision: %w", err)
 	}
 	if database.IsDuplicateConstraintError(err) {
-		existing, getErr := q.GetLibraryAssetByWorkspaceSource(ctx, dbsqlc.GetLibraryAssetByWorkspaceSourceParams{
-			WorkspaceID: workspaceInternalID, Provider: domain.ProviderWorkspaceMedia, SourceID: sourceID,
+		// (workspace, media_asset_id) lost a concurrent save: read
+		// back the winner so replays converge on one row.
+		existing, getErr := q.GetLibraryAssetByWorkspaceMedia(ctx, dbsqlc.GetLibraryAssetByWorkspaceMediaParams{
+			WorkspaceID: workspaceInternalID, MediaAssetID: pgtype.Int8{Int64: media.InternalID, Valid: true},
 		})
 		if getErr == nil {
-			return assetFromWorkspaceSourceRow(strings.TrimSpace(workspacePublicID), existing), false, nil
+			return assetFromRow(strings.TrimSpace(workspacePublicID), dbsqlc.GetLibraryAssetByPublicIDRow(existing)), false, nil
 		}
 	}
 	return nil, false, fmt.Errorf("save managed library asset: %w", err)
@@ -188,7 +217,7 @@ func (s *Service) ListAssets(ctx context.Context, workspacePublicID string) ([]*
 	}
 	out := make([]*domain.V1Asset, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, assetFromListRow(strings.TrimSpace(workspacePublicID), row))
+		out = append(out, assetFromRow(strings.TrimSpace(workspacePublicID), dbsqlc.GetLibraryAssetByPublicIDRow(row)))
 	}
 	return out, nil
 }
@@ -223,7 +252,7 @@ func (s *Service) GetAsset(ctx context.Context, workspacePublicID, assetPublicID
 	if err != nil {
 		return nil, err
 	}
-	return assetFromPublicIDRow(strings.TrimSpace(workspacePublicID), row), nil
+	return assetFromRow(strings.TrimSpace(workspacePublicID), row), nil
 }
 
 // MoveAsset rebinds the folder ("" moves to Quick Saves); unknown
@@ -254,12 +283,12 @@ func (s *Service) MoveAsset(ctx context.Context, workspacePublicID, assetPublicI
 	} else if err != nil {
 		return nil, err
 	}
-	targetInternalID, err := resolveAssetFolderInternal(ctx, q, workspaceInternalID, folderPublicID)
+	targetFolder, err := resolveAssetFolder(ctx, q, workspaceInternalID, folderPublicID)
 	if err != nil {
 		return nil, err
 	}
 	row, err := q.MoveLibraryAsset(ctx, dbsqlc.MoveLibraryAssetParams{
-		WorkspaceID: workspaceInternalID, PublicID: strings.TrimSpace(assetPublicID), FolderID: targetInternalID,
+		WorkspaceID: workspaceInternalID, PublicID: strings.TrimSpace(assetPublicID), FolderID: targetFolder.InternalID,
 	})
 	if database.IsNotFound(err) {
 		return nil, domain.ErrV1AssetNotFound
@@ -267,15 +296,7 @@ func (s *Service) MoveAsset(ctx context.Context, workspacePublicID, assetPublicI
 	if err != nil {
 		return nil, fmt.Errorf("move library asset: %w", err)
 	}
-	targetPublicID := strings.TrimSpace(folderPublicID)
-	if targetPublicID == "" {
-		quickSaves, qsErr := q.GetQuickSavesFolder(ctx, workspaceInternalID)
-		if qsErr != nil {
-			return nil, qsErr
-		}
-		targetPublicID = quickSaves.PublicID
-	}
-	return assetFromLibraryAsset(strings.TrimSpace(workspacePublicID), targetPublicID, row), nil
+	return assetFromRow(strings.TrimSpace(workspacePublicID), dbsqlc.GetLibraryAssetByPublicIDRow(row)), nil
 }
 
 // DeleteAsset drops the saved reference (the provider original is
@@ -349,11 +370,11 @@ func (s *Service) ResolveAssets(ctx context.Context, workspacePublicID string, i
 		if sourceID != "" {
 			if workspaceInternalID > 0 {
 				row, err := q.GetLibraryAssetByWorkspaceSource(ctx, dbsqlc.GetLibraryAssetByWorkspaceSourceParams{
-					WorkspaceID: workspaceInternalID, Provider: provider, SourceID: sourceID,
+					WorkspaceID: workspaceInternalID, Provider: textParam(provider), SourceID: textParam(sourceID),
 				})
 				if err == nil {
 					result.Status = domain.V1ResolveResolved
-					result.Asset = assetFromWorkspaceSourceRow(trimmedWorkspace, row)
+					result.Asset = assetFromRow(trimmedWorkspace, dbsqlc.GetLibraryAssetByPublicIDRow(row))
 				} else if !database.IsNotFound(err) {
 					return nil, err
 				}
@@ -367,16 +388,16 @@ func (s *Service) ResolveAssets(ctx context.Context, workspacePublicID string, i
 		}
 		if workspaceInternalID > 0 {
 			rows, err := q.ListLibraryAssetsByWorkspaceProvider(ctx, dbsqlc.ListLibraryAssetsByWorkspaceProviderParams{
-				WorkspaceID: workspaceInternalID, Provider: provider, RowLimit: maxLibraryAssets,
+				WorkspaceID: workspaceInternalID, Provider: textParam(provider), RowLimit: maxLibraryAssets,
 			})
 			if err != nil {
 				return nil, err
 			}
 			for _, row := range rows {
-				if row.SourceUrl == sourceURL || row.PreviewUrl == sourceURL || row.OriginalUrl == sourceURL {
+				if row.LibraryAsset.SourceUrl.String == sourceURL || row.LibraryAsset.PreviewUrl.String == sourceURL || row.LibraryAsset.OriginalUrl.String == sourceURL {
 					result.Status = domain.V1ResolveResolved
-					result.SourceID = row.SourceID
-					result.Asset = assetFromProviderRow(trimmedWorkspace, row)
+					result.SourceID = row.LibraryAsset.SourceID.String
+					result.Asset = assetFromRow(trimmedWorkspace, dbsqlc.GetLibraryAssetByPublicIDRow(row))
 					break
 				}
 			}
@@ -384,17 +405,4 @@ func (s *Service) ResolveAssets(ctx context.Context, workspacePublicID string, i
 		results = append(results, result)
 	}
 	return results, nil
-}
-
-// FindManagedMedia resolves the stored canonical media link without materialization.
-func (s *Service) FindManagedMedia(ctx context.Context, workspacePublicID, assetPublicID string) (string, error) {
-	q, err := s.dbWithContext(ctx).queries()
-	if err != nil {
-		return "", err
-	}
-	id, err := q.GetLibraryManagedMediaPublicID(ctx, dbsqlc.GetLibraryManagedMediaPublicIDParams{WorkspacePublicID: workspacePublicID, AssetPublicID: assetPublicID})
-	if database.IsNotFound(err) {
-		return "", domain.ErrV1AssetNotFound
-	}
-	return id, err
 }

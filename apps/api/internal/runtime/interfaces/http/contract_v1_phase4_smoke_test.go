@@ -137,7 +137,7 @@ func TestPhase4SurfacesLive(t *testing.T) {
 
 	status, saveBody := phase4Call(t, fx, http.MethodPost,
 		ContractV1GroupPath+"/workspaces/"+ws+"/library/assets",
-		`{"data":{"provider":"unsplash","source_id":"ph4-1","source_url":"https://images.unsplash.com/ph4-1","preview_url":"https://images.unsplash.com/ph4-1","original_url":"https://images.unsplash.com/ph4-1","folder_id":"`+folderID+`"}}`, 1)
+		`{"data":{"source":"external","provider":"unsplash","source_id":"ph4-1","source_url":"https://images.unsplash.com/ph4-1","preview_url":"https://images.unsplash.com/ph4-1","original_url":"https://images.unsplash.com/ph4-1","folder_id":"`+folderID+`"}}`, 1)
 	if status != http.StatusCreated {
 		t.Fatalf("save library asset = %d (%v), want 201", status, saveBody)
 	}

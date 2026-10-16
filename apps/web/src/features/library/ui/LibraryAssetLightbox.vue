@@ -25,14 +25,14 @@
               {{ asset.title || t('library.states.savedReference') }}
             </h3>
             <p class="mt-1 mb-0 text-white/70 text-xs drop-shadow-md">
-              {{ asset.author }} · {{ asset.provider }}
+              {{ sourceAttribution }}
             </p>
           </div>
 
-          <!-- 右上角：来源链接 + 极简圆形 ✕ 关闭按钮 -->
+          <!-- 右上角：来源链接（仅外部收藏渲染） + 极简圆形 ✕ 关闭按钮 -->
           <div class="flex items-center gap-2">
             <a
-              v-if="asset.sourceUrl"
+              v-if="asset.source === 'external' && asset.sourceUrl"
               :href="asset.sourceUrl"
               target="_blank"
               rel="noreferrer"
@@ -75,7 +75,7 @@
 import { useWindowSize } from '@vueuse/core'
 import { useMediaDisplayUrl } from '../../../core/media/useMediaDisplayUrl'
 import { fitMediaDisplaySize } from '../../../core/media/mediaDisplay'
-import { onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Xmark } from '@iconoir/vue'
 import { lightboxScrimIconButtonClass, lightboxScrimLinkClass } from '../../../theme/lightboxScrim'
@@ -91,6 +91,13 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const { width, height } = useWindowSize()
+// Attribution is display-only: external rows show author + provider, managed
+// rows show only the author (no provider identity, no source link).
+const sourceAttribution = computed(() => {
+  if (!props.asset) return ''
+  if (props.asset.source === 'media') return props.asset.author ?? ''
+  return `${props.asset.author ?? ''} · ${props.asset.provider}`
+})
 const displayUrl = useMediaDisplayUrl(
   () => props.asset?.display,
   () => fitMediaDisplaySize(props.asset, Math.min(1152, width.value - 32), height.value * 0.82),

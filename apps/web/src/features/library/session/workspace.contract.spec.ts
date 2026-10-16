@@ -5,11 +5,12 @@ import {
   assertLibraryAssetId,
   assertLibraryFolderId,
   assertWorkspaceId,
-  libraryAssetKey,
+  libraryAssetKeyFor,
   mapWorkspaceLibraryProvider,
   toWorkspaceLibraryAsset,
   toWorkspaceLibraryAssetInput,
   toWorkspaceLibraryFolder,
+  toWorkspaceLibraryMediaAssetInput,
   toWorkspaceLibraryResolveResult,
 } from '../core/validators'
 import { WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS, workspaceLibraryApi } from './resource'
@@ -17,7 +18,6 @@ import {
   lookupWorkspaceSavedAssetKeys,
   materializeLibraryAssetForCanvas,
   removeWorkspaceSearchReference,
-  saveWorkspaceSearchReference,
 } from './libraryUseCases'
 import {
   getDeleteWorkspaceLibraryAssetUrl,
@@ -74,6 +74,7 @@ function assetFixture(overrides: Record<string, unknown> = {}): Record<string, u
     id: ASSET_ID,
     workspace_id: WORKSPACE_ID,
     folder_id: FOLDER_ID,
+    source: 'external',
     provider: 'unsplash',
     source_id: 'u1',
     source_url: PREVIEW_URL,
@@ -86,6 +87,23 @@ function assetFixture(overrides: Record<string, unknown> = {}): Record<string, u
     created_at: '2026-09-23T00:00:00Z',
     display: mediaDisplayFixture(),
     updated_at: '2026-09-23T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function mediaAssetFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'lasset_media0001',
+    workspace_id: WORKSPACE_ID,
+    folder_id: FOLDER_ID,
+    source: 'media',
+    media_asset_id: 'asset_media0001',
+    title: 'Generated hero banner',
+    width: 1600,
+    height: 900,
+    created_at: '2026-10-11T09:30:00Z',
+    display: mediaDisplayFixture(),
+    updated_at: '2026-10-11T09:30:00Z',
     ...overrides,
   }
 }
@@ -138,6 +156,7 @@ describe('workspace library mapping', () => {
       name: 'inspo',
     })
     expect(toWorkspaceLibraryAsset(assetFixture())).toMatchObject({
+      source: 'external',
       id: ASSET_ID,
       folderId: FOLDER_ID,
       provider: 'unsplash',
@@ -167,6 +186,80 @@ describe('workspace library mapping', () => {
     expect(() =>
       toWorkspaceLibraryResolveResult({ provider: 'unsplash', status: 'bogus' }),
     ).toThrow()
+  })
+})
+
+describe('unified library source mapping', () => {
+  it('reads external rows with provider identity and real URLs', () => {
+    const asset = toWorkspaceLibraryAsset(assetFixture())
+    expect(asset.source).toBe('external')
+    if (asset.source !== 'external') throw new Error('unreachable')
+    expect(asset.provider).toBe('unsplash')
+    expect(asset.sourceId).toBe('u1')
+    expect(libraryAssetKeyFor(asset)).toBe('unsplash:u1')
+  })
+
+  it('reads media rows with the media identity, paired dimensions, and no URL keys', () => {
+    const known = toWorkspaceLibraryAsset(mediaAssetFixture())
+    expect(known.source).toBe('media')
+    if (known.source !== 'media') throw new Error('unreachable')
+    expect(known.mediaAssetId).toBe('asset_media0001')
+    expect([known.width, known.height]).toEqual([1600, 900])
+    expect(known).not.toHaveProperty('provider')
+    expect(known).not.toHaveProperty('source_id')
+    expect(libraryAssetKeyFor(known)).toBe('media:asset_media0001')
+    const unknown = toWorkspaceLibraryAsset(mediaAssetFixture({ width: null, height: null }))
+    if (unknown.source !== 'media') throw new Error('unreachable')
+    expect([unknown.width, unknown.height]).toEqual([null, null])
+  })
+
+  it('rejects unpaired dimensions and media rows carrying URL keys', () => {
+    expect(() => toWorkspaceLibraryAsset(mediaAssetFixture({ width: 100, height: null }))).toThrow()
+    expect(() =>
+      toWorkspaceLibraryAsset(mediaAssetFixture({ provider: 'unsplash', source_id: 'x' })),
+    ).toThrow()
+    expect(() => toWorkspaceLibraryAsset(mediaAssetFixture({ media_asset_id: 'nope' }))).toThrow()
+    expect(() => toWorkspaceLibraryAsset(assetFixture({ source: 'bogus' }))).toThrow()
+  })
+
+  it('rejects zero media dimensions and negative external dimensions (no lenient read)', () => {
+    expect(() => toWorkspaceLibraryAsset(mediaAssetFixture({ width: 0, height: 0 }))).toThrow()
+    expect(() => toWorkspaceLibraryAsset(mediaAssetFixture({ width: 0, height: 100 }))).toThrow()
+    expect(() => toWorkspaceLibraryAsset(assetFixture({ width: -1, height: 80 }))).toThrow()
+    expect(() => toWorkspaceLibraryAsset(assetFixture({ width: 100, height: -1 }))).toThrow()
+  })
+
+  it('rejects assets missing the source discriminator (no fallback reader)', () => {
+    const withoutSource = assetFixture()
+    delete withoutSource.source
+    expect(() => toWorkspaceLibraryAsset(withoutSource)).toThrow()
+  })
+
+  it('pins the Phase A read fixtures without drift', async () => {
+    const fixtures = (
+      await import('../../../../../../contracts/library/library-source.fixtures.json')
+    ).default as {
+      external: Record<string, unknown>
+      media_known: Record<string, unknown>
+      media_unknown: Record<string, unknown>
+      mixed_list: { data: Record<string, unknown>[] }
+      task_lineage: Record<string, unknown>
+    }
+    const external = toWorkspaceLibraryAsset(fixtures.external)
+    expect(external.source).toBe('external')
+    const known = toWorkspaceLibraryAsset(fixtures.media_known)
+    expect(known.source).toBe('media')
+    const unknown = toWorkspaceLibraryAsset(fixtures.media_unknown)
+    if (unknown.source !== 'media') throw new Error('unreachable')
+    expect([unknown.width, unknown.height]).toEqual([null, null])
+    // Task lineage rides along as provenance only: never identity, never wire.
+    const lineage = toWorkspaceLibraryAsset(fixtures.task_lineage)
+    if (lineage.source !== 'media') throw new Error('unreachable')
+    expect(libraryAssetKeyFor(lineage)).toBe(
+      `media:${fixtures.task_lineage.media_asset_id as string}`,
+    )
+    const mixed = fixtures.mixed_list.data.map(toWorkspaceLibraryAsset)
+    expect(mixed.map((item) => item.source)).toEqual(['external', 'media', 'media'])
   })
 })
 
@@ -253,6 +346,7 @@ describe('workspace library intent helpers', () => {
         height: 800,
       }),
     ).toEqual({
+      source: 'external',
       provider: 'unsplash',
       sourceId: 'photo-1',
       sourceUrl: 'https://unsplash.com/photos/photo-1',
@@ -263,6 +357,21 @@ describe('workspace library intent helpers', () => {
       width: 1200,
       height: 800,
     })
+  })
+
+  it('builds media inputs with the media identity and no URL keys', () => {
+    expect(
+      toWorkspaceLibraryMediaAssetInput('asset_media0001', { title: 'Banner' }, FOLDER_ID),
+    ).toEqual({
+      source: 'media',
+      mediaAssetId: 'asset_media0001',
+      title: 'Banner',
+      folderId: FOLDER_ID,
+    })
+    expect(toWorkspaceLibraryMediaAssetInput('asset_media0001', {})).toMatchObject({
+      source: 'media',
+    })
+    expect(() => toWorkspaceLibraryMediaAssetInput('nope', {})).toThrow()
   })
 
   it('targets one folder for saves and rejects malformed folder ids', () => {
@@ -300,66 +409,17 @@ describe('workspace library intent helpers', () => {
     ).toThrow()
   })
 
-  it('uses one saved identity key format for lookup and UI state', () => {
-    expect(libraryAssetKey('pexels', '123')).toBe('pexels:123')
+  it('uses one saved identity key format per source for lookup and UI state', () => {
+    expect(libraryAssetKeyFor({ source: 'external', provider: 'pexels', sourceId: '123' })).toBe(
+      'pexels:123',
+    )
+    expect(libraryAssetKeyFor({ source: 'media', mediaAssetId: 'asset_media0001' })).toBe(
+      'media:asset_media0001',
+    )
   })
 })
 
 describe('workspace library use cases', () => {
-  const reference = {
-    provider: 'unsplash' as const,
-    id: 'u1',
-    source_url: PREVIEW_URL,
-    preview_url: PREVIEW_URL,
-    original_url: PREVIEW_URL,
-    title: 'dunes',
-    author: 'a',
-    width: 100,
-    height: 80,
-  }
-
-  it('saves a reference into a newly created folder', async () => {
-    const seenBodies: unknown[] = []
-    useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/library/folders', async () => {
-        return HttpResponse.json({ data: folderFixture({ name: 'fresh' }) }, { status: 201 })
-      }),
-      http.post('/api/v1/workspaces/:workspaceId/library/assets', async ({ request }) => {
-        seenBodies.push(await request.json())
-        return HttpResponse.json({ data: assetFixture() }, { status: 201 })
-      }),
-    )
-    const result = await saveWorkspaceSearchReference(WORKSPACE_ID, reference, undefined, 'fresh')
-    expect(result.asset.id).toBe(ASSET_ID)
-    // The committed facts carry the actually created Folder identity.
-    expect(result.createdFolder?.id).toBe(FOLDER_ID)
-    expect(result.assetKey).toBe('unsplash:u1')
-    expect(result.affectedFolderKeys).toEqual(['all', FOLDER_ID])
-    expect(seenBodies).toHaveLength(1)
-    expect(seenBodies[0]).toMatchObject({
-      data: { provider: 'unsplash', source_id: 'u1', folder_id: FOLDER_ID },
-    })
-  })
-
-  it('saves a reference unfiled without a folder', async () => {
-    const seenBodies: unknown[] = []
-    useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/library/assets', async ({ request }) => {
-        seenBodies.push(await request.json())
-        return HttpResponse.json({ data: assetFixture({ folder_id: '' }) }, { status: 201 })
-      }),
-    )
-    const result = await saveWorkspaceSearchReference(WORKSPACE_ID, reference)
-    expect(result.asset.folderId).toBeUndefined()
-    expect(result.createdFolder).toBeUndefined()
-    expect(result.assetKey).toBe('unsplash:u1')
-    expect(result.affectedFolderKeys).toEqual(['all'])
-    expect(seenBodies[0]).toMatchObject({ data: { provider: 'unsplash', source_id: 'u1' } })
-    expect((seenBodies[0] as { data: Record<string, unknown> }).data).not.toHaveProperty(
-      'folder_id',
-    )
-  })
-
   it('removes a reference by resolving it first, and skips unknown ones', async () => {
     const deleted: string[] = []
     useMswHandlers(

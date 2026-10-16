@@ -15,6 +15,10 @@ import (
 )
 
 func libraryDisplayVersion(asset *librarydomain.V1Asset) string {
+	if asset.Source == librarydomain.AssetSourceMedia {
+		sum := sha256.Sum256([]byte("media\x00" + asset.MediaAssetID))
+		return hex.EncodeToString(sum[:12])
+	}
 	sum := sha256.Sum256([]byte(asset.Provider + "\x00" + asset.PreviewURL))
 	return hex.EncodeToString(sum[:12])
 }

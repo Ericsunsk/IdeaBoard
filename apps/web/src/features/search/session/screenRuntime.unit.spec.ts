@@ -16,12 +16,14 @@ const mocks = vi.hoisted(() => ({
     folderFacts: {},
     subscribe: vi.fn(
       (
-        _listener: (outcome: {
-          kind: string
-          provider?: string
-          sourceID?: string
-          assetKey?: string
-        }) => void,
+        _listener: (
+          outcomes: Array<{
+            kind: string
+            provider?: string
+            sourceID?: string
+            assetKey?: string
+          }>,
+        ) => void,
       ) =>
         () => {},
     ),
@@ -29,7 +31,9 @@ const mocks = vi.hoisted(() => ({
   nextSession: null as ReturnType<typeof createSession> | null,
   sessions: [] as ReturnType<typeof createSession>[],
   mutationListener: null as
-    | ((outcome: { kind: string; provider?: string; sourceID?: string; assetKey?: string }) => void)
+    | ((
+        outcomes: Array<{ kind: string; provider?: string; sourceID?: string; assetKey?: string }>,
+      ) => void)
     | null,
 }))
 
@@ -268,18 +272,27 @@ describe('screenRuntime', () => {
     unmount()
   })
 
-  it('marks an Island-removed asset unsaved through the coordination outcome', () => {
+  it('updates saved state from Library publications', () => {
     const { unmount } = mountRuntime(true)
     const session = mocks.sessions[0]!
 
-    mocks.mutationListener?.({
-      kind: 'asset-removed',
-      provider: 'unsplash',
-      sourceID: 'removed-image',
-      assetKey: 'unsplash:removed-image',
-    })
+    mocks.mutationListener?.([
+      {
+        kind: 'asset-saved',
+        assetKey: 'unsplash:saved-image',
+      },
+      {
+        kind: 'asset-removed',
+        provider: 'unsplash',
+        sourceID: 'removed-image',
+        assetKey: 'unsplash:removed-image',
+      },
+    ])
 
-    expect(session.library.markAssetUnsaved).toHaveBeenCalledWith('unsplash:removed-image')
+    expect(session.library.markAssetSaved).toHaveBeenCalledExactlyOnceWith('unsplash:saved-image')
+    expect(session.library.markAssetUnsaved).toHaveBeenCalledExactlyOnceWith(
+      'unsplash:removed-image',
+    )
     unmount()
   })
 

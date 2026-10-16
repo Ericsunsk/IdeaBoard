@@ -7,8 +7,10 @@ export type CanvasLibraryImportDescriptor = {
   assetId: string
   title: string
   previewUrl: string
-  width: number
-  height: number
+  /** Null when the managed size is unknown; importers use the fit fallback. */
+  width: number | null
+  /** Null when the managed size is unknown; importers use the fit fallback. */
+  height: number | null
 }
 
 export function toCanvasLibraryImportDescriptor(

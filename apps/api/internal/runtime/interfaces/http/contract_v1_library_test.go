@@ -110,7 +110,7 @@ func v1SaveAssetBody(sourceID, folderID string) string {
 	if folderID != "" {
 		folder = fmt.Sprintf(`,"folder_id":%q`, folderID)
 	}
-	return fmt.Sprintf(`{"data":{"provider":"unsplash","source_id":%q,"source_url":%q,"preview_url":%q,"original_url":%q,"title":"dunes","author":"a","width":100,"height":80%s}}`,
+	return fmt.Sprintf(`{"data":{"source":"external","provider":"unsplash","source_id":%q,"source_url":%q,"preview_url":%q,"original_url":%q,"title":"dunes","author":"a","width":100,"height":80%s}}`,
 		sourceID, v1TestAssetURL, v1TestAssetURL, v1TestAssetURL, folder)
 }
 
@@ -428,5 +428,69 @@ func TestV1LibraryAuthorizationMatrix(t *testing.T) {
 	status, _, payload := doV1(t, bare, v1Call{method: http.MethodGet, path: fx.foldersPath(), userID: fx.owner})
 	if status != http.StatusNotImplemented || v1ErrorCode(t, payload) != string(contract.CodeContractNotImplemented) {
 		t.Fatalf("nil store = %d %v, want 501 contract_not_implemented", status, payload)
+	}
+}
+
+func TestV1LibraryAssetSaveMediaBranch(t *testing.T) {
+	fx := newV1LibraryFixture(t, ContractV1LibraryDeps{})
+	fx.lib.RegisterManagedMediaForTests(fx.ws.PublicID, "asset_httpmedia0000001", nil, nil, false)
+
+	save := func(key, body string, userID int64) (int, map[string]any) {
+		status, _, payload := doV1(t, fx.engine, v1Call{method: http.MethodPost, path: fx.assetsPath(), userID: userID, body: body,
+			headers: map[string]string{contract.IdempotencyKeyHeader: key}})
+		return status, payload
+	}
+	status, first := save("media-key-1", `{"data":{"source":"media","media_asset_id":"asset_httpmedia0000001","title":"http hero"}}`, fx.owner)
+	if status != http.StatusCreated {
+		t.Fatalf("media save = %d %v, want 201", status, first)
+	}
+	data := first["data"].(map[string]any)
+	if data["source"] != "media" || data["media_asset_id"] != "asset_httpmedia0000001" {
+		t.Fatalf("media save shape = %v, want media source with link", data)
+	}
+	for _, key := range []string{"provider", "source_id", "source_url", "preview_url", "original_url"} {
+		if _, present := data[key]; present {
+			t.Fatalf("media save carries %q, want no provider/URL keys", key)
+		}
+	}
+	if width, present := data["width"]; !present || width != nil {
+		t.Fatalf("media width = %v (present=%v), want explicit null", width, present)
+	}
+	if data["title"] != "http hero" {
+		t.Fatalf("media title = %v, want durable title", data["title"])
+	}
+	if data["display"] == nil {
+		t.Fatal("media save lacks inline display")
+	}
+	assetID := data["id"].(string)
+
+	// Repeat converges on the existing row (200, same id).
+	status, dup := save("media-key-2", `{"data":{"source":"media","media_asset_id":"asset_httpmedia0000001"}}`, fx.member)
+	if status != http.StatusOK || dup["data"].(map[string]any)["id"] != assetID {
+		t.Fatalf("media repeat = %d %v, want 200 same id %s", status, dup, assetID)
+	}
+
+	// Mixed-shape payloads fail closed: media rows reject provider keys,
+	// external rows reject media keys, source is required.
+	for _, tt := range []struct {
+		name string
+		body string
+	}{
+		{"media with provider", `{"data":{"source":"media","media_asset_id":"asset_httpmedia0000001","provider":"unsplash"}}`},
+		{"media with dims", `{"data":{"source":"media","media_asset_id":"asset_httpmedia0000001","width":10,"height":10}}`},
+		{"external with media id", `{"data":{"source":"external","provider":"unsplash","source_id":"x1","source_url":"https://images.unsplash.com/x1","preview_url":"https://images.unsplash.com/x1","original_url":"https://images.unsplash.com/x1","media_asset_id":"asset_httpmedia0000001"}}`},
+		{"missing source", `{"data":{"provider":"unsplash","source_id":"x1"}}`},
+		{"unknown source", `{"data":{"source":"remote","media_asset_id":"asset_httpmedia0000001"}}`},
+	} {
+		if status, payload := save("media-bad-"+tt.name, tt.body, fx.owner); status != http.StatusUnprocessableEntity ||
+			v1ErrorCode(t, payload) != string(contract.CodeValidationFailed) {
+			t.Fatalf("%s = %d %v, want 422 validation_failed", tt.name, status, payload)
+		}
+	}
+
+	// Unknown media fails as not found with nothing written.
+	status, missing := save("media-key-3", `{"data":{"source":"media","media_asset_id":"asset_missing0000000001"}}`, fx.owner)
+	if status != http.StatusNotFound || v1ErrorCode(t, missing) != string(contract.CodeLibraryAssetNotFound) {
+		t.Fatalf("unknown media = %d %v, want 404 library_asset_not_found", status, missing)
 	}
 }

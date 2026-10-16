@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { toCanvasLibraryImportDescriptor, type LibraryAssetView } from './transfer'
 
 const asset: LibraryAssetView = {
+  source: 'external',
   id: 'lasset_asset0042',
   workspaceId: 'ws_test123',
   provider: 'pexels',

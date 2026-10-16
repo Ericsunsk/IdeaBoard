@@ -7,6 +7,7 @@ function createHarness(
 ) {
   const beginNodeDragTransaction = vi.fn()
   const commitNodeDragTransaction = vi.fn()
+  const finishNodeDragAsLibrarySave = vi.fn(() => [] as string[])
   const beginFlowNodeDragDuplicateTracking = vi.fn()
   const finishFlowNodeDragDuplicateTracking = vi.fn()
   const dismissTransientCanvasUi = vi.fn()
@@ -15,6 +16,7 @@ function createHarness(
   const interactions = useFlowNodeDragInteractions({
     beginNodeDragTransaction,
     commitNodeDragTransaction,
+    finishNodeDragAsLibrarySave,
     isDuplicateModifierPressed: ref(options.isDuplicateModifierPressed ?? false),
     beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking,
@@ -26,6 +28,7 @@ function createHarness(
     interactions,
     beginNodeDragTransaction,
     commitNodeDragTransaction,
+    finishNodeDragAsLibrarySave,
     beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking,
     dismissTransientCanvasUi,
@@ -96,5 +99,22 @@ describe('useFlowNodeDragInteractions', () => {
     await Promise.resolve()
 
     expect(harness.commitNodeDragTransaction).not.toHaveBeenCalled()
+  })
+
+  it('finishes a library save without committing the move', async () => {
+    const harness = createHarness()
+    const afterFinish = vi.fn()
+
+    harness.interactions.onNodeDragStopAsLibrarySave(afterFinish)
+
+    expect(harness.commitNodeDragTransaction).not.toHaveBeenCalled()
+    expect(harness.finishNodeDragAsLibrarySave).not.toHaveBeenCalled()
+
+    await Promise.resolve()
+
+    expect(harness.finishNodeDragAsLibrarySave).toHaveBeenCalledTimes(1)
+    expect(afterFinish).toHaveBeenCalledTimes(1)
+    expect(harness.commitNodeDragTransaction).not.toHaveBeenCalled()
+    expect(harness.finishFlowNodeDragDuplicateTracking).toHaveBeenCalledWith(false)
   })
 })

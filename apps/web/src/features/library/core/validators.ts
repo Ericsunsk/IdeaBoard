@@ -109,7 +109,8 @@ export function mapWorkspaceLibraryProvider(value: unknown): WorkspaceLibraryAss
   throw new Error('Invalid library asset payload: provider')
 }
 
-export type WorkspaceLibraryAsset = {
+export type WorkspaceLibraryExternalAsset = {
+  source: 'external'
   id: string
   workspaceId: string
   folderId?: string | undefined
@@ -119,6 +120,7 @@ export type WorkspaceLibraryAsset = {
   previewUrl: string
   originalUrl: string
   title?: string | undefined
+  /** Display-only attribution; never save identity. */
   author?: string | undefined
   width: number
   height: number
@@ -127,14 +129,104 @@ export type WorkspaceLibraryAsset = {
   display?: MediaDisplay | undefined
 }
 
-export function toWorkspaceLibraryAsset(raw: unknown): WorkspaceLibraryAsset {
-  if (!isRecord(raw)) throw new Error('Invalid library asset payload')
-  const folderId = optionalString(raw.folder_id)
-  if (folderId != null) assertLibraryFolderId(folderId)
+export type WorkspaceLibraryMediaAsset = {
+  source: 'media'
+  id: string
+  workspaceId: string
+  folderId?: string | undefined
+  mediaAssetId: string
+  title?: string | undefined
+  /** Display-only attribution; never save identity. */
+  author?: string | undefined
+  /** Paired: both numbers when known, both null when unknown. */
+  width: number | null
+  /** Paired: both numbers when known, both null when unknown. */
+  height: number | null
+  createdAt: string
+  updatedAt: string
+  display?: MediaDisplay | undefined
+}
+
+/**
+ * Library Source: `source` discriminates
+ * external provider references from managed media. Media rows carry the Media
+ * Asset identity with no URL keys; task lineage (`task_id`,
+ * `task_result_index`) and operator identity are provenance/server-internal
+ * and never part of the read identity.
+ */
+export type WorkspaceLibraryAsset = WorkspaceLibraryExternalAsset | WorkspaceLibraryMediaAsset
+
+function mapWorkspaceLibrarySource(value: unknown): 'external' | 'media' {
+  if (value === 'external' || value === 'media') return value
+  throw new Error('Invalid library asset payload: source')
+}
+
+function assertMediaAssetId(value: string): string {
+  const trimmed = value.trim()
+  if (!opaqueIdPattern(['asset']).test(trimmed)) {
+    throw new Error('Invalid library asset payload: expected media asset_...')
+  }
+  return trimmed
+}
+
+function requiredMediaAssetId(raw: unknown): string {
+  if (typeof raw !== 'string' || !raw.trim()) {
+    throw new Error('Invalid library asset payload: media_asset_id')
+  }
+  return assertMediaAssetId(raw)
+}
+
+/** Paired nullable dimensions: both numbers when known, both null when unknown. */
+function requiredPairedDimensions(raw: Record<string, unknown>): {
+  width: number | null
+  height: number | null
+} {
+  const { width, height } = raw
+  if (width === null && height === null) return { width: null, height: null }
+  if (typeof width === 'number' && typeof height === 'number') {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      throw new Error('Invalid library asset payload: width/height')
+    }
+    return { width, height }
+  }
+  throw new Error('Invalid library asset payload: width/height must pair number|null')
+}
+
+function toWorkspaceLibraryMediaAsset(
+  raw: Record<string, unknown>,
+  shared: Pick<WorkspaceLibraryMediaAsset, 'id' | 'workspaceId' | 'folderId'>,
+): WorkspaceLibraryMediaAsset {
+  // Media rows must not carry external URL/provider keys, even empty ones.
+  for (const key of ['provider', 'source_id', 'source_url', 'preview_url', 'original_url']) {
+    if (raw[key] !== undefined) {
+      throw new Error(`Invalid library asset payload: media must not carry ${key}`)
+    }
+  }
+  const { width, height } = requiredPairedDimensions(raw)
   return {
-    id: assertLibraryAssetId(requiredString(raw.id, 'id')),
-    workspaceId: assertWorkspaceId(requiredString(raw.workspace_id, 'workspace_id')),
-    folderId,
+    source: 'media',
+    ...shared,
+    mediaAssetId: requiredMediaAssetId(raw.media_asset_id),
+    title: optionalString(raw.title),
+    author: optionalString(raw.author),
+    width,
+    height,
+    createdAt: requiredString(raw.created_at, 'created_at'),
+    updatedAt: requiredString(raw.updated_at, 'updated_at'),
+    display: toMediaDisplay(raw.display),
+  }
+}
+
+function toWorkspaceLibraryExternalAsset(
+  raw: Record<string, unknown>,
+  shared: Pick<WorkspaceLibraryExternalAsset, 'id' | 'workspaceId' | 'folderId'>,
+): WorkspaceLibraryExternalAsset {
+  const width = requiredNumber(raw.width, 'width')
+  const height = requiredNumber(raw.height, 'height')
+  if (width < 0 || height < 0) throw new Error('Invalid library asset payload: width/height')
+  return {
+    source: 'external',
+    ...shared,
     provider: mapWorkspaceLibraryProvider(raw.provider),
     sourceId: requiredString(raw.source_id, 'source_id'),
     sourceUrl: requiredString(raw.source_url, 'source_url'),
@@ -142,12 +234,28 @@ export function toWorkspaceLibraryAsset(raw: unknown): WorkspaceLibraryAsset {
     originalUrl: requiredString(raw.original_url, 'original_url'),
     title: optionalString(raw.title),
     author: optionalString(raw.author),
-    width: requiredNumber(raw.width, 'width'),
-    height: requiredNumber(raw.height, 'height'),
+    width,
+    height,
     createdAt: requiredString(raw.created_at, 'created_at'),
     updatedAt: requiredString(raw.updated_at, 'updated_at'),
     display: toMediaDisplay(raw.display),
   }
+}
+
+export function toWorkspaceLibraryAsset(raw: unknown): WorkspaceLibraryAsset {
+  if (!isRecord(raw)) throw new Error('Invalid library asset payload')
+  const folderId = optionalString(raw.folder_id)
+  if (folderId != null) assertLibraryFolderId(folderId)
+  const shared = {
+    id: assertLibraryAssetId(requiredString(raw.id, 'id')),
+    workspaceId: assertWorkspaceId(requiredString(raw.workspace_id, 'workspace_id')),
+    folderId,
+  }
+  // `source` is required: backend always emits the discriminator and rejects
+  // a missing source with 422; absent `source` fails closed here.
+  const source = mapWorkspaceLibrarySource(raw.source)
+  if (source === 'media') return toWorkspaceLibraryMediaAsset(raw, shared)
+  return toWorkspaceLibraryExternalAsset(raw, shared)
 }
 
 export type WorkspaceLibraryResolveStatus = 'resolved' | 'unresolved'
@@ -196,7 +304,8 @@ export function toWorkspaceLibraryPage<T>(
   }
 }
 
-export type WorkspaceLibraryAssetInput = {
+export type WorkspaceLibraryExternalAssetInput = {
+  source: 'external'
   provider: WorkspaceLibraryAssetProvider
   sourceId: string
   sourceUrl?: string | undefined
@@ -209,9 +318,31 @@ export type WorkspaceLibraryAssetInput = {
   folderId?: string | undefined
 }
 
-/** Cross-surface save identity: `provider:source_id`. */
-export function libraryAssetKey(provider: string, sourceID: string): string {
-  return `${provider}:${sourceID}`
+export type WorkspaceLibraryMediaAssetInput = {
+  source: 'media'
+  mediaAssetId: string
+  title?: string | undefined
+  folderId?: string | undefined
+}
+
+/**
+ * Discriminated save input matching the wire `source`: external references
+ * carry provider/source identity plus URLs, media saves carry only the
+ * uploaded Media Asset identity (dimensions project server-side; no URL
+ * keys, no task lineage, no operator identity, author display-only).
+ */
+export type WorkspaceLibraryAssetInput =
+  WorkspaceLibraryExternalAssetInput | WorkspaceLibraryMediaAssetInput
+
+/** Save identity across surfaces: external `provider:source_id`, media `media:<id>`. */
+export type LibraryAssetIdentity =
+  | { source: 'external'; provider: string; sourceId: string }
+  | { source: 'media'; mediaAssetId: string }
+
+export function libraryAssetKeyFor(identity: LibraryAssetIdentity): string {
+  return identity.source === 'media'
+    ? `media:${identity.mediaAssetId}`
+    : `${identity.provider}:${identity.sourceId}`
 }
 
 /**
@@ -234,9 +365,10 @@ export type LibrarySearchReference = {
 export function toWorkspaceLibraryAssetInput(
   reference: LibrarySearchReference,
   folderId?: string,
-): WorkspaceLibraryAssetInput {
+): WorkspaceLibraryExternalAssetInput {
   if (folderId != null) assertLibraryFolderId(folderId)
   return {
+    source: 'external',
     provider: reference.provider,
     sourceId: reference.id,
     sourceUrl: reference.source_url,
@@ -246,6 +378,20 @@ export function toWorkspaceLibraryAssetInput(
     author: reference.author,
     width: reference.width,
     height: reference.height,
+    ...(folderId == null ? {} : { folderId }),
+  }
+}
+
+export function toWorkspaceLibraryMediaAssetInput(
+  mediaAssetId: string,
+  meta: { title?: string | undefined } = {},
+  folderId?: string,
+): WorkspaceLibraryMediaAssetInput {
+  if (folderId != null) assertLibraryFolderId(folderId)
+  return {
+    source: 'media',
+    mediaAssetId: assertMediaAssetId(mediaAssetId),
+    ...(meta.title == null || !meta.title.trim() ? {} : { title: meta.title }),
     ...(folderId == null ? {} : { folderId }),
   }
 }

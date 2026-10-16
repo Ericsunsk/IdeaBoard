@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -202,6 +203,56 @@ func (f *v1ReadThroughFixture) pollJobs(t *testing.T, want func([]*librarydomain
 			t.Fatalf("timed out waiting for jobs, have %d", len(all))
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestV1LibraryUploadedMediaImport(t *testing.T) {
+	fetcher := &readThroughStubFetcher{}
+	f := newV1ReadThroughFixture(t, fetcher, true)
+	var imageBytes bytes.Buffer
+	if err := png.Encode(&imageBytes, image.NewRGBA(image.Rect(0, 0, 240, 360))); err != nil {
+		t.Fatal(err)
+	}
+	staged := imageBytes.Bytes()
+	uploadsPath := "/api/v1/workspaces/" + f.ws.PublicID + "/uploads"
+	uploadID := v1GapsDeclare(t, f.engine, uploadsPath, f.owner, "library-import-declare", "本地图片.png", staged)
+	v1GapsStage(t, f.engine, uploadsPath+"/"+uploadID+"/bytes", staged, f.owner, "library-import-stage")
+	status, _, payload := doV1(t, f.engine, v1Call{
+		method: "POST", path: uploadsPath + "/" + uploadID + "/complete", userID: f.owner,
+		body:    fmt.Sprintf(`{"data":{"checksum_sha256":%q,"size_bytes":%d,"mime_type":"image/png","media_kind":"image"}}`, v1GapsChecksum(staged), len(staged)),
+		headers: map[string]string{"Idempotency-Key": "library-import-complete"},
+	})
+	if status != http.StatusOK {
+		t.Fatalf("complete image upload = %d %v, want 200", status, payload)
+	}
+	mediaID := v1MediaAssetID(t, v1Data(t, payload).(map[string]any)["asset"])
+	f.lib.RegisterManagedMediaForTests(f.ws.PublicID, mediaID, nil, nil, false)
+	status, _, payload = doV1(t, f.engine, v1Call{
+		method: "POST", path: "/api/v1/workspaces/" + f.ws.PublicID + "/library/assets", userID: f.owner,
+		body:    fmt.Sprintf(`{"data":{"source":"media","media_asset_id":%q}}`, mediaID),
+		headers: map[string]string{"Idempotency-Key": "library-import-save"},
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("save uploaded media = %d %v, want 201", status, payload)
+	}
+	libraryID := v1Data(t, payload).(map[string]any)["id"].(string)
+	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: f.mediaPath(libraryID), userID: f.member})
+	if status != http.StatusOK {
+		t.Fatalf("import uploaded Library image = %d %v, want 200", status, payload)
+	}
+	dto := v1Data(t, payload).(map[string]any)
+	if dto["id"] != mediaID {
+		t.Fatalf("imported Media ID = %v, want existing %s", dto["id"], mediaID)
+	}
+	if dto["width"] != float64(240) || dto["height"] != float64(360) {
+		t.Fatalf("imported image dimensions = %v x %v, want 240 x 360", dto["width"], dto["height"])
+	}
+	status, _, body := doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: dto["content_url"].(string), userID: f.member}, "library-import-")
+	if status != http.StatusOK || body != string(staged) {
+		t.Fatalf("imported image content = %d len %d, want uploaded bytes", status, len(body))
+	}
+	if len(f.jobs(t)) != 0 || fetcher.callCount() != 0 {
+		t.Fatal("managed import triggered external materialization")
 	}
 }
 

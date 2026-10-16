@@ -3,13 +3,17 @@
     <aside
       v-show="open"
       v-library-drop
+      :[LIBRARY_DROP_PANEL_ATTRIBUTE]="true"
       class="chrome-presence library-island border border-page-chrome-border bg-popover shadow-page-chrome z-40 flex flex-col overflow-hidden rounded-overlay p-5 text-foreground max-w-[calc(100vw-32px)]"
       :class="[
         isCanvasPresentation ? 'relative h-full w-full' : searchIslandClass,
-        isPanelHovered ? 'ring-2 ring-primary' : '',
+        isPanelHovered || isNativeHovering || isExternalPanelHovered ? 'ring-2 ring-primary' : '',
       ]"
       :aria-label="t('library.title')"
       @click="closeFolderMenu(false)"
+      @dragover="onNativeDragOver"
+      @dragleave="onNativeDragLeave"
+      @drop="onNativeFileDrop"
     >
       <!-- 🌟 1. 常驻顶栏控制区与灵感夹微胶囊 (支持用户主动折叠/展开分类胶囊) -->
       <div class="flex flex-col shrink-0 mb-2">
@@ -78,6 +82,7 @@
                 v-for="folder in workspace.folderTabs.value"
                 :key="folder.folderKey"
                 v-library-drop="folder.folderKey"
+                :[LIBRARY_DROP_FOLDER_ATTRIBUTE]="folder.folderKey"
                 class="group/folder-pill inline-flex h-7 shrink-0 items-center rounded-pill"
                 @contextmenu.stop="openFolderMenu($event, folder)"
               >
@@ -91,7 +96,8 @@
                     workspace.selectedFolder.value === folder.folderKey
                       ? 'border-transparent bg-primary text-primary-foreground shadow-xs'
                       : 'border-transparent bg-muted text-muted-foreground hover:bg-muted hover:text-foreground',
-                    hoveredPillKey === folder.folderKey
+                    hoveredPillKey === folder.folderKey ||
+                    nativeHoveredFolderKey === folder.folderKey
                       ? '!scale-105 !border-primary !bg-primary/10'
                       : '',
                   ]"
@@ -99,11 +105,6 @@
                 >
                   <ReportColumns
                     v-if="folder.folderKey === 'all'"
-                    class="size-3 opacity-80"
-                    aria-hidden="true"
-                  />
-                  <Bookmark
-                    v-else-if="folder.folderKey === 'quick-saves'"
                     class="size-3 opacity-80"
                     aria-hidden="true"
                   />
@@ -140,6 +141,41 @@
         >
           {{ t('common.actions.retry') }}
         </button>
+      </div>
+
+      <div
+        v-if="saveOperations.length"
+        class="mb-2 max-h-28 shrink-0 overflow-y-auto"
+        aria-live="polite"
+      >
+        <div
+          v-for="operation in saveOperations"
+          :key="operation.id"
+          class="flex items-center justify-between gap-3 rounded-panel border border-border px-3 py-2 text-xs"
+        >
+          <span>
+            {{ operation.items[0]?.title }} ·
+            {{
+              operation.status === 'running'
+                ? t('common.states.saving')
+                : t('search.toasts.savedBatchPartial', {
+                    successCount: operation.savedCount,
+                    failureCount: operation.failedCount,
+                  })
+            }}
+            <span v-if="operation.status === 'running'">
+              {{ operation.savedCount }}/{{ operation.items.length }}
+            </span>
+          </span>
+          <button
+            v-if="operation.status !== 'running'"
+            type="button"
+            class="shrink-0 cursor-pointer rounded-pill bg-primary px-3 py-1.5 font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            @click="retrySave(operation.id)"
+          >
+            {{ t('common.actions.retry') }}
+          </button>
+        </div>
       </div>
 
       <LibraryAssetGallery
@@ -208,7 +244,6 @@ import { resolveMediaDisplayUrl } from '../../../core/media/mediaDisplay'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  Bookmark,
   Folder,
   NavArrowDown,
   NavArrowLeft,
@@ -237,9 +272,16 @@ import LibraryAssetLightbox from './LibraryAssetLightbox.vue'
 import LibraryFolderDialogs from './LibraryFolderDialogs.vue'
 import LibraryFolderContextMenu from './LibraryFolderContextMenu.vue'
 import { useLibraryIslandDnD } from '../session/useLibraryIslandDnD'
+import { useLibraryNativeFileDrop } from './useLibraryNativeFileDrop'
+import {
+  LIBRARY_DROP_FOLDER_ATTRIBUTE,
+  LIBRARY_DROP_PANEL_ATTRIBUTE,
+  type LibraryDropHit,
+} from './libraryDropHitTest'
 import { useAppToast } from '../../../core/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
 import type { LibraryDragPayload, LibraryDropTargets } from '../core/drag'
+import type { LibrarySaveModule } from '../session/librarySaveModule'
 import { useLibraryDropTargets } from './useLibraryDropTargets'
 
 const props = defineProps<{
@@ -247,6 +289,7 @@ const props = defineProps<{
   workspaceId: string | null
   folderFacts: LibraryFolderFacts
   mutationPublisher: LibraryMutationPublisher
+  saveModule: LibrarySaveModule
   referenceKeys?: string[]
   presentation: 'search' | 'canvas'
   dropTargets?: LibraryDropTargets
@@ -274,6 +317,24 @@ const searchIslandClass = computed(() =>
 
 const confirmDialog = useUserConfirmDialog()
 const toast = useAppToast()
+const saveOperations = computed(() =>
+  props.saveModule.operations.value
+    .filter((operation) => operation.status !== 'succeeded' && operation.status !== 'abandoned')
+    .map((operation) => ({
+      ...operation,
+      savedCount: operation.items.filter((item) => item.status === 'saved').length,
+      failedCount: operation.items.filter((item) => item.status === 'failed').length,
+    })),
+)
+
+async function retrySave(operationId: string) {
+  try {
+    await props.saveModule.retryOperation(operationId)
+  } catch (error) {
+    toast.error(userFacingErrorCopy(error, t('library.errors.saveAssetFailed')))
+  }
+}
+
 const workspace = useLibraryWorkspace({
   workspaceId: () => props.workspaceId,
   syncRoute: false,
@@ -284,9 +345,40 @@ const workspace = useLibraryWorkspace({
 
 const dropTargets = props.dropTargets ?? createPointerDropTargets<LibraryDragPayload>()
 const hoveredPillKey = ref<string | null>(null)
+const isExternalPanelHovered = ref(false)
 const { receiveDrop } = useLibraryIslandDnD({
   workspace,
-  mutationPublisher: props.mutationPublisher,
+  saveModule: props.saveModule,
+})
+const {
+  isNativeHovering,
+  nativeHoveredFolderKey,
+  onNativeDragOver,
+  onNativeDragLeave,
+  onNativeDrop: onNativeFileDrop,
+} = useLibraryNativeFileDrop({
+  isOpen: () => props.open,
+  canReceive: () => true,
+  selectedFolder: () => workspace.selectedFolder.value,
+  isFolderKnown: (key) => workspace.folders.value.some((folder) => folder.id === key),
+  selectFolder: (key) => selectFolder(key),
+  saveModule: props.saveModule,
+  notifyWarning: (message) => toast.warning(message),
+})
+
+/**
+ * External (non-Pointer-adapter) drag hover, e.g. Canvas node drags. Only
+ * touches the island's own hover state — never Canvas state.
+ */
+function setExternalDragHover(hit: LibraryDropHit | null) {
+  hoveredPillKey.value = hit?.kind === 'folder' ? hit.folderKey : null
+  isExternalPanelHovered.value = hit?.kind === 'panel'
+}
+
+defineExpose({
+  setExternalDragHover,
+  getSelectedFolderKey: () => workspace.selectedFolder.value,
+  isFolderKnown: (key: string) => workspace.folders.value.some((folder) => folder.id === key),
 })
 let disposeAssetDrag: (() => void) | null = null
 function handleAssetPointerDown(event: PointerEvent, asset: LibraryAssetView) {
@@ -474,12 +566,15 @@ watch(
 
 let unsubscribeMutation = () => {}
 onMounted(() => {
-  unsubscribeMutation = props.mutationPublisher.subscribe((outcome) => {
+  unsubscribeMutation = props.mutationPublisher.subscribe((outcomes) => {
     if (
       !props.open ||
       !initialized.value ||
-      outcome.galleryEffect !== 'reload-current' ||
-      !outcome.affectedFolderKeys.includes(workspace.selectedFolder.value)
+      !outcomes.some(
+        (outcome) =>
+          outcome.galleryEffect === 'reload-current' &&
+          outcome.affectedFolderKeys.includes(workspace.selectedFolder.value),
+      )
     ) {
       return
     }

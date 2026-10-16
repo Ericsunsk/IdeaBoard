@@ -9,9 +9,7 @@ import { resolveAssetUrl } from '../../../core/config/runtimeUrls'
 import { i18n } from '../../../core/i18n'
 import {
   assertLibraryAssetId,
-  libraryAssetKey,
-  toWorkspaceLibraryAssetInput,
-  type LibrarySearchReference,
+  libraryAssetKeyFor,
   type WorkspaceLibraryAsset,
   type WorkspaceLibraryFolder,
 } from '../core/validators'
@@ -71,55 +69,10 @@ export async function lookupWorkspaceSavedAssetKeys(
     )
     for (const result of results) {
       if (result.status !== 'resolved' || !result.asset) continue
-      saved.add(libraryAssetKey(result.asset.provider, result.asset.sourceId))
+      saved.add(libraryAssetKeyFor(result.asset))
     }
   }
   return saved
-}
-
-/** Committed save result: the stored asset plus where it actually landed. */
-export type WorkspaceLibrarySaveResult = {
-  asset: WorkspaceLibraryAsset
-  /** Present only when this call created the folder. */
-  createdFolder?: WorkspaceLibraryFolder | undefined
-  assetKey: string
-  affectedFolderKeys: string[]
-}
-
-/**
- * Saves a Search reference; creates the folder first when a new name is given.
- * The returned `affectedFolderKeys`/`createdFolder` are the committed write
- * facts — callers must not rebuild the target from their input folder id.
- */
-export async function saveWorkspaceSearchReference(
-  workspaceId: string,
-  reference: LibrarySearchReference,
-  folderId?: string,
-  newFolderName?: string,
-  options: WorkspaceLibraryRequestOptions = {},
-): Promise<WorkspaceLibrarySaveResult> {
-  let targetFolderId = folderId
-  let createdFolder: WorkspaceLibraryFolder | undefined
-  const trimmedName = newFolderName?.trim()
-  if (trimmedName) {
-    createdFolder = await workspaceLibraryApi.createFolder(workspaceId, trimmedName, options)
-    targetFolderId = createdFolder.id
-  }
-  const asset = await workspaceLibraryApi.saveAsset(
-    workspaceId,
-    toWorkspaceLibraryAssetInput(reference, targetFolderId),
-    options,
-  )
-  return {
-    asset,
-    ...(createdFolder == null ? {} : { createdFolder }),
-    assetKey: libraryAssetKey(asset.provider, asset.sourceId),
-    affectedFolderKeys: uniqueLibraryFolderKeys([
-      LIBRARY_ALL_FOLDER_KEY,
-      asset.folderId,
-      createdFolder?.id,
-    ]),
-  }
 }
 
 /** Committed remove result, or `null` when the reference was never saved. */
@@ -150,7 +103,7 @@ export async function removeWorkspaceSearchReference(
   await workspaceLibraryApi.deleteAsset(workspaceId, asset.id, options)
   return {
     asset,
-    assetKey: libraryAssetKey(asset.provider, asset.sourceId),
+    assetKey: libraryAssetKeyFor(asset),
     affectedFolderKeys: uniqueLibraryFolderKeys([LIBRARY_ALL_FOLDER_KEY, asset.folderId]),
   }
 }

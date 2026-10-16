@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract": "930-library-source",
+  "discriminator": "source",
+  "notes": "Read-shape fixtures for the unified Library Source contract (issues 930/931). external rows carry provider/source identity plus real URLs and non-null positive dimensions. media rows carry media_asset_id plus nullable dimensions (null = unknown) and MUST NOT contain provider/source_id/source_url/preview_url/original_url keys. Operator identity (saved_by_user_id) is server-internal and never serialized. Task lineage (task_id/task_result_index) is provenance only, never a dedup key. Folder rule unchanged: write \"\" means Quick Saves; reads carry the resolved lfolder_ id.",
+  "external": {
+    "id": "lasset_9fK3mQvXxLp2",
+    "workspace_id": "ws_8K2mQvXxLp4A",
+    "folder_id": "lfolder_4Hd8sWmZqLpX",
+    "source": "external",
+    "provider": "unsplash",
+    "source_id": "photo-1493246507139",
+    "source_url": "https://unsplash.com/photos/mountain-lake-1493246507139",
+    "preview_url": "https://images.unsplash.com/photo-1493246507139?w=640",
+    "original_url": "https://images.unsplash.com/photo-1493246507139?w=2400",
+    "title": "Mountain lake at dawn",
+    "author": "Jane Photographer",
+    "width": 2400,
+    "height": 1600,
+    "created_at": "2026-10-10T08:00:00Z",
+    "updated_at": "2026-10-10T08:00:00Z",
+    "display": {
+      "variants": [
+        {
+          "tier": "thumb",
+          "max_side": 256,
+          "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_9fK3mQvXxLp2/derivatives/thumb?v=8f2c1a9b4d60"
+        },
+        {
+          "tier": "preview",
+          "max_side": 640,
+          "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_9fK3mQvXxLp2/derivatives/preview?v=8f2c1a9b4d60"
+        },
+        {
+          "tier": "large-preview",
+          "max_side": 1280,
+          "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_9fK3mQvXxLp2/derivatives/large-preview?v=8f2c1a9b4d60"
+        }
+      ]
+    }
+  },
+  "media_known": {
+    "id": "lasset_2Dx8sWmZqLpY",
+    "workspace_id": "ws_8K2mQvXxLp4A",
+    "folder_id": "lfolder_7Qs2vXmKpLqZ",
+    "source": "media",
+    "media_asset_id": "asset_5Gh9sDkXwQmV",
+    "title": "Generated hero banner",
+    "width": 1600,
+    "height": 900,
+    "created_at": "2026-10-11T09:30:00Z",
+    "updated_at": "2026-10-11T09:30:00Z",
+    "display": {
+      "variants": [
+        {
+          "tier": "thumb",
+          "max_side": 256,
+          "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_2Dx8sWmZqLpY/derivatives/thumb?v=1b7e4c02a9f3"
+        },
+        {
+          "tier": "preview",
+          "max_side": 640,
+          "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_2Dx8sWmZqLpY/derivatives/preview?v=1b7e4c02a9f3"
+        },
+        {
+          "tier": "large-preview",
+          "max_side": 1280,
+          "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_2Dx8sWmZqLpY/derivatives/large-preview?v=1b7e4c02a9f3"
+        }
+      ]
+    }
+  },
+  "media_unknown": {
+    "id": "lasset_6Pw4vXmKqLtN",
+    "workspace_id": "ws_8K2mQvXxLp4A",
+    "folder_id": "lfolder_7Qs2vXmKpLqZ",
+    "source": "media",
+    "media_asset_id": "asset_9Qw3tYuIoPaS",
+    "width": null,
+    "height": null,
+    "created_at": "2026-10-12T10:00:00Z",
+    "updated_at": "2026-10-12T10:00:00Z",
+    "display": {
+      "variants": [
+        {
+          "tier": "thumb",
+          "max_side": 256,
+          "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_6Pw4vXmKqLtN/derivatives/thumb?v=44aa0d91c2e7"
+        },
+        {
+          "tier": "preview",
+          "max_side": 640,
+          "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_6Pw4vXmKqLtN/derivatives/preview?v=44aa0d91c2e7"
+        },
+        {
+          "tier": "large-preview",
+          "max_side": 1280,
+          "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_6Pw4vXmKqLtN/derivatives/large-preview?v=44aa0d91c2e7"
+        }
+      ]
+    }
+  },
+  "mixed_list": {
+    "data": [
+      {
+        "id": "lasset_9fK3mQvXxLp2",
+        "workspace_id": "ws_8K2mQvXxLp4A",
+        "folder_id": "lfolder_4Hd8sWmZqLpX",
+        "source": "external",
+        "provider": "unsplash",
+        "source_id": "photo-1493246507139",
+        "source_url": "https://unsplash.com/photos/mountain-lake-1493246507139",
+        "preview_url": "https://images.unsplash.com/photo-1493246507139?w=640",
+        "original_url": "https://images.unsplash.com/photo-1493246507139?w=2400",
+        "title": "Mountain lake at dawn",
+        "author": "Jane Photographer",
+        "width": 2400,
+        "height": 1600,
+        "created_at": "2026-10-10T08:00:00Z",
+        "updated_at": "2026-10-10T08:00:00Z",
+        "display": {
+          "variants": [
+            {
+              "tier": "thumb",
+              "max_side": 256,
+              "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_9fK3mQvXxLp2/derivatives/thumb?v=8f2c1a9b4d60"
+            },
+            {
+              "tier": "preview",
+              "max_side": 640,
+              "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_9fK3mQvXxLp2/derivatives/preview?v=8f2c1a9b4d60"
+            },
+            {
+              "tier": "large-preview",
+              "max_side": 1280,
+              "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_9fK3mQvXxLp2/derivatives/large-preview?v=8f2c1a9b4d60"
+            }
+          ]
+        }
+      },
+      {
+        "id": "lasset_2Dx8sWmZqLpY",
+        "workspace_id": "ws_8K2mQvXxLp4A",
+        "folder_id": "lfolder_7Qs2vXmKpLqZ",
+        "source": "media",
+        "media_asset_id": "asset_5Gh9sDkXwQmV",
+        "title": "Generated hero banner",
+        "width": 1600,
+        "height": 900,
+        "created_at": "2026-10-11T09:30:00Z",
+        "updated_at": "2026-10-11T09:30:00Z",
+        "display": {
+          "variants": [
+            {
+              "tier": "thumb",
+              "max_side": 256,
+              "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_2Dx8sWmZqLpY/derivatives/thumb?v=1b7e4c02a9f3"
+            },
+            {
+              "tier": "preview",
+              "max_side": 640,
+              "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_2Dx8sWmZqLpY/derivatives/preview?v=1b7e4c02a9f3"
+            },
+            {
+              "tier": "large-preview",
+              "max_side": 1280,
+              "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_2Dx8sWmZqLpY/derivatives/large-preview?v=1b7e4c02a9f3"
+            }
+          ]
+        }
+      },
+      {
+        "id": "lasset_6Pw4vXmKqLtN",
+        "workspace_id": "ws_8K2mQvXxLp4A",
+        "folder_id": "lfolder_7Qs2vXmKpLqZ",
+        "source": "media",
+        "media_asset_id": "asset_9Qw3tYuIoPaS",
+        "width": null,
+        "height": null,
+        "created_at": "2026-10-12T10:00:00Z",
+        "updated_at": "2026-10-12T10:00:00Z",
+        "display": {
+          "variants": [
+            {
+              "tier": "thumb",
+              "max_side": 256,
+              "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_6Pw4vXmKqLtN/derivatives/thumb?v=44aa0d91c2e7"
+            },
+            {
+              "tier": "preview",
+              "max_side": 640,
+              "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_6Pw4vXmKqLtN/derivatives/preview?v=44aa0d91c2e7"
+            },
+            {
+              "tier": "large-preview",
+              "max_side": 1280,
+              "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_6Pw4vXmKqLtN/derivatives/large-preview?v=44aa0d91c2e7"
+            }
+          ]
+        }
+      }
+    ],
+    "meta": {
+      "next_cursor": "",
+      "has_more": false
+    }
+  },
+  "task_lineage": {
+    "id": "lasset_8Rt5wYnMqLbV",
+    "workspace_id": "ws_8K2mQvXxLp4A",
+    "folder_id": "lfolder_7Qs2vXmKpLqZ",
+    "source": "media",
+    "media_asset_id": "asset_3Zx8cVbNmAsD",
+    "width": 1024,
+    "height": 1024,
+    "task_id": "task_7Hd2sKmQvLpX",
+    "task_result_index": 0,
+    "created_at": "2026-10-13T11:00:00Z",
+    "updated_at": "2026-10-13T11:00:00Z",
+    "display": {
+      "variants": [
+        {
+          "tier": "thumb",
+          "max_side": 256,
+          "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_8Rt5wYnMqLbV/derivatives/thumb?v=9d01bc55e6a2"
+        },
+        {
+          "tier": "preview",
+          "max_side": 640,
+          "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_8Rt5wYnMqLbV/derivatives/preview?v=9d01bc55e6a2"
+        },
+        {
+          "tier": "large-preview",
+          "max_side": 1280,
+          "url": "/api/v1/workspaces/ws_8K2mQvXxLp4A/library/assets/lasset_8Rt5wYnMqLbV/derivatives/large-preview?v=9d01bc55e6a2"
+        }
+      ]
+    }
+  }
+}

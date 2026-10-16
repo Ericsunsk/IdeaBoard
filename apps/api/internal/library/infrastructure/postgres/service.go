@@ -18,9 +18,8 @@
 // (same tx), mirroring the in-memory "become unfiled" semantics.
 // System folders are immutable: rename/delete statements exclude them.
 //
-// Title/author have no durable columns (workspace assets keep provider
-// URL + source metadata only); inputs are validated by the seam and
-// reads return empty strings.
+// Title/author are durable display metadata; task lineage and the
+// server-side operator persist on media rows (never serialized).
 //
 // Materializations are durable jobs (pending -> running -> completed|
 // failed; terminal states immutable). The durable status word for

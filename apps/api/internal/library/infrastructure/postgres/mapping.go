@@ -23,46 +23,45 @@ func folderFromRow(workspacePublicID string, row dbsqlc.LibraryFolder) *domain.V
 	}
 }
 
-func assetCore(workspacePublicID, folderPublicID, publicID, provider, sourceID, sourceURL, previewURL, originalURL string, width, height int32, createdAt, updatedAt pgtype.Timestamptz) *domain.V1Asset {
-	return &domain.V1Asset{
-		WorkspacePublicID: workspacePublicID,
-		PublicID:          publicID,
-		FolderPublicID:    folderPublicID,
-		Provider:          provider,
-		SourceID:          sourceID,
-		SourceURL:         sourceURL,
-		PreviewURL:        previewURL,
-		OriginalURL:       originalURL,
-		Width:             width,
-		Height:            height,
-		CreatedAt:         dbutil.TimeValue(createdAt),
-		UpdatedAt:         dbutil.TimeValue(updatedAt),
+// int4Pair projects a nullable media dimension pair onto the Library
+// read shape: both set and positive, else both nil (unknown). Media rows
+// outside images may carry half-known dimensions; the wire never does.
+func int4Pair(width, height pgtype.Int4) (*int32, *int32) {
+	if !width.Valid || !height.Valid {
+		return nil, nil
 	}
+	w, h := width.Int32, height.Int32
+	return domain.PairDimensions(&w, &h)
 }
 
-func assetFromLibraryAsset(workspacePublicID, folderPublicID string, row dbsqlc.LibraryAsset) *domain.V1Asset {
-	return assetCore(workspacePublicID, folderPublicID, row.PublicID, row.Provider, row.SourceID,
-		row.SourceUrl, row.PreviewUrl, row.OriginalUrl, row.Width, row.Height, row.CreatedAt, row.UpdatedAt)
-}
-
-func assetFromPublicIDRow(workspacePublicID string, row dbsqlc.GetLibraryAssetByPublicIDRow) *domain.V1Asset {
-	return assetCore(workspacePublicID, row.FolderPublicID, row.PublicID, row.Provider, row.SourceID,
-		row.SourceUrl, row.PreviewUrl, row.OriginalUrl, row.Width, row.Height, row.CreatedAt, row.UpdatedAt)
-}
-
-func assetFromWorkspaceSourceRow(workspacePublicID string, row dbsqlc.GetLibraryAssetByWorkspaceSourceRow) *domain.V1Asset {
-	return assetCore(workspacePublicID, row.FolderPublicID, row.PublicID, row.Provider, row.SourceID,
-		row.SourceUrl, row.PreviewUrl, row.OriginalUrl, row.Width, row.Height, row.CreatedAt, row.UpdatedAt)
-}
-
-func assetFromListRow(workspacePublicID string, row dbsqlc.ListLibraryAssetsRow) *domain.V1Asset {
-	return assetCore(workspacePublicID, row.FolderPublicID, row.PublicID, row.Provider, row.SourceID,
-		row.SourceUrl, row.PreviewUrl, row.OriginalUrl, row.Width, row.Height, row.CreatedAt, row.UpdatedAt)
-}
-
-func assetFromProviderRow(workspacePublicID string, row dbsqlc.ListLibraryAssetsByWorkspaceProviderRow) *domain.V1Asset {
-	return assetCore(workspacePublicID, row.FolderPublicID, row.PublicID, row.Provider, row.SourceID,
-		row.SourceUrl, row.PreviewUrl, row.OriginalUrl, row.Width, row.Height, row.CreatedAt, row.UpdatedAt)
+func assetFromRow(workspacePublicID string, view dbsqlc.GetLibraryAssetByPublicIDRow) *domain.V1Asset {
+	row := view.LibraryAsset
+	asset := &domain.V1Asset{
+		WorkspacePublicID: workspacePublicID,
+		PublicID:          row.PublicID,
+		FolderPublicID:    view.FolderPublicID,
+		Title:             row.Title,
+		Author:            row.Author,
+		CreatedAt:         dbutil.TimeValue(row.CreatedAt),
+		UpdatedAt:         dbutil.TimeValue(row.UpdatedAt),
+	}
+	if row.MediaAssetID.Valid {
+		asset.Source = domain.AssetSourceMedia
+		asset.MediaAssetID = view.MediaAssetPublicID.String
+		asset.Width, asset.Height = int4Pair(view.MediaWidth, view.MediaHeight)
+		if row.TaskID.Valid && row.TaskResultIndex.Valid {
+			asset.Lineage = &domain.TaskLineage{TaskID: row.TaskID.String, ResultIndex: row.TaskResultIndex.Int32}
+		}
+		return asset
+	}
+	asset.Source = domain.AssetSourceExternal
+	asset.Provider = row.Provider.String
+	asset.SourceID = row.SourceID.String
+	asset.SourceURL = row.SourceUrl.String
+	asset.PreviewURL = row.PreviewUrl.String
+	asset.OriginalURL = row.OriginalUrl.String
+	asset.Width, asset.Height = &row.Width.Int32, &row.Height.Int32
+	return asset
 }
 
 // ensureQuickSavesFolderRow ensures the workspace Quick Saves system
@@ -90,31 +89,22 @@ func ensureQuickSavesFolderRow(ctx context.Context, q *dbsqlc.Queries, workspace
 	return row, nil
 }
 
-// resolveAssetFolderInternal maps a folder binding to its internal id:
-// "" means Quick Saves (ensured), otherwise the folder must exist in
-// the workspace.
-func resolveAssetFolderInternal(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID int64, folderPublicID string) (int64, error) {
+// resolveAssetFolder resolves an explicit folder or ensures Quick Saves.
+func resolveAssetFolder(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID int64, folderPublicID string) (dbsqlc.LibraryFolder, error) {
 	trimmed := strings.TrimSpace(folderPublicID)
 	if trimmed == "" {
-		quickSaves, err := ensureQuickSavesFolderRow(ctx, q, workspaceInternalID)
-		if err != nil {
-			return 0, err
-		}
-		return quickSaves.InternalID, nil
+		return ensureQuickSavesFolderRow(ctx, q, workspaceInternalID)
 	}
 	if !domain.IsV1FolderID(trimmed) {
-		return 0, domain.ErrV1FolderNotFound
+		return dbsqlc.LibraryFolder{}, domain.ErrV1FolderNotFound
 	}
 	folder, err := q.GetLibraryFolderByPublicID(ctx, dbsqlc.GetLibraryFolderByPublicIDParams{
 		WorkspaceID: workspaceInternalID, PublicID: trimmed,
 	})
 	if database.IsNotFound(err) {
-		return 0, domain.ErrV1FolderNotFound
+		return dbsqlc.LibraryFolder{}, domain.ErrV1FolderNotFound
 	}
-	if err != nil {
-		return 0, err
-	}
-	return folder.InternalID, nil
+	return folder, err
 }
 
 func isFolderNameConflict(err error) bool {
@@ -143,6 +133,16 @@ func nullText(value string) pgtype.Text {
 		return pgtype.Text{}
 	}
 	return pgtype.Text{String: value, Valid: true}
+}
+
+// textParam lifts a validated non-empty value into a nullable column.
+func textParam(value string) pgtype.Text {
+	return pgtype.Text{String: value, Valid: true}
+}
+
+// int4Param lifts a validated dimension into a nullable column.
+func int4Param(value int32) pgtype.Int4 {
+	return pgtype.Int4{Int32: value, Valid: true}
 }
 
 func isMaterializationPublicIDConflict(err error) bool {

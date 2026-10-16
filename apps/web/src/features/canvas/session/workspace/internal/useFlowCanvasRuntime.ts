@@ -267,6 +267,19 @@ function useCanvasRuntimeHistory(
   })
 }
 
+function commitStagedNodeDrag(
+  nodeDragLifecycle: CanvasNodeDragLifecycle,
+  renderNodes: Ref<Node[]>,
+  renderEdgesRef: Ref<Edge[]>,
+): void {
+  nodeDragLifecycle.commit((store, transaction) =>
+    stageCanvasRendererSelection(store, transaction, [
+      ...renderNodes.value,
+      ...renderEdgesRef.value,
+    ]),
+  )
+}
+
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const renderNodes = options.nodes
   const renderEdgesRef = options.edges
@@ -463,15 +476,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     transaction.commit()
   }
 
-  function commitNodeDragTransaction() {
-    nodeDragLifecycle.commit((store, transaction) =>
-      stageCanvasRendererSelection(store, transaction, [
-        ...renderNodes.value,
-        ...renderEdgesRef.value,
-      ]),
-    )
-  }
-
   return {
     persistence: {
       currentBoardId: options.boardSession.currentBoardId,
@@ -488,7 +492,9 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       reconcileRendererSelection,
       nodeDragTransactions: {
         begin: nodeDragLifecycle.begin,
-        commit: commitNodeDragTransaction,
+        commit: () => commitStagedNodeDrag(nodeDragLifecycle, renderNodes, renderEdgesRef),
+        finishAsLibrarySave: nodeDragLifecycle.finishAsLibrarySave,
+        isActive: nodeDragLifecycle.isActive,
       },
     },
     graphEditing: {

@@ -12528,9 +12528,29 @@
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#LibrarySearchReference"]
       },
+      "LibraryAssetIdentity": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibraryAssetIdentity"]
+      },
+      "WorkspaceLibraryExternalAsset": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#WorkspaceLibraryExternalAsset"]
+      },
+      "WorkspaceLibraryExternalAssetInput": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#WorkspaceLibraryExternalAssetInput"]
+      },
       "WorkspaceLibraryAsset": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#WorkspaceLibraryAsset"]
+      },
+      "WorkspaceLibraryMediaAsset": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#WorkspaceLibraryMediaAsset"]
+      },
+      "WorkspaceLibraryMediaAssetInput": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#WorkspaceLibraryMediaAssetInput"]
       },
       "WorkspaceLibraryAssetInput": {
         "kind": "canonical-origin",
@@ -12568,10 +12588,6 @@
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#assertWorkspaceId"]
       },
-      "libraryAssetKey": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/library/index.ts#libraryAssetKey"]
-      },
       "mapWorkspaceLibraryResolveStatus": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#mapWorkspaceLibraryResolveStatus"]
@@ -12587,6 +12603,14 @@
       "toWorkspaceLibraryAssetInput": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#toWorkspaceLibraryAssetInput"]
+      },
+      "libraryAssetKeyFor": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#libraryAssetKeyFor"]
+      },
+      "toWorkspaceLibraryMediaAssetInput": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#toWorkspaceLibraryMediaAssetInput"]
       },
       "toWorkspaceLibraryFolder": {
         "kind": "canonical-origin",
@@ -12610,16 +12634,46 @@
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#LIBRARY_ALL_FOLDER_KEY"
         ]
       },
+      "LIBRARY_DROP_FOLDER_ATTRIBUTE": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LIBRARY_DROP_FOLDER_ATTRIBUTE"
+        ]
+      },
+      "LIBRARY_DROP_PANEL_ATTRIBUTE": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LIBRARY_DROP_PANEL_ATTRIBUTE"
+        ]
+      },
+      "LIBRARY_SAVE_UPLOAD_CONCURRENCY": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LIBRARY_SAVE_UPLOAD_CONCURRENCY"
+        ]
+      },
       "LibraryAssetFact": {
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibraryAssetFact"
         ]
       },
+      "LibraryAssetIdentity": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibraryAssetIdentity"
+        ]
+      },
       "LibraryAssetMaterializer": {
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibraryAssetMaterializer"
+        ]
+      },
+      "LibraryDropHit": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibraryDropHit"
         ]
       },
       "LibraryAssetView": {
@@ -12682,6 +12736,78 @@
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibraryMutationPublisher"
         ]
       },
+      "LibrarySaveAssetPort": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibrarySaveAssetPort"
+        ]
+      },
+      "LibrarySaveItemState": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibrarySaveItemState"
+        ]
+      },
+      "LibrarySaveItemStatus": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibrarySaveItemStatus"
+        ]
+      },
+      "LibrarySaveModule": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibrarySaveModule"
+        ]
+      },
+      "LibrarySaveModuleOptions": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibrarySaveModuleOptions"
+        ]
+      },
+      "LibrarySaveNotifyPort": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibrarySaveNotifyPort"
+        ]
+      },
+      "LibrarySaveOperationState": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibrarySaveOperationState"
+        ]
+      },
+      "LibrarySaveOperationStatus": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibrarySaveOperationStatus"
+        ]
+      },
+      "LibrarySaveSourceInput": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibrarySaveSourceInput"
+        ]
+      },
+      "LibrarySaveSubmitOptions": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibrarySaveSubmitOptions"
+        ]
+      },
+      "LibrarySaveSubmitResult": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibrarySaveSubmitResult"
+        ]
+      },
+      "LibrarySaveUploadPort": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#LibrarySaveUploadPort"
+        ]
+      },
       "LibrarySearchReference": {
         "kind": "canonical-public",
         "evidence": [
@@ -12718,10 +12844,34 @@
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#WorkspaceLibraryAssetProvider"
         ]
       },
+      "WorkspaceLibraryExternalAsset": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#WorkspaceLibraryExternalAsset"
+        ]
+      },
+      "WorkspaceLibraryExternalAssetInput": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#WorkspaceLibraryExternalAssetInput"
+        ]
+      },
       "WorkspaceLibraryFolder": {
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#WorkspaceLibraryFolder"
+        ]
+      },
+      "WorkspaceLibraryMediaAsset": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#WorkspaceLibraryMediaAsset"
+        ]
+      },
+      "WorkspaceLibraryMediaAssetInput": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#WorkspaceLibraryMediaAssetInput"
         ]
       },
       "WorkspaceLibraryPage": {
@@ -12752,12 +12902,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#WorkspaceLibraryResolveStatus"
-        ]
-      },
-      "WorkspaceLibrarySaveResult": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#WorkspaceLibrarySaveResult"
         ]
       },
       "WorkspaceLibrarySavedKey": {
@@ -12820,6 +12964,12 @@
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#createLibraryMutationPublisher"
         ]
       },
+      "createLibrarySaveModule": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#createLibrarySaveModule"
+        ]
+      },
       "deleteFolderConfirmation": {
         "kind": "canonical-public",
         "evidence": [
@@ -12832,10 +12982,10 @@
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#libraryAffectedFolderKeysForAsset"
         ]
       },
-      "libraryAssetKey": {
+      "libraryAssetKeyFor": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#libraryAssetKey"
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#libraryAssetKeyFor"
         ]
       },
       "listAllWorkspaceLibraryFolders": {
@@ -12874,6 +13024,12 @@
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#materializeLibraryAssetForCanvas"
         ]
       },
+      "queryLibraryDropHit": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#queryLibraryDropHit"
+        ]
+      },
       "removeAssetConfirmation": {
         "kind": "canonical-public",
         "evidence": [
@@ -12892,10 +13048,10 @@
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#requireWorkspaceId"
         ]
       },
-      "saveWorkspaceSearchReference": {
+      "resolveLibrarySaveFolderId": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/library/index.ts#saveWorkspaceSearchReference"
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#resolveLibrarySaveFolderId"
         ]
       },
       "toCanvasLibraryImportDescriptor": {
@@ -12914,6 +13070,12 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/library/index.ts#toWorkspaceLibraryAssetInput"
+        ]
+      },
+      "toWorkspaceLibraryMediaAssetInput": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/library/index.ts#toWorkspaceLibraryMediaAssetInput"
         ]
       },
       "toWorkspaceLibraryFolder": {
@@ -13030,10 +13192,6 @@
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#WorkspaceLibraryRemoveResult"]
       },
-      "WorkspaceLibrarySaveResult": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/library/index.ts#WorkspaceLibrarySaveResult"]
-      },
       "WorkspaceLibrarySavedKey": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#WorkspaceLibrarySavedKey"]
@@ -13053,10 +13211,68 @@
       "removeWorkspaceSearchReference": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#removeWorkspaceSearchReference"]
-      },
-      "saveWorkspaceSearchReference": {
+      }
+    },
+    "src/features/library/session/librarySaveModule.ts": {
+      "LIBRARY_SAVE_UPLOAD_CONCURRENCY": {
         "kind": "canonical-origin",
-        "evidence": ["src/features/library/index.ts#saveWorkspaceSearchReference"]
+        "evidence": ["src/features/library/index.ts#LIBRARY_SAVE_UPLOAD_CONCURRENCY"]
+      },
+      "LibrarySaveAssetPort": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibrarySaveAssetPort"]
+      },
+      "LibrarySaveItemState": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibrarySaveItemState"]
+      },
+      "LibrarySaveItemStatus": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibrarySaveItemStatus"]
+      },
+      "LibrarySaveModule": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibrarySaveModule"]
+      },
+      "LibrarySaveModuleOptions": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibrarySaveModuleOptions"]
+      },
+      "LibrarySaveNotifyPort": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibrarySaveNotifyPort"]
+      },
+      "LibrarySaveOperationState": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibrarySaveOperationState"]
+      },
+      "LibrarySaveOperationStatus": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibrarySaveOperationStatus"]
+      },
+      "LibrarySaveSourceInput": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibrarySaveSourceInput"]
+      },
+      "LibrarySaveSubmitOptions": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibrarySaveSubmitOptions"]
+      },
+      "LibrarySaveSubmitResult": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibrarySaveSubmitResult"]
+      },
+      "LibrarySaveUploadPort": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibrarySaveUploadPort"]
+      },
+      "createLibrarySaveModule": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#createLibrarySaveModule"]
+      },
+      "resolveLibrarySaveFolderId": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#resolveLibrarySaveFolderId"]
       }
     },
     "src/features/library/session/resource.ts": {
@@ -13085,6 +13301,24 @@
       "useLibraryWorkspace": {
         "kind": "canonical-origin",
         "evidence": ["src/features/library/index.ts#useLibraryWorkspace"]
+      }
+    },
+    "src/features/library/ui/libraryDropHitTest.ts": {
+      "LIBRARY_DROP_FOLDER_ATTRIBUTE": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LIBRARY_DROP_FOLDER_ATTRIBUTE"]
+      },
+      "LIBRARY_DROP_PANEL_ATTRIBUTE": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LIBRARY_DROP_PANEL_ATTRIBUTE"]
+      },
+      "LibraryDropHit": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#LibraryDropHit"]
+      },
+      "queryLibraryDropHit": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/library/index.ts#queryLibraryDropHit"]
       }
     },
     "src/features/library/ui/confirmations.ts": {
@@ -15997,6 +16231,14 @@
       "sha256": "c8741a160a451a1079c96d83f1efe2f5ee69e05b37958abe51432280da3061dd",
       "exports": ["EventId"]
     },
+    "src/api/generated-query/public/model/externalLibraryAsset.ts": {
+      "sha256": "3385c34b34545fd64abfc8e15ce1194a6bbb0edbbda4da8111a0f18ac0e0f525",
+      "exports": ["ExternalLibraryAsset"]
+    },
+    "src/api/generated-query/public/model/externalLibraryAssetSource.ts": {
+      "sha256": "57950022b79a3fcfa8bcf70b47dd9ba97c6f827e436c688e8369960d08c0ad0f",
+      "exports": ["ExternalLibraryAssetSource"]
+    },
     "src/api/generated-query/public/model/forbiddenResponse.ts": {
       "sha256": "4e1b831ad3ca96250be824b97b54c13d1794aa521cde588135816695e31d308c",
       "exports": ["ForbiddenResponse"]
@@ -16030,7 +16272,7 @@
       "exports": ["IfMatchParameter"]
     },
     "src/api/generated-query/public/model/index.ts": {
-      "sha256": "96ee6d314765068376bd037aa07af267ef9ba693a221e38d6d8fa0eead389a17",
+      "sha256": "7f0b08e822e8d9570d3749afefa3d8f069ed0a47af5f0d4a2d6ca1dd7912fbad",
       "exports": []
     },
     "src/api/generated-query/public/model/joinBoardRequest.ts": {
@@ -16042,7 +16284,7 @@
       "exports": ["JoinBoardRequestData"]
     },
     "src/api/generated-query/public/model/libraryAsset.ts": {
-      "sha256": "97ffd03263b5156b7fbf94b6911e19998af2ad76cda429d703e1d05638ca81cd",
+      "sha256": "774a22db6f55a89dc10b3e823a992ae0c3ca375f1afdc137046f69f7e836c095",
       "exports": ["LibraryAsset"]
     },
     "src/api/generated-query/public/model/libraryAssetEnvelope.ts": {
@@ -16116,6 +16358,14 @@
     "src/api/generated-query/public/model/listWorkspaceTasksParams.ts": {
       "sha256": "9f98b3560780a06017e0f7a8978ca9021529a8e709e9fb1c55de7aabf247d09e",
       "exports": ["ListWorkspaceTasksParams"]
+    },
+    "src/api/generated-query/public/model/mediaLibraryAsset.ts": {
+      "sha256": "f2cac414b753b9c57dfe677d84ce709915336122d83311d5320176d6ddfd6358",
+      "exports": ["MediaLibraryAsset"]
+    },
+    "src/api/generated-query/public/model/mediaLibraryAssetSource.ts": {
+      "sha256": "306e81c7a656a70f9cdb5ca22b973b0cc2cbf4f1ad4b79fb352c885ed19cd48e",
+      "exports": ["MediaLibraryAssetSource"]
     },
     "src/api/generated-query/public/model/mediaAsset.ts": {
       "sha256": "f8743fb1099b7d28244a8f003094cb34f5ac0251ec060a23e58e4a404d38a806",
@@ -16330,12 +16580,24 @@
       "exports": ["ResolveLibraryAssetsResult"]
     },
     "src/api/generated-query/public/model/saveLibraryAssetRequest.ts": {
-      "sha256": "594aece3b3cb235a932f13054fdeb92da7e0bb76fafa7e70fa1cf837fe88e054",
+      "sha256": "8119d12bc4fc0261278d332289cb85db1b2777cadebf293cc2460c9ac067f9f9",
       "exports": ["SaveLibraryAssetRequest"]
     },
-    "src/api/generated-query/public/model/saveLibraryAssetRequestData.ts": {
-      "sha256": "642f4fae8de57f4da4ef54dd2f00c7b46268710711bbfefaac3f1f17eb2ec77f",
-      "exports": ["SaveLibraryAssetRequestData"]
+    "src/api/generated-query/public/model/saveExternalLibraryAssetData.ts": {
+      "sha256": "17ea9c73904380787e66794bea83b716460b23eb72b8d9f63b02ba0b755dc21d",
+      "exports": ["SaveExternalLibraryAssetData"]
+    },
+    "src/api/generated-query/public/model/saveExternalLibraryAssetDataSource.ts": {
+      "sha256": "07b82c2e53b1f259dd4fa4f2db3ed9fcb33ac5344283a1cdc6bec217ebbd4fdf",
+      "exports": ["SaveExternalLibraryAssetDataSource"]
+    },
+    "src/api/generated-query/public/model/saveMediaLibraryAssetData.ts": {
+      "sha256": "3e4a7d7384f903f50d6af723acda1c3315fa95238e8ccc54f78340b564a8ee98",
+      "exports": ["SaveMediaLibraryAssetData"]
+    },
+    "src/api/generated-query/public/model/saveMediaLibraryAssetDataSource.ts": {
+      "sha256": "68935138506e878235de3d1609c47c73f0a4081c78da9bb1487bb13f2158b07f",
+      "exports": ["SaveMediaLibraryAssetDataSource"]
     },
     "src/api/generated-query/public/model/searchWorkspaceParams.ts": {
       "sha256": "0e4ef43fab9dc74ea64cf293b17d3d7b6ccb1776e489804ab8f56df1fda4af2e",
@@ -16879,7 +17141,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-library/workspace-library.ts": {
-      "sha256": "84b04ff5730e06616e55aa79a902e05c0e87167b0d0e8edd4ecd92da99d4a4ec",
+      "sha256": "baaf36c87e7894d3a9377fbf6e7c98c300e0fa2cb1f424b50f3d445382be806b",
       "exports": [
         "CreateWorkspaceLibraryFolderMutationBody",
         "CreateWorkspaceLibraryFolderMutationError",

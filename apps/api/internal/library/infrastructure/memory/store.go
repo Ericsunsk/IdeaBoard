@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strings"
 	"sync"
@@ -11,6 +12,10 @@ import (
 	"ideaboard/api/internal/library/ports"
 )
 
+// errManagedOperatorRequired fails managed saves without a server-side
+// operator (a wiring bug, never a client input error).
+var errManagedOperatorRequired = errors.New("library: managed save operator required")
+
 // InMemoryWorkspaceLibraryStore is a mutex-guarded
 // WorkspaceLibraryStore for tests ONLY. It must never be wired in
 // production.
@@ -19,12 +24,40 @@ type InMemoryWorkspaceLibraryStore struct {
 	folders          map[string]map[string]*domain.V1Folder
 	assets           map[string]map[string]*domain.V1Asset
 	assetIndex       map[string]string
+	mediaIndex       map[string]string
 	materializations map[string]map[string]*domain.V1Materialization
+	// managedMedia is the test-only Media readability registry backing
+	// the media branch of SaveManagedMediaAsset: tests register the
+	// managed rows the store may link (workspace-scoped, archived rows
+	// stay unlinkable). Production validation lives in postgres.
+	managedMedia map[string]*managedMediaRecord
 	// materializationOrder keeps per-workspace job ids in creation
 	// order (postgres parity for ListMaterializations; map iteration
 	// alone cannot reproduce it when CreatedAt ties).
 	materializationOrder map[string][]string
 	now                  func() time.Time
+}
+
+// managedMediaRecord is one linkable managed row for tests.
+type managedMediaRecord struct {
+	archived bool
+	width    *int32
+	height   *int32
+}
+
+// RegisterManagedMediaForTests registers a linkable managed row:
+// dimensions pair like the read projection (both set or both nil),
+// archived rows fail saves like production.
+func (s *InMemoryWorkspaceLibraryStore) RegisterManagedMediaForTests(workspacePublicID, mediaPublicID string, width, height *int32, archived bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.managedMedia == nil {
+		s.managedMedia = make(map[string]*managedMediaRecord)
+	}
+	w, h := domain.PairDimensions(width, height)
+	s.managedMedia[workspacePublicID+"\x00"+mediaPublicID] = &managedMediaRecord{
+		archived: archived, width: w, height: h,
+	}
 }
 
 var _ ports.WorkspaceLibraryStore = (*InMemoryWorkspaceLibraryStore)(nil)
@@ -36,6 +69,8 @@ func NewInMemoryWorkspaceLibraryStoreForTests() *InMemoryWorkspaceLibraryStore {
 		folders:              make(map[string]map[string]*domain.V1Folder),
 		assets:               make(map[string]map[string]*domain.V1Asset),
 		assetIndex:           make(map[string]string),
+		mediaIndex:           make(map[string]string),
+		managedMedia:         make(map[string]*managedMediaRecord),
 		materializations:     make(map[string]map[string]*domain.V1Materialization),
 		materializationOrder: make(map[string][]string),
 		now:                  time.Now,
@@ -53,6 +88,12 @@ func v1LibraryAssetDedupKey(workspacePublicID, provider, sourceID string) string
 	return workspacePublicID + "\x00" + provider + "\x00" + sourceID
 }
 
+func v1LibraryManagedDedupKey(workspacePublicID, mediaPublicID string) string {
+	return workspacePublicID + "\x00\x00" + mediaPublicID
+}
+
+func int32Ptr(v int32) *int32 { return &v }
+
 func copyV1Folder(folder *domain.V1Folder) *domain.V1Folder {
 	if folder == nil {
 		return nil
@@ -66,6 +107,18 @@ func copyV1Asset(asset *domain.V1Asset) *domain.V1Asset {
 		return nil
 	}
 	out := *asset
+	if asset.Width != nil {
+		w := *asset.Width
+		out.Width = &w
+	}
+	if asset.Height != nil {
+		h := *asset.Height
+		out.Height = &h
+	}
+	if asset.Lineage != nil {
+		lineage := *asset.Lineage
+		out.Lineage = &lineage
+	}
 	return &out
 }
 
@@ -77,8 +130,8 @@ func copyV1Materialization(record *domain.V1Materialization) *domain.V1Materiali
 	return &out
 }
 
-// CreateFolder validates the display name (1..100 runes, same bound as
-// the legacy surface) and enforces per-workspace name uniqueness.
+// CreateFolder validates the display name (1..100 runes) and enforces
+// per-workspace name uniqueness.
 func (s *InMemoryWorkspaceLibraryStore) CreateFolder(ctx context.Context, workspacePublicID, name, publicID string) (*domain.V1Folder, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -203,12 +256,14 @@ func (s *InMemoryWorkspaceLibraryStore) SaveAsset(ctx context.Context, workspace
 		}
 	}
 	now := s.clock()
+	width, height := int32Ptr(normalized.Width), int32Ptr(normalized.Height)
 	asset := &domain.V1Asset{
 		WorkspacePublicID: workspacePublicID, PublicID: publicID, FolderPublicID: folderID,
+		Source:   domain.AssetSourceExternal,
 		Provider: normalized.Provider, SourceID: normalized.SourceID,
 		SourceURL: normalized.SourceURL, PreviewURL: normalized.PreviewURL, OriginalURL: normalized.OriginalURL,
 		Title: normalized.Title, Author: normalized.Author,
-		Width: normalized.Width, Height: normalized.Height,
+		Width: width, Height: height,
 		CreatedAt: now, UpdatedAt: now,
 	}
 	if s.assets[workspacePublicID] == nil {
@@ -216,6 +271,62 @@ func (s *InMemoryWorkspaceLibraryStore) SaveAsset(ctx context.Context, workspace
 	}
 	s.assets[workspacePublicID][publicID] = asset
 	s.assetIndex[v1LibraryAssetDedupKey(workspacePublicID, normalized.Provider, normalized.SourceID)] = publicID
+	return copyV1Asset(asset), true, nil
+}
+
+// SaveManagedMediaAsset is the test-only sibling of the single
+// managed-save use case: manual and task-auto entries converge here.
+// The media row must be registered for the workspace and readable
+// (missing, cross-workspace, or archived media fails closed with no row
+// written). Dedup identity is (workspace, media asset); repeats return
+// the existing row with created=false without touching its folder,
+// lineage, or metadata.
+func (s *InMemoryWorkspaceLibraryStore) SaveManagedMediaAsset(ctx context.Context, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
+	normalized, err := domain.NormalizeAndValidateManagedAsset(input)
+	if err != nil {
+		return nil, false, err
+	}
+	if input.OperatorUserID <= 0 {
+		return nil, false, errManagedOperatorRequired
+	}
+	folderID := strings.TrimSpace(input.FolderPublicID)
+	if folderID != "" && !domain.IsV1FolderID(folderID) {
+		return nil, false, domain.ErrV1FolderNotFound
+	}
+	if strings.TrimSpace(workspacePublicID) == "" || !domain.IsV1AssetID(publicID) {
+		return nil, false, domain.ErrV1AssetNotFound
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	media := s.managedMedia[workspacePublicID+"\x00"+normalized.MediaAssetID]
+	if media == nil || media.archived {
+		return nil, false, domain.ErrV1AssetNotFound
+	}
+	if folderID != "" && s.folders[workspacePublicID][folderID] == nil {
+		return nil, false, domain.ErrV1FolderNotFound
+	}
+	if existingID, ok := s.mediaIndex[v1LibraryManagedDedupKey(workspacePublicID, normalized.MediaAssetID)]; ok {
+		if existing := s.assets[workspacePublicID][existingID]; existing != nil {
+			return copyV1Asset(existing), false, nil
+		}
+	}
+	now := s.clock()
+	asset := &domain.V1Asset{
+		WorkspacePublicID: workspacePublicID, PublicID: publicID, FolderPublicID: folderID,
+		Source: domain.AssetSourceMedia, MediaAssetID: normalized.MediaAssetID,
+		Title: normalized.Title, Author: normalized.Author,
+		Width: media.width, Height: media.height,
+		Lineage:   normalized.Lineage,
+		CreatedAt: now, UpdatedAt: now,
+	}
+	if s.assets[workspacePublicID] == nil {
+		s.assets[workspacePublicID] = make(map[string]*domain.V1Asset)
+	}
+	s.assets[workspacePublicID][publicID] = asset
+	s.mediaIndex[v1LibraryManagedDedupKey(workspacePublicID, normalized.MediaAssetID)] = publicID
 	return copyV1Asset(asset), true, nil
 }
 
@@ -293,6 +404,9 @@ func (s *InMemoryWorkspaceLibraryStore) DeleteAsset(ctx context.Context, workspa
 	}
 	delete(s.assets[workspacePublicID], assetPublicID)
 	delete(s.assetIndex, v1LibraryAssetDedupKey(workspacePublicID, asset.Provider, asset.SourceID))
+	if asset.Source == domain.AssetSourceMedia && asset.MediaAssetID != "" {
+		delete(s.mediaIndex, v1LibraryManagedDedupKey(workspacePublicID, asset.MediaAssetID))
+	}
 	return nil
 }
 

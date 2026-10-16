@@ -39,12 +39,6 @@ func normalizeAssetFields(input *AssetInput) {
 	input.OriginalURL = strings.TrimSpace(input.OriginalURL)
 	input.Title = strings.TrimSpace(input.Title)
 	input.Author = strings.TrimSpace(input.Author)
-	if input.OriginalURL == "" && input.PreviewURL != "" {
-		input.OriginalURL = input.PreviewURL
-	}
-	if input.SourceURL == "" && input.PreviewURL != "" {
-		input.SourceURL = input.PreviewURL
-	}
 }
 
 func validateAssetMetadata(input AssetInput) error {

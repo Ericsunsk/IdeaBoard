@@ -35,9 +35,7 @@ type WorkspaceMediaStore = workspacemedia.WorkspaceMediaStore
 // WorkspaceMediaObjects stores and reads workspace original bytes.
 type WorkspaceMediaObjects = workspacemedia.MediaObjects
 
-// maxCompleteDimension bounds client-declared frame dimensions at
-// complete time (no byte inspection in this slice; 0 maps to NULL and
-// reads back as 0).
+// maxCompleteDimension bounds client-declared frame dimensions at complete time.
 const maxCompleteDimension = int32(32768)
 
 // v1MediaBinaryMaxBytes bounds each original image response.
@@ -670,7 +668,7 @@ func (h *contractV1Handler) completeUploadOnce(ctx context.Context, workspacePub
 	if !session.IsLive() {
 		return nil, workspacemedia.ErrStateConflict
 	}
-	if gateErr := h.verifyStagedUploadBytes(ctx, session); gateErr != nil {
+	if gateErr := h.verifyStagedUploadBytes(ctx, session, &facts); gateErr != nil {
 		return nil, gateErr
 	}
 	completed, asset, err := h.deps.Media.CompleteSession(ctx, workspacePublicID, uploadID, facts, workspacemedia.CreateAssetParams{
@@ -698,7 +696,7 @@ func (h *contractV1Handler) completeUploadOnce(ctx context.Context, workspacePub
 // backend failures report 503 without writing anything. Without a byte
 // backend the gate is skipped (degraded metadata mode); production
 // wiring always sets MediaObjects.
-func (h *contractV1Handler) verifyStagedUploadBytes(ctx context.Context, session *workspacemedia.Session) error {
+func (h *contractV1Handler) verifyStagedUploadBytes(ctx context.Context, session *workspacemedia.Session, facts *workspacemedia.CompleteFacts) error {
 	if h == nil || h.deps.MediaObjects == nil || session == nil {
 		return nil
 	}
@@ -724,6 +722,13 @@ func (h *contractV1Handler) verifyStagedUploadBytes(ctx context.Context, session
 		_, _ = h.deps.Media.FailSession(ctx, session.WorkspaceID, session.ID, "staged checksum mismatch")
 		return &workspacemedia.ValidationError{Fields: map[string]string{"checksum_sha256": "invalid"}}
 	}
+	imageFacts, err := imageformat.InspectDetectedBytes(object.Data)
+	if err != nil {
+		_, _ = h.deps.Media.FailSession(ctx, session.WorkspaceID, session.ID, "invalid staged image")
+		return &workspacemedia.ValidationError{Fields: map[string]string{"bytes": "invalid"}}
+	}
+	facts.Width = int32(imageFacts.Width)
+	facts.Height = int32(imageFacts.Height)
 	return nil
 }
 

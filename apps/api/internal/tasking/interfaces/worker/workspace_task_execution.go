@@ -11,7 +11,7 @@ package worker
 // AFTER the provider returned is NOT retryable (defect 2): that send is
 // already billed, so it converges terminally on a detached context and
 // never returns the error whose River redelivery would re-enter the
-// provider. The post-commit auto-materialize trigger (#828) is best-effort:
+// provider. The post-commit Library save is best-effort:
 // the task is complete regardless of its outcome.
 //
 // The gateway bridge below consumes the canonical execution plan and calls
@@ -106,10 +106,10 @@ func (w *WorkspaceTaskWorker) completeExecution(
 			"task_id", taskID, "model", model, "retry_layer", send.layer, "err", err)
 		return w.convergeUnsettledSend(claimed, workspaceFailureMessage(fmt.Errorf("settlement failed after provider send: %w", err)))
 	}
-	// #828: auto-materialize AFTER the atomic Complete commit. The
+	// Save managed references after the atomic Complete commit. The
 	// task is complete regardless of the outcome; trigger failures
 	// are logged and never retried through River.
-	w.materializeCompletedTask(ctx, completed)
+	w.saveCompletedTask(ctx, completed)
 	slog.Info("workspace task completed", "task_id", taskID, "outputs", len(outputs),
 		"model", model, "retry_layer", send.layer)
 	return nil
@@ -179,15 +179,15 @@ func (w *WorkspaceTaskWorker) convergeUnsettledSend(task *workspacetasks.Workspa
 	return nil
 }
 
-// materializeCompletedTask runs the #828 post-commit trigger. The task is
+// saveCompletedTask saves managed references after commit. The Task is
 // already complete: failures are warn-logged and swallowed so a completed
 // task never requeues through River.
-func (w *WorkspaceTaskWorker) materializeCompletedTask(ctx context.Context, completed *workspacetasks.WorkspaceTask) {
-	if w.materializer == nil || completed == nil {
+func (w *WorkspaceTaskWorker) saveCompletedTask(ctx context.Context, completed *workspacetasks.WorkspaceTask) {
+	if w.librarySaver == nil || completed == nil {
 		return
 	}
-	if err := w.materializer.MaterializeCompletedTask(ctx, completed); err != nil {
-		slog.Warn("workspace task auto-materialize failed; task stays complete",
+	if err := w.librarySaver.SaveCompletedTask(ctx, completed); err != nil {
+		slog.Warn("workspace task auto-save failed; task stays complete",
 			"task_id", completed.ID, "err", err)
 	}
 }

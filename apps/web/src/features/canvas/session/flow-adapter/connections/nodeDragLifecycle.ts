@@ -20,6 +20,13 @@ export type CanvasNodeDragLifecycle = {
     stageFinalization?: (store: CanvasGraphStore, transaction: CanvasGraphTransaction) => void,
   ) => void
   cancel: () => void
+  /**
+   * Third terminal outcome (save-to-library): ends the drag without
+   * committing any position change — no history entry, no dirty state —
+   * and reports the dragged cohort so the caller can save it elsewhere.
+   * Position rendering stays the caller's job (it owns the revert).
+   */
+  finishAsLibrarySave: () => readonly string[] | null
   isActive: () => boolean
 }
 
@@ -123,6 +130,14 @@ export function createCanvasNodeDragLifecycle(
     }
   }
 
+  function finishAsLibrarySave() {
+    const drag = activeDrag
+    if (!drag) return null
+    const nodeIds = [...drag.nodeIds]
+    cancel()
+    return nodeIds
+  }
+
   function begin(nodeIds: readonly string[]) {
     if (activeDrag) cancel()
     const targetNodeIds = new Set(nodeIds)
@@ -215,6 +230,7 @@ export function createCanvasNodeDragLifecycle(
     handleChanges,
     commit,
     cancel,
+    finishAsLibrarySave,
     isActive,
   }
 }

@@ -54,38 +54,35 @@ describe('Search save feedback', () => {
     toast = mockAppToast()
   })
 
-  it.each([
-    ['folder-a', 'Folder A'],
-    ['folder-unknown', undefined],
-  ])(
-    'reports the actual deduplicated folder %s after creating another folder',
-    async (folderId, name) => {
-      mocks.saveReference.mockResolvedValue({
-        asset: { folderId },
-        createdFolder: { id: 'folder-b', name: 'Folder B' },
-      })
-      const { user } = renderWithUser(Host, {
-        global: {
-          stubs: {
-            Popover: { props: ['open'], template: '<div v-if="open"><slot /></div>' },
-            PopoverContent: { template: '<div><slot /></div>' },
-            PopoverAnchor: true,
-          },
+  it('passes the precomputed folder copy for a new-folder save', async () => {
+    mocks.saveReference.mockResolvedValue({
+      asset: { folderId: 'folder-b' },
+      createdFolder: { id: 'folder-b', name: 'Folder B' },
+    })
+    const { user } = renderWithUser(Host, {
+      global: {
+        stubs: {
+          Popover: { props: ['open'], template: '<div v-if="open"><slot /></div>' },
+          PopoverContent: { template: '<div><slot /></div>' },
+          PopoverAnchor: true,
         },
-      })
-      await user.click(screen.getByRole('button', { name: 'Open save menu' }))
-      const input = screen.getByRole('textbox')
-      await user.type(input, 'Folder B')
-      await waitFor(() => expect(screen.getByRole('button', { name: /Folder B/ })).toBeEnabled())
-      await user.click(screen.getByRole('button', { name: /Folder B/ }))
-      await waitFor(() =>
-        expect(toast.success).toHaveBeenCalledWith(
-          name
-            ? i18n.global.t('search.savePopover.savedToast', { name })
-            : i18n.global.t('search.savePopover.savedToLibraryToast'),
-        ),
-      )
-      expect(mocks.saveReference).toHaveBeenCalledWith(result, undefined, 'Folder B')
-    },
-  )
+      },
+    })
+    await user.click(screen.getByRole('button', { name: 'Open save menu' }))
+    const input = screen.getByRole('textbox')
+    await user.type(input, 'Folder B')
+    await waitFor(() => expect(screen.getByRole('button', { name: /Folder B/ })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: /Folder B/ }))
+    // The popover passes the precomputed target copy to the shared save
+    // module (which owns the single notification) and only closes itself.
+    await waitFor(() =>
+      expect(mocks.saveReference).toHaveBeenCalledWith(
+        result,
+        undefined,
+        'Folder B',
+        i18n.global.t('search.savePopover.savedToast', { name: 'Folder B' }),
+      ),
+    )
+    expect(toast.success).not.toHaveBeenCalled()
+  })
 })

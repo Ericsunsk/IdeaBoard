@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { fireEvent } from '@testing-library/vue'
 import { render, screen, within } from '../../../test/render'
 import LibraryAssetGallery from './LibraryAssetGallery.vue'
-import { libraryAssetKey } from '../core/validators'
+import { libraryAssetKeyFor } from '../core/validators'
 import type { LibraryAssetView } from '../core/transfer'
 
 function galleryAsset(index: number): LibraryAssetView {
   return {
+    source: 'external',
     id: `lasset_asset${String(index).padStart(4, '0')}`,
     workspaceId: 'ws_test0001',
     folderId: 'lfolder_folder0001',
@@ -44,10 +45,11 @@ describe('LibraryAssetGallery', () => {
     expect(image).toHaveAttribute('src', '/api/media/previews/fixture/thumb')
     expect(image).toHaveAttribute('loading', 'lazy')
     expect(image).not.toHaveAttribute('srcset')
+    // Display renditions are the only image source: without them the card
+    // shows the unavailable state, never an external URL fallback.
     await view.rerender(baseProps([{ ...asset, display: undefined }]))
     expect(screen.queryByRole('img')).toBeNull()
     expect(screen.getByText('Image unavailable')).toBeInTheDocument()
-    expect(asset.originalUrl).toBe('https://images.unsplash.com/photo-0')
   })
 
   it('starts pointer dragging only from the preview and prevents native dragging', async () => {
@@ -90,7 +92,11 @@ describe('LibraryAssetGallery', () => {
     // library/masonry-child-identity: Reference 2 carries image-error state;
     // Reference 3 changes lanes and must retain DOM-local state and focus.
     const assets = [0, 1, 2, 3, 4].map(galleryAsset)
-    const selectedKey = libraryAssetKey('unsplash', 'photo-3')
+    const selectedKey = libraryAssetKeyFor({
+      source: 'external',
+      provider: 'unsplash',
+      sourceId: 'photo-3',
+    })
     const { rerender } = render(LibraryAssetGallery, {
       props: { ...baseProps(assets), referenceKeys: [selectedKey] },
     })

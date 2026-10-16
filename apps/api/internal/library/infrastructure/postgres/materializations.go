@@ -57,7 +57,7 @@ func (s *Service) CreateMaterialization(ctx context.Context, workspacePublicID, 
 	minted := strings.TrimSpace(publicID)
 	for attempt := 0; attempt < mintAttempts; attempt++ {
 		row, err := q.CreateLibraryMaterialization(ctx, dbsqlc.CreateLibraryMaterializationParams{
-			PublicID: minted, WorkspaceID: workspaceInternalID, LibraryAssetID: asset.InternalID,
+			PublicID: minted, WorkspaceID: workspaceInternalID, LibraryAssetID: asset.LibraryAsset.InternalID,
 		})
 		if isMaterializationPublicIDConflict(err) {
 			minted, err = domain.NewV1MaterializationPublicID()
@@ -69,7 +69,7 @@ func (s *Service) CreateMaterialization(ctx context.Context, workspacePublicID, 
 		if err != nil {
 			return nil, fmt.Errorf("create library materialization: %w", err)
 		}
-		return materializationFromDetail(trimmedWorkspace, row.PublicID, asset.PublicID,
+		return materializationFromDetail(trimmedWorkspace, row.PublicID, asset.LibraryAsset.PublicID,
 			row.Status, pgtype.Text{}, row.ErrorMessage, row.CreatedAt, row.CompletedAt)
 	}
 	return nil, errors.New("library: materialization public id mint collision, retry the request")
@@ -114,12 +114,12 @@ func (s *Service) ClaimMaterialization(ctx context.Context, workspacePublicID, a
 	created := false
 	err = db.withTx(func(txq *dbsqlc.Queries) error {
 		if err := txq.LockLibraryMaterializationAsset(ctx, dbsqlc.LockLibraryMaterializationAssetParams{
-			WorkspaceID: workspaceInternalID, LibraryAssetID: asset.InternalID,
+			WorkspaceID: workspaceInternalID, LibraryAssetID: asset.LibraryAsset.InternalID,
 		}); err != nil {
 			return err
 		}
 		existing, err := txq.GetActiveLibraryMaterializationByAsset(ctx, dbsqlc.GetActiveLibraryMaterializationByAssetParams{
-			WorkspaceID: workspaceInternalID, LibraryAssetID: asset.InternalID,
+			WorkspaceID: workspaceInternalID, LibraryAssetID: asset.LibraryAsset.InternalID,
 		})
 		if err == nil {
 			result, err = materializationFromDetail(strings.TrimSpace(workspacePublicID), existing.PublicID, existing.AssetPublicID,
@@ -130,12 +130,12 @@ func (s *Service) ClaimMaterialization(ctx context.Context, workspacePublicID, a
 			return err
 		}
 		row, err := txq.CreateLibraryMaterialization(ctx, dbsqlc.CreateLibraryMaterializationParams{
-			PublicID: strings.TrimSpace(publicID), WorkspaceID: workspaceInternalID, LibraryAssetID: asset.InternalID,
+			PublicID: strings.TrimSpace(publicID), WorkspaceID: workspaceInternalID, LibraryAssetID: asset.LibraryAsset.InternalID,
 		})
 		if err != nil {
 			return fmt.Errorf("create library materialization: %w", err)
 		}
-		result, err = materializationFromDetail(strings.TrimSpace(workspacePublicID), row.PublicID, asset.PublicID,
+		result, err = materializationFromDetail(strings.TrimSpace(workspacePublicID), row.PublicID, asset.LibraryAsset.PublicID,
 			row.Status, pgtype.Text{}, row.ErrorMessage, row.CreatedAt, row.CompletedAt)
 		created = err == nil
 		return err

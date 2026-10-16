@@ -9,9 +9,9 @@ package httpapi
 // through the Canvas pending-fact loop) relies on this read-through:
 //
 //   - lasset_ id on GET media-assets/:asset_id resolves the owned
-//     library asset plus the newest completed job link. A hit serves
-//     the linked managed asset (200) with its asset_-based
-//     content/derivative URLs.
+//     library asset's direct Media link or newest completed external
+//     materialization. A hit serves the linked managed asset (200)
+//     with its asset_-based content/derivative URLs.
 //   - A miss fires ONE best-effort async fetch and answers 404
 //     media_not_found now; the Canvas retry loop re-reads until the
 //     fetch lands (200).
@@ -32,10 +32,8 @@ package httpapi
 // Failure posture: trigger errors NEVER fail the read (404 either
 // way) and fold into a failed job record inside the application
 // service with its fixed message. Terminal job records are
-// immutable, so concurrent settlers converge. Task-output library
-// rows (provider workspace_media) carry no exposed media link, so
-// they 404 without a trigger; their media already exists as managed
-// assets and the task worker links them directly.
+// immutable, so concurrent settlers converge. Managed references
+// resolve their existing Media identity without creating a job.
 
 import (
 	"ideaboard/api/internal/media/workspacemedia"
@@ -45,8 +43,8 @@ import (
 )
 
 // getLibraryMaterializedMediaAsset serves GET media-assets/:asset_id
-// for lasset_ ids (the Canvas import read path). A completed link
-// renders the managed asset DTO (200); anything else requests one
+// for lasset_ ids (the Canvas import read path). A managed link
+// renders the managed asset DTO (200); an external miss requests one
 // best-effort fetch and renders 404 media_not_found so the Canvas
 // pending-fact retry loop owns the retry. Unknown assets and
 // unwired stores 404 without requesting.

@@ -65,8 +65,11 @@ function folder(id: string, name: string): WorkspaceLibraryFolder {
   }
 }
 
-function asset(overrides: Partial<WorkspaceLibraryAsset> = {}): WorkspaceLibraryAsset {
+function asset(
+  overrides: Partial<Extract<WorkspaceLibraryAsset, { source: 'external' }>> = {},
+): WorkspaceLibraryAsset {
   return {
+    source: 'external',
     id: 'lasset_asset0009',
     workspaceId: WORKSPACE_ID,
     folderId: 'lfolder_folder0003',
@@ -268,6 +271,7 @@ describe('useLibraryWorkspace', () => {
     expect(outcomes).toEqual([
       {
         kind: 'asset-removed',
+        source: 'external',
         provider: 'pexels',
         sourceID: 'deleted-image',
         assetKey: 'pexels:deleted-image',

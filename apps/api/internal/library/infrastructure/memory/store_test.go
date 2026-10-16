@@ -138,3 +138,73 @@ func TestInMemoryClaimMaterializationConvergesConcurrentCalls(t *testing.T) {
 		t.Fatalf("failed-job retry = %+v, created=%v, err=%v", job, created, err)
 	}
 }
+
+func TestInMemorySaveManagedMediaConverges(t *testing.T) {
+	ctx := context.Background()
+	store := NewInMemoryWorkspaceLibraryStoreForTests()
+	w, h := int32(640), int32(480)
+	store.RegisterManagedMediaForTests("ws_mem", "asset_mem000000000000000001", &w, &h, false)
+	store.RegisterManagedMediaForTests("ws_mem", "asset_mem000000000000000002", nil, nil, false)
+	store.RegisterManagedMediaForTests("ws_mem", "asset_mem000000000000000003", nil, nil, true)
+
+	auto, created, err := store.SaveManagedMediaAsset(ctx, "ws_mem", domain.V1SaveManagedAssetInput{
+		MediaAssetID: "asset_mem000000000000000001", Title: "auto",
+		Lineage:        &domain.TaskLineage{TaskID: "task_aaaaaaaaaaaaaaaaaaaaaaaa", ResultIndex: 1},
+		OperatorUserID: 7,
+	}, mustV1AssetID(t))
+	if err != nil || !created {
+		t.Fatalf("auto = %v %v, want created", auto, err)
+	}
+	if auto.Source != domain.AssetSourceMedia || auto.Width == nil || *auto.Width != 640 {
+		t.Fatalf("auto = %+v, want media with projected dims", auto)
+	}
+	unknown, created, err := store.SaveManagedMediaAsset(ctx, "ws_mem", domain.V1SaveManagedAssetInput{
+		MediaAssetID: "asset_mem000000000000000002", OperatorUserID: 7,
+	}, mustV1AssetID(t))
+	if err != nil || !created || unknown.Width != nil || unknown.Height != nil {
+		t.Fatalf("unknown = %+v %v, want created with null dims", unknown, err)
+	}
+
+	// Manual repeat converges without touching folder/lineage/metadata.
+	manual, created, err := store.SaveManagedMediaAsset(ctx, "ws_mem", domain.V1SaveManagedAssetInput{
+		MediaAssetID: "asset_mem000000000000000001", Title: "override", OperatorUserID: 9,
+	}, mustV1AssetID(t))
+	if err != nil || created || manual.PublicID != auto.PublicID || manual.Title != "auto" || manual.Lineage == nil {
+		t.Fatalf("manual = %+v %v, want existing row kept", manual, err)
+	}
+
+	// Forbidden media fail closed.
+	for _, tt := range []struct {
+		name  string
+		ws    string
+		media string
+	}{
+		{"cross-workspace", "ws_other", "asset_mem000000000000000001"},
+		{"archived", "ws_mem", "asset_mem000000000000000003"},
+		{"missing", "ws_mem", "asset_missing00000000000001"},
+		{"no operator", "ws_mem", "asset_mem000000000000000002"},
+	} {
+		op := int64(7)
+		if tt.name == "no operator" {
+			op = 0
+		}
+		if _, _, err := store.SaveManagedMediaAsset(ctx, tt.ws, domain.V1SaveManagedAssetInput{
+			MediaAssetID: tt.media, OperatorUserID: op,
+		}, mustV1AssetID(t)); err == nil {
+			t.Fatalf("%s saved, want failure", tt.name)
+		}
+	}
+	all, err := store.ListAssets(ctx, "ws_mem")
+	if err != nil || len(all) != 2 {
+		t.Fatalf("assets = %d %v, want 2", len(all), err)
+	}
+}
+
+func mustV1AssetID(t *testing.T) string {
+	t.Helper()
+	id, err := domain.NewV1AssetPublicID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}

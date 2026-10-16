@@ -13,8 +13,19 @@ import { useCanvasGroupPresentationInteraction } from '../../nodes/groups'
 import type { CanvasWorkspaceRuntime } from '../../../session/workspace'
 import { useCanvasNodeContextMenu } from '../useCanvasNodeContextMenu'
 import type { useFlowActiveNodePanels } from '../useFlowActiveNodePanels'
+import { useCanvasNodeLibrarySaveRouter } from './useCanvasNodeLibrarySaveRouter'
+import type { LibraryDropHit, LibrarySaveModule } from '../../../../library'
 
 type ActivePanels = ReturnType<typeof useFlowActiveNodePanels>
+
+export type CanvasScreenLibrarySaveBridge = {
+  saveModule: LibrarySaveModule
+  isIslandOpen: () => boolean
+  setIslandHover: (hit: LibraryDropHit | null) => void
+  getSelectedFolderKey: () => string
+  isFolderKnown: (key: string) => boolean
+  notifyError: (message: string) => void
+}
 
 type CanvasScreenSurfaceInteractionOptions = {
   workspace: CanvasWorkspaceRuntime
@@ -24,6 +35,7 @@ type CanvasScreenSurfaceInteractionOptions = {
   isCanvasMinimapEnabled: Ref<boolean>
   isDuplicateModifierPressed: Ref<boolean>
   activePanels: ActivePanels
+  librarySave?: CanvasScreenLibrarySaveBridge | undefined
 }
 
 function useScreenTransientUi(
@@ -105,20 +117,36 @@ function useScreenNodeDragInteractions(
 ) {
   const { commands, viewModel } = options.workspace
   const tools = viewModel.imageWorkflow.tools
+  const isNodeDragLocked = () => tools.locks.isCanvasLocked.value || tools.retouch.isApplying.value
+  const librarySaveRouter = options.librarySave
+    ? useCanvasNodeLibrarySaveRouter({
+        nodes: viewModel.flowPane.nodes,
+        isNodeDragActive: commands.flowPane.nodeDragTransactions.isActive,
+        isNodeDragLocked,
+        isIslandAvailable: options.librarySave.isIslandOpen,
+        setIslandHover: options.librarySave.setIslandHover,
+        getSelectedFolderKey: options.librarySave.getSelectedFolderKey,
+        isFolderKnown: options.librarySave.isFolderKnown,
+        saveModule: options.librarySave.saveModule,
+        notifyError: options.librarySave.notifyError,
+      })
+    : null
   const dragInteractions = useFlowNodeDragInteractions({
     beginNodeDragTransaction: commands.flowPane.nodeDragTransactions.begin,
     commitNodeDragTransaction: commands.flowPane.nodeDragTransactions.commit,
+    finishNodeDragAsLibrarySave: commands.flowPane.nodeDragTransactions.finishAsLibrarySave,
     isDuplicateModifierPressed: options.isDuplicateModifierPressed,
     beginFlowNodeDragDuplicateTracking: commands.graphEditing.beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking: commands.graphEditing.finishFlowNodeDragDuplicateTracking,
     dismissTransientCanvasUi,
-    isNodeDragLocked: () => tools.locks.isCanvasLocked.value || tools.retouch.isApplying.value,
+    isNodeDragLocked,
   })
 
   function onNodeDragStart(payload: NodeDragEvent) {
     commands.viewportControls.onNodeDragStart()
     try {
       dragInteractions.onNodeDragStart(payload.nodes.map((node) => node.id))
+      librarySaveRouter?.start(payload.nodes.map((node) => node.id))
     } catch (error) {
       commands.viewportControls.onNodeDragStop()
       throw error
@@ -126,8 +154,17 @@ function useScreenNodeDragInteractions(
   }
 
   function onNodeDragStop() {
+    const saveDecision = librarySaveRouter?.evaluateStop()
     try {
-      dragInteractions.onNodeDragStop()
+      if (saveDecision?.kind === 'save') {
+        dragInteractions.onNodeDragStopAsLibrarySave(() => {
+          // Fire-and-forget: the position transaction already ended with no
+          // commit, and the save module owns retries plus notifications.
+          void librarySaveRouter?.finishSave(saveDecision)
+        })
+      } else {
+        dragInteractions.onNodeDragStop()
+      }
     } finally {
       commands.viewportControls.onNodeDragStop()
     }

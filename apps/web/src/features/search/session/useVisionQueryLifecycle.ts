@@ -13,7 +13,7 @@ import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
 import { i18n } from '../../../core/i18n'
 import { createUniqueId } from '../../../core/utils/ids'
 import { workspaceUploadApi } from '../../../api/upload'
-import type { LibraryAssetView } from '../../library'
+import { libraryAssetKeyFor, type LibraryAssetView } from '../../library'
 import type { SearchAuthAction } from '../core/authAction'
 import {
   clearCachedVisionReferences,
@@ -296,7 +296,7 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
   }
 
   function addLibraryAsset(asset: LibraryAssetView) {
-    const key = searchReferenceKey(asset.provider, asset.sourceId)
+    const key = libraryAssetKeyFor(asset)
     if (collection.has(key)) return
     if (!canAddReference.value) {
       toast.warning(i18n.global.t('search.errors.maxReferenceImages'))

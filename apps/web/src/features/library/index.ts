@@ -15,19 +15,25 @@ export {
   assertLibraryAssetId,
   assertLibraryFolderId,
   assertWorkspaceId,
-  libraryAssetKey,
+  libraryAssetKeyFor,
   mapWorkspaceLibraryProvider,
   mapWorkspaceLibraryResolveStatus,
   requireWorkspaceId,
   toWorkspaceLibraryAsset,
   toWorkspaceLibraryAssetInput,
+  toWorkspaceLibraryMediaAssetInput,
   toWorkspaceLibraryFolder,
   toWorkspaceLibraryResolveResult,
+  type LibraryAssetIdentity,
   type LibrarySearchReference,
   type WorkspaceLibraryAsset,
   type WorkspaceLibraryAssetInput,
   type WorkspaceLibraryAssetProvider,
+  type WorkspaceLibraryExternalAsset,
+  type WorkspaceLibraryExternalAssetInput,
   type WorkspaceLibraryFolder,
+  type WorkspaceLibraryMediaAsset,
+  type WorkspaceLibraryMediaAssetInput,
   type WorkspaceLibraryPage,
   type WorkspaceLibraryResolveResult,
   type WorkspaceLibraryResolveStatus,
@@ -38,17 +44,17 @@ export {
   lookupWorkspaceSavedAssetKeys,
   materializeLibraryAssetForCanvas,
   removeWorkspaceSearchReference,
-  saveWorkspaceSearchReference,
   type LibraryAssetMaterializer,
   type LibraryMaterializeOptions,
   type LibraryMaterializedMedia,
   type WorkspaceLibraryRemoveResult,
   type WorkspaceLibrarySavedKey,
-  type WorkspaceLibrarySaveResult,
 } from './session/libraryUseCases'
 export * from './core/transfer'
 export * from './session/folderFacts'
+export * from './session/librarySaveModule'
 export * from './ui/confirmations'
+export * from './ui/libraryDropHitTest'
 export * from './session/useLibraryWorkspace'
 export type { LibraryDragPayload, LibraryDropTargets } from './core/drag'
 

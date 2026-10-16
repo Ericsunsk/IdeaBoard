@@ -98,6 +98,9 @@ type CanvasWorkspaceRuntimeCommands = {
     nodeDragTransactions: {
       begin: (nodeIds: readonly string[]) => void
       commit: () => void
+      /** Save-to-library outcome: ends the drag with no position commit. */
+      finishAsLibrarySave: () => readonly string[] | null
+      isActive: () => boolean
     }
   }
   persistence: {

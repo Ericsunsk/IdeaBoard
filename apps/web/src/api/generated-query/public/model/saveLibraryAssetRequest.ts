@@ -10,8 +10,10 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { SaveLibraryAssetRequestData } from './saveLibraryAssetRequestData'
+import type { SaveExternalLibraryAssetData } from './saveExternalLibraryAssetData'
+import type { SaveMediaLibraryAssetData } from './saveMediaLibraryAssetData'
 
 export interface SaveLibraryAssetRequest {
-  data: SaveLibraryAssetRequestData
+  /** Save payload discriminated by source. */
+  data: SaveExternalLibraryAssetData | SaveMediaLibraryAssetData
 }

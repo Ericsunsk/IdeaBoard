@@ -542,7 +542,7 @@ export const getListWorkspaceLibraryAssetsUrl = (
 }
 
 /**
- * Assets return in creation order. The optional folder_id query filters to one folder; unknown folder shapes converge to 404 library_folder_not_found.
+ * Assets return in creation order. Each item carries a source discriminator: external rows carry provider/source identity plus real URLs, media rows carry a media_asset_id with no provider/URL keys. Media dimensions are projected from the managed Media row (null = unknown). The optional folder_id query filters to one folder; unknown folder shapes converge to 404 library_folder_not_found.
  * @summary List workspace library assets with cursor pagination (members only)
  */
 export const listWorkspaceLibraryAssets = async (
@@ -636,8 +636,8 @@ export const getSaveWorkspaceLibraryAssetUrl = (workspaceId: string) => {
 }
 
 /**
- * Assets are saved external references ONLY (provider URL + source metadata, never bytes) behind the provider-allowlist https URL gate. Save is idempotent on (workspace, provider, source_id): re-saving returns the existing asset with 200 instead of 201. Requires the Idempotency-Key header (scope library:asset-save).
- * @summary Save a provider reference as a workspace library asset (members only)
+ * Saves are discriminated by source. External saves carry a provider reference (provider URL + source metadata, never bytes) behind the provider-allowlist https URL gate and are idempotent on (workspace, provider, source_id). Media saves carry a managed Media Asset identity (same-workspace, readable) and are idempotent on (workspace, media_asset_id). Re-saving returns the existing asset with 200 instead of 201 without touching its folder or metadata. Requires the Idempotency-Key header (scope library:asset-save).
+ * @summary Save a workspace library asset (members only)
  */
 export const saveWorkspaceLibraryAsset = async (
   workspaceId: string,
@@ -730,7 +730,7 @@ export type SaveWorkspaceLibraryAssetMutationVariables = {
 }
 
 /**
- * @summary Save a provider reference as a workspace library asset (members only)
+ * @summary Save a workspace library asset (members only)
  */
 export const useSaveWorkspaceLibraryAsset = <
   TError =

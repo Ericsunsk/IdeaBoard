@@ -253,22 +253,21 @@ async function persist(folderId?: string, newFolderName?: string) {
   if (!request || saving.value) return
   saving.value = true
   try {
-    const saved = await library.saveReference(request.result, folderId, newFolderName)
-    hide()
+    // The shared save module owns the success/error notification (single
+    // toast per operation); the popover only closes on success. The target
+    // copy is computed up front: a new folder name is known before creation.
+    const trimmedName = newFolderName?.trim()
     const targetName =
-      (saved.createdFolder && saved.createdFolder.id === saved.asset.folderId
-        ? saved.createdFolder.name
-        : undefined) ||
-      (saved.asset.folderId
-        ? folders.value.find((folder) => folder.id === saved.asset.folderId)?.name
-        : t('search.savePopover.quickSaves'))
-    toast.success(
-      targetName
-        ? t('search.savePopover.savedToast', { name: targetName })
-        : t('search.savePopover.savedToLibraryToast'),
+      trimmedName ||
+      (folderId ? folders.value.find((folder) => folder.id === folderId)?.name : undefined) ||
+      t('search.savePopover.quickSaves')
+    await library.saveReference(
+      request.result,
+      folderId,
+      newFolderName,
+      t('search.savePopover.savedToast', { name: targetName }),
     )
-  } catch (error) {
-    toast.error(userFacingErrorCopy(error, t('library.errors.saveAssetFailed')))
+    hide()
   } finally {
     saving.value = false
   }

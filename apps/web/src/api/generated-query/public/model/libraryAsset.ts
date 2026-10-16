@@ -10,35 +10,10 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { LibraryAssetId } from './libraryAssetId'
-import type { LibraryAssetProvider } from './libraryAssetProvider'
-import type { LibraryFolderId } from './libraryFolderId'
-import type { MediaDisplay } from './mediaDisplay'
-import type { WorkspaceId } from './workspaceId'
+import type { ExternalLibraryAsset } from './externalLibraryAsset'
+import type { MediaLibraryAsset } from './mediaLibraryAsset'
 
-export interface LibraryAsset {
-  id: LibraryAssetId
-  workspace_id: WorkspaceId
-  /** Omitted when unfiled. */
-  folder_id?: LibraryFolderId
-  provider: LibraryAssetProvider
-  /**
-   * @minLength 1
-   * @maxLength 128
-   */
-  source_id: string
-  source_url: string
-  preview_url: string
-  original_url: string
-  /** @maxLength 255 */
-  title?: string
-  /** @maxLength 255 */
-  author?: string
-  /** @minimum 0 */
-  width: number
-  /** @minimum 0 */
-  height: number
-  created_at: string
-  updated_at: string
-  display?: MediaDisplay
-}
+/**
+ * Saved library reference discriminated by source. External rows carry provider/source identity plus real URLs; media rows carry a media_asset_id with no provider/URL keys.
+ */
+export type LibraryAsset = ExternalLibraryAsset | MediaLibraryAsset

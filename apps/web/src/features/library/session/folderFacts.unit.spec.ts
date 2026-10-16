@@ -104,7 +104,9 @@ describe('Library Folder facts', () => {
     const facts = createLibraryFolderFacts(fetchFolders)
     const publisher = createLibraryMutationPublisher(facts)
     const outcomes: unknown[] = []
-    publisher.subscribe((outcome) => outcomes.push(outcome))
+    publisher.subscribe((batch) => {
+      outcomes.push(...batch)
+    })
 
     const publication = publisher.publishMutations([
       { kind: 'folder-renamed', affectedFolderKeys: ['lfolder_folder0007'], galleryEffect: 'none' },
@@ -127,7 +129,9 @@ describe('Library Folder facts', () => {
     const facts = createLibraryFolderFacts(fetchFolders)
     const publisher = createLibraryMutationPublisher(facts)
     const outcomes: unknown[] = []
-    publisher.subscribe((outcome) => outcomes.push(outcome))
+    publisher.subscribe((batch) => {
+      outcomes.push(...batch)
+    })
 
     await publisher.publishMutation({
       kind: 'folder-renamed',
@@ -145,11 +149,17 @@ describe('Library mutation-fact builders', () => {
   it('derives saved/removed folders from the stored asset with the caller policy intact', () => {
     expect(
       buildLibraryAssetSavedOutcome(
-        { provider: 'unsplash', sourceId: 'u1', folderId: 'lfolder_folder0001' },
+        {
+          source: 'external',
+          provider: 'unsplash',
+          sourceId: 'u1',
+          folderId: 'lfolder_folder0001',
+        },
         'reload-current',
       ),
     ).toEqual({
       kind: 'asset-saved',
+      source: 'external',
       provider: 'unsplash',
       sourceID: 'u1',
       assetKey: 'unsplash:u1',
@@ -158,21 +168,35 @@ describe('Library mutation-fact builders', () => {
     })
     expect(
       buildLibraryAssetRemovedOutcome(
-        { provider: 'pexels', sourceId: 'p1', folderId: undefined },
+        { source: 'external', provider: 'pexels', sourceId: 'p1', folderId: undefined },
         'reload-current',
       ),
     ).toEqual({
       kind: 'asset-removed',
+      source: 'external',
       provider: 'pexels',
       sourceID: 'p1',
       assetKey: 'pexels:p1',
       affectedFolderKeys: ['all'],
       galleryEffect: 'reload-current',
     })
+    expect(
+      buildLibraryAssetSavedOutcome(
+        { source: 'media', mediaAssetId: 'asset_media0001', folderId: 'lfolder_folder0001' },
+        'reload-current',
+      ),
+    ).toEqual({
+      kind: 'asset-saved',
+      source: 'media',
+      mediaAssetId: 'asset_media0001',
+      assetKey: 'media:asset_media0001',
+      affectedFolderKeys: ['all', 'lfolder_folder0001'],
+      galleryEffect: 'reload-current',
+    })
     // `selection-will-reload` stays a distinct caller-driven policy.
     expect(
       buildLibraryAssetSavedOutcome(
-        { provider: 'unsplash', sourceId: 'u1', folderId: undefined },
+        { source: 'external', provider: 'unsplash', sourceId: 'u1', folderId: undefined },
         'selection-will-reload',
       ).galleryEffect,
     ).toBe('selection-will-reload')
@@ -183,7 +207,12 @@ describe('Library mutation-fact builders', () => {
       buildLibraryAssetMovedOutcome(
         {
           previousFolderId: 'lfolder_folder0003',
-          asset: { provider: 'unsplash', sourceId: 'u1', folderId: 'lfolder_folder0007' },
+          asset: {
+            source: 'external',
+            provider: 'unsplash',
+            sourceId: 'u1',
+            folderId: 'lfolder_folder0007',
+          },
         },
         'none',
       ),
@@ -196,7 +225,12 @@ describe('Library mutation-fact builders', () => {
       buildLibraryAssetMovedOutcome(
         {
           previousFolderId: 'lfolder_folder0007',
-          asset: { provider: 'unsplash', sourceId: 'u1', folderId: 'lfolder_folder0007' },
+          asset: {
+            source: 'external',
+            provider: 'unsplash',
+            sourceId: 'u1',
+            folderId: 'lfolder_folder0007',
+          },
         },
         'none',
       ).affectedFolderKeys,

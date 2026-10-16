@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "696a80a364937d91cfbe6979745ed0523f63ec67",
+  "checkpointSha": "e9d1d60da75bfb2eda84c9717d81df5d649a153d",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -2600,7 +2600,7 @@
         }
       ],
       "fanIn": 19,
-      "fanOut": 246,
+      "fanOut": 253,
       "fanOutTargets": [
         "src/api/generated-query/public/model/addBoardMemberRequest.ts",
         "src/api/generated-query/public/model/addBoardMemberRequestData.ts",
@@ -2678,6 +2678,8 @@
         "src/api/generated-query/public/model/errorEnvelopeError.ts",
         "src/api/generated-query/public/model/errorEnvelopeErrorDetails.ts",
         "src/api/generated-query/public/model/eventId.ts",
+        "src/api/generated-query/public/model/externalLibraryAsset.ts",
+        "src/api/generated-query/public/model/externalLibraryAssetSource.ts",
         "src/api/generated-query/public/model/forbiddenResponse.ts",
         "src/api/generated-query/public/model/getPublicBrandingLogoParams.ts",
         "src/api/generated-query/public/model/getPublicUserAvatarParams.ts",
@@ -2719,6 +2721,8 @@
         "src/api/generated-query/public/model/mediaDisplayVariant.ts",
         "src/api/generated-query/public/model/mediaDisplayVariantMaxSide.ts",
         "src/api/generated-query/public/model/mediaDisplayVariantTier.ts",
+        "src/api/generated-query/public/model/mediaLibraryAsset.ts",
+        "src/api/generated-query/public/model/mediaLibraryAssetSource.ts",
         "src/api/generated-query/public/model/membershipRole.ts",
         "src/api/generated-query/public/model/moveLibraryAssetRequest.ts",
         "src/api/generated-query/public/model/moveLibraryAssetRequestData.ts",
@@ -2760,8 +2764,11 @@
         "src/api/generated-query/public/model/resolveLibraryAssetsRequest.ts",
         "src/api/generated-query/public/model/resolveLibraryAssetsRequestData.ts",
         "src/api/generated-query/public/model/resolveLibraryAssetsResult.ts",
+        "src/api/generated-query/public/model/saveExternalLibraryAssetData.ts",
+        "src/api/generated-query/public/model/saveExternalLibraryAssetDataSource.ts",
         "src/api/generated-query/public/model/saveLibraryAssetRequest.ts",
-        "src/api/generated-query/public/model/saveLibraryAssetRequestData.ts",
+        "src/api/generated-query/public/model/saveMediaLibraryAssetData.ts",
+        "src/api/generated-query/public/model/saveMediaLibraryAssetDataSource.ts",
         "src/api/generated-query/public/model/searchWorkspaceParams.ts",
         "src/api/generated-query/public/model/searchWorkspaceProviderItem.ts",
         "src/api/generated-query/public/model/service.ts",
@@ -3232,6 +3239,16 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/externalLibraryAsset.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/externalLibraryAssetSource.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/forbiddenResponse.ts",
           "kind": "runtime"
         },
@@ -3433,6 +3450,16 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/mediaDisplayVariantTier.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/mediaLibraryAsset.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/mediaLibraryAssetSource.ts",
           "kind": "runtime"
         },
         {
@@ -3642,12 +3669,27 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/saveExternalLibraryAssetData.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/saveExternalLibraryAssetDataSource.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/saveLibraryAssetRequest.ts",
           "kind": "runtime"
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/saveLibraryAssetRequestData.ts",
+          "to": "src/api/generated-query/public/model/saveMediaLibraryAssetData.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/saveMediaLibraryAssetDataSource.ts",
           "kind": "runtime"
         },
         {
@@ -4086,7 +4128,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 19,
-      "targetFanOut": 246,
+      "targetFanOut": 253,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -4842,12 +4884,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.unit.spec.ts",
+          "to": "src/api/mediaWorkspaceScope.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/api/mediaWorkspaceScope.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 6,
+      "fanIn": 7,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -4855,7 +4902,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -5078,12 +5125,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/library/session/librarySaveModule.ts",
+          "to": "src/api/upload.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/api/upload.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 10,
+      "fanIn": 11,
       "fanOut": 9,
       "fanOutTargets": [
         "src/api/contractKernel.ts",
@@ -5123,7 +5175,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 10,
+      "targetFanIn": 11,
       "targetFanOut": 9,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -8634,7 +8686,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/session/useLibraryIslandDnD.ts",
+          "from": "src/features/canvas/ui/screens/CanvasScreen.vue",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryIsland.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -8645,6 +8702,11 @@
         },
         {
           "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/libraryCoordinator.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -8674,7 +8736,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 17,
+      "fanIn": 19,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/vue-sonner/lib/index.js"],
       "outboundEdges": [
@@ -8688,7 +8750,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 17,
+      "targetFanIn": 19,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -10062,7 +10124,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/session/useLibraryIslandDnD.ts",
+          "from": "src/features/library/session/librarySaveModule.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -10082,11 +10144,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/session/useSearchSession.ts",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
@@ -10102,7 +10159,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 31,
+      "fanIn": 30,
       "fanOut": 1,
       "fanOutTargets": ["src/core/i18n/index.ts"],
       "outboundEdges": [
@@ -10116,7 +10173,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 31,
+      "targetFanIn": 30,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -10656,6 +10713,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/library-save/canvasImageSaveAdapter.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/media/serviceImageActionText.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -10756,6 +10818,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/screens/useCanvasNodeContextMenu.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -10781,6 +10848,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/library/session/librarySaveModule.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -10797,6 +10869,11 @@
         },
         {
           "from": "src/features/library/ui/confirmations.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/useLibraryNativeFileDrop.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -10857,7 +10934,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 123,
+      "fanIn": 127,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
@@ -10927,7 +11004,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 123,
+      "targetFanIn": 127,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -11818,9 +11895,29 @@
           "from": "src/features/canvas/session/graph-editing/inputs/useFlowImageUploadActions.ts",
           "to": "src/core/media/imageAssetPipeline.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/library-save/canvasImageSaveAdapter.ts",
+          "to": "src/core/media/imageAssetPipeline.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/library-save/canvasImageSaveAdapter.unit.spec.ts",
+          "to": "src/core/media/imageAssetPipeline.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/useLibraryNativeFileDrop.ts",
+          "to": "src/core/media/imageAssetPipeline.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/useLibraryNativeFileDrop.unit.spec.ts",
+          "to": "src/core/media/imageAssetPipeline.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 4,
+      "fanIn": 8,
       "fanOut": 6,
       "fanOutTargets": [
         "node_modules/compressorjs/dist/compressor.common.js",
@@ -11866,7 +11963,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 4,
+      "targetFanIn": 8,
       "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -11906,12 +12003,22 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.ts",
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/screens/useCanvasImageLightbox.ts",
           "to": "src/core/media/imageDimensions.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 6,
+      "fanIn": 8,
       "fanOut": 1,
       "fanOutTargets": ["src/core/media/mediaReadScheduler.ts"],
       "outboundEdges": [
@@ -11925,7 +12032,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 6,
+      "targetFanIn": 8,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13260,6 +13367,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/library/session/librarySaveModule.ts",
+          "to": "src/core/utils/ids.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/session/resource.ts",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
@@ -13270,7 +13382,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 11,
+      "fanIn": 12,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -13278,7 +13390,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 11,
+      "targetFanIn": 12,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13326,9 +13438,14 @@
           "from": "src/features/canvas/session/graph-editing/inputs/useFlowImageUploadActions.unit.spec.ts",
           "to": "src/core/utils/imageUploadSupport.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/useLibraryNativeFileDrop.ts",
+          "to": "src/core/utils/imageUploadSupport.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 7,
+      "fanIn": 8,
       "fanOut": 2,
       "fanOutTargets": ["src/core/constants/media.ts", "src/core/i18n/index.ts"],
       "outboundEdges": [
@@ -13347,7 +13464,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 7,
+      "targetFanIn": 8,
       "targetFanOut": 2,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -24071,6 +24188,11 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.ts",
+          "to": "src/features/board/ports/canvas.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/ui/screens/internal/useCanvasScreenLifecycle.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
@@ -24091,7 +24213,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 90,
+      "fanIn": 91,
       "fanOut": 59,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
@@ -25025,7 +25147,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 90,
+      "targetFanIn": 91,
       "targetFanOut": 59,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -29108,6 +29230,11 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/screens/internal/useCanvasScreenImageToolUi.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "runtime"
@@ -29123,7 +29250,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 61,
+      "fanIn": 62,
       "fanOut": 32,
       "fanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
@@ -30125,7 +30252,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 61,
+      "targetFanIn": 62,
       "targetFanOut": 32,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -30245,7 +30372,7 @@
         }
       ],
       "fanIn": 12,
-      "fanOut": 37,
+      "fanOut": 38,
       "fanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/vitest/dist/index.js",
@@ -30256,6 +30383,7 @@
         "src/core/i18n/index.ts",
         "src/core/i18n/userLocale.ts",
         "src/core/media/imageAssetPipeline.ts",
+        "src/core/media/imageDimensions.ts",
         "src/core/media/mediaRef.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/imageUploadSupport.ts",
@@ -30558,6 +30686,11 @@
         },
         {
           "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.ts",
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.ts",
           "to": "src/core/utils/polling.ts",
           "kind": "runtime"
         },
@@ -30614,6 +30747,11 @@
         {
           "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/graph-editing/inputs/useCanvasLibraryImportRuntime.unit.spec.ts",
+          "to": "src/core/media/imageDimensions.ts",
           "kind": "runtime"
         },
         {
@@ -31307,7 +31445,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 12,
-      "targetFanOut": 37,
+      "targetFanOut": 38,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -36907,7 +37045,7 @@
         }
       ],
       "fanIn": 1,
-      "fanOut": 46,
+      "fanOut": 49,
       "fanOutTargets": [
         "node_modules/@testing-library/jest-dom/vitest.js",
         "node_modules/@vue-flow/core/dist/style.css",
@@ -36921,8 +37059,10 @@
         "photoswipe/lightbox",
         "photoswipe/style.css",
         "src/api/mediaAssetDelivery.ts",
+        "src/api/mediaWorkspaceScope.ts",
         "src/api/upload.ts",
         "src/app/style.css",
+        "src/core/composables/useAppToast.ts",
         "src/core/config/runtimeUrls.ts",
         "src/core/i18n/index.ts",
         "src/core/interaction/pointerDrag.ts",
@@ -36940,6 +37080,7 @@
         "src/features/canvas/session/flow-adapter/index.ts",
         "src/features/canvas/session/graph-editing/index.ts",
         "src/features/canvas/session/image-workflow/index.ts",
+        "src/features/canvas/session/library-save/canvasImageSaveAdapter.ts",
         "src/features/canvas/session/workspace/index.ts",
         "src/features/canvas/tools/image-tools/index.ts",
         "src/features/canvas/tools/outpaint/session/useImageOutpaintOverlay.ts",
@@ -37025,6 +37166,11 @@
         {
           "from": "src/features/canvas/ui/screens/CanvasScreen.vue",
           "to": "src/api/upload.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/CanvasScreen.vue",
+          "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
@@ -37324,6 +37470,11 @@
         },
         {
           "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryIsland.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryIsland.ts",
           "to": "src/features/library/index.ts",
           "kind": "runtime"
         },
@@ -37341,6 +37492,71 @@
           "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryIsland.unit.spec.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.ts",
+          "to": "src/features/board/ports/canvas.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.ts",
+          "to": "src/features/canvas/session/flow-adapter/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.ts",
+          "to": "src/features/canvas/session/library-save/canvasImageSaveAdapter.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.ts",
+          "to": "src/features/canvas/session/library-save/canvasImageSaveAdapter.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.unit.spec.ts",
+          "to": "node_modules/@vue-flow/core/dist/vue-flow-core.js",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.unit.spec.ts",
+          "to": "src/api/mediaWorkspaceScope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.unit.spec.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/screens/internal/useCanvasScreenImageToolUi.ts",
@@ -37421,6 +37637,11 @@
           "from": "src/features/canvas/ui/screens/internal/useCanvasScreenSurfaceInteractions.ts",
           "to": "src/features/canvas/ui/overlays/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasScreenSurfaceInteractions.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/screens/useCanvasImageLightbox.ts",
@@ -37583,7 +37804,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 1,
-      "targetFanOut": 46,
+      "targetFanOut": 49,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -38060,6 +38281,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/library-save/canvasImageSaveAdapter.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceGraphRuntime.ts",
           "to": "src/features/library/index.ts",
           "kind": "type-only"
@@ -38098,6 +38324,21 @@
           "from": "src/features/canvas/ui/screens/internal/useCanvasLibraryIsland.ts",
           "to": "src/features/library/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasNodeLibrarySaveRouter.unit.spec.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasScreenSurfaceInteractions.ts",
+          "to": "src/features/library/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/search/core/authAction.ts",
@@ -38145,14 +38386,9 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/search/session/useSearchSession.ts",
-          "to": "src/features/library/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/features/library/index.ts",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/search/session/useVisionQueryLifecycle.unit.spec.ts",
@@ -38165,9 +38401,10 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 24,
-      "fanOut": 44,
+      "fanIn": 27,
+      "fanOut": 49,
       "fanOutTargets": [
+        "../../contracts/library/library-source.fixtures.json",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vueuse/core/dist/index.js",
@@ -38177,8 +38414,10 @@
         "node_modules/vue/index.js",
         "src/api/client.ts",
         "src/api/contractKernel.ts",
+        "src/api/generated-query/public/model/saveLibraryAssetRequest.ts",
         "src/api/generated-query/public/workspace-library/workspace-library.ts",
         "src/api/mediaAssetDelivery.ts",
+        "src/api/upload.ts",
         "src/app/style.css",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/index.ts",
@@ -38195,11 +38434,13 @@
         "src/core/interaction/menuKeyboardNavigation.ts",
         "src/core/interaction/pointerDrag.ts",
         "src/core/interaction/pointerDropTargets.ts",
+        "src/core/media/imageAssetPipeline.ts",
         "src/core/media/mediaDisplay.ts",
         "src/core/media/useMediaDisplayUrl.ts",
         "src/core/router/queryParams.ts",
         "src/core/utils/guards.ts",
         "src/core/utils/ids.ts",
+        "src/core/utils/imageUploadSupport.ts",
         "src/core/utils/opaqueIds.ts",
         "src/core/utils/request.ts",
         "src/core/utils/workspaceId.ts",
@@ -38280,6 +38521,51 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/library/session/librarySaveModule.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/librarySaveModule.contract.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/librarySaveModule.contract.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/librarySaveModule.contract.spec.ts",
+          "to": "src/test/msw.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/librarySaveModule.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/librarySaveModule.ts",
+          "to": "src/api/upload.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/librarySaveModule.ts",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/librarySaveModule.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/librarySaveModule.ts",
+          "to": "src/core/utils/ids.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/session/libraryUseCases.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
@@ -38321,6 +38607,11 @@
         },
         {
           "from": "src/features/library/session/resource.ts",
+          "to": "src/api/generated-query/public/model/saveLibraryAssetRequest.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/library/session/resource.ts",
           "to": "src/api/generated-query/public/workspace-library/workspace-library.ts",
           "kind": "runtime"
         },
@@ -38345,28 +38636,8 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/library/session/useLibraryIslandDnD.ts",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/session/useLibraryIslandDnD.ts",
-          "to": "src/core/composables/useAppToast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/session/useLibraryIslandDnD.ts",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/library/session/useLibraryIslandDnD.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/session/useLibraryIslandDnD.unit.spec.ts",
-          "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
         },
         {
@@ -38422,6 +38693,11 @@
         {
           "from": "src/features/library/session/useLibraryWorkspace.unit.spec.ts",
           "to": "src/test/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/session/workspace.contract.spec.ts",
+          "to": "../../contracts/library/library-source.fixtures.json",
           "kind": "runtime"
         },
         {
@@ -38713,14 +38989,49 @@
           "from": "src/features/library/ui/useLibraryDropTargets.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/useLibraryNativeFileDrop.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/useLibraryNativeFileDrop.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/useLibraryNativeFileDrop.ts",
+          "to": "src/core/media/imageAssetPipeline.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/useLibraryNativeFileDrop.ts",
+          "to": "src/core/utils/imageUploadSupport.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/useLibraryNativeFileDrop.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/useLibraryNativeFileDrop.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/useLibraryNativeFileDrop.unit.spec.ts",
+          "to": "src/core/media/imageAssetPipeline.ts",
+          "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 24,
-      "targetFanOut": 44,
+      "targetFanIn": 27,
+      "targetFanOut": 49,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -38944,6 +39255,11 @@
         },
         {
           "from": "src/features/search/session/adapters/libraryCoordinator.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/adapters/libraryCoordinator.ts",
           "to": "src/core/contracts/externalImageProviders.ts",
           "kind": "type-only"
         },
@@ -38959,12 +39275,12 @@
         },
         {
           "from": "src/features/search/session/adapters/libraryCoordinator.unit.spec.ts",
-          "to": "src/features/library/index.ts",
+          "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
           "from": "src/features/search/session/adapters/libraryCoordinator.unit.spec.ts",
-          "to": "src/test/mediaDisplay.ts",
+          "to": "src/features/library/index.ts",
           "kind": "runtime"
         },
         {
@@ -39239,11 +39555,6 @@
         },
         {
           "from": "src/features/search/session/useSearchSession.ts",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -39255,11 +39566,6 @@
         {
           "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/core/router/queryParams.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/session/useSearchSession.ts",
-          "to": "src/features/library/index.ts",
           "kind": "runtime"
         },
         {
@@ -39330,7 +39636,7 @@
         {
           "from": "src/features/search/session/useVisionQueryLifecycle.ts",
           "to": "src/features/library/index.ts",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/search/session/useVisionQueryLifecycle.ts",

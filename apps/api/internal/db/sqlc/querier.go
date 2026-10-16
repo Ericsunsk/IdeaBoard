@@ -151,6 +151,10 @@ type Querier interface {
 	CreateLibraryAsset(ctx context.Context, arg CreateLibraryAssetParams) (LibraryAsset, error)
 	CreateLibraryFolder(ctx context.Context, arg CreateLibraryFolderParams) (LibraryFolder, error)
 	CreateLibraryMaterialization(ctx context.Context, arg CreateLibraryMaterializationParams) (LibraryMaterialization, error)
+	// CreateMediaAsset inserts the durable asset row. Width/height ride
+	// NULL when unknown (0 maps to NULL; the image CHECK passes on NULL
+	// and read-back maps NULL to 0).
+	CreateMediaAsset(ctx context.Context, arg CreateMediaAssetParams) (MediaAsset, error)
 	// Workspace-scoped library queries (#818, Phase 4-01 of #809).
 	//
 	// All lookups are keyed by workspace first: every folder/asset row is
@@ -173,14 +177,19 @@ type Querier interface {
 	// Assets always live in a folder (folder_id NOT NULL): the workspace
 	// Quick Saves system folder is the unfiled bucket. Save/move callers
 	// pass an empty folder to mean Quick Saves and the store ensures it.
-	// Title/author have no durable columns (the workspace tables keep
-	// provider URL + source metadata only); they are validated by the seam
-	// and intentionally not persisted here.
-	CreateManagedLibraryAsset(ctx context.Context, arg CreateManagedLibraryAssetParams) (LibraryAsset, error)
-	// CreateMediaAsset inserts the durable asset row. Width/height ride
-	// NULL when unknown (0 maps to NULL; the image CHECK passes on NULL
-	// and read-back maps NULL to 0).
-	CreateMediaAsset(ctx context.Context, arg CreateMediaAssetParams) (MediaAsset, error)
+	// Title/author are durable display metadata; task_id/task_result_index
+	// are task provenance (paired, never a dedup key); saved_by_user_id is
+	// the server-side operator identity (never serialized on the wire).
+	// Source is derived (media_asset_id IS NOT NULL -> 'media', else
+	// 'external'); there is no source column. Media display dimensions are
+	// projected at read time from the joined media_assets row (Media owns
+	// the fact; library width/height stay NULL on media rows), paired by
+	// the seam (either both set or both NULL).
+	// Dedup identity: external rows (workspace_id, provider, source_id)
+	// WHERE media_asset_id IS NULL; media rows (workspace_id, media_asset_id)
+	// WHERE NOT NULL. Asset reads LEFT JOIN media_assets for the managed
+	// link identity + dimension projection in one round trip.
+	CreateMediaLibraryAsset(ctx context.Context, arg CreateMediaLibraryAssetParams) (LibraryAsset, error)
 	// Organization tenancy queries (#801). Public references use public_id;
 	// internal_id stays database-internal.
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
@@ -272,10 +281,10 @@ type Querier interface {
 	GetControlTaskByPublicID(ctx context.Context, publicID string) (GetControlTaskByPublicIDRow, error)
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
 	GetLibraryAssetByPublicID(ctx context.Context, arg GetLibraryAssetByPublicIDParams) (GetLibraryAssetByPublicIDRow, error)
+	GetLibraryAssetByWorkspaceMedia(ctx context.Context, arg GetLibraryAssetByWorkspaceMediaParams) (GetLibraryAssetByWorkspaceMediaRow, error)
 	GetLibraryAssetByWorkspaceSource(ctx context.Context, arg GetLibraryAssetByWorkspaceSourceParams) (GetLibraryAssetByWorkspaceSourceRow, error)
 	GetLibraryFolderByPublicID(ctx context.Context, arg GetLibraryFolderByPublicIDParams) (LibraryFolder, error)
 	GetLibraryFolderByWorkspaceAndNameCI(ctx context.Context, arg GetLibraryFolderByWorkspaceAndNameCIParams) (LibraryFolder, error)
-	GetLibraryManagedMediaPublicID(ctx context.Context, arg GetLibraryManagedMediaPublicIDParams) (string, error)
 	GetLibraryMaterializationByPublicID(ctx context.Context, arg GetLibraryMaterializationByPublicIDParams) (GetLibraryMaterializationByPublicIDRow, error)
 	// GetMediaAssetByPublicID returns the asset row including archived
 	// ones (archived assets stay metadata-readable; bytes go 410).
@@ -361,7 +370,6 @@ type Querier interface {
 	ListEligibleServicePoolModels(ctx context.Context, arg ListEligibleServicePoolModelsParams) ([]string, error)
 	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
 	ListLibraryAssets(ctx context.Context, arg ListLibraryAssetsParams) ([]ListLibraryAssetsRow, error)
-	ListLibraryAssetsByFolder(ctx context.Context, arg ListLibraryAssetsByFolderParams) ([]ListLibraryAssetsByFolderRow, error)
 	ListLibraryAssetsByWorkspaceProvider(ctx context.Context, arg ListLibraryAssetsByWorkspaceProviderParams) ([]ListLibraryAssetsByWorkspaceProviderRow, error)
 	ListLibraryFolders(ctx context.Context, arg ListLibraryFoldersParams) ([]LibraryFolder, error)
 	ListLibraryMaterializations(ctx context.Context, arg ListLibraryMaterializationsParams) ([]ListLibraryMaterializationsRow, error)
@@ -501,7 +509,7 @@ type Querier interface {
 	// after create). Zero rows means already moved or invisible; the
 	// caller distinguishes via GetUploadSessionByPublicID.
 	MarkUploadSessionTransferring(ctx context.Context, arg MarkUploadSessionTransferringParams) (UploadSession, error)
-	MoveLibraryAsset(ctx context.Context, arg MoveLibraryAssetParams) (LibraryAsset, error)
+	MoveLibraryAsset(ctx context.Context, arg MoveLibraryAssetParams) (MoveLibraryAssetRow, error)
 	MoveLibraryAssetsToFolder(ctx context.Context, arg MoveLibraryAssetsToFolderParams) (int64, error)
 	PurgeExpiredControlIdempotency(ctx context.Context) (int64, error)
 	RecordPaymentOrderPaid(ctx context.Context, arg RecordPaymentOrderPaidParams) (PaymentOrder, error)

@@ -2915,7 +2915,11 @@ paths:
       operationId: listWorkspaceLibraryAssets
       summary: List workspace library assets with cursor pagination (members only)
       description: >-
-        Assets return in creation order. The optional folder_id query
+        Assets return in creation order. Each item carries a source
+        discriminator: external rows carry provider/source identity plus
+        real URLs, media rows carry a media_asset_id with no
+        provider/URL keys. Media dimensions are projected from the
+        managed Media row (null = unknown). The optional folder_id query
         filters to one folder; unknown folder shapes converge to 404
         library_folder_not_found.
       parameters:
@@ -2947,13 +2951,17 @@ paths:
     post:
       tags: [WorkspaceLibrary]
       operationId: saveWorkspaceLibraryAsset
-      summary: Save a provider reference as a workspace library asset (members only)
+      summary: Save a workspace library asset (members only)
       description: >-
-        Assets are saved external references ONLY (provider URL + source
-        metadata, never bytes) behind the provider-allowlist https URL
-        gate. Save is idempotent on (workspace, provider, source_id):
-        re-saving returns the existing asset with 200 instead of 201.
-        Requires the Idempotency-Key header (scope library:asset-save).
+        Saves are discriminated by source. External saves carry a
+        provider reference (provider URL + source metadata, never bytes)
+        behind the provider-allowlist https URL gate and are idempotent
+        on (workspace, provider, source_id). Media saves carry a managed
+        Media Asset identity (same-workspace, readable) and are
+        idempotent on (workspace, media_asset_id). Re-saving returns the
+        existing asset with 200 instead of 201 without touching its
+        folder or metadata. Requires the Idempotency-Key header (scope
+        library:asset-save).
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -5471,8 +5479,16 @@ components:
           type: string
           description: Same-origin image byte URL; never an original or processing input reference.
     LibraryAsset:
+      oneOf:
+        - $ref: '#/components/schemas/ExternalLibraryAsset'
+        - $ref: '#/components/schemas/MediaLibraryAsset'
+      description: >-
+        Saved library reference discriminated by source. External rows
+        carry provider/source identity plus real URLs; media rows carry
+        a media_asset_id with no provider/URL keys.
+    ExternalLibraryAsset:
       type: object
-      required: [id, workspace_id, provider, source_id, source_url, preview_url, original_url, width, height, created_at, updated_at]
+      required: [id, workspace_id, source, provider, source_id, source_url, preview_url, original_url, width, height, created_at, updated_at]
       additionalProperties: false
       properties:
         id:
@@ -5482,6 +5498,9 @@ components:
         folder_id:
           $ref: '#/components/schemas/LibraryFolderId'
           description: Omitted when unfiled.
+        source:
+          type: string
+          enum: [external]
         provider:
           $ref: '#/components/schemas/LibraryAssetProvider'
         source_id:
@@ -5519,6 +5538,58 @@ components:
           format: date-time
         display:
           $ref: '#/components/schemas/MediaDisplay'
+    MediaLibraryAsset:
+      type: object
+      required: [id, workspace_id, source, media_asset_id, width, height, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/LibraryAssetId'
+        workspace_id:
+          $ref: '#/components/schemas/WorkspaceId'
+        folder_id:
+          $ref: '#/components/schemas/LibraryFolderId'
+          description: Omitted when unfiled.
+        source:
+          type: string
+          enum: [media]
+        media_asset_id:
+          type: string
+          description: Managed Media Asset identity (asset_...).
+        title:
+          type: string
+          maxLength: 255
+        author:
+          type: string
+          maxLength: 255
+        width:
+          type: integer
+          format: int32
+          minimum: 1
+          nullable: true
+          description: Projected from the managed Media row; null = unknown. Always paired with height.
+        height:
+          type: integer
+          format: int32
+          minimum: 1
+          nullable: true
+          description: Projected from the managed Media row; null = unknown. Always paired with width.
+        task_id:
+          type: string
+          description: Task provenance (which task output produced this save). Absent on manual saves. Never a dedup key.
+        task_result_index:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Task provenance, paired with task_id.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        display:
+          $ref: '#/components/schemas/MediaDisplay'
     LibraryAssetEnvelope:
       type: object
       required: [data]
@@ -5543,41 +5614,68 @@ components:
       additionalProperties: false
       properties:
         data:
-          type: object
-          required: [provider, source_id]
-          additionalProperties: false
-          properties:
-            provider:
-              $ref: '#/components/schemas/LibraryAssetProvider'
-            source_id:
-              type: string
-              minLength: 1
-              maxLength: 128
-            source_url:
-              type: string
-              format: uri
-            preview_url:
-              type: string
-              format: uri
-            original_url:
-              type: string
-              format: uri
-            title:
-              type: string
-              maxLength: 255
-            author:
-              type: string
-              maxLength: 255
-            width:
-              type: integer
-              format: int32
-              minimum: 0
-            height:
-              type: integer
-              format: int32
-              minimum: 0
-            folder_id:
-              $ref: '#/components/schemas/LibraryFolderId'
+          oneOf:
+            - $ref: '#/components/schemas/SaveExternalLibraryAssetData'
+            - $ref: '#/components/schemas/SaveMediaLibraryAssetData'
+          description: Save payload discriminated by source.
+    SaveExternalLibraryAssetData:
+      type: object
+      required: [source, provider, source_id]
+      additionalProperties: false
+      properties:
+        source:
+          type: string
+          enum: [external]
+        provider:
+          $ref: '#/components/schemas/LibraryAssetProvider'
+        source_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        source_url:
+          type: string
+          format: uri
+        preview_url:
+          type: string
+          format: uri
+        original_url:
+          type: string
+          format: uri
+        title:
+          type: string
+          maxLength: 255
+        author:
+          type: string
+          maxLength: 255
+        width:
+          type: integer
+          format: int32
+          minimum: 0
+        height:
+          type: integer
+          format: int32
+          minimum: 0
+        folder_id:
+          $ref: '#/components/schemas/LibraryFolderId'
+    SaveMediaLibraryAssetData:
+      type: object
+      required: [source, media_asset_id]
+      additionalProperties: false
+      properties:
+        source:
+          type: string
+          enum: [media]
+        media_asset_id:
+          type: string
+          description: Same-workspace readable Media Asset identity (asset_...).
+        title:
+          type: string
+          maxLength: 255
+        author:
+          type: string
+          maxLength: 255
+        folder_id:
+          $ref: '#/components/schemas/LibraryFolderId'
     MoveLibraryAssetRequest:
       type: object
       required: [data]

@@ -10,20 +10,31 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/pagination"
 )
 
 const (
-	ProviderUnsplash       = "unsplash"
-	ProviderPexels         = "pexels"
-	ProviderWorkspaceMedia = "workspace_media"
-	AllAssetsFolder        = "all"
-	QuickSavesFolder       = "quick-saves"
+	ProviderUnsplash = "unsplash"
+	ProviderPexels   = "pexels"
+	AllAssetsFolder  = "all"
+	QuickSavesFolder = "quick-saves"
 	// DefaultPageSize tracks the shared pagination standard.
 	DefaultPageSize = pagination.DefaultLimit
 	// MaxPageSize tracks the shared pagination standard.
 	MaxPageSize = pagination.MaxLimit
+)
+
+// AssetSource is the Library Source discriminator:
+// 'external' rows carry provider/source identity plus real URLs;
+// 'media' rows carry a Media Asset identity and no provider/URL keys.
+type AssetSource string
+
+const (
+	AssetSourceExternal AssetSource = "external"
+	AssetSourceMedia    AssetSource = "media"
 )
 
 type FolderSelectionKind string
@@ -82,6 +93,14 @@ type Asset struct {
 	UpdatedAt   time.Time
 }
 
+// TaskLineage is task provenance for a managed save: which task output
+// produced it. Provenance only, never a dedup key; nil means a manual
+// (non-task) save. Always paired by construction.
+type TaskLineage struct {
+	TaskID      string
+	ResultIndex int32
+}
+
 type AssetInput struct {
 	Provider    string `json:"provider"`
 	SourceID    string `json:"source_id"`
@@ -92,6 +111,42 @@ type AssetInput struct {
 	Author      string `json:"author"`
 	Width       int32  `json:"width"`
 	Height      int32  `json:"height"`
+}
+
+// NormalizeAndValidateManagedAsset trims the managed-save payload and
+// enforces its shape: a well-formed asset_ Media identity, bounded
+// display metadata, and well-formed task provenance when present.
+// The store validates the operator and resolves the folder binding
+// ("" means Quick Saves).
+func NormalizeAndValidateManagedAsset(input V1SaveManagedAssetInput) (V1SaveManagedAssetInput, error) {
+	input.MediaAssetID = strings.TrimSpace(input.MediaAssetID)
+	input.Title = strings.TrimSpace(input.Title)
+	input.Author = strings.TrimSpace(input.Author)
+	if !contract.IsAssetID(input.MediaAssetID) {
+		return V1SaveManagedAssetInput{}, ErrInvalidSource
+	}
+	if utf8.RuneCountInString(input.Title) > 255 || utf8.RuneCountInString(input.Author) > 255 {
+		return V1SaveManagedAssetInput{}, ErrInvalidSource
+	}
+	if input.Lineage != nil {
+		lineage := *input.Lineage
+		lineage.TaskID = strings.TrimSpace(lineage.TaskID)
+		if !contract.IsTaskID(lineage.TaskID) || lineage.ResultIndex < 0 {
+			return V1SaveManagedAssetInput{}, ErrInvalidSource
+		}
+		input.Lineage = &lineage
+	}
+	return input, nil
+}
+
+// PairDimensions projects a media dimension pair onto the Library read
+// shape: both set and positive, else both nil (unknown). Guards against
+// half-known media rows so the wire never carries an unpaired pair.
+func PairDimensions(width, height *int32) (*int32, *int32) {
+	if width == nil || height == nil || *width <= 0 || *height <= 0 {
+		return nil, nil
+	}
+	return width, height
 }
 
 type SaveAssetCommand struct {

@@ -74,26 +74,29 @@ func (q *Queries) CompleteLibraryMaterialization(ctx context.Context, arg Comple
 const createLibraryAsset = `-- name: CreateLibraryAsset :one
 INSERT INTO library_assets (
   public_id, workspace_id, folder_id, provider, source_id,
-  source_url, preview_url, original_url, media_asset_id, width, height
+  source_url, preview_url, original_url, title, author, width, height, saved_by_user_id
 )
 VALUES (
   $1, $2, $3, $4, $5,
-  $6, $7, $8, NULL, $9, $10
+  $6, $7, $8, $9, $10, $11, $12, $13
 )
-RETURNING internal_id, public_id, workspace_id, folder_id, provider, source_id, source_url, preview_url, original_url, media_asset_id, width, height, created_at, updated_at
+RETURNING internal_id, public_id, workspace_id, folder_id, provider, source_id, source_url, preview_url, original_url, media_asset_id, title, author, width, height, task_id, task_result_index, saved_by_user_id, created_at, updated_at
 `
 
 type CreateLibraryAssetParams struct {
-	PublicID    string `json:"public_id"`
-	WorkspaceID int64  `json:"workspace_id"`
-	FolderID    int64  `json:"folder_id"`
-	Provider    string `json:"provider"`
-	SourceID    string `json:"source_id"`
-	SourceUrl   string `json:"source_url"`
-	PreviewUrl  string `json:"preview_url"`
-	OriginalUrl string `json:"original_url"`
-	Width       int32  `json:"width"`
-	Height      int32  `json:"height"`
+	PublicID      string      `json:"public_id"`
+	WorkspaceID   int64       `json:"workspace_id"`
+	FolderID      int64       `json:"folder_id"`
+	Provider      pgtype.Text `json:"provider"`
+	SourceID      pgtype.Text `json:"source_id"`
+	SourceUrl     pgtype.Text `json:"source_url"`
+	PreviewUrl    pgtype.Text `json:"preview_url"`
+	OriginalUrl   pgtype.Text `json:"original_url"`
+	Title         string      `json:"title"`
+	Author        string      `json:"author"`
+	Width         pgtype.Int4 `json:"width"`
+	Height        pgtype.Int4 `json:"height"`
+	SavedByUserID pgtype.Int8 `json:"saved_by_user_id"`
 }
 
 func (q *Queries) CreateLibraryAsset(ctx context.Context, arg CreateLibraryAssetParams) (LibraryAsset, error) {
@@ -106,8 +109,11 @@ func (q *Queries) CreateLibraryAsset(ctx context.Context, arg CreateLibraryAsset
 		arg.SourceUrl,
 		arg.PreviewUrl,
 		arg.OriginalUrl,
+		arg.Title,
+		arg.Author,
 		arg.Width,
 		arg.Height,
+		arg.SavedByUserID,
 	)
 	var i LibraryAsset
 	err := row.Scan(
@@ -121,8 +127,13 @@ func (q *Queries) CreateLibraryAsset(ctx context.Context, arg CreateLibraryAsset
 		&i.PreviewUrl,
 		&i.OriginalUrl,
 		&i.MediaAssetID,
+		&i.Title,
+		&i.Author,
 		&i.Width,
 		&i.Height,
+		&i.TaskID,
+		&i.TaskResultIndex,
+		&i.SavedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -194,28 +205,29 @@ func (q *Queries) CreateLibraryMaterialization(ctx context.Context, arg CreateLi
 	return i, err
 }
 
-const createManagedLibraryAsset = `-- name: CreateManagedLibraryAsset :one
+const createMediaLibraryAsset = `-- name: CreateMediaLibraryAsset :one
 
 INSERT INTO library_assets (
-  public_id, workspace_id, folder_id, provider, source_id,
-  source_url, preview_url, original_url, media_asset_id, width, height
+  public_id, workspace_id, folder_id, media_asset_id,
+  title, author, task_id, task_result_index, saved_by_user_id
 )
-SELECT
-  $1, $2, $3, 'workspace_media', $4,
-  '', '', '', $5, ma.width, ma.height
-FROM media_assets AS ma
-WHERE ma.internal_id = $5
-  AND ma.workspace_id = $2
-  AND ma.archived_at IS NULL
-RETURNING internal_id, public_id, workspace_id, folder_id, provider, source_id, source_url, preview_url, original_url, media_asset_id, width, height, created_at, updated_at
+VALUES (
+  $1, $2, $3, $4,
+  $5, $6, $7, $8, $9
+)
+RETURNING internal_id, public_id, workspace_id, folder_id, provider, source_id, source_url, preview_url, original_url, media_asset_id, title, author, width, height, task_id, task_result_index, saved_by_user_id, created_at, updated_at
 `
 
-type CreateManagedLibraryAssetParams struct {
-	PublicID     string      `json:"public_id"`
-	WorkspaceID  int64       `json:"workspace_id"`
-	FolderID     int64       `json:"folder_id"`
-	SourceID     string      `json:"source_id"`
-	MediaAssetID pgtype.Int8 `json:"media_asset_id"`
+type CreateMediaLibraryAssetParams struct {
+	PublicID        string      `json:"public_id"`
+	WorkspaceID     int64       `json:"workspace_id"`
+	FolderID        int64       `json:"folder_id"`
+	MediaAssetID    pgtype.Int8 `json:"media_asset_id"`
+	Title           string      `json:"title"`
+	Author          string      `json:"author"`
+	TaskID          pgtype.Text `json:"task_id"`
+	TaskResultIndex pgtype.Int4 `json:"task_result_index"`
+	SavedByUserID   pgtype.Int8 `json:"saved_by_user_id"`
 }
 
 // Workspace-scoped library queries (#818, Phase 4-01 of #809).
@@ -240,16 +252,29 @@ type CreateManagedLibraryAssetParams struct {
 // Assets always live in a folder (folder_id NOT NULL): the workspace
 // Quick Saves system folder is the unfiled bucket. Save/move callers
 // pass an empty folder to mean Quick Saves and the store ensures it.
-// Title/author have no durable columns (the workspace tables keep
-// provider URL + source metadata only); they are validated by the seam
-// and intentionally not persisted here.
-func (q *Queries) CreateManagedLibraryAsset(ctx context.Context, arg CreateManagedLibraryAssetParams) (LibraryAsset, error) {
-	row := q.db.QueryRow(ctx, createManagedLibraryAsset,
+// Title/author are durable display metadata; task_id/task_result_index
+// are task provenance (paired, never a dedup key); saved_by_user_id is
+// the server-side operator identity (never serialized on the wire).
+// Source is derived (media_asset_id IS NOT NULL -> 'media', else
+// 'external'); there is no source column. Media display dimensions are
+// projected at read time from the joined media_assets row (Media owns
+// the fact; library width/height stay NULL on media rows), paired by
+// the seam (either both set or both NULL).
+// Dedup identity: external rows (workspace_id, provider, source_id)
+// WHERE media_asset_id IS NULL; media rows (workspace_id, media_asset_id)
+// WHERE NOT NULL. Asset reads LEFT JOIN media_assets for the managed
+// link identity + dimension projection in one round trip.
+func (q *Queries) CreateMediaLibraryAsset(ctx context.Context, arg CreateMediaLibraryAssetParams) (LibraryAsset, error) {
+	row := q.db.QueryRow(ctx, createMediaLibraryAsset,
 		arg.PublicID,
 		arg.WorkspaceID,
 		arg.FolderID,
-		arg.SourceID,
 		arg.MediaAssetID,
+		arg.Title,
+		arg.Author,
+		arg.TaskID,
+		arg.TaskResultIndex,
+		arg.SavedByUserID,
 	)
 	var i LibraryAsset
 	err := row.Scan(
@@ -263,8 +288,13 @@ func (q *Queries) CreateManagedLibraryAsset(ctx context.Context, arg CreateManag
 		&i.PreviewUrl,
 		&i.OriginalUrl,
 		&i.MediaAssetID,
+		&i.Title,
+		&i.Author,
 		&i.Width,
 		&i.Height,
+		&i.TaskID,
+		&i.TaskResultIndex,
+		&i.SavedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -441,12 +471,13 @@ func (q *Queries) GetActiveLibraryMaterializationByAsset(ctx context.Context, ar
 }
 
 const getLibraryAssetByPublicID = `-- name: GetLibraryAssetByPublicID :one
-SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
+SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id, a.provider, a.source_id, a.source_url, a.preview_url, a.original_url, a.media_asset_id, a.title, a.author, a.width, a.height, a.task_id, a.task_result_index, a.saved_by_user_id, a.created_at, a.updated_at,
   f.public_id AS folder_public_id,
-  a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
+  ma.public_id AS media_asset_public_id,
+  ma.width AS media_width, ma.height AS media_height
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id
 WHERE a.workspace_id = $1
   AND a.public_id = $2
 LIMIT 1
@@ -458,102 +489,157 @@ type GetLibraryAssetByPublicIDParams struct {
 }
 
 type GetLibraryAssetByPublicIDRow struct {
-	InternalID     int64              `json:"internal_id"`
-	PublicID       string             `json:"public_id"`
-	WorkspaceID    int64              `json:"workspace_id"`
-	FolderID       int64              `json:"folder_id"`
-	FolderPublicID string             `json:"folder_public_id"`
-	Provider       string             `json:"provider"`
-	SourceID       string             `json:"source_id"`
-	SourceUrl      string             `json:"source_url"`
-	PreviewUrl     string             `json:"preview_url"`
-	OriginalUrl    string             `json:"original_url"`
-	MediaAssetID   pgtype.Int8        `json:"media_asset_id"`
-	Width          int32              `json:"width"`
-	Height         int32              `json:"height"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	LibraryAsset       LibraryAsset `json:"library_asset"`
+	FolderPublicID     string       `json:"folder_public_id"`
+	MediaAssetPublicID pgtype.Text  `json:"media_asset_public_id"`
+	MediaWidth         pgtype.Int4  `json:"media_width"`
+	MediaHeight        pgtype.Int4  `json:"media_height"`
 }
 
 func (q *Queries) GetLibraryAssetByPublicID(ctx context.Context, arg GetLibraryAssetByPublicIDParams) (GetLibraryAssetByPublicIDRow, error) {
 	row := q.db.QueryRow(ctx, getLibraryAssetByPublicID, arg.WorkspaceID, arg.PublicID)
 	var i GetLibraryAssetByPublicIDRow
 	err := row.Scan(
-		&i.InternalID,
-		&i.PublicID,
-		&i.WorkspaceID,
-		&i.FolderID,
+		&i.LibraryAsset.InternalID,
+		&i.LibraryAsset.PublicID,
+		&i.LibraryAsset.WorkspaceID,
+		&i.LibraryAsset.FolderID,
+		&i.LibraryAsset.Provider,
+		&i.LibraryAsset.SourceID,
+		&i.LibraryAsset.SourceUrl,
+		&i.LibraryAsset.PreviewUrl,
+		&i.LibraryAsset.OriginalUrl,
+		&i.LibraryAsset.MediaAssetID,
+		&i.LibraryAsset.Title,
+		&i.LibraryAsset.Author,
+		&i.LibraryAsset.Width,
+		&i.LibraryAsset.Height,
+		&i.LibraryAsset.TaskID,
+		&i.LibraryAsset.TaskResultIndex,
+		&i.LibraryAsset.SavedByUserID,
+		&i.LibraryAsset.CreatedAt,
+		&i.LibraryAsset.UpdatedAt,
 		&i.FolderPublicID,
-		&i.Provider,
-		&i.SourceID,
-		&i.SourceUrl,
-		&i.PreviewUrl,
-		&i.OriginalUrl,
-		&i.MediaAssetID,
-		&i.Width,
-		&i.Height,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.MediaAssetPublicID,
+		&i.MediaWidth,
+		&i.MediaHeight,
+	)
+	return i, err
+}
+
+const getLibraryAssetByWorkspaceMedia = `-- name: GetLibraryAssetByWorkspaceMedia :one
+SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id, a.provider, a.source_id, a.source_url, a.preview_url, a.original_url, a.media_asset_id, a.title, a.author, a.width, a.height, a.task_id, a.task_result_index, a.saved_by_user_id, a.created_at, a.updated_at,
+  f.public_id AS folder_public_id,
+  ma.public_id AS media_asset_public_id,
+  ma.width AS media_width, ma.height AS media_height
+FROM library_assets AS a
+INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id
+WHERE a.workspace_id = $1
+  AND a.media_asset_id = $2
+LIMIT 1
+`
+
+type GetLibraryAssetByWorkspaceMediaParams struct {
+	WorkspaceID  int64       `json:"workspace_id"`
+	MediaAssetID pgtype.Int8 `json:"media_asset_id"`
+}
+
+type GetLibraryAssetByWorkspaceMediaRow struct {
+	LibraryAsset       LibraryAsset `json:"library_asset"`
+	FolderPublicID     string       `json:"folder_public_id"`
+	MediaAssetPublicID pgtype.Text  `json:"media_asset_public_id"`
+	MediaWidth         pgtype.Int4  `json:"media_width"`
+	MediaHeight        pgtype.Int4  `json:"media_height"`
+}
+
+func (q *Queries) GetLibraryAssetByWorkspaceMedia(ctx context.Context, arg GetLibraryAssetByWorkspaceMediaParams) (GetLibraryAssetByWorkspaceMediaRow, error) {
+	row := q.db.QueryRow(ctx, getLibraryAssetByWorkspaceMedia, arg.WorkspaceID, arg.MediaAssetID)
+	var i GetLibraryAssetByWorkspaceMediaRow
+	err := row.Scan(
+		&i.LibraryAsset.InternalID,
+		&i.LibraryAsset.PublicID,
+		&i.LibraryAsset.WorkspaceID,
+		&i.LibraryAsset.FolderID,
+		&i.LibraryAsset.Provider,
+		&i.LibraryAsset.SourceID,
+		&i.LibraryAsset.SourceUrl,
+		&i.LibraryAsset.PreviewUrl,
+		&i.LibraryAsset.OriginalUrl,
+		&i.LibraryAsset.MediaAssetID,
+		&i.LibraryAsset.Title,
+		&i.LibraryAsset.Author,
+		&i.LibraryAsset.Width,
+		&i.LibraryAsset.Height,
+		&i.LibraryAsset.TaskID,
+		&i.LibraryAsset.TaskResultIndex,
+		&i.LibraryAsset.SavedByUserID,
+		&i.LibraryAsset.CreatedAt,
+		&i.LibraryAsset.UpdatedAt,
+		&i.FolderPublicID,
+		&i.MediaAssetPublicID,
+		&i.MediaWidth,
+		&i.MediaHeight,
 	)
 	return i, err
 }
 
 const getLibraryAssetByWorkspaceSource = `-- name: GetLibraryAssetByWorkspaceSource :one
-SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
+SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id, a.provider, a.source_id, a.source_url, a.preview_url, a.original_url, a.media_asset_id, a.title, a.author, a.width, a.height, a.task_id, a.task_result_index, a.saved_by_user_id, a.created_at, a.updated_at,
   f.public_id AS folder_public_id,
-  a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
+  ma.public_id AS media_asset_public_id,
+  ma.width AS media_width, ma.height AS media_height
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id
 WHERE a.workspace_id = $1
+  AND a.media_asset_id IS NULL
   AND a.provider = $2
   AND a.source_id = $3
 LIMIT 1
 `
 
 type GetLibraryAssetByWorkspaceSourceParams struct {
-	WorkspaceID int64  `json:"workspace_id"`
-	Provider    string `json:"provider"`
-	SourceID    string `json:"source_id"`
+	WorkspaceID int64       `json:"workspace_id"`
+	Provider    pgtype.Text `json:"provider"`
+	SourceID    pgtype.Text `json:"source_id"`
 }
 
 type GetLibraryAssetByWorkspaceSourceRow struct {
-	InternalID     int64              `json:"internal_id"`
-	PublicID       string             `json:"public_id"`
-	WorkspaceID    int64              `json:"workspace_id"`
-	FolderID       int64              `json:"folder_id"`
-	FolderPublicID string             `json:"folder_public_id"`
-	Provider       string             `json:"provider"`
-	SourceID       string             `json:"source_id"`
-	SourceUrl      string             `json:"source_url"`
-	PreviewUrl     string             `json:"preview_url"`
-	OriginalUrl    string             `json:"original_url"`
-	MediaAssetID   pgtype.Int8        `json:"media_asset_id"`
-	Width          int32              `json:"width"`
-	Height         int32              `json:"height"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	LibraryAsset       LibraryAsset `json:"library_asset"`
+	FolderPublicID     string       `json:"folder_public_id"`
+	MediaAssetPublicID pgtype.Text  `json:"media_asset_public_id"`
+	MediaWidth         pgtype.Int4  `json:"media_width"`
+	MediaHeight        pgtype.Int4  `json:"media_height"`
 }
 
 func (q *Queries) GetLibraryAssetByWorkspaceSource(ctx context.Context, arg GetLibraryAssetByWorkspaceSourceParams) (GetLibraryAssetByWorkspaceSourceRow, error) {
 	row := q.db.QueryRow(ctx, getLibraryAssetByWorkspaceSource, arg.WorkspaceID, arg.Provider, arg.SourceID)
 	var i GetLibraryAssetByWorkspaceSourceRow
 	err := row.Scan(
-		&i.InternalID,
-		&i.PublicID,
-		&i.WorkspaceID,
-		&i.FolderID,
+		&i.LibraryAsset.InternalID,
+		&i.LibraryAsset.PublicID,
+		&i.LibraryAsset.WorkspaceID,
+		&i.LibraryAsset.FolderID,
+		&i.LibraryAsset.Provider,
+		&i.LibraryAsset.SourceID,
+		&i.LibraryAsset.SourceUrl,
+		&i.LibraryAsset.PreviewUrl,
+		&i.LibraryAsset.OriginalUrl,
+		&i.LibraryAsset.MediaAssetID,
+		&i.LibraryAsset.Title,
+		&i.LibraryAsset.Author,
+		&i.LibraryAsset.Width,
+		&i.LibraryAsset.Height,
+		&i.LibraryAsset.TaskID,
+		&i.LibraryAsset.TaskResultIndex,
+		&i.LibraryAsset.SavedByUserID,
+		&i.LibraryAsset.CreatedAt,
+		&i.LibraryAsset.UpdatedAt,
 		&i.FolderPublicID,
-		&i.Provider,
-		&i.SourceID,
-		&i.SourceUrl,
-		&i.PreviewUrl,
-		&i.OriginalUrl,
-		&i.MediaAssetID,
-		&i.Width,
-		&i.Height,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.MediaAssetPublicID,
+		&i.MediaWidth,
+		&i.MediaHeight,
 	)
 	return i, err
 }
@@ -616,27 +702,6 @@ func (q *Queries) GetLibraryFolderByWorkspaceAndNameCI(ctx context.Context, arg 
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const getLibraryManagedMediaPublicID = `-- name: GetLibraryManagedMediaPublicID :one
-SELECT ma.public_id
-FROM library_assets AS a
-INNER JOIN workspaces AS w ON w.internal_id = a.workspace_id
-INNER JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id AND ma.workspace_id = a.workspace_id
-WHERE w.public_id = $1
-  AND a.public_id = $2
-`
-
-type GetLibraryManagedMediaPublicIDParams struct {
-	WorkspacePublicID string `json:"workspace_public_id"`
-	AssetPublicID     string `json:"asset_public_id"`
-}
-
-func (q *Queries) GetLibraryManagedMediaPublicID(ctx context.Context, arg GetLibraryManagedMediaPublicIDParams) (string, error) {
-	row := q.db.QueryRow(ctx, getLibraryManagedMediaPublicID, arg.WorkspacePublicID, arg.AssetPublicID)
-	var public_id string
-	err := row.Scan(&public_id)
-	return public_id, err
 }
 
 const getLibraryMaterializationByPublicID = `-- name: GetLibraryMaterializationByPublicID :one
@@ -718,12 +783,13 @@ func (q *Queries) GetQuickSavesFolder(ctx context.Context, workspaceID int64) (L
 }
 
 const listLibraryAssets = `-- name: ListLibraryAssets :many
-SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
+SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id, a.provider, a.source_id, a.source_url, a.preview_url, a.original_url, a.media_asset_id, a.title, a.author, a.width, a.height, a.task_id, a.task_result_index, a.saved_by_user_id, a.created_at, a.updated_at,
   f.public_id AS folder_public_id,
-  a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
+  ma.public_id AS media_asset_public_id,
+  ma.width AS media_width, ma.height AS media_height
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id
 WHERE a.workspace_id = $1
 ORDER BY a.created_at ASC, a.internal_id ASC
 LIMIT $2
@@ -735,21 +801,11 @@ type ListLibraryAssetsParams struct {
 }
 
 type ListLibraryAssetsRow struct {
-	InternalID     int64              `json:"internal_id"`
-	PublicID       string             `json:"public_id"`
-	WorkspaceID    int64              `json:"workspace_id"`
-	FolderID       int64              `json:"folder_id"`
-	FolderPublicID string             `json:"folder_public_id"`
-	Provider       string             `json:"provider"`
-	SourceID       string             `json:"source_id"`
-	SourceUrl      string             `json:"source_url"`
-	PreviewUrl     string             `json:"preview_url"`
-	OriginalUrl    string             `json:"original_url"`
-	MediaAssetID   pgtype.Int8        `json:"media_asset_id"`
-	Width          int32              `json:"width"`
-	Height         int32              `json:"height"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	LibraryAsset       LibraryAsset `json:"library_asset"`
+	FolderPublicID     string       `json:"folder_public_id"`
+	MediaAssetPublicID pgtype.Text  `json:"media_asset_public_id"`
+	MediaWidth         pgtype.Int4  `json:"media_width"`
+	MediaHeight        pgtype.Int4  `json:"media_height"`
 }
 
 func (q *Queries) ListLibraryAssets(ctx context.Context, arg ListLibraryAssetsParams) ([]ListLibraryAssetsRow, error) {
@@ -762,94 +818,29 @@ func (q *Queries) ListLibraryAssets(ctx context.Context, arg ListLibraryAssetsPa
 	for rows.Next() {
 		var i ListLibraryAssetsRow
 		if err := rows.Scan(
-			&i.InternalID,
-			&i.PublicID,
-			&i.WorkspaceID,
-			&i.FolderID,
+			&i.LibraryAsset.InternalID,
+			&i.LibraryAsset.PublicID,
+			&i.LibraryAsset.WorkspaceID,
+			&i.LibraryAsset.FolderID,
+			&i.LibraryAsset.Provider,
+			&i.LibraryAsset.SourceID,
+			&i.LibraryAsset.SourceUrl,
+			&i.LibraryAsset.PreviewUrl,
+			&i.LibraryAsset.OriginalUrl,
+			&i.LibraryAsset.MediaAssetID,
+			&i.LibraryAsset.Title,
+			&i.LibraryAsset.Author,
+			&i.LibraryAsset.Width,
+			&i.LibraryAsset.Height,
+			&i.LibraryAsset.TaskID,
+			&i.LibraryAsset.TaskResultIndex,
+			&i.LibraryAsset.SavedByUserID,
+			&i.LibraryAsset.CreatedAt,
+			&i.LibraryAsset.UpdatedAt,
 			&i.FolderPublicID,
-			&i.Provider,
-			&i.SourceID,
-			&i.SourceUrl,
-			&i.PreviewUrl,
-			&i.OriginalUrl,
-			&i.MediaAssetID,
-			&i.Width,
-			&i.Height,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listLibraryAssetsByFolder = `-- name: ListLibraryAssetsByFolder :many
-SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
-  f.public_id AS folder_public_id,
-  a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
-FROM library_assets AS a
-INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
-WHERE a.workspace_id = $1
-  AND a.folder_id = $2
-ORDER BY a.created_at ASC, a.internal_id ASC
-LIMIT $3
-`
-
-type ListLibraryAssetsByFolderParams struct {
-	WorkspaceID int64 `json:"workspace_id"`
-	FolderID    int64 `json:"folder_id"`
-	RowLimit    int32 `json:"row_limit"`
-}
-
-type ListLibraryAssetsByFolderRow struct {
-	InternalID     int64              `json:"internal_id"`
-	PublicID       string             `json:"public_id"`
-	WorkspaceID    int64              `json:"workspace_id"`
-	FolderID       int64              `json:"folder_id"`
-	FolderPublicID string             `json:"folder_public_id"`
-	Provider       string             `json:"provider"`
-	SourceID       string             `json:"source_id"`
-	SourceUrl      string             `json:"source_url"`
-	PreviewUrl     string             `json:"preview_url"`
-	OriginalUrl    string             `json:"original_url"`
-	MediaAssetID   pgtype.Int8        `json:"media_asset_id"`
-	Width          int32              `json:"width"`
-	Height         int32              `json:"height"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) ListLibraryAssetsByFolder(ctx context.Context, arg ListLibraryAssetsByFolderParams) ([]ListLibraryAssetsByFolderRow, error) {
-	rows, err := q.db.Query(ctx, listLibraryAssetsByFolder, arg.WorkspaceID, arg.FolderID, arg.RowLimit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListLibraryAssetsByFolderRow
-	for rows.Next() {
-		var i ListLibraryAssetsByFolderRow
-		if err := rows.Scan(
-			&i.InternalID,
-			&i.PublicID,
-			&i.WorkspaceID,
-			&i.FolderID,
-			&i.FolderPublicID,
-			&i.Provider,
-			&i.SourceID,
-			&i.SourceUrl,
-			&i.PreviewUrl,
-			&i.OriginalUrl,
-			&i.MediaAssetID,
-			&i.Width,
-			&i.Height,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.MediaAssetPublicID,
+			&i.MediaWidth,
+			&i.MediaHeight,
 		); err != nil {
 			return nil, err
 		}
@@ -862,39 +853,32 @@ func (q *Queries) ListLibraryAssetsByFolder(ctx context.Context, arg ListLibrary
 }
 
 const listLibraryAssetsByWorkspaceProvider = `-- name: ListLibraryAssetsByWorkspaceProvider :many
-SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
+SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id, a.provider, a.source_id, a.source_url, a.preview_url, a.original_url, a.media_asset_id, a.title, a.author, a.width, a.height, a.task_id, a.task_result_index, a.saved_by_user_id, a.created_at, a.updated_at,
   f.public_id AS folder_public_id,
-  a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.width, a.height, a.created_at, a.updated_at
+  ma.public_id AS media_asset_public_id,
+  ma.width AS media_width, ma.height AS media_height
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id
 WHERE a.workspace_id = $1
+  AND a.media_asset_id IS NULL
   AND a.provider = $2
 ORDER BY a.created_at ASC, a.internal_id ASC
 LIMIT $3
 `
 
 type ListLibraryAssetsByWorkspaceProviderParams struct {
-	WorkspaceID int64  `json:"workspace_id"`
-	Provider    string `json:"provider"`
-	RowLimit    int32  `json:"row_limit"`
+	WorkspaceID int64       `json:"workspace_id"`
+	Provider    pgtype.Text `json:"provider"`
+	RowLimit    int32       `json:"row_limit"`
 }
 
 type ListLibraryAssetsByWorkspaceProviderRow struct {
-	InternalID     int64              `json:"internal_id"`
-	PublicID       string             `json:"public_id"`
-	WorkspaceID    int64              `json:"workspace_id"`
-	FolderID       int64              `json:"folder_id"`
-	FolderPublicID string             `json:"folder_public_id"`
-	Provider       string             `json:"provider"`
-	SourceID       string             `json:"source_id"`
-	SourceUrl      string             `json:"source_url"`
-	PreviewUrl     string             `json:"preview_url"`
-	OriginalUrl    string             `json:"original_url"`
-	Width          int32              `json:"width"`
-	Height         int32              `json:"height"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	LibraryAsset       LibraryAsset `json:"library_asset"`
+	FolderPublicID     string       `json:"folder_public_id"`
+	MediaAssetPublicID pgtype.Text  `json:"media_asset_public_id"`
+	MediaWidth         pgtype.Int4  `json:"media_width"`
+	MediaHeight        pgtype.Int4  `json:"media_height"`
 }
 
 func (q *Queries) ListLibraryAssetsByWorkspaceProvider(ctx context.Context, arg ListLibraryAssetsByWorkspaceProviderParams) ([]ListLibraryAssetsByWorkspaceProviderRow, error) {
@@ -907,20 +891,29 @@ func (q *Queries) ListLibraryAssetsByWorkspaceProvider(ctx context.Context, arg 
 	for rows.Next() {
 		var i ListLibraryAssetsByWorkspaceProviderRow
 		if err := rows.Scan(
-			&i.InternalID,
-			&i.PublicID,
-			&i.WorkspaceID,
-			&i.FolderID,
+			&i.LibraryAsset.InternalID,
+			&i.LibraryAsset.PublicID,
+			&i.LibraryAsset.WorkspaceID,
+			&i.LibraryAsset.FolderID,
+			&i.LibraryAsset.Provider,
+			&i.LibraryAsset.SourceID,
+			&i.LibraryAsset.SourceUrl,
+			&i.LibraryAsset.PreviewUrl,
+			&i.LibraryAsset.OriginalUrl,
+			&i.LibraryAsset.MediaAssetID,
+			&i.LibraryAsset.Title,
+			&i.LibraryAsset.Author,
+			&i.LibraryAsset.Width,
+			&i.LibraryAsset.Height,
+			&i.LibraryAsset.TaskID,
+			&i.LibraryAsset.TaskResultIndex,
+			&i.LibraryAsset.SavedByUserID,
+			&i.LibraryAsset.CreatedAt,
+			&i.LibraryAsset.UpdatedAt,
 			&i.FolderPublicID,
-			&i.Provider,
-			&i.SourceID,
-			&i.SourceUrl,
-			&i.PreviewUrl,
-			&i.OriginalUrl,
-			&i.Width,
-			&i.Height,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.MediaAssetPublicID,
+			&i.MediaWidth,
+			&i.MediaHeight,
 		); err != nil {
 			return nil, err
 		}
@@ -1077,11 +1070,20 @@ func (q *Queries) LockLibraryMaterializationAsset(ctx context.Context, arg LockL
 }
 
 const moveLibraryAsset = `-- name: MoveLibraryAsset :one
-UPDATE library_assets AS a
-SET folder_id = $1, updated_at = now()
-WHERE a.workspace_id = $2
-  AND a.public_id = $3
-RETURNING a.internal_id, a.public_id, a.workspace_id, a.folder_id, a.provider, a.source_id, a.source_url, a.preview_url, a.original_url, a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
+WITH moved AS (
+  UPDATE library_assets AS a
+  SET folder_id = $1, updated_at = now()
+  WHERE a.workspace_id = $2
+    AND a.public_id = $3
+  RETURNING a.internal_id, a.public_id, a.workspace_id, a.folder_id, a.provider, a.source_id, a.source_url, a.preview_url, a.original_url, a.media_asset_id, a.title, a.author, a.width, a.height, a.task_id, a.task_result_index, a.saved_by_user_id, a.created_at, a.updated_at
+)
+SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id, a.provider, a.source_id, a.source_url, a.preview_url, a.original_url, a.media_asset_id, a.title, a.author, a.width, a.height, a.task_id, a.task_result_index, a.saved_by_user_id, a.created_at, a.updated_at,
+  f.public_id AS folder_public_id,
+  ma.public_id AS media_asset_public_id,
+  ma.width AS media_width, ma.height AS media_height
+FROM moved AS a
+INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = a.media_asset_id
 `
 
 type MoveLibraryAssetParams struct {
@@ -1090,24 +1092,41 @@ type MoveLibraryAssetParams struct {
 	PublicID    string `json:"public_id"`
 }
 
-func (q *Queries) MoveLibraryAsset(ctx context.Context, arg MoveLibraryAssetParams) (LibraryAsset, error) {
+type MoveLibraryAssetRow struct {
+	LibraryAsset       LibraryAsset `json:"library_asset"`
+	FolderPublicID     string       `json:"folder_public_id"`
+	MediaAssetPublicID pgtype.Text  `json:"media_asset_public_id"`
+	MediaWidth         pgtype.Int4  `json:"media_width"`
+	MediaHeight        pgtype.Int4  `json:"media_height"`
+}
+
+func (q *Queries) MoveLibraryAsset(ctx context.Context, arg MoveLibraryAssetParams) (MoveLibraryAssetRow, error) {
 	row := q.db.QueryRow(ctx, moveLibraryAsset, arg.FolderID, arg.WorkspaceID, arg.PublicID)
-	var i LibraryAsset
+	var i MoveLibraryAssetRow
 	err := row.Scan(
-		&i.InternalID,
-		&i.PublicID,
-		&i.WorkspaceID,
-		&i.FolderID,
-		&i.Provider,
-		&i.SourceID,
-		&i.SourceUrl,
-		&i.PreviewUrl,
-		&i.OriginalUrl,
-		&i.MediaAssetID,
-		&i.Width,
-		&i.Height,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.LibraryAsset.InternalID,
+		&i.LibraryAsset.PublicID,
+		&i.LibraryAsset.WorkspaceID,
+		&i.LibraryAsset.FolderID,
+		&i.LibraryAsset.Provider,
+		&i.LibraryAsset.SourceID,
+		&i.LibraryAsset.SourceUrl,
+		&i.LibraryAsset.PreviewUrl,
+		&i.LibraryAsset.OriginalUrl,
+		&i.LibraryAsset.MediaAssetID,
+		&i.LibraryAsset.Title,
+		&i.LibraryAsset.Author,
+		&i.LibraryAsset.Width,
+		&i.LibraryAsset.Height,
+		&i.LibraryAsset.TaskID,
+		&i.LibraryAsset.TaskResultIndex,
+		&i.LibraryAsset.SavedByUserID,
+		&i.LibraryAsset.CreatedAt,
+		&i.LibraryAsset.UpdatedAt,
+		&i.FolderPublicID,
+		&i.MediaAssetPublicID,
+		&i.MediaWidth,
+		&i.MediaHeight,
 	)
 	return i, err
 }

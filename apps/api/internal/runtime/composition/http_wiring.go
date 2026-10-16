@@ -119,7 +119,7 @@ func newAppRouter(
 	// requests/responses. A materializer build failure fails startup
 	// (fail closed) instead of serving silent 404s.
 	libraryStore := librarypostgres.NewService(repos.db)
-	librarySources := &libraryapplication.SourceResolver{Store: libraryStore, ManagedMedia: libraryStore}
+	librarySources := &libraryapplication.SourceResolver{Store: libraryStore}
 	libraryMaterializer, err := materializerassets.NewLibraryMaterializer(materializerassets.LibraryMaterializerDeps{
 		Media: taskServices.workspaceTaskMedia, Objects: services.storageService,
 		Fetcher: materializerassets.RemoteLibrarySourceFetcher{},

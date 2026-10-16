@@ -24,7 +24,7 @@ import (
 //     advances job state.
 //
 // Contracts preserved: owner stamping, workspace isolation (store keys
-// every lookup by workspace), provider policy (workspace_media rows
+// every lookup by workspace), provider policy (media rows
 // never trigger; fetchable hosts stay code-owned inside the
 // materializer), detached timeout + panic recovery (best-effort: reads
 // never fail because the fetch did), atomic claim with
@@ -38,11 +38,8 @@ import (
 // ingest is local byte writes).
 const DefaultReadThroughTimeout = 90 * time.Second
 
-// FailureCode/Message fold every trigger failure into a failed job
-// record (same shape as the task worker; the code word is
-// seam-stable, the message is the fixed user-facing retry copy).
-// NOTE: tasking/application/runtime/message.go keeps an intentional copy
-// (msgMaterializeOne) for the worker path; change both together.
+// ReadThroughFailureCode and ReadThroughFailureMessage identify failed
+// external ingestion attempts.
 const (
 	ReadThroughFailureCode    = "library_materialization_failed"
 	ReadThroughFailureMessage = "素材转存失败，请稍后重试"
@@ -119,33 +116,26 @@ func NewReadThroughService(store ReadThroughStore, materializer materializerasse
 	return &ReadThroughService{store: store, materializer: materializer, executor: executor, timeout: timeout}
 }
 
-// Resolve reads completed remote materializations. Workspace Media references
-// are not read-through inputs: their canonical link is used only by display.
+// Resolve selects the owned Media link: direct for managed references,
+// completed materialization for external references.
 func (s *ReadThroughService) Resolve(ctx context.Context, workspacePublicID, assetPublicID string) (stored *domain.V1Asset, mediaAssetID string, found bool) {
 	if s == nil || s.store == nil {
 		return nil, "", false
 	}
-	stored, err := s.store.GetAsset(ctx, workspacePublicID, assetPublicID)
-	if err != nil || stored == nil {
-		return nil, "", false
-	}
-	if strings.TrimSpace(stored.Provider) == domain.ProviderWorkspaceMedia {
-		return stored, "", false
-	}
-	mediaAssetID, found, err = (&SourceResolver{Store: s.store}).FindCompletedMaterializationMedia(ctx, workspacePublicID, assetPublicID)
-	return stored, mediaAssetID, err == nil && found
+	stored, mediaAssetID, err := (&SourceResolver{Store: s.store}).Resolve(ctx, workspacePublicID, assetPublicID)
+	return stored, mediaAssetID, err == nil && mediaAssetID != ""
 }
 
 // Request fires the best-effort async fetch for a known remote
 // library asset. The detached context (owner-stamped, WithoutCancel
 // + timeout) outlives the request; panics are absorbed with a log
 // so the trigger can never take down the server. Unknown assets,
-// workspace_media rows, and missing owners are no-ops.
+// media rows, and missing owners are no-ops.
 func (s *ReadThroughService) Request(baseCtx context.Context, workspacePublicID string, stored *domain.V1Asset, ownerUserID int64) {
 	if s == nil || s.store == nil || s.materializer == nil || s.executor == nil || stored == nil || ownerUserID <= 0 {
 		return
 	}
-	if strings.TrimSpace(stored.Provider) == domain.ProviderWorkspaceMedia {
+	if stored.Source == domain.AssetSourceMedia {
 		return
 	}
 	workspaceID := strings.TrimSpace(workspacePublicID)

@@ -4,9 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../workspace/routePaths'
 import { stringParam } from '../../../core/router/queryParams'
 import { useAppToast } from '../../../core/composables/useAppToast'
-import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
 import { i18n } from '../../../core/i18n'
-import { libraryAssetKey } from '../../library'
+import { searchReferenceKey } from './adapters/libraryBridge'
 import type { LibrarySearchReference } from '../core/authAction'
 import { getLibraryIslandState, setLibraryIslandState } from './adapters/libraryIslandPersistence'
 import { type SearchResult, type VisionReference } from '../core/models'
@@ -187,16 +186,16 @@ export function useSearchSession(options: SearchSessionOptions) {
 
   async function saveReferenceToQuickSaves(reference: LibrarySearchReference): Promise<boolean> {
     try {
-      const saved = await libraryCoordinator.saveReference(reference)
-      feed.markSavedKey(libraryAssetKey(saved.asset.provider, saved.asset.sourceId))
-      toast.success(
+      await libraryCoordinator.saveReference(
+        reference,
+        undefined,
+        undefined,
         i18n.global.t('search.toasts.savedToQuickSaves', {
           title: reference.title || i18n.global.t('search.fallbackImageTitle'),
         }),
       )
       return true
-    } catch (error) {
-      toast.error(userFacingErrorCopy(error, i18n.global.t('library.errors.saveAssetFailed')))
+    } catch {
       return false
     }
   }
@@ -211,23 +210,7 @@ export function useSearchSession(options: SearchSessionOptions) {
       })
       return
     }
-    const outcomes = await libraryCoordinator.saveReferences(items.map(toLibraryReference))
-    let successCount = 0
-    for (const outcome of outcomes) {
-      if (outcome.status !== 'fulfilled') continue
-      feed.markSavedKey(libraryAssetKey(outcome.value.asset.provider, outcome.value.asset.sourceId))
-      successCount += 1
-    }
-    const failureCount = outcomes.length - successCount
-    if (failureCount === 0) {
-      toast.success(i18n.global.t('search.toasts.savedBatchSuccess', { count: successCount }))
-    } else if (successCount === 0) {
-      toast.error(i18n.global.t('search.toasts.savedBatchFailed'))
-    } else {
-      toast.warning(
-        i18n.global.t('search.toasts.savedBatchPartial', { successCount, failureCount }),
-      )
-    }
+    await libraryCoordinator.saveReferences(items.map(toLibraryReference))
     clearSelection()
   }
 
@@ -271,11 +254,11 @@ export function useSearchSession(options: SearchSessionOptions) {
 
   watch(feed.results, (items) => {
     clearSelection()
-    const byKey = new Map(items.map((item) => [libraryAssetKey(item.provider, item.id), item]))
+    const byKey = new Map(items.map((item) => [searchReferenceKey(item.provider, item.id), item]))
     vision.refreshReferencePresentation(items)
     const active = lightbox.activeResult.value
     if (active) {
-      const fresh = byKey.get(libraryAssetKey(active.provider, active.id))
+      const fresh = byKey.get(searchReferenceKey(active.provider, active.id))
       if (fresh || isMediaDisplayExpired(active.display)) {
         lightbox.activeResult.value = { ...active, display: fresh?.display }
       }

@@ -269,22 +269,15 @@ func newAppTaskRuntime(
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace task renderer: %w", err)
 	}
-	// #828: post-Complete auto-materialize into the workspace library Quick
-	// Saves folder. The trigger is unbilled (permanent free tier): the
-	// saver ensures the Quick Saves asset and the trigger records the
-	// durable job directly, with no quote, hold, capture, or release.
 	workspaceLibraryStore := librarypostgres.NewService(repos.db)
-	workspaceAutoMaterializer, err := taskruntime.NewWorkspaceTaskAutoMaterializer(taskruntime.WorkspaceTaskAutoMaterializerDeps{
-		Store: workspaceLibraryStore,
-		Saver: taskruntime.NewWorkspaceTaskLibrarySaver(workspaceLibraryStore),
-	})
+	workspaceAutoSaver, err := taskruntime.NewWorkspaceTaskAutoSaver(taskruntime.NewWorkspaceTaskLibrarySaver(workspaceLibraryStore))
 	if err != nil {
-		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace task auto-materializer: %w", err)
+		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace task auto-saver: %w", err)
 	}
 	workspaceWorker, err := taskworker.NewWorkspaceTaskWorker(taskworker.WorkspaceTaskWorkerDeps{
 		Store: workspaceStore, Settler: workspaceSettlerBridge, Assets: workspaceAssets,
 		Provider: taskworker.NewWorkspaceGatewayProvider(&workspaceGatewayCallerAdapter{executor: workspaceGateway}),
-		Renderer: workspaceRenderer, Materializer: workspaceAutoMaterializer,
+		Renderer: workspaceRenderer, LibrarySaver: workspaceAutoSaver,
 		// The postgres store is the durable attempt-fact recorder
 		// (retry_layer/gateway_retry_count, #848): it also gates the
 		// single bounded model fallback, which requires its persisted

@@ -122,7 +122,7 @@
                 @click.stop="emit('select-reference', asset)"
               >
                 <Check
-                  v-if="referenceKeys?.includes(libraryAssetKey(asset.provider, asset.sourceId))"
+                  v-if="referenceKeys?.includes(libraryAssetKeyFor(asset))"
                   class="size-3"
                   aria-hidden="true"
                 />
@@ -134,7 +134,7 @@
                 {{ asset.title || t('library.states.untitledReference') }}
               </p>
               <p class="mt-0.5 mb-0 truncate text-admin-micro text-white/70">
-                {{ asset.author || asset.provider }}
+                {{ asset.author || (asset.source === 'external' ? asset.provider : '') }}
               </p>
             </div>
           </div>
@@ -160,7 +160,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useDevicePixelRatio, useResizeObserver } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { Check, Plus, Search, Xmark } from '@iconoir/vue'
-import { libraryAssetKey } from '../core/validators'
+import { libraryAssetKeyFor } from '../core/validators'
 import { resolveMediaDisplayUrl } from '../../../core/media/mediaDisplay'
 import type { LibraryAssetView } from '../core/transfer'
 import {

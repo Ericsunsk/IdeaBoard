@@ -466,20 +466,25 @@ type IdentityAuthSyncIntent struct {
 }
 
 type LibraryAsset struct {
-	InternalID   int64              `json:"internal_id"`
-	PublicID     string             `json:"public_id"`
-	WorkspaceID  int64              `json:"workspace_id"`
-	FolderID     int64              `json:"folder_id"`
-	Provider     string             `json:"provider"`
-	SourceID     string             `json:"source_id"`
-	SourceUrl    string             `json:"source_url"`
-	PreviewUrl   string             `json:"preview_url"`
-	OriginalUrl  string             `json:"original_url"`
-	MediaAssetID pgtype.Int8        `json:"media_asset_id"`
-	Width        int32              `json:"width"`
-	Height       int32              `json:"height"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	InternalID      int64              `json:"internal_id"`
+	PublicID        string             `json:"public_id"`
+	WorkspaceID     int64              `json:"workspace_id"`
+	FolderID        int64              `json:"folder_id"`
+	Provider        pgtype.Text        `json:"provider"`
+	SourceID        pgtype.Text        `json:"source_id"`
+	SourceUrl       pgtype.Text        `json:"source_url"`
+	PreviewUrl      pgtype.Text        `json:"preview_url"`
+	OriginalUrl     pgtype.Text        `json:"original_url"`
+	MediaAssetID    pgtype.Int8        `json:"media_asset_id"`
+	Title           string             `json:"title"`
+	Author          string             `json:"author"`
+	Width           pgtype.Int4        `json:"width"`
+	Height          pgtype.Int4        `json:"height"`
+	TaskID          pgtype.Text        `json:"task_id"`
+	TaskResultIndex pgtype.Int4        `json:"task_result_index"`
+	SavedByUserID   pgtype.Int8        `json:"saved_by_user_id"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type LibraryAssetMediaAsset struct {

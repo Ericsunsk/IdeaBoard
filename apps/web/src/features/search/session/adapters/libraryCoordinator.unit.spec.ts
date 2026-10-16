@@ -1,14 +1,16 @@
-import { mediaDisplayFixture } from '../../../../test/mediaDisplay'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { createSearchLibraryCoordinator } from './libraryCoordinator'
 
 const WORKSPACE_ID = 'ws_test123'
 
 const mocks = vi.hoisted(() => ({
   listFolders: vi.fn(),
-  saveAsset: vi.fn(),
-  resolveAssets: vi.fn(),
+  submit: vi.fn(),
   deleteAsset: vi.fn(),
+  toastSuccess: vi.fn(),
+  toastWarning: vi.fn(),
+  toastError: vi.fn(),
 }))
 
 vi.mock('../../../library', async (importOriginal) => {
@@ -20,11 +22,24 @@ vi.mock('../../../library', async (importOriginal) => {
     createLibraryFolderFacts: (fetchFolders?: () => Promise<never[]>) =>
       actual.createLibraryFolderFacts(fetchFolders ?? mocks.listFolders),
     listAllWorkspaceLibraryFolders: mocks.listFolders,
-    saveWorkspaceSearchReference: mocks.saveAsset,
     removeWorkspaceSearchReference: mocks.deleteAsset,
-    libraryAssetKey: (provider: string, sourceID: string) => `${provider}:${sourceID}`,
+    createLibrarySaveModule: () => ({
+      operations: ref([]),
+      submit: mocks.submit,
+      retryOperation: vi.fn(),
+      clear: vi.fn(),
+      dispose: vi.fn(),
+    }),
   }
 })
+
+vi.mock('../../../../core/composables/useAppToast', () => ({
+  useAppToast: () => ({
+    success: mocks.toastSuccess,
+    warning: mocks.toastWarning,
+    error: mocks.toastError,
+  }),
+}))
 
 const reference = {
   provider: 'unsplash' as const,
@@ -38,30 +53,27 @@ const reference = {
   height: 100,
 }
 
-function savedResult(overrides: Record<string, unknown> = {}) {
-  const asset = {
-    id: 'lasset_asset0001',
-    workspaceId: WORKSPACE_ID,
-    provider: 'unsplash',
-    sourceId: 'image-1',
-    sourceUrl: 'https://example.com/source',
-    previewUrl: 'https://example.com/preview',
-    originalUrl: 'https://example.com/original',
-    title: 'Image',
-    author: 'Author',
-    width: 100,
-    height: 100,
-    createdAt: '2026-09-24T00:00:00Z',
-    display: mediaDisplayFixture(),
-    updatedAt: '2026-09-24T00:00:00Z',
-    ...overrides,
-  } as Record<string, unknown>
-  const folderId = asset.folderId as string | undefined
-  const sourceId = asset.sourceId as string
+function submitResult(sourceId: string, folderId?: string) {
   return {
-    asset,
-    assetKey: `unsplash:${sourceId}`,
-    affectedFolderKeys: folderId ? ['all', folderId] : ['all'],
+    operationId: 'op-1',
+    status: 'succeeded',
+    items: [
+      {
+        id: 'item-1',
+        kind: 'external',
+        title: 'Image',
+        status: 'saved',
+        attempts: 1,
+        asset: {
+          source: 'external' as const,
+          id: 'lasset_asset0001',
+          workspaceId: WORKSPACE_ID,
+          provider: 'unsplash' as const,
+          sourceId,
+          folderId,
+        },
+      },
+    ],
   }
 }
 
@@ -69,152 +81,97 @@ describe('Search Library coordinator', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.listFolders.mockResolvedValue([])
+    mocks.submit.mockResolvedValue(submitResult('image-1'))
   })
 
-  it('refreshes the shared Folder facts after save and remove mutations', async () => {
-    mocks.saveAsset.mockResolvedValue(savedResult())
-    mocks.deleteAsset.mockResolvedValue({
-      asset: {
-        provider: 'unsplash',
-        sourceId: 'image-1',
-        folderId: undefined,
-      },
-      assetKey: 'unsplash:image-1',
-      affectedFolderKeys: ['all'],
-    })
+  it('delegates saves to the shared save module and returns the stored asset', async () => {
     const coordinator = createSearchLibraryCoordinator({ workspaceId: WORKSPACE_ID })
-    const outcomes: unknown[] = []
-    coordinator.subscribe((outcome) => outcomes.push(outcome))
-
-    await coordinator.saveReference(reference)
-    await coordinator.removeReference('unsplash', 'image-1')
-
-    expect(mocks.saveAsset).toHaveBeenCalledWith(WORKSPACE_ID, reference, undefined, undefined)
-    expect(mocks.deleteAsset).toHaveBeenCalledWith(WORKSPACE_ID, 'unsplash', 'image-1')
-    expect(mocks.listFolders).toHaveBeenCalledTimes(2)
-    expect(outcomes).toEqual([
-      {
-        kind: 'asset-saved',
-        provider: 'unsplash',
-        sourceID: 'image-1',
-        assetKey: 'unsplash:image-1',
-        affectedFolderKeys: ['all'],
-        galleryEffect: 'reload-current',
-      },
-      {
-        kind: 'asset-removed',
-        provider: 'unsplash',
-        sourceID: 'image-1',
-        assetKey: 'unsplash:image-1',
-        affectedFolderKeys: ['all'],
-        galleryEffect: 'reload-current',
-      },
-    ])
-  })
-
-  it('carries the actually created Folder identity when saving into a new folder', async () => {
-    mocks.saveAsset.mockResolvedValue({
-      asset: {
-        provider: 'unsplash',
-        sourceId: 'image-1',
-        folderId: 'lfolder_folder0009',
-      },
-      createdFolder: { id: 'lfolder_folder0009', name: 'fresh' },
-      assetKey: 'unsplash:image-1',
-      affectedFolderKeys: ['all', 'lfolder_folder0009'],
-    })
-    const coordinator = createSearchLibraryCoordinator({ workspaceId: WORKSPACE_ID })
-    const outcomes: unknown[] = []
-    coordinator.subscribe((outcome) => outcomes.push(outcome))
 
     const saved = await coordinator.saveReference(reference, undefined, 'fresh')
 
-    expect(mocks.saveAsset).toHaveBeenCalledWith(WORKSPACE_ID, reference, undefined, 'fresh')
-    // The caller never rebuilds the target from its input: the created Folder
-    // identity comes back with the committed result.
-    expect(saved.createdFolder?.id).toBe('lfolder_folder0009')
-    expect(outcomes).toEqual([
-      {
-        kind: 'asset-saved',
-        provider: 'unsplash',
-        sourceID: 'image-1',
-        assetKey: 'unsplash:image-1',
-        affectedFolderKeys: ['all', 'lfolder_folder0009'],
-        galleryEffect: 'reload-current',
-      },
-    ])
+    // Search shapes the input; upload/retry/publication/notification stay in
+    // the module. Heavy lifecycle coverage lives in the module contract spec.
+    expect(mocks.submit).toHaveBeenCalledExactlyOnceWith(
+      { source: 'external', reference },
+      { newFolderName: 'fresh', galleryEffect: 'reload-current' },
+    )
+    expect(saved.asset.source).toBe('external')
+    if (saved.asset.source !== 'external') throw new Error('unreachable')
+    expect(saved.asset.sourceId).toBe('image-1')
   })
 
   it('reports the filed target from the stored asset for existing folders', async () => {
-    mocks.saveAsset.mockResolvedValue(savedResult({ folderId: 'lfolder_folder0002' }))
+    mocks.submit.mockResolvedValue(submitResult('image-1', 'lfolder_folder0002'))
     const coordinator = createSearchLibraryCoordinator({ workspaceId: WORKSPACE_ID })
-    const outcomes: unknown[] = []
-    coordinator.subscribe((outcome) => outcomes.push(outcome))
 
-    await coordinator.saveReference(reference, 'lfolder_folder0002')
+    const saved = await coordinator.saveReference(reference, 'lfolder_folder0002')
 
-    expect(outcomes).toEqual([
-      {
-        kind: 'asset-saved',
-        provider: 'unsplash',
-        sourceID: 'image-1',
-        assetKey: 'unsplash:image-1',
-        affectedFolderKeys: ['all', 'lfolder_folder0002'],
-        galleryEffect: 'reload-current',
-      },
-    ])
+    expect(mocks.submit).toHaveBeenCalledExactlyOnceWith(
+      { source: 'external', reference },
+      { folderId: 'lfolder_folder0002', galleryEffect: 'reload-current' },
+    )
+    expect(saved.asset.folderId).toBe('lfolder_folder0002')
   })
 
-  it('keeps batch partial success and reports each stored target', async () => {
-    mocks.saveAsset
-      .mockResolvedValueOnce(savedResult({ sourceId: 'image-1' }))
-      .mockRejectedValueOnce(new Error('save failed'))
-      .mockResolvedValueOnce(savedResult({ sourceId: 'kept-2', folderId: undefined }))
+  it('throws without notifying twice when the module reports failure', async () => {
+    mocks.submit.mockResolvedValue({
+      operationId: 'op-1',
+      status: 'failed',
+      items: [
+        {
+          id: 'item-1',
+          kind: 'external',
+          title: 'Image',
+          status: 'failed',
+          attempts: 1,
+          error: 'nope',
+        },
+      ],
+    })
     const coordinator = createSearchLibraryCoordinator({ workspaceId: WORKSPACE_ID })
-    const outcomes: unknown[] = []
-    coordinator.subscribe((outcome) => outcomes.push(outcome))
+
+    await expect(coordinator.saveReference(reference)).rejects.toThrow()
+  })
+
+  it('submits batches as one module operation', async () => {
+    mocks.submit.mockResolvedValue({
+      operationId: 'op-1',
+      status: 'partial',
+      items: [],
+    })
+    const coordinator = createSearchLibraryCoordinator({ workspaceId: WORKSPACE_ID })
 
     const second = { ...reference, id: 'kept-2' }
-    const results = await coordinator.saveReferences([
-      reference,
-      { ...reference, id: 'boom' },
-      second,
-    ])
+    const result = await coordinator.saveReferences([reference, second])
 
-    expect(results.map((result) => result.status)).toEqual(['fulfilled', 'rejected', 'fulfilled'])
-    expect(outcomes).toHaveLength(2)
-    // Each outcome reports its actually stored asset — never the batch input.
-    expect(outcomes).toEqual([
-      {
-        kind: 'asset-saved',
-        provider: 'unsplash',
-        sourceID: 'image-1',
-        assetKey: 'unsplash:image-1',
-        affectedFolderKeys: ['all'],
-        galleryEffect: 'reload-current',
-      },
-      {
-        kind: 'asset-saved',
-        provider: 'unsplash',
-        sourceID: 'kept-2',
-        assetKey: 'unsplash:kept-2',
-        affectedFolderKeys: ['all'],
-        galleryEffect: 'reload-current',
-      },
-    ])
+    expect(mocks.submit).toHaveBeenCalledExactlyOnceWith(
+      [
+        { source: 'external', reference },
+        { source: 'external', reference: second },
+      ],
+      { galleryEffect: 'reload-current' },
+    )
+    expect(result.status).toBe('partial')
   })
 
   it('reports the deleted asset folders and still marks an unknown reference', async () => {
     mocks.deleteAsset
       .mockResolvedValueOnce({
-        asset: { provider: 'unsplash', sourceId: 'filed', folderId: 'lfolder_folder0003' },
+        asset: {
+          source: 'external',
+          provider: 'unsplash',
+          sourceId: 'filed',
+          folderId: 'lfolder_folder0003',
+        },
         assetKey: 'unsplash:filed',
         affectedFolderKeys: ['all', 'lfolder_folder0003'],
       })
       .mockResolvedValueOnce(null)
     const coordinator = createSearchLibraryCoordinator({ workspaceId: WORKSPACE_ID })
     const outcomes: unknown[] = []
-    coordinator.subscribe((outcome) => outcomes.push(outcome))
+    coordinator.subscribe((batch) => {
+      outcomes.push(...batch)
+    })
 
     await coordinator.removeReference('unsplash', 'filed')
     const missing = await coordinator.removeReference('unsplash', 'ghost')
@@ -223,6 +180,7 @@ describe('Search Library coordinator', () => {
     expect(outcomes).toEqual([
       {
         kind: 'asset-removed',
+        source: 'external',
         provider: 'unsplash',
         sourceID: 'filed',
         assetKey: 'unsplash:filed',
@@ -231,6 +189,7 @@ describe('Search Library coordinator', () => {
       },
       {
         kind: 'asset-removed',
+        source: 'external',
         provider: 'unsplash',
         sourceID: 'ghost',
         assetKey: 'unsplash:ghost',
@@ -240,29 +199,11 @@ describe('Search Library coordinator', () => {
     ])
   })
 
-  it('publishes successful save and remove outcomes when the Folder refresh fails', async () => {
-    mocks.listFolders.mockRejectedValue(new Error('Folder refresh unavailable'))
-    mocks.saveAsset.mockResolvedValue(savedResult())
-    mocks.deleteAsset.mockResolvedValue({
-      asset: { provider: 'unsplash', sourceId: 'image-1', folderId: undefined },
-      assetKey: 'unsplash:image-1',
-      affectedFolderKeys: ['all'],
-    })
-    const coordinator = createSearchLibraryCoordinator({ workspaceId: WORKSPACE_ID })
-    const outcomes: string[] = []
-    coordinator.subscribe((outcome) => outcomes.push(outcome.kind))
-
-    await coordinator.saveReference(reference)
-    await coordinator.removeReference('unsplash', 'image-1')
-
-    expect(outcomes).toEqual(['asset-saved', 'asset-removed'])
-  })
-
   it('fails closed without a workspace', async () => {
     const coordinator = createSearchLibraryCoordinator({ workspaceId: null })
     await expect(coordinator.saveReference(reference)).rejects.toThrow()
     await expect(coordinator.removeReference('unsplash', 'image-1')).rejects.toThrow()
-    expect(mocks.saveAsset).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
     expect(mocks.deleteAsset).not.toHaveBeenCalled()
   })
 })

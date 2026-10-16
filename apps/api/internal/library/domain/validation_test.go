@@ -52,6 +52,25 @@ func TestNormalizeAndValidateAssetRejectsUntrustedURLs(t *testing.T) {
 	}
 }
 
+func TestNormalizeAndValidateAssetRejectsMissingURLsWithoutFallback(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		mutate func(*AssetInput)
+	}{
+		{"missing source_url", func(input *AssetInput) { input.SourceURL = "" }},
+		{"missing original_url", func(input *AssetInput) { input.OriginalURL = "" }},
+		{"missing preview_url", func(input *AssetInput) { input.PreviewURL = "" }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			input := validAssetInput()
+			tt.mutate(&input)
+			if _, err := NormalizeAndValidateAsset(input); err != ErrInvalidSource {
+				t.Fatalf("error = %v, want %v (no preview fallback fill)", err, ErrInvalidSource)
+			}
+		})
+	}
+}
+
 func TestNormalizeAndValidateAssetRejectsUnsupportedProvider(t *testing.T) {
 	input := validAssetInput()
 	input.Provider = "google"
@@ -96,6 +115,73 @@ func TestParseFolderSelection(t *testing.T) {
 	for _, raw := range []string{"0", "-1", "wat"} {
 		if _, err := ParseFolderSelection(raw); err != ErrFolderNotFound {
 			t.Fatalf("ParseFolderSelection(%q) error = %v, want %v", raw, err, ErrFolderNotFound)
+		}
+	}
+}
+
+func validManagedAssetInput() V1SaveManagedAssetInput {
+	return V1SaveManagedAssetInput{
+		MediaAssetID: "asset_0123456789abcdef01234567",
+		Title:        "hero",
+		Author:       "maker",
+	}
+}
+
+func TestNormalizeAndValidateManagedAssetAcceptsManualAndTaskShapes(t *testing.T) {
+	manual, err := NormalizeAndValidateManagedAsset(validManagedAssetInput())
+	if err != nil || manual.Lineage != nil {
+		t.Fatalf("manual = %+v, %v; want accepted without lineage", manual, err)
+	}
+	withLineage := validManagedAssetInput()
+	withLineage.Lineage = &TaskLineage{TaskID: "task_aaaaaaaaaaaaaaaaaaaaaaaa", ResultIndex: 3}
+	got, err := NormalizeAndValidateManagedAsset(withLineage)
+	if err != nil || got.Lineage == nil || got.Lineage.TaskID != "task_aaaaaaaaaaaaaaaaaaaaaaaa" || got.Lineage.ResultIndex != 3 {
+		t.Fatalf("task = %+v, %v; want accepted provenance", got, err)
+	}
+}
+
+func TestNormalizeAndValidateManagedAssetRejects(t *testing.T) {
+	valid := validManagedAssetInput()
+	for _, tt := range []struct {
+		name   string
+		mutate func(*V1SaveManagedAssetInput)
+	}{
+		{"bad media id", func(m *V1SaveManagedAssetInput) { m.MediaAssetID = "nope" }},
+		{"empty media id", func(m *V1SaveManagedAssetInput) { m.MediaAssetID = "  " }},
+		{"long title", func(m *V1SaveManagedAssetInput) { m.Title = string(make([]byte, 300)) }},
+		{"bad task id", func(m *V1SaveManagedAssetInput) { m.Lineage = &TaskLineage{TaskID: "nope", ResultIndex: 0} }},
+		{"negative index", func(m *V1SaveManagedAssetInput) {
+			m.Lineage = &TaskLineage{TaskID: "task_aaaaaaaaaaaaaaaaaaaaaaaa", ResultIndex: -1}
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			input := valid
+			tt.mutate(&input)
+			if _, err := NormalizeAndValidateManagedAsset(input); err != ErrInvalidSource {
+				t.Fatalf("error = %v, want %v", err, ErrInvalidSource)
+			}
+		})
+	}
+}
+
+func TestPairDimensionsKeepsPairs(t *testing.T) {
+	w, h := int32(100), int32(80)
+	gotW, gotH := PairDimensions(&w, &h)
+	if gotW == nil || *gotW != 100 || gotH == nil || *gotH != 80 {
+		t.Fatalf("pair = %v x %v, want 100 x 80", gotW, gotH)
+	}
+	zero := int32(0)
+	for _, tt := range []struct {
+		name  string
+		width *int32
+		vert  *int32
+	}{
+		{"both nil", nil, nil},
+		{"half known", &w, nil},
+		{"zero", &zero, &h},
+	} {
+		if gotW, gotH := PairDimensions(tt.width, tt.vert); gotW != nil || gotH != nil {
+			t.Fatalf("%s = %v x %v, want nil pair", tt.name, gotW, gotH)
 		}
 	}
 }

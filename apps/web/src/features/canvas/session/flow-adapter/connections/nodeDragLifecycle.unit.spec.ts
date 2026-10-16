@@ -320,4 +320,59 @@ describe('createCanvasNodeDragLifecycle', () => {
     })
     expect(harness.store.getNode('prompt-2')).toMatchObject({ snapshot: { text: 'ready' } })
   })
+
+  it('ends a library save with no position commit, history, or dirty state', () => {
+    const harness = createHarness()
+
+    harness.lifecycle.begin(['prompt-1', 'prompt-2'])
+    harness.lifecycle.handleChanges([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 440, y: 80 },
+        from: { x: 40, y: 40 },
+        dragging: true,
+      },
+    ])
+
+    const saved = harness.lifecycle.finishAsLibrarySave()
+
+    expect(saved).toEqual(['prompt-1', 'prompt-2'])
+    expect(harness.lifecycle.isActive()).toBe(false)
+    // Staged positions are discarded: the graph keeps origin facts and no
+    // membership finalization runs for the save outcome.
+    expect(harness.store.getNode('prompt-1')).toMatchObject({ snapshot: { x: 40, y: 40 } })
+    expect(harness.committedMembershipChanges).toEqual([])
+    expect(harness.lifecycleOrder).toEqual(['begin'])
+  })
+
+  it('reports no save cohort without an active drag', () => {
+    const harness = createHarness()
+
+    expect(harness.lifecycle.finishAsLibrarySave()).toBeNull()
+
+    harness.lifecycle.begin(['prompt-1'])
+    expect(harness.lifecycle.finishAsLibrarySave()).toEqual(['prompt-1'])
+    // The terminal is single-shot: a second finish finds no active drag.
+    expect(harness.lifecycle.finishAsLibrarySave()).toBeNull()
+  })
+
+  it('keeps cancel distinct from the save terminal (both discard, only save reports)', () => {
+    const harness = createHarness()
+
+    harness.lifecycle.begin(['prompt-1'])
+    harness.lifecycle.handleChanges([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 440, y: 80 },
+        from: { x: 40, y: 40 },
+        dragging: true,
+      },
+    ])
+    harness.lifecycle.cancel()
+
+    expect(harness.lifecycle.isActive()).toBe(false)
+    expect(harness.store.getNode('prompt-1')).toMatchObject({ snapshot: { x: 40, y: 40 } })
+  })
 })

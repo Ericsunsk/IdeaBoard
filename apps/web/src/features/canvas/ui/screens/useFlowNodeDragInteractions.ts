@@ -4,6 +4,8 @@ import type { DismissTransientCanvasUi } from './useFlowTransientUiDismissal'
 type UseFlowNodeDragInteractionsOptions = {
   beginNodeDragTransaction: (nodeIds: readonly string[]) => void
   commitNodeDragTransaction: () => void
+  /** Third drag outcome (save-to-library): ends the drag with no position commit. */
+  finishNodeDragAsLibrarySave: () => void
   isDuplicateModifierPressed: Ref<boolean>
   beginFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
   finishFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
@@ -22,7 +24,7 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
     options.beginFlowNodeDragDuplicateTracking(options.isDuplicateModifierPressed.value)
   }
 
-  function onNodeDragStop() {
+  function scheduleStop(finalize: () => void) {
     if (options.isNodeDragLocked?.()) return
     options.dismissTransientCanvasUi({
       shouldCloseOutpaint: true,
@@ -35,7 +37,7 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
       if (pendingDragStopCommit !== commitToken) return
       pendingDragStopCommit = null
       try {
-        options.commitNodeDragTransaction()
+        finalize()
       } finally {
         // Always clear duplicate tracking, even when a graph commit fails.
         // Keeping this cleanup after commit preserves the duplicate position
@@ -46,8 +48,20 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
     pendingDragStopCommit = commitToken
   }
 
+  function onNodeDragStop() {
+    scheduleStop(() => options.commitNodeDragTransaction())
+  }
+
+  function onNodeDragStopAsLibrarySave(afterFinish: () => void) {
+    scheduleStop(() => {
+      options.finishNodeDragAsLibrarySave()
+      afterFinish()
+    })
+  }
+
   return {
     onNodeDragStart,
     onNodeDragStop,
+    onNodeDragStopAsLibrarySave,
   }
 }

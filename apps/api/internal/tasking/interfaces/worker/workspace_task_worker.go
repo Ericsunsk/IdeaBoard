@@ -135,8 +135,8 @@ func (f WorkspaceTaskGenerateFunc) Generate(ctx context.Context, task *workspace
 // every task closed with a clear message. Renderer is optional: nil keeps
 // the previous passthrough (provider refs settle as-is); set, remote
 // results are ingested into workspace media assets (#827) before the
-// atomic Complete. Materializer is optional: nil keeps completion bare;
-// set, settled outputs auto-materialize into library Quick Saves (#828)
+// atomic Complete. LibrarySaver is optional: nil keeps completion bare;
+// set, settled outputs are saved in library Quick Saves
 // AFTER the atomic Complete, best-effort (failures logged, task stays
 // complete, River never retries a completed task). Attempts is optional:
 // nil disables durable attempt facts (unit paths); production always
@@ -151,7 +151,7 @@ type WorkspaceTaskWorkerDeps struct {
 	Assets       workspacetasks.AssetReader
 	Provider     WorkspaceTaskProvider
 	Renderer     taskruntime.WorkspaceTaskRenderer
-	Materializer taskruntime.WorkspaceTaskAutoMaterializer
+	LibrarySaver taskruntime.WorkspaceTaskAutoSaver
 	Attempts     workspacetasks.AttemptRecorder
 	Metrics      ModelFallbackObserver
 }
@@ -175,7 +175,7 @@ type WorkspaceTaskWorker struct {
 	assets       workspacetasks.AssetReader
 	provider     WorkspaceTaskProvider
 	renderer     taskruntime.WorkspaceTaskRenderer
-	materializer taskruntime.WorkspaceTaskAutoMaterializer
+	librarySaver taskruntime.WorkspaceTaskAutoSaver
 	attempts     workspacetasks.AttemptRecorder
 	metrics      ModelFallbackObserver
 	claims       WorkspaceTaskAttemptClaimStore
@@ -203,7 +203,7 @@ func NewWorkspaceTaskWorker(deps WorkspaceTaskWorkerDeps) (*WorkspaceTaskWorker,
 	return &WorkspaceTaskWorker{
 		store: deps.Store, settler: deps.Settler,
 		assets: deps.Assets, provider: deps.Provider, renderer: deps.Renderer,
-		materializer: deps.Materializer, attempts: deps.Attempts,
+		librarySaver: deps.LibrarySaver, attempts: deps.Attempts,
 		metrics: deps.Metrics, claims: claims,
 	}, nil
 }

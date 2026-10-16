@@ -10,26 +10,16 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { LibraryAssetProvider } from './libraryAssetProvider'
 import type { LibraryFolderId } from './libraryFolderId'
+import type { SaveMediaLibraryAssetDataSource } from './saveMediaLibraryAssetDataSource'
 
-export type SaveLibraryAssetRequestData = {
-  provider: LibraryAssetProvider
-  /**
-   * @minLength 1
-   * @maxLength 128
-   */
-  source_id: string
-  source_url?: string
-  preview_url?: string
-  original_url?: string
+export interface SaveMediaLibraryAssetData {
+  source: SaveMediaLibraryAssetDataSource
+  /** Same-workspace readable Media Asset identity (asset_...). */
+  media_asset_id: string
   /** @maxLength 255 */
   title?: string
   /** @maxLength 255 */
   author?: string
-  /** @minimum 0 */
-  width?: number
-  /** @minimum 0 */
-  height?: number
   folder_id?: LibraryFolderId
 }

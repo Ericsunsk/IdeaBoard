@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -140,27 +141,52 @@ CREATE TABLE library_assets (
   public_id TEXT NOT NULL,
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
   folder_id BIGINT NOT NULL REFERENCES library_folders(internal_id) ON DELETE RESTRICT,
-  provider TEXT NOT NULL,
-  source_id TEXT NOT NULL,
-  source_url TEXT NOT NULL,
-  preview_url TEXT NOT NULL,
-  original_url TEXT NOT NULL,
+  provider TEXT NULL,
+  source_id TEXT NULL,
+  source_url TEXT NULL,
+  preview_url TEXT NULL,
+  original_url TEXT NULL,
   media_asset_id BIGINT NULL REFERENCES media_assets(internal_id) ON DELETE RESTRICT,
-  width INT NOT NULL DEFAULT 0,
-  height INT NOT NULL DEFAULT 0,
+  title TEXT NOT NULL DEFAULT '',
+  author TEXT NOT NULL DEFAULT '',
+  width INT NULL,
+  height INT NULL,
+  task_id TEXT NULL,
+  task_result_index INT NULL,
+  saved_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT uq_library_assets_public_id UNIQUE (public_id),
-  CONSTRAINT uq_library_assets_workspace_source UNIQUE (workspace_id, provider, source_id),
   CONSTRAINT chk_library_assets_public_id CHECK (public_id LIKE 'lasset\_%'),
-  CONSTRAINT chk_library_assets_provider CHECK (provider IN ('unsplash','pexels','workspace_media')),
-  CONSTRAINT chk_library_assets_source_id CHECK (length(btrim(source_id)) > 0),
-  CONSTRAINT chk_library_assets_dimensions CHECK (width >= 0 AND height >= 0),
+  CONSTRAINT chk_library_assets_title CHECK (length(title) <= 255),
+  CONSTRAINT chk_library_assets_author CHECK (length(author) <= 255),
+  CONSTRAINT chk_library_assets_dimensions CHECK (
+    (media_asset_id IS NULL AND width IS NOT NULL AND height IS NOT NULL AND width >= 0 AND height >= 0)
+    OR (media_asset_id IS NOT NULL AND width IS NULL AND height IS NULL)
+  ),
+  CONSTRAINT chk_library_assets_lineage CHECK (
+    (task_id IS NULL AND task_result_index IS NULL)
+    OR (task_id IS NOT NULL AND task_id LIKE 'task\_%' AND task_result_index IS NOT NULL AND task_result_index >= 0)
+  ),
   CONSTRAINT chk_library_assets_reference_shape CHECK (
-    (provider = 'workspace_media' AND media_asset_id IS NOT NULL AND source_url = '' AND preview_url = '' AND original_url = '')
-    OR (provider IN ('unsplash','pexels') AND media_asset_id IS NULL AND source_url <> '' AND preview_url <> '' AND original_url <> '')
+    (media_asset_id IS NOT NULL
+      AND provider IS NULL AND source_id IS NULL
+      AND source_url IS NULL AND preview_url IS NULL AND original_url IS NULL)
+    OR (media_asset_id IS NULL
+      AND provider IN ('unsplash','pexels')
+      AND source_id IS NOT NULL AND length(btrim(source_id)) > 0 AND length(source_id) <= 128
+      AND source_url IS NOT NULL AND source_url <> ''
+      AND preview_url IS NOT NULL AND preview_url <> ''
+      AND original_url IS NOT NULL AND original_url <> '')
   )
 );
+
+CREATE UNIQUE INDEX uq_library_assets_workspace_source
+  ON library_assets (workspace_id, provider, source_id)
+  WHERE media_asset_id IS NULL;
+CREATE UNIQUE INDEX uq_library_assets_workspace_media
+  ON library_assets (workspace_id, media_asset_id)
+  WHERE media_asset_id IS NOT NULL;
 
 CREATE TABLE library_materializations (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -654,6 +680,12 @@ func TestLibraryServiceResolve(t *testing.T) {
 	if results[3].Status != "resolved" || results[3].SourceID != "r1" {
 		t.Fatalf("url resolve = %+v, want resolved r1", results[3])
 	}
+	for _, index := range []int{0, 3} {
+		asset := results[index].Asset
+		if !reflect.DeepEqual(asset, saved) {
+			t.Fatalf("resolve item %d projection differs from save: %+v / %+v", index, asset, saved)
+		}
+	}
 	if results[4].Status != "unresolved" || results[5].Status != "unresolved" {
 		t.Fatalf("bad url resolves = %+v, want unresolved", results[4:6])
 	}
@@ -923,21 +955,35 @@ func TestLibraryServiceManagedDisplayLinkIsWorkspaceScoped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	saved, _, err := env.svc.SaveManagedMediaAsset(ctx, env.wsA, "task-output", mediaID, assetID)
-	if err != nil {
-		t.Fatal(err)
+	saved, created, err := env.svc.SaveManagedMediaAsset(ctx, env.wsA, domain.V1SaveManagedAssetInput{
+		MediaAssetID: mediaID, Title: "hero", OperatorUserID: env.userID,
+	}, assetID)
+	if err != nil || !created {
+		t.Fatalf("managed save = %v, %v; want created", saved, err)
 	}
-	got, err := env.svc.FindManagedMedia(ctx, env.wsA, saved.PublicID)
-	if err != nil || got != mediaID {
-		t.Fatalf("managed link=%q, error=%v", got, err)
+	if saved.Source != domain.AssetSourceMedia || saved.MediaAssetID != mediaID {
+		t.Fatalf("managed save = %+v; want media source with link", saved)
 	}
-	if _, err := env.svc.FindManagedMedia(ctx, env.wsB, saved.PublicID); !errors.Is(err, domain.ErrV1AssetNotFound) {
+	if saved.Provider != "" || saved.SourceID != "" || saved.SourceURL != "" || saved.PreviewURL != "" || saved.OriginalURL != "" {
+		t.Fatalf("managed save = %+v; want no provider/URL keys", saved)
+	}
+	if saved.Width == nil || *saved.Width != 100 || saved.Height == nil || *saved.Height != 80 {
+		t.Fatalf("managed dims = %v x %v; want projected 100 x 80", saved.Width, saved.Height)
+	}
+	if saved.Title != "hero" || saved.Lineage != nil {
+		t.Fatalf("managed save = %+v; want durable title, no lineage", saved)
+	}
+	got, err := env.svc.GetAsset(ctx, env.wsA, saved.PublicID)
+	if err != nil || got.MediaAssetID != mediaID {
+		t.Fatalf("managed link=%q, error=%v", got.MediaAssetID, err)
+	}
+	if _, err := env.svc.GetAsset(ctx, env.wsB, saved.PublicID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatal("cross-workspace managed link exposed")
 	}
 	if err := env.svc.DeleteAsset(ctx, env.wsA, saved.PublicID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := env.svc.FindManagedMedia(ctx, env.wsA, saved.PublicID); !errors.Is(err, domain.ErrV1AssetNotFound) {
+	if _, err := env.svc.GetAsset(ctx, env.wsA, saved.PublicID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatal("deleted managed link exposed")
 	}
 }

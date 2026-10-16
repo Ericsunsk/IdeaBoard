@@ -47,9 +47,9 @@ func (w *WorkspaceTaskWorker) loadDispatchableTask(ctx context.Context, args wor
 	}
 	if task.IsTerminal() {
 		if task.Status == workspacetasks.StatusCompleted {
-			// Complete commits before auto-materialization. A redelivery in
+			// Complete commits before Library auto-save. A redelivery in
 			// this gap replays the idempotent trigger and repairs the link.
-			w.materializeCompletedTask(ctx, task)
+			w.saveCompletedTask(ctx, task)
 		}
 		slog.Info("workspace task already terminal; dropping dirty job", "task_id", taskID, "status", task.Status)
 		return nil, nil

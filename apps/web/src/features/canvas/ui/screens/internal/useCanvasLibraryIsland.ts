@@ -2,9 +2,11 @@ import { onScopeDispose, ref } from 'vue'
 import {
   createLibraryFolderFacts,
   createLibraryMutationPublisher,
+  createLibrarySaveModule,
   listAllWorkspaceLibraryFolders,
   requireWorkspaceId,
 } from '../../../../library'
+import { useAppToast } from '../../../../../core/composables/useAppToast'
 import { getWorkspaceSelectionStore } from '../../../../workspace'
 
 /** Owns Canvas-local Library visibility and its shared Library coordination facts. */
@@ -18,11 +20,19 @@ export function useCanvasLibraryIsland() {
     ),
   )
   const mutationPublisher = createLibraryMutationPublisher(folderFacts)
+  const saveModule = createLibrarySaveModule({
+    workspaceId: () => getWorkspaceSelectionStore().getSelectedId(),
+    mutationPublisher,
+    notify: useAppToast(),
+  })
 
-  onScopeDispose(folderFacts.dispose)
+  onScopeDispose(() => {
+    saveModule.dispose()
+    folderFacts.dispose()
+  })
 
   return {
-    view: { isOpen, isMounted, isFocusWithin, folderFacts, mutationPublisher },
+    view: { isOpen, isMounted, isFocusWithin, folderFacts, mutationPublisher, saveModule },
     commands: {
       toggle() {
         if (!isOpen.value) isMounted.value = true
