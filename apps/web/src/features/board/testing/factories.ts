@@ -31,7 +31,6 @@ export type MockWorkspaceBoardApiState = {
   }>
   createdBoards: Array<Record<string, unknown>>
   archivedBoardIds: string[]
-  joinedBoard: Record<string, unknown> | null
   listError?: unknown
   saveError?: unknown
   createError?: unknown
@@ -46,7 +45,6 @@ export function createMockWorkspaceBoardApiState(
     savedCalls: [],
     createdBoards: [],
     archivedBoardIds: [],
-    joinedBoard: null,
     ...overrides,
   }
 }
@@ -95,21 +93,6 @@ function mockCreateBoard(
   }
   state.createdBoards.push(created)
   return Promise.resolve({ data: created })
-}
-
-function mockJoinBoard(
-  state: MockWorkspaceBoardApiState,
-  url: string,
-  config?: MockRequestConfig,
-): Promise<unknown> {
-  state.savedCalls.push({
-    url,
-    method: 'POST',
-    headers: configHeaders(config),
-    body: parseBody(config?.body),
-  })
-  if (state.joinedBoard) return Promise.resolve({ data: state.joinedBoard })
-  return Promise.reject(new Error(`Unexpected board join without fixture: POST ${url}`))
 }
 
 function mockReadDocument(state: MockWorkspaceBoardApiState, boardId: string): Promise<unknown> {
@@ -236,11 +219,6 @@ const BOARD_ROUTE_TABLE: Array<{
     run: (state, _url, config, match) => mockCreateBoard(state, match[1] ?? '', config),
   },
   {
-    pattern: /^\/v1\/workspaces\/[^/]+\/boards\/join$/,
-    methods: ['POST'],
-    run: (state, url, config) => mockJoinBoard(state, url, config),
-  },
-  {
     pattern: /^\/v1\/workspaces\/[^/]+\/boards\/([^/]+)\/document$/,
     methods: ['GET'],
     run: (state, _url, _config, match) => mockReadDocument(state, match[1] ?? ''),
@@ -337,6 +315,11 @@ export function makeBoardState(overrides: Partial<BoardState> = {}): BoardState 
   )
 }
 
-export function makeBoardMeta(id: string, name = id, updatedAt = 1): BoardMeta {
-  return { id, name, createdAt: 1, updatedAt }
+export function makeBoardMeta(
+  id: string,
+  name = id,
+  updatedAt = 1,
+  overrides: Partial<BoardMeta> = {},
+): BoardMeta {
+  return { id, name, createdAt: 1, updatedAt, ...overrides }
 }

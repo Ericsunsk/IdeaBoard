@@ -57,6 +57,8 @@ export default {
     folderDeleted: '폴더가 삭제되었습니다',
     assetMoved: '에셋이 이동되었습니다',
     removedFromLibrary: '라이브러리에서 제거되었습니다',
+    publishedToWorkspace:
+      '워크스페이스 라이브러리에 게시되었습니다. 워크스페이스 멤버에게 표시됩니다.',
   },
   errors: {
     loadFoldersFailed: '폴더를 불러올 수 없습니다',
@@ -69,5 +71,7 @@ export default {
     deleteFolderFailed: '폴더를 삭제할 수 없습니다',
     importAssetFailed: '에셋을 가져올 수 없습니다',
     lookupStatusFailed: '저장 상태를 조회할 수 없습니다',
+    saveRestrictedDenied:
+      '게시 거부됨: 제한된 소재는 생성자 또는 관리자만 워크스페이스에 저장할 수 있습니다.',
   },
 } as const

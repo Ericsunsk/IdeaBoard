@@ -92,7 +92,7 @@ export default {
       '그룹 경계를 업데이트하지 못했습니다. 캔버스를 새로고침한 뒤 다시 시도해 주세요.',
   },
   chrome: {
-    shareComingSoon: '공유 기능 곧 제공 예정',
+    share: '공유',
     export: '내보내기',
     selectTool: '선택 (V)',
     handTool: '손 (H)',
@@ -129,6 +129,8 @@ export default {
     boardRestoreFailedError: '캔버스를 복원하지 못했습니다. 나중에 다시 시도해 주세요.',
     boardArchivedRenameBlocked:
       '이 캔버스는 보관 처리되었습니다. 이름을 변경하려면 먼저 복원해 주세요.',
+    boardReadOnlyLabel: '이 캔버스는 읽기 전용입니다.',
+    boardReadOnlyRenameBlocked: '이 캔버스에 대한 보기 권한만 있어 이름을 변경할 수 없습니다.',
   },
   viewport: {
     zoomIn: '확대',
@@ -332,6 +334,8 @@ export default {
     saved: '저장됨',
     saveFailed: '저장에 실패했습니다. 나중에 다시 시도해 주세요.',
     boardArchivedSaveBlocked: '이 캔버스는 보관 처리되었습니다. 계속 편집하려면 복원해 주세요.',
+    boardAccessLost:
+      '이 보드에 대한 접근 권한이 없습니다. 저장하지 않은 변경사항은 삭제되었습니다.',
     downloadEmptyResponse: '다운로드 실패: 빈 응답입니다.',
     downloadImageHttpFailed: '다운로드 실패: HTTP {code}',
     downloadImageFailed: '다운로드 실패: {reason}',

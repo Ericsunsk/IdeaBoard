@@ -3,6 +3,7 @@ import type { BoardRepository } from '../../session/catalog/repository'
 import type { CatalogEntry, CatalogSortMode, Catalog, CatalogNavigation } from './contract'
 import type { BoardFeedback } from './useBoardFeedback'
 import { createCommandHandlers } from './commandHandlers'
+import { filterBoardsByRange, useGalleryRange, type BoardGalleryRange } from './range'
 
 type GalleryControllerDependencies = {
   catalog: BoardRepository
@@ -16,9 +17,14 @@ function filterAndSortBoards(
   boards: readonly CatalogEntry[],
   keyword: string,
   sortMode: CatalogSortMode,
+  range: BoardGalleryRange,
 ): CatalogEntry[] {
+  // Range is a pure frontend derivation over the single canonical
+  // authorized catalog: no refetch, no catalog overwrite, no permission
+  // change. Search and sort apply within the selected range.
+  const inRange = filterBoardsByRange(boards, range)
   const normalizedKeyword = keyword.toLowerCase()
-  const filtered = boards.filter((board) => {
+  const filtered = inRange.filter((board) => {
     if (!normalizedKeyword) return true
     return board.name.toLowerCase().includes(normalizedKeyword)
   })
@@ -26,6 +32,28 @@ function filterAndSortBoards(
     return [...filtered].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
   }
   return [...filtered].sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+function createBoardViews(dependencies: {
+  boards: () => readonly CatalogEntry[]
+  searchKeyword: Ref<string>
+  sortMode: Ref<CatalogSortMode>
+  galleryRange: Ref<BoardGalleryRange>
+}) {
+  const boards = computed<readonly CatalogEntry[]>(() => dependencies.boards())
+  const visibleBoards = computed(() =>
+    filterAndSortBoards(
+      boards.value,
+      dependencies.searchKeyword.value,
+      dependencies.sortMode.value,
+      dependencies.galleryRange.value,
+    ),
+  )
+  const rangeCounts = computed(() => ({
+    personal: filterBoardsByRange(boards.value, 'personal').length,
+    team: filterBoardsByRange(boards.value, 'team').length,
+  }))
+  return { visibleBoards, rangeCounts }
 }
 
 function setupCatalogRefresh(refresh: {
@@ -93,6 +121,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
   const activeMenuBoardId = ref<string | null>(null)
   const searchKeyword = ref('')
   const sortMode = ref<CatalogSortMode>('recent')
+  const galleryRangeState = useGalleryRange()
   const renamingBoardId = ref<string | null>(null)
   const renameDraft = ref('')
   const catalogRecoveryBoardId = ref<string | null>(null)
@@ -102,18 +131,22 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
   const isDeletePending = ref(false)
   let suppressNextBoardOpen = false
 
-  const boards = computed<readonly CatalogEntry[]>(
-    () => dependencies.catalog.viewModel.boards.value,
-  )
-  const visibleBoards = computed(() =>
-    filterAndSortBoards(boards.value, searchKeyword.value, sortMode.value),
-  )
+  const { visibleBoards, rangeCounts } = createBoardViews({
+    boards: () => dependencies.catalog.viewModel.boards.value,
+    searchKeyword,
+    sortMode,
+    galleryRange: galleryRangeState.range,
+  })
 
   const stopScopeWatch = watch(dependencies.catalog.viewModel.scope, () => {
     activeMenuBoardId.value = null
     clearRename(false)
     catalogRecoveryBoardId.value = null
     resetDeleteState()
+    // The persisted range is isolated per User + Workspace: a scope switch
+    // loads that scope's saved range (default personal), never the
+    // previous scope's selection.
+    galleryRangeState.reloadPersistedRange()
   })
 
   const commandHandlers = createCommandHandlers({
@@ -132,6 +165,16 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
   })
 
   const { hydration, reloadCatalog } = commandHandlers
+
+  async function createAndOpenBoard(): Promise<void> {
+    const didOpen = await commandHandlers.createAndOpenBoard()
+    // New boards are server-fixed to workspace_access none under the
+    // caller, so they always land in the personal range: a successful
+    // creation returns the gallery there whatever range it started from.
+    // Creation sends a name-only body in every range; the current range
+    // never changes the default permission.
+    if (didOpen) galleryRangeState.setRange('personal')
+  }
 
   function setSearchKeyword(value: string | undefined) {
     searchKeyword.value = (value ?? '').trim()
@@ -220,6 +263,8 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
       catalogHydrationFailed: hydration.viewModel.catalogHydrationFailed,
       searchKeyword: readonly(searchKeyword),
       sortMode: readonly(sortMode),
+      range: readonly(galleryRangeState.range),
+      rangeCounts,
       activeMenuBoardId: readonly(activeMenuBoardId),
       renamingBoardId: readonly(renamingBoardId),
       renameDraft: readonly(renameDraft),
@@ -233,9 +278,10 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
       initialize: hydration.initialize,
       setSearchKeyword,
       setSortMode,
+      setRange: galleryRangeState.setRange,
       toggleBoardMenu,
       handleBoardMenuHidden,
-      createAndOpenBoard: commandHandlers.createAndOpenBoard,
+      createAndOpenBoard,
       duplicateBoard: commandHandlers.duplicateBoard,
       startRename,
       updateRenameDraft,

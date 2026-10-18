@@ -284,6 +284,11 @@ func (e *atomicEnv) seedSecondWorkspaceWithFundedOwner(t *testing.T) (workspaceI
 		workspaceID, userID); err != nil {
 		t.Fatalf("seed second workspace: %v", err)
 	}
+	if _, err := e.pool.Exec(ctx,
+		`INSERT INTO workspace_memberships (workspace_id, user_id, role) SELECT internal_id, $2, 'owner' FROM workspaces WHERE public_id = $1`,
+		workspaceID, userID); err != nil {
+		t.Fatalf("seed second workspace membership: %v", err)
+	}
 	tx, err := e.pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)

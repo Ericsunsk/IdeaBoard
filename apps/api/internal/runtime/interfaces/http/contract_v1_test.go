@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
@@ -102,7 +103,11 @@ func newV1TestEngine(store tenancy.Store, dir *staticUserDirectory) *gin.Engine 
 		c.Next()
 	})
 	v1 := router.Group(ContractV1GroupPath)
-	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{Store: store, Users: dir})
+	var boardStore boards.WorkspaceBoardStore
+	if membershipScope, ok := store.(boards.WorkspaceMembershipScope); ok {
+		boardStore = boards.NewInMemoryWorkspaceBoardStoreForTests(membershipScope, dir)
+	}
+	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{Store: store, Users: dir, Boards: boardStore})
 	return router
 }
 

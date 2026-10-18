@@ -42,7 +42,11 @@ function avatarFileExtension(file: File): string | undefined {
 }
 
 export const uploadApi = {
-  upload: async (file: File, workspaceId: string): Promise<UploadImageMetadata> => {
+  upload: async (
+    file: File,
+    workspaceId: string,
+    options?: { boardId?: string | undefined },
+  ): Promise<UploadImageMetadata> => {
     const workspace = workspaceId.trim()
     if (!workspace) throw new Error(i18n.global.t('common.errors.uploadFailed'))
     const bytes = await file.arrayBuffer()
@@ -61,6 +65,9 @@ export const uploadApi = {
         sizeBytes: file.size,
         checksumSha256,
         mediaKind: 'image',
+        // #936: bind Canvas uploads to their board when the board has a
+        // durable identity; unsaved boards stay unbound (owner-only).
+        ...(options?.boardId != null ? { boardId: options.boardId } : {}),
       },
       { idempotencyKey: workspaceUploadIdempotencyKey('create') },
     )
@@ -313,6 +320,22 @@ export type WorkspaceUploadCreateInput = {
   sizeBytes: number
   checksumSha256: string
   mediaKind?: string | undefined
+  /**
+   * Optional board the upload is captured for (#936: restricted upload
+   * target). Only `board_...` shapes are sent; anything else (unsaved
+   * canvas boards, local ids) stays unbound so the asset is owner-only
+   * until another source grants wider access. The server verifies the
+   * creator's board write access — never trusted from the client.
+   */
+  boardId?: string | undefined
+}
+
+/** Mirrors the backend `board_` public-id shape (prefix + alnum/`-`/`_` suffix). */
+export function isBoardPublicIdShape(raw: unknown): raw is string {
+  if (typeof raw !== 'string') return false
+  const trimmed = raw.trim()
+  if (!trimmed.startsWith('board_') || trimmed.length <= 'board_'.length) return false
+  return /^[A-Za-z0-9_-]+$/.test(trimmed.slice('board_'.length))
 }
 
 export type WorkspaceUploadCompleteInput = {
@@ -352,6 +375,7 @@ export const workspaceUploadApi = {
     data.media_kind = (input.mediaKind ?? 'image') as NonNullable<
       CreateUploadRequest['data']['media_kind']
     >
+    if (isBoardPublicIdShape(input.boardId)) data.board_id = input.boardId.trim()
     const envelope = await createWorkspaceUploadTransport(
       assertWorkspaceId(workspaceId),
       { data },

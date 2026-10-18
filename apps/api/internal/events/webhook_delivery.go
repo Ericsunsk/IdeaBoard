@@ -76,6 +76,26 @@ func (s *WebhookStore) executeDeliveryAttempt(ctx context.Context, subscriptionI
 		s.mu.Unlock()
 		return nil
 	}
+	s.mu.Unlock()
+	// Pending protected deliveries cannot leave through a Workspace webhook.
+	// Mark the drop terminally so durable reconciliation does not retry it.
+	if !workspaceWebhookVisible(envelope) {
+		s.mu.Lock()
+		if live, stillThere := s.subs[subscriptionID]; stillThere {
+			if live.Delivered == nil {
+				live.Delivered = map[string]struct{}{}
+			}
+			live.Delivered[envelope.ID] = struct{}{}
+		}
+		s.mu.Unlock()
+		if persistence != nil {
+			if err := persistence.MarkDelivered(ctx, subscriptionID, envelope); err != nil {
+				return fmt.Errorf("events: persist dropped webhook: %w", err)
+			}
+		}
+		return nil
+	}
+	s.mu.Lock()
 	body, err := json.Marshal(envelope)
 	s.mu.Unlock()
 	if err != nil {

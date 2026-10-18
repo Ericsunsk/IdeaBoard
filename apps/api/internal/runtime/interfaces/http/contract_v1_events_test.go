@@ -112,7 +112,7 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
 	tasks := workspacetasks.NewInMemoryStoreForTests()
-	boardsStore := boards.NewInMemoryWorkspaceBoardStoreForTests()
+	boardsStore := boards.NewInMemoryWorkspaceBoardStoreForTests(store, dir)
 	libStore := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
 	lib := libStore
 	quoter := &fakeTaskQuoter{}
@@ -309,68 +309,14 @@ func TestV1TaskCancelEmitsCancelledAndReleased(t *testing.T) {
 
 func TestV1BoardProducersEmit(t *testing.T) {
 	fx := newV1EventsFixture(t)
-	docPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/boards/" + fx.boardID + "/document"
-	status, payload := eventIDEM(t, fx.engine, http.MethodPut, docPath, 1, "evt-doc-1",
-		`{"data":{"schema_version":1,"payload":{"a":1}}}`,
-		map[string]string{contract.IfMatchHeader: "1"})
-	if status != http.StatusOK {
-		t.Fatalf("replace document = %d %v, want 200", status, payload)
-	}
-	membersPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/boards/" + fx.boardID + "/members"
-	target := tenancy.FormatUserPublicID(fx.dir.ensure(4))
-	fx.store.SeedWorkspaceMember(fx.ws.PublicID, 4, tenancy.RoleMember)
-	status, payload = eventIDEM(t, fx.engine, http.MethodPost, membersPath, 1, "evt-madd-1",
-		fmt.Sprintf(`{"data":{"user_id":%q,"role":"viewer"}}`, target), nil)
-	if status != http.StatusCreated {
-		t.Fatalf("member add = %d %v, want 201", status, payload)
-	}
-	sharesPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/boards/" + fx.boardID + "/shares"
-	status, payload = eventIDEM(t, fx.engine, http.MethodPost, sharesPath, 1, "evt-share-1", `{"data":{"role":"viewer"}}`, nil)
-	if status != http.StatusCreated {
-		t.Fatalf("share create = %d %v, want 201", status, payload)
-	}
-	tokenID := payload["data"].(map[string]any)["token_id"].(string)
-	status, payload = eventIDEM(t, fx.engine, http.MethodDelete, sharesPath+"/"+tokenID, 1, "evt-unshare-1", "", nil)
-	if status != http.StatusOK {
-		t.Fatalf("share revoke = %d %v, want 200", status, payload)
-	}
-	types := fx.logTypes()
+	replaceBoardDocumentForVisibilityTest(t, fx, "event-doc", "1")
+	addBoardViewerForVisibilityTest(t, fx, 4, "event-share")
 	counts := map[string]int{}
-	for _, typ := range types {
+	for _, typ := range fx.logTypes() {
 		counts[typ]++
 	}
-	for _, want := range []string{
-		events.EventV1BoardDocumentReplaced, events.EventV1BoardMemberChanged, events.EventV1BoardShareRevoked,
-	} {
-		if counts[want] != 1 {
-			t.Fatalf("%s count=%d, want 1 (types=%v)", want, counts[want], types)
-		}
-	}
-	missed, _, _ := fx.eventLog.ReplayAfter(fx.ws.PublicID, "evt_doesnotexist0000", events.WorkspaceEventFilter{})
-	for _, envelope := range missed {
-		if err := events.ValidateV1Envelope(envelope); err != nil {
-			t.Fatalf("board envelope invalid: %v", err)
-		}
-		var data map[string]any
-		_ = json.Unmarshal(envelope.Data, &data)
-		switch envelope.Type {
-		case events.EventV1BoardDocumentReplaced:
-			if data["board_id"] != fx.boardID || data["revision"].(float64) != 2 {
-				t.Fatalf("document_replaced data=%v", data)
-			}
-		case events.EventV1BoardMemberChanged:
-			if data["board_id"] != fx.boardID || data["member_id"] != target {
-				t.Fatalf("member_changed data=%v", data)
-			}
-		case events.EventV1BoardShareRevoked:
-			if data["board_id"] != fx.boardID || data["share_token_id"] != tokenID {
-				t.Fatalf("share_revoked data=%v", data)
-			}
-			raw, _ := json.Marshal(envelope)
-			if bytes.Contains(raw, []byte("bearer")) {
-				t.Fatal("share_revoked must never carry the bearer")
-			}
-		}
+	if counts[events.EventV1BoardDocumentReplaced] != 1 || counts[events.EventV1BoardAccessChanged] != 2 {
+		t.Fatalf("events=%v", counts)
 	}
 }
 
@@ -426,6 +372,20 @@ func TestV1EventVisibilityMatrix(t *testing.T) {
 	}
 }
 
+func TestV1EventSubscriptionRejectsPrincipalScopedTypes(t *testing.T) {
+	fx := newV1EventsFixture(t)
+	for _, typ := range []string{events.EventV1TaskCreated, events.EventV1MediaAssetReady, events.EventV1BoardDocumentReplaced} {
+		status, payload := eventIDEM(t, fx.engine, http.MethodPost, fx.subscriptionsPath(), 2, "evt-sub-private-"+typ,
+			fmt.Sprintf(`{"data":{"url":"https://hooks.example.com/x","event_types":[%q]}}`, typ), nil)
+		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeValidationFailed) {
+			t.Fatalf("subscription %s = %d %v, want 422 validation_failed", typ, status, payload)
+		}
+	}
+	if got := len(fx.webhooks.List(fx.ws.PublicID)); got != 0 {
+		t.Fatalf("protected subscriptions persisted=%d, want 0", got)
+	}
+}
+
 func TestV1EventSubscriptionCRUD(t *testing.T) {
 	fx := newV1EventsFixture(t)
 	// Missing Idempotency-Key fails closed.
@@ -442,7 +402,7 @@ func TestV1EventSubscriptionCRUD(t *testing.T) {
 	}
 	// Create with a minted secret: plaintext returned exactly once.
 	status, payload = eventIDEM(t, fx.engine, http.MethodPost, fx.subscriptionsPath(), 2, "evt-sub-1",
-		`{"data":{"url":"https://hooks.example.com/x","event_types":["task.completed"]}}`, nil)
+		`{"data":{"url":"https://hooks.example.com/x","event_types":["billing.settled"]}}`, nil)
 	if status != http.StatusCreated {
 		t.Fatalf("create = %d %v, want 201", status, payload)
 	}
@@ -462,7 +422,7 @@ func TestV1EventSubscriptionCRUD(t *testing.T) {
 	}
 	// Replay with the same key+hash returns the same subscription.
 	status, replay := eventIDEM(t, fx.engine, http.MethodPost, fx.subscriptionsPath(), 2, "evt-sub-1",
-		`{"data":{"url":"https://hooks.example.com/x","event_types":["task.completed"]}}`, nil)
+		`{"data":{"url":"https://hooks.example.com/x","event_types":["billing.settled"]}}`, nil)
 	if status != http.StatusCreated {
 		t.Fatalf("replay = %d, want 201", status)
 	}
@@ -526,9 +486,20 @@ func TestV1WebhookDispatchVerifiesSignature(t *testing.T) {
 	if status != http.StatusAccepted {
 		t.Fatalf("create task = %d, want 202", status)
 	}
+	if calls, _, _ := fx.sender.snapshot(); calls != 0 {
+		t.Fatalf("private Task settlement sent %d webhook frames", calls)
+	}
+	envelope, err := events.MintV1Envelope(events.EventV1BillingSettled, fx.ws.PublicID,
+		events.V1Actor{Type: events.V1ActorSystem, ID: "system"},
+		events.V1Resource{Type: events.V1ResourceCheckoutSession, ID: "checkout_1"},
+		events.V1BillingSettledData{ReferenceType: "checkout_session", ReferenceID: "checkout_1", SettlementState: "captured"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx.webhooks.Dispatch(t.Context(), envelope)
 	calls, bodies, headers := fx.sender.snapshot()
-	if calls != 2 {
-		t.Fatalf("webhook calls = %d, want 2 (task.created + billing.settled)", calls)
+	if calls != 1 {
+		t.Fatalf("webhook calls = %d, want 1 Workspace billing settlement", calls)
 	}
 	subs := fx.webhooks.List(fx.ws.PublicID)
 	if len(subs) != 1 {

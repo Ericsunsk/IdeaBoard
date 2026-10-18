@@ -11,16 +11,32 @@ info:
     Envelope versioning is independent from HTTP API versions: `version`
     versions the event data payload for (`type`) only. The frozen registry
     (all version 1) is: task.created/running/completed/failed/cancelled,
-    media.asset_ready/archived, board.document_replaced/member_changed/
-    share_revoked, billing.settled.
+    media.asset_ready/archived, board.document_replaced/access_changed,
+    billing.settled. board.share_revoked was removed with the #935
+    bearer-chain deletion (no replacement event).
     Registry changes are additive only; existing (type, version) pairs never
     change shape. Internal DB rows, numeric ids, storage URLs, bearers, and
     amounts are never exposed (public ids + API URIs + refs only). Control
     audit records are never exposed on this surface (see #808).
 
+    Delivery visibility (#940): servers filter every channel by CURRENT
+    permission at delivery time, never broadcast-then-frontend-filter.
+    board.document_replaced reaches only principals holding
+    current board read access (an envelope emitted before a revocation but
+    delivered after it is dropped; ordinary replay never returns
+    now-invisible history). board.access_changed is a directed control
+    signal delivered ONLY to the named member (recipient from the prior
+    grant; board identity + access version, never content) and never rides
+    webhooks. Workspace webhook subscriptions have no selected-member
+    identity. Only checkout-session billing.settled has a Workspace-wide webhook audience;
+    Task-linked settlements and Task, Media and Board frames are excluded
+    at dispatch and delivery.
+    board.access_changed payloads reject unknown data keys so no
+    producer can smuggle content through the revocation path.
+
     Producer maturity: HTTP-path producers (task.created/cancelled,
-    media.asset_ready/archived, board.document_replaced/member_changed/
-    share_revoked, billing.settled refs) emit after their store commit. task.running/completed/failed
+    media.asset_ready/archived, board.document_replaced/access_changed,
+    billing.settled refs) emit after their store commit. task.running/completed/failed
     validate here but have no live HTTP producer yet: worker-side terminal
     settle flushes through the same staged seam with the #809 worker.
 
@@ -79,9 +95,15 @@ info:
 
     Retention: NATS JetStream MaxAge (7 days per DESIGN) is authoritative;
     the process-local hot log (1000 envelopes/workspace) is the live
-    replay window. Durable outbox persistence lands with #809.
+    replay window. Cross-instance commits fan out through the JetStream
+    bridge into every instance's hot log (per-recipient filtering stays at
+    serve time). Directed board.access_changed signals persist in the
+    board_access_event_outbox until their live emit completes (River
+    sweeper replays on the stable evt_ id); ordinary board frames stay
+    best-effort invalidation hints converging through gap + HTTP
+    revalidation. Durable outbox persistence lands with #809.
   x-event-transports: [sse, webhook]
-  x-event-types: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.member_changed, board.share_revoked, billing.settled]
+  x-event-types: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.access_changed, billing.settled]
 servers:
   - url: /api/v1
 paths:
@@ -334,7 +356,7 @@ components:
           description: Opaque event identifier, also used for SSE Last-Event-ID replay.
         type:
           type: string
-          enum: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.member_changed, board.share_revoked, billing.settled]
+          enum: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.access_changed, billing.settled]
           description: Stable event type with independent schema versioning.
         version:
           type: integer
@@ -455,28 +477,23 @@ components:
         revision:
           type: integer
           minimum: 1
-    BoardMemberChangedData:
+    BoardAccessChangedData:
       type: object
-      required: [board_id, member_id]
+      required: [board_id, member_id, access_version]
       additionalProperties: false
       properties:
         board_id:
           type: string
           pattern: '^board_[A-Za-z0-9_-]+$'
+          description: Already-known board identity, never content.
         member_id:
           type: string
           pattern: '^usr_[A-Za-z0-9_-]+$'
-    BoardShareRevokedData:
-      type: object
-      required: [board_id, share_token_id]
-      additionalProperties: false
-      properties:
-        board_id:
-          type: string
-          pattern: '^board_[A-Za-z0-9_-]+$'
-        share_token_id:
-          type: string
-          description: Token id only; the bearer never leaves the server.
+          description: Directed recipient (from the prior grant); servers deliver only to this member.
+        access_version:
+          type: integer
+          minimum: 1
+          description: Monotonic access version; orders access signals only, never document revisions.
     BillingSettledData:
       type: object
       required: [reference_type, reference_id, settlement_state]
@@ -493,6 +510,10 @@ components:
         hold_transaction_id:
           type: string
           description: Ledger hold reference only; amounts never appear in events.
+    WebhookEventType:
+      type: string
+      enum: [billing.settled]
+      description: Only checkout-session settlements deliver. Task-linked settlements and Task, Media and Board content require a user principal.
     EventSubscription:
       type: object
       required: [id, workspace_id, url, event_types, has_secret, status, created_at, updated_at]
@@ -511,8 +532,8 @@ components:
         event_types:
           type: array
           items:
-            type: string
-          description: Empty means all frozen types.
+            $ref: '#/components/schemas/WebhookEventType'
+          description: Supported Workspace-wide webhook events.
         has_secret:
           type: boolean
           description: Secret material never appears in reads.
@@ -599,8 +620,9 @@ components:
               description: Optional whsec_-form secret (at least 16 decoded bytes); when omitted the server mints one.
             event_types:
               type: array
+              description: Empty or omitted means all supported Workspace webhook types.
               items:
-                type: string
+                $ref: '#/components/schemas/WebhookEventType'
     CreateEventSubscriptionResponse:
       type: object
       required: [data]

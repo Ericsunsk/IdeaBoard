@@ -100,8 +100,8 @@ afterEach(() => {
 })
 
 describe('workspace event registry', () => {
-  it('freezes the 11-type version-1 registry', () => {
-    expect(WORKSPACE_EVENT_TYPES).toHaveLength(11)
+  it('freezes the 10-type version-1 registry', () => {
+    expect(WORKSPACE_EVENT_TYPES).toHaveLength(10)
     for (const type of [
       'task.created',
       'task.running',
@@ -111,8 +111,7 @@ describe('workspace event registry', () => {
       'media.asset_ready',
       'media.asset_archived',
       'board.document_replaced',
-      'board.member_changed',
-      'board.share_revoked',
+      'board.access_changed',
       'billing.settled',
     ]) {
       expect(isWorkspaceEventType(type)).toBe(true)

@@ -24,4 +24,12 @@ export default {
   checkout_request_rejected: '无法发起支付，请重试。',
   checkout_session_expired: '支付会话已过期，请重新发起支付。',
   payment_already_completed: '该笔支付已完成。',
+  board_forbidden: '无权操作该看板。',
+  task_forbidden: '无权操作该任务。',
+  board_archived: '该看板已归档，无法执行此操作。',
+  board_not_found: '看板不存在。',
+  board_access_conflict: '访问权限已在别处更改，请刷新后重试。',
+  board_precondition_required: '访问状态已过期，请刷新后重试。',
+  board_member_not_found: '看板成员不存在。',
+  membership_transition_forbidden: '最后一位管理者不能被移除或降级。',
 } as const

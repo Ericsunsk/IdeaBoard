@@ -8,6 +8,7 @@
  */
 export { useWorkspaceAccountControls } from './shell/useWorkspaceAccountControls'
 export type { WorkspaceNavigationAdapter } from './shell/useWorkspaceAccountControls'
+export { useWorkspaceSwitcher } from './shell/useWorkspaceSwitcher'
 export { default as WorkspaceNavigation } from './shell/components/WorkspaceNavigation.vue'
 export { default as WorkspaceHeader } from './shell/components/WorkspaceHeader.vue'
 export {
@@ -57,3 +58,8 @@ export {
   useWorkspaceSelectionPort,
 } from './selection/workspaceSelectionPort'
 export type { WorkspaceSelectionPort } from './selection/workspaceSelectionPort'
+export {
+  fetchWorkspaceMembers,
+  workspaceMembersQueryOptions,
+} from './selection/workspaceMembersResource'
+export type { WorkspaceMemberEntry } from './selection/workspaceMembersResource'

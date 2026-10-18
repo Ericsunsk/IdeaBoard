@@ -50,6 +50,7 @@ type CanvasWorkspaceRuntimeViewModel = {
     isRenamePending: Ref<boolean>
     catalogRecovery: Ref<CanvasWorkspaceCatalogRecoveryState>
     isBoardArchived: Ref<boolean>
+    isBoardReadOnly: ComputedRef<boolean>
     isRestoringArchivedBoard: Ref<boolean>
     currentBoardName: ComputedRef<string>
     boardOptions: ComputedRef<Array<{ id: string; name: string }>>

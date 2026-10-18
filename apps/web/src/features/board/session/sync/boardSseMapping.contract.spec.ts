@@ -73,6 +73,8 @@ function stubEventSource() {
   vi.stubGlobal('EventSource', MockEventSource)
 }
 
+let accessSequence = 0
+
 function envelopeFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'evt_abc123',
@@ -158,18 +160,20 @@ describe('board SSE mapping', () => {
   })
   it('freezes the board event types in the workspace registry', () => {
     expect(WORKSPACE_EVENT_TYPES).toContain('board.document_replaced')
-    expect(WORKSPACE_EVENT_TYPES).toContain('board.member_changed')
-    expect(WORKSPACE_EVENT_TYPES).toContain('board.share_revoked')
+    expect(WORKSPACE_EVENT_TYPES).toContain('board.access_changed')
+    expect(WORKSPACE_EVENT_TYPES).toContain('board.access_changed')
+    expect(WORKSPACE_EVENT_TYPES).not.toContain('board.share_revoked')
     expect(isWorkspaceEventType('board.document_replaced')).toBe(true)
-    expect(isWorkspaceEventType('board.member_changed')).toBe(true)
-    expect(isWorkspaceEventType('board.share_revoked')).toBe(true)
+    expect(isWorkspaceEventType('board.access_changed')).toBe(true)
+    expect(isWorkspaceEventType('board.access_changed')).toBe(true)
+    expect(isWorkspaceEventType('board.share_revoked')).toBe(false)
   })
 
   it('fans out board envelopes per workspace and drops cross-workspace frames', () => {
     stubEventSource()
     const seen: WorkspaceEventEnvelope[] = []
     const stop = subscribeWorkspaceEvent(WORKSPACE_ID, (envelope) => seen.push(envelope), {
-      types: ['board.document_replaced', 'board.member_changed', 'board.share_revoked'],
+      types: ['board.document_replaced', 'board.access_changed'],
     })
     expect(MockEventSource.instances).toHaveLength(1)
 
@@ -267,43 +271,19 @@ describe('board SSE mapping', () => {
       expect(write).not.toHaveBeenCalled()
     })
 
-    it('invalidates the list on member_changed without fetching the document', async () => {
+    it('invalidates the list and removes the document on access_changed', async () => {
       await observeList()
       await client.fetchQuery(boardDocumentOptions(WORKSPACE_ID, 'board-1'))
       connect()
       MockEventSource.instances[0]!.emit(
-        'board.member_changed',
+        'board.access_changed',
         envelopeFixture({
           id: 'evt_member8',
-          type: 'board.member_changed',
-          data: { board_id: 'board-1' },
+          type: 'board.access_changed',
+          data: { board_id: 'board-1', access_version: ++accessSequence },
         }),
       )
       await vi.advanceTimersByTimeAsync(0)
-
-      expect(mocks.request).toHaveBeenCalledTimes(3)
-      expect(
-        mocks.request.mock.calls.filter(([url]) => String(url).endsWith('/document')),
-      ).toHaveLength(1)
-      expect(
-        client.getQueryState(boardQueryKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated,
-      ).toBe(false)
-    })
-
-    it('invalidates the list and removes the document on share_revoked', async () => {
-      await observeList()
-      await client.fetchQuery(boardDocumentOptions(WORKSPACE_ID, 'board-1'))
-      const emit = connect()
-      emit(8)
-      MockEventSource.instances[0]!.emit(
-        'board.share_revoked',
-        envelopeFixture({
-          id: 'evt_revoked8',
-          type: 'board.share_revoked',
-          data: { board_id: 'board-1' },
-        }),
-      )
-      await vi.advanceTimersByTimeAsync(500)
 
       expect(mocks.request).toHaveBeenCalledTimes(3)
       expect(
@@ -314,7 +294,33 @@ describe('board SSE mapping', () => {
       expect(client.getQueryData(boardQueryKeys.list(WORKSPACE_ID))).toBeDefined()
     })
 
-    describe('share_revoked gallery convergence', () => {
+    it('invalidates the Share access resource on access_changed', async () => {
+      await observeList()
+      client.setQueryData(boardQueryKeys.access(WORKSPACE_ID, 'board-1'), {
+        workspaceAccess: 'none',
+        accessVersion: 3,
+        accessState: 'workspace',
+      })
+      connect()
+      MockEventSource.instances[0]!.emit(
+        'board.access_changed',
+        envelopeFixture({
+          id: 'evt_member9',
+          type: 'board.access_changed',
+          data: { board_id: 'board-1', access_version: ++accessSequence },
+        }),
+      )
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(
+        client
+          .getQueryCache()
+          .find({ queryKey: boardQueryKeys.access(WORKSPACE_ID, 'board-1'), exact: true })?.state
+          .isInvalidated,
+      ).toBe(true)
+    })
+
+    describe('access_changed access-loss convergence', () => {
       function connectRevoked(
         convergence: {
           isBoardVisible?: (boardId: string) => boolean
@@ -325,24 +331,24 @@ describe('board SSE mapping', () => {
         stops.push(subscribeBoardQueryInvalidation(client, WORKSPACE_ID, () => false, convergence))
       }
 
-      function emitShareRevoked(id = 'evt_revoked8') {
+      function emitSelectionChanged(id = 'evt_member8') {
         MockEventSource.instances[0]!.emit(
-          'board.share_revoked',
+          'board.access_changed',
           envelopeFixture({
             id,
-            type: 'board.share_revoked',
-            data: { board_id: 'board-1' },
+            type: 'board.access_changed',
+            data: { board_id: 'board-1', access_version: ++accessSequence },
           }),
         )
       }
 
-      it('requests one hydrate convergence when the revoked board is still shown', async () => {
+      it('requests one hydrate convergence when the changed board is still shown', async () => {
         await observeList()
         await client.fetchQuery(boardDocumentOptions(WORKSPACE_ID, 'board-1'))
         const isBoardVisible = vi.fn((boardId: string) => boardId === 'board-1')
         const requestCatalogHydrate = vi.fn()
         connectRevoked({ isBoardVisible, requestCatalogHydrate })
-        emitShareRevoked()
+        emitSelectionChanged()
         await vi.advanceTimersByTimeAsync(0)
 
         expect(isBoardVisible).toHaveBeenCalledWith('board-1')
@@ -354,7 +360,7 @@ describe('board SSE mapping', () => {
         ).toBeUndefined()
       })
 
-      it('coalesces duplicate revoked frames into the single in-flight convergence', async () => {
+      it('coalesces duplicate changed frames into the single in-flight convergence', async () => {
         await observeList()
         const resolvers: Array<() => void> = []
         const requestCatalogHydrate = vi.fn(
@@ -364,24 +370,24 @@ describe('board SSE mapping', () => {
             }),
         )
         connectRevoked({ isBoardVisible: () => true, requestCatalogHydrate })
-        emitShareRevoked('evt_revoked8')
-        emitShareRevoked('evt_revoked8-duplicate')
+        emitSelectionChanged('evt_member8')
+        emitSelectionChanged('evt_member8-duplicate')
         await vi.advanceTimersByTimeAsync(0)
         expect(requestCatalogHydrate).toHaveBeenCalledTimes(1)
 
         resolvers.splice(0).forEach((resolve) => resolve())
         await vi.advanceTimersByTimeAsync(0)
-        emitShareRevoked('evt_revoked8-retry')
+        emitSelectionChanged('evt_member8-retry')
         await vi.advanceTimersByTimeAsync(0)
         expect(requestCatalogHydrate).toHaveBeenCalledTimes(2)
       })
 
-      it('skips the convergence when the revoked board is not shown', async () => {
+      it('skips the convergence when the changed board is not shown', async () => {
         await observeList()
         await client.fetchQuery(boardDocumentOptions(WORKSPACE_ID, 'board-1'))
         const requestCatalogHydrate = vi.fn()
         connectRevoked({ isBoardVisible: () => false, requestCatalogHydrate })
-        emitShareRevoked()
+        emitSelectionChanged()
         await vi.advanceTimersByTimeAsync(500)
 
         expect(requestCatalogHydrate).not.toHaveBeenCalled()
@@ -395,7 +401,7 @@ describe('board SSE mapping', () => {
 
       it('converges the catalog without refetching the removed board document', async () => {
         // The local catalog still shows the synced entry while the server no
-        // longer lists board-1 (revoked elsewhere), so the gallery is stale.
+        // longer lists board-1 (grant removed elsewhere), so the gallery is stale.
         replaceBoards([
           {
             id: 'board-1',
@@ -423,7 +429,7 @@ describe('board SSE mapping', () => {
               hydrateBoardsFromServer({ shouldIncludeDocuments: false, shouldForce: true }),
           }),
         )
-        emitShareRevoked()
+        emitSelectionChanged()
         for (let i = 0; i < 10 && getBoardById('board-1') !== null; i += 1) {
           await vi.advanceTimersByTimeAsync(10)
         }
@@ -431,6 +437,108 @@ describe('board SSE mapping', () => {
         expect(getBoardById('board-1')).toBeNull()
         expect(documentReads()).toHaveLength(1)
         queryClient.clear()
+      })
+    })
+
+    describe('access_changed directed-signal convergence', () => {
+      function connectAccess(
+        convergence: {
+          isBoardVisible?: (boardId: string) => boolean
+          requestCatalogHydrate?: () => void | Promise<unknown>
+        } = {},
+      ) {
+        stubEventSource()
+        stops.push(subscribeBoardQueryInvalidation(client, WORKSPACE_ID, () => false, convergence))
+      }
+
+      function emitAccessChanged(id: string, data: Record<string, unknown>) {
+        MockEventSource.instances[0]!.emit(
+          'board.access_changed',
+          envelopeFixture({
+            id,
+            type: 'board.access_changed',
+            resource: { type: 'board', id: 'board-1' },
+            data,
+          }),
+        )
+      }
+
+      it('invalidates the list and removes the document on a fresh access version', async () => {
+        await observeList()
+        await client.fetchQuery(boardDocumentOptions(WORKSPACE_ID, 'board-1'))
+        const requestCatalogHydrate = vi.fn()
+        connectAccess({ isBoardVisible: () => true, requestCatalogHydrate })
+        emitAccessChanged('evt_access3', { board_id: 'board-1', access_version: 3 })
+        await vi.advanceTimersByTimeAsync(0)
+
+        expect(requestCatalogHydrate).toHaveBeenCalledTimes(1)
+        expect(
+          client
+            .getQueryCache()
+            .find({ queryKey: boardQueryKeys.document(WORKSPACE_ID, 'board-1'), exact: true }),
+        ).toBeUndefined()
+        expect(client.getQueryData(boardQueryKeys.list(WORKSPACE_ID))).toBeDefined()
+      })
+
+      it('drops stale and duplicate access versions without reconverging', async () => {
+        await observeList()
+        await client.fetchQuery(boardDocumentOptions(WORKSPACE_ID, 'board-1'))
+        const requestCatalogHydrate = vi.fn()
+        connectAccess({ isBoardVisible: () => true, requestCatalogHydrate })
+        emitAccessChanged('evt_access3', { board_id: 'board-1', access_version: 3 })
+        await vi.advanceTimersByTimeAsync(0)
+        expect(requestCatalogHydrate).toHaveBeenCalledTimes(1)
+
+        emitAccessChanged('evt_access2-stale', { board_id: 'board-1', access_version: 2 })
+        emitAccessChanged('evt_access3-duplicate', { board_id: 'board-1', access_version: 3 })
+        await vi.advanceTimersByTimeAsync(0)
+        expect(requestCatalogHydrate).toHaveBeenCalledTimes(1)
+
+        emitAccessChanged('evt_access4', { board_id: 'board-1', access_version: 4 })
+        await vi.advanceTimersByTimeAsync(0)
+        expect(requestCatalogHydrate).toHaveBeenCalledTimes(2)
+      })
+
+      it('ignores malformed access versions without touching queries', async () => {
+        await observeList()
+        await client.fetchQuery(boardDocumentOptions(WORKSPACE_ID, 'board-1'))
+        const requestCatalogHydrate = vi.fn()
+        connectAccess({ isBoardVisible: () => true, requestCatalogHydrate })
+        emitAccessChanged('evt_access-missing', { board_id: 'board-1' })
+        emitAccessChanged('evt_access-zero', { board_id: 'board-1', access_version: 0 })
+        emitAccessChanged('evt_access-negative', { board_id: 'board-1', access_version: -2 })
+        await vi.advanceTimersByTimeAsync(0)
+
+        expect(requestCatalogHydrate).not.toHaveBeenCalled()
+        expect(
+          client
+            .getQueryCache()
+            .find({ queryKey: boardQueryKeys.document(WORKSPACE_ID, 'board-1'), exact: true }),
+        ).toBeDefined()
+      })
+
+      it('never mixes the access watermark with document revisions', async () => {
+        await observeList()
+        await observeDocument()
+        const requestCatalogHydrate = vi.fn()
+        connectAccess({ isBoardVisible: () => true, requestCatalogHydrate })
+        // A high access version must not suppress a newer document revision,
+        // and a document frame must not advance the access watermark.
+        emitAccessChanged('evt_access9', { board_id: 'board-1', access_version: 9 })
+        await vi.advanceTimersByTimeAsync(0)
+        expect(requestCatalogHydrate).toHaveBeenCalledTimes(1)
+
+        remoteRevision(10, 'latest from HTTP')
+        MockEventSource.instances[0]!.emit(
+          'board.document_replaced',
+          envelopeFixture({ id: 'evt_rev8', data: { board_id: 'board-1', revision: 8 } }),
+        )
+        await vi.advanceTimersByTimeAsync(500)
+        expect(mocks.request).toHaveBeenCalledTimes(3)
+
+        emitAccessChanged('evt_access9-dup', { board_id: 'board-1', access_version: 9 })
+        await vi.advanceTimersByTimeAsync(0)
+        expect(requestCatalogHydrate).toHaveBeenCalledTimes(1)
       })
     })
 

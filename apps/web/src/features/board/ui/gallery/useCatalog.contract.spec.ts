@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { WorkspaceBoardMeta } from '../../session/adapters/boardsResource'
 import { makeBoardMeta as makeBoard } from '../../testing'
 
 describe('Boards Catalog public interface', () => {
@@ -107,7 +108,7 @@ describe('Boards Catalog public interface', () => {
   })
 })
 
-async function sceneCatalogFixture() {
+async function sceneCatalogFixture(): Promise<WorkspaceBoardMeta> {
   const { parsePreviewScene } = await import('../../core/preview/scene')
   const fixture =
     await import('../../../../../../api/internal/boards/previewscene/testdata/mixed.json')
@@ -121,6 +122,11 @@ async function sceneCatalogFixture() {
     updatedAt: 1,
     contentVersion: 'cv-1',
     previewScene: scene,
+    capabilities: { read: true, write: true, manage: true, generate: true },
+    accessState: 'private' as const,
+    workspaceAccess: 'none' as const,
+    isCreator: true,
+    hasDirectGrant: false,
   }
 }
 
@@ -135,7 +141,7 @@ describe('Catalog scene reads', () => {
     const { getWorkspaceSelectionStore } = await import('../../../workspace')
     const { setStoredAuth } = await import('../../../../core/utils/auth')
     const meta = await sceneCatalogFixture()
-    const scene = meta.previewScene
+    const scene = meta.previewScene!
     primeAuthenticatedWorkspace('ws_first')
     const boards = shallowRef([makeBoard('board-1'), makeBoard('offline')])
     const captured = getBoardScope()

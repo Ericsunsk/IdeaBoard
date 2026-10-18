@@ -210,16 +210,6 @@ export default {
   branding: {
     loadFailed: '无法加载站点设置。',
   },
-  shareJoin: {
-    loadingTitle: '正在加入共享画布…',
-    failedTitle: '无法加入共享画布',
-    successTitle: '已加入共享画布',
-    loadingStatus: '请稍候，正在验证分享凭证并同步画布…',
-    failedStatus: '无法加入该画布，请检查分享链接是否有效。',
-    successStatus: '加入成功，正在跳转…',
-    spinnerAria: '正在加入共享画布',
-    backToBoards: '返回工作区',
-  },
   errors: {
     networkRetry: '网络错误，请重试。',
     walletLoadFailed: '无法加载 Ideas 余额。',

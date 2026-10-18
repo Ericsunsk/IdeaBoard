@@ -57,6 +57,8 @@ export default {
     folderDeleted: 'Carpeta eliminada',
     assetMoved: 'Recurso movido',
     removedFromLibrary: 'Eliminado de la Biblioteca',
+    publishedToWorkspace:
+      'Publicado en la Biblioteca del espacio de trabajo, visible para sus miembros.',
   },
   errors: {
     loadFoldersFailed: 'No se pudieron cargar las carpetas',
@@ -69,5 +71,7 @@ export default {
     deleteFolderFailed: 'No se pudo eliminar la carpeta',
     importAssetFailed: 'No se pudo importar el recurso',
     lookupStatusFailed: 'No se pudo consultar el estado guardado',
+    saveRestrictedDenied:
+      'Publicación denegada: solo el creador o un administrador puede guardar material restringido en el espacio de trabajo.',
   },
 } as const

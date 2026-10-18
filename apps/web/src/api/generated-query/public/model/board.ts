@@ -10,8 +10,12 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { BoardAccessState } from './boardAccessState'
+import type { BoardCapabilities } from './boardCapabilities'
 import type { BoardId } from './boardId'
 import type { BoardPreviewScene } from './boardPreviewScene'
+import type { BoardRelationship } from './boardRelationship'
+import type { WorkspaceAccess } from './workspaceAccess'
 import type { WorkspaceId } from './workspaceId'
 
 export interface Board {
@@ -46,6 +50,17 @@ export interface Board {
    * @nullable
    */
   archived_at?: string | null
+  /** Creator User public identity (usr_ opaque). */
+  creator_user_id: string
+  workspace_access: WorkspaceAccess
+  /**
+   * Independent monotonic access counter, served as the access-<version> ETag on the access resource. Access mutations bump it; document writes never do.
+   * @minimum 1
+   */
+  access_version: number
+  access_state: BoardAccessState
+  relationship: BoardRelationship
+  capabilities: BoardCapabilities
   created_at: string
   updated_at: string
 }

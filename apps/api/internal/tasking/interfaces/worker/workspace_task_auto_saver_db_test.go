@@ -75,3 +75,92 @@ func TestWorkerAutoSaveEndToEndPostgres(t *testing.T) {
 		t.Fatalf("asset folder = %q, want the Quick Saves lfolder_ id", saved.FolderPublicID)
 	}
 }
+
+type revokeBetweenOutputSaver struct {
+	saver      taskruntime.TaskOutputLibrarySaver
+	afterFirst func() error
+	calls      int
+}
+
+func (s *revokeBetweenOutputSaver) SaveTaskOutputAsset(ctx context.Context, workspaceID string, input taskruntime.TaskOutputSaveInput) (*librarydomain.V1Asset, bool, error) {
+	asset, created, err := s.saver.SaveTaskOutputAsset(ctx, workspaceID, input)
+	s.calls++
+	if s.calls == 1 && err == nil {
+		if revokeErr := s.afterFirst(); revokeErr != nil {
+			return nil, false, revokeErr
+		}
+	}
+	return asset, created, err
+}
+
+func TestAutoSaverRechecksMembershipForEachOutputPostgres(t *testing.T) {
+	env := openWorkspaceIntegrationEnv(t)
+	ctx := t.Context()
+	service, _, _ := newWorkerIntegrationService(env)
+	first := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "batch-first.png")
+	second := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "batch-second.png")
+	created, err := service.Create(ctx, workspacetasks.CreateInput{WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1}, "batch-revoke")
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := service.Complete(ctx, env.wsA, created.ID, []workspacetasks.OutputRef{
+		{Kind: workspacetasks.OutputKindAsset, AssetID: first.ID, Role: "result", ResultIndex: 0},
+		{Kind: workspacetasks.OutputKindAsset, AssetID: second.ID, Role: "result", ResultIndex: 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	saver := &revokeBetweenOutputSaver{saver: taskruntime.NewWorkspaceTaskLibrarySaver(env.lib), afterFirst: func() error {
+		_, err := env.pool.Exec(ctx, `DELETE FROM workspace_memberships WHERE workspace_id=(SELECT internal_id FROM workspaces WHERE public_id=$1) AND user_id=$2`, env.wsA, env.userA)
+		return err
+	}}
+	trigger, err := taskruntime.NewWorkspaceTaskAutoSaver(saver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := trigger.SaveCompletedTask(ctx, completed); err != nil {
+		t.Fatal(err)
+	}
+	assets, err := env.lib.ListAssets(ctx, env.wsA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saver.calls != 2 || len(assets) != 1 || assets[0].MediaAssetID != first.ID {
+		t.Fatalf("batch reused stale membership: calls=%d assets=%+v", saver.calls, assets)
+	}
+}
+
+func TestAutomaticPublicationRequiresPersistedOutputPostgres(t *testing.T) {
+	env := openWorkspaceIntegrationEnv(t)
+	ctx := t.Context()
+	service, _, _ := newWorkerIntegrationService(env)
+	output := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "accepted-output.png")
+	unrelated := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "unrelated-upload.png")
+	task, err := service.Create(ctx, workspacetasks.CreateInput{WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1}, "exact-output")
+	if err != nil {
+		t.Fatal(err)
+	}
+	saver := taskruntime.NewWorkspaceTaskLibrarySaver(env.lib)
+	input := taskruntime.TaskOutputSaveInput{TaskID: task.ID, ResultIndex: 0, MediaAssetID: output.ID, OperatorUserID: env.userA}
+	if _, _, err := saver.SaveTaskOutputAsset(ctx, env.wsA, input); err == nil {
+		t.Fatal("pending Task published an output")
+	}
+	if _, err := service.Complete(ctx, env.wsA, task.ID, []workspacetasks.OutputRef{{Kind: workspacetasks.OutputKindAsset, AssetID: output.ID, Role: "result", ResultIndex: 0}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, wrong := range []taskruntime.TaskOutputSaveInput{
+		{TaskID: task.ID, ResultIndex: 1, MediaAssetID: output.ID, OperatorUserID: env.userA},
+		{TaskID: task.ID, ResultIndex: 0, MediaAssetID: unrelated.ID, OperatorUserID: env.userA},
+		{TaskID: task.ID, ResultIndex: 0, MediaAssetID: output.ID, OperatorUserID: env.userB},
+	} {
+		if _, _, err := saver.SaveTaskOutputAsset(ctx, env.wsA, wrong); err == nil {
+			t.Fatalf("forged automatic output accepted: %+v", wrong)
+		}
+	}
+	if assets, err := env.lib.ListAssets(ctx, env.wsA); err != nil || len(assets) != 0 {
+		t.Fatalf("invalid callback published authority: %d,%v", len(assets), err)
+	}
+	if _, created, err := saver.SaveTaskOutputAsset(ctx, env.wsA, input); err != nil || !created {
+		t.Fatalf("exact completed output not accepted: %v,%v", created, err)
+	}
+}

@@ -95,7 +95,11 @@ func NormalizeSubmitIdempotencyKey(raw string) (string, error) {
 //
 // Only the digest is persisted; the raw prompt and params never reach the
 // claim table.
-func TaskSubmitRequestHash(workspaceID, kind string, mediaAssetIDs []string, prompt string, paramsJSON string, quantity int64, resolution string) string {
+//
+// The Board binding is part of the fingerprint (#937): the same key with a
+// different Board ID is a conflict, never a silent replay of a task bound
+// to the wrong Board.
+func TaskSubmitRequestHash(workspaceID, kind string, mediaAssetIDs []string, prompt string, paramsJSON string, quantity int64, resolution string, boardID string) string {
 	assets := append([]string(nil), mediaAssetIDs...)
 	slices.Sort(assets)
 	sum := sha256.Sum256([]byte(strings.Join([]string{
@@ -107,6 +111,7 @@ func TaskSubmitRequestHash(workspaceID, kind string, mediaAssetIDs []string, pro
 		paramsJSON,
 		strconv.FormatInt(quantity, 10),
 		strings.TrimSpace(resolution),
+		strings.TrimSpace(boardID),
 	}, "\x00")))
 	return hex.EncodeToString(sum[:])
 }

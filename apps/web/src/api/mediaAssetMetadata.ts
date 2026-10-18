@@ -226,6 +226,23 @@ export function invalidateMediaAssetMetadata(assetId?: MediaAssetId) {
   notifyAssetInvalidated(null, assetId)
 }
 
+/**
+ * Board access-loss display-lease release (#941): drops every cached
+ * display metadata entry for one workspace (same-origin display URLs and
+ * their expiry facts) without touching other workspaces. In-flight reads
+ * keep their abort scoping; late resolves for now-terminal assets fail at
+ * serve time instead of repopulating. Authorized content re-resolves on
+ * demand through the same authorized transport.
+ */
+export function invalidateWorkspaceMediaAssetMetadata(workspaceId: string): void {
+  const normalized = workspaceId.trim()
+  if (!normalized) return
+  const prefix = `${normalized}:`
+  for (const cacheKey of [...metadataCache.keys()]) {
+    if (cacheKey.startsWith(prefix)) metadataCache.delete(cacheKey)
+  }
+}
+
 export function refreshWorkspaceMediaAssetMetadata(
   workspaceId: string,
   assetId: MediaAssetId,

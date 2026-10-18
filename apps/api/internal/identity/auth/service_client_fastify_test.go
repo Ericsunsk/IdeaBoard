@@ -52,6 +52,17 @@ func TestServiceClientAgainstFastify(t *testing.T) {
 		t.Fatalf("GetUserStates response = %+v, want unbanned admin state", states)
 	}
 
+	lookupID, err := client.LookupUserByEmail(ctx, "  ALICE@example.com ")
+	if err != nil {
+		t.Fatalf("LookupUserByEmail against Fastify: %v", err)
+	}
+	if lookupID != authUserID {
+		t.Fatalf("LookupUserByEmail response = %q, want %q", lookupID, authUserID)
+	}
+	if _, err := client.LookupUserByEmail(ctx, "ghost@example.com"); !errors.Is(err, ErrAuthUserNotFound) {
+		t.Fatalf("LookupUserByEmail not-found error = %v, want ErrAuthUserNotFound", err)
+	}
+
 	assertFastifyMutationSuccess(t, "DeleteUser", func() error {
 		return client.DeleteUser(ctx, authUserID)
 	})

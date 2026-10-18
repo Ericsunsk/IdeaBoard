@@ -7,10 +7,11 @@ import {
 
 describe('redirect safety policy', () => {
   it('allows safe internal redirect paths with query and hash', () => {
-    expect(isSafeInternalRedirectPath('/share?token=abc')).toBe(true)
-    expect(isSafeInternalRedirectPath('/share?token=abc#join')).toBe(true)
     expect(isSafeInternalRedirectPath('/user/boards?tab=recent#top')).toBe(true)
+    expect(isSafeInternalRedirectPath('/user/canvas?boardId=board_abc#node')).toBe(true)
     expect(isSafeInternalRedirectPath('/admin/users?page=1#x')).toBe(true)
+    // The removed /share join route is no longer a safe destination.
+    expect(isSafeInternalRedirectPath('/share?token=abc')).toBe(false)
   })
 
   it('rejects external, protocol-relative, and backslash redirects', () => {
@@ -141,17 +142,17 @@ describe('resolveAuthFailureAction', () => {
     })
   })
 
-  it('preserves a share join destination across login', () => {
+  it('preserves a canvas destination across login', () => {
     expect(
       resolveAuthFailureAction({
         status: 401,
-        requestUrl: '/api/boards/share-token',
-        currentPathname: '/share',
-        currentFullPath: '/share?token=abc',
+        requestUrl: '/api/v1/workspaces/ws_abc/boards',
+        currentPathname: '/user/canvas',
+        currentFullPath: '/user/canvas?boardId=board_abc',
       }),
     ).toEqual({
       kind: 'redirect-login',
-      targetPath: '/user/login?redirect=%2Fshare%3Ftoken%3Dabc',
+      targetPath: '/user/login?redirect=%2Fuser%2Fcanvas%3FboardId%3Dboard_abc',
     })
   })
 

@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"strings"
 
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/library/domain"
 	"ideaboard/api/internal/platform/database"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -99,22 +101,43 @@ func (s *Service) SaveAsset(ctx context.Context, workspacePublicID string, input
 	return nil, false, errors.New("library: asset public id mint collision, retry the request")
 }
 
-// SaveManagedMediaAsset is the managed-save use case for manual and
-// task-auto entries. The reference
-// is keyed by (workspace, media asset) and lives in Quick Saves unless
-// an explicit folder binds it. The media row must exist in the same
-// workspace and stay readable (cross-workspace, archived, or missing
-// media fails closed with no row written). Replays return the existing
-// row with created=false without touching its folder or metadata.
+// SaveManagedMediaAsset atomically authorizes and publishes readable Media.
 func (s *Service) SaveManagedMediaAsset(ctx context.Context, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, false, err
+	return s.acceptPublication(ctx, workspacePublicID, input, publicID, s.authorizeManual)
+}
+
+// SaveTaskOutput accepts one automatic publication from a completed Task.
+func (s *Service) SaveTaskOutput(ctx context.Context, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error) {
+	return s.acceptPublication(ctx, workspacePublicID, input, publicID, s.authorizeAutomatic)
+}
+
+func (s *Service) authorizeManual(ctx context.Context, tx pgx.Tx, workspaceID string, input domain.V1SaveManagedAssetInput) (bool, error) {
+	return true, s.publication.AuthorizeManual(ctx, tx, workspaceID, input)
+}
+
+func (s *Service) authorizeAutomatic(ctx context.Context, tx pgx.Tx, workspaceID string, input domain.V1SaveManagedAssetInput) (bool, error) {
+	return s.publication.AuthorizeAutomatic(ctx, tx, workspaceID, input)
+}
+
+func (s *Service) acceptPublication(ctx context.Context, workspaceID string, input domain.V1SaveManagedAssetInput, publicID string, authorize func(context.Context, pgx.Tx, string, domain.V1SaveManagedAssetInput) (bool, error)) (*domain.V1Asset, bool, error) {
+	if s.publication == nil {
+		return nil, false, ErrNotConfigured
 	}
-	db := s.dbWithContext(ctx)
-	q, err := db.queries()
-	if err != nil {
-		return nil, false, err
-	}
+	var asset *domain.V1Asset
+	var created bool
+	err := s.dbWithContext(ctx).withTxDBTX(func(q *dbsqlc.Queries, tx pgx.Tx) error {
+		ctx := dbutil.ContextWithAmbientTx(ctx, tx)
+		allowed, err := authorize(ctx, tx, workspaceID, input)
+		if err != nil || !allowed {
+			return err
+		}
+		asset, created, err = s.saveManagedMediaAsset(ctx, q, workspaceID, input, publicID)
+		return err
+	})
+	return asset, created, err
+}
+
+func (s *Service) saveManagedMediaAsset(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error) {
 	normalized, err := domain.NormalizeAndValidateManagedAsset(input)
 	if err != nil {
 		return nil, false, err

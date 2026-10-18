@@ -18,6 +18,7 @@ import (
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -407,99 +408,130 @@ func (s *Store) AddWorkspaceMember(ctx context.Context, workspacePublicID string
 	if !tenancy.IsValidRole(role) {
 		return nil, tenancy.ErrForbidden
 	}
-	workspace, err := s.GetWorkspace(ctx, workspacePublicID)
-	if err != nil {
-		return nil, err
-	}
-	dbCtx := s.dbWithContext(ctx)
-	if _, err := dbCtx.q.InsertWorkspaceMembershipIgnore(ctx, dbsqlc.InsertWorkspaceMembershipIgnoreParams{
-		WorkspaceID: workspace.InternalID, UserID: targetUserID, Role: role,
-	}); err != nil {
-		return nil, err
-	}
-	row, err := dbCtx.q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
-		WorkspaceID: workspace.InternalID, UserID: targetUserID,
+	var added *tenancy.WorkspaceMember
+	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
+		workspaceID, err := q.LockWorkspaceMemberships(ctx, strings.TrimSpace(workspacePublicID))
+		if err != nil {
+			return notFound(err)
+		}
+		lookup := dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspaceID, UserID: targetUserID}
+		row, err := q.GetWorkspaceMembership(ctx, lookup)
+		if database.IsNotFound(err) {
+			count, countErr := q.CountWorkspaceMembers(ctx, workspaceID)
+			if countErr != nil {
+				return countErr
+			}
+			if count >= tenancy.MaxWorkspaceMembers {
+				return tenancy.ErrWorkspaceMemberLimitReached
+			}
+			if _, err := q.InsertWorkspaceMembershipIgnore(ctx, dbsqlc.InsertWorkspaceMembershipIgnoreParams{
+				WorkspaceID: workspaceID, UserID: targetUserID, Role: role,
+			}); err != nil {
+				return err
+			}
+			row, err = q.GetWorkspaceMembership(ctx, lookup)
+		}
+		if err != nil {
+			return notFound(err)
+		}
+		externalIDs, err := userExternalIDs(ctx, q, []int64{targetUserID})
+		if err != nil {
+			return err
+		}
+		added = mapWorkspaceMember(workspacePublicID, row, externalIDs)
+		return nil
 	})
-	if err != nil {
-		return nil, notFound(err)
-	}
-	externalIDs, err := userExternalIDs(ctx, dbCtx.q, []int64{targetUserID})
-	if err != nil {
-		return nil, err
-	}
-	return mapWorkspaceMember(workspace.PublicID, row, externalIDs), nil
+	return added, err
 }
 
 // UpdateWorkspaceMemberRole applies the agreed role-transition rules before
 // persisting the new role.
 func (s *Store) UpdateWorkspaceMemberRole(ctx context.Context, workspacePublicID string, actorUserID, targetUserID int64, newRole string) (*tenancy.WorkspaceMember, error) {
-	workspace, err := s.GetWorkspace(ctx, workspacePublicID)
-	if err != nil {
-		return nil, err
-	}
-	dbCtx := s.dbWithContext(ctx)
-	target, err := dbCtx.q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
-		WorkspaceID: workspace.InternalID, UserID: targetUserID,
+	var updated *tenancy.WorkspaceMember
+	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
+		workspaceID, err := q.LockWorkspaceMemberships(ctx, strings.TrimSpace(workspacePublicID))
+		if err != nil {
+			return notFound(err)
+		}
+		target, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
+			WorkspaceID: workspaceID, UserID: targetUserID,
+		})
+		if err != nil {
+			return notFound(err)
+		}
+		actorRole, owners, err := s.mutationContext(ctx, q, workspaceID, actorUserID)
+		if err != nil {
+			return err
+		}
+		if err := tenancy.CheckMemberMutation(actorRole, actorUserID, targetUserID, target.Role, newRole, owners, false); err != nil {
+			return err
+		}
+		if _, err := q.UpdateWorkspaceMemberRole(ctx, dbsqlc.UpdateWorkspaceMemberRoleParams{
+			WorkspaceID: workspaceID, UserID: targetUserID, Role: strings.TrimSpace(newRole),
+		}); err != nil {
+			return err
+		}
+		row, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
+			WorkspaceID: workspaceID, UserID: targetUserID,
+		})
+		if err != nil {
+			return notFound(err)
+		}
+		externalIDs, err := userExternalIDs(ctx, q, []int64{targetUserID})
+		if err != nil {
+			return err
+		}
+		updated = mapWorkspaceMember(workspacePublicID, row, externalIDs)
+		return nil
 	})
-	if err != nil {
-		return nil, notFound(err)
-	}
-	actorRole, owners, err := s.mutationContext(ctx, dbCtx.q, workspace.InternalID, actorUserID)
-	if err != nil {
-		return nil, err
-	}
-	if err := tenancy.CheckMemberMutation(actorRole, actorUserID, targetUserID, target.Role, newRole, owners, false); err != nil {
-		return nil, err
-	}
-	if _, err := dbCtx.q.UpdateWorkspaceMemberRole(ctx, dbsqlc.UpdateWorkspaceMemberRoleParams{
-		WorkspaceID: workspace.InternalID, UserID: targetUserID, Role: strings.TrimSpace(newRole),
-	}); err != nil {
-		return nil, err
-	}
-	updated, err := dbCtx.q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
-		WorkspaceID: workspace.InternalID, UserID: targetUserID,
-	})
-	if err != nil {
-		return nil, notFound(err)
-	}
-	externalIDs, err := userExternalIDs(ctx, dbCtx.q, []int64{targetUserID})
-	if err != nil {
-		return nil, err
-	}
-	return mapWorkspaceMember(workspace.PublicID, updated, externalIDs), nil
+	return updated, err
 }
 
 // RemoveWorkspaceMember applies the agreed removal rules (last-owner guard,
 // self-removal) before deleting the membership row.
-func (s *Store) RemoveWorkspaceMember(ctx context.Context, workspacePublicID string, actorUserID, targetUserID int64) error {
-	workspace, err := s.GetWorkspace(ctx, workspacePublicID)
-	if err != nil {
-		return err
-	}
-	dbCtx := s.dbWithContext(ctx)
-	target, err := dbCtx.q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
-		WorkspaceID: workspace.InternalID, UserID: targetUserID,
+func (s *Store) RemoveWorkspaceMember(ctx context.Context, workspacePublicID string, actorUserID, targetUserID int64, grants tenancy.WorkspaceMemberGrantStore) ([]tenancy.MemberGrantCleanup, error) {
+	var cleaned []tenancy.MemberGrantCleanup
+	err := dbutil.WithTxDBTX(ctx, s.db, func(q *dbsqlc.Queries, tx pgx.Tx) error {
+		workspaceID, err := q.LockWorkspaceMemberships(ctx, strings.TrimSpace(workspacePublicID))
+		if err != nil {
+			return notFound(err)
+		}
+		target, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
+			WorkspaceID: workspaceID, UserID: targetUserID,
+		})
+		if err != nil {
+			return notFound(err)
+		}
+		actorRole, owners, err := s.mutationContext(ctx, q, workspaceID, actorUserID)
+		if err != nil {
+			return err
+		}
+		if err := tenancy.CheckMemberMutation(actorRole, actorUserID, targetUserID, target.Role, "", owners, true); err != nil {
+			return err
+		}
+		if grants == nil {
+			return tenancy.ErrConflict
+		}
+		cleaned, err = grants.RemoveWorkspaceMemberGrants(dbutil.ContextWithAmbientTx(ctx, tx), workspacePublicID, targetUserID)
+		if err != nil {
+			return err
+		}
+
+		rows, err := q.DeleteWorkspaceMembership(ctx, dbsqlc.DeleteWorkspaceMembershipParams{
+			WorkspaceID: workspaceID, UserID: targetUserID,
+		})
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return tenancy.ErrNotFound
+		}
+		return nil
 	})
 	if err != nil {
-		return notFound(err)
+		return nil, err
 	}
-	actorRole, owners, err := s.mutationContext(ctx, dbCtx.q, workspace.InternalID, actorUserID)
-	if err != nil {
-		return err
-	}
-	if err := tenancy.CheckMemberMutation(actorRole, actorUserID, targetUserID, target.Role, "", owners, true); err != nil {
-		return err
-	}
-	rows, err := dbCtx.q.DeleteWorkspaceMembership(ctx, dbsqlc.DeleteWorkspaceMembershipParams{
-		WorkspaceID: workspace.InternalID, UserID: targetUserID,
-	})
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return tenancy.ErrNotFound
-	}
-	return nil
+	return cleaned, nil
 }
 
 func (s *Store) mutationContext(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID, actorUserID int64) (string, int, error) {

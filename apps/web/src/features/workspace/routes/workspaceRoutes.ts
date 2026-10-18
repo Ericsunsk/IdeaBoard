@@ -5,12 +5,7 @@ import {
   REFUND_POLICY_PATH,
   TERMS_PATH,
 } from '../../legal/routePaths'
-import {
-  SHARE_JOIN_PATH,
-  USER_AUTH_CALLBACK_PATH,
-  USER_BOARDS_PATH,
-  USER_ROOT_PATH,
-} from '../routePaths'
+import { USER_AUTH_CALLBACK_PATH, USER_BOARDS_PATH, USER_ROOT_PATH } from '../routePaths'
 
 export const WORKSPACE_DEFAULT_PATH = USER_BOARDS_PATH
 
@@ -38,12 +33,6 @@ export const workspaceRoutes: RouteRecordRaw[] = [
     name: 'AcceptableUse',
     component: () => import('../../legal/pages/AcceptableUsePage.vue'),
     meta: { public: true, seoKey: 'acceptable-use' },
-  },
-  {
-    path: SHARE_JOIN_PATH,
-    name: 'ShareJoin',
-    component: () => import('../pages/WorkspaceShareJoinPage.vue'),
-    meta: { requiresAuth: true },
   },
   {
     path: USER_ROOT_PATH,

@@ -16,6 +16,7 @@ import {
 import { clearStoredAuth } from '../../../../core/utils/auth'
 import { getWorkspaceSelectionStore } from '../../../workspace'
 import { getBoardState, replaceBoardStateMap } from '../persistence/state'
+import type { BoardAccessCapabilities } from '../catalog/boards'
 import { listBoards, replaceBoards } from '../catalog/boards'
 import { hydrateBoardsFromServer } from './boardSync'
 
@@ -57,6 +58,63 @@ describe('board draft overlay', () => {
     await hydrateBoardsFromServer()
 
     expect(listBoards()[0]?.name).toBe('Local Rename')
+    expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('local-newer')
+  })
+
+  it('refreshes access facts while retaining a newer draft and its revision', async () => {
+    const editor: BoardAccessCapabilities = {
+      read: true,
+      write: true,
+      manage: true,
+      generate: true,
+    }
+    const viewer: BoardAccessCapabilities = {
+      read: true,
+      write: false,
+      manage: false,
+      generate: false,
+    }
+    replaceBoards([
+      {
+        id: 'board-1',
+        name: 'Local Rename',
+        createdAt: 100,
+        updatedAt: 2_000,
+        revision: 7,
+        capabilities: editor,
+        workspaceAccess: 'editor',
+        accessState: 'workspace',
+        isCreator: true,
+        hasDirectGrant: true,
+      },
+    ])
+    replaceBoardStateMap({ 'board-1': makePromptBoardState(2_000, 'local-newer') })
+    addRemoteBoardFixture(apiState, WORKSPACE_ID, {
+      id: 'board-1',
+      name: 'Remote',
+      createdAt: 100,
+      updatedAt: 1_000,
+      revision: 8,
+      state: makePromptBoardState(1_000, 'remote'),
+    })
+    Object.assign(apiState.boardsResponse.data[0]!, {
+      capabilities: viewer,
+      workspace_access: 'none',
+      access_state: 'workspace',
+      relationship: { is_creator: false, has_direct_grant: true },
+    })
+
+    await hydrateBoardsFromServer()
+
+    expect(listBoards()[0]).toMatchObject({
+      name: 'Local Rename',
+      revision: 7,
+      capabilities: viewer,
+      workspaceAccess: 'none',
+      accessState: 'workspace',
+      isCreator: false,
+      hasDirectGrant: true,
+    })
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('local-newer')
   })
 

@@ -144,6 +144,21 @@ func (e GetUserStatesEnvelopeCode) Valid() bool {
 	}
 }
 
+// Defines values for LookupUserByEmailEnvelopeCode.
+const (
+	LookupUserByEmailEnvelopeCodeN0 LookupUserByEmailEnvelopeCode = 0
+)
+
+// Valid indicates whether the value is a known member of the LookupUserByEmailEnvelopeCode enum.
+func (e LookupUserByEmailEnvelopeCode) Valid() bool {
+	switch e {
+	case LookupUserByEmailEnvelopeCodeN0:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MailConfigEnvelopeCode.
 const (
 	MailConfigEnvelopeCodeN0 MailConfigEnvelopeCode = 0
@@ -368,13 +383,13 @@ func (e UnbanUserDataBanned) Valid() bool {
 
 // Defines values for UnbanUserEnvelopeCode.
 const (
-	N0 UnbanUserEnvelopeCode = 0
+	UnbanUserEnvelopeCodeN0 UnbanUserEnvelopeCode = 0
 )
 
 // Valid indicates whether the value is a known member of the UnbanUserEnvelopeCode enum.
 func (e UnbanUserEnvelopeCode) Valid() bool {
 	switch e {
-	case N0:
+	case UnbanUserEnvelopeCodeN0:
 		return true
 	default:
 		return false
@@ -394,6 +409,12 @@ type AuthUserEmail struct {
 	AuthUserID string   `json:"auth_user_id"`
 	Email      string   `json:"email"`
 	Providers  []string `json:"providers"`
+}
+
+// AuthUserLookup defines model for AuthUserLookup.
+type AuthUserLookup struct {
+	AuthUserID string `json:"auth_user_id"`
+	Email      string `json:"email"`
 }
 
 // AuthUserRequest defines model for AuthUserRequest.
@@ -521,6 +542,26 @@ type GetUserStatesEnvelopeCode int
 // GetUserStatesRequest defines model for GetUserStatesRequest.
 type GetUserStatesRequest struct {
 	UserIds []string `json:"user_ids"`
+}
+
+// LookupUserByEmailData defines model for LookupUserByEmailData.
+type LookupUserByEmailData struct {
+	User AuthUserLookup `json:"user"`
+}
+
+// LookupUserByEmailEnvelope defines model for LookupUserByEmailEnvelope.
+type LookupUserByEmailEnvelope struct {
+	Code LookupUserByEmailEnvelopeCode `json:"code"`
+	Data LookupUserByEmailData         `json:"data"`
+	Msg  string                        `json:"msg"`
+}
+
+// LookupUserByEmailEnvelopeCode defines model for LookupUserByEmailEnvelope.Code.
+type LookupUserByEmailEnvelopeCode int
+
+// LookupUserByEmailRequest defines model for LookupUserByEmailRequest.
+type LookupUserByEmailRequest struct {
+	Email string `json:"email"`
 }
 
 // MailConfigEnvelope defines model for MailConfigEnvelope.
@@ -799,6 +840,9 @@ type GetUserEmailsJSONRequestBody = GetUserEmailsRequest
 // EnsureUserJSONRequestBody defines body for EnsureUser for application/json ContentType.
 type EnsureUserJSONRequestBody = EnsureUserRequest
 
+// LookupUserByEmailJSONRequestBody defines body for LookupUserByEmail for application/json ContentType.
+type LookupUserByEmailJSONRequestBody = LookupUserByEmailRequest
+
 // RevokeUserSessionsJSONRequestBody defines body for RevokeUserSessions for application/json ContentType.
 type RevokeUserSessionsJSONRequestBody = AuthUserRequest
 
@@ -930,6 +974,11 @@ type ClientInterface interface {
 	EnsureUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	EnsureUser(ctx context.Context, body EnsureUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LookupUserByEmailWithBody request with any body
+	LookupUserByEmailWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	LookupUserByEmail(ctx context.Context, body LookupUserByEmailJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RevokeUserSessionsWithBody request with any body
 	RevokeUserSessionsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1161,6 +1210,30 @@ func (c *Client) EnsureUserWithBody(ctx context.Context, contentType string, bod
 
 func (c *Client) EnsureUser(ctx context.Context, body EnsureUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewEnsureUserRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LookupUserByEmailWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLookupUserByEmailRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LookupUserByEmail(ctx context.Context, body LookupUserByEmailJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLookupUserByEmailRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1681,6 +1754,46 @@ func NewEnsureUserRequestWithBody(server string, contentType string, body io.Rea
 	return req, nil
 }
 
+// NewLookupUserByEmailRequest calls the generic LookupUserByEmail builder with application/json body
+func NewLookupUserByEmailRequest(server string, body LookupUserByEmailJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewLookupUserByEmailRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewLookupUserByEmailRequestWithBody generates requests for LookupUserByEmail with any type of body
+func NewLookupUserByEmailRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/users/lookup")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewRevokeUserSessionsRequest calls the generic RevokeUserSessions builder with application/json body
 func NewRevokeUserSessionsRequest(server string, body RevokeUserSessionsJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -1971,6 +2084,11 @@ type ClientWithResponsesInterface interface {
 	EnsureUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EnsureUserResponse, error)
 
 	EnsureUserWithResponse(ctx context.Context, body EnsureUserJSONRequestBody, reqEditors ...RequestEditorFn) (*EnsureUserResponse, error)
+
+	// LookupUserByEmailWithBodyWithResponse request with any body
+	LookupUserByEmailWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LookupUserByEmailResponse, error)
+
+	LookupUserByEmailWithResponse(ctx context.Context, body LookupUserByEmailJSONRequestBody, reqEditors ...RequestEditorFn) (*LookupUserByEmailResponse, error)
 
 	// RevokeUserSessionsWithBodyWithResponse request with any body
 	RevokeUserSessionsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RevokeUserSessionsResponse, error)
@@ -2370,6 +2488,40 @@ func (r EnsureUserResponse) ContentType() string {
 	return ""
 }
 
+type LookupUserByEmailResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *LookupUserByEmailEnvelope
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON500      *InternalError
+}
+
+// Status returns HTTPResponse.Status
+func (r LookupUserByEmailResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LookupUserByEmailResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LookupUserByEmailResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type RevokeUserSessionsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2696,6 +2848,23 @@ func (c *ClientWithResponses) EnsureUserWithResponse(ctx context.Context, body E
 		return nil, err
 	}
 	return ParseEnsureUserResponse(rsp)
+}
+
+// LookupUserByEmailWithBodyWithResponse request with arbitrary body returning *LookupUserByEmailResponse
+func (c *ClientWithResponses) LookupUserByEmailWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LookupUserByEmailResponse, error) {
+	rsp, err := c.LookupUserByEmailWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLookupUserByEmailResponse(rsp)
+}
+
+func (c *ClientWithResponses) LookupUserByEmailWithResponse(ctx context.Context, body LookupUserByEmailJSONRequestBody, reqEditors ...RequestEditorFn) (*LookupUserByEmailResponse, error) {
+	rsp, err := c.LookupUserByEmail(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLookupUserByEmailResponse(rsp)
 }
 
 // RevokeUserSessionsWithBodyWithResponse request with arbitrary body returning *RevokeUserSessionsResponse
@@ -3356,6 +3525,60 @@ func ParseEnsureUserResponse(rsp *http.Response) (*EnsureUserResponse, error) {
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseLookupUserByEmailResponse parses an HTTP response from a LookupUserByEmailWithResponse call
+func ParseLookupUserByEmailResponse(rsp *http.Response) (*LookupUserByEmailResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LookupUserByEmailResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LookupUserByEmailEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalError

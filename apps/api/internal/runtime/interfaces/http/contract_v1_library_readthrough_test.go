@@ -235,6 +235,9 @@ func TestV1LibraryUploadedMediaImport(t *testing.T) {
 	if status != http.StatusCreated {
 		t.Fatalf("save uploaded media = %d %v, want 201", status, payload)
 	}
+	// #936: the managed save publishes the asset to workspace members; seed
+	// the existence fact on the media seam (twin of the library_assets row).
+	f.media.SeedLibraryLinkForTests(f.ws.PublicID, mediaID)
 	libraryID := v1Data(t, payload).(map[string]any)["id"].(string)
 	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: f.mediaPath(libraryID), userID: f.member})
 	if status != http.StatusOK {

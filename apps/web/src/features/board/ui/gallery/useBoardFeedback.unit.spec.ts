@@ -52,6 +52,7 @@ describe('createBoardFeedback', () => {
       error: null,
     })
     feedback.copyFailed({ isOk: false, reason: 'source-missing' })
+    feedback.copyFailed({ isOk: false, reason: 'source-unreadable', error: null })
     feedback.copyFailed({
       isOk: false,
       reason: 'revision-conflict',
@@ -81,6 +82,7 @@ describe('createBoardFeedback', () => {
       'Sync conflict. The canvas list has been reloaded.',
       'Sync conflict and recovery incomplete. Please reload the canvas list.',
       'Rename sync failed. The original name has been restored.',
+      'Copy failed',
       'Copy failed',
       'A sync conflict occurred while copying. Please try again.',
       'A sync conflict occurred while copying. Please try again.',

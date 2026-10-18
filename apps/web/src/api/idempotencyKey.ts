@@ -98,6 +98,15 @@ export function workspaceTaskIdempotencyKey(operation: 'create' | 'cancel'): str
   return createIdempotencyKey(`task:${operation}`)
 }
 
+// Workspace member key per operation (workspace members slice,
+// `workspace:*` backend idempotency scope bound to operator + workspace).
+// Invite and remove carry `Idempotency-Key` per attempt: retries of the SAME
+// attempt must reuse the returned value; a new operator intent needs a
+// fresh call. Role changes are idempotent by value and carry no key.
+export function workspaceMemberIdempotencyKey(operation: 'invite' | 'remove'): string {
+  return createIdempotencyKey(`workspace:members.${operation}`)
+}
+
 // Control Plane user administration key per operation (issue #808,
 // `control:<operation>` backend scope bound to the operator). Retries of
 // the SAME attempt must reuse the returned value; a new operator intent

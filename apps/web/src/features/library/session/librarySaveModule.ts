@@ -344,7 +344,13 @@ export function createLibrarySaveModule(options: LibrarySaveModuleOptions): Libr
     } catch (error) {
       if (!isCurrent(runtime)) return
       item.state.status = 'failed'
-      item.state.error = userFacingErrorCopy(error, i18n.global.t('library.errors.saveAssetFailed'))
+      item.state.error = userFacingErrorCopy(
+        error,
+        i18n.global.t('library.errors.saveAssetFailed'),
+        // The publish gate is the only save path rendering
+        // board_forbidden: surface the publish-specific denial copy.
+        { board_forbidden: 'library.errors.saveRestrictedDenied' },
+      )
       syncOperation(runtime.id, 'running')
     }
   }
@@ -368,7 +374,11 @@ export function createLibrarySaveModule(options: LibrarySaveModuleOptions): Libr
         runtime.folderId = created.id
       } catch (error) {
         if (!isCurrent(runtime)) return syncOperation(operationId, 'abandoned')
-        const message = userFacingErrorCopy(error, i18n.global.t('library.errors.saveAssetFailed'))
+        const message = userFacingErrorCopy(
+          error,
+          i18n.global.t('library.errors.saveAssetFailed'),
+          { board_forbidden: 'library.errors.saveRestrictedDenied' },
+        )
         for (const item of runtime.items) {
           if (item.state.status === 'saved') continue
           item.state.status = 'failed'

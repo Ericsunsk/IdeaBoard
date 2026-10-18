@@ -18,6 +18,17 @@ FROM workspaces
 WHERE internal_id = sqlc.arg(internal_id)
 LIMIT 1;
 
+-- name: LockWorkspaceMemberships :one
+SELECT internal_id
+FROM workspaces
+WHERE public_id = sqlc.arg(public_id)
+FOR UPDATE;
+
+-- name: CountWorkspaceMembers :one
+SELECT COUNT(*)
+FROM workspace_memberships
+WHERE workspace_id = sqlc.arg(workspace_id);
+
 -- name: ListWorkspacesByUserID :many
 SELECT w.internal_id, w.public_id, w.organization_id, w.owner_user_id, w.name, w.created_at, w.updated_at, w.archived_at
 FROM workspaces AS w

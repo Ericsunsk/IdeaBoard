@@ -35,6 +35,25 @@
             <Xmark class="size-3.5" aria-hidden="true" />
           </button>
         </label>
+        <button
+          type="button"
+          :class="[
+            rangeToggleControlClass,
+            range === 'team' && catalogClasses.rangeToggleButtonActive,
+          ]"
+          :aria-pressed="range === 'team'"
+          :data-state="range === 'team' ? 'active' : 'inactive'"
+          :title="range === 'team' ? t('board.scopeTeam') : t('board.scopePersonal')"
+          :aria-label="range === 'team' ? t('board.scopeTeam') : t('board.scopePersonal')"
+          @click="onRangeCommand(range === 'team' ? 'personal' : 'team')"
+        >
+          <User
+            v-if="range === 'personal'"
+            :class="catalogClasses.rangeToggleIcon"
+            aria-hidden="true"
+          />
+          <Group v-else :class="catalogClasses.rangeToggleIcon" aria-hidden="true" />
+        </button>
         <label :for="sortSelectId" class="sr-only">
           {{ t('board.sortLabel') }}
         </label>
@@ -132,6 +151,7 @@
             @toggle-menu="toggleBoardMenu(board.id)"
             @rename-action="startRename(board)"
             @duplicate-action="duplicateBoard(board.id)"
+            @share-action="onShareBoardIntent(board.id)"
             @delete-action="requestDelete(board)"
             @rename-input="updateRenameDraft"
             @commit-rename="commitRename"
@@ -205,6 +225,8 @@
         </DialogContent>
       </DialogPortal>
     </DialogRoot>
+
+    <ShareDialog :panel="sharePanel" />
   </div>
 </template>
 
@@ -220,7 +242,7 @@ import {
   useOverlayInteractionLifecycle,
 } from '../../../../core/composables/useOverlayInteractionLifecycle'
 import { WorkspaceHeader, useWorkspaceSelection } from '../../../workspace'
-import { NavArrowDown, Search, Xmark } from '@iconoir/vue'
+import { Group, NavArrowDown, Search, User, Xmark } from '@iconoir/vue'
 import { Button } from '@/components/ui/button'
 import {
   DialogContent,
@@ -243,20 +265,25 @@ import {
   SelectViewport,
 } from '@/components/ui/select'
 import { appOverlayMenuSideOffset } from '../../../../theme/appOverlayMenu'
+import { createPageChromeRoundControlClass } from '../../../../core/lib/pageChrome'
 import { Spinner } from '@/components/ui/spinner'
 import { formatCatalogDate, useCatalog, type CatalogSortMode } from './useCatalog'
+import ShareDialog from '../share/ShareDialog.vue'
+import { useSharePanel } from '../../session/share/useSharePanel'
 
 const router = useRouter()
 const { t } = useI18n()
-// Ensure the workspace list loads on this surface: fresh profiles have no
-// persisted selection, so the store stays null until this query resolves and
-// auto-selects. The catalog watches scope and auto-hydrates when it becomes
-// ready; hydrate itself waits while the list is pending.
+const rangeToggleControlClass = createPageChromeRoundControlClass()
+const sharePanel = useSharePanel()
+// Fresh profiles need Workspace selection before catalog hydration.
 useWorkspaceSelection()
 const controller = useCatalog({
   navigation: {
     openBoard(boardId) {
       void router.push({ path: USER_CANVAS_PATH, query: { boardId } })
+    },
+    shareBoard(boardId) {
+      onShareBoardIntent(boardId)
     },
   },
 })
@@ -268,6 +295,7 @@ const {
   catalogHydrationFailed,
   searchKeyword,
   sortMode,
+  range,
   activeMenuBoardId,
   renamingBoardId,
   renameDraft,
@@ -280,6 +308,7 @@ const {
 const {
   setSearchKeyword: onSearchInput,
   setSortMode: onSortModeCommand,
+  setRange: onRangeCommand,
   toggleBoardMenu,
   handleBoardMenuHidden,
   createAndOpenBoard,
@@ -295,6 +324,12 @@ const {
   handleDeleteDialogHidden,
   confirmDelete,
 } = controller.commands
+
+function onShareBoardIntent(boardId: string) {
+  const board = controller.viewModel.visibleBoards.value.find((entry) => entry.id === boardId)
+  if (!board) return
+  sharePanel.open(board.id, board.name)
+}
 
 const {
   ariaBusy: deleteDialogAriaBusy,

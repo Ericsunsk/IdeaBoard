@@ -6,6 +6,8 @@ import {
 import { getCurrentScope, onScopeDispose } from 'vue'
 import {
   syncBoardToServer,
+  getBoardScope,
+  isBoardScopeCurrent,
   useBoardRepository,
   getBoardById,
   touchBoard,
@@ -50,6 +52,7 @@ export function createBoardSessionRepository(
   }
 
   async function load(boardId: string): Promise<BoardSnapshot | null> {
+    const scope = getBoardScope()
     const normalized = normalizeBoardId(boardId)
     if (!normalized) return null
     // Read before hydration so malformed local state is rejected at its storage boundary;
@@ -59,6 +62,7 @@ export function createBoardSessionRepository(
       shouldIncludeDocuments: true,
       shouldForce: false,
     })
+    if (!isBoardScopeCurrent(scope)) throw new Error('BOARD_SCOPE_CHANGED')
     if (!hydrateResult.isOk && hydrateResult.error instanceof InvalidBoardStateError) {
       throw hydrateResult.error
     }
@@ -87,8 +91,10 @@ export function createBoardSessionRepository(
   }
 
   async function save(boardId: string, snapshot: BoardSnapshot): Promise<BoardState> {
+    const scope = getBoardScope()
     const normalized = normalizeBoardId(boardId)
     const saved = await saveLocal(normalized, snapshot)
+    if (!isBoardScopeCurrent(scope)) throw new Error('BOARD_SCOPE_CHANGED')
     try {
       await syncBoardToServer(normalized, saved)
     } catch (error) {

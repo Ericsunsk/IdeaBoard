@@ -90,7 +90,7 @@ export default {
     boundsUpdateFailed: 'Failed to update group bounds. Refresh the canvas and try again.',
   },
   chrome: {
-    shareComingSoon: 'Share coming soon',
+    share: 'Share',
     export: 'Export',
     selectTool: 'Select (V)',
     handTool: 'Hand (H)',
@@ -125,6 +125,8 @@ export default {
     boardRestoredSuccess: 'Board restored.',
     boardRestoreFailedError: 'Failed to restore the board. Please try again later.',
     boardArchivedRenameBlocked: 'This board is archived. Restore it before renaming.',
+    boardReadOnlyLabel: 'This board is read-only.',
+    boardReadOnlyRenameBlocked: 'You have view access to this board. Renaming is disabled.',
   },
   viewport: {
     zoomIn: 'Zoom In',
@@ -323,6 +325,7 @@ export default {
     saved: 'Saved',
     saveFailed: 'Save failed. Please try again later.',
     boardArchivedSaveBlocked: 'This board is archived. Restore it to keep editing.',
+    boardAccessLost: 'You no longer have access to this board. Unsaved changes were discarded.',
     downloadEmptyResponse: 'Download failed: empty response.',
     downloadImageHttpFailed: 'Download failed: HTTP {code}',
     downloadImageFailed: 'Download failed: {reason}',

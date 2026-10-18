@@ -39,10 +39,22 @@ An Execution Plan belongs to Canvas and may produce multiple Tasks. A Routing Sn
 - PostgreSQL and River are the task facts and queue source; NATS is event-only.
 - Terminal success captures Credits; failure, cancellation, and timeout release
   the hold atomically with the task transition.
-- After completion commits, managed Task Outputs are saved in Library Quick
-  Saves by Workspace and Media Asset identity. Each save is best-effort and
-  idempotent; failure never changes Task settlement or requeues execution.
-  Completed-task redelivery replays the saves without rerunning the provider.
+- Submission validates current Workspace membership, Board generation capability,
+  and canonical Media read permission for every input and mask within the same
+  transaction as Quote, Hold, Task insert, and queue insertion.
+- Accepting a Media Task Output records its immutable producing Task, submitter,
+  and original Board identity in the same transaction. Media origin survives raw
+  Task and Board deletion; neither event grants new publication rights.
+- Board-linked Task Outputs remain within the Board audience and never publish
+  automatically to the Workspace Library. Boardless completed outputs may enter
+  Quick Saves after persisted provenance and current membership are validated
+  within each Library write transaction. Saves are best-effort and idempotent;
+  failure never changes Task settlement or requeues execution. Completed-task
+  redelivery replays saves without rerunning the provider. Manual publication
+  requires current Media readability. Board-bound outputs require the producing
+  Board Creator; submitting an Editor Task or owning its generated asset does not
+  confer publication rights. Boardless outputs require their submitter, while
+  ordinary uploads require asset-owner or source-Board Creator authority.
 - Raw task rows live at most the retention window (default 7 days, terminal
   statuses only): each purge freezes statistics into task_daily_stats first,
   then deletes tasks in one transaction. Billing snapshots/settlements/claims,

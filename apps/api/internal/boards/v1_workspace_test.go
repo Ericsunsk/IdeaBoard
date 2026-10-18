@@ -8,7 +8,7 @@ import (
 
 func TestV1BoardLifecycle(t *testing.T) {
 	ctx := context.Background()
-	store := NewInMemoryWorkspaceBoardStoreForTests()
+	store := NewInMemoryWorkspaceBoardStoreForTests(testWorkspaceMembers{}, testWorkspaceMembers{})
 
 	boardID, err := NewV1BoardPublicID()
 	if err != nil {
@@ -33,12 +33,12 @@ func TestV1BoardLifecycle(t *testing.T) {
 		t.Fatalf("list = %v, %v; want 1 board", boards, err)
 	}
 
-	renamed, err := store.RenameBoard(ctx, "ws_test", boardID, "Launch v2")
+	renamed, err := store.RenameBoard(ctx, "ws_test", boardID, "Launch v2", 1)
 	if err != nil || renamed.Name != "Launch v2" || renamed.Revision != 1 {
 		t.Fatalf("rename = %v, %v", renamed, err)
 	}
 
-	archived, err := store.ArchiveBoard(ctx, "ws_test", boardID)
+	archived, err := store.ArchiveBoard(ctx, "ws_test", boardID, 1)
 	if err != nil || archived.ArchivedAt == nil {
 		t.Fatalf("archive = %v, %v", archived, err)
 	}
@@ -49,7 +49,7 @@ func TestV1BoardLifecycle(t *testing.T) {
 	if _, err := store.ReplaceDocument(ctx, "ws_test", boardID, 1, 1, 1, V1InitialDocument()); err != ErrV1Archived {
 		t.Fatalf("archived write = %v, want ErrV1Archived", err)
 	}
-	restored, err := store.RestoreBoard(ctx, "ws_test", boardID)
+	restored, err := store.RestoreBoard(ctx, "ws_test", boardID, 1)
 	if err != nil || restored.ArchivedAt != nil {
 		t.Fatalf("restore = %v, %v", restored, err)
 	}
@@ -57,7 +57,7 @@ func TestV1BoardLifecycle(t *testing.T) {
 
 func TestV1DocumentConcurrency(t *testing.T) {
 	ctx := context.Background()
-	store := NewInMemoryWorkspaceBoardStoreForTests()
+	store := NewInMemoryWorkspaceBoardStoreForTests(testWorkspaceMembers{}, testWorkspaceMembers{})
 	boardID, _ := NewV1BoardPublicID()
 	if _, err := store.CreateBoard(ctx, "ws_c", 1, "Doc", boardID); err != nil {
 		t.Fatal(err)
@@ -119,134 +119,35 @@ func TestV1DocumentStrictRejection(t *testing.T) {
 	}
 }
 
-func TestV1BoardACLAndLastOwner(t *testing.T) {
-	ctx := context.Background()
-	store := NewInMemoryWorkspaceBoardStoreForTests()
-	boardID, _ := NewV1BoardPublicID()
-	if _, err := store.CreateBoard(ctx, "ws_acl", 1, "ACL", boardID); err != nil {
-		t.Fatal(err)
-	}
-	// Creator is the implicit owner; visible workspace members default to
-	// viewer (workspace owners to owner); outsiders with no workspace role
-	// stay denied. Explicit board rows override the default.
-	if role, ok, _ := store.GetBoardRole(ctx, "ws_acl", boardID, 1, "owner"); !ok || role != RoleOwner {
-		t.Fatalf("creator role = %q, %v; want owner", role, ok)
-	}
-	if role, ok, _ := store.GetBoardRole(ctx, "ws_acl", boardID, 2, "member"); !ok || role != RoleViewer {
-		t.Fatalf("workspace member role = %q, %v; want viewer default", role, ok)
-	}
-	if role, ok, _ := store.GetBoardRole(ctx, "ws_acl", boardID, 3, "owner"); !ok || role != RoleOwner {
-		t.Fatalf("workspace owner role = %q, %v; want owner default", role, ok)
-	}
-	if _, ok, _ := store.GetBoardRole(ctx, "ws_acl", boardID, 4, ""); ok {
-		t.Fatal("outsider with no workspace role must stay denied")
-	}
-	// Only owners may grant; editor grant works.
-	if _, err := store.AddBoardMember(ctx, "ws_acl", boardID, 2, 2, RoleEditor, "member"); err != ErrPermissionDenied {
-		t.Fatalf("non-owner add = %v, want ErrPermissionDenied", err)
-	}
-	member, err := store.AddBoardMember(ctx, "ws_acl", boardID, 1, 2, RoleEditor, "owner")
-	if err != nil || member.Role != RoleEditor {
-		t.Fatalf("add = %v, %v", member, err)
-	}
-	// Re-add is idempotent (keeps existing role).
-	member, err = store.AddBoardMember(ctx, "ws_acl", boardID, 1, 2, RoleViewer, "owner")
-	if err != nil || member.Role != RoleEditor {
-		t.Fatalf("re-add = %v, %v; want existing editor role", member, err)
-	}
-	// Explicit rows override the workspace default: user 2 stays editor
-	// even though the workspace default would be viewer.
-	if role, ok, _ := store.GetBoardRole(ctx, "ws_acl", boardID, 2, "member"); !ok || role != RoleEditor {
-		t.Fatalf("explicit override role = %q, %v; want editor", role, ok)
-	}
-	// Second owner unlocks demotion of the implicit owner row path.
-	if _, err := store.AddBoardMember(ctx, "ws_acl", boardID, 1, 3, RoleOwner, "owner"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.UpdateBoardMemberRole(ctx, "ws_acl", boardID, 1, 2, RoleViewer, "owner"); err != nil {
-		t.Fatalf("demote with backup owner = %v", err)
-	}
-	// The implicit creator row cannot be demoted while it is the last owner.
-	soloID, _ := NewV1BoardPublicID()
-	if _, err := store.CreateBoard(ctx, "ws_acl", 9, "Solo", soloID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.UpdateBoardMemberRole(ctx, "ws_acl", soloID, 9, 9, RoleViewer, "owner"); err != ErrV1LastOwner {
-		t.Fatalf("demote last owner = %v, want ErrV1LastOwner", err)
-	}
-	// Removing an explicit owner succeeds while the creator remains owner.
-	if err := store.RemoveBoardMember(ctx, "ws_acl", boardID, 1, 3, "owner"); err != nil {
-		t.Fatalf("remove explicit owner with creator remaining = %v", err)
-	}
-	// Self-leave works for non-owners.
-	if err := store.RemoveBoardMember(ctx, "ws_acl", boardID, 2, 2, "member"); err != nil {
-		t.Fatalf("self leave = %v", err)
-	}
-}
-
-func TestDefaultBoardRoleForWorkspaceRole(t *testing.T) {
-	cases := []struct {
+func TestWorkspaceMembershipPrecondition(t *testing.T) {
+	for _, tc := range []struct {
 		workspace string
-		want      AccessRole
-		ok        bool
+		want      bool
 	}{
-		{"owner", RoleOwner, true},
-		{"admin", RoleViewer, true},
-		{"member", RoleViewer, true},
-		{"", "", false},
-		{"bogus", "", false},
-	}
-	for _, tc := range cases {
-		got, ok := DefaultBoardRoleForWorkspaceRole(tc.workspace)
-		if got != tc.want || ok != tc.ok {
-			t.Fatalf("DefaultBoardRoleForWorkspaceRole(%q) = %q, %v; want %q, %v", tc.workspace, got, ok, tc.want, tc.ok)
+		{"owner", true},
+		{"admin", true},
+		{"member", true},
+		{" member ", true},
+		{"", false},
+		{"bogus", false},
+	} {
+		if got := IsWorkspaceMemberRole(tc.workspace); got != tc.want {
+			t.Fatalf("IsWorkspaceMemberRole(%q) = %v; want %v", tc.workspace, got, tc.want)
 		}
 	}
-}
-
-func TestV1ShareTokenJoin(t *testing.T) {
-	ctx := context.Background()
-	store := NewInMemoryWorkspaceBoardStoreForTests()
-	boardID, _ := NewV1BoardPublicID()
-	if _, err := store.CreateBoard(ctx, "ws_share", 1, "Share", boardID); err != nil {
-		t.Fatal(err)
-	}
-	tokenID, _ := NewV1ShareTokenID()
-	if !IsV1ShareTokenID(tokenID) {
-		t.Fatalf("token id = %q, want sht_ prefix", tokenID)
-	}
-	created, err := store.CreateShareToken(ctx, "ws_share", boardID, 1, RoleViewer, tokenID, V1ShareTokenHash(tokenID), tokenID)
-	if err != nil || created.Bearer == "" {
-		t.Fatalf("create share = %v, %v", created, err)
-	}
-	// Join is idempotent: repeat joins converge to the same role.
-	board, role, err := store.JoinByToken(ctx, "ws_share", tokenID, 7)
-	if err != nil || role != RoleViewer || board.PublicID != boardID {
-		t.Fatalf("join = %v, %q, %v", board, role, err)
-	}
-	if _, role, err := store.JoinByToken(ctx, "ws_share", tokenID, 7); err != nil || role != RoleViewer {
-		t.Fatalf("rejoin = %q, %v; want same viewer role", role, err)
-	}
-	tokens, err := store.ListShareTokens(ctx, "ws_share", boardID)
-	if err != nil || len(tokens) != 1 || tokens[0].UsageCount != 2 {
-		t.Fatalf("usage = %v, %v; want usage_count 2", tokens, err)
-	}
-	if tokens[0].Bearer != "" {
-		t.Fatal("list must never return the bearer")
-	}
-	if len(tokens[0].AuditTrail) != 3 { // create + 2 joins
-		t.Fatalf("audit trail = %d events, want 3", len(tokens[0].AuditTrail))
-	}
-	// Unknown bearers stay invisible.
-	if _, _, err := store.JoinByToken(ctx, "ws_share", "sht_doesnotexist", 8); err != ErrShareTokenNotFound {
-		t.Fatalf("unknown join = %v, want ErrShareTokenNotFound", err)
-	}
-	// Revocation blocks joins with an auditable outcome.
-	if err := store.RevokeShareToken(ctx, "ws_share", boardID, tokenID, 1); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := store.JoinByToken(ctx, "ws_share", tokenID, 8); err != ErrShareTokenRevoked {
-		t.Fatalf("revoked join = %v, want ErrShareTokenRevoked", err)
+	for _, tc := range []struct {
+		access WorkspaceAccess
+		want   bool
+	}{
+		{WorkspaceAccessNone, true},
+		{WorkspaceAccessViewer, true},
+		{WorkspaceAccessEditor, true},
+		{"", false},
+		{"superadmin", false},
+	} {
+		if got := ValidateWorkspaceAccess(tc.access); got != tc.want {
+			t.Fatalf("ValidateWorkspaceAccess(%q) = %v; want %v", tc.access, got, tc.want)
+		}
 	}
 }
 

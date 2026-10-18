@@ -113,14 +113,31 @@ type BillingSku struct {
 }
 
 type Board struct {
-	InternalID  int64              `json:"internal_id"`
-	PublicID    string             `json:"public_id"`
-	WorkspaceID int64              `json:"workspace_id"`
-	Title       string             `json:"title"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	ArchivedAt  pgtype.Timestamptz `json:"archived_at"`
-	OwnerUserID pgtype.Int8        `json:"owner_user_id"`
+	InternalID      int64              `json:"internal_id"`
+	PublicID        string             `json:"public_id"`
+	WorkspaceID     int64              `json:"workspace_id"`
+	Title           string             `json:"title"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	ArchivedAt      pgtype.Timestamptz `json:"archived_at"`
+	OwnerUserID     pgtype.Int8        `json:"owner_user_id"`
+	WorkspaceAccess string             `json:"workspace_access"`
+	AccessVersion   int64              `json:"access_version"`
+}
+
+type BoardAccessEventOutbox struct {
+	InternalID     int64              `json:"internal_id"`
+	EventID        string             `json:"event_id"`
+	WorkspaceID    string             `json:"workspace_id"`
+	BoardID        string             `json:"board_id"`
+	MemberPublicID string             `json:"member_public_id"`
+	AccessVersion  int64              `json:"access_version"`
+	OccurredAt     pgtype.Timestamptz `json:"occurred_at"`
+	StatusState    string             `json:"status_state"`
+	Attempts       int32              `json:"attempts"`
+	NextAttemptAt  pgtype.Timestamptz `json:"next_attempt_at"`
+	DeliveredAt    pgtype.Timestamptz `json:"delivered_at"`
+	LastError      string             `json:"last_error"`
 }
 
 type BoardDocument struct {
@@ -134,10 +151,15 @@ type BoardDocument struct {
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BoardDocumentMediaRef struct {
+	BoardID      int64              `json:"board_id"`
+	MediaAssetID int64              `json:"media_asset_id"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
 type BoardMembership struct {
 	BoardID   int64              `json:"board_id"`
 	UserID    int64              `json:"user_id"`
-	Role      string             `json:"role"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
@@ -151,22 +173,6 @@ type BoardRevision struct {
 	ParentRevisionID pgtype.Int8        `json:"parent_revision_id"`
 	RevisionData     []byte             `json:"revision_data"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-}
-
-type BoardShareToken struct {
-	InternalID      int64              `json:"internal_id"`
-	PublicID        string             `json:"public_id"`
-	BoardID         int64              `json:"board_id"`
-	TokenSecret     string             `json:"token_secret"`
-	GrantedRole     string             `json:"granted_role"`
-	CreatedByUserID int64              `json:"created_by_user_id"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	RevokedAt       pgtype.Timestamptz `json:"revoked_at"`
-	RevokedByUserID pgtype.Int8        `json:"revoked_by_user_id"`
-	TokenID         pgtype.Text        `json:"token_id"`
-	TokenPrefix     string             `json:"token_prefix"`
-	UsageCount      int64              `json:"usage_count"`
 }
 
 type ControlAuditRecord struct {
@@ -535,6 +541,15 @@ type MediaAsset struct {
 	Metadata        []byte             `json:"metadata"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	ArchivedAt      pgtype.Timestamptz `json:"archived_at"`
+}
+
+type MediaAssetTaskOrigin struct {
+	WorkspaceID     int64       `json:"workspace_id"`
+	TaskPublicID    string      `json:"task_public_id"`
+	OutputIndex     int32       `json:"output_index"`
+	MediaAssetID    int64       `json:"media_asset_id"`
+	SubmitterUserID int64       `json:"submitter_user_id"`
+	BoardPublicID   pgtype.Text `json:"board_public_id"`
 }
 
 type Organization struct {
@@ -1074,6 +1089,7 @@ type UploadSession struct {
 	CompletedAt       pgtype.Timestamptz `json:"completed_at"`
 	ExpiredAt         pgtype.Timestamptz `json:"expired_at"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	TargetBoardID     pgtype.Int8        `json:"target_board_id"`
 }
 
 type User struct {

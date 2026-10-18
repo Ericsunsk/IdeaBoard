@@ -140,7 +140,11 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     })
     prepared.warnings.forEach((message) => warning(message))
     if (!normalizedWorkspaceId) throw new Error(t('canvas.session.uploadFailed'))
-    const uploaded = await uploadApi.upload(prepared.uploadFile, normalizedWorkspaceId)
+    // #936: stabilize re-uploads (local files, Library/Search references)
+    // bind to the board being saved when it has a durable identity.
+    const uploaded = await uploadApi.upload(prepared.uploadFile, normalizedWorkspaceId, {
+      boardId: normalizedBoardId,
+    })
     const assetId = uploaded.asset_id?.trim()
     if (!assetId) {
       throw new Error(t('canvas.session.uploadMissingMediaAsset'))

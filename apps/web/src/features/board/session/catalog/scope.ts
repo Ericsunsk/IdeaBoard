@@ -13,17 +13,26 @@ import { getWorkspaceSelectionStore, subscribeWorkspaceSelectionChange } from '.
 export type BoardScope = {
   userScope: string | null
   workspaceId: string | null
+  residency: number
 }
 
-export type CompleteBoardScope = {
+export type CompleteBoardScope = BoardScope & {
   userScope: string
   workspaceId: string
 }
+
+let residency = 0
+const advanceResidency = () => {
+  residency += 1
+}
+subscribeAuthStorageScopeChange(advanceResidency)
+subscribeWorkspaceSelectionChange(advanceResidency)
 
 export function getBoardScope(): BoardScope {
   return {
     userScope: getAuthStorageUserScope(),
     workspaceId: getWorkspaceSelectionStore().getSelectedId(),
+    residency,
   }
 }
 
@@ -31,6 +40,7 @@ export function getRecoverableBoardScope(): BoardScope {
   return {
     userScope: getRecoverableAuthStorageUserScope(),
     workspaceId: getWorkspaceSelectionStore().getSelectedId(),
+    residency,
   }
 }
 
@@ -40,10 +50,16 @@ export function isCompleteBoardScope(scope: BoardScope): scope is CompleteBoardS
 
 export function isBoardScopeCurrent(captured: BoardScope): boolean {
   const current = getBoardScope()
-  return current.userScope === captured.userScope && current.workspaceId === captured.workspaceId
+  return (
+    current.userScope === captured.userScope &&
+    current.workspaceId === captured.workspaceId &&
+    current.residency === captured.residency
+  )
 }
 
-export function boardScopeKey(scope: CompleteBoardScope): string {
+export function boardScopeKey(
+  scope: Pick<CompleteBoardScope, 'userScope' | 'workspaceId'>,
+): string {
   return `${scope.userScope}@${scope.workspaceId}`
 }
 

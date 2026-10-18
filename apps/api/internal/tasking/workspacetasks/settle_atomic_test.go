@@ -38,12 +38,15 @@ import (
 	"ideaboard/api/internal/billing"
 	billingapplication "ideaboard/api/internal/billing/application"
 	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
+	"ideaboard/api/internal/boards"
+	boardtaskaccess "ideaboard/api/internal/boards/taskaccess"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/generation/catalog"
 	"ideaboard/api/internal/generation/routing"
+	"ideaboard/api/internal/media/workspacemedia"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/testdb"
@@ -316,6 +319,12 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 		t.Fatalf("seed atomic settle workspace: %v", err)
 	}
 
+	if _, err := pool.Exec(ctx, `INSERT INTO workspace_memberships(workspace_id,user_id,role) SELECT internal_id,$2,'owner' FROM workspaces WHERE public_id=$1`, ws, userID); err != nil {
+		t.Fatal(err)
+	}
+	boardStore := boards.NewPostgresWorkspaceBoardStore(pool, workspacemedia.ValidateDocumentAssets)
+	acceptance := &workspacemedia.TaskSubmissionAuthorizer{Boards: boardStore, TaskBoards: &boardtaskaccess.Authorizer{Store: boardStore}}
+
 	creditService := credits.NewService(pool)
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -367,7 +376,7 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 		return catalog.SaveRoutingSnapshot(ctx, dbsqlc.New(tx), taskID, snap)
 	}
 	deps := workspacetasks.ServiceDeps{
-		TaskRead: store, TaskLifecycle: store, TaskBilling: store, Quoter: &atomicQuoter{catalog: billingCatalog}, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(), SnapshotSaver: snapshotSaver,
+		Acceptance: acceptance, TaskRead: store, TaskLifecycle: store, TaskBilling: store, Quoter: &atomicQuoter{catalog: billingCatalog}, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(), SnapshotSaver: snapshotSaver,
 	}
 	service := workspacetasks.NewTestServiceForTests(deps)
 	return &atomicEnv{pool: pool, store: store, credits: creditService, holder: holder, queue: queue, service: service, serviceDeps: deps, ws: ws, userID: userID, unitCost: unitCost}
@@ -764,7 +773,7 @@ func openRoutingAtomicEnv(t *testing.T) *atomicEnv {
 	env.service = workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
 		TaskRead: env.store, TaskLifecycle: env.store, TaskBilling: env.store, Quoter: &atomicQuoter{catalog: billingapplication.NewBillableItemCatalog(registry, billingStore)},
 		Holder: env.holder, Queue: env.queue,
-		Resolver: poolResolver, SnapshotSaver: poolSaver,
+		Resolver: poolResolver, SnapshotSaver: poolSaver, Acceptance: env.serviceDeps.Acceptance,
 	})
 	return env
 }

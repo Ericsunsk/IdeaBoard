@@ -6,6 +6,21 @@ const BOARD_QUERY_OWNERS = new Set([
   'src/features/board/session/sync/boardQueries.ts',
   'src/features/board/session/sync/boardSseInvalidation.ts',
   'src/features/board/session/sync/boardSync.ts',
+  // Issue #938 extends ADR-0014 §1 with the Share access fact, grant
+  // roster, and invite-search roster queries plus their invalidation.
+  // Issue #939 keeps the same ownership: the roster view, the live
+  // access fact, and the workspace-baseline draft compose the same Share
+  // queries.
+  'src/features/board/session/share/commands.ts',
+  'src/features/board/session/share/queries.ts',
+  'src/features/board/session/share/useShareAccessFact.ts',
+  'src/features/board/session/share/useShareDialog.ts',
+  'src/features/board/session/share/useShareRoster.ts',
+  // Issue #941 extends the same ownership to confirmed access-loss
+  // convergence: the open-board revalidation observer never writes caches,
+  // and this module only removes the revoked board's protected queries
+  // plus invalidates the catalog list (refetch converges the rest).
+  'src/features/board/session/revocation/convergeAccessLoss.ts',
 ])
 const ALLOWED_ROOTS = [
   'src/features/account/',

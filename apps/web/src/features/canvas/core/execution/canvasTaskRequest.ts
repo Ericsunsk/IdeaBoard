@@ -42,6 +42,14 @@ export type CanvasTaskRequestData = {
   reference_image_asset_ids?: number[]
   /** Opaque `asset_...` ids; the only media refs the v1 transport sends. */
   media_asset_ids?: string[]
+  /**
+   * Opaque `board_...` id binding this submit to its Canvas Board (#937).
+   * The server validates Board identity + generate capability and
+   * snapshots the access version; omitted ids stay non-Canvas tasks
+   * (submitter-only, never auto-published). Set by the execution
+   * transport from the Board attachment, never forged by callers.
+   */
+  board_id?: string
   params?: CanvasTaskParams
 }
 

@@ -10,6 +10,7 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { BoardId } from './boardId'
 import type { CreateWorkspaceTaskRequestDataInputs } from './createWorkspaceTaskRequestDataInputs'
 import type { CreateWorkspaceTaskRequestDataParams } from './createWorkspaceTaskRequestDataParams'
 import type { Service } from './service'
@@ -28,4 +29,6 @@ export type CreateWorkspaceTaskRequestData = {
   quantity?: number
   /** Output resolution; omitted input is normalized to the Service policy canonical value. */
   resolution?: string
+  /** Optional Canvas Board binding (board_...). The server validates Board identity, the caller's generate capability, and input availability before any Quote/Hold, and snapshots the Board access_version into the durable task binding. Omitted Board IDs stay non-Canvas tasks with their own workspace-level permission (submitter-only reads, never auto-published); callers must never forge a Board attribution. Covered by the idempotency hash: same key with a different Board renders 409 task_idempotency_conflict. */
+  board_id?: BoardId
 }

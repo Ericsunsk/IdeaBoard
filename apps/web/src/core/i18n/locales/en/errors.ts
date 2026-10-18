@@ -29,4 +29,12 @@ export default {
   checkout_request_rejected: 'Payment could not be started. Please try again.',
   checkout_session_expired: 'This payment session has expired. Start a new payment.',
   payment_already_completed: 'This payment has already been completed.',
+  board_forbidden: 'You cannot operate this board.',
+  task_forbidden: 'You cannot operate this task.',
+  board_archived: 'This board is archived and cannot accept this operation.',
+  board_not_found: 'Board not found.',
+  board_access_conflict: 'Access changed elsewhere. Refresh and try again.',
+  board_precondition_required: 'Access state is outdated. Refresh and try again.',
+  board_member_not_found: 'Board member not found.',
+  membership_transition_forbidden: 'The last manager cannot be removed or demoted.',
 } as const

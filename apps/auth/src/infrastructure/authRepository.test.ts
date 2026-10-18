@@ -120,6 +120,43 @@ describe('AuthIdentityStore', () => {
     ])
   })
 
+  it('looks up one identity by canonical email case-insensitively', async () => {
+    const queries: Array<{ text: string; values?: unknown[] }> = []
+    const store = createAuthIdentityStore({
+      async query(text: string, values?: unknown[]) {
+        queries.push({ text, values })
+        return {
+          rows: [{ id: 'auth-user-1', email: 'User@Example.com' }],
+          rowCount: 1,
+        }
+      },
+      async connect() {
+        throw new Error('not used')
+      },
+    })
+
+    assert.deepEqual(await store.findUserByCanonicalEmail('user@example.com'), {
+      auth_user_id: 'auth-user-1',
+      email: 'User@Example.com',
+    })
+    assert.deepEqual(queries, [
+      {
+        text: 'SELECT id, email FROM "user" WHERE lower(email) = lower($1) LIMIT 1',
+        values: ['user@example.com'],
+      },
+    ])
+
+    const missing = createAuthIdentityStore({
+      async query() {
+        return { rows: [], rowCount: 0 }
+      },
+      async connect() {
+        throw new Error('not used')
+      },
+    })
+    assert.equal(await missing.findUserByCanonicalEmail('ghost@example.com'), null)
+  })
+
   it('preserves an existing ban expiry when a partial ban command is retried', async () => {
     const queries: Array<{ text: string; values?: unknown[] }> = []
     const store = createAuthIdentityStore({

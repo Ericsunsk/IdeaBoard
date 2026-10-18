@@ -41,7 +41,17 @@
 import { createWorkspaceTask } from '../../../../../api/workspaceTaskTransport'
 import { workspaceTaskIdempotencyKey } from '../../../../../api/idempotencyKey'
 import { notifyUserCreditsInvalidation } from '../../../../../core/query/userCreditsInvalidation'
+import { i18n } from '../../../../../core/i18n'
 import type { CanvasTaskRequestData } from '../../../core/execution/canvasTaskRequest'
+import {
+  getBoardScope,
+  isBoardScopeCurrent,
+  type BoardScope,
+  isBoardAccessLost,
+  isBoardAccessStale,
+  isConfirmedAccessLoss,
+  revalidateAndConvergeBoardAccess,
+} from '../../../../board/ports/canvasSession'
 import { toWorkspaceCreateInput } from './canvasTaskContractMapping'
 import { registerCanvasWorkspaceTask, requireCanvasWorkspaceId } from './canvasTaskCancellation'
 
@@ -73,15 +83,97 @@ export {
 
 export async function submitCanvasWorkspaceTask(
   request: CanvasTaskRequestData,
-  options?: { idempotencyKey?: string | undefined },
+  options?: { idempotencyKey?: string | undefined; boardId?: string | undefined },
 ): Promise<{ taskId: string; workspaceId: string }> {
   const workspaceId = requireCanvasWorkspaceId()
-  const input = toWorkspaceCreateInput(request)
+  const scope = getBoardScope()
+  const boardId = `${options?.boardId ?? request.board_id ?? ''}`.trim()
+  if (boardId) await ensureBoardAccessForSubmit(workspaceId, boardId, scope)
+  if (!isBoardScopeCurrent(scope)) throw boardScopeChangedError()
+  const input = toWorkspaceCreateInput(withCanvasTaskBoardId(request, options?.boardId))
   const clientActionId = `${request.client_action_id ?? ''}`.trim()
   const idempotencyKey =
     options?.idempotencyKey?.trim() || clientActionId || workspaceTaskIdempotencyKey('create')
-  const item = await createWorkspaceTask(workspaceId, input, { idempotencyKey })
+  const item = await createWorkspaceTaskOrConvergeLoss(
+    workspaceId,
+    boardId,
+    input,
+    idempotencyKey,
+    scope,
+  )
+  if (!isBoardScopeCurrent(scope)) throw boardScopeChangedError()
   registerCanvasWorkspaceTask(item.id, item.workspace_id)
   notifyUserCreditsInvalidation({ source: 'task-hold', taskId: item.id })
   return { taskId: item.id, workspaceId: item.workspace_id }
+}
+
+/**
+ * Pre-submit access gate (#941): a confirmed loss stops the doomed submit
+ * (no task, hold, or late result anchors to an unreadable board), and a
+ * stale episode (gap/reconnect/hidden-tab) revalidates once before the
+ * sensitive write — not on every submit.
+ */
+async function ensureBoardAccessForSubmit(
+  workspaceId: string,
+  boardId: string,
+  scope: BoardScope,
+): Promise<void> {
+  if (isBoardAccessLost(boardId)) throw boardAccessLostError()
+  if (!isBoardAccessStale(boardId)) return
+  const verdict = await revalidateAndConvergeBoardAccess(boardId, { workspaceId })
+  if (!isBoardScopeCurrent(scope)) throw boardScopeChangedError()
+  if (verdict === 'revoked') throw boardAccessLostError()
+}
+
+/**
+ * Submit with post-failure disambiguation: a board-bound submit failing
+ * with capability codes revalidates like a document PUT (revocation vs
+ * transient). Unconfirmed failures rethrow untouched so the caller's error
+ * path, draft, and retries survive.
+ */
+async function createWorkspaceTaskOrConvergeLoss(
+  workspaceId: string,
+  boardId: string,
+  input: Parameters<typeof createWorkspaceTask>[1],
+  idempotencyKey: string,
+  scope: BoardScope,
+): Promise<Awaited<ReturnType<typeof createWorkspaceTask>>> {
+  try {
+    return await createWorkspaceTask(workspaceId, input, { idempotencyKey })
+  } catch (error) {
+    if (isBoardScopeCurrent(scope) && boardId && isConfirmedAccessLoss(error)) {
+      await revalidateAndConvergeBoardAccess(boardId, { workspaceId })
+    }
+    throw error
+  }
+}
+
+/**
+ * Board attribution (#937): an explicit option wins; otherwise the
+ * request's own board_id rides through. Absent stays absent
+ * (server-governed non-Canvas semantics); malformed values fail closed
+ * in toWorkspaceCreateInput, never forged.
+ */
+function withCanvasTaskBoardId(
+  request: CanvasTaskRequestData,
+  boardId: string | undefined,
+): CanvasTaskRequestData {
+  const trimmed = `${boardId ?? ''}`.trim()
+  if (!trimmed) return request
+  return { ...request, board_id: trimmed }
+}
+
+/**
+ * Generation-time access-loss failure (#941): carries the stable
+ * `board_forbidden` code (never prose) so every feedback boundary renders
+ * the same copy through the shared error catalog.
+ */
+function boardAccessLostError(): Error {
+  return Object.assign(new Error(i18n.global.t('errorCodes.board_forbidden')), {
+    code: 'board_forbidden',
+  })
+}
+
+function boardScopeChangedError(): Error {
+  return Object.assign(new Error('Board scope changed'), { code: 'board_scope_changed' })
 }

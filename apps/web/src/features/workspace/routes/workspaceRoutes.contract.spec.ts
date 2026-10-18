@@ -31,18 +31,8 @@ describe('workspaceRoutes contract', () => {
     const refundPolicyRoute = requireRoute(workspaceRoutes, '/refund-policy')
     const privacyPolicyRoute = requireRoute(workspaceRoutes, '/privacy-policy')
     const acceptableUseRoute = requireRoute(workspaceRoutes, '/acceptable-use')
-    const shareRoute = requireRoute(workspaceRoutes, '/share')
     const userRootRoute = requireRoute(workspaceRoutes, '/user')
 
-    expect({
-      path: shareRoute.path,
-      name: shareRoute.name,
-      meta: shareRoute.meta,
-    }).toEqual({
-      path: '/share',
-      name: 'ShareJoin',
-      meta: { requiresAuth: true },
-    })
     expect({ name: termsRoute.name, meta: termsRoute.meta }).toEqual({
       name: 'Terms',
       meta: { public: true, seoKey: 'terms' },

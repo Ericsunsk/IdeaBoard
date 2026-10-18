@@ -251,7 +251,15 @@
             :is-used-as-reference="
               references.some((ref) => ref.key === searchReferenceKey(result.provider, result.id))
             "
-            :is-saved="savedKeys.has(libraryAssetKeyFor({ source: 'external', provider: result.provider, sourceId: result.id }))"
+            :is-saved="
+              savedKeys.has(
+                libraryAssetKeyFor({
+                  source: 'external',
+                  provider: result.provider,
+                  sourceId: result.id,
+                }),
+              )
+            "
             :has-image-error="failedImages.has(result.id)"
             :image-retry-count="imageRetryCount(result.id)"
             @card-pointer-down="handleCardPointerDown($event, result)"

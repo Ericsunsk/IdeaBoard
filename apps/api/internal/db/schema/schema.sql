@@ -2442,6 +2442,21 @@ CREATE TABLE media_assets (
 CREATE INDEX idx_media_assets_workspace ON media_assets (workspace_id, created_at DESC) WHERE archived_at IS NULL;
 CREATE INDEX idx_media_assets_owner ON media_assets (owner_user_id, created_at DESC);
 CREATE INDEX idx_media_assets_upload ON media_assets (upload_session_id);
+
+CREATE TABLE media_asset_task_origins (
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  task_public_id TEXT NOT NULL,
+  output_index INT NOT NULL,
+  media_asset_id BIGINT NOT NULL REFERENCES media_assets(internal_id) ON DELETE CASCADE,
+  submitter_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  board_public_id TEXT NULL,
+  CONSTRAINT media_asset_task_origins_pkey PRIMARY KEY (workspace_id, task_public_id, output_index),
+  CONSTRAINT chk_media_asset_task_origins_task CHECK (task_public_id LIKE 'task\_%'),
+  CONSTRAINT chk_media_asset_task_origins_output_index CHECK (output_index >= 0),
+  CONSTRAINT chk_media_asset_task_origins_board CHECK (board_public_id IS NULL OR board_public_id LIKE 'board\_%')
+);
+
+CREATE INDEX idx_media_asset_task_origins_asset ON media_asset_task_origins (media_asset_id);
 CREATE TABLE tasks (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
@@ -2832,6 +2847,42 @@ CREATE INDEX idx_task_status_event_outbox_pending
   ON task_status_event_outbox (next_attempt_at, internal_id)
   WHERE status_state = 'pending';
 
+-- Board directed access-signal outbox (#940). One row per affected user is
+-- recorded post-commit when an access/membership change commits and
+-- replayed (hot log + NATS, never webhooks) until the live emit completes.
+-- The evt_ id is deterministic on (board, member, access_version) so live
+-- emits and replays converge exactly. Pending rows are never pruned;
+-- delivered rows are audit trail pruned past the NATS MaxAge window.
+CREATE TABLE board_access_event_outbox (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  event_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  board_id TEXT NOT NULL,
+  member_public_id TEXT NOT NULL,
+  access_version BIGINT NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  status_state TEXT NOT NULL DEFAULT 'pending',
+  attempts INT NOT NULL DEFAULT 0,
+  next_attempt_at TIMESTAMPTZ NOT NULL,
+  delivered_at TIMESTAMPTZ NULL,
+  last_error TEXT NOT NULL DEFAULT '',
+  CONSTRAINT uq_board_access_event_outbox_event_id UNIQUE (event_id),
+  CONSTRAINT chk_board_access_event_outbox_event_id CHECK (event_id LIKE 'evt\_%'),
+  CONSTRAINT chk_board_access_event_outbox_state CHECK (status_state IN ('pending','delivered')),
+  CONSTRAINT chk_board_access_event_outbox_attempts CHECK (attempts >= 0),
+  CONSTRAINT chk_board_access_event_outbox_workspace CHECK (workspace_id LIKE 'ws\_%'),
+  CONSTRAINT chk_board_access_event_outbox_board CHECK (board_id LIKE 'board\_%'),
+  CONSTRAINT chk_board_access_event_outbox_member CHECK (member_public_id LIKE 'usr\_%'),
+  CONSTRAINT chk_board_access_event_outbox_version CHECK (access_version > 0)
+);
+
+CREATE INDEX idx_board_access_event_outbox_pending
+  ON board_access_event_outbox (next_attempt_at, internal_id)
+  WHERE status_state = 'pending';
+CREATE INDEX idx_board_access_event_outbox_delivered
+  ON board_access_event_outbox (delivered_at)
+  WHERE status_state = 'delivered';
+
 -- Webhook subscriptions with filtered event types and endpoint signing secrets.
 -- signing_secret is encrypted at rest (AES-256-GCM via APP_SECRETS_ENCRYPTION_KEY):
 -- material_kind='encrypted' rows hold ciphertext over the whsec_ transport string;
@@ -3098,9 +3149,7 @@ ALTER TABLE task_execution_attempts
   ADD CONSTRAINT ck_task_execution_attempts_gateway_retry_count CHECK (gateway_retry_count >= 0);
 
 CREATE INDEX idx_task_execution_attempts_retry_layer ON task_execution_attempts (retry_layer) WHERE retry_layer <> '';
--- Boards and collaboration (#802). Boards are workspace-scoped with separate
--- ACL from workspace membership. Document snapshots use optimistic concurrency
--- (ETag/If-Match). Revisions are immutable. Share tokens enable public join.
+-- Workspace-scoped Boards grant one common role to explicitly selected members.
 CREATE TABLE boards (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
@@ -3115,9 +3164,15 @@ CREATE TABLE boards (
   -- rows as not found (fail-closed). The creator never needs a
   -- board_memberships row (see v1_workspace.go).
   owner_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  -- Sharing is disabled by none; viewer/editor applies only to selected members.
+  workspace_access TEXT NOT NULL DEFAULT 'none',
+  -- Access configuration changes atomically advance the independent ETag version.
+  access_version BIGINT NOT NULL DEFAULT 1,
   CONSTRAINT uq_boards_public_id UNIQUE (public_id),
   CONSTRAINT chk_boards_public_id CHECK (public_id LIKE 'board\_%'),
-  CONSTRAINT chk_boards_title CHECK (length(btrim(title)) BETWEEN 1 AND 200)
+  CONSTRAINT chk_boards_title CHECK (length(btrim(title)) BETWEEN 1 AND 200),
+  CONSTRAINT chk_boards_workspace_access CHECK (workspace_access IN ('none', 'viewer', 'editor')),
+  CONSTRAINT chk_boards_access_version CHECK (access_version > 0)
 );
 
 CREATE INDEX idx_boards_workspace ON boards (workspace_id, created_at DESC) WHERE archived_at IS NULL;
@@ -3173,12 +3228,10 @@ CREATE TABLE board_revisions (
 CREATE INDEX idx_board_revisions_board_created ON board_revisions (board_id, created_at DESC);
 CREATE INDEX idx_board_revisions_author ON board_revisions (author_user_id, created_at DESC);
 
--- Board membership ACL, separate from workspace membership. Role enforcement
--- at application layer: owner > editor > viewer.
+-- Selected Workspace members. Their common role lives on boards.workspace_access.
 CREATE TABLE board_memberships (
   board_id BIGINT NOT NULL REFERENCES boards(internal_id) ON DELETE CASCADE,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role TEXT NOT NULL CHECK (role IN ('owner','editor','viewer')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (board_id, user_id)
@@ -3186,43 +3239,37 @@ CREATE TABLE board_memberships (
 
 CREATE INDEX idx_board_memberships_user ON board_memberships (user_id, board_id);
 
--- Share tokens enable public join with configurable role. Token creation,
--- join, and revocation are idempotent commands (Idempotency-Key required).
-CREATE TABLE board_share_tokens (
-  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  public_id TEXT NOT NULL,
+-- Board document media references (#936). One row per (board, media asset)
+-- accepted into the board's persisted document snapshot: the durable join
+-- fact behind asset authorization for board readers. Reconciled in the SAME
+-- transaction as every document accept (ReplaceDocument): newly referenced
+-- asset ids are upserted, ids no longer present are deleted. Multi-source
+-- authorization stays independent — this table carries only the document
+-- source; the upload-target source lives on upload_sessions.target_board_id
+-- and owner/library/task sources on their own rows — so losing one board's
+-- access (or one row here) never revokes an independent grant. Board removal
+-- cascades; asset removal cascades; archive/restore change no row because
+-- authorization revalidates the live board role on every read.
+CREATE TABLE board_document_media_refs (
   board_id BIGINT NOT NULL REFERENCES boards(internal_id) ON DELETE CASCADE,
-  token_secret TEXT NOT NULL,
-  granted_role TEXT NOT NULL CHECK (granted_role IN ('editor','viewer')),
-  created_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  media_asset_id BIGINT NOT NULL REFERENCES media_assets(internal_id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  revoked_at TIMESTAMPTZ NULL,
-  revoked_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  -- Opaque sht_ bearer id exposed in {token_id} URL segments. Nullable so
-  -- the additive migration applies where token rows already exist; the
-  -- store always sets it on insert. Only the bearer hash is kept in
-  -- token_secret (never the bearer), so share secrets need no reversible
-  -- encryption at rest.
-  token_id TEXT NULL,
-  token_prefix TEXT NOT NULL DEFAULT '',
-  -- Join counter. The durable audit trail itself is a #808 follow-up.
-  usage_count BIGINT NOT NULL DEFAULT 0,
-  CONSTRAINT uq_board_share_tokens_public_id UNIQUE (public_id),
-  CONSTRAINT uq_board_share_tokens_secret UNIQUE (token_secret),
-  CONSTRAINT uq_board_share_tokens_token_id UNIQUE (token_id),
-  CONSTRAINT chk_board_share_tokens_public_id CHECK (public_id LIKE 'bst\_%'),
-  CONSTRAINT chk_board_share_tokens_secret CHECK (length(token_secret) >= 32),
-  CONSTRAINT chk_board_share_tokens_token_id CHECK (token_id IS NULL OR token_id LIKE 'sht\_%'),
-  CONSTRAINT chk_board_share_tokens_usage_count CHECK (usage_count >= 0),
-  CONSTRAINT chk_board_share_tokens_revocation CHECK (
-    (revoked_at IS NULL AND revoked_by_user_id IS NULL)
-    OR (revoked_at IS NOT NULL AND revoked_by_user_id IS NOT NULL)
-  )
+  PRIMARY KEY (board_id, media_asset_id)
 );
 
-CREATE INDEX idx_board_share_tokens_board ON board_share_tokens (board_id) WHERE revoked_at IS NULL;
-CREATE INDEX idx_board_share_tokens_secret ON board_share_tokens (token_secret) WHERE revoked_at IS NULL;
+CREATE INDEX idx_board_document_media_refs_asset ON board_document_media_refs (media_asset_id, board_id);
+
+-- Restricted upload target (#936). The board a Canvas/Library/Search upload
+-- is captured for, recorded at session create (pre-complete) and verified
+-- by the handler against the caller's board write access — never trusted
+-- from the client. NULL means no board binding yet (e.g. the board is not
+-- autosaved): the resulting asset stays owner-only until a board document
+-- accept, library save, or task output grants wider access, so there is
+-- never a full-workspace readable window. Cleared when the board row goes
+-- away; the asset itself survives (workspace-scoped immutability).
+ALTER TABLE upload_sessions
+  ADD COLUMN target_board_id BIGINT NULL REFERENCES boards(internal_id) ON DELETE SET NULL;
+CREATE INDEX idx_upload_sessions_target_board ON upload_sessions (target_board_id) WHERE target_board_id IS NOT NULL;
 CREATE TABLE reward_codes (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   display_name VARCHAR(120) NOT NULL,
@@ -5341,7 +5388,6 @@ CREATE TRIGGER set_storage_profile_secret_versions_updated_at BEFORE UPDATE ON s
 CREATE TRIGGER set_feature_prompts_updated_at BEFORE UPDATE ON feature_prompts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_boards_updated_at BEFORE UPDATE ON boards FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_board_memberships_updated_at BEFORE UPDATE ON board_memberships FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER set_board_share_tokens_updated_at BEFORE UPDATE ON board_share_tokens FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 ALTER TABLE payment_webhook_events ADD CONSTRAINT payment_webhook_events_payment_order_id_fkey FOREIGN KEY (payment_order_id) REFERENCES payment_orders(id) ON DELETE RESTRICT;
 
 ALTER TABLE credit_transactions

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
 	identityports "ideaboard/api/internal/identity/users/ports"
@@ -302,6 +303,58 @@ func renderMediaValidationError(c *gin.Context, err error) {
 	renderMediaStoreError(c, err)
 }
 
+// mediaBoards exposes the narrow #936 board-access port consumed by asset
+// authorization: h.deps.Boards satisfies workspacemedia.BoardAccess
+// structurally (GetBoardRole + ListBoardsReferencingAsset). A nil store
+// denies board-sourced reads (fail closed) while owner/library/task
+// sources still evaluate; production always wires Boards.
+func (h *contractV1Handler) mediaBoards() workspacemedia.BoardAccess {
+	if h.deps.Boards == nil {
+		return nil
+	}
+	return h.deps.Boards
+}
+
+// authorizeMediaAsset enforces #936 asset authorization AFTER workspace
+// membership (the withWorkspace prelude or v1BinaryWorkspaceContext) and
+// BEFORE any metadata, bytes, derivative-render, shared-cache, or 304
+// handling. Every denial — unknown id, cross-workspace id, non-member,
+// or member without an independent source — renders media_not_found 404
+// (Baseline 4: ids and URLs are not credentials, existence never leaks).
+// ok=false means a status was already written.
+func (h *contractV1Handler) authorizeMediaAsset(c *gin.Context, workspacePublicID, assetID string, userID int64, workspaceRole string) (*workspacemedia.Asset, bool) {
+	if h.deps.Media == nil {
+		contract.RenderError(c, http.StatusNotImplemented,
+			contract.CodeContractNotImplemented, "The v1 contract surface is not implemented yet")
+		c.Abort()
+		return nil, false
+	}
+	asset, err := h.deps.Media.AuthorizeAsset(c.Request.Context(), workspacePublicID, assetID, userID, workspaceRole, h.mediaBoards())
+	if err != nil {
+		renderMediaStoreError(c, err)
+		return nil, false
+	}
+	return asset, true
+}
+
+// authorizeMediaAssetBytes is the plain-status counterpart of
+// authorizeMediaAsset for the binary endpoints: every failure (including
+// authorization) renders a non-JSON status so content/derivative responses
+// never carry the JSON envelope. ok=false means a status was already
+// written.
+func (h *contractV1Handler) authorizeMediaAssetBytes(c *gin.Context, workspacePublicID, assetID string, userID int64, workspaceRole string) (*workspacemedia.Asset, bool) {
+	if h.deps.Media == nil {
+		renderV1BinaryError(c, http.StatusNotImplemented)
+		return nil, false
+	}
+	asset, err := h.deps.Media.AuthorizeAsset(c.Request.Context(), workspacePublicID, assetID, userID, workspaceRole, h.mediaBoards())
+	if err != nil {
+		renderV1BinaryError(c, http.StatusNotFound)
+		return nil, false
+	}
+	return asset, true
+}
+
 // renderV1BinaryError answers binary endpoints with a plain non-JSON
 // status: content/derivative endpoints never carry the JSON envelope.
 func renderV1BinaryError(c *gin.Context, status int) {
@@ -317,6 +370,12 @@ type v1CreateUploadBody struct {
 		SizeBytes      int64  `json:"size_bytes"`
 		ChecksumSHA256 string `json:"checksum_sha256"`
 		MediaKind      string `json:"media_kind"`
+		// BoardID optionally binds the upload to the board it is captured
+		// for (#936). Verified against the creator's board write access
+		// below — never trusted from the client. Empty means no binding
+		// (e.g. the board is not autosaved yet): the asset stays
+		// owner-only until another source grants wider access.
+		BoardID string `json:"board_id,omitempty"`
 	} `json:"data"`
 }
 
@@ -346,21 +405,34 @@ func (h *contractV1Handler) createUploadSession(c *gin.Context) {
 			renderUploadValidationError(c, validateErr)
 			return
 		}
+		// #936: an optional board binding stages the upload for a board the
+		// creator can write. Malformed, unknown, and unreadable boards
+		// converge to 404; readable-but-unwritable boards to 403 — the
+		// client can neither forge a binding nor learn board existence
+		// from it. Unbound uploads stay owner-only (no workspace-readable
+		// window, even when the board is not autosaved yet).
+		targetBoardID := strings.TrimSpace(body.Data.BoardID)
+		if targetBoardID != "" {
+			if _, _, ok := h.authorizeBoardByID(c, wctx.Workspace, targetBoardID, wctx.Role, identityPrincipal.UserID(), boards.CapWrite); !ok {
+				return
+			}
+		}
 		ctx := c.Request.Context()
 		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 		scope := contract.IdempotencyScope(externalUser, "upload:create")
 		hash := contract.HashIdempotencyRequest("upload:create", workspacePublicID, filename,
-			workspacemedia.CanonicalMIME(mimeType), strconv.FormatInt(body.Data.SizeBytes, 10), checksum, kind)
+			workspacemedia.CanonicalMIME(mimeType), strconv.FormatInt(body.Data.SizeBytes, 10), checksum, kind, targetBoardID)
 		ownerUserID := identityPrincipal.UserID()
 		result, _, doErr := h.deps.Idempotency.Do(ctx, scope, ownerUserID, key, hash, func() (any, error) {
 			session, createErr := h.deps.Media.CreateSession(ctx, workspacemedia.CreateSessionParams{
-				WorkspaceID:    workspacePublicID,
-				OwnerUserID:    ownerUserID,
-				Filename:       filename,
-				MIMEType:       mimeType,
-				SizeBytes:      body.Data.SizeBytes,
-				ChecksumSHA256: checksum,
-				MediaKind:      kind,
+				WorkspaceID:         workspacePublicID,
+				OwnerUserID:         ownerUserID,
+				Filename:            filename,
+				MIMEType:            mimeType,
+				SizeBytes:           body.Data.SizeBytes,
+				ChecksumSHA256:      checksum,
+				MediaKind:           kind,
+				TargetBoardPublicID: targetBoardID,
 			})
 			if createErr != nil {
 				return nil, createErr
@@ -751,8 +823,11 @@ func (h *contractV1Handler) listMediaAssets(c *gin.Context) {
 			}
 			offset = cursor.Offset
 		}
-		// Over-fetch by one to compute has_more without a count query.
-		assets, err := h.deps.Media.ListAssets(c.Request.Context(), workspacePublicID, pageSize+1, offset)
+		// #936: authorization precedes pagination. The offset counts
+		// AUTHORIZED items, so pages and has_more never leak unauthorized
+		// rows. Over-fetch by one to compute has_more without a count query.
+		assets, err := h.deps.Media.ListAuthorizedAssets(c.Request.Context(), workspacePublicID,
+			wctx.Principal.UserID(), wctx.Role, h.mediaBoards(), pageSize+1, offset)
 		if err != nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable51)
 			c.Abort()
@@ -790,7 +865,7 @@ func (h *contractV1Handler) getMediaAsset(c *gin.Context) {
 		// completed materialization link serves the managed asset; a miss
 		// triggers one best-effort async fetch and 404s now.
 		if contract.IsLibraryAssetID(assetID) {
-			h.getLibraryMaterializedMediaAsset(c, workspacePublicID, assetID)
+			h.getLibraryMaterializedMediaAsset(c, workspacePublicID, assetID, wctx.Principal.UserID(), wctx.Role)
 			return
 		}
 		if !contract.IsAssetID(assetID) {
@@ -798,9 +873,9 @@ func (h *contractV1Handler) getMediaAsset(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		asset, err := h.deps.Media.GetAsset(c.Request.Context(), workspacePublicID, assetID)
-		if err != nil {
-			renderMediaStoreError(c, err)
+		// #936: metadata reads enforce the same authorization as bytes.
+		asset, ok := h.authorizeMediaAsset(c, workspacePublicID, assetID, wctx.Principal.UserID(), wctx.Role)
+		if !ok {
 			return
 		}
 		contract.RenderSuccess(c, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
@@ -837,9 +912,11 @@ func (h *contractV1Handler) batchGetMediaAssets(c *gin.Context) {
 				renderMediaStoreError(c, workspacemedia.ErrNotFound)
 				return
 			}
-			asset, err := h.deps.Media.GetAsset(c.Request.Context(), workspacePublicID, assetID)
-			if err != nil {
-				renderMediaStoreError(c, err)
+			// #936: batch items enforce per-id authorization with the same
+			// 404 convergence as the single read; one unauthorized id fails
+			// the batch without naming which source was missing.
+			asset, ok := h.authorizeMediaAsset(c, workspacePublicID, assetID, wctx.Principal.UserID(), wctx.Role)
+			if !ok {
 				return
 			}
 			items = append(items, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
@@ -856,6 +933,12 @@ func (h *contractV1Handler) archiveMediaAsset(c *gin.Context) {
 		if !contract.IsAssetID(assetID) {
 			contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, msgMediaNotFound)
 			c.Abort()
+			return
+		}
+		// #936: archiving an unreadable asset reads as 404 (the admin
+		// prelude already gated workspace owner/admin; authorization runs
+		// before any state change or idempotency claim).
+		if _, ok := h.authorizeMediaAsset(c, workspacePublicID, assetID, identityPrincipal.UserID(), wctx.Role); !ok {
 			return
 		}
 		key, err := contract.IdempotencyKeyFromHeader(c)
@@ -905,50 +988,46 @@ func (h *contractV1Handler) archiveMediaAsset(c *gin.Context) {
 // (including auth and fail-closed paths) renders a non-JSON status so
 // content/derivative responses never carry the JSON envelope. Only
 // workspace members pass; hidden workspaces and non-members converge
-// to 404 (Baseline 4 anti-enumeration).
-func (h *contractV1Handler) v1BinaryWorkspaceContext(c *gin.Context) (string, bool) {
+// to 404 (Baseline 4 anti-enumeration). It returns the caller's user id
+// and workspace role for #936 asset authorization downstream.
+func (h *contractV1Handler) v1BinaryWorkspaceContext(c *gin.Context) (workspacePublicID string, userID int64, workspaceRole string, allowed bool) {
 	identityPrincipal, ok := principal.From(c)
 	if !ok {
 		renderV1BinaryError(c, http.StatusUnauthorized)
-		return "", false
+		return "", 0, "", false
 	}
 	if h.deps.Store == nil || h.deps.Media == nil {
 		renderV1BinaryError(c, http.StatusNotImplemented)
-		return "", false
+		return "", 0, "", false
 	}
 	raw := strings.TrimSpace(c.Param("workspace_id"))
 	if !contract.IsWorkspaceID(raw) {
 		renderV1BinaryError(c, http.StatusNotFound)
-		return "", false
+		return "", 0, "", false
 	}
 	ctx := c.Request.Context()
 	workspace, err := h.deps.Store.GetWorkspace(ctx, raw)
 	if err != nil {
 		renderV1BinaryError(c, http.StatusNotFound)
-		return "", false
+		return "", 0, "", false
 	}
-	_, member, err := h.deps.Store.GetWorkspaceRole(ctx, raw, identityPrincipal.UserID())
+	role, member, err := h.deps.Store.GetWorkspaceRole(ctx, raw, identityPrincipal.UserID())
 	if err != nil || !member {
 		renderV1BinaryError(c, http.StatusNotFound)
-		return "", false
+		return "", 0, "", false
 	}
-	return workspace.PublicID, true
+	return workspace.PublicID, identityPrincipal.UserID(), role, true
 }
 
 // v1MediaBinaryAsset resolves the asset for binary endpoints with plain
 // (non-envelope) failures. ok=false means a status was already written.
-func (h *contractV1Handler) v1MediaBinaryAsset(c *gin.Context, workspacePublicID, assetID string) (*workspacemedia.Asset, bool) {
-	if h.deps.Media == nil {
-		renderV1BinaryError(c, http.StatusNotImplemented)
-		return nil, false
-	}
-	if !contract.IsAssetID(assetID) {
-		renderV1BinaryError(c, http.StatusNotFound)
-		return nil, false
-	}
-	asset, err := h.deps.Media.GetAsset(c.Request.Context(), workspacePublicID, assetID)
-	if err != nil {
-		renderV1BinaryError(c, http.StatusNotFound)
+// #936: authorization runs on the loaded asset BEFORE the archived (410)
+// and readiness (409) gates — and therefore before the ETag/304 shortcut
+// and the derivative renderer — so unauthorized callers always read 404
+// and never learn whether the bytes exist, are archived, or are ready.
+func (h *contractV1Handler) v1MediaBinaryAsset(c *gin.Context, workspacePublicID, assetID string, userID int64, workspaceRole string) (*workspacemedia.Asset, bool) {
+	asset, ok := h.authorizeMediaAssetBytes(c, workspacePublicID, assetID, userID, workspaceRole)
+	if !ok {
 		return nil, false
 	}
 	if asset.IsArchived() {
@@ -1034,12 +1113,12 @@ func v1MediaDisposition(mime, filename string) string {
 }
 
 func (h *contractV1Handler) contentMediaAsset(c *gin.Context) {
-	workspacePublicID, allowed := h.v1BinaryWorkspaceContext(c)
+	workspacePublicID, userID, workspaceRole, allowed := h.v1BinaryWorkspaceContext(c)
 	if !allowed {
 		return
 	}
 	assetID := strings.TrimSpace(c.Param("asset_id"))
-	asset, ok := h.v1MediaBinaryAsset(c, workspacePublicID, assetID)
+	asset, ok := h.v1MediaBinaryAsset(c, workspacePublicID, assetID, userID, workspaceRole)
 	if !ok {
 		return
 	}
@@ -1047,7 +1126,7 @@ func (h *contractV1Handler) contentMediaAsset(c *gin.Context) {
 }
 
 func (h *contractV1Handler) derivativeMediaAsset(c *gin.Context) {
-	workspacePublicID, allowed := h.v1BinaryWorkspaceContext(c)
+	workspacePublicID, userID, workspaceRole, allowed := h.v1BinaryWorkspaceContext(c)
 	if !allowed {
 		return
 	}
@@ -1061,7 +1140,7 @@ func (h *contractV1Handler) derivativeMediaAsset(c *gin.Context) {
 		return
 	}
 	assetID := strings.TrimSpace(c.Param("asset_id"))
-	asset, ok := h.v1MediaBinaryAsset(c, workspacePublicID, assetID)
+	asset, ok := h.v1MediaBinaryAsset(c, workspacePublicID, assetID, userID, workspaceRole)
 	if !ok {
 		return
 	}

@@ -263,6 +263,14 @@ type CreateSessionParams struct {
 	SizeBytes      int64
 	ChecksumSHA256 string
 	MediaKind      string
+	// TargetBoardPublicID optionally binds the session to the board the
+	// upload is captured for (#936). The caller (HTTP handler) verifies
+	// the creator's board write access BEFORE calling; the service
+	// resolves the board inside the workspace and fails closed
+	// (ErrNotFound) when it does not resolve. Empty means no binding:
+	// the completed asset stays owner-only until another source grants
+	// wider access.
+	TargetBoardPublicID string
 }
 
 // CreateAssetParams carries validated asset creation input for the
@@ -310,6 +318,7 @@ type UpdateMetadataParams struct {
 type WorkspaceMediaStore interface {
 	SessionStore
 	AssetStore
+	AssetAccessStore
 }
 
 // SessionStore is the upload-session half of the seam.

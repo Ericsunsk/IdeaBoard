@@ -28,7 +28,6 @@ const CARD_SURFACE_FILES = [
   'core/components/RangedLineChartCard.vue',
   'features/admin/shared/ui/chart/AdminChartCard.vue',
   'features/admin/shared/ui/chart/AdminRangedLineChartCard.vue',
-  'features/workspace/pages/WorkspaceShareJoinPage.vue',
 ]
 
 function listVueFiles(dir: string): string[] {

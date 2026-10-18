@@ -11,9 +11,9 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"sync"
 	"testing"
 
-	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
 	tenancypg "ideaboard/api/internal/tenancy/postgres"
 	"ideaboard/api/internal/testdb"
@@ -38,7 +38,8 @@ func newPostgresWorkspaceBoardFixture(t *testing.T) (context.Context, *PostgresW
 	if err != nil {
 		t.Fatalf("create workspace failed: %v", err)
 	}
-	return ctx, NewPostgresWorkspaceBoardStore(db), ws
+	seedBoardTestMembers(t, NewPostgresWorkspaceBoardStore(db, testDocumentAssetValidator), ws.InternalID, 3, 7, 8, 10)
+	return ctx, NewPostgresWorkspaceBoardStore(db, testDocumentAssetValidator), ws
 }
 
 func mustCreatePostgresBoard(t *testing.T, ctx context.Context, store *PostgresWorkspaceBoardStore, ws *tenancy.Workspace, name string) string {
@@ -69,7 +70,7 @@ func TestPostgresWorkspaceBoardStoreLifecycle(t *testing.T) {
 		t.Fatalf("etag = %q, want 1", FormatV1ETag(got.Revision))
 	}
 
-	renamed, err := store.RenameBoard(ctx, ws.PublicID, boardID, "Renamed")
+	renamed, err := store.RenameBoard(ctx, ws.PublicID, boardID, "Renamed", postgresStoreOwner)
 	if err != nil {
 		t.Fatalf("rename failed: %v", err)
 	}
@@ -82,14 +83,14 @@ func TestPostgresWorkspaceBoardStoreLifecycle(t *testing.T) {
 		t.Fatalf("list = %d boards err %v, want 1", len(listed.Entries), err)
 	}
 
-	archived, err := store.ArchiveBoard(ctx, ws.PublicID, boardID)
+	archived, err := store.ArchiveBoard(ctx, ws.PublicID, boardID, postgresStoreOwner)
 	if err != nil || archived.ArchivedAt == nil {
 		t.Fatalf("archive failed: %v", err)
 	}
-	if _, err := store.ArchiveBoard(ctx, ws.PublicID, boardID); !errors.Is(err, ErrNotFound) {
+	if _, err := store.ArchiveBoard(ctx, ws.PublicID, boardID, postgresStoreOwner); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("second archive err = %v, want ErrNotFound", err)
 	}
-	if _, err := store.RenameBoard(ctx, ws.PublicID, boardID, "Nope"); !errors.Is(err, ErrV1Archived) {
+	if _, err := store.RenameBoard(ctx, ws.PublicID, boardID, "Nope", postgresStoreOwner); !errors.Is(err, ErrV1Archived) {
 		t.Fatalf("rename archived err = %v, want ErrV1Archived", err)
 	}
 	visible, err := store.ListBoardCatalog(ctx, ws.PublicID, false, postgresStoreOwner, "owner", V1BoardCatalogPageRequest{Limit: 100})
@@ -100,10 +101,10 @@ func TestPostgresWorkspaceBoardStoreLifecycle(t *testing.T) {
 	if err != nil || len(all.Entries) != 1 {
 		t.Fatalf("list all = %d err %v, want 1", len(all.Entries), err)
 	}
-	if _, err := store.RestoreBoard(ctx, ws.PublicID, boardID); err != nil {
+	if _, err := store.RestoreBoard(ctx, ws.PublicID, boardID, postgresStoreOwner); err != nil {
 		t.Fatalf("restore failed: %v", err)
 	}
-	if _, err := store.RestoreBoard(ctx, ws.PublicID, boardID); !errors.Is(err, ErrNotFound) {
+	if _, err := store.RestoreBoard(ctx, ws.PublicID, boardID, postgresStoreOwner); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("second restore err = %v, want ErrNotFound", err)
 	}
 }
@@ -169,147 +170,6 @@ func TestPostgresWorkspaceBoardStoreDocumentRevisions(t *testing.T) {
 	}
 }
 
-func TestPostgresWorkspaceBoardStoreMembers(t *testing.T) {
-	ctx, store, ws := newPostgresWorkspaceBoardFixture(t)
-	boardID := mustCreatePostgresBoard(t, ctx, store, ws, "Members")
-
-	// Seed visible workspace memberships: member defaults to viewer,
-	// a second workspace owner defaults to owner; outsiders stay denied.
-	db := store.db
-	tenancyStore := tenancypg.NewStore(db)
-	wsOwnerRole, wsOwnerMember, err := tenancyStore.GetWorkspaceRole(ctx, ws.PublicID, postgresStoreOwner)
-	if err != nil || !wsOwnerMember {
-		t.Fatalf("fixture owner workspace role = %q member=%v err=%v, want owner member", wsOwnerRole, wsOwnerMember, err)
-	}
-	if _, err := tenancyStore.AddWorkspaceMember(ctx, ws.PublicID, postgresStoreMember, tenancy.RoleMember); err != nil {
-		t.Fatalf("seed workspace member failed: %v", err)
-	}
-	wsMemberRole, wsMemberMember, err := tenancyStore.GetWorkspaceRole(ctx, ws.PublicID, postgresStoreMember)
-	if err != nil || !wsMemberMember {
-		t.Fatalf("seeded member workspace role = %q member=%v err=%v", wsMemberRole, wsMemberMember, err)
-	}
-	wsExtraOwner := postgresStoreExtra
-	if _, err := tenancyStore.AddWorkspaceMember(ctx, ws.PublicID, wsExtraOwner, tenancy.RoleOwner); err != nil {
-		t.Fatalf("seed workspace owner failed: %v", err)
-	}
-	wsExtraRole, wsExtraMember, err := tenancyStore.GetWorkspaceRole(ctx, ws.PublicID, wsExtraOwner)
-	if err != nil || !wsExtraMember {
-		t.Fatalf("seeded owner workspace role = %q member=%v err=%v", wsExtraRole, wsExtraMember, err)
-	}
-
-	if _, ok, err := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreOutsider, ""); err != nil || ok {
-		t.Fatalf("outsider role = %v err %v, want not-ok", ok, err)
-	}
-	if role, ok, err := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreOwner, wsOwnerRole); err != nil || !ok || role != RoleOwner {
-		t.Fatalf("owner role = %v %v err %v, want owner", role, ok, err)
-	}
-	if role, ok, err := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreMember, wsMemberRole); err != nil || !ok || role != RoleViewer {
-		t.Fatalf("member default role = %v %v err %v, want viewer", role, ok, err)
-	}
-	if role, ok, err := store.GetBoardRole(ctx, ws.PublicID, boardID, wsExtraOwner, wsExtraRole); err != nil || !ok || role != RoleOwner {
-		t.Fatalf("workspace owner default role = %v %v err %v, want owner", role, ok, err)
-	}
-
-	if _, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOutsider, postgresStoreMember, RoleViewer, ""); !errors.Is(err, ErrPermissionDenied) {
-		t.Fatalf("outsider grant err = %v, want ErrPermissionDenied", err)
-	}
-	added, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreMember, RoleViewer, wsOwnerRole)
-	if err != nil || added.Role != RoleViewer {
-		t.Fatalf("add member err = %v role = %v", err, added)
-	}
-	// Re-adding keeps the existing role (idempotent).
-	replayed, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreMember, RoleEditor, wsOwnerRole)
-	if err != nil || replayed.Role != RoleViewer {
-		t.Fatalf("re-add err = %v role = %v, want viewer", err, replayed)
-	}
-	// Explicit rows override the workspace default.
-	if role, ok, err := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreMember, wsMemberRole); err != nil || !ok || role != RoleViewer {
-		t.Fatalf("explicit override role = %v %v err %v, want viewer", role, ok, err)
-	}
-	if _, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreOwner, RoleViewer, wsOwnerRole); !errors.Is(err, ErrMemberInviteSelf) {
-		t.Fatalf("add owner err = %v, want ErrMemberInviteSelf", err)
-	}
-
-	members, err := store.ListBoardMembers(ctx, ws.PublicID, boardID)
-	if err != nil || len(members) != 1 || members[0].UserID != postgresStoreMember {
-		t.Fatalf("members = %+v err %v, want 1 viewer", members, err)
-	}
-
-	promoted, err := store.UpdateBoardMemberRole(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreMember, RoleEditor, wsOwnerRole)
-	if err != nil || promoted.Role != RoleEditor {
-		t.Fatalf("promote err = %v", err)
-	}
-	if err := store.RemoveBoardMember(ctx, ws.PublicID, boardID, postgresStoreMember, postgresStoreMember, wsMemberRole); err != nil {
-		t.Fatalf("self-remove failed: %v", err)
-	}
-
-	// Sole owner cannot be demoted or removed.
-	if _, err := store.UpdateBoardMemberRole(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreOwner, RoleEditor, wsOwnerRole); !errors.Is(err, ErrV1LastOwner) {
-		t.Fatalf("demote sole owner err = %v, want ErrV1LastOwner", err)
-	}
-	if err := store.RemoveBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreOwner, wsOwnerRole); !errors.Is(err, ErrMemberInviteSelf) {
-		t.Fatalf("remove owner err = %v, want ErrMemberInviteSelf", err)
-	}
-}
-
-func TestPostgresWorkspaceBoardStoreShareTokens(t *testing.T) {
-	ctx, store, ws := newPostgresWorkspaceBoardFixture(t)
-	boardID := mustCreatePostgresBoard(t, ctx, store, ws, "Shares")
-
-	tokenID, err := NewV1ShareTokenID()
-	if err != nil {
-		t.Fatalf("mint token id failed: %v", err)
-	}
-	created, err := store.CreateShareToken(ctx, ws.PublicID, boardID, postgresStoreOwner, RoleViewer, tokenID, V1ShareTokenHash(tokenID), tokenID)
-	if err != nil {
-		t.Fatalf("create share failed: %v", err)
-	}
-	if created.Bearer == "" || created.TokenPrefix == "" {
-		t.Fatal("created share must carry the bearer once with a prefix")
-	}
-	if !contract.IsValidPublicID("sht_", created.TokenID) {
-		t.Fatalf("token id = %q, want sht_ shape", created.TokenID)
-	}
-
-	tokens, err := store.ListShareTokens(ctx, ws.PublicID, boardID)
-	if err != nil || len(tokens) != 1 {
-		t.Fatalf("list shares = %d err %v, want 1", len(tokens), err)
-	}
-	if tokens[0].Bearer != "" {
-		t.Fatal("listed share must not carry the bearer")
-	}
-	if tokens[0].UsageCount != 0 {
-		t.Fatalf("usage = %d, want 0", tokens[0].UsageCount)
-	}
-
-	joined, role, err := store.JoinByToken(ctx, ws.PublicID, tokenID, postgresStoreMember)
-	if err != nil || role != RoleViewer || joined.PublicID != boardID {
-		t.Fatalf("join err = %v role = %v", err, role)
-	}
-	after, err := store.ListShareTokens(ctx, ws.PublicID, boardID)
-	if err != nil || after[0].UsageCount != 1 {
-		t.Fatalf("usage after join = %+v err %v, want 1", after, err)
-	}
-	// Repeat joins converge idempotently.
-	if _, _, err := store.JoinByToken(ctx, ws.PublicID, tokenID, postgresStoreMember); err != nil {
-		t.Fatalf("rejoin failed: %v", err)
-	}
-
-	if err := store.RevokeShareToken(ctx, ws.PublicID, boardID, tokenID, postgresStoreOwner); err != nil {
-		t.Fatalf("revoke failed: %v", err)
-	}
-	// Revoking twice succeeds (idempotent).
-	if err := store.RevokeShareToken(ctx, ws.PublicID, boardID, tokenID, postgresStoreOwner); err != nil {
-		t.Fatalf("second revoke failed: %v", err)
-	}
-	if _, _, err := store.JoinByToken(ctx, ws.PublicID, tokenID, postgresStoreOutsider); !errors.Is(err, ErrShareTokenRevoked) {
-		t.Fatalf("join revoked err = %v, want ErrShareTokenRevoked", err)
-	}
-	if _, _, err := store.JoinByToken(ctx, ws.PublicID, "sht_bogusbogusbogus00", postgresStoreOutsider); !errors.Is(err, ErrShareTokenNotFound) {
-		t.Fatalf("join unknown err = %v, want ErrShareTokenNotFound", err)
-	}
-}
-
 func TestPostgresWorkspaceBoardStoreCrossWorkspaceInvisible(t *testing.T) {
 	ctx, store, ws := newPostgresWorkspaceBoardFixture(t)
 	boardID := mustCreatePostgresBoard(t, ctx, store, ws, "Private")
@@ -335,15 +195,218 @@ func TestPostgresWorkspaceBoardStoreCrossWorkspaceInvisible(t *testing.T) {
 	if page, err := store.ListBoardCatalog(ctx, other.PublicID, true, postgresStoreOutsider, "owner", V1BoardCatalogPageRequest{Limit: 100}); err != nil || len(page.Entries) != 0 {
 		t.Fatalf("foreign catalog = %v, %v; want no entries", page, err)
 	}
+}
 
-	tokenID, err := NewV1ShareTokenID()
+// TestPostgresSharingOffConcurrent pins the #941 revocation race on real
+// PostgreSQL: concurrent sharing Off writers at one version serialize on
+// the board row lock and losers read ErrAccessConflict (412 at the edge),
+// never silent last-write-wins. A mixed access-write/sharing Off race
+// admits exactly one winner, repeats on the current version converge
+// without moving it, and non-creators stay denied. Skips without
+// API_TEST_DATABASE_DSN like every other PG integration test.
+func TestPostgresSharingOffConcurrent(t *testing.T) {
+	ctx, store, ws := newPostgresWorkspaceBoardFixture(t)
+
+	boardID := mustCreatePostgresBoard(t, ctx, store, ws, "Concurrent private")
+	if _, err := store.ReplaceBoardAccess(ctx, ws.PublicID, boardID, postgresStoreOwner, 1, WorkspaceAccess(RoleViewer), []int64{postgresStoreMember}); err != nil {
+		t.Fatalf("grant viewer: %v", err)
+	}
+
+	const writers = 8
+	type outcome struct {
+		only *V1BoardAccess
+		err  error
+	}
+	results := make(chan outcome, writers)
+	var wg sync.WaitGroup
+	for i := 0; i < writers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			only, err := store.ReplaceBoardAccess(ctx, ws.PublicID, boardID, postgresStoreOwner, 2, WorkspaceAccessNone, nil)
+			results <- outcome{only: only, err: err}
+		}()
+	}
+	wg.Wait()
+	close(results)
+	wins, conflicts := 0, 0
+	for result := range results {
+		if result.err == nil {
+			wins++
+			if result.only == nil || result.only.AccessVersion != 3 || result.only.AccessState != AccessStatePrivate {
+				t.Fatalf("winning sharing Off = %+v, want version 3 private", result.only)
+			}
+			continue
+		}
+		if !errors.Is(result.err, ErrAccessConflict) {
+			t.Fatalf("losing sharing Off err = %v, want ErrAccessConflict", result.err)
+		}
+		conflicts++
+	}
+	if wins != 1 || conflicts != writers-1 {
+		t.Fatalf("wins=%d conflicts=%d, want 1 and %d", wins, conflicts, writers-1)
+	}
+	if _, ok, _ := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreMember, "member"); ok {
+		t.Fatal("granted member must lose visibility after the winning reset")
+	}
+	// Repeating on the current version converges without moving it.
+	again, err := store.ReplaceBoardAccess(ctx, ws.PublicID, boardID, postgresStoreOwner, 3, WorkspaceAccessNone, nil)
+	if err != nil || again.AccessVersion != 3 {
+		t.Fatalf("sharing Off replay = %+v, %v; want version 3", again, err)
+	}
+	// Stale versions conflict; visible non-creators stay denied.
+	if _, err := store.ReplaceBoardAccess(ctx, ws.PublicID, boardID, postgresStoreOwner, 2, WorkspaceAccessNone, nil); !errors.Is(err, ErrAccessConflict) {
+		t.Fatalf("stale sharing Off = %v, want ErrAccessConflict", err)
+	}
+
+	// Mixed race: one access-write and one sharing Off at one version
+	// admit exactly one winner; the board converges to the winner's fact.
+	raced := mustCreatePostgresBoard(t, ctx, store, ws, "Concurrent mixed")
+	if _, err := store.ReplaceBoardAccess(ctx, ws.PublicID, raced, postgresStoreOwner, 1, WorkspaceAccess(RoleViewer), []int64{postgresStoreMember}); err != nil {
+		t.Fatalf("grant raced viewer: %v", err)
+	}
+	type mixedOutcome struct {
+		winner string
+		err    error
+	}
+	mixed := make(chan mixedOutcome, 2)
+	var mixedWG sync.WaitGroup
+	mixedWG.Add(2)
+	go func() {
+		defer mixedWG.Done()
+		_, err := store.ReplaceBoardAccess(ctx, ws.PublicID, raced, postgresStoreOwner, 2, WorkspaceAccessViewer, nil)
+		mixed <- mixedOutcome{winner: "access", err: err}
+	}()
+	go func() {
+		defer mixedWG.Done()
+		_, err := store.ReplaceBoardAccess(ctx, ws.PublicID, raced, postgresStoreOwner, 2, WorkspaceAccessNone, nil)
+		mixed <- mixedOutcome{winner: "private", err: err}
+	}()
+	mixedWG.Wait()
+	close(mixed)
+	succeeded := 0
+	for result := range mixed {
+		if result.err == nil {
+			succeeded++
+			continue
+		}
+		if !errors.Is(result.err, ErrAccessConflict) {
+			t.Fatalf("mixed loser (%s) err = %v, want ErrAccessConflict", result.winner, result.err)
+		}
+	}
+	if succeeded != 1 {
+		t.Fatalf("mixed race successes = %d, want exactly 1", succeeded)
+	}
+	access, err := store.GetBoardAccess(ctx, ws.PublicID, raced)
 	if err != nil {
-		t.Fatalf("mint token id failed: %v", err)
+		t.Fatalf("get raced access: %v", err)
 	}
-	if _, err := store.CreateShareToken(ctx, ws.PublicID, boardID, postgresStoreOwner, RoleViewer, tokenID, V1ShareTokenHash(tokenID), tokenID); err != nil {
-		t.Fatalf("create share failed: %v", err)
+	if access.AccessVersion != 3 {
+		t.Fatalf("raced version = %d, want exactly one bump to 3", access.AccessVersion)
 	}
-	if _, _, err := store.JoinByToken(ctx, other.PublicID, tokenID, postgresStoreExtra); !errors.Is(err, ErrShareTokenNotFound) {
-		t.Fatalf("foreign join err = %v, want ErrShareTokenNotFound", err)
+}
+
+// TestPostgresMemberGrantPurgeParity pins RemoveWorkspaceMemberGrants on
+// real PostgreSQL beyond the shared matrix: multi-board deterministic
+// order, live-version bumps with grant deletes in one transaction, and a
+// version-stable repeat. Skips without API_TEST_DATABASE_DSN.
+func TestPostgresMemberGrantPurgeParity(t *testing.T) {
+	ctx, store, ws := newPostgresWorkspaceBoardFixture(t)
+
+	first := mustCreatePostgresBoard(t, ctx, store, ws, "Purge first")
+	second := mustCreatePostgresBoard(t, ctx, store, ws, "Purge second")
+	for _, boardID := range []string{first, second} {
+		if _, err := store.ReplaceBoardAccess(ctx, ws.PublicID, boardID, postgresStoreOwner, 1, WorkspaceAccess(RoleViewer), []int64{postgresStoreMember}); err != nil {
+			t.Fatalf("grant viewer on %s: %v", boardID, err)
+		}
+	}
+	cleaned, err := cleanupMemberGrantsForTests(ctx, store, ws.PublicID, postgresStoreMember)
+	if err != nil {
+		t.Fatalf("purge grants: %v", err)
+	}
+	if len(cleaned) != 2 {
+		t.Fatalf("purged boards = %+v, want both boards", cleaned)
+	}
+	// Deterministic public-id order, one version bump each.
+	if cleaned[0].BoardPublicID > cleaned[1].BoardPublicID {
+		t.Fatalf("purge order = %q then %q, want public_id ASC", cleaned[0].BoardPublicID, cleaned[1].BoardPublicID)
+	}
+	for _, entry := range cleaned {
+		if entry.AccessVersion != 3 {
+			t.Fatalf("purge entry = %+v, want live version 3", entry)
+		}
+		if _, ok, _ := store.GetBoardRole(ctx, ws.PublicID, entry.BoardPublicID, postgresStoreMember, "member"); ok {
+			t.Fatalf("departed member still visible on %s", entry.BoardPublicID)
+		}
+	}
+	// Repeat: version-stable no-op, and the rest of the workspace is
+	// untouched (creator still owns both boards).
+	again, err := cleanupMemberGrantsForTests(ctx, store, ws.PublicID, postgresStoreMember)
+	if err != nil || len(again) != 0 {
+		t.Fatalf("purge repeat = %+v, %v; want empty no-op", again, err)
+	}
+	for _, boardID := range []string{first, second} {
+		access, err := store.GetBoardAccess(ctx, ws.PublicID, boardID)
+		if err != nil || access.AccessVersion != 3 {
+			t.Fatalf("board %s access = %+v, %v; want version 3", boardID, access, err)
+		}
+		if _, ok, _ := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreOwner, "owner"); !ok {
+			t.Fatalf("creator lost visibility on %s", boardID)
+		}
+	}
+	// Rejoin after purge mints a fresh grant (no stale row resurrects):
+	// the re-grant succeeds and moves the version again.
+	if _, err := store.ReplaceBoardAccess(ctx, ws.PublicID, first, postgresStoreOwner, 3, WorkspaceAccess(RoleViewer), []int64{postgresStoreMember}); err != nil {
+		t.Fatalf("re-grant after purge: %v", err)
+	}
+	if access, err := store.GetBoardAccess(ctx, ws.PublicID, first); err != nil || access.AccessVersion != 4 {
+		t.Fatalf("board %s access after rejoin = %+v, %v; want version 4", first, access, err)
+	}
+}
+
+// TestPostgresWorkspaceLeaveRejoinGrantsNothing verifies membership departure
+// removes direct grants atomically, and rejoining grants no Board access.
+func TestPostgresWorkspaceLeaveRejoinGrantsNothing(t *testing.T) {
+	db := testdb.Open(t)
+	ctx := context.Background()
+	tenancyStore := tenancypg.NewStore(db)
+	ws, err := tenancyStore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
+		Name:        "boards-pg-rejoin",
+		OwnerUserID: postgresStoreOwner,
+	})
+	if err != nil {
+		t.Fatalf("create workspace failed: %v", err)
+	}
+	if _, err := tenancyStore.AddWorkspaceMember(ctx, ws.PublicID, postgresStoreMember, tenancy.RoleMember); err != nil {
+		t.Fatalf("add workspace member failed: %v", err)
+	}
+	store := NewPostgresWorkspaceBoardStore(db, testDocumentAssetValidator)
+	boardID := mustCreatePostgresBoard(t, ctx, store, ws, "Rejoin cycle")
+	if _, err := store.ReplaceBoardAccess(ctx, ws.PublicID, boardID, postgresStoreOwner, 1, WorkspaceAccess(RoleViewer), []int64{postgresStoreMember}); err != nil {
+		t.Fatalf("grant viewer: %v", err)
+	}
+	if _, ok, _ := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreMember, "member"); !ok {
+		t.Fatal("member must see the board before leaving")
+	}
+	if _, err := tenancyStore.RemoveWorkspaceMember(ctx, ws.PublicID, postgresStoreOwner, postgresStoreMember, store); err != nil {
+		t.Fatalf("remove workspace member failed: %v", err)
+	}
+	if _, ok, _ := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreMember, ""); ok {
+		t.Fatal("departed member must lose visibility after leave")
+	}
+	if _, err := tenancyStore.AddWorkspaceMember(ctx, ws.PublicID, postgresStoreMember, tenancy.RoleMember); err != nil {
+		t.Fatalf("re-add workspace member failed: %v", err)
+	}
+	if _, ok, _ := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreMember, "member"); ok {
+		t.Fatal("rejoined member must stay invisible without an explicit re-grant")
+	}
+	members, err := store.ListBoardMembers(ctx, ws.PublicID, boardID)
+	if err != nil {
+		t.Fatalf("list members: %v", err)
+	}
+	for _, member := range members {
+		if member.UserID == postgresStoreMember {
+			t.Fatalf("rejoined member resurrected in roster: %+v", member)
+		}
 	}
 }

@@ -18,6 +18,7 @@ import {
 } from './canvasGraphSessionRuntime'
 import { useCanvasGroupRuntime } from '../../graph-editing'
 import type { BoardSnapshot } from '../../../../board/ports/canvas'
+import { isBoardAccessLost } from '../../../../board/ports/canvasSession'
 import { boardSnapshotToFlow } from '../../../session/flow-adapter'
 import {
   createCanvasDeleteCommandLifecycle,
@@ -151,6 +152,20 @@ function useCanvasRuntimeBoardSync(
     ...(options.onArchived ? { onArchived: options.onArchived } : {}),
     canApplyReconciliation,
   })
+}
+
+/**
+ * Autosave run gate: node drags pause the loop, and a confirmed board
+ * access loss stops it outright — pending retries never re-fire the
+ * doomed write (no re-injection), while unconfirmed failures keep
+ * retrying through the coordinator.
+ */
+function canRunBoardAutosave(
+  nodeDragLifecycle: Pick<CanvasNodeDragLifecycle, 'isActive'>,
+  currentBoardId: string | null | undefined,
+): boolean {
+  if (nodeDragLifecycle.isActive()) return false
+  return !isBoardAccessLost(currentBoardId ?? '')
 }
 
 function useCanvasRuntimeGroupCommands(
@@ -358,7 +373,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     isDirty: options.isDirty,
     isSaving: options.isSavingBoard,
     resumeSignal: options.autosaveResumeSignal,
-    canRun: () => !nodeDragLifecycle.isActive(),
+    canRun: () => canRunBoardAutosave(nodeDragLifecycle, options.boardSession.currentBoardId.value),
     save: (autosaveOptions?: { isSilent?: boolean | undefined }) =>
       saveCurrentBoardSnapshot({
         isSilent: autosaveOptions?.isSilent,

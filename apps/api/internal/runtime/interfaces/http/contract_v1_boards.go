@@ -1,29 +1,6 @@
 package httpapi
 
-// Workspace-rooted boards + collaboration handlers (issue #802).
-//
-// Additive only: all routes mount under
-// /api/v1/workspaces/{workspace_id}/boards via the existing
-// ContractV1GroupPath + PublicContractChain pattern. Legacy
-// /api/user|/api/admin board routes were removed in #809.
-//
-// Auth model: ResolvePrincipal + RequireWorkspaceCapability for the explicit
-// workspace context, then the board ACL (roles owner|editor|viewer).
-// The board creator/implicit owner row counts as owner; visible workspace
-// members default to viewer (workspace owners to owner) and explicit board
-// rows override the default. Outsiders (no workspace membership and no
-// board role) converge to 404 board_not_found; visible-but-forbidden
-// callers get 403 board_forbidden.
-//
-// Envelope: contract.RenderSuccess/RenderPaginated/RenderError; cursor
-// pagination cursor/page_size; POST/PUT/DELETE require the Idempotency-Key
-// header-only scope board:<op>; concurrency via ETag/If-Match over the
-// revision counter (stale -> 409 board_revision_conflict).
-//
-// Production boards surface: the postgres workspace-board mapping
-// (board_documents/board_revisions) is live since the #809 follow-up;
-// ContractV1Deps.Boards is wired in composition/http_wiring.go.
-// Tests inject boards.NewInMemoryWorkspaceBoardStoreForTests().
+// Workspace-scoped Board routes share one selected-member authorization policy.
 
 import (
 	"encoding/json"
@@ -37,6 +14,7 @@ import (
 	"ideaboard/api/internal/boards/previewscene"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
 
@@ -49,7 +27,6 @@ import (
 func (h *contractV1Handler) registerBoardRoutes(group *gin.RouterGroup) {
 	group.GET("/workspaces/:workspace_id/boards", h.listBoards)
 	group.POST("/workspaces/:workspace_id/boards", h.createBoard)
-	group.POST("/workspaces/:workspace_id/boards/join", h.joinBoardByToken)
 	group.GET("/workspaces/:workspace_id/boards/:board_id", h.getBoard)
 	group.PATCH("/workspaces/:workspace_id/boards/:board_id", h.renameBoard)
 	group.POST("/workspaces/:workspace_id/boards/:board_id/archive", h.archiveBoard)
@@ -58,13 +35,8 @@ func (h *contractV1Handler) registerBoardRoutes(group *gin.RouterGroup) {
 	group.PUT("/workspaces/:workspace_id/boards/:board_id/document", h.replaceBoardDocument)
 	group.GET("/workspaces/:workspace_id/boards/:board_id/revisions", h.listBoardRevisions)
 	group.GET("/workspaces/:workspace_id/boards/:board_id/revisions/:revision_id", h.getBoardRevision)
-	group.GET("/workspaces/:workspace_id/boards/:board_id/members", h.listBoardMembers)
-	group.POST("/workspaces/:workspace_id/boards/:board_id/members", h.addBoardMember)
-	group.PATCH("/workspaces/:workspace_id/boards/:board_id/members/:member_id", h.updateBoardMember)
-	group.DELETE("/workspaces/:workspace_id/boards/:board_id/members/:member_id", h.removeBoardMember)
-	group.GET("/workspaces/:workspace_id/boards/:board_id/shares", h.listShareTokens)
-	group.POST("/workspaces/:workspace_id/boards/:board_id/shares", h.createShareToken)
-	group.DELETE("/workspaces/:workspace_id/boards/:board_id/shares/:token_id", h.revokeShareToken)
+	group.GET("/workspaces/:workspace_id/boards/:board_id/access", h.getBoardAccess)
+	group.PUT("/workspaces/:workspace_id/boards/:board_id/access", h.updateBoardAccess)
 }
 
 func (h *contractV1Handler) requireBoardsStore(c *gin.Context) bool {
@@ -93,13 +65,41 @@ func (h *contractV1Handler) boardWorkspaceContext(c *gin.Context, identityPrinci
 	return workspace, role, true
 }
 
-// boardAccess resolves a board within a visible workspace and enforces the
-// board ACL: malformed ids, unknown boards, and callers holding no
-// effective board role (no explicit grant and no visible workspace default)
-// converge to 404 board_not_found (Baseline 4).
-func (h *contractV1Handler) boardAccess(c *gin.Context, workspace *tenancy.Workspace, workspaceRole string, userID int64) (*boards.V1Board, boards.AccessRole, bool) {
-	raw := strings.TrimSpace(c.Param("board_id"))
+// boardRoles exposes the narrow board-access port (#934) consumed by this
+// surface today and by Media / Tasking / Events in #936/#937/#940: role
+// facts only, never Boards private storage and never an HTTP handler.
+// h.deps.Boards always satisfies it (both stores assert
+// boards.RoleReader); nil fails closed through requireStoreAndBoards
+// before any caller reaches here.
+func (h *contractV1Handler) boardRoles() boards.RoleReader {
+	return h.deps.Boards
+}
+
+// authorizeBoard resolves a board within a visible workspace and enforces
+// the unified Boards access policy (boards.ResolveRole +
+// boards.CheckCapability, see internal/boards/policy.go): malformed ids,
+// unknown boards, and callers holding no effective board role (no explicit
+// grant and no visible workspace default) converge to 404 board_not_found
+// (Baseline 4); visible callers lacking the operation capability get 403
+// board_forbidden. It is the only board authorization helper on this
+// surface: every board-scoped route (metadata, document, revisions,
+// catalog-embedded Preview Scene, member management, rename,
+// archive/restore, writes) enters through it with its capability.
+func (h *contractV1Handler) authorizeBoard(c *gin.Context, workspace *tenancy.Workspace, workspaceRole string, userID int64, cap boards.Capability) (*boards.V1Board, boards.AccessRole, bool) {
+	return h.authorizeBoardByID(c, workspace, strings.TrimSpace(c.Param("board_id")), workspaceRole, userID, cap)
+}
+
+// authorizeBoardByID is the explicit-id core behind authorizeBoard (#936:
+// upload-target binding verifies a body-supplied board id through the same
+// 404/403 convergence without a :board_id route param).
+func (h *contractV1Handler) authorizeBoardByID(c *gin.Context, workspace *tenancy.Workspace, boardID, workspaceRole string, userID int64, cap boards.Capability) (*boards.V1Board, boards.AccessRole, bool) {
+	raw := strings.TrimSpace(boardID)
 	if !contract.IsBoardID(raw) {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, msgBoardNotFound)
+		c.Abort()
+		return nil, "", false
+	}
+	if h.deps.Boards == nil {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, msgBoardNotFound)
 		c.Abort()
 		return nil, "", false
@@ -111,59 +111,42 @@ func (h *contractV1Handler) boardAccess(c *gin.Context, workspace *tenancy.Works
 		c.Abort()
 		return nil, "", false
 	}
-	role, ok, err := h.deps.Boards.GetBoardRole(ctx, workspace.PublicID, board.PublicID, userID, workspaceRole)
-	if err != nil || !ok {
+	role, ok, err := h.boardRoles().GetBoardRole(ctx, workspace.PublicID, board.PublicID, userID, workspaceRole)
+	if err != nil || boards.CheckCapability(role, ok, boards.CapRead) != nil {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, msgBoardNotFound)
+		c.Abort()
+		return nil, "", false
+	}
+	if err := boards.CheckCapability(role, ok, cap); err != nil {
+		contract.RenderError(c, http.StatusForbidden, contract.CodeBoardForbidden, msgForbidden)
 		c.Abort()
 		return nil, "", false
 	}
 	return board, role, true
 }
 
-// requireBoardRole renders 403 board_forbidden unless the caller holds one of
-// the allowed board roles.
-func requireBoardRole(c *gin.Context, role boards.AccessRole, allowed ...boards.AccessRole) bool {
-	for _, candidate := range allowed {
-		if role == candidate {
-			return true
-		}
-	}
-	contract.RenderError(c, http.StatusForbidden, contract.CodeBoardForbidden, msgForbidden)
-	c.Abort()
-	return false
-}
-
 func renderBoardError(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, workspacemedia.ErrNotFound):
+		contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, msgMediaNotFound)
+	case errors.Is(err, boards.ErrInvalidInput):
+		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeValidationFailed, msgUpdateBoardAccess)
 	case errors.Is(err, boards.ErrNotFound):
 		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, msgBoardNotFound)
 	case errors.Is(err, boards.ErrRevisionConflict):
 		contract.RenderError(c, http.StatusConflict, contract.CodeBoardRevisionConflict, msgBoardRevisionConflict)
+	case errors.Is(err, boards.ErrAccessConflict):
+		contract.RenderError(c, http.StatusPreconditionFailed, contract.CodeBoardAccessConflict, msgBoardAccessConflict)
+	case errors.Is(err, boards.ErrPreconditionNeeded):
+		contract.RenderError(c, http.StatusPreconditionRequired, contract.CodeBoardPreconditionRequired, msgBoardPreconditionRequired)
 	case errors.Is(err, boards.ErrPermissionDenied):
 		contract.RenderError(c, http.StatusForbidden, contract.CodeBoardForbidden, msgForbidden)
 	case errors.Is(err, boards.ErrV1Archived):
 		contract.RenderError(c, contract.StatusOf(contract.CodeBoardArchived), contract.CodeBoardArchived, msgBoardArchived)
 	case errors.Is(err, boards.ErrMemberNotFound):
 		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardMemberNotFound, msgWorkspaceMemberNotFound)
-	case errors.Is(err, boards.ErrMemberInviteSelf):
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			msgRenderBoardError, contract.FieldErrors{Fields: map[string]string{"user_id": "invalid"}})
-	case errors.Is(err, boards.ErrMemberInvalidRole):
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			msgRenderBoardError2, contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
 	case errors.Is(err, boards.ErrIDConflict):
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable46)
-	case errors.Is(err, boards.ErrV1LastOwner):
-		contract.RenderError(c, contract.StatusOf(contract.CodeMembershipTransitionForbidden),
-			contract.CodeMembershipTransitionForbidden, msgMembershipTransitionForbidden2)
-	case errors.Is(err, boards.ErrShareTokenNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardShareTokenNotFound, msgBoardShareTokenNotFound)
-	case errors.Is(err, boards.ErrShareTokenRevoked),
-		errors.Is(err, boards.ErrShareTokenExpired),
-		errors.Is(err, boards.ErrV1ShareTokenExpired),
-		errors.Is(err, boards.ErrShareTokenInvalid):
-		contract.RenderError(c, contract.StatusOf(contract.CodeBoardShareTokenInvalid),
-			contract.CodeBoardShareTokenInvalid, msgBoardShareTokenInvalid)
 	default:
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable46)
 	}
@@ -189,29 +172,6 @@ func (h *contractV1Handler) boardDo(c *gin.Context, userExternalID string, userI
 	return result, nil, true
 }
 
-// renderJoinError converges every join failure to 404
-// board_share_token_not_found (unknown, revoked, expired, or
-// foreign-workspace bearers never leak existence); only malformed input is
-// 400.
-func renderJoinError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, boards.ErrInvalidInput):
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			msgRenderJoinError, contract.FieldErrors{Fields: map[string]string{"token": "invalid"}})
-	case errors.Is(err, boards.ErrShareTokenNotFound),
-		errors.Is(err, boards.ErrShareTokenRevoked),
-		errors.Is(err, boards.ErrShareTokenExpired),
-		errors.Is(err, boards.ErrV1ShareTokenExpired),
-		errors.Is(err, boards.ErrShareTokenInvalid),
-		errors.Is(err, boards.ErrNotFound),
-		errors.Is(err, boards.ErrV1Archived):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardShareTokenNotFound, msgBoardShareTokenNotFound)
-	default:
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable46)
-	}
-	c.Abort()
-}
-
 // parseBoardIfMatch requires the If-Match precondition for document writes:
 // missing/empty/"*"/unparsable values render 400, stale values surfacing as
 // 409 happens at ReplaceDocument time.
@@ -233,9 +193,9 @@ func parseBoardIfMatch(c *gin.Context) (int64, bool) {
 	return revision, true
 }
 
-// logBoardAudit emits the operator/target/reason/outcome tuple for share and
-// member mutations. Secrets (bearers) are never logged: share targets use
-// the list-safe prefix. #808 persists these as durable audit records.
+// logBoardAudit emits the operator/target/reason/outcome tuple for access and
+// member mutations. No secrets are logged: access targets use the board id.
+// #808 persists these as durable audit records.
 func logBoardAudit(op string, operatorUserID int64, target, reason, outcome string) {
 	slog.Info("board v1 audit",
 		"op", op,
@@ -246,57 +206,151 @@ func logBoardAudit(op string, operatorUserID int64, target, reason, outcome stri
 	)
 }
 
-type v1BoardDTO struct {
-	ID             string          `json:"id"`
-	WorkspaceID    string          `json:"workspace_id"`
-	Name           string          `json:"name"`
-	Revision       int64           `json:"revision"`
-	SchemaVersion  int32           `json:"schema_version"`
-	ContentVersion string          `json:"content_version,omitempty"`
-	PreviewScene   json.RawMessage `json:"preview_scene,omitempty"`
-	ArchivedAt     *string         `json:"archived_at,omitempty"`
-	CreatedAt      string          `json:"created_at"`
-	UpdatedAt      string          `json:"updated_at"`
+type v1BoardCapabilitiesDTO struct {
+	Read     bool `json:"read"`
+	Write    bool `json:"write"`
+	Manage   bool `json:"manage"`
+	Generate bool `json:"generate"`
 }
 
-func toBoardDTO(board *boards.V1Board) v1BoardDTO {
+type v1BoardRelationshipDTO struct {
+	IsCreator      bool `json:"is_creator"`
+	HasDirectGrant bool `json:"has_direct_grant"`
+}
+
+func toBoardCapabilitiesDTO(caps boards.Capabilities) v1BoardCapabilitiesDTO {
+	return v1BoardCapabilitiesDTO{
+		Read:     caps.CanRead,
+		Write:    caps.CanWrite,
+		Manage:   caps.CanManage,
+		Generate: caps.CanGenerate,
+	}
+}
+
+type v1BoardDTO struct {
+	ID              string                 `json:"id"`
+	WorkspaceID     string                 `json:"workspace_id"`
+	Name            string                 `json:"name"`
+	Revision        int64                  `json:"revision"`
+	SchemaVersion   int32                  `json:"schema_version"`
+	ContentVersion  string                 `json:"content_version,omitempty"`
+	PreviewScene    json.RawMessage        `json:"preview_scene,omitempty"`
+	ArchivedAt      *string                `json:"archived_at,omitempty"`
+	CreatorUserID   string                 `json:"creator_user_id"`
+	WorkspaceAccess string                 `json:"workspace_access"`
+	AccessVersion   int64                  `json:"access_version"`
+	AccessState     string                 `json:"access_state"`
+	Relationship    v1BoardRelationshipDTO `json:"relationship"`
+	Capabilities    v1BoardCapabilitiesDTO `json:"capabilities"`
+	CreatedAt       string                 `json:"created_at"`
+	UpdatedAt       string                 `json:"updated_at"`
+}
+
+func boardCapabilitiesDTOFor(role boards.AccessRole, callerUserID int64, board *boards.V1Board) v1BoardCapabilitiesDTO {
+	return toBoardCapabilitiesDTO(boards.CapabilitiesFor(role, true, board.ArchivedAt != nil))
+}
+
+// toBoardMemberDTO resolves the creator public identity for board payloads.
+// Boards without a resolvable creator fail closed (503): creator_user_id is
+// a required User public identity, never an internal id.
+func (h *contractV1Handler) toBoardCreatorDTO(c *gin.Context, ownerUserID int64) (string, bool) {
+	if h.deps.Users == nil {
+		contract.RenderError(c, http.StatusNotImplemented,
+			contract.CodeContractNotImplemented, "The v1 boards surface is not implemented yet")
+		c.Abort()
+		return "", false
+	}
+	publicID, err := h.deps.Users.GetUserPublicID(c.Request.Context(), ownerUserID)
+	if err != nil || publicID == uuid.Nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable47)
+		c.Abort()
+		return "", false
+	}
+	return tenancy.FormatUserPublicID(publicID), true
+}
+
+// toBoardDTOFull renders one board with its access facts: creator public
+// identity, common sharing role, monotonic access version, derived posture,
+// caller relationship, and capabilities. The catalog path stays down the
+// single-query entry facts instead (toBoardCatalogDTO); single-board reads
+// resolve the caller's grant from the roster scan.
+func (h *contractV1Handler) toBoardDTOFull(c *gin.Context, board *boards.V1Board, callerUserID int64, role boards.AccessRole) (v1BoardDTO, bool) {
+	creator, ok := h.toBoardCreatorDTO(c, board.OwnerUserID)
+	if !ok {
+		return v1BoardDTO{}, false
+	}
+	members, err := h.deps.Boards.ListBoardMembers(c.Request.Context(), board.WorkspacePublicID, board.PublicID)
+	if err != nil {
+		renderBoardError(c, err)
+		return v1BoardDTO{}, false
+	}
+	var hasDirectGrant bool
+	for _, member := range members {
+		if member.UserID == callerUserID {
+			hasDirectGrant = true
+			break
+		}
+	}
 	dto := v1BoardDTO{
-		ID:             board.PublicID,
-		WorkspaceID:    board.WorkspacePublicID,
-		Name:           board.Name,
-		Revision:       board.Revision,
-		SchemaVersion:  board.SchemaVersion,
-		ContentVersion: board.ContentVersion,
-		PreviewScene:   board.PreviewScene,
-		CreatedAt:      v1FormatTime(board.CreatedAt),
-		UpdatedAt:      v1FormatTime(board.UpdatedAt),
+		ID:              board.PublicID,
+		WorkspaceID:     board.WorkspacePublicID,
+		Name:            board.Name,
+		Revision:        board.Revision,
+		SchemaVersion:   board.SchemaVersion,
+		ContentVersion:  board.ContentVersion,
+		PreviewScene:    board.PreviewScene,
+		CreatorUserID:   creator,
+		WorkspaceAccess: string(board.WorkspaceAccess),
+		AccessVersion:   board.AccessVersion,
+		AccessState:     string(boards.DeriveAccessState(board.WorkspaceAccess, len(members) > 0)),
+		Relationship: v1BoardRelationshipDTO{
+			IsCreator:      callerUserID == board.OwnerUserID,
+			HasDirectGrant: hasDirectGrant,
+		},
+		Capabilities: boardCapabilitiesDTOFor(role, callerUserID, board),
+		CreatedAt:    v1FormatTime(board.CreatedAt),
+		UpdatedAt:    v1FormatTime(board.UpdatedAt),
 	}
 	if board.ArchivedAt != nil {
 		archived := v1FormatTime(*board.ArchivedAt)
 		dto.ArchivedAt = &archived
 	}
-	return dto
+	return dto, true
 }
 
 // toBoardCatalogDTO renders one Gallery catalog card: metadata plus the
-// stored scene projection, never the full document.
-func toBoardCatalogDTO(entry *boards.V1BoardCatalogEntry) v1BoardDTO {
+// stored scene projection (never the full document or the full ACL), with
+// the caller's effective role facts carried from the catalog query.
+func (h *contractV1Handler) toBoardCatalogDTO(c *gin.Context, entry *boards.V1BoardCatalogEntry, callerUserID int64) (v1BoardDTO, bool) {
+	creator, ok := h.toBoardCreatorDTO(c, entry.OwnerUserID)
+	if !ok {
+		return v1BoardDTO{}, false
+	}
 	dto := v1BoardDTO{
-		ID:             entry.PublicID,
-		WorkspaceID:    entry.WorkspacePublicID,
-		Name:           entry.Name,
-		Revision:       entry.Revision,
-		SchemaVersion:  entry.SchemaVersion,
-		ContentVersion: entry.ContentVersion,
-		PreviewScene:   entry.PreviewScene,
-		CreatedAt:      v1FormatTime(entry.CreatedAt),
-		UpdatedAt:      v1FormatTime(entry.UpdatedAt),
+		ID:              entry.PublicID,
+		WorkspaceID:     entry.WorkspacePublicID,
+		Name:            entry.Name,
+		Revision:        entry.Revision,
+		SchemaVersion:   entry.SchemaVersion,
+		ContentVersion:  entry.ContentVersion,
+		PreviewScene:    entry.PreviewScene,
+		CreatorUserID:   creator,
+		WorkspaceAccess: string(entry.WorkspaceAccess),
+		AccessVersion:   entry.AccessVersion,
+		AccessState:     string(entry.AccessState),
+		Relationship: v1BoardRelationshipDTO{
+			IsCreator:      callerUserID == entry.OwnerUserID,
+			HasDirectGrant: entry.HasDirectGrant,
+		},
+		Capabilities: toBoardCapabilitiesDTO(boards.CapabilitiesFor(entry.EffectiveRole, true, entry.ArchivedAt != nil)),
+		CreatedAt:    v1FormatTime(entry.CreatedAt),
+		UpdatedAt:    v1FormatTime(entry.UpdatedAt),
 	}
 	if entry.ArchivedAt != nil {
 		archived := v1FormatTime(*entry.ArchivedAt)
 		dto.ArchivedAt = &archived
 	}
-	return dto
+	return dto, true
 }
 
 func boardPageRequest(c *gin.Context) (boards.V1BoardCatalogPageRequest, bool) {
@@ -371,7 +425,11 @@ func (h *contractV1Handler) listBoards(c *gin.Context) {
 		}
 		data := make([]v1BoardDTO, 0, len(page.Entries))
 		for _, entry := range page.Entries {
-			data = append(data, toBoardCatalogDTO(entry))
+			dto, ok := h.toBoardCatalogDTO(c, entry, wctx.Principal.UserID())
+			if !ok {
+				return
+			}
+			data = append(data, dto)
 		}
 		contract.RenderPaginated(c, data, meta)
 	})
@@ -425,8 +483,12 @@ func (h *contractV1Handler) createBoard(c *gin.Context) {
 			return
 		}
 		logBoardAudit("board_create", identityPrincipal.UserID(), workspace.PublicID+"/"+created.PublicID, "board_create", "created")
+		dto, ok := h.toBoardDTOFull(c, created, identityPrincipal.UserID(), boards.RoleOwner)
+		if !ok {
+			return
+		}
 		contract.SetETag(c, boards.FormatV1ETag(created.Revision))
-		contract.RenderCreated(c, toBoardDTO(created))
+		contract.RenderCreated(c, dto)
 	})
 }
 
@@ -435,12 +497,16 @@ func (h *contractV1Handler) getBoard(c *gin.Context) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		workspaceRole := wctx.Role
-		board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		board, role, ok := h.authorizeBoard(c, workspace, workspaceRole, identityPrincipal.UserID(), boards.CapRead)
+		if !ok {
+			return
+		}
+		dto, ok := h.toBoardDTOFull(c, board, identityPrincipal.UserID(), role)
 		if !ok {
 			return
 		}
 		contract.SetETag(c, boards.FormatV1ETag(board.Revision))
-		contract.RenderSuccess(c, toBoardDTO(board))
+		contract.RenderSuccess(c, dto)
 	})
 }
 
@@ -455,11 +521,8 @@ func (h *contractV1Handler) renameBoard(c *gin.Context) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		workspaceRole := wctx.Role
-		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		board, role, ok := h.authorizeBoard(c, workspace, workspaceRole, identityPrincipal.UserID(), boards.CapWrite)
 		if !ok {
-			return
-		}
-		if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
 			return
 		}
 		var body v1RenameBoardBody
@@ -474,13 +537,17 @@ func (h *contractV1Handler) renameBoard(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		renamed, err := h.deps.Boards.RenameBoard(c.Request.Context(), workspace.PublicID, board.PublicID, name)
+		renamed, err := h.deps.Boards.RenameBoard(c.Request.Context(), workspace.PublicID, board.PublicID, name, identityPrincipal.UserID())
 		if err != nil {
 			renderBoardError(c, err)
 			return
 		}
+		dto, ok := h.toBoardDTOFull(c, renamed, identityPrincipal.UserID(), role)
+		if !ok {
+			return
+		}
 		contract.SetETag(c, boards.FormatV1ETag(renamed.Revision))
-		contract.RenderSuccess(c, toBoardDTO(renamed))
+		contract.RenderSuccess(c, dto)
 	})
 }
 
@@ -489,11 +556,8 @@ func (h *contractV1Handler) archiveBoard(c *gin.Context) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		workspaceRole := wctx.Role
-		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		board, role, ok := h.authorizeBoard(c, workspace, workspaceRole, identityPrincipal.UserID(), boards.CapWrite)
 		if !ok {
-			return
-		}
-		if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
 			return
 		}
 		key, ok := requireV1IdempotencyKey(c)
@@ -503,7 +567,7 @@ func (h *contractV1Handler) archiveBoard(c *gin.Context) {
 		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 		hash := contract.HashIdempotencyRequest("board:archive", workspace.PublicID, board.PublicID)
 		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "archive", key, hash, func() (any, error) {
-			return h.deps.Boards.ArchiveBoard(c.Request.Context(), workspace.PublicID, board.PublicID)
+			return h.deps.Boards.ArchiveBoard(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID())
 		})
 		if !ok {
 			return
@@ -518,7 +582,11 @@ func (h *contractV1Handler) archiveBoard(c *gin.Context) {
 			return
 		}
 		logBoardAudit("board_archive", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID, "board_archive", "archived")
-		contract.RenderSuccess(c, toBoardDTO(archived))
+		dto, ok := h.toBoardDTOFull(c, archived, identityPrincipal.UserID(), role)
+		if !ok {
+			return
+		}
+		contract.RenderSuccess(c, dto)
 	})
 }
 
@@ -527,11 +595,8 @@ func (h *contractV1Handler) restoreBoard(c *gin.Context) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		workspaceRole := wctx.Role
-		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		board, role, ok := h.authorizeBoard(c, workspace, workspaceRole, identityPrincipal.UserID(), boards.CapWrite)
 		if !ok {
-			return
-		}
-		if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
 			return
 		}
 		key, ok := requireV1IdempotencyKey(c)
@@ -541,7 +606,7 @@ func (h *contractV1Handler) restoreBoard(c *gin.Context) {
 		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 		hash := contract.HashIdempotencyRequest("board:restore", workspace.PublicID, board.PublicID)
 		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "restore", key, hash, func() (any, error) {
-			return h.deps.Boards.RestoreBoard(c.Request.Context(), workspace.PublicID, board.PublicID)
+			return h.deps.Boards.RestoreBoard(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID())
 		})
 		if !ok {
 			return
@@ -556,7 +621,11 @@ func (h *contractV1Handler) restoreBoard(c *gin.Context) {
 			return
 		}
 		logBoardAudit("board_restore", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID, "board_restore", "restored")
-		contract.RenderSuccess(c, toBoardDTO(restored))
+		dto, ok := h.toBoardDTOFull(c, restored, identityPrincipal.UserID(), role)
+		if !ok {
+			return
+		}
+		contract.RenderSuccess(c, dto)
 	})
 }
 
@@ -605,7 +674,7 @@ func (h *contractV1Handler) getBoardDocument(c *gin.Context) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		workspaceRole := wctx.Role
-		board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		board, _, ok := h.authorizeBoard(c, workspace, workspaceRole, identityPrincipal.UserID(), boards.CapRead)
 		if !ok {
 			return
 		}
@@ -626,11 +695,8 @@ func (h *contractV1Handler) replaceBoardDocument(c *gin.Context) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		workspaceRole := wctx.Role
-		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		board, _, ok := h.authorizeBoard(c, workspace, workspaceRole, identityPrincipal.UserID(), boards.CapWrite)
 		if !ok {
-			return
-		}
-		if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
 			return
 		}
 		key, ok := requireV1IdempotencyKey(c)
@@ -665,8 +731,6 @@ func (h *contractV1Handler) replaceBoardDocument(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		// Canonical snapshot: re-marshal the validated envelope so stored bytes
-		// are stable regardless of client whitespace.
 		snapshot := json.RawMessage(rawEnvelope)
 		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 		hash := contract.HashIdempotencyRequest("board:document-replace", workspace.PublicID, board.PublicID,
@@ -731,7 +795,7 @@ func (h *contractV1Handler) listBoardRevisions(c *gin.Context) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		workspaceRole := wctx.Role
-		board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		board, _, ok := h.authorizeBoard(c, workspace, workspaceRole, identityPrincipal.UserID(), boards.CapRead)
 		if !ok {
 			return
 		}
@@ -762,7 +826,7 @@ func (h *contractV1Handler) getBoardRevision(c *gin.Context) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		workspaceRole := wctx.Role
-		board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		board, _, ok := h.authorizeBoard(c, workspace, workspaceRole, identityPrincipal.UserID(), boards.CapRead)
 		if !ok {
 			return
 		}
@@ -787,28 +851,6 @@ func (h *contractV1Handler) getBoardRevision(c *gin.Context) {
 			Snapshot:           revision.Snapshot,
 		})
 	})
-}
-
-type v1BoardMemberDTO struct {
-	UserID    string `json:"user_id"`
-	Role      string `json:"role"`
-	CreatedAt string `json:"created_at,omitempty"`
-}
-
-func (h *contractV1Handler) toBoardMemberDTO(c *gin.Context, userID int64, role boards.AccessRole, createdAt string) (v1BoardMemberDTO, bool) {
-	if h.deps.Users == nil {
-		contract.RenderError(c, http.StatusNotImplemented,
-			contract.CodeContractNotImplemented, "The v1 boards surface is not implemented yet")
-		c.Abort()
-		return v1BoardMemberDTO{}, false
-	}
-	publicID, err := h.deps.Users.GetUserPublicID(c.Request.Context(), userID)
-	if err != nil || publicID == uuid.Nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable47)
-		c.Abort()
-		return v1BoardMemberDTO{}, false
-	}
-	return v1BoardMemberDTO{UserID: tenancy.FormatUserPublicID(publicID), Role: string(role), CreatedAt: createdAt}, true
 }
 
 func (h *contractV1Handler) resolveBoardMemberUserID(c *gin.Context, raw string) (int64, bool) {
@@ -839,336 +881,156 @@ func (h *contractV1Handler) resolveBoardMemberUserID(c *gin.Context, raw string)
 	return userID, true
 }
 
-func (h *contractV1Handler) listBoardMembers(c *gin.Context) {
+// v1BoardAccessDTO is the independent access-resource view of one board:
+// the common sharing role, the monotonic version (served as ETag
+// access-<version>), and the derived sharing posture. It carries no
+// document bytes, revision, preview payload, or ACL rows.
+type v1BoardAccessDTO struct {
+	WorkspaceID     string   `json:"workspace_id"`
+	BoardID         string   `json:"board_id"`
+	WorkspaceAccess string   `json:"workspace_access"`
+	AccessVersion   int64    `json:"access_version"`
+	AccessState     string   `json:"access_state"`
+	MemberUserIDs   []string `json:"member_user_ids"`
+	ArchivedAt      *string  `json:"archived_at,omitempty"`
+}
+
+func (h *contractV1Handler) toBoardAccessDTO(c *gin.Context, access *boards.V1BoardAccess) (v1BoardAccessDTO, bool) {
+	dto := v1BoardAccessDTO{
+		WorkspaceID:     access.WorkspacePublicID,
+		BoardID:         access.BoardPublicID,
+		WorkspaceAccess: string(access.WorkspaceAccess),
+		AccessVersion:   access.AccessVersion,
+		AccessState:     string(access.AccessState),
+		MemberUserIDs:   make([]string, 0, len(access.MemberUserIDs)),
+	}
+	if access.ArchivedAt != nil {
+		archived := v1FormatTime(*access.ArchivedAt)
+		dto.ArchivedAt = &archived
+	}
+	for _, id := range access.MemberUserIDs {
+		publicID, ok := h.toBoardCreatorDTO(c, id)
+		if !ok {
+			return v1BoardAccessDTO{}, false
+		}
+		dto.MemberUserIDs = append(dto.MemberUserIDs, publicID)
+	}
+	return dto, true
+}
+
+// parseBoardAccessIfMatch requires the access-version precondition for
+// access-resource writes: a missing If-Match renders 428
+// board_precondition_required (aborted), an unparsable value renders 400,
+// and a stale version surfaces as 412 board_access_conflict at commit time.
+func parseBoardAccessIfMatch(c *gin.Context) (int64, bool) {
+	raw := strings.TrimSpace(contract.IfMatch(c))
+	if raw == "" {
+		renderBoardError(c, boards.ErrPreconditionNeeded)
+		return 0, false
+	}
+	version, err := boards.ParseAccessIfMatch(raw)
+	if err != nil {
+		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
+			msgParseBoardAccessIfMatch, contract.FieldErrors{Fields: map[string]string{"if_match": "invalid"}})
+		c.Abort()
+		return 0, false
+	}
+	return version, true
+}
+
+type v1UpdateBoardAccessBody struct {
+	Data struct {
+		WorkspaceAccess string   `json:"workspace_access"`
+		MemberUserIDs   []string `json:"member_user_ids"`
+	} `json:"data"`
+}
+
+// getBoardAccess reads the common role, selected members, the monotonic
+// version as ETag access-<version>, and the
+// derived posture. Management capability is required; every other caller
+// already sees the version fact on board payloads.
+func (h *contractV1Handler) getBoardAccess(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		workspaceRole := wctx.Role
-		board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		board, _, ok := h.authorizeBoard(c, workspace, workspaceRole, identityPrincipal.UserID(), boards.CapManage)
 		if !ok {
 			return
 		}
-		ownerDTO, ok := h.toBoardMemberDTO(c, board.OwnerUserID, boards.RoleOwner, v1FormatTime(board.CreatedAt))
-		if !ok {
-			return
-		}
-		members, err := h.deps.Boards.ListBoardMembers(c.Request.Context(), workspace.PublicID, board.PublicID)
+		access, err := h.deps.Boards.GetBoardAccess(c.Request.Context(), workspace.PublicID, board.PublicID)
 		if err != nil {
 			renderBoardError(c, err)
 			return
 		}
-		page := []v1BoardMemberDTO{ownerDTO}
-		for _, member := range members {
-			if member.UserID == board.OwnerUserID {
-				continue
-			}
-			dto, ok := h.toBoardMemberDTO(c, member.UserID, member.Role, v1FormatTime(member.CreatedAt))
-			if !ok {
-				return
-			}
-			page = append(page, dto)
-		}
-		contract.RenderSuccess(c, page)
-	})
-}
-
-type v1AddBoardMemberBody struct {
-	Data struct {
-		UserID string `json:"user_id"`
-		Role   string `json:"role"`
-	} `json:"data"`
-}
-
-func (h *contractV1Handler) addBoardMember(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
-		identityPrincipal := wctx.Principal
-		workspace := wctx.Workspace
-		workspaceRole := wctx.Role
-		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		contract.SetETag(c, boards.FormatAccessETag(access.AccessVersion))
+		dto, ok := h.toBoardAccessDTO(c, access)
 		if !ok {
 			return
 		}
-		if !requireBoardRole(c, role, boards.RoleOwner) {
-			return
-		}
-		key, ok := requireV1IdempotencyKey(c)
-		if !ok {
-			return
-		}
-		var body v1AddBoardMemberBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-			writeV1InputError(c)
-			return
-		}
-		targetRole := boards.AccessRole(strings.TrimSpace(body.Data.Role))
-		if err := boards.ValidateV1BoardRole(targetRole); err != nil {
-			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				msgRenderBoardError2, contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
-			c.Abort()
-			return
-		}
-		targetUserID, ok := h.resolveBoardMemberUserID(c, body.Data.UserID)
-		if !ok {
-			return
-		}
-		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-		hash := contract.HashIdempotencyRequest("board:member-add", workspace.PublicID, board.PublicID, body.Data.UserID, string(targetRole))
-		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "member-add", key, hash, func() (any, error) {
-			added, addErr := h.deps.Boards.AddBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, targetRole, workspaceRole)
-			if addErr != nil {
-				return nil, addErr
-			}
-			// #807: board.member_changed AFTER the roster commit.
-			memberExternal := body.Data.UserID
-			if h.deps.Users != nil {
-				if publicID, lookupErr := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID); lookupErr == nil {
-					memberExternal = tenancy.FormatUserPublicID(publicID)
-				}
-			}
-			h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
-				events.EventV1BoardMemberChanged,
-				events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
-				events.V1BoardMemberChangedData{BoardID: board.PublicID, MemberID: memberExternal})
-			return added, nil
-		})
-		if !ok {
-			return
-		}
-		if fnErr != nil {
-			renderBoardError(c, fnErr)
-			return
-		}
-		added, ok := result.(*boards.V1BoardMember)
-		if !ok || added == nil {
-			renderBoardError(c, errors.New("boards: member-add type mismatch"))
-			return
-		}
-		dto, ok := h.toBoardMemberDTO(c, added.UserID, added.Role, v1FormatTime(added.CreatedAt))
-		if !ok {
-			return
-		}
-		logBoardAudit("board_member_add", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID+"/"+dto.UserID, "member_add:"+string(targetRole), "added")
-		contract.RenderCreated(c, dto)
-	})
-}
-
-type v1UpdateBoardMemberBody struct {
-	Data struct {
-		Role string `json:"role"`
-	} `json:"data"`
-}
-
-func (h *contractV1Handler) updateBoardMember(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
-		identityPrincipal := wctx.Principal
-		workspace := wctx.Workspace
-		workspaceRole := wctx.Role
-		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-		if !ok {
-			return
-		}
-		if !requireBoardRole(c, role, boards.RoleOwner) {
-			return
-		}
-		var body v1UpdateBoardMemberBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-			writeV1InputError(c)
-			return
-		}
-		newRole := boards.AccessRole(strings.TrimSpace(body.Data.Role))
-		if err := boards.ValidateV1BoardRole(newRole); err != nil {
-			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				msgRenderBoardError2, contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
-			c.Abort()
-			return
-		}
-		targetUserID, ok := h.resolveBoardMemberUserID(c, c.Param("member_id"))
-		if !ok {
-			return
-		}
-		updated, err := h.deps.Boards.UpdateBoardMemberRole(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, newRole, workspaceRole)
-		if err != nil {
-			renderBoardError(c, err)
-			return
-		}
-		// #807: board.member_changed AFTER the role commit (no idempotency
-		// wrapper on this route; the store commit is the boundary).
-		memberExternal := strings.TrimSpace(c.Param("member_id"))
-		if h.deps.Users != nil {
-			if publicID, lookupErr := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID); lookupErr == nil {
-				memberExternal = tenancy.FormatUserPublicID(publicID)
-			}
-		}
-		h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
-			events.EventV1BoardMemberChanged,
-			events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
-			events.V1BoardMemberChangedData{BoardID: board.PublicID, MemberID: memberExternal})
-		dto, ok := h.toBoardMemberDTO(c, updated.UserID, updated.Role, v1FormatTime(updated.CreatedAt))
-		if !ok {
-			return
-		}
-		logBoardAudit("board_member_update", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID+"/"+dto.UserID, "member_update:"+string(newRole), "updated")
 		contract.RenderSuccess(c, dto)
 	})
 }
 
-func (h *contractV1Handler) removeBoardMember(c *gin.Context) {
+// updateBoardAccess replaces the complete sharing configuration (none|viewer|editor).
+// Only board owners may write; archived boards reject the write; a missing
+// If-Match renders 428 and a stale access_version renders 412
+// board_access_conflict. No-op replays keep the version; real changes bump
+// it without touching the document revision, content_version, or Preview
+// Scene. Ordinary renames stay on PATCH.
+func (h *contractV1Handler) updateBoardAccess(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		workspaceRole := wctx.Role
-		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		board, _, ok := h.authorizeBoard(c, workspace, workspaceRole, identityPrincipal.UserID(), boards.CapManage)
 		if !ok {
-			return
-		}
-		targetUserID, ok := h.resolveBoardMemberUserID(c, c.Param("member_id"))
-		if !ok {
-			return
-		}
-		// Owners manage the roster; anyone may leave by removing themselves
-		// (last-owner protection still applies).
-		if targetUserID != identityPrincipal.UserID() && !requireBoardRole(c, role, boards.RoleOwner) {
 			return
 		}
 		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
-		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-		targetExternal, _ := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID)
-		hash := contract.HashIdempotencyRequest("board:member-remove", workspace.PublicID, board.PublicID, tenancy.FormatUserPublicID(targetExternal))
-		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "member-remove", key, hash, func() (any, error) {
-			if removeErr := h.deps.Boards.RemoveBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, workspaceRole); removeErr != nil {
-				return nil, removeErr
-			}
-			// #807: board.member_changed AFTER the roster commit.
-			memberExternal := tenancy.FormatUserPublicID(targetExternal)
-			h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
-				events.EventV1BoardMemberChanged,
-				events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
-				events.V1BoardMemberChangedData{BoardID: board.PublicID, MemberID: memberExternal})
-			return &v1DeletedDTO{Deleted: true}, nil
-		})
+		expectedVersion, ok := parseBoardAccessIfMatch(c)
 		if !ok {
 			return
 		}
-		if fnErr != nil {
-			renderBoardError(c, fnErr)
-			return
-		}
-		deleted, ok := result.(*v1DeletedDTO)
-		if !ok || deleted == nil {
-			renderBoardError(c, errors.New("boards: member-remove type mismatch"))
-			return
-		}
-		logBoardAudit("board_member_remove", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID, "member_remove", "removed")
-		contract.RenderSuccess(c, *deleted)
-	})
-}
-
-type v1BoardShareDTO struct {
-	TokenID     string  `json:"token_id"`
-	Token       string  `json:"token,omitempty"`
-	TokenPrefix string  `json:"token_prefix"`
-	Role        string  `json:"role"`
-	Revoked     bool    `json:"revoked"`
-	UsageCount  int64   `json:"usage_count"`
-	CreatedAt   string  `json:"created_at"`
-	RevokedAt   *string `json:"revoked_at,omitempty"`
-}
-
-func toBoardShareDTO(token *boards.V1ShareToken, withBearer bool) v1BoardShareDTO {
-	dto := v1BoardShareDTO{
-		TokenID:     token.TokenID,
-		TokenPrefix: token.TokenPrefix,
-		Role:        string(token.Role),
-		Revoked:     token.Revoked,
-		UsageCount:  token.UsageCount,
-		CreatedAt:   v1FormatTime(token.CreatedAt),
-	}
-	if withBearer {
-		dto.Token = token.Bearer
-	}
-	if token.RevokedAt != nil {
-		revoked := v1FormatTime(*token.RevokedAt)
-		dto.RevokedAt = &revoked
-	}
-	return dto
-}
-
-func (h *contractV1Handler) listShareTokens(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
-		identityPrincipal := wctx.Principal
-		workspace := wctx.Workspace
-		workspaceRole := wctx.Role
-		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-		if !ok {
-			return
-		}
-		if !requireBoardRole(c, role, boards.RoleOwner) {
-			return
-		}
-		tokens, err := h.deps.Boards.ListShareTokens(c.Request.Context(), workspace.PublicID, board.PublicID)
-		if err != nil {
-			renderBoardError(c, err)
-			return
-		}
-		page := make([]v1BoardShareDTO, 0, len(tokens))
-		for _, token := range tokens {
-			page = append(page, toBoardShareDTO(token, false))
-		}
-		contract.RenderSuccess(c, page)
-	})
-}
-
-type v1CreateShareBody struct {
-	Data struct {
-		Role string `json:"role"`
-	} `json:"data"`
-}
-
-func (h *contractV1Handler) createShareToken(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
-		identityPrincipal := wctx.Principal
-		workspace := wctx.Workspace
-		workspaceRole := wctx.Role
-		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-		if !ok {
-			return
-		}
-		if !requireBoardRole(c, role, boards.RoleOwner) {
-			return
-		}
-		key, ok := requireV1IdempotencyKey(c)
-		if !ok {
-			return
-		}
-		var body v1CreateShareBody
+		var body v1UpdateBoardAccessBody
 		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
 			writeV1InputError(c)
 			return
 		}
-		shareRole := boards.AccessRole(strings.TrimSpace(body.Data.Role))
-		if shareRole != boards.RoleEditor && shareRole != boards.RoleViewer {
+		if body.Data.MemberUserIDs == nil {
+			writeV1InputError(c)
+			return
+		}
+		target := boards.WorkspaceAccess(strings.TrimSpace(body.Data.WorkspaceAccess))
+		if !boards.ValidateWorkspaceAccess(target) {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				msgCreateShareToken, contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
+				msgUpdateBoardAccess, contract.FieldErrors{Fields: map[string]string{"workspace_access": "invalid"}})
 			c.Abort()
 			return
 		}
+		selectedIDs := make([]int64, 0, len(body.Data.MemberUserIDs))
+		if target != boards.WorkspaceAccessNone {
+			for _, publicID := range body.Data.MemberUserIDs {
+				id, ok := h.resolveBoardMemberUserID(c, publicID)
+				if !ok {
+					return
+				}
+				selectedIDs = append(selectedIDs, id)
+			}
+		}
 		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-		hash := contract.HashIdempotencyRequest("board:share-create", workspace.PublicID, board.PublicID, string(shareRole))
-		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "share-create", key, hash, func() (any, error) {
-			tokenID, mintErr := boards.NewV1ShareTokenID()
-			if mintErr != nil {
-				return nil, mintErr
+		hash := contract.HashIdempotencyRequest("board:access-update", workspace.PublicID, board.PublicID,
+			strconv.FormatInt(expectedVersion, 10), string(target), strings.Join(body.Data.MemberUserIDs, ","))
+		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "access-update", key, hash, func() (any, error) {
+			updated, err := h.deps.Boards.ReplaceBoardAccess(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), expectedVersion, target, selectedIDs)
+			if err != nil {
+				return nil, err
 			}
-			created, createErr := h.deps.Boards.CreateShareToken(c.Request.Context(), workspace.PublicID, board.PublicID,
-				identityPrincipal.UserID(), shareRole, tokenID, boards.V1ShareTokenHash(tokenID), tokenID)
-			if createErr != nil {
-				return nil, createErr
-			}
-			dto := toBoardShareDTO(created, true)
-			return &dto, nil
+			h.deliverBoardAccessSignals(c.Request.Context(), updated.AccessSignals)
+			return updated, nil
 		})
 		if !ok {
 			return
@@ -1177,161 +1039,17 @@ func (h *contractV1Handler) createShareToken(c *gin.Context) {
 			renderBoardError(c, fnErr)
 			return
 		}
-		dto, ok := result.(*v1BoardShareDTO)
-		if !ok || dto == nil {
-			renderBoardError(c, errors.New("boards: share-create type mismatch"))
+		updated, ok := result.(*boards.V1BoardAccess)
+		if !ok || updated == nil {
+			renderBoardError(c, errors.New("boards: access-update type mismatch"))
 			return
 		}
-		logBoardAudit("board_share_create", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID+"/"+dto.TokenPrefix, "share_create:"+string(shareRole), "created")
-		contract.RenderCreated(c, *dto)
-	})
-}
-
-func (h *contractV1Handler) revokeShareToken(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
-		identityPrincipal := wctx.Principal
-		workspace := wctx.Workspace
-		workspaceRole := wctx.Role
-		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		logBoardAudit("board_access_update", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID, "access_update:"+string(target), "updated")
+		contract.SetETag(c, boards.FormatAccessETag(updated.AccessVersion))
+		dto, ok := h.toBoardAccessDTO(c, updated)
 		if !ok {
 			return
 		}
-		if !requireBoardRole(c, role, boards.RoleOwner) {
-			return
-		}
-		key, ok := requireV1IdempotencyKey(c)
-		if !ok {
-			return
-		}
-		// {token_id} stays an opaque string: legacy integer ids simply miss the
-		// lookup and read as 404 (tolerated read-only, never a distinct status).
-		tokenID := strings.TrimSpace(c.Param("token_id"))
-		if tokenID == "" {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeBoardShareTokenNotFound, msgBoardShareTokenNotFound)
-			c.Abort()
-			return
-		}
-		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-		hash := contract.HashIdempotencyRequest("board:share-revoke", workspace.PublicID, board.PublicID, tokenID)
-		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "share-revoke", key, hash, func() (any, error) {
-			if revokeErr := h.deps.Boards.RevokeShareToken(c.Request.Context(), workspace.PublicID, board.PublicID, tokenID, identityPrincipal.UserID()); revokeErr != nil {
-				return nil, revokeErr
-			}
-			// #807: board.share_revoked AFTER the revocation commit (token
-			// id only; the bearer never leaves the server).
-			h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
-				events.EventV1BoardShareRevoked,
-				events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
-				events.V1BoardShareRevokedData{BoardID: board.PublicID, ShareTokenID: tokenID})
-			return &v1DeletedDTO{Deleted: true}, nil
-		})
-		if !ok {
-			return
-		}
-		if fnErr != nil {
-			renderBoardError(c, fnErr)
-			return
-		}
-		deleted, ok := result.(*v1DeletedDTO)
-		if !ok || deleted == nil {
-			renderBoardError(c, errors.New("boards: share-revoke type mismatch"))
-			return
-		}
-		prefix := tokenID
-		if len(prefix) > 8 {
-			prefix = prefix[:8]
-		}
-		logBoardAudit("board_share_revoke", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID+"/"+prefix, "share_revoke", "revoked")
-		contract.RenderSuccess(c, *deleted)
+		contract.RenderSuccess(c, dto)
 	})
-}
-
-type v1JoinBoardBody struct {
-	Data struct {
-		Token string `json:"token"`
-	} `json:"data"`
-}
-
-func (h *contractV1Handler) joinBoardByToken(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	// The bearer is the capability: the workspace must exist (unknown ids
-	// stay 404 workspace_not_found) but the joiner needs no workspace
-	// membership yet. A successful join grants workspace membership
-	// (member) alongside the board grant, so the collaborator can reach
-	// the workspace-rooted board surface afterwards. Workspace members
-	// without an explicit board grant default to viewer (owners to owner);
-	// explicit board rows still override.
-	rawWorkspace := strings.TrimSpace(c.Param("workspace_id"))
-	if !contract.IsWorkspaceID(rawWorkspace) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
-		c.Abort()
-		return
-	}
-	workspace, err := h.deps.Store.GetWorkspace(c.Request.Context(), rawWorkspace)
-	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
-		c.Abort()
-		return
-	}
-	key, ok := requireV1IdempotencyKey(c)
-	if !ok {
-		return
-	}
-	var body v1JoinBoardBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		writeV1InputError(c)
-		return
-	}
-	bearer := strings.TrimSpace(body.Data.Token)
-	if bearer == "" {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			msgRenderJoinError, contract.FieldErrors{Fields: map[string]string{"token": "required"}})
-		c.Abort()
-		return
-	}
-	// Join failures (unknown/revoked bearer, foreign-workspace token) all
-	// converge to 404 board_share_token_not_found: existence is not leaked.
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("board:join", workspace.PublicID, bearer)
-	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "join", key, hash, func() (any, error) {
-		board, _, joinErr := h.deps.Boards.JoinByToken(c.Request.Context(), workspace.PublicID, bearer, identityPrincipal.UserID())
-		if joinErr != nil {
-			return nil, joinErr
-		}
-		// Membership is granted only once the bearer has redeemed, never
-		// before: JoinByToken cannot be gated on it because the board store
-		// never reads workspace membership (it resolves the joiner's role
-		// from the board row it just wrote), so an up-front grant authorizes
-		// nothing and only leaves a member row behind on rejected joins.
-		// A member row is not board-scoped — it reaches billing, credits,
-		// tasks, media and library — so a rejected bearer must leave no
-		// trace at all. Keeping the grant inside the idempotency scope also
-		// means a replayed success can never outlive its own grant.
-		if _, memberErr := h.deps.Store.AddWorkspaceMember(c.Request.Context(), workspace.PublicID, identityPrincipal.UserID(), tenancy.RoleMember); memberErr != nil {
-			return nil, memberErr
-		}
-		dto := toBoardDTO(board)
-		return &dto, nil
-	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderJoinError(c, fnErr)
-		return
-	}
-	dto, ok := result.(*v1BoardDTO)
-	if !ok || dto == nil {
-		renderBoardError(c, errors.New("boards: join type mismatch"))
-		return
-	}
-	prefix := bearer
-	if len(prefix) > 8 {
-		prefix = prefix[:8]
-	}
-	logBoardAudit("board_join", identityPrincipal.UserID(), workspace.PublicID+"/"+dto.ID+"/"+prefix, "share_join", "joined")
-	contract.RenderSuccess(c, *dto)
 }

@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
@@ -64,7 +65,7 @@ func newControlHarness(t *testing.T, mutate func(*ContractControlDeps)) *control
 		Users: h.users, Identity: h.identity, Impersonator: &fakeImpersonator{},
 		Credits: h.credits, CreditUsers: fakeControlCreditDirectory{},
 		CreditReads: fakeControlCreditReads{}, Reconciliation: fakeControlReconciliation{},
-		Tasks: h.tasks, Tenancy: h.store, UserDirectory: h.dir,
+		Tasks: h.tasks, Tenancy: h.store, UserDirectory: h.dir, Boards: boards.NewInMemoryWorkspaceBoardStoreForTests(h.store, h.dir),
 		BillingAccounts: fakeControlBillingAccounts{}, Catalog: h.catalog,
 		Payments: h.payments, AuditSink: h.sink,
 		Idempotency: contract.NewIdempotencyStore(contract.DefaultIdempotencyStoreOptions()),

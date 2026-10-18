@@ -64,3 +64,18 @@ CREATE TABLE media_assets (
 CREATE INDEX idx_media_assets_workspace ON media_assets (workspace_id, created_at DESC) WHERE archived_at IS NULL;
 CREATE INDEX idx_media_assets_owner ON media_assets (owner_user_id, created_at DESC);
 CREATE INDEX idx_media_assets_upload ON media_assets (upload_session_id);
+
+CREATE TABLE media_asset_task_origins (
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  task_public_id TEXT NOT NULL,
+  output_index INT NOT NULL,
+  media_asset_id BIGINT NOT NULL REFERENCES media_assets(internal_id) ON DELETE CASCADE,
+  submitter_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  board_public_id TEXT NULL,
+  CONSTRAINT media_asset_task_origins_pkey PRIMARY KEY (workspace_id, task_public_id, output_index),
+  CONSTRAINT chk_media_asset_task_origins_task CHECK (task_public_id LIKE 'task\_%'),
+  CONSTRAINT chk_media_asset_task_origins_output_index CHECK (output_index >= 0),
+  CONSTRAINT chk_media_asset_task_origins_board CHECK (board_public_id IS NULL OR board_public_id LIKE 'board\_%')
+);
+
+CREATE INDEX idx_media_asset_task_origins_asset ON media_asset_task_origins (media_asset_id);

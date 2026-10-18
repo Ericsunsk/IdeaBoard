@@ -27,6 +27,11 @@ export function rememberBoardServerContent(boardId: string, state: BoardState): 
   serverContent.set(boardId.trim(), documentContent(state))
 }
 
+/** Drops the server-content baseline for one board (access-loss cleanup). */
+export function forgetBoardServerContent(boardId: string): void {
+  serverContent.delete(boardId.trim())
+}
+
 export function hasBoardServerContent(boardId: string): boolean {
   return serverContent.has(boardId.trim())
 }

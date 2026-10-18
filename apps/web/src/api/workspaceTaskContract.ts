@@ -108,6 +108,13 @@ export type CreateWorkspaceTaskInput = {
   params?: Record<string, unknown> | undefined
   quantity?: number | undefined
   resolution?: string | undefined
+  /**
+   * Optional Canvas Board binding (v1 `data.board_id`, board_...). The
+   * server validates Board identity + generate capability before any
+   * Quote/Hold. Omitted ids stay non-Canvas tasks (submitter-only,
+   * never auto-published); callers must never forge a Board attribution.
+   */
+  board_id?: string | undefined
 }
 
 export type WorkspaceTasksRequestOptions = {

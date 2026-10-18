@@ -20,6 +20,7 @@ describe('CanvasChrome', () => {
           isMenuOpen: false,
           isRenaming: false,
           isRenamePending: false,
+          isReadOnly: false,
           catalogRecovery: { status: 'idle' },
           archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
@@ -67,6 +68,7 @@ describe('CanvasChrome', () => {
           isMenuOpen: false,
           isRenaming: false,
           isRenamePending: false,
+          isReadOnly: false,
           catalogRecovery: { status: 'idle' },
           archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
@@ -92,14 +94,56 @@ describe('CanvasChrome', () => {
     })
 
     const credits = screen.getByRole('button', { name: 'Idea余额 100 Ideas' })
-    const share = screen.getByRole('button', { name: 'Share coming soon' })
+    const share = screen.getByRole('button', { name: 'Share' })
 
     expect(share.previousElementSibling).toBe(credits)
-    expect(share).toBeDisabled()
-    expect(share).toHaveAttribute('title', 'Share coming soon')
+    expect(share).toBeEnabled()
+    expect(share).toHaveAttribute('title', 'Share')
     expect(screen.getAllByRole('button', { name: 'Idea余额 100 Ideas' })).toHaveLength(1)
     expect(credits).toHaveTextContent('100')
     expect(credits).not.toHaveTextContent('Ideas')
+  })
+
+  it('emits the share intent when the share control is activated', async () => {
+    const { emitted, user } = renderWithUser(CanvasChrome, {
+      props: {
+        isInert: false,
+        isHidden: false,
+        board: {
+          currentName: 'Untitled',
+          options: [],
+          currentId: 'board-a',
+          isMenuOpen: false,
+          isRenaming: false,
+          isRenamePending: false,
+          isReadOnly: false,
+          catalogRecovery: { status: 'idle' },
+          archived: { isArchived: false, isRestoring: false },
+          setNameInputRef: vi.fn(),
+        },
+        account: {
+          balance: {
+            status: 'ready',
+            availableIdeas: 100,
+            displayValue: '100',
+            ariaLabel: 'Idea余额 100 Ideas',
+            command: vi.fn(),
+          },
+          menuItems: [],
+        },
+        tools: {
+          activeTool: 'select',
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
+        },
+        status: { isExportDisabled: false, zoomLevel: 100 },
+      },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Share' }))
+
+    expect(emitted()['share']).toHaveLength(1)
   })
 
   it('exposes an executable catalog reload recovery action', async () => {
@@ -114,6 +158,7 @@ describe('CanvasChrome', () => {
           isMenuOpen: false,
           isRenaming: false,
           isRenamePending: false,
+          isReadOnly: false,
           catalogRecovery: { status: 'reload-required', boardId: 'board-a' },
           archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
@@ -155,6 +200,7 @@ describe('CanvasChrome', () => {
           isMenuOpen: false,
           isRenaming: false,
           isRenamePending: false,
+          isReadOnly: false,
           catalogRecovery: { status: 'idle' },
           archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
@@ -200,6 +246,7 @@ describe('CanvasChrome', () => {
           isMenuOpen: false,
           isRenaming: true,
           isRenamePending: false,
+          isReadOnly: false,
           catalogRecovery: { status: 'idle' },
           archived: { isArchived: false, isRestoring: false },
           setNameInputRef,
@@ -245,6 +292,7 @@ describe('CanvasChrome', () => {
         isMenuOpen: false,
         isRenaming: true,
         isRenamePending: true,
+        isReadOnly: false,
         catalogRecovery: { status: 'idle' },
         archived: { isArchived: false, isRestoring: false },
         setNameInputRef,
@@ -275,6 +323,7 @@ describe('CanvasChrome', () => {
           isMenuOpen: true,
           isRenaming: false,
           isRenamePending: false,
+          isReadOnly: false,
           catalogRecovery: { status: 'reload-required', boardId: 'board-a' },
           archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
@@ -320,6 +369,7 @@ describe('CanvasChrome', () => {
           isMenuOpen: false,
           isRenaming: false,
           isRenamePending: false,
+          isReadOnly: false,
           catalogRecovery: { status: 'idle' },
           archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
@@ -365,6 +415,7 @@ describe('CanvasChrome', () => {
           isMenuOpen: false,
           isRenaming: false,
           isRenamePending: false,
+          isReadOnly: false,
           catalogRecovery: { status: 'idle' },
           archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
@@ -411,6 +462,7 @@ describe('CanvasChrome', () => {
           isMenuOpen: false,
           isRenaming: false,
           isRenamePending: false,
+          isReadOnly: false,
           catalogRecovery: { status: 'idle' },
           archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
@@ -455,6 +507,7 @@ describe('CanvasChrome', () => {
           isMenuOpen: false,
           isRenaming: false,
           isRenamePending: false,
+          isReadOnly: false,
           catalogRecovery: { status: 'idle' },
           archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
@@ -494,6 +547,7 @@ describe('CanvasChrome', () => {
           isMenuOpen: false,
           isRenaming: false,
           isRenamePending: false,
+          isReadOnly: false,
           catalogRecovery: { status: 'idle' },
           archived: { isArchived: true, isRestoring: false },
           setNameInputRef: vi.fn(),
@@ -540,6 +594,7 @@ describe('CanvasChrome', () => {
           isMenuOpen: false,
           isRenaming: false,
           isRenamePending: false,
+          isReadOnly: false,
           catalogRecovery: { status: 'idle' },
           archived: { isArchived: true, isRestoring: true },
           setNameInputRef: vi.fn(),

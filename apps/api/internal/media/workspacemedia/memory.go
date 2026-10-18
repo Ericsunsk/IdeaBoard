@@ -14,20 +14,33 @@ import (
 // miss), lazy session expiry, atomic complete (asset insert +
 // session flip), and idempotent archive.
 type InMemoryWorkspaceMediaStore struct {
-	mu         sync.Mutex
-	sessions   map[string]*Session
-	assets     map[string]*Asset
-	taskAssets map[string][]*TaskAsset
-	now        func() time.Time
+	mu             sync.Mutex
+	sessions       map[string]*Session
+	assets         map[string]*Asset
+	taskAssets     map[string][]*TaskAsset
+	taskVisibility map[string]taskVisibility
+	// sessionTargets records the restricted upload-target board (#936) per
+	// session key, persisted at create (pre-complete). assetTargets carries
+	// the binding onto the completed asset (twin of the
+	// upload_sessions.target_board_id -> asset join). libraryLinks seeds the
+	// published-library existence fact (twin of library_assets).
+	sessionTargets map[string]string
+	assetTargets   map[string]string
+	libraryLinks   map[string]struct{}
+	now            func() time.Time
 }
 
 // NewInMemoryWorkspaceMediaStoreForTests builds an empty test-only store.
 func NewInMemoryWorkspaceMediaStoreForTests() *InMemoryWorkspaceMediaStore {
 	return &InMemoryWorkspaceMediaStore{
-		sessions:   make(map[string]*Session),
-		assets:     make(map[string]*Asset),
-		taskAssets: make(map[string][]*TaskAsset),
-		now:        time.Now,
+		sessions:       make(map[string]*Session),
+		assets:         make(map[string]*Asset),
+		taskAssets:     make(map[string][]*TaskAsset),
+		taskVisibility: make(map[string]taskVisibility),
+		sessionTargets: make(map[string]string),
+		assetTargets:   make(map[string]string),
+		libraryLinks:   make(map[string]struct{}),
+		now:            time.Now,
 	}
 }
 
@@ -151,6 +164,13 @@ func (s *InMemoryWorkspaceMediaStore) CreateSession(ctx context.Context, params 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sessions[mediaKey(session.WorkspaceID, session.ID)] = session
+	// #936: persist the restricted upload-target binding pre-complete (twin
+	// of upload_sessions.target_board_id). Existence is NOT validated here
+	// (no boards knowledge); the read-time role check fails closed on
+	// unknown boards, and the HTTP layer verifies board write access first.
+	if target := strings.TrimSpace(params.TargetBoardPublicID); target != "" {
+		s.sessionTargets[mediaKey(session.WorkspaceID, session.ID)] = target
+	}
 	return copySession(session), nil
 }
 
@@ -217,6 +237,10 @@ func (s *InMemoryWorkspaceMediaStore) CompleteSession(ctx context.Context, works
 		CreatedAt:      now,
 	}
 	s.assets[mediaKey(created.WorkspaceID, created.ID)] = created
+	// #936: carry the pre-complete target binding onto the durable asset.
+	if target := strings.TrimSpace(s.sessionTargets[mediaKey(session.WorkspaceID, session.ID)]); target != "" {
+		s.assetTargets[mediaKey(created.WorkspaceID, created.ID)] = target
+	}
 	session.Status = StatusCompleted
 	completed := now
 	session.CompletedAt = &completed
@@ -344,10 +368,11 @@ func (s *InMemoryWorkspaceMediaStore) UpdateAssetMetadata(ctx context.Context, w
 
 // SeedTaskAssetForTests attaches an asset to a task for ListTaskAssets
 // tests (the in-memory store carries no task tables).
-func (s *InMemoryWorkspaceMediaStore) SeedTaskAssetForTests(workspaceID, taskID string, item *TaskAsset) {
+func (s *InMemoryWorkspaceMediaStore) SeedTaskAssetForTests(workspaceID, taskID string, submitterUserID int64, boardID string, item *TaskAsset) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := mediaKey(workspaceID, taskID)
+	s.taskVisibility[key] = taskVisibility{submitterUserID: submitterUserID, boardID: boardID}
 	entry := &TaskAsset{OutputIndex: item.OutputIndex, Role: item.Role}
 	if item.Asset != nil {
 		entry.Asset = copyAsset(item.Asset)

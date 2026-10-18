@@ -23,12 +23,12 @@
 -- Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 
 -- name: CreateUploadSession :one
-INSERT INTO upload_sessions (public_id, workspace_id, uploader_user_id, declared_mime_type, declared_size_bytes, declared_checksum, storage_key, status)
-VALUES (sqlc.arg(public_id), sqlc.arg(workspace_id), sqlc.arg(uploader_user_id), sqlc.arg(declared_mime_type), sqlc.arg(declared_size_bytes), sqlc.narg(declared_checksum), sqlc.narg(storage_key), 'pending')
-RETURNING internal_id, public_id, workspace_id, uploader_user_id, declared_mime_type, declared_size_bytes, declared_checksum, storage_key, status, completed_at, expired_at, created_at;
+INSERT INTO upload_sessions (public_id, workspace_id, uploader_user_id, declared_mime_type, declared_size_bytes, declared_checksum, storage_key, target_board_id, status)
+VALUES (sqlc.arg(public_id), sqlc.arg(workspace_id), sqlc.arg(uploader_user_id), sqlc.arg(declared_mime_type), sqlc.arg(declared_size_bytes), sqlc.narg(declared_checksum), sqlc.narg(storage_key), sqlc.narg(target_board_id), 'pending')
+RETURNING internal_id, public_id, workspace_id, uploader_user_id, declared_mime_type, declared_size_bytes, declared_checksum, storage_key, status, completed_at, expired_at, created_at, target_board_id;
 
 -- name: GetUploadSessionByPublicID :one
-SELECT u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at
+SELECT u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at, u.target_board_id
 FROM upload_sessions AS u
 INNER JOIN workspaces AS w ON w.internal_id = u.workspace_id
 WHERE u.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id)
@@ -45,7 +45,7 @@ WHERE u.workspace_id = w.internal_id
 AND u.public_id = sqlc.arg(public_id)
 AND w.public_id = sqlc.arg(workspace_public_id)
 AND u.status = 'pending'
-RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at;
+RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at, u.target_board_id;
 
 -- CompleteUploadSession flips a live session to completed with its
 -- reserved storage key. The durable Media Asset row is inserted
@@ -58,7 +58,7 @@ WHERE u.workspace_id = w.internal_id
 AND u.public_id = sqlc.arg(public_id)
 AND w.public_id = sqlc.arg(workspace_public_id)
 AND u.status IN ('pending', 'transferring')
-RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at;
+RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at, u.target_board_id;
 
 -- FailUploadSession flips a live session to failed (chk gate carries
 -- no extra columns for failed rows; the reason stays server-side).
@@ -70,7 +70,7 @@ WHERE u.workspace_id = w.internal_id
 AND u.public_id = sqlc.arg(public_id)
 AND w.public_id = sqlc.arg(workspace_public_id)
 AND u.status IN ('pending', 'transferring')
-RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at;
+RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at, u.target_board_id;
 
 -- ExpireUploadSession lazily expires a live session past its TTL.
 -- name: ExpireUploadSession :one
@@ -81,7 +81,7 @@ WHERE u.workspace_id = w.internal_id
 AND u.public_id = sqlc.arg(public_id)
 AND w.public_id = sqlc.arg(workspace_public_id)
 AND u.status IN ('pending', 'transferring')
-RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at;
+RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at, u.target_board_id;
 
 -- CreateMediaAsset inserts the durable asset row. Width/height ride
 -- NULL when unknown (0 maps to NULL; the image CHECK passes on NULL
@@ -151,3 +151,56 @@ INNER JOIN media_assets AS m ON m.internal_id = o.media_asset_id
 WHERE t.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id)
 AND o.output_kind = 'media_asset'
 ORDER BY o.output_index ASC;
+
+-- ResolveBoardInternalID maps a workspace-scoped board public id to its
+-- internal id for upload-target binding (#936). Misses (unknown board or
+-- foreign workspace) return no row; the service maps that to ErrNotFound
+-- so the handler renders 404 without leaking existence.
+-- name: ResolveBoardInternalID :one
+SELECT b.internal_id
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE b.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id)
+LIMIT 1;
+
+-- GetMediaAssetUploadTargetBoard resolves the restricted upload-target
+-- board (#936) for one asset through its creating session. Assets whose
+-- session carries no target (or whose board row went away) return a NULL
+-- board id on the single row; unknown or cross-workspace assets return no
+-- row at all (ErrNotFound, never a distinct status).
+-- name: GetMediaAssetUploadTargetBoard :one
+SELECT b.public_id AS target_board_public_id
+FROM media_assets AS m
+INNER JOIN workspaces AS w ON w.internal_id = m.workspace_id
+INNER JOIN upload_sessions AS u ON u.internal_id = m.upload_session_id
+LEFT JOIN boards AS b ON b.internal_id = u.target_board_id
+WHERE m.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id)
+LIMIT 1;
+
+-- MediaAssetHasLibraryLink reports whether a workspace-scoped asset backs
+-- at least one published Workspace Library row (#936: shared-library
+-- source). Library rows are member-visible, so existence authorizes every
+-- workspace member. Unknown or cross-workspace assets report false, never
+-- a distinct status.
+-- name: MediaAssetHasLibraryLink :one
+SELECT EXISTS(
+  SELECT 1
+  FROM media_assets AS m
+  INNER JOIN workspaces AS w ON w.internal_id = m.workspace_id
+  INNER JOIN library_assets AS l ON l.media_asset_id = m.internal_id
+  WHERE m.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id)
+);
+
+-- ListMediaAssetTaskOrigins preserves producing authority independently of
+-- Task retention and Board deletion. An ordinary upload has no Task origin.
+-- name: ListMediaAssetTaskOrigins :many
+SELECT o.task_public_id,
+       w.public_id AS workspace_public_id,
+       o.submitter_user_id,
+       COALESCE(o.board_public_id, '')::text AS board_public_id
+FROM media_asset_task_origins AS o
+INNER JOIN workspaces AS w ON w.internal_id = o.workspace_id
+INNER JOIN media_assets AS m ON m.internal_id = o.media_asset_id AND m.workspace_id = o.workspace_id
+WHERE m.public_id = sqlc.arg(public_id)
+  AND w.public_id = sqlc.arg(workspace_public_id)
+ORDER BY o.task_public_id ASC, o.output_index ASC;

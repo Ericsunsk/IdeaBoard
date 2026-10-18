@@ -7,10 +7,11 @@ var apiOwnedTableNames = []string{
 	"admin_brand_logo_overrides",
 	"api_accounts",
 	"billing_accounts",
+	"board_access_event_outbox",
 	"board_documents",
+	"board_document_media_refs",
 	"board_memberships",
 	"board_revisions",
-	"board_share_tokens",
 	"boards",
 	// control_idempotency_records shares the full-DML grant: Claim inserts
 	// the in-progress fact, Complete/Abandon settle it, and PurgeExpired
@@ -54,8 +55,8 @@ var apiOwnedSequenceNames = []string{
 	"api_account_secrets_id_seq",
 	"api_accounts_id_seq",
 	"billing_accounts_internal_id_seq",
+	"board_access_event_outbox_internal_id_seq",
 	"board_revisions_internal_id_seq",
-	"board_share_tokens_internal_id_seq",
 	"boards_internal_id_seq",
 	"control_audit_records_internal_id_seq",
 	"event_deliveries_internal_id_seq",
@@ -103,6 +104,22 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 		Name:               "API runtime",
 		RequireSchemaUsage: true,
 		Objects: []dbprivileges.ObjectRule{
+			{
+				Kind:  dbprivileges.KindTable,
+				Names: []string{"media_asset_task_origins"},
+				Required: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeSelect,
+					dbprivileges.PrivilegeInsert,
+				},
+				Forbidden: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeUpdate,
+					dbprivileges.PrivilegeDelete,
+					dbprivileges.PrivilegeTruncate,
+					dbprivileges.PrivilegeReferences,
+					dbprivileges.PrivilegeTrigger,
+				},
+				PublicForbidden: allTablePrivileges,
+			},
 			{
 				Kind:  dbprivileges.KindTable,
 				Names: []string{"identity_admin_reconciliation_runs"},

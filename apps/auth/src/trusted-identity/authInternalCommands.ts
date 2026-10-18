@@ -5,12 +5,15 @@ import type {
   BanUserData,
   DeleteUserData,
   EnsureUserEnvelope,
+  LookupUserByEmailData,
   RevokeUserSessionsData,
   SetUserRoleData,
   UnbanUserData,
 } from '../generated/auth-internal/types.gen.js'
 import {
+  isValidCanonicalEmail,
   normalizeAuthRole,
+  normalizeCanonicalEmail,
   normalizeDisplayName,
   normalizeOptionalPositiveInteger,
 } from '../infrastructure/authUtils.js'
@@ -35,6 +38,9 @@ export type AuthIdentityMutationStore = {
       ban_expires: string | null
     }>
   >
+  findUserByCanonicalEmail?: (
+    email: string,
+  ) => Promise<{ auth_user_id: string; email: string } | null>
   removeAuthUserCascade(authUserID: string): Promise<boolean>
   updateAuthUserRole(authUserID: string, role: AuthRole): Promise<boolean>
   updateAuthUserBanState(
@@ -79,6 +85,10 @@ export type GetUserStatesCommandInput = {
   userIDs?: unknown
 }
 
+export type LookupUserByEmailCommandInput = {
+  email?: unknown
+}
+
 export type BanIdentityCommandInput = AuthUserIDCommandInput & {
   banExpiresIn?: unknown
 }
@@ -96,6 +106,9 @@ export type AuthInternalCommands = {
   getUserStates(
     input: GetUserStatesCommandInput,
   ): Promise<AuthInternalCommandResult<GetUserStatesData>>
+  lookupUserByEmail(
+    input: LookupUserByEmailCommandInput,
+  ): Promise<AuthInternalCommandResult<LookupUserByEmailData>>
   ensureIdentity(
     input: EnsureIdentityCommandInput,
   ): Promise<AuthInternalCommandResult<TrustedIdentityData>>
@@ -115,6 +128,7 @@ export function createAuthInternalCommands(
   return {
     getUserEmails: (input) => getUserEmails(input, mutationStore),
     getUserStates: (input) => getUserStates(input, mutationStore),
+    lookupUserByEmail: (input) => lookupUserByEmail(input, mutationStore),
     ensureIdentity: (input) => ensureIdentity(input, provisioner),
     deleteIdentity: (input) => deleteIdentity(input, mutationStore),
     banIdentity: (input) => banIdentity(input, mutationStore),
@@ -142,6 +156,30 @@ async function getUserEmails(
     })
   } catch (error) {
     return repositoryFailure(error, 'failed to read auth user emails')
+  }
+}
+
+async function lookupUserByEmail(
+  input: LookupUserByEmailCommandInput,
+  repository: AuthIdentityMutationStore,
+): Promise<AuthInternalCommandResult<LookupUserByEmailData>> {
+  const email = normalizeCanonicalEmail(input.email)
+  if (!isValidCanonicalEmail(email)) {
+    return commandFailure('invalid_input', 'a valid email is required')
+  }
+  if (!repository.findUserByCanonicalEmail) {
+    return commandFailure('repository_failure', 'auth user email lookup is not configured')
+  }
+  try {
+    const found = await repository.findUserByCanonicalEmail(email)
+    if (!found) {
+      return commandFailure('not_found', 'auth user not found')
+    }
+    return commandSuccess({
+      user: { auth_user_id: found.auth_user_id, email: found.email },
+    })
+  } catch (error) {
+    return repositoryFailure(error, 'failed to look up auth user by email')
   }
 }
 

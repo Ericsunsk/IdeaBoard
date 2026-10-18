@@ -11,8 +11,10 @@ import (
 
 	"ideaboard/api/internal/testsupport/testenv"
 
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/library/domain"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -286,7 +288,7 @@ func openLibraryTestEnv(t *testing.T) *libraryTestEnv {
 	wsB := fmt.Sprintf("ws_libtest_b_%d", time.Now().UnixNano()%1000000)
 	seedWorkspace(wsA, "lib-a")
 	seedWorkspace(wsB, "lib-b")
-	return &libraryTestEnv{pool: pool, svc: NewService(pool), userID: userID, wsA: wsA, wsB: wsB}
+	return &libraryTestEnv{pool: pool, svc: NewService(pool, fixturePublicationAuthorizer{}), userID: userID, wsA: wsA, wsB: wsB}
 }
 
 func mustFolderID(t *testing.T, ctx context.Context, svc *Service, ws, name string) string {
@@ -423,7 +425,7 @@ func TestLibraryServicePublicIDShapes(t *testing.T) {
 
 func TestLibraryServiceNotConfigured(t *testing.T) {
 	ctx := context.Background()
-	svc := NewService(nil)
+	svc := NewService(nil, nil)
 	if _, err := svc.ListFolders(ctx, "ws_missing"); !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("ListFolders on unconfigured service = %v, want not configured", err)
 	}
@@ -986,4 +988,15 @@ func TestLibraryServiceManagedDisplayLinkIsWorkspaceScoped(t *testing.T) {
 	if _, err := env.svc.GetAsset(ctx, env.wsA, saved.PublicID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatal("deleted managed link exposed")
 	}
+}
+
+// Store fixtures isolate persistence from the cross-context publication policy.
+type fixturePublicationAuthorizer struct{}
+
+func (fixturePublicationAuthorizer) AuthorizeManual(ctx context.Context, tx pgx.Tx, workspaceID string, _ domain.V1SaveManagedAssetInput) error {
+	_, err := dbsqlc.New(tx).LockWorkspaceMemberships(ctx, workspaceID)
+	return err
+}
+func (a fixturePublicationAuthorizer) AuthorizeAutomatic(ctx context.Context, tx pgx.Tx, workspaceID string, input domain.V1SaveManagedAssetInput) (bool, error) {
+	return true, a.AuthorizeManual(ctx, tx, workspaceID, input)
 }

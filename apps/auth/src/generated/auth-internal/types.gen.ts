@@ -204,6 +204,25 @@ export type GetUserEmailsEnvelope = {
     data: GetUserEmailsData;
 };
 
+export type LookupUserByEmailRequest = {
+    email: string;
+};
+
+export type AuthUserLookup = {
+    auth_user_id: string;
+    email: string;
+};
+
+export type LookupUserByEmailData = {
+    user: AuthUserLookup;
+};
+
+export type LookupUserByEmailEnvelope = {
+    code: 0;
+    msg: string;
+    data: LookupUserByEmailData;
+};
+
 export type DeleteUserData = {
     auth_user_id: string;
     deleted: true;
@@ -400,6 +419,43 @@ export type GetUserStatesResponses = {
 };
 
 export type GetUserStatesResponse = GetUserStatesResponses[keyof GetUserStatesResponses];
+
+export type LookupUserByEmailData2 = {
+    body: LookupUserByEmailRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/users/lookup';
+};
+
+export type LookupUserByEmailErrors = {
+    /**
+     * Invalid request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Internal key or session rejected
+     */
+    401: ErrorEnvelope;
+    /**
+     * Auth identity not found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Auth dependency or repository failure
+     */
+    500: ErrorEnvelope;
+};
+
+export type LookupUserByEmailError = LookupUserByEmailErrors[keyof LookupUserByEmailErrors];
+
+export type LookupUserByEmailResponses = {
+    /**
+     * Auth identity resolved
+     */
+    200: LookupUserByEmailEnvelope;
+};
+
+export type LookupUserByEmailResponse = LookupUserByEmailResponses[keyof LookupUserByEmailResponses];
 
 export type DeleteUserData2 = {
     body?: never;

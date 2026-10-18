@@ -13,6 +13,7 @@ import (
 	"ideaboard/api/internal/platform/telemetry"
 	"ideaboard/api/internal/workflow"
 
+	"github.com/jackc/pgx/v5"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -37,6 +38,7 @@ type Service struct {
 	holder        Holder
 	queue         Enqueuer
 	assets        AssetReader
+	acceptance    SubmissionAuthorizer
 	// resolver is the authoritative Service Model Pool decision point
 	// (ADR-0012 rule 10, #848). Quote and Create consult it; a nil
 	// resolver fails closed with the canonical unavailable sentinel.
@@ -50,8 +52,12 @@ type Service struct {
 	// ServiceDeps.SubmissionClaims: production settlement fails closed
 	// without it.
 	submissionClaims TxSubmissionClaimStore
-	events           []TaskEvent
-	now              func() time.Time
+	// boards resolves the caller's Board posture for Board-bound submits
+	// (#937). Nil fails closed for bound submits (rejected) and for
+	// bound reads (invisible); Board-less tasks never consult it.
+	boards BoardAuthorizer
+	events []TaskEvent
+	now    func() time.Time
 }
 
 // ServiceDeps wires the settlement seams. TaskRead and TaskLifecycle are
@@ -81,6 +87,18 @@ type ServiceDeps struct {
 	// (ErrSettlementUnavailable), so a missing wiring fails closed instead
 	// of degrading into an unfenced create.
 	SubmissionClaims TxSubmissionClaimStore
+	// Boards resolves the caller's Board posture for Board-bound submits
+	// (#937). REQUIRED when any submit carries a Board ID (production
+	// wiring always supplies it); a bound submit with a nil authorizer
+	// fails closed instead of degrading into an unbound task.
+	Boards     BoardAuthorizer
+	Acceptance SubmissionAuthorizer
+}
+
+// SubmissionAuthorizer accepts current membership, Board capability and all input
+// permissions on the settlement transaction before any Quote or Hold.
+type SubmissionAuthorizer interface {
+	AuthorizeSubmission(context.Context, pgx.Tx, CreateInput) (TaskBoardBinding, error)
 }
 
 // NewService builds the settlement orchestrator.
@@ -91,7 +109,7 @@ func NewService(deps ServiceDeps) *Service {
 		quoter:      deps.Quoter, holder: deps.Holder,
 		queue: deps.Queue, assets: deps.Assets,
 		resolver: deps.Resolver, saveSnapshot: deps.SnapshotSaver, now: time.Now,
-		submissionClaims: deps.SubmissionClaims,
+		submissionClaims: deps.SubmissionClaims, boards: deps.Boards, acceptance: deps.Acceptance,
 	}
 }
 
@@ -212,6 +230,16 @@ type CreateInput struct {
 	// prompt with the same key is a conflict, not a replay) but is not
 	// itself persisted here; the canonical compiler owns prompt storage.
 	Prompt string
+	// BoardID optionally binds a Canvas submit to its Board (#937): the
+	// board_ public id, validated against the caller's live Board
+	// posture (visible identity + generate capability + input
+	// availability) before any Quote/Hold. Empty means a non-Canvas task
+	// with its own workspace-level permission; it must never be forged
+	// into a Board attribution.
+	BoardID string
+	// WorkspaceRole is the caller's workspace role string, consumed only
+	// together with BoardID for Board posture resolution.
+	WorkspaceRole string
 }
 
 // Create settles one task atomically: Quote -> Hold -> Insert -> Enqueue,
@@ -241,7 +269,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	if err != nil {
 		return nil, err
 	}
-	if err := s.verifyInputAssets(ctx, input.WorkspaceID, input.MediaAssetIDs, input.Params); err != nil {
+	if err := ValidateBoardID(input.BoardID); err != nil {
 		return nil, err
 	}
 	if s.quoter == nil || s.holder == nil || s.queue == nil {
@@ -281,6 +309,17 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	if !s.allowNonTransactional {
 		return nil, ErrSettlementUnavailable
 	}
+	var binding TaskBoardBinding
+	if trimmed := strings.TrimSpace(input.BoardID); trimmed != "" {
+		access, err := s.resolveSubmitBoardAccess(ctx, input.WorkspaceID, trimmed, input.OwnerUserID, input.WorkspaceRole)
+		if err != nil {
+			return nil, err
+		}
+		binding = TaskBoardBinding{BoardID: trimmed, AccessVersion: access.AccessVersion}
+	}
+	if err := s.verifyInputAssets(ctx, input.WorkspaceID, input.MediaAssetIDs, input.Params); err != nil {
+		return nil, err
+	}
 	// Test-only fixtures without transaction seams resolve before Quote/Hold so
 	// an empty pool reserves nothing. Production cannot enter this branch.
 	routingSnap, err := s.resolveSnapshot(ctx, kind, resolution)
@@ -302,13 +341,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	} else {
 		snapshot.SettlementState = "free"
 	}
-	task := &WorkspaceTask{
-		ID: taskID, WorkspaceID: workspaceID, OwnerUserID: input.OwnerUserID,
-		Service: kind, MediaAssetIDs: append([]string(nil), input.MediaAssetIDs...),
-		Params: cloneParams(input.Params), CanonicalParams: input.CanonicalParams,
-		Status:     StatusPending,
-		RetryCount: 0, ExecutionToken: token, BillingSnapshot: snapshot,
-	}
+	task := pendingTaskWithBinding(input, kind, taskID, token, binding, snapshot)
 	created, err := s.taskLifecycle.CreateTask(ctx, task)
 	if err != nil {
 		if holdTxID != "" {
@@ -336,6 +369,19 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	return created, nil
 }
 
+// pendingTaskWithBinding captures the accepted inputs and Board binding for
+// both transactional and test-only compensating settlement.
+func pendingTaskWithBinding(input CreateInput, kind, taskID, token string, binding TaskBoardBinding, snapshot BillingSnapshot) *WorkspaceTask {
+	return &WorkspaceTask{
+		ID: taskID, WorkspaceID: strings.TrimSpace(input.WorkspaceID), OwnerUserID: input.OwnerUserID,
+		Service: kind, MediaAssetIDs: append([]string(nil), input.MediaAssetIDs...),
+		Params: cloneParams(input.Params), CanonicalParams: input.CanonicalParams,
+		BoardID: binding.BoardID, BoardAccessVersion: binding.AccessVersion,
+		Status:     StatusPending,
+		RetryCount: 0, ExecutionToken: token, BillingSnapshot: snapshot,
+	}
+}
+
 // submitRequestHash resolves the fingerprint persisted with the durable
 // claim. Callers that canonicalize the body themselves (the v1 HTTP edge)
 // supply it; otherwise an equivalent hash is derived from the fields that
@@ -350,7 +396,7 @@ func (s *Service) submitRequestHash(input CreateInput, kind, resolution string, 
 			paramsJSON = string(encoded)
 		}
 	}
-	return TaskSubmitRequestHash(input.WorkspaceID, kind, input.MediaAssetIDs, input.Prompt, paramsJSON, quantity, resolution)
+	return TaskSubmitRequestHash(input.WorkspaceID, kind, input.MediaAssetIDs, input.Prompt, paramsJSON, quantity, resolution, input.BoardID)
 }
 
 func cloneParams(in map[string]any) map[string]any {

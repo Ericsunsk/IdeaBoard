@@ -20,6 +20,7 @@
       @reload-catalog="reloadCatalog"
       @restore-archived-board="restoreArchivedBoard"
       @select-board="selectBoard"
+      @share="openSharePanel"
       @export="exportSelectedImages"
       @navigate-back="navigateBack"
       @select-tool="setActiveTool"
@@ -107,6 +108,7 @@
         :items="canvasNodeMenuItems"
         @create="handleNodeContextMenuCreate"
       />
+      <ShareDialog :panel="sharePanel" :ensure-draft-saved="ensureCanvasDraftSaved" />
     </div>
   </div>
 </template>
@@ -153,6 +155,12 @@ import {
 } from '../../session/browser/canvasViewportStorage.ts'
 import { useWorkspaceAccountControls, type WorkspaceNavigationAdapter } from '../../../workspace'
 import { getWorkspaceSelectionStore } from '../../../workspace'
+import {
+  observeOpenBoardAccessLoss,
+  ShareDialog,
+  subscribeBoardAccessLost,
+  useSharePanel,
+} from '../../../board/ports/canvasSession'
 import { useCanvasScreenImageToolUi } from './internal/useCanvasScreenImageToolUi'
 import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSurfaceInteractions'
 import type { CanvasScreenLibrarySaveBridge } from './internal/useCanvasScreenSurfaceInteractions'
@@ -168,6 +176,7 @@ import {
 } from '../../../library'
 import type { CanvasLibraryImportDescriptor } from '../../../library'
 import { useAppToast } from '../../../../core/composables/useAppToast'
+import { i18n } from '../../../../core/i18n'
 
 const props = defineProps<{
   route: RouteLocationNormalizedLoaded
@@ -269,6 +278,7 @@ const {
   isRenamePending,
   catalogRecovery,
   isBoardArchived,
+  isBoardReadOnly,
   isRestoringArchivedBoard,
   currentBoardName,
   boardOptions,
@@ -296,6 +306,43 @@ const accountControls = useWorkspaceAccountControls({
   shouldShowHome: false,
 })
 
+// Share panel (issue #938): the canvas opens the single Share boundary
+// over the current board. Invites require the local draft to exist and
+// the autosave to flush first; the command flow re-validates the server
+// board before every write.
+const sharePanel = useSharePanel()
+
+// Confirmed access loss (issue #941): the open board revalidates on
+// directed/roster signals, SSE gaps, and hidden-tab recovery; a proven
+// loss closes Share, purges protected state, toasts once, and replaces
+// the route with an authorized Gallery (no history entry back to the dead
+// canvas). Unconfirmed errors preserve the draft and never navigate.
+const stopAccessLossObservation = observeOpenBoardAccessLoss({
+  getBoardId: () => currentBoardId.value,
+})
+const stopAccessLossSubscription = subscribeBoardAccessLost((boardId) => {
+  if (!boardId || currentBoardId.value !== boardId) return
+  sharePanel.close()
+  toast.error(i18n.global.t('canvas.session.boardAccessLost'))
+  void router.replace(USER_BOARDS_PATH)
+})
+onBeforeUnmount(() => {
+  stopAccessLossObservation()
+  stopAccessLossSubscription()
+})
+
+function openSharePanel() {
+  const boardId = currentBoardId.value
+  if (!boardId) return
+  sharePanel.open(boardId, currentBoardName.value)
+}
+
+async function ensureCanvasDraftSaved(boardId: string): Promise<boolean> {
+  if (currentBoardId.value !== boardId) return false
+  await commands.persistence.flushAutosave()
+  return currentBoardId.value === boardId
+}
+
 const canvasChromeBoard = computed<CanvasChromeBoardState>(() => ({
   currentName: currentBoardName.value,
   options: boardOptions.value,
@@ -308,6 +355,7 @@ const canvasChromeBoard = computed<CanvasChromeBoardState>(() => ({
     isArchived: isBoardArchived.value,
     isRestoring: isRestoringArchivedBoard.value,
   },
+  isReadOnly: isBoardReadOnly.value,
   setNameInputRef: setBoardNameInputRef,
 }))
 const canvasChromeAccount = computed<CanvasChromeAccountState>(() => ({
@@ -460,9 +508,11 @@ const vueFlowProps = computed(() => {
   const isHandTool = activeTool.value === 'hand'
   // Archived boards reuse the existing canvas lock: while the archived
   // banner is visible the graph is read-only and autosaves cannot dirty it.
-  // Any residual programmatic edit still funnels through the save path,
-  // where 409 `board_archived` re-asserts the banner without toast spam.
-  const isCanvasLocked = isFlowCanvasLocked.value || isBoardArchived.value
+  // Read-only boards (viewer without write, from server capabilities) lock
+  // the same way. Any residual programmatic edit still funnels through the
+  // save path, where 409 `board_archived` / 403 `board_forbidden`
+  // re-asserts the banner without toast spam.
+  const isCanvasLocked = isFlowCanvasLocked.value || isBoardArchived.value || isBoardReadOnly.value
 
   return {
     panOnDrag: isCanvasLocked ? false : isHandTool ? [0, 1, 2] : [1, 2],

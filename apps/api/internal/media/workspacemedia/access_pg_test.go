@@ -1,0 +1,402 @@
+package workspacemedia
+
+// PostgreSQL asset authorization (#936): the same decision matrix against
+// the real SQL facts — owner, upload-target window, document references
+// via the REAL boards store through the narrow port, library rows, task
+// outputs, multi-source independence, list filtering, and reference GC.
+// Skips without API_TEST_DATABASE_DSN.
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"ideaboard/api/internal/boards"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/tenancy"
+	tenancypg "ideaboard/api/internal/tenancy/postgres"
+	"ideaboard/api/internal/testdb"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type accessPGEnv struct {
+	media  *Service
+	boards *boards.PostgresWorkspaceBoardStore
+	ws     string
+	owner  int64
+	member int64
+}
+
+func openAccessPGEnv(t *testing.T) (*accessPGEnv, context.Context, *pgxpool.Pool) {
+	t.Helper()
+	db := testdb.Open(t)
+	ctx := context.Background()
+	tenancyStore := tenancypg.NewStore(db)
+	ws, err := tenancyStore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
+		Name:        "media-access-pg",
+		OwnerUserID: 1,
+	})
+	if err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+	if _, err := tenancyStore.AddWorkspaceMember(ctx, ws.PublicID, 10, "member"); err != nil {
+		t.Fatalf("add member: %v", err)
+	}
+	return &accessPGEnv{
+		media:  NewService(db),
+		boards: boards.NewPostgresWorkspaceBoardStore(db, ValidateDocumentAssets),
+		ws:     ws.PublicID,
+		owner:  1,
+		member: 10,
+	}, ctx, db
+}
+
+func pgUploadComplete(t *testing.T, ctx context.Context, svc *Service, ws string, owner int64, targetBoard string) *Asset {
+	t.Helper()
+	session, err := svc.CreateSession(ctx, CreateSessionParams{
+		WorkspaceID:         ws,
+		OwnerUserID:         owner,
+		Filename:            "photo.png",
+		MIMEType:            "image/png",
+		SizeBytes:           64,
+		ChecksumSHA256:      strings.Repeat("cd", 32),
+		MediaKind:           MediaKindImage,
+		TargetBoardPublicID: targetBoard,
+	})
+	if err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+	_, asset, err := svc.CompleteSession(ctx, ws, session.ID, CompleteFacts{
+		ChecksumSHA256: strings.Repeat("cd", 32),
+		SizeBytes:      64,
+		MediaKind:      MediaKindImage,
+		Width:          100,
+		Height:         80,
+	}, CreateAssetParams{})
+	if err != nil {
+		t.Fatalf("CompleteSession: %v", err)
+	}
+	return asset
+}
+
+func pgDocEnvelope(t *testing.T, assetIDs ...string) json.RawMessage {
+	t.Helper()
+	nodes := make([]map[string]any, 0, len(assetIDs))
+	for i, id := range assetIDs {
+		nodes = append(nodes, map[string]any{
+			"id": float64(i + 1), "x": 0, "y": 0, "width": 280,
+			"sourceImageUrl": "https://example.com/y.png",
+			"sourceMediaRef": map[string]any{"assetId": id},
+			"outputImages":   []any{},
+		})
+	}
+	payload, err := json.Marshal(map[string]any{
+		"schemaVersion": 4, "imageNodes": nodes, "promptNodes": []any{}, "fusionNodes": []any{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelope, err := json.Marshal(map[string]any{"schema_version": 1, "payload": json.RawMessage(payload)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return envelope
+}
+
+func TestAccessPostgresOwnerAndDeny(t *testing.T) {
+	env, ctx, _ := openAccessPGEnv(t)
+	asset := pgUploadComplete(t, ctx, env.media, env.ws, env.owner, "")
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, env.owner, "owner", env.boards); err != nil {
+		t.Fatalf("owner = %v, want allow", err)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, env.member, "member", env.boards); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("member without source = %v, want ErrNotFound", err)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, 8, "", env.boards); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("non-member = %v, want ErrNotFound", err)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, "ws_foreign0000000001", asset.ID, env.owner, "owner", env.boards); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("foreign workspace = %v, want ErrNotFound", err)
+	}
+}
+
+func TestAccessPostgresUploadTargetWindow(t *testing.T) {
+	env, ctx, _ := openAccessPGEnv(t)
+	boardID, err := boards.NewV1BoardPublicID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.boards.CreateBoard(ctx, env.ws, env.owner, "target", boardID); err != nil {
+		t.Fatalf("create board: %v", err)
+	}
+	// Bound BEFORE any document exists: a board reader already reads the
+	// bytes (no workspace-readable window for others, no doc needed).
+	asset := pgUploadComplete(t, ctx, env.media, env.ws, env.owner, boardID)
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, env.member, "member", env.boards); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("non-reader member = %v, want deny", err)
+	}
+	if _, err := env.boards.ReplaceBoardAccess(ctx, env.ws, boardID, env.owner, 1, boards.WorkspaceAccess(boards.RoleViewer), []int64{env.member}); err != nil {
+		t.Fatalf("grant viewer: %v", err)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, env.member, "member", env.boards); err != nil {
+		t.Fatalf("board reader = %v, want allow via upload target", err)
+	}
+	// Losing the board grant revokes the target source live (no row touched).
+	if err := func() error {
+		_, err := env.boards.ReplaceBoardAccess(ctx, env.ws, boardID, env.owner, 2, boards.WorkspaceAccessNone, nil)
+		return err
+	}(); err != nil {
+		t.Fatalf("remove grant: %v", err)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, env.member, "member", env.boards); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("after grant loss = %v, want deny", err)
+	}
+	// Forged bindings fail closed at session create.
+	if _, err := env.media.CreateSession(ctx, CreateSessionParams{
+		WorkspaceID: env.ws, OwnerUserID: env.owner, Filename: "x.png",
+		MIMEType: "image/png", SizeBytes: 64, ChecksumSHA256: strings.Repeat("cd", 32),
+		MediaKind:           MediaKindImage,
+		TargetBoardPublicID: "board_forged000000001",
+	}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("forged target create = %v, want ErrNotFound", err)
+	}
+}
+
+func TestAccessPostgresDocumentLifecycle(t *testing.T) {
+	env, ctx, _ := openAccessPGEnv(t)
+	asset := pgUploadComplete(t, ctx, env.media, env.ws, env.owner, "")
+	boardID, err := boards.NewV1BoardPublicID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.boards.CreateBoard(ctx, env.ws, env.owner, "doc", boardID); err != nil {
+		t.Fatalf("create board: %v", err)
+	}
+	if _, err := env.boards.ReplaceBoardAccess(ctx, env.ws, boardID, env.owner, 1, boards.WorkspaceAccess(boards.RoleViewer), []int64{env.member}); err != nil {
+		t.Fatalf("grant viewer: %v", err)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, env.member, "member", env.boards); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("pre-accept member = %v, want deny", err)
+	}
+	if _, err := env.boards.ReplaceDocument(ctx, env.ws, boardID, env.owner, 1, 1, pgDocEnvelope(t, asset.ID)); err != nil {
+		t.Fatalf("accept with ref: %v", err)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, env.member, "member", env.boards); err != nil {
+		t.Fatalf("post-accept member = %v, want allow", err)
+	}
+	// GC: removing the reference in a later accept revokes the source in
+	// the same transaction; the owner source survives.
+	if _, err := env.boards.ReplaceDocument(ctx, env.ws, boardID, env.owner, 2, 1, pgDocEnvelope(t)); err != nil {
+		t.Fatalf("accept without ref: %v", err)
+	}
+	refs, err := env.boards.ListBoardsReferencingAsset(ctx, env.ws, asset.ID)
+	if err != nil {
+		t.Fatalf("list refs: %v", err)
+	}
+	if len(refs) != 0 {
+		t.Fatalf("refs after removal = %v, want none", refs)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, env.member, "member", env.boards); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("post-removal member = %v, want deny", err)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, env.owner, "owner", env.boards); err != nil {
+		t.Fatalf("owner after removal = %v, want allow", err)
+	}
+}
+
+func TestAccessPostgresLibraryAndTaskSources(t *testing.T) {
+	env, ctx, pool := openAccessPGEnv(t)
+	asset := pgUploadComplete(t, ctx, env.media, env.ws, env.owner, "")
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, env.member, "member", env.boards); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("pre-source member = %v, want deny", err)
+	}
+	// Published library row: folder + media-linked asset.
+	var folderInternal int64
+	if err := pool.QueryRow(ctx,
+		`INSERT INTO library_folders (public_id, workspace_id, name, is_system, is_default)
+		SELECT $1, w.internal_id, 'Quick Saves', TRUE, TRUE FROM workspaces AS w WHERE w.public_id=$2
+		RETURNING internal_id`, "lfolder_pg00000000001", env.ws,
+	).Scan(&folderInternal); err != nil {
+		t.Fatalf("seed folder: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO library_assets (public_id, workspace_id, folder_id, media_asset_id)
+		SELECT $1, w.internal_id, $2, m.internal_id FROM workspaces AS w, media_assets AS m
+		WHERE w.public_id=$3 AND m.public_id=$4`,
+		"lasset_pg000000000001", folderInternal, env.ws, asset.ID,
+	); err != nil {
+		t.Fatalf("seed library asset: %v", err)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, env.member, "member", env.boards); err != nil {
+		t.Fatalf("library member = %v, want allow", err)
+	}
+
+	// Task output visibility follows its submitter and live Board access.
+	asset2 := pgUploadComplete(t, ctx, env.media, env.ws, env.owner, "")
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO billing_accounts (public_id, workspace_id)
+		SELECT $1, w.internal_id FROM workspaces AS w WHERE w.public_id=$2`,
+		"ba_pg0000000000000001", env.ws,
+	); err != nil {
+		t.Fatalf("seed billing account: %v", err)
+	}
+	pgAcceptOutputOrigin(t, pool, env, "task_pg00000000000001", env.owner, "", asset2)
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset2.ID, env.member, "member", env.boards); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("other submitter's Board-less output = %v, want deny", err)
+	}
+	asset2 = pgUploadComplete(t, ctx, env.media, env.ws, env.owner, "")
+	pgAcceptOutputOrigin(t, pool, env, "task_pg00000000000002", env.member, "", asset2)
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset2.ID, env.member, "member", env.boards); err != nil {
+		t.Fatalf("submitter = %v, want allow", err)
+	}
+	boardID, err := boards.NewV1BoardPublicID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.boards.CreateBoard(ctx, env.ws, env.owner, "task", boardID); err != nil {
+		t.Fatal(err)
+	}
+	asset2 = pgUploadComplete(t, ctx, env.media, env.ws, env.owner, "")
+	pgAcceptOutputOrigin(t, pool, env, "task_pg00000000000003", env.owner, boardID, asset2)
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset2.ID, env.member, "member", env.boards); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("private Board output = %v, want deny", err)
+	}
+	if _, err := env.boards.ReplaceBoardAccess(ctx, env.ws, boardID, env.owner, 1, boards.WorkspaceAccess(boards.RoleViewer), []int64{env.member}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset2.ID, env.member, "member", env.boards); err != nil {
+		t.Fatalf("task Board reader = %v, want allow", err)
+	}
+	if _, err := env.media.ArchiveAsset(ctx, env.ws, asset2.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset2.ID, env.member, "member", env.boards); err != nil {
+		t.Fatalf("archived task output metadata = %v, want allow", err)
+	}
+	if err := func() error {
+		_, err := env.boards.ReplaceBoardAccess(ctx, env.ws, boardID, env.owner, 2, boards.WorkspaceAccessNone, nil)
+		return err
+	}(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.media.AuthorizeAsset(ctx, env.ws, asset2.ID, env.member, "member", env.boards); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("revoked task Board reader = %v, want deny", err)
+	}
+}
+
+func pgAcceptOutputOrigin(t *testing.T, pool *pgxpool.Pool, env *accessPGEnv, taskID string, submitter int64, boardID string, asset *Asset) {
+	t.Helper()
+	ctx := t.Context()
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, service, workflow_input)
+  SELECT $1, w.internal_id, $2, b.internal_id, 'generation', jsonb_build_object('board_id', $5::text)
+  FROM workspaces AS w INNER JOIN billing_accounts AS b ON b.workspace_id=w.internal_id
+  WHERE w.public_id=$3 AND b.public_id=$4`,
+		taskID, submitter, env.ws, "ba_pg0000000000000001", boardID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dbsqlc.New(pool).InsertWorkspaceTaskOutput(ctx, dbsqlc.InsertWorkspaceTaskOutputParams{
+		PublicID: taskID, WorkspacePublicID: env.ws, OutputKind: "media_asset",
+		MediaAssetID: pgtype.Int8{Int64: asset.InternalID, Valid: true}, Metadata: []byte(`{}`),
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAccessPostgresListFilters(t *testing.T) {
+	env, ctx, _ := openAccessPGEnv(t)
+	mine := pgUploadComplete(t, ctx, env.media, env.ws, env.member, "")
+	pgUploadComplete(t, ctx, env.media, env.ws, env.owner, "")
+	page, err := env.media.ListAuthorizedAssets(ctx, env.ws, env.member, "member", env.boards, 10, 0)
+	if err != nil {
+		t.Fatalf("list = %v", err)
+	}
+	if len(page) != 1 || page[0].ID != mine.ID {
+		t.Fatalf("member list = %v, want only own asset", page)
+	}
+	all, err := env.media.ListAuthorizedAssets(ctx, env.ws, env.owner, "owner", env.boards, 10, 0)
+	if err != nil {
+		t.Fatalf("owner list = %v", err)
+	}
+	// Owner reads own asset; the member's asset stays hidden.
+	if len(all) != 1 {
+		t.Fatalf("owner list size = %d, want 1", len(all))
+	}
+	for _, a := range all {
+		if a.ID == mine.ID {
+			t.Fatalf("owner list leaked member asset %s", a.ID)
+		}
+	}
+}
+
+func TestAccessPostgresExistingDocumentReferencesBackfill(t *testing.T) {
+	env, ctx, pool := openAccessPGEnv(t)
+	assets := make([]*Asset, 6)
+	for i := range assets {
+		assets[i] = pgUploadComplete(t, ctx, env.media, env.ws, env.owner, "")
+	}
+	ref := func(i int) map[string]any { return map[string]any{"assetId": assets[i].ID} }
+	payload, err := json.Marshal(map[string]any{
+		"schemaVersion": 4,
+		"imageNodes":    []any{map[string]any{"sourceMediaRef": ref(0), "outputImages": []any{map[string]any{"mediaRef": ref(1)}}}},
+		"promptNodes":   []any{map[string]any{"inputImages": []any{map[string]any{"mediaRef": ref(2)}}, "prompt": assets[5].ID}},
+		"fusionNodes":   []any{map[string]any{"inputImages": []any{map[string]any{"mediaRef": ref(3)}}, "outputImages": []any{map[string]any{"mediaRef": ref(4)}}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	boardID, err := boards.NewV1BoardPublicID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.boards.CreateBoard(ctx, env.ws, env.owner, "existing", boardID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.boards.ReplaceBoardAccess(ctx, env.ws, boardID, env.owner, 1, boards.WorkspaceAccess(boards.RoleViewer), []int64{env.member}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.boards.ReplaceDocument(ctx, env.ws, boardID, env.owner, 1, 1, pgDocEnvelope(t)); err != nil {
+		t.Fatal(err)
+	}
+	migration, err := os.ReadFile(filepath.Join("..", "..", "db", "migrations", "20261017120000_board_media_access.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, backfill, ok := strings.Cut(string(migration), "WITH documents AS (")
+	if !ok {
+		t.Fatal("reference backfill statement missing")
+	}
+	envelope, err := json.Marshal(map[string]any{"schema_version": 1, "payload": json.RawMessage(payload)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, snapshot := range [][]byte{envelope, payload} {
+		if _, err := pool.Exec(ctx, `UPDATE board_documents SET snapshot_data=$1::jsonb`, snapshot); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `DELETE FROM board_document_media_refs`); err != nil {
+			t.Fatal(err)
+		}
+		for range 2 {
+			if _, err := pool.Exec(ctx, "WITH documents AS ("+backfill); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for i, asset := range assets {
+			_, err := env.media.AuthorizeAsset(ctx, env.ws, asset.ID, env.member, "member", env.boards)
+			if i < 5 && err != nil {
+				t.Fatalf("typed reference %d = %v, want allow", i, err)
+			}
+			if i == 5 && !errors.Is(err, ErrNotFound) {
+				t.Fatalf("free-text reference = %v, want deny", err)
+			}
+		}
+	}
+}

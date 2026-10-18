@@ -5,7 +5,6 @@ export const USER_LOGIN_PATH = '/user/login'
 export const USER_REGISTER_PATH = '/user/register'
 export const USER_BOARDS_PATH = '/user/boards'
 export const ADMIN_ROOT_PATH = '/admin'
-export const SHARE_JOIN_PATH = '/share'
 
 export function isPathUnderRoute(path: string, rootPath: string): boolean {
   const routePath = path.split(/[?#]/, 1)[0] || '/'

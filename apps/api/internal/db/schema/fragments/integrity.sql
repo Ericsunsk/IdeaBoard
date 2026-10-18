@@ -16,7 +16,6 @@ CREATE TRIGGER set_storage_profile_secret_versions_updated_at BEFORE UPDATE ON s
 CREATE TRIGGER set_feature_prompts_updated_at BEFORE UPDATE ON feature_prompts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_boards_updated_at BEFORE UPDATE ON boards FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_board_memberships_updated_at BEFORE UPDATE ON board_memberships FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER set_board_share_tokens_updated_at BEFORE UPDATE ON board_share_tokens FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 ALTER TABLE payment_webhook_events ADD CONSTRAINT payment_webhook_events_payment_order_id_fkey FOREIGN KEY (payment_order_id) REFERENCES payment_orders(id) ON DELETE RESTRICT;
 
 ALTER TABLE credit_transactions

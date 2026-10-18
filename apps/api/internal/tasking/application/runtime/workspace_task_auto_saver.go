@@ -52,10 +52,10 @@ func (s *workspaceTaskAutoSaver) SaveCompletedTask(ctx context.Context, task *wo
 		if ref.Kind != workspacetasks.OutputKindAsset || strings.TrimSpace(ref.AssetID) == "" {
 			continue
 		}
-		if saved, _, err := s.saver.SaveTaskOutputAsset(ctx, strings.TrimSpace(task.WorkspaceID), TaskOutputSaveInput{
+		if _, _, err := s.saver.SaveTaskOutputAsset(ctx, strings.TrimSpace(task.WorkspaceID), TaskOutputSaveInput{
 			TaskID: task.ID, ResultIndex: ref.ResultIndex,
 			MediaAssetID: strings.TrimSpace(ref.AssetID), OperatorUserID: task.OwnerUserID,
-		}); err != nil || saved == nil {
+		}); err != nil {
 			slog.Warn("task auto-save: Quick Saves save failed",
 				"task_id", task.ID, "result_index", ref.ResultIndex, "err", err)
 		}

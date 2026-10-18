@@ -600,6 +600,10 @@
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/api/upload.ts#assertWorkspaceId"]
       },
+      "isBoardPublicIdShape": {
+        "kind": "test-contract",
+        "evidence": ["src/api/upload.contract.spec.ts"]
+      },
       "mapWorkspaceUploadSessionStatus": {
         "kind": "canonical-public",
         "evidence": [
@@ -1759,12 +1763,6 @@
       "HOME_PATH": {
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/core/auth/routePolicy.ts#HOME_PATH"]
-      },
-      "SHARE_JOIN_PATH": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/core/auth/routePolicy.ts#SHARE_JOIN_PATH"
-        ]
       },
       "USER_BOARDS_PATH": {
         "kind": "canonical-public",
@@ -7406,12 +7404,6 @@
           "docs/frontend-seam-inventory.md: src/features/board/index.ts#InvalidBoardStateError"
         ]
       },
-      "JoinSharedBoardResult": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/index.ts#JoinSharedBoardResult"
-        ]
-      },
       "LatestBoardStateNormalizationOptions": {
         "kind": "canonical-public",
         "evidence": [
@@ -7786,12 +7778,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/board/index.ts#isCompleteBoardScope"
-        ]
-      },
-      "joinSharedBoardByToken": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/board/index.ts#joinSharedBoardByToken"
         ]
       },
       "listBoards": {
@@ -8487,6 +8473,20 @@
         ]
       }
     },
+    "src/features/board/session/adapters/boardsResource.ts": {
+      "BoardCatalogIncompleteError": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/session/adapters/boardsResource.unit.spec.ts"]
+      },
+      "BoardCatalogScopeChangedError": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/session/adapters/boardsResource.unit.spec.ts"]
+      },
+      "BoardPayloadError": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/session/adapters/boardsResourceShare.unit.spec.ts"]
+      }
+    },
     "src/features/board/session/catalog/boards.ts": {
       "BoardMeta": {
         "kind": "canonical-origin",
@@ -8737,14 +8737,22 @@
         "evidence": ["src/features/board/session/preview/thumbnailMedia.unit.spec.ts"]
       }
     },
-    "src/features/board/session/share-join/joinSharedBoardWorkflow.ts": {
-      "JoinSharedBoardResult": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/board/index.ts#JoinSharedBoardResult"]
+    "src/features/board/ui/gallery/range.ts": {
+      "isPersonalBoard": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/ui/gallery/range.unit.spec.ts"]
       },
-      "joinSharedBoardByToken": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/board/index.ts#joinSharedBoardByToken"]
+      "isTeamBoard": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/ui/gallery/range.unit.spec.ts"]
+      },
+      "persistGalleryRange": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/ui/gallery/range.unit.spec.ts"]
+      },
+      "readPersistedGalleryRange": {
+        "kind": "test-contract",
+        "evidence": ["src/features/board/ui/gallery/range.unit.spec.ts"]
       }
     },
     "src/features/board/ui/gallery/skin.ts": {
@@ -13808,12 +13816,6 @@
           "docs/frontend-seam-inventory.md: src/features/workspace/routePaths.ts#HOME_PATH"
         ]
       },
-      "SHARE_JOIN_PATH": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/routePaths.ts#SHARE_JOIN_PATH"
-        ]
-      },
       "USER_AUTH_CALLBACK_PATH": {
         "kind": "canonical-public",
         "evidence": [
@@ -13921,6 +13923,12 @@
       "useWorkspaceSelection": {
         "kind": "canonical-origin",
         "evidence": ["src/features/workspace/index.ts#useWorkspaceSelection"]
+      }
+    },
+    "src/features/workspace/selection/workspaceMembersResource.ts": {
+      "WorkspaceMemberPayloadError": {
+        "kind": "test-contract",
+        "evidence": ["src/features/workspace/selection/workspaceMembersResource.unit.spec.ts"]
       }
     },
     "src/features/workspace/selection/workspaceResource.ts": {
@@ -15775,12 +15783,8 @@
       "exports": ["UploadControlBrandingLogoBody"]
     },
     "src/api/generated-query/public/boards/boards.ts": {
-      "sha256": "03bc235bb846e86a0b4f0ad6d43989c8c7232446cba384236e567f6168df712a",
+      "sha256": "c43a3fbbab468ce2cfaafd02c2b4d4b44ded821ea7f89eb8a19a4d88d5d90182",
       "exports": [
-        "AddBoardMemberMutationBody",
-        "AddBoardMemberMutationError",
-        "AddBoardMemberMutationResult",
-        "AddBoardMemberMutationVariables",
         "ArchiveBoardMutationError",
         "ArchiveBoardMutationResult",
         "ArchiveBoardMutationVariables",
@@ -15788,31 +15792,18 @@
         "CreateBoardMutationError",
         "CreateBoardMutationResult",
         "CreateBoardMutationVariables",
-        "CreateShareTokenMutationBody",
-        "CreateShareTokenMutationError",
-        "CreateShareTokenMutationResult",
-        "CreateShareTokenMutationVariables",
+        "GetBoardAccessQueryError",
+        "GetBoardAccessQueryResult",
         "GetBoardDocumentQueryError",
         "GetBoardDocumentQueryResult",
         "GetBoardQueryError",
         "GetBoardQueryResult",
         "GetBoardRevisionQueryError",
         "GetBoardRevisionQueryResult",
-        "JoinBoardByTokenMutationBody",
-        "JoinBoardByTokenMutationError",
-        "JoinBoardByTokenMutationResult",
-        "JoinBoardByTokenMutationVariables",
-        "ListBoardMembersQueryError",
-        "ListBoardMembersQueryResult",
         "ListBoardRevisionsQueryError",
         "ListBoardRevisionsQueryResult",
         "ListBoardsQueryError",
         "ListBoardsQueryResult",
-        "ListShareTokensQueryError",
-        "ListShareTokensQueryResult",
-        "RemoveBoardMemberMutationError",
-        "RemoveBoardMemberMutationResult",
-        "RemoveBoardMemberMutationVariables",
         "ReplaceBoardDocumentMutationBody",
         "ReplaceBoardDocumentMutationError",
         "ReplaceBoardDocumentMutationResult",
@@ -15820,36 +15811,29 @@
         "RestoreBoardMutationError",
         "RestoreBoardMutationResult",
         "RestoreBoardMutationVariables",
-        "RevokeShareTokenMutationError",
-        "RevokeShareTokenMutationResult",
-        "RevokeShareTokenMutationVariables",
-        "UpdateBoardMemberMutationBody",
-        "UpdateBoardMemberMutationError",
-        "UpdateBoardMemberMutationResult",
-        "UpdateBoardMemberMutationVariables",
+        "UpdateBoardAccessMutationBody",
+        "UpdateBoardAccessMutationError",
+        "UpdateBoardAccessMutationResult",
+        "UpdateBoardAccessMutationVariables",
         "UpdateBoardMutationBody",
         "UpdateBoardMutationError",
         "UpdateBoardMutationResult",
         "UpdateBoardMutationVariables",
-        "addBoardMember",
         "archiveBoard",
         "createBoard",
-        "createShareToken",
-        "getAddBoardMemberMutationKey",
-        "getAddBoardMemberMutationOptions",
-        "getAddBoardMemberUrl",
         "getArchiveBoardMutationKey",
         "getArchiveBoardMutationOptions",
         "getArchiveBoardUrl",
         "getBoard",
+        "getBoardAccess",
         "getBoardDocument",
         "getBoardRevision",
         "getCreateBoardMutationKey",
         "getCreateBoardMutationOptions",
         "getCreateBoardUrl",
-        "getCreateShareTokenMutationKey",
-        "getCreateShareTokenMutationOptions",
-        "getCreateShareTokenUrl",
+        "getGetBoardAccessQueryKey",
+        "getGetBoardAccessQueryOptions",
+        "getGetBoardAccessUrl",
         "getGetBoardDocumentQueryKey",
         "getGetBoardDocumentQueryOptions",
         "getGetBoardDocumentUrl",
@@ -15859,81 +15843,51 @@
         "getGetBoardRevisionQueryOptions",
         "getGetBoardRevisionUrl",
         "getGetBoardUrl",
-        "getJoinBoardByTokenMutationKey",
-        "getJoinBoardByTokenMutationOptions",
-        "getJoinBoardByTokenUrl",
-        "getListBoardMembersQueryKey",
-        "getListBoardMembersQueryOptions",
-        "getListBoardMembersUrl",
         "getListBoardRevisionsQueryKey",
         "getListBoardRevisionsQueryOptions",
         "getListBoardRevisionsUrl",
         "getListBoardsQueryKey",
         "getListBoardsQueryOptions",
         "getListBoardsUrl",
-        "getListShareTokensQueryKey",
-        "getListShareTokensQueryOptions",
-        "getListShareTokensUrl",
-        "getRemoveBoardMemberMutationKey",
-        "getRemoveBoardMemberMutationOptions",
-        "getRemoveBoardMemberUrl",
         "getReplaceBoardDocumentMutationKey",
         "getReplaceBoardDocumentMutationOptions",
         "getReplaceBoardDocumentUrl",
         "getRestoreBoardMutationKey",
         "getRestoreBoardMutationOptions",
         "getRestoreBoardUrl",
-        "getRevokeShareTokenMutationKey",
-        "getRevokeShareTokenMutationOptions",
-        "getRevokeShareTokenUrl",
-        "getUpdateBoardMemberMutationKey",
-        "getUpdateBoardMemberMutationOptions",
-        "getUpdateBoardMemberUrl",
+        "getUpdateBoardAccessMutationKey",
+        "getUpdateBoardAccessMutationOptions",
+        "getUpdateBoardAccessUrl",
         "getUpdateBoardMutationKey",
         "getUpdateBoardMutationOptions",
         "getUpdateBoardUrl",
-        "joinBoardByToken",
-        "listBoardMembers",
         "listBoardRevisions",
         "listBoards",
-        "listShareTokens",
-        "removeBoardMember",
         "replaceBoardDocument",
         "restoreBoard",
-        "revokeShareToken",
         "updateBoard",
-        "updateBoardMember",
-        "useAddBoardMember",
+        "updateBoardAccess",
         "useArchiveBoard",
         "useCreateBoard",
-        "useCreateShareToken",
         "useGetBoard",
+        "useGetBoardAccess",
         "useGetBoardDocument",
         "useGetBoardRevision",
-        "useJoinBoardByToken",
-        "useListBoardMembers",
         "useListBoardRevisions",
         "useListBoards",
-        "useListShareTokens",
-        "useRemoveBoardMember",
         "useReplaceBoardDocument",
         "useRestoreBoard",
-        "useRevokeShareToken",
         "useUpdateBoard",
-        "useUpdateBoardMember"
+        "useUpdateBoardAccess"
       ]
     },
     "src/api/generated-query/public/index.ts": {
       "sha256": "2383b9206ab51dcfcb0088f473d22e6ca2bd1115d957a3ae236bd420ebf58eda",
       "exports": []
     },
-    "src/api/generated-query/public/model/addBoardMemberRequest.ts": {
-      "sha256": "e22b7b51a9f36c306582242c82937b4cd99f8b5f968ef718a86ea6b957742b4d",
-      "exports": ["AddBoardMemberRequest"]
-    },
-    "src/api/generated-query/public/model/addBoardMemberRequestData.ts": {
-      "sha256": "cd5feb0ef52a976fa0c216ed7138b1c219a6ad9592fddfe34cd0304f875b6229",
-      "exports": ["AddBoardMemberRequestData"]
+    "src/api/generated-query/public/model/accessIfMatchParameter.ts": {
+      "sha256": "49dc1a36bfbb52d04e445a27bcd8c075e0ab64e5741cffaa2584d5449ce57bb0",
+      "exports": ["AccessIfMatchParameter"]
     },
     "src/api/generated-query/public/model/addWorkspaceMemberRequest.ts": {
       "sha256": "e0717ad9fae4b35739a739670494d709f3a25d8b9b774336de8aeff958821afc",
@@ -15980,8 +15934,24 @@
       "exports": ["BillingRecordKind"]
     },
     "src/api/generated-query/public/model/board.ts": {
-      "sha256": "3a97835093a265d6191d2ca997907451a47839ca8826b8226ddc384a2bdd3fe4",
+      "sha256": "2c63216bea4c701694881d2addf2b94b27b4c0963b3f1589ed3c22615d7c25cf",
       "exports": ["Board"]
+    },
+    "src/api/generated-query/public/model/boardAccess.ts": {
+      "sha256": "4faa6c4b7ff645caafd2de94e8f1d324cc317db3b07ad2c004da0f6883b8f87d",
+      "exports": ["BoardAccess"]
+    },
+    "src/api/generated-query/public/model/boardAccessEnvelope.ts": {
+      "sha256": "920f3f02186bd237831efda10f2cd04fae0fab0c7e1e425334784b9de59e6b06",
+      "exports": ["BoardAccessEnvelope"]
+    },
+    "src/api/generated-query/public/model/boardAccessState.ts": {
+      "sha256": "4b76d3e2fc1e58e8d9076c2fed9b6882e01f811a134deaf38d9aeb73de7f33e7",
+      "exports": ["BoardAccessState"]
+    },
+    "src/api/generated-query/public/model/boardCapabilities.ts": {
+      "sha256": "e3f6c11881ed1b49d997a712b2c7ca5bd6a6d928d8811431d60df7c702cc4275",
+      "exports": ["BoardCapabilities"]
     },
     "src/api/generated-query/public/model/boardDocument.ts": {
       "sha256": "de1c5fb5e280b58709bea30a94eb098f7c81d5b1218142f452268514bc98936d",
@@ -16007,21 +15977,13 @@
       "sha256": "1ef810784fe098d7eb5cf2e051de7115878f94261cc292b0076fa387b4be2599",
       "exports": ["BoardId"]
     },
-    "src/api/generated-query/public/model/boardMember.ts": {
-      "sha256": "462ef6ccf86165639d939323f5a91d0a51047c35a3913fb0b92c1ab8fca5d5d1",
-      "exports": ["BoardMember"]
-    },
-    "src/api/generated-query/public/model/boardMemberEnvelope.ts": {
-      "sha256": "7a1be0ccf1ac8a5ea38f8e81e77e8d9c9da642ea9c7269e8790e90aca129412d",
-      "exports": ["BoardMemberEnvelope"]
-    },
-    "src/api/generated-query/public/model/boardMemberList.ts": {
-      "sha256": "0b609f5ad4830947af5a836edcd69c7b3eff905c1edc8d07922cd31a76332f29",
-      "exports": ["BoardMemberList"]
-    },
     "src/api/generated-query/public/model/boardPreviewScene.ts": {
       "sha256": "b94745b680f660491939ac1cd36ac21510cb4784225a2384ebf38fed0d20b7da",
       "exports": ["BoardPreviewScene"]
+    },
+    "src/api/generated-query/public/model/boardRelationship.ts": {
+      "sha256": "9ce4428074ad9fb2c21225d79ad2b4e9143e0d6aba7d562c9616007be1ccbc0e",
+      "exports": ["BoardRelationship"]
     },
     "src/api/generated-query/public/model/boardRevision.ts": {
       "sha256": "38dc472f243900cd6b9147387e50d8940918e4416a7ac0403679d13b16a3b541",
@@ -16038,22 +16000,6 @@
     "src/api/generated-query/public/model/boardRevisionDetailSnapshot.ts": {
       "sha256": "5a6e60d601b688b4c4f3a3ef9ac928e03a80e452bd1181d201d6a5f34f3bcf14",
       "exports": ["BoardRevisionDetailSnapshot"]
-    },
-    "src/api/generated-query/public/model/boardRole.ts": {
-      "sha256": "edf762c361ef3fe04ba4b96a9112d2944dce068864c5f56398c98c606ccf6c27",
-      "exports": ["BoardRole"]
-    },
-    "src/api/generated-query/public/model/boardShareToken.ts": {
-      "sha256": "02f80a5b39afb17dfe42a283487ed537cd121b37618b553a7ca4c0f94499b5e3",
-      "exports": ["BoardShareToken"]
-    },
-    "src/api/generated-query/public/model/boardShareTokenEnvelope.ts": {
-      "sha256": "f59197a682c2899a25f1b3af437006ab87a3cd89df4b3b7d07017fa2a4ae872f",
-      "exports": ["BoardShareTokenEnvelope"]
-    },
-    "src/api/generated-query/public/model/boardShareTokenList.ts": {
-      "sha256": "1dbf4ca5ee4097d3015bb6b20a2b84c2c8a8d306559c1d38ecce0274e3641853",
-      "exports": ["BoardShareTokenList"]
     },
     "src/api/generated-query/public/model/cancelWorkspaceTaskRequest.ts": {
       "sha256": "334b33cfcd92617b96cb4097a9661f15be0ecb39efa093d34b47be07e81f0643",
@@ -16119,20 +16065,12 @@
       "sha256": "2bd0e7cc4624cd45f25a74f7dd2af8848bdafc81ae409e3e6fb15cd8249e40c8",
       "exports": ["CreateOrganizationWorkspaceRequestData"]
     },
-    "src/api/generated-query/public/model/createShareTokenRequest.ts": {
-      "sha256": "da2df42fee4a0b89286fdc64964d55867491eccda1b771956714fb9b052c7d9b",
-      "exports": ["CreateShareTokenRequest"]
-    },
-    "src/api/generated-query/public/model/createShareTokenRequestData.ts": {
-      "sha256": "300104f85722fbaad15c6c97a1b9a8884ebb2b2baa04ae773927edb5213facbd",
-      "exports": ["CreateShareTokenRequestData"]
-    },
     "src/api/generated-query/public/model/createUploadRequest.ts": {
       "sha256": "cfe95cb86c28b2afefdbe22b066cecbc67bbbc204c545f6f5dfedb73d1ddf353",
       "exports": ["CreateUploadRequest"]
     },
     "src/api/generated-query/public/model/createUploadRequestData.ts": {
-      "sha256": "94ee78d7ec0f9202f7b8b7cd09744ab2f9b71b5fbb72070fe2898db4a3cff24e",
+      "sha256": "307b770ce36d89c53b7ccdaa9e87686aaba0978735d2b0f9058baa5f221af6bf",
       "exports": ["CreateUploadRequestData"]
     },
     "src/api/generated-query/public/model/createUploadRequestDataMediaKind.ts": {
@@ -16172,7 +16110,7 @@
       "exports": ["CreateWorkspaceTaskRequest"]
     },
     "src/api/generated-query/public/model/createWorkspaceTaskRequestData.ts": {
-      "sha256": "081ec3dbac4057bfcc60492ec6f8f1936ec764871ae4c6f7647ba5e0fad78757",
+      "sha256": "8c36b827780ceb14fcf9063f9e9b0d321244306dd0847f7188efb646653674e5",
       "exports": ["CreateWorkspaceTaskRequestData"]
     },
     "src/api/generated-query/public/model/createWorkspaceTaskRequestDataInputs.ts": {
@@ -16272,16 +16210,260 @@
       "exports": ["IfMatchParameter"]
     },
     "src/api/generated-query/public/model/index.ts": {
-      "sha256": "7f0b08e822e8d9570d3749afefa3d8f069ed0a47af5f0d4a2d6ca1dd7912fbad",
-      "exports": []
-    },
-    "src/api/generated-query/public/model/joinBoardRequest.ts": {
-      "sha256": "43e1772dffce9bf0e39a13c193cc1bdef8f5adb44a88254d99e862b0973718fd",
-      "exports": ["JoinBoardRequest"]
-    },
-    "src/api/generated-query/public/model/joinBoardRequestData.ts": {
-      "sha256": "ca9c0c19e13a30e348bf40961748bab0c249ed67ae7bb67d4d595e388621da61",
-      "exports": ["JoinBoardRequestData"]
+      "sha256": "976c3e141846ee9b61e6a31f037c06c7f81aaeb851e6fbf3f9625038ac140f50",
+      "exports": [
+        "AccessIfMatchParameter",
+        "AddWorkspaceMemberRequest",
+        "AddWorkspaceMemberRequestData",
+        "AvatarUploadResult",
+        "AvatarUploadResultEnvelope",
+        "BadRequestResponse",
+        "BatchGetMediaAssetsRequest",
+        "BatchGetMediaAssetsRequestData",
+        "BatchGetMediaAssetsResult",
+        "BatchGetMediaAssetsResultEnvelope",
+        "BillingRecord",
+        "BillingRecordKind",
+        "Board",
+        "BoardAccess",
+        "BoardAccessEnvelope",
+        "BoardAccessState",
+        "BoardCapabilities",
+        "BoardDocument",
+        "BoardDocumentDocument",
+        "BoardDocumentEnvelope",
+        "BoardDocumentPreviewScene",
+        "BoardEnvelope",
+        "BoardId",
+        "BoardPreviewScene",
+        "BoardRelationship",
+        "BoardRevision",
+        "BoardRevisionDetail",
+        "BoardRevisionDetailEnvelope",
+        "BoardRevisionDetailSnapshot",
+        "CancelWorkspaceTaskRequest",
+        "CancelWorkspaceTaskRequestData",
+        "CompleteUploadEnvelope",
+        "CompleteUploadRequest",
+        "CompleteUploadRequestData",
+        "CompleteUploadRequestDataMediaKind",
+        "CompleteUploadResult",
+        "ConflictResponse",
+        "CreateBoardRequest",
+        "CreateBoardRequestData",
+        "CreateLibraryFolderRequest",
+        "CreateLibraryFolderRequestData",
+        "CreateOrganizationRequest",
+        "CreateOrganizationRequestData",
+        "CreateOrganizationWorkspaceRequest",
+        "CreateOrganizationWorkspaceRequestData",
+        "CreateUploadRequest",
+        "CreateUploadRequestData",
+        "CreateUploadRequestDataMediaKind",
+        "CreateWorkspaceBillingQuoteRequest",
+        "CreateWorkspaceBillingQuoteRequestData",
+        "CreateWorkspaceBillingQuoteRequestDataOutputResolution",
+        "CreateWorkspaceCheckoutRequest",
+        "CreateWorkspaceCheckoutRequestData",
+        "CreateWorkspaceRequest",
+        "CreateWorkspaceRequestData",
+        "CreateWorkspaceTaskRequest",
+        "CreateWorkspaceTaskRequestData",
+        "CreateWorkspaceTaskRequestDataInputs",
+        "CreateWorkspaceTaskRequestDataParams",
+        "CreateWorkspaceVisionQueryRequest",
+        "CreateWorkspaceVisionQueryRequestData",
+        "CreditsLedgerEntry",
+        "CreditsLedgerEntryCommandType",
+        "CursorParameter",
+        "DeletedEnvelope",
+        "DeletedEnvelopeData",
+        "DerivativeWorkspaceLibraryAssetParams",
+        "ErrorEnvelope",
+        "ErrorEnvelopeError",
+        "ErrorEnvelopeErrorDetails",
+        "EventId",
+        "ExternalLibraryAsset",
+        "ExternalLibraryAssetSource",
+        "ForbiddenResponse",
+        "GetPublicBrandingLogoParams",
+        "GetPublicUserAvatarParams",
+        "GetPublicUserAvatarSize",
+        "GetWorkspaceUsageParams",
+        "GetWorkspaceUsageRange",
+        "IdempotencyKeyParameter",
+        "IfMatchParameter",
+        "LibraryAsset",
+        "LibraryAssetEnvelope",
+        "LibraryAssetId",
+        "LibraryAssetProvider",
+        "LibraryFolder",
+        "LibraryFolderEnvelope",
+        "LibraryFolderId",
+        "ListBoardRevisionsParams",
+        "ListBoardsParams",
+        "ListOrganizationsParams",
+        "ListWorkspaceBillingRecordsParams",
+        "ListWorkspaceCreditsLedgerParams",
+        "ListWorkspaceLibraryAssetsParams",
+        "ListWorkspaceLibraryFoldersParams",
+        "ListWorkspaceMediaAssetsParams",
+        "ListWorkspaceRechargesParams",
+        "ListWorkspaceRewardRedemptionsParams",
+        "ListWorkspaceTasksParams",
+        "ListWorkspacesParams",
+        "LookupWorkspaceMemberByEmailParams",
+        "MediaAsset",
+        "MediaAssetDerivatives",
+        "MediaAssetEnvelope",
+        "MediaAssetId",
+        "MediaAssetMediaKind",
+        "MediaAssetStatus",
+        "MediaDerivative",
+        "MediaDerivativeStatus",
+        "MediaDisplay",
+        "MediaDisplayVariant",
+        "MediaDisplayVariantMaxSide",
+        "MediaDisplayVariantTier",
+        "MediaLibraryAsset",
+        "MediaLibraryAssetSource",
+        "MemberLookupEmailParameter",
+        "MembershipRole",
+        "MoveLibraryAssetRequest",
+        "MoveLibraryAssetRequestData",
+        "NotFoundResponse",
+        "Organization",
+        "OrganizationEnvelope",
+        "OrganizationId",
+        "PageSizeParameter",
+        "PaginatedBillingRecords",
+        "PaginatedBoardRevisions",
+        "PaginatedBoards",
+        "PaginatedCreditsLedger",
+        "PaginatedLibraryAssets",
+        "PaginatedLibraryFolders",
+        "PaginatedMediaAssets",
+        "PaginatedOrganizations",
+        "PaginatedWorkspaceRecharges",
+        "PaginatedWorkspaceRewardRedemptions",
+        "PaginatedWorkspaceSearchResults",
+        "PaginatedWorkspaceTasks",
+        "PaginatedWorkspaces",
+        "PaginationMeta",
+        "PreconditionFailedResponse",
+        "PreconditionRequiredResponse",
+        "QuoteWorkspaceTaskRequest",
+        "QuoteWorkspaceTaskRequestData",
+        "RedeemWorkspaceRewardRequest",
+        "RedeemWorkspaceRewardRequestData",
+        "RedeemWorkspaceRewardResult",
+        "RedeemWorkspaceRewardResultEnvelope",
+        "RenameLibraryFolderRequest",
+        "RenameLibraryFolderRequestData",
+        "ReplaceBoardDocumentRequest",
+        "ReplaceBoardDocumentRequestData",
+        "ReplaceBoardDocumentRequestDataPayload",
+        "RequestIdParameter",
+        "ResolveLibraryAssetItem",
+        "ResolveLibraryAssetResult",
+        "ResolveLibraryAssetResultStatus",
+        "ResolveLibraryAssetsEnvelope",
+        "ResolveLibraryAssetsRequest",
+        "ResolveLibraryAssetsRequestData",
+        "ResolveLibraryAssetsResult",
+        "SaveExternalLibraryAssetData",
+        "SaveExternalLibraryAssetDataSource",
+        "SaveLibraryAssetRequest",
+        "SaveMediaLibraryAssetData",
+        "SaveMediaLibraryAssetDataSource",
+        "SearchWorkspaceParams",
+        "SearchWorkspaceProviderItem",
+        "Service",
+        "SuccessEnvelope",
+        "SuccessEnvelopeData",
+        "SuccessEnvelopeMeta",
+        "SupportChannel",
+        "SupportChannelKind",
+        "SupportChannelsSetting",
+        "SupportChannelsSettingEnvelope",
+        "TaskBillingSnapshot",
+        "TaskBillingSnapshotEnvelope",
+        "TaskEnvelope",
+        "TaskId",
+        "TaskOutputKind",
+        "TaskOutputRef",
+        "TaskSettlementState",
+        "TaskStatus",
+        "UnauthorizedResponse",
+        "UnprocessableEntityResponse",
+        "UpdateBoardAccessRequest",
+        "UpdateBoardAccessRequestData",
+        "UpdateBoardRequest",
+        "UpdateBoardRequestData",
+        "UpdateOrganizationRequest",
+        "UpdateOrganizationRequestData",
+        "UpdateWorkspaceMemberRequest",
+        "UpdateWorkspaceMemberRequestData",
+        "UpdateWorkspaceRequest",
+        "UpdateWorkspaceRequestData",
+        "UploadId",
+        "UploadSession",
+        "UploadSessionEnvelope",
+        "UploadSessionMediaKind",
+        "UploadSessionStatus",
+        "UploadTarget",
+        "UploadTargetKind",
+        "User",
+        "UserEnvelope",
+        "UserId",
+        "UserRole",
+        "VisionQueryId",
+        "Workspace",
+        "WorkspaceAccess",
+        "WorkspaceBillingAccount",
+        "WorkspaceBillingAccountEnvelope",
+        "WorkspaceBillingAccountOwnerType",
+        "WorkspaceBillingQuote",
+        "WorkspaceBillingQuoteEnvelope",
+        "WorkspaceCheckoutSession",
+        "WorkspaceCheckoutSessionEnvelope",
+        "WorkspaceCreditsBalance",
+        "WorkspaceCreditsBalanceEnvelope",
+        "WorkspaceCreditsBalanceStatus",
+        "WorkspaceEnvelope",
+        "WorkspaceId",
+        "WorkspaceList",
+        "WorkspaceMember",
+        "WorkspaceMemberEnvelope",
+        "WorkspaceMemberList",
+        "WorkspaceMemberLookup",
+        "WorkspaceMemberLookupEnvelope",
+        "WorkspacePendingOrder",
+        "WorkspacePendingOrderEnvelope",
+        "WorkspacePendingOrderList",
+        "WorkspacePendingOrderListEnvelope",
+        "WorkspacePendingOrderStatus",
+        "WorkspacePurchaseOptions",
+        "WorkspacePurchaseOptionsEnvelope",
+        "WorkspacePurchaseOptionsRefundPolicy",
+        "WorkspacePurchaseOptionsTerms",
+        "WorkspaceRechargeHistoryItem",
+        "WorkspaceRechargeHistoryItemStatus",
+        "WorkspaceRewardRedemption",
+        "WorkspaceRewardRedemptionHistoryItem",
+        "WorkspaceSearchResult",
+        "WorkspaceTask",
+        "WorkspaceTaskOutputs",
+        "WorkspaceTaskOutputsEnvelope",
+        "WorkspaceUsage",
+        "WorkspaceUsageEnvelope",
+        "WorkspaceUsageLifetime",
+        "WorkspaceUsageTimezone",
+        "WorkspaceUsageTrendItem",
+        "WorkspaceVisionQuery",
+        "WorkspaceVisionQueryEnvelope",
+        "WorkspaceVisionQueryStatus"
+      ]
     },
     "src/api/generated-query/public/model/libraryAsset.ts": {
       "sha256": "774a22db6f55a89dc10b3e823a992ae0c3ca375f1afdc137046f69f7e836c095",
@@ -16367,6 +16549,10 @@
       "sha256": "306e81c7a656a70f9cdb5ca22b973b0cc2cbf4f1ad4b79fb352c885ed19cd48e",
       "exports": ["MediaLibraryAssetSource"]
     },
+    "src/api/generated-query/public/model/lookupWorkspaceMemberByEmailParams.ts": {
+      "sha256": "eb1b629398ee4de6fc567a4b61c48b0518fa553bbdc33b96ecf877358a089f41",
+      "exports": ["LookupWorkspaceMemberByEmailParams"]
+    },
     "src/api/generated-query/public/model/mediaAsset.ts": {
       "sha256": "f8743fb1099b7d28244a8f003094cb34f5ac0251ec060a23e58e4a404d38a806",
       "exports": ["MediaAsset"]
@@ -16414,6 +16600,10 @@
     "src/api/generated-query/public/model/mediaDisplayVariantTier.ts": {
       "sha256": "a6473569a7c051006d7d22711a9267e0ee9313637df1024b49b3574733567ddc",
       "exports": ["MediaDisplayVariantTier"]
+    },
+    "src/api/generated-query/public/model/memberLookupEmailParameter.ts": {
+      "sha256": "bd86e54d2cb76ac7f1a2764e1b94e7e7bdf04c0092ee43aa8937c4d82250bfc1",
+      "exports": ["MemberLookupEmailParameter"]
     },
     "src/api/generated-query/public/model/membershipRole.ts": {
       "sha256": "af1ac52587d90c07f3e30a51308d69055dcd111f50d7130ecc9bcedb89af8ba5",
@@ -16502,6 +16692,14 @@
     "src/api/generated-query/public/model/paginationMeta.ts": {
       "sha256": "149a281a793714a2495b18fe01be7fcc37d66992c98b4a05cb53e09bef730a4e",
       "exports": ["PaginationMeta"]
+    },
+    "src/api/generated-query/public/model/preconditionFailedResponse.ts": {
+      "sha256": "03458bd17931d7b77f66338ac7827dbfedce6e08609adf1c53184ce4220b8daa",
+      "exports": ["PreconditionFailedResponse"]
+    },
+    "src/api/generated-query/public/model/preconditionRequiredResponse.ts": {
+      "sha256": "8c7d3d391ed79ac687f3a955332bb3c526867c89e042a9ce5f915fbd02dc7fa9",
+      "exports": ["PreconditionRequiredResponse"]
     },
     "src/api/generated-query/public/model/quoteWorkspaceTaskRequest.ts": {
       "sha256": "a65401d028588cfa6545fc382da071404b3899eb0e852e5391b249e3756f5370",
@@ -16611,14 +16809,6 @@
       "sha256": "d5fc4a96a644ee89616b9f000d7428d19cfed257f81de8a30d12bc739b3aaf3c",
       "exports": ["Service"]
     },
-    "src/api/generated-query/public/model/shareRole.ts": {
-      "sha256": "78baf9262b7a029d9770b3fe4df5e2924878a121264878b3d707075152058863",
-      "exports": ["ShareRole"]
-    },
-    "src/api/generated-query/public/model/shareTokenId.ts": {
-      "sha256": "652c4d0539a17e97c6564895c76cd83ace062f6f5d7a9c533a14fbf58f6671af",
-      "exports": ["ShareTokenId"]
-    },
     "src/api/generated-query/public/model/successEnvelope.ts": {
       "sha256": "adbebe8277c583bbba9ba94f810cdc4b8c948b286c7ef40982971a86db846745",
       "exports": ["SuccessEnvelope"]
@@ -16687,13 +16877,13 @@
       "sha256": "f8e5afde2a5706d4c4945a9e686a6de7052a6c064e9f8ea362aa2e42fcbffe7a",
       "exports": ["UnprocessableEntityResponse"]
     },
-    "src/api/generated-query/public/model/updateBoardMemberRequest.ts": {
-      "sha256": "6475afbd592ed4dae6f388484523a1a474b48c8e5a81b144ae9d5410d5110617",
-      "exports": ["UpdateBoardMemberRequest"]
+    "src/api/generated-query/public/model/updateBoardAccessRequest.ts": {
+      "sha256": "c23fd3832075beac7e5c15a13a00cb3fced925e4764aa22131080c5e7f43b0f9",
+      "exports": ["UpdateBoardAccessRequest"]
     },
-    "src/api/generated-query/public/model/updateBoardMemberRequestData.ts": {
-      "sha256": "8a25950be03e1ec4d183b63401d10b533b830958778649aa4ee245508a7e95bb",
-      "exports": ["UpdateBoardMemberRequestData"]
+    "src/api/generated-query/public/model/updateBoardAccessRequestData.ts": {
+      "sha256": "b8d44ac82e798c4aaa22b1f40d9edd15bf1b71d113a0d79e4ae12ae2c83329e6",
+      "exports": ["UpdateBoardAccessRequestData"]
     },
     "src/api/generated-query/public/model/updateBoardRequest.ts": {
       "sha256": "d22fa4ad3132966ef3b20c8a015788742fd1260bbf49c890f50981af62e07935",
@@ -16779,6 +16969,10 @@
       "sha256": "18c94e90d81aafb2ec2cd414a1632e91d10d24a81e30877ca9201ff7bf5f220c",
       "exports": ["Workspace"]
     },
+    "src/api/generated-query/public/model/workspaceAccess.ts": {
+      "sha256": "7e152ff459abb705b5879bfaf2cea2113e4230fd7f0dcd601325eaed44f35c40",
+      "exports": ["WorkspaceAccess"]
+    },
     "src/api/generated-query/public/model/workspaceBillingAccount.ts": {
       "sha256": "71f1de4827230c3555b5b8a01c361bcd098253b6442c7abf6c88254c4449e9a5",
       "exports": ["WorkspaceBillingAccount"]
@@ -16832,7 +17026,7 @@
       "exports": ["WorkspaceList"]
     },
     "src/api/generated-query/public/model/workspaceMember.ts": {
-      "sha256": "bfeaa425a6ae098472fe4ab58c13caa599d1fea7356d529255d5876d8f6f7c67",
+      "sha256": "ac192a6fca98d6e4ab7d58be6e1048458ad291af8500c124e3919b112fa0b958",
       "exports": ["WorkspaceMember"]
     },
     "src/api/generated-query/public/model/workspaceMemberEnvelope.ts": {
@@ -16842,6 +17036,14 @@
     "src/api/generated-query/public/model/workspaceMemberList.ts": {
       "sha256": "a43fd00af154fb3a38fa668614a15429e40c082e08c325c1b822bfd8d2c48b39",
       "exports": ["WorkspaceMemberList"]
+    },
+    "src/api/generated-query/public/model/workspaceMemberLookup.ts": {
+      "sha256": "2669ca96479f334ec633c8719ea6d9aff05a0897a4701551a85f986e5ebf97f9",
+      "exports": ["WorkspaceMemberLookup"]
+    },
+    "src/api/generated-query/public/model/workspaceMemberLookupEnvelope.ts": {
+      "sha256": "31ce2f3c6de480b92f73d4f45ad5af5378b4c26d6b02712e77f15ea879b57904",
+      "exports": ["WorkspaceMemberLookupEnvelope"]
     },
     "src/api/generated-query/public/model/workspacePendingOrder.ts": {
       "sha256": "730b28b308f01da655a2480ca33f98f64818bb74f8ddbc2cd4282733498a65b6",
@@ -16900,7 +17102,7 @@
       "exports": ["WorkspaceSearchResult"]
     },
     "src/api/generated-query/public/model/workspaceTask.ts": {
-      "sha256": "7682cda867853fbf25fb8fd7b84d8686c0c4e405e9240515143263795c592e8a",
+      "sha256": "55f8a40c5e1cc5da9cb0c3a6e881456f36832cc0776a4383f07f113864177e38",
       "exports": ["WorkspaceTask"]
     },
     "src/api/generated-query/public/model/workspaceTaskOutputs.ts": {
@@ -17312,7 +17514,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-members/workspace-members.ts": {
-      "sha256": "8e41897f5c83cb3ae731b8d6374af837c2bdd154dec274eb0abed3373ab6b9de",
+      "sha256": "416370348955241a5841958f8e5a2aa401b9b3dade3d7e4f44c9ee876bcc6d54",
       "exports": [
         "AddWorkspaceMemberMutationBody",
         "AddWorkspaceMemberMutationError",
@@ -17320,6 +17522,8 @@
         "AddWorkspaceMemberMutationVariables",
         "ListWorkspaceMembersQueryError",
         "ListWorkspaceMembersQueryResult",
+        "LookupWorkspaceMemberByEmailQueryError",
+        "LookupWorkspaceMemberByEmailQueryResult",
         "RemoveWorkspaceMemberMutationError",
         "RemoveWorkspaceMemberMutationResult",
         "RemoveWorkspaceMemberMutationVariables",
@@ -17334,6 +17538,9 @@
         "getListWorkspaceMembersQueryKey",
         "getListWorkspaceMembersQueryOptions",
         "getListWorkspaceMembersUrl",
+        "getLookupWorkspaceMemberByEmailQueryKey",
+        "getLookupWorkspaceMemberByEmailQueryOptions",
+        "getLookupWorkspaceMemberByEmailUrl",
         "getRemoveWorkspaceMemberMutationKey",
         "getRemoveWorkspaceMemberMutationOptions",
         "getRemoveWorkspaceMemberUrl",
@@ -17341,10 +17548,12 @@
         "getUpdateWorkspaceMemberMutationOptions",
         "getUpdateWorkspaceMemberUrl",
         "listWorkspaceMembers",
+        "lookupWorkspaceMemberByEmail",
         "removeWorkspaceMember",
         "updateWorkspaceMember",
         "useAddWorkspaceMember",
         "useListWorkspaceMembers",
+        "useLookupWorkspaceMemberByEmail",
         "useRemoveWorkspaceMember",
         "useUpdateWorkspaceMember"
       ]
@@ -17392,7 +17601,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-tasks/workspace-tasks.ts": {
-      "sha256": "7c6079881a7c7b61d71202b580bb24d01e4a6e9a3b021838ef1baf6e2f7b072e",
+      "sha256": "a13e64851988b2964a3880f407414633849044077785aaab16b4efc19ff66222",
       "exports": [
         "CancelWorkspaceTaskMutationBody",
         "CancelWorkspaceTaskMutationError",

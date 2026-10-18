@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"ideaboard/api/internal/events"
 )
 
 // Membership roles (agreed with the DB sibling stream).
@@ -13,6 +15,8 @@ const (
 	RoleAdmin  = "admin"
 	RoleMember = "member"
 )
+
+const MaxWorkspaceMembers = 5
 
 var (
 	// ErrNotFound reports an invisible or missing resource. Handlers render
@@ -27,6 +31,8 @@ var (
 	// ErrConflict reports a public_id collision during minting; callers
 	// retry with a fresh identifier.
 	ErrConflict = errors.New("tenancy: public id conflict")
+	// ErrWorkspaceMemberLimitReached includes every role, including owners.
+	ErrWorkspaceMemberLimitReached = errors.New("tenancy: workspace member limit reached")
 	// ErrInvalidName reports a display name outside 1..120 characters.
 	ErrInvalidName = errors.New("tenancy: name must be 1..120 characters")
 	// ErrWorkspaceOwnerRequired reports a workspace create without an
@@ -118,6 +124,18 @@ type Store interface {
 	OrganizationStore
 }
 
+// MemberGrantCleanup describes a Board access change caused by membership departure.
+type MemberGrantCleanup struct {
+	BoardPublicID string
+	AccessVersion int64
+	AccessSignals []events.BoardAccessOutboxRecord
+}
+
+// WorkspaceMemberGrantStore joins Board access cleanup to a membership departure.
+type WorkspaceMemberGrantStore interface {
+	RemoveWorkspaceMemberGrants(ctx context.Context, workspacePublicID string, userID int64) ([]MemberGrantCleanup, error)
+}
+
 // WorkspaceStore groups workspace and workspace-membership persistence.
 type WorkspaceStore interface {
 	GetWorkspace(ctx context.Context, publicID string) (*Workspace, error)
@@ -133,7 +151,7 @@ type WorkspaceStore interface {
 	ListWorkspaceMembers(ctx context.Context, workspacePublicID string) ([]*WorkspaceMember, error)
 	AddWorkspaceMember(ctx context.Context, workspacePublicID string, targetUserID int64, role string) (*WorkspaceMember, error)
 	UpdateWorkspaceMemberRole(ctx context.Context, workspacePublicID string, actorUserID, targetUserID int64, newRole string) (*WorkspaceMember, error)
-	RemoveWorkspaceMember(ctx context.Context, workspacePublicID string, actorUserID, targetUserID int64) error
+	RemoveWorkspaceMember(ctx context.Context, workspacePublicID string, actorUserID, targetUserID int64, grants WorkspaceMemberGrantStore) ([]MemberGrantCleanup, error)
 }
 
 // OrganizationStore groups organization and org-scoped workspace reads.

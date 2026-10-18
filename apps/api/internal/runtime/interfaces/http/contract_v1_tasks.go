@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/validation"
 	taskservice "ideaboard/api/internal/tasking/application/task"
@@ -115,6 +116,8 @@ func (h *contractV1Handler) taskService() *workspacetasks.Service {
 		Quoter:      h.deps.TaskQuoter,
 		Holder:      h.deps.TaskHolder, Queue: h.deps.TaskQueue, Assets: h.deps.TaskAssets,
 		Resolver: h.deps.TaskRouter, SnapshotSaver: h.deps.TaskSnapshotSaver,
+		Boards:     h.taskBoardsAuthorizer(),
+		Acceptance: &workspacemedia.TaskSubmissionAuthorizer{Boards: h.deps.Boards, TaskBoards: h.taskBoardsAuthorizer()},
 	}
 	if h.deps.AllowNonTransactionalTaskSettlement {
 		return workspacetasks.NewTestServiceForTests(deps)
@@ -153,6 +156,10 @@ func renderTaskError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, workspacetasks.ErrNotFound):
 		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, msgControlNotFound8)
+	case errors.Is(err, workspacetasks.ErrBoardNotFound):
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, msgBoardNotFound)
+	case errors.Is(err, workspacetasks.ErrBoardArchived):
+		contract.RenderError(c, contract.StatusOf(contract.CodeBoardArchived), contract.CodeBoardArchived, msgBoardArchived)
 	case errors.Is(err, workspacetasks.ErrForbidden):
 		contract.RenderError(c, http.StatusForbidden, contract.CodeTaskForbidden, msgForbidden)
 	case errors.Is(err, workspacetasks.ErrIdempotencyConflict):
@@ -214,6 +221,14 @@ func taskLocation(workspaceID, taskID string) string {
 // Generation snapshot (UserPrompt + CompiledPrompt) that the worker
 // bridges to the provider. The v1 mask rides params.mask_asset_id
 // (workspace public asset_... from the upload-session flow, inpaint only).
+//
+// The optional data.board_id binds a Canvas submit to its Board (#937):
+// the board_ public id is validated against the caller's live Board
+// posture (visible identity + generate capability) before any Quote/Hold,
+// and snapshots the Board access_version into the durable task binding.
+// Omitted Board IDs stay non-Canvas tasks with their own workspace-level
+// permission (submitter-only reads, never auto-published); callers must
+// never forge a Board attribution.
 type v1CreateTaskBody struct {
 	Data struct {
 		Service string `json:"service"`
@@ -224,24 +239,27 @@ type v1CreateTaskBody struct {
 		Params     map[string]any `json:"params"`
 		Quantity   *int64         `json:"quantity"`
 		Resolution *string        `json:"resolution"`
+		BoardID    string         `json:"board_id,omitempty"`
 	} `json:"data"`
 }
 
 type v1TaskDTO struct {
-	ID              string                   `json:"id"`
-	WorkspaceID     string                   `json:"workspace_id"`
-	Service         string                   `json:"service"`
-	MediaAssetIDs   []string                 `json:"media_asset_ids,omitempty"`
-	Status          string                   `json:"status"`
-	RetryCount      int                      `json:"retry_count"`
-	ExecutionToken  string                   `json:"execution_token,omitempty"`
-	OutputRefs      []v1TaskOutputRefDTO     `json:"output_refs,omitempty"`
-	BillingSnapshot v1TaskBillingSnapshotDTO `json:"billing_snapshot"`
-	ErrorMsg        string                   `json:"error_msg,omitempty"`
-	CancelReason    string                   `json:"cancel_reason,omitempty"`
-	CreatedAt       string                   `json:"created_at"`
-	UpdatedAt       string                   `json:"updated_at"`
-	CompletedAt     *string                  `json:"completed_at,omitempty"`
+	ID                 string                   `json:"id"`
+	WorkspaceID        string                   `json:"workspace_id"`
+	Service            string                   `json:"service"`
+	MediaAssetIDs      []string                 `json:"media_asset_ids,omitempty"`
+	BoardID            string                   `json:"board_id,omitempty"`
+	BoardAccessVersion int64                    `json:"board_access_version,omitempty"`
+	Status             string                   `json:"status"`
+	RetryCount         int                      `json:"retry_count"`
+	ExecutionToken     string                   `json:"execution_token,omitempty"`
+	OutputRefs         []v1TaskOutputRefDTO     `json:"output_refs,omitempty"`
+	BillingSnapshot    v1TaskBillingSnapshotDTO `json:"billing_snapshot"`
+	ErrorMsg           string                   `json:"error_msg,omitempty"`
+	CancelReason       string                   `json:"cancel_reason,omitempty"`
+	CreatedAt          string                   `json:"created_at"`
+	UpdatedAt          string                   `json:"updated_at"`
+	CompletedAt        *string                  `json:"completed_at,omitempty"`
 }
 
 type v1TaskBillingSnapshotDTO struct {
@@ -271,7 +289,8 @@ func toTaskDTO(task *workspacetasks.WorkspaceTask) v1TaskDTO {
 	dto := v1TaskDTO{
 		ID: task.ID, WorkspaceID: task.WorkspaceID, Service: task.Service,
 		MediaAssetIDs: append([]string(nil), task.MediaAssetIDs...),
-		Status:        string(task.Status), RetryCount: task.RetryCount, ExecutionToken: task.ExecutionToken,
+		BoardID:       task.BoardID, BoardAccessVersion: task.BoardAccessVersion,
+		Status: string(task.Status), RetryCount: task.RetryCount, ExecutionToken: task.ExecutionToken,
 		ErrorMsg: task.ErrorMsg, CancelReason: task.CancelReason,
 		CreatedAt: v1FormatTime(task.CreatedAt), UpdatedAt: v1FormatTime(task.UpdatedAt),
 		BillingSnapshot: v1TaskBillingSnapshotDTO{
@@ -319,6 +338,26 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 		if err := workspacetasks.ValidateWorkspacePrompt(prompt); err != nil {
 			renderTaskError(c, err)
 			return
+		}
+		// Board binding (#937): malformed board_ shapes fail closed as
+		// 422; the domain resolves visibility/generation against the
+		// live Board posture (invisible -> 404 board_not_found, archived
+		// -> 409 board_archived, no generate capability -> 403
+		// task_forbidden). Omitted Board IDs stay non-Canvas tasks.
+		boardID := strings.TrimSpace(body.Data.BoardID)
+		if err := workspacetasks.ValidateBoardID(boardID); err != nil {
+			renderTaskError(c, err)
+			return
+		}
+		var workspaceRole string
+		if boardID != "" {
+			role, ok := h.taskWorkspaceRoleString(c.Request.Context(), workspace, identityPrincipal.UserID())
+			if !ok {
+				contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, msgControlNotFound8)
+				c.Abort()
+				return
+			}
+			workspaceRole = role
 		}
 		var quantity int64 = 1
 		if body.Data.Quantity != nil {
@@ -406,7 +445,7 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 		}
 		hash := contract.HashIdempotencyRequest("task:create", workspace.PublicID, kind,
 			strings.Join(assetIDs, ","), prompt, string(paramsJSON),
-			strconv.FormatInt(quantity, 10), resolution)
+			strconv.FormatInt(quantity, 10), resolution, boardID)
 		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 		// The durable task claim is workspace-scoped. Include the workspace in
 		// the process-local fast-path scope as well, otherwise the same user
@@ -422,6 +461,7 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 				// The durable claim stores this digest so a repeated key with a
 				// different body is a 409 rather than a replay of the wrong task.
 				RequestHash: hash, Prompt: prompt,
+				BoardID: boardID, WorkspaceRole: workspaceRole,
 			}, key)
 			if err != nil {
 				return nil, err
@@ -465,6 +505,7 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 
 func (h *contractV1Handler) listWorkspaceTasks(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
 		if err != nil {
@@ -487,16 +528,34 @@ func (h *contractV1Handler) listWorkspaceTasks(c *gin.Context) {
 			renderTaskError(c, err)
 			return
 		}
-		hasMore := len(tasks) > pageSize
-		if hasMore {
-			tasks = tasks[:pageSize]
-		}
-		page := make([]v1TaskDTO, 0, len(tasks))
+		// #937 visibility filter: the submitter always sees their own
+		// tasks; other tasks surface only when the caller currently holds
+		// Board read on the linked Board. Board-less tasks by other
+		// submitters are silently skipped (never leaked, never errored),
+		// so omitting the Board ID cannot degrade into workspace-wide
+		// visibility. The workspace role resolves once for the page.
+		callerID := identityPrincipal.UserID()
+		workspaceRole, _ := h.taskWorkspaceRoleString(c.Request.Context(), workspace, callerID)
+		visible := make([]*workspacetasks.WorkspaceTask, 0, len(tasks))
 		for _, task := range tasks {
+			if task != nil && task.OwnerUserID == callerID {
+				visible = append(visible, task)
+				continue
+			}
+			access := h.resolveTaskBoardAccess(c.Request.Context(), workspace, workspaceRole, callerID, task)
+			if workspacetasks.AuthorizeTaskRead(task, callerID, access) {
+				visible = append(visible, task)
+			}
+		}
+		page := make([]v1TaskDTO, 0, len(visible))
+		for _, task := range visible {
 			page = append(page, toTaskDTO(task))
 		}
+		// Cursor pagination stays store-ordered: hasMore derives from the
+		// store page (a filtered page may be shorter without more data).
+		storeHasMore := len(tasks) > pageSize
 		meta := contract.NewPageMeta("", false)
-		if hasMore {
+		if storeHasMore {
 			next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: offset + pageSize})
 			if encodeErr != nil {
 				renderTaskError(c, encodeErr)
@@ -510,6 +569,7 @@ func (h *contractV1Handler) listWorkspaceTasks(c *gin.Context) {
 
 func (h *contractV1Handler) getWorkspaceTask(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		raw := strings.TrimSpace(c.Param("task_id"))
 		if !contract.IsTaskID(raw) {
@@ -520,6 +580,12 @@ func (h *contractV1Handler) getWorkspaceTask(c *gin.Context) {
 		task, err := h.deps.Tasks.GetTask(c.Request.Context(), workspace.PublicID, raw)
 		if err != nil {
 			renderTaskError(c, err)
+			return
+		}
+		// #937: task content is submitter- or Board-reader-only.
+		callerID := identityPrincipal.UserID()
+		workspaceRole, _ := h.taskWorkspaceRoleString(c.Request.Context(), workspace, callerID)
+		if !h.requireVisibleWorkspaceTask(c, workspace, workspaceRole, callerID, task) {
 			return
 		}
 		contract.RenderSuccess(c, toTaskDTO(task))
@@ -544,6 +610,23 @@ func (h *contractV1Handler) cancelWorkspaceTask(c *gin.Context) {
 		}
 		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
+			return
+		}
+		// #937: cancellation needs the task to be visible AND the caller
+		// to hold cancel rights (submitter or Board writer). Readers and
+		// outsiders converge to 404 task_not_found before any idempotency
+		// state is recorded.
+		existing, err := h.deps.Tasks.GetTask(c.Request.Context(), workspace.PublicID, raw)
+		if err != nil {
+			renderTaskError(c, err)
+			return
+		}
+		callerID := identityPrincipal.UserID()
+		workspaceRole, _ := h.taskWorkspaceRoleString(c.Request.Context(), workspace, callerID)
+		access := h.resolveTaskBoardAccess(c.Request.Context(), workspace, workspaceRole, callerID, existing)
+		if !workspacetasks.AuthorizeTaskCancel(existing, callerID, access) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, msgControlNotFound8)
+			c.Abort()
 			return
 		}
 		reason := "user cancel"
@@ -606,6 +689,7 @@ func (h *contractV1Handler) cancelWorkspaceTask(c *gin.Context) {
 
 func (h *contractV1Handler) listWorkspaceTaskOutputs(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		raw := strings.TrimSpace(c.Param("task_id"))
 		if !contract.IsTaskID(raw) {
@@ -616,6 +700,12 @@ func (h *contractV1Handler) listWorkspaceTaskOutputs(c *gin.Context) {
 		task, err := h.deps.Tasks.GetTask(c.Request.Context(), workspace.PublicID, raw)
 		if err != nil {
 			renderTaskError(c, err)
+			return
+		}
+		// #937: outputs inherit task visibility.
+		callerID := identityPrincipal.UserID()
+		workspaceRole, _ := h.taskWorkspaceRoleString(c.Request.Context(), workspace, callerID)
+		if !h.requireVisibleWorkspaceTask(c, workspace, workspaceRole, callerID, task) {
 			return
 		}
 		refs := make([]v1TaskOutputRefDTO, 0, len(task.OutputRefs))

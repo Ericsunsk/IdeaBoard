@@ -153,21 +153,21 @@ const (
 	msgRewardWalletLocked              = "当前账户无法兑换奖励"                  // CodeRewardWalletLocked
 	msgBoardNotFound                   = "看板不存在"                       // CodeBoardNotFound
 	msgBoardRevisionConflict           = "看板版本已变更，请刷新后重试"              // CodeBoardRevisionConflict
+	msgBoardAccessConflict             = "看板访问版本已变更，请刷新后重试"            // CodeBoardAccessConflict
+	msgBoardPreconditionRequired       = "缺少访问版本前提"                    // CodeBoardPreconditionRequired
 	msgBoardArchived                   = "看板已归档"                       // CodeBoardArchived
 	msgRenderBoardError                = "不能邀请或移除所有者"                  // RenderBoardError @ contract_v1_boards.go
 	msgRenderBoardError2               = "成员角色非法"                      // RenderBoardError @ contract_v1_boards.go
 	msgServiceUnavailable46            = "看板服务暂不可用"                    // CodeServiceUnavailable
 	msgMembershipTransitionForbidden2  = "最后一个所有者不能被移除或降级"             // CodeMembershipTransitionForbidden
-	msgBoardShareTokenNotFound         = "分享链接不存在"                     // CodeBoardShareTokenNotFound
-	msgBoardShareTokenInvalid          = "分享链接无效"                      // CodeBoardShareTokenInvalid
-	msgRenderJoinError                 = "分享令牌非法"                      // RenderJoinError @ contract_v1_boards.go
+	msgParseBoardAccessIfMatch         = "访问版本前提非法"                    // ParseBoardAccessIfMatch @ contract_v1_boards.go
+	msgUpdateBoardAccess               = "工作区访问级别非法"                   // UpdateBoardAccess @ contract_v1_boards.go
 	msgParseBoardIfMatch               = "缺少版本前提"                      // ParseBoardIfMatch @ contract_v1_boards.go
 	msgParseBoardIfMatch2              = "版本前提非法"                      // ParseBoardIfMatch @ contract_v1_boards.go
 	msgCreateBoard                     = "看板名称非法"                      // CreateBoard @ contract_v1_boards.go
 	msgReplaceBoardDocument            = "文档快照非法"                      // ReplaceBoardDocument @ contract_v1_boards.go
 	msgBoardNotFound2                  = "看板版本不存在"                     // CodeBoardNotFound
 	msgServiceUnavailable47            = "成员服务暂不可用"                    // CodeServiceUnavailable
-	msgCreateShareToken                = "分享角色非法"                      // CreateShareToken @ contract_v1_boards.go
 	msgEventNotFound                   = "事件不存在"                       // CodeEventNotFound
 	msgServiceUnavailable48            = "事件服务暂不可用"                    // CodeServiceUnavailable
 	msgValidationFailed6               = "事件类型非法"                      // CodeValidationFailed
@@ -216,4 +216,5 @@ const (
 	msgRateLimitMiddleware2            = "请求过于频繁，请稍后重试"                // RateLimitMiddleware @ rate_limit.go
 	msgReadyHandler                    = "服务尚未就绪"                      // ReadyHandler @ routes.go
 	msgPublicBrandingSettingsHandler   = "系统设置服务未配置"                   // PublicBrandingSettingsHandler @ routes.go
+	msgBadRequest35                    = "邮箱地址无效"                      // CodeBadRequest
 )

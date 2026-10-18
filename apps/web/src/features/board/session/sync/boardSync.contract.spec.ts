@@ -420,6 +420,11 @@ describe('boardSync', () => {
     })
     const hydrateTask = hydrateBoardsFromServer()
 
+    // The catalog walk fails fast without issuing a request when the scope
+    // already moved, so the scope must move only after the walk has issued
+    // its first page: otherwise the queued response is never consumed and
+    // leaks into the next test's transport.
+    await vi.waitFor(() => expect(mocks.request).toHaveBeenCalledTimes(1))
     setStoredAuth({
       public_id: '00000000-0000-0000-0000-000000000002',
       display_name: 'other-user',
@@ -456,6 +461,10 @@ describe('boardSync', () => {
     })
     const hydrateTask = hydrateBoardsFromServer()
 
+    // See the auth-scope test above: wait until the walk has issued its
+    // first page before moving the scope, so the queued late response is
+    // consumed by this test instead of leaking into the next transport.
+    await vi.waitFor(() => expect(mocks.request).toHaveBeenCalledTimes(1))
     getWorkspaceSelectionStore().select(workspaceB)
     resolveRequest(apiState.boardsResponse)
 

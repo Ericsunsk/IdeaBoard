@@ -56,6 +56,14 @@
       <div class="mt-[3px] text-xs text-muted-foreground">
         {{ t('board.edited', { date: displayDate }) }}
       </div>
+      <div v-if="accessBadge" :class="catalogClasses.accessBadge">
+        <component
+          :is="accessBadge.icon"
+          :class="catalogClasses.accessBadgeIcon"
+          aria-hidden="true"
+        />
+        <span>{{ accessBadge.label }}</span>
+      </div>
     </div>
 
     <div class="absolute right-3 bottom-3 z-[3]" @click.stop @pointerdown.stop>
@@ -88,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { MoreHoriz } from '@iconoir/vue'
+import { Group, MoreHoriz, User } from '@iconoir/vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import {
@@ -101,7 +109,7 @@ import { useI18n } from 'vue-i18n'
 import type { CatalogEntry } from './contract'
 import type { BoardListSceneEntry } from '../../session/sync/boardQueries'
 import SceneThumbnail from './SceneThumbnail.vue'
-import { blankBoardPreviewSurfaceClass } from './skin'
+import { blankBoardPreviewSurfaceClass, catalogClasses } from './skin'
 
 const props = defineProps<{
   board: CatalogEntry
@@ -118,6 +126,7 @@ const emit = defineEmits<{
   (e: 'toggle-menu'): void
   (e: 'rename-action'): void
   (e: 'duplicate-action'): void
+  (e: 'share-action'): void
   (e: 'delete-action'): void
   (e: 'rename-input', value: string): void
   (e: 'commit-rename'): void
@@ -127,23 +136,65 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+// Server access posture as icon + text (never color alone): the card
+// renders the `access_state` fact verbatim and never derives it locally.
+// Boards without the fact (never-synced local drafts) show no badge until
+// the server mints their identity.
+const accessBadge = computed(() => {
+  switch (props.board.accessState) {
+    case 'workspace':
+      return { icon: Group, label: t('board.accessWorkspace') }
+    case 'private':
+      return { icon: User, label: t('board.accessPrivate') }
+    default:
+      return null
+  }
+})
+
+// Capability gating consumes the server flags verbatim: rename and delete
+// (archive) need write, Share needs manage. Boards without capabilities
+// (never-synced local drafts) keep their local rename/duplicate/delete so
+// offline creation never loses its actions; Share stays hidden until the
+// server confirms manage.
+const canWriteBoard = computed(() =>
+  props.board.capabilities === undefined ? true : props.board.capabilities.write === true,
+)
+const canShareBoard = computed(() => props.board.capabilities?.manage === true)
+
 const menuItems = computed(() => [
-  {
-    key: 'rename',
-    label: t('common.actions.rename'),
-    command: () => emit('rename-action'),
-  },
+  ...(canWriteBoard.value
+    ? [
+        {
+          key: 'rename',
+          label: t('common.actions.rename'),
+          command: () => emit('rename-action'),
+        },
+      ]
+    : []),
   {
     key: 'duplicate',
     label: t('board.duplicate'),
     command: () => emit('duplicate-action'),
   },
-  {
-    key: 'delete',
-    label: t('common.actions.delete'),
-    tone: 'danger',
-    command: () => emit('delete-action'),
-  },
+  ...(canShareBoard.value
+    ? [
+        {
+          key: 'share',
+          label: t('board.share'),
+          command: () => emit('share-action'),
+        },
+      ]
+    : []),
+  ...(canWriteBoard.value
+    ? [
+        {
+          key: 'delete',
+          label: t('common.actions.delete'),
+          tone: 'danger',
+          command: () => emit('delete-action'),
+        },
+      ]
+    : []),
 ])
 
 const renameInputEl = ref<HTMLInputElement | null>(null)

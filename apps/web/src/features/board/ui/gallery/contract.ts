@@ -1,17 +1,48 @@
 import type { ComputedRef, Ref } from 'vue'
 import type { BoardListSceneEntry } from '../../session/sync/boardQueries'
+import type { BoardGalleryRange } from './range'
+
+/**
+ * Server-computed capabilities.
+ * @externalContract Public API BoardCapabilities: consumed verbatim from
+ * catalog payloads, never recomputed locally.
+ */
+type GalleryBoardCapabilities = {
+  read: boolean
+  write: boolean
+  manage: boolean
+  generate: boolean
+}
+
+/** Derived sharing posture, mirrored from the Public API schema. */
+type GalleryBoardAccessState = 'private' | 'workspace'
+
+/** Common sharing gate and role for selected members. */
+type GalleryBoardWorkspaceAccess = 'none' | 'viewer' | 'editor'
 
 export type CatalogEntry = {
   id: string
   name: string
   createdAt: number
   updatedAt: number
+  revision?: number | undefined
+  capabilities?: GalleryBoardCapabilities | undefined
+  accessState?: GalleryBoardAccessState | undefined
+  workspaceAccess?: GalleryBoardWorkspaceAccess | undefined
+  isCreator?: boolean | undefined
+  hasDirectGrant?: boolean | undefined
 }
 
 export type CatalogSortMode = 'recent' | 'name'
 
 export type CatalogNavigation = {
   openBoard(boardId: string): void
+  shareBoard?(boardId: string): void
+}
+
+type CatalogRangeCounts = {
+  personal: number
+  team: number
 }
 
 export type Catalog = {
@@ -23,6 +54,8 @@ export type Catalog = {
     catalogHydrationFailed: Readonly<Ref<boolean>>
     searchKeyword: Readonly<Ref<string>>
     sortMode: Readonly<Ref<CatalogSortMode>>
+    range: Readonly<Ref<BoardGalleryRange>>
+    rangeCounts: ComputedRef<CatalogRangeCounts>
     activeMenuBoardId: Readonly<Ref<string | null>>
     renamingBoardId: Readonly<Ref<string | null>>
     renameDraft: Readonly<Ref<string>>
@@ -36,6 +69,7 @@ export type Catalog = {
     initialize(): Promise<void>
     setSearchKeyword(value: string | undefined): void
     setSortMode(mode: CatalogSortMode): void
+    setRange(range: BoardGalleryRange): void
     toggleBoardMenu(boardId: string): void
     handleBoardMenuHidden(boardId: string): void
     createAndOpenBoard(): Promise<void>

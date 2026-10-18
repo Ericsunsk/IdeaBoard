@@ -48,7 +48,7 @@ import (
 // best-effort fetch and renders 404 media_not_found so the Canvas
 // pending-fact retry loop owns the retry. Unknown assets and
 // unwired stores 404 without requesting.
-func (h *contractV1Handler) getLibraryMaterializedMediaAsset(c *gin.Context, workspacePublicID, assetPublicID string) {
+func (h *contractV1Handler) getLibraryMaterializedMediaAsset(c *gin.Context, workspacePublicID, assetPublicID string, userID int64, workspaceRole string) {
 	svc := h.deps.Library.ReadThrough
 	if svc == nil {
 		renderMediaStoreError(c, workspacemedia.ErrNotFound)
@@ -61,10 +61,13 @@ func (h *contractV1Handler) getLibraryMaterializedMediaAsset(c *gin.Context, wor
 		return
 	}
 	if found {
-		if asset, err := h.deps.Media.GetAsset(ctx, workspacePublicID, mediaAssetID); err == nil && asset != nil {
+		// #936: the managed asset behind a completed library link enforces
+		// the same authorization (members pass via the library source).
+		// Denials stop here with 404 and never trigger a fetch.
+		if asset, ok := h.authorizeMediaAsset(c, workspacePublicID, mediaAssetID, userID, workspaceRole); ok {
 			contract.RenderSuccess(c, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
-			return
 		}
+		return
 	}
 	identityPrincipal, ok := v1RequestPrincipal(c)
 	if !ok {

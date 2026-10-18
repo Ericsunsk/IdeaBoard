@@ -14,6 +14,11 @@ export function primeAuthenticatedWorkspace(workspaceId: string) {
   getWorkspaceSelectionStore().select(workspaceId)
 }
 
+/** Switches the selected workspace in specs (scope-change simulation). */
+export function selectWorkspace(workspaceId: string) {
+  getWorkspaceSelectionStore().select(workspaceId)
+}
+
 export function makePromptBoardState(updatedAt: number, promptText: string): BoardState {
   return makeBoardState({
     updatedAt,

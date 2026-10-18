@@ -3,4 +3,5 @@ export {
   addRemoteBoardFixture,
   makePromptBoardState,
   primeAuthenticatedWorkspace,
+  selectWorkspace,
 } from './syncFixtures'

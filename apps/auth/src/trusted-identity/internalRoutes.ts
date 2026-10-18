@@ -37,6 +37,7 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
     | 'ensureUser'
     | 'getUserEmails'
     | 'getUserStates'
+    | 'lookupUserByEmail'
     | 'deleteUser'
     | 'setUserRole'
     | 'banUser'
@@ -85,6 +86,14 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
         reply,
         await options.commands.getUserStates({
           userIDs: request.body?.user_ids,
+        }),
+      )
+    },
+    lookupUserByEmail: async (request, reply) => {
+      sendCommandResult(
+        reply,
+        await options.commands.lookupUserByEmail({
+          email: request.body?.email,
         }),
       )
     },
@@ -155,6 +164,12 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
     url: authInternalRoutes.getUserStates.fastifyPath,
     preHandler: requireInternalKey,
     handler: handlers.getUserStates,
+  })
+  app.route({
+    method: authInternalRoutes.lookupUserByEmail.method,
+    url: authInternalRoutes.lookupUserByEmail.fastifyPath,
+    preHandler: requireInternalKey,
+    handler: handlers.lookupUserByEmail,
   })
   app.route({
     method: authInternalRoutes.deleteUser.method,

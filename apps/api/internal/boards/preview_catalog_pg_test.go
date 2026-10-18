@@ -29,7 +29,8 @@ func newPostgresPreviewFixture(t *testing.T) (context.Context, *pgxpool.Pool, *P
 	if err != nil {
 		t.Fatalf("create workspace failed: %v", err)
 	}
-	return ctx, db, NewPostgresWorkspaceBoardStore(db), ws
+	seedBoardTestMembers(t, NewPostgresWorkspaceBoardStore(db, testDocumentAssetValidator), ws.InternalID, 3, 7, 8, 10)
+	return ctx, db, NewPostgresWorkspaceBoardStore(db, testDocumentAssetValidator), ws
 }
 
 func nullOutPreviewColumns(t *testing.T, db *pgxpool.Pool, boardPublicID string) {
@@ -86,13 +87,13 @@ func TestPostgresPreviewSceneLifecycle(t *testing.T) {
 	}
 
 	wantVersion, wantScene := updated.ContentVersion, string(updated.PreviewScene)
-	if _, err := store.RenameBoard(ctx, ws.PublicID, boardID, "Preview PG v2"); err != nil {
+	if _, err := store.RenameBoard(ctx, ws.PublicID, boardID, "Preview PG v2", postgresStoreOwner); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.ArchiveBoard(ctx, ws.PublicID, boardID); err != nil {
+	if _, err := store.ArchiveBoard(ctx, ws.PublicID, boardID, postgresStoreOwner); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.RestoreBoard(ctx, ws.PublicID, boardID); err != nil {
+	if _, err := store.RestoreBoard(ctx, ws.PublicID, boardID, postgresStoreOwner); err != nil {
 		t.Fatal(err)
 	}
 	afterMeta, err := store.GetBoard(ctx, ws.PublicID, boardID)
@@ -212,21 +213,17 @@ func TestPostgresPreviewCatalogFiltersEffectiveAccess(t *testing.T) {
 func TestPostgresPreviewCatalogRoleParityAndWorkspaceScope(t *testing.T) {
 	ctx, db, store, ws := newPostgresPreviewFixture(t)
 	boardID := mustCreatePostgresBoard(t, ctx, store, ws, "Role parity")
-	for user, role := range map[int64]AccessRole{postgresStoreMember: RoleEditor, postgresStoreOutsider: RoleViewer} {
-		if _, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, user, role, "owner"); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, err := db.Exec(ctx, `INSERT INTO board_memberships (board_id, user_id, role)
-		SELECT internal_id, $2, 'viewer' FROM boards WHERE public_id = $1`, boardID, postgresStoreOwner); err != nil {
+	if _, err := store.ReplaceBoardAccess(ctx, ws.PublicID, boardID, postgresStoreOwner, 1, WorkspaceAccessEditor, []int64{postgresStoreMember, postgresStoreOutsider}); err != nil {
 		t.Fatal(err)
 	}
+
 	other, err := tenancypg.NewStore(db).CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
 		Name: "Foreign catalog", OwnerUserID: postgresStoreExtra,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	seedBoardTestMembers(t, store, other.InternalID, postgresStoreOwner)
 	mustCreatePostgresBoard(t, ctx, store, other, "Foreign board")
 	for _, tc := range []struct {
 		name          string
@@ -234,13 +231,14 @@ func TestPostgresPreviewCatalogRoleParityAndWorkspaceScope(t *testing.T) {
 		workspaceRole string
 		wantRole      AccessRole
 	}{
-		{"creator-overrides-membership", postgresStoreOwner, "", RoleOwner},
-		{"explicit-editor", postgresStoreMember, "", RoleEditor},
-		{"explicit-viewer-overrides-workspace-owner", postgresStoreOutsider, "owner", RoleViewer},
-		{"default-owner", postgresStoreExtra, "owner", RoleOwner},
-		{"default-admin", postgresStoreExtra, "admin", RoleViewer},
-		{"default-member", postgresStoreExtra, "member", RoleViewer},
-		{"trimmed-default", postgresStoreExtra, " member ", RoleViewer},
+		{"creator-without-membership-denied", postgresStoreOwner, "", ""},
+		{"explicit-editor-with-membership", postgresStoreMember, "member", RoleEditor},
+		{"explicit-grant-without-membership-denied", postgresStoreMember, "", ""},
+		{"selected-common-editor", postgresStoreOutsider, "owner", RoleEditor},
+		{"no-implicit-owner", postgresStoreExtra, "owner", ""},
+		{"no-implicit-admin", postgresStoreExtra, "admin", ""},
+		{"no-implicit-member", postgresStoreExtra, "member", ""},
+		{"trimmed-member-without-grant-denied", postgresStoreExtra, " member ", ""},
 		{"no-workspace-role", postgresStoreExtra, "", ""},
 		{"unknown-workspace-role", postgresStoreExtra, "unknown", ""},
 	} {
@@ -285,7 +283,12 @@ func (trace *catalogQueryTrace) TraceQueryEnd(_ context.Context, _ *pgx.Conn, da
 func TestPostgresPreviewCatalogUsesOneLightweightRead(t *testing.T) {
 	ctx, db, store, ws := newPostgresPreviewFixture(t)
 	for range 3 {
-		mustCreatePostgresBoard(t, ctx, store, ws, "One read")
+		boardID := mustCreatePostgresBoard(t, ctx, store, ws, "One read")
+		// Explicit grants authorize the reader (workspace_access=none
+		// carries no implicit visibility).
+		if _, err := store.ReplaceBoardAccess(ctx, ws.PublicID, boardID, postgresStoreOwner, 1, WorkspaceAccess(RoleViewer), []int64{postgresStoreMember}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	trace := &catalogQueryTrace{}
 	cfg := db.Config()
@@ -295,7 +298,7 @@ func TestPostgresPreviewCatalogUsesOneLightweightRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	catalog, err := NewPostgresWorkspaceBoardStore(pool).ListBoardCatalog(ctx, ws.PublicID, false, postgresStoreMember, "member", V1BoardCatalogPageRequest{Limit: 1})
+	catalog, err := NewPostgresWorkspaceBoardStore(pool, testDocumentAssetValidator).ListBoardCatalog(ctx, ws.PublicID, false, postgresStoreMember, "member", V1BoardCatalogPageRequest{Limit: 1})
 	if err != nil || len(catalog.Entries) != 1 || !catalog.HasMore {
 		t.Fatalf("catalog count=%d err=%v", len(catalog.Entries), err)
 	}
@@ -316,7 +319,7 @@ func TestPostgresPreviewCatalogUsesOneLightweightRead(t *testing.T) {
 func TestPostgresPreviewCatalogAuthorizesBeforeLimit(t *testing.T) {
 	ctx, db, store, ws := newPostgresPreviewFixture(t)
 	boardID := mustCreatePostgresBoard(t, ctx, store, ws, "Older shared board")
-	if _, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreOutsider, RoleViewer, "owner"); err != nil {
+	if _, err := store.ReplaceBoardAccess(ctx, ws.PublicID, boardID, postgresStoreOwner, 1, WorkspaceAccess(RoleViewer), []int64{postgresStoreOutsider}); err != nil {
 		t.Fatal(err)
 	}
 	_, err := db.Exec(ctx, `WITH inserted AS (
@@ -329,7 +332,7 @@ func TestPostgresPreviewCatalogAuthorizesBeforeLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := store.ListBoardCatalog(ctx, ws.PublicID, false, postgresStoreOutsider, "", V1BoardCatalogPageRequest{Limit: 100})
+	catalog, err := store.ListBoardCatalog(ctx, ws.PublicID, false, postgresStoreOutsider, "member", V1BoardCatalogPageRequest{Limit: 100})
 	if err != nil || len(catalog.Entries) != 1 || catalog.Entries[0].PublicID != boardID {
 		t.Fatalf("older accessible board lost behind denied rows: count=%d err=%v", len(catalog.Entries), err)
 	}

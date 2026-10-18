@@ -16,6 +16,7 @@ import {
   parseWorkspaceItem,
   parseWorkspacePage,
   provisionWorkspace,
+  renameWorkspace,
   workspaceApiUrls,
   WORKSPACE_NAME_MAX_LENGTH,
   WORKSPACE_PAGE_SIZE_DEFAULT,
@@ -220,6 +221,40 @@ describe('workspace creation', () => {
       provisionWorkspace({ name: 'x'.repeat(WORKSPACE_NAME_MAX_LENGTH + 1) }),
     ).rejects.toThrow()
     await expect(provisionWorkspace({ name: 'Ok', organizationId: 'nope' })).rejects.toThrow()
+  })
+})
+
+describe('workspace rename', () => {
+  it('renames through PATCH with a name-only body and parses the envelope', async () => {
+    const seen: Array<{ body: unknown; requestId: string | null }> = []
+    useMswHandlers(
+      http.patch('/api/v1/workspaces/:workspaceId', async ({ request }) => {
+        seen.push({ body: await request.json(), requestId: request.headers.get('request-id') })
+        return HttpResponse.json({
+          data: {
+            public_id: 'ws_a1',
+            name: 'Renamed',
+            organization_id: null,
+            archived_at: null,
+          },
+        })
+      }),
+    )
+
+    const updated = await renameWorkspace('ws_a1', { name: '  Renamed  ' })
+
+    expect(updated).toMatchObject({ publicId: 'ws_a1', name: 'Renamed' })
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?.body).toEqual({ data: { name: 'Renamed' } })
+    expect(seen[0]?.requestId).toBeTruthy()
+  })
+
+  it('validates the workspace id and name before touching the network', async () => {
+    await expect(renameWorkspace('123', { name: 'Ok' })).rejects.toThrow()
+    await expect(renameWorkspace('ws_a1', { name: '   ' })).rejects.toThrow()
+    await expect(
+      renameWorkspace('ws_a1', { name: 'x'.repeat(WORKSPACE_NAME_MAX_LENGTH + 1) }),
+    ).rejects.toThrow()
   })
 })
 

@@ -26,11 +26,11 @@ func exerciseCatalogPageContract(t *testing.T, store WorkspaceBoardStore, worksp
 	// The newest two rows are inaccessible; the next is archived. Neither
 	// may consume a position in the reader's ordered page.
 	for _, i := range []int{2, 3, 4, 5, 6} {
-		if _, err := store.AddBoardMember(ctx, workspaceID, ids[i], owner, reader, RoleViewer, "owner"); err != nil {
+		if _, err := store.ReplaceBoardAccess(ctx, workspaceID, ids[i], owner, 1, WorkspaceAccess(RoleViewer), []int64{reader}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := store.ArchiveBoard(ctx, workspaceID, ids[2]); err != nil {
+	if _, err := store.ArchiveBoard(ctx, workspaceID, ids[2], owner); err != nil {
 		t.Fatal(err)
 	}
 	base := time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)
@@ -61,7 +61,7 @@ func exerciseCatalogPageContract(t *testing.T, store WorkspaceBoardStore, worksp
 		{"over-size", V1BoardCatalogPageRequest{Limit: 101}, nil, false, ErrV1CatalogPage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			page, err := store.ListBoardCatalog(ctx, workspaceID, false, reader, "", tc.request)
+			page, err := store.ListBoardCatalog(ctx, workspaceID, false, reader, "member", tc.request)
 			if !errors.Is(err, tc.wantErr) {
 				t.Fatalf("page error=%v want=%v", err, tc.wantErr)
 			}
@@ -78,7 +78,7 @@ func exerciseCatalogPageContract(t *testing.T, store WorkspaceBoardStore, worksp
 			}
 		})
 	}
-	archived, err := store.ListBoardCatalog(ctx, workspaceID, true, reader, "", V1BoardCatalogPageRequest{Limit: 1})
+	archived, err := store.ListBoardCatalog(ctx, workspaceID, true, reader, "member", V1BoardCatalogPageRequest{Limit: 1})
 	if err != nil || len(archived.Entries) != 1 || archived.Entries[0].PublicID != ids[2] || !archived.HasMore {
 		t.Fatalf("archived page count=%d more=%v err=%v", len(archived.Entries), archived.HasMore, err)
 	}
@@ -96,14 +96,14 @@ func exerciseCatalogPageContract(t *testing.T, store WorkspaceBoardStore, worksp
 	}
 	canceled, cancel := context.WithCancel(ctx)
 	cancel()
-	_, err = store.ListBoardCatalog(canceled, workspaceID, false, reader, "", V1BoardCatalogPageRequest{Limit: 1})
+	_, err = store.ListBoardCatalog(canceled, workspaceID, false, reader, "member", V1BoardCatalogPageRequest{Limit: 1})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled request err=%v", err)
 	}
 }
 
 func TestBoardCatalogPageContract(t *testing.T) {
-	store := NewInMemoryWorkspaceBoardStoreForTests()
+	store := NewInMemoryWorkspaceBoardStoreForTests(testWorkspaceMembers{}, testWorkspaceMembers{})
 	const workspaceID = "ws_page_contract"
 	exerciseCatalogPageContract(t, store, workspaceID, func(id string, at time.Time) {
 		store.mu.Lock()
@@ -135,7 +135,7 @@ func assertCatalogCap(t *testing.T, store WorkspaceBoardStore, workspaceID strin
 }
 
 func TestBoardCatalogPageCap(t *testing.T) {
-	store := NewInMemoryWorkspaceBoardStoreForTests()
+	store := NewInMemoryWorkspaceBoardStoreForTests(testWorkspaceMembers{}, testWorkspaceMembers{})
 	const workspaceID = "ws_page_cap"
 	at := time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)
 	for i := range 505 {

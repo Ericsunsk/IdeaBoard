@@ -10,6 +10,7 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { BoardId } from './boardId'
 import type { MediaAssetId } from './mediaAssetId'
 import type { Service } from './service'
 import type { TaskBillingSnapshot } from './taskBillingSnapshot'
@@ -24,6 +25,13 @@ export interface WorkspaceTask {
   service: Service
   /** asset_... input references (no raw storage URLs). */
   media_asset_ids?: MediaAssetId[]
+  /** Durable Canvas Board binding (absent for non-Canvas tasks). Task content is submitter- or current-Board-reader-only; Board-less tasks are submitter-only. */
+  board_id?: BoardId
+  /**
+   * Board access_version snapshot observed at submit (stale-callback detection for completion publishing).
+   * @minimum 1
+   */
+  board_access_version?: number
   status: TaskStatus
   /** @minimum 0 */
   retry_count: number

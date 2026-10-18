@@ -31,7 +31,7 @@ func (s *workspaceTaskLibrarySaver) SaveTaskOutputAsset(ctx context.Context, wor
 	if err != nil {
 		return nil, false, err
 	}
-	return s.store.SaveManagedMediaAsset(ctx, workspacePublicID, librarydomain.V1SaveManagedAssetInput{
+	return s.store.SaveTaskOutput(ctx, workspacePublicID, librarydomain.V1SaveManagedAssetInput{
 		MediaAssetID: input.MediaAssetID,
 		Lineage: &librarydomain.TaskLineage{
 			TaskID:      input.TaskID,

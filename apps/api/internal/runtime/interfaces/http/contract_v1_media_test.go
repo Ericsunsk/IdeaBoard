@@ -310,12 +310,12 @@ func TestV1MediaUploadLifecycle(t *testing.T) {
 		t.Fatalf("asset checksum = %q", got)
 	}
 
-	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID, userID: f.member})
+	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID, userID: f.owner})
 	if status != http.StatusOK {
 		t.Fatalf("get asset = %d %v, want 200", status, payload)
 	}
 
-	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: f.assetsPath(), userID: f.member})
+	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: f.assetsPath(), userID: f.owner})
 	if status != http.StatusOK {
 		t.Fatalf("list = %d %v, want 200", status, payload)
 	}
@@ -325,13 +325,13 @@ func TestV1MediaUploadLifecycle(t *testing.T) {
 	}
 
 	// Bytes never ride the JSON envelope: plain 200 with the staged bytes.
-	status, _, body := doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/content", userID: f.member}, "test-media-")
+	status, _, body := doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/content", userID: f.owner}, "test-media-")
 	if status != http.StatusOK || body != string(staged) {
 		t.Fatalf("content = %d len %d, want 200 staged bytes len %d", status, len(body), len(staged))
 	}
 	// Display tiers render on demand after the asset is ready.
 	assertV1DisplayTierImage(t, f.engine, v1TestImgproxyConfig(t),
-		f.assetsPath()+"/"+assetID+"/derivatives/thumb", f.member,
+		f.assetsPath()+"/"+assetID+"/derivatives/thumb", f.owner,
 		derivativedomain.TierThumb, derivativedomain.TierSpecs[derivativedomain.TierThumb].MaxSide)
 
 	// Archive needs owner/admin: the member is forbidden.
@@ -349,20 +349,20 @@ func TestV1MediaUploadLifecycle(t *testing.T) {
 	}
 
 	// Post-archive gates: metadata stays readable, bytes go 410.
-	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID, userID: f.member})
+	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID, userID: f.owner})
 	if status != http.StatusOK {
 		t.Fatalf("get archived = %d %v, want 200", status, payload)
 	}
-	status, _, _ = doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/content", userID: f.member}, "test-media-")
+	status, _, _ = doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/content", userID: f.owner}, "test-media-")
 	if status != http.StatusGone {
 		t.Fatalf("archived content = %d, want 410", status)
 	}
 	// The archive gate precedes rendering: derivatives go 410 too.
-	status, _, _ = doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/derivatives/thumb", userID: f.member}, "test-media-")
+	status, _, _ = doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/derivatives/thumb", userID: f.owner}, "test-media-")
 	if status != http.StatusGone {
 		t.Fatalf("archived derivative = %d, want 410", status)
 	}
-	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: f.assetsPath(), userID: f.member})
+	status, _, payload = doV1(t, f.engine, v1Call{method: "GET", path: f.assetsPath(), userID: f.owner})
 	if status != http.StatusOK {
 		t.Fatalf("list after archive = %d %v, want 200", status, payload)
 	}
@@ -569,7 +569,7 @@ func TestV1MediaDerivativeWithoutImgproxyBinding(t *testing.T) {
 	assetID := v1GapsComplete(t, engine, uploadsPath+"/"+uploadID+"/complete", staged, member, "nosign-complete")
 
 	status, _, _ := doV1RoundTrip(t, engine, v1Call{method: "GET",
-		path: assetsPath + "/" + assetID + "/derivatives/thumb", userID: member}, "test-media-")
+		path: assetsPath + "/" + assetID + "/derivatives/thumb", userID: owner}, "test-media-")
 	if status != http.StatusConflict {
 		t.Fatalf("unsigned derivative = %d, want plain 409", status)
 	}
@@ -606,6 +606,32 @@ func (s r2KeyMediaStore) GetAsset(ctx context.Context, workspaceID, assetID stri
 	clone := *asset
 	clone.StorageKey = s.r2Key
 	return &clone, nil
+}
+
+// AuthorizeAsset projects the completed asset onto the replayed R2 key,
+// mirroring the GetAsset override: authorization still runs first (#936),
+// only the served storage locator is rewritten.
+func (s r2KeyMediaStore) AuthorizeAsset(ctx context.Context, workspaceID, assetID string, callerUserID int64, workspaceRole string, access workspacemedia.BoardAccess) (*workspacemedia.Asset, error) {
+	asset, err := s.InMemoryWorkspaceMediaStore.AuthorizeAsset(ctx, workspaceID, assetID, callerUserID, workspaceRole, access)
+	if err != nil {
+		return nil, err
+	}
+	clone := *asset
+	clone.StorageKey = s.r2Key
+	return &clone, nil
+}
+
+// ListAuthorizedAssets projects every listed asset onto the replayed R2
+// key, mirroring the GetAsset override.
+func (s r2KeyMediaStore) ListAuthorizedAssets(ctx context.Context, workspaceID string, callerUserID int64, workspaceRole string, access workspacemedia.BoardAccess, limit, offset int) ([]*workspacemedia.Asset, error) {
+	assets, err := s.InMemoryWorkspaceMediaStore.ListAuthorizedAssets(ctx, workspaceID, callerUserID, workspaceRole, access, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	for _, asset := range assets {
+		asset.StorageKey = s.r2Key
+	}
+	return assets, nil
 }
 
 func TestV1MediaDerivativeUsesLocalProfile(t *testing.T) {
@@ -647,7 +673,7 @@ func TestV1MediaDerivativeUsesLocalProfile(t *testing.T) {
 	t.Run("workspace remains local with active s3 profile", func(t *testing.T) {
 		const key = "uploads/ws/workspace/upload/image.png"
 		engine, assetsPath, assetID := build(t, fakeV1StorageProfiler{profile: r2Profile}, key)
-		assertImgproxyImage(t, engine, v1TestImgproxyConfig(t), v1Call{method: "GET", path: assetsPath + "/" + assetID + "/derivatives/thumb", userID: 2}, "local-media-", "workspace local", "private, max-age=300", "/plain/local:///"+key+"@webp")
+		assertImgproxyImage(t, engine, v1TestImgproxyConfig(t), v1Call{method: "GET", path: assetsPath + "/" + assetID + "/derivatives/thumb", userID: 1}, "local-media-", "workspace local", "private, max-age=300", "/plain/local:///"+key+"@webp")
 	})
 
 	t.Run("anything else stays 409", func(t *testing.T) {
@@ -678,7 +704,7 @@ func TestV1MediaDerivativeUsesLocalProfile(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				engine, assetsPath, assetID := build(t, tc.profiler, tc.key)
 				status, _, _ := doV1RoundTrip(t, engine, v1Call{method: "GET",
-					path: assetsPath + "/" + assetID + "/derivatives/thumb", userID: 2}, "test-media-")
+					path: assetsPath + "/" + assetID + "/derivatives/thumb", userID: 1}, "test-media-")
 				if status != http.StatusConflict {
 					t.Fatalf("%s derivative = %d, want plain 409", tc.name, status)
 				}

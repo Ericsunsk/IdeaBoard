@@ -27,6 +27,8 @@ type Querier interface {
 	// day stays re-backfillable).
 	BackfillDailyStatsByCreatedRange(ctx context.Context, arg BackfillDailyStatsByCreatedRangeParams) (BackfillDailyStatsByCreatedRangeRow, error)
 	BindPaymentOrderCheckout(ctx context.Context, arg BindPaymentOrderCheckoutParams) (PaymentOrder, error)
+	// Every changed grant advances its Board access version, including archived Boards.
+	BumpWorkspaceMemberBoardsAccess(ctx context.Context, arg BumpWorkspaceMemberBoardsAccessParams) ([]BumpWorkspaceMemberBoardsAccessRow, error)
 	// CancelWorkspaceTask flips a live task to cancelled (chk constraint
 	// requires cancelled_at) and releases the lease. The tasks table carries
 	// no cancel_reason column, so the reason is recorded in the
@@ -87,6 +89,8 @@ type Querier interface {
 	// ClaimWorkspaceTask does, so the caller converges through the same
 	// GetWorkspaceTaskByPublicID path.
 	ClaimWorkspaceTaskWithAttempt(ctx context.Context, arg ClaimWorkspaceTaskWithAttemptParams) (ClaimWorkspaceTaskWithAttemptRow, error)
+	// Configuration replacement removes previous selections in the accepting transaction.
+	ClearBoardMemberships(ctx context.Context, arg ClearBoardMembershipsParams) (int64, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
 	CompleteControlIdempotency(ctx context.Context, arg CompleteControlIdempotencyParams) (int64, error)
 	CompleteLibraryMaterialization(ctx context.Context, arg CompleteLibraryMaterializationParams) (CompleteLibraryMaterializationRow, error)
@@ -105,7 +109,7 @@ type Querier interface {
 	// the status pills keep their global breakdown while a status is active.
 	CountControlTasks(ctx context.Context, arg CountControlTasksParams) ([]CountControlTasksRow, error)
 	CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error)
-	CountWorkspaceBoardOwners(ctx context.Context, arg CountWorkspaceBoardOwnersParams) (int64, error)
+	CountWorkspaceMembers(ctx context.Context, workspaceID int64) (int64, error)
 	CountWorkspaceOwners(ctx context.Context, workspaceID int64) (int64, error)
 	CountWorkspaceTasks(ctx context.Context, workspacePublicID string) (int64, error)
 	// Workspace-backed control monitor/statistics reads (#809-close).
@@ -221,12 +225,7 @@ type Querier interface {
 	// Workspace tenancy queries (#801). Public references use public_id;
 	// internal_id stays database-internal.
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
-	// Workspace-rooted boards postgres store (#802 interface, #809 follow-up
-	// to #817). boards.workspace_id is the workspace link (no separate link
-	// table); board_revisions rows are INSERT-only, so no UPDATE/DELETE
-	// revision query exists here by design. Every board-scoped query joins
-	// workspaces on public_id so foreign-workspace rows stay invisible.
-	// Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
+	// Workspace-scoped Boards use one common role and explicit selected members.
 	CreateWorkspaceBoard(ctx context.Context, arg CreateWorkspaceBoardParams) (CreateWorkspaceBoardRow, error)
 	// Workspace-scoped task queries (#819, Phase 4-02). The tasks table is the
 	// workspace-scoped async job resource (public_id LIKE 'task_%'):
@@ -239,6 +238,12 @@ type Querier interface {
 	// Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 	CreateWorkspaceTask(ctx context.Context, arg CreateWorkspaceTaskParams) (Task, error)
 	DeleteAdminBrandLogoOverride(ctx context.Context, arg DeleteAdminBrandLogoOverrideParams) (int64, error)
+	// DeleteBoardDocumentMediaRefs clears every accepted document reference
+	// for one board in the calling workspace (#936). ReplaceDocument calls it
+	// before re-inserting the accepted set, so removed references stop
+	// authorizing in the same accepting transaction while upload-target,
+	// owner, library, task, and other-board sources stay untouched.
+	DeleteBoardDocumentMediaRefs(ctx context.Context, arg DeleteBoardDocumentMediaRefsParams) error
 	DeleteControlIdempotencyRecord(ctx context.Context, arg DeleteControlIdempotencyRecordParams) error
 	DeleteLibraryAsset(ctx context.Context, arg DeleteLibraryAssetParams) (int64, error)
 	DeleteLibraryFolder(ctx context.Context, arg DeleteLibraryFolderParams) (int64, error)
@@ -248,6 +253,12 @@ type Querier interface {
 	DeleteSystemConfigsByKeys(ctx context.Context, configKeys []string) error
 	DeleteUserByID(ctx context.Context, id int64) (int64, error)
 	DeleteWorkspaceBoardMembership(ctx context.Context, arg DeleteWorkspaceBoardMembershipParams) (int64, error)
+	// Removes every direct grant of one user across the workspace in the
+	// same transaction as the version bumps above: rejoining later finds no
+	// stale row to resurrect (fail-closed), while the serve-time membership
+	// precondition already denies the departed member before this cleanup
+	// lands. Board/document/Task/asset rows are untouched.
+	DeleteWorkspaceMemberBoardGrants(ctx context.Context, arg DeleteWorkspaceMemberBoardGrantsParams) (int64, error)
 	DeleteWorkspaceMembership(ctx context.Context, arg DeleteWorkspaceMembershipParams) (int64, error)
 	// DeleteWorkspaceTask removes a task row (settlement compensation rollback
 	// on enqueue failure). Outputs cascade.
@@ -269,7 +280,6 @@ type Querier interface {
 	GetBillingAccountByWorkspaceID(ctx context.Context, workspaceID pgtype.Int8) (BillingAccount, error)
 	GetBoardRevisionByID(ctx context.Context, arg GetBoardRevisionByIDParams) (GetBoardRevisionByIDRow, error)
 	GetBoardRevisionByNumber(ctx context.Context, arg GetBoardRevisionByNumberParams) (GetBoardRevisionByNumberRow, error)
-	GetBoardShareTokenBySecret(ctx context.Context, arg GetBoardShareTokenBySecretParams) (GetBoardShareTokenBySecretRow, error)
 	GetControlIdempotency(ctx context.Context, arg GetControlIdempotencyParams) (GetControlIdempotencyRow, error)
 	GetControlTaskBilling(ctx context.Context, taskID string) (GetControlTaskBillingRow, error)
 	// Control Plane global task read model (#809-close). Operators see every
@@ -289,6 +299,12 @@ type Querier interface {
 	// GetMediaAssetByPublicID returns the asset row including archived
 	// ones (archived assets stay metadata-readable; bytes go 410).
 	GetMediaAssetByPublicID(ctx context.Context, arg GetMediaAssetByPublicIDParams) (MediaAsset, error)
+	// GetMediaAssetUploadTargetBoard resolves the restricted upload-target
+	// board (#936) for one asset through its creating session. Assets whose
+	// session carries no target (or whose board row went away) return a NULL
+	// board id on the single row; unknown or cross-workspace assets return no
+	// row at all (ErrNotFound, never a distinct status).
+	GetMediaAssetUploadTargetBoard(ctx context.Context, arg GetMediaAssetUploadTargetBoardParams) (pgtype.Text, error)
 	GetOrganizationByInternalID(ctx context.Context, internalID int64) (Organization, error)
 	GetOrganizationByPublicID(ctx context.Context, publicID string) (Organization, error)
 	GetOrganizationMembership(ctx context.Context, arg GetOrganizationMembershipParams) (OrganizationMembership, error)
@@ -320,7 +336,8 @@ type Querier interface {
 	GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error)
 	GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error)
 	GetWorkspaceBoard(ctx context.Context, arg GetWorkspaceBoardParams) (GetWorkspaceBoardRow, error)
-	GetWorkspaceBoardMembershipRole(ctx context.Context, arg GetWorkspaceBoardMembershipRoleParams) (string, error)
+	GetWorkspaceBoardAccess(ctx context.Context, arg GetWorkspaceBoardAccessParams) (GetWorkspaceBoardAccessRow, error)
+	GetWorkspaceBoardMembership(ctx context.Context, arg GetWorkspaceBoardMembershipParams) (int64, error)
 	GetWorkspaceByInternalID(ctx context.Context, internalID int64) (Workspace, error)
 	GetWorkspaceByPublicID(ctx context.Context, publicID string) (Workspace, error)
 	// GetWorkspaceMediaAssetID resolves a workspace-scoped media asset public
@@ -330,10 +347,8 @@ type Querier interface {
 	GetWorkspaceMembership(ctx context.Context, arg GetWorkspaceMembershipParams) (WorkspaceMembership, error)
 	GetWorkspaceTaskByPublicID(ctx context.Context, arg GetWorkspaceTaskByPublicIDParams) (Task, error)
 	HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error)
-	IncrementBoardShareTokenUsage(ctx context.Context, internalID int64) error
 	InsertBoardDocument(ctx context.Context, arg InsertBoardDocumentParams) error
 	InsertBoardRevision(ctx context.Context, arg InsertBoardRevisionParams) (InsertBoardRevisionRow, error)
-	InsertBoardShareToken(ctx context.Context, arg InsertBoardShareTokenParams) (InsertBoardShareTokenRow, error)
 	// Control Plane audit record writes (#809). Best-effort durable sink
 	// behind the control guard's structured slog record; audit failures
 	// never fail the guarded request.
@@ -353,18 +368,27 @@ type Querier interface {
 	InsertUsedUIDIgnore(ctx context.Context, storageUid string) (int64, error)
 	InsertWorkspaceBoardMembershipIgnore(ctx context.Context, arg InsertWorkspaceBoardMembershipIgnoreParams) (int64, error)
 	InsertWorkspaceMembershipIgnore(ctx context.Context, arg InsertWorkspaceMembershipIgnoreParams) (int64, error)
-	// InsertWorkspaceTaskOutput appends one output ref to a workspace-scoped
-	// task. Scoping resolves atomically in the SELECT so outputs can never
-	// attach to a cross-workspace task id.
-	InsertWorkspaceTaskOutput(ctx context.Context, arg InsertWorkspaceTaskOutputParams) (TaskOutput, error)
+	// InsertWorkspaceTaskOutput accepts the output reference and its immutable
+	// Media origin from the persisted Task in the same statement.
+	InsertWorkspaceTaskOutput(ctx context.Context, arg InsertWorkspaceTaskOutputParams) (InsertWorkspaceTaskOutputRow, error)
 	ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]PaymentCheckoutShutdown, error)
 	ListActivePaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error)
 	ListAdminBrandLogoOverrides(ctx context.Context) ([]AdminBrandLogoOverride, error)
 	ListAdminPaymentOrderWebhookEvents(ctx context.Context, arg ListAdminPaymentOrderWebhookEventsParams) ([]ListAdminPaymentOrderWebhookEventsRow, error)
 	ListAdminPaymentOrders(ctx context.Context, arg ListAdminPaymentOrdersParams) ([]ListAdminPaymentOrdersRow, error)
 	ListBackfilledDatesByRange(ctx context.Context, arg ListBackfilledDatesByRangeParams) ([]pgtype.Date, error)
+	// ListBoardDocumentMediaRefAssets audits the accepted document references
+	// of one board as asset public ids (#936, GC/persistence verification).
+	// Unknown or cross-workspace boards list empty.
+	ListBoardDocumentMediaRefAssets(ctx context.Context, arg ListBoardDocumentMediaRefAssetsParams) ([]string, error)
 	ListBoardRevisions(ctx context.Context, arg ListBoardRevisionsParams) ([]ListBoardRevisionsRow, error)
-	ListBoardShareTokens(ctx context.Context, arg ListBoardShareTokensParams) ([]ListBoardShareTokensRow, error)
+	// ListBoardsReferencingMediaAsset lists the workspace-scoped board public
+	// ids whose accepted document references one asset (#936: board-reference
+	// source, read from board_document_media_refs). Served through the narrow
+	// BoardMediaRefReader port: Media authorization resolves each board through
+	// RoleReader and only boards the caller can read authorize. Unknown or
+	// cross-workspace assets list empty.
+	ListBoardsReferencingMediaAsset(ctx context.Context, arg ListBoardsReferencingMediaAssetParams) ([]string, error)
 	ListControlTasks(ctx context.Context, arg ListControlTasksParams) ([]ListControlTasksRow, error)
 	ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error)
 	ListEligibleServicePoolModels(ctx context.Context, arg ListEligibleServicePoolModelsParams) ([]string, error)
@@ -373,6 +397,9 @@ type Querier interface {
 	ListLibraryAssetsByWorkspaceProvider(ctx context.Context, arg ListLibraryAssetsByWorkspaceProviderParams) ([]ListLibraryAssetsByWorkspaceProviderRow, error)
 	ListLibraryFolders(ctx context.Context, arg ListLibraryFoldersParams) ([]LibraryFolder, error)
 	ListLibraryMaterializations(ctx context.Context, arg ListLibraryMaterializationsParams) ([]ListLibraryMaterializationsRow, error)
+	// ListMediaAssetTaskOrigins preserves producing authority independently of
+	// Task retention and Board deletion. An ordinary upload has no Task origin.
+	ListMediaAssetTaskOrigins(ctx context.Context, arg ListMediaAssetTaskOriginsParams) ([]ListMediaAssetTaskOriginsRow, error)
 	// ListMediaAssets pages live (non-archived) workspace assets
 	// newest-first with limit/offset (the v1 layer converts cursor to
 	// offset and over-fetches by one for has_more).
@@ -452,9 +479,13 @@ type Querier interface {
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	// Limit authorized identifiers before joining scene bodies. The count row
-	// preserves offset validation even when the requested page is empty.
+	// preserves offset validation even when the requested page is empty. The
+	// predicate mirrors ResolveRole: current members read their own Boards or
+	// selected Boards with a configured Viewer/Editor role.
 	ListWorkspaceBoardCatalog(ctx context.Context, arg ListWorkspaceBoardCatalogParams) ([]ListWorkspaceBoardCatalogRow, error)
 	ListWorkspaceBoardMemberships(ctx context.Context, arg ListWorkspaceBoardMembershipsParams) ([]ListWorkspaceBoardMembershipsRow, error)
+	// Every currently readable Board affected by the membership departure.
+	ListWorkspaceMemberBoardGrants(ctx context.Context, arg ListWorkspaceMemberBoardGrantsParams) ([]ListWorkspaceMemberBoardGrantsRow, error)
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]WorkspaceMembership, error)
 	ListWorkspaceTaskOutputs(ctx context.Context, arg ListWorkspaceTaskOutputsParams) ([]TaskOutput, error)
 	// ListWorkspaceTaskOutputsByTaskIDs batches output reads for list pages
@@ -497,6 +528,11 @@ type Querier interface {
 	LockServiceModelPool(ctx context.Context, service string) error
 	LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error)
 	LockWorkspaceBoard(ctx context.Context, arg LockWorkspaceBoardParams) (LockWorkspaceBoardRow, error)
+	// Configuration writes lock Workspace membership before the Board row.
+	LockWorkspaceBoardAccess(ctx context.Context, arg LockWorkspaceBoardAccessParams) (LockWorkspaceBoardAccessRow, error)
+	// Lock affected Boards in a stable order before removing grants.
+	LockWorkspaceMemberBoards(ctx context.Context, arg LockWorkspaceMemberBoardsParams) ([]LockWorkspaceMemberBoardsRow, error)
+	LockWorkspaceMemberships(ctx context.Context, publicID string) (int64, error)
 	MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
 	MarkPaymentOrderCancelled(ctx context.Context, arg MarkPaymentOrderCancelledParams) (PaymentOrder, error)
 	MarkPaymentOrderCredited(ctx context.Context, arg MarkPaymentOrderCreditedParams) (PaymentOrder, error)
@@ -509,6 +545,12 @@ type Querier interface {
 	// after create). Zero rows means already moved or invisible; the
 	// caller distinguishes via GetUploadSessionByPublicID.
 	MarkUploadSessionTransferring(ctx context.Context, arg MarkUploadSessionTransferringParams) (UploadSession, error)
+	// MediaAssetHasLibraryLink reports whether a workspace-scoped asset backs
+	// at least one published Workspace Library row (#936: shared-library
+	// source). Library rows are member-visible, so existence authorizes every
+	// workspace member. Unknown or cross-workspace assets report false, never
+	// a distinct status.
+	MediaAssetHasLibraryLink(ctx context.Context, arg MediaAssetHasLibraryLinkParams) (bool, error)
 	MoveLibraryAsset(ctx context.Context, arg MoveLibraryAssetParams) (MoveLibraryAssetRow, error)
 	MoveLibraryAssetsToFolder(ctx context.Context, arg MoveLibraryAssetsToFolderParams) (int64, error)
 	PurgeExpiredControlIdempotency(ctx context.Context) (int64, error)
@@ -516,6 +558,11 @@ type Querier interface {
 	RenameLibraryFolder(ctx context.Context, arg RenameLibraryFolderParams) (LibraryFolder, error)
 	RenameWorkspaceBoard(ctx context.Context, arg RenameWorkspaceBoardParams) (int64, error)
 	ReplacePaymentStripeConfiguration(ctx context.Context, arg ReplacePaymentStripeConfigurationParams) (PaymentStripeConfiguration, error)
+	// ResolveBoardInternalID maps a workspace-scoped board public id to its
+	// internal id for upload-target binding (#936). Misses (unknown board or
+	// foreign workspace) return no row; the service maps that to ErrNotFound
+	// so the handler renders 404 without leaking existence.
+	ResolveBoardInternalID(ctx context.Context, arg ResolveBoardInternalIDParams) (int64, error)
 	RestoreWorkspaceBoard(ctx context.Context, arg RestoreWorkspaceBoardParams) (int64, error)
 	RetireActiveStorageProfileSecretVersion(ctx context.Context, arg RetireActiveStorageProfileSecretVersionParams) (int64, error)
 	// RetryWorkspaceTask consumes one retry budget entry: a live task returns
@@ -523,12 +570,15 @@ type Querier interface {
 	// must carry an empty lease_token), and the fresh execution token recorded
 	// in the workflow_input envelope.
 	RetryWorkspaceTask(ctx context.Context, arg RetryWorkspaceTaskParams) (Task, error)
-	RevokeBoardShareToken(ctx context.Context, arg RevokeBoardShareTokenParams) (int64, error)
 	// Operator backfill sweep (backfill-board-previews): internal-id ordered
 	// pages of rows whose content identity was never assigned. Internal-id
 	// keyed like TouchWorkspaceBoard/InsertBoardDocument: ids come from the
 	// scan itself, never from caller input (see the scope-check allowlist).
 	ScanBoardDocumentsMissingPreview(ctx context.Context, rowLimit int32) ([]ScanBoardDocumentsMissingPreviewRow, error)
+	// Version-guarded access transition: bumps access_version exactly once.
+	// Zero rows means the board vanished or a concurrent writer moved the
+	// version first (callers distinguish via a re-read).
+	SetBoardWorkspaceAccess(ctx context.Context, arg SetBoardWorkspaceAccessParams) (int64, error)
 	SetCurrentStorageProfile(ctx context.Context, arg SetCurrentStorageProfileParams) (int64, error)
 	SetTaskRoutingSnapshot(ctx context.Context, arg SetTaskRoutingSnapshotParams) (int64, error)
 	// Transitions read their result back through the data-modifying
@@ -557,12 +607,16 @@ type Querier interface {
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (int64, error)
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (int64, error)
 	UpdateUserStorageUID(ctx context.Context, arg UpdateUserStorageUIDParams) (int64, error)
-	UpdateWorkspaceBoardMembershipRole(ctx context.Context, arg UpdateWorkspaceBoardMembershipRoleParams) (int64, error)
 	UpdateWorkspaceMemberRole(ctx context.Context, arg UpdateWorkspaceMemberRoleParams) (int64, error)
 	UpdateWorkspaceName(ctx context.Context, arg UpdateWorkspaceNameParams) (int64, error)
 	UpsertAdminBrandLogoOverride(ctx context.Context, arg UpsertAdminBrandLogoOverrideParams) (AdminBrandLogoOverride, error)
+	// UpsertBoardDocumentMediaRef records one accepted board -> media asset
+	// reference (#936: document source). Reconciled in the SAME transaction as
+	// the document accept: the board and the asset must both resolve inside
+	// the calling workspace or no row is written (fail-closed, never
+	// cross-workspace). Replays converge via ON CONFLICT DO NOTHING.
+	UpsertBoardDocumentMediaRef(ctx context.Context, arg UpsertBoardDocumentMediaRefParams) error
 	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)
-	UpsertJoinBoardMembership(ctx context.Context, arg UpsertJoinBoardMembershipParams) error
 	UpsertOrganizationMembership(ctx context.Context, arg UpsertOrganizationMembershipParams) error
 	UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCustomerParams) (PaymentCustomer, error)
 	UpsertServiceModelPoolVersion(ctx context.Context, arg UpsertServiceModelPoolVersionParams) (int64, error)

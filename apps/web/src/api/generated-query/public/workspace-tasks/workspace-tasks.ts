@@ -68,7 +68,7 @@ export const getListWorkspaceTasksUrl = (
 }
 
 /**
- * Lists workspace tasks oldest-first with cursor pagination. Hidden workspaces converge to 404 task_not_found (never workspace_not_found) so the task surface never leaks workspace existence.
+ * Lists workspace tasks oldest-first with cursor pagination. Hidden workspaces converge to 404 task_not_found (never workspace_not_found) so the task surface never leaks workspace existence. Tasks are submitter- or current-Board-reader-only: Board-less tasks by other submitters are silently skipped, so omitting the Board ID never degrades into workspace-wide visibility.
  * @summary List workspace tasks with cursor pagination (members only)
  */
 export const listWorkspaceTasks = async (
@@ -153,7 +153,7 @@ export const getCreateWorkspaceTaskUrl = (workspaceId: string) => {
 }
 
 /**
- * Submits an async task under the discriminated input union {service, inputs:{media_asset_ids}, params}: service names a registered AI image service (generation, inpaint, render, variations, cutout, fusion, upscale, outpaint); media_asset_ids carry asset_... references only (no raw storage URLs); unknown params keys and storage URLs render 422 validation_failed with details.fields. Settlement runs Quote -> Hold -> Insert -> Enqueue with compensating rollback. Requires the Idempotency-Key header (scope task:create): same key+hash replays the first task, key reuse with a different request renders 409 task_idempotency_conflict. Insufficient Ideas render 402 task_insufficient_credits. Billing settles against a server-side quote for the ai-image:<service> SKU (unpriced or unregistered SKU renders billing_pricing_unavailable 422 deterministic, transient quote failures billing_quote_unavailable 503, billing_wallet_restricted 403). Missing Service Model Pool routing returns service_resolution_unavailable 422 before Quote/Hold. Resolution semantics: params.output_resolution is the client source of truth; an explicit top-level resolution must agree with it exactly (case-insensitive) or submit fails 422 validation_failed on details.fields.resolution. An omitted resolution is normalized once to the Service policy's canonical 1k/2k/4k value. Only 1k, 2k, and 4k are accepted; default is not a request or billing variant.
+ * Submits an async task under the discriminated input union {service, inputs:{media_asset_ids}, params}: service names a registered AI image service (generation, inpaint, render, variations, cutout, fusion, upscale, outpaint); media_asset_ids carry asset_... references only (no raw storage URLs); unknown params keys and storage URLs render 422 validation_failed with details.fields. Settlement runs Quote -> Hold -> Insert -> Enqueue with compensating rollback. Requires the Idempotency-Key header (scope task:create): same key+hash replays the first task, key reuse with a different request renders 409 task_idempotency_conflict. Insufficient Ideas render 402 task_insufficient_credits. Billing settles against a server-side quote for the ai-image:<service> SKU (unpriced or unregistered SKU renders billing_pricing_unavailable 422 deterministic, transient quote failures billing_quote_unavailable 503, billing_wallet_restricted 403). Missing Service Model Pool routing returns service_resolution_unavailable 422 before Quote/Hold. Resolution semantics: params.output_resolution is the client source of truth; an explicit top-level resolution must agree with it exactly (case-insensitive) or submit fails 422 validation_failed on details.fields.resolution. An omitted resolution is normalized once to the Service policy's canonical 1k/2k/4k value. Only 1k, 2k, and 4k are accepted; default is not a request or billing variant. An optional data.board_id binds a Canvas submit to its Board (Board identity + generate capability validated before Quote/Hold; invisible Boards render 404 board_not_found, archived Boards 409 board_archived, visible Boards without generate capability 403 task_forbidden).
  * @summary Submit a workspace task (members only, 202 + Location)
  */
 export const createWorkspaceTask = async (
@@ -269,7 +269,7 @@ export const getGetWorkspaceTaskUrl = (workspaceId: string, taskId: string) => {
 }
 
 /**
- * Malformed task_ shapes, unknown tasks, and cross-workspace ids converge to 404 task_not_found. The response carries no params object (params are write-only); outputs ride output_refs.
+ * Malformed task_ shapes, unknown tasks, and cross-workspace ids converge to 404 task_not_found. Tasks are submitter- or current-Board-reader-only (other callers converge to 404 task_not_found). The response carries no params object (params are write-only); outputs ride output_refs.
  * @summary Get a workspace task (members only)
  */
 export const getWorkspaceTask = async (

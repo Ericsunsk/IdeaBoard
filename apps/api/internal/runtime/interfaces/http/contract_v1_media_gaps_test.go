@@ -258,7 +258,7 @@ func TestV1UploadBytesFullLifecycle(t *testing.T) {
 	v1GapsStage(t, f.engine, f.uploadsPath()+"/"+uploadID+"/bytes", staged, f.member, "gaps-life-stage")
 	assetID := v1GapsComplete(t, f.engine, f.uploadsPath()+"/"+uploadID+"/complete", staged, f.member, "gaps-life-complete")
 	status, _, payload := doV1(t, f.engine, v1Call{method: "GET",
-		path: f.assetsPath() + "/" + assetID, userID: f.member})
+		path: f.assetsPath() + "/" + assetID, userID: f.owner})
 	if status != http.StatusOK {
 		t.Fatalf("asset metadata = %d %v, want 200", status, payload)
 	}
@@ -268,12 +268,12 @@ func TestV1UploadBytesFullLifecycle(t *testing.T) {
 	}
 
 	status, _, body := doV1RoundTrip(t, f.engine, v1Call{method: "GET",
-		path: f.assetsPath() + "/" + assetID + "/content", userID: f.member}, "test-gaps-")
+		path: f.assetsPath() + "/" + assetID + "/content", userID: f.owner}, "test-gaps-")
 	if status != http.StatusOK || body != string(staged) {
 		t.Fatalf("content = %d len %d, want 200 staged bytes len %d", status, len(body), len(staged))
 	}
 	assertV1DisplayTierImage(t, f.engine, v1TestImgproxyConfig(t),
-		f.assetsPath()+"/"+assetID+"/derivatives/thumb", f.member,
+		f.assetsPath()+"/"+assetID+"/derivatives/thumb", f.owner,
 		derivativedomain.TierThumb, derivativedomain.TierSpecs[derivativedomain.TierThumb].MaxSide)
 
 	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.assetsPath() + "/" + assetID + "/archive",
@@ -698,7 +698,7 @@ func TestV1BatchGetMediaAssets(t *testing.T) {
 	}
 
 	// Reversed request order comes back reversed (order preserved).
-	status, payload := batch([]string{secondAsset, firstAsset}, f.member)
+	status, payload := batch([]string{secondAsset, firstAsset}, f.owner)
 	if status != http.StatusOK {
 		t.Fatalf("batch = %d %v, want 200", status, payload)
 	}

@@ -97,6 +97,10 @@ func TestV1LibraryDisplayUsesCompletedManagedLink(t *testing.T) {
 	if _, err := lib.SetMaterializationResult(context.Background(), f.ws.PublicID, jobID, librarydomain.V1MaterializationCompleted, managed.ID, "", ""); err != nil {
 		t.Fatal(err)
 	}
+	// #936: the completed materialization link publishes the managed asset
+	// to workspace members; seed the same existence fact on the media seam
+	// (twin of the library_assets row, which lives in the library store).
+	f.media.SeedLibraryLinkForTests(f.ws.PublicID, managed.ID)
 	cfg := v1TestImgproxyConfig(t)
 	renderer := imgproxy.NewRenderer(cfg, nil)
 	previews, err := preview.NewService(cfg, t.TempDir(), renderer)
@@ -132,6 +136,9 @@ func TestV1LibraryDisplayDirectManagedLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// #936: the managed save publishes the asset to workspace members; seed
+	// the existence fact on the media seam (twin of the library_assets row).
+	f.media.SeedLibraryLinkForTests(f.ws.PublicID, managed.ID)
 	danglingID, err := librarydomain.NewV1AssetPublicID()
 	if err != nil {
 		t.Fatal(err)

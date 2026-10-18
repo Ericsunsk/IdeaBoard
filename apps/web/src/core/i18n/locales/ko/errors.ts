@@ -26,4 +26,12 @@ export default {
   checkout_request_rejected: '결제를 시작할 수 없습니다. 다시 시도해 주세요.',
   checkout_session_expired: '결제 세션이 만료되었습니다. 새 결제를 시작해 주세요.',
   payment_already_completed: '이미 완료된 결제입니다.',
+  board_forbidden: '이 보드를 조작할 수 없습니다.',
+  task_forbidden: '이 작업을 조작할 수 없습니다.',
+  board_archived: '이 보드는 보관되어 이 작업을 수행할 수 없습니다.',
+  board_not_found: '보드를 찾을 수 없습니다.',
+  board_access_conflict: '접근 권한이 다른 곳에서 변경되었습니다. 새로고침 후 다시 시도하세요.',
+  board_precondition_required: '접근 상태가 오래되었습니다. 새로고침 후 다시 시도하세요.',
+  board_member_not_found: '보드 멤버를 찾을 수 없습니다.',
+  membership_transition_forbidden: '마지막 매니저는 제거하거나 강등할 수 없습니다.',
 } as const

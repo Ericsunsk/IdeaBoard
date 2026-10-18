@@ -1,20 +1,16 @@
--- Workspace-rooted boards postgres store (#802 interface, #809 follow-up
--- to #817). boards.workspace_id is the workspace link (no separate link
--- table); board_revisions rows are INSERT-only, so no UPDATE/DELETE
--- revision query exists here by design. Every board-scoped query joins
--- workspaces on public_id so foreign-workspace rows stay invisible.
--- Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
+-- Workspace-scoped Boards use one common role and explicit selected members.
 
 -- name: CreateWorkspaceBoard :one
 INSERT INTO boards (public_id, workspace_id, owner_user_id, title)
 SELECT sqlc.arg(public_id), w.internal_id, sqlc.arg(owner_user_id), sqlc.arg(title)
 FROM workspaces AS w
 WHERE w.public_id = sqlc.arg(workspace_public_id)
-RETURNING internal_id, public_id, owner_user_id, title, created_at, updated_at, archived_at;
+RETURNING internal_id, public_id, owner_user_id, title, workspace_access, access_version, created_at, updated_at, archived_at;
 
 -- name: GetWorkspaceBoard :one
 SELECT b.internal_id, b.public_id, w.public_id AS workspace_public_id,
-  b.owner_user_id, b.title, b.created_at, b.updated_at, b.archived_at,
+  b.owner_user_id, b.title, b.workspace_access, b.access_version,
+  b.created_at, b.updated_at, b.archived_at,
   d.document_version, d.schema_version, d.snapshot_data,
   d.content_version, d.preview_scene
 FROM boards AS b
@@ -25,9 +21,17 @@ LIMIT 1;
 
 -- name: ListWorkspaceBoardCatalog :many
 -- Limit authorized identifiers before joining scene bodies. The count row
--- preserves offset validation even when the requested page is empty.
+-- preserves offset validation even when the requested page is empty. The
+-- predicate mirrors ResolveRole: current members read their own Boards or
+-- selected Boards with a configured Viewer/Editor role.
 WITH authorized AS MATERIALIZED (
-  SELECT b.internal_id, b.updated_at, b.public_id
+  SELECT b.internal_id, b.updated_at, b.public_id,
+    (m.user_id IS NOT NULL) AS has_direct_grant,
+    CASE
+      WHEN b.owner_user_id = sqlc.arg(user_id) THEN 'owner'
+      WHEN m.user_id IS NOT NULL AND b.workspace_access IN ('viewer', 'editor') THEN b.workspace_access
+      ELSE ''
+    END AS effective_role
   FROM boards AS b
   INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
   INNER JOIN board_documents AS d ON d.board_id = b.internal_id
@@ -35,15 +39,16 @@ WITH authorized AS MATERIALIZED (
   WHERE w.public_id = sqlc.arg(workspace_public_id)
     AND (b.archived_at IS NULL OR sqlc.arg(include_archived))
     AND b.owner_user_id IS NOT NULL
+    AND sqlc.arg(is_workspace_member)
+    AND EXISTS (SELECT 1 FROM workspace_memberships AS wm WHERE wm.workspace_id = w.internal_id AND wm.user_id = sqlc.arg(user_id) AND btrim(wm.role) IN ('owner', 'admin', 'member'))
     AND (
       b.owner_user_id = sqlc.arg(user_id)
-      OR (m.user_id IS NOT NULL AND btrim(m.role) IN ('owner', 'editor', 'viewer'))
-      OR (m.user_id IS NULL AND sqlc.arg(workspace_role)::text IN ('owner', 'admin', 'member'))
+      OR (m.user_id IS NOT NULL AND b.workspace_access IN ('viewer', 'editor'))
     )
   ORDER BY b.updated_at DESC, b.public_id ASC
   LIMIT sqlc.arg(catalog_limit)
 ), page AS (
-  SELECT internal_id FROM authorized
+  SELECT internal_id, has_direct_grant, effective_role FROM authorized
   ORDER BY updated_at DESC, public_id ASC
   LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset)
 ), total AS (
@@ -51,8 +56,11 @@ WITH authorized AS MATERIALIZED (
 )
 SELECT total.total_count,
   b.internal_id, b.public_id, w.public_id AS workspace_public_id,
-  b.owner_user_id, b.title, b.created_at, b.updated_at, b.archived_at,
-  d.document_version, d.schema_version, d.content_version, d.preview_scene
+  b.owner_user_id, b.title, b.workspace_access, b.access_version,
+  b.created_at, b.updated_at, b.archived_at,
+  d.document_version, d.schema_version, d.content_version, d.preview_scene,
+  page.has_direct_grant, page.effective_role,
+  EXISTS (SELECT 1 FROM board_memberships AS g WHERE g.board_id = b.internal_id) AS has_any_grants
 FROM total
 LEFT JOIN page ON true
 LEFT JOIN boards AS b ON b.internal_id = page.internal_id
@@ -102,6 +110,88 @@ INNER JOIN board_documents AS d ON d.board_id = b.internal_id
 WHERE w.public_id = sqlc.arg(workspace_public_id) AND b.public_id = sqlc.arg(board_public_id)
 LIMIT 1
 FOR UPDATE;
+
+-- name: GetWorkspaceBoardAccess :one
+SELECT b.owner_user_id, b.workspace_access, b.access_version, b.archived_at
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE w.public_id = sqlc.arg(workspace_public_id) AND b.public_id = sqlc.arg(board_public_id)
+LIMIT 1;
+
+-- name: LockWorkspaceBoardAccess :one
+-- Configuration writes lock Workspace membership before the Board row.
+SELECT b.internal_id, b.owner_user_id, b.workspace_access, b.access_version, b.archived_at
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE w.public_id = sqlc.arg(workspace_public_id) AND b.public_id = sqlc.arg(board_public_id)
+LIMIT 1
+FOR UPDATE;
+
+-- name: SetBoardWorkspaceAccess :execrows
+-- Version-guarded access transition: bumps access_version exactly once.
+-- Zero rows means the board vanished or a concurrent writer moved the
+-- version first (callers distinguish via a re-read).
+UPDATE boards AS b
+SET workspace_access = sqlc.arg(workspace_access), access_version = access_version + 1, updated_at = now()
+FROM workspaces AS w
+WHERE w.internal_id = b.workspace_id
+  AND w.public_id = sqlc.arg(workspace_public_id)
+  AND b.public_id = sqlc.arg(board_public_id)
+  AND b.access_version = sqlc.arg(expected_version)
+  AND b.archived_at IS NULL;
+
+-- name: ClearBoardMemberships :execrows
+-- Configuration replacement removes previous selections in the accepting transaction.
+DELETE FROM board_memberships AS m
+USING boards AS b, workspaces AS w
+WHERE m.board_id = b.internal_id
+  AND w.internal_id = b.workspace_id
+  AND w.public_id = sqlc.arg(workspace_public_id)
+  AND b.public_id = sqlc.arg(board_public_id);
+
+-- name: ListWorkspaceMemberBoardGrants :many
+-- Every currently readable Board affected by the membership departure.
+SELECT b.public_id, b.access_version, b.archived_at IS NOT NULL AS is_archived
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+LEFT JOIN board_memberships AS m ON m.board_id = b.internal_id AND m.user_id = sqlc.arg(user_id)
+WHERE w.public_id = sqlc.arg(workspace_public_id)
+  AND (b.owner_user_id = sqlc.arg(user_id)
+    OR (m.user_id IS NOT NULL AND b.workspace_access IN ('viewer', 'editor')))
+ORDER BY b.public_id ASC;
+
+-- name: LockWorkspaceMemberBoards :many
+-- Lock affected Boards in a stable order before removing grants.
+SELECT b.internal_id, b.public_id, b.access_version, b.owner_user_id
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE w.public_id = sqlc.arg(workspace_public_id)
+  AND b.public_id = ANY(sqlc.arg(board_public_ids)::text[])
+ORDER BY b.public_id ASC
+FOR UPDATE;
+
+-- name: BumpWorkspaceMemberBoardsAccess :many
+-- Every changed grant advances its Board access version, including archived Boards.
+UPDATE boards AS b
+SET access_version = access_version + 1, updated_at = now()
+FROM workspaces AS w
+WHERE w.internal_id = b.workspace_id
+  AND w.public_id = sqlc.arg(workspace_public_id)
+  AND b.public_id = ANY(sqlc.arg(board_public_ids)::text[])
+RETURNING b.public_id, b.access_version;
+
+-- name: DeleteWorkspaceMemberBoardGrants :execrows
+-- Removes every direct grant of one user across the workspace in the
+-- same transaction as the version bumps above: rejoining later finds no
+-- stale row to resurrect (fail-closed), while the serve-time membership
+-- precondition already denies the departed member before this cleanup
+-- lands. Board/document/Task/asset rows are untouched.
+DELETE FROM board_memberships AS m
+USING boards AS b, workspaces AS w
+WHERE m.board_id = b.internal_id
+  AND w.internal_id = b.workspace_id
+  AND w.public_id = sqlc.arg(workspace_public_id)
+  AND m.user_id = sqlc.arg(user_id);
 
 -- name: UpdateBoardDocument :execrows
 UPDATE board_documents
@@ -170,8 +260,8 @@ WHERE w.public_id = sqlc.arg(workspace_public_id)
 ORDER BY r.revision_number ASC
 LIMIT sqlc.arg(row_limit);
 
--- name: GetWorkspaceBoardMembershipRole :one
-SELECT m.role
+-- name: GetWorkspaceBoardMembership :one
+SELECT m.user_id
 FROM board_memberships AS m
 INNER JOIN boards AS b ON b.internal_id = m.board_id
 INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
@@ -181,7 +271,7 @@ WHERE w.public_id = sqlc.arg(workspace_public_id)
 LIMIT 1;
 
 -- name: ListWorkspaceBoardMemberships :many
-SELECT m.user_id, m.role, m.created_at
+SELECT m.user_id, m.created_at
 FROM board_memberships AS m
 INNER JOIN boards AS b ON b.internal_id = m.board_id
 INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
@@ -192,23 +282,13 @@ ORDER BY m.user_id ASC
 LIMIT sqlc.arg(row_limit);
 
 -- name: InsertWorkspaceBoardMembershipIgnore :execrows
-INSERT INTO board_memberships (board_id, user_id, role)
-SELECT b.internal_id, sqlc.arg(user_id), sqlc.arg(role)
+INSERT INTO board_memberships (board_id, user_id)
+SELECT b.internal_id, sqlc.arg(user_id)
 FROM boards AS b
 INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
 WHERE w.public_id = sqlc.arg(workspace_public_id)
   AND b.public_id = sqlc.arg(board_public_id)
 ON CONFLICT (board_id, user_id) DO NOTHING;
-
--- name: UpdateWorkspaceBoardMembershipRole :execrows
-UPDATE board_memberships AS m
-SET role = sqlc.arg(role)
-FROM boards AS b
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-WHERE m.board_id = b.internal_id
-  AND w.public_id = sqlc.arg(workspace_public_id)
-  AND b.public_id = sqlc.arg(board_public_id)
-  AND m.user_id = sqlc.arg(user_id);
 
 -- name: DeleteWorkspaceBoardMembership :execrows
 DELETE FROM board_memberships AS m
@@ -219,63 +299,59 @@ WHERE m.board_id = b.internal_id
   AND b.public_id = sqlc.arg(board_public_id)
   AND m.user_id = sqlc.arg(user_id);
 
--- name: CountWorkspaceBoardOwners :one
-SELECT COUNT(*)
-FROM board_memberships AS m
-INNER JOIN boards AS b ON b.internal_id = m.board_id
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-WHERE w.public_id = sqlc.arg(workspace_public_id)
-  AND b.public_id = sqlc.arg(board_public_id)
-  AND m.role = 'owner'
-  AND m.user_id <> COALESCE(b.owner_user_id, -1);
-
--- name: InsertBoardShareToken :one
-INSERT INTO board_share_tokens (public_id, board_id, token_id, token_secret, token_prefix, granted_role, created_by_user_id)
-SELECT sqlc.arg(public_id), b.internal_id, sqlc.arg(token_id), sqlc.arg(token_secret), sqlc.arg(token_prefix), sqlc.arg(granted_role), sqlc.arg(created_by_user_id)
+-- UpsertBoardDocumentMediaRef records one accepted board -> media asset
+-- reference (#936: document source). Reconciled in the SAME transaction as
+-- the document accept: the board and the asset must both resolve inside
+-- the calling workspace or no row is written (fail-closed, never
+-- cross-workspace). Replays converge via ON CONFLICT DO NOTHING.
+-- name: UpsertBoardDocumentMediaRef :exec
+INSERT INTO board_document_media_refs (board_id, media_asset_id)
+SELECT b.internal_id, m.internal_id
 FROM boards AS b
 INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+INNER JOIN media_assets AS m ON m.workspace_id = w.internal_id
 WHERE w.public_id = sqlc.arg(workspace_public_id)
   AND b.public_id = sqlc.arg(board_public_id)
-RETURNING internal_id, created_at;
+  AND m.public_id = sqlc.arg(asset_public_id)
+ON CONFLICT (board_id, media_asset_id) DO NOTHING;
 
--- name: ListBoardShareTokens :many
-SELECT t.public_id, t.token_id, t.token_secret, t.token_prefix, t.granted_role,
-  t.created_by_user_id, t.created_at, t.revoked_at, t.revoked_by_user_id, t.usage_count
-FROM board_share_tokens AS t
-INNER JOIN boards AS b ON b.internal_id = t.board_id
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-WHERE w.public_id = sqlc.arg(workspace_public_id)
-  AND b.public_id = sqlc.arg(board_public_id)
-ORDER BY t.created_at DESC, t.internal_id DESC
-LIMIT sqlc.arg(row_limit);
-
--- name: GetBoardShareTokenBySecret :one
-SELECT t.internal_id, t.public_id, t.token_id, t.token_secret, t.token_prefix, t.granted_role,
-  t.created_by_user_id, t.created_at, t.revoked_at, t.revoked_by_user_id, t.usage_count,
-  b.internal_id AS board_internal_id, b.public_id AS board_public_id, b.archived_at AS board_archived_at,
-  b.owner_user_id AS board_owner_user_id
-FROM board_share_tokens AS t
-INNER JOIN boards AS b ON b.internal_id = t.board_id
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-WHERE w.public_id = sqlc.arg(workspace_public_id)
-  AND t.token_secret = sqlc.arg(token_secret)
-LIMIT 1;
-
--- name: RevokeBoardShareToken :execrows
-UPDATE board_share_tokens AS t
-SET revoked_at = COALESCE(t.revoked_at, now()),
-  revoked_by_user_id = COALESCE(t.revoked_by_user_id, sqlc.arg(revoked_by_user_id))
-FROM boards AS b
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-WHERE t.board_id = b.internal_id
+-- DeleteBoardDocumentMediaRefs clears every accepted document reference
+-- for one board in the calling workspace (#936). ReplaceDocument calls it
+-- before re-inserting the accepted set, so removed references stop
+-- authorizing in the same accepting transaction while upload-target,
+-- owner, library, task, and other-board sources stay untouched.
+-- name: DeleteBoardDocumentMediaRefs :exec
+DELETE FROM board_document_media_refs AS r
+USING boards AS b, workspaces AS w
+WHERE r.board_id = b.internal_id
+  AND w.internal_id = b.workspace_id
   AND w.public_id = sqlc.arg(workspace_public_id)
+  AND b.public_id = sqlc.arg(board_public_id);
+
+-- ListBoardDocumentMediaRefAssets audits the accepted document references
+-- of one board as asset public ids (#936, GC/persistence verification).
+-- Unknown or cross-workspace boards list empty.
+-- name: ListBoardDocumentMediaRefAssets :many
+SELECT m.public_id
+FROM board_document_media_refs AS r
+INNER JOIN boards AS b ON b.internal_id = r.board_id
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+INNER JOIN media_assets AS m ON m.internal_id = r.media_asset_id
+WHERE w.public_id = sqlc.arg(workspace_public_id)
   AND b.public_id = sqlc.arg(board_public_id)
-  AND t.token_id = sqlc.arg(token_id);
+ORDER BY m.public_id ASC;
 
--- name: IncrementBoardShareTokenUsage :exec
-UPDATE board_share_tokens SET usage_count = usage_count + 1 WHERE internal_id = sqlc.arg(internal_id);
-
--- name: UpsertJoinBoardMembership :exec
-INSERT INTO board_memberships (board_id, user_id, role)
-VALUES (sqlc.arg(board_id), sqlc.arg(user_id), sqlc.arg(role))
-ON CONFLICT (board_id, user_id) DO UPDATE SET role = EXCLUDED.role;
+-- ListBoardsReferencingMediaAsset lists the workspace-scoped board public
+-- ids whose accepted document references one asset (#936: board-reference
+-- source, read from board_document_media_refs). Served through the narrow
+-- BoardMediaRefReader port: Media authorization resolves each board through
+-- RoleReader and only boards the caller can read authorize. Unknown or
+-- cross-workspace assets list empty.
+-- name: ListBoardsReferencingMediaAsset :many
+SELECT b.public_id
+FROM media_assets AS m
+INNER JOIN workspaces AS w ON w.internal_id = m.workspace_id
+INNER JOIN board_document_media_refs AS r ON r.media_asset_id = m.internal_id
+INNER JOIN boards AS b ON b.internal_id = r.board_id
+WHERE m.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id)
+ORDER BY b.public_id ASC;

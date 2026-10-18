@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -16,6 +17,10 @@ type v1MemberDTO struct {
 	UserID    string `json:"user_id"`
 	Role      string `json:"role"`
 	CreatedAt string `json:"created_at,omitempty"`
+	// Email is the workspace-visible member email for invite search and
+	// display assistance only. It is omitted when unavailable and never
+	// acts as a write identity (writes stay usr_).
+	Email string `json:"email,omitempty"`
 }
 
 type v1DeletedDTO struct {
@@ -77,6 +82,8 @@ func (h *contractV1Handler) resolveMemberUserID(c *gin.Context, raw string) (int
 
 func renderMemberTransitionError(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, tenancy.ErrWorkspaceMemberLimitReached):
+		contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceMemberLimitReached, "Workspace supports up to 5 members, including owners")
 	case errors.Is(err, tenancy.ErrLastOwner):
 		contract.RenderError(c, contract.StatusOf(contract.CodeMembershipTransitionForbidden),
 			contract.CodeMembershipTransitionForbidden, msgMembershipTransitionForbidden2)
@@ -107,8 +114,41 @@ func (h *contractV1Handler) listWorkspaceMembers(c *gin.Context) {
 			}
 			page = append(page, dto)
 		}
+		// Best-effort email enrichment for invite search: unknown or
+		// missing emails stay omitted and never fail the list.
+		h.enrichMemberEmails(c.Request.Context(), members, page)
 		contract.RenderSuccess(c, page)
 	})
+}
+
+// enrichMemberEmails joins workspace-member emails onto the list DTOs in
+// place. It fails closed: a nil provider, lookup error, or missing email
+// leaves the corresponding field omitted while the list still renders 200.
+// Single-member writes (add/update) intentionally bypass this path and keep
+// their usr_-only shape.
+func (h *contractV1Handler) enrichMemberEmails(ctx context.Context, members []*tenancy.WorkspaceMember, page []v1MemberDTO) {
+	if h.deps.MemberEmails == nil || len(members) == 0 || len(page) != len(members) {
+		return
+	}
+	ids := make([]int64, 0, len(members))
+	for _, m := range members {
+		if m == nil {
+			continue
+		}
+		ids = append(ids, m.UserID)
+	}
+	emails, err := h.deps.MemberEmails.GetMemberEmails(ctx, ids)
+	if err != nil || len(emails) == 0 {
+		return
+	}
+	for i, m := range members {
+		if m == nil {
+			continue
+		}
+		if email := strings.TrimSpace(emails[m.UserID]); email != "" {
+			page[i].Email = email
+		}
+	}
 }
 
 type v1AddMemberBody struct {
@@ -171,7 +211,11 @@ func (h *contractV1Handler) addWorkspaceMember(c *gin.Context) {
 		externalUser := tenancy.FormatUserPublicID(wctx.Principal.PublicID())
 		hash := contract.HashIdempotencyRequest("workspace:member-add", wctx.Workspace.PublicID, body.Data.UserID, newRole)
 		result, fnErr, ok := h.workspaceDo(c, externalUser, wctx.Principal.UserID(), "member-add", key, hash, func() (any, error) {
-			return h.deps.Store.AddWorkspaceMember(c.Request.Context(), wctx.Workspace.PublicID, targetUserID, newRole)
+			added, err := h.deps.Store.AddWorkspaceMember(c.Request.Context(), wctx.Workspace.PublicID, targetUserID, newRole)
+			if err != nil {
+				return nil, err
+			}
+			return added, nil
 		})
 		if !ok {
 			return
@@ -244,10 +288,15 @@ func (h *contractV1Handler) removeWorkspaceMember(c *gin.Context) {
 		externalUser := tenancy.FormatUserPublicID(wctx.Principal.PublicID())
 		hash := contract.HashIdempotencyRequest("workspace:member-remove", wctx.Workspace.PublicID, tenancy.FormatUserPublicID(targetExternal))
 		result, fnErr, ok := h.workspaceDo(c, externalUser, wctx.Principal.UserID(), "member-remove", key, hash, func() (any, error) {
-			if err := h.deps.Store.RemoveWorkspaceMember(
-				c.Request.Context(), wctx.Workspace.PublicID, wctx.Principal.UserID(), targetUserID); err != nil {
+			cleaned, err := h.deps.Store.RemoveWorkspaceMember(
+				c.Request.Context(), wctx.Workspace.PublicID, wctx.Principal.UserID(), targetUserID, h.deps.Boards)
+			if err != nil {
 				return nil, err
 			}
+			for _, board := range cleaned {
+				h.deliverBoardAccessSignals(c.Request.Context(), board.AccessSignals)
+			}
+
 			return &v1DeletedDTO{Deleted: true}, nil
 		})
 		if !ok {

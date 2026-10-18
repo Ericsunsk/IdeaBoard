@@ -46,7 +46,7 @@
               :class="props.avatarImageClass"
               :alt="t('auth.menu.avatarAlt')"
             />
-            <span v-else :class="[props.avatarPlaceholderClass, 'bg-transparent']">
+            <span v-else :class="props.avatarPlaceholderClass">
               <User :class="props.avatarIconClass" />
             </span>
           </button>
@@ -68,6 +68,91 @@
             </DropdownMenuLabel>
             <DropdownMenuSeparator class="my-1" />
           </template>
+
+          <DropdownMenuSub v-if="isWorkspaceRowVisible" v-model:open="isWorkspaceSubOpen">
+            <div class="flex items-center gap-1 px-2.5 pt-1.5 pb-0.5">
+              <span class="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
+                {{ t('workspace.switcher.rowTitle') }}
+              </span>
+              <button
+                type="button"
+                class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground focus-visible:shadow-focus-ring"
+                :aria-label="t('workspace.switcher.manage')"
+                :title="t('workspace.switcher.manage')"
+                @click.stop="openWorkspaceSettings"
+              >
+                <Settings class="size-4" aria-hidden="true" />
+              </button>
+            </div>
+            <DropdownMenuSubTrigger :class="[appOverlayMenuItemClass, props.menuItemClass]">
+              <span class="truncate" :title="currentWorkspaceLabel">{{
+                currentWorkspaceLabel
+              }}</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent
+              :side-offset="appOverlayMenuSideOffset"
+              :class="submenuContentClass"
+            >
+              <div
+                v-if="isWorkspaceLoading"
+                class="flex items-center gap-2 px-2.5 py-2"
+                aria-live="polite"
+              >
+                <Spinner class="size-4 shrink-0" aria-hidden="true" />
+                <span class="truncate text-xs text-muted-foreground">
+                  {{ t('common.actions.loading') }}
+                </span>
+              </div>
+              <template v-else-if="workspaceLoadError">
+                <div class="px-2.5 py-2" aria-live="polite">
+                  <p class="m-0 text-xs leading-normal text-destructive">
+                    {{ workspaceLoadError }}
+                  </p>
+                </div>
+                <DropdownMenuItem
+                  :class="[appOverlayMenuItemClass, props.menuItemClass]"
+                  @select="handleWorkspaceRetry"
+                >
+                  <span class="truncate">{{ t('common.actions.retry') }}</span>
+                </DropdownMenuItem>
+              </template>
+              <p
+                v-else-if="visibleWorkspaces.length === 0"
+                class="m-0 px-2.5 py-2 text-xs text-muted-foreground"
+                aria-live="polite"
+              >
+                {{ t('workspace.switcher.empty') }}
+              </p>
+              <template v-else>
+                <DropdownMenuItem
+                  v-for="item in visibleWorkspaces"
+                  :key="item.publicId"
+                  :class="[
+                    appOverlayMenuItemClass,
+                    props.menuItemClass,
+                    item.publicId === props.workspace?.selectedId &&
+                      'bg-muted text-[var(--app-overlay-menu-item-hover-color,var(--foreground))] font-medium',
+                  ]"
+                  :data-control-state="
+                    item.publicId === props.workspace?.selectedId ? 'active' : 'idle'
+                  "
+                  :aria-current="item.publicId === props.workspace?.selectedId ? 'true' : undefined"
+                  @select="handleWorkspaceSelect(item.publicId)"
+                >
+                  <span class="truncate flex-1" :title="workspaceOptionLabel(item)">{{
+                    workspaceOptionLabel(item)
+                  }}</span>
+                  <Check
+                    v-if="item.publicId === props.workspace?.selectedId"
+                    class="size-3.5 shrink-0 ml-auto"
+                    aria-hidden="true"
+                  />
+                </DropdownMenuItem>
+              </template>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+
+          <DropdownMenuSeparator class="my-1" />
 
           <DropdownMenuItem
             v-for="item in nonDangerItems"
@@ -178,6 +263,21 @@
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <WorkspaceSettingsDialog
+        v-if="isWorkspaceRowVisible"
+        :is-open="isWorkspaceSettingsOpen"
+        :items="props.workspace?.items ?? []"
+        :selected-id="props.workspace?.selectedId ?? null"
+        :is-loading="isWorkspaceLoading"
+        :load-error="workspaceLoadError"
+        :name-max-length="workspaceNameMaxLength"
+        :current-user-id="props.workspace?.currentUserId ?? null"
+        :on-retry="handleWorkspaceDialogRetry"
+        :on-create="handleWorkspaceCreate"
+        :on-rename="handleWorkspaceRename"
+        :on-select="props.workspace?.onSelect"
+        @update:is-open="isWorkspaceSettingsOpen = $event"
+      />
     </template>
   </div>
 </template>
@@ -185,7 +285,7 @@
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Check, HalfMoon, Laptop, SunLight, User } from '@iconoir/vue'
+import { Check, HalfMoon, Laptop, Settings, SunLight, User } from '@iconoir/vue'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -197,6 +297,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Spinner } from '@/components/ui/spinner'
 import {
   appOverlayMenuDangerItemClass,
   appOverlayMenuItemClass,
@@ -214,7 +315,14 @@ import { LOCALE_MANIFEST } from '../../../../core/i18n/localeManifest'
 import type { SupportChannel } from '../../../../core/composables/useSupportChannels'
 import SupportChannelQr from './SupportChannelQr.vue'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
-import type { UserAccountMenuItem, UserIdeaBalanceControl } from './userAccountMenu.types'
+import WorkspaceSettingsDialog from './WorkspaceSettingsDialog.vue'
+import { isPersonalWorkspaceItem, visibleWorkspaceItems } from './workspaceMenu'
+import type {
+  UserAccountMenuItem,
+  UserAccountMenuWorkspace,
+  UserAccountMenuWorkspaceItem,
+  UserIdeaBalanceControl,
+} from './userAccountMenu.types'
 
 const props = withDefaults(
   defineProps<{
@@ -231,6 +339,7 @@ const props = withDefaults(
     menuDangerItemClass?: string
     showCredits?: boolean
     supportChannels?: SupportChannel[]
+    workspace?: UserAccountMenuWorkspace | undefined
   }>(),
   {
     avatarUrl: undefined,
@@ -245,11 +354,14 @@ const props = withDefaults(
     menuDangerItemClass: appOverlayMenuDangerItemClass,
     showCredits: true,
     supportChannels: () => [],
+    workspace: undefined,
   },
 )
 
 const open = defineModel<boolean>('open', { default: false })
 const activeSupportChannelId = ref<string | null>(null)
+const isWorkspaceSubOpen = ref(false)
+const isWorkspaceSettingsOpen = ref(false)
 const { locale: i18nLocale, t } = useI18n()
 const { mode, setTheme } = useTheme()
 
@@ -302,6 +414,73 @@ const dangerItems = computed(() => props.items.filter((item) => item.tone === 'd
 const loginItem = computed(() => props.items.find((item) => item.key === 'login'))
 const registerItem = computed(() => props.items.find((item) => item.key === 'register'))
 const isGuest = computed(() => Boolean(loginItem.value && registerItem.value))
+
+// Workspace switcher row: rendered inside the dropdown for signed-in menus
+// that receive workspace state from their shell header (workspace + admin
+// alike). Guests never see a dropdown, so the row stays hidden for them.
+const WORKSPACE_NAME_MAX_LENGTH_FALLBACK = 120
+
+const isWorkspaceRowVisible = computed(() => !isGuest.value && props.workspace != null)
+const visibleWorkspaces = computed(() => visibleWorkspaceItems(props.workspace?.items ?? []))
+const isWorkspaceLoading = computed(() => props.workspace?.status === 'loading')
+const workspaceLoadError = computed(() =>
+  props.workspace?.status === 'error'
+    ? (props.workspace.errorMessage ?? t('workspace.switcher.loadFailed'))
+    : null,
+)
+const workspaceNameMaxLength = computed(
+  () => props.workspace?.nameMaxLength ?? WORKSPACE_NAME_MAX_LENGTH_FALLBACK,
+)
+function workspaceOptionLabel(item: UserAccountMenuWorkspaceItem): string {
+  return isPersonalWorkspaceItem(item) ? t('workspace.switcher.defaultBadge') : item.name
+}
+
+const currentWorkspaceLabel = computed(() => {
+  const workspace = props.workspace
+  const selected = workspace?.items.find((item) => item.publicId === workspace.selectedId)
+  if (!selected) return t('workspace.switcher.title')
+  return workspaceOptionLabel(selected)
+})
+
+function handleWorkspaceSelect(workspaceId: string) {
+  isWorkspaceSubOpen.value = false
+  open.value = false
+  props.workspace?.onSelect(workspaceId)
+}
+
+function handleWorkspaceRetry(event: Event) {
+  // Stay in the menu so the reloaded list lands where the user is looking.
+  event.preventDefault()
+  props.workspace?.onRetry()
+}
+
+function openWorkspaceSettings() {
+  // The submenu and the settings modal never share the screen: opening the
+  // modal closes the submenu and the dropdown with it.
+  isWorkspaceSubOpen.value = false
+  open.value = false
+  isWorkspaceSettingsOpen.value = true
+}
+
+function handleWorkspaceDialogRetry() {
+  props.workspace?.onRetry()
+}
+
+function requireWorkspace(): UserAccountMenuWorkspace {
+  const workspace = props.workspace
+  if (!workspace) throw new Error('Workspace controls are unavailable')
+  return workspace
+}
+
+async function handleWorkspaceCreate(name: string) {
+  // The header switches to the new workspace gallery on success; the dialog
+  // closes itself, and the dropdown is already closed.
+  return requireWorkspace().onCreate(name)
+}
+
+async function handleWorkspaceRename(workspaceId: string, name: string) {
+  return requireWorkspace().onRename(workspaceId, name)
+}
 
 function keepSupportQrFocus(event: Event) {
   if (event.target instanceof Element && event.target.closest('[data-support-qr-panel]'))

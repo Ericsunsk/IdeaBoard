@@ -21,3 +21,18 @@ export function useAccountWorkspace(options?: { enabled?: MaybeRefOrGetter<boole
   const isSelectionSettled = computed(() => selection.status.value !== 'loading')
   return { workspaceId, isSelectionPending, isSelectionSettled }
 }
+
+export {
+  changeWorkspaceMemberRole,
+  classifyWorkspaceMemberError,
+  invalidateWorkspaceMemberQueries,
+  inviteWorkspaceMember,
+  lookupWorkspaceMemberId,
+  removeWorkspaceMemberEntry,
+  workspaceMembersQueryOptions,
+} from '../../workspace/selection/workspaceMembersResource'
+export type {
+  WorkspaceMemberEntry,
+  WorkspaceMemberFailureReason,
+  WorkspaceMemberRole,
+} from '../../workspace/selection/workspaceMembersResource'

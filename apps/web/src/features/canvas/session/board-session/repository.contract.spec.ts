@@ -15,6 +15,8 @@ import { createBoardSessionRepository, isBoardSessionRemoteSyncError } from './r
 import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { resetMediaWorkspaceIdResolver } from '../../../../api/mediaAssetDelivery'
 import { queryClient } from '../../../../core/query/queryClient'
+import { createDeferred } from '../../../../test/deferred'
+import { useBoardSession } from './useBoardSession'
 
 const mocks = vi.hoisted(() => {
   const request = vi.fn()
@@ -211,6 +213,73 @@ describe('createBoardSessionRepository', () => {
     queryClient.clear()
     resetWorkspaceSelectionStore()
     resetMediaWorkspaceIdResolver()
+  })
+
+  it.each(['resolve', 'reject'] as const)(
+    'preserves the fresh A→B→A draft when old stabilization %ss',
+    async (outcome) => {
+      const board = createBoard('Stabilization Residency')
+      replaceBoardStateMap({ [board.id]: makeState(1_000, 'old-draft') })
+      const repository = createBoardSessionRepository()
+      const stabilization = createDeferred<BoardSnapshot>()
+      const session = useBoardSession({
+        getBoardIdQuery: () => board.id,
+        getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
+        repository,
+        message: { warning: vi.fn() },
+        createUploadLifecycle: () => ({
+          stabilizeSnapshotForSave: () => stabilization.promise,
+        }),
+      })
+      const saving = session.save(makeSnapshot('old-draft'))
+      const denied = expect(saving).rejects.toThrow('BOARD_SCOPE_CHANGED')
+
+      getWorkspaceSelectionStore().select('ws_other')
+      getWorkspaceSelectionStore().select(WORKSPACE_ID)
+      await repository.saveLocal(board.id, makeSnapshot('fresh-draft'))
+      if (outcome === 'resolve') stabilization.resolve(makeSnapshot('old-stabilized'))
+      else stabilization.reject(new Error('old-upload-failed'))
+
+      await denied
+      expect(getBoardState(board.id)?.promptNodes[0]?.text).toBe('fresh-draft')
+      expect(mocks.request).not.toHaveBeenCalled()
+    },
+  )
+
+  it('does not sync after a residency change during the local-save await', async () => {
+    const board = createBoard('Save Residency')
+    replaceBoardStateMap({ [board.id]: makeState(1_000, 'old-draft') })
+    const repository = createBoardSessionRepository()
+    const saving = repository.save(board.id, makeSnapshot('old-save'))
+    const denied = expect(saving).rejects.toThrow('BOARD_SCOPE_CHANGED')
+
+    getWorkspaceSelectionStore().select('ws_other')
+    getWorkspaceSelectionStore().select(WORKSPACE_ID)
+    await repository.saveLocal(board.id, makeSnapshot('fresh-draft'))
+
+    await denied
+    expect(getBoardState(board.id)?.promptNodes[0]?.text).toBe('fresh-draft')
+    expect(mocks.request).not.toHaveBeenCalled()
+  })
+
+  it('does not load a new residency draft after old hydration resolves', async () => {
+    const board = createBoard('Load Residency')
+    replaceBoardStateMap({ [board.id]: makeState(1_000, 'old-draft') })
+    const repository = createBoardSessionRepository()
+    const hydration = createDeferred<unknown>()
+    mocks.request.mockImplementationOnce(() => hydration.promise)
+    const loading = repository.load(board.id)
+    const denied = expect(loading).rejects.toThrow('BOARD_SCOPE_CHANGED')
+    await vi.waitFor(() => expect(mocks.request).toHaveBeenCalledOnce())
+
+    getWorkspaceSelectionStore().select('ws_other')
+    getWorkspaceSelectionStore().select(WORKSPACE_ID)
+    await repository.saveLocal(board.id, makeSnapshot('fresh-draft'))
+    hydration.resolve({ data: [], meta: { has_more: false, next_cursor: null } })
+
+    await denied
+    expect(getBoardState(board.id)?.promptNodes[0]?.text).toBe('fresh-draft')
+    expect(mocks.request).toHaveBeenCalledOnce()
   })
 
   it('fails closed when the localStorage write throws', async () => {

@@ -187,16 +187,34 @@ WHERE t.workspace_id = w.internal_id
 AND t.public_id = sqlc.arg(public_id)
 AND w.public_id = sqlc.arg(workspace_public_id);
 
--- InsertWorkspaceTaskOutput appends one output ref to a workspace-scoped
--- task. Scoping resolves atomically in the SELECT so outputs can never
--- attach to a cross-workspace task id.
+-- InsertWorkspaceTaskOutput accepts the output reference and its immutable
+-- Media origin from the persisted Task in the same statement.
 -- name: InsertWorkspaceTaskOutput :one
-INSERT INTO task_outputs (task_id, output_index, output_kind, media_asset_id, remote_url, metadata)
-SELECT t.internal_id, sqlc.arg(output_index), sqlc.arg(output_kind), sqlc.narg(media_asset_id), sqlc.narg(remote_url), sqlc.arg(metadata)
-FROM tasks AS t
-INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
-WHERE t.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id)
-RETURNING internal_id, task_id, output_index, output_kind, media_asset_id, remote_url, metadata, created_at;
+WITH source AS (
+  SELECT t.*
+  FROM tasks AS t
+  INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
+  WHERE t.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id)
+), inserted AS (
+  INSERT INTO task_outputs (task_id, output_index, output_kind, media_asset_id, remote_url, metadata)
+  SELECT t.internal_id, sqlc.arg(output_index), sqlc.arg(output_kind), sqlc.narg(media_asset_id), sqlc.narg(remote_url), sqlc.arg(metadata)
+  FROM source AS t
+  WHERE sqlc.narg(media_asset_id)::bigint IS NULL OR EXISTS (
+    SELECT 1 FROM media_assets AS m
+    WHERE m.internal_id = sqlc.narg(media_asset_id) AND m.workspace_id = t.workspace_id
+  )
+  RETURNING *
+), origins AS (
+  INSERT INTO media_asset_task_origins (workspace_id, task_public_id, output_index, media_asset_id, submitter_user_id, board_public_id)
+  SELECT t.workspace_id, t.public_id, o.output_index, o.media_asset_id, t.submitter_user_id,
+         NULLIF(btrim(t.workflow_input ->> 'board_id'), '')
+  FROM inserted AS o
+  INNER JOIN source AS t ON t.internal_id = o.task_id
+  WHERE o.media_asset_id IS NOT NULL
+  RETURNING media_asset_id
+)
+SELECT internal_id, task_id, output_index, output_kind, media_asset_id, remote_url, metadata, created_at
+FROM inserted;
 
 -- name: ListWorkspaceTaskOutputs :many
 SELECT o.internal_id, o.task_id, o.output_index, o.output_kind, o.media_asset_id, o.remote_url, o.metadata, o.created_at

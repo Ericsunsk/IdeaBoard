@@ -362,7 +362,7 @@ func IsWebhookSubscriptionID(id string) bool {
 
 // Create registers a subscription. Empty secret mints one (returned once
 // via minted=true); provided secrets must be >= 16 chars. Empty
-// eventTypes means all frozen types.
+// eventTypes means all supported Workspace webhook types.
 //
 // The durable write happens outside the mutex: the registry check is
 // copied out under lock, persistence runs unlocked, then the projection
@@ -384,13 +384,17 @@ func (s *WebhookStore) Create(ctx context.Context, workspaceID, destination stri
 		if trimmed == "" {
 			continue
 		}
-		if !IsV1EventType(trimmed) {
-			return nil, nil, false, fmt.Errorf("events: unknown event type filter %q", trimmed)
+		if !IsWorkspaceWebhookEventType(trimmed) {
+			return nil, nil, false, fmt.Errorf("events: unsupported webhook event type %q", trimmed)
 		}
 		normalized = append(normalized, trimmed)
 	}
 	if len(normalized) == 0 {
-		normalized = V1EventTypes()
+		for _, typ := range V1EventTypes() {
+			if IsWorkspaceWebhookEventType(typ) {
+				normalized = append(normalized, typ)
+			}
+		}
 	}
 	minted := false
 	if len(secret) == 0 {

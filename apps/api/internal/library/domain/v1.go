@@ -193,10 +193,8 @@ type V1SaveAssetInput struct {
 	OperatorUserID int64
 }
 
-// V1SaveManagedAssetInput carries one managed save into the single
-// managed-save use case (manual and task-auto entries converge here):
-// the Media Asset identity, display metadata, task provenance, and the
-// server-side operator. FolderPublicID "" targets Quick Saves.
+// V1SaveManagedAssetInput identifies Media, display metadata, Task provenance,
+// and the server-side operator. FolderPublicID "" targets Quick Saves.
 type V1SaveManagedAssetInput struct {
 	FolderPublicID string
 	MediaAssetID   string

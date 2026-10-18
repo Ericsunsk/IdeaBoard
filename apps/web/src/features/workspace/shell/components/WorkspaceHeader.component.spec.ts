@@ -1,6 +1,7 @@
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { renderWithUser } from '../../../../test/render'
 import type { User } from '../../../../api/sessionUserType'
 import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../routePaths'
@@ -65,7 +66,13 @@ async function renderHeader(props: { sticky?: boolean } = {}) {
     },
   })
 
-  return renderWithUser(Harness, { global: { plugins: [router] } })
+  // The header hosts the workspace switcher, which reads the shared query
+  // client at setup. Anonymous users keep the list query disabled, so no
+  // network fires here.
+  const queryClient = new QueryClient()
+  return renderWithUser(Harness, {
+    global: { plugins: [router, [VueQueryPlugin, { queryClient }]] },
+  })
 }
 
 describe('WorkspaceHeader', () => {

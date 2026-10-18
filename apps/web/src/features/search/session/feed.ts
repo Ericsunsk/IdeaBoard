@@ -301,11 +301,15 @@ export function createSearchFeed(
   }
 
   function markSaved(result: SearchResult): void {
-    markSavedKey(libraryAssetKeyFor({ source: 'external', provider: result.provider, sourceId: result.id }))
+    markSavedKey(
+      libraryAssetKeyFor({ source: 'external', provider: result.provider, sourceId: result.id }),
+    )
   }
 
   function markUnsaved(result: SearchResult): void {
-    markUnsavedKey(libraryAssetKeyFor({ source: 'external', provider: result.provider, sourceId: result.id }))
+    markUnsavedKey(
+      libraryAssetKeyFor({ source: 'external', provider: result.provider, sourceId: result.id }),
+    )
   }
 
   function markImageError(id: string): void {

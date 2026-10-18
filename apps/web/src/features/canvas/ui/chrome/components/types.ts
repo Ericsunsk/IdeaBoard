@@ -25,6 +25,8 @@ export type CanvasChromeBoardState = {
   isRenamePending: boolean
   catalogRecovery: CanvasChromeCatalogRecoveryState
   archived: CanvasChromeArchivedState
+  /** Server capabilities say read-only (viewer without write). */
+  isReadOnly: boolean
   setNameInputRef: (el: HTMLElement | null) => void
 }
 

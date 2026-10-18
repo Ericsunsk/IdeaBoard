@@ -89,7 +89,7 @@ export default {
     boundsUpdateFailed: '更新分组边界失败，请刷新画布后重试。',
   },
   chrome: {
-    shareComingSoon: '分享功能即将上线',
+    share: '分享',
     export: '导出',
     selectTool: '选择 (V)',
     handTool: '抓手 (H)',
@@ -123,6 +123,8 @@ export default {
     boardRestoredSuccess: '画布已恢复。',
     boardRestoreFailedError: '恢复画布失败，请稍后重试。',
     boardArchivedRenameBlocked: '该画布已归档，请恢复后再重命名。',
+    boardReadOnlyLabel: '该画布为只读状态。',
+    boardReadOnlyRenameBlocked: '你对该画布仅有查看权限，无法重命名。',
   },
   viewport: {
     zoomIn: '放大',
@@ -314,6 +316,7 @@ export default {
     saved: '已保存',
     saveFailed: '保存失败，请稍后重试。',
     boardArchivedSaveBlocked: '该画布已归档，请恢复后再继续编辑。',
+    boardAccessLost: '你已没有这块画板的访问权限，未保存的更改已丢弃。',
     downloadEmptyResponse: '下载失败：响应内容为空。',
     downloadImageHttpFailed: '下载失败：HTTP {code}',
     downloadImageFailed: '下载失败：{reason}',

@@ -13,7 +13,7 @@ export const accountCloseButtonClass =
   '!absolute !top-4 !right-4 !z-20 !flex !h-8 !w-8 !min-w-8 !items-center !justify-center !rounded-pill !border !border-transparent !bg-transparent !p-0 !text-muted-foreground !shadow-none !transition-[background-color,border-color,color] !duration-[var(--motion-feedback-duration)] !ease-[var(--motion-feedback-easing)] hover:!border-border hover:!bg-muted hover:!text-foreground focus-visible:!outline-none focus-visible:!shadow-focus-ring'
 
 const accountNavTabBaseClass =
-  '!flex !h-11 !w-full !justify-start !gap-2 !rounded-control !border-0 !px-2.5 !text-admin-content !font-semibold !shadow-none !transition-[background-color,color,box-shadow] !duration-[var(--motion-control-duration)] !ease-[var(--motion-control-easing)] focus-visible:!outline-none focus-visible:!shadow-focus-ring'
+  '!flex !items-center !h-11 !w-full !justify-start !gap-2 !rounded-control !border-0 !px-3 !text-admin-content !font-semibold !shadow-none !transition-[background-color,color,box-shadow] !duration-[var(--motion-control-duration)] !ease-[var(--motion-control-easing)] focus-visible:!outline-none focus-visible:!shadow-focus-ring'
 
 export function accountNavTabClass(active: boolean): string {
   return active
@@ -22,7 +22,7 @@ export function accountNavTabClass(active: boolean): string {
 }
 
 export const accountLogoutButtonClass =
-  '!flex !h-11 !w-full !justify-start !gap-2 !rounded-control !border-0 !bg-transparent !px-2.5 !text-admin-content !font-semibold !text-destructive !shadow-none !transition-[background-color,color,opacity] !duration-[var(--motion-feedback-duration)] !ease-[var(--motion-feedback-easing)] hover:!bg-destructive/10 hover:!text-destructive focus-visible:!outline-none focus-visible:!shadow-focus-ring disabled:!cursor-not-allowed disabled:!opacity-60'
+  '!flex !items-center !h-11 !w-full !justify-start !gap-2 !rounded-control !border-0 !bg-transparent !px-3 !text-admin-content !font-semibold !text-destructive !shadow-none !transition-[background-color,color,opacity] !duration-[var(--motion-feedback-duration)] !ease-[var(--motion-feedback-easing)] hover:!bg-destructive/10 hover:!text-destructive focus-visible:!outline-none focus-visible:!shadow-focus-ring disabled:!cursor-not-allowed disabled:!opacity-60'
 
 export const accountCardPanelClass =
   'rounded-panel border border-border bg-card p-4 shadow-sm sm:p-5'

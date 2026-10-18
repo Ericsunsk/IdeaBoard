@@ -22,7 +22,9 @@ import {
 import {
   archiveWorkspaceBoard,
   createWorkspaceBoard,
+  fetchWorkspaceBoardDocument,
   requireBoardWorkspaceId,
+  type WorkspaceBoardDocument,
   type WorkspaceBoardMeta,
 } from '../adapters/boardsResource'
 import { deleteBoardState, duplicateBoardState } from '../persistence/state'
@@ -80,6 +82,7 @@ export type BoardRollbackRenameResult =
 export type BoardDuplicateResult =
   | { isOk: true; board: BoardMeta }
   | { isOk: false; reason: 'source-missing'; error?: undefined }
+  | { isOk: false; reason: 'source-unreadable'; error?: unknown }
   | {
       isOk: false
       reason: BoardSyncConflictKind | 'sync-failed'
@@ -116,9 +119,20 @@ export interface BoardCommandDependencies {
   // register the minted identity locally, then sync the document.
   resolveWorkspace?(): string
   createServerBoard?(workspaceId: string, name: string): Promise<WorkspaceBoardMeta>
+  /** Reads the source document to prove copy readability before minting. */
+  fetchSourceDocument?(workspaceId: string, boardId: string): Promise<WorkspaceBoardDocument>
   /** Archives a server-created board using the workspace captured before the request. */
   archiveServerBoard?(workspaceId: string, boardId: string): Promise<WorkspaceBoardMeta>
-  registerServerBoard?(input: { id: string; name: string; revision?: number }): BoardMeta | null
+  registerServerBoard?(input: {
+    id: string
+    name: string
+    revision?: number
+    capabilities?: WorkspaceBoardMeta['capabilities']
+    accessState?: WorkspaceBoardMeta['accessState']
+    workspaceAccess?: WorkspaceBoardMeta['workspaceAccess']
+    isCreator?: boolean
+    hasDirectGrant?: boolean
+  }): BoardMeta | null
 }
 
 export interface BoardCommands {
@@ -152,6 +166,7 @@ const defaultDependencies: BoardCommandDependencies = {
   isMutationCurrent: () => true,
   resolveWorkspace: () => requireBoardWorkspaceId(),
   createServerBoard: (workspaceId, name) => createWorkspaceBoard(workspaceId, name),
+  fetchSourceDocument: (workspaceId, boardId) => fetchWorkspaceBoardDocument(workspaceId, boardId),
   archiveServerBoard: (workspaceId, boardId) => archiveWorkspaceBoard(workspaceId, boardId),
   registerServerBoard: (input) => registerBoardMeta(input),
 }
@@ -333,6 +348,14 @@ export function createBoardCommands(
       id: server.id,
       name: server.name || localBoard.name,
       revision: server.revision,
+      // A minted board carries the server's access fact (workspace_access
+      // none, creator-only): capabilities register verbatim so the copy
+      // never inherits the source ACL.
+      capabilities: server.capabilities,
+      accessState: server.accessState,
+      workspaceAccess: server.workspaceAccess,
+      isCreator: server.isCreator,
+      hasDirectGrant: server.hasDirectGrant,
     })
     cleanupLocal()
     if (!registered) {
@@ -389,15 +412,51 @@ export function createBoardCommands(
       if (!copy) {
         return { isOk: false, reason: 'source-missing' }
       }
-      return createServerBoardAndSync(
-        copy,
-        () => {
-          deps.deleteBoard(copy.id)
-        },
-        (registeredBoardId) => {
-          deps.duplicateBoardState(sourceBoardId, registeredBoardId)
-        },
-      )
+      // #943 copy precondition: prove the source board (and, through it,
+      // the document the copy will carry) is still readable by the copier
+      // BEFORE minting anything. A revoked or deleted source fails here
+      // with no board created; per-asset readability is enforced again at
+      // accept time by the server media gate, which fails the document
+      // sync below when an asset is no longer usable.
+      const cleanupCopy = () => {
+        deps.deleteBoard(copy.id)
+      }
+      try {
+        const resolveWorkspace = deps.resolveWorkspace ?? (() => requireBoardWorkspaceId())
+        const fetchSourceDocument =
+          deps.fetchSourceDocument ??
+          ((workspaceId: string, boardId: string) =>
+            fetchWorkspaceBoardDocument(workspaceId, boardId))
+        await fetchSourceDocument(resolveWorkspace(), sourceBoardId)
+      } catch (error) {
+        if (!deps.isMutationCurrent()) return { isOk: false, reason: 'scope-changed' }
+        cleanupCopy()
+        return { isOk: false, reason: 'source-unreadable', error }
+      }
+      let mintedServerBoardId: string | null = null
+      const result = await createServerBoardAndSync(copy, cleanupCopy, (registeredBoardId) => {
+        mintedServerBoardId = registeredBoardId
+        deps.duplicateBoardState(sourceBoardId, registeredBoardId)
+      })
+      // #943 copy atomicity: a minted board whose document sync failed must
+      // not linger as a partial copy. The failure already dropped every
+      // local follow-up; archive the server board best-effort through the
+      // current workspace (scope switches return scope-changed above and
+      // archive through the captured workspace there instead).
+      if (!result.isOk && result.reason !== 'scope-changed' && mintedServerBoardId) {
+        const archive = deps.archiveServerBoard
+        if (archive) {
+          try {
+            const resolveWorkspace = deps.resolveWorkspace ?? (() => requireBoardWorkspaceId())
+            await archive(resolveWorkspace(), mintedServerBoardId)
+          } catch {
+            // Best effort: the orphan stays creator-only (workspace_access
+            // none) so it never exposes tenant content; a later
+            // reconciliation can restore or re-archive it.
+          }
+        }
+      }
+      return result
     },
 
     async delete({ boardId }) {
@@ -433,6 +492,13 @@ function cloneBoardMeta(board: BoardMeta): BoardMeta {
     ...(board.revision === undefined ? {} : { revision: board.revision }),
     ...(board.archivedAt === undefined ? {} : { archivedAt: board.archivedAt }),
     ...(board.workspaceId === undefined ? {} : { workspaceId: board.workspaceId }),
+    // Server access facts ride optimistic renames untouched: the rename
+    // path must never drop the range derivation or capability gating.
+    ...(board.capabilities === undefined ? {} : { capabilities: board.capabilities }),
+    ...(board.accessState === undefined ? {} : { accessState: board.accessState }),
+    ...(board.workspaceAccess === undefined ? {} : { workspaceAccess: board.workspaceAccess }),
+    ...(board.isCreator === undefined ? {} : { isCreator: board.isCreator }),
+    ...(board.hasDirectGrant === undefined ? {} : { hasDirectGrant: board.hasDirectGrant }),
   }
 }
 

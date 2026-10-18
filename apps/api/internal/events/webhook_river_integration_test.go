@@ -63,10 +63,10 @@ ON CONFLICT (public_id) DO NOTHING`); err != nil {
 	if err != nil {
 		t.Fatal(err)
 	}
-	envelope, err := events.MintV1Envelope(events.EventV1TaskCompleted, "ws_1",
+	envelope, err := events.MintV1Envelope(events.EventV1BillingSettled, "ws_1",
 		events.V1Actor{Type: events.V1ActorUser, ID: "usr_actor"},
-		events.V1Resource{Type: events.V1ResourceTask, ID: "task_1"},
-		events.V1TaskCompletedData{TaskID: "task_1", OutputsURI: "/api/v1/workspaces/ws_1/tasks/task_1/outputs"})
+		events.V1Resource{Type: events.V1ResourceCheckoutSession, ID: "checkout_1"},
+		events.V1BillingSettledData{ReferenceType: "checkout_session", ReferenceID: "checkout_1", SettlementState: "captured"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,10 +197,10 @@ func TestWebhookDeadLetterSurvivesRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	envelope, err := events.MintV1Envelope(events.EventV1TaskCompleted, "ws_1",
+	envelope, err := events.MintV1Envelope(events.EventV1BillingSettled, "ws_1",
 		events.V1Actor{Type: events.V1ActorUser, ID: "usr_actor"},
-		events.V1Resource{Type: events.V1ResourceTask, ID: "task_1"},
-		events.V1TaskCompletedData{TaskID: "task_1", OutputsURI: "/api/v1/workspaces/ws_1/tasks/task_1/outputs"})
+		events.V1Resource{Type: events.V1ResourceCheckoutSession, ID: "checkout_1"},
+		events.V1BillingSettledData{ReferenceType: "checkout_session", ReferenceID: "checkout_1", SettlementState: "captured"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,7 +10,22 @@ import {
   BOARD_SESSION_AUTH_UNAVAILABLE_CODE,
   BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE,
 } from './useBoardSession'
+import { getWorkspaceSelectionStore } from '../../../workspace'
 import { createBoardSyncCoordinator, type SaveStatus } from './boardSyncCoordinator'
+
+const accessLossSeams = vi.hoisted(() => ({
+  isLost: vi.fn(() => false),
+  revalidate: vi.fn<() => Promise<'preserved' | 'revoked'>>(async () => 'preserved'),
+}))
+
+vi.mock('../../../board/ports/canvasSession', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../board/ports/canvasSession')>()
+  return {
+    ...actual,
+    isBoardAccessLost: accessLossSeams.isLost,
+    revalidateAndConvergeBoardAccess: accessLossSeams.revalidate,
+  }
+})
 
 function makeSnapshot(marker: string): BoardSnapshot {
   const snapshot = createEmptyBoardSnapshot()
@@ -460,5 +475,108 @@ describe('Board Sync Coordinator', () => {
     expect(harness.onError).toHaveBeenCalledWith(
       'This board is archived. Restore it to keep editing.',
     )
+  })
+
+  it('delegates board-coded save failures to access-loss revalidation', async () => {
+    const harness = createHarness()
+    accessLossSeams.revalidate.mockClear()
+    accessLossSeams.revalidate.mockResolvedValueOnce('revoked')
+    const failure = Object.assign(new Error('denied'), {
+      status: 403,
+      code: 'board_forbidden',
+    })
+    vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+      snapshot: makeSnapshot('saved-locally'),
+      remoteSync: { isOk: false, reason: 'sync-failed', error: failure },
+    })
+
+    const result = await harness.coordinator.saveCurrentBoardSnapshot()
+
+    expect(result.isSaved).toBe(false)
+    // The draft is preserved as retry until the verdict lands.
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('retry')
+    // Board-coded 403s never use the session-missing copy.
+    expect(harness.onError).not.toHaveBeenCalledWith(
+      'Save failed: user session is missing. Please sign in and try again.',
+    )
+    await vi.waitFor(() => expect(accessLossSeams.revalidate).toHaveBeenCalledWith('board-a'))
+  })
+
+  it('keeps save feedback separate from asynchronous access-loss revalidation', async () => {
+    getWorkspaceSelectionStore().select('ws_save123')
+    const harness = createHarness()
+    let resolve!: (verdict: 'revoked') => void
+    accessLossSeams.revalidate.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done
+        }),
+    )
+    vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+      snapshot: makeSnapshot('old'),
+      remoteSync: {
+        isOk: false,
+        reason: 'sync-failed',
+        error: Object.assign(new Error('denied'), { code: 'board_forbidden' }),
+      },
+    })
+    await harness.coordinator.saveCurrentBoardSnapshot()
+    getWorkspaceSelectionStore().select('ws_save456')
+    getWorkspaceSelectionStore().select('ws_save123')
+    harness.isDirty.value = true
+    resolve('revoked')
+    await Promise.resolve()
+    expect(harness.isDirty.value).toBe(true)
+  })
+
+  it('preserves the draft when revalidation stays unconfirmed', async () => {
+    const harness = createHarness()
+    accessLossSeams.revalidate.mockClear()
+    const failure = Object.assign(new Error('missing'), {
+      status: 404,
+      code: 'board_not_found',
+    })
+    vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+      snapshot: makeSnapshot('saved-locally'),
+      remoteSync: { isOk: false, reason: 'sync-failed', error: failure },
+    })
+
+    const result = await harness.coordinator.saveCurrentBoardSnapshot()
+
+    expect(result.isSaved).toBe(false)
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.boardSession.save).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(accessLossSeams.revalidate).toHaveBeenCalledWith('board-a'))
+  })
+
+  it('skips network failures without revalidating', async () => {
+    const harness = createHarness()
+    accessLossSeams.revalidate.mockClear()
+    vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+      snapshot: makeSnapshot('saved-locally'),
+      remoteSync: { isOk: false, reason: 'sync-failed', error: new Error('offline') },
+    })
+
+    await harness.coordinator.saveCurrentBoardSnapshot()
+
+    expect(accessLossSeams.revalidate).not.toHaveBeenCalled()
+    expect(harness.isDirty.value).toBe(true)
+  })
+
+  it('skips the doomed write once the board is marked lost', async () => {
+    const harness = createHarness()
+    accessLossSeams.isLost.mockReturnValueOnce(true)
+    try {
+      const result = await harness.coordinator.saveCurrentBoardSnapshot()
+
+      expect(result).toEqual({ isSaved: false })
+      expect(harness.boardSession.save).not.toHaveBeenCalled()
+      expect(harness.onError).not.toHaveBeenCalled()
+      expect(harness.onWarning).not.toHaveBeenCalled()
+    } finally {
+      accessLossSeams.isLost.mockReset()
+      accessLossSeams.isLost.mockReturnValue(false)
+    }
   })
 })

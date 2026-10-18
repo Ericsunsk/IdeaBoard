@@ -34,27 +34,68 @@ func (q *Queries) ArchiveWorkspaceBoard(ctx context.Context, arg ArchiveWorkspac
 	return result.RowsAffected(), nil
 }
 
-const countWorkspaceBoardOwners = `-- name: CountWorkspaceBoardOwners :one
-SELECT COUNT(*)
-FROM board_memberships AS m
-INNER JOIN boards AS b ON b.internal_id = m.board_id
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-WHERE w.public_id = $1
-  AND b.public_id = $2
-  AND m.role = 'owner'
-  AND m.user_id <> COALESCE(b.owner_user_id, -1)
+const bumpWorkspaceMemberBoardsAccess = `-- name: BumpWorkspaceMemberBoardsAccess :many
+UPDATE boards AS b
+SET access_version = access_version + 1, updated_at = now()
+FROM workspaces AS w
+WHERE w.internal_id = b.workspace_id
+  AND w.public_id = $1
+  AND b.public_id = ANY($2::text[])
+RETURNING b.public_id, b.access_version
 `
 
-type CountWorkspaceBoardOwnersParams struct {
+type BumpWorkspaceMemberBoardsAccessParams struct {
+	WorkspacePublicID string   `json:"workspace_public_id"`
+	BoardPublicIds    []string `json:"board_public_ids"`
+}
+
+type BumpWorkspaceMemberBoardsAccessRow struct {
+	PublicID      string `json:"public_id"`
+	AccessVersion int64  `json:"access_version"`
+}
+
+// Every changed grant advances its Board access version, including archived Boards.
+func (q *Queries) BumpWorkspaceMemberBoardsAccess(ctx context.Context, arg BumpWorkspaceMemberBoardsAccessParams) ([]BumpWorkspaceMemberBoardsAccessRow, error) {
+	rows, err := q.db.Query(ctx, bumpWorkspaceMemberBoardsAccess, arg.WorkspacePublicID, arg.BoardPublicIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BumpWorkspaceMemberBoardsAccessRow
+	for rows.Next() {
+		var i BumpWorkspaceMemberBoardsAccessRow
+		if err := rows.Scan(&i.PublicID, &i.AccessVersion); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const clearBoardMemberships = `-- name: ClearBoardMemberships :execrows
+DELETE FROM board_memberships AS m
+USING boards AS b, workspaces AS w
+WHERE m.board_id = b.internal_id
+  AND w.internal_id = b.workspace_id
+  AND w.public_id = $1
+  AND b.public_id = $2
+`
+
+type ClearBoardMembershipsParams struct {
 	WorkspacePublicID string `json:"workspace_public_id"`
 	BoardPublicID     string `json:"board_public_id"`
 }
 
-func (q *Queries) CountWorkspaceBoardOwners(ctx context.Context, arg CountWorkspaceBoardOwnersParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countWorkspaceBoardOwners, arg.WorkspacePublicID, arg.BoardPublicID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
+// Configuration replacement removes previous selections in the accepting transaction.
+func (q *Queries) ClearBoardMemberships(ctx context.Context, arg ClearBoardMembershipsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, clearBoardMemberships, arg.WorkspacePublicID, arg.BoardPublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const createWorkspaceBoard = `-- name: CreateWorkspaceBoard :one
@@ -63,7 +104,7 @@ INSERT INTO boards (public_id, workspace_id, owner_user_id, title)
 SELECT $1, w.internal_id, $2, $3
 FROM workspaces AS w
 WHERE w.public_id = $4
-RETURNING internal_id, public_id, owner_user_id, title, created_at, updated_at, archived_at
+RETURNING internal_id, public_id, owner_user_id, title, workspace_access, access_version, created_at, updated_at, archived_at
 `
 
 type CreateWorkspaceBoardParams struct {
@@ -74,21 +115,18 @@ type CreateWorkspaceBoardParams struct {
 }
 
 type CreateWorkspaceBoardRow struct {
-	InternalID  int64              `json:"internal_id"`
-	PublicID    string             `json:"public_id"`
-	OwnerUserID pgtype.Int8        `json:"owner_user_id"`
-	Title       string             `json:"title"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	ArchivedAt  pgtype.Timestamptz `json:"archived_at"`
+	InternalID      int64              `json:"internal_id"`
+	PublicID        string             `json:"public_id"`
+	OwnerUserID     pgtype.Int8        `json:"owner_user_id"`
+	Title           string             `json:"title"`
+	WorkspaceAccess string             `json:"workspace_access"`
+	AccessVersion   int64              `json:"access_version"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	ArchivedAt      pgtype.Timestamptz `json:"archived_at"`
 }
 
-// Workspace-rooted boards postgres store (#802 interface, #809 follow-up
-// to #817). boards.workspace_id is the workspace link (no separate link
-// table); board_revisions rows are INSERT-only, so no UPDATE/DELETE
-// revision query exists here by design. Every board-scoped query joins
-// workspaces on public_id so foreign-workspace rows stay invisible.
-// Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
+// Workspace-scoped Boards use one common role and explicit selected members.
 func (q *Queries) CreateWorkspaceBoard(ctx context.Context, arg CreateWorkspaceBoardParams) (CreateWorkspaceBoardRow, error) {
 	row := q.db.QueryRow(ctx, createWorkspaceBoard,
 		arg.PublicID,
@@ -102,11 +140,37 @@ func (q *Queries) CreateWorkspaceBoard(ctx context.Context, arg CreateWorkspaceB
 		&i.PublicID,
 		&i.OwnerUserID,
 		&i.Title,
+		&i.WorkspaceAccess,
+		&i.AccessVersion,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
 	)
 	return i, err
+}
+
+const deleteBoardDocumentMediaRefs = `-- name: DeleteBoardDocumentMediaRefs :exec
+DELETE FROM board_document_media_refs AS r
+USING boards AS b, workspaces AS w
+WHERE r.board_id = b.internal_id
+  AND w.internal_id = b.workspace_id
+  AND w.public_id = $1
+  AND b.public_id = $2
+`
+
+type DeleteBoardDocumentMediaRefsParams struct {
+	WorkspacePublicID string `json:"workspace_public_id"`
+	BoardPublicID     string `json:"board_public_id"`
+}
+
+// DeleteBoardDocumentMediaRefs clears every accepted document reference
+// for one board in the calling workspace (#936). ReplaceDocument calls it
+// before re-inserting the accepted set, so removed references stop
+// authorizing in the same accepting transaction while upload-target,
+// owner, library, task, and other-board sources stay untouched.
+func (q *Queries) DeleteBoardDocumentMediaRefs(ctx context.Context, arg DeleteBoardDocumentMediaRefsParams) error {
+	_, err := q.db.Exec(ctx, deleteBoardDocumentMediaRefs, arg.WorkspacePublicID, arg.BoardPublicID)
+	return err
 }
 
 const deleteWorkspaceBoardMembership = `-- name: DeleteWorkspaceBoardMembership :execrows
@@ -127,6 +191,33 @@ type DeleteWorkspaceBoardMembershipParams struct {
 
 func (q *Queries) DeleteWorkspaceBoardMembership(ctx context.Context, arg DeleteWorkspaceBoardMembershipParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteWorkspaceBoardMembership, arg.WorkspacePublicID, arg.BoardPublicID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteWorkspaceMemberBoardGrants = `-- name: DeleteWorkspaceMemberBoardGrants :execrows
+DELETE FROM board_memberships AS m
+USING boards AS b, workspaces AS w
+WHERE m.board_id = b.internal_id
+  AND w.internal_id = b.workspace_id
+  AND w.public_id = $1
+  AND m.user_id = $2
+`
+
+type DeleteWorkspaceMemberBoardGrantsParams struct {
+	WorkspacePublicID string `json:"workspace_public_id"`
+	UserID            int64  `json:"user_id"`
+}
+
+// Removes every direct grant of one user across the workspace in the
+// same transaction as the version bumps above: rejoining later finds no
+// stale row to resurrect (fail-closed), while the serve-time membership
+// precondition already denies the departed member before this cleanup
+// lands. Board/document/Task/asset rows are untouched.
+func (q *Queries) DeleteWorkspaceMemberBoardGrants(ctx context.Context, arg DeleteWorkspaceMemberBoardGrantsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWorkspaceMemberBoardGrants, arg.WorkspacePublicID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
@@ -221,68 +312,10 @@ func (q *Queries) GetBoardRevisionByNumber(ctx context.Context, arg GetBoardRevi
 	return i, err
 }
 
-const getBoardShareTokenBySecret = `-- name: GetBoardShareTokenBySecret :one
-SELECT t.internal_id, t.public_id, t.token_id, t.token_secret, t.token_prefix, t.granted_role,
-  t.created_by_user_id, t.created_at, t.revoked_at, t.revoked_by_user_id, t.usage_count,
-  b.internal_id AS board_internal_id, b.public_id AS board_public_id, b.archived_at AS board_archived_at,
-  b.owner_user_id AS board_owner_user_id
-FROM board_share_tokens AS t
-INNER JOIN boards AS b ON b.internal_id = t.board_id
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-WHERE w.public_id = $1
-  AND t.token_secret = $2
-LIMIT 1
-`
-
-type GetBoardShareTokenBySecretParams struct {
-	WorkspacePublicID string `json:"workspace_public_id"`
-	TokenSecret       string `json:"token_secret"`
-}
-
-type GetBoardShareTokenBySecretRow struct {
-	InternalID       int64              `json:"internal_id"`
-	PublicID         string             `json:"public_id"`
-	TokenID          pgtype.Text        `json:"token_id"`
-	TokenSecret      string             `json:"token_secret"`
-	TokenPrefix      string             `json:"token_prefix"`
-	GrantedRole      string             `json:"granted_role"`
-	CreatedByUserID  int64              `json:"created_by_user_id"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	RevokedAt        pgtype.Timestamptz `json:"revoked_at"`
-	RevokedByUserID  pgtype.Int8        `json:"revoked_by_user_id"`
-	UsageCount       int64              `json:"usage_count"`
-	BoardInternalID  int64              `json:"board_internal_id"`
-	BoardPublicID    string             `json:"board_public_id"`
-	BoardArchivedAt  pgtype.Timestamptz `json:"board_archived_at"`
-	BoardOwnerUserID pgtype.Int8        `json:"board_owner_user_id"`
-}
-
-func (q *Queries) GetBoardShareTokenBySecret(ctx context.Context, arg GetBoardShareTokenBySecretParams) (GetBoardShareTokenBySecretRow, error) {
-	row := q.db.QueryRow(ctx, getBoardShareTokenBySecret, arg.WorkspacePublicID, arg.TokenSecret)
-	var i GetBoardShareTokenBySecretRow
-	err := row.Scan(
-		&i.InternalID,
-		&i.PublicID,
-		&i.TokenID,
-		&i.TokenSecret,
-		&i.TokenPrefix,
-		&i.GrantedRole,
-		&i.CreatedByUserID,
-		&i.CreatedAt,
-		&i.RevokedAt,
-		&i.RevokedByUserID,
-		&i.UsageCount,
-		&i.BoardInternalID,
-		&i.BoardPublicID,
-		&i.BoardArchivedAt,
-		&i.BoardOwnerUserID,
-	)
-	return i, err
-}
-
 const getWorkspaceBoard = `-- name: GetWorkspaceBoard :one
 SELECT b.internal_id, b.public_id, w.public_id AS workspace_public_id,
-  b.owner_user_id, b.title, b.created_at, b.updated_at, b.archived_at,
+  b.owner_user_id, b.title, b.workspace_access, b.access_version,
+  b.created_at, b.updated_at, b.archived_at,
   d.document_version, d.schema_version, d.snapshot_data,
   d.content_version, d.preview_scene
 FROM boards AS b
@@ -303,6 +336,8 @@ type GetWorkspaceBoardRow struct {
 	WorkspacePublicID string             `json:"workspace_public_id"`
 	OwnerUserID       pgtype.Int8        `json:"owner_user_id"`
 	Title             string             `json:"title"`
+	WorkspaceAccess   string             `json:"workspace_access"`
+	AccessVersion     int64              `json:"access_version"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
@@ -322,6 +357,8 @@ func (q *Queries) GetWorkspaceBoard(ctx context.Context, arg GetWorkspaceBoardPa
 		&i.WorkspacePublicID,
 		&i.OwnerUserID,
 		&i.Title,
+		&i.WorkspaceAccess,
+		&i.AccessVersion,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -334,8 +371,40 @@ func (q *Queries) GetWorkspaceBoard(ctx context.Context, arg GetWorkspaceBoardPa
 	return i, err
 }
 
-const getWorkspaceBoardMembershipRole = `-- name: GetWorkspaceBoardMembershipRole :one
-SELECT m.role
+const getWorkspaceBoardAccess = `-- name: GetWorkspaceBoardAccess :one
+SELECT b.owner_user_id, b.workspace_access, b.access_version, b.archived_at
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE w.public_id = $1 AND b.public_id = $2
+LIMIT 1
+`
+
+type GetWorkspaceBoardAccessParams struct {
+	WorkspacePublicID string `json:"workspace_public_id"`
+	BoardPublicID     string `json:"board_public_id"`
+}
+
+type GetWorkspaceBoardAccessRow struct {
+	OwnerUserID     pgtype.Int8        `json:"owner_user_id"`
+	WorkspaceAccess string             `json:"workspace_access"`
+	AccessVersion   int64              `json:"access_version"`
+	ArchivedAt      pgtype.Timestamptz `json:"archived_at"`
+}
+
+func (q *Queries) GetWorkspaceBoardAccess(ctx context.Context, arg GetWorkspaceBoardAccessParams) (GetWorkspaceBoardAccessRow, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceBoardAccess, arg.WorkspacePublicID, arg.BoardPublicID)
+	var i GetWorkspaceBoardAccessRow
+	err := row.Scan(
+		&i.OwnerUserID,
+		&i.WorkspaceAccess,
+		&i.AccessVersion,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
+const getWorkspaceBoardMembership = `-- name: GetWorkspaceBoardMembership :one
+SELECT m.user_id
 FROM board_memberships AS m
 INNER JOIN boards AS b ON b.internal_id = m.board_id
 INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
@@ -345,26 +414,17 @@ WHERE w.public_id = $1
 LIMIT 1
 `
 
-type GetWorkspaceBoardMembershipRoleParams struct {
+type GetWorkspaceBoardMembershipParams struct {
 	WorkspacePublicID string `json:"workspace_public_id"`
 	BoardPublicID     string `json:"board_public_id"`
 	UserID            int64  `json:"user_id"`
 }
 
-func (q *Queries) GetWorkspaceBoardMembershipRole(ctx context.Context, arg GetWorkspaceBoardMembershipRoleParams) (string, error) {
-	row := q.db.QueryRow(ctx, getWorkspaceBoardMembershipRole, arg.WorkspacePublicID, arg.BoardPublicID, arg.UserID)
-	var role string
-	err := row.Scan(&role)
-	return role, err
-}
-
-const incrementBoardShareTokenUsage = `-- name: IncrementBoardShareTokenUsage :exec
-UPDATE board_share_tokens SET usage_count = usage_count + 1 WHERE internal_id = $1
-`
-
-func (q *Queries) IncrementBoardShareTokenUsage(ctx context.Context, internalID int64) error {
-	_, err := q.db.Exec(ctx, incrementBoardShareTokenUsage, internalID)
-	return err
+func (q *Queries) GetWorkspaceBoardMembership(ctx context.Context, arg GetWorkspaceBoardMembershipParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceBoardMembership, arg.WorkspacePublicID, arg.BoardPublicID, arg.UserID)
+	var user_id int64
+	err := row.Scan(&user_id)
+	return user_id, err
 }
 
 const insertBoardDocument = `-- name: InsertBoardDocument :exec
@@ -429,76 +489,67 @@ func (q *Queries) InsertBoardRevision(ctx context.Context, arg InsertBoardRevisi
 	return i, err
 }
 
-const insertBoardShareToken = `-- name: InsertBoardShareToken :one
-INSERT INTO board_share_tokens (public_id, board_id, token_id, token_secret, token_prefix, granted_role, created_by_user_id)
-SELECT $1, b.internal_id, $2, $3, $4, $5, $6
-FROM boards AS b
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-WHERE w.public_id = $7
-  AND b.public_id = $8
-RETURNING internal_id, created_at
-`
-
-type InsertBoardShareTokenParams struct {
-	PublicID          string      `json:"public_id"`
-	TokenID           pgtype.Text `json:"token_id"`
-	TokenSecret       string      `json:"token_secret"`
-	TokenPrefix       string      `json:"token_prefix"`
-	GrantedRole       string      `json:"granted_role"`
-	CreatedByUserID   int64       `json:"created_by_user_id"`
-	WorkspacePublicID string      `json:"workspace_public_id"`
-	BoardPublicID     string      `json:"board_public_id"`
-}
-
-type InsertBoardShareTokenRow struct {
-	InternalID int64              `json:"internal_id"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-}
-
-func (q *Queries) InsertBoardShareToken(ctx context.Context, arg InsertBoardShareTokenParams) (InsertBoardShareTokenRow, error) {
-	row := q.db.QueryRow(ctx, insertBoardShareToken,
-		arg.PublicID,
-		arg.TokenID,
-		arg.TokenSecret,
-		arg.TokenPrefix,
-		arg.GrantedRole,
-		arg.CreatedByUserID,
-		arg.WorkspacePublicID,
-		arg.BoardPublicID,
-	)
-	var i InsertBoardShareTokenRow
-	err := row.Scan(&i.InternalID, &i.CreatedAt)
-	return i, err
-}
-
 const insertWorkspaceBoardMembershipIgnore = `-- name: InsertWorkspaceBoardMembershipIgnore :execrows
-INSERT INTO board_memberships (board_id, user_id, role)
-SELECT b.internal_id, $1, $2
+INSERT INTO board_memberships (board_id, user_id)
+SELECT b.internal_id, $1
 FROM boards AS b
 INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-WHERE w.public_id = $3
-  AND b.public_id = $4
+WHERE w.public_id = $2
+  AND b.public_id = $3
 ON CONFLICT (board_id, user_id) DO NOTHING
 `
 
 type InsertWorkspaceBoardMembershipIgnoreParams struct {
 	UserID            int64  `json:"user_id"`
-	Role              string `json:"role"`
 	WorkspacePublicID string `json:"workspace_public_id"`
 	BoardPublicID     string `json:"board_public_id"`
 }
 
 func (q *Queries) InsertWorkspaceBoardMembershipIgnore(ctx context.Context, arg InsertWorkspaceBoardMembershipIgnoreParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertWorkspaceBoardMembershipIgnore,
-		arg.UserID,
-		arg.Role,
-		arg.WorkspacePublicID,
-		arg.BoardPublicID,
-	)
+	result, err := q.db.Exec(ctx, insertWorkspaceBoardMembershipIgnore, arg.UserID, arg.WorkspacePublicID, arg.BoardPublicID)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const listBoardDocumentMediaRefAssets = `-- name: ListBoardDocumentMediaRefAssets :many
+SELECT m.public_id
+FROM board_document_media_refs AS r
+INNER JOIN boards AS b ON b.internal_id = r.board_id
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+INNER JOIN media_assets AS m ON m.internal_id = r.media_asset_id
+WHERE w.public_id = $1
+  AND b.public_id = $2
+ORDER BY m.public_id ASC
+`
+
+type ListBoardDocumentMediaRefAssetsParams struct {
+	WorkspacePublicID string `json:"workspace_public_id"`
+	BoardPublicID     string `json:"board_public_id"`
+}
+
+// ListBoardDocumentMediaRefAssets audits the accepted document references
+// of one board as asset public ids (#936, GC/persistence verification).
+// Unknown or cross-workspace boards list empty.
+func (q *Queries) ListBoardDocumentMediaRefAssets(ctx context.Context, arg ListBoardDocumentMediaRefAssetsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listBoardDocumentMediaRefAssets, arg.WorkspacePublicID, arg.BoardPublicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var public_id string
+		if err := rows.Scan(&public_id); err != nil {
+			return nil, err
+		}
+		items = append(items, public_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listBoardRevisions = `-- name: ListBoardRevisions :many
@@ -558,61 +609,40 @@ func (q *Queries) ListBoardRevisions(ctx context.Context, arg ListBoardRevisions
 	return items, nil
 }
 
-const listBoardShareTokens = `-- name: ListBoardShareTokens :many
-SELECT t.public_id, t.token_id, t.token_secret, t.token_prefix, t.granted_role,
-  t.created_by_user_id, t.created_at, t.revoked_at, t.revoked_by_user_id, t.usage_count
-FROM board_share_tokens AS t
-INNER JOIN boards AS b ON b.internal_id = t.board_id
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-WHERE w.public_id = $1
-  AND b.public_id = $2
-ORDER BY t.created_at DESC, t.internal_id DESC
-LIMIT $3
+const listBoardsReferencingMediaAsset = `-- name: ListBoardsReferencingMediaAsset :many
+SELECT b.public_id
+FROM media_assets AS m
+INNER JOIN workspaces AS w ON w.internal_id = m.workspace_id
+INNER JOIN board_document_media_refs AS r ON r.media_asset_id = m.internal_id
+INNER JOIN boards AS b ON b.internal_id = r.board_id
+WHERE m.public_id = $1 AND w.public_id = $2
+ORDER BY b.public_id ASC
 `
 
-type ListBoardShareTokensParams struct {
+type ListBoardsReferencingMediaAssetParams struct {
+	PublicID          string `json:"public_id"`
 	WorkspacePublicID string `json:"workspace_public_id"`
-	BoardPublicID     string `json:"board_public_id"`
-	RowLimit          int32  `json:"row_limit"`
 }
 
-type ListBoardShareTokensRow struct {
-	PublicID        string             `json:"public_id"`
-	TokenID         pgtype.Text        `json:"token_id"`
-	TokenSecret     string             `json:"token_secret"`
-	TokenPrefix     string             `json:"token_prefix"`
-	GrantedRole     string             `json:"granted_role"`
-	CreatedByUserID int64              `json:"created_by_user_id"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	RevokedAt       pgtype.Timestamptz `json:"revoked_at"`
-	RevokedByUserID pgtype.Int8        `json:"revoked_by_user_id"`
-	UsageCount      int64              `json:"usage_count"`
-}
-
-func (q *Queries) ListBoardShareTokens(ctx context.Context, arg ListBoardShareTokensParams) ([]ListBoardShareTokensRow, error) {
-	rows, err := q.db.Query(ctx, listBoardShareTokens, arg.WorkspacePublicID, arg.BoardPublicID, arg.RowLimit)
+// ListBoardsReferencingMediaAsset lists the workspace-scoped board public
+// ids whose accepted document references one asset (#936: board-reference
+// source, read from board_document_media_refs). Served through the narrow
+// BoardMediaRefReader port: Media authorization resolves each board through
+// RoleReader and only boards the caller can read authorize. Unknown or
+// cross-workspace assets list empty.
+func (q *Queries) ListBoardsReferencingMediaAsset(ctx context.Context, arg ListBoardsReferencingMediaAssetParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listBoardsReferencingMediaAsset, arg.PublicID, arg.WorkspacePublicID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListBoardShareTokensRow
+	var items []string
 	for rows.Next() {
-		var i ListBoardShareTokensRow
-		if err := rows.Scan(
-			&i.PublicID,
-			&i.TokenID,
-			&i.TokenSecret,
-			&i.TokenPrefix,
-			&i.GrantedRole,
-			&i.CreatedByUserID,
-			&i.CreatedAt,
-			&i.RevokedAt,
-			&i.RevokedByUserID,
-			&i.UsageCount,
-		); err != nil {
+		var public_id string
+		if err := rows.Scan(&public_id); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, public_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -622,7 +652,13 @@ func (q *Queries) ListBoardShareTokens(ctx context.Context, arg ListBoardShareTo
 
 const listWorkspaceBoardCatalog = `-- name: ListWorkspaceBoardCatalog :many
 WITH authorized AS MATERIALIZED (
-  SELECT b.internal_id, b.updated_at, b.public_id
+  SELECT b.internal_id, b.updated_at, b.public_id,
+    (m.user_id IS NOT NULL) AS has_direct_grant,
+    CASE
+      WHEN b.owner_user_id = $1 THEN 'owner'
+      WHEN m.user_id IS NOT NULL AND b.workspace_access IN ('viewer', 'editor') THEN b.workspace_access
+      ELSE ''
+    END AS effective_role
   FROM boards AS b
   INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
   INNER JOIN board_documents AS d ON d.board_id = b.internal_id
@@ -630,15 +666,16 @@ WITH authorized AS MATERIALIZED (
   WHERE w.public_id = $2
     AND (b.archived_at IS NULL OR $3)
     AND b.owner_user_id IS NOT NULL
+    AND $4
+    AND EXISTS (SELECT 1 FROM workspace_memberships AS wm WHERE wm.workspace_id = w.internal_id AND wm.user_id = $1 AND btrim(wm.role) IN ('owner', 'admin', 'member'))
     AND (
       b.owner_user_id = $1
-      OR (m.user_id IS NOT NULL AND btrim(m.role) IN ('owner', 'editor', 'viewer'))
-      OR (m.user_id IS NULL AND $4::text IN ('owner', 'admin', 'member'))
+      OR (m.user_id IS NOT NULL AND b.workspace_access IN ('viewer', 'editor'))
     )
   ORDER BY b.updated_at DESC, b.public_id ASC
   LIMIT $5
 ), page AS (
-  SELECT internal_id FROM authorized
+  SELECT internal_id, has_direct_grant, effective_role FROM authorized
   ORDER BY updated_at DESC, public_id ASC
   LIMIT $7 OFFSET $6
 ), total AS (
@@ -646,8 +683,11 @@ WITH authorized AS MATERIALIZED (
 )
 SELECT total.total_count,
   b.internal_id, b.public_id, w.public_id AS workspace_public_id,
-  b.owner_user_id, b.title, b.created_at, b.updated_at, b.archived_at,
-  d.document_version, d.schema_version, d.content_version, d.preview_scene
+  b.owner_user_id, b.title, b.workspace_access, b.access_version,
+  b.created_at, b.updated_at, b.archived_at,
+  d.document_version, d.schema_version, d.content_version, d.preview_scene,
+  page.has_direct_grant, page.effective_role,
+  EXISTS (SELECT 1 FROM board_memberships AS g WHERE g.board_id = b.internal_id) AS has_any_grants
 FROM total
 LEFT JOIN page ON true
 LEFT JOIN boards AS b ON b.internal_id = page.internal_id
@@ -657,10 +697,10 @@ ORDER BY b.updated_at DESC, b.public_id ASC
 `
 
 type ListWorkspaceBoardCatalogParams struct {
-	UserID            int64       `json:"user_id"`
+	UserID            pgtype.Int8 `json:"user_id"`
 	WorkspacePublicID string      `json:"workspace_public_id"`
 	IncludeArchived   interface{} `json:"include_archived"`
-	WorkspaceRole     string      `json:"workspace_role"`
+	IsWorkspaceMember interface{} `json:"is_workspace_member"`
 	CatalogLimit      int32       `json:"catalog_limit"`
 	RowOffset         int32       `json:"row_offset"`
 	RowLimit          int32       `json:"row_limit"`
@@ -673,6 +713,8 @@ type ListWorkspaceBoardCatalogRow struct {
 	WorkspacePublicID pgtype.Text        `json:"workspace_public_id"`
 	OwnerUserID       pgtype.Int8        `json:"owner_user_id"`
 	Title             pgtype.Text        `json:"title"`
+	WorkspaceAccess   pgtype.Text        `json:"workspace_access"`
+	AccessVersion     pgtype.Int8        `json:"access_version"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
@@ -680,16 +722,21 @@ type ListWorkspaceBoardCatalogRow struct {
 	SchemaVersion     pgtype.Int4        `json:"schema_version"`
 	ContentVersion    pgtype.Text        `json:"content_version"`
 	PreviewScene      []byte             `json:"preview_scene"`
+	HasDirectGrant    interface{}        `json:"has_direct_grant"`
+	EffectiveRole     pgtype.Text        `json:"effective_role"`
+	HasAnyGrants      bool               `json:"has_any_grants"`
 }
 
 // Limit authorized identifiers before joining scene bodies. The count row
-// preserves offset validation even when the requested page is empty.
+// preserves offset validation even when the requested page is empty. The
+// predicate mirrors ResolveRole: current members read their own Boards or
+// selected Boards with a configured Viewer/Editor role.
 func (q *Queries) ListWorkspaceBoardCatalog(ctx context.Context, arg ListWorkspaceBoardCatalogParams) ([]ListWorkspaceBoardCatalogRow, error) {
 	rows, err := q.db.Query(ctx, listWorkspaceBoardCatalog,
 		arg.UserID,
 		arg.WorkspacePublicID,
 		arg.IncludeArchived,
-		arg.WorkspaceRole,
+		arg.IsWorkspaceMember,
 		arg.CatalogLimit,
 		arg.RowOffset,
 		arg.RowLimit,
@@ -708,6 +755,8 @@ func (q *Queries) ListWorkspaceBoardCatalog(ctx context.Context, arg ListWorkspa
 			&i.WorkspacePublicID,
 			&i.OwnerUserID,
 			&i.Title,
+			&i.WorkspaceAccess,
+			&i.AccessVersion,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -715,6 +764,9 @@ func (q *Queries) ListWorkspaceBoardCatalog(ctx context.Context, arg ListWorkspa
 			&i.SchemaVersion,
 			&i.ContentVersion,
 			&i.PreviewScene,
+			&i.HasDirectGrant,
+			&i.EffectiveRole,
+			&i.HasAnyGrants,
 		); err != nil {
 			return nil, err
 		}
@@ -727,7 +779,7 @@ func (q *Queries) ListWorkspaceBoardCatalog(ctx context.Context, arg ListWorkspa
 }
 
 const listWorkspaceBoardMemberships = `-- name: ListWorkspaceBoardMemberships :many
-SELECT m.user_id, m.role, m.created_at
+SELECT m.user_id, m.created_at
 FROM board_memberships AS m
 INNER JOIN boards AS b ON b.internal_id = m.board_id
 INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
@@ -746,7 +798,6 @@ type ListWorkspaceBoardMembershipsParams struct {
 
 type ListWorkspaceBoardMembershipsRow struct {
 	UserID    int64              `json:"user_id"`
-	Role      string             `json:"role"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
@@ -759,7 +810,50 @@ func (q *Queries) ListWorkspaceBoardMemberships(ctx context.Context, arg ListWor
 	var items []ListWorkspaceBoardMembershipsRow
 	for rows.Next() {
 		var i ListWorkspaceBoardMembershipsRow
-		if err := rows.Scan(&i.UserID, &i.Role, &i.CreatedAt); err != nil {
+		if err := rows.Scan(&i.UserID, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWorkspaceMemberBoardGrants = `-- name: ListWorkspaceMemberBoardGrants :many
+SELECT b.public_id, b.access_version, b.archived_at IS NOT NULL AS is_archived
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+LEFT JOIN board_memberships AS m ON m.board_id = b.internal_id AND m.user_id = $1
+WHERE w.public_id = $2
+  AND (b.owner_user_id = $1
+    OR (m.user_id IS NOT NULL AND b.workspace_access IN ('viewer', 'editor')))
+ORDER BY b.public_id ASC
+`
+
+type ListWorkspaceMemberBoardGrantsParams struct {
+	UserID            int64  `json:"user_id"`
+	WorkspacePublicID string `json:"workspace_public_id"`
+}
+
+type ListWorkspaceMemberBoardGrantsRow struct {
+	PublicID      string      `json:"public_id"`
+	AccessVersion int64       `json:"access_version"`
+	IsArchived    interface{} `json:"is_archived"`
+}
+
+// Every currently readable Board affected by the membership departure.
+func (q *Queries) ListWorkspaceMemberBoardGrants(ctx context.Context, arg ListWorkspaceMemberBoardGrantsParams) ([]ListWorkspaceMemberBoardGrantsRow, error) {
+	rows, err := q.db.Query(ctx, listWorkspaceMemberBoardGrants, arg.UserID, arg.WorkspacePublicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListWorkspaceMemberBoardGrantsRow
+	for rows.Next() {
+		var i ListWorkspaceMemberBoardGrantsRow
+		if err := rows.Scan(&i.PublicID, &i.AccessVersion, &i.IsArchived); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -796,6 +890,90 @@ func (q *Queries) LockWorkspaceBoard(ctx context.Context, arg LockWorkspaceBoard
 	var i LockWorkspaceBoardRow
 	err := row.Scan(&i.InternalID, &i.ArchivedAt, &i.DocumentVersion)
 	return i, err
+}
+
+const lockWorkspaceBoardAccess = `-- name: LockWorkspaceBoardAccess :one
+SELECT b.internal_id, b.owner_user_id, b.workspace_access, b.access_version, b.archived_at
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE w.public_id = $1 AND b.public_id = $2
+LIMIT 1
+FOR UPDATE
+`
+
+type LockWorkspaceBoardAccessParams struct {
+	WorkspacePublicID string `json:"workspace_public_id"`
+	BoardPublicID     string `json:"board_public_id"`
+}
+
+type LockWorkspaceBoardAccessRow struct {
+	InternalID      int64              `json:"internal_id"`
+	OwnerUserID     pgtype.Int8        `json:"owner_user_id"`
+	WorkspaceAccess string             `json:"workspace_access"`
+	AccessVersion   int64              `json:"access_version"`
+	ArchivedAt      pgtype.Timestamptz `json:"archived_at"`
+}
+
+// Configuration writes lock Workspace membership before the Board row.
+func (q *Queries) LockWorkspaceBoardAccess(ctx context.Context, arg LockWorkspaceBoardAccessParams) (LockWorkspaceBoardAccessRow, error) {
+	row := q.db.QueryRow(ctx, lockWorkspaceBoardAccess, arg.WorkspacePublicID, arg.BoardPublicID)
+	var i LockWorkspaceBoardAccessRow
+	err := row.Scan(
+		&i.InternalID,
+		&i.OwnerUserID,
+		&i.WorkspaceAccess,
+		&i.AccessVersion,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
+const lockWorkspaceMemberBoards = `-- name: LockWorkspaceMemberBoards :many
+SELECT b.internal_id, b.public_id, b.access_version, b.owner_user_id
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE w.public_id = $1
+  AND b.public_id = ANY($2::text[])
+ORDER BY b.public_id ASC
+FOR UPDATE
+`
+
+type LockWorkspaceMemberBoardsParams struct {
+	WorkspacePublicID string   `json:"workspace_public_id"`
+	BoardPublicIds    []string `json:"board_public_ids"`
+}
+
+type LockWorkspaceMemberBoardsRow struct {
+	InternalID    int64       `json:"internal_id"`
+	PublicID      string      `json:"public_id"`
+	AccessVersion int64       `json:"access_version"`
+	OwnerUserID   pgtype.Int8 `json:"owner_user_id"`
+}
+
+// Lock affected Boards in a stable order before removing grants.
+func (q *Queries) LockWorkspaceMemberBoards(ctx context.Context, arg LockWorkspaceMemberBoardsParams) ([]LockWorkspaceMemberBoardsRow, error) {
+	rows, err := q.db.Query(ctx, lockWorkspaceMemberBoards, arg.WorkspacePublicID, arg.BoardPublicIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LockWorkspaceMemberBoardsRow
+	for rows.Next() {
+		var i LockWorkspaceMemberBoardsRow
+		if err := rows.Scan(
+			&i.InternalID,
+			&i.PublicID,
+			&i.AccessVersion,
+			&i.OwnerUserID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const renameWorkspaceBoard = `-- name: RenameWorkspaceBoard :execrows
@@ -845,38 +1023,6 @@ func (q *Queries) RestoreWorkspaceBoard(ctx context.Context, arg RestoreWorkspac
 	return result.RowsAffected(), nil
 }
 
-const revokeBoardShareToken = `-- name: RevokeBoardShareToken :execrows
-UPDATE board_share_tokens AS t
-SET revoked_at = COALESCE(t.revoked_at, now()),
-  revoked_by_user_id = COALESCE(t.revoked_by_user_id, $1)
-FROM boards AS b
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-WHERE t.board_id = b.internal_id
-  AND w.public_id = $2
-  AND b.public_id = $3
-  AND t.token_id = $4
-`
-
-type RevokeBoardShareTokenParams struct {
-	RevokedByUserID   pgtype.Int8 `json:"revoked_by_user_id"`
-	WorkspacePublicID string      `json:"workspace_public_id"`
-	BoardPublicID     string      `json:"board_public_id"`
-	TokenID           pgtype.Text `json:"token_id"`
-}
-
-func (q *Queries) RevokeBoardShareToken(ctx context.Context, arg RevokeBoardShareTokenParams) (int64, error) {
-	result, err := q.db.Exec(ctx, revokeBoardShareToken,
-		arg.RevokedByUserID,
-		arg.WorkspacePublicID,
-		arg.BoardPublicID,
-		arg.TokenID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const scanBoardDocumentsMissingPreview = `-- name: ScanBoardDocumentsMissingPreview :many
 SELECT d.board_id, d.snapshot_data
 FROM board_documents AS d
@@ -912,6 +1058,40 @@ func (q *Queries) ScanBoardDocumentsMissingPreview(ctx context.Context, rowLimit
 		return nil, err
 	}
 	return items, nil
+}
+
+const setBoardWorkspaceAccess = `-- name: SetBoardWorkspaceAccess :execrows
+UPDATE boards AS b
+SET workspace_access = $1, access_version = access_version + 1, updated_at = now()
+FROM workspaces AS w
+WHERE w.internal_id = b.workspace_id
+  AND w.public_id = $2
+  AND b.public_id = $3
+  AND b.access_version = $4
+  AND b.archived_at IS NULL
+`
+
+type SetBoardWorkspaceAccessParams struct {
+	WorkspaceAccess   string `json:"workspace_access"`
+	WorkspacePublicID string `json:"workspace_public_id"`
+	BoardPublicID     string `json:"board_public_id"`
+	ExpectedVersion   int64  `json:"expected_version"`
+}
+
+// Version-guarded access transition: bumps access_version exactly once.
+// Zero rows means the board vanished or a concurrent writer moved the
+// version first (callers distinguish via a re-read).
+func (q *Queries) SetBoardWorkspaceAccess(ctx context.Context, arg SetBoardWorkspaceAccessParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setBoardWorkspaceAccess,
+		arg.WorkspaceAccess,
+		arg.WorkspacePublicID,
+		arg.BoardPublicID,
+		arg.ExpectedVersion,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const touchWorkspaceBoard = `-- name: TouchWorkspaceBoard :exec
@@ -982,50 +1162,30 @@ func (q *Queries) UpdateBoardDocumentPreview(ctx context.Context, arg UpdateBoar
 	return result.RowsAffected(), nil
 }
 
-const updateWorkspaceBoardMembershipRole = `-- name: UpdateWorkspaceBoardMembershipRole :execrows
-UPDATE board_memberships AS m
-SET role = $1
+const upsertBoardDocumentMediaRef = `-- name: UpsertBoardDocumentMediaRef :exec
+INSERT INTO board_document_media_refs (board_id, media_asset_id)
+SELECT b.internal_id, m.internal_id
 FROM boards AS b
 INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-WHERE m.board_id = b.internal_id
-  AND w.public_id = $2
-  AND b.public_id = $3
-  AND m.user_id = $4
+INNER JOIN media_assets AS m ON m.workspace_id = w.internal_id
+WHERE w.public_id = $1
+  AND b.public_id = $2
+  AND m.public_id = $3
+ON CONFLICT (board_id, media_asset_id) DO NOTHING
 `
 
-type UpdateWorkspaceBoardMembershipRoleParams struct {
-	Role              string `json:"role"`
+type UpsertBoardDocumentMediaRefParams struct {
 	WorkspacePublicID string `json:"workspace_public_id"`
 	BoardPublicID     string `json:"board_public_id"`
-	UserID            int64  `json:"user_id"`
+	AssetPublicID     string `json:"asset_public_id"`
 }
 
-func (q *Queries) UpdateWorkspaceBoardMembershipRole(ctx context.Context, arg UpdateWorkspaceBoardMembershipRoleParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updateWorkspaceBoardMembershipRole,
-		arg.Role,
-		arg.WorkspacePublicID,
-		arg.BoardPublicID,
-		arg.UserID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const upsertJoinBoardMembership = `-- name: UpsertJoinBoardMembership :exec
-INSERT INTO board_memberships (board_id, user_id, role)
-VALUES ($1, $2, $3)
-ON CONFLICT (board_id, user_id) DO UPDATE SET role = EXCLUDED.role
-`
-
-type UpsertJoinBoardMembershipParams struct {
-	BoardID int64  `json:"board_id"`
-	UserID  int64  `json:"user_id"`
-	Role    string `json:"role"`
-}
-
-func (q *Queries) UpsertJoinBoardMembership(ctx context.Context, arg UpsertJoinBoardMembershipParams) error {
-	_, err := q.db.Exec(ctx, upsertJoinBoardMembership, arg.BoardID, arg.UserID, arg.Role)
+// UpsertBoardDocumentMediaRef records one accepted board -> media asset
+// reference (#936: document source). Reconciled in the SAME transaction as
+// the document accept: the board and the asset must both resolve inside
+// the calling workspace or no row is written (fail-closed, never
+// cross-workspace). Replays converge via ON CONFLICT DO NOTHING.
+func (q *Queries) UpsertBoardDocumentMediaRef(ctx context.Context, arg UpsertBoardDocumentMediaRefParams) error {
+	_, err := q.db.Exec(ctx, upsertBoardDocumentMediaRef, arg.WorkspacePublicID, arg.BoardPublicID, arg.AssetPublicID)
 	return err
 }

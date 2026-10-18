@@ -259,7 +259,7 @@ func TestMemoryListTaskAssetsSeeded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store.SeedTaskAssetForTests("ws_a", "task_1", &TaskAsset{Asset: asset, OutputIndex: 0, Role: "result"})
+	store.SeedTaskAssetForTests("ws_a", "task_1", asset.OwnerUserID, "", &TaskAsset{Asset: asset, OutputIndex: 0, Role: "result"})
 
 	items, err := store.ListTaskAssets(ctx, "ws_a", "task_1")
 	if err != nil || len(items) != 1 || items[0].Asset.ID != asset.ID || items[0].Role != "result" {

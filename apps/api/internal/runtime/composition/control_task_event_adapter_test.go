@@ -1,19 +1,5 @@
 package composition
 
-// Control Plane task event adapter (admin cancel dead-channel fix).
-//
-// The control-plane tests prove the Control Plane ANNOUNCES a committed
-// transition exactly once. These prove the other half: that the adapter
-// actually delivers that announcement to the real event layer, so the fix
-// is not a silent no-op behind a counting fake.
-//
-// Both delivery channels are asserted with COUNTS against REAL event
-// components (the workspace hot log and the webhook store), because the
-// failure this guards is "the Control Plane called the port and nothing
-// arrived". The NATS task status channel is covered by a fake publisher,
-// which is the right tool there: it needs no broker, and the envelope
-// shape it must carry is what matters.
-
 import (
 	"context"
 	"encoding/json"
@@ -68,7 +54,7 @@ func controlAdapterFixture(t *testing.T) (*countingTaskStatusPublisher, *events.
 	if _, _, _, err := webhooks.Create(
 		context.Background(), workspace,
 		"https://hooks.example.test/task-events",
-		[]string{events.EventV1TaskCancelled},
+		nil,
 		nil, // let the store mint the whsec_ secret
 	); err != nil {
 		t.Fatalf("create webhook subscription: %v", err)
@@ -90,11 +76,7 @@ func controlTransition(workspace, taskID string, actorPublicID uuid.UUID) httpap
 	}
 }
 
-// TestControlTaskEventAdapterDeliversBothChannelsOnce proves one
-// announcement reaches the task status channel exactly once AND produces
-// exactly one signed webhook delivery carrying a valid task.cancelled
-// envelope scoped to the right workspace.
-func TestControlTaskEventAdapterDeliversBothChannelsOnce(t *testing.T) {
+func TestControlTaskEventAdapterDeliversTaskStatusAndSSEOnce(t *testing.T) {
 	status, webhooks, enqueuer, workspace := controlAdapterFixture(t)
 	log := events.NewWorkspaceEventLog()
 	adapter := newControlTaskEventAdapter(status, log, nil, webhooks)
@@ -122,10 +104,14 @@ func TestControlTaskEventAdapterDeliversBothChannelsOnce(t *testing.T) {
 		t.Fatalf("published event = %+v, want cancelled for %s", published, taskID)
 	}
 
-	if len(enqueuer.inserts) != 1 {
-		t.Fatalf("webhook deliveries = %d, want exactly 1: %+v", len(enqueuer.inserts), enqueuer.inserts)
+	if len(enqueuer.inserts) != 0 {
+		t.Fatalf("private Task produced %d Workspace webhook deliveries", len(enqueuer.inserts))
 	}
-	envelope := enqueuer.inserts[0].Envelope
+	missed, _, _ := log.ReplayAfter(workspace, "evt_missing", events.WorkspaceEventFilter{})
+	if len(missed) != 1 {
+		t.Fatalf("Task SSE envelopes=%d, want 1", len(missed))
+	}
+	envelope := missed[0]
 	if envelope.Type != events.EventV1TaskCancelled {
 		t.Fatalf("envelope type = %q, want %s", envelope.Type, events.EventV1TaskCancelled)
 	}
@@ -135,8 +121,6 @@ func TestControlTaskEventAdapterDeliversBothChannelsOnce(t *testing.T) {
 	if envelope.Actor.Type != events.V1ActorUser || envelope.Actor.ID != tenancy.FormatUserPublicID(actorPublicID) {
 		t.Fatalf("envelope actor = %+v, want the operator usr_ id", envelope.Actor)
 	}
-	// The envelope must also land in the hot log SSE subscribers read, and
-	// it must be the SAME envelope the webhook carries (one mint, one id).
 	if got := log.Len(workspace); got != 1 {
 		t.Fatalf("workspace event log length = %d, want exactly 1", got)
 	}
@@ -146,17 +130,22 @@ func TestControlTaskEventAdapterDeliversBothChannelsOnce(t *testing.T) {
 // cancellation cause in the workspace payload.
 func TestControlTaskEventAdapterEnvelopeCarriesCancelReason(t *testing.T) {
 	_, webhooks, enqueuer, workspace := controlAdapterFixture(t)
-	adapter := newControlTaskEventAdapter(nil, events.NewWorkspaceEventLog(), nil, webhooks)
+	log := events.NewWorkspaceEventLog()
+	adapter := newControlTaskEventAdapter(nil, log, nil, webhooks)
 
 	taskID := controlTaskPublicID()
 	if err := adapter.EmitWorkspaceTaskEvent(context.Background(),
 		controlTransition(workspace, taskID, uuid.New())); err != nil {
 		t.Fatalf("EmitWorkspaceTaskEvent: %v", err)
 	}
-	if len(enqueuer.inserts) != 1 {
-		t.Fatalf("webhook deliveries = %d, want exactly 1", len(enqueuer.inserts))
+	if len(enqueuer.inserts) != 0 {
+		t.Fatalf("private Task produced %d Workspace webhook deliveries", len(enqueuer.inserts))
 	}
-	envelope := enqueuer.inserts[0].Envelope
+	missed, _, _ := log.ReplayAfter(workspace, "evt_missing", events.WorkspaceEventFilter{})
+	if len(missed) != 1 {
+		t.Fatalf("Task SSE envelopes=%d, want 1", len(missed))
+	}
+	envelope := missed[0]
 	if err := events.ValidateV1Envelope(envelope); err != nil {
 		t.Fatalf("emitted envelope must validate: %v", err)
 	}
@@ -196,17 +185,22 @@ func TestControlTaskEventAdapterEmitsBillingSettledForCancel(t *testing.T) {
 // instead of emitting an invalid (empty actor) envelope or failing.
 func TestControlTaskEventAdapterFallsBackToServiceActor(t *testing.T) {
 	_, webhooks, enqueuer, workspace := controlAdapterFixture(t)
-	adapter := newControlTaskEventAdapter(nil, events.NewWorkspaceEventLog(), nil, webhooks)
+	log := events.NewWorkspaceEventLog()
+	adapter := newControlTaskEventAdapter(nil, log, nil, webhooks)
 
 	event := controlTransition(workspace, controlTaskPublicID(), uuid.New())
 	event.ActorUserID = ""
 	if err := adapter.EmitWorkspaceTaskEvent(context.Background(), event); err != nil {
 		t.Fatalf("EmitWorkspaceTaskEvent: %v", err)
 	}
-	if len(enqueuer.inserts) != 1 {
-		t.Fatalf("webhook deliveries = %d, want exactly 1", len(enqueuer.inserts))
+	if len(enqueuer.inserts) != 0 {
+		t.Fatalf("private Task produced %d Workspace webhook deliveries", len(enqueuer.inserts))
 	}
-	envelope := enqueuer.inserts[0].Envelope
+	missed, _, _ := log.ReplayAfter(workspace, "evt_missing", events.WorkspaceEventFilter{})
+	if len(missed) != 1 {
+		t.Fatalf("Task SSE envelopes=%d, want 1", len(missed))
+	}
+	envelope := missed[0]
 	if envelope.Actor.Type != events.V1ActorService || envelope.Actor.ID != controlPlaneActorID {
 		t.Fatalf("envelope actor = %+v, want service/%s", envelope.Actor, controlPlaneActorID)
 	}

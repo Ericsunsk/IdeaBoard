@@ -618,6 +618,39 @@ func (c *ServiceClient) GetUserEmails(ctx context.Context, authUserIDs []string)
 	return identities, nil
 }
 
+// LookupUserByEmail resolves one Auth-owned identity by canonical email
+// (exact match, case-insensitive after trim + lower-casing). Unknown
+// emails surface ErrAuthUserNotFound so callers converge to 404 without
+// distinguishing unregistered identities from missing business rows.
+func (c *ServiceClient) LookupUserByEmail(ctx context.Context, email string) (string, error) {
+	client, err := c.contractClient()
+	if err != nil {
+		return "", err
+	}
+	normalized := strings.ToLower(strings.TrimSpace(email))
+	if normalized == "" {
+		return "", fmt.Errorf("auth user email is required")
+	}
+	response, err := client.LookupUserByEmailWithResponse(ctx, internalcontract.LookupUserByEmailJSONRequestBody{Email: normalized})
+	if err != nil {
+		return "", err
+	}
+	if response.StatusCode() == http.StatusNotFound {
+		return "", ErrAuthUserNotFound
+	}
+	if response.StatusCode() != http.StatusOK {
+		return "", contractFailure("lookup user by email", response.StatusCode(), response.Body)
+	}
+	if response.JSON200 == nil || response.JSON200.Code != internalcontract.LookupUserByEmailEnvelopeCodeN0 {
+		return "", fmt.Errorf("auth service lookup user by email returned an invalid success envelope")
+	}
+	authUserID := strings.TrimSpace(response.JSON200.Data.User.AuthUserID)
+	if authUserID == "" {
+		return "", fmt.Errorf("auth service lookup user by email returned an invalid success envelope")
+	}
+	return authUserID, nil
+}
+
 func (c *ServiceClient) DeleteUser(ctx context.Context, authUserID string) error {
 	client, normalizedID, err := c.managedUserClient(authUserID)
 	if err != nil {

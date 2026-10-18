@@ -11,6 +11,7 @@ import type { ImageNodeItem } from '../../../../board/ports/canvas'
 import { createCanvasImageSaveInputs } from '../../../session/library-save/canvasImageSaveAdapter'
 import type { CanvasImageSaveSource } from '../../../session/library-save/canvasImageSaveAdapter'
 import { i18n } from '../../../../../core/i18n'
+import { userFacingErrorCopy } from '../../../../../core/errors/errorCatalog'
 
 /**
  * Canvas node-drag save routing.
@@ -145,9 +146,16 @@ export function useCanvasNodeLibrarySaveRouter(options: CanvasNodeLibrarySaveRou
       await options.saveModule.submit(createCanvasImageSaveInputs(decision.sources), {
         ...(resolved.folderId == null ? {} : { folderId: resolved.folderId }),
         galleryEffect: 'reload-current',
+        // Manual canvas saves publish to the workspace Library: the
+        // success copy states the workspace visibility explicitly (#937).
+        successMessage: i18n.global.t('library.toasts.publishedToWorkspace'),
       })
-    } catch {
-      options.notifyError(i18n.global.t('library.errors.saveAssetFailed'))
+    } catch (error) {
+      options.notifyError(
+        userFacingErrorCopy(error, i18n.global.t('library.errors.saveAssetFailed'), {
+          board_forbidden: 'library.errors.saveRestrictedDenied',
+        }),
+      )
     }
   }
 

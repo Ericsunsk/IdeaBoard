@@ -103,6 +103,19 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     return boardRepository.viewModel.byId.value.get(boardId)?.name ?? boardId
   })
 
+  // Read-only display derives from the server-computed capabilities riding
+  // the hydrated catalog entry: canWrite false renders the read-only
+  // banner and gates rename affordances. Boards without a capability fact
+  // (never hydrated) stay editable here — the server still enforces 403.
+  // No role is recomputed locally.
+  const isBoardReadOnly = computed(() => {
+    const boardId = `${options.currentBoardId.value ?? ''}`.trim()
+    if (!boardId) return false
+    const capabilities = boardRepository.viewModel.byId.value.get(boardId)?.capabilities
+    if (!capabilities) return false
+    return capabilities.write !== true
+  })
+
   const boardOptions = computed(() =>
     boardRepository.viewModel.boards.value.map((board) => ({ id: board.id, name: board.name })),
   )
@@ -118,6 +131,10 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
   function startBoardRename() {
     if (isBoardArchived.value) {
       options.message.warning(t('canvas.chrome.boardArchivedRenameBlocked'))
+      return
+    }
+    if (isBoardReadOnly.value) {
+      options.message.warning(t('canvas.chrome.boardReadOnlyRenameBlocked'))
       return
     }
     if (isRenamePending.value) {
@@ -213,6 +230,12 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
       options.message.warning(t('canvas.chrome.boardArchivedRenameBlocked'))
       return
     }
+    if (isBoardReadOnly.value) {
+      isRenamingBoard.value = false
+      boardNameDraft.value = ''
+      options.message.warning(t('canvas.chrome.boardReadOnlyRenameBlocked'))
+      return
+    }
     const normalized = normalizeBoardName(boardNameDraft.value)
     const currentName = normalizeBoardName(currentBoardName.value)
     isRenamingBoard.value = false
@@ -276,6 +299,7 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     isRenamePending,
     catalogRecovery,
     isBoardArchived,
+    isBoardReadOnly,
     isRestoringArchivedBoard,
     refreshArchivedState,
     markArchivedFromSave,

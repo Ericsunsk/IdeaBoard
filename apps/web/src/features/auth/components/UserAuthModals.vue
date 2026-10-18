@@ -34,7 +34,6 @@ import { ADMIN_ROOT_PATH } from '../../../core/auth/routePolicy'
 import { stringParam, stringParamWhere } from '../../../core/router/queryParams'
 import {
   HOME_PATH,
-  SHARE_JOIN_PATH,
   USER_BOARDS_PATH,
   USER_CANVAS_PATH,
   USER_LOGIN_PATH,
@@ -129,7 +128,7 @@ const oauthRedirectPath = props.presentation === 'overlay' ? route.fullPath : un
 
 function resolveAuthClosePath() {
   const target = resolveLoginRedirectPath()
-  const protectedPrefixes = [USER_BOARDS_PATH, USER_CANVAS_PATH, ADMIN_ROOT_PATH, SHARE_JOIN_PATH]
+  const protectedPrefixes = [USER_BOARDS_PATH, USER_CANVAS_PATH, ADMIN_ROOT_PATH]
   return protectedPrefixes.some((prefix) => target === prefix || target.startsWith(`${prefix}/`))
     ? HOME_PATH
     : target

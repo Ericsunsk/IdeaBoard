@@ -84,10 +84,10 @@ func webhookJob(args WebhookDeliveryArgs, attempt, maxAttempts int) *river.Job[W
 
 func testEnvelope(t *testing.T) V1Envelope {
 	t.Helper()
-	envelope, err := MintV1Envelope(EventV1TaskCompleted, "ws_1",
+	envelope, err := MintV1Envelope(EventV1BillingSettled, "ws_1",
 		V1Actor{Type: V1ActorUser, ID: "usr_actor"},
-		V1Resource{Type: V1ResourceTask, ID: "task_1"},
-		V1TaskCompletedData{TaskID: "task_1", OutputsURI: "/api/v1/workspaces/ws_1/tasks/task_1/outputs"})
+		V1Resource{Type: V1ResourceCheckoutSession, ID: "checkout_1"},
+		V1BillingSettledData{ReferenceType: "checkout_session", ReferenceID: "checkout_1", SettlementState: "captured"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestWebhookCreateMintsSecretOnce(t *testing.T) {
 	// Provided secrets are never returned in any view.
 	provided := FormatWhsecSecret([]byte("provided-secret-1234"))
 	if _, _, _, err := store.Create(context.Background(), "ws_1", "https://hooks.example.com/y",
-		[]string{EventV1TaskCompleted}, []byte(provided)); err != nil {
+		[]string{EventV1BillingSettled}, []byte(provided)); err != nil {
 		t.Fatal(err)
 	}
 	for _, view := range store.List("ws_1") {
@@ -448,22 +448,14 @@ func TestWebhookDuplicateDeliveryDedups(t *testing.T) {
 	}
 }
 
-func TestWebhookFilterAndDelete(t *testing.T) {
+func TestWebhookDelete(t *testing.T) {
 	sender := &fakeWebhookSender{status: 200}
 	enqueuer := &fakeWebhookEnqueuer{}
 	store := NewWebhookStore(sender, enqueuer)
 	filtered, _, _, err := store.Create(context.Background(), "ws_1", "https://hooks.example.com/x",
-		[]string{EventV1TaskCreated}, nil)
+		[]string{EventV1BillingSettled}, nil)
 	if err != nil {
 		t.Fatal(err)
-	}
-	envelope := testEnvelope(t) // task.completed: filtered out
-	store.Dispatch(context.Background(), envelope)
-	if sender.calls != 0 {
-		t.Fatal("filtered-out type must not dispatch")
-	}
-	if len(enqueuer.inserts) != 0 {
-		t.Fatal("filtered-out type must not enqueue")
 	}
 	if deleted, err := store.Delete(context.Background(), "ws_1", filtered.ID); err != nil || !deleted {
 		t.Fatal("delete must succeed")

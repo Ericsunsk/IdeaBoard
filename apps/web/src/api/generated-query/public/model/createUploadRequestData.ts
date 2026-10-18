@@ -29,4 +29,6 @@ export type CreateUploadRequestData = {
   checksum_sha256: string
   /** Defaults to image when omitted. */
   media_kind?: CreateUploadRequestDataMediaKind
+  /** Optional board the upload is captured for (#936). Verified against the creator's board write access; malformed, unknown, and unreadable boards converge to 404, readable-but-unwritable boards to 403. Empty means no binding: the asset stays owner-only until another source grants wider access. */
+  board_id?: string
 }

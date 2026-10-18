@@ -74,7 +74,7 @@ describe('board source of truth', () => {
   })
 
   it('selection port owns the scope: resolution fails closed before any network call', () => {
-    expect(getBoardScope()).toEqual({
+    expect(getBoardScope()).toMatchObject({
       userScope: expect.any(String),
       workspaceId: WORKSPACE_ID,
     })

@@ -201,7 +201,11 @@ describe('useCanvasGraphEditing', () => {
 
     await interactions.onFlowImageOpenFile('image-1')
     const snapshot = harness.nodes.value[0]?.data?.snapshotNode as ImageNodeItem
-    expect(harness.upload).toHaveBeenCalledWith(expect.any(File), 'ws_test123')
+    // #936: the canvas board id rides the upload for target binding (the
+    // transport sends board_id only for durable board_ shapes).
+    expect(harness.upload).toHaveBeenCalledWith(expect.any(File), 'ws_test123', {
+      boardId: 'board-a',
+    })
     expect(snapshot).toMatchObject({
       title: 'picked.png',
       sourceImageUrl: '/api/v1/workspaces/ws_test123/media-assets/asset_42/derivatives/preview',

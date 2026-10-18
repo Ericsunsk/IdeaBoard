@@ -214,16 +214,6 @@ export default {
   branding: {
     loadFailed: 'No se pudo cargar la configuración del sitio.',
   },
-  shareJoin: {
-    loadingTitle: 'Uniéndose al tablero compartido…',
-    failedTitle: 'No se pudo unir al tablero compartido',
-    successTitle: 'Se unió al tablero compartido',
-    loadingStatus: 'Espere mientras verificamos el token y sincronizamos el tablero…',
-    failedStatus: 'No se pudo unir al tablero. Compruebe si el enlace es válido.',
-    successStatus: 'Unión exitosa. Redirigiendo…',
-    spinnerAria: 'Uniéndose al tablero compartido',
-    backToBoards: 'Volver a tableros',
-  },
   errors: {
     networkRetry: 'Error de red. Inténtelo de nuevo.',
     walletLoadFailed: 'No se pudo cargar su saldo de Ideas.',

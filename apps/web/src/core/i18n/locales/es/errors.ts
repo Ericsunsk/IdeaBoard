@@ -31,4 +31,13 @@ export default {
   checkout_request_rejected: 'No se pudo iniciar el pago. Inténtelo de nuevo.',
   checkout_session_expired: 'Esta sesión de pago ha expirado. Inicie un nuevo pago.',
   payment_already_completed: 'Este pago ya se ha completado.',
+  board_forbidden: 'No puedes operar este tablero.',
+  task_forbidden: 'No puedes operar esta tarea.',
+  board_archived: 'Este tablero está archivado y no acepta esta operación.',
+  board_not_found: 'Tablero no encontrado.',
+  board_access_conflict: 'El acceso cambió en otro lugar. Actualiza e inténtalo de nuevo.',
+  board_precondition_required:
+    'El estado de acceso está desactualizado. Actualiza e inténtalo de nuevo.',
+  board_member_not_found: 'Miembro del tablero no encontrado.',
+  membership_transition_forbidden: 'El último gestor no se puede quitar ni degradar.',
 } as const

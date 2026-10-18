@@ -66,8 +66,6 @@ predicate_allowlist=(
   "InsertBoardDocument"
   "UpdateBoardDocument"
   "InsertBoardRevision"
-  "IncrementBoardShareTokenUsage"
-  "UpsertJoinBoardMembership"
   # Board preview backfill sweep (operator command only, no user input):
   # the scan pages internal board ids with no assigned content identity
   # and the write re-keys by the scanned internal id with an IS NULL

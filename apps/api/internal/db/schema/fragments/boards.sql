@@ -1,6 +1,4 @@
--- Boards and collaboration (#802). Boards are workspace-scoped with separate
--- ACL from workspace membership. Document snapshots use optimistic concurrency
--- (ETag/If-Match). Revisions are immutable. Share tokens enable public join.
+-- Workspace-scoped Boards grant one common role to explicitly selected members.
 CREATE TABLE boards (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
@@ -15,9 +13,15 @@ CREATE TABLE boards (
   -- rows as not found (fail-closed). The creator never needs a
   -- board_memberships row (see v1_workspace.go).
   owner_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  -- Sharing is disabled by none; viewer/editor applies only to selected members.
+  workspace_access TEXT NOT NULL DEFAULT 'none',
+  -- Access configuration changes atomically advance the independent ETag version.
+  access_version BIGINT NOT NULL DEFAULT 1,
   CONSTRAINT uq_boards_public_id UNIQUE (public_id),
   CONSTRAINT chk_boards_public_id CHECK (public_id LIKE 'board\_%'),
-  CONSTRAINT chk_boards_title CHECK (length(btrim(title)) BETWEEN 1 AND 200)
+  CONSTRAINT chk_boards_title CHECK (length(btrim(title)) BETWEEN 1 AND 200),
+  CONSTRAINT chk_boards_workspace_access CHECK (workspace_access IN ('none', 'viewer', 'editor')),
+  CONSTRAINT chk_boards_access_version CHECK (access_version > 0)
 );
 
 CREATE INDEX idx_boards_workspace ON boards (workspace_id, created_at DESC) WHERE archived_at IS NULL;
@@ -73,12 +77,10 @@ CREATE TABLE board_revisions (
 CREATE INDEX idx_board_revisions_board_created ON board_revisions (board_id, created_at DESC);
 CREATE INDEX idx_board_revisions_author ON board_revisions (author_user_id, created_at DESC);
 
--- Board membership ACL, separate from workspace membership. Role enforcement
--- at application layer: owner > editor > viewer.
+-- Selected Workspace members. Their common role lives on boards.workspace_access.
 CREATE TABLE board_memberships (
   board_id BIGINT NOT NULL REFERENCES boards(internal_id) ON DELETE CASCADE,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role TEXT NOT NULL CHECK (role IN ('owner','editor','viewer')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (board_id, user_id)
@@ -86,40 +88,34 @@ CREATE TABLE board_memberships (
 
 CREATE INDEX idx_board_memberships_user ON board_memberships (user_id, board_id);
 
--- Share tokens enable public join with configurable role. Token creation,
--- join, and revocation are idempotent commands (Idempotency-Key required).
-CREATE TABLE board_share_tokens (
-  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  public_id TEXT NOT NULL,
+-- Board document media references (#936). One row per (board, media asset)
+-- accepted into the board's persisted document snapshot: the durable join
+-- fact behind asset authorization for board readers. Reconciled in the SAME
+-- transaction as every document accept (ReplaceDocument): newly referenced
+-- asset ids are upserted, ids no longer present are deleted. Multi-source
+-- authorization stays independent — this table carries only the document
+-- source; the upload-target source lives on upload_sessions.target_board_id
+-- and owner/library/task sources on their own rows — so losing one board's
+-- access (or one row here) never revokes an independent grant. Board removal
+-- cascades; asset removal cascades; archive/restore change no row because
+-- authorization revalidates the live board role on every read.
+CREATE TABLE board_document_media_refs (
   board_id BIGINT NOT NULL REFERENCES boards(internal_id) ON DELETE CASCADE,
-  token_secret TEXT NOT NULL,
-  granted_role TEXT NOT NULL CHECK (granted_role IN ('editor','viewer')),
-  created_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  media_asset_id BIGINT NOT NULL REFERENCES media_assets(internal_id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  revoked_at TIMESTAMPTZ NULL,
-  revoked_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  -- Opaque sht_ bearer id exposed in {token_id} URL segments. Nullable so
-  -- the additive migration applies where token rows already exist; the
-  -- store always sets it on insert. Only the bearer hash is kept in
-  -- token_secret (never the bearer), so share secrets need no reversible
-  -- encryption at rest.
-  token_id TEXT NULL,
-  token_prefix TEXT NOT NULL DEFAULT '',
-  -- Join counter. The durable audit trail itself is a #808 follow-up.
-  usage_count BIGINT NOT NULL DEFAULT 0,
-  CONSTRAINT uq_board_share_tokens_public_id UNIQUE (public_id),
-  CONSTRAINT uq_board_share_tokens_secret UNIQUE (token_secret),
-  CONSTRAINT uq_board_share_tokens_token_id UNIQUE (token_id),
-  CONSTRAINT chk_board_share_tokens_public_id CHECK (public_id LIKE 'bst\_%'),
-  CONSTRAINT chk_board_share_tokens_secret CHECK (length(token_secret) >= 32),
-  CONSTRAINT chk_board_share_tokens_token_id CHECK (token_id IS NULL OR token_id LIKE 'sht\_%'),
-  CONSTRAINT chk_board_share_tokens_usage_count CHECK (usage_count >= 0),
-  CONSTRAINT chk_board_share_tokens_revocation CHECK (
-    (revoked_at IS NULL AND revoked_by_user_id IS NULL)
-    OR (revoked_at IS NOT NULL AND revoked_by_user_id IS NOT NULL)
-  )
+  PRIMARY KEY (board_id, media_asset_id)
 );
 
-CREATE INDEX idx_board_share_tokens_board ON board_share_tokens (board_id) WHERE revoked_at IS NULL;
-CREATE INDEX idx_board_share_tokens_secret ON board_share_tokens (token_secret) WHERE revoked_at IS NULL;
+CREATE INDEX idx_board_document_media_refs_asset ON board_document_media_refs (media_asset_id, board_id);
+
+-- Restricted upload target (#936). The board a Canvas/Library/Search upload
+-- is captured for, recorded at session create (pre-complete) and verified
+-- by the handler against the caller's board write access — never trusted
+-- from the client. NULL means no board binding yet (e.g. the board is not
+-- autosaved): the resulting asset stays owner-only until a board document
+-- accept, library save, or task output grants wider access, so there is
+-- never a full-workspace readable window. Cleared when the board row goes
+-- away; the asset itself survives (workspace-scoped immutability).
+ALTER TABLE upload_sessions
+  ADD COLUMN target_board_id BIGINT NULL REFERENCES boards(internal_id) ON DELETE SET NULL;
+CREATE INDEX idx_upload_sessions_target_board ON upload_sessions (target_board_id) WHERE target_board_id IS NOT NULL;

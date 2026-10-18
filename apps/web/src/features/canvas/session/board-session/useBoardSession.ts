@@ -1,6 +1,11 @@
 import type { BoardSnapshot } from '../../../board/ports/canvas'
 import { computed, type ComputedRef } from 'vue'
-import { isBoardArchivedError, isBoardSyncConflictError } from '../../../board/ports/canvasSession'
+import {
+  getBoardScope,
+  isBoardScopeCurrent,
+  isBoardArchivedError,
+  isBoardSyncConflictError,
+} from '../../../board/ports/canvasSession'
 import { i18n } from '../../../../core/i18n'
 import {
   createBoardSessionRepository,
@@ -134,6 +139,7 @@ export function useBoardSession(options: BoardSessionTestOptions): BoardSession 
   }
 
   async function save(snapshot: BoardSnapshot): Promise<BoardSessionSaveResult> {
+    const scope = getBoardScope()
     const boardId = currentBoardId.value
     if (!boardId) {
       throw new Error(i18n.global.t('canvas.session.missingBoardIdSave'))
@@ -164,9 +170,11 @@ export function useBoardSession(options: BoardSessionTestOptions): BoardSession 
     try {
       stabilizedSnapshot = await uploadLifecycle.stabilizeSnapshotForSave(snapshot)
     } catch (error) {
+      if (!isBoardScopeCurrent(scope)) throw new Error('BOARD_SCOPE_CHANGED', { cause: error })
       await repository.saveLocal(boardId, snapshot)
       throw error
     }
+    if (!isBoardScopeCurrent(scope)) throw new Error('BOARD_SCOPE_CHANGED')
     try {
       await repository.save(boardId, stabilizedSnapshot)
     } catch (error) {

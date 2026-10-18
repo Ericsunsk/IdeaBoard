@@ -158,6 +158,47 @@
         }
       }
     },
+    "/internal/users/lookup": {
+      "post": {
+        "operationId": "lookupUserByEmail",
+        "summary": "Look up a single Auth identity by canonical email",
+        "description": "Read-only exact-match lookup for the workspace invite search. The email is normalized (trimmed, lower-cased) and matched case-insensitively; unknown emails render 404 and are never fabricated.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LookupUserByEmailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Auth identity resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupUserByEmailEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/internal/users/{id}": {
       "parameters": [
         {
@@ -1062,6 +1103,59 @@
           },
           "data": {
             "$ref": "#/components/schemas/GetUserEmailsData"
+          }
+        }
+      },
+      "LookupUserByEmailRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["email"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 320
+          }
+        }
+      },
+      "AuthUserLookup": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["auth_user_id", "email"],
+        "properties": {
+          "auth_user_id": {
+            "type": "string",
+            "x-go-name": "AuthUserID"
+          },
+          "email": {
+            "type": "string"
+          }
+        }
+      },
+      "LookupUserByEmailData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["user"],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/AuthUserLookup"
+          }
+        }
+      },
+      "LookupUserByEmailEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "msg", "data"],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "enum": [0]
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LookupUserByEmailData"
           }
         }
       },

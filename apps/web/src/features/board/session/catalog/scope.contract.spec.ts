@@ -107,7 +107,7 @@ describe('boardScope', () => {
     clearStoredAuth()
     forgetStoredAuthScope()
 
-    expect(getBoardScope()).toEqual({ userScope: null, workspaceId: WORKSPACE_A })
+    expect(getBoardScope()).toMatchObject({ userScope: null, workspaceId: WORKSPACE_A })
     expect(listBoards()).toEqual([])
     expect(getBoardState('board-a')).toBeNull()
   })
@@ -137,12 +137,12 @@ describe('boardScope', () => {
     const unsubscribe = subscribeBoardScopeChange((scope) => observed.push({ ...scope }))
     try {
       getWorkspaceSelectionStore().select(WORKSPACE_B)
-      expect(getBoardScope()).toEqual({ userScope: userScope(), workspaceId: WORKSPACE_B })
-      expect(observed.at(-1)).toEqual({ userScope: userScope(), workspaceId: WORKSPACE_B })
+      expect(getBoardScope()).toMatchObject({ userScope: userScope(), workspaceId: WORKSPACE_B })
+      expect(observed.at(-1)).toMatchObject({ userScope: userScope(), workspaceId: WORKSPACE_B })
 
       clearStoredAuth()
-      expect(getBoardScope()).toEqual({ userScope: null, workspaceId: WORKSPACE_B })
-      expect(observed.at(-1)).toEqual({ userScope: null, workspaceId: WORKSPACE_B })
+      expect(getBoardScope()).toMatchObject({ userScope: null, workspaceId: WORKSPACE_B })
+      expect(observed.at(-1)).toMatchObject({ userScope: null, workspaceId: WORKSPACE_B })
     } finally {
       unsubscribe()
     }

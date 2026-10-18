@@ -8,6 +8,8 @@ import (
 	"sync"
 
 	"ideaboard/api/internal/aigateway"
+	"ideaboard/api/internal/boards"
+	boardtaskaccess "ideaboard/api/internal/boards/taskaccess"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/generation/catalog"
 	"ideaboard/api/internal/generation/routing"
@@ -194,6 +196,17 @@ func newAppTaskRuntime(
 	workspaceEvents := events.NewWorkspaceEventLog()
 	webhookStore := events.NewWebhookStore(events.NewHTTPSender(), nil)
 	webhookStore.SetPersistence(events.NewPostgresWebhookPersistence(dbs.db))
+	// #940: cross-instance workspace-envelope fanout. Remote-origin
+	// envelopes append into the shared hot log so this instance's SSE
+	// replay + live subscribers observe other instances' commits.
+	// Per-recipient permission filtering stays at SSE/webhook serve time;
+	// the bridge never republishes (Append dedups without refanout).
+	if eventBus != nil {
+		if err := eventBus.SubscribeWorkspaceEvents(ctx, events.NewWorkspaceEventBridgeHandler(workspaceEvents)); err != nil {
+			_ = eventBus.Close()
+			return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to subscribe workspace event fanout: %w", err)
+		}
+	}
 
 	riverQueue := taskqueue.NewRiverQueue(nil, dbs.db, riverpolicy.RiverMaxAttemptsDefault)
 	aiGatewayRepo := aigateway.NewConfigRepository(repos.systemConfigRepo)
@@ -241,6 +254,13 @@ func newAppTaskRuntime(
 		Workspace: workspaceEvents, Bus: eventBus, Webhooks: webhookStore,
 	}
 	taskStatusOutboxWorker := outboxworker.NewWorker(taskStatusOutboxReplayer)
+	// #940: directed board access signals whose live emit never completed
+	// replay through the same sinks (hot log + NATS bus, never webhooks).
+	boardAccessOutboxReplayer := &events.BoardAccessSignals{
+		Store: events.NewBoardAccessOutboxStore(dbs.db),
+		Log:   workspaceEvents, Bus: eventBus,
+	}
+	boardAccessOutboxWorker := outboxworker.NewBoardAccessWorker(boardAccessOutboxReplayer)
 	workspaceMediaResolver := taskruntime.NewWorkspaceTaskRuntimeMediaResolver(workspaceMedia, services.storageService)
 	// Live dispatch finalize seam: provider image bytes land directly in
 	// workspace media assets (never legacy user storage), so Generate
@@ -269,7 +289,10 @@ func newAppTaskRuntime(
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace task renderer: %w", err)
 	}
-	workspaceLibraryStore := librarypostgres.NewService(repos.db)
+	boardStore := boards.NewPostgresWorkspaceBoardStore(repos.db, workspacemedia.ValidateDocumentAssets)
+	workspaceLibraryStore := librarypostgres.NewService(repos.db, &workspacemedia.LibraryPublicationAuthorizer{
+		Boards: boardStore, TaskBoards: &boardtaskaccess.Authorizer{Store: boardStore},
+	})
 	workspaceAutoSaver, err := taskruntime.NewWorkspaceTaskAutoSaver(taskruntime.NewWorkspaceTaskLibrarySaver(workspaceLibraryStore))
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace task auto-saver: %w", err)
@@ -347,13 +370,15 @@ func newAppTaskRuntime(
 	// with the retention service (no legacy store left to purge against).
 	// Workspace task lifecycle retention is #809-close work.
 	taskStatusOutboxPeriodicJobs := outboxworker.PeriodicJobs()
-	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs)+len(settlementSweepPeriodicJobs)+len(taskStatusOutboxPeriodicJobs)+len(identityPeriodicJobs))
+	boardAccessOutboxPeriodicJobs := outboxworker.BoardAccessPeriodicJobs()
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs)+len(settlementSweepPeriodicJobs)+len(taskStatusOutboxPeriodicJobs)+len(boardAccessOutboxPeriodicJobs)+len(identityPeriodicJobs))
 	periodicJobs = append(periodicJobs, creditPeriodicJobs...)
 	periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
 	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
 	periodicJobs = append(periodicJobs, visionBillingPeriodicJobs...)
 	periodicJobs = append(periodicJobs, settlementSweepPeriodicJobs...)
 	periodicJobs = append(periodicJobs, taskStatusOutboxPeriodicJobs...)
+	periodicJobs = append(periodicJobs, boardAccessOutboxPeriodicJobs...)
 	periodicJobs = append(periodicJobs, identityPeriodicJobs...)
 	// #809 hard cut: the legacy River task worker (old job kinds) is
 	// gone (see workerriver.NewRiverClient). Stray old-kind jobs
@@ -401,6 +426,9 @@ func newAppTaskRuntime(
 			// Durable task status event replay shares the maintenance queue; the
 			// outbox row is the delivery retry fact, never the task queue.
 			river.AddWorker(workers, taskStatusOutboxWorker)
+			// #940: directed board access-signal replay rides the same
+			// maintenance queue (hot log + NATS sinks, never webhooks).
+			river.AddWorker(workers, boardAccessOutboxWorker)
 			// Identity admin reconciliation: the dry-run scan worker and its
 			// schedule worker ride the same client (no new infra).
 			river.AddWorker(workers, identityreconciliation.NewExecuteWorker(identityAdminReconciler))

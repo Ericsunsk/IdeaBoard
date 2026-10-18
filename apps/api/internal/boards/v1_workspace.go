@@ -1,33 +1,7 @@
 package boards
 
-// Workspace-rooted board collaboration store (issue #802).
-//
-// The legacy boards tables carry no workspace association, archive state, or
-// revision history, and sqlc generated code must not be hand-edited. This
-// file therefore owns a small additive WorkspaceBoardStore interface with
-// context.Context-first methods plus an in-memory implementation used by
-// contract tests. A postgres implementation (workspace_board_links mapping +
-// immutable board_revisions table) is a documented #809 follow-up; until it
-// lands, production handlers fail closed with 501 when the store is nil.
-//
-// Invariants owned here:
-//   - Board external ids mint board_<hex>; legacy non-prefixed rows are out
-//     of scope for this store (tolerated read-only by the legacy handlers).
-//   - Share token bearers mint sht_<hex>; the bearer is shown once at create
-//     (and on idempotent replay) and only its hash is retained for lookup.
-//   - Revisions are INSERT-only: ReplaceDocument appends a new immutable
-//     revision entry; entries are never mutated and are addressable by
-//     revision number or entry id.
-//   - Workspace members with visible membership default to viewer
-//     (workspace owners default to owner); explicit board rows override
-//     the default. Callers with no visible workspace membership and no
-//     explicit grant stay invisible (404 at the handler edge).
-//   - The last owner cannot be removed or demoted (ErrV1LastOwner).
-
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,27 +13,24 @@ import (
 	"unicode/utf8"
 
 	"ideaboard/api/internal/boards/previewscene"
+	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/tenancy"
+
+	"github.com/google/uuid"
 )
 
 var (
-	// ErrV1LastOwner blocks removing or demoting the last board owner.
-	ErrV1LastOwner = errors.New("board last owner cannot be removed or demoted")
 	// ErrV1Archived reports a write against an archived board.
 	ErrV1Archived      = errors.New("board is archived")
 	ErrV1CatalogPage   = errors.New("invalid board catalog page")
 	ErrV1CatalogOffset = errors.New("invalid board catalog offset")
-	// ErrV1ShareTokenExpired reports a join against an expired token.
-	ErrV1ShareTokenExpired = errors.New("share token expired")
 )
 
 // Board document bounds (issue #802): the v1 snapshot is a versioned
 // discriminated union {"schema_version": N, "payload": {...}} persisted raw.
 const (
-	v1BoardNameMaxRunes = 120
-	// v1ShareTokenPrefix stays local: sht_ is not a kernel prefix yet
-	// (see #801); shape validation delegates to the kernel helper.
-	v1ShareTokenPrefix    = "sht_"
+	v1BoardNameMaxRunes   = 120
 	v1MaxDocumentBytes    = 8 * 1024 * 1024
 	v1InitialSchemaVerion = int32(1)
 )
@@ -71,6 +42,9 @@ const (
 // renames and archive transitions never change it). PreviewScene is the
 // stored versioned scene projection (nil when the document schema is not
 // extractable); the Gallery catalog reads it without fetching documents.
+// WorkspaceAccess is the common role for selected members; AccessVersion is the
+// independent monotonic access counter (ETag access-<version>), bumped only
+// by access mutations and never by document writes.
 type V1Board struct {
 	WorkspacePublicID string
 	PublicID          string
@@ -83,6 +57,8 @@ type V1Board struct {
 	ArchivedAt        *time.Time
 	OwnerUserID       int64
 	CreatedBy         int64
+	WorkspaceAccess   WorkspaceAccess
+	AccessVersion     int64
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
@@ -101,8 +77,18 @@ type V1BoardCatalogEntry struct {
 	ArchivedAt        *time.Time
 	OwnerUserID       int64
 	CreatedBy         int64
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	WorkspaceAccess   WorkspaceAccess
+	AccessVersion     int64
+	// EffectiveRole is the caller's resolved role for this card
+	// (catalog SQL computes the set-form of ResolveRole; the in-memory
+	// scan resolves it per board), so handlers render capabilities
+	// without per-row lookups. HasDirectGrant marks the caller's own
+	// grant row; AccessState is the board-level posture.
+	EffectiveRole  AccessRole
+	HasDirectGrant bool
+	AccessState    AccessState
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type V1BoardCatalogPageRequest struct {
@@ -127,43 +113,12 @@ func (page V1BoardCatalogPageRequest) validate() error {
 	return nil
 }
 
-// V1BoardMember is one explicit board grant. The board creator/owner is an
+// V1BoardMember records a selected Workspace member. The Board creator is an
 // implicit owner and never needs a row.
 type V1BoardMember struct {
 	BoardPublicID string
 	UserID        int64
-	Role          AccessRole
 	CreatedAt     time.Time
-}
-
-// V1AuditEvent carries operator/target/reason/outcome for share and member
-// mutations. It is only logged today; #808 persists it as durable audit.
-type V1AuditEvent struct {
-	At             time.Time `json:"at"`
-	OperatorUserID int64     `json:"operator_user_id"`
-	Target         string    `json:"target"`
-	Reason         string    `json:"reason"`
-	Outcome        string    `json:"outcome"`
-}
-
-// V1ShareToken is one collaboration bearer. Bearer plaintext lives only in
-// the create/replay response; the store retains the hash for join lookup.
-// (Production postgres must encrypt the bearer at rest like the legacy
-// CreateShareTokenIdempotent path; see the #809 migration note.)
-type V1ShareToken struct {
-	TokenID       string
-	BoardPublicID string
-	TokenHash     string
-	TokenPrefix   string
-	Bearer        string `json:"-"`
-	Role          AccessRole
-	CreatedBy     int64
-	Revoked       bool
-	UsageCount    int64
-	RevokedAt     *time.Time
-	RevokedBy     *int64
-	CreatedAt     time.Time
-	AuditTrail    []V1AuditEvent
 }
 
 // V1Revision is one immutable document snapshot.
@@ -178,27 +133,38 @@ type V1Revision struct {
 	CreatedAt      time.Time
 }
 
+// V1BoardAccess is the access-resource view of one board: the workspace
+// common role, selected members, monotonic version, and sharing posture. It
+// carries no document bytes, revision, or preview payload.
+type V1BoardAccess struct {
+	WorkspacePublicID string
+	BoardPublicID     string
+	WorkspaceAccess   WorkspaceAccess
+	AccessVersion     int64
+	AccessState       AccessState
+	MemberUserIDs     []int64
+	ArchivedAt        *time.Time
+	AccessSignals     []events.BoardAccessOutboxRecord
+}
+
 // WorkspaceBoardStore is the additive persistence seam for workspace-rooted
 // boards. Repository methods take context.Context first.
 type WorkspaceBoardStore interface {
 	CreateBoard(ctx context.Context, workspacePublicID string, creatorUserID int64, name, publicID string) (*V1Board, error)
 	ListBoardCatalog(ctx context.Context, workspacePublicID string, includeArchived bool, userID int64, workspaceRole string, page V1BoardCatalogPageRequest) (V1BoardCatalogPage, error)
 	GetBoard(ctx context.Context, workspacePublicID, boardPublicID string) (*V1Board, error)
-	RenameBoard(ctx context.Context, workspacePublicID, boardPublicID, name string) (*V1Board, error)
-	ArchiveBoard(ctx context.Context, workspacePublicID, boardPublicID string) (*V1Board, error)
-	RestoreBoard(ctx context.Context, workspacePublicID, boardPublicID string) (*V1Board, error)
+	RenameBoard(ctx context.Context, workspacePublicID, boardPublicID, name string, actorUserID int64) (*V1Board, error)
+	ArchiveBoard(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID int64) (*V1Board, error)
+	RestoreBoard(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID int64) (*V1Board, error)
 	ReplaceDocument(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, expectedRevision int64, schemaVersion int32, snapshot json.RawMessage) (*V1Board, error)
 	ListRevisions(ctx context.Context, workspacePublicID, boardPublicID string) ([]*V1Revision, error)
 	GetRevision(ctx context.Context, workspacePublicID, boardPublicID string, revisionOrID int64) (*V1Revision, error)
 	GetBoardRole(ctx context.Context, workspacePublicID, boardPublicID string, userID int64, workspaceRole string) (AccessRole, bool, error)
+	ListBoardsReferencingAsset(ctx context.Context, workspacePublicID, assetPublicID string) ([]string, error)
 	ListBoardMembers(ctx context.Context, workspacePublicID, boardPublicID string) ([]*V1BoardMember, error)
-	AddBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, role AccessRole, actorWorkspaceRole string) (*V1BoardMember, error)
-	UpdateBoardMemberRole(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, newRole AccessRole, actorWorkspaceRole string) (*V1BoardMember, error)
-	RemoveBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, actorWorkspaceRole string) error
-	CreateShareToken(ctx context.Context, workspacePublicID, boardPublicID string, creatorUserID int64, role AccessRole, tokenID, tokenHash, bearer string) (*V1ShareToken, error)
-	ListShareTokens(ctx context.Context, workspacePublicID, boardPublicID string) ([]*V1ShareToken, error)
-	RevokeShareToken(ctx context.Context, workspacePublicID, boardPublicID, tokenID string, revokedBy int64) error
-	JoinByToken(ctx context.Context, workspacePublicID, bearer string, userID int64) (*V1Board, AccessRole, error)
+	GetBoardAccess(ctx context.Context, workspacePublicID, boardPublicID string) (*V1BoardAccess, error)
+	ReplaceBoardAccess(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, expectedVersion int64, access WorkspaceAccess, selectedUserIDs []int64) (*V1BoardAccess, error)
+	RemoveWorkspaceMemberGrants(ctx context.Context, workspacePublicID string, userID int64) ([]tenancy.MemberGrantCleanup, error)
 }
 
 // NewV1BoardPublicID mints an opaque board_ public identifier.
@@ -206,65 +172,14 @@ func NewV1BoardPublicID() (string, error) {
 	return contract.MintPublicID(contract.PrefixBoard, 12)
 }
 
-// NewV1ShareTokenID mints an opaque sht_ share bearer.
-func NewV1ShareTokenID() (string, error) {
-	return contract.MintPublicID(v1ShareTokenPrefix, 16)
-}
-
-// IsV1ShareTokenID reports sht_ shape (opaque URL segment for {token_id}).
-func IsV1ShareTokenID(id string) bool {
-	return contract.IsValidPublicID(v1ShareTokenPrefix, id)
-}
-
-// V1ShareTokenHash derives the lookup hash stored for a bearer.
-func V1ShareTokenHash(bearer string) string {
-	sum := sha256.Sum256([]byte(strings.TrimSpace(bearer)))
-	return hex.EncodeToString(sum[:])
-}
-
-// V1ShareTokenPrefixOf derives the list-safe prefix shown for a bearer.
-func V1ShareTokenPrefixOf(bearer string) string {
-	trimmed := strings.TrimSpace(bearer)
-	if len(trimmed) <= 8 {
-		return trimmed
-	}
-	return trimmed[:8]
-}
-
 // ValidateV1BoardName validates v1 board display names (1..120 runes after
-// trim; the legacy 60-rune bound stays untouched on the old surface).
+// trim).
 func ValidateV1BoardName(name string) error {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" || utf8.RuneCountInString(trimmed) > v1BoardNameMaxRunes {
 		return errors.New("boards: v1 board name must be 1..120 characters")
 	}
 	return nil
-}
-
-// ValidateV1BoardRole validates explicit board grant roles.
-func ValidateV1BoardRole(role AccessRole) error {
-	switch role {
-	case RoleOwner, RoleEditor, RoleViewer:
-		return nil
-	default:
-		return ErrMemberInvalidRole
-	}
-}
-
-// DefaultBoardRoleForWorkspaceRole maps a visible workspace membership role
-// to the default board role: workspace owners default to board owner,
-// admins/members default to viewer. Unknown/empty roles report ok=false so
-// callers stay fail-closed. Explicit board rows always override this
-// default (check explicit first, then fall back).
-func DefaultBoardRoleForWorkspaceRole(workspaceRole string) (AccessRole, bool) {
-	switch strings.TrimSpace(workspaceRole) {
-	case "owner":
-		return RoleOwner, true
-	case "admin", "member":
-		return RoleViewer, true
-	default:
-		return "", false
-	}
 }
 
 // FormatV1ETag renders the revision counter as the ETag validator value.
@@ -336,28 +251,64 @@ func v1BoardKey(workspacePublicID, boardPublicID string) string {
 	return workspacePublicID + "\x00" + boardPublicID
 }
 
+// splitV1BoardKey recovers the workspace + board public ids from a board
+// key. ok is false when the key carries no separator (never for keys minted
+// by v1BoardKey).
+func splitV1BoardKey(key string) (workspacePublicID, boardPublicID string, ok bool) {
+	workspacePublicID, boardPublicID, ok = strings.Cut(key, "\x00")
+	return workspacePublicID, boardPublicID, ok
+}
+
+// WorkspaceMembershipScope holds membership facts stable while a Board mutation is accepted.
+type WorkspaceMembershipScope interface {
+	WithWorkspaceMembers(ctx context.Context, workspacePublicID string, action func(roleFor func(int64) string) error) error
+}
+
+func withWorkspaceMembers[T any](ctx context.Context, scope WorkspaceMembershipScope, workspacePublicID string, action func(roleFor func(int64) string) (T, error)) (T, error) {
+	var result T
+	if scope == nil {
+		return result, ErrNotFound
+	}
+	err := scope.WithWorkspaceMembers(ctx, workspacePublicID, func(roleFor func(int64) string) error {
+		var err error
+		result, err = action(roleFor)
+		return err
+	})
+	return result, err
+}
+
+type AccessSignalRecipientDirectory interface {
+	GetUserPublicID(context.Context, int64) (uuid.UUID, error)
+}
+
 // InMemoryWorkspaceBoardStore is a mutex-guarded WorkspaceBoardStore for
 // tests ONLY. It must never be wired in production.
 type InMemoryWorkspaceBoardStore struct {
-	mu         sync.Mutex
-	boards     map[string]map[string]*V1Board
-	members    map[string]map[int64]*V1BoardMember
-	shares     map[string]map[string]*V1ShareToken
-	shareIndex map[string]*V1ShareToken
-	revisions  map[string][]*V1Revision
-	nextRevID  int64
-	now        func() time.Time
+	accessRecipients AccessSignalRecipientDirectory
+	workspaceMembers WorkspaceMembershipScope
+	mu               sync.Mutex
+	boards           map[string]map[string]*V1Board
+	members          map[string]map[int64]*V1BoardMember
+	revisions        map[string][]*V1Revision
+	// mediaRefs tracks accepted document -> media asset references per
+	// board key (#936, in-memory twin of board_document_media_refs).
+	// Reconciled on every ReplaceDocument; read through the narrow
+	// BoardMediaRefReader port only.
+	mediaRefs map[string]map[string]struct{}
+	nextRevID int64
+	now       func() time.Time
 }
 
 // NewInMemoryWorkspaceBoardStoreForTests builds an empty test-only store.
-func NewInMemoryWorkspaceBoardStoreForTests() *InMemoryWorkspaceBoardStore {
+func NewInMemoryWorkspaceBoardStoreForTests(workspaceMembers WorkspaceMembershipScope, accessRecipients AccessSignalRecipientDirectory) *InMemoryWorkspaceBoardStore {
 	return &InMemoryWorkspaceBoardStore{
-		boards:     make(map[string]map[string]*V1Board),
-		members:    make(map[string]map[int64]*V1BoardMember),
-		shares:     make(map[string]map[string]*V1ShareToken),
-		shareIndex: make(map[string]*V1ShareToken),
-		revisions:  make(map[string][]*V1Revision),
-		now:        time.Now,
+		workspaceMembers: workspaceMembers,
+		accessRecipients: accessRecipients,
+		boards:           make(map[string]map[string]*V1Board),
+		members:          make(map[string]map[int64]*V1BoardMember),
+		revisions:        make(map[string][]*V1Revision),
+		mediaRefs:        make(map[string]map[string]struct{}),
+		now:              time.Now,
 	}
 }
 
@@ -403,27 +354,10 @@ func copyV1Revision(revision *V1Revision) *V1Revision {
 	return &out
 }
 
-func copyV1ShareToken(token *V1ShareToken) *V1ShareToken {
-	if token == nil {
-		return nil
-	}
-	out := *token
-	out.Bearer = ""
-	if token.RevokedAt != nil {
-		revoked := *token.RevokedAt
-		out.RevokedAt = &revoked
-	}
-	if token.RevokedBy != nil {
-		revokedBy := *token.RevokedBy
-		out.RevokedBy = &revokedBy
-	}
-	out.AuditTrail = append([]V1AuditEvent(nil), token.AuditTrail...)
-	return &out
-}
-
 // v1BoardCatalogEntryOf projects one board to its Gallery catalog card:
-// metadata plus the stored scene projection, never the full document.
-func v1BoardCatalogEntryOf(board *V1Board) *V1BoardCatalogEntry {
+// metadata plus the stored scene projection, never the full document. The
+// caller passes the already-resolved role facts (never recomputed here).
+func v1BoardCatalogEntryOf(board *V1Board, role AccessRole, hasDirectGrant bool, hasAnyGrants bool) *V1BoardCatalogEntry {
 	if board == nil {
 		return nil
 	}
@@ -436,6 +370,11 @@ func v1BoardCatalogEntryOf(board *V1Board) *V1BoardCatalogEntry {
 		ContentVersion:    board.ContentVersion,
 		OwnerUserID:       board.OwnerUserID,
 		CreatedBy:         board.CreatedBy,
+		WorkspaceAccess:   board.WorkspaceAccess,
+		AccessVersion:     board.AccessVersion,
+		EffectiveRole:     role,
+		HasDirectGrant:    hasDirectGrant,
+		AccessState:       DeriveAccessState(board.WorkspaceAccess, hasAnyGrants),
 		CreatedAt:         board.CreatedAt,
 		UpdatedAt:         board.UpdatedAt,
 	}
@@ -466,35 +405,18 @@ func (s *InMemoryWorkspaceBoardStore) getBoardLocked(key, boardPublicID string) 
 	return board, nil
 }
 
-// boardRoleLocked reports the effective board role: the creator/owner row is
-// an implicit owner; explicit member rows override; visible workspace
-// members fall back to viewer (owners to owner). Unknown/empty workspace
-// roles stay fail-closed (no default).
+// boardRoleLocked reports the effective board role. Thin adapter over the
+// unified ResolveRole policy (see policy.go): the only in-memory-specific
+// steps are fetching the selected member row and the workspace_access fact
+// from memory.
 func (s *InMemoryWorkspaceBoardStore) boardRoleLocked(key string, board *V1Board, userID int64, workspaceRole string) (AccessRole, bool) {
-	if board.OwnerUserID == userID {
-		return RoleOwner, true
-	}
-	if member, ok := s.members[key][userID]; ok {
-		return member.Role, true
-	}
-	if role, ok := DefaultBoardRoleForWorkspaceRole(workspaceRole); ok {
-		return role, true
-	}
-	return "", false
-}
-
-func (s *InMemoryWorkspaceBoardStore) ownerCountLocked(key string, board *V1Board) int {
-	count := 1 // creator/owner row is always an owner.
-	for userID, member := range s.members[key] {
-		if userID != board.OwnerUserID && member.Role == RoleOwner {
-			count++
-		}
-	}
-	return count
+	_, selected := s.members[key][userID]
+	return ResolveRole(board.OwnerUserID, userID, selected, board.WorkspaceAccess, IsWorkspaceMemberRole(workspaceRole))
 }
 
 // CreateBoard mints a workspace-rooted board at revision 1 with the empty
-// discriminated-union snapshot; the creator is the implicit owner.
+// discriminated-union snapshot; the creator is the implicit owner. The
+// sharing role is always none: creation requests cannot widen it.
 func (s *InMemoryWorkspaceBoardStore) CreateBoard(ctx context.Context, workspacePublicID string, creatorUserID int64, name, publicID string) (*V1Board, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -509,45 +431,52 @@ func (s *InMemoryWorkspaceBoardStore) CreateBoard(ctx context.Context, workspace
 	if trimmedID == "" {
 		return nil, ErrInvalidInput
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.boards[workspacePublicID] == nil {
-		s.boards[workspacePublicID] = make(map[string]*V1Board)
-	}
-	if _, exists := s.boards[workspacePublicID][trimmedID]; exists {
-		return nil, ErrIDConflict
-	}
-	now := s.clock()
-	document := V1InitialDocument()
-	version, scene, _ := previewscene.DeriveCatalog(document)
-	board := &V1Board{
-		WorkspacePublicID: workspacePublicID,
-		PublicID:          trimmedID,
-		Name:              strings.TrimSpace(name),
-		Revision:          1,
-		SchemaVersion:     v1InitialSchemaVerion,
-		Document:          document,
-		ContentVersion:    version,
-		PreviewScene:      scene,
-		OwnerUserID:       creatorUserID,
-		CreatedBy:         creatorUserID,
-		CreatedAt:         now,
-		UpdatedAt:         now,
-	}
-	s.boards[workspacePublicID][trimmedID] = board
-	key := v1BoardKey(workspacePublicID, trimmedID)
-	s.nextRevID++
-	s.revisions[key] = append(s.revisions[key], &V1Revision{
-		ID:             s.nextRevID,
-		BoardPublicID:  trimmedID,
-		Revision:       1,
-		SchemaVersion:  v1InitialSchemaVerion,
-		Snapshot:       document,
-		SourceRevision: 0,
-		CreatedBy:      creatorUserID,
-		CreatedAt:      now,
+	return withWorkspaceMembers(ctx, s.workspaceMembers, workspacePublicID, func(roleFor func(int64) string) (*V1Board, error) {
+		if !IsWorkspaceMemberRole(roleFor(creatorUserID)) {
+			return nil, ErrNotFound
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.boards[workspacePublicID] == nil {
+			s.boards[workspacePublicID] = make(map[string]*V1Board)
+		}
+		if _, exists := s.boards[workspacePublicID][trimmedID]; exists {
+			return nil, ErrIDConflict
+		}
+		now := s.clock()
+		document := V1InitialDocument()
+		version, scene, _ := previewscene.DeriveCatalog(document)
+		board := &V1Board{
+			WorkspacePublicID: workspacePublicID,
+			PublicID:          trimmedID,
+			Name:              strings.TrimSpace(name),
+			Revision:          1,
+			SchemaVersion:     v1InitialSchemaVerion,
+			Document:          document,
+			ContentVersion:    version,
+			PreviewScene:      scene,
+			OwnerUserID:       creatorUserID,
+			CreatedBy:         creatorUserID,
+			WorkspaceAccess:   WorkspaceAccessNone,
+			AccessVersion:     1,
+			CreatedAt:         now,
+			UpdatedAt:         now,
+		}
+		s.boards[workspacePublicID][trimmedID] = board
+		key := v1BoardKey(workspacePublicID, trimmedID)
+		s.nextRevID++
+		s.revisions[key] = append(s.revisions[key], &V1Revision{
+			ID:             s.nextRevID,
+			BoardPublicID:  trimmedID,
+			Revision:       1,
+			SchemaVersion:  v1InitialSchemaVerion,
+			Snapshot:       document,
+			SourceRevision: 0,
+			CreatedBy:      creatorUserID,
+			CreatedAt:      now,
+		})
+		return copyV1Board(board), nil
 	})
-	return copyV1Board(board), nil
 }
 
 // ListBoardCatalog selects authorized cards before pagination, ordered by
@@ -559,36 +488,58 @@ func (s *InMemoryWorkspaceBoardStore) ListBoardCatalog(ctx context.Context, work
 	if err := page.validate(); err != nil {
 		return V1BoardCatalogPage{}, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	var eligible []*V1Board
-	for _, board := range s.boards[workspacePublicID] {
-		if board.ArchivedAt != nil && !includeArchived {
-			continue
+	if !IsWorkspaceMemberRole(workspaceRole) {
+		if page.Offset > 0 {
+			return V1BoardCatalogPage{}, ErrV1CatalogOffset
 		}
-		if _, ok := s.boardRoleLocked(v1BoardKey(workspacePublicID, board.PublicID), board, userID, workspaceRole); !ok {
-			continue
-		}
-		eligible = append(eligible, board)
+		return V1BoardCatalogPage{Entries: []*V1BoardCatalogEntry{}}, nil
 	}
-	sort.Slice(eligible, func(i, j int) bool {
-		if eligible[i].UpdatedAt.Equal(eligible[j].UpdatedAt) {
-			return eligible[i].PublicID < eligible[j].PublicID
+	return withWorkspaceMembers(ctx, s.workspaceMembers, workspacePublicID, func(roleFor func(int64) string) (V1BoardCatalogPage, error) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		var eligible []*V1Board
+		type eligibleFacts struct {
+			role           AccessRole
+			hasDirectGrant bool
 		}
-		return eligible[i].UpdatedAt.After(eligible[j].UpdatedAt)
+		facts := map[string]eligibleFacts{}
+		for _, board := range s.boards[workspacePublicID] {
+			if board.ArchivedAt != nil && !includeArchived {
+				continue
+			}
+			if board.OwnerUserID <= 0 {
+				// Owner-less rows stay invisible (fail-closed).
+				continue
+			}
+			key := v1BoardKey(workspacePublicID, board.PublicID)
+			role, ok := s.boardRoleLocked(key, board, userID, roleFor(userID))
+			if !ok {
+				continue
+			}
+			_, hasDirectGrant := s.members[key][userID]
+			eligible = append(eligible, board)
+			facts[board.PublicID] = eligibleFacts{role: role, hasDirectGrant: hasDirectGrant}
+		}
+		sort.Slice(eligible, func(i, j int) bool {
+			if eligible[i].UpdatedAt.Equal(eligible[j].UpdatedAt) {
+				return eligible[i].PublicID < eligible[j].PublicID
+			}
+			return eligible[i].UpdatedAt.After(eligible[j].UpdatedAt)
+		})
+		if len(eligible) > maxBoardCatalogRows {
+			eligible = eligible[:maxBoardCatalogRows]
+		}
+		if page.Offset > len(eligible) {
+			return V1BoardCatalogPage{}, ErrV1CatalogOffset
+		}
+		end := min(page.Offset+page.Limit, len(eligible))
+		out := V1BoardCatalogPage{Entries: make([]*V1BoardCatalogEntry, 0, end-page.Offset), HasMore: end < len(eligible)}
+		for _, board := range eligible[page.Offset:end] {
+			fact := facts[board.PublicID]
+			out.Entries = append(out.Entries, v1BoardCatalogEntryOf(board, fact.role, fact.hasDirectGrant, len(s.members[v1BoardKey(workspacePublicID, board.PublicID)]) > 0))
+		}
+		return out, nil
 	})
-	if len(eligible) > maxBoardCatalogRows {
-		eligible = eligible[:maxBoardCatalogRows]
-	}
-	if page.Offset > len(eligible) {
-		return V1BoardCatalogPage{}, ErrV1CatalogOffset
-	}
-	end := min(page.Offset+page.Limit, len(eligible))
-	out := V1BoardCatalogPage{Entries: make([]*V1BoardCatalogEntry, 0, end-page.Offset), HasMore: end < len(eligible)}
-	for _, board := range eligible[page.Offset:end] {
-		out.Entries = append(out.Entries, v1BoardCatalogEntryOf(board))
-	}
-	return out, nil
 }
 
 // GetBoard reads one board (archived rows stay visible here; callers decide
@@ -607,65 +558,86 @@ func (s *InMemoryWorkspaceBoardStore) GetBoard(ctx context.Context, workspacePub
 }
 
 // RenameBoard renames a live board; the revision counter is untouched.
-func (s *InMemoryWorkspaceBoardStore) RenameBoard(ctx context.Context, workspacePublicID, boardPublicID, name string) (*V1Board, error) {
+func (s *InMemoryWorkspaceBoardStore) RenameBoard(ctx context.Context, workspacePublicID, boardPublicID, name string, actorUserID int64) (*V1Board, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	if err := ValidateV1BoardName(name); err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
-	if err != nil {
-		return nil, err
-	}
-	if board.ArchivedAt != nil {
-		return nil, ErrV1Archived
-	}
-	board.Name = strings.TrimSpace(name)
-	board.UpdatedAt = s.clock()
-	return copyV1Board(board), nil
+	return withWorkspaceMembers(ctx, s.workspaceMembers, workspacePublicID, func(roleFor func(int64) string) (*V1Board, error) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
+		if err != nil {
+			return nil, err
+		}
+		role, visible := s.boardRoleLocked(v1BoardKey(workspacePublicID, board.PublicID), board, actorUserID, roleFor(actorUserID))
+		if err := CheckCapability(role, visible, CapWrite); err != nil {
+			return nil, err
+		}
+
+		if board.ArchivedAt != nil {
+			return nil, ErrV1Archived
+		}
+		board.Name = strings.TrimSpace(name)
+		board.UpdatedAt = s.clock()
+		return copyV1Board(board), nil
+	})
 }
 
 // ArchiveBoard archives a live board; already-archived rows read as not
 // found so archive stays idempotent-safe at the handler layer.
-func (s *InMemoryWorkspaceBoardStore) ArchiveBoard(ctx context.Context, workspacePublicID, boardPublicID string) (*V1Board, error) {
+func (s *InMemoryWorkspaceBoardStore) ArchiveBoard(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID int64) (*V1Board, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
-	if err != nil {
-		return nil, err
-	}
-	if board.ArchivedAt != nil {
-		return nil, ErrNotFound
-	}
-	now := s.clock()
-	board.ArchivedAt = &now
-	board.UpdatedAt = now
-	return copyV1Board(board), nil
+	return withWorkspaceMembers(ctx, s.workspaceMembers, workspacePublicID, func(roleFor func(int64) string) (*V1Board, error) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
+		if err != nil {
+			return nil, err
+		}
+		role, visible := s.boardRoleLocked(v1BoardKey(workspacePublicID, board.PublicID), board, actorUserID, roleFor(actorUserID))
+		if err := CheckCapability(role, visible, CapWrite); err != nil {
+			return nil, err
+		}
+
+		if board.ArchivedAt != nil {
+			return nil, ErrNotFound
+		}
+		now := s.clock()
+		board.ArchivedAt = &now
+		board.UpdatedAt = now
+		return copyV1Board(board), nil
+	})
 }
 
 // RestoreBoard clears the archive timestamp; live boards read as not found.
-func (s *InMemoryWorkspaceBoardStore) RestoreBoard(ctx context.Context, workspacePublicID, boardPublicID string) (*V1Board, error) {
+func (s *InMemoryWorkspaceBoardStore) RestoreBoard(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID int64) (*V1Board, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
-	if err != nil {
-		return nil, err
-	}
-	if board.ArchivedAt == nil {
-		return nil, ErrNotFound
-	}
-	board.ArchivedAt = nil
-	board.UpdatedAt = s.clock()
-	return copyV1Board(board), nil
+	return withWorkspaceMembers(ctx, s.workspaceMembers, workspacePublicID, func(roleFor func(int64) string) (*V1Board, error) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
+		if err != nil {
+			return nil, err
+		}
+		role, visible := s.boardRoleLocked(v1BoardKey(workspacePublicID, board.PublicID), board, actorUserID, roleFor(actorUserID))
+		if err := CheckCapability(role, visible, CapWrite); err != nil {
+			return nil, err
+		}
+
+		if board.ArchivedAt == nil {
+			return nil, ErrNotFound
+		}
+		board.ArchivedAt = nil
+		board.UpdatedAt = s.clock()
+		return copyV1Board(board), nil
+	})
 }
 
 // ReplaceDocument appends an immutable revision when the expected revision
@@ -677,40 +649,56 @@ func (s *InMemoryWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 	if actorUserID <= 0 || expectedRevision <= 0 || schemaVersion < 1 || len(snapshot) == 0 {
 		return nil, ErrInvalidInput
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
-	if err != nil {
-		return nil, err
-	}
-	if board.ArchivedAt != nil {
-		return nil, ErrV1Archived
-	}
-	if board.Revision != expectedRevision {
-		return nil, ErrRevisionConflict
-	}
-	document := make(json.RawMessage, len(snapshot))
-	copy(document, snapshot)
-	version, scene, _ := previewscene.DeriveCatalog(document)
-	board.Revision++
-	board.SchemaVersion = schemaVersion
-	board.Document = document
-	board.ContentVersion = version
-	board.PreviewScene = scene
-	board.UpdatedAt = s.clock()
-	key := v1BoardKey(workspacePublicID, board.PublicID)
-	s.nextRevID++
-	s.revisions[key] = append(s.revisions[key], &V1Revision{
-		ID:             s.nextRevID,
-		BoardPublicID:  board.PublicID,
-		Revision:       board.Revision,
-		SchemaVersion:  schemaVersion,
-		Snapshot:       document,
-		SourceRevision: expectedRevision,
-		CreatedBy:      actorUserID,
-		CreatedAt:      board.UpdatedAt,
+	return withWorkspaceMembers(ctx, s.workspaceMembers, workspacePublicID, func(roleFor func(int64) string) (*V1Board, error) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
+		if err != nil {
+			return nil, err
+		}
+		role, visible := s.boardRoleLocked(v1BoardKey(workspacePublicID, board.PublicID), board, actorUserID, roleFor(actorUserID))
+		if err := CheckCapability(role, visible, CapWrite); err != nil {
+			return nil, err
+		}
+
+		if board.ArchivedAt != nil {
+			return nil, ErrV1Archived
+		}
+		if board.Revision != expectedRevision {
+			return nil, ErrRevisionConflict
+		}
+		document := make(json.RawMessage, len(snapshot))
+		copy(document, snapshot)
+		version, scene, _ := previewscene.DeriveCatalog(document)
+		board.Revision++
+		board.SchemaVersion = schemaVersion
+		board.Document = document
+		board.ContentVersion = version
+		board.PreviewScene = scene
+		board.UpdatedAt = s.clock()
+		key := v1BoardKey(workspacePublicID, board.PublicID)
+		s.nextRevID++
+		s.revisions[key] = append(s.revisions[key], &V1Revision{
+			ID:             s.nextRevID,
+			BoardPublicID:  board.PublicID,
+			Revision:       board.Revision,
+			SchemaVersion:  schemaVersion,
+			Snapshot:       document,
+			SourceRevision: expectedRevision,
+			CreatedBy:      actorUserID,
+			CreatedAt:      board.UpdatedAt,
+		})
+		// #936: reconcile the accepted document -> media references (twin of
+		// the postgres accepting transaction above: removed ids stop
+		// authorizing, unknown shapes match nothing).
+		accepted := previewscene.ExtractMediaAssetIDs(document)
+		refs := make(map[string]struct{}, len(accepted))
+		for _, assetPublicID := range accepted {
+			refs[assetPublicID] = struct{}{}
+		}
+		s.mediaRefs[key] = refs
+		return copyV1Board(board), nil
 	})
-	return copyV1Board(board), nil
 }
 
 // ListRevisions returns immutable snapshots oldest-first (copies; the stored
@@ -756,24 +744,59 @@ func (s *InMemoryWorkspaceBoardStore) GetRevision(ctx context.Context, workspace
 	return nil, ErrNotFound
 }
 
-// GetBoardRole reports the effective board role (creator counts as owner;
-// explicit rows override; visible workspace members fall back to viewer,
-// workspace owners to owner; unknown/empty workspace roles stay denied).
+// GetBoardRole resolves the role against current Workspace membership.
 func (s *InMemoryWorkspaceBoardStore) GetBoardRole(ctx context.Context, workspacePublicID, boardPublicID string, userID int64, workspaceRole string) (AccessRole, bool, error) {
 	if err := ctx.Err(); err != nil {
 		return "", false, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
-	if err != nil {
-		return "", false, err
+	if !IsWorkspaceMemberRole(workspaceRole) || s.workspaceMembers == nil {
+		return "", false, nil
 	}
-	role, ok := s.boardRoleLocked(v1BoardKey(workspacePublicID, board.PublicID), board, userID, workspaceRole)
-	return role, ok, nil
+	var role AccessRole
+	var visible bool
+	err := s.workspaceMembers.WithWorkspaceMembers(ctx, workspacePublicID, func(roleFor func(int64) string) error {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
+		if err != nil {
+			return err
+		}
+		role, visible = s.boardRoleLocked(v1BoardKey(workspacePublicID, board.PublicID), board, userID, roleFor(userID))
+		return nil
+	})
+	return role, visible, err
 }
 
-// ListBoardMembers lists explicit grants ordered by user id (the implicit
+// ListBoardsReferencingAsset serves the narrow BoardMediaRefReader port
+// (#936, in-memory twin): board public ids in this workspace whose accepted
+// document references one media asset, stably sorted. Unknown shapes list
+// empty (fail-closed, never a distinct status).
+func (s *InMemoryWorkspaceBoardStore) ListBoardsReferencingAsset(ctx context.Context, workspacePublicID, assetPublicID string) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	trimmedAsset := strings.TrimSpace(assetPublicID)
+	if !contract.IsAssetID(trimmedAsset) {
+		return nil, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []string
+	for key, refs := range s.mediaRefs {
+		if _, ok := refs[trimmedAsset]; !ok {
+			continue
+		}
+		workspaceID, boardPublicID, ok := splitV1BoardKey(key)
+		if !ok || workspaceID != strings.TrimSpace(workspacePublicID) {
+			continue
+		}
+		out = append(out, boardPublicID)
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// ListBoardMembers lists selected members ordered by user id (the implicit
 // owner row is not listed here; handlers prepend it from the board row).
 func (s *InMemoryWorkspaceBoardStore) ListBoardMembers(ctx context.Context, workspacePublicID, boardPublicID string) ([]*V1BoardMember, error) {
 	if err := ctx.Err(); err != nil {
@@ -795,293 +818,204 @@ func (s *InMemoryWorkspaceBoardStore) ListBoardMembers(ctx context.Context, work
 	return out, nil
 }
 
-// AddBoardMember grants a role idempotently: re-adding keeps the existing
-// role. Only board owners may grant; only owners may grant owner.
-// The actor's effective role includes the workspace default (workspace
-// owners count as board owners); explicit rows still override.
-func (s *InMemoryWorkspaceBoardStore) AddBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, role AccessRole, actorWorkspaceRole string) (*V1BoardMember, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
+func (s *InMemoryWorkspaceBoardStore) boardAccessLocked(board *V1Board) *V1BoardAccess {
+	ids := make([]int64, 0, len(s.members[v1BoardKey(board.WorkspacePublicID, board.PublicID)]))
+	for userID := range s.members[v1BoardKey(board.WorkspacePublicID, board.PublicID)] {
+		ids = append(ids, userID)
 	}
-	if err := ValidateV1BoardRole(role); err != nil {
-		return nil, err
-	}
-	if actorUserID <= 0 || targetUserID <= 0 {
-		return nil, ErrInvalidInput
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
-	if err != nil {
-		return nil, err
-	}
-	key := v1BoardKey(workspacePublicID, board.PublicID)
-	actorRole, ok := s.boardRoleLocked(key, board, actorUserID, actorWorkspaceRole)
-	if !ok || actorRole != RoleOwner {
-		return nil, ErrPermissionDenied
-	}
-	if targetUserID == board.OwnerUserID {
-		return nil, ErrMemberInviteSelf
-	}
-	if existing, ok := s.members[key][targetUserID]; ok {
-		copied := *existing
-		return &copied, nil
-	}
-	if role == RoleOwner && actorRole != RoleOwner {
-		return nil, ErrPermissionDenied
-	}
-	now := s.clock()
-	member := &V1BoardMember{BoardPublicID: board.PublicID, UserID: targetUserID, Role: role, CreatedAt: now}
-	if s.members[key] == nil {
-		s.members[key] = make(map[int64]*V1BoardMember)
-	}
-	s.members[key][targetUserID] = member
-	copied := *member
-	return &copied, nil
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return &V1BoardAccess{WorkspacePublicID: board.WorkspacePublicID, BoardPublicID: board.PublicID, WorkspaceAccess: board.WorkspaceAccess, AccessVersion: board.AccessVersion, AccessState: DeriveAccessState(board.WorkspaceAccess, len(ids) > 0), MemberUserIDs: ids, ArchivedAt: board.ArchivedAt}
 }
 
-// UpdateBoardMemberRole applies owner-only transitions with last-owner
-// protection. The actor's effective role includes the workspace default.
-func (s *InMemoryWorkspaceBoardStore) UpdateBoardMemberRole(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, newRole AccessRole, actorWorkspaceRole string) (*V1BoardMember, error) {
+func (s *InMemoryWorkspaceBoardStore) GetBoardAccess(ctx context.Context, workspacePublicID, boardPublicID string) (*V1BoardAccess, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := ValidateV1BoardRole(newRole); err != nil {
-		return nil, err
-	}
-	if actorUserID <= 0 || targetUserID <= 0 {
-		return nil, ErrInvalidInput
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
+	board, err := s.getBoardLocked(workspacePublicID, boardPublicID)
 	if err != nil {
 		return nil, err
 	}
-	key := v1BoardKey(workspacePublicID, board.PublicID)
-	actorRole, ok := s.boardRoleLocked(key, board, actorUserID, actorWorkspaceRole)
-	if !ok || actorRole != RoleOwner {
-		return nil, ErrPermissionDenied
+	return s.boardAccessLocked(board), nil
+}
+
+// ReplaceBoardAccess accepts the complete sharing configuration under one membership lock.
+func (s *InMemoryWorkspaceBoardStore) ReplaceBoardAccess(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, expectedVersion int64, access WorkspaceAccess, selectedUserIDs []int64) (*V1BoardAccess, error) {
+	if !ValidateWorkspaceAccess(access) || actorUserID <= 0 || expectedVersion <= 0 {
+		return nil, ErrInvalidInput
 	}
-	if targetUserID == board.OwnerUserID {
-		if newRole != RoleOwner && s.ownerCountLocked(key, board) <= 1 {
-			return nil, ErrV1LastOwner
+	return withWorkspaceMembers(ctx, s.workspaceMembers, workspacePublicID, func(roleFor func(int64) string) (*V1BoardAccess, error) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		board, err := s.getBoardLocked(workspacePublicID, boardPublicID)
+		if err != nil {
+			return nil, err
 		}
-		if newRole != RoleOwner {
+		if !IsWorkspaceMemberRole(roleFor(actorUserID)) {
+			return nil, ErrNotFound
+		}
+		if actorUserID != board.OwnerUserID {
 			return nil, ErrPermissionDenied
 		}
-		return &V1BoardMember{BoardPublicID: board.PublicID, UserID: targetUserID, Role: RoleOwner}, nil
-	}
-	member, ok := s.members[key][targetUserID]
-	if !ok {
-		return nil, ErrMemberNotFound
-	}
-	if member.Role == RoleOwner && newRole != RoleOwner && s.ownerCountLocked(key, board) <= 1 {
-		return nil, ErrV1LastOwner
-	}
-	member.Role = newRole
-	copied := *member
-	return &copied, nil
+		if board.ArchivedAt != nil {
+			return nil, ErrV1Archived
+		}
+		if board.AccessVersion != expectedVersion {
+			return nil, ErrAccessConflict
+		}
+		ids, err := selectedBoardMembers(access, selectedUserIDs, board.OwnerUserID)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range ids {
+			if !IsWorkspaceMemberRole(roleFor(id)) {
+				return nil, ErrMemberNotFound
+			}
+		}
+		before := s.boardAccessLocked(board)
+		if board.WorkspaceAccess == access && equalMemberIDs(before.MemberUserIDs, ids) {
+			return before, nil
+		}
+		signals, err := s.accessSignals(ctx, workspacePublicID, boardPublicID, changedBoardMembers(before.MemberUserIDs, ids, board.OwnerUserID), board.AccessVersion+1, s.clock())
+		if err != nil {
+			return nil, err
+		}
+		key := v1BoardKey(workspacePublicID, boardPublicID)
+		members := make(map[int64]*V1BoardMember, len(ids))
+		for _, id := range ids {
+			member := s.members[key][id]
+			if member == nil {
+				member = &V1BoardMember{BoardPublicID: boardPublicID, UserID: id, CreatedAt: s.clock()}
+			}
+			members[id] = member
+		}
+		s.members[key] = members
+		board.WorkspaceAccess = access
+		board.AccessVersion++
+		board.UpdatedAt = s.clock()
+		out := s.boardAccessLocked(board)
+		out.AccessSignals = signals
+		return out, nil
+	})
 }
 
-// RemoveBoardMember removes a grant: owners may remove anyone, anyone may
-// remove themselves. The last owner is protected. The actor's effective
-// role includes the workspace default.
-func (s *InMemoryWorkspaceBoardStore) RemoveBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, actorWorkspaceRole string) error {
-	if err := ctx.Err(); err != nil {
-		return err
+func selectedBoardMembers(access WorkspaceAccess, ids []int64, creatorID int64) ([]int64, error) {
+	out := make([]int64, 0, len(ids))
+	if access == WorkspaceAccessNone {
+		return out, nil
 	}
-	if actorUserID <= 0 || targetUserID <= 0 {
-		return ErrInvalidInput
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
-	if err != nil {
-		return err
-	}
-	key := v1BoardKey(workspacePublicID, board.PublicID)
-	if targetUserID == board.OwnerUserID {
-		return ErrMemberInviteSelf
-	}
-	member, ok := s.members[key][targetUserID]
-	if !ok {
-		return ErrMemberNotFound
-	}
-	if member.Role == RoleOwner && s.ownerCountLocked(key, board) <= 1 {
-		return ErrV1LastOwner
-	}
-	if actorUserID != targetUserID {
-		actorRole, ok := s.boardRoleLocked(key, board, actorUserID, actorWorkspaceRole)
-		if !ok || actorRole != RoleOwner {
-			return ErrPermissionDenied
+	seen := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		if id <= 0 || id == creatorID {
+			return nil, ErrInvalidInput
+		}
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
 		}
 	}
-	delete(s.members[key], targetUserID)
-	return nil
+	if len(out) > tenancy.MaxWorkspaceMembers-1 {
+		return nil, ErrInvalidInput
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out, nil
 }
 
-// CreateShareToken stores one bearer (plaintext in memory only; production
-// postgres must encrypt at rest). Bearer uniqueness rides the hash unique
-// index; collisions return ErrIDConflict so callers mint again.
-func (s *InMemoryWorkspaceBoardStore) CreateShareToken(ctx context.Context, workspacePublicID, boardPublicID string, creatorUserID int64, role AccessRole, tokenID, tokenHash, bearer string) (*V1ShareToken, error) {
+func equalMemberIDs(a, b []int64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// RemoveWorkspaceMemberGrants removes selections and advances every affected
+// Board access version while the caller holds the Workspace membership lock.
+func (s *InMemoryWorkspaceBoardStore) RemoveWorkspaceMemberGrants(ctx context.Context, workspacePublicID string, userID int64) ([]tenancy.MemberGrantCleanup, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if role != RoleEditor && role != RoleViewer {
-		return nil, ErrMemberInvalidRole
+	if userID <= 0 {
+		return nil, ErrInvalidInput
 	}
-	if !IsV1ShareTokenID(strings.TrimSpace(tokenID)) || strings.TrimSpace(tokenHash) == "" || strings.TrimSpace(bearer) == "" {
+	workspacePublicID = strings.TrimSpace(workspacePublicID)
+	if workspacePublicID == "" {
 		return nil, ErrInvalidInput
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
-	if err != nil {
-		return nil, err
-	}
-	key := v1BoardKey(workspacePublicID, board.PublicID)
-	if _, exists := s.shareIndex[strings.TrimSpace(tokenHash)]; exists {
-		return nil, ErrIDConflict
-	}
-	now := s.clock()
-	token := &V1ShareToken{
-		TokenID:       strings.TrimSpace(tokenID),
-		BoardPublicID: board.PublicID,
-		TokenHash:     strings.TrimSpace(tokenHash),
-		TokenPrefix:   V1ShareTokenPrefixOf(bearer),
-		Bearer:        strings.TrimSpace(bearer),
-		Role:          role,
-		CreatedBy:     creatorUserID,
-		CreatedAt:     now,
-		AuditTrail: []V1AuditEvent{{
-			At:             now,
-			OperatorUserID: creatorUserID,
-			Target:         strings.TrimSpace(tokenID),
-			Reason:         "share_create",
-			Outcome:        "created",
-		}},
-	}
-	if s.shares[key] == nil {
-		s.shares[key] = make(map[string]*V1ShareToken)
-	}
-	s.shares[key][token.TokenID] = token
-	s.shareIndex[token.TokenHash] = token
-	out := copyV1ShareToken(token)
-	out.Bearer = token.Bearer
-	return out, nil
-}
-
-// ListShareTokens lists bearers newest-first without secrets.
-func (s *InMemoryWorkspaceBoardStore) ListShareTokens(ctx context.Context, workspacePublicID, boardPublicID string) ([]*V1ShareToken, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
-	if err != nil {
-		return nil, err
-	}
-	key := v1BoardKey(workspacePublicID, board.PublicID)
-	out := make([]*V1ShareToken, 0, len(s.shares[key]))
-	for _, token := range s.shares[key] {
-		out = append(out, copyV1ShareToken(token))
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
-	return out, nil
-}
-
-// RevokeShareToken revokes a bearer with audit fields (idempotent: revoking
-// twice succeeds).
-func (s *InMemoryWorkspaceBoardStore) RevokeShareToken(ctx context.Context, workspacePublicID, boardPublicID, tokenID string, revokedBy int64) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	board, err := s.getBoardLocked(workspacePublicID, strings.TrimSpace(boardPublicID))
-	if err != nil {
-		return err
-	}
-	key := v1BoardKey(workspacePublicID, board.PublicID)
-	token, ok := s.shares[key][strings.TrimSpace(tokenID)]
+	byBoard, ok := s.boards[workspacePublicID]
 	if !ok {
-		return ErrShareTokenNotFound
+		return nil, nil
 	}
-	now := s.clock()
-	if !token.Revoked {
-		token.Revoked = true
-		token.RevokedAt = &now
-		token.RevokedBy = &revokedBy
+	ids := make([]string, 0, len(byBoard))
+	for boardID := range byBoard {
+		key := v1BoardKey(workspacePublicID, boardID)
+		if _, selected := s.members[key][userID]; byBoard[boardID].OwnerUserID == userID || selected && byBoard[boardID].WorkspaceAccess != WorkspaceAccessNone {
+			ids = append(ids, boardID)
+		}
 	}
-	token.AuditTrail = append(token.AuditTrail, V1AuditEvent{
-		At:             now,
-		OperatorUserID: revokedBy,
-		Target:         token.TokenID,
-		Reason:         "share_revoke",
-		Outcome:        "revoked",
-	})
-	return nil
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	sort.Strings(ids)
+	out := make([]tenancy.MemberGrantCleanup, 0, len(ids))
+	for _, boardID := range ids {
+		board := byBoard[boardID]
+		signals, err := s.accessSignals(ctx, workspacePublicID, boardID, changedBoardMembers(nil, []int64{userID}, board.OwnerUserID), board.AccessVersion+1, s.clock())
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, tenancy.MemberGrantCleanup{BoardPublicID: boardID, AccessVersion: board.AccessVersion + 1, AccessSignals: signals})
+	}
+	for _, boardID := range ids {
+		key := v1BoardKey(workspacePublicID, boardID)
+		delete(s.members[key], userID)
+		if len(s.members[key]) == 0 {
+			delete(s.members, key)
+		}
+		board := byBoard[boardID]
+		board.AccessVersion++
+		board.UpdatedAt = s.clock()
+	}
+	return out, nil
 }
 
-// JoinByToken consumes a bearer idempotently: repeat joins by the same user
-// converge to the same role (outcome "rejoined"); the usage counter and
-// audit trail still advance so joins stay auditable for #808.
-func (s *InMemoryWorkspaceBoardStore) JoinByToken(ctx context.Context, workspacePublicID, bearer string, userID int64) (*V1Board, AccessRole, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, "", err
+func (s *InMemoryWorkspaceBoardStore) accessSignals(ctx context.Context, workspaceID, boardID string, recipients []int64, version int64, at time.Time) ([]events.BoardAccessOutboxRecord, error) {
+	if s.accessRecipients == nil {
+		return nil, fmt.Errorf("boards: access signal recipient directory unavailable")
 	}
-	if userID <= 0 || strings.TrimSpace(bearer) == "" {
-		return nil, "", ErrInvalidInput
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	token, ok := s.shareIndex[V1ShareTokenHash(bearer)]
-	if !ok || token == nil {
-		return nil, "", ErrShareTokenNotFound
-	}
-	board, err := s.getBoardLocked(workspacePublicID, token.BoardPublicID)
-	if err != nil {
-		return nil, "", ErrShareTokenNotFound
-	}
-	if token.Revoked {
-		return nil, "", ErrShareTokenRevoked
-	}
-	if token.Role != RoleEditor && token.Role != RoleViewer {
-		return nil, "", ErrShareTokenInvalid
-	}
-	if board.ArchivedAt != nil {
-		return nil, "", ErrV1Archived
-	}
-	now := s.clock()
-	key := v1BoardKey(workspacePublicID, board.PublicID)
-	token.UsageCount++
-	outcome := "joined"
-	if board.OwnerUserID == userID {
-		outcome = "owner_rejoined"
-	} else if existing, ok := s.members[key][userID]; ok && existing.Role == token.Role {
-		outcome = "rejoined"
-	} else {
-		if s.members[key] == nil {
-			s.members[key] = make(map[int64]*V1BoardMember)
+	signals := make([]events.BoardAccessOutboxRecord, 0, len(recipients))
+	for _, id := range recipients {
+		publicID, err := s.accessRecipients.GetUserPublicID(ctx, id)
+		if err != nil {
+			return nil, err
 		}
-		if existing, ok := s.members[key][userID]; ok {
-			existing.Role = token.Role
-		} else {
-			s.members[key][userID] = &V1BoardMember{BoardPublicID: board.PublicID, UserID: userID, Role: token.Role, CreatedAt: now}
-		}
+		signals = append(signals, events.NewBoardAccessOutboxRecord(workspaceID, boardID, tenancy.FormatUserPublicID(publicID), version, at))
 	}
-	token.AuditTrail = append(token.AuditTrail, V1AuditEvent{
-		At:             now,
-		OperatorUserID: userID,
-		Target:         token.TokenID,
-		Reason:         "share_join",
-		Outcome:        outcome,
-	})
-	role, _ := s.boardRoleLocked(key, board, userID, "")
-	return copyV1Board(board), role, nil
+	return signals, nil
 }
 
 // Compile-time convergence: the in-memory store implements the seam.
 var _ WorkspaceBoardStore = (*InMemoryWorkspaceBoardStore)(nil)
+
+func changedBoardMembers(before, after []int64, creatorID int64) []int64 {
+	seen := map[int64]bool{creatorID: true}
+	for _, id := range before {
+		seen[id] = true
+	}
+	for _, id := range after {
+		seen[id] = true
+	}
+	ids := make([]int64, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
+}

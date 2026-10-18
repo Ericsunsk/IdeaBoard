@@ -16,6 +16,7 @@ export function createCanvasWorkspaceRuntimeFacade(
         isRenamePending: board.boardChrome.isRenamePending,
         catalogRecovery: board.boardChrome.catalogRecovery,
         isBoardArchived: board.boardChrome.isBoardArchived,
+        isBoardReadOnly: board.boardChrome.isBoardReadOnly,
         isRestoringArchivedBoard: board.boardChrome.isRestoringArchivedBoard,
         currentBoardName: board.boardChrome.currentBoardName,
         boardOptions: board.boardChrome.boardOptions,

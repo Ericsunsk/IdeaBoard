@@ -7,6 +7,7 @@ import type {
   BoardRenameResult,
 } from './commands'
 import { createBoardCommands } from './commands'
+import type { WorkspaceBoardMeta } from '../adapters/boardsResource'
 import { makeBoardMeta as makeBoard } from '../../testing'
 
 function makeDeps(): BoardCommandDependencies {
@@ -38,17 +39,32 @@ function makeDeps(): BoardCommandDependencies {
     clearSyncRollback: vi.fn(),
     isMutationCurrent: vi.fn(() => true),
     resolveWorkspace: vi.fn(() => 'ws_test123'),
-    createServerBoard: vi.fn(async (_workspaceId: string, name: string) => ({
-      id: 'board-server-1',
-      name,
-      revision: 1,
+    fetchSourceDocument: vi.fn(async () => ({
+      boardId: 'source-board',
+      revision: 2,
       schemaVersion: 4,
-      createdAt: 100,
-      updatedAt: 200,
-      contentVersion: '',
-      previewScene: null,
+      document: {},
+      updatedAt: 300,
     })),
-    archiveServerBoard: vi.fn(async () => ({
+    createServerBoard: vi.fn(
+      async (_workspaceId: string, name: string): Promise<WorkspaceBoardMeta> => ({
+        id: 'board-server-1',
+        name,
+        revision: 1,
+        schemaVersion: 4,
+        createdAt: 100,
+        updatedAt: 200,
+        contentVersion: '',
+        previewScene: null,
+        // A minted board carries the server access fact (none, creator-only).
+        capabilities: { read: true, write: true, manage: true, generate: true },
+        accessState: 'private',
+        workspaceAccess: 'none',
+        isCreator: true,
+        hasDirectGrant: false,
+      }),
+    ),
+    archiveServerBoard: vi.fn(async (): Promise<WorkspaceBoardMeta> => ({
       id: 'board-server-1',
       name: 'Untitled',
       revision: 1,
@@ -57,6 +73,11 @@ function makeDeps(): BoardCommandDependencies {
       updatedAt: 200,
       contentVersion: '',
       previewScene: null,
+      capabilities: { read: true, write: true, manage: true, generate: true },
+      accessState: 'private',
+      workspaceAccess: 'none',
+      isCreator: true,
+      hasDirectGrant: false,
     })),
     registerServerBoard: vi.fn((input: { id: string; name: string; revision?: number }) =>
       makeBoard(input.id, input.name),
@@ -255,6 +276,26 @@ describe('boardCommands', () => {
     expect(deps.deleteBoardState).not.toHaveBeenCalled()
   })
 
+  it('registers the minted copy with the server access fact, never the source ACL', async () => {
+    const commands = createBoardCommands(deps)
+
+    await commands.duplicate({ sourceBoardId: 'source-board' })
+
+    // The server mints workspace_access=none creator-only: registration
+    // carries the minted capabilities verbatim so a copy never inherits
+    // the source grants.
+    expect(deps.registerServerBoard).toHaveBeenCalledWith({
+      id: 'board-server-1',
+      name: 'Source Copy',
+      revision: 1,
+      capabilities: { read: true, write: true, manage: true, generate: true },
+      accessState: 'private',
+      workspaceAccess: 'none',
+      isCreator: true,
+      hasDirectGrant: false,
+    })
+  })
+
   it('archives the duplicated server board in the captured workspace when scope changes', async () => {
     vi.mocked(deps.isMutationCurrent).mockReturnValue(false)
     const commands = createBoardCommands(deps)
@@ -295,6 +336,57 @@ describe('boardCommands', () => {
     expect(deps.deleteBoard).toHaveBeenCalledWith('board-server-1')
     expect(deps.deleteBoardState).toHaveBeenCalledWith('board-server-1')
     expect(deps.hydrateBoards).toHaveBeenCalledWith()
+  })
+
+  it('proves source readability before minting the copy', async () => {
+    const commands = createBoardCommands(deps)
+
+    const result = (await commands.duplicate({
+      sourceBoardId: 'source-board',
+    })) as BoardDuplicateResult
+
+    expect(result).toMatchObject({ isOk: true, board: { id: 'board-server-1' } })
+    expect(deps.fetchSourceDocument).toHaveBeenCalledWith('ws_test123', 'source-board')
+    expect(deps.createServerBoard).toHaveBeenCalledWith('ws_test123', 'Source Copy')
+  })
+
+  it('fails duplicate closed without minting when the source is unreadable', async () => {
+    const error = { status: 404, code: 'board_not_found', msg: 'not found' }
+    vi.mocked(deps.fetchSourceDocument!).mockRejectedValueOnce(error)
+    const commands = createBoardCommands(deps)
+
+    const result = (await commands.duplicate({
+      sourceBoardId: 'source-board',
+    })) as BoardDuplicateResult
+
+    expect(result).toMatchObject({ isOk: false, reason: 'source-unreadable' })
+    expect(deps.createServerBoard).not.toHaveBeenCalled()
+    expect(deps.registerServerBoard).not.toHaveBeenCalled()
+    expect(deps.syncBoard).not.toHaveBeenCalled()
+    expect(deps.deleteBoard).toHaveBeenCalledWith('copy-board')
+  })
+
+  it('archives the minted server board when the copy document sync fails', async () => {
+    const error = new Error('network failed')
+    vi.mocked(deps.syncBoard).mockRejectedValueOnce(error)
+    const commands = createBoardCommands(deps)
+
+    const result = (await commands.duplicate({
+      sourceBoardId: 'source-board',
+    })) as BoardDuplicateResult
+
+    expect(result).toMatchObject({ isOk: false, reason: 'sync-failed' })
+    expect(deps.archiveServerBoard).toHaveBeenCalledWith('ws_test123', 'board-server-1')
+  })
+
+  it('skips the archive compensation when duplicate never minted', async () => {
+    const error = { status: 404, code: 'board_not_found', msg: 'not found' }
+    vi.mocked(deps.fetchSourceDocument!).mockRejectedValueOnce(error)
+    const commands = createBoardCommands(deps)
+
+    await commands.duplicate({ sourceBoardId: 'source-board' })
+
+    expect(deps.archiveServerBoard).not.toHaveBeenCalled()
   })
 
   it('continues local delete cleanup when remote delete returns not found', async () => {

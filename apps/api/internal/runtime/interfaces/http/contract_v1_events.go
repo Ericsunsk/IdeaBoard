@@ -16,56 +16,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Workspace event streams + webhook delivery (issue #807).
+// Workspace members may open SSE streams; subscription management requires
+// Owner or Admin. Hidden workspaces and non-members converge to event_not_found.
+// Live and replay envelopes use current recipient authorization before delivery.
+// Workspace webhooks carry only independently Workspace-wide settlement events.
 //
-// Surface:
-//
-//	GET    /api/v1/workspaces/{workspace_id}/events (SSE, any member)
-//	GET    /api/v1/workspaces/{workspace_id}/event-subscriptions (owner|admin)
-//	POST   /api/v1/workspaces/{workspace_id}/event-subscriptions (owner|admin, Idempotency-Key)
-//	DELETE /api/v1/workspaces/{workspace_id}/event-subscriptions/{subscription_id} (owner|admin, Idempotency-Key)
-//
-// Visibility matrix: malformed ws_ shapes, unknown workspaces, and
-// non-members converge to 404 event_not_found (Baseline 4
-// anti-enumeration); visible members without owner|admin on
-// subscription management get 403 event_forbidden; unknown
-// subscription ids converge to 404 event_subscription_not_found.
-//
-// Exactly-once-from-domain-boundary producers (emit AFTER commit only;
-// emission never fails the commit, sinks are best-effort):
-//
-//	task.created/cancelled  contract_v1_tasks.go create/cancel once-fns:
-//	                        workspacetasks staged events drained after the
-//	                        settlement commit (running/completed/failed flush
-//	                        at the worker settle via the same staged seam;
-//	                        wiring lands with the #809 worker flush).
-//	billing.settled         same task once-fns only (held/free on create,
-//	                        released on cancel). Refs only, no amounts.
-//	                        Materialization never crossed billing.settled.
-//	                        Stripe inbound webhooks stay distinct: they emit
-//	                        internal user events, never workspace envelopes
-//	                        (orders are user-scoped, no workspace mapping).
-//	media.asset_ready       REMOVED with the workspace upload surface
-//	                        (#809 phase 3b-03, issue #813): not emitted
-//	                        while the replacement lands.
-//	media.asset_archived    REMOVED with the workspace media surface
-//	                        (same issue): not emitted while down.
-//	board.document_replaced replaceBoardDocument once-fn after ReplaceDocument.
-//	board.member_changed    member-add/member-remove once-fns after the
-//	                        roster commit; member role update emits after its
-//	                        direct store commit (no idempotency wrapper there).
-//	board.share_revoked     share-revoke once-fn after RevokeShareToken.
-//	library.materialization_* REMOVED with the HTTP materialization
-//	                        surface (internal-only now: no HTTP emitter,
-//	                        types dropped from the v1 registry).
-//
-// Retention/replay: NATS JetStream MaxAge (7 days per DESIGN) is the
-// authoritative retention; the process-local hot log
-// (events.WorkspaceEventLog, 1000 envelopes/workspace) is the live
-// replay window. Cursors are Last-Event-ID evt_ ids bound to the
-// workspace (+ principal membership + types filter): cross-workspace
-// cursors cannot resume (workspace isolation), unknown/evicted cursors
-// resume from the oldest retained envelope with a `gap` notice frame.
+// NATS JetStream retains events for seven days. The process-local hot log keeps
+// up to 1000 envelopes per Workspace for live replay. Last-Event-ID cursors are
+// Workspace-scoped; an unknown or evicted cursor produces a gap notice.
 
 const eventStreamHeartbeatInterval = 15 * time.Second
 
@@ -157,12 +115,19 @@ func parseEventCursor(c *gin.Context) (string, bool) {
 // replay first (with a `gap` notice when the cursor is unknown or
 // evicted), then live envelopes. Every frame carries `id:` so native
 // EventSource resumes automatically.
+//
+// Replay and live frames pass
+// eventVisibleToViewer for this connection's principal, evaluated against
+// CURRENT board access per envelope (never emit-time, never
+// frontend-filtered). Revoked viewers observe only their directed
+// board.access_changed signals; ordinary replay never returns
+// now-invisible history payloads.
 func (h *contractV1Handler) streamWorkspaceEvents(c *gin.Context) {
 	identityPrincipal, ok := v1RequestPrincipal(c)
 	if !ok || !h.requireStore(c) || !h.requireEventSinks(c) {
 		return
 	}
-	workspace, _, _ := h.eventWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.eventWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
@@ -174,6 +139,7 @@ func (h *contractV1Handler) streamWorkspaceEvents(c *gin.Context) {
 	if !ok {
 		return
 	}
+	viewer, _ := h.eventViewerFor(c.Request.Context(), identityPrincipal, workspaceRole)
 	missed, gap, _ := h.deps.Events.ReplayAfter(workspace.PublicID, cursor, filter)
 	if err := sse.Prepare(c); err != nil {
 		slog.Warn("prepare workspace events SSE failed", "err", err)
@@ -189,6 +155,9 @@ func (h *contractV1Handler) streamWorkspaceEvents(c *gin.Context) {
 		}
 	}
 	for _, envelope := range missed {
+		if !h.eventVisibleToViewer(c.Request.Context(), workspace.PublicID, viewer, envelope) {
+			continue
+		}
 		if err := sse.WriteIDEvent(c, envelope.ID, envelope.Type, envelope); err != nil {
 			return
 		}
@@ -210,6 +179,9 @@ func (h *contractV1Handler) streamWorkspaceEvents(c *gin.Context) {
 		case envelope, open := <-stream:
 			if !open {
 				return
+			}
+			if !h.eventVisibleToViewer(c.Request.Context(), workspace.PublicID, viewer, envelope) {
+				continue
 			}
 			if err := sse.WriteIDEvent(c, envelope.ID, envelope.Type, envelope); err != nil {
 				return
@@ -268,7 +240,7 @@ func (h *contractV1Handler) createEventSubscription(c *gin.Context) {
 			return
 		}
 		for _, typ := range body.Data.EventTypes {
-			if strings.TrimSpace(typ) != "" && !events.IsV1EventType(typ) {
+			if strings.TrimSpace(typ) != "" && !events.IsWorkspaceWebhookEventType(typ) {
 				contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
 					contract.CodeValidationFailed, msgValidationFailed6,
 					contract.FieldErrors{Fields: map[string]string{"event_types": "invalid"}})

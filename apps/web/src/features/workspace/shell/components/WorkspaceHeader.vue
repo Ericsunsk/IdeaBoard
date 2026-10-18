@@ -23,6 +23,7 @@
         :balance="accountControls.viewModel.balance.value"
         :items="accountControls.viewModel.menuItems.value"
         :support-channels="supportChannels"
+        :workspace="workspaceSwitcher.menuProps.value"
       >
       </UserAccountMenu>
     </slot>
@@ -42,6 +43,7 @@ import {
   useWorkspaceAccountControls,
   type WorkspaceNavigationAdapter,
 } from '../useWorkspaceAccountControls'
+import { useWorkspaceSwitcher } from '../useWorkspaceSwitcher'
 
 interface WorkspaceHeaderProps {
   sticky?: boolean
@@ -64,4 +66,5 @@ const accountControls = useWorkspaceAccountControls({
     logout: () => logoutAndRedirect(HOME_PATH),
   },
 })
+const workspaceSwitcher = useWorkspaceSwitcher()
 </script>

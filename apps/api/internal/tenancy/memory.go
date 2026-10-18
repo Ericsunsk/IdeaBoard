@@ -311,6 +311,9 @@ func (s *InMemoryStore) AddWorkspaceMember(ctx context.Context, workspacePublicI
 	if existing, ok := s.wsMembers[workspacePublicID][targetUserID]; ok {
 		return &WorkspaceMember{WorkspacePublicID: workspacePublicID, UserID: targetUserID, Role: existing}, nil
 	}
+	if len(s.wsMembers[workspacePublicID]) >= MaxWorkspaceMembers {
+		return nil, ErrWorkspaceMemberLimitReached
+	}
 	now := s.clock()
 	s.grantWorkspaceMemberLocked(workspacePublicID, targetUserID, role, now)
 	return &WorkspaceMember{WorkspacePublicID: workspacePublicID, UserID: targetUserID, Role: role, CreatedAt: now}, nil
@@ -339,23 +342,31 @@ func (s *InMemoryStore) UpdateWorkspaceMemberRole(ctx context.Context, workspace
 	return &WorkspaceMember{WorkspacePublicID: workspacePublicID, UserID: targetUserID, Role: newRole}, nil
 }
 
-func (s *InMemoryStore) RemoveWorkspaceMember(ctx context.Context, workspacePublicID string, actorUserID, targetUserID int64) error {
+func (s *InMemoryStore) RemoveWorkspaceMember(ctx context.Context, workspacePublicID string, actorUserID, targetUserID int64, grants WorkspaceMemberGrantStore) ([]MemberGrantCleanup, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.workspaces[workspacePublicID]; !ok {
-		return ErrNotFound
+		return nil, ErrNotFound
 	}
 	members := s.wsMembers[workspacePublicID]
 	current, ok := members[targetUserID]
 	if !ok {
-		return ErrNotFound
+		return nil, ErrNotFound
 	}
 	actorRole := members[actorUserID]
 	if err := CheckMemberMutation(actorRole, actorUserID, targetUserID, current, "", s.ownerCountLocked(workspacePublicID), true); err != nil {
-		return err
+		return nil, err
 	}
+	if grants == nil {
+		return nil, ErrConflict
+	}
+	cleaned, err := grants.RemoveWorkspaceMemberGrants(ctx, workspacePublicID, targetUserID)
+	if err != nil {
+		return nil, err
+	}
+
 	delete(members, targetUserID)
-	return nil
+	return cleaned, nil
 }
 
 func (s *InMemoryStore) CreateOrganization(ctx context.Context, ownerUserID int64, name string) (*Organization, error) {
@@ -508,4 +519,17 @@ func normalizeRole(role string) string {
 	default:
 		return role
 	}
+}
+
+// WithWorkspaceMembers keeps the membership snapshot stable throughout a dependent mutation.
+func (s *InMemoryStore) WithWorkspaceMembers(ctx context.Context, workspacePublicID string, action func(roleFor func(int64) string) error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.workspaces[workspacePublicID]; !ok {
+		return ErrNotFound
+	}
+	return action(func(userID int64) string { return s.wsMembers[workspacePublicID][userID] })
 }

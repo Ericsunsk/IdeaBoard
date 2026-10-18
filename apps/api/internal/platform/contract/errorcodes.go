@@ -56,6 +56,7 @@ const (
 	CodeOrganizationForbidden           Code = "organization_forbidden"
 	CodeOrganizationIdempotencyConflict Code = "organization_idempotency_conflict"
 	CodeWorkspaceMemberNotFound         Code = "workspace_member_not_found"
+	CodeWorkspaceMemberLimitReached     Code = "workspace_member_limit_reached"
 	CodeMembershipTransitionForbidden   Code = "membership_transition_forbidden"
 
 	// Workspace-rooted board collaboration codes (issue #802). Wire-stable:
@@ -63,17 +64,20 @@ const (
 	// Hidden boards (unknown ids, malformed board_ shapes at lookup, or the
 	// caller holds no board access) converge to board_not_found (404) per
 	// Baseline 4 anti-enumeration; visible-but-forbidden renders 403.
-	// Stale If-Match renders 409 board_revision_conflict; Idempotency-Key
+	// Stale document If-Match renders 409 board_revision_conflict;
+	// access-resource writes without If-Match render 428
+	// board_precondition_required and stale access versions render 412
+	// board_access_conflict; Idempotency-Key
 	// reuse with a different request renders 409
 	// board_idempotency_conflict.
-	CodeBoardNotFound            Code = "board_not_found"
-	CodeBoardForbidden           Code = "board_forbidden"
-	CodeBoardArchived            Code = "board_archived"
-	CodeBoardRevisionConflict    Code = "board_revision_conflict"
-	CodeBoardIdempotencyConflict Code = "board_idempotency_conflict"
-	CodeBoardMemberNotFound      Code = "board_member_not_found"
-	CodeBoardShareTokenNotFound  Code = "board_share_token_not_found"
-	CodeBoardShareTokenInvalid   Code = "board_share_token_invalid"
+	CodeBoardNotFound             Code = "board_not_found"
+	CodeBoardForbidden            Code = "board_forbidden"
+	CodeBoardArchived             Code = "board_archived"
+	CodeBoardRevisionConflict     Code = "board_revision_conflict"
+	CodeBoardAccessConflict       Code = "board_access_conflict"
+	CodeBoardPreconditionRequired Code = "board_precondition_required"
+	CodeBoardIdempotencyConflict  Code = "board_idempotency_conflict"
+	CodeBoardMemberNotFound       Code = "board_member_not_found"
 
 	// Workspace upload session + media asset codes (issue #803).
 	// Wire-stable: do not rename without coordinating the OpenAPI
@@ -225,8 +229,8 @@ const (
 
 	// Legacy board canvas codes (boards edge). Wire-stable. The v1
 	// workspace board surface reuses the #802 kernel codes
-	// (board_not_found, board_revision_conflict, board_member_not_found,
-	// board_share_token_not_found, board_share_token_invalid); the rows
+	// (board_not_found, board_revision_conflict, board_access_conflict,
+	// board_precondition_required, board_member_not_found); the rows
 	// below are the canvas-edge-only outcomes with the same freeze rule.
 	CodeBoardInvalidInput      Code = "board_invalid_input"
 	CodeBoardNameConflict      Code = "board_name_conflict"
@@ -234,8 +238,6 @@ const (
 	CodeBoardPermissionDenied  Code = "board_permission_denied"
 	CodeBoardMemberRoleInvalid Code = "board_member_role_invalid"
 	CodeBoardMemberSelfInvalid Code = "board_member_self_invalid"
-	CodeBoardShareTokenRevoked Code = "board_share_token_revoked"
-	CodeBoardShareTokenExpired Code = "board_share_token_expired"
 	CodeBoardOperationFailed   Code = "board_operation_failed"
 
 	// Payments codes (payments/interfaces/http edge). Wire-stable: do
@@ -341,12 +343,11 @@ const (
 // caller mistake.
 func StatusOf(code Code) int {
 	switch code {
-	case CodePaginationCursorInvalid, CodeIdempotencyKeyRequired, CodeBadRequest, CodeBoardShareTokenInvalid,
+	case CodePaginationCursorInvalid, CodeIdempotencyKeyRequired, CodeBadRequest,
 		CodeBillingInvalidInput,
 		CodeRewardInvalidInput, CodeRewardCodeIDInvalid, CodeRewardRedemptionIDInvalid,
 		CodeRewardPaginationInvalid, CodeRewardCodeInvalid,
 		CodeBoardInvalidInput, CodeBoardMemberRoleInvalid, CodeBoardMemberSelfInvalid,
-		CodeBoardShareTokenRevoked, CodeBoardShareTokenExpired,
 		CodeIdentityRequestInvalid, CodeIdentityUserPublicIDInvalid,
 		CodeStorageInvalidInput, CodeStorageProfileInvalid,
 		CodeStripeConfigurationInvalidInput, CodeCheckoutInvalidInput,
@@ -371,7 +372,7 @@ func StatusOf(code Code) int {
 		CodeIdentityUpstreamRejected:
 		return http.StatusForbidden
 	case CodeNotFound, CodeWorkspaceNotFound, CodeOrganizationNotFound, CodeWorkspaceMemberNotFound,
-		CodeBoardNotFound, CodeBoardMemberNotFound, CodeBoardShareTokenNotFound,
+		CodeBoardNotFound, CodeBoardMemberNotFound,
 		CodeUploadNotFound, CodeMediaNotFound, CodeBillingSessionNotFound,
 		CodeLibraryFolderNotFound, CodeLibraryAssetNotFound, CodeLibraryMaterializationNotFound,
 		CodeTaskNotFound, CodeEventNotFound, CodeEventSubscriptionNotFound, CodeControlNotFound,
@@ -383,6 +384,7 @@ func StatusOf(code Code) int {
 		return http.StatusGone
 	case CodeTaskIdempotencyConflict, CodeIdempotencyConflict, CodeConflict,
 		CodeWorkspaceIdempotencyConflict, CodeOrganizationIdempotencyConflict,
+		CodeWorkspaceMemberLimitReached,
 		CodeBoardRevisionConflict, CodeBoardIdempotencyConflict, CodeBoardArchived,
 		CodeUploadStateConflict, CodeUploadIdempotencyConflict,
 		CodeMediaNotReady, CodeMediaIdempotencyConflict, CodeBillingCheckoutConflict,
@@ -427,6 +429,10 @@ func StatusOf(code Code) int {
 		return http.StatusGatewayTimeout
 	case CodeTaskInsufficientCredits:
 		return http.StatusPaymentRequired
+	case CodeBoardPreconditionRequired:
+		return http.StatusPreconditionRequired
+	case CodeBoardAccessConflict:
+		return http.StatusPreconditionFailed
 	case CodeBillingOperationFailed, CodeRewardOperationFailed, CodeRewardRedeemFailed,
 		CodeBoardOperationFailed, CodeStorageOperationFailed, CodeIdentityOperationFailed:
 		// Explicit 500 pins: same as the fail-closed default, kept so

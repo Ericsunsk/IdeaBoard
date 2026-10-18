@@ -8,7 +8,9 @@ import (
 
 	"ideaboard/api/internal/aigateway"
 	"ideaboard/api/internal/boards"
+	boardtaskaccess "ideaboard/api/internal/boards/taskaccess"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/generation/catalog"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
@@ -21,6 +23,7 @@ import (
 	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	"ideaboard/api/internal/media/derivatives/infrastructure/preview"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
+	"ideaboard/api/internal/media/workspacemedia"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/audit"
@@ -118,7 +121,8 @@ func newAppRouter(
 	// lifecycle + replay orchestration; HTTP only translates
 	// requests/responses. A materializer build failure fails startup
 	// (fail closed) instead of serving silent 404s.
-	libraryStore := librarypostgres.NewService(repos.db)
+	boardStore := boards.NewPostgresWorkspaceBoardStore(repos.db, workspacemedia.ValidateDocumentAssets)
+	libraryStore := librarypostgres.NewService(repos.db, &workspacemedia.LibraryPublicationAuthorizer{Boards: boardStore, TaskBoards: &boardtaskaccess.Authorizer{Store: boardStore}})
 	librarySources := &libraryapplication.SourceResolver{Store: libraryStore}
 	libraryMaterializer, err := materializerassets.NewLibraryMaterializer(materializerassets.LibraryMaterializerDeps{
 		Media: taskServices.workspaceTaskMedia, Objects: services.storageService,
@@ -143,15 +147,22 @@ func newAppRouter(
 			SupportChannels: services.runtimeSettings,
 			Store:           tenancypg.NewStore(repos.db),
 			Users:           httpapi.NewUsersRepositoryDirectory(repos.userRepo),
-			AvatarUID:       httpapi.NewV1AvatarDirectory(repos.userRepo),
-			AvatarProfile:   httpapi.NewV1AvatarProfileDirectory(repos.userRepo),
+			// Workspace-member emails for invite search reuse the Admin
+			// emailReader join (users -> AuthUserIDs -> Auth emails);
+			// members without email omit the field, never fail the list.
+			MemberEmails:  httpapi.NewMemberEmailService(repos.userRepo, services.authServiceClient),
+			MemberLookup:  httpapi.NewMemberLookupService(repos.userRepo, services.authServiceClient),
+			AvatarUID:     httpapi.NewV1AvatarDirectory(repos.userRepo),
+			AvatarProfile: httpapi.NewV1AvatarProfileDirectory(repos.userRepo),
 			// Avatar bytes ride the storage abstraction (active
 			// profile): the same seam serves local today and R2 after
 			// the profile cutover.
 			AvatarObjects: services.storageService,
 			// Workspace board store is live (postgres mapping over
 			// board_documents/board_revisions, #809 follow-up landed).
-			Boards: boards.NewPostgresWorkspaceBoardStore(repos.db),
+			Boards: boardStore,
+			// Acknowledge immediate delivery of transaction-committed access signals.
+			BoardAccessOutbox: events.NewBoardAccessOutboxStore(repos.db),
 			// Workspace library and media stores are live. Library
 			// materialization is internal-only (owner hard cut): no
 			// public materialization route or emitter is wired here;
@@ -265,7 +276,9 @@ func newAppRouter(
 				// workspace bus for cross-instance envelope fanout. No second
 				// NATS connection is opened by this wiring.
 				newControlTaskEventAdapter(taskServices.taskStatusPublisher, taskServices.workspaceEvents, taskServices.workspaceEventBus, taskServices.webhooks)),
-			Tenancy:            tenancypg.NewStore(repos.db),
+			Tenancy: tenancypg.NewStore(repos.db),
+			// #941: operator membership removals purge board grants.
+			Boards:             boardStore,
 			UserDirectory:      controlUserDirectory,
 			BillingAccounts:    tenancypg.NewBillingAccountStore(repos.db),
 			Catalog:            services.billingCatalog,

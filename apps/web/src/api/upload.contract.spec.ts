@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, test, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../test/msw'
-import { UPLOAD_OPERATION_TIMEOUT_MS, uploadApi } from './upload'
+import { isBoardPublicIdShape, UPLOAD_OPERATION_TIMEOUT_MS, uploadApi } from './upload'
 
 const WORKSPACE_ID = 'ws_board1'
 const UPLOAD_ID = 'upload_upload42'
@@ -236,5 +236,87 @@ describe('uploadApi', () => {
     await expect(
       uploadApi.uploadAvatar(new File(['avatar'], 'avatar.png', { type: 'image/png' })),
     ).rejects.toThrow('Avatar upload failed. Please try again.')
+  })
+})
+
+describe('upload board binding (#936)', () => {
+  test('sends board_id when the board has a durable identity', async () => {
+    const file = new File(['image'], 'image.png', { type: 'image/png' })
+    let createBody = ''
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/uploads', async ({ request }) => {
+        createBody = await request.text()
+        return HttpResponse.json({ data: sessionFixture() })
+      }),
+      http.put('/api/v1/workspaces/:workspaceId/uploads/:uploadId/bytes', () =>
+        HttpResponse.json({ data: sessionFixture({ status: 'transferring' }) }),
+      ),
+      http.post('/api/v1/workspaces/:workspaceId/uploads/:uploadId/complete', () =>
+        HttpResponse.json({
+          data: {
+            upload: sessionFixture({ status: 'completed', asset_id: ASSET_ID }),
+            asset: assetFixture(),
+          },
+        }),
+      ),
+    )
+
+    await uploadApi.upload(file, WORKSPACE_ID, { boardId: 'board_abc123456789' })
+    expect(JSON.parse(createBody).data.board_id).toBe('board_abc123456789')
+  })
+
+  test('omits board_id for unsaved boards (owner-only, no workspace window)', async () => {
+    const file = new File(['image'], 'image.png', { type: 'image/png' })
+    let createBody = ''
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/uploads', async ({ request }) => {
+        createBody = await request.text()
+        return HttpResponse.json({ data: sessionFixture() })
+      }),
+      http.put('/api/v1/workspaces/:workspaceId/uploads/:uploadId/bytes', () =>
+        HttpResponse.json({ data: sessionFixture({ status: 'transferring' }) }),
+      ),
+      http.post('/api/v1/workspaces/:workspaceId/uploads/:uploadId/complete', () =>
+        HttpResponse.json({
+          data: {
+            upload: sessionFixture({ status: 'completed', asset_id: ASSET_ID }),
+            asset: assetFixture(),
+          },
+        }),
+      ),
+    )
+
+    await uploadApi.upload(file, WORKSPACE_ID, { boardId: 'local-unsaved-board' })
+    expect('board_id' in JSON.parse(createBody).data).toBe(false)
+    await uploadApi.upload(file, WORKSPACE_ID)
+    expect('board_id' in JSON.parse(createBody).data).toBe(false)
+  })
+})
+
+describe('media delivery has no public bypass (#936)', () => {
+  test('board id shape guard mirrors the backend board_ rule', () => {
+    expect(isBoardPublicIdShape('board_abc123456789')).toBe(true)
+    expect(isBoardPublicIdShape('board_a-b_c')).toBe(true)
+    expect(isBoardPublicIdShape('local-unsaved-board')).toBe(false)
+    expect(isBoardPublicIdShape('board_')).toBe(false)
+    expect(isBoardPublicIdShape('board_bad id')).toBe(false)
+    expect(isBoardPublicIdShape('')).toBe(false)
+    expect(isBoardPublicIdShape(null)).toBe(false)
+  })
+
+  test('delivery URLs stay same-origin without signatures', async () => {
+    const { resolveWorkspaceMediaAssetOriginalURL, resolveWorkspaceMediaAssetDerivativeURL } =
+      await import('./mediaAssetUrls')
+    const original = resolveWorkspaceMediaAssetOriginalURL('ws_board1', 'asset_upload42')
+    const derivative = resolveWorkspaceMediaAssetDerivativeURL(
+      'ws_board1',
+      'asset_upload42',
+      'large-preview',
+    )
+    for (const url of [original, derivative]) {
+      expect(url).toContain('/api/v1/workspaces/ws_board1/media-assets/asset_upload42/')
+      expect(url).not.toContain('?')
+      expect(url.toLowerCase()).not.toContain('sig')
+    }
   })
 })

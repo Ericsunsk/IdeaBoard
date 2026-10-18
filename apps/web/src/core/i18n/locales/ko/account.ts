@@ -213,16 +213,6 @@ export default {
   branding: {
     loadFailed: '사이트 설정을 불러올 수 없습니다.',
   },
-  shareJoin: {
-    loadingTitle: '공유 보드에 참여 중…',
-    failedTitle: '공유 보드에 참여할 수 없습니다',
-    successTitle: '공유 보드에 참여했습니다',
-    loadingStatus: '공유 토큰을 확인하고 보드를 동기화하는 동안 기다려 주세요…',
-    failedStatus: '보드에 참여할 수 없습니다. 공유 링크가 유효한지 확인해 주세요.',
-    successStatus: '성공적으로 참여했습니다. 리디렉션 중…',
-    spinnerAria: '공유 보드에 참여 중',
-    backToBoards: '보드로 돌아가기',
-  },
   errors: {
     networkRetry: '네트워크 오류입니다. 다시 시도해 주세요.',
     walletLoadFailed: 'Ideas 잔액을 불러올 수 없습니다.',

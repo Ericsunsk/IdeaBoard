@@ -129,6 +129,13 @@ var (
 	ErrMediaNotReady = errors.New("workspacetasks: media not ready")
 	// ErrMediaArchived wraps an archived asset (410 media_archived).
 	ErrMediaArchived = errors.New("workspacetasks: media archived")
+	// ErrBoardNotFound wraps an invisible Board binding (unknown id or no
+	// effective Board role for the caller). Handlers render it as 404
+	// board_not_found, never leaking Board existence.
+	ErrBoardNotFound = errors.New("workspacetasks: board not found")
+	// ErrBoardArchived wraps a generation attempt on an archived Board
+	// (409 board_archived, matching the Boards write contract).
+	ErrBoardArchived = errors.New("workspacetasks: board archived")
 )
 
 // RoutingSnapshotSaver persists the immutable submit-time RoutingSnapshot.
@@ -233,16 +240,25 @@ type WorkspaceTask struct {
 	// ResolvedModel handoff. Nil means "never pinned" and fails
 	// the worker closed.
 	RoutingSnapshot json.RawMessage `json:"routing_snapshot,omitempty"`
-	Status          Status          `json:"status"`
-	RetryCount      int             `json:"retry_count"`
-	ExecutionToken  string          `json:"execution_token"`
-	OutputRefs      []OutputRef     `json:"output_refs,omitempty"`
-	BillingSnapshot BillingSnapshot `json:"billing_snapshot"`
-	ErrorMsg        string          `json:"error_msg,omitempty"`
-	CancelReason    string          `json:"cancel_reason,omitempty"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
-	CompletedAt     *time.Time      `json:"completed_at,omitempty"`
+	// BoardID is the durable Canvas Board linkage (#937): the board_
+	// public id the Task was submitted from. Empty means a non-Canvas
+	// task, which keeps its own workspace-level permission and is
+	// submitter-only on reads (omitting the Board ID never widens
+	// visibility). Persisted in the workflow_input envelope in the same
+	// settlement transaction as the insert, Hold, and enqueue.
+	BoardID string `json:"board_id,omitempty"`
+	// BoardAccessVersion records the authorization version accepted with the Task.
+	BoardAccessVersion int64           `json:"board_access_version,omitempty"`
+	Status             Status          `json:"status"`
+	RetryCount         int             `json:"retry_count"`
+	ExecutionToken     string          `json:"execution_token"`
+	OutputRefs         []OutputRef     `json:"output_refs,omitempty"`
+	BillingSnapshot    BillingSnapshot `json:"billing_snapshot"`
+	ErrorMsg           string          `json:"error_msg,omitempty"`
+	CancelReason       string          `json:"cancel_reason,omitempty"`
+	CreatedAt          time.Time       `json:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at"`
+	CompletedAt        *time.Time      `json:"completed_at,omitempty"`
 }
 
 // IsTerminal reports whether the task accepts no further transitions.

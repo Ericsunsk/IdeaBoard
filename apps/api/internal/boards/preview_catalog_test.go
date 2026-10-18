@@ -49,7 +49,7 @@ func mustCatalogEntry(t *testing.T, store *InMemoryWorkspaceBoardStore, ws, boar
 
 func TestPreviewCatalogCreateAssignsVersionWithoutScene(t *testing.T) {
 	ctx := context.Background()
-	store := NewInMemoryWorkspaceBoardStoreForTests()
+	store := NewInMemoryWorkspaceBoardStoreForTests(testWorkspaceMembers{}, testWorkspaceMembers{})
 	boardID, _ := NewV1BoardPublicID()
 	created, err := store.CreateBoard(ctx, "ws_pv", 1, "Fresh", boardID)
 	if err != nil {
@@ -69,7 +69,7 @@ func TestPreviewCatalogCreateAssignsVersionWithoutScene(t *testing.T) {
 
 func TestPreviewCatalogReplacePublishesScene(t *testing.T) {
 	ctx := context.Background()
-	store := NewInMemoryWorkspaceBoardStoreForTests()
+	store := NewInMemoryWorkspaceBoardStoreForTests(testWorkspaceMembers{}, testWorkspaceMembers{})
 	boardID, _ := NewV1BoardPublicID()
 	if _, err := store.CreateBoard(ctx, "ws_pv", 1, "Scene", boardID); err != nil {
 		t.Fatal(err)
@@ -103,7 +103,7 @@ func TestPreviewCatalogReplacePublishesScene(t *testing.T) {
 
 func TestPreviewCatalogMetadataLifecyclePreservesProjection(t *testing.T) {
 	ctx := context.Background()
-	store := NewInMemoryWorkspaceBoardStoreForTests()
+	store := NewInMemoryWorkspaceBoardStoreForTests(testWorkspaceMembers{}, testWorkspaceMembers{})
 	boardID, _ := NewV1BoardPublicID()
 	if _, err := store.CreateBoard(ctx, "ws_pv", 1, "Meta", boardID); err != nil {
 		t.Fatal(err)
@@ -114,21 +114,21 @@ func TestPreviewCatalogMetadataLifecyclePreservesProjection(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantVersion, wantScene := updated.ContentVersion, string(updated.PreviewScene)
-	renamed, err := store.RenameBoard(ctx, "ws_pv", boardID, "Meta v2")
+	renamed, err := store.RenameBoard(ctx, "ws_pv", boardID, "Meta v2", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if renamed.ContentVersion != wantVersion || string(renamed.PreviewScene) != wantScene {
 		t.Fatalf("rename changed the content projection")
 	}
-	archived, err := store.ArchiveBoard(ctx, "ws_pv", boardID)
+	archived, err := store.ArchiveBoard(ctx, "ws_pv", boardID, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if archived.ContentVersion != wantVersion || string(archived.PreviewScene) != wantScene {
 		t.Fatalf("archive changed the content projection")
 	}
-	restored, err := store.RestoreBoard(ctx, "ws_pv", boardID)
+	restored, err := store.RestoreBoard(ctx, "ws_pv", boardID, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestPreviewCatalogMetadataLifecyclePreservesProjection(t *testing.T) {
 
 func TestPreviewCatalogConflictPublishesNothing(t *testing.T) {
 	ctx := context.Background()
-	store := NewInMemoryWorkspaceBoardStoreForTests()
+	store := NewInMemoryWorkspaceBoardStoreForTests(testWorkspaceMembers{}, testWorkspaceMembers{})
 	boardID, _ := NewV1BoardPublicID()
 	if _, err := store.CreateBoard(ctx, "ws_pv", 1, "Conflict", boardID); err != nil {
 		t.Fatal(err)
@@ -169,7 +169,7 @@ func TestPreviewCatalogConflictPublishesNothing(t *testing.T) {
 
 func TestPreviewCatalogNonExtractableSchemaKeepsVersionWithoutScene(t *testing.T) {
 	ctx := context.Background()
-	store := NewInMemoryWorkspaceBoardStoreForTests()
+	store := NewInMemoryWorkspaceBoardStoreForTests(testWorkspaceMembers{}, testWorkspaceMembers{})
 	boardID, _ := NewV1BoardPublicID()
 	if _, err := store.CreateBoard(ctx, "ws_pv", 1, "Legacy", boardID); err != nil {
 		t.Fatal(err)
@@ -238,12 +238,11 @@ func exerciseCatalogVisibility(t *testing.T, store WorkspaceBoardStore, workspac
 		}
 		boardIDs = append(boardIDs, id)
 	}
-	for user, role := range map[int64]AccessRole{3: RoleEditor, 7: RoleViewer} {
-		if _, err := store.AddBoardMember(ctx, workspaceID, boardIDs[0], 1, user, role, "owner"); err != nil {
-			t.Fatal(err)
-		}
+	if _, err := store.ReplaceBoardAccess(ctx, workspaceID, boardIDs[0], 1, 1, WorkspaceAccessEditor, []int64{3, 7}); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := store.ArchiveBoard(ctx, workspaceID, boardIDs[3]); err != nil {
+
+	if _, err := store.ArchiveBoard(ctx, workspaceID, boardIDs[3], 1); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
@@ -253,14 +252,14 @@ func exerciseCatalogVisibility(t *testing.T, store WorkspaceBoardStore, workspac
 		archived bool
 		want     int
 	}{
-		{"workspace-owner", 1, "owner", false, 3},
-		{"workspace-admin", 8, "admin", false, 3},
-		{"workspace-member", 8, "member", false, 3},
-		{"implicit-owner", 1, "", false, 1},
-		{"explicit-editor", 3, "", false, 2},
-		{"explicit-viewer", 7, "", false, 2},
+		{"workspace-owner", 1, "owner", false, 1},
+		{"workspace-admin", 8, "admin", false, 0},
+		{"workspace-member", 8, "member", false, 0},
+		{"creator-without-membership", 1, "", false, 0},
+		{"explicit-editor", 3, "member", false, 2},
+		{"explicit-viewer", 7, "member", false, 2},
 		{"unknown-workspace-role", 8, "unknown", false, 0},
-		{"include-archived", 8, "member", true, 4},
+		{"include-archived", 1, "owner", true, 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			catalog, err := store.ListBoardCatalog(ctx, workspaceID, tc.archived, tc.user, tc.role, V1BoardCatalogPageRequest{Limit: 100})
@@ -287,5 +286,5 @@ func exerciseCatalogVisibility(t *testing.T, store WorkspaceBoardStore, workspac
 }
 
 func TestPreviewCatalogFiltersEffectiveAccess(t *testing.T) {
-	exerciseCatalogVisibility(t, NewInMemoryWorkspaceBoardStoreForTests(), "ws_catalog_acl")
+	exerciseCatalogVisibility(t, NewInMemoryWorkspaceBoardStoreForTests(testWorkspaceMembers{}, testWorkspaceMembers{}), "ws_catalog_acl")
 }

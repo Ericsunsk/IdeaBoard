@@ -101,6 +101,11 @@ func (s *Service) CreateSession(ctx context.Context, params CreateSessionParams)
 		}
 		return nil, err
 	}
+	// Resolve the upload target in the same Workspace; HTTP checks Board write access.
+	targetBoardID, err := resolveTargetBoardInternal(ctx, q, params.WorkspaceID, params.TargetBoardPublicID)
+	if err != nil {
+		return nil, err
+	}
 	canonicalMIME := CanonicalMIME(mimeType)
 	minted, err := NewUploadPublicID()
 	if err != nil {
@@ -116,6 +121,7 @@ func (s *Service) CreateSession(ctx context.Context, params CreateSessionParams)
 			DeclaredSizeBytes: params.SizeBytes,
 			DeclaredChecksum:  nullText(checksum),
 			StorageKey:        nullText(slot),
+			TargetBoardID:     targetBoardID,
 		})
 		if isSessionPublicIDConflict(err) {
 			minted, err = NewUploadPublicID()

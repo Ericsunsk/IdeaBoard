@@ -26,6 +26,7 @@ type UserRow = {
 
 export type AuthIdentityStore = {
   findUserByEmail(email: string): Promise<InternalUserShape | null>
+  findUserByCanonicalEmail(email: string): Promise<{ auth_user_id: string; email: string } | null>
   findUserEmailsByIDs(
     authUserIDs: string[],
   ): Promise<Array<{ auth_user_id: string; email: string; providers: string[] }>>
@@ -60,6 +61,23 @@ export function createAuthIdentityStore(database: AuthIdentityDatabase): AuthIde
         [email],
       )
       return result.rows[0] ? normalizeUserRow(result.rows[0] as UserRow) : null
+    },
+
+    async findUserByCanonicalEmail(email) {
+      const result = await database.query(
+        'SELECT id, email FROM "user" WHERE lower(email) = lower($1) LIMIT 1',
+        [email],
+      )
+      const row = result.rows[0] as UserRow | undefined
+      if (
+        !row ||
+        typeof row.id !== 'string' ||
+        !row.id.trim() ||
+        typeof row.email !== 'string' ||
+        !row.email.trim()
+      )
+        return null
+      return { auth_user_id: row.id, email: row.email }
     },
 
     async findUserEmailsByIDs(authUserIDs) {

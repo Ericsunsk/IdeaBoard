@@ -754,38 +754,67 @@ func (q *Queries) GetWorkspaceTaskByPublicID(ctx context.Context, arg GetWorkspa
 }
 
 const insertWorkspaceTaskOutput = `-- name: InsertWorkspaceTaskOutput :one
-INSERT INTO task_outputs (task_id, output_index, output_kind, media_asset_id, remote_url, metadata)
-SELECT t.internal_id, $1, $2, $3, $4, $5
-FROM tasks AS t
-INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
-WHERE t.public_id = $6 AND w.public_id = $7
-RETURNING internal_id, task_id, output_index, output_kind, media_asset_id, remote_url, metadata, created_at
+WITH source AS (
+  SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id, t.routing_snapshot
+  FROM tasks AS t
+  INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
+  WHERE t.public_id = $1 AND w.public_id = $2
+), inserted AS (
+  INSERT INTO task_outputs (task_id, output_index, output_kind, media_asset_id, remote_url, metadata)
+  SELECT t.internal_id, $3, $4, $5, $6, $7
+  FROM source AS t
+  WHERE $5::bigint IS NULL OR EXISTS (
+    SELECT 1 FROM media_assets AS m
+    WHERE m.internal_id = $5 AND m.workspace_id = t.workspace_id
+  )
+  RETURNING internal_id, task_id, output_index, output_kind, media_asset_id, remote_url, metadata, created_at
+), origins AS (
+  INSERT INTO media_asset_task_origins (workspace_id, task_public_id, output_index, media_asset_id, submitter_user_id, board_public_id)
+  SELECT t.workspace_id, t.public_id, o.output_index, o.media_asset_id, t.submitter_user_id,
+         NULLIF(btrim(t.workflow_input ->> 'board_id'), '')
+  FROM inserted AS o
+  INNER JOIN source AS t ON t.internal_id = o.task_id
+  WHERE o.media_asset_id IS NOT NULL
+  RETURNING media_asset_id
+)
+SELECT internal_id, task_id, output_index, output_kind, media_asset_id, remote_url, metadata, created_at
+FROM inserted
 `
 
 type InsertWorkspaceTaskOutputParams struct {
+	PublicID          string      `json:"public_id"`
+	WorkspacePublicID string      `json:"workspace_public_id"`
 	OutputIndex       int32       `json:"output_index"`
 	OutputKind        string      `json:"output_kind"`
 	MediaAssetID      pgtype.Int8 `json:"media_asset_id"`
 	RemoteUrl         pgtype.Text `json:"remote_url"`
 	Metadata          []byte      `json:"metadata"`
-	PublicID          string      `json:"public_id"`
-	WorkspacePublicID string      `json:"workspace_public_id"`
 }
 
-// InsertWorkspaceTaskOutput appends one output ref to a workspace-scoped
-// task. Scoping resolves atomically in the SELECT so outputs can never
-// attach to a cross-workspace task id.
-func (q *Queries) InsertWorkspaceTaskOutput(ctx context.Context, arg InsertWorkspaceTaskOutputParams) (TaskOutput, error) {
+type InsertWorkspaceTaskOutputRow struct {
+	InternalID   int64              `json:"internal_id"`
+	TaskID       int64              `json:"task_id"`
+	OutputIndex  int32              `json:"output_index"`
+	OutputKind   string             `json:"output_kind"`
+	MediaAssetID pgtype.Int8        `json:"media_asset_id"`
+	RemoteUrl    pgtype.Text        `json:"remote_url"`
+	Metadata     []byte             `json:"metadata"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+// InsertWorkspaceTaskOutput accepts the output reference and its immutable
+// Media origin from the persisted Task in the same statement.
+func (q *Queries) InsertWorkspaceTaskOutput(ctx context.Context, arg InsertWorkspaceTaskOutputParams) (InsertWorkspaceTaskOutputRow, error) {
 	row := q.db.QueryRow(ctx, insertWorkspaceTaskOutput,
+		arg.PublicID,
+		arg.WorkspacePublicID,
 		arg.OutputIndex,
 		arg.OutputKind,
 		arg.MediaAssetID,
 		arg.RemoteUrl,
 		arg.Metadata,
-		arg.PublicID,
-		arg.WorkspacePublicID,
 	)
-	var i TaskOutput
+	var i InsertWorkspaceTaskOutputRow
 	err := row.Scan(
 		&i.InternalID,
 		&i.TaskID,

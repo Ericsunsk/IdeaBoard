@@ -102,7 +102,7 @@ func TestInMemoryLastOwnerGuards(t *testing.T) {
 	if _, err := store.UpdateWorkspaceMemberRole(ctx, ws.PublicID, 1, 1, RoleAdmin); !errors.Is(err, ErrLastOwner) {
 		t.Fatalf("demote last owner err = %v, want ErrLastOwner", err)
 	}
-	if err := store.RemoveWorkspaceMember(ctx, ws.PublicID, 1, 1); !errors.Is(err, ErrLastOwner) {
+	if _, err := store.RemoveWorkspaceMember(ctx, ws.PublicID, 1, 1, testMemberGrants{}); !errors.Is(err, ErrLastOwner) {
 		t.Fatalf("remove last owner err = %v, want ErrLastOwner", err)
 	}
 }

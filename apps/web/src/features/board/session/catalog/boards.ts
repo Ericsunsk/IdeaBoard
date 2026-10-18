@@ -2,6 +2,27 @@ import { createPrefixedId } from '../../../../core/utils/ids'
 import { readLocalStorageItem, writeLocalStorageJson } from '../../../../core/utils/storage'
 import { getRecoverableBoardScope, scopedBoardStorageKey } from './scope'
 
+/**
+ * Server-computed board capabilities, mirrored from the Public API
+ * `BoardCapabilities` schema. Consumed verbatim from board payloads;
+ * never recomputed locally. (Structural mirror — not a generated import:
+ * only `session/adapters/boardsResource.ts` may import the
+ * generated-query boundary.)
+ * @externalContract Public API BoardCapabilities: consumed verbatim.
+ */
+export interface BoardAccessCapabilities {
+  read: boolean
+  write: boolean
+  manage: boolean
+  generate: boolean
+}
+
+/** Derived sharing posture, mirrored from the Public API schema. */
+export type BoardAccessPosture = 'private' | 'workspace'
+
+/** Common sharing gate and selected-member role from the Public API. */
+export type BoardWorkspaceAccess = 'none' | 'viewer' | 'editor'
+
 export interface BoardMeta {
   id: string
   name: string
@@ -9,8 +30,24 @@ export interface BoardMeta {
   updatedAt: number
   revision?: number
   archivedAt?: string | undefined
-  /** Owning workspace: board identity is User + Workspace scoped (issue #894). */
+  /** Owning workspace: board identity is User + Workspace scoped. */
   workspaceId?: string | undefined
+  /**
+   * Server-computed capabilities, consumed as-is (absent on pre-hydration
+   * local boards). Never recomputed locally: no RBAC copy lives here.
+   */
+  capabilities?: BoardAccessCapabilities | undefined
+  /** Derived sharing posture, server-provided alongside capabilities. */
+  accessState?: BoardAccessPosture | undefined
+  /** Common sharing gate and role, server-provided. */
+  workspaceAccess?: BoardWorkspaceAccess | undefined
+  /** Whether the caller is the board creator (implicit owner). */
+  isCreator?: boolean | undefined
+  /**
+   * Whether the caller is explicitly selected for Board sharing
+   * (`relationship.has_direct_grant`); absent on unsynced local Boards.
+   */
+  hasDirectGrant?: boolean | undefined
 }
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boards.v2'
@@ -50,6 +87,47 @@ function toValidArchivedAt(value: unknown): string | undefined {
   return typeof value === 'string' && value ? value : undefined
 }
 
+function toValidCapabilities(value: unknown): BoardAccessCapabilities | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const record = value as Record<string, unknown>
+  for (const key of ['read', 'write', 'manage', 'generate']) {
+    if (typeof record[key] !== 'boolean') return undefined
+  }
+  return {
+    read: record.read as boolean,
+    write: record.write as boolean,
+    manage: record.manage as boolean,
+    generate: record.generate as boolean,
+  }
+}
+
+function toValidAccessState(value: unknown): BoardAccessPosture | undefined {
+  return value === 'private' || value === 'workspace' ? value : undefined
+}
+
+function toValidWorkspaceAccess(value: unknown): BoardWorkspaceAccess | undefined {
+  return value === 'none' || value === 'viewer' || value === 'editor' ? value : undefined
+}
+
+function toValidHasDirectGrant(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined
+}
+
+function toValidAccessFacts(record: Record<string, unknown>): Partial<BoardMeta> {
+  const capabilities = toValidCapabilities(record.capabilities)
+  const accessState = toValidAccessState(record.accessState)
+  const workspaceAccess = toValidWorkspaceAccess(record.workspaceAccess)
+  const isCreator = typeof record.isCreator === 'boolean' ? record.isCreator : undefined
+  const hasDirectGrant = toValidHasDirectGrant(record.hasDirectGrant)
+  return {
+    ...(capabilities === undefined ? {} : { capabilities }),
+    ...(accessState === undefined ? {} : { accessState }),
+    ...(workspaceAccess === undefined ? {} : { workspaceAccess }),
+    ...(isCreator === undefined ? {} : { isCreator }),
+    ...(hasDirectGrant === undefined ? {} : { hasDirectGrant }),
+  }
+}
+
 function toValidBoardMeta(item: unknown): BoardMeta | null {
   if (!item || typeof item !== 'object') return null
   const record = item as Record<string, unknown>
@@ -68,6 +146,7 @@ function toValidBoardMeta(item: unknown): BoardMeta | null {
     ...(revision === undefined ? {} : { revision }),
     ...(archivedAt === undefined ? {} : { archivedAt }),
     ...(workspaceId === undefined ? {} : { workspaceId }),
+    ...toValidAccessFacts(record),
   }
 }
 
@@ -195,6 +274,11 @@ export function registerBoardMeta(input: {
   updatedAt?: number
   revision?: number
   archivedAt?: string | null | undefined
+  capabilities?: BoardAccessCapabilities | undefined
+  accessState?: BoardAccessPosture | undefined
+  workspaceAccess?: BoardWorkspaceAccess | undefined
+  isCreator?: boolean | undefined
+  hasDirectGrant?: boolean | undefined
 }): BoardMeta | null {
   const id = input.id.trim()
   const name = normalizeBoardName(input.name)
@@ -209,6 +293,11 @@ export function registerBoardMeta(input: {
     ...(typeof input.archivedAt === 'string' && input.archivedAt
       ? { archivedAt: input.archivedAt }
       : {}),
+    ...(input.capabilities === undefined ? {} : { capabilities: input.capabilities }),
+    ...(input.accessState === undefined ? {} : { accessState: input.accessState }),
+    ...(input.workspaceAccess === undefined ? {} : { workspaceAccess: input.workspaceAccess }),
+    ...(input.isCreator === undefined ? {} : { isCreator: input.isCreator }),
+    ...(input.hasDirectGrant === undefined ? {} : { hasDirectGrant: input.hasDirectGrant }),
   })
   const valid = toValidBoardMeta(board)
   if (!valid) return null

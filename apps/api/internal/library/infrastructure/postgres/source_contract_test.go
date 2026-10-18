@@ -368,3 +368,19 @@ func TestLibraryManagedSaveForbiddenMedia(t *testing.T) {
 }
 
 func ptr(v int) *int { return &v }
+
+func TestManagedPublicationRequiresPolicy(t *testing.T) {
+	env := openLibraryTestEnv(t)
+	svc := NewService(env.pool, nil)
+	id, err := domain.NewV1AssetPublicID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := domain.V1SaveManagedAssetInput{MediaAssetID: "asset_untrusted", OperatorUserID: env.userID, Lineage: &domain.TaskLineage{TaskID: "task_untrusted", ResultIndex: 0}}
+	if _, _, err := svc.SaveManagedMediaAsset(t.Context(), env.wsA, input, id); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("manual publication without policy: %v", err)
+	}
+	if _, _, err := svc.SaveTaskOutput(t.Context(), env.wsA, input, id); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("automatic publication without policy: %v", err)
+	}
+}

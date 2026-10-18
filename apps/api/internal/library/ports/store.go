@@ -7,6 +7,8 @@ import (
 	"context"
 
 	"ideaboard/api/internal/library/domain"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // WorkspaceLibraryStore persists workspace-scoped library state.
@@ -18,11 +20,10 @@ type WorkspaceLibraryStore interface {
 	RenameFolder(ctx context.Context, workspacePublicID, folderPublicID, name string) (*domain.V1Folder, error)
 	DeleteFolder(ctx context.Context, workspacePublicID, folderPublicID string) error
 	SaveAsset(ctx context.Context, workspacePublicID string, input domain.V1SaveAssetInput, publicID string) (*domain.V1Asset, bool, error)
-	// SaveManagedMediaAsset is the single managed-save use case: manual
-	// and task-auto entries converge here. Dedup identity is
-	// (workspace, media asset); repeats return the existing row with
-	// created=false without touching its folder or metadata.
+	// SaveManagedMediaAsset explicitly publishes readable Media into Workspace Library.
 	SaveManagedMediaAsset(ctx context.Context, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error)
+	// SaveTaskOutput accepts an automatic publication of a persisted Task output.
+	SaveTaskOutput(ctx context.Context, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error)
 	ListAssets(ctx context.Context, workspacePublicID string) ([]*domain.V1Asset, error)
 	GetAsset(ctx context.Context, workspacePublicID, assetPublicID string) (*domain.V1Asset, error)
 	MoveAsset(ctx context.Context, workspacePublicID, assetPublicID, folderPublicID string) (*domain.V1Asset, error)
@@ -37,4 +38,10 @@ type WorkspaceLibraryStore interface {
 // for one workspace asset onto one pending/running/completed job.
 type MaterializationClaimer interface {
 	ClaimMaterialization(ctx context.Context, workspacePublicID, assetPublicID, publicID string) (*domain.V1Materialization, bool, error)
+}
+
+// PublicationAuthorizer evaluates publication on the Library accepting transaction.
+type PublicationAuthorizer interface {
+	AuthorizeManual(context.Context, pgx.Tx, string, domain.V1SaveManagedAssetInput) error
+	AuthorizeAutomatic(context.Context, pgx.Tx, string, domain.V1SaveManagedAssetInput) (bool, error)
 }

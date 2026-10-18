@@ -57,6 +57,7 @@ export default {
     folderDeleted: 'Folder deleted',
     assetMoved: 'Asset moved',
     removedFromLibrary: 'Removed from Library',
+    publishedToWorkspace: 'Published to the workspace Library, visible to workspace members.',
   },
   errors: {
     loadFoldersFailed: 'Could not load folders',
@@ -69,5 +70,7 @@ export default {
     deleteFolderFailed: 'Could not delete the folder',
     importAssetFailed: 'Could not import the asset',
     lookupStatusFailed: 'Could not look up saved status',
+    saveRestrictedDenied:
+      'Publishing denied: only the creator or a Manager can save restricted material to the workspace.',
   },
 } as const

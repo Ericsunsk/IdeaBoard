@@ -78,7 +78,8 @@ var _ workspacetasks.TxSubmissionClaimStore = (*Store)(nil)
 // workflowInputEnvelope is the tasks.workflow_input JSONB shape. Billing
 // snapshots are quote-time facts (the credits ledger owns settlement
 // truth); execution_token is the durable retry-fencing token; cancel
-// reason rides here because tasks carries no cancel text column.
+// reason rides here because tasks carries no cancel text column. The Board
+// binding persists with the accepted inputs in the same task insert.
 type workflowInputEnvelope struct {
 	MediaAssetIDs   []string                        `json:"media_asset_ids,omitempty"`
 	Params          map[string]any                  `json:"params,omitempty"`
@@ -86,6 +87,9 @@ type workflowInputEnvelope struct {
 	BillingSnapshot *workspacetasks.BillingSnapshot `json:"billing_snapshot,omitempty"`
 	ExecutionToken  string                          `json:"execution_token,omitempty"`
 	CancelReason    string                          `json:"cancel_reason,omitempty"`
+	BoardID         string                          `json:"board_id,omitempty"`
+	// BoardAccessVersion snapshots the Board access_version at submit.
+	BoardAccessVersion int64 `json:"board_access_version,omitempty"`
 }
 
 // outputMetadata is the task_outputs.metadata shape.
@@ -109,11 +113,13 @@ func validTaskRef(workspaceID, taskID string) bool {
 
 func marshalEnvelope(task *workspacetasks.WorkspaceTask) ([]byte, error) {
 	envelope := workflowInputEnvelope{
-		MediaAssetIDs:   append([]string(nil), task.MediaAssetIDs...),
-		Params:          task.Params,
-		CanonicalParams: task.CanonicalParams,
-		ExecutionToken:  task.ExecutionToken,
-		CancelReason:    task.CancelReason,
+		MediaAssetIDs:      append([]string(nil), task.MediaAssetIDs...),
+		Params:             task.Params,
+		CanonicalParams:    task.CanonicalParams,
+		ExecutionToken:     task.ExecutionToken,
+		CancelReason:       task.CancelReason,
+		BoardID:            task.BoardID,
+		BoardAccessVersion: task.BoardAccessVersion,
 	}
 	if task.BillingSnapshot.SKU != "" || task.BillingSnapshot.TotalCredits != 0 || task.BillingSnapshot.HoldTransactionID != "" {
 		snapshot := task.BillingSnapshot
@@ -184,16 +190,18 @@ func mapTaskRow(workspacePublicID string, row dbsqlc.Task, outputs []workspaceta
 		CanonicalParams: envelope.CanonicalParams,
 		// The pinned submit-time snapshot rides the row untouched: the
 		// worker parses and Verify()s it, every other reader ignores it.
-		RoutingSnapshot: append([]byte(nil), row.RoutingSnapshot...),
-		Status:          workspacetasks.Status(row.Status),
-		RetryCount:      int(row.RetryCount),
-		ExecutionToken:  envelope.ExecutionToken,
-		OutputRefs:      append([]workspacetasks.OutputRef(nil), outputs...),
-		ErrorMsg:        row.ErrorMessage,
-		CancelReason:    envelope.CancelReason,
-		CreatedAt:       dbutil.TimeValue(row.CreatedAt),
-		UpdatedAt:       dbutil.TimeValue(row.UpdatedAt),
-		CompletedAt:     completed,
+		RoutingSnapshot:    append([]byte(nil), row.RoutingSnapshot...),
+		BoardID:            strings.TrimSpace(envelope.BoardID),
+		BoardAccessVersion: envelope.BoardAccessVersion,
+		Status:             workspacetasks.Status(row.Status),
+		RetryCount:         int(row.RetryCount),
+		ExecutionToken:     envelope.ExecutionToken,
+		OutputRefs:         append([]workspacetasks.OutputRef(nil), outputs...),
+		ErrorMsg:           row.ErrorMessage,
+		CancelReason:       envelope.CancelReason,
+		CreatedAt:          dbutil.TimeValue(row.CreatedAt),
+		UpdatedAt:          dbutil.TimeValue(row.UpdatedAt),
+		CompletedAt:        completed,
 	}
 	if envelope.BillingSnapshot != nil {
 		task.BillingSnapshot = *envelope.BillingSnapshot

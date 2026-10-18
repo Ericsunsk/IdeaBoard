@@ -92,6 +92,7 @@ export async function createWorkspaceTask(
   }
   if (input.quantity != null) data.quantity = input.quantity
   if (input.resolution != null) data.resolution = input.resolution
+  if (input.board_id != null) data.board_id = input.board_id
   const envelope = await createWorkspaceTaskTransport(
     assertWorkspaceTaskWorkspaceId(workspaceId),
     { data },

@@ -260,6 +260,36 @@ describe('workspace task cancel headers', () => {
     await createWorkspaceTask(WORKSPACE_ID, { service: 'upscale' })
     expect((seen[0] as { data: Record<string, unknown> }).data).not.toHaveProperty('prompt')
   })
+
+  it('sends data.board_id when the input carries a Board binding (#937)', async () => {
+    const seen: Array<Record<string, unknown>> = []
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/tasks', async ({ request }) => {
+        seen.push((await request.json()) as Record<string, unknown>)
+        return HttpResponse.json(taskFixture(), { status: 202 })
+      }),
+    )
+    await createWorkspaceTask(
+      WORKSPACE_ID,
+      { service: 'render', board_id: 'board_abc123' },
+      { idempotencyKey: workspaceTaskIdempotencyKey('create') },
+    )
+    expect((seen[0] as { data: Record<string, unknown> }).data).toMatchObject({
+      board_id: 'board_abc123',
+    })
+  })
+
+  it('omits data.board_id for non-Canvas tasks (#937)', async () => {
+    const seen: Array<Record<string, unknown>> = []
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/tasks', async ({ request }) => {
+        seen.push((await request.json()) as Record<string, unknown>)
+        return HttpResponse.json(taskFixture(), { status: 202 })
+      }),
+    )
+    await createWorkspaceTask(WORKSPACE_ID, { service: 'render' })
+    expect((seen[0] as { data: Record<string, unknown> }).data).not.toHaveProperty('board_id')
+  })
 })
 
 describe('workspace task 404/403 matrix', () => {

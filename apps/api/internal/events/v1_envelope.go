@@ -45,8 +45,7 @@ const (
 	EventV1MediaAssetReady       = "media.asset_ready"
 	EventV1MediaAssetArchived    = "media.asset_archived"
 	EventV1BoardDocumentReplaced = "board.document_replaced"
-	EventV1BoardMemberChanged    = "board.member_changed"
-	EventV1BoardShareRevoked     = "board.share_revoked"
+	EventV1BoardAccessChanged    = "board.access_changed"
 	EventV1BillingSettled        = "billing.settled"
 )
 
@@ -60,8 +59,7 @@ var v1EventVersions = map[string]int{
 	EventV1MediaAssetReady:       1,
 	EventV1MediaAssetArchived:    1,
 	EventV1BoardDocumentReplaced: 1,
-	EventV1BoardMemberChanged:    1,
-	EventV1BoardShareRevoked:     1,
+	EventV1BoardAccessChanged:    1,
 	EventV1BillingSettled:        1,
 }
 
@@ -83,8 +81,7 @@ func V1EventTypes() []string {
 		EventV1TaskCreated, EventV1TaskRunning, EventV1TaskCompleted,
 		EventV1TaskFailed, EventV1TaskCancelled,
 		EventV1MediaAssetReady, EventV1MediaAssetArchived,
-		EventV1BoardDocumentReplaced, EventV1BoardMemberChanged, EventV1BoardShareRevoked,
-		EventV1BillingSettled,
+		EventV1BoardDocumentReplaced, EventV1BoardAccessChanged, EventV1BillingSettled,
 	}
 }
 
@@ -172,14 +169,16 @@ type V1BoardDocumentReplacedData struct {
 	Revision int64  `json:"revision"`
 }
 
-type V1BoardMemberChangedData struct {
-	BoardID  string `json:"board_id"`
-	MemberID string `json:"member_id"`
-}
-
-type V1BoardShareRevokedData struct {
-	BoardID      string `json:"board_id"`
-	ShareTokenID string `json:"share_token_id"`
+// V1BoardAccessChangedData is the directed access-loss control signal
+// (issue #940). It carries ONLY the recipient's already-known board
+// identity plus the monotonic access version: no roles, no roster, no
+// document bytes, no prompts, no asset identifiers. Servers deliver it
+// exclusively to the named member (recipient == member_id); it never
+// rides webhooks and ordinary replay never returns it to anyone else.
+type V1BoardAccessChangedData struct {
+	BoardID       string `json:"board_id"`
+	MemberID      string `json:"member_id"`
+	AccessVersion int64  `json:"access_version"`
 }
 
 // V1BillingSettledData carries settlement refs only: quote, hold,
@@ -384,22 +383,34 @@ func validateV1Data(typ string, raw json.RawMessage) error {
 		if !contract.IsValidPublicID(contract.PrefixBoard, stringField("board_id")) {
 			return fmt.Errorf("events: board.document_replaced board_id must be board_ opaque")
 		}
-	case EventV1BoardMemberChanged:
-		if err := require(fields, "board_id", "member_id"); err != nil {
+	case EventV1BoardAccessChanged:
+		if err := require(fields, "board_id", "member_id", "access_version"); err != nil {
 			return err
 		}
+		// #940: the directed signal carries identity + version ONLY.
+		// Unlike other types, unknown data keys fail closed here so no
+		// producer can smuggle roles, roster, prompts, or asset
+		// identifiers through the revocation path.
+		for name := range fields {
+			switch name {
+			case "board_id", "member_id", "access_version":
+			default:
+				return fmt.Errorf("events: board.access_changed data forbids %q", name)
+			}
+		}
 		if !contract.IsValidPublicID(contract.PrefixBoard, stringField("board_id")) {
-			return fmt.Errorf("events: board.member_changed board_id must be board_ opaque")
+			return fmt.Errorf("events: board.access_changed board_id must be board_ opaque")
 		}
 		if !contract.IsValidPublicID(contract.PrefixUser, stringField("member_id")) {
-			return fmt.Errorf("events: board.member_changed member_id must be usr_ opaque")
+			return fmt.Errorf("events: board.access_changed member_id must be usr_ opaque")
 		}
-	case EventV1BoardShareRevoked:
-		if err := require(fields, "board_id", "share_token_id"); err != nil {
-			return err
+		version, hasVersion := fields["access_version"]
+		if !hasVersion {
+			return fmt.Errorf("events: board.access_changed data requires \"access_version\"")
 		}
-		if !contract.IsValidPublicID(contract.PrefixBoard, stringField("board_id")) {
-			return fmt.Errorf("events: board.share_revoked board_id must be board_ opaque")
+		versionNumber, isNumber := version.(float64)
+		if !isNumber || versionNumber < 1 || versionNumber != float64(int64(versionNumber)) {
+			return fmt.Errorf("events: board.access_changed access_version must be a positive integer")
 		}
 	case EventV1BillingSettled:
 		if err := require(fields, "reference_type", "reference_id", "settlement_state"); err != nil {

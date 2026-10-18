@@ -27,30 +27,25 @@ import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
-  AddBoardMemberRequest,
   BadRequestResponse,
+  BoardAccessEnvelope,
   BoardDocumentEnvelope,
   BoardEnvelope,
-  BoardMemberEnvelope,
-  BoardMemberList,
   BoardRevisionDetailEnvelope,
-  BoardShareTokenEnvelope,
-  BoardShareTokenList,
   ConflictResponse,
   CreateBoardRequest,
-  CreateShareTokenRequest,
-  DeletedEnvelope,
   ForbiddenResponse,
-  JoinBoardRequest,
   ListBoardRevisionsParams,
   ListBoardsParams,
   NotFoundResponse,
   PaginatedBoardRevisions,
   PaginatedBoards,
+  PreconditionFailedResponse,
+  PreconditionRequiredResponse,
   ReplaceBoardDocumentRequest,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
-  UpdateBoardMemberRequest,
+  UpdateBoardAccessRequest,
   UpdateBoardRequest,
 } from '../model'
 
@@ -75,7 +70,7 @@ export const getListBoardsUrl = (workspaceId: string, params?: ListBoardsParams)
 }
 
 /**
- * Lists non-archived boards the caller holds an explicit board role on (owner, editor, or viewer). Each card carries metadata plus the stored preview scene projection (content_version, preview_scene) without a document fetch. Workspace membership alone never grants board access: boards without a grant stay invisible and are excluded, never 403. Hidden workspaces converge to 404 workspace_not_found.
+ * Lists non-archived boards visible to the caller under the unified board policy: the current-member Creator and explicitly selected current Workspace members at the common Viewer/Editor role. Each card carries metadata plus the stored preview scene projection (content_version, preview_scene) without a document fetch, plus the caller relationship and capabilities — never the full ACL. Boards without an effective role stay invisible and are excluded, never 403. Hidden workspaces converge to 404 workspace_not_found.
  * @summary List accessible boards of a workspace with cursor pagination
  */
 export const listBoards = async (
@@ -157,7 +152,7 @@ export const getCreateBoardUrl = (workspaceId: string) => {
 }
 
 /**
- * Creates a board at revision 1 with the empty document snapshot; the creator is the implicit owner. Requires the Idempotency-Key header (scope board:create): missing keys render 400 idempotency_key_required, key reuse with a different request renders 409 board_idempotency_conflict, same key+hash replays the first result. Unknown body fields are rejected with 400; blank or overlong names render 422 validation_failed.
+ * Creates a board at revision 1 with the empty document snapshot; the creator is the implicit owner. The server fixes workspace_access to none: creation requests cannot widen access. Requires the Idempotency-Key header (scope board:create): missing keys render 400 idempotency_key_required, key reuse with a different request renders 409 board_idempotency_conflict, same key+hash replays the first result. Unknown body fields are rejected with 400; blank or overlong names render 422 validation_failed.
  * @summary Create a board (workspace members only)
  */
 export const createBoard = async (
@@ -275,123 +270,12 @@ export const useCreateBoard = <
 > => {
   return useMutation(getCreateBoardMutationOptions(options), queryClient)
 }
-export const getJoinBoardByTokenUrl = (workspaceId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/join`
-}
-
-/**
- * The bearer is the capability: the caller needs no prior workspace membership or board grant, and a successful join grants workspace membership (member) alongside the board grant. Requires the Idempotency-Key header. Every join failure (unknown, revoked, or foreign-workspace bearer) converges to 404 board_share_token_not_found so existence is never leaked; only malformed input renders 400.
- * @summary Join a board with a share bearer
- */
-export const joinBoardByToken = async (
-  workspaceId: string,
-  joinBoardRequest: JoinBoardRequest,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<BoardEnvelope> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
-  return publicMutator<BoardEnvelope>(getJoinBoardByTokenUrl(workspaceId), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(joinBoardRequest),
-  })
-}
-
-export const getJoinBoardByTokenMutationKey = () => ['joinBoardByToken'] as const
-
-export const getJoinBoardByTokenMutationOptions = <
-  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof joinBoardByToken>>,
-    TError,
-    JoinBoardByTokenMutationVariables,
-    TContext
-  >
-  request?: SecondParameter<typeof publicMutator>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof joinBoardByToken>>,
-  TError,
-  JoinBoardByTokenMutationVariables,
-  TContext
-> => {
-  const mutationKey = getJoinBoardByTokenMutationKey()
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof joinBoardByToken>>,
-    JoinBoardByTokenMutationVariables
-  > = (props) => {
-    const { workspaceId, data } = props ?? {}
-
-    return joinBoardByToken(workspaceId, data, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type JoinBoardByTokenMutationResult = NonNullable<
-  Awaited<ReturnType<typeof joinBoardByToken>>
->
-export type JoinBoardByTokenMutationBody = JoinBoardRequest
-export type JoinBoardByTokenMutationError =
-  BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse
-export type JoinBoardByTokenMutationVariables = { workspaceId: string; data: JoinBoardRequest }
-
-/**
- * @summary Join a board with a share bearer
- */
-export const useJoinBoardByToken = <
-  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof joinBoardByToken>>,
-      TError,
-      JoinBoardByTokenMutationVariables,
-      TContext
-    >
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof joinBoardByToken>>,
-  TError,
-  JoinBoardByTokenMutationVariables,
-  TContext
-> => {
-  return useMutation(getJoinBoardByTokenMutationOptions(options), queryClient)
-}
 export const getGetBoardUrl = (workspaceId: string, boardId: string) => {
   return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}`
 }
 
 /**
- * Malformed ids, unknown boards, and callers holding no board role converge to 404 board_not_found. The revision counter is returned as the ETag response header.
+ * Malformed ids, unknown boards, and callers holding no effective board role converge to 404 board_not_found. The revision counter is returned as the ETag response header. The payload carries the creator identity, common sharing role, access version, derived posture, caller relationship, and capabilities.
  * @summary Get a board (any board role)
  */
 export const getBoard = async (
@@ -479,7 +363,7 @@ export const getUpdateBoardUrl = (workspaceId: string, boardId: string) => {
 }
 
 /**
- * Viewers render 403 board_forbidden. Writes against an archived board render 409 board_archived. Blank or overlong names render 422 validation_failed. No Idempotency-Key is required.
+ * Rename-only: access changes never ride this route (workspace sharing is replaced atomically through PUT access). Viewers render 403 board_forbidden. Writes against an archived board render 409 board_archived. Blank or overlong names render 422 validation_failed. No Idempotency-Key is required.
  * @summary Rename a board (owner/editor only)
  */
 export const updateBoard = async (
@@ -1252,49 +1136,49 @@ export function useGetBoardRevision<
   return query
 }
 
-export const getListBoardMembersUrl = (workspaceId: string, boardId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}/members`
+export const getGetBoardAccessUrl = (workspaceId: string, boardId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}/access`
 }
 
 /**
- * The implicit owner row comes first, followed by explicit grants ordered by user. Bearer secrets never appear here.
- * @summary List board members (any board role)
+ * Returns the common sharing role, selected member identities, monotonic access version, and actual Private/Workspace posture. The version is returned as the ETag response header in access-<version> form (disjoint from the document revision ETag namespace). Management capability is required; every other caller already sees the version fact on board payloads.
+ * @summary Read the board access fact (owner only)
  */
-export const listBoardMembers = async (
+export const getBoardAccess = async (
   workspaceId: string,
   boardId: string,
   options?: Parameters<typeof publicMutator>[1],
-): Promise<BoardMemberList> => {
-  return publicMutator<BoardMemberList>(getListBoardMembersUrl(workspaceId, boardId), {
+): Promise<BoardAccessEnvelope> => {
+  return publicMutator<BoardAccessEnvelope>(getGetBoardAccessUrl(workspaceId, boardId), {
     ...options,
     method: 'GET',
   })
 }
 
-export const getListBoardMembersQueryKey = (
+export const getGetBoardAccessQueryKey = (
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
 ) => {
-  return ['workspaces', workspaceId, 'boards', boardId, 'members'] as const
+  return ['workspaces', workspaceId, 'boards', boardId, 'access'] as const
 }
 
-export const getListBoardMembersQueryOptions = <
-  TData = Awaited<ReturnType<typeof listBoardMembers>>,
-  TError = UnauthorizedResponse | NotFoundResponse,
+export const getGetBoardAccessQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBoardAccess>>,
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoardMembers>>, TError, TData>>
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoardAccess>>, TError, TData>>
     request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getListBoardMembersQueryKey(workspaceId, boardId)
+  const queryKey = getGetBoardAccessQueryKey(workspaceId, boardId)
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listBoardMembers>>> = ({ signal }) =>
-    listBoardMembers(toValue(workspaceId), toValue(boardId), { signal, ...requestOptions })
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getBoardAccess>>> = ({ signal }) =>
+    getBoardAccess(toValue(workspaceId), toValue(boardId), { signal, ...requestOptions })
 
   return {
     queryKey,
@@ -1307,29 +1191,29 @@ export const getListBoardMembersQueryOptions = <
         toValue(boardId) !== undefined,
     ),
     ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof listBoardMembers>>, TError, TData>
+  } as UseQueryOptions<Awaited<ReturnType<typeof getBoardAccess>>, TError, TData>
 }
 
-export type ListBoardMembersQueryResult = NonNullable<Awaited<ReturnType<typeof listBoardMembers>>>
-export type ListBoardMembersQueryError = UnauthorizedResponse | NotFoundResponse
+export type GetBoardAccessQueryResult = NonNullable<Awaited<ReturnType<typeof getBoardAccess>>>
+export type GetBoardAccessQueryError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse
 
 /**
- * @summary List board members (any board role)
+ * @summary Read the board access fact (owner only)
  */
 
-export function useListBoardMembers<
-  TData = Awaited<ReturnType<typeof listBoardMembers>>,
-  TError = UnauthorizedResponse | NotFoundResponse,
+export function useGetBoardAccess<
+  TData = Awaited<ReturnType<typeof getBoardAccess>>,
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoardMembers>>, TError, TData>>
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoardAccess>>, TError, TData>>
     request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListBoardMembersQueryOptions(workspaceId, boardId, options)
+  const queryOptions = getGetBoardAccessQueryOptions(workspaceId, boardId, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -1340,20 +1224,20 @@ export function useListBoardMembers<
   return query
 }
 
-export const getAddBoardMemberUrl = (workspaceId: string, boardId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}/members`
+export const getUpdateBoardAccessUrl = (workspaceId: string, boardId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}/access`
 }
 
 /**
- * Requires the Idempotency-Key header. Re-adding an existing member keeps the current role. Inviting the implicit owner renders 400 bad_request; unknown users render 404 board_member_not_found; illegal roles render 422 validation_failed.
- * @summary Grant a board role (owner only)
+ * Replaces workspace_access and the complete member_user_ids set atomically; none clears selections. Requires both the Idempotency-Key header and the If-Match precondition carrying the expected access version (the access-<version> ETag value from the last access read). Missing preconditions render 428 board_precondition_required; unparsable values render 400; stale versions render 412 board_access_conflict; archived boards render 409 board_archived. No-op replays keep the version; real changes bump it without touching the document revision, content_version, or Preview Scene. Same key+hash replays the first result, a different request renders 409 board_idempotency_conflict.
+ * @summary Replace the complete sharing configuration (Creator only)
  */
-export const addBoardMember = async (
+export const updateBoardAccess = async (
   workspaceId: string,
   boardId: string,
-  addBoardMemberRequest: AddBoardMemberRequest,
+  updateBoardAccessRequest: UpdateBoardAccessRequest,
   options?: Parameters<typeof publicMutator>[1],
-): Promise<BoardMemberEnvelope> => {
+): Promise<BoardAccessEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -1373,40 +1257,42 @@ export const addBoardMember = async (
     }
     return headers
   }
-  return publicMutator<BoardMemberEnvelope>(getAddBoardMemberUrl(workspaceId, boardId), {
+  return publicMutator<BoardAccessEnvelope>(getUpdateBoardAccessUrl(workspaceId, boardId), {
     ...options,
-    method: 'POST',
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(addBoardMemberRequest),
+    body: JSON.stringify(updateBoardAccessRequest),
   })
 }
 
-export const getAddBoardMemberMutationKey = () => ['addBoardMember'] as const
+export const getUpdateBoardAccessMutationKey = () => ['updateBoardAccess'] as const
 
-export const getAddBoardMemberMutationOptions = <
+export const getUpdateBoardAccessMutationOptions = <
   TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse,
+    | PreconditionFailedResponse
+    | UnprocessableEntityResponse
+    | PreconditionRequiredResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof addBoardMember>>,
+    Awaited<ReturnType<typeof updateBoardAccess>>,
     TError,
-    AddBoardMemberMutationVariables,
+    UpdateBoardAccessMutationVariables,
     TContext
   >
   request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof addBoardMember>>,
+  Awaited<ReturnType<typeof updateBoardAccess>>,
   TError,
-  AddBoardMemberMutationVariables,
+  UpdateBoardAccessMutationVariables,
   TContext
 > => {
-  const mutationKey = getAddBoardMemberMutationKey()
+  const mutationKey = getUpdateBoardAccessMutationKey()
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -1414,634 +1300,66 @@ export const getAddBoardMemberMutationOptions = <
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof addBoardMember>>,
-    AddBoardMemberMutationVariables
+    Awaited<ReturnType<typeof updateBoardAccess>>,
+    UpdateBoardAccessMutationVariables
   > = (props) => {
     const { workspaceId, boardId, data } = props ?? {}
 
-    return addBoardMember(workspaceId, boardId, data, requestOptions)
+    return updateBoardAccess(workspaceId, boardId, data, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type AddBoardMemberMutationResult = NonNullable<Awaited<ReturnType<typeof addBoardMember>>>
-export type AddBoardMemberMutationBody = AddBoardMemberRequest
-export type AddBoardMemberMutationError =
+export type UpdateBoardAccessMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateBoardAccess>>
+>
+export type UpdateBoardAccessMutationBody = UpdateBoardAccessRequest
+export type UpdateBoardAccessMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | ConflictResponse
+  | PreconditionFailedResponse
   | UnprocessableEntityResponse
-export type AddBoardMemberMutationVariables = {
+  | PreconditionRequiredResponse
+export type UpdateBoardAccessMutationVariables = {
   workspaceId: string
   boardId: string
-  data: AddBoardMemberRequest
+  data: UpdateBoardAccessRequest
 }
 
 /**
- * @summary Grant a board role (owner only)
+ * @summary Replace the complete sharing configuration (Creator only)
  */
-export const useAddBoardMember = <
+export const useUpdateBoardAccess = <
   TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse,
+    | PreconditionFailedResponse
+    | UnprocessableEntityResponse
+    | PreconditionRequiredResponse,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof addBoardMember>>,
+      Awaited<ReturnType<typeof updateBoardAccess>>,
       TError,
-      AddBoardMemberMutationVariables,
+      UpdateBoardAccessMutationVariables,
       TContext
     >
     request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof addBoardMember>>,
+  Awaited<ReturnType<typeof updateBoardAccess>>,
   TError,
-  AddBoardMemberMutationVariables,
+  UpdateBoardAccessMutationVariables,
   TContext
 > => {
-  return useMutation(getAddBoardMemberMutationOptions(options), queryClient)
-}
-export const getUpdateBoardMemberUrl = (workspaceId: string, boardId: string, memberId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}/members/${encodeURIComponent(String(memberId))}`
-}
-
-/**
- * Demoting the last owner renders 403 membership_transition_forbidden. Unknown or malformed member ids converge to 404 board_member_not_found. No Idempotency-Key is required.
- * @summary Change a board member role (owner only)
- */
-export const updateBoardMember = async (
-  workspaceId: string,
-  boardId: string,
-  memberId: string,
-  updateBoardMemberRequest: UpdateBoardMemberRequest,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<BoardMemberEnvelope> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
-  return publicMutator<BoardMemberEnvelope>(
-    getUpdateBoardMemberUrl(workspaceId, boardId, memberId),
-    {
-      ...options,
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-      body: JSON.stringify(updateBoardMemberRequest),
-    },
-  )
-}
-
-export const getUpdateBoardMemberMutationKey = () => ['updateBoardMember'] as const
-
-export const getUpdateBoardMemberMutationOptions = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ForbiddenResponse
-    | NotFoundResponse
-    | UnprocessableEntityResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateBoardMember>>,
-    TError,
-    UpdateBoardMemberMutationVariables,
-    TContext
-  >
-  request?: SecondParameter<typeof publicMutator>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateBoardMember>>,
-  TError,
-  UpdateBoardMemberMutationVariables,
-  TContext
-> => {
-  const mutationKey = getUpdateBoardMemberMutationKey()
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateBoardMember>>,
-    UpdateBoardMemberMutationVariables
-  > = (props) => {
-    const { workspaceId, boardId, memberId, data } = props ?? {}
-
-    return updateBoardMember(workspaceId, boardId, memberId, data, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type UpdateBoardMemberMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateBoardMember>>
->
-export type UpdateBoardMemberMutationBody = UpdateBoardMemberRequest
-export type UpdateBoardMemberMutationError =
-  | BadRequestResponse
-  | UnauthorizedResponse
-  | ForbiddenResponse
-  | NotFoundResponse
-  | UnprocessableEntityResponse
-export type UpdateBoardMemberMutationVariables = {
-  workspaceId: string
-  boardId: string
-  memberId: string
-  data: UpdateBoardMemberRequest
-}
-
-/**
- * @summary Change a board member role (owner only)
- */
-export const useUpdateBoardMember = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ForbiddenResponse
-    | NotFoundResponse
-    | UnprocessableEntityResponse,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof updateBoardMember>>,
-      TError,
-      UpdateBoardMemberMutationVariables,
-      TContext
-    >
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof updateBoardMember>>,
-  TError,
-  UpdateBoardMemberMutationVariables,
-  TContext
-> => {
-  return useMutation(getUpdateBoardMemberMutationOptions(options), queryClient)
-}
-export const getRemoveBoardMemberUrl = (workspaceId: string, boardId: string, memberId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}/members/${encodeURIComponent(String(memberId))}`
-}
-
-/**
- * Owners may remove anyone; any member may remove themselves (self-leave). Removing the last owner renders 403 membership_transition_forbidden; removing the implicit owner row renders 400. Requires the Idempotency-Key header.
- * @summary Remove a board member (owner manages the roster; anyone may leave)
- */
-export const removeBoardMember = async (
-  workspaceId: string,
-  boardId: string,
-  memberId: string,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<DeletedEnvelope> => {
-  return publicMutator<DeletedEnvelope>(getRemoveBoardMemberUrl(workspaceId, boardId, memberId), {
-    ...options,
-    method: 'DELETE',
-  })
-}
-
-export const getRemoveBoardMemberMutationKey = () => ['removeBoardMember'] as const
-
-export const getRemoveBoardMemberMutationOptions = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ForbiddenResponse
-    | NotFoundResponse
-    | ConflictResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof removeBoardMember>>,
-    TError,
-    RemoveBoardMemberMutationVariables,
-    TContext
-  >
-  request?: SecondParameter<typeof publicMutator>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof removeBoardMember>>,
-  TError,
-  RemoveBoardMemberMutationVariables,
-  TContext
-> => {
-  const mutationKey = getRemoveBoardMemberMutationKey()
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof removeBoardMember>>,
-    RemoveBoardMemberMutationVariables
-  > = (props) => {
-    const { workspaceId, boardId, memberId } = props ?? {}
-
-    return removeBoardMember(workspaceId, boardId, memberId, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type RemoveBoardMemberMutationResult = NonNullable<
-  Awaited<ReturnType<typeof removeBoardMember>>
->
-
-export type RemoveBoardMemberMutationError =
-  | BadRequestResponse
-  | UnauthorizedResponse
-  | ForbiddenResponse
-  | NotFoundResponse
-  | ConflictResponse
-export type RemoveBoardMemberMutationVariables = {
-  workspaceId: string
-  boardId: string
-  memberId: string
-}
-
-/**
- * @summary Remove a board member (owner manages the roster; anyone may leave)
- */
-export const useRemoveBoardMember = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ForbiddenResponse
-    | NotFoundResponse
-    | ConflictResponse,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof removeBoardMember>>,
-      TError,
-      RemoveBoardMemberMutationVariables,
-      TContext
-    >
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof removeBoardMember>>,
-  TError,
-  RemoveBoardMemberMutationVariables,
-  TContext
-> => {
-  return useMutation(getRemoveBoardMemberMutationOptions(options), queryClient)
-}
-export const getListShareTokensUrl = (workspaceId: string, boardId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}/shares`
-}
-
-/**
- * List entries carry the list-safe token_prefix only; the bearer plaintext is shown once at creation (and on idempotent replay) and never here.
- * @summary List share tokens without bearers (owner only)
- */
-export const listShareTokens = async (
-  workspaceId: string,
-  boardId: string,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<BoardShareTokenList> => {
-  return publicMutator<BoardShareTokenList>(getListShareTokensUrl(workspaceId, boardId), {
-    ...options,
-    method: 'GET',
-  })
-}
-
-export const getListShareTokensQueryKey = (
-  workspaceId: MaybeRefOrGetter<string>,
-  boardId: MaybeRefOrGetter<string>,
-) => {
-  return ['workspaces', workspaceId, 'boards', boardId, 'shares'] as const
-}
-
-export const getListShareTokensQueryOptions = <
-  TData = Awaited<ReturnType<typeof listShareTokens>>,
-  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
->(
-  workspaceId: MaybeRefOrGetter<string>,
-  boardId: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listShareTokens>>, TError, TData>>
-    request?: SecondParameter<typeof publicMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getListShareTokensQueryKey(workspaceId, boardId)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listShareTokens>>> = ({ signal }) =>
-    listShareTokens(toValue(workspaceId), toValue(boardId), { signal, ...requestOptions })
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(
-      () =>
-        toValue(workspaceId) !== null &&
-        toValue(workspaceId) !== undefined &&
-        toValue(boardId) !== null &&
-        toValue(boardId) !== undefined,
-    ),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof listShareTokens>>, TError, TData>
-}
-
-export type ListShareTokensQueryResult = NonNullable<Awaited<ReturnType<typeof listShareTokens>>>
-export type ListShareTokensQueryError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse
-
-/**
- * @summary List share tokens without bearers (owner only)
- */
-
-export function useListShareTokens<
-  TData = Awaited<ReturnType<typeof listShareTokens>>,
-  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
->(
-  workspaceId: MaybeRefOrGetter<string>,
-  boardId: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listShareTokens>>, TError, TData>>
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListShareTokensQueryOptions(workspaceId, boardId, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getCreateShareTokenUrl = (workspaceId: string, boardId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}/shares`
-}
-
-/**
- * Requires the Idempotency-Key header; same key+hash replays the same bearer, a different request renders 409 board_idempotency_conflict. Share roles are editor or viewer only (anything else renders 422 validation_failed). The bearer `token` is returned once and must be stored by the caller.
- * @summary Create a share bearer (owner only)
- */
-export const createShareToken = async (
-  workspaceId: string,
-  boardId: string,
-  createShareTokenRequest: CreateShareTokenRequest,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<BoardShareTokenEnvelope> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
-  return publicMutator<BoardShareTokenEnvelope>(getCreateShareTokenUrl(workspaceId, boardId), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(createShareTokenRequest),
-  })
-}
-
-export const getCreateShareTokenMutationKey = () => ['createShareToken'] as const
-
-export const getCreateShareTokenMutationOptions = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ForbiddenResponse
-    | NotFoundResponse
-    | ConflictResponse
-    | UnprocessableEntityResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createShareToken>>,
-    TError,
-    CreateShareTokenMutationVariables,
-    TContext
-  >
-  request?: SecondParameter<typeof publicMutator>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createShareToken>>,
-  TError,
-  CreateShareTokenMutationVariables,
-  TContext
-> => {
-  const mutationKey = getCreateShareTokenMutationKey()
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createShareToken>>,
-    CreateShareTokenMutationVariables
-  > = (props) => {
-    const { workspaceId, boardId, data } = props ?? {}
-
-    return createShareToken(workspaceId, boardId, data, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type CreateShareTokenMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createShareToken>>
->
-export type CreateShareTokenMutationBody = CreateShareTokenRequest
-export type CreateShareTokenMutationError =
-  | BadRequestResponse
-  | UnauthorizedResponse
-  | ForbiddenResponse
-  | NotFoundResponse
-  | ConflictResponse
-  | UnprocessableEntityResponse
-export type CreateShareTokenMutationVariables = {
-  workspaceId: string
-  boardId: string
-  data: CreateShareTokenRequest
-}
-
-/**
- * @summary Create a share bearer (owner only)
- */
-export const useCreateShareToken = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ForbiddenResponse
-    | NotFoundResponse
-    | ConflictResponse
-    | UnprocessableEntityResponse,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof createShareToken>>,
-      TError,
-      CreateShareTokenMutationVariables,
-      TContext
-    >
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof createShareToken>>,
-  TError,
-  CreateShareTokenMutationVariables,
-  TContext
-> => {
-  return useMutation(getCreateShareTokenMutationOptions(options), queryClient)
-}
-export const getRevokeShareTokenUrl = (workspaceId: string, boardId: string, tokenId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}/shares/${encodeURIComponent(String(tokenId))}`
-}
-
-/**
- * Requires the Idempotency-Key header. Revocation is idempotent: revoking twice succeeds. Unknown token ids converge to 404 board_share_token_not_found. Joins against the bearer converge to the same 404 afterwards.
- * @summary Revoke a share token (owner only)
- */
-export const revokeShareToken = async (
-  workspaceId: string,
-  boardId: string,
-  tokenId: string,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<DeletedEnvelope> => {
-  return publicMutator<DeletedEnvelope>(getRevokeShareTokenUrl(workspaceId, boardId, tokenId), {
-    ...options,
-    method: 'DELETE',
-  })
-}
-
-export const getRevokeShareTokenMutationKey = () => ['revokeShareToken'] as const
-
-export const getRevokeShareTokenMutationOptions = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ForbiddenResponse
-    | NotFoundResponse
-    | ConflictResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof revokeShareToken>>,
-    TError,
-    RevokeShareTokenMutationVariables,
-    TContext
-  >
-  request?: SecondParameter<typeof publicMutator>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof revokeShareToken>>,
-  TError,
-  RevokeShareTokenMutationVariables,
-  TContext
-> => {
-  const mutationKey = getRevokeShareTokenMutationKey()
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof revokeShareToken>>,
-    RevokeShareTokenMutationVariables
-  > = (props) => {
-    const { workspaceId, boardId, tokenId } = props ?? {}
-
-    return revokeShareToken(workspaceId, boardId, tokenId, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type RevokeShareTokenMutationResult = NonNullable<
-  Awaited<ReturnType<typeof revokeShareToken>>
->
-
-export type RevokeShareTokenMutationError =
-  | BadRequestResponse
-  | UnauthorizedResponse
-  | ForbiddenResponse
-  | NotFoundResponse
-  | ConflictResponse
-export type RevokeShareTokenMutationVariables = {
-  workspaceId: string
-  boardId: string
-  tokenId: string
-}
-
-/**
- * @summary Revoke a share token (owner only)
- */
-export const useRevokeShareToken = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ForbiddenResponse
-    | NotFoundResponse
-    | ConflictResponse,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof revokeShareToken>>,
-      TError,
-      RevokeShareTokenMutationVariables,
-      TContext
-    >
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof revokeShareToken>>,
-  TError,
-  RevokeShareTokenMutationVariables,
-  TContext
-> => {
-  return useMutation(getRevokeShareTokenMutationOptions(options), queryClient)
+  return useMutation(getUpdateBoardAccessMutationOptions(options), queryClient)
 }

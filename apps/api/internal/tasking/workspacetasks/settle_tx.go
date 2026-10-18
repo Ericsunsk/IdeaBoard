@@ -284,6 +284,13 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 		// task.created for this exact task.
 		return replayed, true, nil
 	}
+	if s.acceptance == nil {
+		return nil, true, ErrSettlementUnavailable
+	}
+	binding, err := s.acceptance.AuthorizeSubmission(ctx, tx, input)
+	if err != nil {
+		return nil, true, err
+	}
 	// Resolve inside the settlement transaction before Quote/Hold so
 	// an empty pool fails before any ledger, task, or queue write (the
 	// rollback below then removes nothing because nothing was written).
@@ -317,13 +324,7 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	} else {
 		snapshot.SettlementState = "free"
 	}
-	task := &WorkspaceTask{
-		ID: taskID, WorkspaceID: strings.TrimSpace(input.WorkspaceID), OwnerUserID: input.OwnerUserID,
-		Service: kind, MediaAssetIDs: append([]string(nil), input.MediaAssetIDs...),
-		Params: cloneParams(input.Params), CanonicalParams: input.CanonicalParams,
-		Status:     StatusPending,
-		RetryCount: 0, ExecutionToken: token, BillingSnapshot: snapshot,
-	}
+	task := pendingTaskWithBinding(input, kind, taskID, token, binding, snapshot)
 	created, err := txStore.CreateTaskInTx(ctx, tx, task)
 	if err != nil {
 		return nil, true, err

@@ -102,6 +102,16 @@
       </button>
     </div>
     <div
+      v-if="board.isReadOnly && !board.archived.isArchived"
+      class="canvas-chrome-catalog-recovery"
+      aria-live="polite"
+      role="status"
+    >
+      <span class="canvas-chrome-catalog-recovery-label">{{
+        t('canvas.chrome.boardReadOnlyLabel')
+      }}</span>
+    </div>
+    <div
       v-if="board.catalogRecovery.status !== 'idle'"
       class="canvas-chrome-catalog-recovery"
       aria-live="polite"

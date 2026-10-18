@@ -59,7 +59,11 @@ type UseFlowImageUploadActionsOptions = {
   updateSnapshotNode: (nodeId: string, patcher: (prev: CanvasNodeItem) => CanvasNodeItem) => void
   getImageNodeSnapshot: (nodeId: string) => ImageNodeItem | null
   uploadApi: {
-    upload: (file: File, boardId: string) => Promise<UploadedImageData>
+    upload: (
+      file: File,
+      workspaceId: string,
+      options?: { boardId?: string | undefined },
+    ) => Promise<UploadedImageData>
   }
   onWarning: (msg: string) => void
   onNodeMutated?: (nodeId: string) => void
@@ -195,7 +199,11 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         prepared.warnings.forEach((message) => options.onWarning(message))
         const workspaceId = options.workspaceId?.().trim()
         if (!workspaceId) throw new Error(i18n.global.t('canvas.session.uploadFailed'))
-        const uploaded = await options.uploadApi.upload(prepared.uploadFile, workspaceId)
+        const uploaded = await options.uploadApi.upload(prepared.uploadFile, workspaceId, {
+          // #936: bind the upload to its board when the board has a durable
+          // identity; unsaved boards stay unbound (owner-only) server-side.
+          boardId,
+        })
         const assetId = `${uploaded.asset_id ?? ''}`.trim()
         if (!assetId) throw new Error(i18n.global.t('canvas.session.uploadMissingMediaAsset'))
         const width = Number(uploaded.width)

@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/boards"
+	boardtaskaccess "ideaboard/api/internal/boards/taskaccess"
 	librarydomain "ideaboard/api/internal/library/domain"
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	"ideaboard/api/internal/media/workspacemedia"
@@ -39,6 +41,8 @@ CREATE TABLE users (
   status SMALLINT NOT NULL DEFAULT 1,
   last_login_ip VARCHAR(45),
   last_login_country VARCHAR(2),
+  auth_sync_version BIGINT NOT NULL DEFAULT 0,
+  ban_expires_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   CONSTRAINT uq_users_public_id UNIQUE (public_id),
@@ -67,6 +71,14 @@ CREATE TABLE workspaces (
   )
 );
 
+CREATE TABLE workspace_memberships (
+ workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id),
+ user_id BIGINT NOT NULL REFERENCES users(id),
+ role TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ PRIMARY KEY(workspace_id,user_id)
+);
 CREATE TABLE upload_sessions (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
@@ -76,6 +88,7 @@ CREATE TABLE upload_sessions (
   declared_size_bytes BIGINT NOT NULL,
   declared_checksum TEXT NULL,
   storage_key TEXT NULL,
+  target_board_id BIGINT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   completed_at TIMESTAMPTZ NULL,
   expired_at TIMESTAMPTZ NULL,
@@ -239,6 +252,21 @@ CREATE TABLE task_execution_attempts (
   CONSTRAINT ck_task_execution_attempts_gateway_retry_count CHECK (gateway_retry_count >= 0)
 );
 
+CREATE TABLE media_asset_task_origins (
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  task_public_id TEXT NOT NULL,
+  output_index INT NOT NULL,
+  media_asset_id BIGINT NOT NULL REFERENCES media_assets(internal_id) ON DELETE CASCADE,
+  submitter_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  board_public_id TEXT NULL,
+  CONSTRAINT media_asset_task_origins_pkey PRIMARY KEY (workspace_id, task_public_id, output_index),
+  CONSTRAINT chk_media_asset_task_origins_task CHECK (task_public_id LIKE 'task\_%'),
+  CONSTRAINT chk_media_asset_task_origins_output_index CHECK (output_index >= 0),
+  CONSTRAINT chk_media_asset_task_origins_board CHECK (board_public_id IS NULL OR board_public_id LIKE 'board\_%')
+);
+
+CREATE INDEX idx_media_asset_task_origins_asset ON media_asset_task_origins (media_asset_id);
+
 CREATE TABLE task_outputs (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   task_id BIGINT NOT NULL REFERENCES tasks(internal_id) ON DELETE CASCADE,
@@ -325,6 +353,100 @@ CREATE UNIQUE INDEX uq_library_assets_workspace_source
 CREATE UNIQUE INDEX uq_library_assets_workspace_media
   ON library_assets (workspace_id, media_asset_id)
   WHERE media_asset_id IS NOT NULL;
+
+-- Board facts back canonical Task input and explicit publication authorization.
+CREATE TABLE boards (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  archived_at TIMESTAMPTZ NULL,
+  owner_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  workspace_access TEXT NOT NULL DEFAULT 'none',
+  access_version BIGINT NOT NULL DEFAULT 1,
+  CONSTRAINT uq_boards_public_id UNIQUE (public_id),
+  CONSTRAINT chk_boards_public_id CHECK (public_id LIKE 'board\_%'),
+  CONSTRAINT chk_boards_title CHECK (length(btrim(title)) BETWEEN 1 AND 200),
+  CONSTRAINT chk_boards_workspace_access CHECK (workspace_access IN ('none', 'viewer', 'editor')),
+  CONSTRAINT chk_boards_access_version CHECK (access_version > 0)
+);
+
+CREATE TABLE board_documents (
+  board_id BIGINT PRIMARY KEY REFERENCES boards(internal_id) ON DELETE CASCADE,
+  document_version INT NOT NULL DEFAULT 1,
+  snapshot_data JSONB NOT NULL,
+  schema_version INT NOT NULL,
+  etag TEXT NOT NULL,
+  content_version TEXT NULL,
+  preview_scene JSONB NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_board_documents_version_positive CHECK (document_version > 0),
+  CONSTRAINT chk_board_documents_schema_version_positive CHECK (schema_version > 0),
+  CONSTRAINT chk_board_documents_etag CHECK (length(etag) BETWEEN 8 AND 128),
+  CONSTRAINT chk_board_documents_content_version CHECK (content_version IS NULL OR length(content_version) BETWEEN 8 AND 128)
+);
+
+CREATE TABLE board_revisions (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  board_id BIGINT NOT NULL REFERENCES boards(internal_id) ON DELETE CASCADE,
+  revision_number INT NOT NULL,
+  author_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  parent_revision_id BIGINT NULL REFERENCES board_revisions(internal_id) ON DELETE RESTRICT,
+  revision_data JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_board_revisions_public_id UNIQUE (public_id),
+  CONSTRAINT uq_board_revisions_board_number UNIQUE (board_id, revision_number),
+  CONSTRAINT chk_board_revisions_public_id CHECK (public_id LIKE 'rev\_%'),
+  CONSTRAINT chk_board_revisions_number_positive CHECK (revision_number > 0)
+);
+
+CREATE TABLE board_memberships (
+  board_id BIGINT NOT NULL REFERENCES boards(internal_id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (board_id, user_id)
+);
+
+CREATE TABLE board_document_media_refs (
+  board_id BIGINT NOT NULL REFERENCES boards(internal_id) ON DELETE CASCADE,
+  media_asset_id BIGINT NOT NULL REFERENCES media_assets(internal_id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (board_id, media_asset_id)
+);
+CREATE TABLE board_access_event_outbox (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  event_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  board_id TEXT NOT NULL,
+  member_public_id TEXT NOT NULL,
+  access_version BIGINT NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  status_state TEXT NOT NULL DEFAULT 'pending',
+  attempts INT NOT NULL DEFAULT 0,
+  next_attempt_at TIMESTAMPTZ NOT NULL,
+  delivered_at TIMESTAMPTZ NULL,
+  last_error TEXT NOT NULL DEFAULT '',
+  CONSTRAINT uq_board_access_event_outbox_event_id UNIQUE (event_id),
+  CONSTRAINT chk_board_access_event_outbox_event_id CHECK (event_id LIKE 'evt\_%'),
+  CONSTRAINT chk_board_access_event_outbox_state CHECK (status_state IN ('pending','delivered')),
+  CONSTRAINT chk_board_access_event_outbox_attempts CHECK (attempts >= 0),
+  CONSTRAINT chk_board_access_event_outbox_workspace CHECK (workspace_id LIKE 'ws\_%'),
+  CONSTRAINT chk_board_access_event_outbox_board CHECK (board_id LIKE 'board\_%'),
+  CONSTRAINT chk_board_access_event_outbox_member CHECK (member_public_id LIKE 'usr\_%'),
+  CONSTRAINT chk_board_access_event_outbox_version CHECK (access_version > 0)
+);
+
+CREATE INDEX idx_board_access_event_outbox_pending
+  ON board_access_event_outbox (next_attempt_at, internal_id)
+  WHERE status_state = 'pending';
+CREATE INDEX idx_board_access_event_outbox_delivered
+  ON board_access_event_outbox (delivered_at)
+  WHERE status_state = 'delivered';
+
 `
 
 type workspaceIntegrationEnv struct {
@@ -400,8 +522,12 @@ func openWorkspaceIntegrationEnv(t *testing.T) *workspaceIntegrationEnv {
 	wsB := fmt.Sprintf("ws_inttest_b_%d", time.Now().UnixNano()%1000000)
 	seedWorkspace(wsA, "int-a", userA)
 	seedWorkspace(wsB, "int-b", userB)
+	if _, err := pool.Exec(ctx, `INSERT INTO workspace_memberships(workspace_id,user_id,role) SELECT internal_id,owner_user_id,'owner' FROM workspaces`); err != nil {
+		t.Fatal(err)
+	}
+	boardStore := boards.NewPostgresWorkspaceBoardStore(pool, workspacemedia.ValidateDocumentAssets)
 	return &workspaceIntegrationEnv{
-		pool: pool, lib: librarypostgres.NewService(pool),
+		pool: pool, lib: librarypostgres.NewService(pool, &workspacemedia.LibraryPublicationAuthorizer{Boards: boardStore, TaskBoards: &boardtaskaccess.Authorizer{Store: boardStore}}),
 		media: workspacemedia.NewService(pool), tasks: taskpostgres.NewStore(pool),
 		wsA: wsA, wsB: wsB, userA: userA, userB: userB,
 	}

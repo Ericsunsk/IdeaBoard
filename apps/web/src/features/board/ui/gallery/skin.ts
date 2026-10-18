@@ -11,7 +11,7 @@ export const catalogClasses = {
     'm-0 break-words text-center text-[40px] leading-[1.05] font-bold tracking-normal md:text-[62px]',
   pageSubtitle:
     'mt-4 mb-[34px] text-center text-admin-title-sm tracking-normal text-muted-foreground md:text-[19px]',
-  toolbar: 'mb-6 grid grid-cols-1 items-center gap-3.5 md:grid-cols-[auto_minmax(0,1fr)_auto]',
+  toolbar: 'mb-6 grid grid-cols-1 items-center gap-3.5 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]',
   recoveryState:
     'mb-4 flex min-h-10 items-center justify-between gap-3 rounded-panel border border-border bg-card px-3 py-2',
   recoveryText: 'min-w-0 text-admin-body font-semibold text-foreground',
@@ -33,6 +33,11 @@ export const catalogClasses = {
     'ib-user-account-menu-panel w-32 min-w-32 max-w-[8rem] rounded-panel border border-border bg-popover p-1',
   sortSelectItem:
     'control-state flex w-full cursor-pointer select-none items-center rounded-control px-2.5 py-2 text-admin-body font-semibold text-[var(--app-overlay-menu-item-color,var(--muted-foreground))] no-underline transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-[var(--app-overlay-menu-item-hover-bg,var(--accent-hover))] hover:text-[var(--app-overlay-menu-item-hover-color,var(--foreground))] focus:bg-[var(--app-overlay-menu-item-hover-bg,var(--accent-hover))] focus:text-[var(--app-overlay-menu-item-hover-color,var(--foreground))] data-[state=checked]:bg-muted data-[state=checked]:text-foreground data-[state=checked]:font-semibold',
+  rangeToggleButtonActive:
+    'border-primary bg-primary font-bold text-primary-foreground hover:bg-primary-hover hover:text-primary-foreground',
+  rangeToggleIcon: 'size-5 shrink-0',
+  accessBadge: 'mt-1 flex items-center gap-1 text-xs text-muted-foreground',
+  accessBadgeIcon: 'size-3.5 shrink-0',
   loadingState:
     'flex min-h-[244px] items-center justify-center rounded-panel border border-dashed border-border bg-muted/30',
   loadingSpinner: '!h-9 !w-9 text-primary',
@@ -58,7 +63,7 @@ export const catalogClasses = {
 } as const
 // UiDialog 以 :class/cn() 组合造型：mask 沿用 UiDialog 内置 ibDialogMaskClass。
 export const catalogDeleteDialogContentClass =
-  'overflow-hidden rounded-overlay border border-border bg-card shadow-[var(--shadow-board-dialog)]'
+  'overflow-hidden rounded-overlay border border-border bg-popover shadow-[var(--shadow-board-dialog)]'
 
 export const catalogDeleteDialogStyle = {
   width: '360px',

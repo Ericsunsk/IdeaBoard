@@ -9,10 +9,15 @@ import BoardsPage from './BoardsPage.vue'
 const { useCatalog } = vi.hoisted(() => ({ useCatalog: vi.fn() }))
 
 vi.mock('./useCatalog', () => ({ useCatalog, formatCatalogDate: vi.fn() }))
-vi.mock('../../../workspace', () => ({
-  WorkspaceHeader: { render: () => null },
-  useWorkspaceSelection: vi.fn(),
-}))
+vi.mock('../share/ShareDialog.vue', () => ({ default: { render: () => null } }))
+vi.mock('../../../workspace', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../workspace')>()
+  return {
+    ...actual,
+    WorkspaceHeader: { render: () => null },
+    useWorkspaceSelection: vi.fn(),
+  }
+})
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 const disposeCatalogs: (() => void)[] = []

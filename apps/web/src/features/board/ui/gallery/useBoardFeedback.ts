@@ -73,7 +73,7 @@ export function createBoardFeedback(appToast: BoardToast): BoardFeedback {
       appToast.success(t('workspace.feedback.renamed'))
     },
     copyFailed(result) {
-      if (result.reason === 'source-missing') {
+      if (result.reason === 'source-missing' || result.reason === 'source-unreadable') {
         appToast.error(t('workspace.feedback.copyFailed'))
         return
       }

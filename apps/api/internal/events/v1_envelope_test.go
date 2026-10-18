@@ -13,8 +13,8 @@ func testActor() V1Actor {
 
 func TestV1RegistryIsFrozen(t *testing.T) {
 	types := V1EventTypes()
-	if len(types) != 11 {
-		t.Fatalf("registry has %d types, want 11 (additive only)", len(types))
+	if len(types) != 10 {
+		t.Fatalf("registry has %d types, want 10", len(types))
 	}
 	for _, typ := range types {
 		version, ok := V1EventVersion(typ)

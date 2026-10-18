@@ -93,7 +93,7 @@ export default {
       'Error al actualizar los límites del grupo. Actualice el lienzo e inténtelo de nuevo.',
   },
   chrome: {
-    shareComingSoon: 'Compartir próximamente',
+    share: 'Compartir',
     export: 'Exportar',
     selectTool: 'Seleccionar (V)',
     handTool: 'Mano (H)',
@@ -131,6 +131,9 @@ export default {
     boardRestoredSuccess: 'Lienzo restaurado.',
     boardRestoreFailedError: 'No se pudo restaurar el lienzo. Inténtelo de nuevo más tarde.',
     boardArchivedRenameBlocked: 'Este lienzo está archivado. Restáurelo antes de renombrarlo.',
+    boardReadOnlyLabel: 'Este lienzo es de solo lectura.',
+    boardReadOnlyRenameBlocked:
+      'Solo tiene acceso de visualización a este lienzo. No se puede cambiar el nombre.',
   },
   viewport: {
     zoomIn: 'Acercar',
@@ -337,6 +340,8 @@ export default {
     saved: 'Guardado',
     saveFailed: 'Error al guardar. Inténtelo de nuevo más tarde.',
     boardArchivedSaveBlocked: 'Este lienzo está archivado. Restáurelo para seguir editando.',
+    boardAccessLost:
+      'Ya no tienes acceso a este tablero. Los cambios no guardados se han descartado.',
     downloadEmptyResponse: 'Error en la descarga: respuesta vacía.',
     downloadImageHttpFailed: 'Error en la descarga: HTTP {code}',
     downloadImageFailed: 'Error en la descarga: {reason}',

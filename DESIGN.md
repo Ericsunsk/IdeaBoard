@@ -138,6 +138,12 @@ Media context 拥有 object storage provider/profile、upload serving、upload a
 
 Library Asset 是工作区收藏引用（按 source 区分外部图片引用与受管 Media 保存，Media 尺寸由 Media 侧投射、任务来源仅作 lineage）；Media Asset 是 Workspace 内具有稳定 identity 与原图事实的受管素材；Stored Object 是存储中的图片 bytes。Library materialization 通过 Media 建立受管素材，不把收藏记录、素材 identity 和 Object Key 混为一体。Workspace Media 固定使用 `builtin-local`；Avatar 与 Branding Logo 使用 active Storage Profile。Browser 的原图与 Display Tier 经同源 API 获取，imgproxy 的签名地址仅供内部渲染请求使用。
 
+Media Asset 的读取授权以 Board 访问事实为边界（#936）：同一 Workspace 成员默认不可读他人资产；Board 仅由仍在 Workspace 的 Creator 和 Share 明确选中的成员访问，选中成员统一使用 Viewer/Editor，Access Off 原子清空选择，不存在 Workspace 全员继承授权；独立来源（资产 Owner、已发布 Workspace Library 同 workspace 行、任务输出引用、上传目标 Board、已接受文档引用的可读 Board）各自独立授权，ID/URL 不是凭据。上传在 session create 时即持久记录 Owner 与可选目标 Board（需创建者对该 Board 的写权限；未 autosave 的 Board 保持 Owner-only，不出现全员可读窗口）。Board 文档的每次接受在同一事务内同步引用关系（新增/移除），接受前服务端先逐项核对写者对每项素材的独立可读性（已链接项经本 Board 活引用复核，新项须经 Owner/Library/Task/上传目标/其他可读 Board 任一独立来源，失败整单 404 不写任何引用行）；Archive/Restore 不改关系行（授权按 live board role 重算），Board 删除经外键级联清理。List/batch/metadata/content/Derivatives 走同一判定：分页与汇总前授权，授权先于 derivative 渲染、共享缓存复用与 304，同源之外的签名 URL 不作公开入口。Media 经窄端口消费 Board 事实（`boards.RoleReader` 形态的 role 事实 + 引用列表事实，配纯 `CheckCapability/CapRead` 读 helper），不复制 role 规则、不碰 Boards 存储实现。
+
+生成素材的 `media_asset_task_origins` 保存已接受输出的 Workspace、原 Task public ID、submitter、原 Board public ID 与 output index；与输出引用在同一事务中从 Task 事实写入，可保留同一素材的多个真实来源。来源不随 Task retention 或 Board 删除消失，仅随 Media／Workspace 删除清理；Library 发布授权使用该持久来源，不将清理后的生成素材当作普通上传。
+
+Workspace webhook 没有用户身份，只支持 checkout-session 的 `billing.settled`；Task-linked settlement 与 Task、Media、Board 内容事件仅向通过实时授权的 SSE principal 投递，不接受这些类型的 webhook 订阅，已排队的受保护事件在发送前终止。
+
 上传结果、provider output 和用户素材都必须通过 Media/Storage 边界进入业务语义。不要让无关 feature 直接拼接 storage secret、bucket URL 或本地文件路径。
 
 Task input 使用不可变 `TaskInputManifest`；Browser 通过 typed、same-origin `MediaRef` 获取素材。Shipping API/Web source 不得包含 `original_image_url`，Web source/env 不得定义 `VITE_PUBLIC_ASSET_BASE_URL`，Web source 不得构造 `"/uploads/` URL，Workflow/Worker 不得直接导入 `internal/media/storage`。`scripts/ci-media-package-boundary.sh` 和 `scripts/ci-legacy-media-zero-scan.sh` 在 CI 检查这些边界；Tests 可组合 concrete adapters。
@@ -223,12 +229,12 @@ Dependency direction:
 | Context / Feature | Directory            | Business Ownership                                                                                                                       | Key Models & State Machines                                                              |
 | ----------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | Canvas Workspace  | `features/canvas`    | AI 画布交互面、节点运行时、工具链（Retouch/Inpaint/Brush/Select）、命令编排与任务生命周期                                                | Canvas Node/Edge runtime, Tool State Machine, Execution Plan, Task Runner                |
-| Board             | `features/board`     | 看板全生命周期事实源：持久化文档模型、快照 Schema、媒体引用提取、看板 CRUD 与画廊列表、协作加入、revision/乐观锁同步、持久化与预览适配器 | `BoardState`, Valibot `stateSchema`, `boardRepository`, `boardSync`, `previewSerializer` |
+| Board             | `features/board`     | 看板全生命周期事实源：持久化文档模型、快照 Schema、媒体引用提取、看板 CRUD 与画廊列表、直接授权与团队基线、revision/乐观锁同步、持久化与预览适配器 | `BoardState`, Valibot `stateSchema`, `boardRepository`, `boardSync`, `previewSerializer` |
 | Account           | `features/account`   | 用户额度（Idea/Credits）查看与刷新、Stripe 充值收银台、兑换码兑换、账单记录与用量统计明细                                                | Wallet balance, Recharge session state machine, Redemption, Usage trend                  |
 | Admin Verticals   | `features/admin`     | 管理端独立垂直子域（用户管理、积分运营、数据仪表盘、任务监控、模型管理、系统提示词、系统设置）                                           | Vertical context view models, Admin resources, Policy inspection                         |
 | Auth & Identity   | `features/auth`      | 认证与会话状态（Better Auth 集成、登录/注册弹窗与路由拦截、凭据校验、Auth Bridge）                                                       | Session state, Auth token lifecycle, Login/Register workflows                            |
 | Library           | `features/library`   | 外部灵感素材收藏、分类文件夹、媒体引用与拖拽入画布交互                                                                                   | Library item model, Folder taxonomy, cursor pagination                                   |
-| Workspace         | `features/workspace` | 工作区外壳与路由承载：应用全局外壳布局、顶栏导航、工作区路由与协作加入（保留外部 /user/* URL 契约）                                      | Shell layout state, navigation triggers, workspace routes, share-join                    |
+| Workspace         | `features/workspace` | 工作区外壳与路由承载：应用全局外壳布局、顶栏导航、工作区路由（保留外部 /user/* URL 契约）                                                     | Shell layout state, navigation triggers, workspace routes                    |
 | Search            | `features/search`    | 灵感素材搜索、Vision Search、素材引用与搜索结果持久化                                                                                    | Search query state, vision reference state                                               |
 | Legal             | `features/legal`     | 服务条款、隐私政策协议与合规展示                                                                                                         | Terms, Privacy Policy documents                                                          |
 

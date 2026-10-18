@@ -66,6 +66,7 @@ import (
 	libraryports "ideaboard/api/internal/library/ports"
 	mediadomain "ideaboard/api/internal/media/derivatives/domain"
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/gin-gonic/gin"
@@ -167,6 +168,8 @@ func (h *contractV1Handler) libraryWorkspaceContext(c *gin.Context, identityPrin
 
 func renderLibraryError(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, workspacetasks.ErrForbidden):
+		contract.RenderError(c, http.StatusForbidden, contract.CodeBoardForbidden, "Access denied")
 	case errors.Is(err, librarydomain.ErrV1FolderNotFound):
 		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, msgLibraryFolderNotFound)
 	case errors.Is(err, librarydomain.ErrV1AssetNotFound):
@@ -479,6 +482,7 @@ func (h *contractV1Handler) deleteLibraryFolder(c *gin.Context) {
 
 func (h *contractV1Handler) listLibraryAssets(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		var folderFilter *string
 		if raw := strings.TrimSpace(c.Query("folder_id")); raw != "" {
@@ -492,12 +496,15 @@ func (h *contractV1Handler) listLibraryAssets(c *gin.Context) {
 			renderLibraryError(c, err)
 			return
 		}
+		// #937: list responses redact restricted task linkage per asset.
+		workspaceRole, _ := h.libraryCallerRole(c.Request.Context(), workspace, identityPrincipal.UserID())
 		page := make([]v1LibraryAssetDTO, 0, len(all))
 		for _, asset := range all {
 			if folderFilter != nil && asset.FolderPublicID != *folderFilter {
 				continue
 			}
-			page = append(page, toLibraryAssetDTO(workspace.PublicID, asset))
+			visible := h.redactLibraryLineageForCopy(c.Request.Context(), workspace, workspaceRole, identityPrincipal.UserID(), asset)
+			page = append(page, toLibraryAssetDTO(workspace.PublicID, visible))
 		}
 		slice, meta, ok := libraryPageSlice(page, c)
 		if !ok {
@@ -594,7 +601,7 @@ func (h *contractV1Handler) saveExternalLibraryAsset(c *gin.Context, wctx v1Work
 		}
 		return &v1SavedAsset{Asset: saved, Created: created}, nil
 	})
-	h.renderSavedLibraryAsset(c, workspace, result, fnErr, ok)
+	h.renderSavedLibraryAsset(c, wctx, result, fnErr, ok)
 }
 
 func (h *contractV1Handler) saveManagedLibraryAsset(c *gin.Context, wctx v1WorkspaceCtx, body v1SaveLibraryAssetBody, folderPublicID, externalUser string, operatorUserID int64, key string) {
@@ -625,10 +632,10 @@ func (h *contractV1Handler) saveManagedLibraryAsset(c *gin.Context, wctx v1Works
 		}
 		return &v1SavedAsset{Asset: saved, Created: created}, nil
 	})
-	h.renderSavedLibraryAsset(c, workspace, result, fnErr, ok)
+	h.renderSavedLibraryAsset(c, wctx, result, fnErr, ok)
 }
 
-func (h *contractV1Handler) renderSavedLibraryAsset(c *gin.Context, workspace *tenancy.Workspace, result any, fnErr error, ok bool) {
+func (h *contractV1Handler) renderSavedLibraryAsset(c *gin.Context, wctx v1WorkspaceCtx, result any, fnErr error, ok bool) {
 	if !ok {
 		return
 	}
@@ -641,11 +648,15 @@ func (h *contractV1Handler) renderSavedLibraryAsset(c *gin.Context, workspace *t
 		renderLibraryError(c, errors.New("library: asset-save type mismatch"))
 		return
 	}
+	// #937: the save response never reverse-leaks restricted task
+	// linkage the saver may not read.
+	workspaceRole, _ := h.libraryCallerRole(c.Request.Context(), wctx.Workspace, wctx.Principal.UserID())
+	asset := h.redactLibraryLineageForCopy(c.Request.Context(), wctx.Workspace, workspaceRole, wctx.Principal.UserID(), saved.Asset)
 	if saved.Created {
-		contract.RenderCreated(c, toLibraryAssetDTO(workspace.PublicID, saved.Asset))
+		contract.RenderCreated(c, toLibraryAssetDTO(wctx.Workspace.PublicID, asset))
 		return
 	}
-	contract.RenderSuccess(c, toLibraryAssetDTO(workspace.PublicID, saved.Asset))
+	contract.RenderSuccess(c, toLibraryAssetDTO(wctx.Workspace.PublicID, asset))
 }
 
 type v1SavedAsset struct {
@@ -676,6 +687,7 @@ type v1MoveLibraryAssetBody struct {
 
 func (h *contractV1Handler) moveLibraryAsset(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		asset, ok := h.libraryAssetOr404(c, workspace)
 		if !ok {
@@ -691,7 +703,10 @@ func (h *contractV1Handler) moveLibraryAsset(c *gin.Context) {
 			renderLibraryError(c, err)
 			return
 		}
-		contract.RenderSuccess(c, toLibraryAssetDTO(workspace.PublicID, moved))
+		// #937: move responses redact restricted task linkage.
+		workspaceRole, _ := h.libraryCallerRole(c.Request.Context(), workspace, identityPrincipal.UserID())
+		visible := h.redactLibraryLineageForCopy(c.Request.Context(), workspace, workspaceRole, identityPrincipal.UserID(), moved)
+		contract.RenderSuccess(c, toLibraryAssetDTO(workspace.PublicID, visible))
 	})
 }
 
@@ -756,6 +771,7 @@ type v1ResolveLibraryResponseDTO struct {
 
 func (h *contractV1Handler) resolveLibraryAssets(c *gin.Context) {
 	withV1WorkspaceBody(h, c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx, body v1ResolveLibraryAssetsBody) {
+		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		items := make([]librarydomain.V1ResolveItem, 0, len(body.Data.Items))
 		for _, item := range body.Data.Items {
@@ -768,11 +784,14 @@ func (h *contractV1Handler) resolveLibraryAssets(c *gin.Context) {
 			renderLibraryError(c, err)
 			return
 		}
+		// #937: resolution responses redact restricted task linkage.
+		workspaceRole, _ := h.libraryCallerRole(c.Request.Context(), workspace, identityPrincipal.UserID())
 		dto := v1ResolveLibraryResponseDTO{Items: make([]v1ResolveLibraryResultDTO, 0, len(results))}
 		for _, result := range results {
 			entry := v1ResolveLibraryResultDTO{Provider: result.Provider, SourceID: result.SourceID, Status: string(result.Status)}
 			if result.Asset != nil {
-				asset := toLibraryAssetDTO(workspace.PublicID, result.Asset)
+				visible := h.redactLibraryLineageForCopy(c.Request.Context(), workspace, workspaceRole, identityPrincipal.UserID(), result.Asset)
+				asset := toLibraryAssetDTO(workspace.PublicID, visible)
 				entry.Asset = &asset
 			}
 			dto.Items = append(dto.Items, entry)

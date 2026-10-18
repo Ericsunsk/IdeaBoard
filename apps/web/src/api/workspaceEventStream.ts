@@ -1,4 +1,4 @@
-// Workspace event stream transport (issue #807, Public Data Plane).
+// Workspace event stream transport.
 //
 // Versioned envelopes over `GET /api/v1/workspaces/{workspace_id}/events`
 // (SSE), shared with signed webhooks (same envelope, delivery differs).
@@ -34,8 +34,7 @@ export const WORKSPACE_EVENT_TYPES = [
   'media.asset_ready',
   'media.asset_archived',
   'board.document_replaced',
-  'board.member_changed',
-  'board.share_revoked',
+  'board.access_changed',
   'billing.settled',
 ] as const
 

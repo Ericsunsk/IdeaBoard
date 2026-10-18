@@ -119,6 +119,7 @@
           :user-email="userEmail"
           :items="accountMenuItems"
           :support-channels="supportChannels"
+          :workspace="workspaceSwitcher.menuProps.value"
           :avatar-button-class="userAvatarButtonClass"
           :avatar-image-class="userAvatarImageClass"
           :avatar-placeholder-class="userAvatarPlaceholderClass"
@@ -148,6 +149,7 @@ import { useAdminToast } from '../shared'
 import type { AdminAnomalyItem } from '../shared'
 import { adminAnomalyPopoverClass } from '../shared'
 import { USER_BOARDS_PATH, USER_LOGIN_PATH } from '../../workspace/routePaths'
+import { useWorkspaceSwitcher } from '../../workspace'
 import UserAccountMenu from '../../account/ui/chrome/UserAccountMenu.vue'
 import type { UserAccountMenuItem } from '../../account/ui/chrome/userAccountMenu.types'
 
@@ -173,6 +175,7 @@ const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout
 const userMenuOpen = ref(false)
 const { channels: supportChannels } = useSupportChannels()
 const userAccountMenuRef = ref<InstanceType<typeof UserAccountMenu> | null>(null)
+const workspaceSwitcher = useWorkspaceSwitcher()
 
 const userEmail = computed(() => {
   return userStore.email || '--'

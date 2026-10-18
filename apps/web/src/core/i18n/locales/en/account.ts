@@ -214,16 +214,6 @@ export default {
   branding: {
     loadFailed: 'Could not load site settings.',
   },
-  shareJoin: {
-    loadingTitle: 'Joining shared board…',
-    failedTitle: 'Could not join the shared board',
-    successTitle: 'Joined the shared board',
-    loadingStatus: 'Please wait while we verify the share token and sync the board…',
-    failedStatus: 'Could not join the board. Please check whether the share link is valid.',
-    successStatus: 'Joined successfully. Redirecting…',
-    spinnerAria: 'Joining shared board',
-    backToBoards: 'Back to boards',
-  },
   errors: {
     networkRetry: 'Network error. Please try again.',
     walletLoadFailed: 'Could not load your Ideas balance.',

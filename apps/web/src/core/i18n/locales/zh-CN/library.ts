@@ -56,6 +56,7 @@ export default {
     folderDeleted: '文件夹已删除',
     assetMoved: '素材已移动',
     removedFromLibrary: '已从素材库移除',
+    publishedToWorkspace: '已发布到工作区素材库，工作区成员可见。',
   },
   errors: {
     loadFoldersFailed: '无法加载文件夹',
@@ -68,5 +69,6 @@ export default {
     deleteFolderFailed: '无法删除文件夹',
     importAssetFailed: '无法导入素材',
     lookupStatusFailed: '无法查询保存状态',
+    saveRestrictedDenied: '无权发布：受限素材仅创建者或管理员可保存到工作区。',
   },
 } as const

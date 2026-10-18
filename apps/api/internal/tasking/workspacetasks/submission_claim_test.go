@@ -170,7 +170,7 @@ func TestSubmitReplaySurvivesLostProcessCache(t *testing.T) {
 	restarted := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
 		TaskRead: env.store, TaskLifecycle: env.store, TaskBilling: env.store,
 		Quoter: env.serviceDeps.Quoter, Holder: env.holder, Queue: env.queue,
-		Resolver: allowTestPoolResolver(), SnapshotSaver: env.serviceDeps.SnapshotSaver,
+		Resolver: allowTestPoolResolver(), SnapshotSaver: env.serviceDeps.SnapshotSaver, Acceptance: env.serviceDeps.Acceptance,
 	})
 
 	second, err := restarted.Create(context.Background(), workspacetasks.CreateInput{

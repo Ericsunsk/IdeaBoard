@@ -6,7 +6,7 @@ Decision date: 2026-09-10
 
 ## Decision
 
-Frontend 按 bounded contexts 组织。`board` 拥有 persisted Board document/schema、media references、catalog CRUD、collaboration/share join、revision/sync、persistence 和 previews，是唯一 Board repository 与 sync fact source。Canvas `board-session` 通过 Board ports 编排 session，不建立第二 repository 或 sync fact source。
+Frontend 按 bounded contexts 组织。`board` 拥有 persisted Board document/schema、media references、catalog CRUD、直接授权与团队基线（Share 面板）、revision/sync、persistence 和 previews，是唯一 Board repository 与 sync fact source。Canvas `board-session` 通过 Board ports 编排 session，不建立第二 repository 或 sync fact source。
 
 `workspace` 拥有 workspace identity 与 navigation。`canvas`、`search`、`library`、`account`、`admin`、`auth` 和 `legal` 保持独立 context。Cross-context communication 通过 public barrel 或明确登记的 port；匿名 public landing 属于 Canvas presentation，public `/user/*` URLs 是稳定外部契约。
 

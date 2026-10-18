@@ -217,6 +217,84 @@ describe('AuthInternalCommands', () => {
     assert.equal(called, false)
   })
 
+  it('looks up one auth identity by canonical email with normalization', async () => {
+    const seen: string[] = []
+    const commands = createTestCommands({
+      repository: {
+        findUserByCanonicalEmail: async (email) => {
+          seen.push(email)
+          return { auth_user_id: 'auth-admin', email: 'admin@example.com' }
+        },
+      },
+    })
+
+    assert.deepEqual(await commands.lookupUserByEmail({ email: '  Admin@Example.COM ' }), {
+      ok: true,
+      data: { user: { auth_user_id: 'auth-admin', email: 'admin@example.com' } },
+    })
+    assert.deepEqual(seen, ['admin@example.com'])
+  })
+
+  it('rejects invalid email lookups before calling dependencies', async () => {
+    let called = false
+    const commands = createTestCommands({
+      repository: {
+        findUserByCanonicalEmail: async () => {
+          called = true
+          return null
+        },
+      },
+    })
+
+    for (const email of ['', '   ', 'not-an-email', 'a@b', 'a@.com', 'a@com.', 'x'.repeat(321)]) {
+      assert.deepEqual(await commands.lookupUserByEmail({ email }), {
+        ok: false,
+        kind: 'invalid_input',
+        message: 'a valid email is required',
+      })
+    }
+    assert.equal(called, false)
+  })
+
+  it('reports unknown emails as not found without fabrication', async () => {
+    const commands = createTestCommands({
+      repository: {
+        findUserByCanonicalEmail: async () => null,
+      },
+    })
+
+    assert.deepEqual(await commands.lookupUserByEmail({ email: 'ghost@example.com' }), {
+      ok: false,
+      kind: 'not_found',
+      message: 'auth user not found',
+    })
+  })
+
+  it('classifies email lookup dependency failures without leaking state', async () => {
+    const commands = createTestCommands({
+      repository: {
+        findUserByCanonicalEmail: async () => {
+          throw new Error('db down')
+        },
+      },
+    })
+
+    assert.deepEqual(await commands.lookupUserByEmail({ email: 'admin@example.com' }), {
+      ok: false,
+      kind: 'repository_failure',
+      message: 'failed to look up auth user by email',
+    })
+
+    const unconfigured = createTestCommands({
+      repository: { findUserByCanonicalEmail: undefined },
+    })
+    assert.deepEqual(await unconfigured.lookupUserByEmail({ email: 'admin@example.com' }), {
+      ok: false,
+      kind: 'repository_failure',
+      message: 'auth user email lookup is not configured',
+    })
+  })
+
   it('classifies dependency throws consistently as repository failures', async (t) => {
     t.mock.method(console, 'error', () => {})
     const throwingCommands = createTestCommands({

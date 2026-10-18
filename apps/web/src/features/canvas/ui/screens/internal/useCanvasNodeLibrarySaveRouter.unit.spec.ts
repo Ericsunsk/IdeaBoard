@@ -14,6 +14,7 @@ import {
   useCanvasNodeLibrarySaveRouter,
   type CanvasNodeLibrarySaveRouterOptions,
 } from './useCanvasNodeLibrarySaveRouter'
+import { i18n } from '../../../../../core/i18n'
 
 function imageNode(id: string, x: number, y: number): Node {
   return {
@@ -115,7 +116,11 @@ describe('useCanvasNodeLibrarySaveRouter', () => {
           file: expect.any(Function),
         },
       ],
-      { folderId: 'lfolder_folder0007', galleryEffect: 'reload-current' },
+      {
+        folderId: 'lfolder_folder0007',
+        galleryEffect: 'reload-current',
+        successMessage: i18n.global.t('library.toasts.publishedToWorkspace'),
+      },
     )
   })
 
@@ -136,7 +141,11 @@ describe('useCanvasNodeLibrarySaveRouter', () => {
 
     expect(saveModule.submit).toHaveBeenCalledExactlyOnceWith(
       [{ source: 'media', mediaAssetId: 'asset_managed001' }],
-      { folderId: 'lfolder_folder0007', galleryEffect: 'reload-current' },
+      {
+        folderId: 'lfolder_folder0007',
+        galleryEffect: 'reload-current',
+        successMessage: i18n.global.t('library.toasts.publishedToWorkspace'),
+      },
     )
     expect(notifyError).not.toHaveBeenCalled()
   })

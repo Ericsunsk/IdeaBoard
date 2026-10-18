@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { i18n } from '../../../../../core/i18n'
+import type { CanvasTaskRequestData } from '../../../core/execution/canvasTaskRequest'
 import type { TaskImageResult } from '../../../../../core/query/taskResult'
 import type { CanvasGraphStore } from '../../../core/graph'
 import type { CanvasRendererMetricsPort } from '../../../session/flow-adapter'
@@ -59,6 +60,23 @@ export type PendingWorkflowAssembly = {
 }
 
 /**
+ * Board attribution (#937): canvas submits ride the Board under
+ * execution. The Board attachment is ground truth and wins over any
+ * request-carried value; absent attachments stay absent (the server
+ * governs unbound tasks as submitter-only, never workspace-visible).
+ * Malformed attachment ids fail closed downstream in the workspace
+ * adapter mapping, never silently.
+ */
+function withExecutionBoardId(
+  executionCore: PendingImageExecutionCore,
+  request: CanvasTaskRequestData,
+): CanvasTaskRequestData {
+  const boardId = executionCore.currentAttachment()?.boardId?.trim()
+  if (!boardId) return request
+  return { ...request, board_id: boardId }
+}
+
+/**
  * Shared assembly for the pending-result execution path: result reservation,
  * task transport, and the workflow runner. Both the workspace runtime and the
  * image workflow entrypoint build the same seam; diverging copies caused
@@ -106,7 +124,10 @@ export function assemblePendingImageWorkflow(
           ),
         submit: (request, clientActionId, fallbackMessage) =>
           taskAdapter.submitTaskRequest(
-            withTaskClientActionId(request, clientActionId),
+            withTaskClientActionId(
+              withExecutionBoardId(options.executionCore, request),
+              clientActionId,
+            ),
             fallbackMessage,
           ),
         resolve: async (taskId, resultIndex, fallbackRatio) =>

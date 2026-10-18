@@ -8,13 +8,8 @@ import (
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
 
-// TaskAssetAdapter adapts the workspace media store to the
-// workspacetasks AssetReader seam (task input verification: invisible
-// assets fail closed as media-not-found, archived as media-archived,
-// non-ready as media-not-ready). It reports through the
-// workspacetasks sentinels so settlement maps them without knowing
-// Media internals. Wire it as workspacetasks.ServiceDeps.Assets once
-// the task surface consumes media inputs (#821).
+// TaskAssetAdapter supplies readiness facts for worker execution of accepted
+// immutable inputs. Submission authorization belongs to TaskSubmissionAuthorizer.
 type TaskAssetAdapter struct {
 	Store AssetStore
 }

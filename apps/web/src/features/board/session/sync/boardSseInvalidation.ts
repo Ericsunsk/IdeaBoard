@@ -11,13 +11,10 @@
 //   dropped (reorder/duplicate protection). Draft-dirty boards are marked
 //   stale without refetching, so the draft under the cursor is never
 //   overwritten.
-// - `board.member_changed` → invalidate the list only.
-// - `board.share_revoked` → invalidate the list, remove the document, and
-//   when the revoked board is still in the local catalog (the gallery shows
-//   a stale entry until the next hydrate), request exactly one hydrate
-//   convergence. The convergence reads over HTTP and never emits SSE frames,
-//   so it cannot re-trigger this handler; duplicate frames while a
-//   convergence is in flight coalesce into that single run.
+// - `board.access_changed` → invalidate the catalog and access resource,
+//   remove the document query, and request one HTTP access convergence.
+//   Directed signals carry a per-Board access-version watermark; duplicate
+//   and reordered versions never trigger another convergence.
 // - stream gap → invalidate only `['boards', workspaceId]`; other
 //   workspaces and task caches stay untouched.
 
@@ -32,11 +29,11 @@ import { isBoardDraftDirty } from './boardDraftState'
 
 export const BOARD_DOCUMENT_REPLACE_COALESCE_MS = 500
 
-export type BoardShareRevokedConvergence = {
-  /** Whether the revoked board is currently shown (defaults to the local catalog). */
+export type BoardAccessLossConvergence = {
+  /** Whether the changed board is currently shown (defaults to the local catalog). */
   isBoardVisible?: ((boardId: string) => boolean) | undefined
   /**
-   * Caller-owned hydrate convergence for a visible revoked board. The
+   * Caller-owned hydrate convergence for a visible changed board. The
    * production observer supplies its catalog hydrate; without it, ordinary
    * list invalidation converges active Query observers. A promise coalesces
    * the in-flight run instead of stacking.
@@ -56,10 +53,11 @@ export function subscribeBoardQueryInvalidation(
   client: QueryClient,
   workspaceId: string,
   isDraftDirty: (boardId: string) => boolean = () => false,
-  convergence: BoardShareRevokedConvergence = {},
+  convergence: BoardAccessLossConvergence = {},
 ): () => void {
   const pending = new Map<string, number>()
   const observedRevisions = new Map<string, number>()
+  const observedAccessVersions = new Map<string, number>()
   const hydrateInflight = new Set<string>()
   const isBoardVisible =
     convergence.isBoardVisible ?? ((boardId: string) => getBoardById(boardId) !== null)
@@ -80,7 +78,7 @@ export function subscribeBoardQueryInvalidation(
     }
     pending.clear()
   }
-  function requestShareRevokedConvergence(boardId: string): void {
+  function requestAccessLossConvergence(boardId: string): void {
     if (!requestCatalogHydrate) return
     if (hydrateInflight.has(boardId)) return
     let isShown: boolean
@@ -126,20 +124,26 @@ export function subscribeBoardQueryInvalidation(
         if (timer === undefined) {
           timer = setTimeout(flush, BOARD_DOCUMENT_REPLACE_COALESCE_MS)
         }
-      } else if (envelope.type === 'board.member_changed') {
-        void client.invalidateQueries({ queryKey: boardQueryKeys.list(workspaceId), exact: true })
-      } else if (envelope.type === 'board.share_revoked') {
+      } else if (envelope.type === 'board.access_changed') {
+        const accessVersion = Number(envelope.data.access_version)
+        if (!Number.isInteger(accessVersion) || accessVersion <= 0) return
+        if (accessVersion <= (observedAccessVersions.get(boardId) ?? 0)) return
+        observedAccessVersions.set(boardId, accessVersion)
         pending.delete(boardId)
         void client.invalidateQueries({ queryKey: boardQueryKeys.list(workspaceId), exact: true })
+        void client.invalidateQueries({
+          queryKey: boardQueryKeys.access(workspaceId, boardId),
+          exact: true,
+        })
         client.removeQueries({
           queryKey: boardQueryKeys.document(workspaceId, boardId),
           exact: true,
         })
-        requestShareRevokedConvergence(boardId)
+        requestAccessLossConvergence(boardId)
       }
     },
     {
-      types: ['board.document_replaced', 'board.member_changed', 'board.share_revoked'],
+      types: ['board.document_replaced', 'board.access_changed'],
       onGap: () => {
         void client.invalidateQueries({ queryKey: boardQueryKeys.scopeRoot(workspaceId) })
       },
@@ -164,7 +168,7 @@ export function subscribeBoardQueryScopeInvalidation(
   options: {
     client?: QueryClient
     isDraftDirty?: (boardId: string) => boolean
-    convergence?: BoardShareRevokedConvergence
+    convergence?: BoardAccessLossConvergence
   } = {},
 ): () => void {
   const client = options.client ?? queryClient

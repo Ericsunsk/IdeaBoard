@@ -18,6 +18,7 @@ import (
 
 	"ideaboard/api/internal/aigateway"
 	billinghttp "ideaboard/api/internal/billing/interfaces/http"
+	"ideaboard/api/internal/boards"
 	creditsdomain "ideaboard/api/internal/credits/domain"
 	credithttp "ideaboard/api/internal/credits/interfaces/http"
 	creditsports "ideaboard/api/internal/credits/ports"
@@ -101,15 +102,22 @@ type ControlBillingAccountStore interface {
 // idempotency
 // uniformly around them.
 type ContractControlDeps struct {
-	Users           ControlUserService
-	Identity        identityports.IdentityAdminCommands
-	Impersonator    identityports.AdminUserImpersonator
-	Credits         ControlCreditCommands
-	CreditUsers     ControlCreditDirectory
-	CreditReads     ControlCreditReads
-	Reconciliation  credithttp.ReconciliationService
-	Tasks           ControlTaskAdmin
-	Tenancy         tenancy.Store
+	Users          ControlUserService
+	Identity       identityports.IdentityAdminCommands
+	Impersonator   identityports.AdminUserImpersonator
+	Credits        ControlCreditCommands
+	CreditUsers    ControlCreditDirectory
+	CreditReads    ControlCreditReads
+	Reconciliation credithttp.ReconciliationService
+	Tasks          ControlTaskAdmin
+	Tenancy        tenancy.Store
+	// Boards is the workspace-rooted board collaboration store, used only
+	// for the #941 membership-removal grant purge (operator removals must
+	// converge like self-service removals). Nil keeps the removal working
+	// with serve-time checks fail-closed. The control plane emits no board
+	// signals; readers converge through the bumped access version and the
+	// departed member through access revalidation.
+	Boards          boards.WorkspaceBoardStore
 	UserDirectory   V1UserDirectory
 	BillingAccounts ControlBillingAccountStore
 	Catalog         billinghttp.BillableCatalogService

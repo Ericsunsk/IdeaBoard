@@ -42,12 +42,14 @@ import (
 	"ideaboard/api/internal/library/ports"
 	"ideaboard/api/internal/platform/database"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Service struct {
-	db *pgxpool.Pool
-	q  *dbsqlc.Queries
+	db          *pgxpool.Pool
+	q           *dbsqlc.Queries
+	publication ports.PublicationAuthorizer
 }
 
 // Compile-time convergence with the v1 persistence seam.
@@ -74,11 +76,11 @@ const (
 const mintAttempts = 3
 
 // NewService builds a postgres library Service over pool.
-func NewService(db *pgxpool.Pool) *Service {
+func NewService(db *pgxpool.Pool, publication ports.PublicationAuthorizer) *Service {
 	if db == nil {
 		return &Service{}
 	}
-	return &Service{db: db, q: dbsqlc.New(db)}
+	return &Service{db: db, q: dbsqlc.New(db), publication: publication}
 }
 
 type serviceQueryer struct {
@@ -93,6 +95,10 @@ func (s *Service) dbWithContext(ctx context.Context) serviceQueryer {
 
 func (db serviceQueryer) withTx(run func(*dbsqlc.Queries) error) error {
 	return dbutil.WithTx(db.ctx, db.db, run)
+}
+
+func (db serviceQueryer) withTxDBTX(run func(*dbsqlc.Queries, pgx.Tx) error) error {
+	return dbutil.WithTxDBTX(db.ctx, db.db, run)
 }
 
 func (db serviceQueryer) queries() (*dbsqlc.Queries, error) {

@@ -32,12 +32,14 @@ import type {
   ConflictResponse,
   DeletedEnvelope,
   ForbiddenResponse,
+  LookupWorkspaceMemberByEmailParams,
   NotFoundResponse,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
   UpdateWorkspaceMemberRequest,
   WorkspaceMemberEnvelope,
   WorkspaceMemberList,
+  WorkspaceMemberLookupEnvelope,
 } from '../model'
 
 import { publicMutator } from '../../../publicMutator'
@@ -130,7 +132,7 @@ export const getAddWorkspaceMemberUrl = (workspaceId: string) => {
 }
 
 /**
- * Requires the Idempotency-Key header. Re-adding an existing member keeps the current role. Reusing a key with a different request renders 409 workspace_idempotency_conflict.
+ * Requires the Idempotency-Key header. Re-adding an existing member keeps the current role, including when the workspace is full. Workspaces support at most 5 members including owners; exceeding this limit renders 409 workspace_member_limit_reached. Reusing a key with a different request renders 409 workspace_idempotency_conflict.
  * @summary Add a workspace member (owner/admin only; owner-only promotion)
  */
 export const addWorkspaceMember = async (
@@ -256,6 +258,118 @@ export const useAddWorkspaceMember = <
 > => {
   return useMutation(getAddWorkspaceMemberMutationOptions(options), queryClient)
 }
+export const getLookupWorkspaceMemberByEmailUrl = (
+  workspaceId: string,
+  params: LookupWorkspaceMemberByEmailParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/workspaces/${encodeURIComponent(String(workspaceId))}/members/lookup?${stringifiedParams}`
+    : `/workspaces/${encodeURIComponent(String(workspaceId))}/members/lookup`
+}
+
+/**
+ * Resolves one registered user to its usr_ identifier by exact email match (trimmed, case-insensitive) for the invite flow. Only workspace owners/admins may call it: non-members converge to 404 workspace_not_found, visible members without the capability render 403. Unknown emails converge to 404 workspace_member_not_found, indistinguishable from unregistered identities. The email is resolved through the Auth identity and never stored; the response carries only the usr_ identifier. This is a read-only query: it performs no membership write (invite with POST /workspaces/{workspace_id}/members using the resolved usr_, role, and Idempotency-Key). Abuse is bounded by the existing global per-IP rate limiting plus the single-address exact-match shape (no batch enumeration).
+ * @summary Look up a registered user by email (owner/admin only)
+ */
+export const lookupWorkspaceMemberByEmail = async (
+  workspaceId: string,
+  params: LookupWorkspaceMemberByEmailParams,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspaceMemberLookupEnvelope> => {
+  return publicMutator<WorkspaceMemberLookupEnvelope>(
+    getLookupWorkspaceMemberByEmailUrl(workspaceId, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getLookupWorkspaceMemberByEmailQueryKey = (
+  workspaceId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<LookupWorkspaceMemberByEmailParams>,
+) => {
+  return ['workspaces', workspaceId, 'members', 'lookup', ...(params ? [params] : [])] as const
+}
+
+export const getLookupWorkspaceMemberByEmailQueryOptions = <
+  TData = Awaited<ReturnType<typeof lookupWorkspaceMemberByEmail>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  params: MaybeRefOrGetter<LookupWorkspaceMemberByEmailParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof lookupWorkspaceMemberByEmail>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getLookupWorkspaceMemberByEmailQueryKey(workspaceId, params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof lookupWorkspaceMemberByEmail>>> = ({
+    signal,
+  }) =>
+    lookupWorkspaceMemberByEmail(toValue(workspaceId), toValue(params), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(workspaceId) !== null && toValue(workspaceId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof lookupWorkspaceMemberByEmail>>, TError, TData>
+}
+
+export type LookupWorkspaceMemberByEmailQueryResult = NonNullable<
+  Awaited<ReturnType<typeof lookupWorkspaceMemberByEmail>>
+>
+export type LookupWorkspaceMemberByEmailQueryError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse
+
+/**
+ * @summary Look up a registered user by email (owner/admin only)
+ */
+
+export function useLookupWorkspaceMemberByEmail<
+  TData = Awaited<ReturnType<typeof lookupWorkspaceMemberByEmail>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  params: MaybeRefOrGetter<LookupWorkspaceMemberByEmailParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof lookupWorkspaceMemberByEmail>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getLookupWorkspaceMemberByEmailQueryOptions(workspaceId, params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
 export const getUpdateWorkspaceMemberUrl = (workspaceId: string, memberId: string) => {
   return `/workspaces/${encodeURIComponent(String(workspaceId))}/members/${encodeURIComponent(String(memberId))}`
 }

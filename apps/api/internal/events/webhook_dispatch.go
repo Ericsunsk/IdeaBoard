@@ -55,6 +55,10 @@ func (s *WebhookStore) DispatchErr(ctx context.Context, envelope V1Envelope) err
 	enqueuer := s.enqueuer
 	persistence := s.persistence
 	s.mu.Unlock()
+	// Only events with a Workspace-wide audience can leave through webhooks.
+	if !workspaceWebhookVisible(envelope) {
+		return nil
+	}
 	var firstErr error
 	for _, subscriptionID := range targets {
 		if persistence != nil {

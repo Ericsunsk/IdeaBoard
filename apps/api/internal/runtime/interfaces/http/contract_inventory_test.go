@@ -145,7 +145,8 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			"operationId: createWorkspace",
 			"operationId: listBoards",
 			"operationId: createBoard",
-			"operationId: joinBoardByToken",
+			"operationId: getBoardAccess",
+			"operationId: updateBoardAccess",
 			"operationId: getBoardDocument",
 			"operationId: replaceBoardDocument",
 			// #820/#821 (#809 Phase 4-03/4-04): workspace upload/media

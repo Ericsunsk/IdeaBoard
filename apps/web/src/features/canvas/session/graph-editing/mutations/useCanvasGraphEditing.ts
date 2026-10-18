@@ -33,7 +33,8 @@ type SnapshotNodeMutator = (snapshotNode: CanvasNodeItem) => CanvasNodeItem
 export type CanvasGraphEditingUploadAdapter = {
   upload: (
     file: File,
-    boardId: string,
+    workspaceId: string,
+    options?: { boardId?: string | undefined },
   ) => Promise<{
     url: string
     asset_id: string

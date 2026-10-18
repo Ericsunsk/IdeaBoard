@@ -16,11 +16,25 @@ var (
 	ErrIDConflict         = errors.New("board id conflict")
 	ErrPermissionDenied   = errors.New("board permission denied")
 	ErrMemberNotFound     = errors.New("board member not found")
-	ErrMemberInvalidRole  = errors.New("board member invalid role")
-	ErrMemberInviteSelf   = errors.New("board member invite self")
 	ErrRevisionConflict   = errors.New("board revision conflict")
-	ErrShareTokenNotFound = errors.New("share token not found")
-	ErrShareTokenInvalid  = errors.New("share token invalid")
-	ErrShareTokenExpired  = errors.New("share token expired")
-	ErrShareTokenRevoked  = errors.New("share token revoked")
+	ErrAccessConflict     = errors.New("board access conflict")
+	ErrPreconditionNeeded = errors.New("board access precondition required")
+)
+
+// WorkspaceAccess is the common role for a Board’s selected Workspace members.
+// none disables sharing and has no selected members.
+type WorkspaceAccess string
+
+const (
+	WorkspaceAccessNone   WorkspaceAccess = "none"
+	WorkspaceAccessViewer WorkspaceAccess = "viewer"
+	WorkspaceAccessEditor WorkspaceAccess = "editor"
+)
+
+// AccessState is the Board's actual sharing posture.
+type AccessState string
+
+const (
+	AccessStatePrivate   AccessState = "private"
+	AccessStateWorkspace AccessState = "workspace"
 )

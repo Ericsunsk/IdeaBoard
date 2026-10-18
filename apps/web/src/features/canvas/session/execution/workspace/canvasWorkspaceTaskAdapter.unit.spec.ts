@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   waitWorkspaceTaskTerminal: vi.fn(),
   cancelWorkspaceTask: vi.fn(),
   selectedId: { value: 'ws_test123' as string | null },
+  residency: 0,
 }))
 
 // Seams import the narrow transport/waiter modules directly (issue #859);
@@ -56,6 +57,41 @@ vi.mock('../../../../workspace', () => ({
     selectedId: mocks.selectedId,
     getSelectedId: () => mocks.selectedId.value,
   }),
+}))
+
+const accessLossMocks = vi.hoisted(() => ({
+  isLost: vi.fn(() => false),
+  isStale: vi.fn(() => false),
+  // Faithful stub of the revalidation-only classifier (the full matrix is
+  // pinned in the revocation specs): board capability codes plus bare
+  // revalidation 403/404s confirm, everything else preserves.
+  isConfirmed: vi.fn((error: unknown) => {
+    const record = error as { code?: unknown; status?: unknown } | null
+    const code = typeof record?.code === 'string' ? record.code : null
+    if (code !== null) {
+      return (
+        code === 'board_forbidden' || code === 'board_not_found' || code === 'workspace_not_found'
+      )
+    }
+    return record?.status === 403 || record?.status === 404
+  }),
+  revalidate: vi.fn<() => Promise<'ok' | 'revoked' | 'preserved'>>(async () => 'ok'),
+}))
+
+// Closed mock (no importOriginal spread): the real board session boundary
+// pulls the workspace selection chain, which this spec stubs closed above.
+// The adapter consumes only the public session port.
+vi.mock('../../../../board/ports/canvasSession', () => ({
+  isBoardAccessLost: accessLossMocks.isLost,
+  isBoardAccessStale: accessLossMocks.isStale,
+  isConfirmedAccessLoss: accessLossMocks.isConfirmed,
+  revalidateAndConvergeBoardAccess: accessLossMocks.revalidate,
+  getBoardScope: () => ({
+    userScope: 'test-user',
+    workspaceId: mocks.selectedId.value,
+    residency: mocks.residency,
+  }),
+  isBoardScopeCurrent: (scope: { residency: number }) => scope.residency === mocks.residency,
 }))
 
 const WORKSPACE_ID = 'ws_test123'
@@ -122,6 +158,17 @@ describe('toWorkspaceCreateInput', () => {
       quantity: 2,
       resolution: '1k',
     })
+  })
+
+  it('maps board_id bindings and fails closed on forged shapes (#937)', () => {
+    expect(
+      toWorkspaceCreateInput({ prompt: 'x', service: 'generation', board_id: 'board_abc123' })
+        .board_id,
+    ).toBe('board_abc123')
+    expect(toWorkspaceCreateInput({ prompt: 'x', service: 'generation' }).board_id).toBeUndefined()
+    expect(() =>
+      toWorkspaceCreateInput({ prompt: 'x', service: 'generation', board_id: 'ws_evil' }),
+    ).toThrowError(/board_/)
   })
 
   it('maps non-empty prompts onto data.prompt for prompt-carrying services', () => {
@@ -561,6 +608,152 @@ describe('canvas workspace task transport', () => {
       message: CANVAS_WORKSPACE_REQUIRED_MESSAGE,
     })
     expect(mocks.createWorkspaceTask).not.toHaveBeenCalled()
+  })
+
+  it('refuses board-bound submits once access is confirmed lost', async () => {
+    accessLossMocks.isLost.mockReturnValueOnce(true)
+
+    await expect(
+      submitCanvasWorkspaceTask(
+        { prompt: 'a cat', service: 'generation', client_action_id: 'canvas:act-lost' },
+        { boardId: 'board_lost1' },
+      ),
+    ).rejects.toMatchObject({ code: 'board_forbidden' })
+    expect(mocks.createWorkspaceTask).not.toHaveBeenCalled()
+  })
+
+  it('revalidates stale boards once before submitting', async () => {
+    accessLossMocks.isStale.mockReturnValueOnce(true)
+    mocks.createWorkspaceTask.mockResolvedValue(taskItem({ status: 'pending' }))
+
+    await expect(
+      submitCanvasWorkspaceTask(
+        { prompt: 'a cat', service: 'generation', client_action_id: 'canvas:act-stale' },
+        { boardId: 'board_stale1' },
+      ),
+    ).resolves.toEqual({ taskId: 'task_aaa111', workspaceId: WORKSPACE_ID })
+    expect(accessLossMocks.revalidate).toHaveBeenCalledWith('board_stale1', {
+      workspaceId: WORKSPACE_ID,
+    })
+    expect(mocks.createWorkspaceTask).toHaveBeenCalledTimes(1)
+  })
+
+  it('converges and refuses when stale revalidation proves the loss', async () => {
+    accessLossMocks.isStale.mockReturnValueOnce(true)
+    accessLossMocks.revalidate.mockResolvedValueOnce('revoked')
+
+    await expect(
+      submitCanvasWorkspaceTask(
+        { prompt: 'a cat', service: 'generation', client_action_id: 'canvas:act-revoked' },
+        { boardId: 'board_revoked1' },
+      ),
+    ).rejects.toMatchObject({ code: 'board_forbidden' })
+    expect(mocks.createWorkspaceTask).not.toHaveBeenCalled()
+  })
+
+  it('does not submit or converge a stale revalidation after A→B→A', async () => {
+    accessLossMocks.isStale.mockReturnValueOnce(true)
+    let resolve!: (verdict: 'revoked') => void
+    accessLossMocks.revalidate.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done
+        }),
+    )
+    const pending = submitCanvasWorkspaceTask(
+      { prompt: 'cat', service: 'generation' },
+      { boardId: 'board_late' },
+    )
+    const outcome = expect(pending).rejects.toMatchObject({ code: 'board_scope_changed' })
+    await vi.waitFor(() => expect(accessLossMocks.revalidate).toHaveBeenCalled())
+    mocks.residency += 2
+    resolve('revoked')
+    await outcome
+    expect(mocks.createWorkspaceTask).not.toHaveBeenCalled()
+  })
+
+  it('does not revalidate an old submit failure after A→B→A', async () => {
+    let reject!: (error: Error) => void
+    mocks.createWorkspaceTask.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail
+        }),
+    )
+    const pending = submitCanvasWorkspaceTask(
+      { prompt: 'cat', service: 'generation' },
+      { boardId: 'board_late' },
+    )
+    const outcome = expect(pending).rejects.toMatchObject({ code: 'board_forbidden' })
+    await vi.waitFor(() => expect(mocks.createWorkspaceTask).toHaveBeenCalled())
+    mocks.residency += 2
+    reject(Object.assign(new Error('denied'), { code: 'board_forbidden' }))
+    await outcome
+    expect(accessLossMocks.revalidate).not.toHaveBeenCalled()
+  })
+
+  it('skips the access gate for board-less submits', async () => {
+    accessLossMocks.isLost.mockClear()
+    accessLossMocks.isStale.mockClear()
+    mocks.createWorkspaceTask.mockResolvedValue(taskItem({ status: 'pending' }))
+
+    await submitCanvasWorkspaceTask({
+      prompt: 'a cat',
+      service: 'generation',
+      client_action_id: 'canvas:act-noboard',
+    })
+
+    expect(accessLossMocks.isLost).not.toHaveBeenCalled()
+    expect(accessLossMocks.isStale).not.toHaveBeenCalled()
+    expect(mocks.createWorkspaceTask).toHaveBeenCalledTimes(1)
+  })
+
+  it('revalidates board-bound submit failures and converges on revocation', async () => {
+    accessLossMocks.revalidate.mockClear()
+    accessLossMocks.revalidate.mockResolvedValueOnce('revoked')
+    mocks.createWorkspaceTask.mockRejectedValueOnce(
+      Object.assign(new Error('denied'), { status: 403, code: 'board_forbidden' }),
+    )
+
+    await expect(
+      submitCanvasWorkspaceTask(
+        { prompt: 'a cat', service: 'generation', client_action_id: 'canvas:act-submit-403' },
+        { boardId: 'board_submit1' },
+      ),
+    ).rejects.toMatchObject({ code: 'board_forbidden' })
+    expect(accessLossMocks.revalidate).toHaveBeenCalledWith('board_submit1', {
+      workspaceId: WORKSPACE_ID,
+    })
+  })
+
+  it('keeps the caller error path when submit revalidation stays unconfirmed', async () => {
+    accessLossMocks.revalidate.mockClear()
+    mocks.createWorkspaceTask.mockRejectedValueOnce(
+      Object.assign(new Error('denied'), { status: 403, code: 'board_forbidden' }),
+    )
+
+    await expect(
+      submitCanvasWorkspaceTask(
+        { prompt: 'a cat', service: 'generation', client_action_id: 'canvas:act-submit-ok' },
+        { boardId: 'board_submit2' },
+      ),
+    ).rejects.toMatchObject({ code: 'board_forbidden' })
+    expect(accessLossMocks.revalidate).toHaveBeenCalledWith('board_submit2', {
+      workspaceId: WORKSPACE_ID,
+    })
+  })
+
+  it('skips revalidation for non-capability submit failures', async () => {
+    accessLossMocks.revalidate.mockClear()
+    mocks.createWorkspaceTask.mockRejectedValueOnce(new Error('socket hang up'))
+
+    await expect(
+      submitCanvasWorkspaceTask(
+        { prompt: 'a cat', service: 'generation', client_action_id: 'canvas:act-submit-net' },
+        { boardId: 'board_submit3' },
+      ),
+    ).rejects.toThrow('socket hang up')
+    expect(accessLossMocks.revalidate).not.toHaveBeenCalled()
   })
 
   it('maps a 402 quote to insufficient-credits and a 422 quote to not-ready data', async () => {

@@ -23,7 +23,7 @@ tags:
   - name: WorkspaceMembers
     description: Workspace membership and role transitions.
   - name: Boards
-    description: Workspace-rooted board collaboration, documents, and share tokens.
+    description: Workspace-rooted board collaboration, documents, and access management.
   - name: WorkspaceBilling
     description: Implicit per-workspace billing account, credits, and checkout.
   - name: WorkspaceRewards
@@ -442,7 +442,10 @@ paths:
       summary: Add a workspace member (owner/admin only; owner-only promotion)
       description: >-
         Requires the Idempotency-Key header. Re-adding an existing member
-        keeps the current role. Reusing a key with a different request
+        keeps the current role, including when the workspace is full.
+        Workspaces support at most 5 members including owners; exceeding
+        this limit renders 409 workspace_member_limit_reached.
+        Reusing a key with a different request
         renders 409 workspace_idempotency_conflict.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
@@ -475,6 +478,46 @@ paths:
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/members/lookup:
+    get:
+      tags: [WorkspaceMembers]
+      operationId: lookupWorkspaceMemberByEmail
+      summary: Look up a registered user by email (owner/admin only)
+      description: >-
+        Resolves one registered user to its usr_ identifier by exact email
+        match (trimmed, case-insensitive) for the invite flow. Only
+        workspace owners/admins may call it: non-members converge to 404
+        workspace_not_found, visible members without the capability render
+        403. Unknown emails converge to 404 workspace_member_not_found,
+        indistinguishable from unregistered identities. The email is
+        resolved through the Auth identity and never stored; the response
+        carries only the usr_ identifier. This is a read-only query: it
+        performs no membership write (invite with POST
+        /workspaces/{workspace_id}/members using the resolved usr_,
+        role, and Idempotency-Key). Abuse is bounded by the existing
+        global per-IP rate limiting plus the single-address exact-match
+        shape (no batch enumeration).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/MemberLookupEmail'
+      responses:
+        '200':
+          description: User resolved to its public identifier.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceMemberLookupEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /workspaces/{workspace_id}/members/{member_id}:
     patch:
       tags: [WorkspaceMembers]
@@ -714,11 +757,12 @@ paths:
       operationId: listBoards
       summary: List accessible boards of a workspace with cursor pagination
       description: >-
-        Lists non-archived boards the caller holds an explicit board role
-        on (owner, editor, or viewer). Each card carries metadata plus the
-        stored preview scene projection (content_version, preview_scene)
-        without a document fetch. Workspace membership alone never
-        grants board access: boards without a grant stay invisible and are
+        Lists non-archived boards visible to the caller under the unified
+        board policy: the current-member Creator and explicitly selected
+        current Workspace members at the common Viewer/Editor role. Each card carries metadata plus the stored preview scene
+        projection (content_version, preview_scene) without a document
+        fetch, plus the caller relationship and capabilities — never the
+        full ACL. Boards without an effective role stay invisible and are
         excluded, never 403. Hidden workspaces converge to 404
         workspace_not_found.
       parameters:
@@ -747,7 +791,9 @@ paths:
       summary: Create a board (workspace members only)
       description: >-
         Creates a board at revision 1 with the empty document snapshot;
-        the creator is the implicit owner. Requires the Idempotency-Key
+        the creator is the implicit owner. The server fixes
+        workspace_access to none: creation requests cannot widen access.
+        Requires the Idempotency-Key
         header (scope board:create): missing keys render 400
         idempotency_key_required, key reuse with a different request
         renders 409 board_idempotency_conflict, same key+hash replays the
@@ -784,55 +830,17 @@ paths:
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-  /workspaces/{workspace_id}/boards/join:
-    post:
-      tags: [Boards]
-      operationId: joinBoardByToken
-      summary: Join a board with a share bearer
-      description: >-
-        The bearer is the capability: the caller needs no prior workspace
-        membership or board grant, and a successful join grants workspace
-        membership (member) alongside the board grant. Requires the
-        Idempotency-Key header. Every join failure (unknown, revoked, or
-        foreign-workspace bearer) converges to 404
-        board_share_token_not_found so existence is never leaked; only
-        malformed input renders 400.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/JoinBoardRequest'
-      responses:
-        '200':
-          description: Joined board.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BoardEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
   /workspaces/{workspace_id}/boards/{board_id}:
     get:
       tags: [Boards]
       operationId: getBoard
       summary: Get a board (any board role)
       description: >-
-        Malformed ids, unknown boards, and callers holding no board role
-        converge to 404 board_not_found. The revision counter is returned
-        as the ETag response header.
+        Malformed ids, unknown boards, and callers holding no effective
+        board role converge to 404 board_not_found. The revision counter
+        is returned as the ETag response header. The payload carries the
+        creator identity, common sharing role, access version, derived
+        posture, caller relationship, and capabilities.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/BoardId'
@@ -857,7 +865,9 @@ paths:
       operationId: updateBoard
       summary: Rename a board (owner/editor only)
       description: >-
-        Viewers render 403 board_forbidden. Writes against an archived
+        Rename-only: access changes never ride this route (workspace
+        sharing is replaced atomically through PUT access). Viewers render
+        403 board_forbidden. Writes against an archived
         board render 409 board_archived. Blank or overlong names
         render 422 validation_failed. No Idempotency-Key is required.
       parameters:
@@ -1082,60 +1092,77 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-  /workspaces/{workspace_id}/boards/{board_id}/members:
+  /workspaces/{workspace_id}/boards/{board_id}/access:
     get:
       tags: [Boards]
-      operationId: listBoardMembers
-      summary: List board members (any board role)
+      operationId: getBoardAccess
+      summary: Read the board access fact (owner only)
       description: >-
-        The implicit owner row comes first, followed by explicit grants
-        ordered by user. Bearer secrets never appear here.
+        Returns the common sharing role, selected member identities,
+        monotonic access version, and actual Private/Workspace posture. The version is returned as the ETag
+        response header in access-<version> form (disjoint from the
+        document revision ETag namespace). Management capability is
+        required; every other caller already sees the version fact on
+        board payloads.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/BoardId'
       responses:
         '200':
-          description: Board member list.
+          description: Board access fact.
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BoardMemberList'
+                $ref: '#/components/schemas/BoardAccessEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-    post:
+    put:
       tags: [Boards]
-      operationId: addBoardMember
-      summary: Grant a board role (owner only)
+      operationId: updateBoardAccess
+      summary: Replace the complete sharing configuration (Creator only)
       description: >-
-        Requires the Idempotency-Key header. Re-adding an existing member
-        keeps the current role. Inviting the implicit owner renders 400
-        bad_request; unknown users render 404 board_member_not_found;
-        illegal roles render 422 validation_failed.
+        Replaces workspace_access and the complete member_user_ids set atomically; none clears selections. Requires both
+        the Idempotency-Key header and the If-Match precondition carrying
+        the expected access version (the access-<version> ETag value from
+        the last access read). Missing preconditions render 428
+        board_precondition_required; unparsable values render 400; stale
+        versions render 412 board_access_conflict; archived boards render
+        409 board_archived. No-op replays keep the version; real changes
+        bump it without touching the document revision, content_version,
+        or Preview Scene. Same key+hash replays the first result, a
+        different request renders 409 board_idempotency_conflict.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/BoardId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/AccessIfMatch'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddBoardMemberRequest'
+              $ref: '#/components/schemas/UpdateBoardAccessRequest'
       responses:
-        '201':
-          description: Member added.
+        '200':
+          description: Sharing configuration replaced.
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BoardMemberEnvelope'
+                $ref: '#/components/schemas/BoardAccessEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1146,187 +1173,12 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-  /workspaces/{workspace_id}/boards/{board_id}/members/{member_id}:
-    patch:
-      tags: [Boards]
-      operationId: updateBoardMember
-      summary: Change a board member role (owner only)
-      description: >-
-        Demoting the last owner renders 403
-        membership_transition_forbidden. Unknown or malformed member ids
-        converge to 404 board_member_not_found. No Idempotency-Key is
-        required.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-        - $ref: '#/components/parameters/BoardId'
-        - $ref: '#/components/parameters/MemberId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateBoardMemberRequest'
-      responses:
-        '200':
-          description: Member role updated.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BoardMemberEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-    delete:
-      tags: [Boards]
-      operationId: removeBoardMember
-      summary: Remove a board member (owner manages the roster; anyone may leave)
-      description: >-
-        Owners may remove anyone; any member may remove themselves
-        (self-leave). Removing the last owner renders 403
-        membership_transition_forbidden; removing the implicit owner row
-        renders 400. Requires the Idempotency-Key header.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-        - $ref: '#/components/parameters/BoardId'
-        - $ref: '#/components/parameters/MemberId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      responses:
-        '200':
-          description: Member removed.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeletedEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-  /workspaces/{workspace_id}/boards/{board_id}/shares:
-    get:
-      tags: [Boards]
-      operationId: listShareTokens
-      summary: List share tokens without bearers (owner only)
-      description: >-
-        List entries carry the list-safe token_prefix only; the bearer
-        plaintext is shown once at creation (and on idempotent replay)
-        and never here.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-        - $ref: '#/components/parameters/BoardId'
-      responses:
-        '200':
-          description: Share token list.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BoardShareTokenList'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    post:
-      tags: [Boards]
-      operationId: createShareToken
-      summary: Create a share bearer (owner only)
-      description: >-
-        Requires the Idempotency-Key header; same key+hash replays the
-        same bearer, a different request renders 409
-        board_idempotency_conflict. Share roles are editor or viewer
-        only (anything else renders 422 validation_failed). The bearer
-        `token` is returned once and must be stored by the caller.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-        - $ref: '#/components/parameters/BoardId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateShareTokenRequest'
-      responses:
-        '201':
-          description: Share token created (bearer shown once).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BoardShareTokenEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-  /workspaces/{workspace_id}/boards/{board_id}/shares/{token_id}:
-    delete:
-      tags: [Boards]
-      operationId: revokeShareToken
-      summary: Revoke a share token (owner only)
-      description: >-
-        Requires the Idempotency-Key header. Revocation is idempotent:
-        revoking twice succeeds. Unknown token ids converge to 404
-        board_share_token_not_found. Joins against the bearer converge to
-        the same 404 afterwards.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-        - $ref: '#/components/parameters/BoardId'
-        - $ref: '#/components/parameters/TokenId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      responses:
-        '200':
-          description: Share token revoked.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeletedEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
   /workspaces/{workspace_id}/billing-account:
     get:
       tags: [WorkspaceBilling]
@@ -2076,7 +1928,10 @@ paths:
         Lists workspace tasks oldest-first with cursor pagination. Hidden
         workspaces converge to 404 task_not_found (never
         workspace_not_found) so the task surface never leaks workspace
-        existence.
+        existence. Tasks are submitter- or current-Board-reader-only:
+        Board-less tasks by other submitters are silently skipped, so
+        omitting the Board ID never degrades into workspace-wide
+        visibility.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/Cursor'
@@ -2125,7 +1980,11 @@ paths:
         validation_failed on details.fields.resolution. An omitted
         resolution is normalized once to the Service policy's canonical
         1k/2k/4k value. Only 1k, 2k, and 4k are accepted; default is not a
-        request or billing variant.
+        request or billing variant. An optional data.board_id binds a
+        Canvas submit to its Board (Board identity + generate capability
+        validated before Quote/Hold; invisible Boards render 404
+        board_not_found, archived Boards 409 board_archived, visible
+        Boards without generate capability 403 task_forbidden).
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -2200,8 +2059,10 @@ paths:
       summary: Get a workspace task (members only)
       description: >-
         Malformed task_ shapes, unknown tasks, and cross-workspace ids
-        converge to 404 task_not_found. The response carries no params
-        object (params are write-only); outputs ride output_refs.
+        converge to 404 task_not_found. Tasks are submitter- or
+        current-Board-reader-only (other callers converge to 404
+        task_not_found). The response carries no params object (params are
+        write-only); outputs ride output_refs.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/TaskId'
@@ -3354,6 +3215,16 @@ components:
       description: External usr_ member identifier (database ids never appear in URLs).
       schema:
         $ref: '#/components/schemas/UserId'
+    MemberLookupEmail:
+      name: email
+      in: query
+      required: true
+      description: Registered user email for exact-match invite lookup (trimmed, case-insensitive; resolved per call, never stored).
+      schema:
+        type: string
+        format: email
+        minLength: 1
+        maxLength: 320
     BoardId:
       name: board_id
       in: path
@@ -3370,13 +3241,6 @@ components:
         type: integer
         format: int64
         minimum: 1
-    TokenId:
-      name: token_id
-      in: path
-      required: true
-      description: Opaque sht_ share token identifier (legacy integer shapes simply miss and read as 404).
-      schema:
-        $ref: '#/components/schemas/ShareTokenId'
     UploadId:
       name: upload_id
       in: path
@@ -3399,6 +3263,19 @@ components:
         Expected board revision (the ETag value from the last read).
         Missing, wildcard, or unparsable values render 400; stale values
         render 409 board_revision_conflict at write time.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 32
+    AccessIfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: >-
+        Expected board access version (the access-<version> ETag value
+        from the last access read). Missing values render 428
+        board_precondition_required; unparsable values render 400; stale
+        versions render 412 board_access_conflict at write time.
       schema:
         type: string
         minLength: 1
@@ -3509,6 +3386,24 @@ components:
             $ref: '#/components/schemas/ErrorEnvelope'
     Conflict:
       description: Idempotency-key reuse with a different request.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    PreconditionFailed:
+      description: Stale access version (board_access_conflict).
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    PreconditionRequired:
+      description: Missing access-version precondition (board_precondition_required).
       headers:
         Request-Id:
           $ref: '#/components/headers/RequestId'
@@ -3635,6 +3530,20 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/WorkspaceMember'
+    WorkspaceMemberLookup:
+      type: object
+      required: [user_id]
+      additionalProperties: false
+      properties:
+        user_id:
+          $ref: '#/components/schemas/UserId'
+    WorkspaceMemberLookupEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceMemberLookup'
     PaginationMeta:
       type: object
       required: [next_cursor, has_more]
@@ -3788,6 +3697,14 @@ components:
         created_at:
           type: string
           format: date-time
+        email:
+          type: string
+          format: email
+          description: >-
+            Workspace-visible member email for invite search and display
+            assistance only (members-only visibility, unmasked by decision).
+            Omitted when unavailable; never used as a write identity
+            (member writes stay usr_ with unknown users converging to 404).
     CreateWorkspaceRequest:
       type: object
       required: [data]
@@ -3910,21 +3827,50 @@ components:
             $ref: '#/components/schemas/Organization'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
-    ShareTokenId:
+    WorkspaceAccess:
       type: string
-      pattern: '^sht_[A-Za-z0-9_-]+$'
-      description: Opaque share bearer identifier (the bearer itself is shown once at creation only).
-    BoardRole:
+      enum: [none, viewer, editor]
+      description: >-
+        Common Board role for selected Workspace members only.
+        none disables sharing and clears all selections.
+    BoardAccessState:
       type: string
-      enum: [owner, editor, viewer]
-      description: Explicit board grant role (creator row counts as owner).
-    ShareRole:
-      type: string
-      enum: [editor, viewer]
-      description: Share bearer role (owner cannot be granted via shares).
+      enum: [private, workspace]
+      description: >-
+        private when sharing is disabled or no members are selected;
+        workspace when selected members can access with the common role.
+    BoardRelationship:
+      type: object
+      required: [is_creator, has_direct_grant]
+      additionalProperties: false
+      properties:
+        is_creator:
+          type: boolean
+          description: Caller is the board creator (implicit owner).
+        has_direct_grant:
+          type: boolean
+          description: Caller holds an explicit board grant row.
+    BoardCapabilities:
+      type: object
+      required: [read, write, manage, generate]
+      additionalProperties: false
+      properties:
+        read:
+          type: boolean
+        write:
+          type: boolean
+          description: Rename, archive/restore, and document replacement.
+        manage:
+          type: boolean
+          description: Grants, access-resource writes, and access reads.
+        generate:
+          type: boolean
+          description: >-
+            Generation affordance; task/billing authorization still
+            applies at submit time and is never expanded by this flag.
     Board:
       type: object
-      required: [id, workspace_id, name, revision, schema_version, created_at, updated_at]
+      required: [id, workspace_id, name, revision, schema_version, creator_user_id, workspace_access, access_version, access_state, relationship, capabilities, created_at, updated_at]
       additionalProperties: false
       properties:
         id:
@@ -3968,6 +3914,25 @@ components:
           format: date-time
           nullable: true
           description: RFC3339 UTC timestamp; null unless archived.
+        creator_user_id:
+          type: string
+          description: Creator User public identity (usr_ opaque).
+        workspace_access:
+          $ref: '#/components/schemas/WorkspaceAccess'
+        access_version:
+          type: integer
+          format: int64
+          minimum: 1
+          description: >-
+            Independent monotonic access counter, served as the
+            access-<version> ETag on the access resource. Access
+            mutations bump it; document writes never do.
+        access_state:
+          $ref: '#/components/schemas/BoardAccessState'
+        relationship:
+          $ref: '#/components/schemas/BoardRelationship'
+        capabilities:
+          $ref: '#/components/schemas/BoardCapabilities'
         created_at:
           type: string
           format: date-time
@@ -4020,21 +3985,61 @@ components:
               type: string
               minLength: 1
               maxLength: 120
-    JoinBoardRequest:
+    BoardAccess:
+      type: object
+      required: [workspace_id, board_id, workspace_access, member_user_ids, access_version, access_state]
+      additionalProperties: false
+      properties:
+        workspace_id:
+          $ref: '#/components/schemas/WorkspaceId'
+        board_id:
+          $ref: '#/components/schemas/BoardId'
+        workspace_access:
+          $ref: '#/components/schemas/WorkspaceAccess'
+        member_user_ids:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/UserId'
+          description: Selected current Workspace members, excluding the Creator.
+        access_version:
+          type: integer
+          format: int64
+          minimum: 1
+        access_state:
+          $ref: '#/components/schemas/BoardAccessState'
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: RFC3339 UTC timestamp; null unless archived.
+    BoardAccessEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/BoardAccess'
+    UpdateBoardAccessRequest:
       type: object
       required: [data]
       additionalProperties: false
       properties:
         data:
           type: object
-          required: [token]
+          required: [workspace_access, member_user_ids]
           additionalProperties: false
           properties:
-            token:
-              type: string
-              minLength: 1
-              maxLength: 256
-              description: Share bearer plaintext.
+            workspace_access:
+              $ref: '#/components/schemas/WorkspaceAccess'
+            member_user_ids:
+              type: array
+              uniqueItems: true
+              maxItems: 4
+              items:
+                $ref: '#/components/schemas/UserId'
+              description: Complete selected member set; none clears all selections atomically.
     BoardDocument:
       type: object
       required: [board_id, revision, schema_version, document, updated_at]
@@ -4172,117 +4177,6 @@ components:
             $ref: '#/components/schemas/BoardRevision'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
-    BoardMember:
-      type: object
-      required: [user_id, role]
-      additionalProperties: false
-      properties:
-        user_id:
-          $ref: '#/components/schemas/UserId'
-        role:
-          $ref: '#/components/schemas/BoardRole'
-        created_at:
-          type: string
-          format: date-time
-    BoardMemberEnvelope:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          $ref: '#/components/schemas/BoardMember'
-    BoardMemberList:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/BoardMember'
-    AddBoardMemberRequest:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          type: object
-          required: [user_id, role]
-          additionalProperties: false
-          properties:
-            user_id:
-              $ref: '#/components/schemas/UserId'
-            role:
-              $ref: '#/components/schemas/BoardRole'
-    UpdateBoardMemberRequest:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          type: object
-          required: [role]
-          additionalProperties: false
-          properties:
-            role:
-              $ref: '#/components/schemas/BoardRole'
-    BoardShareToken:
-      type: object
-      required: [token_id, token_prefix, role, revoked, usage_count, created_at]
-      additionalProperties: false
-      properties:
-        token_id:
-          $ref: '#/components/schemas/ShareTokenId'
-        token:
-          type: string
-          description: Bearer plaintext, returned once at creation (and on idempotent replay), never on list.
-        token_prefix:
-          type: string
-          description: List-safe bearer prefix (first 8 characters).
-        role:
-          $ref: '#/components/schemas/ShareRole'
-        revoked:
-          type: boolean
-        usage_count:
-          type: integer
-          format: int64
-          minimum: 0
-        created_at:
-          type: string
-          format: date-time
-        revoked_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: RFC3339 UTC timestamp; null unless revoked.
-    BoardShareTokenEnvelope:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          $ref: '#/components/schemas/BoardShareToken'
-    BoardShareTokenList:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/BoardShareToken'
-    CreateShareTokenRequest:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          type: object
-          required: [role]
-          additionalProperties: false
-          properties:
-            role:
-              $ref: '#/components/schemas/ShareRole'
     UploadTarget:
       type: object
       required: [kind, slot, expires_at]
@@ -4378,6 +4272,15 @@ components:
               enum: [image]
               default: image
               description: Defaults to image when omitted.
+            board_id:
+              type: string
+              description: >-
+                Optional board the upload is captured for (#936). Verified
+                against the creator's board write access; malformed,
+                unknown, and unreadable boards converge to 404,
+                readable-but-unwritable boards to 403. Empty means no
+                binding: the asset stays owner-only until another source
+                grants wider access.
     CompleteUploadRequest:
       type: object
       required: [data]
@@ -5216,6 +5119,17 @@ components:
           items:
             $ref: '#/components/schemas/MediaAssetId'
           description: asset_... input references (no raw storage URLs).
+        board_id:
+          $ref: '#/components/schemas/BoardId'
+          description: >-
+            Durable Canvas Board binding (absent for non-Canvas tasks).
+            Task content is submitter- or current-Board-reader-only;
+            Board-less tasks are submitter-only.
+        board_access_version:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Board access_version snapshot observed at submit (stale-callback detection for completion publishing).
         status:
           $ref: '#/components/schemas/TaskStatus'
         retry_count:
@@ -5331,6 +5245,18 @@ components:
             resolution:
               type: string
               description: Output resolution; omitted input is normalized to the Service policy canonical value.
+            board_id:
+              $ref: '#/components/schemas/BoardId'
+              description: >-
+                Optional Canvas Board binding (board_...). The server
+                validates Board identity, the caller's generate capability,
+                and input availability before any Quote/Hold, and snapshots
+                the Board access_version into the durable task binding.
+                Omitted Board IDs stay non-Canvas tasks with their own
+                workspace-level permission (submitter-only reads, never
+                auto-published); callers must never forge a Board
+                attribution. Covered by the idempotency hash: same key with
+                a different Board renders 409 task_idempotency_conflict.
     QuoteWorkspaceTaskRequest:
       type: object
       required: [data]

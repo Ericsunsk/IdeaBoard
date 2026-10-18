@@ -85,6 +85,18 @@ type ResolvedHydrateBoardsFromServerOptions = {
   rollbackBoardIds: Set<string>
 }
 
+function toLocalAccessFacts(board: WorkspaceBoardMeta): Partial<BoardMeta> {
+  // Server-computed capabilities ride hydration untouched: the catalog
+  // never derives edit rights from roles or membership locally.
+  return {
+    ...(board.capabilities === undefined ? {} : { capabilities: board.capabilities }),
+    ...(board.accessState === undefined ? {} : { accessState: board.accessState }),
+    ...(board.workspaceAccess === undefined ? {} : { workspaceAccess: board.workspaceAccess }),
+    ...(board.isCreator === undefined ? {} : { isCreator: board.isCreator }),
+    ...(board.hasDirectGrant === undefined ? {} : { hasDirectGrant: board.hasDirectGrant }),
+  }
+}
+
 function toLocalMeta(board: WorkspaceBoardMeta): BoardMeta | null {
   const boardId = board.id?.trim()
   const name = normalizeBoardName(board.name || '')
@@ -104,6 +116,7 @@ function toLocalMeta(board: WorkspaceBoardMeta): BoardMeta | null {
     ...(typeof board.archivedAt === 'string' && board.archivedAt
       ? { archivedAt: board.archivedAt }
       : {}),
+    ...toLocalAccessFacts(board),
   }
 }
 
@@ -223,12 +236,22 @@ function applyRemoteBoardsToLocal(
     // make the next save send a false `If-Match` and silently overwrite
     // the collaborator's snapshot. The base only advances when the remote
     // snapshot is accepted (replace path) or after an explicit rebase.
-    mergedMetas.set(remoteMeta.id, preserveLocal ? { ...localMeta } : remoteMeta)
+    const mergedMeta = preserveLocal
+      ? { ...remoteMeta, name: localMeta.name, updatedAt: localMeta.updatedAt }
+      : remoteMeta
+    if (preserveLocal) {
+      if (localMeta.revision === undefined) delete mergedMeta.revision
+      else mergedMeta.revision = localMeta.revision
+    }
+    mergedMetas.set(remoteMeta.id, mergedMeta)
   })
 
   // Local-only boards (absent from the full remote list, which is a
   // complete cursor walk so absence means deleted/archived elsewhere):
-  // absent + revision means the board synced before and is now deleted
+  // the walk is complete-or-throw (truncation and page failures reject the
+  // whole hydrate instead of returning a partial list), so absence here is
+  // a confirmed complete-catalog absence, never an incomplete-walk gap.
+  // Absent + revision means the board synced before and is now deleted
   // elsewhere — deleted-elsewhere wins, so drop the local meta without
   // pushing it back to the server, discarding any unsynced local edits
   // with it (delete semantics, not a conflict). Absent + no revision
@@ -310,6 +333,9 @@ async function listRemoteBoards(
 ): Promise<Array<{ meta: WorkspaceBoardMeta; state: BoardState | null }>> {
   // Hydrate is the explicit visible/recovery freshness path. Query still
   // owns request de-duplication, AbortSignal, cache and revision guards.
+  // The list walk is complete-or-throw and bound to the captured scope: a
+  // truncated walk or a mid-walk User/Workspace switch rejects, so the
+  // merge below only ever observes a confirmed complete catalog.
   const metas = await queryClient.fetchQuery({
     ...boardListOptions(workspaceId),
     ...(shouldForce ? { staleTime: 0 } : {}),
@@ -392,13 +418,14 @@ export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOp
     } satisfies HydrateBoardsFromServerResult
   }
   const scope: CompleteBoardScope = {
+    ...waited,
     userScope: waited.userScope,
     workspaceId: waited.workspaceId,
   }
   const workspaceId = scope.workspaceId
   const resolvedOptions = resolveHydrateOptions(options)
   const rollbackKey = [...resolvedOptions.rollbackBoardIds].sort().join(',')
-  const hydrateKey = `${boardScopeKey(scope)}:${resolvedOptions.shouldPreserveLocalNewer ? 'preserve' : 'replace'}:${rollbackKey}:${options.shouldIncludeDocuments !== false}:${options.shouldForce !== false}`
+  const hydrateKey = `${boardScopeKey(scope)}:${scope.residency}:${resolvedOptions.shouldPreserveLocalNewer ? 'preserve' : 'replace'}:${rollbackKey}:${options.shouldIncludeDocuments !== false}:${options.shouldForce !== false}`
   const inFlight = hydrateInFlight.get(hydrateKey)
   if (inFlight) return inFlight
   const task = (async () => {
@@ -655,14 +682,16 @@ export async function syncDeleteBoardToServer(boardId: string) {
   // v1 has no hard delete; gallery delete archives (already-archived
   // reads 404 so replays converge to isRemoteWasMissing upstream).
   const workspaceId = requireBoardWorkspaceId()
+  const scope = getBoardScope()
   await archiveWorkspaceBoard(workspaceId, boardId)
-  // Delete convergence mirrors share_revoked: invalidate the list and drop
-  // the document query.
+  if (!isBoardScopeCurrent(scope)) return
+  // Archive convergence invalidates the catalog and document: invalidate the
+  // list and drop the document query.
   removeBoardDocumentQuery(workspaceId, boardId.trim())
 }
 
 /**
- * Board sync conflict vocabulary (issue #910).
+ * Board sync conflict vocabulary.
  *
  * v1 has no board-name uniqueness: every 409 that is not `board_archived`
  * is an optimistic-concurrency signal, never a server name-uniqueness
@@ -780,6 +809,11 @@ export async function syncRestoreBoardToServer(boardId: string): Promise<Workspa
       createdAt: meta.createdAt,
       updatedAt: meta.updatedAt,
       revision: meta.revision,
+      capabilities: meta.capabilities,
+      accessState: meta.accessState,
+      workspaceAccess: meta.workspaceAccess,
+      isCreator: meta.isCreator,
+      hasDirectGrant: meta.hasDirectGrant,
     })
   }
   return meta

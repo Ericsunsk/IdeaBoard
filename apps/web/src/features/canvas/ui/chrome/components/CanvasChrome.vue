@@ -31,10 +31,10 @@
         <button
           type="button"
           :class="canvasChromeActionControlClass"
-          :aria-label="t('canvas.chrome.shareComingSoon')"
-          :title="t('canvas.chrome.shareComingSoon')"
-          disabled
+          :aria-label="t('canvas.chrome.share')"
+          :title="t('canvas.chrome.share')"
           @mousedown.stop
+          @click="emit('share')"
         >
           <ShareAndroid class="canvas-chrome-icon" />
         </button>
@@ -187,6 +187,7 @@ const emit = defineEmits<{
   'reload-catalog': []
   'restore-archived-board': []
   'select-board': [boardId: string]
+  share: []
   export: []
   'navigate-back': []
   'select-tool': [tool: 'select' | 'hand']

@@ -1,47 +1,9 @@
 package boards
 
-// Postgres WorkspaceBoardStore (issue #802 interface, #809 follow-up to
-// #817).
-//
-// This is the production WorkspaceBoardStore over PostgreSQL/sqlc. It
-// mirrors InMemoryWorkspaceBoardStore semantics:
-//
-//   - Board external ids mint board_<hex>; legacy non-prefixed ids are out
-//     of scope and fail closed (ErrInvalidInput on create, ErrNotFound on
-//     read). boards.workspace_id is the workspace link (no separate link
-//     table); every board-scoped query joins workspaces on public_id so
-//     foreign-workspace rows stay invisible.
-//   - The board creator is the implicit owner via boards.owner_user_id and
-//     never needs a board_memberships row. Rows predating the owner column
-//     read as not found (fail-closed).
-//   - Visible workspace members default to viewer (workspace owners to
-//     owner); explicit board_memberships rows override the default.
-//     Callers with no visible workspace membership and no explicit grant
-//     stay invisible (404 at the handler edge). Unknown/empty workspace
-//     roles stay fail-closed.
-//   - Revisions are INSERT-only: ReplaceDocument appends a board_revisions
-//     row and advances board_documents under SELECT ... FOR UPDATE plus a
-//     version-guarded UPDATE, so stale writers get ErrRevisionConflict.
-//     The revision counter doubles as the ETag value.
-//   - Only the share-token hash is stored (token_secret); the bearer is
-//     returned once at create and never persisted, so share secrets need
-//     no reversible encryption at rest.
-//   - Workspace membership does NOT grant board access by itself: every
-//     board read requires an explicit board role OR a visible workspace
-//     membership default (creator counts as owner; workspace owners default
-//     to owner, other visible members to viewer; explicit rows override).
-//   - The last owner cannot be removed or demoted (ErrV1LastOwner).
-//
-// Divergences from the in-memory store (documented residuals):
-//   - V1ShareToken.UsageCount is persisted and advances on join, but
-//     V1AuditEvent trails are not (durable audit is #808).
-//   - Board-name uniqueness is not enforced (matches the in-memory store;
-//     no UNIQUE(workspace_id, title) constraint exists).
-//   - CreateBoard on an unknown workspace returns ErrNotFound (the
-//     in-memory store materializes the workspace bucket implicitly);
-//     handlers always resolve the workspace first.
-//
-// Repository methods take context.Context first and use dbWithContext(ctx).
+// Board writes lock the Workspace membership row before Board rows and re-read
+// current membership in the accepting transaction. Document replacement accepts
+// authorized Media references, the immutable revision, document and Preview Scene
+// together. Access changes advance only access_version.
 
 import (
 	"context"
@@ -56,31 +18,42 @@ import (
 	"ideaboard/api/internal/boards/previewscene"
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/tenancy"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Local mint prefixes (not kernel prefixes yet, like v1ShareTokenPrefix in
-// v1_workspace.go). They match the board_revisions (rev_%) and
-// board_share_tokens (bst_%) public_id CHECKs, so minted ids pass through
+// Local mint prefixes (not kernel prefixes yet). They match the
+// board_revisions (rev_%) public_id CHECK, so minted ids pass through
 // opaquely.
 const (
 	postgresRevisionPrefix  = "rev_"
-	postgresShareRowPrefix  = "bst_"
 	maxWorkspaceBoardRows   = int32(500)
 	postgresRevisionIDBytes = 12
-	postgresShareRowIDBytes = 12
 )
+
+// DocumentMediaAccess exposes the Board facts used to accept Media references.
+type DocumentMediaAccess interface {
+	RoleReader
+	BoardMediaRefReader
+}
+
+// DocumentAssetValidator validates references against the accepting transaction.
+type DocumentAssetValidator func(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string, actorUserID int64, access DocumentMediaAccess, assetIDs []string) error
 
 // PostgresWorkspaceBoardStore is the postgres WorkspaceBoardStore. It must
 // never be replaced by the test-only InMemoryWorkspaceBoardStore in
 // production wiring.
 type PostgresWorkspaceBoardStore struct {
-	db *pgxpool.Pool
-	q  *dbsqlc.Queries
+	validateDocumentAssets DocumentAssetValidator
+	db                     *pgxpool.Pool
+	q                      *dbsqlc.Queries
 }
 
 // Compile-time convergence: the postgres store implements the seam.
@@ -93,12 +66,16 @@ type postgresBoardQueryer struct {
 }
 
 // NewPostgresWorkspaceBoardStore builds a postgres WorkspaceBoardStore over pool.
-func NewPostgresWorkspaceBoardStore(db *pgxpool.Pool) *PostgresWorkspaceBoardStore {
-	return &PostgresWorkspaceBoardStore{db: db, q: dbsqlc.New(db)}
+func NewPostgresWorkspaceBoardStore(db *pgxpool.Pool, validateDocumentAssets DocumentAssetValidator) *PostgresWorkspaceBoardStore {
+	return &PostgresWorkspaceBoardStore{db: db, q: dbsqlc.New(db), validateDocumentAssets: validateDocumentAssets}
 }
 
 func (s *PostgresWorkspaceBoardStore) dbWithContext(ctx context.Context) postgresBoardQueryer {
-	return postgresBoardQueryer{ctx: ctx, db: s.db, q: s.q}
+	q := s.q
+	if tx, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		q = dbsqlc.New(tx)
+	}
+	return postgresBoardQueryer{ctx: ctx, db: s.db, q: q}
 }
 
 func (db postgresBoardQueryer) withTx(run func(*dbsqlc.Queries) error) error {
@@ -114,9 +91,10 @@ func boardDocumentETag(version int64, snapshot json.RawMessage) string {
 }
 
 func mapPostgresBoardRole(raw string) (AccessRole, bool) {
-	switch AccessRole(strings.TrimSpace(raw)) {
+	role := AccessRole(raw)
+	switch role {
 	case RoleOwner, RoleEditor, RoleViewer:
-		return AccessRole(strings.TrimSpace(raw)), true
+		return role, true
 	default:
 		return "", false
 	}
@@ -139,6 +117,8 @@ func mapPostgresBoardRow(row dbsqlc.GetWorkspaceBoardRow) (*V1Board, error) {
 		ArchivedAt:        dbutil.TimePtr(row.ArchivedAt),
 		OwnerUserID:       row.OwnerUserID.Int64,
 		CreatedBy:         row.OwnerUserID.Int64,
+		WorkspaceAccess:   WorkspaceAccess(strings.TrimSpace(row.WorkspaceAccess)),
+		AccessVersion:     row.AccessVersion,
 		CreatedAt:         dbutil.TimeValue(row.CreatedAt),
 		UpdatedAt:         dbutil.TimeValue(row.UpdatedAt),
 	}
@@ -158,6 +138,11 @@ func mapPostgresBoardCatalogRow(row dbsqlc.ListWorkspaceBoardCatalogRow) (*V1Boa
 		// Owner-less rows predate the owner column: fail closed.
 		return nil, ErrNotFound
 	}
+	role, ok := mapPostgresBoardRole(row.EffectiveRole.String)
+	if !ok {
+		return nil, ErrNotFound
+	}
+	hasDirectGrant, _ := row.HasDirectGrant.(bool)
 	entry := &V1BoardCatalogEntry{
 		WorkspacePublicID: row.WorkspacePublicID.String,
 		PublicID:          row.PublicID.String,
@@ -167,6 +152,11 @@ func mapPostgresBoardCatalogRow(row dbsqlc.ListWorkspaceBoardCatalogRow) (*V1Boa
 		ArchivedAt:        dbutil.TimePtr(row.ArchivedAt),
 		OwnerUserID:       row.OwnerUserID.Int64,
 		CreatedBy:         row.OwnerUserID.Int64,
+		WorkspaceAccess:   WorkspaceAccess(strings.TrimSpace(row.WorkspaceAccess.String)),
+		AccessVersion:     row.AccessVersion.Int64,
+		EffectiveRole:     role,
+		HasDirectGrant:    hasDirectGrant,
+		AccessState:       DeriveAccessState(WorkspaceAccess(strings.TrimSpace(row.WorkspaceAccess.String)), row.HasAnyGrants),
 		CreatedAt:         dbutil.TimeValue(row.CreatedAt),
 		UpdatedAt:         dbutil.TimeValue(row.UpdatedAt),
 	}
@@ -209,51 +199,73 @@ func (s *PostgresWorkspaceBoardStore) getBoard(ctx context.Context, workspacePub
 	return getPostgresBoard(ctx, s.dbWithContext(ctx).q, workspacePublicID, boardPublicID)
 }
 
-// boardRoleTx reports the effective board role: the owner_user_id counts as
-// owner; explicit member rows grant editor/viewer/owner and override the
-// workspace default; visible workspace members fall back to viewer
-// (workspace owners to owner). Unknown/empty workspace roles stay denied
-// (fail-closed); unknown member rows stay denied.
-func boardRoleTx(ctx context.Context, q *dbsqlc.Queries, board *V1Board, userID int64, workspaceRole string) (AccessRole, bool, error) {
-	if board.OwnerUserID == userID {
-		return RoleOwner, true, nil
-	}
-	raw, err := q.GetWorkspaceBoardMembershipRole(ctx, dbsqlc.GetWorkspaceBoardMembershipRoleParams{
-		WorkspacePublicID: board.WorkspacePublicID,
-		BoardPublicID:     board.PublicID,
-		UserID:            userID,
-	})
+// boardRoleTx resolves current membership and selected members through ResolveRole.
+func boardRoleTx(ctx context.Context, q *dbsqlc.Queries, board *V1Board, userID int64) (AccessRole, bool, error) {
+	workspace, err := q.GetWorkspaceByPublicID(ctx, board.WorkspacePublicID)
 	if err != nil {
-		if database.IsNotFound(err) {
-			if role, ok := DefaultBoardRoleForWorkspaceRole(workspaceRole); ok {
-				return role, true, nil
-			}
-			return "", false, nil
-		}
 		return "", false, err
 	}
-	role, ok := mapPostgresBoardRole(raw)
-	if !ok {
+	membership, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspace.InternalID, UserID: userID})
+	if database.IsNotFound(err) {
 		return "", false, nil
 	}
-	return role, true, nil
+	if err != nil {
+		return "", false, err
+	}
+	if !IsWorkspaceMemberRole(membership.Role) {
+		return "", false, nil
+	}
+	_, err = q.GetWorkspaceBoardMembership(ctx, dbsqlc.GetWorkspaceBoardMembershipParams{WorkspacePublicID: board.WorkspacePublicID, BoardPublicID: board.PublicID, UserID: userID})
+	if err != nil && !database.IsNotFound(err) {
+		return "", false, err
+	}
+	role, visible := ResolveRole(board.OwnerUserID, userID, err == nil, board.WorkspaceAccess, true)
+	return role, visible, nil
 }
 
-// ownerCountTx counts owner-role member rows besides the implicit owner,
-// then adds the implicit owner itself (mirrors ownerCountLocked).
-func ownerCountTx(ctx context.Context, q *dbsqlc.Queries, board *V1Board) (int, error) {
-	count, err := q.CountWorkspaceBoardOwners(ctx, dbsqlc.CountWorkspaceBoardOwnersParams{
-		WorkspacePublicID: board.WorkspacePublicID,
-		BoardPublicID:     board.PublicID,
-	})
+func requireBoardWriteTx(ctx context.Context, q *dbsqlc.Queries, board *V1Board, actorUserID int64) error {
+	role, visible, err := boardRoleTx(ctx, q, board, actorUserID)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	return int(count) + 1, nil
+	return CheckCapability(role, visible, CapWrite)
+}
+
+func lockWorkspaceMembersTx(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string) error {
+	_, err := q.LockWorkspaceMemberships(ctx, workspacePublicID)
+	if database.IsNotFound(err) {
+		return ErrNotFound
+	}
+	return err
+}
+
+func lockWritableBoardTx(ctx context.Context, q *dbsqlc.Queries, workspacePublicID, boardPublicID string, actorUserID int64) (*V1Board, error) {
+	if err := lockWorkspaceMembersTx(ctx, q, workspacePublicID); err != nil {
+		return nil, err
+	}
+	if _, err := q.LockWorkspaceBoardAccess(ctx, dbsqlc.LockWorkspaceBoardAccessParams{
+		WorkspacePublicID: workspacePublicID,
+		BoardPublicID:     boardPublicID,
+	}); err != nil {
+		if database.IsNotFound(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	board, err := getPostgresBoard(ctx, q, workspacePublicID, boardPublicID)
+	if err != nil {
+		return nil, err
+	}
+	if err := requireBoardWriteTx(ctx, q, board, actorUserID); err != nil {
+		return nil, err
+	}
+	return board, nil
 }
 
 // CreateBoard mints a workspace-rooted board at revision 1 with the empty
-// discriminated-union snapshot; the creator is the implicit owner.
+// discriminated-union snapshot; the creator is the implicit owner. The
+// sharing role is fixed to none by the database default: creation
+// requests cannot widen it.
 func (s *PostgresWorkspaceBoardStore) CreateBoard(ctx context.Context, workspacePublicID string, creatorUserID int64, name, publicID string) (*V1Board, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -271,6 +283,24 @@ func (s *PostgresWorkspaceBoardStore) CreateBoard(ctx context.Context, workspace
 	}
 	var created *V1Board
 	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
+		if err := lockWorkspaceMembersTx(ctx, q, workspacePublicID); err != nil {
+			return err
+		}
+		workspace, err := q.GetWorkspaceByPublicID(ctx, workspacePublicID)
+		if err != nil {
+			return err
+		}
+		member, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspace.InternalID, UserID: creatorUserID})
+		if database.IsNotFound(err) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if !IsWorkspaceMemberRole(member.Role) {
+			return ErrNotFound
+		}
+
 		row, err := q.CreateWorkspaceBoard(ctx, dbsqlc.CreateWorkspaceBoardParams{
 			PublicID:          trimmedID,
 			WorkspacePublicID: workspacePublicID,
@@ -341,11 +371,11 @@ func (s *PostgresWorkspaceBoardStore) ListBoardCatalog(ctx context.Context, work
 	rows, err := s.dbWithContext(ctx).q.ListWorkspaceBoardCatalog(ctx, dbsqlc.ListWorkspaceBoardCatalogParams{
 		WorkspacePublicID: strings.TrimSpace(workspacePublicID),
 		IncludeArchived:   includeArchived,
+		IsWorkspaceMember: IsWorkspaceMemberRole(workspaceRole),
 		CatalogLimit:      maxBoardCatalogRows,
 		RowOffset:         int32(page.Offset),
 		RowLimit:          int32(page.Limit),
-		UserID:            userID,
-		WorkspaceRole:     strings.TrimSpace(workspaceRole),
+		UserID:            dbutil.NullInt64(&userID),
 	})
 	if err != nil {
 		return V1BoardCatalogPage{}, err
@@ -378,7 +408,7 @@ func (s *PostgresWorkspaceBoardStore) GetBoard(ctx context.Context, workspacePub
 }
 
 // RenameBoard renames a live board; the revision counter is untouched.
-func (s *PostgresWorkspaceBoardStore) RenameBoard(ctx context.Context, workspacePublicID, boardPublicID, name string) (*V1Board, error) {
+func (s *PostgresWorkspaceBoardStore) RenameBoard(ctx context.Context, workspacePublicID, boardPublicID, name string, actorUserID int64) (*V1Board, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -387,68 +417,79 @@ func (s *PostgresWorkspaceBoardStore) RenameBoard(ctx context.Context, workspace
 	}
 	workspacePublicID = strings.TrimSpace(workspacePublicID)
 	trimmedID := strings.TrimSpace(boardPublicID)
-	if _, err := s.getBoard(ctx, workspacePublicID, trimmedID); err != nil {
-		return nil, err
-	}
-	affected, err := s.dbWithContext(ctx).q.RenameWorkspaceBoard(ctx, dbsqlc.RenameWorkspaceBoardParams{
-		Title:             strings.TrimSpace(name),
-		WorkspacePublicID: workspacePublicID,
-		BoardPublicID:     trimmedID,
+	var updated *V1Board
+	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
+		if _, err := lockWritableBoardTx(ctx, q, workspacePublicID, trimmedID, actorUserID); err != nil {
+			return err
+		}
+		affected, err := q.RenameWorkspaceBoard(ctx, dbsqlc.RenameWorkspaceBoardParams{
+			Title: strings.TrimSpace(name), WorkspacePublicID: workspacePublicID, BoardPublicID: trimmedID,
+		})
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			return ErrV1Archived
+		}
+		updated, err = getPostgresBoard(ctx, q, workspacePublicID, trimmedID)
+		return err
 	})
-	if err != nil {
-		return nil, err
-	}
-	if affected == 0 {
-		return nil, ErrV1Archived
-	}
-	return s.getBoard(ctx, workspacePublicID, trimmedID)
+	return updated, err
 }
 
 // ArchiveBoard archives a live board; already-archived rows read as not
 // found so archive stays idempotent-safe at the handler layer.
-func (s *PostgresWorkspaceBoardStore) ArchiveBoard(ctx context.Context, workspacePublicID, boardPublicID string) (*V1Board, error) {
+func (s *PostgresWorkspaceBoardStore) ArchiveBoard(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID int64) (*V1Board, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	workspacePublicID = strings.TrimSpace(workspacePublicID)
 	trimmedID := strings.TrimSpace(boardPublicID)
-	if _, err := s.getBoard(ctx, workspacePublicID, trimmedID); err != nil {
-		return nil, err
-	}
-	affected, err := s.dbWithContext(ctx).q.ArchiveWorkspaceBoard(ctx, dbsqlc.ArchiveWorkspaceBoardParams{
-		WorkspacePublicID: workspacePublicID,
-		BoardPublicID:     trimmedID,
+	var updated *V1Board
+	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
+		if _, err := lockWritableBoardTx(ctx, q, workspacePublicID, trimmedID, actorUserID); err != nil {
+			return err
+		}
+		affected, err := q.ArchiveWorkspaceBoard(ctx, dbsqlc.ArchiveWorkspaceBoardParams{
+			WorkspacePublicID: workspacePublicID, BoardPublicID: trimmedID,
+		})
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			return ErrNotFound
+		}
+		updated, err = getPostgresBoard(ctx, q, workspacePublicID, trimmedID)
+		return err
 	})
-	if err != nil {
-		return nil, err
-	}
-	if affected == 0 {
-		return nil, ErrNotFound
-	}
-	return s.getBoard(ctx, workspacePublicID, trimmedID)
+	return updated, err
 }
 
 // RestoreBoard clears the archive timestamp; live boards read as not found.
-func (s *PostgresWorkspaceBoardStore) RestoreBoard(ctx context.Context, workspacePublicID, boardPublicID string) (*V1Board, error) {
+func (s *PostgresWorkspaceBoardStore) RestoreBoard(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID int64) (*V1Board, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	workspacePublicID = strings.TrimSpace(workspacePublicID)
 	trimmedID := strings.TrimSpace(boardPublicID)
-	if _, err := s.getBoard(ctx, workspacePublicID, trimmedID); err != nil {
-		return nil, err
-	}
-	affected, err := s.dbWithContext(ctx).q.RestoreWorkspaceBoard(ctx, dbsqlc.RestoreWorkspaceBoardParams{
-		WorkspacePublicID: workspacePublicID,
-		BoardPublicID:     trimmedID,
+	var updated *V1Board
+	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
+		if _, err := lockWritableBoardTx(ctx, q, workspacePublicID, trimmedID, actorUserID); err != nil {
+			return err
+		}
+		affected, err := q.RestoreWorkspaceBoard(ctx, dbsqlc.RestoreWorkspaceBoardParams{
+			WorkspacePublicID: workspacePublicID, BoardPublicID: trimmedID,
+		})
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			return ErrNotFound
+		}
+		updated, err = getPostgresBoard(ctx, q, workspacePublicID, trimmedID)
+		return err
 	})
-	if err != nil {
-		return nil, err
-	}
-	if affected == 0 {
-		return nil, ErrNotFound
-	}
-	return s.getBoard(ctx, workspacePublicID, trimmedID)
+	return updated, err
 }
 
 // ReplaceDocument appends an immutable revision when the expected revision
@@ -464,6 +505,9 @@ func (s *PostgresWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 	trimmedID := strings.TrimSpace(boardPublicID)
 	var updated *V1Board
 	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
+		if _, err := lockWritableBoardTx(ctx, q, workspacePublicID, trimmedID, actorUserID); err != nil {
+			return err
+		}
 		locked, err := q.LockWorkspaceBoard(ctx, dbsqlc.LockWorkspaceBoardParams{
 			WorkspacePublicID: workspacePublicID,
 			BoardPublicID:     trimmedID,
@@ -480,6 +524,16 @@ func (s *PostgresWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 		if int64(locked.DocumentVersion) != expectedRevision {
 			return ErrRevisionConflict
 		}
+		assetIDs := previewscene.ExtractMediaAssetIDs(snapshot)
+		if len(assetIDs) > 0 {
+			if s.validateDocumentAssets == nil {
+				return ErrPermissionDenied
+			}
+			if err := s.validateDocumentAssets(ctx, q, workspacePublicID, actorUserID, &PostgresWorkspaceBoardStore{q: q}, assetIDs); err != nil {
+				return err
+			}
+		}
+
 		parent, err := q.GetBoardRevisionByNumber(ctx, dbsqlc.GetBoardRevisionByNumberParams{
 			WorkspacePublicID: workspacePublicID,
 			BoardPublicID:     trimmedID,
@@ -531,6 +585,27 @@ func (s *PostgresWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 		}
 		if err := q.TouchWorkspaceBoard(ctx, locked.InternalID); err != nil {
 			return err
+		}
+		// #936: reconcile the accepted document -> media references in the
+		// SAME accepting transaction. Removed ids stop authorizing here
+		// while upload-target, owner, library, task, and other-board
+		// sources stay untouched. Unknown asset shapes never match a row
+		// (the upsert joins on the workspace-scoped asset), so forged or
+		// foreign ids grant nothing.
+		if err := q.DeleteBoardDocumentMediaRefs(ctx, dbsqlc.DeleteBoardDocumentMediaRefsParams{
+			WorkspacePublicID: workspacePublicID,
+			BoardPublicID:     trimmedID,
+		}); err != nil {
+			return err
+		}
+		for _, assetPublicID := range assetIDs {
+			if err := q.UpsertBoardDocumentMediaRef(ctx, dbsqlc.UpsertBoardDocumentMediaRefParams{
+				WorkspacePublicID: workspacePublicID,
+				BoardPublicID:     trimmedID,
+				AssetPublicID:     assetPublicID,
+			}); err != nil {
+				return err
+			}
 		}
 		board, err := getPostgresBoard(ctx, q, workspacePublicID, trimmedID)
 		if err != nil {
@@ -618,10 +693,13 @@ func mapPostgresRevision(boardPublicID string, id int64, revision, schemaVersion
 	}
 }
 
-// GetBoardRole reports the effective board role (creator counts as owner;
-// explicit rows override; visible workspace members fall back to viewer,
-// workspace owners to owner).
+// GetBoardRole reports the effective board role through the unified policy
+// (creator counts as owner; every non-creator grant needs valid workspace
+// membership; selected members receive the common role; Workspace Owner / Admin hold no implicit access).
 func (s *PostgresWorkspaceBoardStore) GetBoardRole(ctx context.Context, workspacePublicID, boardPublicID string, userID int64, workspaceRole string) (AccessRole, bool, error) {
+	if !IsWorkspaceMemberRole(workspaceRole) {
+		return "", false, nil
+	}
 	if err := ctx.Err(); err != nil {
 		return "", false, err
 	}
@@ -629,11 +707,39 @@ func (s *PostgresWorkspaceBoardStore) GetBoardRole(ctx context.Context, workspac
 	if err != nil {
 		return "", false, err
 	}
-	return boardRoleTx(ctx, s.dbWithContext(ctx).q, board, userID, workspaceRole)
+	return boardRoleTx(ctx, s.dbWithContext(ctx).q, board, userID)
 }
 
-// ListBoardMembers lists explicit grants ordered by user id (the implicit
-// owner row is not listed here; handlers prepend it from the board row).
+// ListBoardsReferencingAsset serves the narrow BoardMediaRefReader port
+// (#936): the workspace-scoped boards whose accepted document references
+// one media asset. Public ids only; unknown or cross-workspace assets list
+// empty (fail-closed, never a distinct status).
+func (s *PostgresWorkspaceBoardStore) ListBoardsReferencingAsset(ctx context.Context, workspacePublicID, assetPublicID string) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	trimmedAsset := strings.TrimSpace(assetPublicID)
+	if !contract.IsAssetID(trimmedAsset) {
+		return nil, nil
+	}
+	rows, err := s.dbWithContext(ctx).q.ListBoardsReferencingMediaAsset(ctx, dbsqlc.ListBoardsReferencingMediaAssetParams{
+		WorkspacePublicID: strings.TrimSpace(workspacePublicID),
+		PublicID:          trimmedAsset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if trimmed := strings.TrimSpace(row); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out, nil
+}
+
+// ListBoardMembers lists selected members ordered by user id.
+// The Creator has implicit access and does not need a selection row.
 func (s *PostgresWorkspaceBoardStore) ListBoardMembers(ctx context.Context, workspacePublicID, boardPublicID string) ([]*V1BoardMember, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -653,455 +759,235 @@ func (s *PostgresWorkspaceBoardStore) ListBoardMembers(ctx context.Context, work
 	}
 	out := make([]*V1BoardMember, 0, len(rows))
 	for _, row := range rows {
-		role, ok := mapPostgresBoardRole(row.Role)
-		if !ok {
-			continue
-		}
 		out = append(out, &V1BoardMember{
 			BoardPublicID: trimmedID,
 			UserID:        row.UserID,
-			Role:          role,
 			CreatedAt:     dbutil.TimeValue(row.CreatedAt),
 		})
 	}
 	return out, nil
 }
 
-// AddBoardMember grants a role idempotently: re-adding keeps the existing
-// role. Only board owners may grant (the actor's effective role includes
-// the workspace default).
-func (s *PostgresWorkspaceBoardStore) AddBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, role AccessRole, actorWorkspaceRole string) (*V1BoardMember, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
+// readBoardAccessTx reads the common role and selected identities together.
+func readBoardAccessTx(ctx context.Context, q *dbsqlc.Queries, workspacePublicID, boardPublicID string) (*V1BoardAccess, error) {
+	row, err := q.GetWorkspaceBoardAccess(ctx, dbsqlc.GetWorkspaceBoardAccessParams{WorkspacePublicID: workspacePublicID, BoardPublicID: boardPublicID})
+	if database.IsNotFound(err) {
+		return nil, ErrNotFound
 	}
-	if err := ValidateV1BoardRole(role); err != nil {
-		return nil, err
-	}
-	if actorUserID <= 0 || targetUserID <= 0 {
-		return nil, ErrInvalidInput
-	}
-	workspacePublicID = strings.TrimSpace(workspacePublicID)
-	trimmedID := strings.TrimSpace(boardPublicID)
-	var added *V1BoardMember
-	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
-		board, err := getPostgresBoard(ctx, q, workspacePublicID, trimmedID)
-		if err != nil {
-			return err
-		}
-		actorRole, ok, err := boardRoleTx(ctx, q, board, actorUserID, actorWorkspaceRole)
-		if err != nil {
-			return err
-		}
-		if !ok || actorRole != RoleOwner {
-			return ErrPermissionDenied
-		}
-		if targetUserID == board.OwnerUserID {
-			return ErrMemberInviteSelf
-		}
-		if _, err := q.InsertWorkspaceBoardMembershipIgnore(ctx, dbsqlc.InsertWorkspaceBoardMembershipIgnoreParams{
-			WorkspacePublicID: workspacePublicID,
-			BoardPublicID:     trimmedID,
-			UserID:            targetUserID,
-			Role:              string(role),
-		}); err != nil {
-			return err
-		}
-		raw, err := q.GetWorkspaceBoardMembershipRole(ctx, dbsqlc.GetWorkspaceBoardMembershipRoleParams{
-			WorkspacePublicID: workspacePublicID,
-			BoardPublicID:     trimmedID,
-			UserID:            targetUserID,
-		})
-		if err != nil {
-			if database.IsNotFound(err) {
-				return ErrMemberNotFound
-			}
-			return err
-		}
-		current, ok := mapPostgresBoardRole(raw)
-		if !ok {
-			return ErrMemberNotFound
-		}
-		added = &V1BoardMember{BoardPublicID: board.PublicID, UserID: targetUserID, Role: current}
-		// The re-add path keeps the stored role; surface the stored grant
-		// timestamp for fidelity with the in-memory copy semantics.
-		members, err := q.ListWorkspaceBoardMemberships(ctx, dbsqlc.ListWorkspaceBoardMembershipsParams{
-			WorkspacePublicID: workspacePublicID,
-			BoardPublicID:     trimmedID,
-			RowLimit:          maxWorkspaceBoardRows,
-		})
-		if err != nil {
-			return err
-		}
-		for _, member := range members {
-			if member.UserID == targetUserID {
-				added.CreatedAt = dbutil.TimeValue(member.CreatedAt)
-			}
-		}
-		return nil
-	})
 	if err != nil {
 		return nil, err
 	}
-	return added, nil
+	if !row.OwnerUserID.Valid {
+		return nil, ErrNotFound
+	}
+	members, err := q.ListWorkspaceBoardMemberships(ctx, dbsqlc.ListWorkspaceBoardMembershipsParams{WorkspacePublicID: workspacePublicID, BoardPublicID: boardPublicID, RowLimit: maxWorkspaceBoardRows})
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]int64, 0, len(members))
+	for _, member := range members {
+		ids = append(ids, member.UserID)
+	}
+	return &V1BoardAccess{WorkspacePublicID: workspacePublicID, BoardPublicID: boardPublicID, WorkspaceAccess: WorkspaceAccess(row.WorkspaceAccess), AccessVersion: row.AccessVersion, AccessState: DeriveAccessState(WorkspaceAccess(row.WorkspaceAccess), len(ids) > 0), MemberUserIDs: ids, ArchivedAt: dbutil.TimePtr(row.ArchivedAt)}, nil
 }
 
-// UpdateBoardMemberRole applies owner-only transitions with last-owner
-// protection. The actor's effective role includes the workspace default.
-func (s *PostgresWorkspaceBoardStore) UpdateBoardMemberRole(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, newRole AccessRole, actorWorkspaceRole string) (*V1BoardMember, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := ValidateV1BoardRole(newRole); err != nil {
-		return nil, err
-	}
-	if actorUserID <= 0 || targetUserID <= 0 {
+func (s *PostgresWorkspaceBoardStore) GetBoardAccess(ctx context.Context, workspacePublicID, boardPublicID string) (*V1BoardAccess, error) {
+	workspacePublicID = strings.TrimSpace(workspacePublicID)
+	boardPublicID = strings.TrimSpace(boardPublicID)
+	var out *V1BoardAccess
+	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
+		if err := lockWorkspaceMembersTx(ctx, q, workspacePublicID); err != nil {
+			return err
+		}
+		var err error
+		out, err = readBoardAccessTx(ctx, q, workspacePublicID, boardPublicID)
+		return err
+	})
+	return out, err
+}
+
+// ReplaceBoardAccess accepts the complete selected-member policy in one transaction.
+func (s *PostgresWorkspaceBoardStore) ReplaceBoardAccess(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, expectedVersion int64, access WorkspaceAccess, selectedUserIDs []int64) (*V1BoardAccess, error) {
+	if !ValidateWorkspaceAccess(access) || actorUserID <= 0 || expectedVersion <= 0 {
 		return nil, ErrInvalidInput
 	}
 	workspacePublicID = strings.TrimSpace(workspacePublicID)
-	trimmedID := strings.TrimSpace(boardPublicID)
-	var updated *V1BoardMember
+	boardPublicID = strings.TrimSpace(boardPublicID)
+	var out *V1BoardAccess
+	err := dbutil.WithTxDBTX(ctx, s.db, func(q *dbsqlc.Queries, tx pgx.Tx) error {
+		if err := lockWorkspaceMembersTx(ctx, q, workspacePublicID); err != nil {
+			return err
+		}
+		locked, err := q.LockWorkspaceBoardAccess(ctx, dbsqlc.LockWorkspaceBoardAccessParams{WorkspacePublicID: workspacePublicID, BoardPublicID: boardPublicID})
+		if database.IsNotFound(err) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if !locked.OwnerUserID.Valid {
+			return ErrNotFound
+		}
+		board := &V1Board{WorkspacePublicID: workspacePublicID, PublicID: boardPublicID, OwnerUserID: locked.OwnerUserID.Int64, WorkspaceAccess: WorkspaceAccess(locked.WorkspaceAccess), ArchivedAt: dbutil.TimePtr(locked.ArchivedAt)}
+		role, visible, err := boardRoleTx(ctx, q, board, actorUserID)
+		if err != nil {
+			return err
+		}
+		if err := CheckCapability(role, visible, CapManage); err != nil {
+			return err
+		}
+		if board.ArchivedAt != nil {
+			return ErrV1Archived
+		}
+		if locked.AccessVersion != expectedVersion {
+			return ErrAccessConflict
+		}
+		ids, err := selectedBoardMembers(access, selectedUserIDs, board.OwnerUserID)
+		if err != nil {
+			return err
+		}
+		workspace, err := q.GetWorkspaceByPublicID(ctx, workspacePublicID)
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			member, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspace.InternalID, UserID: id})
+			if database.IsNotFound(err) {
+				return ErrMemberNotFound
+			}
+			if err != nil {
+				return err
+			}
+			if !IsWorkspaceMemberRole(member.Role) {
+				return ErrMemberNotFound
+			}
+		}
+		before, err := readBoardAccessTx(ctx, q, workspacePublicID, boardPublicID)
+		if err != nil {
+			return err
+		}
+		if before.WorkspaceAccess == access && equalMemberIDs(before.MemberUserIDs, ids) {
+			out = before
+			return nil
+		}
+		if _, err := q.ClearBoardMemberships(ctx, dbsqlc.ClearBoardMembershipsParams{WorkspacePublicID: workspacePublicID, BoardPublicID: boardPublicID}); err != nil {
+			return err
+		}
+		for _, id := range ids {
+			if _, err := q.InsertWorkspaceBoardMembershipIgnore(ctx, dbsqlc.InsertWorkspaceBoardMembershipIgnoreParams{WorkspacePublicID: workspacePublicID, BoardPublicID: boardPublicID, UserID: id}); err != nil {
+				return err
+			}
+		}
+		affected, err := q.SetBoardWorkspaceAccess(ctx, dbsqlc.SetBoardWorkspaceAccessParams{WorkspacePublicID: workspacePublicID, BoardPublicID: boardPublicID, WorkspaceAccess: string(access), ExpectedVersion: expectedVersion})
+		if err != nil {
+			return err
+		}
+		if affected != 1 {
+			return ErrAccessConflict
+		}
+		out, err = readBoardAccessTx(ctx, q, workspacePublicID, boardPublicID)
+		if err != nil {
+			return err
+		}
+		ordered := changedBoardMembers(before.MemberUserIDs, ids, board.OwnerUserID)
+		occurredAt := time.Now().UTC()
+		for _, id := range ordered {
+			user, err := q.GetUserByID(ctx, id)
+			if err != nil {
+				return err
+			}
+			record := events.NewBoardAccessOutboxRecord(workspacePublicID, boardPublicID, tenancy.FormatUserPublicID(uuid.UUID(user.PublicID.Bytes)), out.AccessVersion, occurredAt)
+			if err := events.NewBoardAccessOutboxStore(s.db).InsertTx(ctx, tx, record); err != nil {
+				return err
+			}
+			out.AccessSignals = append(out.AccessSignals, record)
+		}
+		return nil
+	})
+	return out, err
+}
+
+// RemoveWorkspaceMemberGrants participates in the caller's membership transaction.
+// Workspace membership is locked before Board rows, which lock in public_id order.
+func (s *PostgresWorkspaceBoardStore) RemoveWorkspaceMemberGrants(ctx context.Context, workspacePublicID string, userID int64) ([]tenancy.MemberGrantCleanup, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if userID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	workspacePublicID = strings.TrimSpace(workspacePublicID)
+	if workspacePublicID == "" {
+		return nil, ErrInvalidInput
+	}
+	tx, ok := dbutil.AmbientTxFromContext(ctx)
+	if !ok {
+		return nil, ErrPermissionDenied
+	}
+
+	var out []tenancy.MemberGrantCleanup
 	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
-		board, err := getPostgresBoard(ctx, q, workspacePublicID, trimmedID)
+		grants, err := q.ListWorkspaceMemberBoardGrants(ctx, dbsqlc.ListWorkspaceMemberBoardGrantsParams{
+			WorkspacePublicID: workspacePublicID,
+			UserID:            userID,
+		})
 		if err != nil {
 			return err
 		}
-		actorRole, ok, err := boardRoleTx(ctx, q, board, actorUserID, actorWorkspaceRole)
+		if len(grants) == 0 {
+			return nil
+		}
+		ids := make([]string, 0, len(grants))
+		for _, grant := range grants {
+			ids = append(ids, grant.PublicID)
+		}
+		locked, err := q.LockWorkspaceMemberBoards(ctx, dbsqlc.LockWorkspaceMemberBoardsParams{
+			WorkspacePublicID: workspacePublicID,
+			BoardPublicIds:    ids,
+		})
 		if err != nil {
 			return err
 		}
-		if !ok || actorRole != RoleOwner {
-			return ErrPermissionDenied
+		if _, err := q.DeleteWorkspaceMemberBoardGrants(ctx, dbsqlc.DeleteWorkspaceMemberBoardGrantsParams{
+			WorkspacePublicID: workspacePublicID,
+			UserID:            userID,
+		}); err != nil {
+			return err
 		}
-		if targetUserID == board.OwnerUserID {
-			if newRole != RoleOwner {
-				count, err := ownerCountTx(ctx, q, board)
+		bumped, err := q.BumpWorkspaceMemberBoardsAccess(ctx, dbsqlc.BumpWorkspaceMemberBoardsAccessParams{
+			WorkspacePublicID: workspacePublicID,
+			BoardPublicIds:    ids,
+		})
+		if err != nil {
+			return err
+		}
+		bumpedByID := make(map[string]int64, len(bumped))
+		for _, row := range bumped {
+			bumpedByID[row.PublicID] = row.AccessVersion
+		}
+		out = make([]tenancy.MemberGrantCleanup, 0, len(locked))
+		occurredAt := time.Now().UTC()
+		for _, row := range locked {
+			cleanup := tenancy.MemberGrantCleanup{BoardPublicID: row.PublicID, AccessVersion: bumpedByID[row.PublicID]}
+			for _, recipient := range changedBoardMembers(nil, []int64{userID}, row.OwnerUserID.Int64) {
+				user, err := q.GetUserByID(ctx, recipient)
 				if err != nil {
 					return err
 				}
-				if count <= 1 {
-					return ErrV1LastOwner
+				publicID := tenancy.FormatUserPublicID(uuid.UUID(user.PublicID.Bytes))
+				record := events.NewBoardAccessOutboxRecord(workspacePublicID, row.PublicID, publicID, cleanup.AccessVersion, occurredAt)
+				if err := events.NewBoardAccessOutboxStore(s.db).InsertTx(ctx, tx, record); err != nil {
+					return err
 				}
-				return ErrPermissionDenied
+				cleanup.AccessSignals = append(cleanup.AccessSignals, record)
 			}
-			updated = &V1BoardMember{BoardPublicID: board.PublicID, UserID: targetUserID, Role: RoleOwner}
-			return nil
+			out = append(out, cleanup)
 		}
-		raw, err := q.GetWorkspaceBoardMembershipRole(ctx, dbsqlc.GetWorkspaceBoardMembershipRoleParams{
-			WorkspacePublicID: workspacePublicID,
-			BoardPublicID:     trimmedID,
-			UserID:            targetUserID,
-		})
-		if err != nil {
-			if database.IsNotFound(err) {
-				return ErrMemberNotFound
-			}
-			return err
-		}
-		current, ok := mapPostgresBoardRole(raw)
-		if !ok {
-			return ErrMemberNotFound
-		}
-		if current == RoleOwner && newRole != RoleOwner {
-			count, err := ownerCountTx(ctx, q, board)
-			if err != nil {
-				return err
-			}
-			if count <= 1 {
-				return ErrV1LastOwner
-			}
-		}
-		affected, err := q.UpdateWorkspaceBoardMembershipRole(ctx, dbsqlc.UpdateWorkspaceBoardMembershipRoleParams{
-			Role:              string(newRole),
-			WorkspacePublicID: workspacePublicID,
-			BoardPublicID:     trimmedID,
-			UserID:            targetUserID,
-		})
-		if err != nil {
-			return err
-		}
-		if affected == 0 {
-			return ErrMemberNotFound
-		}
-		updated = &V1BoardMember{BoardPublicID: board.PublicID, UserID: targetUserID, Role: newRole}
+
 		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-	return updated, nil
-}
-
-// RemoveBoardMember removes a grant: owners may remove anyone, anyone may
-// remove themselves. The last owner is protected. The actor's effective
-// role includes the workspace default.
-func (s *PostgresWorkspaceBoardStore) RemoveBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, actorWorkspaceRole string) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if actorUserID <= 0 || targetUserID <= 0 {
-		return ErrInvalidInput
-	}
-	workspacePublicID = strings.TrimSpace(workspacePublicID)
-	trimmedID := strings.TrimSpace(boardPublicID)
-	return s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
-		board, err := getPostgresBoard(ctx, q, workspacePublicID, trimmedID)
-		if err != nil {
-			return err
-		}
-		if targetUserID == board.OwnerUserID {
-			return ErrMemberInviteSelf
-		}
-		raw, err := q.GetWorkspaceBoardMembershipRole(ctx, dbsqlc.GetWorkspaceBoardMembershipRoleParams{
-			WorkspacePublicID: workspacePublicID,
-			BoardPublicID:     trimmedID,
-			UserID:            targetUserID,
-		})
-		if err != nil {
-			if database.IsNotFound(err) {
-				return ErrMemberNotFound
-			}
-			return err
-		}
-		current, ok := mapPostgresBoardRole(raw)
-		if !ok {
-			return ErrMemberNotFound
-		}
-		if current == RoleOwner {
-			count, err := ownerCountTx(ctx, q, board)
-			if err != nil {
-				return err
-			}
-			if count <= 1 {
-				return ErrV1LastOwner
-			}
-		}
-		if actorUserID != targetUserID {
-			actorRole, ok, err := boardRoleTx(ctx, q, board, actorUserID, actorWorkspaceRole)
-			if err != nil {
-				return err
-			}
-			if !ok || actorRole != RoleOwner {
-				return ErrPermissionDenied
-			}
-		}
-		affected, err := q.DeleteWorkspaceBoardMembership(ctx, dbsqlc.DeleteWorkspaceBoardMembershipParams{
-			WorkspacePublicID: workspacePublicID,
-			BoardPublicID:     trimmedID,
-			UserID:            targetUserID,
-		})
-		if err != nil {
-			return err
-		}
-		if affected == 0 {
-			return ErrMemberNotFound
-		}
-		return nil
-	})
-}
-
-func mapPostgresShareToken(boardPublicID, tokenID, tokenHash, tokenPrefix string, role AccessRole, createdBy int64, revoked bool, usageCount int64, createdAt time.Time, revokedAt *time.Time, revokedBy *int64) *V1ShareToken {
-	return &V1ShareToken{
-		TokenID:       tokenID,
-		BoardPublicID: boardPublicID,
-		TokenHash:     tokenHash,
-		TokenPrefix:   tokenPrefix,
-		Role:          role,
-		CreatedBy:     createdBy,
-		Revoked:       revoked,
-		UsageCount:    usageCount,
-		RevokedAt:     revokedAt,
-		RevokedBy:     revokedBy,
-		CreatedAt:     createdAt,
-	}
-}
-
-// CreateShareToken stores one bearer hash (the bearer itself is never
-// persisted). Hash uniqueness rides the token_secret unique index;
-// collisions return ErrIDConflict so callers mint again.
-func (s *PostgresWorkspaceBoardStore) CreateShareToken(ctx context.Context, workspacePublicID, boardPublicID string, creatorUserID int64, role AccessRole, tokenID, tokenHash, bearer string) (*V1ShareToken, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if role != RoleEditor && role != RoleViewer {
-		return nil, ErrMemberInvalidRole
-	}
-	trimmedTokenID := strings.TrimSpace(tokenID)
-	if !IsV1ShareTokenID(trimmedTokenID) || strings.TrimSpace(tokenHash) == "" || strings.TrimSpace(bearer) == "" {
-		return nil, ErrInvalidInput
-	}
-	workspacePublicID = strings.TrimSpace(workspacePublicID)
-	trimmedID := strings.TrimSpace(boardPublicID)
-	var created *V1ShareToken
-	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
-		board, err := getPostgresBoard(ctx, q, workspacePublicID, trimmedID)
-		if err != nil {
-			return err
-		}
-		rowPublicID, err := contract.MintPublicID(postgresShareRowPrefix, postgresShareRowIDBytes)
-		if err != nil {
-			return err
-		}
-		row, err := q.InsertBoardShareToken(ctx, dbsqlc.InsertBoardShareTokenParams{
-			PublicID:          rowPublicID,
-			WorkspacePublicID: workspacePublicID,
-			BoardPublicID:     trimmedID,
-			TokenID:           dbutil.NullString(&trimmedTokenID),
-			TokenSecret:       strings.TrimSpace(tokenHash),
-			TokenPrefix:       V1ShareTokenPrefixOf(bearer),
-			GrantedRole:       string(role),
-			CreatedByUserID:   creatorUserID,
-		})
-		if err != nil {
-			if database.IsDuplicateConstraintError(err) {
-				return ErrIDConflict
-			}
-			if database.IsNotFound(err) {
-				return ErrNotFound
-			}
-			return err
-		}
-		created = mapPostgresShareToken(board.PublicID, trimmedTokenID, strings.TrimSpace(tokenHash), V1ShareTokenPrefixOf(bearer), role, creatorUserID, false, 0, dbutil.TimeValue(row.CreatedAt), nil, nil)
-		created.Bearer = strings.TrimSpace(bearer)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return created, nil
-}
-
-// ListShareTokens lists bearers newest-first without secrets.
-func (s *PostgresWorkspaceBoardStore) ListShareTokens(ctx context.Context, workspacePublicID, boardPublicID string) ([]*V1ShareToken, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	workspacePublicID = strings.TrimSpace(workspacePublicID)
-	trimmedID := strings.TrimSpace(boardPublicID)
-	if _, err := s.getBoard(ctx, workspacePublicID, trimmedID); err != nil {
-		return nil, err
-	}
-	rows, err := s.dbWithContext(ctx).q.ListBoardShareTokens(ctx, dbsqlc.ListBoardShareTokensParams{
-		WorkspacePublicID: workspacePublicID,
-		BoardPublicID:     trimmedID,
-		RowLimit:          maxWorkspaceBoardRows,
-	})
-	if err != nil {
-		return nil, err
-	}
-	out := make([]*V1ShareToken, 0, len(rows))
-	for _, row := range rows {
-		role, ok := mapPostgresBoardRole(row.GrantedRole)
-		if !ok {
-			continue
-		}
-		tokenID := ""
-		if row.TokenID.Valid {
-			tokenID = row.TokenID.String
-		}
-		out = append(out, mapPostgresShareToken(
-			trimmedID,
-			tokenID,
-			row.TokenSecret,
-			row.TokenPrefix,
-			role,
-			row.CreatedByUserID,
-			row.RevokedAt.Valid,
-			row.UsageCount,
-			dbutil.TimeValue(row.CreatedAt),
-			dbutil.TimePtr(row.RevokedAt),
-			dbutil.Int64Ptr(row.RevokedByUserID),
-		))
 	}
 	return out, nil
-}
-
-// RevokeShareToken revokes a bearer (idempotent: revoking twice succeeds).
-func (s *PostgresWorkspaceBoardStore) RevokeShareToken(ctx context.Context, workspacePublicID, boardPublicID, tokenID string, revokedBy int64) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	workspacePublicID = strings.TrimSpace(workspacePublicID)
-	trimmedID := strings.TrimSpace(boardPublicID)
-	trimmedTokenID := strings.TrimSpace(tokenID)
-	if _, err := s.getBoard(ctx, workspacePublicID, trimmedID); err != nil {
-		return err
-	}
-	affected, err := s.dbWithContext(ctx).q.RevokeBoardShareToken(ctx, dbsqlc.RevokeBoardShareTokenParams{
-		RevokedByUserID:   dbutil.NullInt64(&revokedBy),
-		WorkspacePublicID: workspacePublicID,
-		BoardPublicID:     trimmedID,
-		TokenID:           dbutil.NullString(&trimmedTokenID),
-	})
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		return ErrShareTokenNotFound
-	}
-	return nil
-}
-
-// JoinByToken consumes a bearer idempotently: repeat joins by the same user
-// converge to the token role; the usage counter still advances. Unknown,
-// revoked, and foreign-workspace bearers all read as ErrShareTokenNotFound
-// so existence is never leaked.
-func (s *PostgresWorkspaceBoardStore) JoinByToken(ctx context.Context, workspacePublicID, bearer string, userID int64) (*V1Board, AccessRole, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, "", err
-	}
-	if userID <= 0 || strings.TrimSpace(bearer) == "" {
-		return nil, "", ErrInvalidInput
-	}
-	workspacePublicID = strings.TrimSpace(workspacePublicID)
-	var board *V1Board
-	var role AccessRole
-	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
-		token, err := q.GetBoardShareTokenBySecret(ctx, dbsqlc.GetBoardShareTokenBySecretParams{
-			WorkspacePublicID: workspacePublicID,
-			TokenSecret:       V1ShareTokenHash(bearer),
-		})
-		if err != nil {
-			if database.IsNotFound(err) {
-				return ErrShareTokenNotFound
-			}
-			return err
-		}
-		if token.RevokedAt.Valid {
-			return ErrShareTokenRevoked
-		}
-		granted, ok := mapPostgresBoardRole(token.GrantedRole)
-		if !ok || (granted != RoleEditor && granted != RoleViewer) {
-			return ErrShareTokenInvalid
-		}
-		if token.BoardArchivedAt.Valid {
-			return ErrV1Archived
-		}
-		if !token.BoardOwnerUserID.Valid {
-			return ErrNotFound
-		}
-		if err := q.IncrementBoardShareTokenUsage(ctx, token.InternalID); err != nil {
-			return err
-		}
-		current, err := getPostgresBoard(ctx, q, workspacePublicID, token.BoardPublicID)
-		if err != nil {
-			return err
-		}
-		if current.OwnerUserID == userID {
-			board, role = current, RoleOwner
-			return nil
-		}
-		if err := q.UpsertJoinBoardMembership(ctx, dbsqlc.UpsertJoinBoardMembershipParams{
-			BoardID: token.BoardInternalID,
-			UserID:  userID,
-			Role:    string(granted),
-		}); err != nil {
-			return err
-		}
-		board, role = current, granted
-		return nil
-	})
-	if err != nil {
-		return nil, "", err
-	}
-	return board, role, nil
 }

@@ -25,6 +25,19 @@ func (q *Queries) ArchiveWorkspace(ctx context.Context, publicID string) (int64,
 	return result.RowsAffected(), nil
 }
 
+const countWorkspaceMembers = `-- name: CountWorkspaceMembers :one
+SELECT COUNT(*)
+FROM workspace_memberships
+WHERE workspace_id = $1
+`
+
+func (q *Queries) CountWorkspaceMembers(ctx context.Context, workspaceID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countWorkspaceMembers, workspaceID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countWorkspaceOwners = `-- name: CountWorkspaceOwners :one
 SELECT COUNT(*)
 FROM workspace_memberships
@@ -397,6 +410,20 @@ func (q *Queries) ListWorkspacesByUserID(ctx context.Context, arg ListWorkspaces
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockWorkspaceMemberships = `-- name: LockWorkspaceMemberships :one
+SELECT internal_id
+FROM workspaces
+WHERE public_id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockWorkspaceMemberships(ctx context.Context, publicID string) (int64, error) {
+	row := q.db.QueryRow(ctx, lockWorkspaceMemberships, publicID)
+	var internal_id int64
+	err := row.Scan(&internal_id)
+	return internal_id, err
 }
 
 const updateWorkspaceMemberRole = `-- name: UpdateWorkspaceMemberRole :execrows

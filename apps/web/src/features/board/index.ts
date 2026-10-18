@@ -7,7 +7,7 @@
  *
  * Export groups are intentionally classified by responsibility:
  * - core: durable Board document facts and pure validation rules
- * - session: catalog, sync, and share-join use cases/ports
+ * - session: catalog and sync use cases/ports
  * - session/persistence + session/preview: stable adapters with contracts
  * - ui/gallery: catalog view composition consumed by route wiring
  *
@@ -48,11 +48,44 @@ export {
 export * from './session/sync/boardQueryKeys'
 export * from './session/sync/boardQueries'
 export * from './session/sync/boardSseInvalidation'
-export * from './session/share-join/joinSharedBoardWorkflow'
 // Stable adapters for persistence and gallery scene boundaries.
 export * from './session/persistence/state'
 export * from './session/persistence/boardStateSerialization'
 export { blankBoardPreviewSurfaceClass } from './ui/gallery/skin'
+export {
+  captureShareScope,
+  classifyShareError,
+  invalidateShareQueries,
+  isShareScopeCurrent,
+  mintShareAttempt,
+  type ShareActionScope,
+  type ShareAttempt,
+  type ShareFailureReason,
+  type ShareTransport,
+} from './session/share/commands'
+export {
+  readShareBoardFacts,
+  shareAccessOptions,
+  toShareBoardFacts,
+  type ShareBoardFacts,
+} from './session/share/queries'
+export {
+  useSharePanel,
+  type SharePanel,
+  type SharePanelTarget,
+} from './session/share/useSharePanel'
+export {
+  useShareDialog,
+  type ShareDialogController,
+  type ShareDialogDeps,
+} from './session/share/useShareDialog'
+export {
+  createShareFeedback,
+  failureCopyKey,
+  useShareFeedback,
+  type ShareFeedback,
+} from './session/share/feedback'
+export { default as ShareDialog } from './ui/share/ShareDialog.vue'
 // Catalog presentation composition (route-level public surface).
 export type {
   CatalogEntry,

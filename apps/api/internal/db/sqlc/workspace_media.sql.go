@@ -62,7 +62,7 @@ WHERE u.workspace_id = w.internal_id
 AND u.public_id = $2
 AND w.public_id = $3
 AND u.status IN ('pending', 'transferring')
-RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at
+RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at, u.target_board_id
 `
 
 type CompleteUploadSessionParams struct {
@@ -90,6 +90,7 @@ func (q *Queries) CompleteUploadSession(ctx context.Context, arg CompleteUploadS
 		&i.CompletedAt,
 		&i.ExpiredAt,
 		&i.CreatedAt,
+		&i.TargetBoardID,
 	)
 	return i, err
 }
@@ -159,9 +160,9 @@ func (q *Queries) CreateMediaAsset(ctx context.Context, arg CreateMediaAssetPara
 
 const createUploadSession = `-- name: CreateUploadSession :one
 
-INSERT INTO upload_sessions (public_id, workspace_id, uploader_user_id, declared_mime_type, declared_size_bytes, declared_checksum, storage_key, status)
-VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
-RETURNING internal_id, public_id, workspace_id, uploader_user_id, declared_mime_type, declared_size_bytes, declared_checksum, storage_key, status, completed_at, expired_at, created_at
+INSERT INTO upload_sessions (public_id, workspace_id, uploader_user_id, declared_mime_type, declared_size_bytes, declared_checksum, storage_key, target_board_id, status)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+RETURNING internal_id, public_id, workspace_id, uploader_user_id, declared_mime_type, declared_size_bytes, declared_checksum, storage_key, status, completed_at, expired_at, created_at, target_board_id
 `
 
 type CreateUploadSessionParams struct {
@@ -172,6 +173,7 @@ type CreateUploadSessionParams struct {
 	DeclaredSizeBytes int64       `json:"declared_size_bytes"`
 	DeclaredChecksum  pgtype.Text `json:"declared_checksum"`
 	StorageKey        pgtype.Text `json:"storage_key"`
+	TargetBoardID     pgtype.Int8 `json:"target_board_id"`
 }
 
 // Workspace-scoped media queries (#820, Phase 4-03 of #809).
@@ -206,6 +208,7 @@ func (q *Queries) CreateUploadSession(ctx context.Context, arg CreateUploadSessi
 		arg.DeclaredSizeBytes,
 		arg.DeclaredChecksum,
 		arg.StorageKey,
+		arg.TargetBoardID,
 	)
 	var i UploadSession
 	err := row.Scan(
@@ -221,6 +224,7 @@ func (q *Queries) CreateUploadSession(ctx context.Context, arg CreateUploadSessi
 		&i.CompletedAt,
 		&i.ExpiredAt,
 		&i.CreatedAt,
+		&i.TargetBoardID,
 	)
 	return i, err
 }
@@ -233,7 +237,7 @@ WHERE u.workspace_id = w.internal_id
 AND u.public_id = $1
 AND w.public_id = $2
 AND u.status IN ('pending', 'transferring')
-RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at
+RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at, u.target_board_id
 `
 
 type ExpireUploadSessionParams struct {
@@ -258,6 +262,7 @@ func (q *Queries) ExpireUploadSession(ctx context.Context, arg ExpireUploadSessi
 		&i.CompletedAt,
 		&i.ExpiredAt,
 		&i.CreatedAt,
+		&i.TargetBoardID,
 	)
 	return i, err
 }
@@ -270,7 +275,7 @@ WHERE u.workspace_id = w.internal_id
 AND u.public_id = $1
 AND w.public_id = $2
 AND u.status IN ('pending', 'transferring')
-RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at
+RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at, u.target_board_id
 `
 
 type FailUploadSessionParams struct {
@@ -296,6 +301,7 @@ func (q *Queries) FailUploadSession(ctx context.Context, arg FailUploadSessionPa
 		&i.CompletedAt,
 		&i.ExpiredAt,
 		&i.CreatedAt,
+		&i.TargetBoardID,
 	)
 	return i, err
 }
@@ -339,8 +345,35 @@ func (q *Queries) GetMediaAssetByPublicID(ctx context.Context, arg GetMediaAsset
 	return i, err
 }
 
+const getMediaAssetUploadTargetBoard = `-- name: GetMediaAssetUploadTargetBoard :one
+SELECT b.public_id AS target_board_public_id
+FROM media_assets AS m
+INNER JOIN workspaces AS w ON w.internal_id = m.workspace_id
+INNER JOIN upload_sessions AS u ON u.internal_id = m.upload_session_id
+LEFT JOIN boards AS b ON b.internal_id = u.target_board_id
+WHERE m.public_id = $1 AND w.public_id = $2
+LIMIT 1
+`
+
+type GetMediaAssetUploadTargetBoardParams struct {
+	PublicID          string `json:"public_id"`
+	WorkspacePublicID string `json:"workspace_public_id"`
+}
+
+// GetMediaAssetUploadTargetBoard resolves the restricted upload-target
+// board (#936) for one asset through its creating session. Assets whose
+// session carries no target (or whose board row went away) return a NULL
+// board id on the single row; unknown or cross-workspace assets return no
+// row at all (ErrNotFound, never a distinct status).
+func (q *Queries) GetMediaAssetUploadTargetBoard(ctx context.Context, arg GetMediaAssetUploadTargetBoardParams) (pgtype.Text, error) {
+	row := q.db.QueryRow(ctx, getMediaAssetUploadTargetBoard, arg.PublicID, arg.WorkspacePublicID)
+	var target_board_public_id pgtype.Text
+	err := row.Scan(&target_board_public_id)
+	return target_board_public_id, err
+}
+
 const getUploadSessionByPublicID = `-- name: GetUploadSessionByPublicID :one
-SELECT u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at
+SELECT u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at, u.target_board_id
 FROM upload_sessions AS u
 INNER JOIN workspaces AS w ON w.internal_id = u.workspace_id
 WHERE u.public_id = $1 AND w.public_id = $2
@@ -368,8 +401,61 @@ func (q *Queries) GetUploadSessionByPublicID(ctx context.Context, arg GetUploadS
 		&i.CompletedAt,
 		&i.ExpiredAt,
 		&i.CreatedAt,
+		&i.TargetBoardID,
 	)
 	return i, err
+}
+
+const listMediaAssetTaskOrigins = `-- name: ListMediaAssetTaskOrigins :many
+SELECT o.task_public_id,
+       w.public_id AS workspace_public_id,
+       o.submitter_user_id,
+       COALESCE(o.board_public_id, '')::text AS board_public_id
+FROM media_asset_task_origins AS o
+INNER JOIN workspaces AS w ON w.internal_id = o.workspace_id
+INNER JOIN media_assets AS m ON m.internal_id = o.media_asset_id AND m.workspace_id = o.workspace_id
+WHERE m.public_id = $1
+  AND w.public_id = $2
+ORDER BY o.task_public_id ASC, o.output_index ASC
+`
+
+type ListMediaAssetTaskOriginsParams struct {
+	PublicID          string `json:"public_id"`
+	WorkspacePublicID string `json:"workspace_public_id"`
+}
+
+type ListMediaAssetTaskOriginsRow struct {
+	TaskPublicID      string `json:"task_public_id"`
+	WorkspacePublicID string `json:"workspace_public_id"`
+	SubmitterUserID   int64  `json:"submitter_user_id"`
+	BoardPublicID     string `json:"board_public_id"`
+}
+
+// ListMediaAssetTaskOrigins preserves producing authority independently of
+// Task retention and Board deletion. An ordinary upload has no Task origin.
+func (q *Queries) ListMediaAssetTaskOrigins(ctx context.Context, arg ListMediaAssetTaskOriginsParams) ([]ListMediaAssetTaskOriginsRow, error) {
+	rows, err := q.db.Query(ctx, listMediaAssetTaskOrigins, arg.PublicID, arg.WorkspacePublicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMediaAssetTaskOriginsRow
+	for rows.Next() {
+		var i ListMediaAssetTaskOriginsRow
+		if err := rows.Scan(
+			&i.TaskPublicID,
+			&i.WorkspacePublicID,
+			&i.SubmitterUserID,
+			&i.BoardPublicID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listMediaAssets = `-- name: ListMediaAssets :many
@@ -517,7 +603,7 @@ WHERE u.workspace_id = w.internal_id
 AND u.public_id = $1
 AND w.public_id = $2
 AND u.status = 'pending'
-RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at
+RETURNING u.internal_id, u.public_id, u.workspace_id, u.uploader_user_id, u.declared_mime_type, u.declared_size_bytes, u.declared_checksum, u.storage_key, u.status, u.completed_at, u.expired_at, u.created_at, u.target_board_id
 `
 
 type MarkUploadSessionTransferringParams struct {
@@ -544,8 +630,60 @@ func (q *Queries) MarkUploadSessionTransferring(ctx context.Context, arg MarkUpl
 		&i.CompletedAt,
 		&i.ExpiredAt,
 		&i.CreatedAt,
+		&i.TargetBoardID,
 	)
 	return i, err
+}
+
+const mediaAssetHasLibraryLink = `-- name: MediaAssetHasLibraryLink :one
+SELECT EXISTS(
+  SELECT 1
+  FROM media_assets AS m
+  INNER JOIN workspaces AS w ON w.internal_id = m.workspace_id
+  INNER JOIN library_assets AS l ON l.media_asset_id = m.internal_id
+  WHERE m.public_id = $1 AND w.public_id = $2
+)
+`
+
+type MediaAssetHasLibraryLinkParams struct {
+	PublicID          string `json:"public_id"`
+	WorkspacePublicID string `json:"workspace_public_id"`
+}
+
+// MediaAssetHasLibraryLink reports whether a workspace-scoped asset backs
+// at least one published Workspace Library row (#936: shared-library
+// source). Library rows are member-visible, so existence authorizes every
+// workspace member. Unknown or cross-workspace assets report false, never
+// a distinct status.
+func (q *Queries) MediaAssetHasLibraryLink(ctx context.Context, arg MediaAssetHasLibraryLinkParams) (bool, error) {
+	row := q.db.QueryRow(ctx, mediaAssetHasLibraryLink, arg.PublicID, arg.WorkspacePublicID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const resolveBoardInternalID = `-- name: ResolveBoardInternalID :one
+SELECT b.internal_id
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE b.public_id = $1 AND w.public_id = $2
+LIMIT 1
+`
+
+type ResolveBoardInternalIDParams struct {
+	PublicID          string `json:"public_id"`
+	WorkspacePublicID string `json:"workspace_public_id"`
+}
+
+// ResolveBoardInternalID maps a workspace-scoped board public id to its
+// internal id for upload-target binding (#936). Misses (unknown board or
+// foreign workspace) return no row; the service maps that to ErrNotFound
+// so the handler renders 404 without leaking existence.
+func (q *Queries) ResolveBoardInternalID(ctx context.Context, arg ResolveBoardInternalIDParams) (int64, error) {
+	row := q.db.QueryRow(ctx, resolveBoardInternalID, arg.PublicID, arg.WorkspacePublicID)
+	var internal_id int64
+	err := row.Scan(&internal_id)
+	return internal_id, err
 }
 
 const updateMediaAssetMetadata = `-- name: UpdateMediaAssetMetadata :one

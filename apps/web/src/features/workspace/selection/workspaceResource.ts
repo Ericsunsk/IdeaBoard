@@ -25,6 +25,7 @@ import {
   createWorkspace,
   getListWorkspacesQueryKey,
   listWorkspaces,
+  updateWorkspace,
 } from '../../../api/generated-query/public/workspaces/workspaces'
 import { getGetUserQueryKey, getUser } from '../../../api/generated-query/public/user/user'
 import type { ListWorkspacesParams } from '../../../api/generated-query/public/model'
@@ -278,6 +279,32 @@ export async function provisionWorkspace(
     },
   )
   const data = requireContractData<unknown>(response, 'Workspace creation failed')
+  return parseWorkspaceItem(data)
+}
+
+// Explicit PATCH rename (owner/admin only server-side). No Idempotency-Key:
+// renames are idempotent by value, so retries replay safely without one.
+export async function renameWorkspace(
+  workspaceId: string,
+  input: { name: string },
+  options?: WorkspaceRequestOptions,
+): Promise<WorkspaceSummary> {
+  const targetId = requireOpaqueId(workspaceId, 'ws', 'workspace')
+  const name = typeof input.name === 'string' ? input.name.trim() : ''
+  if (!name) throw new Error('Workspace name is required')
+  if (name.length > WORKSPACE_NAME_MAX_LENGTH) {
+    throw new Error('Workspace name is too long')
+  }
+  const response = await updateWorkspace(
+    targetId,
+    {
+      data: {
+        name,
+      },
+    },
+    toRequestConfig(options),
+  )
+  const data = requireContractData<unknown>(response, 'Workspace rename failed')
   return parseWorkspaceItem(data)
 }
 

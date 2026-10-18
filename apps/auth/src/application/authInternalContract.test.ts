@@ -101,6 +101,16 @@ function createContractCommands(): AuthInternalCommands {
         },
       }
     },
+    lookupUserByEmail: async (input) => {
+      if (input.email === 'ghost@example.com') {
+        return { ok: false, kind: 'not_found', message: 'auth user not found' }
+      }
+      assert.deepEqual(input, { email: 'alice@example.com' })
+      return {
+        ok: true,
+        data: { user: { auth_user_id: authUserID, email: 'alice@example.com' } },
+      }
+    },
     deleteIdentity: async (input) => {
       if (input.authUserID === 'missing-auth-user') {
         return { ok: false, kind: 'not_found', message: 'auth user not found' }

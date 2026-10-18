@@ -13,6 +13,7 @@ import {
   primeAuthenticatedWorkspace,
 } from '../../testing'
 import { getBoardState, replaceBoardStateMap, setBoardState } from '../persistence/state'
+import { BoardCatalogIncompleteError } from '../adapters/boardsResource'
 import { boardQueryKeys } from '../sync/boardQueryKeys'
 import {
   hydrateBoardsFromServer,
@@ -70,7 +71,7 @@ describe('production Board repository Query integration', () => {
       state: makePromptBoardState(1000, text),
     })
   }
-  function emit(type: 'board.member_changed' | 'board.document_replaced', revision = 8) {
+  function emit(type: 'board.access_changed' | 'board.document_replaced', revision = 8) {
     MockEventSource.instances.at(-1)!.emit(type, {
       id: `evt_revision${revision}`,
       type,
@@ -79,7 +80,7 @@ describe('production Board repository Query integration', () => {
       actor: { type: 'user', id: 'usr_test123' },
       resource: { type: 'board', id: 'board-1' },
       workspace_id: WORKSPACE_ID,
-      data: { board_id: 'board-1', revision },
+      data: { board_id: 'board-1', revision, access_version: revision },
     })
   }
   beforeEach(() => {
@@ -115,7 +116,7 @@ describe('production Board repository Query integration', () => {
     expect(mocks.request).toHaveBeenCalledTimes(1)
     expect(catalog.viewModel.boards.value[0]?.name).toBe('Server Board')
     apiState.boardsResponse.data[0]!.name = 'Renamed remotely'
-    emit('board.member_changed')
+    emit('board.access_changed')
     await vi.waitFor(() => expect(catalog.viewModel.boards.value[0]?.name).toBe('Renamed remotely'))
     expect(
       mocks.request.mock.calls.filter(([url]) => String(url).endsWith('/document')),
@@ -306,7 +307,7 @@ describe('production Board repository Query integration', () => {
         actor: { type: 'user', id: 'usr_test123' },
         resource: { type: 'board', id: 'board-1' },
         workspace_id: OTHER_WORKSPACE_ID,
-        data: { board_id: 'board-1', revision },
+        data: { board_id: 'board-1', revision, access_version: revision },
       })
     event(10)
     await vi.advanceTimersByTimeAsync(500)
@@ -374,6 +375,33 @@ describe('production Board repository Query integration', () => {
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('revision eight')
   })
 
+  it('preserves local drafts and synced metas when the catalog walk is incomplete', async () => {
+    replaceBoards([{ id: 'offline-1', name: 'Offline', createdAt: 100, updatedAt: 2000 }])
+    const catalog = repository()
+    expect(
+      await catalog.commands.hydrate({
+        shouldPreserveLocalNewer: true,
+        shouldIncludeDocuments: false,
+      }),
+    ).toEqual({ isOk: true })
+    expect(catalog.viewModel.boards.value.map((board) => board.id).sort()).toEqual([
+      'board-1',
+      'offline-1',
+    ])
+
+    // A truncated or partially failed walk rejects instead of returning a
+    // partial list: absence must never read as deletion or revocation.
+    apiState.listError = new BoardCatalogIncompleteError('truncated walk')
+    const result = await catalog.commands.hydrate({ shouldIncludeDocuments: false })
+    expect(result).toMatchObject({ isOk: false })
+    expect(catalog.viewModel.boards.value.map((board) => board.id).sort()).toEqual([
+      'board-1',
+      'offline-1',
+    ])
+    expect(getBoardById('offline-1')?.name).toBe('Offline')
+    expect(getBoardById('board-1')?.name).toBe('Server Board')
+  })
+
   it.each(['returned', 'thrown'] as const)(
     'restores production list-only observation after a %s hydrate failure',
     async (failure) => {
@@ -387,7 +415,7 @@ describe('production Board repository Query integration', () => {
       else hydrate.mockRejectedValueOnce(new Error('test outage'))
       await catalog.commands.hydrate().catch(() => {})
       apiState.boardsResponse.data[0]!.name = 'After failed hydrate'
-      emit('board.member_changed')
+      emit('board.access_changed')
       await vi.advanceTimersByTimeAsync(0)
       expect(catalog.viewModel.boards.value[0]?.name).toBe('After failed hydrate')
       expect(

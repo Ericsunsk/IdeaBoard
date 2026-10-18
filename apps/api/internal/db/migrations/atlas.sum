@@ -1,2 +1,6 @@
-h1:t7/1naCSKUJ49WG0jno0Ig+OShBkx+YnfWE1EjAo3Uw=
+h1:fJ3Uo4wb8bYYdNdHccGfXqrmrEGQr8oI0g1SrZtDruY=
 20261016100000_baseline.sql h1:yTTwIQAwD6mKFJ+Yjjxaa35e+DzYzpW4YQoVjF2uUHY=
+20261017000000_board_only_me_access.sql h1:5/LDCGeI7XI5EEqolYt2QOnvcZrAyiIsI/VKhrc7ELU=
+20261017120000_board_media_access.sql h1:JLllK0kBVqL6LSN6wFD1GzXu1Jj95dvkMktcHciGKkU=
+20261017160000_board_access_event_outbox.sql h1:+h6CxesWzF7+l+HGNj13ZE71l6bU1Y4aiMNGylaBGh0=
+20261018000000_media_asset_task_origins.sql h1:p9StmNJ/usgeLju3bYgtLgbHMYmtQ2yeHNzZVe6xYtI=

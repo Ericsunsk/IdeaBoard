@@ -39,7 +39,10 @@ type ContractV1Deps struct {
 	// Boards is the workspace-rooted board collaboration store (issue
 	// #802). Nil keeps the boards surface fail-closed with 501 until the
 	// postgres workspace-board mapping lands (#809); tests inject the
-	// in-memory implementation.
+	// in-memory implementation. Role facts leave this store only through
+	// the narrow boards.RoleReader port (#934: h.boardRoles()); Media /
+	// Tasking / Events must not copy the role mapping or reach past it
+	// into Boards storage.
 	Boards boards.WorkspaceBoardStore
 	// Library is the workspace-scoped library + materialization surface
 	// (issue #806). Zero value keeps the surface fail-closed (501/503);
@@ -101,12 +104,28 @@ type ContractV1Deps struct {
 	// EventBus publishes v1 envelopes to NATS JetStream (event layer,
 	// not a queue). Nil disables cross-instance fanout (single-process
 	// tests); production wires the shared bus.
-	EventBus        *events.NATSJetStreamEventBus
-	SupportChannels settings.SupportChannelsSettingProvider
+	EventBus *events.NATSJetStreamEventBus
+	// BoardAccessOutbox acknowledges immediate delivery of transaction-committed
+	// access signals. Pending facts remain retryable by the River sweeper.
+	// Nil is reserved for in-memory tests without a durable store.
+	BoardAccessOutbox *events.BoardAccessOutboxStore
+	SupportChannels   settings.SupportChannelsSettingProvider
 	// AvatarProfile persists uploads and projects the user record on session reads.
 	// Nil omits the read projection and fails avatar uploads closed with 503.
 	AvatarProfile V1AvatarProfileDirectory
 	MediaPreviews *preview.Service
+	// MemberEmails resolves workspace-member emails for invite search
+	// (email as search key/display auxiliary; usr_ stays the write
+	// identity). Nil fails closed to no email (field omitted) and never
+	// fails the member list. Production wires NewMemberEmailService over
+	// the users repository plus the Auth email reader; tests inject fakes.
+	MemberEmails V1MemberEmailProvider
+	// MemberLookup resolves one registered user's usr_ identity from an
+	// Auth-owned email for the invite search (query-only; the email is
+	// resolved per call and never stored). Nil fails the lookup closed
+	// with 501. Production wires NewMemberLookupService over the users
+	// repository plus the Auth lookup reader; tests inject fakes.
+	MemberLookup V1MemberLookupProvider
 }
 
 // requireV1IdempotencyKey enforces the shared header-only idempotency contract
@@ -120,6 +139,15 @@ func requireV1IdempotencyKey(c *gin.Context) (string, bool) {
 		return "", false
 	}
 	return key, true
+}
+
+// V1MemberEmailProvider resolves workspace-member emails for invite search.
+// Optional seam: nil fails closed to no email (field omitted), never fails
+// the list. Production joins users.GetByIDs -> authUserIDs ->
+// UserEmailReader.GetUserEmails, mirroring the Admin enrichUserList join;
+// unknown or missing emails are omitted per member.
+type V1MemberEmailProvider interface {
+	GetMemberEmails(ctx context.Context, userIDs []int64) (map[int64]string, error)
 }
 
 // V1UserDirectory translates between internal numeric user ids and the
@@ -275,6 +303,7 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps AuthDeps, deps Co
 	group.POST("/workspaces/:workspace_id/archive", handler.archiveWorkspace)
 	group.GET("/workspaces/:workspace_id/members", handler.listWorkspaceMembers)
 	group.POST("/workspaces/:workspace_id/members", handler.addWorkspaceMember)
+	group.GET("/workspaces/:workspace_id/members/lookup", handler.lookupWorkspaceMemberByEmail)
 	group.PATCH("/workspaces/:workspace_id/members/:member_id", handler.updateWorkspaceMember)
 	group.DELETE("/workspaces/:workspace_id/members/:member_id", handler.removeWorkspaceMember)
 	group.GET("/organizations", handler.listOrganizations)

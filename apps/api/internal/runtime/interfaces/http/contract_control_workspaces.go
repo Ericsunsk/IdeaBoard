@@ -230,10 +230,11 @@ func (d *ContractControlDeps) removeControlWorkspaceMember(c *gin.Context, ctx c
 	if !ok {
 		return
 	}
-	if err := d.Tenancy.RemoveWorkspaceMember(c.Request.Context(), id, ctx.Operator.UserID(), targetID); err != nil {
+	if _, err := d.Tenancy.RemoveWorkspaceMember(c.Request.Context(), id, ctx.Operator.UserID(), targetID, d.Boards); err != nil {
 		writeControlTenancyError(c, err, msgListControlBillingAccounts)
 		return
 	}
+
 	contract.RenderSuccess(c, struct {
 		Removed bool `json:"removed"`
 	}{Removed: true})

@@ -20,7 +20,7 @@ import {
 import type { CanvasTaskRequestData } from '../../../core/execution/canvasTaskRequest'
 
 export type CanvasWorkspaceTaskUnmappableReason =
-  'prompt' | 'service' | 'media-urls' | 'media-ids' | 'params'
+  'prompt' | 'service' | 'media-urls' | 'media-ids' | 'params' | 'board'
 
 export class CanvasWorkspaceTaskUnmappableError extends Error {
   readonly kind = 'task-unmappable' as const
@@ -123,6 +123,25 @@ function assertOpaqueAssetIds(values: readonly string[]): string[] {
     seen.add(value)
   }
   return [...seen]
+}
+
+/**
+ * Canvas Board binding (#937): an opaque `board_...` id only. Absent
+ * stays absent (non-Canvas semantics, server-governed); malformed values
+ * fail closed before any network call so callers never forge a Board
+ * attribution or see a cryptic 422.
+ */
+function toWorkspaceBoardId(value: unknown): string | undefined {
+  if (value == null) return undefined
+  const boardId = `${value}`.trim()
+  if (!boardId) return undefined
+  if (!isOpaqueId(boardId) || opaqueIdPrefix(boardId) !== 'board') {
+    throw new CanvasWorkspaceTaskUnmappableError(
+      'board',
+      `Invalid canvas task board id ${JSON.stringify(value)}: v1 board_id accepts board_... references only.`,
+    )
+  }
+  return boardId
 }
 
 // v1-safe param keys (mirrors backend ValidateParams minus everything the
@@ -321,6 +340,7 @@ export function toWorkspaceCreateInput(request: CanvasTaskRequestData): CreateWo
   const params = toWorkspaceParams(request.params)
   const quantity = toWorkspaceQuantity(request.params)
   const resolution = toWorkspaceResolution(request.params)
+  const boardId = toWorkspaceBoardId(request.board_id)
   // NOTE: legacy `priority` (interactive hint) has no v1 field and is
   // dropped; `client_action_id` becomes the header-only Idempotency-Key.
   return {
@@ -330,6 +350,7 @@ export function toWorkspaceCreateInput(request: CanvasTaskRequestData): CreateWo
     ...(params == null ? {} : { params }),
     ...(quantity == null ? {} : { quantity }),
     ...(resolution == null ? {} : { resolution }),
+    ...(boardId == null ? {} : { board_id: boardId }),
   }
 }
 

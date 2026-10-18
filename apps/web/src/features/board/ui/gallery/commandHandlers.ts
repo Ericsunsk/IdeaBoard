@@ -166,7 +166,7 @@ export function createCommandHandlers({
   resetDeleteState,
 }: CatalogCommandDependencies) {
   const hydration = createCatalogHydration({ catalog, feedback, warn, state })
-  async function createAndOpenBoard() {
+  async function createAndOpenBoard(): Promise<boolean> {
     state.activeMenuBoardId.value = null
     const result = await runCatalogCommand(
       () => catalog.commands.create(),
@@ -175,14 +175,15 @@ export function createCommandHandlers({
         feedback.catalogSyncFailed()
       },
     )
-    if (!result) return
+    if (!result) return false
     if (!result.isOk) {
-      if (result.reason === 'scope-changed') return
+      if (result.reason === 'scope-changed') return false
       feedback.createFailed(result)
       warn('[boards] failed to sync new board', result.error)
-      return
+      return false
     }
     navigation.openBoard(result.board.id)
+    return true
   }
 
   async function duplicateBoard(boardId: string) {
@@ -198,7 +199,7 @@ export function createCommandHandlers({
     if (!result.isOk) {
       if (result.reason === 'scope-changed') return
       feedback.copyFailed(result)
-      if (result.reason !== 'source-missing') {
+      if (result.reason !== 'source-missing' && result.reason !== 'source-unreadable') {
         warn('[boards] failed to sync duplicated board', result.error)
       }
       return

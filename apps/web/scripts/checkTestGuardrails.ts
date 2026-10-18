@@ -182,6 +182,13 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
         'Unmounts one Testing Library render result between multiple render() calls; the component harness still goes through src/test/render.',
     },
   ],
+  'src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts': [
+    {
+      rule: 'raw-unmount-call',
+      reason:
+        'Unmounts the approved src/test/render harness result in a finally after fake-timer zoom assertions; the mount itself stays on the harness.',
+    },
+  ],
   'src/features/admin/settings/ui/pages/AdminSettingsOnThisPage.component.spec.ts': [
     {
       rule: 'document-div-host',

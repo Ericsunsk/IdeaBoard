@@ -138,6 +138,7 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
       isRenamePending: boardHeader.isRenamePending,
       catalogRecovery: boardHeader.catalogRecovery,
       isBoardArchived: boardHeader.isBoardArchived,
+      isBoardReadOnly: boardHeader.isBoardReadOnly,
       isRestoringArchivedBoard: boardHeader.isRestoringArchivedBoard,
       refreshArchivedState: boardHeader.refreshArchivedState,
       restoreArchivedBoard: boardHeader.restoreArchivedBoard,

@@ -30,7 +30,7 @@ func libraryDisplay(workspaceID string, asset *librarydomain.V1Asset) *mediadoma
 }
 
 func (h *contractV1Handler) derivativeLibraryAsset(c *gin.Context) {
-	workspaceID, allowed := h.v1BinaryWorkspaceContext(c)
+	workspaceID, userID, workspaceRole, allowed := h.v1BinaryWorkspaceContext(c)
 	if !allowed {
 		return
 	}
@@ -61,15 +61,18 @@ func (h *contractV1Handler) derivativeLibraryAsset(c *gin.Context) {
 		return
 	}
 	if mediaID != "" {
-		h.writeLibraryManagedDisplay(c, workspaceID, mediaID, tier)
+		h.writeLibraryManagedDisplay(c, workspaceID, mediaID, tier, userID, workspaceRole)
 		return
 	}
 	image, err := h.deps.MediaPreviews.RenderSource(c.Request.Context(), asset.Provider, asset.PreviewURL, tier)
 	writeRenderedImage(c, image, err, "private, max-age=300")
 }
 
-func (h *contractV1Handler) writeLibraryManagedDisplay(c *gin.Context, workspaceID, mediaID, tier string) {
-	media, ok := h.v1MediaBinaryAsset(c, workspaceID, mediaID)
+func (h *contractV1Handler) writeLibraryManagedDisplay(c *gin.Context, workspaceID, mediaID, tier string, userID int64, workspaceRole string) {
+	// #936: managed bytes behind a library asset enforce the same asset
+	// authorization (the library-link source authorizes members here);
+	// a shared library reference never becomes a bypass around it.
+	media, ok := h.v1MediaBinaryAsset(c, workspaceID, mediaID, userID, workspaceRole)
 	if !ok {
 		return
 	}

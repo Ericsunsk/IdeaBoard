@@ -7,6 +7,7 @@ import {
   type NodeProps,
 } from '@vue-flow/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { render } from '../../../../test/render'
 import CanvasScreen from './CanvasScreen.vue'
@@ -297,6 +298,7 @@ function createRuntimeViewModel() {
       isRenamePending: ref(false),
       catalogRecovery: ref({ status: 'idle' }),
       isBoardArchived: ref(false),
+      isBoardReadOnly: ref(false),
       isRestoringArchivedBoard: ref(false),
       currentBoardName: ref('Board A'),
       boardOptions: ref([]),
@@ -474,6 +476,7 @@ function renderScreen(
       logoutAndRedirect: vi.fn(),
     },
     global: {
+      plugins: [[VueQueryPlugin, { queryClient: new QueryClient() }]],
       stubs: {
         CanvasChrome: ChromeStub,
         VueFlow: isNativeFlow ? VueFlow : VueFlowStub,
@@ -534,21 +537,26 @@ describe('CanvasScreen', () => {
     expect(mocks.flowProps.panOnDrag).toEqual([1, 2])
   })
 
-  it.each(['locked', 'archived'] as const)('disables navigation for %s boards', async (state) => {
-    const view = renderScreen()
-    if (state === 'archived')
-      view.harness.runtime.viewModel.boardChrome.isBoardArchived.value = true
-    else view.harness.runtime.viewModel.imageWorkflow.tools.locks.isCanvasLocked.value = true
-    await nextTick()
-    expect(mocks.flowProps).toMatchObject({
-      panOnDrag: false,
-      panOnScroll: false,
-      zoomOnPinch: false,
-      zoomOnDoubleClick: false,
-      nodesDraggable: false,
-      elementsSelectable: false,
-    } satisfies Partial<FlowProps>)
-  })
+  it.each(['locked', 'archived', 'read-only'] as const)(
+    'disables navigation for %s boards',
+    async (state) => {
+      const view = renderScreen()
+      if (state === 'archived')
+        view.harness.runtime.viewModel.boardChrome.isBoardArchived.value = true
+      else if (state === 'read-only')
+        view.harness.runtime.viewModel.boardChrome.isBoardReadOnly.value = true
+      else view.harness.runtime.viewModel.imageWorkflow.tools.locks.isCanvasLocked.value = true
+      await nextTick()
+      expect(mocks.flowProps).toMatchObject({
+        panOnDrag: false,
+        panOnScroll: false,
+        zoomOnPinch: false,
+        zoomOnDoubleClick: false,
+        nodesDraggable: false,
+        elementsSelectable: false,
+      } satisfies Partial<FlowProps>)
+    },
+  )
 
   it('uses temporary Space Hand mode and restores the selected tool on release', async () => {
     renderScreen()

@@ -22,7 +22,6 @@ import (
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 func newV1BoardsTestEngine(store tenancy.Store, boardsStore boards.WorkspaceBoardStore, dir *staticUserDirectory) *gin.Engine {
@@ -80,8 +79,8 @@ func newV1BoardsFixture(t *testing.T) *v1BoardsFixture {
 	t.Helper()
 	ctx := context.Background()
 	store := tenancy.NewInMemoryStoreForTests()
-	boardsStore := boards.NewInMemoryWorkspaceBoardStoreForTests()
 	dir := newStaticUserDirectory()
+	boardsStore := boards.NewInMemoryWorkspaceBoardStoreForTests(store, dir)
 	const owner, editor, viewer, wsMember, outsider = 101, 102, 103, 104, 105
 	for _, id := range []int64{owner, editor, viewer, wsMember, outsider} {
 		dir.ensure(id)
@@ -97,17 +96,15 @@ func newV1BoardsFixture(t *testing.T) *v1BoardsFixture {
 	if _, err := boardsStore.CreateBoard(ctx, ws.PublicID, owner, "Launch", boardID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := boardsStore.AddBoardMember(ctx, ws.PublicID, boardID, owner, editor, boards.RoleEditor, tenancy.RoleOwner); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := boardsStore.AddBoardMember(ctx, ws.PublicID, boardID, owner, viewer, boards.RoleViewer, tenancy.RoleOwner); err != nil {
-		t.Fatal(err)
-	}
 	// wsMember holds workspace membership with no explicit board grant:
 	// with the viewer default they read as viewer (owners read as owner).
 	store.SeedWorkspaceMember(ws.PublicID, editor, tenancy.RoleMember)
 	store.SeedWorkspaceMember(ws.PublicID, viewer, tenancy.RoleMember)
 	store.SeedWorkspaceMember(ws.PublicID, wsMember, tenancy.RoleMember)
+	if _, err := boardsStore.ReplaceBoardAccess(ctx, ws.PublicID, boardID, owner, 1, boards.WorkspaceAccessEditor, []int64{editor, viewer}); err != nil {
+		t.Fatal(err)
+	}
+
 	engine := newV1BoardsTestEngine(store, boardsStore, dir)
 	return &v1BoardsFixture{
 		store: store, boards: boardsStore, dir: dir, engine: engine,
@@ -283,7 +280,6 @@ func TestV1BoardsConcurrency(t *testing.T) {
 func TestV1BoardsACLMatrix(t *testing.T) {
 	f := newV1BoardsFixture(t)
 	detailPath := f.boardPath("")
-	docPath := f.boardPath("/document")
 
 	t.Run("workspace outsider cannot see the surface", func(t *testing.T) {
 		status, _, payload := doV1(t, f.engine, v1Call{method: http.MethodGet, path: detailPath, userID: f.outsider})
@@ -296,23 +292,28 @@ func TestV1BoardsACLMatrix(t *testing.T) {
 		}
 	})
 
-	t.Run("workspace member without explicit grant defaults to viewer", func(t *testing.T) {
+	t.Run("workspace member without explicit grant stays invisible", func(t *testing.T) {
 		status, _, payload := doV1(t, f.engine, v1Call{method: http.MethodGet, path: detailPath, userID: f.wsMember})
-		if status != 200 {
-			t.Fatalf("default viewer read = %d %v, want 200", status, payload)
+		if status != 404 || v1ErrorCode(t, payload) != string(contract.CodeBoardNotFound) {
+			t.Fatalf("grant-less member read = %d %v, want 404 board_not_found", status, payload)
 		}
 		status, _, listed := doV1(t, f.engine, v1Call{method: http.MethodGet, path: f.boardsPath(""), userID: f.wsMember})
-		if status != 200 || len(listed["data"].([]any)) != 1 {
-			t.Fatalf("default viewer list = %d %v, want 1 board", status, listed)
+		if status != 200 || len(listed["data"].([]any)) != 0 {
+			t.Fatalf("grant-less member list = %d %v, want 200 with 0 boards", status, listed)
 		}
-		// Viewers read but cannot write.
+		// Invisible boards never surface a 403: writes converge to 404.
 		status, forbidden := boardIDEMKey(t, f.engine, http.MethodPatch, detailPath, f.wsMember, "", `{"data":{"name":"Nope"}}`)
-		if status != 403 || v1ErrorCode(t, forbidden) != string(contract.CodeBoardForbidden) {
-			t.Fatalf("default viewer rename = %d %v, want 403 board_forbidden", status, forbidden)
+		if status != 404 || v1ErrorCode(t, forbidden) != string(contract.CodeBoardNotFound) {
+			t.Fatalf("grant-less member rename = %d %v, want 404 board_not_found", status, forbidden)
 		}
 	})
 
 	t.Run("viewer reads but cannot write", func(t *testing.T) {
+		f := newV1BoardsFixture(t)
+		if _, err := f.boards.ReplaceBoardAccess(t.Context(), f.workspace.PublicID, f.boardID, f.owner, 2, boards.WorkspaceAccessViewer, []int64{f.editor, f.viewer}); err != nil {
+			t.Fatal(err)
+		}
+		detailPath, docPath := f.boardPath(""), f.boardPath("/document")
 		if status, _ := boardIDEMKey(t, f.engine, http.MethodGet, detailPath, f.viewer, "", ""); status != 200 {
 			t.Fatalf("viewer read = %d, want 200", status)
 		}
@@ -328,18 +329,16 @@ func TestV1BoardsACLMatrix(t *testing.T) {
 		}
 	})
 
-	t.Run("editor writes but cannot manage roster or shares", func(t *testing.T) {
+	t.Run("editor writes but cannot manage roster or access", func(t *testing.T) {
 		if status, _ := boardIDEMKey(t, f.engine, http.MethodPatch, detailPath, f.editor, "", `{"data":{"name":"Editor Rename"}}`); status != 200 {
 			t.Fatalf("editor rename = %d, want 200", status)
 		}
-		status, payload := boardIDEMKey(t, f.engine, http.MethodPost, f.boardPath("/members"), f.editor, "ed-add",
-			fmt.Sprintf(`{"data":{"user_id":%q,"role":"viewer"}}`, tenancy.FormatUserPublicID(f.dir.ensure(106))))
-		if status != 403 || v1ErrorCode(t, payload) != string(contract.CodeBoardForbidden) {
-			t.Fatalf("editor member add = %d %v, want 403 board_forbidden", status, payload)
-		}
-		status, _ = boardIDEMKey(t, f.engine, http.MethodPost, f.boardPath("/shares"), f.editor, "ed-share", `{"data":{"role":"viewer"}}`)
-		if status != 403 {
-			t.Fatalf("editor share create = %d, want 403", status)
+
+		call := v1Call{method: http.MethodPut, path: f.boardPath("/access"), userID: f.editor,
+			body:    `{"data":{"workspace_access":"viewer"}}`,
+			headers: map[string]string{contract.IdempotencyKeyHeader: "ed-acc", contract.IfMatchHeader: "access-3"}}
+		if status, _, payload := doV1(t, f.engine, call); status != 403 {
+			t.Fatalf("editor access write = %d %v, want 403", status, payload)
 		}
 	})
 
@@ -351,230 +350,21 @@ func TestV1BoardsACLMatrix(t *testing.T) {
 	})
 }
 
-func TestV1BoardsShareReplayAndJoin(t *testing.T) {
+func TestV1BoardsJoinRouteRemoved(t *testing.T) {
 	f := newV1BoardsFixture(t)
-	f.dir.ensure(106)
-	sharesPath := f.boardPath("/shares")
-
-	post := func(userID int64, key, body string) (int, map[string]any) {
-		return boardIDEMKey(t, f.engine, http.MethodPost, sharesPath, userID, key, body)
+	joinCall := v1Call{method: http.MethodPost, path: f.boardsPath("/join"), userID: f.owner,
+		body:    `{"data":{"token":"sht_bogus"}}`,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "dead-join"}}
+	// Removed routes fall through to gin's plain-text 404 (no JSON
+	// envelope, no share-token error code): use the raw round trip.
+	if status, _, _ := doV1RoundTrip(t, f.engine, joinCall, "test-req-"); status != 404 {
+		t.Fatalf("join route = %d, want 404 (route removed)", status)
 	}
-	status, first := post(f.owner, "share-1", `{"data":{"role":"viewer"}}`)
-	if status != 201 {
-		t.Fatalf("share create = %d %v, want 201", status, first)
-	}
-	firstData := v1Data(t, first).(map[string]any)
-	tokenID, _ := firstData["token_id"].(string)
-	bearer, _ := firstData["token"].(string)
-	if !strings.HasPrefix(tokenID, "sht_") || bearer == "" {
-		t.Fatalf("share = %v, want sht_ token_id with bearer shown once", firstData)
-	}
-	// Same key+hash replays the same bearer.
-	status, replay := post(f.owner, "share-1", `{"data":{"role":"viewer"}}`)
-	if status != 201 {
-		t.Fatalf("share replay = %d %v, want 201", status, replay)
-	}
-	replayData := v1Data(t, replay).(map[string]any)
-	if replayData["token_id"] != tokenID || replayData["token"] != bearer {
-		t.Fatalf("replay = %v, want same token", replayData)
-	}
-	// Same key with a different request conflicts.
-	status, conflict := post(f.owner, "share-1", `{"data":{"role":"editor"}}`)
-	if status != 409 || v1ErrorCode(t, conflict) != string(contract.CodeBoardIdempotencyConflict) {
-		t.Fatalf("share conflict = %d %v, want 409 board_idempotency_conflict", status, conflict)
-	}
-	// List never returns the bearer.
-	status, _, listed := doV1(t, f.engine, v1Call{method: http.MethodGet, path: sharesPath, userID: f.owner})
-	if status != 200 {
-		t.Fatalf("share list = %d", status)
-	}
-	items := v1Data(t, listed).([]any)
-	if len(items) != 1 || items[0].(map[string]any)["token"] != nil {
-		t.Fatalf("share list = %v, want one entry without bearer", items)
-	}
-	// Join is idempotent: the workspace member gains viewer access twice.
-	joinPath := f.boardsPath("/join")
-	join := func(userID int64, key, token string) (int, map[string]any) {
-		return boardIDEMKey(t, f.engine, http.MethodPost, joinPath, userID, key,
-			fmt.Sprintf(`{"data":{"token":%q}}`, token))
-	}
-	// The joiner needs workspace membership first (workspace context is explicit).
-	f.store.SeedWorkspaceMember(f.workspace.PublicID, 106, tenancy.RoleMember)
-	status, joined := join(106, "join-1", bearer)
-	if status != 200 {
-		t.Fatalf("join = %d %v, want 200", status, joined)
-	}
-	status, again := join(106, "join-2", bearer)
-	if status != 200 {
-		t.Fatalf("rejoin = %d %v, want 200", status, again)
-	}
-	// Unknown bearers stay invisible.
-	status, unknown := join(106, "join-3", "sht_unknownbearer")
-	if status != 404 || v1ErrorCode(t, unknown) != string(contract.CodeBoardShareTokenNotFound) {
-		t.Fatalf("unknown join = %d %v, want 404 board_share_token_not_found", status, unknown)
-	}
-	// Revocation converges joins to 404 with an auditable outcome.
-	status, _ = boardIDEMKey(t, f.engine, http.MethodDelete, sharesPath+"/"+tokenID, f.owner, "revoke-1", "")
-	if status != 200 {
-		t.Fatalf("revoke = %d, want 200", status)
-	}
-	status, revoked := join(106, "join-4", bearer)
-	if status != 404 || v1ErrorCode(t, revoked) != string(contract.CodeBoardShareTokenNotFound) {
-		t.Fatalf("revoked join = %d %v, want 404 board_share_token_not_found", status, revoked)
-	}
-	// A workspace outsider holding a fresh bearer joins and gains workspace
-	// membership alongside the board grant (the bearer is the capability).
-	status, second := post(f.owner, "share-2", `{"data":{"role":"editor"}}`)
-	if status != 201 {
-		t.Fatalf("second share = %d %v, want 201", status, second)
-	}
-	secondBearer, _ := v1Data(t, second).(map[string]any)["token"].(string)
-	status, outsiderJoin := join(f.outsider, "join-5", secondBearer)
-	if status != 200 {
-		t.Fatalf("outsider join = %d %v, want 200", status, outsiderJoin)
-	}
-	if _, member, err := f.store.GetWorkspaceRole(context.Background(), f.workspace.PublicID, f.outsider); err != nil || !member {
-		t.Fatalf("join must grant workspace membership, member=%v err=%v", member, err)
-	}
-	status, _, readBack := doV1(t, f.engine, v1Call{method: http.MethodGet, path: f.boardPath(""), userID: f.outsider})
-	if status != 200 {
-		t.Fatalf("joined outsider read = %d %v, want 200", status, readBack)
-	}
-}
-
-// TestV1BoardsJoinRejectedBearerGrantsNoMembership pins the authorization
-// order on the join path: a bearer that fails to redeem (unknown or revoked)
-// must leave no membership row behind. Membership is not board-scoped — it
-// reaches billing, credits, tasks, media and library — so granting before the
-// token is validated would hand a caller who only guessed a workspace id a
-// far wider surface than the bearer was ever scoped to.
-//
-// The joiners below are deliberately never seeded with SeedWorkspaceMember, so
-// the negative assertions are not masked by a pre-existing membership (the
-// shares test seeds its joiner up front and so cannot observe this).
-func TestV1BoardsJoinRejectedBearerGrantsNoMembership(t *testing.T) {
-	f := newV1BoardsFixture(t)
-	ctx := context.Background()
-	sharesPath := f.boardPath("/shares")
-
-	isMember := func(userID int64) bool {
-		t.Helper()
-		_, member, err := f.store.GetWorkspaceRole(ctx, f.workspace.PublicID, userID)
-		if err != nil {
-			t.Fatalf("workspace role for %d = %v", userID, err)
+	for _, path := range []string{f.boardPath("/shares"), f.boardPath("/shares/sht_bogus")} {
+		call := v1Call{method: http.MethodGet, path: path, userID: f.owner}
+		if status, _, _ := doV1RoundTrip(t, f.engine, call, "test-req-"); status != 404 {
+			t.Fatalf("GET %s = %d, want 404 (route removed)", path, status)
 		}
-		return member
-	}
-	join := func(userID int64, key, token string) (int, map[string]any) {
-		return boardIDEMKey(t, f.engine, http.MethodPost, f.boardsPath("/join"), userID, key,
-			fmt.Sprintf(`{"data":{"token":%q}}`, token))
-	}
-	mintShare := func(key, role string) (string, string) {
-		t.Helper()
-		status, created := boardIDEMKey(t, f.engine, http.MethodPost, sharesPath, f.owner, key,
-			fmt.Sprintf(`{"data":{"role":%q}}`, role))
-		if status != 201 {
-			t.Fatalf("share create = %d %v, want 201", status, created)
-		}
-		data := v1Data(t, created).(map[string]any)
-		tokenID, _ := data["token_id"].(string)
-		bearer, _ := data["token"].(string)
-		if tokenID == "" || bearer == "" {
-			t.Fatalf("share = %v, want token_id and bearer", data)
-		}
-		return tokenID, bearer
-	}
-
-	const unknownJoiner, revokedJoiner, validJoiner = 106, 107, 108
-	for _, id := range []int64{unknownJoiner, revokedJoiner, validJoiner} {
-		if isMember(id) {
-			t.Fatalf("user %d must start as a workspace non-member", id)
-		}
-	}
-
-	// An unknown bearer converges to 404 and grants nothing.
-	status, unknown := join(unknownJoiner, "leak-unknown", "sht_unknownbearer")
-	if status != 404 || v1ErrorCode(t, unknown) != string(contract.CodeBoardShareTokenNotFound) {
-		t.Fatalf("unknown join = %d %v, want 404 board_share_token_not_found", status, unknown)
-	}
-	if isMember(unknownJoiner) {
-		t.Fatal("rejected join granted workspace membership: a failed bearer must leave no trace")
-	}
-
-	// A revoked bearer likewise converges to 404 and grants nothing.
-	revokedTokenID, revokedBearer := mintShare("leak-share-revoked", "viewer")
-	if status, _ := boardIDEMKey(t, f.engine, http.MethodDelete, sharesPath+"/"+revokedTokenID, f.owner, "leak-revoke", ""); status != 200 {
-		t.Fatalf("revoke = %d, want 200", status)
-	}
-	status, revoked := join(revokedJoiner, "leak-revoked", revokedBearer)
-	if status != 404 || v1ErrorCode(t, revoked) != string(contract.CodeBoardShareTokenNotFound) {
-		t.Fatalf("revoked join = %d %v, want 404 board_share_token_not_found", status, revoked)
-	}
-	if isMember(revokedJoiner) {
-		t.Fatal("revoked join granted workspace membership: a failed bearer must leave no trace")
-	}
-
-	// Positive control, so the two assertions above cannot pass vacuously by
-	// the grant having been dropped outright: a live bearer still grants
-	// membership, which is what lets the collaborator reach workspace-rooted
-	// surfaces after joining.
-	_, validBearer := mintShare("leak-share-valid", "editor")
-	status, joined := join(validJoiner, "leak-valid", validBearer)
-	if status != 200 {
-		t.Fatalf("valid join = %d %v, want 200", status, joined)
-	}
-	if !isMember(validJoiner) {
-		t.Fatal("successful join must grant workspace membership alongside the board grant")
-	}
-}
-
-func TestV1BoardsMembers(t *testing.T) {
-	f := newV1BoardsFixture(t)
-	f.dir.ensure(106)
-	f.dir.ensure(107)
-	f.store.SeedWorkspaceMember(f.workspace.PublicID, 106, tenancy.RoleMember)
-	f.store.SeedWorkspaceMember(f.workspace.PublicID, 107, tenancy.RoleMember)
-	membersPath := f.boardPath("/members")
-	usr := func(userID int64) string { return tenancy.FormatUserPublicID(f.dir.ensure(userID)) }
-
-	status, payload := boardIDEMKey(t, f.engine, http.MethodPost, membersPath, f.owner, "m-add-1",
-		fmt.Sprintf(`{"data":{"user_id":%q,"role":"viewer"}}`, usr(106)))
-	if status != 201 {
-		t.Fatalf("member add = %d %v, want 201", status, payload)
-	}
-	status, _, listed := doV1(t, f.engine, v1Call{method: http.MethodGet, path: membersPath, userID: f.owner})
-	if status != 200 {
-		t.Fatalf("member list = %d", status)
-	}
-	// Owner row + editor + viewer fixtures + new member.
-	if len(v1Data(t, listed).([]any)) != 4 {
-		t.Fatalf("members = %v, want 4 rows", listed)
-	}
-	// Promote to editor.
-	status, _ = boardIDEMKey(t, f.engine, http.MethodPatch, membersPath+"/"+usr(106), f.owner, "", `{"data":{"role":"editor"}}`)
-	if status != 200 {
-		t.Fatalf("promote = %d, want 200", status)
-	}
-	// Demoting the last (implicit) owner is protected with the shared code.
-	status, payload = boardIDEMKey(t, f.engine, http.MethodPatch, membersPath+"/"+usr(f.owner), f.owner, "", `{"data":{"role":"viewer"}}`)
-	if status != 403 || v1ErrorCode(t, payload) != string(contract.CodeMembershipTransitionForbidden) {
-		t.Fatalf("demote last owner = %d %v, want 403 membership_transition_forbidden", status, payload)
-	}
-	// Self-leave works for non-owners.
-	status, _ = boardIDEMKey(t, f.engine, http.MethodDelete, membersPath+"/"+usr(106), 106, "m-leave-1", "")
-	if status != 200 {
-		t.Fatalf("self leave = %d, want 200", status)
-	}
-	// Unknown and malformed member ids are invisible (404).
-	unknown := tenancy.FormatUserPublicID(uuid.New())
-	status, _, payload = doV1(t, f.engine, v1Call{method: http.MethodPatch, path: membersPath + "/" + unknown, userID: f.owner, body: `{"data":{"role":"viewer"}}`})
-	if status != 404 || v1ErrorCode(t, payload) != string(contract.CodeBoardMemberNotFound) {
-		t.Fatalf("unknown member = %d %v, want 404 board_member_not_found", status, payload)
-	}
-	status, _, _ = doV1(t, f.engine, v1Call{method: http.MethodDelete, path: membersPath + "/nope", userID: f.owner,
-		headers: map[string]string{contract.IdempotencyKeyHeader: "m-del-bad"}})
-	if status != 404 {
-		t.Fatalf("malformed member delete = %d, want 404", status)
 	}
 }
 
@@ -595,6 +385,9 @@ func TestV1BoardsArchivedWritesConflict(t *testing.T) {
 	f := newV1BoardsFixture(t)
 	detailPath := f.boardPath("")
 	docPath := f.boardPath("/document")
+	if _, err := f.boards.ReplaceBoardAccess(t.Context(), f.workspace.PublicID, f.boardID, f.owner, 2, boards.WorkspaceAccessViewer, []int64{f.editor, f.viewer}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Permission-denied control: viewer rename on a live board stays 403.
 	status, payload := boardIDEMKey(t, f.engine, http.MethodPatch, detailPath, f.viewer, "", `{"data":{"name":"Nope"}}`)

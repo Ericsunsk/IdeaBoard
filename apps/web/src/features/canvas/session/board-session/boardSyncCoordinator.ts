@@ -5,6 +5,11 @@ import {
   type BoardSnapshot,
 } from '../../../board/ports/canvas'
 import {
+  isBoardAccessLost,
+  isConfirmedAccessLoss,
+  revalidateAndConvergeBoardAccess,
+} from '../../../board/ports/canvasSession'
+import {
   BOARD_SESSION_AUTH_UNAVAILABLE_CODE,
   BOARD_SESSION_WORKSPACE_UNAVAILABLE_CODE,
   type BoardSession,
@@ -217,6 +222,17 @@ export function createBoardSyncCoordinator(
     return Number(options.graphRevision.value)
   }
 
+  /**
+   * Session-auth failure predicate: 401 always, plus 403s that carry no
+   * board capability verdict. Board-coded 403/404s are capability verdicts
+   * on this board (possibly a revocation): they skip the session-missing
+   * copy and keep the preserved-retry copy until revalidation lands.
+   */
+  function isSessionAuthFailure(status: number | null, code: string | null): boolean {
+    if (status === 401) return true
+    return status === 403 && code !== 'board_forbidden' && code !== 'board_not_found'
+  }
+
   function notifyRemoteSyncFailure(
     boardId: string,
     reason: 'sync-failed' | 'conflict' | 'archived',
@@ -264,7 +280,10 @@ export function createBoardSyncCoordinator(
       typeof (error as { status?: unknown } | null)?.status === 'number'
         ? ((error as { status?: number }).status as number)
         : null
-    if (status === 401 || status === 403) {
+    // Board-coded 403/404s skip the auth copy (see isSessionAuthFailure
+    // above): the save-failure path revalidates them and a proven loss
+    // converges, anything else keeps the preserved-retry copy.
+    if (isSessionAuthFailure(status, code)) {
       options.onError(i18n.global.t('canvas.session.saveAuthUnavailable'))
       return
     }
@@ -308,6 +327,23 @@ export function createBoardSyncCoordinator(
     if (shouldNotifySaveFailure(saveOptions.isSilent, boardId, remoteSync.reason)) {
       notifyRemoteSyncFailure(boardId, remoteSync.reason, remoteSync.error)
     }
+    maybeRevalidateAccessAfterSyncFailure(boardId, remoteSync)
+  }
+
+  /**
+   * A document PUT 403/404 is ambiguous (revocation vs transient): only a
+   * revalidation verdict converges. The draft stays dirty/`retry` until
+   * the verdict lands, so unconfirmed failures preserve unsaved content
+   * and keep retrying; a proven loss converges (purge + Gallery) through
+   * the shared revocation path.
+   */
+  function maybeRevalidateAccessAfterSyncFailure(
+    boardId: string,
+    remoteSync: BoardSaveStep['remoteSync'],
+  ): void {
+    if (remoteSync.isOk || remoteSync.reason !== 'sync-failed') return
+    if (!isConfirmedAccessLoss(remoteSync.error)) return
+    void revalidateAndConvergeBoardAccess(boardId)
   }
 
   function settleCommittedSave(args: {
@@ -380,6 +416,12 @@ export function createBoardSyncCoordinator(
     const boardId = options.boardSession.currentBoardId.value
     if (!boardId) {
       options.onWarning(i18n.global.t('canvas.session.missingBoardIdSave'))
+      return { isSaved: false }
+    }
+    if (isBoardAccessLost(boardId)) {
+      // Confirmed loss: never issue the doomed write (no retry
+      // scheduling, no toast spam here); convergence owns the notice +
+      // Gallery navigation through its surface subscribers.
       return { isSaved: false }
     }
     const saveToken = ++saveSequence

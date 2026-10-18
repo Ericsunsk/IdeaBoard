@@ -16,3 +16,20 @@ export {
   syncRestoreBoardToServer,
   type BoardSyncConflictKind,
 } from '../session/sync/boardSync'
+
+export { useSharePanel } from '../session/share/useSharePanel'
+export { default as ShareDialog } from '../ui/share/ShareDialog.vue'
+
+// Only confirmed revocation purges protected state; transport failures do not.
+export {
+  isBoardAccessLost,
+  isBoardAccessStale,
+  isConfirmedAccessLoss,
+} from '../session/revocation/accessLoss'
+export {
+  observeOpenBoardAccessLoss,
+  revalidateAndConvergeBoardAccess,
+  subscribeBoardAccessLost,
+} from '../session/revocation/convergeAccessLoss'
+
+export { getBoardScope, isBoardScopeCurrent, type BoardScope } from '../session/catalog/scope'
