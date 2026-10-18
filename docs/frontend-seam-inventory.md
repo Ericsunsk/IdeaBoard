@@ -16971,9 +16971,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 49,
-      "measuredFanOut": 67,
+      "measuredFanOut": 68,
       "targetFanIn": 49,
-      "targetFanOut": 67,
+      "targetFanOut": 68,
       "ownershipScope": ["src/features/board/"],
       "publicExports": [
         "BOARD_DOCUMENT_REPLACE_COALESCE_MS",
@@ -17257,6 +17257,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/lib/utils.ts",
         "src/test/deferred.ts",
         "src/test/factories/index.ts",
+        "src/test/msw.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
@@ -17749,9 +17750,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 91,
-      "measuredFanOut": 67,
+      "measuredFanOut": 68,
       "targetFanIn": 91,
-      "targetFanOut": 67,
+      "targetFanOut": 68,
       "ownershipScope": ["src/features/board/"],
       "publicExports": [
         "BoardSnapshot",
@@ -17882,6 +17883,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/lib/utils.ts",
         "src/test/deferred.ts",
         "src/test/factories/index.ts",
+        "src/test/msw.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
@@ -17949,9 +17951,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 10,
-      "measuredFanOut": 67,
+      "measuredFanOut": 68,
       "targetFanIn": 10,
-      "targetFanOut": 67,
+      "targetFanOut": 68,
       "ownershipScope": ["src/features/board/"],
       "publicExports": [
         "BoardRepository",
@@ -18043,6 +18045,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/lib/utils.ts",
         "src/test/deferred.ts",
         "src/test/factories/index.ts",
+        "src/test/msw.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
@@ -23549,9 +23552,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue`            | canonical | admin         | 2       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue`                | canonical | admin         | 1       | 2 → 2                    | 3 → 3                     |
 | `src/features/auth/index.ts`                                                 | canonical | auth          | 28      | 31 → 31                  | 46 → 46                   |
-| `src/features/board/index.ts`                                                | canonical | board         | 218     | 49 → 49                  | 67 → 67                   |
-| `src/features/board/ports/canvas.ts`                                         | canonical | board         | 65      | 91 → 91                  | 67 → 67                   |
-| `src/features/board/ports/canvasSession.ts`                                  | canonical | board         | 27      | 10 → 10                  | 67 → 67                   |
+| `src/features/board/index.ts`                                                | canonical | board         | 218     | 49 → 49                  | 68 → 68                   |
+| `src/features/board/ports/canvas.ts`                                         | canonical | board         | 65      | 91 → 91                  | 68 → 68                   |
+| `src/features/board/ports/canvasSession.ts`                                  | canonical | board         | 26      | 10 → 10                  | 68 → 68                   |
 | `src/features/board/ports/testing.ts`                                        | canonical | board         | 2       | 6 → 6                    | 1 → 1                     |
 | `src/features/board/testing/index.ts`                                        | canonical | board         | 12      | 29 → 29                  | 5 → 5                     |
 | `src/features/canvas/core/graph/canvasGraphStoreWriter.ts`                   | canonical | canvas        | 1       | 3 → 3                    | 2 → 2                     |

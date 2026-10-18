@@ -62,6 +62,7 @@ function makeDeps(): BoardCommandDependencies {
         workspaceAccess: 'none',
         isCreator: true,
         hasDirectGrant: false,
+        creatorUserId: 'usr_creator',
       }),
     ),
     archiveServerBoard: vi.fn(async (): Promise<WorkspaceBoardMeta> => ({
@@ -78,6 +79,7 @@ function makeDeps(): BoardCommandDependencies {
       workspaceAccess: 'none',
       isCreator: true,
       hasDirectGrant: false,
+      creatorUserId: 'usr_creator',
     })),
     registerServerBoard: vi.fn((input: { id: string; name: string; revision?: number }) =>
       makeBoard(input.id, input.name),

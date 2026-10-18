@@ -87,6 +87,7 @@ function mockCreateBoard(
     name: body?.data?.name ?? 'Untitled',
     revision: 1,
     schema_version: BOARD_STATE_SCHEMA_VERSION,
+    creator_user_id: 'usr_creator',
     archived_at: null,
     created_at: '2026-09-25T00:00:00.000Z',
     updated_at: '2026-09-25T00:00:00Z',
@@ -178,7 +179,7 @@ function mockRestoreBoard(state: MockWorkspaceBoardApiState, boardId: string): P
   const board = state.boardsResponse.data.find((item) => item.id === boardId)
   return Promise.resolve({
     data: {
-      ...(board ?? { id: boardId, name: 'Board' }),
+      ...(board ?? { id: boardId, name: 'Board', creator_user_id: 'usr_creator' }),
       archived_at: null,
     },
   })

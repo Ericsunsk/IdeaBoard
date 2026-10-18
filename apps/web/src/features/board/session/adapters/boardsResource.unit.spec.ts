@@ -8,6 +8,7 @@ import { primeAuthenticatedWorkspace } from '../../testing'
 import {
   BoardCatalogIncompleteError,
   BoardCatalogScopeChangedError,
+  BoardPayloadError,
   createWorkspaceBoard,
   fetchWorkspaceBoards,
 } from './boardsResource'
@@ -45,6 +46,7 @@ function boardDto(extra: Record<string, unknown> = {}) {
     name: 'Scene Board',
     revision: 3,
     schema_version: 4,
+    creator_user_id: 'usr_creator',
     archived_at: null,
     created_at: new Date(100).toISOString(),
     updated_at: new Date(200).toISOString(),
@@ -59,6 +61,26 @@ beforeEach(() => {
 })
 
 describe('boardsResource catalog scenes', () => {
+  test('retains the Creator public identity for cached Board consumers', async () => {
+    mocks.listBoards.mockResolvedValue({
+      data: [boardDto({ creator_user_id: 'usr_other_creator' })],
+      meta: { has_more: false },
+    })
+    const [meta] = await fetchWorkspaceBoards(WORKSPACE_ID)
+    expect(meta?.creatorUserId).toBe('usr_other_creator')
+  })
+
+  test.each([undefined, '', 'not-a-user'])(
+    'rejects invalid Creator identity %s',
+    async (creator) => {
+      mocks.listBoards.mockResolvedValue({
+        data: [boardDto({ creator_user_id: creator })],
+        meta: { has_more: false },
+      })
+      await expect(fetchWorkspaceBoards(WORKSPACE_ID)).rejects.toBeInstanceOf(BoardPayloadError)
+    },
+  )
+
   test('carries the strict-parsed server scene and content version', async () => {
     mocks.listBoards.mockResolvedValue({
       data: [boardDto({ preview_scene: loadFixtureScene('mixed'), content_version: 'cv-1' })],

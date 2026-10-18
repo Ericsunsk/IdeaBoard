@@ -37,6 +37,7 @@ type V1BoardDto = {
   name: string
   revision: number
   schema_version: number
+  creator_user_id: string
   archived_at: string | null
   created_at: string
   updated_at: string
@@ -67,6 +68,7 @@ function findOrCreateV1BoardDto(boardId: string): V1BoardDto {
       name: 'Board',
       revision: 1,
       schema_version: BOARD_STATE_SCHEMA_VERSION,
+      creator_user_id: 'usr_creator',
       archived_at: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -540,6 +542,7 @@ describe('createBoardSessionRepository', () => {
       name: board.name,
       revision: 1,
       schema_version: BOARD_STATE_SCHEMA_VERSION,
+      creator_user_id: 'usr_creator',
       archived_at: null,
       created_at: new Date(board.createdAt).toISOString(),
       updated_at: new Date(board.updatedAt).toISOString(),

@@ -112,6 +112,7 @@ export type WorkspaceBoardMeta = {
    * `relationship.has_direct_grant`; the team range also requires a noncreator.
    */
   hasDirectGrant: boolean
+  creatorUserId: string
 }
 
 export type WorkspaceBoardDocument = {
@@ -208,6 +209,7 @@ function toWorkspaceBoardMeta(board: Board): WorkspaceBoardMeta {
     workspaceAccess: toWorkspaceAccess(board),
     isCreator: board.relationship?.is_creator === true,
     hasDirectGrant: board.relationship?.has_direct_grant === true,
+    creatorUserId: toUserPublicId(board.creator_user_id, 'creator_user_id'),
   }
 }
 
@@ -519,18 +521,6 @@ export async function fetchBoardAccessFact(
   if (!id) throw new BoardPayloadError('id')
   const envelope = await getBoardAccess(workspace, id, requestConfig(options))
   return toShareAccessFact(envelope.data)
-}
-
-export async function fetchBoardCreatorIdentity(
-  workspaceId: string | null | undefined,
-  boardId: string,
-  options: BoardsRequestOptions = {},
-): Promise<string> {
-  const workspace = requireBoardWorkspaceId(workspaceId)
-  const id = boardId.trim()
-  if (!id) throw new BoardPayloadError('id')
-  const envelope = await getBoard(workspace, id, requestConfig(options))
-  return toUserPublicId(envelope.data.creator_user_id, 'creator_user_id')
 }
 
 export async function replaceBoardSharing(

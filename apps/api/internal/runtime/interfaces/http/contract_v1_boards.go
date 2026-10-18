@@ -246,11 +246,7 @@ type v1BoardDTO struct {
 	UpdatedAt       string                 `json:"updated_at"`
 }
 
-func boardCapabilitiesDTOFor(role boards.AccessRole, callerUserID int64, board *boards.V1Board) v1BoardCapabilitiesDTO {
-	return toBoardCapabilitiesDTO(boards.CapabilitiesFor(role, true, board.ArchivedAt != nil))
-}
-
-// toBoardMemberDTO resolves the creator public identity for board payloads.
+// toBoardCreatorDTO resolves the creator public identity for board payloads.
 // Boards without a resolvable creator fail closed (503): creator_user_id is
 // a required User public identity, never an internal id.
 func (h *contractV1Handler) toBoardCreatorDTO(c *gin.Context, ownerUserID int64) (string, bool) {
@@ -291,31 +287,8 @@ func (h *contractV1Handler) toBoardDTOFull(c *gin.Context, board *boards.V1Board
 			break
 		}
 	}
-	dto := v1BoardDTO{
-		ID:              board.PublicID,
-		WorkspaceID:     board.WorkspacePublicID,
-		Name:            board.Name,
-		Revision:        board.Revision,
-		SchemaVersion:   board.SchemaVersion,
-		ContentVersion:  board.ContentVersion,
-		PreviewScene:    board.PreviewScene,
-		CreatorUserID:   creator,
-		WorkspaceAccess: string(board.WorkspaceAccess),
-		AccessVersion:   board.AccessVersion,
-		AccessState:     string(boards.DeriveAccessState(board.WorkspaceAccess, len(members) > 0)),
-		Relationship: v1BoardRelationshipDTO{
-			IsCreator:      callerUserID == board.OwnerUserID,
-			HasDirectGrant: hasDirectGrant,
-		},
-		Capabilities: boardCapabilitiesDTOFor(role, callerUserID, board),
-		CreatedAt:    v1FormatTime(board.CreatedAt),
-		UpdatedAt:    v1FormatTime(board.UpdatedAt),
-	}
-	if board.ArchivedAt != nil {
-		archived := v1FormatTime(*board.ArchivedAt)
-		dto.ArchivedAt = &archived
-	}
-	return dto, true
+	entry := boards.CatalogEntryOf(board, role, hasDirectGrant, len(members) > 0)
+	return toBoardDTO(entry, creator, callerUserID), true
 }
 
 // toBoardCatalogDTO renders one Gallery catalog card: metadata plus the
@@ -326,6 +299,10 @@ func (h *contractV1Handler) toBoardCatalogDTO(c *gin.Context, entry *boards.V1Bo
 	if !ok {
 		return v1BoardDTO{}, false
 	}
+	return toBoardDTO(entry, creator, callerUserID), true
+}
+
+func toBoardDTO(entry *boards.V1BoardCatalogEntry, creator string, callerUserID int64) v1BoardDTO {
 	dto := v1BoardDTO{
 		ID:              entry.PublicID,
 		WorkspaceID:     entry.WorkspacePublicID,
@@ -350,7 +327,7 @@ func (h *contractV1Handler) toBoardCatalogDTO(c *gin.Context, entry *boards.V1Bo
 		archived := v1FormatTime(*entry.ArchivedAt)
 		dto.ArchivedAt = &archived
 	}
-	return dto, true
+	return dto
 }
 
 func boardPageRequest(c *gin.Context) (boards.V1BoardCatalogPageRequest, bool) {

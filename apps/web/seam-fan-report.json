@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "e8501acdd69cff1d7e27c0bc28875e026ea31d4d",
+  "checkpointSha": "4060eb6bc4f2b31cf15cd5739d04655788dc5d03",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -23237,7 +23237,7 @@
         }
       ],
       "fanIn": 49,
-      "fanOut": 67,
+      "fanOut": 68,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
         "fs",
@@ -23300,6 +23300,7 @@
         "src/lib/utils.ts",
         "src/test/deferred.ts",
         "src/test/factories/index.ts",
+        "src/test/msw.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
@@ -23841,6 +23842,11 @@
         {
           "from": "src/features/board/session/share/useShareRoster.contract.spec.ts",
           "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/share/useShareRoster.contract.spec.ts",
+          "to": "src/test/msw.ts",
           "kind": "runtime"
         },
         {
@@ -24599,7 +24605,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 49,
-      "targetFanOut": 67,
+      "targetFanOut": 68,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -25089,7 +25095,7 @@
         }
       ],
       "fanIn": 91,
-      "fanOut": 67,
+      "fanOut": 68,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
         "fs",
@@ -25152,6 +25158,7 @@
         "src/lib/utils.ts",
         "src/test/deferred.ts",
         "src/test/factories/index.ts",
+        "src/test/msw.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
@@ -25693,6 +25700,11 @@
         {
           "from": "src/features/board/session/share/useShareRoster.contract.spec.ts",
           "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/share/useShareRoster.contract.spec.ts",
+          "to": "src/test/msw.ts",
           "kind": "runtime"
         },
         {
@@ -26451,7 +26463,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 91,
-      "targetFanOut": 67,
+      "targetFanOut": 68,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -26516,7 +26528,7 @@
         }
       ],
       "fanIn": 10,
-      "fanOut": 67,
+      "fanOut": 68,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
         "fs",
@@ -26579,6 +26591,7 @@
         "src/lib/utils.ts",
         "src/test/deferred.ts",
         "src/test/factories/index.ts",
+        "src/test/msw.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
@@ -27120,6 +27133,11 @@
         {
           "from": "src/features/board/session/share/useShareRoster.contract.spec.ts",
           "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/share/useShareRoster.contract.spec.ts",
+          "to": "src/test/msw.ts",
           "kind": "runtime"
         },
         {
@@ -27878,7 +27896,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 10,
-      "targetFanOut": 67,
+      "targetFanOut": 68,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

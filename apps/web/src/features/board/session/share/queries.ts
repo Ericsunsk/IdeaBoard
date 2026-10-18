@@ -16,6 +16,7 @@ export type ShareBoardFacts = {
   accessState: 'private' | 'workspace'
   workspaceAccess: 'none' | 'viewer' | 'editor'
   isCreator: boolean
+  creatorUserId: string
 }
 
 /** Reads Share board facts from the catalog list cache (no network). */
@@ -34,6 +35,7 @@ export function toShareBoardFacts(meta: WorkspaceBoardMeta): ShareBoardFacts | n
     accessState: meta.accessState,
     workspaceAccess: meta.workspaceAccess,
     isCreator: meta.isCreator,
+    creatorUserId: meta.creatorUserId,
   }
 }
 

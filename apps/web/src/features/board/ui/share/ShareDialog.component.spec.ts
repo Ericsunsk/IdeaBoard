@@ -24,7 +24,13 @@ const panels: Array<ReturnType<typeof useSharePanel>> = []
 let pointerStyle: HTMLStyleElement
 let toast: ReturnType<typeof mockAppToast>
 
-function setup(options: { isCreator?: boolean; access?: Partial<WorkspaceBoardAccessFact> } = {}) {
+function setup(
+  options: {
+    isCreator?: boolean
+    access?: Partial<WorkspaceBoardAccessFact>
+    isCached?: boolean
+  } = {},
+) {
   const isCreator = options.isCreator ?? true
   let access: WorkspaceBoardAccessFact = {
     workspaceAccess: 'viewer',
@@ -47,11 +53,11 @@ function setup(options: { isCreator?: boolean; access?: Partial<WorkspaceBoardAc
     workspaceAccess: access.workspaceAccess,
     isCreator,
     hasDirectGrant: !isCreator,
+    creatorUserId: creator,
   }
   const transport: ShareTransport = {
     fetchMeta: vi.fn().mockImplementation(async () => meta),
     fetchAccess: vi.fn().mockImplementation(async () => access),
-    fetchBoardCreatorIdentity: vi.fn().mockResolvedValue(creator),
     fetchRoster: vi
       .fn()
       .mockResolvedValue([creator, member, other].map((userId) => ({ userId, role: 'member' }))),
@@ -70,7 +76,7 @@ function setup(options: { isCreator?: boolean; access?: Partial<WorkspaceBoardAc
       return access
     }),
   }
-  queryClient.setQueryData(boardQueryKeys.list(WORKSPACE), [meta])
+  if (options.isCached !== false) queryClient.setQueryData(boardQueryKeys.list(WORKSPACE), [meta])
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const panel = useSharePanel()
   panels.push(panel)
@@ -100,6 +106,15 @@ afterEach(() => {
 })
 
 describe('selected-member Board sharing', () => {
+  test.each([true, false])(
+    'pins Creator from Board metadata with catalog cached=%s',
+    async (isCached) => {
+      const { transport } = setup({ isCached })
+      expect(await screen.findByRole('button', { name: /usr_creator/ })).toBeDisabled()
+      expect(transport.fetchMeta).toHaveBeenCalledTimes(isCached ? 0 : 1)
+    },
+  )
+
   test('pins Creator, displays only selection controls and uses one common role', async () => {
     const { user, transport, access } = setup()
     expect(await screen.findByRole('button', { name: /usr_creator/ })).toBeDisabled()

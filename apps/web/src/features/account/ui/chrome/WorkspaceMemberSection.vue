@@ -104,7 +104,7 @@
           <li
             v-for="entry in section.roster.value"
             :key="entry.userId"
-            class="flex flex-col gap-2 rounded-control p-2 hover:bg-muted/40 transition-colors"
+            class="flex flex-col gap-2 rounded-control p-2 hover:bg-muted/40 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
           >
             <div class="flex items-center justify-between gap-3">
               <!-- Left: Avatar + Identity -->
@@ -157,7 +157,7 @@
                     role="radio"
                     :aria-checked="entry.role === 'member'"
                     :class="[
-                      'h-7 px-2.5 rounded-sm text-xs font-medium transition-[color,background-color,box-shadow] duration-[var(--motion-control-duration)] cursor-pointer select-none',
+                      'h-7 px-2.5 rounded-control text-xs font-medium transition-[color,background-color,box-shadow] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer select-none',
                       entry.role === 'member'
                         ? 'bg-background text-foreground shadow-xs font-semibold'
                         : 'text-muted-foreground hover:text-foreground hover:bg-background/40',
@@ -172,7 +172,7 @@
                     role="radio"
                     :aria-checked="entry.role === 'admin'"
                     :class="[
-                      'h-7 px-2.5 rounded-sm text-xs font-medium transition-[color,background-color,box-shadow] duration-[var(--motion-control-duration)] cursor-pointer select-none',
+                      'h-7 px-2.5 rounded-control text-xs font-medium transition-[color,background-color,box-shadow] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer select-none',
                       entry.role === 'admin'
                         ? 'bg-background text-foreground shadow-xs font-semibold'
                         : 'text-muted-foreground hover:text-foreground hover:bg-background/40',
@@ -187,7 +187,7 @@
                     role="radio"
                     :aria-checked="entry.role === 'owner'"
                     :class="[
-                      'h-7 px-2.5 rounded-sm text-xs font-medium transition-[color,background-color,box-shadow] duration-[var(--motion-control-duration)] select-none',
+                      'h-7 px-2.5 rounded-control text-xs font-medium transition-[color,background-color,box-shadow] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] select-none',
                       entry.role === 'owner'
                         ? 'bg-background text-foreground shadow-xs font-semibold cursor-default'
                         : 'text-muted-foreground hover:text-foreground hover:bg-background/40 cursor-pointer',
@@ -210,7 +210,7 @@
                   <button
                     v-if="section.confirmingRemoveId.value !== entry.userId"
                     type="button"
-                    class="h-7 px-2.5 rounded-sm text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    class="h-7 px-2.5 rounded-control text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="section.isPending(`remove:${entry.userId}`)"
                     @click="section.requestRemove(entry.userId)"
                   >

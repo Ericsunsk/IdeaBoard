@@ -7,7 +7,6 @@ import { boardQueryKeys } from '../sync/boardQueryKeys'
 import { fetchWorkspaceMembers } from '../../../workspace'
 import {
   fetchBoardAccessFact,
-  fetchBoardCreatorIdentity,
   fetchWorkspaceBoardMeta,
   replaceBoardSharing,
   type ShareAccessInput,
@@ -52,7 +51,6 @@ export type ShareTransport = {
   fetchMeta: typeof fetchWorkspaceBoardMeta
   fetchAccess: typeof fetchBoardAccessFact
   fetchRoster: typeof fetchWorkspaceMembers
-  fetchBoardCreatorIdentity: typeof fetchBoardCreatorIdentity
   replaceAccess: typeof replaceBoardSharing
 }
 
@@ -60,7 +58,6 @@ export const shareTransport: ShareTransport = {
   fetchMeta: fetchWorkspaceBoardMeta,
   fetchAccess: fetchBoardAccessFact,
   fetchRoster: fetchWorkspaceMembers,
-  fetchBoardCreatorIdentity,
   replaceAccess: replaceBoardSharing,
 }
 

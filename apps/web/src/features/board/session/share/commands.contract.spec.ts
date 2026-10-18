@@ -27,7 +27,6 @@ function setup() {
     fetchMeta: vi.fn().mockResolvedValue({ id: BOARD }),
     fetchAccess: vi.fn().mockResolvedValue(config),
     fetchRoster: vi.fn().mockResolvedValue([]),
-    fetchBoardCreatorIdentity: vi.fn().mockResolvedValue('usr_creator'),
     replaceAccess: vi.fn().mockResolvedValue(config),
   }
   const scope = captureShareScope(BOARD)

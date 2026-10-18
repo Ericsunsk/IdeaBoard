@@ -354,10 +354,10 @@ func copyV1Revision(revision *V1Revision) *V1Revision {
 	return &out
 }
 
-// v1BoardCatalogEntryOf projects one board to its Gallery catalog card:
+// CatalogEntryOf projects one board to its Gallery catalog card:
 // metadata plus the stored scene projection, never the full document. The
 // caller passes the already-resolved role facts (never recomputed here).
-func v1BoardCatalogEntryOf(board *V1Board, role AccessRole, hasDirectGrant bool, hasAnyGrants bool) *V1BoardCatalogEntry {
+func CatalogEntryOf(board *V1Board, role AccessRole, hasDirectGrant bool, hasAnyGrants bool) *V1BoardCatalogEntry {
 	if board == nil {
 		return nil
 	}
@@ -536,7 +536,7 @@ func (s *InMemoryWorkspaceBoardStore) ListBoardCatalog(ctx context.Context, work
 		out := V1BoardCatalogPage{Entries: make([]*V1BoardCatalogEntry, 0, end-page.Offset), HasMore: end < len(eligible)}
 		for _, board := range eligible[page.Offset:end] {
 			fact := facts[board.PublicID]
-			out.Entries = append(out.Entries, v1BoardCatalogEntryOf(board, fact.role, fact.hasDirectGrant, len(s.members[v1BoardKey(workspacePublicID, board.PublicID)]) > 0))
+			out.Entries = append(out.Entries, CatalogEntryOf(board, fact.role, fact.hasDirectGrant, len(s.members[v1BoardKey(workspacePublicID, board.PublicID)]) > 0))
 		}
 		return out, nil
 	})

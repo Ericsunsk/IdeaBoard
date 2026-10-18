@@ -35,7 +35,6 @@ type ShareSnapshot = {
   scope: ShareActionScope
   generation: number
   facts: ShareBoardFacts
-  creatorId: string
 }
 
 export function useShareDialog(options: ShareDialogDeps & { panel: SharePanel }) {
@@ -68,7 +67,7 @@ export function useShareDialog(options: ShareDialogDeps & { panel: SharePanel })
     transport,
     enabled,
     scope: () => snapshot.value?.scope ?? null,
-    creatorId: () => snapshot.value?.creatorId ?? '',
+    creatorId: () => facts.value?.creatorUserId ?? '',
     selectedIds: () => memberUserIds.value,
   })
   const isBusy = computed(
@@ -112,11 +111,7 @@ export function useShareDialog(options: ShareDialogDeps & { panel: SharePanel })
         openError.value = 'board-not-saved'
         return
       }
-      const creatorId = facts.capabilities.manage
-        ? await transport.fetchBoardCreatorIdentity(scope.workspaceId, scope.boardId)
-        : ''
-      if (!isShareScopeCurrent(scope) || options.panel.generation.value !== generation) return
-      snapshot.value = { scope, generation, facts, creatorId }
+      snapshot.value = { scope, generation, facts }
     } catch (error) {
       if (isShareScopeCurrent(scope) && options.panel.generation.value === generation)
         openError.value = classifyShareError(error)
@@ -205,7 +200,7 @@ export function useShareDialog(options: ShareDialogDeps & { panel: SharePanel })
   }
 
   async function toggleMember(userId: string): Promise<void> {
-    if (userId === snapshot.value?.creatorId || workspaceAccess.value === 'none') return
+    if (userId === facts.value?.creatorUserId || workspaceAccess.value === 'none') return
     const selected = new Set(memberUserIds.value)
     if (selected.has(userId)) selected.delete(userId)
     else selected.add(userId)

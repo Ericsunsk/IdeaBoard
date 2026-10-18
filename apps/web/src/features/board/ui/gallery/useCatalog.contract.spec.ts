@@ -127,6 +127,7 @@ async function sceneCatalogFixture(): Promise<WorkspaceBoardMeta> {
     workspaceAccess: 'none' as const,
     isCreator: true,
     hasDirectGrant: false,
+    creatorUserId: 'usr_creator',
   }
 }
 
