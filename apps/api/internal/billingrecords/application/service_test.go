@@ -18,7 +18,7 @@ import (
 )
 
 func TestServiceListReturnsOnlyCurrentUsersFinalBillingRecords(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	creditService := credits.NewService(pool)
 	seedWallet(t, ctx, pool, creditService, 42)
@@ -64,7 +64,7 @@ func TestServiceListReturnsOnlyCurrentUsersFinalBillingRecords(t *testing.T) {
 }
 
 func TestServiceListUsesStableFilteredCursor(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	creditService := credits.NewService(pool)
 	seedWallet(t, ctx, pool, creditService, 42)
@@ -91,7 +91,7 @@ func TestServiceListUsesStableFilteredCursor(t *testing.T) {
 }
 
 func TestServiceListRejectsBalancesOutsideJavaScriptSafeIntegerRange(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	creditService := credits.NewService(pool)
 	seedWallet(t, ctx, pool, creditService, 42)
@@ -106,7 +106,7 @@ func TestServiceListRejectsBalancesOutsideJavaScriptSafeIntegerRange(t *testing.
 }
 
 func TestServiceListUsesWalletSequenceIndex(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	creditService := credits.NewService(pool)
 	seedWallet(t, ctx, pool, creditService, 42)

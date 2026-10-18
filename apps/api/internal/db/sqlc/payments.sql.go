@@ -482,106 +482,11 @@ type GetPaymentOrderByCheckoutSessionParams struct {
 	StripeCheckoutSessionID pgtype.Text `json:"stripe_checkout_session_id"`
 }
 
+// Unified Checkout-session lookup (merged from ...ForUpdate + plain): the
+// non-lock version is kept. The only caller is the webhook read path
+// (dispatch, outside a write tx), which needs no row lock.
 func (q *Queries) GetPaymentOrderByCheckoutSession(ctx context.Context, arg GetPaymentOrderByCheckoutSessionParams) (PaymentOrder, error) {
 	row := q.db.QueryRow(ctx, getPaymentOrderByCheckoutSession, arg.StripeAccountID, arg.StripeCheckoutSessionID)
-	var i PaymentOrder
-	err := row.Scan(
-		&i.ID,
-		&i.PublicOrderNumber,
-		&i.PublicToken,
-		&i.UserID,
-		&i.ClientIdempotencyKey,
-		&i.RequestHash,
-		&i.Status,
-		&i.StripeCredentialID,
-		&i.StripeAccountID,
-		&i.StripeCustomerID,
-		&i.StripeProductID,
-		&i.StripeCheckoutSessionID,
-		&i.StripePaymentIntentID,
-		&i.StripeChargeID,
-		&i.IdeaQuantity,
-		&i.BaseCurrency,
-		&i.BaseAmountMinor,
-		&i.PaidSubtotalMinor,
-		&i.PaidTaxMinor,
-		&i.PaidTotalMinor,
-		&i.PaidCurrency,
-		&i.TermsVersion,
-		&i.RefundPolicyVersion,
-		&i.ReturnBaseUrl,
-		&i.CheckoutUrl,
-		&i.ReceiptUrl,
-		&i.CreditTransactionID,
-		&i.ExpiresAt,
-		&i.PaidAt,
-		&i.CreditedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getPaymentOrderByCheckoutSessionForUpdate = `-- name: GetPaymentOrderByCheckoutSessionForUpdate :one
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
-FROM payment_orders
-WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2
-FOR UPDATE
-`
-
-type GetPaymentOrderByCheckoutSessionForUpdateParams struct {
-	StripeAccountID         string      `json:"stripe_account_id"`
-	StripeCheckoutSessionID pgtype.Text `json:"stripe_checkout_session_id"`
-}
-
-func (q *Queries) GetPaymentOrderByCheckoutSessionForUpdate(ctx context.Context, arg GetPaymentOrderByCheckoutSessionForUpdateParams) (PaymentOrder, error) {
-	row := q.db.QueryRow(ctx, getPaymentOrderByCheckoutSessionForUpdate, arg.StripeAccountID, arg.StripeCheckoutSessionID)
-	var i PaymentOrder
-	err := row.Scan(
-		&i.ID,
-		&i.PublicOrderNumber,
-		&i.PublicToken,
-		&i.UserID,
-		&i.ClientIdempotencyKey,
-		&i.RequestHash,
-		&i.Status,
-		&i.StripeCredentialID,
-		&i.StripeAccountID,
-		&i.StripeCustomerID,
-		&i.StripeProductID,
-		&i.StripeCheckoutSessionID,
-		&i.StripePaymentIntentID,
-		&i.StripeChargeID,
-		&i.IdeaQuantity,
-		&i.BaseCurrency,
-		&i.BaseAmountMinor,
-		&i.PaidSubtotalMinor,
-		&i.PaidTaxMinor,
-		&i.PaidTotalMinor,
-		&i.PaidCurrency,
-		&i.TermsVersion,
-		&i.RefundPolicyVersion,
-		&i.ReturnBaseUrl,
-		&i.CheckoutUrl,
-		&i.ReceiptUrl,
-		&i.CreditTransactionID,
-		&i.ExpiresAt,
-		&i.PaidAt,
-		&i.CreditedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getPaymentOrderByID = `-- name: GetPaymentOrderByID :one
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
-FROM payment_orders
-WHERE id = $1
-`
-
-func (q *Queries) GetPaymentOrderByID(ctx context.Context, id pgtype.UUID) (PaymentOrder, error) {
-	row := q.db.QueryRow(ctx, getPaymentOrderByID, id)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
@@ -627,6 +532,11 @@ WHERE id = $1
 FOR UPDATE
 `
 
+// Unified ID lookup (merged from GetPaymentOrderByID + GetPaymentOrderByIDForUpdate):
+// the lock version is kept. Write paths (RecordPaid/Credit) run inside withTx
+// and need the row lock for serialization; single-statement reads outside an
+// explicit tx release the lock immediately, so they behave like the plain
+// read they replaced.
 func (q *Queries) GetPaymentOrderByIDForUpdate(ctx context.Context, id pgtype.UUID) (PaymentOrder, error) {
 	row := q.db.QueryRow(ctx, getPaymentOrderByIDForUpdate, id)
 	var i PaymentOrder

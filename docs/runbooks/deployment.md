@@ -173,13 +173,13 @@ git push origin v0.1.0
 
 Production deployment 使用固定 concurrency group 串行执行，新的发布不会取消正在进行的发布。SSH connection timeout 为 15 秒，远程 deployment 最长运行 25 分钟；失败时 workflow fail closed，并在 GitHub job summary 中记录 tag、commit、四张 image digest、失败阶段和受控 recovery hint。restricted entrypoint 会丢弃部署过程的原始 stdout/stderr，SSH 只返回 allow-listed JSON 结果；GitHub 不接收未脱敏的容器日志或 inspection output。migration 后失败不会自动 restore PostgreSQL，仍按本 runbook 的人工回滚流程处理。
 
-发布路径先推送 immutable SHA image，通过 BuildKit 为 multi-arch image 生成 max-mode provenance 和 SBOM attestation，并生成各平台 durable CycloneDX SBOM；固定版本且经过 repo-local SHA-256 校验的 Grype 分别扫描 `linux/amd64` 与 `linux/arm64`，拦截 `high` 及以上漏洞；Cosign keyless OIDC 对最终 image digest 签名，全部成功后才推广 mutable aliases。Grype 版本与 archive trust anchor 分别由 [`.grype-version`](../../.grype-version) 和 [`.grype-checksums`](../../.grype-checksums) 管理，例外统一维护在 [`.grype.yaml`](../../.grype.yaml)，新增例外时只加窄范围规则并记录原因与复查日期。
+发布路径只推送 immutable SHA image（`sha-<commit>` tag，不推广 mutable alias），当前 Production 节点只构建 `linux/arm64` 单架构；通过 BuildKit 为该单架构 image 生成 max-mode provenance 和 SBOM attestation，不再额外生成或发布平台 SBOM 文件；固定版本且经过 repo-local SHA-256 校验的 Grype 只扫描 `linux/arm64` image，拦截 `high` 及以上漏洞；Cosign keyless OIDC 对最终 image digest 签名，全部成功后才写入 release manifest。Grype 版本与 archive trust anchor 分别由 [`.grype-version`](../../.grype-version) 和 [`.grype-checksums`](../../.grype-checksums) 管理，例外统一维护在 [`.grype.yaml`](../../.grype.yaml)，新增例外时只加窄范围规则并记录原因与复查日期。
 
 `ideaboard update --manifest ...` 默认会在 pull 前执行 Cosign keyless 验签。VPS 必须先安装 `cosign`；离线排障时才临时设置 `COSIGN_VERIFY=false`。手动验签示例：
 
 ```bash
 cosign verify \
-  --certificate-identity "https://github.com/<github-owner>/<github-repo>/.github/workflows/docker-images.yml@refs/heads/main" \
+  --certificate-identity "https://github.com/<github-owner>/<github-repo>/.github/workflows/docker-images.yml@refs/tags/<release-tag>" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
   "ghcr.io/<github-owner>/<github-repo>/ideaboard-api@sha256:<digest>"
 ```
@@ -555,7 +555,7 @@ Workspace Media 固定以 `builtin-local` + `storage_key` 定位对象；avatar 
 
 1. 先确认目标 profile 已通过 Admin storage test，并在隔离对象上完成 upload、read、公开 URL 和 delete smoke；确认 API 与 Web 使用同一 release manifest。
 2. 更换 active profile 前，必须将全部 avatar 与 logo 按原 key 复制到目标存储并验证可读，再在 Admin 中 Apply 目标 profile；目标 profile 的 imgproxy credentials 与 source allowlist 必须同步配置。
-3. 用真实用户流程验证 Canvas upload/reload、Admin logo、avatar、task output 和 Library materialization；再运行 `docker exec ideaboard-api /app/ideaboard-server media-reclamation scan`，记录 `stale_uploading_assets`、`orphan_assets` 与 `pending_deletion_assets`。
+3. 用真实用户流程验证 Canvas upload/reload、Admin logo、avatar、task output 和 Library materialization。当前没有可手动执行的 `media-reclamation scan` 命令（未实现）：不要拼装 `docker exec ... media-reclamation scan`；Media 收敛由 `media_reclamation` River queue worker 执行，按 [backend-metrics.md](./backend-metrics.md) C 节观察该 queue 的 depth/lag 与 worker 日志确认。
 4. 切换后保留原 profile 及其对象至少一个 `GracePeriod`（当前 24 小时），只允许通过 Media reclamation worker 删除已确认无引用对象。确认稳定后再由 Admin 禁用旧 profile。
 
 失败时先在 Admin Apply 上一个已验证 profile，并执行 API/Web smoke；不要回滚数据库或删除对象。若失败发生在 migration 之后，按本节 image rollback + backup 评估流程处理，Media Asset 的 `storage_key` 记录仍是事实源。

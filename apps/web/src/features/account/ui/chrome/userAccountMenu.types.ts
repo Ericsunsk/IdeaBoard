@@ -17,6 +17,8 @@ export type UserAccountMenuWorkspaceItem = {
   publicId: string
   name: string
   organizationId: string | null
+  // The server marker controls the Default badge and protected actions.
+  isDefault: boolean
   archivedAt: string | null
 }
 
@@ -39,6 +41,7 @@ export type UserAccountMenuWorkspace = {
   onSelect: (workspaceId: string) => void
   onCreate: (name: string) => Promise<UserAccountMenuWorkspaceItem>
   onRename: (workspaceId: string, name: string) => Promise<UserAccountMenuWorkspaceItem>
+  onArchive: (workspaceId: string) => Promise<UserAccountMenuWorkspaceItem>
   onRetry: () => void
 }
 

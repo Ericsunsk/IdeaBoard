@@ -18,10 +18,10 @@ import (
 )
 
 func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	seedRechargeableWallet(t, pool, 42)
-	repo := newTestPaymentStores(db)
+	repo := newTestPaymentStores(pool)
 	now := time.Now().UTC()
 	order := createBoundPaymentOrder(t, repo)
 	configuration := activeTestStripeConfiguration(t, repo)

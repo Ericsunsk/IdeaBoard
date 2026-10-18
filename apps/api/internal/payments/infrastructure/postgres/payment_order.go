@@ -1,8 +1,6 @@
 package postgres
 
 import (
-	"time"
-
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
@@ -23,18 +21,14 @@ func PaymentOrder(row dbsqlc.PaymentOrder) paymentsdomain.PaymentOrder {
 		StripeCheckoutSessionID: PgTextString(row.StripeCheckoutSessionID),
 		StripePaymentIntentID:   row.StripePaymentIntentID, StripeChargeID: row.StripeChargeID,
 		IdeaQuantity: row.IdeaQuantity, BaseCurrency: row.BaseCurrency, BaseAmountMinor: row.BaseAmountMinor,
-		PaidSubtotalMinor: NullInt64Pointer(row.PaidSubtotalMinor), PaidTaxMinor: NullInt64Pointer(row.PaidTaxMinor),
-		PaidTotalMinor: NullInt64Pointer(row.PaidTotalMinor), PaidCurrency: row.PaidCurrency,
+		PaidSubtotalMinor: dbutil.Int64Ptr(row.PaidSubtotalMinor), PaidTaxMinor: dbutil.Int64Ptr(row.PaidTaxMinor),
+		PaidTotalMinor: dbutil.Int64Ptr(row.PaidTotalMinor), PaidCurrency: row.PaidCurrency,
 		TermsVersion: row.TermsVersion, RefundPolicyVersion: row.RefundPolicyVersion,
 		ReturnBaseURL: row.ReturnBaseUrl, CheckoutURL: row.CheckoutUrl, ReceiptURL: row.ReceiptUrl,
 		CreditTransactionID: PgTextString(row.CreditTransactionID),
-		ExpiresAt:           dbutil.TimeValue(row.ExpiresAt), PaidAt: NullTimePointer(row.PaidAt), CreditedAt: NullTimePointer(row.CreditedAt),
+		ExpiresAt:           dbutil.TimeValue(row.ExpiresAt), PaidAt: dbutil.TimePtr(row.PaidAt), CreditedAt: dbutil.TimePtr(row.CreditedAt),
 		CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt),
 	}
-}
-
-func ParseUUID(value string) (uuid.UUID, error) {
-	return uuid.Parse(value)
 }
 
 func pgUUIDToPgType(id uuid.UUID) pgtype.UUID {
@@ -53,12 +47,4 @@ func PgTextString(value pgtype.Text) string {
 		return ""
 	}
 	return value.String
-}
-
-func NullInt64Pointer(value pgtype.Int8) *int64 {
-	return dbutil.Int64Ptr(value)
-}
-
-func NullTimePointer(value pgtype.Timestamptz) *time.Time {
-	return dbutil.TimePtr(value)
 }

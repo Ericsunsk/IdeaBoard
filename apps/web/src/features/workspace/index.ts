@@ -12,6 +12,7 @@ export { useWorkspaceSwitcher } from './shell/useWorkspaceSwitcher'
 export { default as WorkspaceNavigation } from './shell/components/WorkspaceNavigation.vue'
 export { default as WorkspaceHeader } from './shell/components/WorkspaceHeader.vue'
 export {
+  archiveWorkspace,
   classifyWorkspaceAccessError,
   fetchAllWorkspaces,
   fetchPrincipal,
@@ -21,6 +22,7 @@ export {
   parseWorkspaceItem,
   parseWorkspacePage,
   provisionWorkspace,
+  renameWorkspace,
   workspaceApiUrls,
   workspaceQueryKeys,
 } from './selection/workspaceResource'

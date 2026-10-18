@@ -14,12 +14,12 @@ import (
 
 func TestDisablePurchasesFastPathExpiresExistingCheckout(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	seedRechargeableWallet(t, pool, 42)
 	configurationGateway := configuredFakeStripeGateway("acct_shutdown", "prod_shutdown")
 	checkoutGateway := &fakeCheckoutGateway{}
-	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, creditService)
+	service := newConfiguredPurchaseService(t, pool, configurationGateway, checkoutGateway, creditService)
 
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "checkout-shutdown-open", 501))
 	if err != nil {
@@ -38,14 +38,14 @@ func TestDisablePurchasesFastPathExpiresExistingCheckout(t *testing.T) {
 		t.Fatalf("CreateCheckout after disable error = %v, want paymentsdomain.ErrPurchasesUnavailable", err)
 	}
 
-	shutdowns, err := newTestPaymentStores(db).ListActivePaymentCheckoutShutdowns(t.Context())
+	shutdowns, err := newTestPaymentStores(pool).ListActivePaymentCheckoutShutdowns(t.Context())
 	if err != nil || len(shutdowns) != 1 {
 		t.Fatalf("active shutdowns = %+v, %v", shutdowns, err)
 	}
 	if err := service.RunPaymentCheckoutShutdown(t.Context(), shutdowns[0].ID); err != nil {
 		t.Fatalf("run Checkout shutdown: %v", err)
 	}
-	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderCancelled)
+	assertLifecycleOrderStatus(t, pool, created.PublicToken, paymentsdomain.PaymentOrderCancelled)
 	if checkoutGateway.expireCalls != 1 {
 		t.Fatalf("Stripe ExpireCheckoutSession calls = %d, want 1", checkoutGateway.expireCalls)
 	}
@@ -59,9 +59,9 @@ func TestDisablePurchasesFastPathExpiresExistingCheckout(t *testing.T) {
 
 func TestDisabledReconciliationDoesNotCreateCheckout(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
-	creditService := credits.NewService(pool)
-	seedRechargeableWallet(t, pool, 42)
+	db := testdb.Open(t)
+	creditService := credits.NewService(db)
+	seedRechargeableWallet(t, db, 42)
 	configurationGateway := configuredFakeStripeGateway("acct_shutdown_reconciliation", "prod_shutdown_reconciliation")
 	checkoutGateway := &fakeCheckoutGateway{}
 	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, creditService)

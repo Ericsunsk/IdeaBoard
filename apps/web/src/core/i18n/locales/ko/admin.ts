@@ -1,22 +1,10 @@
 export default {
   common: {
-    save: '저장',
     saveChanges: '저장',
-    create: '생성',
     cancel: '취소',
-    delete: '삭제',
-    edit: '편집',
-    close: '닫기',
     search: '검색',
-    status: '상태',
     actions: '작업',
     refresh: '새로고침',
-    autoRefresh: '자동 새로고침',
-    filter: '필터',
-    all: '전체',
-    reset: '초기화',
-    confirm: '확인',
-    loading: '로딩 중...',
   },
   rewardCode: {
     createTitle: '리워드 코드 생성',

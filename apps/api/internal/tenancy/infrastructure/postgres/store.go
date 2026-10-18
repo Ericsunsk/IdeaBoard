@@ -84,6 +84,15 @@ func isPublicIDConflict(err error) bool {
 		strings.Contains(lowered, "uq_organizations_public_id")
 }
 
+// isDefaultConflict reports a duplicate violation of the single-live-Default
+// partial unique index (a second Default create for the same owner).
+func isDefaultConflict(err error) bool {
+	if !database.IsDuplicateConstraintError(err) {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "ux_workspaces_default_owner")
+}
+
 func nullInt64(value int64) pgtype.Int8 {
 	if value <= 0 {
 		return pgtype.Int8{}
@@ -109,6 +118,7 @@ func mapWorkspace(row dbsqlc.Workspace, organizationPublicID *string) *tenancy.W
 		OrganizationID: organizationPublicID,
 		OwnerUserID:    dbutil.Int64Ptr(row.OwnerUserID),
 		Name:           row.Name,
+		IsDefault:      row.IsDefault,
 		ArchivedAt:     dbutil.TimePtr(row.ArchivedAt),
 		CreatedAt:      dbutil.TimeValue(row.CreatedAt),
 		UpdatedAt:      dbutil.TimeValue(row.UpdatedAt),
@@ -216,9 +226,16 @@ func (s *Store) mapWorkspaceRows(ctx context.Context, rows []dbsqlc.Workspace) (
 // CreateWorkspace mints a ws_ workspace under an organization (by public id)
 // or a personal owner. The owner invariant (organization OR owner) is
 // enforced by the database CHECK; the owner gains an owner membership row.
+// Personal creates without an organization are always non-Default
+// (IsDefault must stay false on this path); only EnsureDefaultWorkspace
+// mints the Default row. A second Default create for the same owner fails
+// with tenancy.ErrDefaultWorkspaceConflict.
 func (s *Store) CreateWorkspace(ctx context.Context, params tenancy.CreateWorkspaceParams) (*tenancy.Workspace, error) {
 	if err := tenancy.ValidateName(params.Name); err != nil {
 		return nil, err
+	}
+	if params.IsDefault && params.OrganizationID != nil {
+		return nil, tenancy.ErrDefaultWorkspaceConflict
 	}
 	var orgInternal pgtype.Int8
 	var orgPublicID *string
@@ -245,6 +262,7 @@ func (s *Store) CreateWorkspace(ctx context.Context, params tenancy.CreateWorksp
 				OrganizationID: orgInternal,
 				OwnerUserID:    nullInt64(params.OwnerUserID),
 				Name:           strings.TrimSpace(params.Name),
+				IsDefault:      params.IsDefault && !orgInternal.Valid,
 			})
 			if insertErr != nil {
 				return insertErr
@@ -262,6 +280,9 @@ func (s *Store) CreateWorkspace(ctx context.Context, params tenancy.CreateWorksp
 		if isPublicIDConflict(err) {
 			continue
 		}
+		if isDefaultConflict(err) {
+			return nil, tenancy.ErrDefaultWorkspaceConflict
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -271,10 +292,19 @@ func (s *Store) CreateWorkspace(ctx context.Context, params tenancy.CreateWorksp
 }
 
 // UpdateWorkspace renames a live workspace; archived or missing rows read
-// as not found.
+// as not found. The Default workspace is never renamed: attempts fail with
+// tenancy.ErrDefaultWorkspaceProtected. The is_default marker is immutable
+// after creation, so the pre-check below cannot race a flag flip.
 func (s *Store) UpdateWorkspace(ctx context.Context, publicID, name string) (*tenancy.Workspace, error) {
 	if err := tenancy.ValidateName(name); err != nil {
 		return nil, err
+	}
+	workspace, err := s.GetWorkspace(ctx, publicID)
+	if err != nil {
+		return nil, err
+	}
+	if workspace.IsDefaultWorkspace() {
+		return nil, tenancy.ErrDefaultWorkspaceProtected
 	}
 	rows, err := s.dbWithContext(ctx).q.UpdateWorkspaceName(ctx, dbsqlc.UpdateWorkspaceNameParams{
 		Name: strings.TrimSpace(name), PublicID: strings.TrimSpace(publicID),
@@ -289,8 +319,18 @@ func (s *Store) UpdateWorkspace(ctx context.Context, publicID, name string) (*te
 }
 
 // ArchiveWorkspace archives a live workspace and returns it with ArchivedAt
-// set; already-archived or missing rows read as not found.
+// set; already-archived or missing rows read as not found. The Default
+// workspace is never archived: attempts fail with
+// tenancy.ErrDefaultWorkspaceProtected. The is_default marker is immutable
+// after creation, so the pre-check below cannot race a flag flip.
 func (s *Store) ArchiveWorkspace(ctx context.Context, publicID string) (*tenancy.Workspace, error) {
+	workspace, err := s.GetWorkspace(ctx, publicID)
+	if err != nil {
+		return nil, err
+	}
+	if workspace.IsDefaultWorkspace() {
+		return nil, tenancy.ErrDefaultWorkspaceProtected
+	}
 	rows, err := s.dbWithContext(ctx).q.ArchiveWorkspace(ctx, strings.TrimSpace(publicID))
 	if err != nil {
 		return nil, err
@@ -301,10 +341,12 @@ func (s *Store) ArchiveWorkspace(ctx context.Context, publicID string) (*tenancy
 	return s.GetWorkspace(ctx, publicID)
 }
 
-// EnsurePersonalWorkspace idempotently provisions the user's personal
-// workspace. Concurrent callers collapse on ux_workspaces_personal_owner
+// EnsureDefaultWorkspace idempotently provisions the user's Default
+// workspace. Concurrent callers collapse on ux_workspaces_default_owner
 // (INSERT ... ON CONFLICT DO NOTHING) and all read back the same row.
-func (s *Store) EnsurePersonalWorkspace(ctx context.Context, userID int64) (*tenancy.Workspace, error) {
+// Users holding only non-Default personal rows get a fresh Default row;
+// existing rows are left untouched.
+func (s *Store) EnsureDefaultWorkspace(ctx context.Context, userID int64) (*tenancy.Workspace, error) {
 	if userID <= 0 {
 		return nil, tenancy.ErrPersonalWorkspaceUserRequired
 	}
@@ -315,14 +357,14 @@ func (s *Store) EnsurePersonalWorkspace(ctx context.Context, userID int64) (*ten
 		}
 		var row dbsqlc.Workspace
 		err = s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
-			if _, insertErr := q.InsertPersonalWorkspaceIgnore(ctx, dbsqlc.InsertPersonalWorkspaceIgnoreParams{
+			if _, insertErr := q.InsertDefaultWorkspaceIgnore(ctx, dbsqlc.InsertDefaultWorkspaceIgnoreParams{
 				PublicID:    publicID,
 				OwnerUserID: pgtype.Int8{Int64: userID, Valid: true},
 				Name:        "My Workspace",
 			}); insertErr != nil {
 				return insertErr
 			}
-			selected, selectErr := q.GetPersonalWorkspaceByOwner(ctx, pgtype.Int8{Int64: userID, Valid: true})
+			selected, selectErr := q.GetDefaultWorkspaceByOwner(ctx, pgtype.Int8{Int64: userID, Valid: true})
 			if selectErr != nil {
 				return selectErr
 			}

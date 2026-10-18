@@ -11,6 +11,34 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const checkStorageUIDTaken = `-- name: CheckStorageUIDTaken :one
+SELECT EXISTS(
+  SELECT 1 FROM users
+  WHERE users.storage_uid = $1 AND users.id <> $2
+) OR EXISTS(
+  SELECT 1 FROM users_used_uids
+  WHERE users_used_uids.storage_uid = $3
+) AS taken
+`
+
+type CheckStorageUIDTakenParams struct {
+	UserStorageUid string `json:"user_storage_uid"`
+	ID             int64  `json:"id"`
+	UsedStorageUid string `json:"used_storage_uid"`
+}
+
+// Merged from GetUserIDByStorageUIDForUpdate + GetUsedUIDForUpdate: one
+// roundtrip checks both the live users table (excluding the caller) and the
+// historical users_used_uids. Serialization rides the users_used_uids unique
+// constraint + InsertUsedUIDIgnore retry loop (FOR UPDATE on a missing row
+// locks nothing, so the previous per-table row locks were not load-bearing).
+func (q *Queries) CheckStorageUIDTaken(ctx context.Context, arg CheckStorageUIDTakenParams) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, checkStorageUIDTaken, arg.UserStorageUid, arg.ID, arg.UsedStorageUid)
+	var taken pgtype.Bool
+	err := row.Scan(&taken)
+	return taken, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
   display_name, auth_user_id, storage_uid, avatar, role, status
@@ -48,34 +76,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 	var i CreateUserRow
 	err := row.Scan(&i.ID, &i.PublicID, &i.DisplayName)
 	return i, err
-}
-
-const deleteUserByID = `-- name: DeleteUserByID :execrows
-DELETE FROM users
-WHERE id = $1
-`
-
-func (q *Queries) DeleteUserByID(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteUserByID, id)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const getUsedUIDForUpdate = `-- name: GetUsedUIDForUpdate :one
-SELECT storage_uid
-FROM users_used_uids
-WHERE storage_uid = $1
-LIMIT 1
-FOR UPDATE
-`
-
-func (q *Queries) GetUsedUIDForUpdate(ctx context.Context, storageUid string) (string, error) {
-	row := q.db.QueryRow(ctx, getUsedUIDForUpdate, storageUid)
-	var storage_uid string
-	err := row.Scan(&storage_uid)
-	return storage_uid, err
 }
 
 const getUserByAuthUserID = `-- name: GetUserByAuthUserID :one
@@ -188,26 +188,6 @@ func (q *Queries) GetUserByStorageUID(ctx context.Context, storageUid string) (U
 		&i.BanExpiresAt,
 	)
 	return i, err
-}
-
-const getUserIDByStorageUIDForUpdate = `-- name: GetUserIDByStorageUIDForUpdate :one
-SELECT id
-FROM users
-WHERE storage_uid = $1 AND id <> $2
-LIMIT 1
-FOR UPDATE
-`
-
-type GetUserIDByStorageUIDForUpdateParams struct {
-	StorageUid string `json:"storage_uid"`
-	ID         int64  `json:"id"`
-}
-
-func (q *Queries) GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error) {
-	row := q.db.QueryRow(ctx, getUserIDByStorageUIDForUpdate, arg.StorageUid, arg.ID)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
 }
 
 const getUsersByIDs = `-- name: GetUsersByIDs :many

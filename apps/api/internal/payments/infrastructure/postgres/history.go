@@ -56,7 +56,7 @@ func decodeRechargeHistoryRecord(row dbsqlc.ListPaymentRechargeHistoryRow) payme
 		OccurredAt:           dbutil.TimeValue(row.OccurredAt),
 		IdeaQuantity:         row.IdeaQuantity,
 		Status:               row.Status,
-		PaidTotalMinor:       NullInt64Pointer(row.PaidTotalMinor),
+		PaidTotalMinor:       dbutil.Int64Ptr(row.PaidTotalMinor),
 		PaidCurrency:         strings.ToLower(row.PaidCurrency),
 		ReceiptURL:           row.ReceiptUrl,
 		RefundedIdeaQuantity: row.RefundedIdeaQuantity,

@@ -25,8 +25,6 @@ export const tableHeadClasses =
 export const tableCellClasses =
   'p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]'
 
-export const tableCaptionClasses = 'mt-4 text-sm text-muted-foreground'
-
 /**
  * Sortable header button. `min-h-8` holds the 32px touch-target floor from
  * `theme/touch-target.css` so dense tables do not need a per-instance

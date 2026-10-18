@@ -15,7 +15,7 @@ import (
 )
 
 func TestTaskBillingUsageUsesUserCreatedIndexWithNormalPlanner(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	request, sku := seedTaskBillingUsageProduct(t, ctx, pool)
 	seedTaskBillingUsageSnapshots(t, ctx, pool, 81, 32, "usage_plan_target", request, sku)
@@ -28,7 +28,7 @@ func TestTaskBillingUsageUsesUserCreatedIndexWithNormalPlanner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := NewUsageStore(db)
+	store := NewUsageStore(pool)
 	count, activeDays, err := store.GetTaskUsage(ctx, 81, location)
 	if err != nil {
 		t.Fatalf("GetTaskUsage() error = %v", err)
@@ -65,7 +65,7 @@ WHERE user_id = $1`, 81, location.String())
 }
 
 func TestTaskUsageAggregationUsesShanghaiDayBoundary(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	request, sku := seedTaskBillingUsageProduct(t, ctx, pool)
 	const (
@@ -78,7 +78,7 @@ func TestTaskUsageAggregationUsesShanghaiDayBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	count, activeDays, err := NewUsageStore(db).GetTaskUsage(ctx, userID, location)
+	count, activeDays, err := NewUsageStore(pool).GetTaskUsage(ctx, userID, location)
 	if err != nil {
 		t.Fatalf("GetTaskUsage() error = %v", err)
 	}

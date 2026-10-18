@@ -20,3 +20,5 @@ ADR-0008 确立网关唯一出口后，AccountPool 的账号 key、失败计数�
 ## Status
 
 Accepted（2026-09-16，方案封版确认）。
+
+Superseded（2026-10-19）：Decision-2“行保留停写”被 [ADR-0018](./0018-drop-accountpool-tables.md) 替代，三表已删；账单事实不再依赖这些行。其余决策（执行事实、fencing）继续有效。

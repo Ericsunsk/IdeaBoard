@@ -6,9 +6,7 @@
 package privileges
 
 var apiOwnedTableNames = []string{
-	"api_account_secrets",
 	"admin_brand_logo_overrides",
-	"api_accounts",
 	"billing_accounts",
 	"board_access_event_outbox",
 	"board_documents",
@@ -32,7 +30,6 @@ var apiOwnedTableNames = []string{
 	"media_assets",
 	"organization_memberships",
 	"organizations",
-	"provider_endpoints",
 	"storage_profile_secret_versions",
 	"storage_profiles",
 	"system_configs",
@@ -55,8 +52,6 @@ var apiOwnedTableNames = []string{
 }
 
 var apiOwnedSequenceNames = []string{
-	"api_account_secrets_id_seq",
-	"api_accounts_id_seq",
 	"billing_accounts_internal_id_seq",
 	"board_access_event_outbox_internal_id_seq",
 	"board_revisions_internal_id_seq",
@@ -70,7 +65,6 @@ var apiOwnedSequenceNames = []string{
 	"library_materializations_internal_id_seq",
 	"media_assets_internal_id_seq",
 	"organizations_internal_id_seq",
-	"provider_endpoints_id_seq",
 	"storage_profile_secret_versions_id_seq",
 	"system_configs_id_seq",
 	"task_daily_stat_backfills_id_seq",

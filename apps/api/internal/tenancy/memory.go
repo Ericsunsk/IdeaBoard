@@ -150,9 +150,22 @@ func (s *InMemoryStore) CreateWorkspace(ctx context.Context, params CreateWorksp
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if params.IsDefault && params.OrganizationID != nil {
+		return nil, ErrDefaultWorkspaceConflict
+	}
 	if params.OrganizationID != nil {
 		if _, ok := s.organizations[*params.OrganizationID]; !ok {
 			return nil, ErrNotFound
+		}
+	}
+	if params.IsDefault && params.OwnerUserID <= 0 {
+		return nil, ErrPersonalWorkspaceUserRequired
+	}
+	if params.IsDefault && params.OrganizationID == nil {
+		for _, w := range s.workspaces {
+			if w.IsDefaultWorkspace() && !w.IsArchived() && w.OwnerUserID != nil && *w.OwnerUserID == params.OwnerUserID {
+				return nil, ErrDefaultWorkspaceConflict
+			}
 		}
 	}
 	publicID, err := NewWorkspacePublicID()
@@ -168,6 +181,7 @@ func (s *InMemoryStore) CreateWorkspace(ctx context.Context, params CreateWorksp
 		PublicID:       publicID,
 		OrganizationID: params.OrganizationID,
 		Name:           params.Name,
+		IsDefault:      params.IsDefault && params.OrganizationID == nil,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -207,6 +221,9 @@ func (s *InMemoryStore) UpdateWorkspace(ctx context.Context, publicID, name stri
 	if !ok || w.IsArchived() {
 		return nil, ErrNotFound
 	}
+	if w.IsDefaultWorkspace() {
+		return nil, ErrDefaultWorkspaceProtected
+	}
 	w.Name = name
 	w.UpdatedAt = s.clock()
 	return copyWorkspace(w), nil
@@ -219,17 +236,23 @@ func (s *InMemoryStore) ArchiveWorkspace(ctx context.Context, publicID string) (
 	if !ok || w.IsArchived() {
 		return nil, ErrNotFound
 	}
+	if w.IsDefaultWorkspace() {
+		return nil, ErrDefaultWorkspaceProtected
+	}
 	now := s.clock()
 	w.ArchivedAt = &now
 	w.UpdatedAt = now
 	return copyWorkspace(w), nil
 }
 
-func (s *InMemoryStore) EnsurePersonalWorkspace(ctx context.Context, userID int64) (*Workspace, error) {
+func (s *InMemoryStore) EnsureDefaultWorkspace(ctx context.Context, userID int64) (*Workspace, error) {
+	if userID <= 0 {
+		return nil, ErrPersonalWorkspaceUserRequired
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, w := range s.workspaces {
-		if w.IsPersonal() && !w.IsArchived() && w.OwnerUserID != nil && *w.OwnerUserID == userID {
+		if w.IsDefaultWorkspace() && !w.IsArchived() && w.OwnerUserID != nil && *w.OwnerUserID == userID {
 			return copyWorkspace(w), nil
 		}
 	}
@@ -247,6 +270,7 @@ func (s *InMemoryStore) EnsurePersonalWorkspace(ctx context.Context, userID int6
 		PublicID:    publicID,
 		OwnerUserID: &owner,
 		Name:        "My Workspace",
+		IsDefault:   true,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}

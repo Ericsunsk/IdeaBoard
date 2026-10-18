@@ -52,7 +52,7 @@ export function subscribeWorkspaceSelectionChange(
   return () => workspaceSelectionListeners.delete(listener)
 }
 
-export type WorkspaceSelectionSource = 'url' | 'stored' | 'auto-personal' | 'auto-first' | 'none'
+export type WorkspaceSelectionSource = 'url' | 'stored' | 'auto-default' | 'auto-first' | 'none'
 
 export type WorkspaceSelectionStatus =
   'loading' | 'empty' | 'ready' | 'error' | 'hidden' | 'forbidden' | 'disabled'
@@ -64,8 +64,8 @@ export function asWorkspaceId(value: unknown): string | null {
   return trimmed
 }
 
-// Resolution order: explicit URL share > persisted choice > personal
-// workspace (`organizationId == null`) > first visible item > none.
+// Resolution order: explicit URL share > persisted choice > Default
+// workspace (`isDefault`) > first visible item > none.
 export function resolveWorkspaceSelection(
   items: readonly WorkspaceSummary[],
   hints?: { urlId?: unknown; storedId?: unknown },
@@ -75,8 +75,8 @@ export function resolveWorkspaceSelection(
   if (urlId && visible.has(urlId)) return { selectedId: urlId, source: 'url' }
   const storedId = asWorkspaceId(hints?.storedId)
   if (storedId && visible.has(storedId)) return { selectedId: storedId, source: 'stored' }
-  const personal = items.find((item) => item.organizationId == null)
-  if (personal) return { selectedId: personal.publicId, source: 'auto-personal' }
+  const def = items.find((item) => item.isDefault)
+  if (def) return { selectedId: def.publicId, source: 'auto-default' }
   const first = items[0]
   if (first) return { selectedId: first.publicId, source: 'auto-first' }
   return { selectedId: null, source: 'none' }
@@ -282,8 +282,8 @@ export function useWorkspaceSelection(options?: UseWorkspaceSelectionOptions) {
 
   // Keep the shared choice sticky across refetches without ever
   // copying server items into the store. Auto derivations stay pure so the
-  // personal-first rule re-evaluates deterministically on every load.
-  // Persist every resolved id (url, stored, auto-personal, auto-first):
+  // Default-first rule re-evaluates deterministically on every load.
+  // Persist every resolved id (url, stored, auto-default, auto-first):
   // resource layers read the store directly (`getSelectedId()`), so an
   // unpersisted auto-resolution leaves boards/library fail-closed with
   // "select a workspace" errors on fresh profiles that have no picker UI.

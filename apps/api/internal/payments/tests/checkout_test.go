@@ -24,7 +24,7 @@ import (
 
 func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	seedRechargeableWallet(t, pool, 42)
 	configurationGateway := configuredFakeStripeGateway("acct_checkout", "prod_checkout")
 	checkoutGateway := &fakeCheckoutGateway{}
@@ -32,14 +32,14 @@ func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *te
 	checkoutGateway.afterCreateCustomer = func() { now = now.Add(2 * time.Minute) }
 	checkoutGateway.beforeCreateSession = func(input paymentports.CreateCheckoutSessionInput) {
 		var status string
-		if err := db.QueryRow(t.Context(), `SELECT status FROM payment_orders WHERE id = $1`, input.PaymentOrderID).Scan(&status); err != nil {
+		if err := pool.QueryRow(t.Context(), `SELECT status FROM payment_orders WHERE id = $1`, input.PaymentOrderID).Scan(&status); err != nil {
 			t.Fatalf("Stripe called before durable Payment Order: %v", err)
 		}
 		if status != string(paymentsdomain.PaymentOrderCreating) {
 			t.Fatalf("Payment Order status before Stripe = %q", status)
 		}
 	}
-	service := newConfiguredPurchaseServiceWithClock(t, db, configurationGateway, checkoutGateway, credits.NewService(pool), func() time.Time { return now })
+	service := newConfiguredPurchaseServiceWithClock(t, pool, configurationGateway, checkoutGateway, credits.NewService(pool), func() time.Time { return now })
 	requestedAt := now
 	command := paymentsdomain.CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "purchase-checkout-request-1", IdeaQuantity: 501,
@@ -63,7 +63,7 @@ func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *te
 		t.Fatalf("Stripe Checkout input = %+v", createdInput)
 	}
 	var storedExpiresAt time.Time
-	if err := db.QueryRow(t.Context(), `SELECT expires_at FROM payment_orders WHERE public_token = $1`, first.PublicToken).Scan(&storedExpiresAt); err != nil {
+	if err := pool.QueryRow(t.Context(), `SELECT expires_at FROM payment_orders WHERE public_token = $1`, first.PublicToken).Scan(&storedExpiresAt); err != nil {
 		t.Fatal(err)
 	}
 	if !storedExpiresAt.Equal(createdInput.ExpiresAt) {
@@ -87,11 +87,11 @@ func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *te
 
 func TestCreateCheckoutCreatesCustomerPerStripeMode(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	seedRechargeableWallet(t, pool, 42)
 	configurationGateway := configuredFakeStripeGateway("acct_checkout", "prod_test")
 	checkoutGateway := &fakeCheckoutGateway{}
-	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, credits.NewService(pool))
+	service := newConfiguredPurchaseService(t, pool, configurationGateway, checkoutGateway, credits.NewService(pool))
 
 	first := paymentsdomain.CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "purchase-customer-test-generation", IdeaQuantity: 501,
@@ -127,11 +127,11 @@ func TestCreateCheckoutCreatesCustomerPerStripeMode(t *testing.T) {
 
 func TestCreateCheckoutReusesCustomerAfterKeyRotationWithinStripeMode(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	seedRechargeableWallet(t, pool, 42)
 	configurationGateway := configuredFakeStripeGateway("acct_checkout", "prod_test")
 	checkoutGateway := &fakeCheckoutGateway{}
-	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, credits.NewService(pool))
+	service := newConfiguredPurchaseService(t, pool, configurationGateway, checkoutGateway, credits.NewService(pool))
 
 	first := paymentsdomain.CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "purchase-customer-mode-key-a", IdeaQuantity: 501,
@@ -161,11 +161,11 @@ func TestCreateCheckoutReusesCustomerAfterKeyRotationWithinStripeMode(t *testing
 
 func TestCreateCheckoutReplaysImmutableSecondPrecisionExpiryAfterProviderTimeout(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	seedRechargeableWallet(t, pool, 42)
 	checkoutGateway := &fakeCheckoutGateway{createSessionErrors: []error{paymentcontracts.ErrStripeProviderUnavailable}}
 	now := time.Now().UTC().Truncate(time.Second).Add(987654321)
-	service := newConfiguredPurchaseServiceWithClock(t, db, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool), func() time.Time { return now })
+	service := newConfiguredPurchaseServiceWithClock(t, pool, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool), func() time.Time { return now })
 	command := paymentsdomain.CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "purchase-checkout-timeout-recovery", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
@@ -198,7 +198,7 @@ func TestCreateCheckoutReplaysImmutableSecondPrecisionExpiryAfterProviderTimeout
 		t.Fatalf("replayed Stripe Checkout input changed: first=%+v second=%+v", first, second)
 	}
 	var orderCount int
-	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = $1`, command.UserID).Scan(&orderCount); err != nil {
+	if err := pool.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = $1`, command.UserID).Scan(&orderCount); err != nil {
 		t.Fatal(err)
 	}
 	if orderCount != 1 {
@@ -208,7 +208,7 @@ func TestCreateCheckoutReplaysImmutableSecondPrecisionExpiryAfterProviderTimeout
 
 func TestCreateCheckoutConvergesPaidSessionRecoveredFromCreatingOrder(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	seedRechargeableWallet(t, pool, 42)
 	checkoutGateway := &fakeCheckoutGateway{
 		createSessionErrors: []error{paymentcontracts.ErrStripeProviderUnavailable},
@@ -229,7 +229,7 @@ func TestCreateCheckoutConvergesPaidSessionRecoveredFromCreatingOrder(t *testing
 			return session
 		},
 	}
-	service := newConfiguredPurchaseService(t, db, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool))
+	service := newConfiguredPurchaseService(t, pool, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool))
 	command := paymentsdomain.CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "purchase-checkout-recovered-paid", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
@@ -242,7 +242,7 @@ func TestCreateCheckoutConvergesPaidSessionRecoveredFromCreatingOrder(t *testing
 	if _, err := service.CreateCheckout(t.Context(), command); !errors.Is(err, paymentcontracts.ErrPaymentAlreadyCompleted) {
 		t.Fatalf("recovered paid Checkout error = %v, want ErrPaymentAlreadyCompleted", err)
 	}
-	assertPurchaseOrderStatusByKey(t, db, command.UserID, command.ClientIdempotencyKey, paymentsdomain.PaymentOrderCredited)
+	assertPurchaseOrderStatusByKey(t, pool, command.UserID, command.ClientIdempotencyKey, paymentsdomain.PaymentOrderCredited)
 	wallet, err := credits.NewService(pool).GetWallet(t.Context(), command.UserID)
 	if err != nil || wallet.Available != 502 {
 		t.Fatalf("Wallet after recovered paid Checkout = %+v, %v", wallet, err)
@@ -258,7 +258,7 @@ func TestCreateCheckoutConvergesPaidSessionRecoveredFromCreatingOrder(t *testing
 
 func TestCreateCheckoutExpiresRecoveredCreatingSessionBeforeNewAttempt(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	seedRechargeableWallet(t, pool, 42)
 	checkoutGateway := &fakeCheckoutGateway{
 		createSessionErrors: []error{paymentcontracts.ErrStripeProviderUnavailable},
@@ -271,7 +271,7 @@ func TestCreateCheckoutExpiresRecoveredCreatingSessionBeforeNewAttempt(t *testin
 			return session
 		},
 	}
-	service := newConfiguredPurchaseService(t, db, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool))
+	service := newConfiguredPurchaseService(t, pool, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool))
 	command := paymentsdomain.CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "purchase-checkout-recovered-expired", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
@@ -284,7 +284,7 @@ func TestCreateCheckoutExpiresRecoveredCreatingSessionBeforeNewAttempt(t *testin
 	if _, err := service.CreateCheckout(t.Context(), command); !errors.Is(err, paymentcontracts.ErrCheckoutSessionExpired) {
 		t.Fatalf("recovered expired Checkout error = %v, want ErrCheckoutSessionExpired", err)
 	}
-	assertPurchaseOrderStatusByKey(t, db, command.UserID, command.ClientIdempotencyKey, paymentsdomain.PaymentOrderExpired)
+	assertPurchaseOrderStatusByKey(t, pool, command.UserID, command.ClientIdempotencyKey, paymentsdomain.PaymentOrderExpired)
 
 	retry := command
 	retry.ClientIdempotencyKey = "purchase-checkout-after-recovered-expired"
@@ -296,14 +296,14 @@ func TestCreateCheckoutExpiresRecoveredCreatingSessionBeforeNewAttempt(t *testin
 
 func TestCreateCheckoutReleasesOrderAfterDefinitiveProviderRejection(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	seedRechargeableWallet(t, pool, 42)
 	checkoutGateway := &fakeCheckoutGateway{createSessionErrors: []error{
 		paymentports.NewGatewayError(paymentports.GatewayErrorRequestRejected, "Stripe rejected Checkout parameters", nil),
 	}}
 	service := newConfiguredPurchaseService(
 		t,
-		db,
+		pool,
 		configuredFakeStripeGateway("acct_checkout", "prod_checkout"),
 		checkoutGateway,
 		credits.NewService(pool),
@@ -318,7 +318,7 @@ func TestCreateCheckoutReleasesOrderAfterDefinitiveProviderRejection(t *testing.
 		t.Fatalf("rejected Checkout error = %v, want purchases unavailable", err)
 	}
 	var firstToken, firstStatus string
-	if err := db.QueryRow(t.Context(), `
+	if err := pool.QueryRow(t.Context(), `
 SELECT public_token, status
 FROM payment_orders
 WHERE user_id = $1 AND client_idempotency_key = $2`, command.UserID, command.ClientIdempotencyKey).Scan(&firstToken, &firstStatus); err != nil {
@@ -344,12 +344,12 @@ WHERE user_id = $1 AND client_idempotency_key = $2`, command.UserID, command.Cli
 
 func TestActiveOrderQueryCreditsOnlyAValidatedPaidStripeSession(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	seedRechargeableWallet(t, pool, 42)
 	configurationGateway := configuredFakeStripeGateway("acct_query", "prod_query")
 	checkoutGateway := &fakeCheckoutGateway{}
-	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, creditService)
+	service := newConfiguredPurchaseService(t, pool, configurationGateway, checkoutGateway, creditService)
 	checkout, err := service.CreateCheckout(t.Context(), paymentsdomain.CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "purchase-query-request-1", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
@@ -378,7 +378,7 @@ func TestActiveOrderQueryCreditsOnlyAValidatedPaidStripeSession(t *testing.T) {
 
 func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	seedRechargeableWallet(t, pool, 42)
 	configurationGateway := configuredFakeStripeGateway("acct_webhook_purchase", "prod_webhook_purchase")
@@ -389,7 +389,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 		CreatedAt: verifiedAt.Add(-time.Minute),
 	}}
 	events := NewEventHub()
-	repo := newTestPaymentStores(db)
+	repo := newTestPaymentStores(pool)
 	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(events, func() time.Time { return verifiedAt }), configurationGateway, checkoutGateway, creditService, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook_purchase", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
@@ -453,7 +453,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 		t.Fatalf("replayed webhook = %+v, %v", replay, err)
 	}
 	var purchaseCount int
-	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'purchase_credit'`).Scan(&purchaseCount); err != nil {
+	if err := pool.QueryRow(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'purchase_credit'`).Scan(&purchaseCount); err != nil {
 		t.Fatal(err)
 	}
 	if purchaseCount != 1 {
@@ -463,12 +463,12 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 
 func TestStripeKeyChangePreservesUnsettledOrderCredential(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	seedRechargeableWallet(t, pool, 42)
 	configurationGateway := configuredFakeStripeGateway("acct_original", "prod_original")
 	checkoutGateway := &fakeCheckoutGateway{}
-	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, creditService)
+	service := newConfiguredPurchaseService(t, pool, configurationGateway, checkoutGateway, creditService)
 	if _, err := service.CreateCheckout(t.Context(), paymentsdomain.CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "account-switch-open-order", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
@@ -489,11 +489,11 @@ func TestStripeKeyChangePreservesUnsettledOrderCredential(t *testing.T) {
 	if err != nil || stored.AccountID != "acct_replacement" {
 		t.Fatalf("Stripe configuration did not rotate: %+v, %v", stored, err)
 	}
-	orders, err := newTestPaymentStores(db).ListActivePaymentOrders(t.Context(), 42)
+	orders, err := newTestPaymentStores(pool).ListActivePaymentOrders(t.Context(), 42)
 	if err != nil || len(orders) != 1 {
 		t.Fatalf("active orders = %+v, %v", orders, err)
 	}
-	credential, err := newTestPaymentStores(db).GetStripeCredential(t.Context(), orders[0].StripeCredentialID)
+	credential, err := newTestPaymentStores(pool).GetStripeCredential(t.Context(), orders[0].StripeCredentialID)
 	if err != nil || credential.AccountID != "acct_original" {
 		t.Fatalf("order credential = %+v, %v", credential, err)
 	}
@@ -501,7 +501,7 @@ func TestStripeKeyChangePreservesUnsettledOrderCredential(t *testing.T) {
 
 func TestStripeKeyChangeDoesNotWaitForProviderIO(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	seedRechargeableWallet(t, pool, 42)
 	configurationGateway := configuredFakeStripeGateway("acct_original", "prod_original")
@@ -512,7 +512,7 @@ func TestStripeKeyChangeDoesNotWaitForProviderIO(t *testing.T) {
 		close(checkoutStarted)
 		<-releaseCheckout
 	}
-	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, creditService)
+	service := newConfiguredPurchaseService(t, pool, configurationGateway, checkoutGateway, creditService)
 
 	checkoutDone := make(chan error, 1)
 	go func() {

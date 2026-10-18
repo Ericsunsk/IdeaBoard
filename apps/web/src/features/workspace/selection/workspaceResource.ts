@@ -22,6 +22,7 @@
 // domain types exported here.
 
 import {
+  archiveWorkspace as archiveWorkspaceTransport,
   createWorkspace,
   getListWorkspacesQueryKey,
   listWorkspaces,
@@ -42,11 +43,14 @@ import type { AuthFailureMode } from '../../../api/client'
 import { withSignal } from '../../../core/utils/request'
 import { asTrimmedString, isRecord } from '../../../core/utils/guards'
 import { resolveApiUrl } from '../../../core/config/runtimeUrls'
+import { userErrorCode } from '../../../core/errors/errorCatalog'
 
 export type WorkspaceSummary = {
   publicId: string
   name: string
   organizationId: string | null
+  // Default workspaces cannot be deleted, archived, or renamed.
+  isDefault: boolean
   archivedAt: string | null
   createdAt?: string | undefined
 }
@@ -101,6 +105,7 @@ export function parseWorkspaceItem(raw: unknown): WorkspaceSummary {
     publicId,
     name,
     organizationId,
+    isDefault: raw.is_default === true,
     archivedAt,
     ...(createdAt === undefined ? {} : { createdAt }),
   }
@@ -167,22 +172,13 @@ function readErrorStatus(error: unknown): number | null {
   return typeof status === 'number' && Number.isFinite(status) ? status : null
 }
 
-function readErrorCode(error: unknown): string | null {
-  if (!isRecord(error)) return null
-  const code = (error as { code?: unknown }).code
-  if (typeof code === 'string' && code) return code.toLowerCase()
-  const data = isRecord(error.data) ? (error.data as Record<string, unknown>) : null
-  const nested = data?.code ?? data?.error_code
-  return typeof nested === 'string' && nested ? nested.toLowerCase() : null
-}
-
 // 404 (hidden, including never-shared) vs 403 (visible-but-forbidden) stay
 // distinct so callers can render "not found" vs "no access" honestly.
 export function classifyWorkspaceAccessError(error: unknown): WorkspaceAccessKind | null {
   const status = readErrorStatus(error)
   if (status === 404) return 'hidden'
   if (status === 403) return 'forbidden'
-  const code = readErrorCode(error)
+  const code = userErrorCode(error)?.toLowerCase()
   if (!code) return null
   if (code.includes('not_found') || code === 'workspace_hidden') return 'hidden'
   if (code.includes('forbidden') || code.includes('denied')) return 'forbidden'
@@ -282,7 +278,8 @@ export async function provisionWorkspace(
   return parseWorkspaceItem(data)
 }
 
-// Explicit PATCH rename (owner/admin only server-side). No Idempotency-Key:
+// Explicit PATCH rename (owner/admin only server-side, never the Default
+// row: it renders 403 workspace_default_protected). No Idempotency-Key:
 // renames are idempotent by value, so retries replay safely without one.
 export async function renameWorkspace(
   workspaceId: string,
@@ -305,6 +302,19 @@ export async function renameWorkspace(
     toRequestConfig(options),
   )
   const data = requireContractData<unknown>(response, 'Workspace rename failed')
+  return parseWorkspaceItem(data)
+}
+
+// Explicit POST archive (owner/admin only server-side). No Idempotency-Key:
+// the transition is single-shot and repeat archives converge server-side.
+// The Default workspace renders 403 workspace_default_protected.
+export async function archiveWorkspace(
+  workspaceId: string,
+  options?: WorkspaceRequestOptions,
+): Promise<WorkspaceSummary> {
+  const targetId = requireOpaqueId(workspaceId, 'ws', 'workspace')
+  const response = await archiveWorkspaceTransport(targetId, toRequestConfig(options))
+  const data = requireContractData<unknown>(response, 'Workspace archive failed')
   return parseWorkspaceItem(data)
 }
 
@@ -333,7 +343,7 @@ export const workspaceApiUrls = {
   workspaceDetail: (workspaceId: string): string =>
     resolveApiUrl(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}`),
   archiveWorkspace: (workspaceId: string): string =>
-    resolveApiUrl(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}:archive`),
+    resolveApiUrl(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/archive`),
   organizations: (): string => resolveApiUrl('/api/v1/organizations'),
   organizationDetail: (organizationId: string): string =>
     resolveApiUrl(`/api/v1/organizations/${encodeURIComponent(organizationId)}`),

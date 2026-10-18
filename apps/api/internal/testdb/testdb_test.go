@@ -55,18 +55,6 @@ VALUES ($1, 'testdb-isolation', 'I65432', 'user', 1)
 	}
 }
 
-func TestOpenWithPoolUsesTheSnapshotSchema(t *testing.T) {
-	_, pool := OpenWithPool(t)
-
-	var exists bool
-	if err := pool.QueryRow(t.Context(), `SELECT to_regclass('users') IS NOT NULL`).Scan(&exists); err != nil {
-		t.Fatalf("query pooled snapshot schema: %v", err)
-	}
-	if !exists {
-		t.Fatal("pooled test database is not connected to the snapshot schema")
-	}
-}
-
 func assertRelationExists(t *testing.T, db *pgxpool.Pool, relation string) {
 	t.Helper()
 

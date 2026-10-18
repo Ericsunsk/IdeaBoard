@@ -16,10 +16,10 @@ import (
 )
 
 func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	repo := newTestPaymentStores(db)
+	pool := testdb.Open(t)
+	repo := newTestPaymentStores(pool)
 	now := time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC)
-	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
+	_ = createCreditedRefundOrder(t, pool, repo, now.Add(-time.Hour))
 	creditService := credits.NewService(pool)
 	spendAmount, err := domain.NewCreditAmount(450)
 	if err != nil {
@@ -75,10 +75,10 @@ func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 }
 
 func TestPaymentDisputeFullDebitRetainsRestrictionAfterLoss(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	repo := newTestPaymentStores(db)
+	pool := testdb.Open(t)
+	repo := newTestPaymentStores(pool)
 	now := time.Date(2026, 8, 5, 12, 30, 0, 0, time.UTC)
-	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
+	_ = createCreditedRefundOrder(t, pool, repo, now.Add(-time.Hour))
 	dispute, changed, err := repo.ConvergePaymentDispute(t.Context(), paymentports.StripeDispute{
 		ID: "dp_full_loss", Status: "lost", ChargeID: "ch_refund", PaymentIntentID: "pi_refund",
 		AmountMinor: 525, Currency: "usd", CreatedAt: now,
@@ -93,10 +93,10 @@ func TestPaymentDisputeFullDebitRetainsRestrictionAfterLoss(t *testing.T) {
 }
 
 func TestWonDisputeDiscoveredAfterCloseDoesNotCreateTransientRecovery(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	repo := newTestPaymentStores(db)
+	pool := testdb.Open(t)
+	repo := newTestPaymentStores(pool)
 	now := time.Date(2026, 8, 5, 13, 0, 0, 0, time.UTC)
-	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
+	_ = createCreditedRefundOrder(t, pool, repo, now.Add(-time.Hour))
 
 	dispute, changed, err := repo.ConvergePaymentDispute(t.Context(), paymentports.StripeDispute{
 		ID: "dp_close_first", Status: "won", ChargeID: "ch_refund", PaymentIntentID: "pi_refund",
@@ -117,10 +117,10 @@ func TestWonDisputeDiscoveredAfterCloseDoesNotCreateTransientRecovery(t *testing
 }
 
 func TestPaymentDisputeAndLaterRefundShareTheOrderIdeaCap(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	repo := newTestPaymentStores(db)
+	pool := testdb.Open(t)
+	repo := newTestPaymentStores(pool)
 	now := time.Date(2026, 8, 5, 14, 0, 0, 0, time.UTC)
-	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
+	order := createCreditedRefundOrder(t, pool, repo, now.Add(-time.Hour))
 
 	dispute, _, err := repo.ConvergePaymentDispute(t.Context(), paymentports.StripeDispute{
 		ID: "dp_before_refund", Status: "under_review", ChargeID: "ch_refund", PaymentIntentID: "pi_refund",
@@ -149,10 +149,10 @@ func TestPaymentDisputeAndLaterRefundShareTheOrderIdeaCap(t *testing.T) {
 }
 
 func TestPaymentRefundAndLaterDisputeShareTheOrderIdeaCap(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	repo := newTestPaymentStores(db)
+	pool := testdb.Open(t)
+	repo := newTestPaymentStores(pool)
 	now := time.Date(2026, 8, 5, 14, 30, 0, 0, time.UTC)
-	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
+	order := createCreditedRefundOrder(t, pool, repo, now.Add(-time.Hour))
 
 	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 300,
@@ -175,10 +175,10 @@ func TestPaymentRefundAndLaterDisputeShareTheOrderIdeaCap(t *testing.T) {
 }
 
 func TestPaymentDisputeSerializesWithConcurrentConsumption(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	repo := newTestPaymentStores(db)
+	pool := testdb.Open(t)
+	repo := newTestPaymentStores(pool)
 	now := time.Date(2026, 8, 5, 15, 0, 0, 0, time.UTC)
-	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
+	_ = createCreditedRefundOrder(t, pool, repo, now.Add(-time.Hour))
 	creditService := credits.NewService(pool)
 	holdAmount, err := domain.NewCreditAmount(100)
 	if err != nil {

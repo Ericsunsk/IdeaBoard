@@ -18,7 +18,7 @@ import (
 )
 
 func TestRewardCodeCreateSearchRedeemAndReplay(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	command := ports.CreateRewardCodeCommand{
@@ -89,7 +89,7 @@ func TestRewardCodeCreateSearchRedeemAndReplay(t *testing.T) {
 }
 
 func TestRewardCodeGrantFailureRollsBackCapacityAndRedemption(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	realCredits := credits.NewService(pool)
 	service := newTestRewardService(t, pool, realCredits)
 	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
@@ -118,7 +118,7 @@ func TestRewardCodeGrantFailureRollsBackCapacityAndRedemption(t *testing.T) {
 }
 
 func TestRewardCodeExpirationIsEndExclusive(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	expiresAt := time.Now().UTC().Add(time.Hour)
@@ -149,7 +149,7 @@ WHERE id = $1`, created.RewardCode.ID); err != nil {
 }
 
 func TestRewardCodeRedemptionUsesDatabaseTimeWhenApplicationClockIsAhead(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	expiresAt := time.Now().UTC().Add(time.Hour)
 	service := newTestRewardService(t, pool, creditService)
@@ -177,7 +177,7 @@ func TestRewardCodeRedemptionUsesDatabaseTimeWhenApplicationClockIsAhead(t *test
 }
 
 func TestRewardCodeConcurrentFinalCapacityAndSameUserReplay(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
@@ -261,7 +261,7 @@ func TestRewardCodeConcurrentFinalCapacityAndSameUserReplay(t *testing.T) {
 }
 
 func TestRewardCodeDeleteAndRedeemSerializeWithoutOrphanFacts(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{

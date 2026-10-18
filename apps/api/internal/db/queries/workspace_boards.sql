@@ -290,15 +290,6 @@ WHERE w.public_id = sqlc.arg(workspace_public_id)
   AND b.public_id = sqlc.arg(board_public_id)
 ON CONFLICT (board_id, user_id) DO NOTHING;
 
--- name: DeleteWorkspaceBoardMembership :execrows
-DELETE FROM board_memberships AS m
-USING boards AS b, workspaces AS w
-WHERE m.board_id = b.internal_id
-  AND w.internal_id = b.workspace_id
-  AND w.public_id = sqlc.arg(workspace_public_id)
-  AND b.public_id = sqlc.arg(board_public_id)
-  AND m.user_id = sqlc.arg(user_id);
-
 -- UpsertBoardDocumentMediaRef records one accepted board -> media asset
 -- reference (#936: document source). Reconciled in the SAME transaction as
 -- the document accept: the board and the asset must both resolve inside
@@ -327,19 +318,6 @@ WHERE r.board_id = b.internal_id
   AND w.internal_id = b.workspace_id
   AND w.public_id = sqlc.arg(workspace_public_id)
   AND b.public_id = sqlc.arg(board_public_id);
-
--- ListBoardDocumentMediaRefAssets audits the accepted document references
--- of one board as asset public ids (#936, GC/persistence verification).
--- Unknown or cross-workspace boards list empty.
--- name: ListBoardDocumentMediaRefAssets :many
-SELECT m.public_id
-FROM board_document_media_refs AS r
-INNER JOIN boards AS b ON b.internal_id = r.board_id
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-INNER JOIN media_assets AS m ON m.internal_id = r.media_asset_id
-WHERE w.public_id = sqlc.arg(workspace_public_id)
-  AND b.public_id = sqlc.arg(board_public_id)
-ORDER BY m.public_id ASC;
 
 -- ListBoardsReferencingMediaAsset lists the workspace-scoped board public
 -- ids whose accepted document references one asset (#936: board-reference

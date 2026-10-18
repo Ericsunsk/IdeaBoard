@@ -140,7 +140,7 @@ func (r *Repository) GetPaymentOrderByPublicToken(ctx context.Context, userID in
 	if r == nil || r.db == nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	publicToken, err := ParseUUID(token)
+	publicToken, err := uuid.Parse(token)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, database.ErrNotFound
 	}
@@ -154,11 +154,11 @@ func (r *Repository) GetPaymentOrderByPublicToken(ctx context.Context, userID in
 }
 
 func (r *Repository) GetPaymentOrderByID(ctx context.Context, orderID string) (paymentsdomain.PaymentOrder, error) {
-	id, err := ParseUUID(orderID)
+	id, err := uuid.Parse(orderID)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, database.ErrNotFound
 	}
-	row, err := r.DBWithContext(ctx).Queries().GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
+	row, err := r.DBWithContext(ctx).Queries().GetPaymentOrderByIDForUpdate(ctx, pgUUIDToPgType(id))
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, err
 	}

@@ -43,7 +43,7 @@ func (f *riverProvenSender) Send(_ context.Context, _ string, headers map[string
 // restart.
 func TestWebhookRiverDurability(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	if err := workerriver.MigrateRiver(t.Context(), pool); err != nil {
 		t.Fatalf("MigrateRiver() error = %v", err)
 	}
@@ -72,10 +72,10 @@ ON CONFLICT (public_id) DO NOTHING`); err != nil {
 		t.Fatal(err)
 	}
 
-	before := countWebhookDeliverJobs(t, db)
+	before := countWebhookDeliverJobs(t, pool)
 	store.Dispatch(context.Background(), envelope)
 	store.Dispatch(context.Background(), envelope)
-	if got := countWebhookDeliverJobs(t, db); got != before+1 {
+	if got := countWebhookDeliverJobs(t, pool); got != before+1 {
 		t.Fatalf("job rows=%d, want %d: duplicate Dispatch must collapse to one unique row", got, before+1)
 	}
 
@@ -180,7 +180,7 @@ WHERE s.public_id = $1 AND e.public_id = $2 AND a.attempt_number = 1`, sub.ID, e
 
 func TestWebhookDeadLetterSurvivesRestart(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	if err := workerriver.MigrateRiver(t.Context(), pool); err != nil {
 		t.Fatal(err)
 	}

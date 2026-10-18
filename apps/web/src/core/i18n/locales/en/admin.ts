@@ -1,22 +1,10 @@
 export default {
   common: {
-    save: 'Save',
     saveChanges: 'Save',
-    create: 'Create',
     cancel: 'Cancel',
-    delete: 'Delete',
-    edit: 'Edit',
-    close: 'Close',
     search: 'Search',
-    status: 'Status',
     actions: 'Actions',
     refresh: 'Refresh',
-    autoRefresh: 'Auto Refresh',
-    filter: 'Filter',
-    all: 'All',
-    reset: 'Reset',
-    confirm: 'Confirm',
-    loading: 'Loading...',
   },
   rewardCode: {
     createTitle: 'Create Redemption Code',

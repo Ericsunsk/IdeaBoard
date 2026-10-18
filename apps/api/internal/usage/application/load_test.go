@@ -36,13 +36,13 @@ func TestUsageMillionTransactionDataset(t *testing.T) {
 	}
 	transactionCount := usageLoadTransactionCount(t)
 	targetCount := transactionCount / 10
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 
 	anchor := usageLoadAnchor(t)
 	captureSeedStarted := time.Now()
-	if err := SeedCaptureFacts(ctx, db, CaptureFactsConfig{
+	if err := SeedCaptureFacts(ctx, pool, CaptureFactsConfig{
 		BaseUserID:       usageLoadTargetUserID,
 		UserCount:        usageLoadUserCount,
 		TransactionCount: transactionCount,
@@ -54,17 +54,17 @@ func TestUsageMillionTransactionDataset(t *testing.T) {
 	captureSeedDuration := time.Since(captureSeedStarted)
 
 	taskSeedStarted := time.Now()
-	seedUsageLoadTaskSnapshots(t, ctx, db, pool, transactionCount, targetCount, anchor)
+	seedUsageLoadTaskSnapshots(t, ctx, pool, pool, transactionCount, targetCount, anchor)
 	taskSeedDuration := time.Since(taskSeedStarted)
 
 	verifyStarted := time.Now()
-	verifyUsageLoadFacts(t, ctx, db, transactionCount, targetCount)
+	verifyUsageLoadFacts(t, ctx, pool, transactionCount, targetCount)
 	verifyDuration := time.Since(verifyStarted)
 
-	if _, err := db.Exec(ctx, `ANALYZE credit_transactions`); err != nil {
+	if _, err := pool.Exec(ctx, `ANALYZE credit_transactions`); err != nil {
 		t.Fatalf("analyze Usage load facts: %v", err)
 	}
-	if _, err := db.Exec(ctx, `ANALYZE task_billing_snapshots`); err != nil {
+	if _, err := pool.Exec(ctx, `ANALYZE task_billing_snapshots`); err != nil {
 		t.Fatalf("analyze Usage load Task Billing facts: %v", err)
 	}
 	location, err := time.LoadLocation(ShanghaiTimezone)
@@ -72,7 +72,7 @@ func TestUsageMillionTransactionDataset(t *testing.T) {
 		t.Fatalf("load Shanghai timezone: %v", err)
 	}
 	yearStart := dateInLocation(anchor, location).AddDate(0, 0, -(usagedomain.Range1Year.Days() - 1))
-	plan := explainUsageCaptureTrend(t, ctx, db, usageLoadTargetUserID, location, yearStart, yearStart.AddDate(0, 0, usagedomain.Range1Year.Days()))
+	plan := explainUsageCaptureTrend(t, ctx, pool, usageLoadTargetUserID, location, yearStart, yearStart.AddDate(0, 0, usagedomain.Range1Year.Days()))
 	if !planUsesIndex(plan, usageCaptureIndex) {
 		encoded, _ := json.MarshalIndent(plan, "", "  ")
 		t.Fatalf("normal planner did not use %s:\n%s", usageCaptureIndex, encoded)
@@ -80,7 +80,7 @@ func TestUsageMillionTransactionDataset(t *testing.T) {
 
 	service := NewService(
 		credits.NewService(pool),
-		taskbilling.NewUsageStore(db),
+		taskbilling.NewUsageStore(pool),
 		ServiceOptions{Now: func() time.Time { return anchor }},
 	)
 	results := make(map[usagedomain.Range]usageLoadLatency)
@@ -109,7 +109,7 @@ func TestUsageMillionTransactionDataset(t *testing.T) {
 	}
 
 	var postgresVersion string
-	if err := db.QueryRow(ctx, `SHOW server_version`).Scan(&postgresVersion); err != nil {
+	if err := pool.QueryRow(ctx, `SHOW server_version`).Scan(&postgresVersion); err != nil {
 		t.Fatalf("read PostgreSQL version: %v", err)
 	}
 	t.Logf(

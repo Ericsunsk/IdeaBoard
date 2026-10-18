@@ -266,9 +266,7 @@ func TestStalledSweepIsIdempotent(t *testing.T) {
 }
 
 // seedSecondWorkspaceWithFundedOwner creates an independent user + personal
-// workspace with a funded wallet. At most one live personal workspace may exist
-// per user (ux_workspaces_personal_owner), so proving the cross-workspace fence
-// needs a genuinely second workspace, not a second row on the same owner.
+// workspace with a funded wallet to test the cross-workspace fence.
 func (e *atomicEnv) seedSecondWorkspaceWithFundedOwner(t *testing.T) (workspaceID string, userID int64) {
 	t.Helper()
 	ctx := context.Background()

@@ -47,6 +47,7 @@ CREATE TABLE workspaces (
   organization_id BIGINT NULL,
   owner_user_id BIGINT NULL REFERENCES users(id),
   name TEXT NOT NULL,
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   archived_at TIMESTAMPTZ NULL,

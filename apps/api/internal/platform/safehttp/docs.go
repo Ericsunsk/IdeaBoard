@@ -22,7 +22,7 @@
 // retries. 429/503 answers carrying a Retry-After header wait for the
 // advertised delay (capped by MaxRetryAfterWait) instead of backoff.
 //
-// The former platform/outbound and platform/outboundhttp packages are
-// deprecated shims over this implementation (type aliases and forwarders,
-// no duplicated logic); new code imports safehttp directly.
+// The former platform/outbound and platform/outboundhttp packages were
+// removed after consolidation onto this implementation (no duplicated logic
+// remains); new code imports safehttp directly.
 package safehttp

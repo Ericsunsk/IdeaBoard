@@ -19,7 +19,7 @@ import (
 )
 
 func TestAdminDeductionOnlyConsumesAvailableCredits(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	const userID int64 = 401
@@ -49,7 +49,7 @@ func TestAdminDeductionOnlyConsumesAvailableCredits(t *testing.T) {
 }
 
 func TestAdminDeductionIsIdempotentAndConcurrentBounded(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	const userID int64 = 405
@@ -113,7 +113,7 @@ func TestAdminDeductionIsIdempotentAndConcurrentBounded(t *testing.T) {
 }
 
 func TestAdminRefundIsIdempotentAndDoesNotDoubleRefund(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	const userID int64 = 406
@@ -158,7 +158,7 @@ func TestAdminRefundIsIdempotentAndDoesNotDoubleRefund(t *testing.T) {
 }
 
 func TestAdminCorrectionReversesOriginalTransactionWithConcurrentCap(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	const userID int64 = 407
@@ -212,7 +212,7 @@ func TestAdminCorrectionReversesOriginalTransactionWithConcurrentCap(t *testing.
 }
 
 func TestAdminCorrectionAllowsRewardRedemptionGrantButRejectsOtherUserGrants(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	const rewardUserID int64 = 410
@@ -261,7 +261,7 @@ func TestAdminCorrectionAllowsRewardRedemptionGrantButRejectsOtherUserGrants(t *
 }
 
 func TestAdminCorrectionSupportsDeductionAndRefundDirectionsAndRejectsInvalidOrigins(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	const userID int64 = 408
@@ -325,7 +325,7 @@ func TestAdminCorrectionSupportsDeductionAndRefundDirectionsAndRejectsInvalidOri
 }
 
 func TestAdminRefundsAreConcurrentBoundedAndAllowedForFrozenWallet(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	const userID int64 = 402
@@ -391,7 +391,7 @@ func TestAdminRefundsAreConcurrentBoundedAndAllowedForFrozenWallet(t *testing.T)
 }
 
 func TestAdminLedgerPageExposesCrossPageHoldAndChargeReferences(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	const userID int64 = 403
@@ -436,7 +436,7 @@ func TestAdminLedgerPageExposesCrossPageHoldAndChargeReferences(t *testing.T) {
 }
 
 func TestAnonymizedTombstoneRetainsAdminLedgerReadAndLinkedRefundOnly(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	const userID int64 = 404

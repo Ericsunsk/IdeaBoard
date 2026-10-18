@@ -101,10 +101,11 @@ const principalContextKey = "ideaboard.auth.principal"
 
 // Principal is the complete, validated identity of an authenticated request.
 //
-// Legacy accessors (UserID, Role, IsAdmin, Require, RequireAdmin) are
-// preserved for the /api/user and /api/admin surfaces and are DEPRECATED
-// for new /api/v1 code, which must use Subject/SubjectType/TenantScope/
-// Capabilities and RequireCapability instead. Removed in #809.
+// Accessors (UserID, Role, IsAdmin, Require, RequireAdmin) remain the
+// active identity surface: the Control Plane guard and its handlers
+// authorize and attribute through them. New /api/v1 code prefers the
+// Subject/SubjectType/TenantScope/Capabilities model with
+// RequireCapability where capability checks apply.
 type Principal struct {
 	userID      int64
 	publicID    uuid.UUID

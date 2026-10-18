@@ -2,18 +2,13 @@ package testdb
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-var roleCounter uint64
 
 func CreateRestrictedRole(t testing.TB, db *pgxpool.Pool, prefix string) string {
 	t.Helper()
@@ -73,6 +68,5 @@ func nextRoleName(prefix string) string {
 	if len(prefix) > 24 {
 		prefix = prefix[:24]
 	}
-	counter := atomic.AddUint64(&roleCounter, 1)
-	return fmt.Sprintf("%s_%x_%x_%x", prefix, os.Getpid(), time.Now().UnixNano(), counter)
+	return nextUniqueName(prefix)
 }

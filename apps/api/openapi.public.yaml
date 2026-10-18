@@ -70,7 +70,7 @@ paths:
       summary: Get the current principal profile
       description: >-
         Returns the session principal with the external usr_ identifier.
-        Provisions the personal workspace idempotently on first call.
+        Provisions the Default workspace idempotently on first call.
       responses:
         '200':
           description: Current principal profile.
@@ -286,6 +286,10 @@ paths:
       tags: [Workspaces]
       operationId: listWorkspaces
       summary: List visible workspaces with cursor pagination
+      description: >-
+        Lists membership-visible workspaces. When the caller holds no live
+        Default workspace, one is provisioned idempotently before the list
+        is read.
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/PageSize'
@@ -307,6 +311,11 @@ paths:
       tags: [Workspaces]
       operationId: createWorkspace
       summary: Create a workspace
+      description: >-
+        Creates a non-Default workspace. Personal creates without an
+        organization are unlimited; the per-user Default workspace is only
+        ever minted by idempotent auto-provisioning. A second Default create
+        renders 409 workspace_default_conflict.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -362,6 +371,8 @@ paths:
       summary: Rename a workspace (owner/admin only)
       description: >-
         Renames the workspace. No Idempotency-Key is required.
+        The Default workspace is never renamed: attempts render 403
+        workspace_default_protected.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       requestBody:
@@ -397,6 +408,9 @@ paths:
       summary: Archive a workspace (owner/admin only)
       description: >-
         Archives the workspace. No Idempotency-Key is required.
+        The Default workspace is never archived: attempts render 403
+        workspace_default_protected. Workspaces are never hard-deleted, so
+        this guard covers the only delete path.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       responses:
@@ -793,7 +807,8 @@ paths:
         Creates a board at revision 1 with the empty document snapshot;
         the creator is the implicit owner. The server fixes
         workspace_access to none: creation requests cannot widen access.
-        Requires the Idempotency-Key
+        A missing per-user Default workspace is provisioned idempotently
+        as a side effect. Requires the Idempotency-Key
         header (scope board:create): missing keys render 400
         idempotency_key_required, key reuse with a different request
         renders 409 board_idempotency_conflict, same key+hash replays the
@@ -3661,6 +3676,12 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        is_default:
+          type: boolean
+          description: >-
+            True for the owner's Default workspace: exactly one live row per
+            user, never deleted, archived, or renamed, auto-provisioned when
+            missing. Organization workspaces always report false.
         created_at:
           type: string
           format: date-time

@@ -11,7 +11,7 @@ import '@testing-library/jest-dom/vitest'
 // background/shadow/blur/border, token application, gutter layout and
 // overlay-button fills — never file text.
 //
-// Coverage map (ledger `src/features/search/searchChrome.contract.spec.ts`):
+// Coverage map:
 // - chrome surface without a Search-only layer (scenario 1): dock rendered
 //   on the bare shared surface (bg equality + no shadow + shared blur).
 // - SearchPage hover border (scenario 1): the library trigger rests on the

@@ -1,6 +1,4 @@
 CREATE TRIGGER set_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER set_api_accounts_updated_at BEFORE UPDATE ON api_accounts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER set_api_account_secrets_updated_at BEFORE UPDATE ON api_account_secrets FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_tasks_updated_at BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_execution_metrics_updated_at BEFORE UPDATE ON task_execution_metrics FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_execution_attempts_updated_at BEFORE UPDATE ON task_execution_attempts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -8,7 +6,6 @@ CREATE TRIGGER set_task_cancellations_updated_at BEFORE UPDATE ON task_cancellat
 CREATE TRIGGER set_task_daily_stats_updated_at BEFORE UPDATE ON task_daily_stats FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_stat_events_updated_at BEFORE UPDATE ON task_stat_events FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_daily_stat_backfills_updated_at BEFORE UPDATE ON task_daily_stat_backfills FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER set_provider_endpoints_updated_at BEFORE UPDATE ON provider_endpoints FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_system_configs_updated_at BEFORE UPDATE ON system_configs FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_admin_brand_logo_overrides_updated_at BEFORE UPDATE ON admin_brand_logo_overrides FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_storage_profiles_updated_at BEFORE UPDATE ON storage_profiles FOR EACH ROW EXECUTE FUNCTION set_updated_at();

@@ -115,6 +115,8 @@ const (
 	MsgServiceUnavailable36            = errorrender.MsgServiceUnavailable36                           // CodeServiceUnavailable
 	MsgWorkspaceMemberNotFound         = errorrender.MsgWorkspaceMemberNotFound                        // CodeWorkspaceMemberNotFound
 	MsgMembershipTransitionForbidden   = errorrender.MsgMembershipTransitionForbidden                  // CodeMembershipTransitionForbidden
+	MsgWorkspaceDefaultProtected       = errorrender.MsgWorkspaceDefaultProtected                      // CodeWorkspaceDefaultProtected
+	MsgWorkspaceDefaultConflict        = errorrender.MsgWorkspaceDefaultConflict                       // CodeWorkspaceDefaultConflict
 	MsgServiceUnavailable37            = errorrender.MsgServiceUnavailable37                           // CodeServiceUnavailable
 	MsgServiceUnavailable38            = errorrender.MsgServiceUnavailable38                           // CodeServiceUnavailable
 	MsgBadRequest30                    = errorrender.MsgBadRequest30                                   // CodeBadRequest

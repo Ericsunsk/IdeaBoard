@@ -174,13 +174,32 @@ function seedRosters() {
 
 function dialogItems() {
   return [
-    { publicId: 'ws_personal1', name: 'Personal', organizationId: null, archivedAt: null },
-    { publicId: 'ws_team2', name: 'Team 2', organizationId: 'org_c3', archivedAt: null },
-    { publicId: 'ws_team3', name: 'Team 3', organizationId: 'org_c3', archivedAt: null },
+    {
+      publicId: 'ws_personal1',
+      name: 'Personal',
+      organizationId: null,
+      isDefault: true,
+      archivedAt: null,
+    },
+    {
+      publicId: 'ws_team2',
+      name: 'Team 2',
+      organizationId: 'org_c3',
+      isDefault: false,
+      archivedAt: null,
+    },
+    {
+      publicId: 'ws_team3',
+      name: 'Team 3',
+      organizationId: 'org_c3',
+      isDefault: false,
+      archivedAt: null,
+    },
     {
       publicId: 'ws_old4',
       name: 'Old',
       organizationId: null,
+      isDefault: false,
       archivedAt: '2026-01-01T00:00:00Z',
     },
   ]
@@ -197,6 +216,7 @@ function renderMembersDialog() {
       onRetry: vi.fn(),
       onCreate: vi.fn(),
       onRename: vi.fn(),
+      onArchive: vi.fn(),
     },
     global: {
       stubs: dialogStubs,
@@ -482,7 +502,9 @@ describe('WorkspaceSettingsDialog members', () => {
 
   test('falls back to the viewer session avatar for the viewer entry', async () => {
     const store = useUserStore()
-    store.setAuth(makeSessionUser({ public_id: ME, avatar: '/api/v1/public/users/usr_me/avatar?v=7' }))
+    store.setAuth(
+      makeSessionUser({ public_id: ME, avatar: '/api/v1/public/users/usr_me/avatar?v=7' }),
+    )
     try {
       fakeMembers.rosters.set('ws_personal1', [
         { userId: ME, role: 'owner', email: 'me@example.com' },

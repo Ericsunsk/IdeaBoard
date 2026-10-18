@@ -17,7 +17,7 @@ import (
 )
 
 func TestCreditHealthUsesCurrentFindingsAndExactLedgerRestrictions(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := t.Context()
 

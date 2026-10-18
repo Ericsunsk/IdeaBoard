@@ -16,7 +16,7 @@ import (
 )
 
 func TestPurchaseCreditsUsesCallerTransactionAndCanonicalIdempotency(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	if _, err := service.Grant(t.Context(), ports.GrantCommand{
 		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 10),
@@ -90,7 +90,7 @@ func TestPurchaseCreditsUsesCallerTransactionAndCanonicalIdempotency(t *testing.
 }
 
 func TestPurchaseCreditsRequiresStripePaymentServiceMetadata(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	if _, err := service.Grant(t.Context(), ports.GrantCommand{
 		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 1),
@@ -109,7 +109,7 @@ func TestPurchaseCreditsRequiresStripePaymentServiceMetadata(t *testing.T) {
 }
 
 func TestPurchaseCreditsConvergesAfterWalletBecomesRestrictedAndFrozen(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	if _, err := service.Grant(t.Context(), ports.GrantCommand{
 		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 1),
@@ -142,7 +142,7 @@ func TestPurchaseCreditsConvergesAfterWalletBecomesRestrictedAndFrozen(t *testin
 }
 
 func TestPurchaseRefundSettlesReservedIdeasToIssuanceIdempotently(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	if _, err := service.Grant(t.Context(), ports.GrantCommand{UserID: 42, Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("purchase-refund:seed", "purchase-refund-seed")}); err != nil {
 		t.Fatal(err)

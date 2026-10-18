@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import {
+  archiveWorkspace,
   buildWorkspaceCreateHeaders,
   classifyWorkspaceAccessError,
   fetchAllWorkspaces,
@@ -25,8 +26,20 @@ import {
 
 const AGREED_PAGE = {
   data: [
-    { public_id: 'ws_a1', name: 'Alpha', organization_id: null, archived_at: null },
-    { public_id: 'ws_b2', name: 'Beta', organization_id: 'org_c3', archived_at: null },
+    {
+      public_id: 'ws_a1',
+      name: 'Alpha',
+      organization_id: null,
+      is_default: true,
+      archived_at: null,
+    },
+    {
+      public_id: 'ws_b2',
+      name: 'Beta',
+      organization_id: 'org_c3',
+      is_default: false,
+      archived_at: null,
+    },
   ],
   meta: { next_cursor: 'cursor2', has_more: true },
 }
@@ -42,12 +55,14 @@ describe('workspace list envelope', () => {
         publicId: 'ws_a1',
         name: 'Alpha',
         organizationId: null,
+        isDefault: true,
         archivedAt: null,
       },
       {
         publicId: 'ws_b2',
         name: 'Beta',
         organizationId: 'org_c3',
+        isDefault: false,
         archivedAt: null,
       },
     ])
@@ -255,6 +270,74 @@ describe('workspace rename', () => {
     await expect(
       renameWorkspace('ws_a1', { name: 'x'.repeat(WORKSPACE_NAME_MAX_LENGTH + 1) }),
     ).rejects.toThrow()
+  })
+
+  it('surfaces the server machine code instead of swallowing it', async () => {
+    useMswHandlers(
+      http.patch('/api/v1/workspaces/:workspaceId', () =>
+        HttpResponse.json(
+          { error: { code: 'workspace_default_protected', message: 'No', request_id: 'r1' } },
+          { status: 403 },
+        ),
+      ),
+    )
+
+    await expect(renameWorkspace('ws_d1', { name: 'Nope' })).rejects.toMatchObject({
+      code: 'workspace_default_protected',
+    })
+  })
+})
+
+describe('workspace default marker', () => {
+  it('parses is_default and defaults absent markers to false', () => {
+    expect(
+      parseWorkspaceItem({ public_id: 'ws_d1', name: 'Default', is_default: true }),
+    ).toMatchObject({ publicId: 'ws_d1', isDefault: true })
+    expect(
+      parseWorkspaceItem({ public_id: 'ws_p1', name: 'Plain', is_default: false }),
+    ).toMatchObject({ publicId: 'ws_p1', isDefault: false })
+    expect(parseWorkspaceItem({ public_id: 'ws_l1', name: 'Legacy' })).toMatchObject({
+      publicId: 'ws_l1',
+      isDefault: false,
+    })
+  })
+
+  it('archives through POST .../archive and parses the envelope', async () => {
+    const seen: string[] = []
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/archive', ({ params }) => {
+        seen.push(String(params.workspaceId))
+        return HttpResponse.json({
+          data: {
+            public_id: 'ws_a1',
+            name: 'Alpha',
+            organization_id: null,
+            is_default: false,
+            archived_at: '2026-10-18T00:00:00Z',
+          },
+        })
+      }),
+    )
+
+    const archived = await archiveWorkspace('ws_a1')
+
+    expect(seen).toEqual(['ws_a1'])
+    expect(archived).toMatchObject({ publicId: 'ws_a1', archivedAt: '2026-10-18T00:00:00Z' })
+  })
+
+  it('surfaces the server machine code instead of swallowing it', async () => {
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/archive', () =>
+        HttpResponse.json(
+          { error: { code: 'workspace_default_protected', message: 'No', request_id: 'r1' } },
+          { status: 403 },
+        ),
+      ),
+    )
+
+    await expect(archiveWorkspace('ws_d1')).rejects.toMatchObject({
+      code: 'workspace_default_protected',
+    })
   })
 })
 

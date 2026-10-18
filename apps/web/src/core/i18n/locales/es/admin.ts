@@ -1,22 +1,10 @@
 export default {
   common: {
-    save: 'Guardar',
     saveChanges: 'Guardar',
-    create: 'Crear',
     cancel: 'Cancelar',
-    delete: 'Eliminar',
-    edit: 'Editar',
-    close: 'Cerrar',
     search: 'Buscar',
-    status: 'Estado',
     actions: 'Acciones',
     refresh: 'Actualizar',
-    autoRefresh: 'Actualización automática',
-    filter: 'Filtrar',
-    all: 'Todos',
-    reset: 'Restablecer',
-    confirm: 'Confirmar',
-    loading: 'Cargando...',
   },
   rewardCode: {
     createTitle: 'Crear código de canje',

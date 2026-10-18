@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	schemaCounter      uint64
+	uniqueNameCounter  uint64
 	loadSchemaSnapshot = sync.OnceValues(func() (string, error) {
 		path, err := schemaSnapshotPath()
 		if err != nil {
@@ -30,6 +30,16 @@ var (
 	})
 )
 
+// nextUniqueName uses a shared counter, pid, and timestamp to isolate test
+// schemas and restricted roles.
+func nextUniqueName(prefix string) string {
+	counter := atomic.AddUint64(&uniqueNameCounter, 1)
+	return prefix + "_" +
+		strconv.FormatInt(int64(os.Getpid()), 36) + "_" +
+		strconv.FormatInt(time.Now().UnixNano(), 36) + "_" +
+		strconv.FormatUint(counter, 36)
+}
+
 // Open returns an isolated pgxpool.Pool for PostgreSQL integration tests.
 func Open(t testing.TB) *pgxpool.Pool {
 	t.Helper()
@@ -38,19 +48,6 @@ func Open(t testing.TB) *pgxpool.Pool {
 	pool := openIsolatedPool(t, env)
 	migrateAndSeed(t, pool, env)
 	return pool
-}
-
-// OpenWithPool returns two handles to the same isolated schema pool. Both
-// values point at the same *pgxpool.Pool; the pair exists so call sites
-// migrated from the legacy (sql.DB, pgxpool.Pool) tuple keep compiling
-// while they move to the single-pool seam.
-func OpenWithPool(t testing.TB) (*pgxpool.Pool, *pgxpool.Pool) {
-	t.Helper()
-
-	env := createIsolatedEnv(t)
-	pool := openIsolatedPool(t, env)
-	migrateAndSeed(t, pool, env)
-	return pool, pool
 }
 
 type isolatedEnv struct {
@@ -74,7 +71,7 @@ func createIsolatedEnv(t testing.TB) isolatedEnv {
 		t.Fatalf("open PostgreSQL test db failed: %v", err)
 	}
 
-	schemaName := nextSchemaName()
+	schemaName := nextUniqueName("ideaboard_test")
 	quotedSchema := pgx.Identifier{schemaName}.Sanitize()
 	schemaCreated := false
 	t.Cleanup(func() {
@@ -179,14 +176,6 @@ func schemaSnapshotPath() (string, error) {
 		return "", fmt.Errorf("resolve canonical schema snapshot path")
 	}
 	return filepath.Join(filepath.Dir(sourcePath), "../db/schema/schema.sql"), nil
-}
-
-func nextSchemaName() string {
-	counter := atomic.AddUint64(&schemaCounter, 1)
-	return "ideaboard_test_" +
-		strconv.FormatInt(int64(os.Getpid()), 36) + "_" +
-		strconv.FormatInt(time.Now().UnixNano(), 36) + "_" +
-		strconv.FormatUint(counter, 36)
 }
 
 func searchPathForSchema(schemaName string) string {

@@ -421,6 +421,12 @@ func (h *contractV1Handler) createBoard(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
+		// Default auto-provision hook: board creation requires the per-user
+		// Default home to exist, so a missing Default is minted here
+		// (idempotent; failures never fail the board create itself).
+		if h.deps.Store != nil {
+			_, _ = h.deps.Store.EnsureDefaultWorkspace(c.Request.Context(), identityPrincipal.UserID())
+		}
 		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return

@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestParseWorkflowFeatureSlug(t *testing.T) {
+func TestParseAIImageFeatureSlug(t *testing.T) {
 	tests := []struct {
 		name string
 		raw  string
@@ -28,7 +28,7 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := ParseWorkflowFeatureSlug(tt.raw)
+			got, ok := ParseAIImageFeatureSlug(tt.raw)
 			if got != tt.want || ok != tt.ok {
 				t.Fatalf("raw=%q got=(%q,%v), want=(%q,%v)", tt.raw, got, ok, tt.want, tt.ok)
 			}
@@ -36,7 +36,7 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 	}
 }
 
-func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
+func TestParseAIImageFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 	canonical := []string{
 		FeatureSlugGeneration,
 		FeatureSlugInpaint,
@@ -50,7 +50,7 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 
 	for _, slug := range canonical {
 		t.Run(slug, func(t *testing.T) {
-			got, ok := ParseWorkflowFeatureSlug(slug)
+			got, ok := ParseAIImageFeatureSlug(slug)
 			if !ok || got != slug {
 				t.Fatalf("slug=%q got=(%q,%v), want=(%q,true)", slug, got, ok, slug)
 			}
@@ -59,10 +59,10 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 }
 
 func TestCanonicalFeatureRegistryMatchesProductionRouting(t *testing.T) {
-	canonical := SupportedFeatureSlugs()
+	canonical := AIImageFeatureSlugs()
 	for _, slug := range canonical {
 		t.Run(slug, func(t *testing.T) {
-			if _, ok := ParseWorkflowFeatureSlug(slug); !ok {
+			if _, ok := ParseAIImageFeatureSlug(slug); !ok {
 				t.Fatalf("canonical feature %q is not routable", slug)
 			}
 			if !IsAIImageFeature(slug) {
@@ -87,7 +87,7 @@ func TestAIImageFeatureSlugsAreTheCanonicalWorkflowContract(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Fatalf("AI image features=%v, want=%v", got, want)
 	}
-	supported := SupportedFeatureSlugs()
+	supported := AIImageFeatureSlugs()
 	for _, slug := range want {
 		if !IsAIImageFeature(slug) {
 			t.Fatalf("canonical workflow %q is not classified as AI image", slug)
@@ -110,7 +110,7 @@ func TestVisionSlugIsReservedForSearch(t *testing.T) {
 	if ReservedVisionSlug != "vision" {
 		t.Fatalf("reserved vision slug = %q, want %q", ReservedVisionSlug, "vision")
 	}
-	if _, ok := ParseWorkflowFeatureSlug(ReservedVisionSlug); ok {
+	if _, ok := ParseAIImageFeatureSlug(ReservedVisionSlug); ok {
 		t.Fatalf("reserved slug %q validates as workflow, want rejection", ReservedVisionSlug)
 	}
 	if _, err := ValidateWorkflowFeatureSlug(ReservedVisionSlug); err == nil {
@@ -126,7 +126,7 @@ func TestVisionSlugIsReservedForSearch(t *testing.T) {
 	}
 }
 
-func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T) {
+func TestAIImageFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T) {
 	repoRoot := findWorkflowRepoRoot(t)
 	frontendPath := filepath.Join(repoRoot, "apps", "web", "src", "core", "contracts", "imageServices.ts")
 	raw, err := os.ReadFile(frontendPath)
@@ -135,7 +135,7 @@ func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T
 	}
 
 	frontendSlugs := extractFrontendWorkflowFeatureSlugs(t, string(raw))
-	backendSlugs := SupportedFeatureSlugs()
+	backendSlugs := AIImageFeatureSlugs()
 	assertSameFeatureSlugs(t, "frontend shared contract", backendSlugs, frontendSlugs)
 
 	publicAPIRaw, err := os.ReadFile(filepath.Join(repoRoot, "apps", "api", "openapi.public.yaml"))

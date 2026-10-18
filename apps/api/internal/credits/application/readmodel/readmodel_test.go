@@ -12,7 +12,7 @@ import (
 )
 
 func TestReadModelRejectsInvalidInput(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := t.Context()
 
@@ -34,7 +34,7 @@ func TestReadModelRejectsInvalidInput(t *testing.T) {
 }
 
 func TestReadModelReturnsCommittedWalletAndBalances(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := t.Context()
 
@@ -79,7 +79,7 @@ func TestReadModelReturnsCommittedWalletAndBalances(t *testing.T) {
 }
 
 func TestReadModelListsLedgerNewestFirstWithKeysetPagination(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := t.Context()
 

@@ -1,22 +1,10 @@
 export default {
   common: {
-    save: '保存',
     saveChanges: '保存',
-    create: '创建',
     cancel: '取消',
-    delete: '删除',
-    edit: '编辑',
-    close: '关闭',
     search: '搜索',
-    status: '状态',
     actions: '操作',
     refresh: '刷新',
-    autoRefresh: '自动刷新',
-    filter: '筛选',
-    all: '全部',
-    reset: '重置',
-    confirm: '确认',
-    loading: '加载中...',
   },
   rewardCode: {
     createTitle: '创建兑换码',

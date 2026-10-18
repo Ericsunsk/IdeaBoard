@@ -14,7 +14,7 @@ import (
 )
 
 func TestPaidPaymentOrderAndPurchaseCreditConvergeAtomicallyOnce(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	seedAmount, err := domain.NewCreditAmount(1)
 	if err != nil {
@@ -31,7 +31,7 @@ func TestPaidPaymentOrderAndPurchaseCreditConvergeAtomicallyOnce(t *testing.T) {
 		t.Fatalf("seed Wallet: %v", err)
 	}
 
-	repo := newTestPaymentStores(db)
+	repo := newTestPaymentStores(pool)
 	order := createBoundPaymentOrder(t, repo)
 	facts := paidCheckoutFacts(order)
 	creditedAt := time.Date(2026, 8, 1, 12, 10, 0, 0, time.UTC)
@@ -73,7 +73,7 @@ func TestPaidPaymentOrderAndPurchaseCreditConvergeAtomicallyOnce(t *testing.T) {
 	}
 
 	var purchaseCount int
-	if err := db.QueryRow(t.Context(), `
+	if err := pool.QueryRow(t.Context(), `
 SELECT COUNT(*) FROM credit_transactions
 WHERE command_type = 'purchase_credit' AND business_reference_id = $1`, order.ID).Scan(&purchaseCount); err != nil {
 		t.Fatal(err)
@@ -84,8 +84,8 @@ WHERE command_type = 'purchase_credit' AND business_reference_id = $1`, order.ID
 }
 
 func TestPaidPaymentOrderFactConflictRollsBackWithoutCredit(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	creditService := credits.NewService(pool)
+	db := testdb.Open(t)
+	creditService := credits.NewService(db)
 	seedAmount, _ := domain.NewCreditAmount(1)
 	if _, err := creditService.Grant(t.Context(), ports.GrantCommand{
 		UserID: 42, Amount: seedAmount,

@@ -52,12 +52,14 @@ function workspace(overrides: Partial<WorkspaceSummary> & { publicId: string }):
   return {
     name: overrides.publicId,
     organizationId: null,
+    isDefault: false,
     archivedAt: null,
     ...overrides,
   }
 }
 
-const PERSONAL = workspace({ publicId: 'ws_personal1', name: 'Personal' })
+const DEFAULT = workspace({ publicId: 'ws_default1', name: 'Default', isDefault: true })
+const PLAIN = workspace({ publicId: 'ws_plain3', name: 'Plain' })
 const TEAM = workspace({ publicId: 'ws_team2', name: 'Team', organizationId: 'org_c3' })
 
 function mockQuery(state: {
@@ -87,22 +89,22 @@ function freshStore(): WorkspaceSelectionStore {
 describe('resolveWorkspaceSelection', () => {
   it('prefers the shared URL choice over the persisted one', () => {
     expect(
-      resolveWorkspaceSelection([PERSONAL, TEAM], { urlId: 'ws_team2', storedId: 'ws_personal1' }),
+      resolveWorkspaceSelection([DEFAULT, TEAM], { urlId: 'ws_team2', storedId: 'ws_default1' }),
     ).toEqual({ selectedId: 'ws_team2', source: 'url' })
   })
 
-  it('falls back to the persisted choice and then to personal', () => {
-    expect(resolveWorkspaceSelection([PERSONAL, TEAM], { storedId: 'ws_team2' })).toEqual({
+  it('falls back to the persisted choice and then to default', () => {
+    expect(resolveWorkspaceSelection([DEFAULT, TEAM], { storedId: 'ws_team2' })).toEqual({
       selectedId: 'ws_team2',
       source: 'stored',
     })
-    expect(resolveWorkspaceSelection([TEAM, PERSONAL], {})).toEqual({
-      selectedId: 'ws_personal1',
-      source: 'auto-personal',
+    expect(resolveWorkspaceSelection([TEAM, DEFAULT], {})).toEqual({
+      selectedId: 'ws_default1',
+      source: 'auto-default',
     })
   })
 
-  it('uses the first visible item when nothing personal exists', () => {
+  it('uses the first visible item when no default exists', () => {
     expect(resolveWorkspaceSelection([TEAM], {})).toEqual({
       selectedId: 'ws_team2',
       source: 'auto-first',
@@ -110,10 +112,21 @@ describe('resolveWorkspaceSelection', () => {
     expect(resolveWorkspaceSelection([], {})).toEqual({ selectedId: null, source: 'none' })
   })
 
+  it('never treats a plain personal row as the default', () => {
+    expect(resolveWorkspaceSelection([PLAIN, TEAM], {})).toEqual({
+      selectedId: 'ws_plain3',
+      source: 'auto-first',
+    })
+    expect(resolveWorkspaceSelection([TEAM, PLAIN, DEFAULT], {})).toEqual({
+      selectedId: 'ws_default1',
+      source: 'auto-default',
+    })
+  })
+
   it('ignores stale or malformed hints instead of selecting them', () => {
-    expect(resolveWorkspaceSelection([PERSONAL], { urlId: 'ws_gone9', storedId: '123' })).toEqual({
-      selectedId: 'ws_personal1',
-      source: 'auto-personal',
+    expect(resolveWorkspaceSelection([DEFAULT], { urlId: 'ws_gone9', storedId: '123' })).toEqual({
+      selectedId: 'ws_default1',
+      source: 'auto-default',
     })
   })
 })
@@ -129,10 +142,10 @@ describe('selection persistence', () => {
   it('persists through localStorage under a stable key', () => {
     const persist = localStorageWorkspacePersist()
 
-    persist.writeSelectedId('ws_personal1')
+    persist.writeSelectedId('ws_default1')
 
-    expect(window.localStorage.getItem(WORKSPACE_SELECTION_STORAGE_KEY)).toBe('ws_personal1')
-    expect(persist.readSelectedId()).toBe('ws_personal1')
+    expect(window.localStorage.getItem(WORKSPACE_SELECTION_STORAGE_KEY)).toBe('ws_default1')
+    expect(persist.readSelectedId()).toBe('ws_default1')
 
     persist.writeSelectedId(null)
     expect(window.localStorage.getItem(WORKSPACE_SELECTION_STORAGE_KEY)).toBeNull()
@@ -146,7 +159,7 @@ describe('selection persistence', () => {
     const reloaded = createWorkspaceSelectionStore({ persist })
     expect(reloaded.getSelectedId()).toBe('ws_team2')
     expect(
-      resolveWorkspaceSelection([PERSONAL, TEAM], { storedId: reloaded.getSelectedId() }).source,
+      resolveWorkspaceSelection([DEFAULT, TEAM], { storedId: reloaded.getSelectedId() }).source,
     ).toBe('stored')
   })
 
@@ -244,24 +257,24 @@ describe('useWorkspaceSelection', () => {
     routerMocks.replace.mockReset()
   })
 
-  it('auto-selects the personal workspace, persists it, and reports ready', () => {
-    mockQuery({ items: [TEAM, PERSONAL] })
+  it('auto-selects the default workspace, persists it, and reports ready', () => {
+    mockQuery({ items: [TEAM, DEFAULT] })
     mockRoute()
 
     const store = freshStore()
     const selection = useWorkspaceSelection({ store })
 
-    expect(selection.selectedId.value).toBe('ws_personal1')
+    expect(selection.selectedId.value).toBe('ws_default1')
     // Auto-resolution is persisted so cross-layer readers
     // (`getSelectedId()`) see the same workspace; the source then
     // reports 'stored' on re-evaluation.
-    expect(store.getSelectedId()).toBe('ws_personal1')
+    expect(store.getSelectedId()).toBe('ws_default1')
     expect(selection.selectionSource.value).toBe('stored')
     expect(selection.status.value).toBe('ready')
   })
 
   it('persists explicit selection and reflects it in the URL', () => {
-    mockQuery({ items: [PERSONAL, TEAM] })
+    mockQuery({ items: [DEFAULT, TEAM] })
     mockRoute()
 
     const selection = useWorkspaceSelection({ store: freshStore() })

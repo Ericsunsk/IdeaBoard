@@ -7,8 +7,8 @@ function isVisibleWorkspaceItem(item: UserAccountMenuWorkspaceItem): boolean {
   return item.archivedAt == null
 }
 
-export function isPersonalWorkspaceItem(item: UserAccountMenuWorkspaceItem): boolean {
-  return item.organizationId == null
+export function isDefaultWorkspaceItem(item: UserAccountMenuWorkspaceItem): boolean {
+  return item.isDefault === true
 }
 
 export function visibleWorkspaceItems(

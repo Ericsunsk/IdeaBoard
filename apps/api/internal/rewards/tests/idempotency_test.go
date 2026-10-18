@@ -138,7 +138,7 @@ func TestRewardRedeemBindsKeyToCodeAndReplaysBeforeRateLimit(t *testing.T) {
 }
 
 func TestRewardRedeemReplaysFirstResult(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	if _, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
@@ -178,7 +178,7 @@ func TestRewardRedeemReplaysFirstResult(t *testing.T) {
 }
 
 func TestRewardCreateRequiresIdempotencyKey(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	router := newIdempotencyAdminRouter(t, rewardhttp.NewAdminCommandHandler(service))
@@ -193,7 +193,7 @@ func TestRewardCreateRequiresIdempotencyKey(t *testing.T) {
 }
 
 func TestRewardCreateRejectsBodyIdempotencyKey(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	router := newIdempotencyAdminRouter(t, rewardhttp.NewAdminCommandHandler(service))
@@ -221,7 +221,7 @@ func TestRewardCreateRejectsBodyIdempotencyKey(t *testing.T) {
 }
 
 func TestRewardCreateReplaysWithHeaderKey(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	router := newIdempotencyAdminRouter(t, rewardhttp.NewAdminCommandHandler(service))

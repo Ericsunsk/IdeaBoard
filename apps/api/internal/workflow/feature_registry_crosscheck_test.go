@@ -62,7 +62,7 @@ func TestLiveRegistryMatchesDurableSnapshotForCurrentSchema(t *testing.T) {
 			}
 		})
 	}
-	for _, slug := range SupportedFeatureSlugs() {
+	for _, slug := range AIImageFeatureSlugs() {
 		if !slices.Contains(liveSlugs, slug) {
 			t.Fatalf("canonical slug %q missing from live registry", slug)
 		}

@@ -99,41 +99,6 @@ func (q *Queries) InsertServiceModelPoolResolution(ctx context.Context, arg Inse
 	return err
 }
 
-const listEligibleServicePoolModels = `-- name: ListEligibleServicePoolModels :many
-SELECT e.model_id
-FROM service_model_pool_entry AS e
-INNER JOIN service_model_pool_resolution AS r ON r.pool_entry_id = e.id
-WHERE e.service = $1
-  AND e.enabled
-  AND r.resolution = $2
-ORDER BY e.model_id ASC
-`
-
-type ListEligibleServicePoolModelsParams struct {
-	Service    string `json:"service"`
-	Resolution string `json:"resolution"`
-}
-
-func (q *Queries) ListEligibleServicePoolModels(ctx context.Context, arg ListEligibleServicePoolModelsParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, listEligibleServicePoolModels, arg.Service, arg.Resolution)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var model_id string
-		if err := rows.Scan(&model_id); err != nil {
-			return nil, err
-		}
-		items = append(items, model_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listServiceModelPoolEntries = `-- name: ListServiceModelPoolEntries :many
 SELECT id, service, model_id, enabled, created_at, updated_at
 FROM service_model_pool_entry

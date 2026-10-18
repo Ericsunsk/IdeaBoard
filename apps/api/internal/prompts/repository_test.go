@@ -50,8 +50,8 @@ func TestFeaturePromptListIncludesUnconfiguredFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListConfigs: %v", err)
 	}
-	want := make(map[string]bool, len(workflow.SupportedFeatureSlugs())-1)
-	for _, slug := range workflow.SupportedFeatureSlugs() {
+	want := make(map[string]bool, len(workflow.AIImageFeatureSlugs())-1)
+	for _, slug := range workflow.AIImageFeatureSlugs() {
 		if slug != workflow.FeatureSlugCutout {
 			want[slug] = false
 		}

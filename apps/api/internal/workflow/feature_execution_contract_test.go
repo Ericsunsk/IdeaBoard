@@ -100,7 +100,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 		},
 	}
 
-	canonical := SupportedFeatureSlugs()
+	canonical := AIImageFeatureSlugs()
 	if len(tests) != len(canonical) {
 		t.Fatalf("feature Contract matrix has %d entries, canonical registry has %d", len(tests), len(canonical))
 	}
@@ -377,7 +377,7 @@ func TestCompileFeatureExecutionPlanFixedPriceTransformsUse1KResolution(t *testi
 func TestFeatureExecutionPlanDurableRoundTripPreservesCanonicalFacts(t *testing.T) {
 	count := 3
 	resolution := OutputResolution2K
-	for _, feature := range SupportedFeatureSlugs() {
+	for _, feature := range AIImageFeatureSlugs() {
 		t.Run(feature, func(t *testing.T) {
 			params := FeatureExecutionParams{ImageInputCount: 1}
 			if feature == FeatureSlugInpaint {

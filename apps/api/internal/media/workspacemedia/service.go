@@ -95,18 +95,16 @@ func resolveWorkspaceInternal(ctx context.Context, q *dbsqlc.Queries, workspaceP
 	return internalID, nil
 }
 
+// nullText keeps the original string when non-blank (blank check trims,
+// stored value does not). dbutil.NullString stores the trimmed value
+// instead, so switching would let padded inputs ("  abc  ") match a trimmed
+// row ("abc"): fail-closed lookups (checksum/slot/exclusion) must keep the
+// original so padded ids miss instead of accidentally hitting.
 func nullText(value string) pgtype.Text {
 	if strings.TrimSpace(value) == "" {
 		return pgtype.Text{}
 	}
 	return pgtype.Text{String: value, Valid: true}
-}
-
-func nullInt4(value int32, present bool) pgtype.Int4 {
-	if !present || value < 0 {
-		return pgtype.Int4{}
-	}
-	return pgtype.Int4{Int32: value, Valid: true}
 }
 
 func int4Value(value pgtype.Int4) int32 {

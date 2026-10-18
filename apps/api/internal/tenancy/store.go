@@ -38,9 +38,18 @@ var (
 	// ErrWorkspaceOwnerRequired reports a workspace create without an
 	// organization or an owner.
 	ErrWorkspaceOwnerRequired = errors.New("tenancy: workspace requires an organization or an owner")
-	// ErrPersonalWorkspaceUserRequired reports a personal workspace
+	// ErrDefaultWorkspaceProtected reports an archive/rename (delete)
+	// attempt on a Default workspace. Handlers render it as 403
+	// (workspace_default_protected): the Default workspace is never
+	// deleted, archived, or renamed.
+	ErrDefaultWorkspaceProtected = errors.New("tenancy: default workspace cannot be archived, deleted, or renamed")
+	// ErrDefaultWorkspaceConflict reports a second Default workspace create
+	// for an owner that already holds a live Default. Handlers render it
+	// as 409 (workspace_default_conflict).
+	ErrDefaultWorkspaceConflict = errors.New("tenancy: default workspace already exists")
+	// ErrPersonalWorkspaceUserRequired reports a default workspace
 	// provision without a user.
-	ErrPersonalWorkspaceUserRequired = errors.New("tenancy: personal workspace requires a user")
+	ErrPersonalWorkspaceUserRequired = errors.New("tenancy: default workspace requires a user")
 	// ErrBillingStoreNotConfigured reports a billing account store
 	// without queries.
 	ErrBillingStoreNotConfigured = errors.New("tenancy: billing account store not configured")
@@ -65,22 +74,32 @@ func IsValidRole(role string) bool {
 
 // Workspace mirrors the agreed workspaces row: internal numeric key for
 // joins, opaque ws_ public_id for API exposure, NULL-able organization
-// and owner references, archival timestamp.
+// and owner references, the Default marker, archival timestamp.
 type Workspace struct {
 	InternalID     int64
 	PublicID       string
 	OrganizationID *string
 	OwnerUserID    *int64
 	Name           string
-	ArchivedAt     *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// IsDefault marks the user's Default workspace: exactly one live row
+	// per owner, never deleted, archived, or renamed, auto-provisioned
+	// when missing. Organization workspaces never carry it.
+	IsDefault  bool
+	ArchivedAt *time.Time
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // IsPersonal reports whether the workspace is a personal workspace
 // (organization_id IS NULL).
 func (w *Workspace) IsPersonal() bool {
 	return w != nil && w.OrganizationID == nil
+}
+
+// IsDefaultWorkspace reports whether the workspace is the owner's Default
+// workspace (personal scope plus the is_default marker).
+func (w *Workspace) IsDefaultWorkspace() bool {
+	return w != nil && w.IsPersonal() && w.IsDefault
 }
 
 // IsArchived reports whether the workspace is archived.
@@ -108,11 +127,16 @@ type WorkspaceMember struct {
 }
 
 // CreateWorkspaceParams carries validated workspace creation input.
+// IsDefault requests the Default marker: only personal scope may carry
+// it, and an owner holding a live Default rejects a second one with
+// ErrDefaultWorkspaceConflict. Plain POST creation always passes false
+// (non-Default personal workspaces are unlimited).
 // Repository methods take context.Context first.
 type CreateWorkspaceParams struct {
 	Name           string
 	OrganizationID *string
 	OwnerUserID    int64
+	IsDefault      bool
 }
 
 // Store is the AGREED tenancy persistence interface the DB sibling
@@ -142,10 +166,13 @@ type WorkspaceStore interface {
 	CreateWorkspace(ctx context.Context, params CreateWorkspaceParams) (*Workspace, error)
 	UpdateWorkspace(ctx context.Context, publicID, name string) (*Workspace, error)
 	ArchiveWorkspace(ctx context.Context, publicID string) (*Workspace, error)
-	// EnsurePersonalWorkspace idempotently provisions the user's personal
+	// EnsureDefaultWorkspace idempotently provisions the user's Default
 	// workspace (INSERT ... ON CONFLICT DO NOTHING in postgres).
-	// Concurrent callers converge to a single workspace.
-	EnsurePersonalWorkspace(ctx context.Context, userID int64) (*Workspace, error)
+	// Concurrent callers converge to a single Default workspace. When the
+	// user holds no live Default (fresh profile, or only non-Default
+	// personal rows), a new Default row is minted; existing non-Default
+	// rows are left untouched.
+	EnsureDefaultWorkspace(ctx context.Context, userID int64) (*Workspace, error)
 	GetWorkspaceRole(ctx context.Context, workspacePublicID string, userID int64) (string, bool, error)
 	ListWorkspaceMembers(ctx context.Context, workspacePublicID string) ([]*WorkspaceMember, error)
 	AddWorkspaceMember(ctx context.Context, workspacePublicID string, targetUserID int64, role string) (*WorkspaceMember, error)

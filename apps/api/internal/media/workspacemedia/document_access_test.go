@@ -125,7 +125,7 @@ func TestDocumentAcceptanceRejectsSourceRevokedWhileWaiting(t *testing.T) {
 			t.Fatal("document acceptance did not wait for Workspace lock")
 		}
 	}
-	if _, err := q.DeleteWorkspaceBoardMembership(ctx, dbsqlc.DeleteWorkspaceBoardMembershipParams{WorkspacePublicID: env.ws, BoardPublicID: source, UserID: env.member}); err != nil {
+	if _, err := q.DeleteWorkspaceMemberBoardGrants(ctx, dbsqlc.DeleteWorkspaceMemberBoardGrantsParams{WorkspacePublicID: env.ws, UserID: env.member}); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

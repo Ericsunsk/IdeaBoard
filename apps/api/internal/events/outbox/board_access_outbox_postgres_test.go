@@ -15,7 +15,7 @@ import (
 )
 
 func TestBoardAccessOutboxPostgresQueue(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	store := NewBoardAccessOutboxStore(pool)
 	ctx := context.Background()
 	var occurredAt time.Time

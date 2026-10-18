@@ -38,7 +38,7 @@ import (
 )
 
 func TestPublishPricesJoinsAmbientCarrierTx(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := NewStore(pool)
 	ctx := context.Background()
 
@@ -100,7 +100,7 @@ func TestPublishPricesJoinsAmbientCarrierTx(t *testing.T) {
 }
 
 func TestPublishPricesRollsBackWithAmbientCarrier(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := NewStore(pool)
 	ctx := context.Background()
 
@@ -137,7 +137,7 @@ func TestPublishPricesRollsBackWithAmbientCarrier(t *testing.T) {
 }
 
 func TestPublishPricesCommitsJointlyWithControlAudit(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := NewStore(pool)
 	auditStore := audit.NewStore(pool)
 	ctx := context.Background()
@@ -206,7 +206,7 @@ func TestPublishPricesCommitsJointlyWithControlAudit(t *testing.T) {
 }
 
 func TestPublishPricesControlAuditFailureRollsBackBusiness(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := NewStore(pool)
 	auditStore := audit.NewStore(pool)
 	ctx := context.Background()
@@ -267,7 +267,7 @@ func TestPublishPricesControlAuditFailureRollsBackBusiness(t *testing.T) {
 
 func TestOtherCatalogWritesJoinAmbientCarrierTx(t *testing.T) {
 	t.Run("availability", func(t *testing.T) {
-		_, pool := testdb.OpenWithPool(t)
+		pool := testdb.Open(t)
 		service := NewStore(pool)
 		ctx := context.Background()
 		definition := testBillableDefinition("test:carrier-avail", "Carrier Avail")
@@ -322,7 +322,7 @@ func TestOtherCatalogWritesJoinAmbientCarrierTx(t *testing.T) {
 	})
 
 	t.Run("delete", func(t *testing.T) {
-		_, pool := testdb.OpenWithPool(t)
+		pool := testdb.Open(t)
 		service := NewStore(pool)
 		ctx := context.Background()
 		// Registry-absent SKU: the application gate rejects
@@ -376,7 +376,7 @@ func TestOtherCatalogWritesJoinAmbientCarrierTx(t *testing.T) {
 	})
 
 	t.Run("owned path without carrier stays self-contained", func(t *testing.T) {
-		_, pool := testdb.OpenWithPool(t)
+		pool := testdb.Open(t)
 		service := NewStore(pool)
 		ctx := context.Background()
 		definition := testBillableDefinition("test:carrier-owned", "Carrier Owned")

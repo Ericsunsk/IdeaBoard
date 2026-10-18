@@ -355,11 +355,11 @@ func (h *contractV1Handler) getUser(c *gin.Context) {
 		dto.UpdatedAt = v1FormatTime(profile.UpdatedAt)
 		dto.Status = profile.Status
 	}
-	// Personal workspace auto-provision hook: idempotent and
+	// Default workspace auto-provision hook: idempotent and
 	// concurrent-safe; a provision failure never fails /user itself.
 	if h.deps.Store != nil {
-		if personal, err := h.deps.Store.EnsurePersonalWorkspace(c.Request.Context(), identityPrincipal.UserID()); err == nil && personal != nil {
-			id := personal.PublicID
+		if def, err := h.deps.Store.EnsureDefaultWorkspace(c.Request.Context(), identityPrincipal.UserID()); err == nil && def != nil {
+			id := def.PublicID
 			dto.PersonalWorkspaceID = &id
 		}
 	}
@@ -370,14 +370,19 @@ type v1WorkspaceDTO struct {
 	ID             string  `json:"id"`
 	OrganizationID *string `json:"organization_id"`
 	Name           string  `json:"name"`
-	CreatedAt      string  `json:"created_at"`
-	ArchivedAt     *string `json:"archived_at,omitempty"`
+	// IsDefault marks the owner's Default workspace: exactly one live row
+	// per user, never deleted, archived, or renamed, auto-provisioned
+	// when missing. Organization workspaces always report false.
+	IsDefault  bool    `json:"is_default"`
+	CreatedAt  string  `json:"created_at"`
+	ArchivedAt *string `json:"archived_at,omitempty"`
 }
 
 func toWorkspaceDTO(w *tenancy.Workspace) v1WorkspaceDTO {
 	dto := v1WorkspaceDTO{
 		ID:        w.PublicID,
 		Name:      w.Name,
+		IsDefault: w.IsDefaultWorkspace(),
 		CreatedAt: v1FormatTime(w.CreatedAt),
 	}
 	if w.OrganizationID != nil {
@@ -422,9 +427,18 @@ func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	// First-list auto-provision hook when the user has no workspace yet.
-	if len(workspaces) == 0 {
-		if personal, provisionErr := h.deps.Store.EnsurePersonalWorkspace(ctx, identityPrincipal.UserID()); provisionErr == nil && personal != nil {
+	// Default auto-provision hook when the user holds no live Default yet.
+	// Non-Default personal rows do not satisfy it: a user with only plain
+	// rows still gets a fresh Default row here.
+	hasDefault := false
+	for _, w := range workspaces {
+		if w.IsDefaultWorkspace() {
+			hasDefault = true
+			break
+		}
+	}
+	if !hasDefault {
+		if def, provisionErr := h.deps.Store.EnsureDefaultWorkspace(ctx, identityPrincipal.UserID()); provisionErr == nil && def != nil {
 			workspaces, err = h.deps.Store.ListWorkspacesForUser(ctx, identityPrincipal.UserID())
 			if err != nil {
 				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
@@ -525,6 +539,9 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 	scope := contract.IdempotencyScope(externalUser, "workspace:create")
 	hash := contract.HashIdempotencyRequest("workspace:create", name, orgPart)
 	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
+		// Plain POST creation (no organization) always mints a non-Default
+		// personal workspace; such rows are unlimited. Only
+		// EnsureDefaultWorkspace mints the Default row.
 		params := tenancy.CreateWorkspaceParams{Name: name, OrganizationID: orgID, OwnerUserID: identityPrincipal.UserID()}
 		if orgID != nil {
 			return h.deps.Store.CreateOrganizationWorkspace(ctx, *orgID, identityPrincipal.UserID(), name)
@@ -534,6 +551,11 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 	if doErr != nil {
 		if contract.IsIdempotencyConflict(doErr) {
 			contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, runtimehttp.MsgWorkspaceIdempotencyConflict)
+			c.Abort()
+			return
+		}
+		if errors.Is(doErr, tenancy.ErrDefaultWorkspaceConflict) {
+			contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceDefaultConflict), contract.CodeWorkspaceDefaultConflict, runtimehttp.MsgWorkspaceDefaultConflict)
 			c.Abort()
 			return
 		}
@@ -593,6 +615,11 @@ func (h *contractV1Handler) updateWorkspace(c *gin.Context) {
 		}
 		updated, err := h.deps.Store.UpdateWorkspace(c.Request.Context(), wctx.Workspace.PublicID, name)
 		if err != nil {
+			if errors.Is(err, tenancy.ErrDefaultWorkspaceProtected) {
+				contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceDefaultProtected), contract.CodeWorkspaceDefaultProtected, runtimehttp.MsgWorkspaceDefaultProtected)
+				c.Abort()
+				return
+			}
 			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
 			c.Abort()
 			return
@@ -605,6 +632,11 @@ func (h *contractV1Handler) archiveWorkspace(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx) {
 		archived, err := h.deps.Store.ArchiveWorkspace(c.Request.Context(), wctx.Workspace.PublicID)
 		if err != nil {
+			if errors.Is(err, tenancy.ErrDefaultWorkspaceProtected) {
+				contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceDefaultProtected), contract.CodeWorkspaceDefaultProtected, runtimehttp.MsgWorkspaceDefaultProtected)
+				c.Abort()
+				return
+			}
 			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
 			c.Abort()
 			return

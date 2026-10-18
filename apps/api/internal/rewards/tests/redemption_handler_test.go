@@ -18,7 +18,7 @@ import (
 )
 
 func TestRewardRedeemPreservesCommittedOutcomeWithoutPostCommitIdentityProjection(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{

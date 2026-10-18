@@ -72,8 +72,8 @@ Local-newer draft 优先于旧 remote snapshot；显式 rollback 或 `preserveLo
 - `boardSseMapping.contract.spec.ts`：coalesce、revision guard、dirty draft、member/gap scope。
 - `boardRevisionConflict.contract.spec.ts`：409、explicit reload 和 GET/PUT 404。
 - `boardDraftOverlay.contract.spec.ts`：draft precedence、rollback、offline creation 和 late response。
-- `revocation/accessLoss.contract.spec.ts`（#941）：重验证专用的 loss 分类（确认 vs 保留矩阵）、registry/scope 隔离、mid-flight verdict 丢弃、open-board 观察（定向/roster 信号只重验证打开中的 board、gap 重验证、board 切换丢弃 late verdict）。
-- `revocation/convergeAccessLoss.contract.spec.ts`（#941）：确认清理（registry 标记、受保护 Query 移除、本地副本丢弃且不复制、surface 通知隔离、无 scope 不收敛、跨 workspace 隔离）。
+- `../revocation/accessLoss.contract.spec.ts`（#941）：重验证专用的 loss 分类（确认 vs 保留矩阵）、registry/scope 隔离、mid-flight verdict 丢弃、open-board 观察（定向/roster 信号只重验证打开中的 board、gap 重验证、board 切换丢弃 late verdict）。
+- `../revocation/convergeAccessLoss.contract.spec.ts`（#941）：确认清理（registry 标记、受保护 Query 移除、本地副本丢弃且不复制、surface 通知隔离、无 scope 不收敛、跨 workspace 隔离）。
 
 ```sh
 cd apps/web

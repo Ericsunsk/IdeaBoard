@@ -61,7 +61,7 @@ func readCarrierUserStatus(t *testing.T, ctx context.Context, querier carrierSta
 }
 
 func TestSetUserStatusJoinsAmbientCarrierTx(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
@@ -99,7 +99,7 @@ func TestSetUserStatusJoinsAmbientCarrierTx(t *testing.T) {
 }
 
 func TestSetUserStatusRollsBackWithAmbientCarrier(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()

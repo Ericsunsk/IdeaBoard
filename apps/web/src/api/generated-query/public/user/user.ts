@@ -120,7 +120,7 @@ export const getGetUserUrl = () => {
 }
 
 /**
- * Returns the session principal with the external usr_ identifier. Provisions the personal workspace idempotently on first call.
+ * Returns the session principal with the external usr_ identifier. Provisions the Default workspace idempotently on first call.
  * @summary Get the current principal profile
  */
 export const getUser = async (

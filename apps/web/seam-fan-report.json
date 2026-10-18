@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "4060eb6bc4f2b31cf15cd5739d04655788dc5d03",
+  "checkpointSha": "67d88377ba2b5829a80d925278815cf7ede47a7c",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -10131,6 +10131,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/recharge/PendingOrders.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
@@ -10271,6 +10276,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
@@ -10281,7 +10291,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 35,
+      "fanIn": 37,
       "fanOut": 1,
       "fanOutTargets": ["src/core/i18n/index.ts"],
       "outboundEdges": [
@@ -10295,7 +10305,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 35,
+      "targetFanIn": 37,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -15139,6 +15149,16 @@
         },
         {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.component.spec.ts",
+          "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.component.spec.ts",
+          "to": "src/test/factories/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.component.spec.ts",
           "to": "src/test/render.ts",
           "kind": "runtime"
         },
@@ -15215,6 +15235,11 @@
         {
           "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
           "to": "src/components/ui/spinner/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
@@ -17718,7 +17743,7 @@
         }
       ],
       "fanIn": 120,
-      "fanOut": 54,
+      "fanOut": 53,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -17743,7 +17768,6 @@
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
         "src/components/ui/table/TableBody.vue",
-        "src/components/ui/table/TableCaption.vue",
         "src/components/ui/table/TableCell.vue",
         "src/components/ui/table/TableFooter.vue",
         "src/components/ui/table/TableHead.vue",
@@ -18722,21 +18746,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/table/AdminTableCaption.vue",
-          "to": "node_modules/vue/index.js",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/admin/shared/ui/table/AdminTableCaption.vue",
-          "to": "src/components/ui/table/TableCaption.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/table/AdminTableCaption.vue",
-          "to": "src/lib/utils.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/shared/ui/table/AdminTableCell.vue",
           "to": "node_modules/vue/index.js",
           "kind": "type-only"
@@ -19027,7 +19036,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 120,
-      "targetFanOut": 54,
+      "targetFanOut": 53,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -22130,6 +22139,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.component.spec.ts",
+          "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
@@ -22176,6 +22190,11 @@
         },
         {
           "from": "src/features/admin/users/session/sessionCommands.ts",
+          "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/share/ShareDialog.component.spec.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
         },
@@ -22255,7 +22274,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 31,
+      "fanIn": 33,
       "fanOut": 46,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -22966,7 +22985,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 31,
+      "targetFanIn": 33,
       "targetFanOut": 46,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -24527,6 +24546,16 @@
         {
           "from": "src/features/board/ui/share/ShareDialog.component.spec.ts",
           "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/share/ShareDialog.component.spec.ts",
+          "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/share/ShareDialog.component.spec.ts",
+          "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
         {
@@ -26389,6 +26418,16 @@
         },
         {
           "from": "src/features/board/ui/share/ShareDialog.component.spec.ts",
+          "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/share/ShareDialog.component.spec.ts",
+          "to": "src/test/factories/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/share/ShareDialog.component.spec.ts",
           "to": "src/test/render.ts",
           "kind": "runtime"
         },
@@ -27818,6 +27857,16 @@
         {
           "from": "src/features/board/ui/share/ShareDialog.component.spec.ts",
           "to": "src/core/query/queryClient.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/share/ShareDialog.component.spec.ts",
+          "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/share/ShareDialog.component.spec.ts",
+          "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
         {
@@ -42432,6 +42481,11 @@
         },
         {
           "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/core/utils/guards.ts",
           "kind": "runtime"
         },
@@ -43251,6 +43305,11 @@
     "src/test/factories/index.ts": {
       "consumerEdges": [
         {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.component.spec.ts",
+          "to": "src/test/factories/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/dialog/AccountDialogContent.component.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
@@ -43311,6 +43370,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/share/ShareDialog.component.spec.ts",
+          "to": "src/test/factories/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/pages/CanvasPage.component.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
@@ -43326,7 +43390,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 15,
+      "fanIn": 17,
       "fanOut": 1,
       "fanOutTargets": ["src/api/sessionUserType.ts"],
       "outboundEdges": [
@@ -43340,7 +43404,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 15,
+      "targetFanIn": 17,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,

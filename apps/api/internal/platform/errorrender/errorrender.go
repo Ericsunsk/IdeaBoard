@@ -9,8 +9,8 @@
 // logging.
 //
 // The former platform/apperror (taxonomy.go) and platform/validation
-// (validation.go) implementations moved here; those packages remain as
-// deprecated aliases over this implementation — no duplicated logic.
+// (validation.go) implementations moved here; those packages were removed
+// after the move — no duplicated logic remains.
 package errorrender
 
 import (

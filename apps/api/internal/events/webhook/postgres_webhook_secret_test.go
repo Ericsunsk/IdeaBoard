@@ -30,7 +30,7 @@ func mustMintSubscriptionID(t *testing.T) string {
 // envelope is recorded, and loads resolve the original signing key.
 func TestPostgresWebhookSecretEncryptedAtRest(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	if _, err := pool.Exec(t.Context(), `
 INSERT INTO workspaces (public_id, owner_user_id, name)
 VALUES ('ws_1', 1, 'webhook secret encryption test')
@@ -94,7 +94,7 @@ FROM event_subscriptions WHERE public_id = $1`, sub.ID).Scan(&stored, &kind, &ve
 // loads stay stable.
 func TestPostgresWebhookSecretLegacyPlaintextInterop(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	if _, err := pool.Exec(t.Context(), `
 INSERT INTO workspaces (public_id, owner_user_id, name)
 VALUES ('ws_1', 1, 'webhook legacy secret test')
@@ -146,7 +146,7 @@ FROM event_subscriptions WHERE public_id = $1`, subID).Scan(&stored, &kind, &ver
 // a retired master key do not decode: the error carries no secret material.
 func TestPostgresWebhookSecretRotationFailsClosed(t *testing.T) {
 	secretstest.EnableEncryption(t)
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	if _, err := pool.Exec(t.Context(), `
 INSERT INTO workspaces (public_id, owner_user_id, name)
 VALUES ('ws_1', 1, 'webhook rotation test')
@@ -178,7 +178,7 @@ ON CONFLICT (public_id) DO NOTHING`); err != nil {
 // TestPostgresWebhookSecretWriteFailsWithoutKey proves writes fail closed
 // when the master key is not configured.
 func TestPostgresWebhookSecretWriteFailsWithoutKey(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	secrets.EncryptionKey = nil
 	persistence := webhook.NewPostgresWebhookPersistence(pool)
 	sub := &webhook.WebhookSubscription{

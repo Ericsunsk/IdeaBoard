@@ -45,10 +45,6 @@ func TestNullHelpersRoundTrip(t *testing.T) {
 	if got := Int64Ptr(NullInt64(&i)); got == nil || *got != i {
 		t.Fatalf("NullInt64/Int64Ptr round trip = %v, want %v", got, i)
 	}
-	var i32 int32 = 3
-	if got := Int32Ptr(NullInt32(&i32)); got == nil || *got != i32 {
-		t.Fatalf("NullInt32/Int32Ptr round trip = %v, want %v", got, i32)
-	}
 	s := "  hello  "
 	if got := StringPtr(NullString(&s)); got == nil || *got != "hello" {
 		t.Fatalf("NullString/StringPtr round trip = %v, want hello", got)

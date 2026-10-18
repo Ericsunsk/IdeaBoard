@@ -13,7 +13,7 @@ import (
 var reconciliationTestLocation = time.FixedZone("Asia/Shanghai", 8*60*60)
 
 func TestReconciliationScheduleCreatesOneCatchUpRunAndRetriesMissedSlot(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	enqueuer := &reconciliationEnqueuerStub{}
 	service := newReconciliationService(t, pool, enqueuer)
 	target := time.Date(2026, 7, 17, 3, 0, 0, 0, reconciliationTestLocation)
@@ -33,7 +33,7 @@ func TestReconciliationScheduleCreatesOneCatchUpRunAndRetriesMissedSlot(t *testi
 	if err != nil || duplicate != nil {
 		t.Fatalf("duplicate catch-up run = %+v, err = %v", duplicate, err)
 	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
+	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
 		t.Fatalf("duplicate run count = %d, want 1", got)
 	}
 
@@ -43,11 +43,11 @@ func TestReconciliationScheduleCreatesOneCatchUpRunAndRetriesMissedSlot(t *testi
 	if _, err := service.ScheduleReconciliation(t.Context(), target, true); err != nil {
 		t.Fatal(err)
 	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
+	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
 		t.Fatalf("recent-success run count = %d, want 1", got)
 	}
 
-	if _, err := db.Exec(t.Context(), `
+	if _, err := pool.Exec(t.Context(), `
 UPDATE credit_reconciliation_runs
 SET completed_at = clock_timestamp() - INTERVAL '25 hours'
 WHERE id = $1`, first.ID); err != nil {
@@ -57,7 +57,7 @@ WHERE id = $1`, first.ID); err != nil {
 	if err != nil || second == nil {
 		t.Fatalf("missed catch-up run = %+v, err = %v", second, err)
 	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 2 {
+	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 2 {
 		t.Fatalf("missed catch-up run count = %d, want 2", got)
 	}
 	if len(enqueuer.calls) != 2 || enqueuer.calls[1] != second.ID {
@@ -66,7 +66,7 @@ WHERE id = $1`, first.ID); err != nil {
 }
 
 func TestReconciliationScheduleDoesNotReplaceRecentManualSuccess(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	enqueuer := &reconciliationEnqueuerStub{}
 	service := newReconciliationService(t, pool, enqueuer)
 	manual, err := service.StartReconciliation(t.Context(), reconciliationStartInput(t))
@@ -80,16 +80,16 @@ func TestReconciliationScheduleDoesNotReplaceRecentManualSuccess(t *testing.T) {
 	if _, err := service.ScheduleReconciliation(t.Context(), target, false); err != nil {
 		t.Fatal(err)
 	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 2 {
+	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 2 {
 		t.Fatalf("run count = %d, want manual + scheduled", got)
 	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs WHERE trigger_type = 'scheduled'`); got != 1 {
+	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_reconciliation_runs WHERE trigger_type = 'scheduled'`); got != 1 {
 		t.Fatalf("scheduled run count = %d, want 1", got)
 	}
 }
 
 func TestConcurrentReconciliationSchedulesCreateAndEnqueueOneRun(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	enqueuer := &reconciliationEnqueuerStub{}
 	service := newReconciliationService(t, pool, enqueuer)
 	slot := time.Date(2026, 7, 17, 3, 0, 0, 0, reconciliationTestLocation)
@@ -112,7 +112,7 @@ func TestConcurrentReconciliationSchedulesCreateAndEnqueueOneRun(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
+	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
 		t.Fatalf("concurrent scheduled run count = %d, want 1", got)
 	}
 	if len(enqueuer.calls) != 1 {
@@ -121,20 +121,20 @@ func TestConcurrentReconciliationSchedulesCreateAndEnqueueOneRun(t *testing.T) {
 }
 
 func TestScheduledReconciliationRollsBackRunWhenDispatchFails(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	dispatchErr := errors.New("dispatcher unavailable")
 	failing := newReconciliationService(t, pool, &reconciliationEnqueuerStub{err: dispatchErr})
 	slot := time.Date(2026, 7, 17, 3, 0, 0, 0, reconciliationTestLocation)
 	if _, err := failing.ScheduleReconciliation(t.Context(), slot, false); !errors.Is(err, dispatchErr) {
 		t.Fatalf("ScheduleReconciliation() error = %v, want dispatcher error", err)
 	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 0 {
+	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 0 {
 		t.Fatalf("run count after dispatch rollback = %d, want 0", got)
 	}
 }
 
 func TestReconciliationCatchUpReusesFailedSlotAndDispatchesOnce(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	firstDispatcher := &reconciliationEnqueuerStub{}
 	firstService := newReconciliationService(t, pool, firstDispatcher)
 	slot := time.Date(2026, 7, 17, 3, 0, 0, 0, reconciliationTestLocation)
@@ -152,7 +152,7 @@ func TestReconciliationCatchUpReusesFailedSlotAndDispatchesOnce(t *testing.T) {
 	if err != nil || retried == nil || retried.ID != firstRun.ID || retried.Status != ports.ReconciliationRunQueued {
 		t.Fatalf("retried run = %+v, err = %v", retried, err)
 	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
+	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
 		t.Fatalf("run count after retry = %d, want 1", got)
 	}
 	if len(restartDispatcher.calls) != 1 || restartDispatcher.calls[0] != firstRun.ID {

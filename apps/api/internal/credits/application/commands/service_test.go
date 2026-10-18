@@ -19,7 +19,7 @@ import (
 )
 
 func TestAdminCanGrantCreditsAndReadWalletLedger(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 
@@ -86,7 +86,7 @@ func TestAdminCanGrantCreditsAndReadWalletLedger(t *testing.T) {
 }
 
 func TestCreditCommandIdempotencyReturnsOriginalResultAndRejectsHashConflict(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	command := ports.GrantCommand{
@@ -133,7 +133,7 @@ func TestCreditCommandIdempotencyReturnsOriginalResultAndRejectsHashConflict(t *
 }
 
 func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	userID := int64(88)
@@ -235,7 +235,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 }
 
 func TestCreditHoldSupportsOneCaptureAndOneReleaseWithStableTotals(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	const userID int64 = 889
@@ -273,7 +273,7 @@ func TestCreditHoldSupportsOneCaptureAndOneReleaseWithStableTotals(t *testing.T)
 }
 
 func TestConcurrentHoldsCannotOverspendOneWallet(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	userID := int64(90)
@@ -332,7 +332,7 @@ func TestConcurrentHoldsCannotOverspendOneWallet(t *testing.T) {
 }
 
 func TestDifferentWalletsDoNotShareASystemAccountLock(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	tx, err := pool.Begin(ctx)
@@ -369,7 +369,7 @@ func TestDifferentWalletsDoNotShareASystemAccountLock(t *testing.T) {
 }
 
 func TestPostgresEnforcesBalancedImmutableLedgerAndProjectionWrites(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	userID := int64(93)

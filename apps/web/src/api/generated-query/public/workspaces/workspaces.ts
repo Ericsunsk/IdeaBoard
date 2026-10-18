@@ -59,6 +59,7 @@ export const getListWorkspacesUrl = (params?: ListWorkspacesParams) => {
 }
 
 /**
+ * Lists membership-visible workspaces. When the caller holds no live Default workspace, one is provisioned idempotently before the list is read.
  * @summary List visible workspaces with cursor pagination
  */
 export const listWorkspaces = async (
@@ -133,6 +134,7 @@ export const getCreateWorkspaceUrl = () => {
 }
 
 /**
+ * Creates a non-Default workspace. Personal creates without an organization are unlimited; the per-user Default workspace is only ever minted by idempotent auto-provisioning. A second Default create renders 409 workspace_default_conflict.
  * @summary Create a workspace
  */
 export const createWorkspace = async (
@@ -329,7 +331,7 @@ export const getUpdateWorkspaceUrl = (workspaceId: string) => {
 }
 
 /**
- * Renames the workspace. No Idempotency-Key is required.
+ * Renames the workspace. No Idempotency-Key is required. The Default workspace is never renamed: attempts render 403 workspace_default_protected.
  * @summary Rename a workspace (owner/admin only)
  */
 export const updateWorkspace = async (
@@ -452,7 +454,7 @@ export const getArchiveWorkspaceUrl = (workspaceId: string) => {
 }
 
 /**
- * Archives the workspace. No Idempotency-Key is required.
+ * Archives the workspace. No Idempotency-Key is required. The Default workspace is never archived: attempts render 403 workspace_default_protected. Workspaces are never hard-deleted, so this guard covers the only delete path.
  * @summary Archive a workspace (owner/admin only)
  */
 export const archiveWorkspace = async (

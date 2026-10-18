@@ -346,36 +346,11 @@ func reserveStorageUID(ctx context.Context, q *dbsqlc.Queries, storageUID string
 }
 
 func storageUIDTaken(ctx context.Context, q *dbsqlc.Queries, storageUID string, excludeID int64) (bool, error) {
-	exists, err := storageUIDExists(ctx, q, storageUID, excludeID)
+	taken, err := q.CheckStorageUIDTaken(ctx, dbsqlc.CheckStorageUIDTakenParams{UserStorageUid: storageUID, UsedStorageUid: storageUID, ID: excludeID})
 	if err != nil {
 		return false, err
 	}
-	if exists {
-		return true, nil
-	}
-	return usedUIDExists(ctx, q, storageUID)
-}
-
-func storageUIDExists(ctx context.Context, q *dbsqlc.Queries, storageUID string, excludeID int64) (bool, error) {
-	_, err := q.GetUserIDByStorageUIDForUpdate(ctx, dbsqlc.GetUserIDByStorageUIDForUpdateParams{StorageUid: storageUID, ID: excludeID})
-	if err == nil {
-		return true, nil
-	}
-	if database.IsNotFound(err) {
-		return false, nil
-	}
-	return false, err
-}
-
-func usedUIDExists(ctx context.Context, q *dbsqlc.Queries, storageUID string) (bool, error) {
-	_, err := q.GetUsedUIDForUpdate(ctx, storageUID)
-	if err == nil {
-		return true, nil
-	}
-	if database.IsNotFound(err) {
-		return false, nil
-	}
-	return false, err
+	return taken.Bool, nil
 }
 
 func recordUsedUID(ctx context.Context, q *dbsqlc.Queries, storageUID string) (bool, error) {

@@ -16,7 +16,7 @@ import (
 )
 
 func TestWalletRestrictionsAreConcurrentIdempotentAndIndependentlyReleased(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	userID := int64(91)
@@ -193,7 +193,7 @@ WHERE wallet_user_id = $1`, userID).Scan(&totalRows, &releasedRows); err != nil 
 }
 
 func TestWalletRestrictionBlocksNewExposureButAllowsConvergenceAndRepair(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	userID := int64(92)
@@ -338,7 +338,7 @@ func TestWalletRestrictionBlocksNewExposureButAllowsConvergenceAndRepair(t *test
 }
 
 func TestWalletRestrictionDatabaseConstraintsRejectUserActorsAndInvalidReleaseTimeline(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	userID := int64(93)

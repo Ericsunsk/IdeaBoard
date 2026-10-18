@@ -4,7 +4,7 @@
 // query client, and session store are stubbed. Assertions cover the
 // gallery landing (no stale boardId), create-and-switch, rename refresh,
 // and menu-prop mapping.
-import { defineComponent, h, ref } from 'vue'
+import { computed, defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { i18n } from '../../../core/i18n'
 import { render } from '../../../test/render'
@@ -19,7 +19,10 @@ const routeState = vi.hoisted(() => ({
 }))
 const queryMocks = vi.hoisted(() => ({ invalidateQueries: vi.fn() }))
 const selectionMocks = vi.hoisted(() => ({ useWorkspaceSelection: vi.fn() }))
-const resourceMocks = vi.hoisted(() => ({ renameWorkspace: vi.fn() }))
+const resourceMocks = vi.hoisted(() => ({
+  renameWorkspace: vi.fn(),
+  archiveWorkspace: vi.fn(),
+}))
 
 vi.mock('vue-router', () => ({
   useRoute: () => routeState,
@@ -47,6 +50,7 @@ vi.mock('../selection/workspaceContext', () => ({
 vi.mock('../selection/workspaceResource', () => ({
   WORKSPACE_NAME_MAX_LENGTH: 120,
   renameWorkspace: resourceMocks.renameWorkspace,
+  archiveWorkspace: resourceMocks.archiveWorkspace,
   workspaceQueryKeys: { list: ['workspaces'] },
 }))
 
@@ -56,18 +60,19 @@ function workspaceSummary(overrides: Partial<WorkspaceSummary> & { publicId: str
   return {
     name: overrides.publicId,
     organizationId: null,
+    isDefault: false,
     archivedAt: null,
     ...overrides,
   } as WorkspaceSummary
 }
 
-const PERSONAL = workspaceSummary({ publicId: 'ws_personal1', name: 'Personal' })
+const DEFAULT = workspaceSummary({ publicId: 'ws_default1', name: 'Default', isDefault: true })
 const TEAM = workspaceSummary({ publicId: 'ws_team2', name: 'Team', organizationId: 'org_c3' })
 
 function stubSelection(overrides: Record<string, unknown> = {}) {
   const selection = {
-    items: ref([PERSONAL, TEAM]),
-    selectedId: ref<string | null>('ws_personal1'),
+    items: ref([DEFAULT, TEAM]),
+    selectedId: ref<string | null>('ws_default1'),
     status: ref('ready'),
     error: ref<unknown>(null),
     selectWorkspace: vi.fn(),
@@ -102,6 +107,7 @@ describe('useWorkspaceSwitcher', () => {
     routerMocks.replace.mockReset()
     queryMocks.invalidateQueries.mockReset()
     resourceMocks.renameWorkspace.mockReset()
+    resourceMocks.archiveWorkspace.mockReset()
     selectionMocks.useWorkspaceSelection.mockReset()
   })
 
@@ -165,6 +171,7 @@ describe('useWorkspaceSwitcher', () => {
   test('renames through PATCH, refreshes the list, and stays on the current route', async () => {
     const updated = workspaceSummary({ publicId: 'ws_team2', name: 'Renamed' })
     resourceMocks.renameWorkspace.mockResolvedValue(updated)
+    stubSelection()
     const switcher = renderSwitcher()
 
     await expect(switcher.renameWorkspaceItem('ws_team2', 'Renamed')).resolves.toEqual(updated)
@@ -177,14 +184,27 @@ describe('useWorkspaceSwitcher', () => {
     expect(routerMocks.replace).not.toHaveBeenCalled()
   })
 
+  test('rejects renaming the default row with the server code without touching the network', async () => {
+    stubSelection()
+    const switcher = renderSwitcher()
+
+    await expect(switcher.renameWorkspaceItem('ws_default1', 'Renamed')).rejects.toMatchObject({
+      code: 'workspace_default_protected',
+    })
+    expect(resourceMocks.renameWorkspace).not.toHaveBeenCalled()
+    expect(queryMocks.invalidateQueries).not.toHaveBeenCalled()
+    expect(routerMocks.push).not.toHaveBeenCalled()
+    expect(routerMocks.replace).not.toHaveBeenCalled()
+  })
+
   test('maps selection state to menu props with gallery and retry commands', () => {
     const selection = stubSelection({ status: ref('hidden'), error: ref({ status: 404 }) })
     const switcher = renderSwitcher()
 
     const menuProps = switcher.menuProps.value
 
-    expect(menuProps.items).toEqual([PERSONAL, TEAM])
-    expect(menuProps.selectedId).toBe('ws_personal1')
+    expect(menuProps.items).toEqual([DEFAULT, TEAM])
+    expect(menuProps.selectedId).toBe('ws_default1')
     expect(menuProps.status).toBe('error')
     expect(menuProps.errorMessage).toBe('Could not load workspaces.')
     expect(menuProps.nameMaxLength).toBe(120)
@@ -199,5 +219,69 @@ describe('useWorkspaceSwitcher', () => {
       path: USER_BOARDS_PATH,
       query: { workspace: 'ws_team2' },
     })
+  })
+
+  test('leaves the archived canvas after refresh falls selection back to default', async () => {
+    const archived = workspaceSummary({
+      publicId: 'ws_team2',
+      name: 'Team',
+      organizationId: 'org_c3',
+      archivedAt: '2026-10-18T00:00:00Z',
+    })
+    resourceMocks.archiveWorkspace.mockResolvedValue(archived)
+    const items = ref([DEFAULT, TEAM])
+    const selectedId = computed(
+      () =>
+        items.value.find((item) => item.publicId === TEAM.publicId)?.publicId ?? DEFAULT.publicId,
+    )
+    const selection = stubSelection({ items, selectedId })
+    routeState.query = { boardId: 'board_1', workspace: TEAM.publicId }
+    queryMocks.invalidateQueries.mockImplementation(async () => {
+      items.value = [DEFAULT]
+    })
+    const switcher = renderSwitcher()
+
+    await expect(switcher.archiveWorkspaceItem('ws_team2')).resolves.toEqual(archived)
+
+    expect(resourceMocks.archiveWorkspace).toHaveBeenCalledWith('ws_team2')
+    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspaces'] })
+    expect(selectedId.value).toBe(DEFAULT.publicId)
+    expect(selection.selectWorkspace).toHaveBeenCalledWith('ws_default1')
+    expect(routerMocks.push).toHaveBeenCalledWith({
+      path: USER_BOARDS_PATH,
+      query: { workspace: 'ws_default1' },
+    })
+  })
+
+  test('stays on the current canvas when archiving another workspace', async () => {
+    resourceMocks.archiveWorkspace.mockResolvedValue({
+      ...TEAM,
+      archivedAt: '2026-10-18T00:00:00Z',
+    })
+    const selection = stubSelection()
+    routeState.query = { boardId: 'board_1', workspace: DEFAULT.publicId }
+    const switcher = renderSwitcher()
+
+    await switcher.archiveWorkspaceItem(TEAM.publicId)
+
+    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspaces'] })
+    expect(selection.selectWorkspace).not.toHaveBeenCalled()
+    expect(routerMocks.push).not.toHaveBeenCalled()
+    expect(routerMocks.replace).not.toHaveBeenCalled()
+  })
+
+  test('propagates the server code when archiving the default row fails', async () => {
+    const failure = Object.assign(new Error('request failed'), {
+      code: 'workspace_default_protected',
+    })
+    resourceMocks.archiveWorkspace.mockRejectedValue(failure)
+    stubSelection()
+    const switcher = renderSwitcher()
+
+    await expect(switcher.archiveWorkspaceItem('ws_default1')).rejects.toMatchObject({
+      code: 'workspace_default_protected',
+    })
+    expect(queryMocks.invalidateQueries).not.toHaveBeenCalled()
+    expect(routerMocks.push).not.toHaveBeenCalled()
   })
 })

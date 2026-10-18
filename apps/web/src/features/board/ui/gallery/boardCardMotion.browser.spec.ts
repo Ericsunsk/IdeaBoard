@@ -1,5 +1,5 @@
-// BoardCard motion browser contract (computed-style replacement for the
-// retired `boardCardMotion.contract.spec.ts` source-string assertions).
+// BoardCard motion browser contract (computed-style assertions on rendered
+// output).
 //
 // Reads computed styles while exercising default, hover, focus and
 // reduced-motion states: hover/focus feedback on the stable card root,

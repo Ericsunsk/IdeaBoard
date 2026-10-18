@@ -103,7 +103,7 @@ func NullTime(value *time.Time) pgtype.Timestamptz {
 	if value == nil {
 		return pgtype.Timestamptz{}
 	}
-	return pgtype.Timestamptz{Time: *value, Valid: true}
+	return TimestamptzFromTime(*value)
 }
 
 func TimePtr(value pgtype.Timestamptz) *time.Time {
@@ -136,21 +136,6 @@ func Int64Ptr(value pgtype.Int8) *int64 {
 	return &v
 }
 
-func NullInt32(value *int32) pgtype.Int4 {
-	if value == nil {
-		return pgtype.Int4{}
-	}
-	return pgtype.Int4{Int32: *value, Valid: true}
-}
-
-func Int32Ptr(value pgtype.Int4) *int32 {
-	if !value.Valid {
-		return nil
-	}
-	v := value.Int32
-	return &v
-}
-
 func NullString(value *string) pgtype.Text {
 	if value == nil {
 		return pgtype.Text{}
@@ -172,6 +157,17 @@ func TimestamptzFromTime(value time.Time) pgtype.Timestamptz {
 		return pgtype.Timestamptz{}
 	}
 	return pgtype.Timestamptz{Time: value, Valid: true}
+}
+
+// Int4FromPresent lifts a validated int32 into a nullable column. Unlike a
+// plain pointer helper it also encodes the domain's non-negative guard:
+// absent or negative values persist as NULL so half-known dimensions never
+// reach the wire.
+func Int4FromPresent(value int32, present bool) pgtype.Int4 {
+	if !present || value < 0 {
+		return pgtype.Int4{}
+	}
+	return pgtype.Int4{Int32: value, Valid: true}
 }
 
 func DateFromTime(value time.Time) pgtype.Date {

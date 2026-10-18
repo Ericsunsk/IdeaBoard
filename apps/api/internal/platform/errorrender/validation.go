@@ -4,8 +4,8 @@ import "errors"
 
 // ValidationError is a sentinel-like validation error. Its Error method
 // returns the message, so it is safe to expose to API consumers. (Moved here
-// from platform/validation so taxonomy, rendering, and the validation
-// sentinel share one home; platform/validation re-exports this type.)
+// from the former platform/validation package, which was removed, so taxonomy,
+// rendering, and the validation sentinel share one home.)
 type ValidationError string
 
 func (e ValidationError) Error() string { return string(e) }

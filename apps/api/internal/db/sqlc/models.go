@@ -34,36 +34,6 @@ type AiSearchOperation struct {
 	SettledAt         pgtype.Timestamptz `json:"settled_at"`
 }
 
-type ApiAccount struct {
-	ID                 int64              `json:"id"`
-	Name               string             `json:"name"`
-	ProviderEndpointID int64              `json:"provider_endpoint_id"`
-	MaxConcurrent      int32              `json:"max_concurrent"`
-	Timeout            int32              `json:"timeout"`
-	ExtraConfig        string             `json:"extra_config"`
-	Status             int16              `json:"status"`
-	FailCount          int32              `json:"fail_count"`
-	Weight             int32              `json:"weight"`
-	CreatedAt          pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt          pgtype.Timestamptz `json:"deleted_at"`
-}
-
-type ApiAccountSecret struct {
-	ID                 int64              `json:"id"`
-	AccountID          int64              `json:"account_id"`
-	SecretMaterialKind string             `json:"secret_material_kind"`
-	SecretPayload      string             `json:"secret_payload"`
-	KeyVersion         string             `json:"key_version"`
-	Fingerprint        string             `json:"fingerprint"`
-	Status             string             `json:"status"`
-	RotatedAt          pgtype.Timestamptz `json:"rotated_at"`
-	ExpiresAt          pgtype.Timestamptz `json:"expires_at"`
-	RetiredAt          pgtype.Timestamptz `json:"retired_at"`
-	CreatedAt          pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
-}
-
 type BillingAccount struct {
 	InternalID     int64              `json:"internal_id"`
 	PublicID       string             `json:"public_id"`
@@ -750,17 +720,6 @@ type PaymentWebhookEvent struct {
 	PaymentOrderID   pgtype.UUID        `json:"payment_order_id"`
 }
 
-type ProviderEndpoint struct {
-	ID        int64              `json:"id"`
-	ApiType   string             `json:"api_type"`
-	Protocol  string             `json:"protocol"`
-	Name      string             `json:"name"`
-	BaseUrl   string             `json:"base_url"`
-	Status    int16              `json:"status"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-}
-
 type RewardAdminAction struct {
 	ID                   int64              `json:"id"`
 	RewardCodeID         pgtype.Int8        `json:"reward_code_id"`
@@ -1131,6 +1090,7 @@ type Workspace struct {
 	OrganizationID pgtype.Int8        `json:"organization_id"`
 	OwnerUserID    pgtype.Int8        `json:"owner_user_id"`
 	Name           string             `json:"name"`
+	IsDefault      bool               `json:"is_default"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	ArchivedAt     pgtype.Timestamptz `json:"archived_at"`

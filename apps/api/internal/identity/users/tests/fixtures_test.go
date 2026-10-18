@@ -11,7 +11,6 @@ import (
 	"ideaboard/api/internal/identity/users/application/reconciliation"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	"ideaboard/api/internal/identity/users/infrastructure/postgres"
-	userhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/testdb"
 	"os"
@@ -24,20 +23,13 @@ import (
 )
 
 type (
-	User                 = identitydomain.User
-	UsedUID              = identitydomain.UsedUID
-	UserListRequest      = ports.UserListRequest
-	UserListCounts       = ports.UserListCounts
-	UserListResponse     = ports.UserListResponse
-	AdminUserListItem    = ports.AdminUserListItem
-	AdminBanUserRequest  = ports.AdminBanUserRequest
-	LoginMetadataRequest = ports.LoginMetadataRequest
+	User            = identitydomain.User
+	UserListRequest = ports.UserListRequest
 
 	VerifiedIdentity = ports.VerifiedIdentity
 	ProvisionResult  = ports.ProvisionResult
 
-	DeletionPhase    = ports.DeletionPhase
-	DeletionProgress = ports.DeletionProgress
+	DeletionPhase = ports.DeletionPhase
 
 	IdentityAdminErrorKind    = ports.IdentityAdminErrorKind
 	IdentityAdminCommandError = ports.IdentityAdminCommandError
@@ -48,16 +40,11 @@ type (
 	UserUploadCleaner            = ports.UserUploadCleaner
 	CreditWalletLifecycleService = ports.CreditWalletLifecycleService
 	UserCreditBalanceReader      = ports.UserCreditBalanceReader
-	UserEmailReader              = ports.UserEmailReader
-	AdminUserImpersonator        = ports.AdminUserImpersonator
-	ImpersonationAuditor         = userhttp.ImpersonationAuditor
 	IdentityAdminCommands        = ports.IdentityAdminCommands
 	UserLifecycle                = ports.UserLifecycle
 
-	UserRepository  = postgres.Repository
-	UserService     = administration.Service
-	AdminHandler    = userhttp.AdminHandler
-	InternalHandler = userhttp.InternalHandler
+	UserRepository = postgres.Repository
+	UserService    = administration.Service
 )
 
 const (
@@ -72,34 +59,23 @@ const (
 	DeletionPendingTombstone = ports.DeletionPendingTombstone
 	DeletionCompleted        = ports.DeletionCompleted
 
-	IdentityAdminInvalid                = ports.IdentityAdminInvalid
-	IdentityAdminConflict               = ports.IdentityAdminConflict
-	IdentityAdminForbidden              = ports.IdentityAdminForbidden
-	IdentityAdminTargetNotFound         = ports.IdentityAdminTargetNotFound
-	IdentityAdminAuthIdentityNotFound   = ports.IdentityAdminAuthIdentityNotFound
-	IdentityAdminAuthFailure            = ports.IdentityAdminAuthFailure
-	IdentityAdminBusinessFailure        = ports.IdentityAdminBusinessFailure
-	IdentityAdminReconciliationRequired = ports.IdentityAdminReconciliationRequired
-	IdentityAdminUnavailable            = ports.IdentityAdminUnavailable
+	IdentityAdminInvalid              = ports.IdentityAdminInvalid
+	IdentityAdminConflict             = ports.IdentityAdminConflict
+	IdentityAdminForbidden            = ports.IdentityAdminForbidden
+	IdentityAdminTargetNotFound       = ports.IdentityAdminTargetNotFound
+	IdentityAdminAuthIdentityNotFound = ports.IdentityAdminAuthIdentityNotFound
+	IdentityAdminAuthFailure          = ports.IdentityAdminAuthFailure
+	IdentityAdminBusinessFailure      = ports.IdentityAdminBusinessFailure
+	IdentityAdminUnavailable          = ports.IdentityAdminUnavailable
 )
 
 var (
-	ErrUserNotFound                      = identitydomain.ErrUserNotFound
 	ErrUserDeletionInProgress            = identitydomain.ErrUserDeletionInProgress
 	ErrUserDeletionBlockedByPaymentState = identitydomain.ErrUserDeletionBlockedByPaymentState
-	ErrUserDeletionAuthUnavailable       = identitydomain.ErrUserDeletionAuthUnavailable
-	ErrUserDeletionStorageUnavailable    = identitydomain.ErrUserDeletionStorageUnavailable
-	ErrInvalidStorageUID                 = identitydomain.ErrInvalidStorageUID
 
-	NewUserRepository                = postgres.NewRepository
-	NewUserServiceWithEmailReader    = administration.NewService
-	NewIdentityAdminCommands         = administration.NewIdentityAdminCommands
-	NewAdminHandler                  = userhttp.NewAdminHandler
-	NewInternalHandler               = userhttp.NewInternalHandler
-	NewStorageUID                    = identitydomain.NewStorageUID
-	IsValidStorageUID                = identitydomain.IsValidStorageUID
-	RespondIdentityAdminCommandError = userhttp.RespondIdentityAdminCommandError
-	respondIdentityAdminCommandError = userhttp.RespondIdentityAdminCommandError
+	NewUserRepository        = postgres.NewRepository
+	NewIdentityAdminCommands = administration.NewIdentityAdminCommands
+	IsValidStorageUID        = identitydomain.IsValidStorageUID
 )
 
 type LifecycleService struct {
@@ -149,10 +125,6 @@ func NewUserService(
 
 func newIdentityAdminCommands(users ports.UserMutationQueries, auth ports.AuthUserManager, sync *authsync.Store) ports.IdentityAdminCommands {
 	return administration.NewIdentityAdminCommands(users, auth, sync)
-}
-
-func identityAdminError(kind IdentityAdminErrorKind, message string, cause error) *IdentityAdminCommandError {
-	return &IdentityAdminCommandError{Kind: kind, Message: message, Cause: cause}
 }
 
 func newUserRepoTestDB(t *testing.T) *pgxpool.Pool {
@@ -217,31 +189,6 @@ type recordingAuthUserDeleter struct {
 func (d *recordingAuthUserDeleter) DeleteUser(_ context.Context, authUserID string) error {
 	d.authUserIDs = append(d.authUserIDs, authUserID)
 	return d.err
-}
-
-// administration HTTP resource helpers (merged from administration_http_helpers_test.go,
-// renamed by resource).
-type fakeAdminUserImpersonator struct {
-	cookieHeader string
-	authUserID   string
-	setCookies   []string
-	err          error
-}
-
-func (f *fakeAdminUserImpersonator) ImpersonateUser(_ context.Context, cookieHeader string, authUserID string) ([]string, error) {
-	f.cookieHeader = cookieHeader
-	f.authUserID = authUserID
-	return f.setCookies, f.err
-}
-
-type adminImpersonationStatusError int
-
-func (e adminImpersonationStatusError) Error() string {
-	return "impersonation failed"
-}
-
-func (e adminImpersonationStatusError) StatusCode() int {
-	return int(e)
 }
 
 func TestMain(m *testing.M) {

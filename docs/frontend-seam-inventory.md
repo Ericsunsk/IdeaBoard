@@ -8825,6 +8825,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/recharge/PendingOrders.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
@@ -8965,6 +8970,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/workspace/selection/workspaceResource.ts",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/shell/useWorkspaceAccountControls.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
@@ -8975,9 +8985,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 35,
+      "measuredFanIn": 37,
       "measuredFanOut": 1,
-      "targetFanIn": 35,
+      "targetFanIn": 37,
       "targetFanOut": 1,
       "ownershipScope": ["src/core/errors/errorCatalog.ts"],
       "publicExports": [
@@ -14244,9 +14254,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 120,
-      "measuredFanOut": 54,
+      "measuredFanOut": 53,
       "targetFanIn": 120,
-      "targetFanOut": 54,
+      "targetFanOut": 53,
       "ownershipScope": [
         "src/features/admin/shared/core/",
         "src/features/admin/shared/index.ts",
@@ -14334,7 +14344,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "AdminSwitchRowPillSize",
         "AdminTable",
         "AdminTableBody",
-        "AdminTableCaption",
         "AdminTableCell",
         "AdminTableFooter",
         "AdminTableHead",
@@ -14517,7 +14526,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
         "src/components/ui/table/TableBody.vue",
-        "src/components/ui/table/TableCaption.vue",
         "src/components/ui/table/TableCell.vue",
         "src/components/ui/table/TableFooter.vue",
         "src/components/ui/table/TableHead.vue",
@@ -22435,6 +22443,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "WorkspaceSelectionStatus",
         "WorkspaceSelectionStore",
         "WorkspaceSummary",
+        "archiveWorkspace",
         "classifyWorkspaceAccessError",
         "createWorkspaceSelectionStore",
         "fetchAllWorkspaces",
@@ -22453,6 +22462,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "parseWorkspaceItem",
         "parseWorkspacePage",
         "provisionWorkspace",
+        "renameWorkspace",
         "resetWorkspaceSelectionPort",
         "resetWorkspaceSelectionStore",
         "resolveWorkspaceSelection",

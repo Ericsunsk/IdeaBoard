@@ -85,12 +85,25 @@ function workspaceControls(
 ): UserAccountMenuWorkspace {
   return {
     items: [
-      { publicId: 'ws_personal1', name: 'Personal', organizationId: null, archivedAt: null },
-      { publicId: 'ws_team2', name: 'Team', organizationId: 'org_c3', archivedAt: null },
+      {
+        publicId: 'ws_personal1',
+        name: 'Personal',
+        organizationId: null,
+        isDefault: true,
+        archivedAt: null,
+      },
+      {
+        publicId: 'ws_team2',
+        name: 'Team',
+        organizationId: 'org_c3',
+        isDefault: false,
+        archivedAt: null,
+      },
       {
         publicId: 'ws_old3',
         name: 'Old',
         organizationId: null,
+        isDefault: false,
         archivedAt: '2026-01-01T00:00:00Z',
       },
     ],
@@ -99,6 +112,7 @@ function workspaceControls(
     onSelect: vi.fn(),
     onCreate: vi.fn(),
     onRename: vi.fn(),
+    onArchive: vi.fn(),
     onRetry: vi.fn(),
     ...overrides,
   }
@@ -537,6 +551,7 @@ describe('UserAccountMenu', () => {
         publicId: 'ws_new4',
         name: 'New workspace',
         organizationId: null,
+        isDefault: false,
         archivedAt: null,
       }
       const workspace = workspaceControls({ onCreate: vi.fn().mockResolvedValue(created) })
@@ -553,8 +568,20 @@ describe('UserAccountMenu', () => {
 
     it('generates an incremented default name when collision occurs', async () => {
       const items = [
-        { publicId: 'ws_personal1', name: 'Personal', organizationId: null, archivedAt: null },
-        { publicId: 'ws_item2', name: 'New workspace', organizationId: 'org_c2', archivedAt: null },
+        {
+          publicId: 'ws_personal1',
+          name: 'Personal',
+          organizationId: null,
+          isDefault: true,
+          archivedAt: null,
+        },
+        {
+          publicId: 'ws_item2',
+          name: 'New workspace',
+          organizationId: 'org_c2',
+          isDefault: false,
+          archivedAt: null,
+        },
       ]
       const workspace = workspaceControls({
         items,
@@ -562,6 +589,7 @@ describe('UserAccountMenu', () => {
           publicId: 'ws_3',
           name: 'New workspace 2',
           organizationId: null,
+          isDefault: false,
           archivedAt: null,
         }),
       })
@@ -591,7 +619,6 @@ describe('UserAccountMenu', () => {
       })
       const view = await openSettingsDialog(workspace)
 
-      expect(screen.queryByRole('button', { name: 'Rename Default' })).not.toBeInTheDocument()
       await view.user.click(screen.getByRole('button', { name: 'Team' }))
       await view.user.click(screen.getByRole('button', { name: 'Rename Team' }))
       const renameInput = screen.getByLabelText('Rename Team')
@@ -633,6 +660,112 @@ describe('UserAccountMenu', () => {
 
       expect(workspace.onRename).not.toHaveBeenCalled()
       expect(await screen.findByText('A workspace with this name already exists.')).toBeVisible()
+    })
+
+    it('disables renaming for the Default workspace', async () => {
+      const workspace = workspaceControls({ onRename: vi.fn() })
+      await openSettingsDialog(workspace)
+
+      expect(screen.getByRole('button', { name: 'Rename Default' })).toBeDisabled()
+      expect(screen.getByText('The Default workspace cannot be renamed.')).toBeVisible()
+      expect(workspace.onRename).not.toHaveBeenCalled()
+    })
+
+    it('renames a non-Default workspace', async () => {
+      const renamed = {
+        publicId: 'ws_team2',
+        name: 'Renamed',
+        organizationId: 'org_c3',
+        isDefault: false,
+        archivedAt: null,
+      }
+      const workspace = workspaceControls({
+        onRename: vi.fn().mockResolvedValue(renamed),
+      })
+      const view = await openSettingsDialog(workspace)
+
+      await view.user.click(screen.getByRole('button', { name: 'Team' }))
+      await view.user.click(screen.getByRole('button', { name: 'Rename Team' }))
+      const renameInput = screen.getByLabelText('Rename Team')
+      await view.user.clear(renameInput)
+      await view.user.type(renameInput, 'Renamed')
+      await view.user.keyboard('{Enter}')
+
+      await waitFor(() => expect(workspace.onRename).toHaveBeenCalledWith('ws_team2', 'Renamed'))
+    })
+
+    it('surfaces the server code when creation fails', async () => {
+      const failure = Object.assign(new Error('request failed'), {
+        code: 'workspace_default_conflict',
+      })
+      const workspace = workspaceControls({
+        onCreate: vi.fn().mockRejectedValue(failure),
+      })
+      const view = await openSettingsDialog(workspace)
+
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+
+      expect(
+        await screen.findByText(
+          'Could not create the workspace. Please try again. (workspace_default_conflict)',
+        ),
+      ).toBeVisible()
+      expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
+    })
+
+    it('disables archiving for the Default workspace', async () => {
+      const workspace = workspaceControls()
+      await openSettingsDialog(workspace)
+
+      const archiveButton = screen.getByRole('button', { name: 'Archive' })
+      expect(archiveButton).toBeDisabled()
+      expect(screen.getByText('The Default workspace cannot be archived.')).toBeVisible()
+      expect(workspace.onArchive).not.toHaveBeenCalled()
+    })
+
+    it('archives a plain workspace through a two-step confirm', async () => {
+      const archived = {
+        publicId: 'ws_team2',
+        name: 'Team',
+        organizationId: 'org_c3',
+        isDefault: false,
+        archivedAt: '2026-10-18T00:00:00Z',
+      }
+      const workspace = workspaceControls({
+        onArchive: vi.fn().mockResolvedValue(archived),
+      })
+      const view = await openSettingsDialog(workspace)
+
+      await view.user.click(screen.getByRole('button', { name: 'Team' }))
+      const archiveButton = screen.getByRole('button', { name: 'Archive' })
+      expect(archiveButton).toBeEnabled()
+
+      await view.user.click(archiveButton)
+      expect(screen.getByText('Archive "Team"? It will leave your workspace list.')).toBeVisible()
+
+      await view.user.click(screen.getByRole('button', { name: 'Confirm archive' }))
+      await waitFor(() => expect(workspace.onArchive).toHaveBeenCalledWith('ws_team2'))
+    })
+
+    it('keeps settings open with an inline code when archiving fails', async () => {
+      const failure = Object.assign(new Error('request failed'), {
+        code: 'workspace_default_protected',
+      })
+      const workspace = workspaceControls({
+        onArchive: vi.fn().mockRejectedValue(failure),
+      })
+      const view = await openSettingsDialog(workspace)
+
+      await view.user.click(screen.getByRole('button', { name: 'Team' }))
+      await view.user.click(screen.getByRole('button', { name: 'Archive' }))
+      await view.user.click(screen.getByRole('button', { name: 'Confirm archive' }))
+
+      expect(
+        await screen.findByText(
+          'Could not archive the workspace. Please try again. (workspace_default_protected)',
+        ),
+      ).toBeVisible()
+      expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
     })
   })
 })

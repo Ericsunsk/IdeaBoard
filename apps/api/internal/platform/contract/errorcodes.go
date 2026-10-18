@@ -58,6 +58,14 @@ const (
 	CodeWorkspaceMemberNotFound         Code = "workspace_member_not_found"
 	CodeWorkspaceMemberLimitReached     Code = "workspace_member_limit_reached"
 	CodeMembershipTransitionForbidden   Code = "membership_transition_forbidden"
+	// Default workspace lifecycle codes (Default resolution). Wire-stable:
+	// do not rename without coordinating the OpenAPI contract and callers.
+	// Archiving (the only delete path; workspaces are never hard-deleted)
+	// and renaming a Default workspace render 403
+	// workspace_default_protected; minting a second live Default for the
+	// same owner renders 409 workspace_default_conflict.
+	CodeWorkspaceDefaultProtected Code = "workspace_default_protected"
+	CodeWorkspaceDefaultConflict  Code = "workspace_default_conflict"
 
 	// Workspace-rooted board collaboration codes (issue #802). Wire-stable:
 	// do not rename without coordinating the OpenAPI contract and callers.
@@ -381,6 +389,7 @@ func StatusOf(code Code) int {
 	case CodeUnauthorized, CodeIdentityUnauthorized:
 		return http.StatusUnauthorized
 	case CodeForbidden, CodeWorkspaceForbidden, CodeOrganizationForbidden, CodeMembershipTransitionForbidden,
+		CodeWorkspaceDefaultProtected,
 		CodeBoardForbidden, CodeBillingWalletRestricted, CodeTaskForbidden, CodeEventForbidden,
 		CodeBoardPermissionDenied, CodeStripePermissionDenied, CodeIdentityForbidden,
 		// CodeIdentityUpstreamRejected renders with the upstream 401/403
@@ -402,7 +411,7 @@ func StatusOf(code Code) int {
 		return http.StatusGone
 	case CodeTaskIdempotencyConflict, CodeIdempotencyConflict, CodeConflict,
 		CodeWorkspaceIdempotencyConflict, CodeOrganizationIdempotencyConflict,
-		CodeWorkspaceMemberLimitReached,
+		CodeWorkspaceMemberLimitReached, CodeWorkspaceDefaultConflict,
 		CodeBoardRevisionConflict, CodeBoardIdempotencyConflict, CodeBoardArchived,
 		CodeUploadStateConflict, CodeUploadIdempotencyConflict,
 		CodeMediaNotReady, CodeMediaIdempotencyConflict, CodeBillingCheckoutConflict,

@@ -8,6 +8,7 @@ import type { UserAccountMenuWorkspace } from '../../account/ui/chrome/userAccou
 import { USER_BOARDS_PATH } from '../routePaths'
 import {
   WORKSPACE_NAME_MAX_LENGTH,
+  archiveWorkspace,
   renameWorkspace,
   workspaceQueryKeys,
   type WorkspaceSummary,
@@ -79,9 +80,32 @@ export function useWorkspaceSwitcher() {
   }
 
   async function renameWorkspaceItem(workspaceId: string, name: string): Promise<WorkspaceSummary> {
+    // The Default workspace is never renamed: fail fast with the server
+    // machine code so callers branch on code, never on copy. No transport
+    // call and no list refresh on this path.
+    const current = selection.items.value.find((item) => item.publicId === workspaceId)
+    if (current?.isDefault === true) {
+      throw Object.assign(new Error('Default workspace cannot be renamed'), {
+        code: 'workspace_default_protected',
+        status: 403,
+      })
+    }
     const updated = await renameWorkspace(workspaceId, { name })
     await refreshWorkspaceList()
     return updated
+  }
+
+  // Reuse the selection seam's fallback after archiving the selected workspace.
+  async function archiveWorkspaceItem(workspaceId: string): Promise<WorkspaceSummary> {
+    const archived = await archiveWorkspace(workspaceId)
+    // Refresh can already resolve the selection to Default while the URL still names the archived row.
+    const isSelectedWorkspace = selection.selectedId.value === workspaceId
+    await refreshWorkspaceList()
+    if (isSelectedWorkspace) {
+      const fallbackId = selection.selectedId.value
+      if (fallbackId) switchToGalleryWorkspace(fallbackId)
+    }
+    return archived
   }
 
   const menuProps = computed<UserAccountMenuWorkspace>(() => {
@@ -100,11 +124,18 @@ export function useWorkspaceSwitcher() {
       onSelect: switchToGalleryWorkspace,
       onCreate: createAndSwitchWorkspace,
       onRename: renameWorkspaceItem,
+      onArchive: archiveWorkspaceItem,
       onRetry: () => {
         void selection.refetch()
       },
     }
   })
 
-  return { menuProps, switchToGalleryWorkspace, createAndSwitchWorkspace, renameWorkspaceItem }
+  return {
+    menuProps,
+    switchToGalleryWorkspace,
+    createAndSwitchWorkspace,
+    renameWorkspaceItem,
+    archiveWorkspaceItem,
+  }
 }

@@ -323,8 +323,8 @@ func (s *Service) CompleteSession(ctx context.Context, workspaceID, uploadID str
 				SizeBytes:       session.SizeBytes,
 				Checksum:        session.ChecksumSHA256,
 				MediaKind:       session.MediaKind,
-				Width:           nullInt4(facts.Width, facts.Width > 0),
-				Height:          nullInt4(facts.Height, facts.Height > 0),
+				Width:           dbutil.Int4FromPresent(facts.Width, facts.Width > 0),
+				Height:          dbutil.Int4FromPresent(facts.Height, facts.Height > 0),
 				DurationMs:      pgtype.Int4{},
 				Metadata:        []byte(`{}`),
 			})

@@ -135,7 +135,6 @@ describe('AdminTable', () => {
       AdminTableRow,
       AdminTableCell,
       AdminTableFooter,
-      AdminTableCaption,
     } = await import('./adminTableAtoms')
 
     renderWithUser(
@@ -144,7 +143,6 @@ describe('AdminTable', () => {
         {},
         {
           default: () => [
-            h(AdminTableCaption, {}, () => '测试说明'),
             h(AdminTableHeader, {}, () => [
               h(AdminTableRow, {}, () => [h(AdminTableHead, {}, () => '标题列')]),
             ]),
@@ -162,7 +160,6 @@ describe('AdminTable', () => {
     expect(await screen.findByRole('columnheader', { name: '标题列' })).toBeVisible()
     expect(screen.getByText('内容格')).toBeVisible()
     expect(screen.getByText('汇总格')).toBeVisible()
-    expect(screen.getByText('测试说明')).toBeVisible()
   })
 
   it('treats select-all as current-page only when selection holds other rows', async () => {

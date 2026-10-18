@@ -48,11 +48,11 @@ func (r *Repository) CompletePaymentOrderReconciliationClaim(
 	if r == nil || r.db == nil || claim.Order.ID == "" || claim.Generation <= 0 {
 		return false, fmt.Errorf("payments repository: invalid reconciliation claim")
 	}
-	orderID, err := ParseUUID(claim.Order.ID)
+	orderID, err := uuid.Parse(claim.Order.ID)
 	if err != nil {
 		return false, fmt.Errorf("parse reconciliation payment order ID: %w", err)
 	}
-	token, err := ParseUUID(claim.Token)
+	token, err := uuid.Parse(claim.Token)
 	if err != nil {
 		return false, fmt.Errorf("parse reconciliation claim token: %w", err)
 	}
@@ -91,7 +91,7 @@ func (r *Repository) ListPaymentReconciliationAnomalies(ctx context.Context, lim
 		items = append(items, paymentreconciliation.Anomaly{
 			PaymentOrderID: pgUUIDString(row.ID), PublicOrderNumber: row.PublicOrderNumber, UserID: row.UserID,
 			Status: paymentsdomain.PaymentOrderStatus(row.Status), LastErrorCode: row.LastErrorCode, LastErrorSummary: row.LastErrorSummary,
-			LastCheckedAt: NullTimePointer(row.LastCheckedAt), AnomalousAt: dbutil.TimeValue(row.AnomalousAt), CreatedAt: dbutil.TimeValue(row.CreatedAt),
+			LastCheckedAt: dbutil.TimePtr(row.LastCheckedAt), AnomalousAt: dbutil.TimeValue(row.AnomalousAt), CreatedAt: dbutil.TimeValue(row.CreatedAt),
 		})
 	}
 	return items, nil

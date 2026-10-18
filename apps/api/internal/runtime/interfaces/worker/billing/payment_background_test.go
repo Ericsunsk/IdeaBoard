@@ -84,7 +84,7 @@ func (s *paymentBackgroundServiceStub) RunActivePaymentCheckoutShutdowns(context
 }
 
 func TestPaymentCheckoutShutdownDispatcherUsesRiverProducer(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	if err := workerriver.MigrateRiver(t.Context(), pool); err != nil {
 		t.Fatalf("MigrateRiver() error = %v", err)
 	}
@@ -96,11 +96,11 @@ func TestPaymentCheckoutShutdownDispatcherUsesRiverProducer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewPaymentCheckoutShutdownDispatcher() error = %v", err)
 	}
-	before := countPaymentBackgroundJobs(t, db, "payment_checkout_shutdown")
+	before := countPaymentBackgroundJobs(t, pool, "payment_checkout_shutdown")
 	if err := dispatcher.EnqueuePaymentCheckoutShutdown(t.Context(), "shutdown-integration"); err != nil {
 		t.Fatalf("EnqueuePaymentCheckoutShutdown() error = %v", err)
 	}
-	if got := countPaymentBackgroundJobs(t, db, "payment_checkout_shutdown"); got != before+1 {
+	if got := countPaymentBackgroundJobs(t, pool, "payment_checkout_shutdown"); got != before+1 {
 		t.Fatalf("shutdown job count = %d, want %d", got, before+1)
 	}
 }

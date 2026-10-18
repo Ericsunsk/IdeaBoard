@@ -14,7 +14,7 @@ Board writes 使用 optimistic revision concurrency。Client 发送 observed doc
 ## Contract owners
 
 - `apps/api/openapi.public.yaml` 定义 `If-Match` request header 和 `ETag` response header。
-- `apps/api/internal/runtime/interfaces/http/contract_v1_boards.go` 校验 request header，并将 stale revision 映射为 `board_revision_conflict`。
+- `apps/api/internal/runtime/interfaces/http/v1/boards.go` 校验 request header，并将 stale revision 映射为 `board_revision_conflict`。
 - `apps/web/src/features/board/session/adapters/boardsResource.ts` 将 base revision 映射为 `If-Match`，并读取 response document revision。
 
 Board writes 不再使用 atomic compare-and-swap，或 offline multi-writer reconciliation 需要更复杂 conflict model 时，应重新 review 此决策。

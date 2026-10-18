@@ -14,6 +14,7 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -230,7 +231,7 @@ func (r *Repository) ConvergePaidPaymentOrder(ctx context.Context, facts payment
 }
 
 func (r *Repository) RecordPaidPaymentOrder(ctx context.Context, facts paymentsdomain.PaidCheckoutFacts) (paymentsdomain.PaymentOrder, bool, error) {
-	id, err := ParseUUID(facts.PaymentOrderID)
+	id, err := uuid.Parse(facts.PaymentOrderID)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, false, paymentsdomain.ErrCheckoutIdempotencyConflict
 	}
@@ -280,7 +281,7 @@ func recordPaidOrderInTx(ctx context.Context, q *dbsqlc.Queries, row dbsqlc.Paym
 }
 
 func (r *Repository) CreditPaidPaymentOrder(ctx context.Context, orderID string, creditedAt time.Time) (paymentsdomain.PaymentConvergenceResult, error) {
-	id, err := ParseUUID(orderID)
+	id, err := uuid.Parse(orderID)
 	if err != nil {
 		return paymentsdomain.PaymentConvergenceResult{}, paymentsdomain.ErrCheckoutIdempotencyConflict
 	}
@@ -331,7 +332,7 @@ func creditLockedPaidOrderInTx(ctx context.Context, q *dbsqlc.Queries, tx pgx.Tx
 	if err != nil {
 		return paymentsdomain.PaymentConvergenceResult{}, fmt.Errorf("credit paid payment order: %w", err)
 	}
-	id, err := ParseUUID(order.ID)
+	id, err := uuid.Parse(order.ID)
 	if err != nil {
 		return paymentsdomain.PaymentConvergenceResult{}, paymentsdomain.ErrCheckoutIdempotencyConflict
 	}

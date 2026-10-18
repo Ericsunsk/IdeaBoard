@@ -5477,10 +5477,6 @@
       "AdminTableCell": {
         "kind": "test-contract",
         "evidence": ["src/features/admin/shared/ui/table/AdminTable.component.spec.ts"]
-      },
-      "AdminTableCaption": {
-        "kind": "test-contract",
-        "evidence": ["src/features/admin/shared/ui/table/AdminTable.component.spec.ts"]
       }
     },
     "src/features/admin/shared/ui/form/SwitchRow.vue": {
@@ -13646,6 +13642,12 @@
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#WorkspaceSummary"
         ]
       },
+      "archiveWorkspace": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#archiveWorkspace"
+        ]
+      },
       "classifyWorkspaceAccessError": {
         "kind": "canonical-public",
         "evidence": [
@@ -13746,6 +13748,12 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#provisionWorkspace"
+        ]
+      },
+      "renameWorkspace": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#renameWorkspace"
         ]
       },
       "resetWorkspaceSelectionPort": {
@@ -15783,7 +15791,7 @@
       "exports": ["UploadControlBrandingLogoBody"]
     },
     "src/api/generated-query/public/boards/boards.ts": {
-      "sha256": "c43a3fbbab468ce2cfaafd02c2b4d4b44ded821ea7f89eb8a19a4d88d5d90182",
+      "sha256": "e6ff2e9544be7c2cafa5f7d3526978c3fd2362506265cad52965a7cce270c48e",
       "exports": [
         "ArchiveBoardMutationError",
         "ArchiveBoardMutationResult",
@@ -16966,7 +16974,7 @@
       "exports": ["VisionQueryId"]
     },
     "src/api/generated-query/public/model/workspace.ts": {
-      "sha256": "18c94e90d81aafb2ec2cd414a1632e91d10d24a81e30877ca9201ff7bf5f220c",
+      "sha256": "4352473425f212135d9dbfc397c93c5338fecf4f8a6a1ea028ca64bc3e57bc28",
       "exports": ["Workspace"]
     },
     "src/api/generated-query/public/model/workspaceAccess.ts": {
@@ -17199,7 +17207,7 @@
       ]
     },
     "src/api/generated-query/public/user/user.ts": {
-      "sha256": "8f7c4219a94974aa23101098d7d340fccd911bb7f703ff20630c097dd88cb902",
+      "sha256": "64faffdbc28c65ae56c7fdc14f39722cef6ea8ef62f57f0543a4343497225c09",
       "exports": [
         "GetPublicBrandingLogoQueryError",
         "GetPublicBrandingLogoQueryResult",
@@ -17654,7 +17662,7 @@
       ]
     },
     "src/api/generated-query/public/workspaces/workspaces.ts": {
-      "sha256": "ab2db6ad8caa668a3942858f23cb14ded9d54c3866b133afc30ad784aa7b1a55",
+      "sha256": "22a067464572c2d5ebac29280bde6974f8577fbfe7eed5811f1369ccb527d642",
       "exports": [
         "ArchiveWorkspaceMutationError",
         "ArchiveWorkspaceMutationResult",
@@ -17844,10 +17852,6 @@
     "src/features/admin/shared/ui/popover/adminPopoverAtoms.ts": {
       "kind": "retained-public-or-test-support",
       "evidence": ["src/features/admin/shared/ui/popover/AdminPopover.component.spec.ts"]
-    },
-    "src/features/admin/shared/ui/table/AdminTableCaption.vue": {
-      "kind": "retained-public-or-test-support",
-      "evidence": ["src/features/admin/shared/ui/table/adminTableAtoms.ts"]
     },
     "src/features/admin/shared/ui/table/AdminTableFooter.vue": {
       "kind": "retained-public-or-test-support",

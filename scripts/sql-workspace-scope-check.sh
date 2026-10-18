@@ -60,8 +60,6 @@ predicate_allowlist=(
   # Internal-id keyed: ids are resolved from an in-scope read in the same
   # store call, never from caller-supplied public ids.
   "ListWorkspaceTaskOutputsByTaskIDs"
-  "UpsertMediaAssetDerivative"
-  "ListMediaAssetDerivatives"
   "TouchWorkspaceBoard"
   "InsertBoardDocument"
   "UpdateBoardDocument"

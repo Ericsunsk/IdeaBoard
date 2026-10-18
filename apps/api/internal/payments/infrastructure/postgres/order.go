@@ -13,6 +13,7 @@ import (
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -56,15 +57,15 @@ func (r *Repository) CreatePaymentOrderIntent(ctx context.Context, input payment
 	if r == nil || r.db == nil {
 		return paymentsdomain.PaymentOrder{}, false, fmt.Errorf("payments repository: database unavailable")
 	}
-	id, err := ParseUUID(input.ID)
+	id, err := uuid.Parse(input.ID)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, false, fmt.Errorf("parse payment order ID: %w", err)
 	}
-	publicToken, err := ParseUUID(input.PublicToken)
+	publicToken, err := uuid.Parse(input.PublicToken)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, false, fmt.Errorf("parse payment order public token: %w", err)
 	}
-	stripeCredentialID, err := ParseUUID(input.StripeCredentialID)
+	stripeCredentialID, err := uuid.Parse(input.StripeCredentialID)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, false, fmt.Errorf("parse Stripe credential ID: %w", err)
 	}
@@ -128,7 +129,7 @@ func (r *Repository) BindPaymentOrderCheckout(ctx context.Context, input payment
 	if r == nil || r.db == nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	id, err := ParseUUID(input.OrderID)
+	id, err := uuid.Parse(input.OrderID)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("parse payment order ID: %w", err)
 	}
@@ -143,7 +144,7 @@ func (r *Repository) BindPaymentOrderCheckout(ctx context.Context, input payment
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("bind payment Checkout Session: %w", err)
 	}
-	existing, readErr := r.DBWithContext(ctx).Queries().GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
+	existing, readErr := r.DBWithContext(ctx).Queries().GetPaymentOrderByIDForUpdate(ctx, pgUUIDToPgType(id))
 	if readErr != nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("read payment order after bind conflict: %w", readErr)
 	}
@@ -158,13 +159,13 @@ func (r *Repository) MarkPaymentOrderAsyncPending(ctx context.Context, orderID s
 	if r == nil || r.db == nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	id, err := ParseUUID(orderID)
+	id, err := uuid.Parse(orderID)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("parse payment order ID: %w", err)
 	}
 	row, err := r.DBWithContext(ctx).Queries().MarkPaymentOrderAsyncPending(ctx, pgUUIDToPgType(id))
 	if errors.Is(err, pgx.ErrNoRows) {
-		row, err = r.DBWithContext(ctx).Queries().GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
+		row, err = r.DBWithContext(ctx).Queries().GetPaymentOrderByIDForUpdate(ctx, pgUUIDToPgType(id))
 	}
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("mark payment order async pending: %w", err)
@@ -176,13 +177,13 @@ func (r *Repository) MarkPaymentOrderFailed(ctx context.Context, orderID string)
 	if r == nil || r.db == nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	id, err := ParseUUID(orderID)
+	id, err := uuid.Parse(orderID)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("parse payment order ID: %w", err)
 	}
 	row, err := r.DBWithContext(ctx).Queries().MarkPaymentOrderFailed(ctx, pgUUIDToPgType(id))
 	if errors.Is(err, pgx.ErrNoRows) {
-		row, err = r.DBWithContext(ctx).Queries().GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
+		row, err = r.DBWithContext(ctx).Queries().GetPaymentOrderByIDForUpdate(ctx, pgUUIDToPgType(id))
 	}
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("mark payment order failed: %w", err)
@@ -191,7 +192,7 @@ func (r *Repository) MarkPaymentOrderFailed(ctx context.Context, orderID string)
 }
 
 func (r *Repository) MarkPaymentOrderExpired(ctx context.Context, orderID string) (paymentsdomain.PaymentOrder, bool, error) {
-	id, err := ParseUUID(orderID)
+	id, err := uuid.Parse(orderID)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, false, paymentcontracts.ErrPaymentOrderNotFound
 	}
@@ -203,7 +204,7 @@ func (r *Repository) MarkPaymentOrderExpired(ctx context.Context, orderID string
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return paymentsdomain.PaymentOrder{}, false, fmt.Errorf("mark payment order expired: %w", err)
 	}
-	existing, err := queries.GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
+	existing, err := queries.GetPaymentOrderByIDForUpdate(ctx, pgUUIDToPgType(id))
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, false, fmt.Errorf("read payment order after expiry replay: %w", err)
 	}
@@ -211,7 +212,7 @@ func (r *Repository) MarkPaymentOrderExpired(ctx context.Context, orderID string
 }
 
 func (r *Repository) MarkPaymentOrderCancelled(ctx context.Context, userID int64, orderID string) (paymentsdomain.PaymentOrder, bool, error) {
-	id, err := ParseUUID(orderID)
+	id, err := uuid.Parse(orderID)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, false, paymentcontracts.ErrPaymentOrderNotFound
 	}
@@ -223,7 +224,7 @@ func (r *Repository) MarkPaymentOrderCancelled(ctx context.Context, userID int64
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return paymentsdomain.PaymentOrder{}, false, fmt.Errorf("mark payment order cancelled: %w", err)
 	}
-	existing, err := queries.GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
+	existing, err := queries.GetPaymentOrderByIDForUpdate(ctx, pgUUIDToPgType(id))
 	if err != nil || existing.UserID != userID {
 		return paymentsdomain.PaymentOrder{}, false, paymentcontracts.ErrPaymentOrderNotFound
 	}

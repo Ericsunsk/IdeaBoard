@@ -18,7 +18,7 @@ import (
 )
 
 func TestCaptureUsageAggregationUsesShanghaiDayBoundary(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	const userID int64 = 771
 	service := seedCaptureUsageWallet(t, ctx, pool, userID, 120, "boundary")
@@ -54,7 +54,7 @@ func TestCaptureUsageAggregationUsesShanghaiDayBoundary(t *testing.T) {
 }
 
 func TestCaptureUsageAggregationUsesPartialCoveringIndex(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	const targetUserID int64 = 771
 	const otherUserID int64 = 772

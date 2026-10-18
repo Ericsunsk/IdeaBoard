@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"sync"
 	"testing"
 
@@ -74,10 +75,10 @@ func randomStorageUID(t *testing.T) string {
 	return string(buf)
 }
 
-// TestEnsurePersonalWorkspaceConcurrent proves personal provisioning is
-// idempotent under concurrency: N callers converge to one row with one
-// public_id, backed by ux_workspaces_personal_owner.
-func TestEnsurePersonalWorkspaceConcurrent(t *testing.T) {
+// TestEnsureDefaultWorkspaceConcurrent proves default provisioning is
+// idempotent under concurrency: N callers converge to one Default row with
+// one public_id, backed by ux_workspaces_default_owner.
+func TestEnsureDefaultWorkspaceConcurrent(t *testing.T) {
 	db := newTenancyTestDB(t)
 	store := NewStore(db)
 	userID := createTenancyTestUser(t, db)
@@ -91,7 +92,7 @@ func TestEnsurePersonalWorkspaceConcurrent(t *testing.T) {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			workspace, err := store.EnsurePersonalWorkspace(ctx, userID)
+			workspace, err := store.EnsureDefaultWorkspace(ctx, userID)
 			if err != nil {
 				errs[index] = err
 				return
@@ -115,19 +116,19 @@ func TestEnsurePersonalWorkspaceConcurrent(t *testing.T) {
 	}
 
 	var rowCount int64
-	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM workspaces WHERE owner_user_id = $1 AND organization_id IS NULL AND archived_at IS NULL`, userID).Scan(&rowCount); err != nil {
-		t.Fatalf("count personal workspaces failed: %v", err)
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM workspaces WHERE owner_user_id = $1 AND organization_id IS NULL AND is_default AND archived_at IS NULL`, userID).Scan(&rowCount); err != nil {
+		t.Fatalf("count default workspaces failed: %v", err)
 	}
 	if rowCount != 1 {
-		t.Fatalf("personal workspace rows = %d, want exactly 1", rowCount)
+		t.Fatalf("default workspace rows = %d, want exactly 1", rowCount)
 	}
 
 	workspace, err := store.GetWorkspace(ctx, publicIDs[0])
 	if err != nil {
 		t.Fatalf("get provisioned workspace failed: %v", err)
 	}
-	if !workspace.IsPersonal() || workspace.OwnerUserID == nil || *workspace.OwnerUserID != userID {
-		t.Fatalf("provisioned workspace is not the user personal workspace: %+v", workspace)
+	if !workspace.IsDefaultWorkspace() || workspace.OwnerUserID == nil || *workspace.OwnerUserID != userID {
+		t.Fatalf("provisioned workspace is not the user default workspace: %+v", workspace)
 	}
 	role, ok, err := store.GetWorkspaceRole(ctx, publicIDs[0], userID)
 	if err != nil || !ok || role != tenancy.RoleOwner {
@@ -150,9 +151,9 @@ func TestBillingAccountOwnerStubProvesSeam(t *testing.T) {
 	userID := createTenancyTestUser(t, db)
 	ctx := context.Background()
 
-	workspace, err := store.EnsurePersonalWorkspace(ctx, userID)
+	workspace, err := store.EnsureDefaultWorkspace(ctx, userID)
 	if err != nil {
-		t.Fatalf("ensure personal workspace failed: %v", err)
+		t.Fatalf("ensure default workspace failed: %v", err)
 	}
 	queries := dbsqlc.New(db)
 	// The #804 hard cut requires a ba_-prefixed public_id on every billing
@@ -177,5 +178,53 @@ func TestBillingAccountOwnerStubProvesSeam(t *testing.T) {
 	}
 	if loaded.InternalID != stub.InternalID {
 		t.Fatalf("stub internal_id = %d, want %d", loaded.InternalID, stub.InternalID)
+	}
+}
+
+// TestDefaultWorkspaceSemantics pins the Bug2 product contract against
+// PostgreSQL: plain personal creates are unlimited and non-Default, a
+// second Default create is rejected, the Default row cannot be archived or
+// renamed, non-Default rows rename normally, and a user holding only plain
+// rows still gets a Default on ensure.
+func TestDefaultWorkspaceSemantics(t *testing.T) {
+	db := newTenancyTestDB(t)
+	store := NewStore(db)
+	userID := createTenancyTestUser(t, db)
+	ctx := context.Background()
+
+	plain, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "plain-a", OwnerUserID: userID})
+	if err != nil {
+		t.Fatalf("plain create failed: %v", err)
+	}
+	if plain.IsDefaultWorkspace() {
+		t.Fatalf("plain create must not be Default: %+v", plain)
+	}
+	plainB, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "plain-b", OwnerUserID: userID})
+	if err != nil {
+		t.Fatalf("second plain create failed (must be unlimited): %v", err)
+	}
+
+	def, err := store.EnsureDefaultWorkspace(ctx, userID)
+	if err != nil {
+		t.Fatalf("ensure default failed: %v", err)
+	}
+	if !def.IsDefaultWorkspace() {
+		t.Fatalf("ensured workspace is not Default: %+v", def)
+	}
+	if _, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "dup", OwnerUserID: userID, IsDefault: true}); !errors.Is(err, tenancy.ErrDefaultWorkspaceConflict) {
+		t.Fatalf("second Default err = %v, want ErrDefaultWorkspaceConflict", err)
+	}
+	if _, err := store.ArchiveWorkspace(ctx, def.PublicID); !errors.Is(err, tenancy.ErrDefaultWorkspaceProtected) {
+		t.Fatalf("archive default err = %v, want ErrDefaultWorkspaceProtected", err)
+	}
+	if _, err := store.UpdateWorkspace(ctx, def.PublicID, "Renamed Default"); !errors.Is(err, tenancy.ErrDefaultWorkspaceProtected) {
+		t.Fatalf("rename default err = %v, want ErrDefaultWorkspaceProtected", err)
+	}
+	renamed, err := store.UpdateWorkspace(ctx, plainB.PublicID, "Renamed Plain")
+	if err != nil || renamed.Name != "Renamed Plain" {
+		t.Fatalf("rename plain = %+v, %v; want renamed", renamed, err)
+	}
+	if _, err := store.ArchiveWorkspace(ctx, plain.PublicID); err != nil {
+		t.Fatalf("archive plain failed: %v", err)
 	}
 }

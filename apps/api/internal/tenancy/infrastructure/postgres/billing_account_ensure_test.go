@@ -13,9 +13,9 @@ func TestEnsureBillingAccountForWorkspace(t *testing.T) {
 	userID := createTenancyTestUser(t, db)
 	ctx := context.Background()
 
-	workspace, err := store.EnsurePersonalWorkspace(ctx, userID)
+	workspace, err := store.EnsureDefaultWorkspace(ctx, userID)
 	if err != nil {
-		t.Fatalf("ensure personal workspace failed: %v", err)
+		t.Fatalf("ensure default workspace failed: %v", err)
 	}
 	t.Logf("workspace internal=%d public=%s", workspace.InternalID, workspace.PublicID)
 

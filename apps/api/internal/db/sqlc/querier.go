@@ -16,7 +16,6 @@ type Querier interface {
 	// archives miss (archived_at IS NULL guard); the caller reads back
 	// the stored row so replays converge instead of 404ing.
 	ArchiveMediaAsset(ctx context.Context, arg ArchiveMediaAssetParams) (MediaAsset, error)
-	ArchiveOrganization(ctx context.Context, publicID string) (int64, error)
 	ArchiveWorkspace(ctx context.Context, publicID string) (int64, error)
 	ArchiveWorkspaceBoard(ctx context.Context, arg ArchiveWorkspaceBoardParams) (int64, error)
 	// BackfillDailyStatsByCreatedRange freezes one day of terminal workspace
@@ -34,6 +33,12 @@ type Querier interface {
 	// no cancel_reason column, so the reason is recorded in the
 	// workflow_input envelope for read-back parity.
 	CancelWorkspaceTask(ctx context.Context, arg CancelWorkspaceTaskParams) (Task, error)
+	// Merged from GetUserIDByStorageUIDForUpdate + GetUsedUIDForUpdate: one
+	// roundtrip checks both the live users table (excluding the caller) and the
+	// historical users_used_uids. Serialization rides the users_used_uids unique
+	// constraint + InsertUsedUIDIgnore retry loop (FOR UPDATE on a missing row
+	// locks nothing, so the previous per-table row locks were not load-bearing).
+	CheckStorageUIDTaken(ctx context.Context, arg CheckStorageUIDTakenParams) (pgtype.Bool, error)
 	// Control idempotency authority. A unique attempt_token fences all writes.
 	// Atomic mutations commit completion with business writes; detached mutations
 	// commit settlement_unknown before external I/O, excluding lease takeover.
@@ -108,7 +113,6 @@ type Querier interface {
 	// Counts honor the user/keyword filters but never the status filter, so
 	// the status pills keep their global breakdown while a status is active.
 	CountControlTasks(ctx context.Context, arg CountControlTasksParams) ([]CountControlTasksRow, error)
-	CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error)
 	CountWorkspaceMembers(ctx context.Context, workspaceID int64) (int64, error)
 	CountWorkspaceOwners(ctx context.Context, workspaceID int64) (int64, error)
 	CountWorkspaceTasks(ctx context.Context, workspacePublicID string) (int64, error)
@@ -224,6 +228,11 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	// Workspace tenancy queries (#801). Public references use public_id;
 	// internal_id stays database-internal.
+	//
+	// Default workspace rule (Bug2 root fix): every user owns exactly one live
+	// Default personal workspace (is_default). Plain personal workspaces created
+	// without an organization are always non-Default and unlimited; only
+	// EnsureDefaultWorkspace mints the Default row.
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
 	// Workspace-scoped Boards use one common role and explicit selected members.
 	CreateWorkspaceBoard(ctx context.Context, arg CreateWorkspaceBoardParams) (CreateWorkspaceBoardRow, error)
@@ -247,12 +256,9 @@ type Querier interface {
 	DeleteControlIdempotencyRecord(ctx context.Context, arg DeleteControlIdempotencyRecordParams) error
 	DeleteLibraryAsset(ctx context.Context, arg DeleteLibraryAssetParams) (int64, error)
 	DeleteLibraryFolder(ctx context.Context, arg DeleteLibraryFolderParams) (int64, error)
-	DeleteOrganizationMembership(ctx context.Context, arg DeleteOrganizationMembershipParams) (int64, error)
 	DeleteServiceModelPoolEntries(ctx context.Context, service string) error
 	DeleteServiceModelPoolResolutions(ctx context.Context, service string) error
 	DeleteSystemConfigsByKeys(ctx context.Context, configKeys []string) error
-	DeleteUserByID(ctx context.Context, id int64) (int64, error)
-	DeleteWorkspaceBoardMembership(ctx context.Context, arg DeleteWorkspaceBoardMembershipParams) (int64, error)
 	// Removes every direct grant of one user across the workspace in the
 	// same transaction as the version bumps above: rejoining later finds no
 	// stale row to resurrect (fail-closed), while the serve-time membership
@@ -289,6 +295,7 @@ type Querier interface {
 	// Settlement joins stay LEFT: tasks without billing facts (free or
 	// pre-settlement rows) still list.
 	GetControlTaskByPublicID(ctx context.Context, publicID string) (GetControlTaskByPublicIDRow, error)
+	GetDefaultWorkspaceByOwner(ctx context.Context, ownerUserID pgtype.Int8) (Workspace, error)
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
 	GetLibraryAssetByPublicID(ctx context.Context, arg GetLibraryAssetByPublicIDParams) (GetLibraryAssetByPublicIDRow, error)
 	GetLibraryAssetByWorkspaceMedia(ctx context.Context, arg GetLibraryAssetByWorkspaceMediaParams) (GetLibraryAssetByWorkspaceMediaRow, error)
@@ -310,9 +317,15 @@ type Querier interface {
 	GetOrganizationMembership(ctx context.Context, arg GetOrganizationMembershipParams) (OrganizationMembership, error)
 	GetPaymentCheckoutShutdown(ctx context.Context, id pgtype.UUID) (PaymentCheckoutShutdown, error)
 	GetPaymentCustomer(ctx context.Context, arg GetPaymentCustomerParams) (PaymentCustomer, error)
+	// Unified Checkout-session lookup (merged from ...ForUpdate + plain): the
+	// non-lock version is kept. The only caller is the webhook read path
+	// (dispatch, outside a write tx), which needs no row lock.
 	GetPaymentOrderByCheckoutSession(ctx context.Context, arg GetPaymentOrderByCheckoutSessionParams) (PaymentOrder, error)
-	GetPaymentOrderByCheckoutSessionForUpdate(ctx context.Context, arg GetPaymentOrderByCheckoutSessionForUpdateParams) (PaymentOrder, error)
-	GetPaymentOrderByID(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
+	// Unified ID lookup (merged from GetPaymentOrderByID + GetPaymentOrderByIDForUpdate):
+	// the lock version is kept. Write paths (RecordPaid/Credit) run inside withTx
+	// and need the row lock for serialization; single-statement reads outside an
+	// explicit tx release the lock immediately, so they behave like the plain
+	// read they replaced.
 	GetPaymentOrderByIDForUpdate(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
 	GetPaymentOrderByIdempotency(ctx context.Context, arg GetPaymentOrderByIdempotencyParams) (PaymentOrder, error)
 	GetPaymentOrderByPublicToken(ctx context.Context, arg GetPaymentOrderByPublicTokenParams) (PaymentOrder, error)
@@ -321,24 +334,20 @@ type Querier interface {
 	GetPaymentStripeCredentialForOrder(ctx context.Context, id pgtype.UUID) (PaymentStripeCredential, error)
 	GetPaymentStripeCredentialForOrderNumber(ctx context.Context, publicOrderNumber string) (PaymentStripeCredential, error)
 	GetPaymentWebhookEvent(ctx context.Context, stripeEventID string) (PaymentWebhookEvent, error)
-	GetPersonalWorkspaceByOwner(ctx context.Context, ownerUserID pgtype.Int8) (Workspace, error)
 	GetQuickSavesFolder(ctx context.Context, workspaceID int64) (LibraryFolder, error)
 	GetServiceModelPoolVersion(ctx context.Context, service string) (int64, error)
 	GetSystemConfig(ctx context.Context, configKey string) (SystemConfig, error)
 	GetTaskRoutingSnapshot(ctx context.Context, publicID string) ([]byte, error)
 	GetTaskSubmissionIdempotency(ctx context.Context, arg GetTaskSubmissionIdempotencyParams) (GetTaskSubmissionIdempotencyRow, error)
 	GetUploadSessionByPublicID(ctx context.Context, arg GetUploadSessionByPublicIDParams) (UploadSession, error)
-	GetUsedUIDForUpdate(ctx context.Context, storageUid string) (string, error)
 	GetUserByAuthUserID(ctx context.Context, authUserID pgtype.Text) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
 	GetUserByPublicID(ctx context.Context, publicID pgtype.UUID) (User, error)
 	GetUserByStorageUID(ctx context.Context, storageUid string) (User, error)
-	GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error)
 	GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error)
 	GetWorkspaceBoard(ctx context.Context, arg GetWorkspaceBoardParams) (GetWorkspaceBoardRow, error)
 	GetWorkspaceBoardAccess(ctx context.Context, arg GetWorkspaceBoardAccessParams) (GetWorkspaceBoardAccessRow, error)
 	GetWorkspaceBoardMembership(ctx context.Context, arg GetWorkspaceBoardMembershipParams) (int64, error)
-	GetWorkspaceByInternalID(ctx context.Context, internalID int64) (Workspace, error)
 	GetWorkspaceByPublicID(ctx context.Context, publicID string) (Workspace, error)
 	// GetWorkspaceMediaAssetID resolves a workspace-scoped media asset public
 	// id for output association. Minimal lookup only; the full media surface
@@ -353,15 +362,15 @@ type Querier interface {
 	// behind the control guard's structured slog record; audit failures
 	// never fail the guarded request.
 	InsertControlAuditRecord(ctx context.Context, arg InsertControlAuditRecordParams) (InsertControlAuditRecordRow, error)
+	// Default workspace provisioning is idempotent on the partial unique index
+	// ux_workspaces_default_owner: concurrent inserts for the same owner collapse
+	// to a single Default row, and the follow-up select always reads the winner.
+	InsertDefaultWorkspaceIgnore(ctx context.Context, arg InsertDefaultWorkspaceIgnoreParams) (int64, error)
 	InsertPaymentAdminAction(ctx context.Context, arg InsertPaymentAdminActionParams) error
 	InsertPaymentCheckoutShutdown(ctx context.Context, arg InsertPaymentCheckoutShutdownParams) (PaymentCheckoutShutdown, error)
 	InsertPaymentOrderIntent(ctx context.Context, arg InsertPaymentOrderIntentParams) (PaymentOrder, error)
 	InsertPaymentStripeCredential(ctx context.Context, arg InsertPaymentStripeCredentialParams) (PaymentStripeCredential, error)
 	InsertPaymentWebhookEvent(ctx context.Context, arg InsertPaymentWebhookEventParams) (int64, error)
-	// Personal workspace provisioning is idempotent on the partial unique index
-	// ux_workspaces_personal_owner: concurrent inserts for the same owner collapse
-	// to a single row, and the follow-up select always reads the winner.
-	InsertPersonalWorkspaceIgnore(ctx context.Context, arg InsertPersonalWorkspaceIgnoreParams) (int64, error)
 	InsertServiceModelPoolEntry(ctx context.Context, arg InsertServiceModelPoolEntryParams) (ServiceModelPoolEntry, error)
 	InsertServiceModelPoolResolution(ctx context.Context, arg InsertServiceModelPoolResolutionParams) error
 	InsertStorageProfileSecretVersion(ctx context.Context, arg InsertStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
@@ -377,10 +386,6 @@ type Querier interface {
 	ListAdminPaymentOrderWebhookEvents(ctx context.Context, arg ListAdminPaymentOrderWebhookEventsParams) ([]ListAdminPaymentOrderWebhookEventsRow, error)
 	ListAdminPaymentOrders(ctx context.Context, arg ListAdminPaymentOrdersParams) ([]ListAdminPaymentOrdersRow, error)
 	ListBackfilledDatesByRange(ctx context.Context, arg ListBackfilledDatesByRangeParams) ([]pgtype.Date, error)
-	// ListBoardDocumentMediaRefAssets audits the accepted document references
-	// of one board as asset public ids (#936, GC/persistence verification).
-	// Unknown or cross-workspace boards list empty.
-	ListBoardDocumentMediaRefAssets(ctx context.Context, arg ListBoardDocumentMediaRefAssetsParams) ([]string, error)
 	ListBoardRevisions(ctx context.Context, arg ListBoardRevisionsParams) ([]ListBoardRevisionsRow, error)
 	// ListBoardsReferencingMediaAsset lists the workspace-scoped board public
 	// ids whose accepted document references one asset (#936: board-reference
@@ -391,7 +396,6 @@ type Querier interface {
 	ListBoardsReferencingMediaAsset(ctx context.Context, arg ListBoardsReferencingMediaAssetParams) ([]string, error)
 	ListControlTasks(ctx context.Context, arg ListControlTasksParams) ([]ListControlTasksRow, error)
 	ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error)
-	ListEligibleServicePoolModels(ctx context.Context, arg ListEligibleServicePoolModelsParams) ([]string, error)
 	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
 	ListLibraryAssets(ctx context.Context, arg ListLibraryAssetsParams) ([]ListLibraryAssetsRow, error)
 	ListLibraryAssetsByWorkspaceProvider(ctx context.Context, arg ListLibraryAssetsByWorkspaceProviderParams) ([]ListLibraryAssetsByWorkspaceProviderRow, error)
@@ -408,7 +412,6 @@ type Querier interface {
 	// plus recent execution attempts. Attempt buckets stay empty until the
 	// worker records attempts; pending buckets are live immediately.
 	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
-	ListOrganizationMembers(ctx context.Context, arg ListOrganizationMembersParams) ([]OrganizationMembership, error)
 	ListOrganizationsByUserID(ctx context.Context, arg ListOrganizationsByUserIDParams) ([]Organization, error)
 	ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg ListPaymentOrdersForCheckoutShutdownParams) ([]PaymentOrder, error)
 	ListPaymentRechargeHistory(ctx context.Context, arg ListPaymentRechargeHistoryParams) ([]ListPaymentRechargeHistoryRow, error)
@@ -599,7 +602,6 @@ type Querier interface {
 	// UpdateMediaAssetMetadata refreshes dimensions and merges metadata
 	// (read-modify-write merge: unknown keys from other writers survive).
 	UpdateMediaAssetMetadata(ctx context.Context, arg UpdateMediaAssetMetadataParams) (MediaAsset, error)
-	UpdateOrganizationMemberRole(ctx context.Context, arg UpdateOrganizationMemberRoleParams) (int64, error)
 	UpdateOrganizationName(ctx context.Context, arg UpdateOrganizationNameParams) (int64, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error)
 	UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (int64, error)

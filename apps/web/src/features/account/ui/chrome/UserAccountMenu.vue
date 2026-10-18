@@ -275,6 +275,7 @@
         :on-retry="handleWorkspaceDialogRetry"
         :on-create="handleWorkspaceCreate"
         :on-rename="handleWorkspaceRename"
+        :on-archive="handleWorkspaceArchive"
         :on-select="props.workspace?.onSelect"
         @update:is-open="isWorkspaceSettingsOpen = $event"
       />
@@ -316,7 +317,7 @@ import type { SupportChannel } from '../../../../core/composables/useSupportChan
 import SupportChannelQr from './SupportChannelQr.vue'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
 import WorkspaceSettingsDialog from './WorkspaceSettingsDialog.vue'
-import { isPersonalWorkspaceItem, visibleWorkspaceItems } from './workspaceMenu'
+import { isDefaultWorkspaceItem, visibleWorkspaceItems } from './workspaceMenu'
 import type {
   UserAccountMenuItem,
   UserAccountMenuWorkspace,
@@ -432,7 +433,7 @@ const workspaceNameMaxLength = computed(
   () => props.workspace?.nameMaxLength ?? WORKSPACE_NAME_MAX_LENGTH_FALLBACK,
 )
 function workspaceOptionLabel(item: UserAccountMenuWorkspaceItem): string {
-  return isPersonalWorkspaceItem(item) ? t('workspace.switcher.defaultBadge') : item.name
+  return isDefaultWorkspaceItem(item) ? t('workspace.switcher.defaultBadge') : item.name
 }
 
 const currentWorkspaceLabel = computed(() => {
@@ -480,6 +481,10 @@ async function handleWorkspaceCreate(name: string) {
 
 async function handleWorkspaceRename(workspaceId: string, name: string) {
   return requireWorkspace().onRename(workspaceId, name)
+}
+
+async function handleWorkspaceArchive(workspaceId: string) {
+  return requireWorkspace().onArchive(workspaceId)
 }
 
 function keepSupportQrFocus(event: Event) {

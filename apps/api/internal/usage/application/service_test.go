@@ -226,11 +226,11 @@ func (s *taskUsageReaderStub) GetTaskUsage(context.Context, int64, *time.Locatio
 	return s.taskCount, s.activeDays, s.err
 }
 func TestServiceGetCurrentReportsDurableLogicalTasks(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	const userID int64 = 901
-	seedUsageUser(t, ctx, db, userID, "US0901")
-	seedUsageUser(t, ctx, db, 902, "US0902")
+	seedUsageUser(t, ctx, pool, userID, "US0901")
+	seedUsageUser(t, ctx, pool, 902, "US0902")
 
 	creditService := credits.NewService(pool)
 	firstCapture := captureUsageCredits(t, ctx, creditService, userID, 20, "usage-capture-1")
@@ -256,7 +256,7 @@ func TestServiceGetCurrentReportsDurableLogicalTasks(t *testing.T) {
 	seedDurableUsageSnapshots(t, ctx, pool, billingWriter, request, 902, []string{"usage-other-user"})
 
 	newUsageService := func() *Service {
-		return NewService(creditService, taskbilling.NewUsageStore(db), ServiceOptions{Now: func() time.Time {
+		return NewService(creditService, taskbilling.NewUsageStore(pool), ServiceOptions{Now: func() time.Time {
 			return latestCapture.CreatedAt
 		}})
 	}

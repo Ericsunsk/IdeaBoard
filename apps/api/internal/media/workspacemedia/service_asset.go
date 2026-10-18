@@ -182,9 +182,9 @@ func (s *Service) UpdateAssetMetadata(ctx context.Context, workspaceID, assetID 
 	row, err := q.UpdateMediaAssetMetadata(ctx, dbsqlc.UpdateMediaAssetMetadataParams{
 		// Zero/negative dimensions normalize to NULL (unknown):
 		// the image CHECK requires width/height > 0 when present.
-		Width:             nullInt4(params.Width, params.HasDims && params.Width > 0),
-		Height:            nullInt4(params.Height, params.HasDims && params.Height > 0),
-		DurationMs:        nullInt4(params.DurationMs, params.HasDur),
+		Width:             dbutil.Int4FromPresent(params.Width, params.HasDims && params.Width > 0),
+		Height:            dbutil.Int4FromPresent(params.Height, params.HasDims && params.Height > 0),
+		DurationMs:        dbutil.Int4FromPresent(params.DurationMs, params.HasDur),
 		Metadata:          raw,
 		PublicID:          strings.TrimSpace(assetID),
 		WorkspacePublicID: trimmedWorkspace,

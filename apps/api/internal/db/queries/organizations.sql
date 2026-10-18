@@ -31,11 +31,6 @@ UPDATE organizations
 SET name = sqlc.arg(name), updated_at = now()
 WHERE public_id = sqlc.arg(public_id) AND archived_at IS NULL;
 
--- name: ArchiveOrganization :execrows
-UPDATE organizations
-SET archived_at = now(), updated_at = now()
-WHERE public_id = sqlc.arg(public_id) AND archived_at IS NULL;
-
 -- name: UpsertOrganizationMembership :exec
 INSERT INTO organization_memberships (organization_id, user_id, role)
 VALUES (sqlc.arg(organization_id), sqlc.arg(user_id), sqlc.arg(role))
@@ -46,24 +41,3 @@ SET role = EXCLUDED.role;
 SELECT organization_id, user_id, role, created_at
 FROM organization_memberships
 WHERE organization_id = sqlc.arg(organization_id) AND user_id = sqlc.arg(user_id);
-
--- name: ListOrganizationMembers :many
-SELECT m.organization_id, m.user_id, m.role, m.created_at
-FROM organization_memberships AS m
-WHERE m.organization_id = sqlc.arg(organization_id)
-ORDER BY m.created_at ASC
-LIMIT sqlc.arg(row_limit);
-
--- name: UpdateOrganizationMemberRole :execrows
-UPDATE organization_memberships
-SET role = sqlc.arg(role)
-WHERE organization_id = sqlc.arg(organization_id) AND user_id = sqlc.arg(user_id);
-
--- name: DeleteOrganizationMembership :execrows
-DELETE FROM organization_memberships
-WHERE organization_id = sqlc.arg(organization_id) AND user_id = sqlc.arg(user_id);
-
--- name: CountOrganizationOwners :one
-SELECT COUNT(*)
-FROM organization_memberships
-WHERE organization_id = sqlc.arg(organization_id) AND role = 'owner';

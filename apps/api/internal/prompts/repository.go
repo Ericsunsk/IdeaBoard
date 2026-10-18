@@ -78,8 +78,8 @@ func (r *FeaturePromptRepository) ListConfigs(ctx context.Context) ([]FeaturePro
 	for _, row := range rows {
 		bySlug[row.FeatureSlug] = row
 	}
-	configs := make([]FeaturePromptConfig, 0, len(workflow.SupportedFeatureSlugs())-1)
-	for _, slug := range workflow.SupportedFeatureSlugs() {
+	configs := make([]FeaturePromptConfig, 0, len(workflow.AIImageFeatureSlugs())-1)
+	for _, slug := range workflow.AIImageFeatureSlugs() {
 		if !isPromptConfigurableFeature(slug) {
 			continue
 		}

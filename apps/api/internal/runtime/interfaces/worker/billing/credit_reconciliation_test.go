@@ -161,7 +161,7 @@ func (s *creditReconciliationWorkerServiceStub) GetReconciliationRun(context.Con
 }
 
 func TestCreditReconciliationDispatcherUsesCallerTransaction(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	if err := workerriver.MigrateRiver(t.Context(), pool); err != nil {
 		t.Fatalf("MigrateRiver() error = %v", err)
 	}
@@ -173,7 +173,7 @@ func TestCreditReconciliationDispatcherUsesCallerTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCreditReconciliationDispatcher() error = %v", err)
 	}
-	before := countCreditReconciliationJobs(t, db)
+	before := countCreditReconciliationJobs(t, pool)
 
 	tx, err := pool.Begin(t.Context())
 	if err != nil {
@@ -185,7 +185,7 @@ func TestCreditReconciliationDispatcherUsesCallerTransaction(t *testing.T) {
 	if err := tx.Rollback(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if got := countCreditReconciliationJobs(t, db); got != before {
+	if got := countCreditReconciliationJobs(t, pool); got != before {
 		t.Fatalf("job count after rollback = %d, want %d", got, before)
 	}
 
@@ -199,7 +199,7 @@ func TestCreditReconciliationDispatcherUsesCallerTransaction(t *testing.T) {
 	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if got := countCreditReconciliationJobs(t, db); got != before+1 {
+	if got := countCreditReconciliationJobs(t, pool); got != before+1 {
 		t.Fatalf("job count after commit = %d, want %d", got, before+1)
 	}
 }

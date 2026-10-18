@@ -43,10 +43,6 @@ SET display_name = sqlc.arg(display_name),
     status = sqlc.arg(status)
 WHERE id = sqlc.arg(id);
 
--- name: DeleteUserByID :execrows
-DELETE FROM users
-WHERE id = sqlc.arg(id);
-
 -- name: SummarizeUsers :one
 SELECT
   COUNT(*) AS total,
@@ -99,19 +95,19 @@ SELECT id, storage_uid
 FROM users
 ORDER BY id ASC;
 
--- name: GetUserIDByStorageUIDForUpdate :one
-SELECT id
-FROM users
-WHERE storage_uid = sqlc.arg(storage_uid) AND id <> sqlc.arg(id)
-LIMIT 1
-FOR UPDATE;
-
--- name: GetUsedUIDForUpdate :one
-SELECT storage_uid
-FROM users_used_uids
-WHERE storage_uid = sqlc.arg(storage_uid)
-LIMIT 1
-FOR UPDATE;
+-- name: CheckStorageUIDTaken :one
+-- Merged from GetUserIDByStorageUIDForUpdate + GetUsedUIDForUpdate: one
+-- roundtrip checks both the live users table (excluding the caller) and the
+-- historical users_used_uids. Serialization rides the users_used_uids unique
+-- constraint + InsertUsedUIDIgnore retry loop (FOR UPDATE on a missing row
+-- locks nothing, so the previous per-table row locks were not load-bearing).
+SELECT EXISTS(
+  SELECT 1 FROM users
+  WHERE users.storage_uid = sqlc.arg(user_storage_uid) AND users.id <> sqlc.arg(id)
+) OR EXISTS(
+  SELECT 1 FROM users_used_uids
+  WHERE users_used_uids.storage_uid = sqlc.arg(used_storage_uid)
+) AS taken;
 
 -- name: InsertUsedUIDIgnore :execrows
 INSERT INTO users_used_uids (storage_uid)

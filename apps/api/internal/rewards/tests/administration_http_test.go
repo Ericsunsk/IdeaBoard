@@ -62,10 +62,10 @@ func (p repositoryIdentityProjection) ResolveIdentities(
 }
 
 func TestAdminListsSafeRedemptionSummariesScopedToRewardCode(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	userRepo := identitypostgres.NewRepository(db)
+	userRepo := identitypostgres.NewRepository(pool)
 	projectionCalls := &identityProjectionCalls{}
 	redeemingUser, err := userRepo.GetByID(t.Context(), 3)
 	if err != nil {
@@ -148,10 +148,10 @@ func TestAdminListsSafeRedemptionSummariesScopedToRewardCode(t *testing.T) {
 }
 
 func TestAdminGetsRedemptionDetailOnlyWithinRewardCodeScope(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	userRepo := identitypostgres.NewRepository(db)
+	userRepo := identitypostgres.NewRepository(pool)
 	projectionCalls := &identityProjectionCalls{}
 	redeemingUser, err := userRepo.GetByID(t.Context(), 3)
 	if err != nil {
@@ -240,10 +240,10 @@ func TestAdminGetsRedemptionDetailOnlyWithinRewardCodeScope(t *testing.T) {
 }
 
 func TestAdminRedemptionListUsesBoundedKeysetPagination(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	userRepo := identitypostgres.NewRepository(db)
+	userRepo := identitypostgres.NewRepository(pool)
 	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "Admin pagination", Code: "ADMIN-PAGINATION-2026", CreditAmount: 9,
 		IdempotencyKey: "admin-pagination", ActorUserID: 1,

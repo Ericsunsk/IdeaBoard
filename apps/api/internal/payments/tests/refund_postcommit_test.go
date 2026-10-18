@@ -32,7 +32,7 @@ func (f *countingRefundPublisher) total() int {
 }
 
 func TestPaymentRefundPublishDefersToPostCommit(t *testing.T) {
-	db, _ := testdb.OpenWithPool(t)
+	db := testdb.Open(t)
 	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))

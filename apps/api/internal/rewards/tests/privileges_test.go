@@ -20,7 +20,7 @@ import (
 )
 
 func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := t.Context()
 	service := newTestRewardService(t, pool, credits.NewService(pool))
 	created, err := service.CreateRewardCode(ctx, ports.CreateRewardCodeCommand{
@@ -33,21 +33,21 @@ func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T
 
 	runtimeRole := fmt.Sprintf("rewards_runtime_test_%d_%d", os.Getpid(), time.Now().UnixNano())
 	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
-	if _, err := db.Exec(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
+	if _, err := pool.Exec(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
 		t.Fatalf("create runtime role: %v", err)
 	}
 	t.Cleanup(func() {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_, _ = db.Exec(cleanupCtx, `DROP OWNED BY `+roleSQL)
-		_, _ = db.Exec(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL)
+		_, _ = pool.Exec(cleanupCtx, `DROP OWNED BY `+roleSQL)
+		_, _ = pool.Exec(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL)
 	})
 
 	policies := []dbprivileges.Policy{dbprivileges.RuntimePrivilegePolicy(), rewardspostgres.RuntimePrivilegePolicy()}
-	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
+	if err := dbprivileges.Configure(ctx, pool, runtimeRole, policies...); err != nil {
 		t.Fatalf("configure runtime privilege policies: %v", err)
 	}
-	conn, err := db.Acquire(ctx)
+	conn, err := pool.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("open runtime connection: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T
 	if err := dbprivileges.Verify(ctx, conn, policies...); err != nil {
 		t.Fatalf("verify runtime privilege policies: %v", err)
 	}
-	if _, err := db.Exec(ctx, `
+	if _, err := pool.Exec(ctx, `
 UPDATE reward_codes
 SET expires_at = clock_timestamp() - INTERVAL '1 second'
 WHERE id = $1`, created.RewardCode.ID); err != nil {
@@ -98,7 +98,7 @@ WHERE id = $1`, created.RewardCode.ID); err != nil {
 		"guard_reward_code_identity()",
 	} {
 		var runtimeCanExecute, publicCanExecute bool
-		if err := db.QueryRow(ctx, `
+		if err := pool.QueryRow(ctx, `
 SELECT has_function_privilege($1, $2, 'EXECUTE'),
        has_function_privilege('public', $2, 'EXECUTE')`, runtimeRole, signature).Scan(
 			&runtimeCanExecute,
@@ -122,7 +122,7 @@ SELECT has_function_privilege($1, $2, 'EXECUTE'),
 		var owner string
 		var config string
 		var trustedSchema string
-		if err := db.QueryRow(ctx, `
+		if err := pool.QueryRow(ctx, `
 SELECT functions.prosecdef,
        pg_get_userbyid(functions.proowner),
        COALESCE(array_to_string(functions.proconfig, ','), ''),
@@ -139,7 +139,7 @@ WHERE functions.oid = $1::regprocedure`, signature).Scan(
 	}
 	for _, signature := range commandFunctions {
 		var runtimeCanExecute, publicCanExecute bool
-		if err := db.QueryRow(ctx, `
+		if err := pool.QueryRow(ctx, `
 SELECT has_function_privilege($1, $2, 'EXECUTE'),
        has_function_privilege('public', $2, 'EXECUTE')`, runtimeRole, signature).Scan(
 			&runtimeCanExecute,
@@ -154,7 +154,7 @@ SELECT has_function_privilege($1, $2, 'EXECUTE'),
 }
 
 func TestRuntimeRoleCanUseRewardAdminServiceCommands(t *testing.T) {
-	db, ownerPool := testdb.OpenWithPool(t)
+	ownerPool := testdb.Open(t)
 	ctx := t.Context()
 	ownerService := newTestRewardService(t, ownerPool, credits.NewService(ownerPool))
 	createFixture := func(name, code, idempotencyKey string) ports.CreatedRewardCode {
@@ -173,11 +173,11 @@ func TestRuntimeRoleCanUseRewardAdminServiceCommands(t *testing.T) {
 	redeemable := createFixture("Runtime 兑换奖励", "RUNTIME-REDEEM-26", "runtime-redeem")
 	provisionRewardWallet(t, ownerPool, credits.NewService(ownerPool), 3)
 
-	runtimeRole := testdb.CreateRestrictedRole(t, db, "rewards_service_runtime")
+	runtimeRole := testdb.CreateRestrictedRole(t, ownerPool, "rewards_service_runtime")
 	policies := []dbprivileges.Policy{
 		dbprivileges.RuntimePrivilegePolicy(), creditpostgres.RuntimePrivilegePolicy(), rewardspostgres.RuntimePrivilegePolicy(),
 	}
-	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
+	if err := dbprivileges.Configure(ctx, ownerPool, runtimeRole, policies...); err != nil {
 		t.Fatalf("configure runtime privilege policies: %v", err)
 	}
 

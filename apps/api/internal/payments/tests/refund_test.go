@@ -68,10 +68,10 @@ func (f *refundGatewayFake) RetrieveRefund(_ context.Context, _ string, refundID
 }
 
 func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	repo := newTestPaymentStores(db)
+	pool := testdb.Open(t)
+	repo := newTestPaymentStores(pool)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
-	order := createCreditedRefundOrder(t, db, repo, now.Add(-13*24*time.Hour))
+	order := createCreditedRefundOrder(t, pool, repo, now.Add(-13*24*time.Hour))
 
 	refund, replayed, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 200,
@@ -81,7 +81,7 @@ func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T
 		t.Fatalf("CreatePendingPaymentRefund() refund=%+v replayed=%v error=%v", refund, replayed, err)
 	}
 	var refundReason string
-	if err := db.QueryRow(t.Context(), `SELECT reason FROM payment_refunds WHERE id = $1::uuid`, refund.ID).Scan(&refundReason); err != nil || refundReason != "" {
+	if err := pool.QueryRow(t.Context(), `SELECT reason FROM payment_refunds WHERE id = $1::uuid`, refund.ID).Scan(&refundReason); err != nil || refundReason != "" {
 		t.Fatalf("Admin refund reason = %q, %v", refundReason, err)
 	}
 	if refund.AmountMinor != 200 || refund.Currency != "usd" || refund.Status != paymentsdomain.PaymentRefundPending {
@@ -134,13 +134,13 @@ func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T
 		t.Fatalf("settled Wallet=%+v error=%v", wallet, err)
 	}
 	var commandType string
-	if err := db.QueryRow(t.Context(), `SELECT command_type FROM credit_transactions WHERE transaction_id = $1`, succeeded.CreditTransactionID).Scan(&commandType); err != nil || commandType != "purchase_refund" {
+	if err := pool.QueryRow(t.Context(), `SELECT command_type FROM credit_transactions WHERE transaction_id = $1`, succeeded.CreditTransactionID).Scan(&commandType); err != nil || commandType != "purchase_refund" {
 		t.Fatalf("purchase_refund transaction type=%q error=%v", commandType, err)
 	}
 }
 
 func TestPaymentRefundReservationCommitsBeforeAmbientControlTransaction(t *testing.T) {
-	db, _ := testdb.OpenWithPool(t)
+	db := testdb.Open(t)
 	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
@@ -198,7 +198,7 @@ func TestPaymentRefundReservationCommitsBeforeAmbientControlTransaction(t *testi
 }
 
 func TestPaymentRefundServiceChainCommitsBeforeStripeUnderAmbientControlTx(t *testing.T) {
-	db, _ := testdb.OpenWithPool(t)
+	db := testdb.Open(t)
 	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
@@ -276,13 +276,13 @@ func TestPaymentRefundServiceChainCommitsBeforeStripeUnderAmbientControlTx(t *te
 }
 
 func TestExternalDashboardRefundUsesTypedHoldUnderRestriction(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	db := testdb.Open(t)
 	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	// A spending restriction blocks the generic spending Hold but must not
 	// block legitimate Dashboard refund recovery via PurchaseRefundHold.
-	if _, err := credits.NewService(pool).RestrictWallet(t.Context(), ports.RestrictWalletCommand{
+	if _, err := credits.NewService(db).RestrictWallet(t.Context(), ports.RestrictWalletCommand{
 		UserID: 42, Type: "payment_dispute", Source: "stripe_dispute",
 		RelatedObject: domain.BusinessReference{Type: "payment_dispute", ID: "dispute-897"},
 		Reason:        "open payment dispute", Actor: domain.Actor{Type: domain.ActorService, ID: "payments"},
@@ -311,17 +311,17 @@ func TestExternalDashboardRefundUsesTypedHoldUnderRestriction(t *testing.T) {
 	if err != nil || settled.Status != paymentsdomain.PaymentRefundSucceeded {
 		t.Fatalf("MarkPaymentRefundSucceeded() refund=%+v error=%v", settled, err)
 	}
-	wallet, err := credits.NewService(pool).GetWallet(t.Context(), 42)
+	wallet, err := credits.NewService(db).GetWallet(t.Context(), 42)
 	if err != nil || wallet.Reserved != 0 {
 		t.Fatalf("settled wallet=%+v error=%v", wallet, err)
 	}
 }
 
 func TestExternalDashboardRefundInsufficientIdeasSurfacesRecoverableError(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	repo := newTestPaymentStores(db)
+	pool := testdb.Open(t)
+	repo := newTestPaymentStores(pool)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
-	createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
+	createCreditedRefundOrder(t, pool, repo, now.Add(-time.Hour))
 	// Spend 400 of 500 Ideas so the Dashboard refund cannot be recovered.
 	spendAmount, err := domain.NewCreditAmount(400)
 	if err != nil {
@@ -398,10 +398,10 @@ func TestPaymentRefundTerminalFactsCannotRegress(t *testing.T) {
 }
 
 func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	repo := newTestPaymentStores(db)
+	pool := testdb.Open(t)
+	repo := newTestPaymentStores(pool)
 	now := time.Now().UTC()
-	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
+	order := createCreditedRefundOrder(t, pool, repo, now.Add(-time.Hour))
 	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 100,
 		IdempotencyKey: "refund-reconciliation", Now: now.Add(-3 * time.Minute),
@@ -449,10 +449,10 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 }
 
 func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	repo := newTestPaymentStores(db)
+	pool := testdb.Open(t)
+	repo := newTestPaymentStores(pool)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
-	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
+	order := createCreditedRefundOrder(t, pool, repo, now.Add(-time.Hour))
 	errs := make(chan error, 2)
 	for index := range 2 {
 		go func() {

@@ -68,7 +68,7 @@ func provisionDurableSagaUser(t *testing.T, lifecycle *LifecycleService, authUse
 // failure), the business deactivate + Wallet freeze + durable request
 // committed by the saga stay frozen and never return to active.
 func TestDeletionInitSurvivesGuardRollback(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned := provisionDurableSagaUser(t, lifecycle, "auth-durable-init-1", "durable-init-1@example.com")
@@ -112,7 +112,7 @@ func TestDeletionInitSurvivesGuardRollback(t *testing.T) {
 // then rolls the carrier back to simulate an external-success-then-
 // audit/commit failure. The completed tombstone must survive.
 func TestDeletionFullSagaSurvivesGuardRollback(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	creditService := credits.NewService(pool)
 	lifecycle := newLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
@@ -173,13 +173,13 @@ func TestDeletionFullSagaSurvivesGuardRollback(t *testing.T) {
 // Auth/Media): interruption at each phase, duplicate execution, and the
 // final PII tombstone. No failure restores active.
 func TestControlDeletePhaseInterruptionRetryAndTombstone(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned := provisionDurableSagaUser(t, lifecycle, "auth-durable-control-1", "durable-control-1@example.com")
 
 	cleaner := &scriptedUploadCleaner{errs: []error{errors.New("storage unavailable")}}
-	userService := NewUserService(NewUserRepository(db), lifecycle, nil, cleaner)
+	userService := NewUserService(NewUserRepository(pool), lifecycle, nil, cleaner)
 	events := &[]string{}
 	authManager := &fakeIdentityAdminAuth{events: events, deleteErrors: []error{errors.New("auth unavailable"), errors.New("auth unavailable")}}
 	commands := newIdentityAdminCommands(userService, authManager, nil)
@@ -254,7 +254,7 @@ func TestControlDeletePhaseInterruptionRetryAndTombstone(t *testing.T) {
 // phase advance is lost; the retry re-runs the already-cleaned prefix
 // (idempotent success) and still reaches the tombstone.
 func TestControlDeleteConvergesAfterLostStorageAdvance(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned := provisionDurableSagaUser(t, lifecycle, "auth-durable-storage-1", "durable-storage-1@example.com")
@@ -274,7 +274,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_storage_phase_advance_once()`); err != nil {
 	}
 
 	cleaner := &scriptedUploadCleaner{}
-	userService := NewUserService(NewUserRepository(db), lifecycle, nil, cleaner)
+	userService := NewUserService(NewUserRepository(pool), lifecycle, nil, cleaner)
 	authManager := &fakeIdentityAdminAuth{events: &[]string{}}
 	commands := newIdentityAdminCommands(userService, authManager, nil)
 	actor := identityAdminActor(t)
@@ -315,7 +315,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_storage_phase_advance_once()`); err != nil {
 // the durable path: after a lost Auth phase advance, the retry sees
 // Auth answer not_found and still converges.
 func TestDeletionAuthGoneIsConvergence(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned := provisionDurableSagaUser(t, lifecycle, "auth-durable-gone-1", "durable-gone-1@example.com")
@@ -335,7 +335,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_auth_phase_advance_durable()`); err != nil {
 
 	authDeleter := &scriptedAuthDeleter{}
 	cleaner := &scriptedUploadCleaner{}
-	userService := NewUserService(NewUserRepository(db), lifecycle, nil, cleaner)
+	userService := NewUserService(NewUserRepository(pool), lifecycle, nil, cleaner)
 	_ = userService
 	if err := lifecycle.DeleteUser(ctx, provisioned.User.ID, authDeleter, cleaner); err == nil {
 		t.Fatal("lost Auth phase advance should surface an error")

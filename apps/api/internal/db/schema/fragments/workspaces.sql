@@ -1,9 +1,12 @@
 -- Workspace tenancy foundation (#801).
 --
 -- A Workspace is owned by a User (personal Workspace, no Organization) or by
--- an Organization. Workspace membership and Board membership are separate
--- permission layers. Public references must use public_id; the internal_id
--- bigint stays database-internal per the contract kernel.
+-- an Organization. Every user additionally owns exactly one live Default
+-- personal workspace (is_default): it is never deleted, archived, or renamed,
+-- and is auto-provisioned when missing. Workspace membership and
+-- Board membership are separate permission layers. Public references must use
+-- public_id; the internal_id bigint stays database-internal per the contract
+-- kernel.
 
 CREATE TABLE workspaces (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -11,6 +14,11 @@ CREATE TABLE workspaces (
   organization_id BIGINT NULL REFERENCES organizations(internal_id),
   owner_user_id BIGINT NULL REFERENCES users(id),
   name TEXT NOT NULL,
+  -- Default workspace marker (Bug2 root fix): every user owns exactly one
+  -- live Default personal workspace. Non-Default personal workspaces are
+  -- unlimited; organization workspaces never carry the marker (see
+  -- chk_workspaces_default_scope).
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   archived_at TIMESTAMPTZ NULL,
@@ -21,12 +29,17 @@ CREATE TABLE workspaces (
   CONSTRAINT chk_workspaces_owner_xor CHECK (
     (organization_id IS NOT NULL AND owner_user_id IS NULL)
     OR (organization_id IS NULL AND owner_user_id IS NOT NULL)
+  ),
+  CONSTRAINT chk_workspaces_default_scope CHECK (
+    NOT is_default OR (organization_id IS NULL AND owner_user_id IS NOT NULL)
   )
 );
 
--- Personal workspace idempotency: at most one live personal Workspace per user.
--- Archived personal Workspaces stay out of the way so reprovisioning works.
-CREATE UNIQUE INDEX ux_workspaces_personal_owner ON workspaces(owner_user_id) WHERE organization_id IS NULL AND archived_at IS NULL;
+-- Default workspace idempotency: at most one live Default workspace per
+-- user. Archived Default rows stay out of the way so reprovisioning works.
+-- Plain personal workspaces are intentionally unlimited, so the legacy
+-- ux_workspaces_personal_owner cap is gone.
+CREATE UNIQUE INDEX ux_workspaces_default_owner ON workspaces(owner_user_id) WHERE organization_id IS NULL AND is_default AND archived_at IS NULL;
 
 CREATE TABLE workspace_memberships (
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,

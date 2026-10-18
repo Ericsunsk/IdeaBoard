@@ -158,12 +158,12 @@ SELECT *
 FROM payment_orders
 WHERE user_id = $1 AND client_idempotency_key = $2;
 
--- name: GetPaymentOrderByID :one
-SELECT *
-FROM payment_orders
-WHERE id = $1;
-
 -- name: GetPaymentOrderByIDForUpdate :one
+-- Unified ID lookup (merged from GetPaymentOrderByID + GetPaymentOrderByIDForUpdate):
+-- the lock version is kept. Write paths (RecordPaid/Credit) run inside withTx
+-- and need the row lock for serialization; single-statement reads outside an
+-- explicit tx release the lock immediately, so they behave like the plain
+-- read they replaced.
 SELECT *
 FROM payment_orders
 WHERE id = $1
@@ -243,13 +243,10 @@ SET status = 'checkout_open',
 WHERE id = $1 AND status = 'creating'
 RETURNING *;
 
--- name: GetPaymentOrderByCheckoutSessionForUpdate :one
-SELECT *
-FROM payment_orders
-WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2
-FOR UPDATE;
-
 -- name: GetPaymentOrderByCheckoutSession :one
+-- Unified Checkout-session lookup (merged from ...ForUpdate + plain): the
+-- non-lock version is kept. The only caller is the webhook read path
+-- (dispatch, outside a write tx), which needs no row lock.
 SELECT *
 FROM payment_orders
 WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2;

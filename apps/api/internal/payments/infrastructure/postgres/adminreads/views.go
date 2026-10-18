@@ -23,12 +23,12 @@ func decodeAdminPaymentOrderRecord(row dbsqlc.ListAdminPaymentOrdersRow) payment
 		IdeaQuantity:      row.IdeaQuantity,
 		BaseCurrency:      strings.ToLower(row.BaseCurrency),
 		BaseAmountMinor:   row.BaseAmountMinor,
-		PaidTotalMinor:    postgres.NullInt64Pointer(row.PaidTotalMinor),
+		PaidTotalMinor:    dbutil.Int64Ptr(row.PaidTotalMinor),
 		PaidCurrency:      strings.ToLower(row.PaidCurrency),
-		PaidAt:            postgres.NullTimePointer(row.PaidAt),
-		CreditedAt:        postgres.NullTimePointer(row.CreditedAt),
-		LastCheckedAt:     postgres.NullTimePointer(row.LastCheckedAt),
-		AnomalousAt:       postgres.NullTimePointer(row.AnomalousAt),
+		PaidAt:            dbutil.TimePtr(row.PaidAt),
+		CreditedAt:        dbutil.TimePtr(row.CreditedAt),
+		LastCheckedAt:     dbutil.TimePtr(row.LastCheckedAt),
+		AnomalousAt:       dbutil.TimePtr(row.AnomalousAt),
 	}
 }
 
@@ -38,19 +38,19 @@ func decodeAdminPaymentOrderDetailFacts(row dbsqlc.GetAdminPaymentOrderRow) paym
 		UserPublicID: uuid.UUID(row.UserPublicID.Bytes), DisplayName: row.DisplayName,
 		Status: row.Status, IdeaQuantity: row.IdeaQuantity,
 		BaseCurrency: strings.ToLower(row.BaseCurrency), BaseAmountMinor: row.BaseAmountMinor,
-		PaidSubtotalMinor: postgres.NullInt64Pointer(row.PaidSubtotalMinor),
-		PaidTaxMinor:      postgres.NullInt64Pointer(row.PaidTaxMinor),
-		PaidTotalMinor:    postgres.NullInt64Pointer(row.PaidTotalMinor),
+		PaidSubtotalMinor: dbutil.Int64Ptr(row.PaidSubtotalMinor),
+		PaidTaxMinor:      dbutil.Int64Ptr(row.PaidTaxMinor),
+		PaidTotalMinor:    dbutil.Int64Ptr(row.PaidTotalMinor),
 		PaidCurrency:      strings.ToLower(row.PaidCurrency),
 		StripeAccountID:   row.StripeAccountID, StripeCustomerID: row.StripeCustomerID,
 		StripeCheckoutSessionID: postgres.PgTextString(row.StripeCheckoutSessionID),
 		StripePaymentIntentID:   row.StripePaymentIntentID, StripeChargeID: row.StripeChargeID,
 		TermsVersion: row.TermsVersion, RefundPolicyVersion: row.RefundPolicyVersion,
 		ReceiptURL: row.ReceiptUrl, ExpiresAt: dbutil.TimeValue(row.ExpiresAt), CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt),
-		PaidAt: postgres.NullTimePointer(row.PaidAt), CreditedAt: postgres.NullTimePointer(row.CreditedAt),
+		PaidAt: dbutil.TimePtr(row.PaidAt), CreditedAt: dbutil.TimePtr(row.CreditedAt),
 		LastErrorCode: postgres.PgTextString(row.LastErrorCode), LastErrorSummary: postgres.PgTextString(row.LastErrorSummary),
-		LastCheckedAt: postgres.NullTimePointer(row.LastCheckedAt), NextAttemptAt: postgres.NullTimePointer(row.NextAttemptAt),
-		AnomalousAt: postgres.NullTimePointer(row.AnomalousAt),
+		LastCheckedAt: dbutil.TimePtr(row.LastCheckedAt), NextAttemptAt: dbutil.TimePtr(row.NextAttemptAt),
+		AnomalousAt: dbutil.TimePtr(row.AnomalousAt),
 	}
 }
 
@@ -59,6 +59,6 @@ func decodeAdminPaymentWebhookEventRecord(row dbsqlc.ListAdminPaymentOrderWebhoo
 		EventType:      row.EventType,
 		StripeObjectID: row.StripeObjectID,
 		ReceivedAt:     dbutil.TimeValue(row.ReceivedAt),
-		ProcessedAt:    postgres.NullTimePointer(row.ProcessedAt),
+		ProcessedAt:    dbutil.TimePtr(row.ProcessedAt),
 	}
 }

@@ -1,21 +1,20 @@
 -- Workspace tenancy queries (#801). Public references use public_id;
 -- internal_id stays database-internal.
+--
+-- Default workspace rule (Bug2 root fix): every user owns exactly one live
+-- Default personal workspace (is_default). Plain personal workspaces created
+-- without an organization are always non-Default and unlimited; only
+-- EnsureDefaultWorkspace mints the Default row.
 
 -- name: CreateWorkspace :one
-INSERT INTO workspaces (public_id, organization_id, owner_user_id, name)
-VALUES (sqlc.arg(public_id), sqlc.narg(organization_id), sqlc.narg(owner_user_id), sqlc.arg(name))
-RETURNING internal_id, public_id, organization_id, owner_user_id, name, created_at, updated_at, archived_at;
+INSERT INTO workspaces (public_id, organization_id, owner_user_id, name, is_default)
+VALUES (sqlc.arg(public_id), sqlc.narg(organization_id), sqlc.narg(owner_user_id), sqlc.arg(name), sqlc.arg(is_default))
+RETURNING internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at;
 
 -- name: GetWorkspaceByPublicID :one
-SELECT internal_id, public_id, organization_id, owner_user_id, name, created_at, updated_at, archived_at
+SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
 FROM workspaces
 WHERE public_id = sqlc.arg(public_id)
-LIMIT 1;
-
--- name: GetWorkspaceByInternalID :one
-SELECT internal_id, public_id, organization_id, owner_user_id, name, created_at, updated_at, archived_at
-FROM workspaces
-WHERE internal_id = sqlc.arg(internal_id)
 LIMIT 1;
 
 -- name: LockWorkspaceMemberships :one
@@ -30,7 +29,7 @@ FROM workspace_memberships
 WHERE workspace_id = sqlc.arg(workspace_id);
 
 -- name: ListWorkspacesByUserID :many
-SELECT w.internal_id, w.public_id, w.organization_id, w.owner_user_id, w.name, w.created_at, w.updated_at, w.archived_at
+SELECT w.internal_id, w.public_id, w.organization_id, w.owner_user_id, w.name, w.is_default, w.created_at, w.updated_at, w.archived_at
 FROM workspaces AS w
 INNER JOIN workspace_memberships AS m ON m.workspace_id = w.internal_id
 WHERE m.user_id = sqlc.arg(user_id) AND w.archived_at IS NULL
@@ -38,7 +37,7 @@ ORDER BY w.internal_id ASC
 LIMIT sqlc.arg(row_limit);
 
 -- name: ListWorkspacesByOrganizationID :many
-SELECT internal_id, public_id, organization_id, owner_user_id, name, created_at, updated_at, archived_at
+SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
 FROM workspaces
 WHERE organization_id = sqlc.arg(organization_id) AND archived_at IS NULL
 ORDER BY internal_id ASC
@@ -91,18 +90,18 @@ SELECT COUNT(*)
 FROM workspace_memberships
 WHERE workspace_id = sqlc.arg(workspace_id) AND role = 'owner';
 
--- Personal workspace provisioning is idempotent on the partial unique index
--- ux_workspaces_personal_owner: concurrent inserts for the same owner collapse
--- to a single row, and the follow-up select always reads the winner.
--- name: InsertPersonalWorkspaceIgnore :execrows
-INSERT INTO workspaces (public_id, owner_user_id, name)
-VALUES (sqlc.arg(public_id), sqlc.arg(owner_user_id), sqlc.arg(name))
-ON CONFLICT (owner_user_id) WHERE organization_id IS NULL AND archived_at IS NULL DO NOTHING;
+-- Default workspace provisioning is idempotent on the partial unique index
+-- ux_workspaces_default_owner: concurrent inserts for the same owner collapse
+-- to a single Default row, and the follow-up select always reads the winner.
+-- name: InsertDefaultWorkspaceIgnore :execrows
+INSERT INTO workspaces (public_id, owner_user_id, name, is_default)
+VALUES (sqlc.arg(public_id), sqlc.arg(owner_user_id), sqlc.arg(name), TRUE)
+ON CONFLICT (owner_user_id) WHERE organization_id IS NULL AND is_default AND archived_at IS NULL DO NOTHING;
 
--- name: GetPersonalWorkspaceByOwner :one
-SELECT internal_id, public_id, organization_id, owner_user_id, name, created_at, updated_at, archived_at
+-- name: GetDefaultWorkspaceByOwner :one
+SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
 FROM workspaces
-WHERE owner_user_id = sqlc.arg(owner_user_id) AND organization_id IS NULL AND archived_at IS NULL
+WHERE owner_user_id = sqlc.arg(owner_user_id) AND organization_id IS NULL AND is_default AND archived_at IS NULL
 LIMIT 1;
 
 -- Billing Account owner stub (#801). Full lifecycle belongs to #804.

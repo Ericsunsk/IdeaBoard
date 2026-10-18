@@ -51,8 +51,8 @@ func IsAIImageFeature(raw string) bool {
 
 func ParseAIImageFeatureSlug(raw string) (string, bool) {
 	// Single canonical owner for feature-slug validation. New callers
-	// use this directly; Parse/ValidateWorkflow* are thin
-	// aliases below so ValidateCreate/handler never fork the set.
+	// use this directly; ValidateWorkflow* is a thin alias below so
+	// ValidateCreate/handler never fork the set.
 	slug := normalizeWorkflowFeatureSlug(raw)
 	if slug == "" || !workflowFeatureSlugRe.MatchString(slug) {
 		return "", false
@@ -61,12 +61,6 @@ func ParseAIImageFeatureSlug(raw string) (string, bool) {
 		return "", false
 	}
 	return slug, true
-}
-
-func SupportedFeatureSlugs() []string {
-	slugs := make([]string, len(supportedWorkflowFeatureSlugs))
-	copy(slugs, supportedWorkflowFeatureSlugs)
-	return slugs
 }
 
 func supportedFeatureSlugSet(slugs []string) map[string]struct{} {
@@ -79,14 +73,6 @@ func supportedFeatureSlugSet(slugs []string) map[string]struct{} {
 
 func normalizeWorkflowFeatureSlug(raw string) string {
 	return strings.TrimSpace(raw)
-}
-
-func ParseWorkflowFeatureSlug(raw string) (string, bool) {
-	// Legacy alias: the workflow/task/AI-image registries share one
-	// canonical list, so this delegates to the single owner
-	// ParseAIImageFeatureSlug. New callers use ParseAIImageFeatureSlug
-	// directly.
-	return ParseAIImageFeatureSlug(raw)
 }
 
 func ValidateWorkflowFeatureSlug(raw string) (string, error) {

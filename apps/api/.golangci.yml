@@ -82,8 +82,6 @@ linters:
             - internal/db/**/*.go
             - internal/events/**/*.go
           deny:
-            - pkg: ideaboard/api/internal/accountpool
-              desc: platform must not depend on business contexts
             - pkg: ideaboard/api/internal/billing
               desc: platform must not depend on business contexts
             - pkg: ideaboard/api/internal/billingrecords
@@ -113,7 +111,6 @@ linters:
         # DESIGN.md + apps/api/CONTEXT.md: business must not import runtime.
         no-runtime-from-business:
           files:
-            - internal/accountpool/**/*.go
             - internal/billing/**/*.go
             - internal/billingrecords/**/*.go
             - internal/boards/**/*.go

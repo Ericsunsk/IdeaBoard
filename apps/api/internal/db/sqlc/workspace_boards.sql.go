@@ -173,30 +173,6 @@ func (q *Queries) DeleteBoardDocumentMediaRefs(ctx context.Context, arg DeleteBo
 	return err
 }
 
-const deleteWorkspaceBoardMembership = `-- name: DeleteWorkspaceBoardMembership :execrows
-DELETE FROM board_memberships AS m
-USING boards AS b, workspaces AS w
-WHERE m.board_id = b.internal_id
-  AND w.internal_id = b.workspace_id
-  AND w.public_id = $1
-  AND b.public_id = $2
-  AND m.user_id = $3
-`
-
-type DeleteWorkspaceBoardMembershipParams struct {
-	WorkspacePublicID string `json:"workspace_public_id"`
-	BoardPublicID     string `json:"board_public_id"`
-	UserID            int64  `json:"user_id"`
-}
-
-func (q *Queries) DeleteWorkspaceBoardMembership(ctx context.Context, arg DeleteWorkspaceBoardMembershipParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteWorkspaceBoardMembership, arg.WorkspacePublicID, arg.BoardPublicID, arg.UserID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const deleteWorkspaceMemberBoardGrants = `-- name: DeleteWorkspaceMemberBoardGrants :execrows
 DELETE FROM board_memberships AS m
 USING boards AS b, workspaces AS w
@@ -511,45 +487,6 @@ func (q *Queries) InsertWorkspaceBoardMembershipIgnore(ctx context.Context, arg 
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const listBoardDocumentMediaRefAssets = `-- name: ListBoardDocumentMediaRefAssets :many
-SELECT m.public_id
-FROM board_document_media_refs AS r
-INNER JOIN boards AS b ON b.internal_id = r.board_id
-INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
-INNER JOIN media_assets AS m ON m.internal_id = r.media_asset_id
-WHERE w.public_id = $1
-  AND b.public_id = $2
-ORDER BY m.public_id ASC
-`
-
-type ListBoardDocumentMediaRefAssetsParams struct {
-	WorkspacePublicID string `json:"workspace_public_id"`
-	BoardPublicID     string `json:"board_public_id"`
-}
-
-// ListBoardDocumentMediaRefAssets audits the accepted document references
-// of one board as asset public ids (#936, GC/persistence verification).
-// Unknown or cross-workspace boards list empty.
-func (q *Queries) ListBoardDocumentMediaRefAssets(ctx context.Context, arg ListBoardDocumentMediaRefAssetsParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, listBoardDocumentMediaRefAssets, arg.WorkspacePublicID, arg.BoardPublicID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var public_id string
-		if err := rows.Scan(&public_id); err != nil {
-			return nil, err
-		}
-		items = append(items, public_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listBoardRevisions = `-- name: ListBoardRevisions :many

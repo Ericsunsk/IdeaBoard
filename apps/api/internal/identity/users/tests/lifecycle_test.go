@@ -40,7 +40,7 @@ func lifecycleHold(userID int64, key string) ports.HoldCommand {
 }
 
 func TestProvisionIdentityCreatesUserWalletAndWelcomeGrantAtomically(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
 	identity := VerifiedIdentity{
@@ -88,7 +88,7 @@ func TestProvisionIdentityCreatesUserWalletAndWelcomeGrantAtomically(t *testing.
 }
 
 func TestProvisionIdentityConcurrentRetriesGrantWelcomeCreditsOnce(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	identity := VerifiedIdentity{
 		AuthUserID: "auth-concurrent-1", DisplayName: "concurrent-user",
@@ -138,7 +138,7 @@ func TestProvisionIdentityConcurrentRetriesGrantWelcomeCreditsOnce(t *testing.T)
 }
 
 func TestProvisionIdentityDoesNotGrantAgainAfterTrustedClaimIdentityChanges(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
 	identity := VerifiedIdentity{
@@ -168,7 +168,7 @@ func TestProvisionIdentityDoesNotGrantAgainAfterTrustedClaimIdentityChanges(t *t
 }
 
 func TestProvisionIdentityFailsClosedWithoutTrustedClaimIdentityOrClaimKey(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	var initialUserCount int
 	if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM users`).Scan(&initialUserCount); err != nil {
@@ -211,7 +211,7 @@ func TestProvisionIdentityFailsClosedWithoutTrustedClaimIdentityOrClaimKey(t *te
 }
 
 func TestSetUserStatusFreezesAndRestoresWalletAtomically(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
@@ -277,7 +277,7 @@ WHERE users.id = $1`, result.User.ID).Scan(&userStatus, &walletStatus); err != n
 }
 
 func TestSetUserStatusAndTombstoneMissingUserReturnNotFound(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 
 	if err := service.SetUserStatus(context.Background(), 999999, 0); !database.IsNotFound(err) {
@@ -289,7 +289,7 @@ func TestSetUserStatusAndTombstoneMissingUserReturnNotFound(t *testing.T) {
 }
 
 func TestTombstoneUserPreservesAccountingAndPreventsWelcomeReclaim(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
@@ -360,7 +360,7 @@ FROM users JOIN credit_wallets ON credit_wallets.user_id = users.id WHERE users.
 }
 
 func TestInitializeExistingIdentityProvisionsWalletAndWelcomeGrant(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	authUserID := "auth-existing-1"
 	var userID int64
@@ -383,9 +383,9 @@ RETURNING id`, authUserID).Scan(&userID); err != nil {
 }
 
 func TestDirectUserRepositoryInsertProvisionsCreditWalletProjection(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
-	repo := NewUserRepository(db)
+	repo := NewUserRepository(pool)
 	user := &User{DisplayName: "direct-user-insert", Role: "user", Status: 1}
 	if err := repo.Create(ctx, user); err != nil {
 		t.Fatalf("create user: %v", err)
@@ -401,7 +401,7 @@ func TestDirectUserRepositoryInsertProvisionsCreditWalletProjection(t *testing.T
 }
 
 func TestInitializeExistingBannedIdentityGrantsWelcomeCreditsIntoFrozenWallet(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	authUserID := "auth-existing-banned-1"
 	var userID int64
@@ -428,7 +428,7 @@ RETURNING id`, authUserID).Scan(&userID); err != nil {
 }
 
 func TestWelcomeIdentityKeyRotationFailsClosedWithoutPartialState(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	first := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	if err := first.VerifyWelcomeIdentityKey(ctx); err != nil {
@@ -458,7 +458,7 @@ func TestWelcomeIdentityKeyRotationFailsClosedWithoutPartialState(t *testing.T) 
 }
 
 func TestAdminProvisionCreatesAndRepairsLifecycleAtomically(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	identity := VerifiedIdentity{
@@ -496,7 +496,7 @@ func TestAdminProvisionCreatesAndRepairsLifecycleAtomically(t *testing.T) {
 }
 
 func TestUserDeletionFailuresRemainFrozenAndRetryConverges(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
@@ -527,7 +527,7 @@ VALUES ('task_deleteconvergence', $1, $2, $3, 'render', '{}', 'pending')`, works
 
 	authDeleter := &recordingAuthUserDeleter{err: errors.New("auth unavailable")}
 	cleaner := &recordingUserUploadCleaner{err: errors.New("storage unavailable")}
-	service := NewUserService(NewUserRepository(db), lifecycle, nil, cleaner)
+	service := NewUserService(NewUserRepository(pool), lifecycle, nil, cleaner)
 	if err := service.DeleteUser(ctx, provisioned.User.ID, authDeleter); err == nil {
 		t.Fatal("Auth failure should stop deletion")
 	}
@@ -615,7 +615,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_user_tombstone_once()`); err != nil {
 // not_found; that must be treated as "already converged" so Storage cleanup
 // and the PII tombstone still run instead of stranding the user forever.
 func TestUserDeletionConvergesWhenAuthIdentityAlreadyGoneAfterLostPhaseAdvance(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
@@ -646,7 +646,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_auth_phase_advance_once()`); err != nil {
 
 	authDeleter := &recordingAuthUserDeleter{}
 	cleaner := &recordingUserUploadCleaner{}
-	service := NewUserService(NewUserRepository(db), lifecycle, nil, cleaner)
+	service := NewUserService(NewUserRepository(pool), lifecycle, nil, cleaner)
 	if err := service.DeleteUser(ctx, provisioned.User.ID, authDeleter); err == nil {
 		t.Fatal("lost Auth phase advance should surface an error on the first attempt")
 	}
@@ -709,7 +709,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_auth_phase_advance_once()`); err != nil {
 }
 
 func TestUserDeletionIsBlockedByUnsettledPaymentState(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
@@ -730,7 +730,7 @@ func TestUserDeletionIsBlockedByUnsettledPaymentState(t *testing.T) {
 		t.Fatalf("encrypt payment webhook secret fixture: %v", err)
 	}
 
-	if _, err := db.Exec(ctx, `
+	if _, err := pool.Exec(ctx, `
 INSERT INTO payment_stripe_credentials (
   id, account_id, mode, charges_enabled, stripe_product_id, stripe_webhook_endpoint_id,
   api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind, created_by
@@ -742,7 +742,7 @@ VALUES (
 		t.Fatalf("seed payment credential generation: %v", err)
 	}
 
-	if _, err := db.Exec(ctx, `
+	if _, err := pool.Exec(ctx, `
 INSERT INTO payment_orders (
   id, public_order_number, public_token, user_id, client_idempotency_key, request_hash,
   status, stripe_credential_id, stripe_account_id, stripe_product_id, idea_quantity, base_amount_minor, terms_version,
@@ -782,7 +782,7 @@ WHERE users.id = $1`, provisioned.User.ID).Scan(&userStatus, &walletStatus); err
 }
 
 func TestIdentityAdminCommandsResumeDeletionFromPendingStorage(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
 	lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
@@ -795,7 +795,7 @@ func TestIdentityAdminCommandsResumeDeletionFromPendingStorage(t *testing.T) {
 	}
 
 	cleaner := &recordingUserUploadCleaner{err: errors.New("storage unavailable")}
-	userService := NewUserService(NewUserRepository(db), lifecycle, nil, cleaner)
+	userService := NewUserService(NewUserRepository(pool), lifecycle, nil, cleaner)
 	events := &[]string{}
 	authManager := &fakeIdentityAdminAuth{events: events}
 	commands := newIdentityAdminCommands(userService, authManager, nil)
@@ -822,7 +822,7 @@ func TestIdentityAdminCommandsResumeDeletionFromPendingStorage(t *testing.T) {
 func TestProvisionConcurrentWithBanOrDeleteNeverLeavesInactiveUserWithActiveWallet(t *testing.T) {
 	for _, operation := range []string{"ban", "delete"} {
 		t.Run(operation, func(t *testing.T) {
-			_, pool := testdb.OpenWithPool(t)
+			pool := testdb.Open(t)
 			ctx := context.Background()
 			lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 			identity := VerifiedIdentity{

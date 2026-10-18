@@ -198,7 +198,7 @@ func v1WorkspaceFixture(t *testing.T, ctx context.Context, store *tenancy.InMemo
 	return ws
 }
 
-func TestV1UserProvisionsPersonalWorkspace(t *testing.T) {
+func TestV1UserProvisionsDefaultWorkspace(t *testing.T) {
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
 	engine := newV1TestEngine(store, dir)
@@ -566,7 +566,7 @@ func TestV1WorkspaceIdempotency(t *testing.T) {
 	}
 }
 
-func TestV1UserConcurrentProvision(t *testing.T) {
+func TestV1UserConcurrentDefaultProvision(t *testing.T) {
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
 	engine := newV1TestEngine(store, dir)
@@ -613,9 +613,9 @@ func TestV1WorkspacePagination(t *testing.T) {
 		status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces" + query, userID: userID})
 		return status, payload
 	}
-	// Provision the personal workspace first. The 3 fixtures are already
-	// personal (no organization), so /user converges onto the first one and
-	// the list stays at 3: pages of 2 + 1.
+	// Provision the Default workspace first. The 3 fixtures are plain
+	// non-Default rows, so /user mints the Default and the list holds 4:
+	// pages of 2 + 2.
 	if status, _, _ := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/user", userID: userID}); status != 200 {
 		t.Fatalf("GET /user = %d", status)
 	}
@@ -632,8 +632,19 @@ func TestV1WorkspacePagination(t *testing.T) {
 	}
 	cursor := meta["next_cursor"].(string)
 	status, second := get("?page_size=2&cursor=" + cursor)
-	if status != 200 || len(second["data"].([]any)) != 1 || second["meta"].(map[string]any)["has_more"] != false {
+	if status != 200 || len(second["data"].([]any)) != 2 || second["meta"].(map[string]any)["has_more"] != false {
 		t.Fatalf("second page = %d %v", status, second)
+	}
+	defaults := 0
+	for _, page := range []map[string]any{first, second} {
+		for _, item := range page["data"].([]any) {
+			if item.(map[string]any)["is_default"] == true {
+				defaults++
+			}
+		}
+	}
+	if defaults != 1 {
+		t.Fatalf("default rows across pages = %d, want exactly 1", defaults)
 	}
 	status, bad := get("?cursor=!!!")
 	if status != 400 || v1ErrorCode(t, bad) != string(contract.CodePaginationCursorInvalid) {
@@ -642,6 +653,168 @@ func TestV1WorkspacePagination(t *testing.T) {
 	status, badSize := get("?page_size=101")
 	if status != 400 {
 		t.Fatalf("bad page_size = %d %v, want 400", status, badSize)
+	}
+}
+
+// TestV1CreateMultipleNonDefaultWorkspaces proves plain POST creation
+// without an organization is unlimited and never Default.
+func TestV1CreateMultipleNonDefaultWorkspaces(t *testing.T) {
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	engine := newV1TestEngine(store, dir)
+
+	const userID int64 = 61
+	post := func(key, name string) (int, map[string]any) {
+		status, _, payload := doV1(t, engine, v1Call{
+			method: http.MethodPost, path: "/api/v1/workspaces", userID: userID,
+			body:    fmt.Sprintf(`{"data":{"name":%q}}`, name),
+			headers: map[string]string{contract.IdempotencyKeyHeader: key},
+		})
+		return status, payload
+	}
+	ids := map[string]struct{}{}
+	for i, name := range []string{"plain-a", "plain-b", "plain-c"} {
+		status, payload := post(fmt.Sprintf("plain-%d", i), name)
+		if status != 201 {
+			t.Fatalf("create %q = %d %v, want 201", name, status, payload)
+		}
+		data := v1Data(t, payload).(map[string]any)
+		if data["is_default"] == true {
+			t.Fatalf("POST create %q must not be Default: %v", name, data)
+		}
+		id, _ := data["id"].(string)
+		ids[id] = struct{}{}
+	}
+	if len(ids) != 3 {
+		t.Fatalf("created ids = %v, want 3 distinct rows", ids)
+	}
+}
+
+// TestV1ArchiveDefaultWorkspaceProtected proves the Default workspace
+// cannot be archived (403 workspace_default_protected) while plain rows
+// archive normally. Workspaces are never hard-deleted, so this guard
+// covers the only delete path.
+func TestV1ArchiveDefaultWorkspaceProtected(t *testing.T) {
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	engine := newV1TestEngine(store, dir)
+
+	const userID int64 = 62
+	status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/user", userID: userID})
+	if status != 200 {
+		t.Fatalf("GET /user = %d %v, want 200", status, payload)
+	}
+	defID, _ := v1Data(t, payload).(map[string]any)["personal_workspace_id"].(string)
+	if defID == "" {
+		t.Fatal("personal_workspace_id missing after provision")
+	}
+	status, _, archived := doV1(t, engine, v1Call{method: http.MethodPost, path: "/api/v1/workspaces/" + defID + "/archive", userID: userID})
+	if status != http.StatusForbidden || v1ErrorCode(t, archived) != string(contract.CodeWorkspaceDefaultProtected) {
+		t.Fatalf("archive default = %d %v, want 403 workspace_default_protected", status, archived)
+	}
+
+	plain := v1WorkspaceFixture(t, context.Background(), store, "plain", userID)
+	status, _, _ = doV1(t, engine, v1Call{method: http.MethodPost, path: "/api/v1/workspaces/" + plain.PublicID + "/archive", userID: userID})
+	if status != 200 {
+		t.Fatalf("archive plain = %d, want 200", status)
+	}
+}
+
+// TestV1RenameDefaultWorkspaceProtected proves the Default workspace
+// cannot be renamed (403 workspace_default_protected) while plain rows
+// rename normally.
+func TestV1RenameDefaultWorkspaceProtected(t *testing.T) {
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	engine := newV1TestEngine(store, dir)
+
+	const userID int64 = 65
+	status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/user", userID: userID})
+	if status != 200 {
+		t.Fatalf("GET /user = %d %v, want 200", status, payload)
+	}
+	defID, _ := v1Data(t, payload).(map[string]any)["personal_workspace_id"].(string)
+	if defID == "" {
+		t.Fatal("personal_workspace_id missing after provision")
+	}
+	status, _, renamed := doV1(t, engine, v1Call{method: http.MethodPatch, path: "/api/v1/workspaces/" + defID, userID: userID, body: `{"data":{"name":"Renamed Default"}}`})
+	if status != http.StatusForbidden || v1ErrorCode(t, renamed) != string(contract.CodeWorkspaceDefaultProtected) {
+		t.Fatalf("rename default = %d %v, want 403 workspace_default_protected", status, renamed)
+	}
+
+	plain := v1WorkspaceFixture(t, context.Background(), store, "plain", userID)
+	status, _, payload = doV1(t, engine, v1Call{method: http.MethodPatch, path: "/api/v1/workspaces/" + plain.PublicID, userID: userID, body: `{"data":{"name":"Renamed Plain"}}`})
+	if status != 200 {
+		t.Fatalf("rename plain = %d %v, want 200", status, payload)
+	}
+	if v1Data(t, payload).(map[string]any)["name"] != "Renamed Plain" {
+		t.Fatalf("renamed plain name = %v, want Renamed Plain", payload)
+	}
+}
+
+// TestV1ListBackfillsMissingDefault proves first-list auto-provisioning is
+// keyed on the missing Default, not on an empty list: a user holding only
+// plain rows still gets a Default row.
+func TestV1ListBackfillsMissingDefault(t *testing.T) {
+	ctx := context.Background()
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	engine := newV1TestEngine(store, dir)
+
+	const userID int64 = 63
+	v1WorkspaceFixture(t, ctx, store, "plain-a", userID)
+	v1WorkspaceFixture(t, ctx, store, "plain-b", userID)
+
+	status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces?page_size=50", userID: userID})
+	if status != 200 {
+		t.Fatalf("list = %d %v, want 200", status, payload)
+	}
+	items := v1Data(t, payload).([]any)
+	if len(items) != 3 {
+		t.Fatalf("list items = %d, want 2 plain + backfilled Default", len(items))
+	}
+	defaults := 0
+	for _, item := range items {
+		if item.(map[string]any)["is_default"] == true {
+			defaults++
+		}
+	}
+	if defaults != 1 {
+		t.Fatalf("default rows = %d, want exactly 1", defaults)
+	}
+}
+
+// TestV1CreateBoardBackfillsDefault proves board creation mints a missing
+// Default workspace as a side effect while the board itself lands in the
+// requested workspace.
+func TestV1CreateBoardBackfillsDefault(t *testing.T) {
+	ctx := context.Background()
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	engine := newV1TestEngine(store, dir)
+
+	const userID int64 = 64
+	ws := v1WorkspaceFixture(t, ctx, store, "plain", userID)
+	status, _, payload := doV1(t, engine, v1Call{
+		method: http.MethodPost, path: "/api/v1/workspaces/" + ws.PublicID + "/boards", userID: userID,
+		body:    `{"data":{"name":"Atlas"}}`,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "board-backfill-1"},
+	})
+	if status != 201 {
+		t.Fatalf("create board = %d %v, want 201", status, payload)
+	}
+	visible, err := store.ListWorkspacesForUser(ctx, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaults := 0
+	for _, w := range visible {
+		if w.IsDefaultWorkspace() {
+			defaults++
+		}
+	}
+	if defaults != 1 {
+		t.Fatalf("default rows after board create = %d, want exactly 1 (%v)", defaults, visible)
 	}
 }
 

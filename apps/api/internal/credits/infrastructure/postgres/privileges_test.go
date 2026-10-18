@@ -43,23 +43,23 @@ var creditShadowTableNames = []string{
 }
 
 func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := context.Background()
-	createProtectedAuthTables(t, ctx, db)
+	createProtectedAuthTables(t, ctx, pool)
 	runtimeRole := fmt.Sprintf("credits_runtime_test_%d_%d", os.Getpid(), time.Now().UnixNano())
 	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
-	if _, err := db.Exec(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
+	if _, err := pool.Exec(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
 		t.Fatalf("create runtime role error = %v", err)
 	}
 	t.Cleanup(func() {
-		_, _ = db.Exec(context.Background(), `DROP OWNED BY `+roleSQL)
-		_, _ = db.Exec(context.Background(), `DROP ROLE IF EXISTS `+roleSQL)
+		_, _ = pool.Exec(context.Background(), `DROP OWNED BY `+roleSQL)
+		_, _ = pool.Exec(context.Background(), `DROP ROLE IF EXISTS `+roleSQL)
 	})
 	policies := []dbprivileges.Policy{dbprivileges.RuntimePrivilegePolicy(), postgres.RuntimePrivilegePolicy()}
-	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
+	if err := dbprivileges.Configure(ctx, pool, runtimeRole, policies...); err != nil {
 		t.Fatalf("configure runtime privilege policies error = %v", err)
 	}
-	if err := dbprivileges.Verify(ctx, db, policies...); err == nil {
+	if err := dbprivileges.Verify(ctx, pool, policies...); err == nil {
 		t.Fatal("schema owner was accepted as the API runtime role")
 	}
 
@@ -134,7 +134,7 @@ SELECT transaction_id FROM execute_credit_command_v2(
 	if err == nil || !strings.Contains(err.Error(), "invalid credit command") {
 		t.Fatalf("runtime direct non-admin deduction error = %v, want invalid credit command", err)
 	}
-	runtimeConn, err := db.Acquire(ctx)
+	runtimeConn, err := pool.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("open runtime privilege verification connection error = %v", err)
 	}
@@ -185,7 +185,7 @@ INSERT INTO credit_wallet_restrictions (
 	var canExecutePurchase bool
 	var canCreateRestriction bool
 	var canReleaseRestriction bool
-	if err := db.QueryRow(ctx, `
+	if err := pool.QueryRow(ctx, `
 SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
        has_table_privilege($1, 'users', 'INSERT'),
        has_table_privilege($1, '"user"', 'INSERT'),
@@ -235,7 +235,7 @@ SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
 	var securityDefiner bool
 	var functionConfig string
 	var trustedSchema string
-	if err := db.QueryRow(ctx, `
+	if err := pool.QueryRow(ctx, `
 SELECT prosecdef, COALESCE(array_to_string(proconfig, ','), ''), current_schema()
 FROM pg_proc
 WHERE oid = 'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)'::regprocedure`,
@@ -245,7 +245,7 @@ WHERE oid = 'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,te
 	if !securityDefiner || !isTrustedFunctionSearchPath(functionConfig, trustedSchema) {
 		t.Fatalf("command function security_definer=%v config=%v", securityDefiner, functionConfig)
 	}
-	if err := db.QueryRow(ctx, `
+	if err := pool.QueryRow(ctx, `
 SELECT prosecdef, COALESCE(array_to_string(proconfig, ','), '')
 FROM pg_proc
 WHERE oid = 'execute_credit_purchase_v1(bigint,bigint,text,text,text,text,text,text,text)'::regprocedure`,
@@ -261,7 +261,7 @@ WHERE oid = 'execute_credit_purchase_v1(bigint,bigint,text,text,text,text,text,t
 	} {
 		var restrictionSecurityDefiner bool
 		var restrictionFunctionConfig string
-		if err := db.QueryRow(ctx, `
+		if err := pool.QueryRow(ctx, `
 SELECT prosecdef, COALESCE(array_to_string(proconfig, ','), '')
 FROM pg_proc
 WHERE oid = $1::regprocedure`, functionName).Scan(&restrictionSecurityDefiner, &restrictionFunctionConfig); err != nil {
@@ -272,7 +272,7 @@ WHERE oid = $1::regprocedure`, functionName).Scan(&restrictionSecurityDefiner, &
 		}
 	}
 	var postingFunctionConfig string
-	if err := db.QueryRow(ctx, `
+	if err := pool.QueryRow(ctx, `
 SELECT COALESCE(array_to_string(proconfig, ','), '')
 FROM pg_proc
 WHERE oid = 'apply_credit_posting_balances()'::regprocedure`,

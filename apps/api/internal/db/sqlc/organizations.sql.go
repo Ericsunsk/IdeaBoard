@@ -9,33 +9,6 @@ import (
 	"context"
 )
 
-const archiveOrganization = `-- name: ArchiveOrganization :execrows
-UPDATE organizations
-SET archived_at = now(), updated_at = now()
-WHERE public_id = $1 AND archived_at IS NULL
-`
-
-func (q *Queries) ArchiveOrganization(ctx context.Context, publicID string) (int64, error) {
-	result, err := q.db.Exec(ctx, archiveOrganization, publicID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const countOrganizationOwners = `-- name: CountOrganizationOwners :one
-SELECT COUNT(*)
-FROM organization_memberships
-WHERE organization_id = $1 AND role = 'owner'
-`
-
-func (q *Queries) CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error) {
-	row := q.db.QueryRow(ctx, countOrganizationOwners, organizationID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createOrganization = `-- name: CreateOrganization :one
 
 INSERT INTO organizations (public_id, name)
@@ -62,24 +35,6 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 		&i.ArchivedAt,
 	)
 	return i, err
-}
-
-const deleteOrganizationMembership = `-- name: DeleteOrganizationMembership :execrows
-DELETE FROM organization_memberships
-WHERE organization_id = $1 AND user_id = $2
-`
-
-type DeleteOrganizationMembershipParams struct {
-	OrganizationID int64 `json:"organization_id"`
-	UserID         int64 `json:"user_id"`
-}
-
-func (q *Queries) DeleteOrganizationMembership(ctx context.Context, arg DeleteOrganizationMembershipParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteOrganizationMembership, arg.OrganizationID, arg.UserID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
 }
 
 const getOrganizationByInternalID = `-- name: GetOrganizationByInternalID :one
@@ -147,44 +102,6 @@ func (q *Queries) GetOrganizationMembership(ctx context.Context, arg GetOrganiza
 	return i, err
 }
 
-const listOrganizationMembers = `-- name: ListOrganizationMembers :many
-SELECT m.organization_id, m.user_id, m.role, m.created_at
-FROM organization_memberships AS m
-WHERE m.organization_id = $1
-ORDER BY m.created_at ASC
-LIMIT $2
-`
-
-type ListOrganizationMembersParams struct {
-	OrganizationID int64 `json:"organization_id"`
-	RowLimit       int32 `json:"row_limit"`
-}
-
-func (q *Queries) ListOrganizationMembers(ctx context.Context, arg ListOrganizationMembersParams) ([]OrganizationMembership, error) {
-	rows, err := q.db.Query(ctx, listOrganizationMembers, arg.OrganizationID, arg.RowLimit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []OrganizationMembership
-	for rows.Next() {
-		var i OrganizationMembership
-		if err := rows.Scan(
-			&i.OrganizationID,
-			&i.UserID,
-			&i.Role,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listOrganizationsByUserID = `-- name: ListOrganizationsByUserID :many
 SELECT o.internal_id, o.public_id, o.name, o.created_at, o.updated_at, o.archived_at
 FROM organizations AS o
@@ -224,26 +141,6 @@ func (q *Queries) ListOrganizationsByUserID(ctx context.Context, arg ListOrganiz
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateOrganizationMemberRole = `-- name: UpdateOrganizationMemberRole :execrows
-UPDATE organization_memberships
-SET role = $1
-WHERE organization_id = $2 AND user_id = $3
-`
-
-type UpdateOrganizationMemberRoleParams struct {
-	Role           string `json:"role"`
-	OrganizationID int64  `json:"organization_id"`
-	UserID         int64  `json:"user_id"`
-}
-
-func (q *Queries) UpdateOrganizationMemberRole(ctx context.Context, arg UpdateOrganizationMemberRoleParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updateOrganizationMemberRole, arg.Role, arg.OrganizationID, arg.UserID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
 }
 
 const updateOrganizationName = `-- name: UpdateOrganizationName :execrows

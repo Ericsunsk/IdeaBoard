@@ -16,7 +16,7 @@ import (
 )
 
 func TestAIImageReadinessReturnsQuoteAndWalletAvailability(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	billingService := billingpostgres.NewStore(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
@@ -75,7 +75,7 @@ func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
 		} {
 			scenario := scenario
 			t.Run(feature+"/"+scenario.name, func(t *testing.T) {
-				_, pool := testdb.OpenWithPool(t)
+				pool := testdb.Open(t)
 				billingService := billingpostgres.NewStore(pool)
 				creditService := credits.NewService(pool)
 				request, err := AIImageRequest(feature, "1k", 1)
@@ -160,7 +160,7 @@ func TestHoldAndPersistFailsClosedForUnavailableFeatureStates(t *testing.T) {
 		{name: "archived", publish: true},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
-			db, pool := testdb.OpenWithPool(t)
+			pool := testdb.Open(t)
 			billingService := billingpostgres.NewStore(pool)
 			creditService := credits.NewService(pool)
 			request, err := AIImageRequest(workflow.FeatureSlugInpaint, "1k", 1)
@@ -202,7 +202,7 @@ func TestHoldAndPersistFailsClosedForUnavailableFeatureStates(t *testing.T) {
 				t.Fatalf("HoldAndPersist error=%v, want ErrPricingUnavailable", err)
 			}
 			var count int
-			if err := db.QueryRow(t.Context(), `SELECT count(*) FROM task_billing_snapshots WHERE task_id = $1`, "unavailable-"+scenario.name).Scan(&count); err != nil {
+			if err := pool.QueryRow(t.Context(), `SELECT count(*) FROM task_billing_snapshots WHERE task_id = $1`, "unavailable-"+scenario.name).Scan(&count); err != nil {
 				t.Fatal(err)
 			}
 			if count != 0 {
@@ -213,7 +213,7 @@ func TestHoldAndPersistFailsClosedForUnavailableFeatureStates(t *testing.T) {
 }
 
 func TestDatabaseRejectsTaskBillingFactMutationAndIllegalSettlement(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	billingService := billingpostgres.NewStore(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
@@ -243,14 +243,14 @@ func TestDatabaseRejectsTaskBillingFactMutationAndIllegalSettlement(t *testing.T
 		t.Fatal(err)
 	}
 	var persistedDisplayName string
-	if err := db.QueryRow(t.Context(), `
+	if err := pool.QueryRow(t.Context(), `
 SELECT display_name FROM task_billing_snapshots WHERE task_id = 'immutable-billing-task'`).Scan(&persistedDisplayName); err != nil {
 		t.Fatal(err)
 	}
 	if persistedDisplayName != "Pattern" {
 		t.Fatalf("persisted display name=%q after SKU rename, want Pattern", persistedDisplayName)
 	}
-	if _, err := db.Exec(t.Context(), `
+	if _, err := pool.Exec(t.Context(), `
 INSERT INTO task_billing_snapshots (
   task_id, user_id, service, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at
@@ -260,7 +260,7 @@ SELECT 'invalid-initial-settlement', 1, service, sku, display_name, price_versio
 FROM task_billing_snapshots WHERE task_id = 'immutable-billing-task'`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(t.Context(), `
+	if _, err := pool.Exec(t.Context(), `
 INSERT INTO task_billing_settlements (task_id, state)
 VALUES ('invalid-initial-settlement', 'held')`); err == nil {
 		t.Fatal("free snapshot accepted held initial settlement")
@@ -272,7 +272,7 @@ VALUES ('invalid-initial-settlement', 'held')`); err == nil {
 		`UPDATE task_billing_settlements SET state = 'released', actual_output_count = 0, released_credits = 1, release_transaction_id = 'fake', settled_at = now() WHERE task_id = 'immutable-billing-task'`,
 		`DELETE FROM task_billing_settlements WHERE task_id = 'immutable-billing-task'`,
 	} {
-		if _, err := db.Exec(t.Context(), statement); err == nil {
+		if _, err := pool.Exec(t.Context(), statement); err == nil {
 			t.Fatalf("statement unexpectedly succeeded: %s", fmt.Sprintf("%.80s", statement))
 		}
 	}

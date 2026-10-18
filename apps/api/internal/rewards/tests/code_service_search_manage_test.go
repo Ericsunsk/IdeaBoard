@@ -15,7 +15,7 @@ import (
 )
 
 func TestSearchRewardCodesFiltersCountsAndPaginates(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	now := time.Date(2030, time.July, 22, 8, 0, 0, 0, time.UTC)
 	service := rewards.NewServiceWithOptions(pool, rewardscredits.New(creditService), newTestRewardKeyring(t), rewards.ServiceOptions{
@@ -134,7 +134,7 @@ func TestSearchRewardCodesFiltersCountsAndPaginates(t *testing.T) {
 }
 
 func TestSearchRewardCodesUsesSingleTimestampForFilterAndRowStatus(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	createdAt := time.Date(2030, time.July, 22, 8, 0, 0, 0, time.UTC)
 	keyring := newTestRewardKeyring(t)
@@ -172,7 +172,7 @@ func TestSearchRewardCodesUsesSingleTimestampForFilterAndRowStatus(t *testing.T)
 }
 
 func TestRewardCodeMigrationCatalogAndAppendOnlyGuards(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := newTestRewardService(t, pool, credits.NewService(pool))
 	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "Schema Guard", Code: "SCHEMA-GUARD-2026", CreditAmount: 1,
@@ -217,7 +217,7 @@ func TestRewardCodeMigrationCatalogAndAppendOnlyGuards(t *testing.T) {
 func TestRewardCodeKeyRetirementRejectsDisabledAndExpiredDefinitions(t *testing.T) {
 	for _, state := range []string{"disabled", "expired"} {
 		t.Run(state, func(t *testing.T) {
-			_, pool := testdb.OpenWithPool(t)
+			pool := testdb.Open(t)
 			creditService := credits.NewService(pool)
 			now := time.Date(2030, time.July, 21, 8, 0, 0, 0, time.UTC)
 			oldKey := rewards.CodeKey{Version: "retiring-old", Secret: bytes.Repeat([]byte{0x51}, 32)}
@@ -266,7 +266,7 @@ func TestRewardCodeKeyRetirementRejectsDisabledAndExpiredDefinitions(t *testing.
 }
 
 func TestRewardCodeManagementChangesOnlyFutureRedemptionsAndEnforcesCap(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	now := time.Date(2030, time.July, 22, 8, 0, 0, 0, time.UTC)
 	service := newTestRewardServiceAt(t, pool, creditService, now)
@@ -359,7 +359,7 @@ FROM reward_redemptions WHERE id = $1`, first.Redemption.ID).Scan(
 }
 
 func TestRewardCodeRedemptionSnapshotsSurviveRenameAndRotation(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{

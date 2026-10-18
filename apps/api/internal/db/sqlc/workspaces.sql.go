@@ -80,9 +80,9 @@ func (q *Queries) CreateBillingAccountStub(ctx context.Context, arg CreateBillin
 
 const createWorkspace = `-- name: CreateWorkspace :one
 
-INSERT INTO workspaces (public_id, organization_id, owner_user_id, name)
-VALUES ($1, $2, $3, $4)
-RETURNING internal_id, public_id, organization_id, owner_user_id, name, created_at, updated_at, archived_at
+INSERT INTO workspaces (public_id, organization_id, owner_user_id, name, is_default)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
 `
 
 type CreateWorkspaceParams struct {
@@ -90,16 +90,23 @@ type CreateWorkspaceParams struct {
 	OrganizationID pgtype.Int8 `json:"organization_id"`
 	OwnerUserID    pgtype.Int8 `json:"owner_user_id"`
 	Name           string      `json:"name"`
+	IsDefault      bool        `json:"is_default"`
 }
 
 // Workspace tenancy queries (#801). Public references use public_id;
 // internal_id stays database-internal.
+//
+// Default workspace rule (Bug2 root fix): every user owns exactly one live
+// Default personal workspace (is_default). Plain personal workspaces created
+// without an organization are always non-Default and unlimited; only
+// EnsureDefaultWorkspace mints the Default row.
 func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error) {
 	row := q.db.QueryRow(ctx, createWorkspace,
 		arg.PublicID,
 		arg.OrganizationID,
 		arg.OwnerUserID,
 		arg.Name,
+		arg.IsDefault,
 	)
 	var i Workspace
 	err := row.Scan(
@@ -108,6 +115,7 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 		&i.OrganizationID,
 		&i.OwnerUserID,
 		&i.Name,
+		&i.IsDefault,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -154,15 +162,15 @@ func (q *Queries) GetBillingAccountByWorkspaceID(ctx context.Context, workspaceI
 	return i, err
 }
 
-const getPersonalWorkspaceByOwner = `-- name: GetPersonalWorkspaceByOwner :one
-SELECT internal_id, public_id, organization_id, owner_user_id, name, created_at, updated_at, archived_at
+const getDefaultWorkspaceByOwner = `-- name: GetDefaultWorkspaceByOwner :one
+SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
 FROM workspaces
-WHERE owner_user_id = $1 AND organization_id IS NULL AND archived_at IS NULL
+WHERE owner_user_id = $1 AND organization_id IS NULL AND is_default AND archived_at IS NULL
 LIMIT 1
 `
 
-func (q *Queries) GetPersonalWorkspaceByOwner(ctx context.Context, ownerUserID pgtype.Int8) (Workspace, error) {
-	row := q.db.QueryRow(ctx, getPersonalWorkspaceByOwner, ownerUserID)
+func (q *Queries) GetDefaultWorkspaceByOwner(ctx context.Context, ownerUserID pgtype.Int8) (Workspace, error) {
+	row := q.db.QueryRow(ctx, getDefaultWorkspaceByOwner, ownerUserID)
 	var i Workspace
 	err := row.Scan(
 		&i.InternalID,
@@ -170,29 +178,7 @@ func (q *Queries) GetPersonalWorkspaceByOwner(ctx context.Context, ownerUserID p
 		&i.OrganizationID,
 		&i.OwnerUserID,
 		&i.Name,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.ArchivedAt,
-	)
-	return i, err
-}
-
-const getWorkspaceByInternalID = `-- name: GetWorkspaceByInternalID :one
-SELECT internal_id, public_id, organization_id, owner_user_id, name, created_at, updated_at, archived_at
-FROM workspaces
-WHERE internal_id = $1
-LIMIT 1
-`
-
-func (q *Queries) GetWorkspaceByInternalID(ctx context.Context, internalID int64) (Workspace, error) {
-	row := q.db.QueryRow(ctx, getWorkspaceByInternalID, internalID)
-	var i Workspace
-	err := row.Scan(
-		&i.InternalID,
-		&i.PublicID,
-		&i.OrganizationID,
-		&i.OwnerUserID,
-		&i.Name,
+		&i.IsDefault,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -201,7 +187,7 @@ func (q *Queries) GetWorkspaceByInternalID(ctx context.Context, internalID int64
 }
 
 const getWorkspaceByPublicID = `-- name: GetWorkspaceByPublicID :one
-SELECT internal_id, public_id, organization_id, owner_user_id, name, created_at, updated_at, archived_at
+SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
 FROM workspaces
 WHERE public_id = $1
 LIMIT 1
@@ -216,6 +202,7 @@ func (q *Queries) GetWorkspaceByPublicID(ctx context.Context, publicID string) (
 		&i.OrganizationID,
 		&i.OwnerUserID,
 		&i.Name,
+		&i.IsDefault,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -246,23 +233,23 @@ func (q *Queries) GetWorkspaceMembership(ctx context.Context, arg GetWorkspaceMe
 	return i, err
 }
 
-const insertPersonalWorkspaceIgnore = `-- name: InsertPersonalWorkspaceIgnore :execrows
-INSERT INTO workspaces (public_id, owner_user_id, name)
-VALUES ($1, $2, $3)
-ON CONFLICT (owner_user_id) WHERE organization_id IS NULL AND archived_at IS NULL DO NOTHING
+const insertDefaultWorkspaceIgnore = `-- name: InsertDefaultWorkspaceIgnore :execrows
+INSERT INTO workspaces (public_id, owner_user_id, name, is_default)
+VALUES ($1, $2, $3, TRUE)
+ON CONFLICT (owner_user_id) WHERE organization_id IS NULL AND is_default AND archived_at IS NULL DO NOTHING
 `
 
-type InsertPersonalWorkspaceIgnoreParams struct {
+type InsertDefaultWorkspaceIgnoreParams struct {
 	PublicID    string      `json:"public_id"`
 	OwnerUserID pgtype.Int8 `json:"owner_user_id"`
 	Name        string      `json:"name"`
 }
 
-// Personal workspace provisioning is idempotent on the partial unique index
-// ux_workspaces_personal_owner: concurrent inserts for the same owner collapse
-// to a single row, and the follow-up select always reads the winner.
-func (q *Queries) InsertPersonalWorkspaceIgnore(ctx context.Context, arg InsertPersonalWorkspaceIgnoreParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertPersonalWorkspaceIgnore, arg.PublicID, arg.OwnerUserID, arg.Name)
+// Default workspace provisioning is idempotent on the partial unique index
+// ux_workspaces_default_owner: concurrent inserts for the same owner collapse
+// to a single Default row, and the follow-up select always reads the winner.
+func (q *Queries) InsertDefaultWorkspaceIgnore(ctx context.Context, arg InsertDefaultWorkspaceIgnoreParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertDefaultWorkspaceIgnore, arg.PublicID, arg.OwnerUserID, arg.Name)
 	if err != nil {
 		return 0, err
 	}
@@ -328,7 +315,7 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMem
 }
 
 const listWorkspacesByOrganizationID = `-- name: ListWorkspacesByOrganizationID :many
-SELECT internal_id, public_id, organization_id, owner_user_id, name, created_at, updated_at, archived_at
+SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
 FROM workspaces
 WHERE organization_id = $1 AND archived_at IS NULL
 ORDER BY internal_id ASC
@@ -355,6 +342,7 @@ func (q *Queries) ListWorkspacesByOrganizationID(ctx context.Context, arg ListWo
 			&i.OrganizationID,
 			&i.OwnerUserID,
 			&i.Name,
+			&i.IsDefault,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -370,7 +358,7 @@ func (q *Queries) ListWorkspacesByOrganizationID(ctx context.Context, arg ListWo
 }
 
 const listWorkspacesByUserID = `-- name: ListWorkspacesByUserID :many
-SELECT w.internal_id, w.public_id, w.organization_id, w.owner_user_id, w.name, w.created_at, w.updated_at, w.archived_at
+SELECT w.internal_id, w.public_id, w.organization_id, w.owner_user_id, w.name, w.is_default, w.created_at, w.updated_at, w.archived_at
 FROM workspaces AS w
 INNER JOIN workspace_memberships AS m ON m.workspace_id = w.internal_id
 WHERE m.user_id = $1 AND w.archived_at IS NULL
@@ -398,6 +386,7 @@ func (q *Queries) ListWorkspacesByUserID(ctx context.Context, arg ListWorkspaces
 			&i.OrganizationID,
 			&i.OwnerUserID,
 			&i.Name,
+			&i.IsDefault,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,

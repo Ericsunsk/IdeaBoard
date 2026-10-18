@@ -42,7 +42,6 @@ func TestOpenAppDatabasesStartsWithConfiguredLimitedRole(t *testing.T) {
 	if err := databases.RiverPool.Ping(t.Context()); err != nil {
 		t.Fatalf("ping startup River pool: %v", err)
 	}
-	assertProviderEndpointConfigurationAccess(t, databases.DB)
 	assertLibraryMaterializationMappingAccess(t, databases.DB)
 	assertWorkspaceRuntimeTableAccess(t, databases.DB)
 	assertWorkspaceRuntimeSequenceAccess(t, databases.DB)
@@ -63,21 +62,6 @@ SELECT has_table_privilege(
 	}
 	if !allowed {
 		t.Fatal("runtime role lacks library_asset_media_assets SELECT, INSERT, UPDATE, or DELETE")
-	}
-}
-
-func assertProviderEndpointConfigurationAccess(t *testing.T, db *pgxpool.Pool) {
-	t.Helper()
-	ctx := t.Context()
-	var endpointID int64
-	if err := db.QueryRow(ctx, `
-INSERT INTO provider_endpoints (api_type, protocol, name, base_url)
-VALUES ('custom', 'image-pipeline', 'runtime privilege test', 'https://runtime-privilege.test')
-RETURNING id`).Scan(&endpointID); err != nil {
-		t.Fatalf("insert provider endpoint with runtime role: %v", err)
-	}
-	if _, err := db.Exec(ctx, `DELETE FROM provider_endpoints WHERE id = $1`, endpointID); err != nil {
-		t.Fatalf("delete provider endpoint with runtime role: %v", err)
 	}
 }
 
@@ -257,7 +241,7 @@ func TestOpenAppDatabasesFailsBeforeRiverPoolAndClosesPoolOnPrivilegeDrift(t *te
 
 func newStartupDatabaseFixture(t *testing.T) startupDatabaseFixture {
 	t.Helper()
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	ctx := t.Context()
 	if err := workerriver.Migrate(ctx, pool); err != nil {
 		t.Fatalf("migrate River schema: %v", err)
@@ -269,7 +253,7 @@ func newStartupDatabaseFixture(t *testing.T) startupDatabaseFixture {
 		t.Fatalf("parse API_TEST_DATABASE_DSN: %v", err)
 	}
 	var schemaName string
-	if err := db.QueryRow(ctx, `SELECT current_schema()`).Scan(&schemaName); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT current_schema()`).Scan(&schemaName); err != nil {
 		t.Fatalf("load isolated schema: %v", err)
 	}
 	runtimeRole := fmt.Sprintf("startup_runtime_test_%d_%d", os.Getpid(), time.Now().UnixNano())
@@ -277,29 +261,29 @@ func newStartupDatabaseFixture(t *testing.T) startupDatabaseFixture {
 	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
 	databaseSQL := pgx.Identifier{parsed.Database}.Sanitize()
 	schemaSQL := pgx.Identifier{schemaName}.Sanitize()
-	if _, err := db.Exec(ctx, `CREATE ROLE `+roleSQL+` LOGIN PASSWORD `+"'"+strings.ReplaceAll(runtimePassword, "'", "''")+"'"); err != nil {
+	if _, err := pool.Exec(ctx, `CREATE ROLE `+roleSQL+` LOGIN PASSWORD `+"'"+strings.ReplaceAll(runtimePassword, "'", "''")+"'"); err != nil {
 		t.Fatalf("create runtime role: %v", err)
 	}
 	t.Cleanup(func() {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_, _ = db.Exec(cleanupCtx, `DROP OWNED BY `+roleSQL)
-		_, _ = db.Exec(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL)
+		_, _ = pool.Exec(cleanupCtx, `DROP OWNED BY `+roleSQL)
+		_, _ = pool.Exec(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL)
 	})
-	if _, err := db.Exec(ctx, `GRANT CONNECT ON DATABASE `+databaseSQL+` TO `+roleSQL); err != nil {
+	if _, err := pool.Exec(ctx, `GRANT CONNECT ON DATABASE `+databaseSQL+` TO `+roleSQL); err != nil {
 		t.Fatalf("grant runtime database connection: %v", err)
 	}
-	if _, err := db.Exec(ctx,
+	if _, err := pool.Exec(ctx,
 		`ALTER ROLE `+roleSQL+` IN DATABASE `+databaseSQL+` SET search_path TO `+schemaSQL+`, public`,
 	); err != nil {
 		t.Fatalf("set runtime role search_path: %v", err)
 	}
-	if err := dbprivileges.Configure(ctx, db, runtimeRole, runtimePrivilegePolicies()...); err != nil {
+	if err := dbprivileges.Configure(ctx, pool, runtimeRole, runtimePrivilegePolicies()...); err != nil {
 		t.Fatalf("configure runtime privilege policies: %v", err)
 	}
 
 	return startupDatabaseFixture{
-		ownerDB: db,
+		ownerDB: pool,
 		config: &config.Config{Database: config.DatabaseConfig{
 			Host:     parsed.Host,
 			Port:     strconv.Itoa(int(parsed.Port)),

@@ -16,7 +16,7 @@ import (
 )
 
 func TestRewardCodeCreateReplaySurvivesHMACRotation(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	oldKey := rewards.CodeKey{Version: "old", Secret: bytes.Repeat([]byte{0x31}, 32)}
 	newKey := rewards.CodeKey{Version: "new", Secret: bytes.Repeat([]byte{0x32}, 32)}
@@ -45,7 +45,7 @@ func TestRewardCodeCreateReplaySurvivesHMACRotation(t *testing.T) {
 }
 
 func TestRewardCodeCreateReplaySurvivesReverseHMACRotation(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	oldKey := rewards.CodeKey{Version: "reverse-old", Secret: bytes.Repeat([]byte{0x33}, 32)}
 	newKey := rewards.CodeKey{Version: "reverse-new", Secret: bytes.Repeat([]byte{0x34}, 32)}
@@ -82,7 +82,7 @@ func TestRewardCodeCreateReplaySurvivesReverseHMACRotation(t *testing.T) {
 }
 
 func TestRewardCodeCreateConcurrentIdempotencyAcrossRollingKeyrings(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	oldKey := rewards.CodeKey{Version: "concurrent-old", Secret: bytes.Repeat([]byte{0x35}, 32)}
 	newKey := rewards.CodeKey{Version: "concurrent-new", Secret: bytes.Repeat([]byte{0x36}, 32)}
@@ -135,7 +135,7 @@ func TestRewardCodeCreateConcurrentIdempotencyAcrossRollingKeyrings(t *testing.T
 }
 
 func TestRewardCodeCreateSerializesSamePlaintextAcrossRollingKeyrings(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	oldKey := rewards.CodeKey{Version: "rolling-old", Secret: bytes.Repeat([]byte{0x41}, 32)}
 	newKey := rewards.CodeKey{Version: "rolling-new", Secret: bytes.Repeat([]byte{0x42}, 32)}
@@ -191,7 +191,7 @@ func TestRewardCodeCreateSerializesSamePlaintextAcrossRollingKeyrings(t *testing
 }
 
 func TestRewardCodeRotationIsAtomicReplaySafeAndRevokesOldCode(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
@@ -305,7 +305,7 @@ FROM reward_admin_actions WHERE reward_code_id_snapshot = $1`, created.RewardCod
 }
 
 func TestRewardCodeDeleteRequiresZeroRedemptionsAndPreservesJournalSnapshot(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	deletable, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{

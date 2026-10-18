@@ -32,6 +32,7 @@ export const adminRoutes: RouteRecordRaw[] = [
         })),
       {
         path: 'credits',
+        name: 'AdminCredits',
         component: adminPageComponents.credits,
         meta: { requiresAuth: true, title: '积分运营', hidePageHeader: true },
         children: [

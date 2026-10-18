@@ -40,15 +40,6 @@ INNER JOIN service_model_pool_entry AS e ON e.id = r.pool_entry_id
 WHERE e.service = sqlc.arg(service)
 ORDER BY r.pool_entry_id ASC, r.resolution ASC;
 
--- name: ListEligibleServicePoolModels :many
-SELECT e.model_id
-FROM service_model_pool_entry AS e
-INNER JOIN service_model_pool_resolution AS r ON r.pool_entry_id = e.id
-WHERE e.service = sqlc.arg(service)
-  AND e.enabled
-  AND r.resolution = sqlc.arg(resolution)
-ORDER BY e.model_id ASC;
-
 -- name: InsertServiceModelPoolEntry :one
 INSERT INTO service_model_pool_entry (service, model_id, enabled)
 VALUES (sqlc.arg(service), sqlc.arg(model_id), sqlc.arg(enabled))

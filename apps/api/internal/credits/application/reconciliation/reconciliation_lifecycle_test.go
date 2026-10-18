@@ -14,7 +14,7 @@ import (
 )
 
 func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	enqueuer := &reconciliationEnqueuerStub{}
 	service := newReconciliationService(t, pool, enqueuer)
 	invalid := ports.StartManualReconciliationInput{}
@@ -37,7 +37,7 @@ func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *t
 	if len(enqueuer.calls) != 1 {
 		t.Fatalf("active Run enqueue calls = %d, want 1", len(enqueuer.calls))
 	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
+	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
 		t.Fatalf("run count = %d", got)
 	}
 
@@ -49,14 +49,14 @@ func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *t
 	if _, err := failing.StartReconciliation(t.Context(), reconciliationStartInput(t)); !errors.Is(err, riverErr) {
 		t.Fatalf("StartReconciliation() error = %v, want wrapped River error", err)
 	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
+	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
 		t.Fatalf("run count after enqueue rollback = %d", got)
 	}
 }
 
 func TestReconciliationExecutionLockIsScopedToSchema(t *testing.T) {
-	_, firstPool := testdb.OpenWithPool(t)
-	_, secondPool := testdb.OpenWithPool(t)
+	firstPool := testdb.Open(t)
+	secondPool := testdb.Open(t)
 
 	firstTx, err := firstPool.Begin(t.Context())
 	if err != nil {
@@ -82,27 +82,27 @@ SELECT
 }
 
 func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
 	ctx := t.Context()
 	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 500), Metadata: testhelpers.TestMetadata("matrix:grant", "matrix-grant")}); err != nil {
 		t.Fatal(err)
 	}
 	var priceID, priceVersion int64
-	if err := db.QueryRow(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation', 'Reconciliation Test', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation', 'Reconciliation Test', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
 		t.Fatal(err)
 	}
 
-	releasedHold := createReconciliationTaskFixture(t, db, service, "task_reconcile_running_released", "pending", "", 93, priceID, priceVersion)
+	releasedHold := createReconciliationTaskFixture(t, pool, service, "task_reconcile_running_released", "pending", "", 93, priceID, priceVersion)
 	release, err := service.Release(ctx, ports.ReleaseCommand{UserID: 93, HoldTransactionID: releasedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("release:running", "task_reconcile_running_released")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `UPDATE task_billing_settlements SET state = 'released', actual_output_count = 0, released_credits = 5, release_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "task_reconcile_running_released", release.TransactionID); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE task_billing_settlements SET state = 'released', actual_output_count = 0, released_credits = 5, release_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "task_reconcile_running_released", release.TransactionID); err != nil {
 		t.Fatal(err)
 	}
-	createReconciliationTaskFixture(t, db, service, "task_reconcile_completed_held", "completed", "", 93, priceID, priceVersion)
-	createReconciliationTaskFixture(t, db, service, "task_reconcile_failed_held", "failed", "provider failed", 93, priceID, priceVersion)
+	createReconciliationTaskFixture(t, pool, service, "task_reconcile_completed_held", "completed", "", 93, priceID, priceVersion)
+	createReconciliationTaskFixture(t, pool, service, "task_reconcile_failed_held", "failed", "provider failed", 93, priceID, priceVersion)
 
 	missingTaskMetadata := taskReconciliationMetadata("hold:missing-task:1", "reconcile-missing-task")
 	if _, err := service.Hold(ctx, ports.HoldCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: missingTaskMetadata}); err != nil {
@@ -117,10 +117,10 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
+	if _, err := pool.Exec(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `UPDATE credit_transactions SET related_transaction_id = transaction_id WHERE transaction_id = $1`, illegal.TransactionID); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE credit_transactions SET related_transaction_id = transaction_id WHERE transaction_id = $1`, illegal.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -132,10 +132,10 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `ALTER TABLE credit_charges DROP CONSTRAINT ck_credit_charges_refunded_range`); err != nil {
+	if _, err := pool.Exec(ctx, `ALTER TABLE credit_charges DROP CONSTRAINT ck_credit_charges_refunded_range`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `UPDATE credit_charges SET amount = 11, refunded_amount = 12 WHERE capture_transaction_id = $1`, capture.TransactionID); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE credit_charges SET amount = 11, refunded_amount = 12 WHERE capture_transaction_id = $1`, capture.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -143,42 +143,42 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `ALTER TABLE credit_holds DROP CONSTRAINT ck_credit_holds_terminal_consistency`); err != nil {
+	if _, err := pool.Exec(ctx, `ALTER TABLE credit_holds DROP CONSTRAINT ck_credit_holds_terminal_consistency`); err != nil {
 		t.Fatal(err)
 	}
 
-	missingBillingHold := createReconciliationTaskFixture(t, db, service, "task_reconcile_missing_billing_facts", "pending", "", 93, priceID, priceVersion)
-	missingRunningHold := createReconciliationTaskFixture(t, db, service, "task_reconcile_running_missing_billing_facts", "pending", "", 93, priceID, priceVersion)
+	missingBillingHold := createReconciliationTaskFixture(t, pool, service, "task_reconcile_missing_billing_facts", "pending", "", 93, priceID, priceVersion)
+	missingRunningHold := createReconciliationTaskFixture(t, pool, service, "task_reconcile_running_missing_billing_facts", "pending", "", 93, priceID, priceVersion)
 	// The workspace-scoped tasks table carries no assignment or lease guard
 	// that blocks this transition, so the status flip needs no bypass.
-	if _, err := db.Exec(ctx, `UPDATE tasks SET status='running' WHERE public_id='task_reconcile_running_missing_billing_facts'`); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE tasks SET status='running' WHERE public_id='task_reconcile_running_missing_billing_facts'`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `ALTER TABLE task_billing_settlements DISABLE TRIGGER task_billing_settlements_state_machine`); err != nil {
+	if _, err := pool.Exec(ctx, `ALTER TABLE task_billing_settlements DISABLE TRIGGER task_billing_settlements_state_machine`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `
+	if _, err := pool.Exec(ctx, `
 UPDATE task_billing_settlements
 SET state = 'captured', actual_output_count = 1, captured_credits = 5, settled_at = clock_timestamp()
 WHERE task_id = 'task_reconcile_completed_held'`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `ALTER TABLE task_billing_snapshots DROP CONSTRAINT task_billing_snapshot_hold_fk`); err != nil {
+	if _, err := pool.Exec(ctx, `ALTER TABLE task_billing_snapshots DROP CONSTRAINT task_billing_snapshot_hold_fk`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `ALTER TABLE credit_holds DROP CONSTRAINT fk_credit_holds_hold_transaction_id`); err != nil {
+	if _, err := pool.Exec(ctx, `ALTER TABLE credit_holds DROP CONSTRAINT fk_credit_holds_hold_transaction_id`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `DELETE FROM task_billing_settlements WHERE task_id = 'task_reconcile_missing_billing_facts'`); err != nil {
+	if _, err := pool.Exec(ctx, `DELETE FROM task_billing_settlements WHERE task_id = 'task_reconcile_missing_billing_facts'`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `DELETE FROM task_billing_settlements WHERE task_id = 'task_reconcile_running_missing_billing_facts'`); err != nil {
+	if _, err := pool.Exec(ctx, `DELETE FROM task_billing_settlements WHERE task_id = 'task_reconcile_running_missing_billing_facts'`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `DELETE FROM credit_holds WHERE hold_transaction_id = $1`, missingBillingHold); err != nil {
+	if _, err := pool.Exec(ctx, `DELETE FROM credit_holds WHERE hold_transaction_id = $1`, missingBillingHold); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `DELETE FROM credit_holds WHERE hold_transaction_id = $1`, missingRunningHold); err != nil {
+	if _, err := pool.Exec(ctx, `DELETE FROM credit_holds WHERE hold_transaction_id = $1`, missingRunningHold); err != nil {
 		t.Fatal(err)
 	}
 
@@ -186,22 +186,22 @@ WHERE task_id = 'task_reconcile_completed_held'`); err != nil {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER validate_credit_transaction_on_insert`); err != nil {
+	if _, err := pool.Exec(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER validate_credit_transaction_on_insert`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `ALTER TABLE credit_postings DISABLE TRIGGER guard_credit_posting_transaction_scope`); err != nil {
+	if _, err := pool.Exec(ctx, `ALTER TABLE credit_postings DISABLE TRIGGER guard_credit_posting_transaction_scope`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `
+	if _, err := pool.Exec(ctx, `
 INSERT INTO credit_transactions (transaction_id,wallet_user_id,command_type,idempotency_key,request_hash,actor_type,actor_id,source,reason,business_reference_type,business_reference_id,related_transaction_id,command_amount,posting_count,available_balance_after,reserved_balance_after)
 VALUES ('ctx_over_correction',93,'correction','matrix:over-correction',repeat('c',64),'admin','1','test','over correction','admin_adjustment','over-correction',$1,5,2,0,0)`, adminGrant.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 	var grantFromID, grantToID int64
-	if err := db.QueryRow(ctx, `SELECT MAX(account_id) FILTER (WHERE amount < 0), MAX(account_id) FILTER (WHERE amount > 0) FROM credit_postings WHERE transaction_id=$1`, adminGrant.TransactionID).Scan(&grantFromID, &grantToID); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT MAX(account_id) FILTER (WHERE amount < 0), MAX(account_id) FILTER (WHERE amount > 0) FROM credit_postings WHERE transaction_id=$1`, adminGrant.TransactionID).Scan(&grantFromID, &grantToID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `INSERT INTO credit_postings(transaction_id,account_id,amount) VALUES ('ctx_over_correction',$1,-5),('ctx_over_correction',$2,5)`, grantToID, grantFromID); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO credit_postings(transaction_id,account_id,amount) VALUES ('ctx_over_correction',$1,-5),('ctx_over_correction',$2,5)`, grantToID, grantFromID); err != nil {
 		t.Fatal(err)
 	}
 	duplicate := testhelpers.TestMetadata("matrix:duplicate-nontask", "duplicate-nontask")
@@ -213,27 +213,27 @@ VALUES ('ctx_over_correction',93,'correction','matrix:over-correction',repeat('c
 	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: duplicate}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `UPDATE credit_holds SET status = 'captured' WHERE hold_transaction_id = $1`, badHold.TransactionID); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE credit_holds SET status = 'captured' WHERE hold_transaction_id = $1`, badHold.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := db.Exec(ctx, `ALTER TABLE credit_postings DISABLE TRIGGER prevent_credit_postings_mutation`); err != nil {
+	if _, err := pool.Exec(ctx, `ALTER TABLE credit_postings DISABLE TRIGGER prevent_credit_postings_mutation`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `DELETE FROM credit_postings WHERE id = (SELECT MAX(id) FROM credit_postings WHERE transaction_id = $1)`, illegal.TransactionID); err != nil {
+	if _, err := pool.Exec(ctx, `DELETE FROM credit_postings WHERE id = (SELECT MAX(id) FROM credit_postings WHERE transaction_id = $1)`, illegal.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := db.Exec(ctx, `ALTER TABLE credit_transactions DROP CONSTRAINT uq_credit_transactions_idempotency_key`); err != nil {
+	if _, err := pool.Exec(ctx, `ALTER TABLE credit_transactions DROP CONSTRAINT uq_credit_transactions_idempotency_key`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER validate_credit_transaction_on_insert`); err != nil {
+	if _, err := pool.Exec(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER validate_credit_transaction_on_insert`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `ALTER TABLE credit_postings DISABLE TRIGGER guard_credit_posting_transaction_scope`); err != nil {
+	if _, err := pool.Exec(ctx, `ALTER TABLE credit_postings DISABLE TRIGGER guard_credit_posting_transaction_scope`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `
+	if _, err := pool.Exec(ctx, `
 INSERT INTO credit_transactions (transaction_id, wallet_user_id, command_type, idempotency_key, request_hash, actor_type, actor_id,
  source, reason, business_reference_type, business_reference_id, command_amount, posting_count, available_balance_after, reserved_balance_after)
 SELECT 'ctx_reconcile_hash_conflict', wallet_user_id, command_type, idempotency_key, repeat('b', 64), actor_type, actor_id,
@@ -242,10 +242,10 @@ FROM credit_transactions WHERE transaction_id = $1`, illegal.TransactionID); err
 		t.Fatal(err)
 	}
 	var issuanceID, availableID int64
-	if err := db.QueryRow(ctx, `SELECT MAX(id) FILTER (WHERE account_role='system_issuance'), MAX(id) FILTER (WHERE account_role='user_available') FROM credit_accounts WHERE shard_key='wallet:93' OR wallet_user_id=93`).Scan(&issuanceID, &availableID); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT MAX(id) FILTER (WHERE account_role='system_issuance'), MAX(id) FILTER (WHERE account_role='user_available') FROM credit_accounts WHERE shard_key='wallet:93' OR wallet_user_id=93`).Scan(&issuanceID, &availableID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `INSERT INTO credit_postings(transaction_id, account_id, amount) VALUES ('ctx_reconcile_hash_conflict',$1,-1),('ctx_reconcile_hash_conflict',$2,1)`, issuanceID, availableID); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO credit_postings(transaction_id, account_id, amount) VALUES ('ctx_reconcile_hash_conflict',$1,-1),('ctx_reconcile_hash_conflict',$2,1)`, issuanceID, availableID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -278,34 +278,34 @@ FROM credit_transactions WHERE transaction_id = $1`, illegal.TransactionID); err
 }
 
 func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
 	ctx := t.Context()
 	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 50), Metadata: testhelpers.TestMetadata("active-held:grant", "active-held-grant")}); err != nil {
 		t.Fatal(err)
 	}
 	var priceID, priceVersion int64
-	if err := db.QueryRow(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation', 'Active Held Test', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation', 'Active Held Test', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
 		t.Fatal(err)
 	}
 
-	capturedHold := createReconciliationTaskFixture(t, db, service, "task_active_captured", "pending", "", 93, priceID, priceVersion)
+	capturedHold := createReconciliationTaskFixture(t, pool, service, "task_active_captured", "pending", "", 93, priceID, priceVersion)
 	capture, err := service.Capture(ctx, ports.CaptureCommand{UserID: 93, HoldTransactionID: capturedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("capture:active", "task_active_captured")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `UPDATE task_billing_settlements SET state = 'captured', actual_output_count = 1, captured_credits = 5, capture_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "task_active_captured", capture.TransactionID); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE task_billing_settlements SET state = 'captured', actual_output_count = 1, captured_credits = 5, capture_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "task_active_captured", capture.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 
-	createReconciliationTaskFixture(t, db, service, "task_active_free", "pending", "", 93, priceID, priceVersion)
-	if _, err := db.Exec(ctx, `ALTER TABLE task_billing_settlements DISABLE TRIGGER task_billing_settlements_state_machine`); err != nil {
+	createReconciliationTaskFixture(t, pool, service, "task_active_free", "pending", "", 93, priceID, priceVersion)
+	if _, err := pool.Exec(ctx, `ALTER TABLE task_billing_settlements DISABLE TRIGGER task_billing_settlements_state_machine`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `UPDATE task_billing_settlements SET state = 'free', settled_at = clock_timestamp() WHERE task_id = 'task_active_free'`); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE task_billing_settlements SET state = 'free', settled_at = clock_timestamp() WHERE task_id = 'task_active_free'`); err != nil {
 		t.Fatal(err)
 	}
-	createReconciliationTaskFixture(t, db, service, "task_active_held", "pending", "", 93, priceID, priceVersion)
+	createReconciliationTaskFixture(t, pool, service, "task_active_held", "pending", "", 93, priceID, priceVersion)
 
 	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
 	if err != nil {
@@ -338,7 +338,7 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 }
 
 func TestReconciliationScanDoesNotWaitOnNormalWalletHotRows(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	if _, err := service.Grant(t.Context(), ports.GrantCommand{UserID: 99, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("nonblock:grant", "nonblock-grant")}); err != nil {
 		t.Fatal(err)

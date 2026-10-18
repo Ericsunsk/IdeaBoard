@@ -20,7 +20,7 @@ import (
 )
 
 func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	userHandler := rewardhttp.NewUserHandler(service)

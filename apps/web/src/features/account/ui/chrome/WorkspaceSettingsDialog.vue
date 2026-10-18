@@ -131,7 +131,9 @@
                       :invalid="renameError !== null"
                       :disabled="isRenaming"
                       :aria-label="
-                        t('workspace.switcher.renameAriaLabel', { name: activeWorkspace.name })
+                        t('workspace.switcher.renameAriaLabel', {
+                          name: workspaceItemName(activeWorkspace),
+                        })
                       "
                       :maxlength="nameFieldMaxLength"
                       @keydown.enter="commitRename(activeWorkspace)"
@@ -176,15 +178,17 @@
                         {{ workspaceItemName(activeWorkspace) }}
                       </h2>
                       <Button
-                        v-if="!isPersonalWorkspaceItem(activeWorkspace)"
                         type="button"
                         variant="ghost"
                         size="icon"
                         class="size-7 text-muted-foreground hover:text-foreground"
+                        :is-disabled="isDefaultWorkspaceItem(activeWorkspace)"
                         :title="
-                          t('workspace.switcher.renameAriaLabel', {
-                            name: workspaceItemName(activeWorkspace),
-                          })
+                          isDefaultWorkspaceItem(activeWorkspace)
+                            ? t('workspace.switcher.renameDefaultNote')
+                            : t('workspace.switcher.renameAriaLabel', {
+                                name: workspaceItemName(activeWorkspace),
+                              })
                         "
                         :aria-label="
                           t('workspace.switcher.renameAriaLabel', {
@@ -199,6 +203,12 @@
                     <p class="m-0 mt-1 text-xs text-muted-foreground font-mono">
                       ID: {{ activeWorkspace.publicId }}
                     </p>
+                    <p
+                      v-if="isDefaultWorkspaceItem(activeWorkspace)"
+                      class="m-0 mt-0.5 text-xs text-muted-foreground"
+                    >
+                      {{ t('workspace.switcher.renameDefaultNote') }}
+                    </p>
                   </div>
                 </div>
               </header>
@@ -211,6 +221,86 @@
                 :current-user-id="props.currentUserId"
                 :is-expanded="true"
               />
+
+              <!-- Archive row: the Default workspace is never archived, so its
+                button stays disabled with the protected note. -->
+              <section
+                class="flex flex-col gap-2 rounded-control border border-border p-3"
+                :aria-label="t('workspace.switcher.archiveSectionLabel')"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <div class="min-w-0">
+                    <p class="m-0 text-sm font-medium text-foreground">
+                      {{ t('workspace.switcher.archiveTitle') }}
+                    </p>
+                    <p class="m-0 mt-0.5 text-xs text-muted-foreground">
+                      {{
+                        isDefaultWorkspaceItem(activeWorkspace)
+                          ? t('workspace.switcher.archiveDefaultNote')
+                          : t('workspace.switcher.archiveHint')
+                      }}
+                    </p>
+                  </div>
+                  <Button
+                    v-if="!confirmingArchiveId"
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    class="h-9 shrink-0"
+                    :is-disabled="isDefaultWorkspaceItem(activeWorkspace) || isArchiving"
+                    :title="
+                      isDefaultWorkspaceItem(activeWorkspace)
+                        ? t('workspace.switcher.archiveDefaultNote')
+                        : undefined
+                    "
+                    :aria-label="t('workspace.switcher.archiveAction')"
+                    @click="requestArchive(activeWorkspace)"
+                  >
+                    {{ t('workspace.switcher.archiveAction') }}
+                  </Button>
+                </div>
+                <div
+                  v-if="confirmingArchiveId === activeWorkspace.publicId"
+                  class="flex flex-col gap-2"
+                >
+                  <p class="m-0 text-xs leading-normal text-foreground" role="alert">
+                    {{ t('workspace.switcher.archiveConfirm', { name: activeWorkspace.name }) }}
+                  </p>
+                  <div class="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      class="h-9 shrink-0"
+                      :is-loading="isArchiving"
+                      :is-disabled="isArchiving"
+                      @click="commitArchive(activeWorkspace)"
+                    >
+                      {{
+                        isArchiving
+                          ? t('workspace.switcher.archiving')
+                          : t('workspace.switcher.archiveConfirmAction')
+                      }}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      class="h-9 shrink-0"
+                      :is-disabled="isArchiving"
+                      @click="cancelArchive"
+                    >
+                      {{ t('common.actions.cancel') }}
+                    </Button>
+                  </div>
+                </div>
+                <p
+                  v-if="archiveError"
+                  class="m-0 text-xs leading-normal text-destructive"
+                  role="alert"
+                >
+                  {{ archiveError }}
+                </p>
+              </section>
             </div>
 
             <!-- If no workspace is selected -->
@@ -244,9 +334,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import { ibDialogMaskClass } from '../../../../theme/dialogMask'
 import type { UserAccountMenuWorkspaceItem } from './userAccountMenu.types'
-import { isPersonalWorkspaceItem, visibleWorkspaceItems } from './workspaceMenu'
+import { isDefaultWorkspaceItem, visibleWorkspaceItems } from './workspaceMenu'
 import WorkspaceMemberSection from './WorkspaceMemberSection.vue'
 import {
   accountCloseButtonClass,
@@ -268,6 +359,7 @@ const props = withDefaults(
     onRetry: () => void
     onCreate: (name: string) => Promise<UserAccountMenuWorkspaceItem>
     onRename: (workspaceId: string, name: string) => Promise<UserAccountMenuWorkspaceItem>
+    onArchive: (workspaceId: string) => Promise<UserAccountMenuWorkspaceItem>
     onSelect?: ((workspaceId: string) => void) | undefined
   }>(),
   {
@@ -314,12 +406,15 @@ const activeWorkspace = computed(() => {
 })
 
 function workspaceItemName(item: UserAccountMenuWorkspaceItem): string {
-  return isPersonalWorkspaceItem(item) ? t('workspace.switcher.defaultBadge') : item.name
+  return isDefaultWorkspaceItem(item) ? t('workspace.switcher.defaultBadge') : item.name
 }
 
 function selectWorkspace(item: UserAccountMenuWorkspaceItem) {
   if (editingId.value && editingId.value !== item.publicId) {
     cancelRename()
+  }
+  if (confirmingArchiveId.value && confirmingArchiveId.value !== item.publicId) {
+    cancelArchive()
   }
   activeWorkspaceId.value = item.publicId
 }
@@ -342,7 +437,7 @@ function generateUniqueWorkspaceName(): string {
   const existing = new Set<string>()
   for (const item of visibleItems.value) {
     existing.add(item.name.trim().toLowerCase())
-    if (isPersonalWorkspaceItem(item)) {
+    if (isDefaultWorkspaceItem(item)) {
       existing.add(t('workspace.switcher.defaultBadge').trim().toLowerCase())
     }
   }
@@ -366,7 +461,7 @@ function validateName(raw: string, currentWorkspaceId?: string | null): string |
     if (currentWorkspaceId && item.publicId === currentWorkspaceId) return false
     const isMatchingRaw = item.name.trim().toLowerCase() === next.toLowerCase()
     const isMatchingDefault =
-      isPersonalWorkspaceItem(item) &&
+      isDefaultWorkspaceItem(item) &&
       t('workspace.switcher.defaultBadge').trim().toLowerCase() === next.toLowerCase()
     return isMatchingRaw || isMatchingDefault
   })
@@ -384,15 +479,19 @@ async function submitCreate() {
   try {
     const created = await props.onCreate(name)
     activeWorkspaceId.value = created.publicId
-  } catch {
-    createError.value = t('workspace.switcher.createFailed')
+  } catch (error) {
+    const code = userErrorCode(error)?.toLowerCase()
+    createError.value =
+      code != null
+        ? `${t('workspace.switcher.createFailed')} (${code})`
+        : t('workspace.switcher.createFailed')
   } finally {
     isCreating.value = false
   }
 }
 
 function startRename(item: UserAccountMenuWorkspaceItem) {
-  if (isPersonalWorkspaceItem(item)) return
+  if (isDefaultWorkspaceItem(item)) return
   activeWorkspaceId.value = item.publicId
   editingId.value = item.publicId
   draftName.value = item.name
@@ -413,7 +512,7 @@ function cancelRename() {
 }
 
 async function commitRename(item: UserAccountMenuWorkspaceItem) {
-  if (isPersonalWorkspaceItem(item)) {
+  if (isDefaultWorkspaceItem(item)) {
     cancelRename()
     return
   }
@@ -438,6 +537,44 @@ async function commitRename(item: UserAccountMenuWorkspaceItem) {
     renameError.value = t('workspace.switcher.renameFailed')
   } finally {
     isRenaming.value = false
+  }
+}
+
+const confirmingArchiveId = ref<string | null>(null)
+const isArchiving = ref(false)
+const archiveError = ref<string | null>(null)
+
+function requestArchive(item: UserAccountMenuWorkspaceItem) {
+  if (isDefaultWorkspaceItem(item) || isArchiving.value) return
+  activeWorkspaceId.value = item.publicId
+  confirmingArchiveId.value = item.publicId
+  archiveError.value = null
+}
+
+function cancelArchive() {
+  confirmingArchiveId.value = null
+  archiveError.value = null
+}
+
+async function commitArchive(item: UserAccountMenuWorkspaceItem) {
+  if (isDefaultWorkspaceItem(item)) {
+    cancelArchive()
+    return
+  }
+  if (confirmingArchiveId.value !== item.publicId || isArchiving.value) return
+  isArchiving.value = true
+  archiveError.value = null
+  try {
+    await props.onArchive(item.publicId)
+    confirmingArchiveId.value = null
+  } catch (error) {
+    const code = userErrorCode(error)?.toLowerCase()
+    archiveError.value =
+      code != null
+        ? `${t('workspace.switcher.archiveFailed')} (${code})`
+        : t('workspace.switcher.archiveFailed')
+  } finally {
+    isArchiving.value = false
   }
 }
 </script>

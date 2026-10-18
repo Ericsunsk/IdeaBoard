@@ -587,10 +587,10 @@ func TestCheckoutLifecycleReturnExpiryAllowsVerifiedLatePayment(t *testing.T) {
 func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout paymentports.CheckoutGateway, verifier paymentports.StripeWebhookVerifier) (*pgxpool.Pool, *payments.Service, *credits.Service, *events.Hub) {
 	t.Helper()
 	secretstest.EnableEncryption(t)
-	db, pool := testdb.OpenWithPool(t)
+	pool := testdb.Open(t)
 	wallets := credits.NewService(pool)
 	seedCheckoutLifecycleWallet(t, wallets, 42)
-	repo := newTestPaymentStores(db)
+	repo := newTestPaymentStores(pool)
 	hub := NewEventHub()
 	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(hub, func() time.Time { return now.UTC() }),
 		lifecycleStripeGateway{}, checkout, wallets, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
@@ -600,7 +600,7 @@ func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout paymentp
 	}); err != nil {
 		t.Fatalf("configure Stripe: %v", err)
 	}
-	return db, service, wallets, hub
+	return pool, service, wallets, hub
 }
 
 func lifecycleCheckoutCommand(userID int64, key string, quantity int64) paymentsdomain.CreateCheckoutCommand {
