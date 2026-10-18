@@ -3,6 +3,7 @@ package dialects
 import (
 	"encoding/json"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 )
 
 // FalDialect shapes Fal.ai media-route payloads (generation, inpaint,
@@ -24,7 +25,7 @@ func (FalDialect) Encode(req Request) ([]byte, error) {
 	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf(msgEncode2, err)
+		return nil, fmt.Errorf(errorrender.MsgEncode2, err)
 	}
 	return encoded, nil
 }

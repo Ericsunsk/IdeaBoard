@@ -11,6 +11,9 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/rewards"
+	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
+	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport"
 
@@ -85,7 +88,7 @@ func assertRewardMachineCode(t *testing.T, recorder *httptest.ResponseRecorder, 
 	}
 }
 
-func newIdempotencyAdminRouter(t *testing.T, handler *AdminCommandHandler) http.Handler {
+func newIdempotencyAdminRouter(t *testing.T, handler *rewards.AdminCommandHandler) http.Handler {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -98,7 +101,7 @@ func newIdempotencyAdminRouter(t *testing.T, handler *AdminCommandHandler) http.
 }
 
 func TestRewardRedeemRequiresIdempotencyKey(t *testing.T) {
-	handler := NewUserHandler(rewardHandlerServiceStub{})
+	handler := rewardhttp.NewUserHandler(rewardHandlerServiceStub{})
 	router := rewardRedeemRouter(t, handler, 41)
 
 	request := httptest.NewRequest(http.MethodPost, "/user/rewards/redeem", strings.NewReader(`{"code":"MISSING-KEY"}`))
@@ -111,14 +114,14 @@ func TestRewardRedeemRequiresIdempotencyKey(t *testing.T) {
 
 func TestRewardRedeemBindsKeyToCodeAndReplaysBeforeRateLimit(t *testing.T) {
 	serviceCalls := 0
-	handler := NewUserHandler(rewardHandlerServiceStub{redeem: func(_ context.Context, command RedeemCommand) (RedeemResult, error) {
+	handler := rewardhttp.NewUserHandler(rewardHandlerServiceStub{redeem: func(_ context.Context, command ports.RedeemCommand) (ports.RedeemResult, error) {
 		serviceCalls++
-		return RedeemResult{CreditedAmount: int64(len(command.Code))}, nil
+		return ports.RedeemResult{CreditedAmount: int64(len(command.Code))}, nil
 	}})
 	router := rewardRedeemRouter(t, handler, 41)
 
-	for attempt := 0; attempt < defaultRedemptionAttemptLimit+2; attempt++ {
-		result, _ := performRewardWriteWithKey[RedeemResult](t, router, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "REPLAY01"}, "same-key", http.StatusOK)
+	for attempt := 0; attempt < rewards.DefaultRedemptionAttemptLimit+2; attempt++ {
+		result, _ := performRewardWriteWithKey[ports.RedeemResult](t, router, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "REPLAY01"}, "same-key", http.StatusOK)
 		if attempt > 0 && !result.Replayed {
 			t.Fatalf("attempt %d replayed=false, want true", attempt+1)
 		}
@@ -127,7 +130,7 @@ func TestRewardRedeemBindsKeyToCodeAndReplaysBeforeRateLimit(t *testing.T) {
 		t.Fatalf("service calls=%d, want 1", serviceCalls)
 	}
 
-	_, conflict := performRewardWriteWithKey[RedeemResult](t, router, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "OTHER001"}, "same-key", http.StatusConflict)
+	_, conflict := performRewardWriteWithKey[ports.RedeemResult](t, router, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "OTHER001"}, "same-key", http.StatusConflict)
 	assertRewardMachineCode(t, conflict, http.StatusConflict, "reward_code_idempotency_conflict")
 	if serviceCalls != 1 {
 		t.Fatalf("conflicting request executed service; calls=%d", serviceCalls)
@@ -138,7 +141,7 @@ func TestRewardRedeemReplaysFirstResult(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	if _, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	if _, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "Idempotent replay", Code: "REPLAY-KEY-2026", CreditAmount: 12,
 		IdempotencyKey: "replay-key-create", ActorUserID: 1,
 	}); err != nil {
@@ -146,7 +149,7 @@ func TestRewardRedeemReplaysFirstResult(t *testing.T) {
 	}
 	provisionRewardWallet(t, pool, creditService, 7)
 
-	handler := NewUserHandler(service)
+	handler := rewardhttp.NewUserHandler(service)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -155,8 +158,8 @@ func TestRewardRedeemReplaysFirstResult(t *testing.T) {
 	})
 	router.POST("/user/rewards/redeem", handler.Redeem)
 
-	redeem := func(key string) (RedeemResult, *httptest.ResponseRecorder) {
-		return performRewardWriteWithKey[RedeemResult](
+	redeem := func(key string) (ports.RedeemResult, *httptest.ResponseRecorder) {
+		return performRewardWriteWithKey[ports.RedeemResult](
 			t, router, http.MethodPost, "/user/rewards/redeem",
 			map[string]any{"code": "REPLAY-KEY-2026"}, key, http.StatusOK,
 		)
@@ -178,9 +181,9 @@ func TestRewardCreateRequiresIdempotencyKey(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	router := newIdempotencyAdminRouter(t, NewAdminCommandHandler(service))
+	router := newIdempotencyAdminRouter(t, rewardhttp.NewAdminCommandHandler(service))
 
-	_, recorder := performRewardWriteWithKey[CreatedRewardCode](
+	_, recorder := performRewardWriteWithKey[ports.CreatedRewardCode](
 		t, router, http.MethodPost, "/admin/rewards/codes", map[string]any{
 			"display_name": "Missing key", "code": "MISSING-KEY-2026",
 			"credit_amount": 5, "max_redemptions": 0,
@@ -193,11 +196,11 @@ func TestRewardCreateRejectsBodyIdempotencyKey(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	router := newIdempotencyAdminRouter(t, NewAdminCommandHandler(service))
+	router := newIdempotencyAdminRouter(t, rewardhttp.NewAdminCommandHandler(service))
 
 	// Header-only: a body idempotency_key is not a fallback — strict
 	// decoding rejects it as an unknown field even with a valid header.
-	_, recorder := performRewardWriteWithKey[CreatedRewardCode](
+	_, recorder := performRewardWriteWithKey[ports.CreatedRewardCode](
 		t, router, http.MethodPost, "/admin/rewards/codes", map[string]any{
 			"display_name": "Body key", "code": "BODY-KEY-2026",
 			"credit_amount": 5, "max_redemptions": 0, "idempotency_key": "body-key",
@@ -206,7 +209,7 @@ func TestRewardCreateRejectsBodyIdempotencyKey(t *testing.T) {
 	assertRewardMachineCode(t, recorder, http.StatusBadRequest, "reward_invalid_input")
 
 	// The same payload without the body key succeeds on the header alone.
-	created, _ := performRewardWriteWithKey[CreatedRewardCode](
+	created, _ := performRewardWriteWithKey[ports.CreatedRewardCode](
 		t, router, http.MethodPost, "/admin/rewards/codes", map[string]any{
 			"display_name": "Body key", "code": "BODY-KEY-2026",
 			"credit_amount": 5, "max_redemptions": 0,
@@ -221,10 +224,10 @@ func TestRewardCreateReplaysWithHeaderKey(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	router := newIdempotencyAdminRouter(t, NewAdminCommandHandler(service))
+	router := newIdempotencyAdminRouter(t, rewardhttp.NewAdminCommandHandler(service))
 
-	create := func(key string) (CreatedRewardCode, *httptest.ResponseRecorder) {
-		return performRewardWriteWithKey[CreatedRewardCode](
+	create := func(key string) (ports.CreatedRewardCode, *httptest.ResponseRecorder) {
+		return performRewardWriteWithKey[ports.CreatedRewardCode](
 			t, router, http.MethodPost, "/admin/rewards/codes", map[string]any{
 				"display_name": "Header replay", "code": "HEADER-REPLAY-2026",
 				"credit_amount": 7, "max_redemptions": 0,

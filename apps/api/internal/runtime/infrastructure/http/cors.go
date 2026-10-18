@@ -1,6 +1,7 @@
-package httpinfra
+package http
 
 import (
+	"ideaboard/api/internal/platform/errorrender"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -48,7 +49,7 @@ type originPolicy struct {
 func newOriginPolicy(appEnv string, allowedOrigins []string) originPolicy {
 	allowed, configured, invalid := buildAllowedOriginSet(allowedOrigins)
 	if isProductionRuntime(appEnv) && configured {
-		slog.Warn(msgNewOriginPolicy)
+		slog.Warn(errorrender.MsgNewOriginPolicy)
 	}
 	return originPolicy{
 		production:       isProductionRuntime(appEnv),

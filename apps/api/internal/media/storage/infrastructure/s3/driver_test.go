@@ -15,7 +15,7 @@ import (
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/infrastructure/remote"
 	"ideaboard/api/internal/media/storage/ports"
-	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
 
 	"github.com/minio/minio-go/v7"
@@ -179,7 +179,7 @@ func TestS3CompatibleSignedURL(t *testing.T) {
 		_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
 	}))
 	t.Cleanup(server.Close)
-	restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
+	restore := safehttp.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
 	t.Cleanup(restore)
 
 	url, err := NewS3CompatibleService().SignedURLWithConfig(context.Background(), "uploads/asset/preview.webp", time.Hour, &S3CompatibleConfig{
@@ -200,7 +200,7 @@ func TestS3CompatibleSignedURL(t *testing.T) {
 }
 
 func TestS3CompatibleReadUsesAccessDomainDeliveryPlane(t *testing.T) {
-	restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
+	restore := safehttp.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
 	t.Cleanup(restore)
 
 	var endpointCalls atomic.Int64
@@ -560,7 +560,7 @@ func TestS3CompatibleValidateBaseConfigEndpointPolicy(t *testing.T) {
 	}
 
 	t.Run("plain public host endpoint passes", func(t *testing.T) {
-		restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{})
+		restore := safehttp.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{})
 		t.Cleanup(restore)
 		cfg := *base
 		cfg.Endpoint = "s3.us-east-1.amazonaws.com"
@@ -570,7 +570,7 @@ func TestS3CompatibleValidateBaseConfigEndpointPolicy(t *testing.T) {
 	})
 
 	t.Run("plain localhost endpoint rejected by default", func(t *testing.T) {
-		restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{})
+		restore := safehttp.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{})
 		t.Cleanup(restore)
 		cfg := *base
 		cfg.Endpoint = "127.0.0.1:9000"
@@ -580,7 +580,7 @@ func TestS3CompatibleValidateBaseConfigEndpointPolicy(t *testing.T) {
 	})
 
 	t.Run("plain localhost endpoint allowed when allowlisted", func(t *testing.T) {
-		restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
+		restore := safehttp.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
 		t.Cleanup(restore)
 		cfg := *base
 		cfg.Endpoint = "127.0.0.1:9000"
@@ -593,7 +593,7 @@ func TestS3CompatibleValidateBaseConfigEndpointPolicy(t *testing.T) {
 func TestS3CompatibleClientRechecksEndpointPolicyBeforeUsingCachedClient(t *testing.T) {
 	service := NewS3CompatibleService()
 	provider := &mutableStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}}
-	restore := outbound.ConfigurePolicyProvider(provider)
+	restore := safehttp.ConfigurePolicyProvider(provider)
 	t.Cleanup(restore)
 
 	type ctxKey struct{}

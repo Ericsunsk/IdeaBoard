@@ -13,6 +13,7 @@ CREATE TABLE workspace_events (
   event_data JSONB NOT NULL,
   occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT uq_workspace_events_public_id UNIQUE (public_id),
+  -- Kernel prefix pin: mirrors contract.PrefixEvent.
   CONSTRAINT chk_workspace_events_public_id CHECK (public_id LIKE 'evt\_%'),
   CONSTRAINT chk_workspace_events_type CHECK (length(btrim(event_type)) > 0),
   CONSTRAINT chk_workspace_events_version CHECK (event_version > 0),
@@ -47,6 +48,7 @@ CREATE TABLE task_status_event_outbox (
   delivered_at TIMESTAMPTZ NULL,
   last_error TEXT NOT NULL DEFAULT '',
   CONSTRAINT uq_task_status_event_outbox_event_id UNIQUE (event_id),
+  -- Kernel prefix pin: mirrors contract.PrefixEvent.
   CONSTRAINT chk_task_status_event_outbox_event_id CHECK (event_id LIKE 'evt\_%'),
   CONSTRAINT chk_task_status_event_outbox_status CHECK (status IN ('pending','running','completed','failed','cancelled')),
   CONSTRAINT chk_task_status_event_outbox_state CHECK (status_state IN ('pending','delivered')),
@@ -80,9 +82,13 @@ CREATE TABLE board_access_event_outbox (
   delivered_at TIMESTAMPTZ NULL,
   last_error TEXT NOT NULL DEFAULT '',
   CONSTRAINT uq_board_access_event_outbox_event_id UNIQUE (event_id),
+  -- Kernel prefix pins: event_id mirrors contract.PrefixEvent.
   CONSTRAINT chk_board_access_event_outbox_event_id CHECK (event_id LIKE 'evt\_%'),
   CONSTRAINT chk_board_access_event_outbox_state CHECK (status_state IN ('pending','delivered')),
   CONSTRAINT chk_board_access_event_outbox_attempts CHECK (attempts >= 0),
+  -- Identity pins: workspace_id mirrors contract.PrefixWorkspace,
+  -- board_id mirrors contract.PrefixBoard, member_public_id mirrors
+  -- contract.PrefixUser.
   CONSTRAINT chk_board_access_event_outbox_workspace CHECK (workspace_id LIKE 'ws\_%'),
   CONSTRAINT chk_board_access_event_outbox_board CHECK (board_id LIKE 'board\_%'),
   CONSTRAINT chk_board_access_event_outbox_member CHECK (member_public_id LIKE 'usr\_%'),

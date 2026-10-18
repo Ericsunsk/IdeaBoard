@@ -50,6 +50,10 @@ func (s *VisionSearchService) Extract(ctx context.Context, input domain.VisionIn
 	return normalizeVisionExtraction(extraction)
 }
 
+// ValidateVisionImages is the single canonical image-content gate for every
+// vision ingress (multipart uploads, library/external references, billing
+// pre-validation). Callers validate shapes and bounds at their own edge;
+// content inspection funnels through here and must not be reimplemented.
 func ValidateVisionImages(images []domain.VisionImage) error {
 	total := 0
 	for _, image := range images {

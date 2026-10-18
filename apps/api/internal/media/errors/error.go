@@ -1,4 +1,4 @@
-package mediaerrors
+package errors
 
 import (
 	"errors"

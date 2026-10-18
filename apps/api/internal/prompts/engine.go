@@ -28,7 +28,15 @@ type FeaturePromptMergePolicy struct {
 type featurePromptVariableProvider func(map[string]interface{}) map[string]interface{}
 
 var featurePromptVariableProviders = map[string]featurePromptVariableProvider{
-	workflow.FeatureSlugVariations: variationsPromptVariables,
+	// Direct workflow contract read; no local wrapper so the
+	// Read*Contract seam stays single-owned by workflow.
+	workflow.FeatureSlugVariations: func(params map[string]interface{}) map[string]interface{} {
+		contract, ok := workflow.ReadVariationsPromptContract(params)
+		if !ok {
+			return nil
+		}
+		return contract.PromptVariables()
+	},
 }
 
 var featurePromptBindings = map[string][]promptTemplateBinding{
@@ -36,8 +44,12 @@ var featurePromptBindings = map[string][]promptTemplateBinding{
 		{
 			placeholder: paramkeys.PromptPlaceholderFusionInputWeights,
 			paramKey:    paramkeys.PromptPathFusionInputWeights,
-			reader:      readFusionInputWeightsPromptParam,
-			formatter:   formatImageWeightsTemplateValue,
+			// Direct workflow read adapted to the binding signature;
+			// no named wrapper so ReadFusionInputWeights stays owned by workflow.
+			reader: func(params map[string]interface{}, _ string) (interface{}, bool) {
+				return workflow.ReadFusionInputWeights(params)
+			},
+			formatter: formatImageWeightsTemplateValue,
 		},
 	},
 }
@@ -104,18 +116,6 @@ func applyPromptTemplateBindings(
 func readDirectPromptParam(params map[string]interface{}, key string) (interface{}, bool) {
 	value, ok := params[key]
 	return value, ok
-}
-
-func readFusionInputWeightsPromptParam(params map[string]interface{}, _ string) (interface{}, bool) {
-	return workflow.ReadFusionInputWeights(params)
-}
-
-func variationsPromptVariables(params map[string]interface{}) map[string]interface{} {
-	contract, ok := workflow.ReadVariationsPromptContract(params)
-	if !ok {
-		return nil
-	}
-	return contract.PromptVariables()
 }
 
 func stringPromptValue(value interface{}) (string, bool) {

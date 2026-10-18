@@ -1,6 +1,9 @@
 package ports
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type CreateStripeRefundInput struct {
 	APIKey         string
@@ -35,4 +38,19 @@ const (
 type RefundGateway interface {
 	CreateRefund(context.Context, CreateStripeRefundInput) (StripeRefund, error)
 	RetrieveRefund(context.Context, string, string) (StripeRefund, error)
+}
+
+// merged from internal/payments/ports/dispute.go (structural consolidation; symbols unchanged).
+type StripeDispute struct {
+	ID              string
+	Status          string
+	ChargeID        string
+	PaymentIntentID string
+	AmountMinor     int64
+	Currency        string
+	CreatedAt       time.Time
+}
+
+type DisputeGateway interface {
+	RetrieveDispute(context.Context, string, string) (StripeDispute, error)
 }

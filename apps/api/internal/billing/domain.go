@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"ideaboard/api/internal/generation/routing"
 )
 
 const (
@@ -15,16 +17,10 @@ const (
 type OutputResolution string
 
 const (
-	OutputResolution1K OutputResolution = "1k"
-	OutputResolution2K OutputResolution = "2k"
-	OutputResolution4K OutputResolution = "4k"
+	OutputResolution1K OutputResolution = OutputResolution(routing.Resolution1K)
+	OutputResolution2K OutputResolution = OutputResolution(routing.Resolution2K)
+	OutputResolution4K OutputResolution = OutputResolution(routing.Resolution4K)
 )
-
-var outputResolutions = [...]OutputResolution{
-	OutputResolution1K,
-	OutputResolution2K,
-	OutputResolution4K,
-}
 
 // canonicalPricingVariants is the registry fallback when a definition omits
 // its variant list: exactly 1k, 2k, and 4k. It names catalog values, never a
@@ -36,13 +32,15 @@ var canonicalPricingVariants = [...]OutputResolution{
 }
 
 func NormalizeOutputResolution(raw string) (OutputResolution, error) {
-	resolution := OutputResolution(strings.ToLower(strings.TrimSpace(raw)))
-	for _, supported := range outputResolutions {
-		if resolution == supported {
-			return resolution, nil
-		}
+	// Canonical owner is routing.NormalizeResolution; this is a thin
+	// type adapter so billing callers never fork the 1k/2k/4k set.
+	// Blank/"default" is rejected here; omitted requests default to 1k
+	// once in workflow.compileOutputResolution only.
+	res, err := routing.NormalizeResolution(raw)
+	if err != nil {
+		return "", ErrInvalidOutputResolution
 	}
-	return "", ErrInvalidOutputResolution
+	return OutputResolution(res), nil
 }
 
 var (

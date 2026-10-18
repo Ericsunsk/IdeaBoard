@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/rewards"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
+	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
+	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
@@ -35,8 +38,8 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "create invalid Code",
 			method: http.MethodPost, path: "/admin/rewards/codes",
 			body: `{"display_name":"Bad","code":"x","credit_amount":1}`,
-			stub: rewardHandlerServiceStub{create: func(context.Context, CreateRewardCodeCommand) (CreatedRewardCode, error) {
-				return CreatedRewardCode{}, ErrInvalidCommand
+			stub: rewardHandlerServiceStub{create: func(context.Context, ports.CreateRewardCodeCommand) (ports.CreatedRewardCode, error) {
+				return ports.CreatedRewardCode{}, rewardsdomain.ErrInvalidCode
 			}},
 			wantStatus: http.StatusBadRequest, wantCode: "reward_code_invalid", wantMsg: "参数错误",
 		},
@@ -44,8 +47,8 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "create idempotency conflict",
 			method: http.MethodPost, path: "/admin/rewards/codes",
 			body: `{"display_name":"Bad","code":"CONFLICT01","credit_amount":1}`,
-			stub: rewardHandlerServiceStub{create: func(context.Context, CreateRewardCodeCommand) (CreatedRewardCode, error) {
-				return CreatedRewardCode{}, ErrRewardCodeConflict
+			stub: rewardHandlerServiceStub{create: func(context.Context, ports.CreateRewardCodeCommand) (ports.CreatedRewardCode, error) {
+				return ports.CreatedRewardCode{}, rewardsdomain.ErrRewardCodeConflict
 			}},
 			wantStatus: http.StatusConflict, wantCode: "reward_code_idempotency_conflict", wantMsg: "幂等请求与原请求不一致",
 		},
@@ -53,8 +56,8 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "create Code collision",
 			method: http.MethodPost, path: "/admin/rewards/codes",
 			body: `{"display_name":"Bad","code":"DUP00001","credit_amount":1}`,
-			stub: rewardHandlerServiceStub{create: func(context.Context, CreateRewardCodeCommand) (CreatedRewardCode, error) {
-				return CreatedRewardCode{}, ErrCodeCollision
+			stub: rewardHandlerServiceStub{create: func(context.Context, ports.CreateRewardCodeCommand) (ports.CreatedRewardCode, error) {
+				return ports.CreatedRewardCode{}, rewardsdomain.ErrCodeCollision
 			}},
 			wantStatus: http.StatusConflict, wantCode: "reward_code_conflict", wantMsg: "兑换码已存在",
 		},
@@ -62,8 +65,8 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "update Code not found",
 			method: http.MethodPatch, path: "/admin/rewards/codes/7",
 			body: `{"display_name":"Missing","credit_amount":1,"max_redemptions":0}`,
-			stub: rewardHandlerServiceStub{update: func(context.Context, UpdateRewardCodeCommand) (UpdatedRewardCode, error) {
-				return UpdatedRewardCode{}, ErrRewardCodeNotFound
+			stub: rewardHandlerServiceStub{update: func(context.Context, ports.UpdateRewardCodeCommand) (ports.UpdatedRewardCode, error) {
+				return ports.UpdatedRewardCode{}, rewardsdomain.ErrRewardCodeNotFound
 			}},
 			wantStatus: http.StatusNotFound, wantCode: "reward_code_not_found", wantMsg: "兑换码不存在",
 		},
@@ -71,8 +74,8 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "update cap below redemptions",
 			method: http.MethodPatch, path: "/admin/rewards/codes/7",
 			body: `{"display_name":"Cap","credit_amount":1,"max_redemptions":1}`,
-			stub: rewardHandlerServiceStub{update: func(context.Context, UpdateRewardCodeCommand) (UpdatedRewardCode, error) {
-				return UpdatedRewardCode{}, ErrCapBelowRedemptions
+			stub: rewardHandlerServiceStub{update: func(context.Context, ports.UpdateRewardCodeCommand) (ports.UpdatedRewardCode, error) {
+				return ports.UpdatedRewardCode{}, rewardsdomain.ErrCapBelowRedemptions
 			}},
 			wantStatus: http.StatusConflict, wantCode: "reward_code_cap_invalid", wantMsg: "兑换上限不能低于已兑换次数",
 		},
@@ -80,8 +83,8 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "delete redeemed Code",
 			method: http.MethodDelete, path: "/admin/rewards/codes/7",
 			body: ``,
-			stub: rewardHandlerServiceStub{delete: func(context.Context, DeleteRewardCodeCommand) (DeletedRewardCode, error) {
-				return DeletedRewardCode{}, ErrRewardCodeRedeemed
+			stub: rewardHandlerServiceStub{delete: func(context.Context, ports.DeleteRewardCodeCommand) (ports.DeletedRewardCode, error) {
+				return ports.DeletedRewardCode{}, rewardsdomain.ErrRewardCodeRedeemed
 			}},
 			wantStatus: http.StatusConflict, wantCode: "reward_code_redeemed", wantMsg: "已有兑换记录，只能停用该兑换码",
 		},
@@ -89,8 +92,8 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "delete unknown error stays internal",
 			method: http.MethodDelete, path: "/admin/rewards/codes/7",
 			body: ``,
-			stub: rewardHandlerServiceStub{delete: func(context.Context, DeleteRewardCodeCommand) (DeletedRewardCode, error) {
-				return DeletedRewardCode{}, errors.New("db connection refused")
+			stub: rewardHandlerServiceStub{delete: func(context.Context, ports.DeleteRewardCodeCommand) (ports.DeletedRewardCode, error) {
+				return ports.DeletedRewardCode{}, errors.New("db connection refused")
 			}},
 			wantStatus: http.StatusInternalServerError, wantCode: "reward_operation_failed", wantMsg: "奖励操作失败",
 		},
@@ -98,9 +101,9 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "create malformed JSON",
 			method: http.MethodPost, path: "/admin/rewards/codes",
 			body: `{"display_name":`,
-			stub: rewardHandlerServiceStub{create: func(context.Context, CreateRewardCodeCommand) (CreatedRewardCode, error) {
+			stub: rewardHandlerServiceStub{create: func(context.Context, ports.CreateRewardCodeCommand) (ports.CreatedRewardCode, error) {
 				t.Fatal("malformed request reached Rewards service")
-				return CreatedRewardCode{}, nil
+				return ports.CreatedRewardCode{}, nil
 			}},
 			wantStatus: http.StatusBadRequest, wantCode: "reward_invalid_input", wantMsg: "参数错误",
 		},
@@ -108,16 +111,16 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "update illegal Code id",
 			method: http.MethodPatch, path: "/admin/rewards/codes/abc",
 			body: `{"display_name":"Bad","credit_amount":1,"max_redemptions":0}`,
-			stub: rewardHandlerServiceStub{update: func(context.Context, UpdateRewardCodeCommand) (UpdatedRewardCode, error) {
+			stub: rewardHandlerServiceStub{update: func(context.Context, ports.UpdateRewardCodeCommand) (ports.UpdatedRewardCode, error) {
 				t.Fatal("illegal id reached Rewards service")
-				return UpdatedRewardCode{}, nil
+				return ports.UpdatedRewardCode{}, nil
 			}},
 			wantStatus: http.StatusBadRequest, wantCode: "reward_code_id_invalid", wantMsg: "兑换码 ID 无效",
 		},
 	}
 	for _, testCase := range adminCommandCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			handler := NewAdminCommandHandler(testCase.stub)
+			handler := rewardhttp.NewAdminCommandHandler(testCase.stub)
 			gin.SetMode(gin.TestMode)
 			router := gin.New()
 			router.Use(func(c *gin.Context) {
@@ -151,10 +154,10 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "redemption not found",
 			method: http.MethodGet, path: "/admin/rewards/codes/5/redemptions/9999", body: ``,
 			handler: func(stub rewardHandlerServiceStub) http.Handler {
-				return adminRedemptionDetailRouter(t, NewAdminReadHandler(stub, nil))
+				return adminRedemptionDetailRouter(t, rewardhttp.NewAdminReadHandler(stub, nil))
 			},
-			stub: rewardHandlerServiceStub{getRedemption: func(context.Context, GetAdminRedemptionInput) (AdminRedemptionDetail, error) {
-				return AdminRedemptionDetail{}, ErrRedemptionNotFound
+			stub: rewardHandlerServiceStub{getRedemption: func(context.Context, ports.GetAdminRedemptionInput) (ports.AdminRedemptionDetail, error) {
+				return ports.AdminRedemptionDetail{}, rewardsdomain.ErrRedemptionNotFound
 			}},
 			wantStatus: http.StatusNotFound, wantCode: "reward_redemption_not_found", wantMsg: "兑换记录不存在",
 		},
@@ -162,7 +165,7 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "illegal redemption id",
 			method: http.MethodGet, path: "/admin/rewards/codes/5/redemptions/0", body: ``,
 			handler: func(stub rewardHandlerServiceStub) http.Handler {
-				return adminRedemptionDetailRouter(t, NewAdminReadHandler(stub, nil))
+				return adminRedemptionDetailRouter(t, rewardhttp.NewAdminReadHandler(stub, nil))
 			},
 			stub:       rewardHandlerServiceStub{},
 			wantStatus: http.StatusBadRequest, wantCode: "reward_redemption_id_invalid", wantMsg: "兑换记录 ID 无效",
@@ -171,7 +174,7 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "illegal pagination limit",
 			method: http.MethodGet, path: "/admin/rewards/codes/5/redemptions?limit=101", body: ``,
 			handler: func(stub rewardHandlerServiceStub) http.Handler {
-				return adminRedemptionListRouter(t, NewAdminReadHandler(stub, nil))
+				return adminRedemptionListRouter(t, rewardhttp.NewAdminReadHandler(stub, nil))
 			},
 			stub:       rewardHandlerServiceStub{},
 			wantStatus: http.StatusBadRequest, wantCode: "reward_pagination_invalid", wantMsg: "limit 无效",
@@ -180,7 +183,7 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			name:   "search rejects URL input",
 			method: http.MethodPost, path: "/admin/rewards/codes/search?query=x", body: `{}`,
 			handler: func(stub rewardHandlerServiceStub) http.Handler {
-				return adminRewardSearchRouter(t, NewAdminReadHandler(stub, nil))
+				return adminRewardSearchRouter(t, rewardhttp.NewAdminReadHandler(stub, nil))
 			},
 			stub:       rewardHandlerServiceStub{},
 			wantStatus: http.StatusBadRequest, wantCode: "reward_invalid_input", wantMsg: "参数错误",
@@ -211,15 +214,15 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 		wantCode   string
 		wantMsg    string
 	}{
-		{name: "invalid Code", redeemErr: ErrInvalidCommand, wantStatus: http.StatusUnprocessableEntity, wantCode: "reward_code_unavailable", wantMsg: "兑换码无效或已失效"},
-		{name: "unavailable Code", redeemErr: ErrCodeUnavailable, wantStatus: http.StatusUnprocessableEntity, wantCode: "reward_code_unavailable", wantMsg: "兑换码无效或已失效"},
+		{name: "invalid Code", redeemErr: rewardsdomain.ErrInvalidCode, wantStatus: http.StatusUnprocessableEntity, wantCode: "reward_code_unavailable", wantMsg: "兑换码无效或已失效"},
+		{name: "unavailable Code", redeemErr: rewardsdomain.ErrCodeUnavailable, wantStatus: http.StatusUnprocessableEntity, wantCode: "reward_code_unavailable", wantMsg: "兑换码无效或已失效"},
 		{name: "frozen Wallet", redeemErr: rewardsdomain.ErrWalletFrozen, wantStatus: http.StatusConflict, wantCode: "reward_wallet_locked", wantMsg: "当前账户无法兑换奖励"},
 		{name: "unknown failure", redeemErr: errors.New("credit grant timeout"), wantStatus: http.StatusInternalServerError, wantCode: "reward_redeem_failed", wantMsg: "网络错误，请重试"},
 	}
 	for _, testCase := range redeemCases {
 		t.Run("redeem "+testCase.name, func(t *testing.T) {
-			handler := NewUserHandler(rewardHandlerServiceStub{redeem: func(context.Context, RedeemCommand) (RedeemResult, error) {
-				return RedeemResult{}, testCase.redeemErr
+			handler := rewardhttp.NewUserHandler(rewardHandlerServiceStub{redeem: func(context.Context, ports.RedeemCommand) (ports.RedeemResult, error) {
+				return ports.RedeemResult{}, testCase.redeemErr
 			}})
 			router := rewardRedeemRouter(t, handler, 41)
 			recorder := performRawRewardRedeem(t, router, `{"code":"MACHINE01"}`)
@@ -235,13 +238,13 @@ func TestRewardUnavailableServiceRendersMachineCode(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("user redeem without service", func(t *testing.T) {
-		router := rewardRedeemRouter(t, NewUserHandler(nil), 41)
+		router := rewardRedeemRouter(t, rewardhttp.NewUserHandler(nil), 41)
 		recorder := performRawRewardRedeem(t, router, `{"code":"MACHINE01"}`)
 		assertRewardMachineError(t, recorder, http.StatusServiceUnavailable, "reward_service_unavailable", "网络错误，请重试")
 	})
 
 	t.Run("admin command without service", func(t *testing.T) {
-		handler := NewAdminCommandHandler(nil)
+		handler := rewardhttp.NewAdminCommandHandler(nil)
 		router := gin.New()
 		router.Use(func(c *gin.Context) {
 			testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
@@ -255,11 +258,11 @@ func TestRewardUnavailableServiceRendersMachineCode(t *testing.T) {
 
 func TestRewardRedeemThrottleRendersMachineCode(t *testing.T) {
 	now := time.Date(2026, time.July, 16, 12, 0, 0, 0, time.UTC)
-	handler := newUserHandlerWithOptions(rewardHandlerServiceStub{redeem: func(context.Context, RedeemCommand) (RedeemResult, error) {
-		return RedeemResult{CreditedAmount: 1}, nil
-	}}, redemptionHandlerOptions{Now: func() time.Time { return now }})
+	handler := rewardhttp.NewUserHandlerWithOptions(rewardHandlerServiceStub{redeem: func(context.Context, ports.RedeemCommand) (ports.RedeemResult, error) {
+		return ports.RedeemResult{CreditedAmount: 1}, nil
+	}}, rewards.RedemptionHandlerOptions{Now: func() time.Time { return now }})
 	router := rewardRedeemRouter(t, handler, 41)
-	for attempt := 1; attempt <= defaultRedemptionAttemptLimit; attempt++ {
+	for attempt := 1; attempt <= rewards.DefaultRedemptionAttemptLimit; attempt++ {
 		if recorder := performRawRewardRedeemWithKey(t, router, `{"code":"MACHINE01"}`, fmt.Sprintf("machine-key-%d", attempt)); recorder.Code != http.StatusOK {
 			t.Fatalf("attempt %d status = %d; body=%s", attempt, recorder.Code, recorder.Body.String())
 		}
@@ -286,7 +289,7 @@ func assertRewardMachineError(t *testing.T, recorder *httptest.ResponseRecorder,
 	}
 }
 
-func adminRedemptionListRouter(t *testing.T, handler *AdminReadHandler) http.Handler {
+func adminRedemptionListRouter(t *testing.T, handler *rewards.AdminReadHandler) http.Handler {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -298,7 +301,7 @@ func adminRedemptionListRouter(t *testing.T, handler *AdminReadHandler) http.Han
 	return router
 }
 
-func adminRedemptionDetailRouter(t *testing.T, handler *AdminReadHandler) http.Handler {
+func adminRedemptionDetailRouter(t *testing.T, handler *rewards.AdminReadHandler) http.Handler {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -310,7 +313,7 @@ func adminRedemptionDetailRouter(t *testing.T, handler *AdminReadHandler) http.H
 	return router
 }
 
-func adminRewardSearchRouter(t *testing.T, handler *AdminReadHandler) http.Handler {
+func adminRewardSearchRouter(t *testing.T, handler *rewards.AdminReadHandler) http.Handler {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

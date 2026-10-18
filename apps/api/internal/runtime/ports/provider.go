@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"net"
 	"net/http"
 	"time"
@@ -66,7 +67,7 @@ type UpstreamHTTPError struct {
 }
 
 func (e *UpstreamHTTPError) Error() string {
-	return fmt.Sprintf(msgError, e.StatusCode, e.Body)
+	return fmt.Sprintf(errorrender.MsgRuntimePortsError, e.StatusCode, e.Body)
 }
 
 func (e *UpstreamHTTPError) HTTPStatus() int {

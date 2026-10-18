@@ -2,9 +2,8 @@ package contracts
 
 import (
 	"context"
-	"time"
-
 	paymentsdomain "ideaboard/api/internal/payments/domain"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -141,4 +140,13 @@ type AdminPaymentRefundResult struct {
 	Status            paymentsdomain.PaymentRefundStatus `json:"status"`
 	CreatedAt         time.Time                          `json:"created_at"`
 	UpdatedAt         time.Time                          `json:"updated_at"`
+}
+
+// merged from internal/payments/application/contracts/refund.go (structural consolidation; symbols unchanged).
+// CreatePaymentRefundCommand describes an administrator-requested refund.
+type CreatePaymentRefundCommand struct {
+	ActorID        int64
+	OrderNumber    string
+	IdeaQuantity   int64
+	IdempotencyKey string
 }

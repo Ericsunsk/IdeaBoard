@@ -2,11 +2,11 @@ package http
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
 
+	creditsdomain "ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
@@ -51,100 +51,102 @@ const (
 	codeRewardRedeemFailed            = string(contract.CodeRewardRedeemFailed)
 )
 
-type rewardErrorMapping struct {
-	targets []error
-	status  int
-	code    string
-	message string
-}
-
-func (m rewardErrorMapping) Matches(err error) bool {
-	return errorrender.TargetsMatch(m.targets, err)
-}
-
-func (m rewardErrorMapping) render(c *gin.Context, err error) {
-	msg := m.message
-	if msg == "" {
-		slog.Error("reward error mapping missing safe message",
-			"code", m.code,
-			"status", m.status,
-			"error_type", fmt.Sprintf("%T", err),
-			"error_summary", redactedRewardErrorSummary(err))
-		msg = msgRender
-	}
-	errorrender.Render(c, m.status, m.code, msg)
-}
+// Reward scopes partition the single domain table across surfaces:
+// admin writes render through writeRewardError, user redeem through
+// writeRewardRedeemError. Unscoped rows serve both; scoped rows serve
+// one surface (notably ErrInvalidCode: 400 invalid for admin, 422
+// unavailable for redeem so callers branch on one code).
+const (
+	rewardScopeAdmin  = "admin"
+	rewardScopeRedeem = "redeem"
+)
 
 // rewardDomainErrorTable is the single source of truth for mapping domain
-// failures to the machine-readable envelope. Rows are ordered from the most
-// specific outcome to the most generic; the first match wins.
-var rewardDomainErrorTable = []rewardErrorMapping{
+// failures to the machine-readable envelope, shared by the admin and
+// redeem surfaces via Scope. Rows are ordered from the most specific
+// outcome to the most generic; the first in-scope match wins.
+var rewardDomainErrorTable = []errorrender.Mapping{
 	{
-		targets: []error{rewardsdomain.ErrRewardCodeConflict},
-		status:  http.StatusConflict,
-		code:    codeRewardCodeIdempotencyConflict,
-		message: msgRender2,
+		Targets: []error{rewardsdomain.ErrRewardCodeConflict},
+		Status:  http.StatusConflict,
+		Code:    codeRewardCodeIdempotencyConflict,
+		Message: errorrender.MsgRender2,
+		Scope:   rewardScopeAdmin,
 	},
 	{
-		targets: []error{rewardsdomain.ErrCodeCollision},
-		status:  http.StatusConflict,
-		code:    codeRewardCodeConflict,
-		message: msgRender3,
+		Targets: []error{rewardsdomain.ErrCodeCollision},
+		Status:  http.StatusConflict,
+		Code:    codeRewardCodeConflict,
+		Message: errorrender.MsgRender3,
+		Scope:   rewardScopeAdmin,
 	},
 	{
-		targets: []error{rewardsdomain.ErrRewardCodeNotFound},
-		status:  http.StatusNotFound,
-		code:    codeRewardCodeNotFound,
-		message: msgRender4,
+		Targets: []error{rewardsdomain.ErrRewardCodeNotFound},
+		Status:  http.StatusNotFound,
+		Code:    codeRewardCodeNotFound,
+		Message: errorrender.MsgRender4,
+		Scope:   rewardScopeAdmin,
 	},
 	{
-		targets: []error{rewardsdomain.ErrCapBelowRedemptions},
-		status:  http.StatusConflict,
-		code:    codeRewardCodeCapInvalid,
-		message: msgRender5,
+		Targets: []error{rewardsdomain.ErrCapBelowRedemptions},
+		Status:  http.StatusConflict,
+		Code:    codeRewardCodeCapInvalid,
+		Message: errorrender.MsgRender5,
+		Scope:   rewardScopeAdmin,
 	},
 	{
-		targets: []error{rewardsdomain.ErrRewardCodeRedeemed},
-		status:  http.StatusConflict,
-		code:    codeRewardCodeRedeemed,
-		message: msgRender6,
+		Targets: []error{rewardsdomain.ErrRewardCodeRedeemed},
+		Status:  http.StatusConflict,
+		Code:    codeRewardCodeRedeemed,
+		Message: errorrender.MsgRender6,
+		Scope:   rewardScopeAdmin,
 	},
 	{
-		targets: []error{rewardsdomain.ErrRedemptionNotFound},
-		status:  http.StatusNotFound,
-		code:    codeRewardRedemptionNotFound,
-		message: msgRender7,
+		Targets: []error{rewardsdomain.ErrRedemptionNotFound},
+		Status:  http.StatusNotFound,
+		Code:    codeRewardRedemptionNotFound,
+		Message: errorrender.MsgRender7,
+		Scope:   rewardScopeAdmin,
 	},
 	{
-		targets: []error{rewardsdomain.ErrCodeUnavailable},
-		status:  http.StatusUnprocessableEntity,
-		code:    codeRewardCodeUnavailable,
-		message: msgRender8,
+		Targets: []error{rewardsdomain.ErrCodeUnavailable},
+		Status:  http.StatusUnprocessableEntity,
+		Code:    codeRewardCodeUnavailable,
+		Message: errorrender.MsgRender8,
 	},
 	{
-		targets: []error{rewardsdomain.ErrWalletFrozen},
-		status:  http.StatusConflict,
-		code:    codeRewardWalletLocked,
-		message: msgRender9,
+		// Wallet lock converges both sentinels: the adapter maps the
+		// canonical credits/domain frozen state to rewardsdomain, but a
+		// direct credits failure must render the same 409 instead of a
+		// generic 500. credits/domain stays the single source; this row
+		// only lists its target.
+		Targets: []error{rewardsdomain.ErrWalletFrozen, creditsdomain.ErrWalletFrozen},
+		Status:  http.StatusConflict,
+		Code:    codeRewardWalletLocked,
+		Message: errorrender.MsgRender9,
 	},
 	{
-		targets: []error{rewardsdomain.ErrInvalidCode},
-		status:  http.StatusBadRequest,
-		code:    codeRewardCodeInvalid,
-		message: msgRewardInvalidInput,
+		Targets: []error{rewardsdomain.ErrInvalidCode},
+		Status:  http.StatusBadRequest,
+		Code:    codeRewardCodeInvalid,
+		Message: errorrender.MsgRewardInvalidInput,
+		Scope:   rewardScopeAdmin,
+	},
+	{
+		Targets: []error{rewardsdomain.ErrInvalidCode},
+		Status:  http.StatusUnprocessableEntity,
+		Code:    codeRewardCodeUnavailable,
+		Message: errorrender.MsgRender8,
+		Scope:   rewardScopeRedeem,
 	},
 }
 
-func renderMappedRewardError(c *gin.Context, err error, table []rewardErrorMapping, defaultStatus int, defaultCode, defaultMessage string) {
-	if row, ok := errorrender.FirstMatch(table, err); ok {
-		row.render(c, err)
-		return
-	}
-	slog.Error("reward operation failed",
+func rewardUnmatchedAttrs(err error) []any {
+	return []any{
 		"outcome", "internal_error",
 		"error_type", fmt.Sprintf("%T", err),
-		"error_summary", redactedRewardErrorSummary(err))
-	errorrender.Render(c, defaultStatus, defaultCode, defaultMessage)
+		"error_summary", redactedRewardErrorSummary(err),
+	}
 }
 
 // redactedRewardErrorSummary keeps an unmatched (5xx) failure attributable
@@ -179,27 +181,34 @@ const maxRewardErrorSummaryRunes = 300
 
 // writeRewardError renders admin-side failures through the machine envelope.
 func writeRewardError(c *gin.Context, err error) {
-	renderMappedRewardError(c, err, rewardDomainErrorTable,
-		http.StatusInternalServerError, codeRewardOperationFailed, msgRewardOperationFailed)
+	errorrender.RenderMapped(c, err, rewardDomainErrorTable, errorrender.MappedOptions{
+		Scope:           rewardScopeAdmin,
+		DefaultStatus:   http.StatusInternalServerError,
+		DefaultCode:     codeRewardOperationFailed,
+		DefaultMessage:  errorrender.MsgRewardOperationFailed,
+		FallbackMessage: errorrender.MsgRewardsInterfacesHTTPRender,
+		UnmatchedLog:    "reward operation failed",
+		UnmatchedAttrs:  rewardUnmatchedAttrs,
+		// Raw errors carry code plaintext/digests; logs keep only the
+		// redacted summary, never the wrapped error.
+		OmitUnmatchedErr: true,
+	})
 }
 
-// writeRewardRedeemError renders user redeem failures. Invalid and
-// unavailable codes share the 422 outcome so callers branch on one code.
+// writeRewardRedeemError renders user redeem failures through the shared
+// table (redeem scope). Invalid and unavailable codes share the 422
+// outcome so callers branch on one code.
 func writeRewardRedeemError(c *gin.Context, err error) {
-	renderMappedRewardError(c, err, []rewardErrorMapping{
-		{
-			targets: []error{rewardsdomain.ErrInvalidCode, rewardsdomain.ErrCodeUnavailable},
-			status:  http.StatusUnprocessableEntity,
-			code:    codeRewardCodeUnavailable,
-			message: msgRender8,
-		},
-		{
-			targets: []error{rewardsdomain.ErrWalletFrozen},
-			status:  http.StatusConflict,
-			code:    codeRewardWalletLocked,
-			message: msgRender9,
-		},
-	}, http.StatusInternalServerError, codeRewardRedeemFailed, msgRewardRedeemFailed)
+	errorrender.RenderMapped(c, err, rewardDomainErrorTable, errorrender.MappedOptions{
+		Scope:            rewardScopeRedeem,
+		DefaultStatus:    http.StatusInternalServerError,
+		DefaultCode:      codeRewardRedeemFailed,
+		DefaultMessage:   errorrender.MsgRewardRedeemFailed,
+		FallbackMessage:  errorrender.MsgRewardsInterfacesHTTPRender,
+		UnmatchedLog:     "reward operation failed",
+		UnmatchedAttrs:   rewardUnmatchedAttrs,
+		OmitUnmatchedErr: true,
+	})
 }
 
 // writeRewardInputError renders request-shape failures (malformed JSON,
@@ -211,40 +220,14 @@ func writeRewardInputError(c *gin.Context, code, message string) {
 
 // writeRewardRateLimitedError renders the per-user redeem throttle outcome.
 func writeRewardRateLimitedError(c *gin.Context) {
-	errorrender.Render(c, http.StatusTooManyRequests, codeRewardRateLimited, msgRewardRateLimited)
+	errorrender.Render(c, http.StatusTooManyRequests, codeRewardRateLimited, errorrender.MsgRewardRateLimited)
 }
 
 // writeRewardUnavailableError renders a missing service dependency.
 func writeRewardUnavailableError(c *gin.Context, userFacing bool) {
 	if userFacing {
-		errorrender.Render(c, http.StatusServiceUnavailable, codeRewardServiceUnavailable, msgRewardRedeemFailed)
+		errorrender.Render(c, http.StatusServiceUnavailable, codeRewardServiceUnavailable, errorrender.MsgRewardRedeemFailed)
 		return
 	}
-	errorrender.Render(c, http.StatusServiceUnavailable, codeRewardServiceUnavailable, msgRewardServiceUnavailable)
+	errorrender.Render(c, http.StatusServiceUnavailable, codeRewardServiceUnavailable, errorrender.MsgRewardServiceUnavailable)
 }
-
-// Backend-owned user-facing copy for this package. Each constant
-// is the single source of truth for one rendered message; call
-// sites reference these names so copy changes stay in one place.
-// Values are byte-identical to the previously inline literals.
-const (
-	msgRewardInvalidInput            = "参数错误"            // codeRewardInvalidInput
-	msgRewardCodeIDInvalid           = "兑换码 ID 无效"       // codeRewardCodeIDInvalid
-	msgRewardPaginationInvalid       = "before_id 无效"    // codeRewardPaginationInvalid
-	msgRewardPaginationInvalid2      = "limit 无效"        // codeRewardPaginationInvalid
-	msgRewardRedemptionIDInvalid     = "兑换记录 ID 无效"      // codeRewardRedemptionIDInvalid
-	msgRender                        = "操作失败，请稍后重试"      // Render @ errors.go
-	msgRender2                       = "幂等请求与原请求不一致"     // Render @ errors.go
-	msgRender3                       = "兑换码已存在"          // Render @ errors.go
-	msgRender4                       = "兑换码不存在"          // Render @ errors.go
-	msgRender5                       = "兑换上限不能低于已兑换次数"   // Render @ errors.go
-	msgRender6                       = "已有兑换记录，只能停用该兑换码" // Render @ errors.go
-	msgRender7                       = "兑换记录不存在"         // Render @ errors.go
-	msgRender8                       = "兑换码无效或已失效"       // Render @ errors.go
-	msgRender9                       = "当前账户无法兑换奖励"      // Render @ errors.go
-	msgRewardOperationFailed         = "奖励操作失败"          // codeRewardOperationFailed
-	msgRewardRedeemFailed            = "网络错误，请重试"        // codeRewardRedeemFailed
-	msgRewardRateLimited             = "操作过于频繁，请稍后重试"    // codeRewardRateLimited
-	msgRewardServiceUnavailable      = "奖励服务暂不可用"        // codeRewardServiceUnavailable
-	msgRewardCodeIdempotencyConflict = "幂等请求与原请求不一致"     // codeRewardCodeIdempotencyConflict
-)

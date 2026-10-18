@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { setUserLocale } from '../../../../core/i18n'
 import { queryClient } from '../../../../core/query/queryClient'
-import { renderWithUser, screen, waitFor } from '../../../../test/render'
+import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
 import { mockAppToast } from '../../../../test/toast'
+import { makeSessionUser } from '../../../../test/factories'
+import { useUserStore } from '../../../auth'
 import { primeAuthenticatedWorkspace, selectWorkspace } from '../../testing'
 import { boardQueryKeys } from '../../session/sync/boardQueryKeys'
 import { useSharePanel } from '../../session/share/useSharePanel'
@@ -29,6 +31,12 @@ function setup(
     isCreator?: boolean
     access?: Partial<WorkspaceBoardAccessFact>
     isCached?: boolean
+    roster?: Array<{
+      userId: string
+      role: 'member'
+      email?: string | undefined
+      avatar_url?: string | undefined
+    }>
   } = {},
 ) {
   const isCreator = options.isCreator ?? true
@@ -60,7 +68,9 @@ function setup(
     fetchAccess: vi.fn().mockImplementation(async () => access),
     fetchRoster: vi
       .fn()
-      .mockResolvedValue([creator, member, other].map((userId) => ({ userId, role: 'member' }))),
+      .mockResolvedValue(
+        options.roster ?? [creator, member, other].map((userId) => ({ userId, role: 'member' })),
+      ),
     replaceAccess: vi.fn().mockImplementation(async (_workspace, _board, input, write) => {
       if (write.expectedVersion !== access.accessVersion)
         throw Object.assign(new Error('conflict'), { code: 'board_access_conflict' })
@@ -236,6 +246,100 @@ describe('selected-member Board sharing', () => {
     await user.click(target)
     expect(await screen.findByText('You can view this board.')).toBeVisible()
     expect(panel.isOpen.value).toBe(true)
+  })
+
+  test('renders roster avatars from avatar_url and no image without one', async () => {
+    setup({
+      roster: [
+        {
+          userId: creator,
+          role: 'member',
+          email: 'creator@example.com',
+          avatar_url: '/api/v1/public/users/usr_creator/avatar?v=2',
+        },
+        { userId: member, role: 'member', email: 'member@example.com' },
+        {
+          userId: other,
+          role: 'member',
+          email: 'other@example.com',
+          avatar_url: '/avatar-other.png',
+        },
+      ],
+    })
+
+    // Images stay `display:none` until loaded in happy-dom (excluded from
+    // accessible-name computation), so scope by member button and assert the
+    // rendered img attributes directly.
+    const creatorButton = await screen.findByRole('button', { name: /creator@example\.com/ })
+    const creatorImg = within(creatorButton).getByRole('img', { hidden: true })
+    expect(creatorImg).toHaveAttribute(
+      'src',
+      '/api/v1/public/users/usr_creator/avatar?v=2&size=64',
+    )
+    expect(creatorImg).toHaveAttribute('alt', 'creator@example.com')
+    const otherButton = screen.getByRole('button', { name: /other@example\.com/ })
+    expect(within(otherButton).getByRole('img', { hidden: true })).toHaveAttribute(
+      'src',
+      '/avatar-other.png',
+    )
+    // Members without an avatar render no image (AvatarFallback keeps its
+    // existing delay behavior, unchanged here).
+    const memberButton = screen.getByRole('button', { name: /member@example\.com/ })
+    expect(within(memberButton).queryByRole('img', { hidden: true })).toBeNull()
+  })
+
+  test('prefers the roster avatar over the viewer avatar and never leaks it', async () => {
+    const store = useUserStore()
+    store.setAuth(makeSessionUser({ public_id: other, avatar: '/api/v1/public/users/usr_other/avatar?v=5' }))
+    try {
+      setup({
+        roster: [
+          { userId: creator, role: 'member', email: 'creator@example.com' },
+          { userId: member, role: 'member', email: 'member@example.com' },
+          {
+            userId: other,
+            role: 'member',
+            email: 'other@example.com',
+            avatar_url: '/avatar-other.png',
+          },
+        ],
+      })
+
+      const otherButton = await screen.findByRole('button', { name: /other@example\.com/ })
+      expect(within(otherButton).getByRole('img', { hidden: true })).toHaveAttribute(
+        'src',
+        '/avatar-other.png',
+      )
+      // The viewer avatar never leaks onto other members.
+      const memberButton = screen.getByRole('button', { name: /member@example\.com/ })
+      expect(within(memberButton).queryByRole('img', { hidden: true })).toBeNull()
+    } finally {
+      store.clearAuth()
+    }
+  })
+
+  test('falls back to the viewer session avatar for the viewer entry', async () => {
+    const store = useUserStore()
+    store.setAuth(makeSessionUser({ public_id: member, avatar: '/api/v1/public/users/usr_member/avatar?v=6' }))
+    try {
+      setup({
+        roster: [
+          { userId: creator, role: 'member', email: 'creator@example.com' },
+          { userId: member, role: 'member', email: 'member@example.com' },
+          { userId: other, role: 'member', email: 'other@example.com' },
+        ],
+      })
+
+      const memberButton = await screen.findByRole('button', { name: /member@example\.com/ })
+      expect(within(memberButton).getByRole('img', { hidden: true })).toHaveAttribute(
+        'src',
+        '/api/v1/public/users/usr_member/avatar?v=6&size=64',
+      )
+      const creatorButton = screen.getByRole('button', { name: /creator@example\.com/ })
+      expect(within(creatorButton).queryByRole('img', { hidden: true })).toBeNull()
+    } finally {
+      store.clearAuth()
+    }
   })
 
   test('A→B→A does not emit success for a write from the old Share residency', async () => {

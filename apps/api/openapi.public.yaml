@@ -3705,6 +3705,12 @@ components:
             assistance only (members-only visibility, unmasked by decision).
             Omitted when unavailable; never used as a write identity
             (member writes stay usr_ with unknown users converging to 404).
+        avatar:
+          type: string
+          description: >-
+            Workspace-visible member avatar public URL with a content
+            version query (members-only visibility). Omitted when the
+            member has no custom avatar or the value is unavailable.
     CreateWorkspaceRequest:
       type: object
       required: [data]

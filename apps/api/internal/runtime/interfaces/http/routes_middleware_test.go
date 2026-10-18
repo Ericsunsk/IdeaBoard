@@ -1,4 +1,4 @@
-package httpapi
+package http
 
 // The legacy /api/user + /api/admin upload bypasses were deleted with the
 // #809 hard cut: no POST path bypasses the global JSON body limit anymore

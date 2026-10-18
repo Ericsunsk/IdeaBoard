@@ -31,8 +31,8 @@ func TestDeriveCatalogEnforcesBudgets(t *testing.T) {
 	if !ok {
 		t.Fatalf("large schema-4 board must derive a catalog scene")
 	}
-	if len(sceneJSON) > 65536 {
-		t.Fatalf("catalog scene = %d bytes, want <= 65536", len(sceneJSON))
+	if len(sceneJSON) > CatalogMaxSceneBytes {
+		t.Fatalf("catalog scene = %d bytes, want <= %d", len(sceneJSON), CatalogMaxSceneBytes)
 	}
 	scene, err := ParseScene(sceneJSON)
 	if err != nil {
@@ -44,11 +44,11 @@ func TestDeriveCatalogEnforcesBudgets(t *testing.T) {
 	if !scene.Truncated {
 		t.Fatalf("2000-node board must report truncation")
 	}
-	if len(scene.Nodes) > 500 {
-		t.Fatalf("nodes = %d, want <= 500", len(scene.Nodes))
+	if len(scene.Nodes) > CatalogMaxNodes {
+		t.Fatalf("nodes = %d, want <= %d", len(scene.Nodes), CatalogMaxNodes)
 	}
-	if len(scene.Connections) > 1000 {
-		t.Fatalf("connections = %d, want <= 1000", len(scene.Connections))
+	if len(scene.Connections) > CatalogMaxConnections {
+		t.Fatalf("connections = %d, want <= %d", len(scene.Connections), CatalogMaxConnections)
 	}
 	media := 0
 	for _, n := range scene.Nodes {
@@ -57,8 +57,8 @@ func TestDeriveCatalogEnforcesBudgets(t *testing.T) {
 	if scene.Omitted.MediaRefs != 4000-media {
 		t.Fatalf("omitted media refs = %d, want %d", scene.Omitted.MediaRefs, 4000-media)
 	}
-	if media > 1500 {
-		t.Fatalf("media refs = %d, want <= 1500", media)
+	if media > CatalogMaxMediaRefs {
+		t.Fatalf("media refs = %d, want <= %d", media, CatalogMaxMediaRefs)
 	}
 	limits := CatalogLimits()
 	for _, check := range []struct {
@@ -135,8 +135,8 @@ func TestDeriveCatalogBoundsGroupsAndMembership(t *testing.T) {
 			if !ok {
 				t.Fatal("group-heavy scene must derive")
 			}
-			if len(raw) > 65536 {
-				t.Fatalf("group-heavy scene = %d bytes, want <= 65536", len(raw))
+			if len(raw) > CatalogMaxSceneBytes {
+				t.Fatalf("group-heavy scene = %d bytes, want <= %d", len(raw), CatalogMaxSceneBytes)
 			}
 			scene, err := ParseScene(raw)
 			if err != nil {

@@ -20,14 +20,14 @@ func PaymentOrder(row dbsqlc.PaymentOrder) paymentsdomain.PaymentOrder {
 		UserID: row.UserID, ClientIdempotencyKey: row.ClientIdempotencyKey, RequestHash: row.RequestHash,
 		Status: paymentsdomain.PaymentOrderStatus(row.Status), StripeCredentialID: pgUUIDString(row.StripeCredentialID), StripeAccountID: row.StripeAccountID,
 		StripeCustomerID: row.StripeCustomerID, StripeProductID: row.StripeProductID,
-		StripeCheckoutSessionID: pgTextString(row.StripeCheckoutSessionID),
+		StripeCheckoutSessionID: PgTextString(row.StripeCheckoutSessionID),
 		StripePaymentIntentID:   row.StripePaymentIntentID, StripeChargeID: row.StripeChargeID,
 		IdeaQuantity: row.IdeaQuantity, BaseCurrency: row.BaseCurrency, BaseAmountMinor: row.BaseAmountMinor,
 		PaidSubtotalMinor: NullInt64Pointer(row.PaidSubtotalMinor), PaidTaxMinor: NullInt64Pointer(row.PaidTaxMinor),
 		PaidTotalMinor: NullInt64Pointer(row.PaidTotalMinor), PaidCurrency: row.PaidCurrency,
 		TermsVersion: row.TermsVersion, RefundPolicyVersion: row.RefundPolicyVersion,
 		ReturnBaseURL: row.ReturnBaseUrl, CheckoutURL: row.CheckoutUrl, ReceiptURL: row.ReceiptUrl,
-		CreditTransactionID: pgTextString(row.CreditTransactionID),
+		CreditTransactionID: PgTextString(row.CreditTransactionID),
 		ExpiresAt:           dbutil.TimeValue(row.ExpiresAt), PaidAt: NullTimePointer(row.PaidAt), CreditedAt: NullTimePointer(row.CreditedAt),
 		CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt),
 	}
@@ -48,7 +48,7 @@ func pgUUIDString(value pgtype.UUID) string {
 	return uuid.UUID(value.Bytes).String()
 }
 
-func pgTextString(value pgtype.Text) string {
+func PgTextString(value pgtype.Text) string {
 	if !value.Valid {
 		return ""
 	}

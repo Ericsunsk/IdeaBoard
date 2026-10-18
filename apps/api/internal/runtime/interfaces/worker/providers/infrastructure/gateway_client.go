@@ -1,4 +1,4 @@
-package infrastructure
+package providerinfra
 
 import (
 	"bytes"
@@ -15,8 +15,7 @@ import (
 
 	runtimeports "ideaboard/api/internal/runtime/ports"
 
-	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/outboundhttp"
+	"ideaboard/api/internal/platform/safehttp"
 	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 )
 
@@ -46,7 +45,7 @@ type GatewayClientConfig struct {
 	// Outbound overrides the standard outbound client (timeout cap,
 	// bounded retries, Retry-After). Nil builds the gateway default
 	// policy; tests inject isolated instances here.
-	Outbound *outboundhttp.Client
+	Outbound *safehttp.Client
 	// Target names this egress in outbound logs/metrics; empty keeps the
 	// gateway default ("ai-gateway", vision passes "vision-search").
 	Target string
@@ -65,7 +64,7 @@ type GatewayClient struct {
 	token    string
 	timeout  time.Duration
 	maxBytes int64
-	outbound *outboundhttp.Client
+	outbound *safehttp.Client
 	target   string
 	metrics  *redmetrics.Set
 }
@@ -95,7 +94,7 @@ func NewGatewayClient(cfg GatewayClientConfig) (*GatewayClient, error) {
 	}
 	outbound := cfg.Outbound
 	if outbound == nil {
-		outbound = outboundhttp.NewClient(outboundhttp.Config{
+		outbound = safehttp.NewClient(safehttp.Config{
 			Timeout:     timeout,
 			MaxTimeout:  defaultGatewayTimeout,
 			MaxAttempts: 1,
@@ -141,10 +140,10 @@ func (c *GatewayClient) Do(ctx context.Context, req runtimeports.GatewayRequest)
 	// provider call. req.MaxAttempts only controls Cloudflare's internal tries.
 	// The gateway URL is operator-controlled. Do not add its host here:
 	// request-time policy must explicitly authorize every configured egress.
-	resp, err := c.outbound.Do(ctx, httpReq, outboundhttp.RequestOptions{
+	resp, err := c.outbound.Do(ctx, httpReq, safehttp.RequestOptions{
 		Timeout:     timeout,
 		MaxAttempts: 1,
-		AllowHosts:  outbound.AllowHosts(ctx),
+		AllowHosts:  safehttp.AllowHosts(ctx),
 		Target:      c.target,
 	})
 	if err != nil {
@@ -152,7 +151,7 @@ func (c *GatewayClient) Do(ctx context.Context, req runtimeports.GatewayRequest)
 		// Bounded retries exhausted on a retryable status still surface
 		// as UpstreamHTTPError so failure classifiers (probe verdicts,
 		// provider categories, worker requeue decisions) keep working.
-		var statusErr *outboundhttp.HTTPStatusError
+		var statusErr *safehttp.HTTPStatusError
 		if errors.As(err, &statusErr) {
 			return runtimeports.GatewayResponse{}, fmt.Errorf("gateway request failed: %w",
 				runtimeports.NewUpstreamHTTPError(statusErr.StatusCode, statusErr.Body, statusErr.RetryAfter))

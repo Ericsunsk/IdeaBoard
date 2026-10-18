@@ -11,10 +11,11 @@ import (
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/events"
+	eventoutbox "ideaboard/api/internal/events/outbox"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tasking/workspacetasks"
-	tenancypg "ideaboard/api/internal/tenancy/postgres"
+	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -29,7 +30,7 @@ const defaultTaskPriority = int32(2)
 type Store struct {
 	db     *pgxpool.Pool
 	q      *dbsqlc.Queries
-	outbox *events.TaskStatusOutboxStore
+	outbox *eventoutbox.TaskStatusOutboxStore
 }
 
 // Compile-time convergence with each minimal persistence seam.
@@ -47,7 +48,7 @@ type repositoryQueryer struct {
 
 // NewStore builds a postgres workspace task Store over pool.
 func NewStore(db *pgxpool.Pool) *Store {
-	return &Store{db: db, q: dbsqlc.New(db), outbox: events.NewTaskStatusOutboxStore(db)}
+	return &Store{db: db, q: dbsqlc.New(db), outbox: eventoutbox.NewTaskStatusOutboxStore(db)}
 }
 
 func (s *Store) dbWithContext(ctx context.Context) repositoryQueryer {
@@ -367,20 +368,20 @@ func nilIfEmpty(value string) any {
 	return value
 }
 
-func taskOutboxRecord(task *workspacetasks.WorkspaceTask, status workspacetasks.Status, eventType string, data any) (events.TaskStatusOutboxRecord, error) {
+func taskOutboxRecord(task *workspacetasks.WorkspaceTask, status workspacetasks.Status, eventType string, data any) (eventoutbox.TaskStatusOutboxRecord, error) {
 	if task == nil {
-		return events.TaskStatusOutboxRecord{}, fmt.Errorf("tasking postgres: outbox task is nil")
+		return eventoutbox.TaskStatusOutboxRecord{}, fmt.Errorf("tasking postgres: outbox task is nil")
 	}
 	raw := json.RawMessage(`{}`)
 	if data != nil {
 		encoded, err := json.Marshal(data)
 		if err != nil {
-			return events.TaskStatusOutboxRecord{}, fmt.Errorf("tasking postgres: encode outbox event: %w", err)
+			return eventoutbox.TaskStatusOutboxRecord{}, fmt.Errorf("tasking postgres: encode outbox event: %w", err)
 		}
 		raw = encoded
 	}
-	return events.TaskStatusOutboxRecord{
-		EventID:      events.StableTaskEventID(task.ID, events.TaskStatus(status), task.ExecutionToken),
+	return eventoutbox.TaskStatusOutboxRecord{
+		EventID:      events.StableEventID(task.ID, string(status), task.ExecutionToken),
 		WorkspaceID:  task.WorkspaceID,
 		TaskID:       task.ID,
 		Status:       events.TaskStatus(status),

@@ -1,19 +1,19 @@
-package payments
+package payments_test
 
-import "testing"
+import (
+	"ideaboard/api/internal/payments"
+	"testing"
+)
 
 func TestWorkflowConstructorsRejectIncompleteDependencies(t *testing.T) {
-	runtime := NewPaymentRuntime(nil, nil)
-	if _, err := NewPaymentOrderTransitions(nil, runtime); err == nil {
+	runtime := payments.NewPaymentRuntime(nil, nil)
+	if _, err := payments.NewPaymentOrderTransitions(nil, runtime); err == nil {
 		t.Fatal("NewPaymentOrderTransitions accepted nil store")
 	}
-	if _, err := NewCheckoutWorkflow(CheckoutWorkflowDependencies{}); err == nil {
-		t.Fatal("NewCheckoutWorkflow accepted incomplete dependencies")
+	if _, err := payments.NewService(payments.ServiceDependencies{}); err == nil {
+		t.Fatal("NewService accepted incomplete dependencies")
 	}
-	if _, err := NewStripeFactsWorkflow(StripeFactsWorkflowDependencies{}); err == nil {
-		t.Fatal("NewStripeFactsWorkflow accepted incomplete dependencies")
-	}
-	if _, err := NewService(nil, nil); err == nil {
-		t.Fatal("NewService accepted incomplete workflows")
+	if _, err := payments.NewService(payments.ServiceDependencies{Transitions: nil}); err == nil {
+		t.Fatal("NewService accepted missing transitions")
 	}
 }

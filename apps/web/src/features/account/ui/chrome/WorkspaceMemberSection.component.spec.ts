@@ -9,6 +9,8 @@ import {
 import { setUserLocale } from '../../../../core/i18n'
 import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
 import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
+import { makeSessionUser } from '../../../../test/factories'
+import { useUserStore } from '../../../auth'
 import WorkspaceSettingsDialog from './WorkspaceSettingsDialog.vue'
 import type { WorkspaceMemberEntry } from '../../session/accountWorkspace'
 
@@ -450,6 +452,53 @@ describe('WorkspaceSettingsDialog members', () => {
     expect(screen.queryByRole('region', { name: 'Members of Default' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Default' }))
     expect(within(sectionByWorkspace('Default')).queryByText('usr_new')).toBeNull()
+  })
+
+  test('renders roster avatars from entry avatar_url and no image without one', async () => {
+    fakeMembers.rosters.set('ws_personal1', [
+      { userId: ME, role: 'owner', email: 'me@example.com' },
+      {
+        userId: 'usr_a',
+        role: 'member',
+        email: 'a@example.com',
+        avatar_url: '/api/v1/public/users/usr_a/avatar?v=3',
+      },
+      { userId: 'usr_b', role: 'member', email: 'b@example.com' },
+    ])
+    renderMembersDialog()
+
+    const section = within(await screen.findByRole('region', { name: 'Members of Default' }))
+    // Wait for the roster payload: the region shell renders before the query
+    // resolves, and an early query would see zero images.
+    await section.findByText('a@example.com')
+    // Images stay `display:none` until loaded in happy-dom (excluded from
+    // accessible-name computation), so collect the rendered imgs and assert
+    // their alt/src pairs: exactly the avatar-carrying member renders one.
+    const imgs = section.getAllByRole('img', { hidden: true })
+    expect(imgs.map((img) => [img.getAttribute('alt'), img.getAttribute('src')])).toEqual([
+      ['a@example.com', '/api/v1/public/users/usr_a/avatar?v=3&size=64'],
+    ])
+  })
+
+  test('falls back to the viewer session avatar for the viewer entry', async () => {
+    const store = useUserStore()
+    store.setAuth(makeSessionUser({ public_id: ME, avatar: '/api/v1/public/users/usr_me/avatar?v=7' }))
+    try {
+      fakeMembers.rosters.set('ws_personal1', [
+        { userId: ME, role: 'owner', email: 'me@example.com' },
+        { userId: 'usr_a', role: 'member', email: 'a@example.com' },
+      ])
+      renderMembersDialog()
+
+      const section = within(await screen.findByRole('region', { name: 'Members of Default' }))
+      await section.findByText('me@example.com')
+      const imgs = section.getAllByRole('img', { hidden: true })
+      expect(imgs.map((img) => [img.getAttribute('alt'), img.getAttribute('src')])).toEqual([
+        ['me@example.com', '/api/v1/public/users/usr_me/avatar?v=7&size=64'],
+      ])
+    } finally {
+      store.clearAuth()
+    }
   })
 
   test('roster failures render retry and converge on retry', async () => {

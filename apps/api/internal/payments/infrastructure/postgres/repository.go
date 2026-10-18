@@ -29,7 +29,7 @@ type pgxTransactionStarter interface {
 	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
 }
 
-type paymentContextDB struct {
+type ContextDB struct {
 	ctx                context.Context
 	executor           dbsqlc.DBTX
 	transactionStarter pgxTransactionStarter
@@ -39,11 +39,19 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) dbWithContext(ctx context.Context) paymentContextDB {
+// Available reports whether the repository was constructed with a database
+// pool. Aggregate subpackages (adminreads, refunds, disputes) embed
+// *Repository and use this check so a missing pool surfaces as an error
+// instead of a nil-pool panic.
+func (r *Repository) Available() bool {
+	return r != nil && r.db != nil
+}
+
+func (r *Repository) DBWithContext(ctx context.Context) ContextDB {
 	if connection, ok := AdvisoryConnection(ctx); ok {
-		return paymentContextDB{ctx: ctx, executor: connection, transactionStarter: connection}
+		return ContextDB{ctx: ctx, executor: connection, transactionStarter: connection}
 	}
-	return paymentContextDB{ctx: ctx, executor: r.db, transactionStarter: r.db}
+	return ContextDB{ctx: ctx, executor: r.db, transactionStarter: r.db}
 }
 
 func (r *Repository) WithUserCheckoutLock(ctx context.Context, userID int64, run func(context.Context) error) (resultErr error) {
@@ -54,11 +62,17 @@ func (r *Repository) WithUserCheckoutLock(ctx context.Context, userID int64, run
 	return WithAdvisoryLock(ctx, r.db, lockKey, userCheckoutLifecycleLockSeed, run)
 }
 
-func (db paymentContextDB) queries() *dbsqlc.Queries {
+func (db ContextDB) Queries() *dbsqlc.Queries {
 	return dbsqlc.New(db.executor)
 }
 
-// beginTx opens the write transaction for one repository unit, or reuses
+// Executor exposes the context-bound query executor (pool, advisory-lock
+// connection, or ambient guard transaction) for aggregate subpackages.
+func (db ContextDB) Executor() dbsqlc.DBTX {
+	return db.executor
+}
+
+// BeginTx opens the write transaction for one repository unit, or reuses
 // the ambient guard transaction staged in the context (control audit
 // atomicity, step 3). The bool reports ownership: true means the caller
 // opened the transaction and must commit or roll it back; false means
@@ -66,7 +80,7 @@ func (db paymentContextDB) queries() *dbsqlc.Queries {
 // rolls it back, so the caller must do neither. With no carrier the
 // starter path below runs unchanged (including the advisory-lock session
 // starter when one is staged).
-func (db paymentContextDB) beginTx() (pgx.Tx, bool, error) {
+func (db ContextDB) BeginTx() (pgx.Tx, bool, error) {
 	if ambient, ok := dbutil.AmbientTxFromContext(db.ctx); ok {
 		return ambient, false, nil
 	}
@@ -80,7 +94,7 @@ func (db paymentContextDB) beginTx() (pgx.Tx, bool, error) {
 	return tx, true, nil
 }
 
-// beginDirectTx opens a write transaction for refund/dispute persistence, or
+// BeginDirectTx opens a write transaction for refund/dispute persistence, or
 // reuses the ambient guard transaction staged in the context (control audit
 // atomicity, step 3). The bool reports ownership: true means the caller
 // opened the transaction and must commit or roll it back; false means the
@@ -88,9 +102,9 @@ func (db paymentContextDB) beginTx() (pgx.Tx, bool, error) {
 // back, so the caller must do neither. These paths never run under an
 // advisory lock, so the fallback matches the previous r.db.BeginTx exactly.
 // The admin refund reservation and post-provider settlement use
-// beginCommittedRefundTx instead because Stripe I/O sits between their
+// BeginCommittedRefundTx instead because Stripe I/O sits between their
 // transaction boundaries.
-func (r *Repository) beginDirectTx(ctx context.Context) (pgx.Tx, bool, error) {
+func (r *Repository) BeginDirectTx(ctx context.Context) (pgx.Tx, bool, error) {
 	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
 		return ambient, false, nil
 	}
@@ -104,14 +118,14 @@ func (r *Repository) beginDirectTx(ctx context.Context) (pgx.Tx, bool, error) {
 	return tx, true, nil
 }
 
-// beginCommittedRefundTx starts a transaction whose commit is part of the
+// BeginCommittedRefundTx starts a transaction whose commit is part of the
 // refund protocol itself. The administrator refund path performs Stripe I/O
 // immediately after reserving Ideas, so the reservation (and its phase audit)
 // must be durable before the provider call. It deliberately does not borrow
 // the Control guard carrier: the guard transaction remains open until the
 // HTTP response is audited, which is too late to establish the provider
 // boundary and would let a later audit failure roll back a cash-side effect.
-func (r *Repository) beginCommittedRefundTx(ctx context.Context) (pgx.Tx, bool, error) {
+func (r *Repository) BeginCommittedRefundTx(ctx context.Context) (pgx.Tx, bool, error) {
 	if r == nil || r.db == nil {
 		return nil, false, fmt.Errorf("payments repository: database unavailable")
 	}
@@ -134,27 +148,27 @@ func commitIfOwned(ctx context.Context, tx pgx.Tx, owned bool) error {
 	return nil
 }
 
-// commitDirectIfOwned commits an owned direct transaction and is a
+// CommitDirectIfOwned commits an owned direct transaction and is a
 // no-op for a borrowed guard transaction (the guard commits it with the
 // audit row).
-func commitDirectIfOwned(ctx context.Context, tx pgx.Tx, owned bool) error {
+func CommitDirectIfOwned(ctx context.Context, tx pgx.Tx, owned bool) error {
 	if !owned {
 		return nil
 	}
 	return tx.Commit(ctx)
 }
 
-// rollbackDirectIfOwned rolls back an owned direct transaction and is a
+// RollbackDirectIfOwned rolls back an owned direct transaction and is a
 // no-op for a borrowed guard transaction (the guard owns its fate).
-func rollbackDirectIfOwned(ctx context.Context, tx pgx.Tx, owned bool) {
+func RollbackDirectIfOwned(ctx context.Context, tx pgx.Tx, owned bool) {
 	if !owned {
 		return
 	}
 	_ = tx.Rollback(ctx)
 }
 
-func (db paymentContextDB) withTx(run func(*dbsqlc.Queries, pgx.Tx) error) (resultErr error) {
-	tx, owned, err := db.beginTx()
+func (db ContextDB) withTx(run func(*dbsqlc.Queries, pgx.Tx) error) (resultErr error) {
+	tx, owned, err := db.BeginTx()
 	if err != nil {
 		return err
 	}
@@ -173,6 +187,32 @@ func (db paymentContextDB) withTx(run func(*dbsqlc.Queries, pgx.Tx) error) (resu
 		return err
 	}
 	return commitIfOwned(db.ctx, tx, owned)
+}
+
+// WithReadSnapshot runs read-only admin queries inside a repeatable-read
+// snapshot. It lives on the root kernel (not in adminreads) because it only
+// needs the transaction starter, and both the root adapter and the adminreads
+// subpackage share it.
+func (db ContextDB) WithReadSnapshot(run func(*dbsqlc.Queries) error) (resultErr error) {
+	if db.transactionStarter == nil {
+		return fmt.Errorf("payments repository: database unavailable")
+	}
+	tx, err := db.transactionStarter.BeginTx(db.ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return fmt.Errorf("begin payments read snapshot: %w", err)
+	}
+	defer func() {
+		if rollbackErr := tx.Rollback(db.ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) && resultErr != nil {
+			resultErr = errors.Join(resultErr, fmt.Errorf("rollback payments read snapshot: %w", rollbackErr))
+		}
+	}()
+	if err := run(dbsqlc.New(tx)); err != nil {
+		return err
+	}
+	if err := tx.Commit(db.ctx); err != nil {
+		return fmt.Errorf("commit payments read snapshot: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) ConvergePaidPaymentOrder(ctx context.Context, facts paymentsdomain.PaidCheckoutFacts, creditedAt time.Time) (paymentsdomain.PaymentConvergenceResult, error) {
@@ -196,7 +236,7 @@ func (r *Repository) RecordPaidPaymentOrder(ctx context.Context, facts paymentsd
 	}
 	var result paymentsdomain.PaymentOrder
 	var replayed bool
-	err = r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, _ pgx.Tx) error {
+	err = r.DBWithContext(ctx).withTx(func(q *dbsqlc.Queries, _ pgx.Tx) error {
 		row, err := q.GetPaymentOrderByIDForUpdate(ctx, pgUUIDToPgType(id))
 		if err != nil {
 			return fmt.Errorf("lock payment order to record paid fact: %w", err)
@@ -245,7 +285,7 @@ func (r *Repository) CreditPaidPaymentOrder(ctx context.Context, orderID string,
 		return paymentsdomain.PaymentConvergenceResult{}, paymentsdomain.ErrCheckoutIdempotencyConflict
 	}
 	var result paymentsdomain.PaymentConvergenceResult
-	err = r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx pgx.Tx) error {
+	err = r.DBWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx pgx.Tx) error {
 		row, err := q.GetPaymentOrderByIDForUpdate(ctx, pgUUIDToPgType(id))
 		if err != nil {
 			return fmt.Errorf("lock paid payment order for credit: %w", err)

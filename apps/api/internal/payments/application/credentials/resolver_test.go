@@ -1,4 +1,4 @@
-package credentials
+package credentials_test
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	"ideaboard/api/internal/platform/secrets"
 	secretstest "ideaboard/api/internal/testsupport/secretstest"
+
+	"ideaboard/api/internal/payments/application/credentials"
 )
 
 type stubStore struct {
@@ -78,14 +80,14 @@ func encryptedStored(t *testing.T, apiKey, webhookSecret string) paymentconfigur
 }
 
 func TestNewResolverRejectsNilStore(t *testing.T) {
-	if _, err := NewResolver(nil); err == nil {
+	if _, err := credentials.NewResolver(nil); err == nil {
 		t.Fatal("NewResolver accepted nil store")
 	}
 }
 
 func TestResolverRecoversAPIKeyThroughOneBoundary(t *testing.T) {
 	stored := encryptedStored(t, "sk_test_key", "whsec_test")
-	resolver, err := NewResolver(&stubStore{
+	resolver, err := credentials.NewResolver(&stubStore{
 		byID:     map[string]paymentconfiguration.StoredStripeConfiguration{"cred_test": stored},
 		byOrder:  map[string]paymentconfiguration.StoredStripeConfiguration{"order_test": stored},
 		byNumber: map[string]paymentconfiguration.StoredStripeConfiguration{"PO-TEST": stored},
@@ -104,7 +106,7 @@ func TestResolverRecoversAPIKeyThroughOneBoundary(t *testing.T) {
 	if _, key, err := resolver.ForOrderNumber(ctx, "PO-TEST"); err != nil || key != "sk_test_key" {
 		t.Fatalf("ForOrderNumber key = %q, err = %v", key, err)
 	}
-	if secret, err := DecryptWebhookSecret(stored.WebhookSecretCiphertext, stored.SecretMaterialKind); err != nil || secret != "whsec_test" {
+	if secret, err := credentials.DecryptWebhookSecret(stored.WebhookSecretCiphertext, stored.SecretMaterialKind); err != nil || secret != "whsec_test" {
 		t.Fatalf("DecryptWebhookSecret = %q, err = %v", secret, err)
 	}
 	if got, err := resolver.ListCredentials(ctx); err != nil || len(got) != 1 {
@@ -113,7 +115,7 @@ func TestResolverRecoversAPIKeyThroughOneBoundary(t *testing.T) {
 }
 
 func TestResolverNormalizesLookupFailures(t *testing.T) {
-	resolver, err := NewResolver(&stubStore{})
+	resolver, err := credentials.NewResolver(&stubStore{})
 	if err != nil {
 		t.Fatalf("NewResolver: %v", err)
 	}
@@ -131,7 +133,7 @@ func TestResolverNormalizesLookupFailures(t *testing.T) {
 
 func TestResolverDecryptFailureStaysInvalid(t *testing.T) {
 	broken := paymentconfiguration.StoredStripeConfiguration{CredentialID: "cred_broken", AccountID: "acct_broken", APIKeyCiphertext: "not-ciphertext", SecretMaterialKind: secrets.MaterialKindEncrypted}
-	resolver, err := NewResolver(&stubStore{
+	resolver, err := credentials.NewResolver(&stubStore{
 		byID: map[string]paymentconfiguration.StoredStripeConfiguration{"cred_broken": broken},
 	})
 	if err != nil {

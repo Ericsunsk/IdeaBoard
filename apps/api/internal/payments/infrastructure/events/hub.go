@@ -1,4 +1,4 @@
-package paymentevents
+package events
 
 import (
 	"encoding/json"

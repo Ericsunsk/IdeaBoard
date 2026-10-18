@@ -1,4 +1,4 @@
-package httpapi
+package http
 
 // Contract inventory gate for issue #800 (API Contract Kernel), flipped to
 // legacy-ZERO by the #809 hard cut.
@@ -54,9 +54,17 @@ func (inventoryRateLimitStub) GetRateLimit(context.Context) (settings.RateLimitS
 	return settings.RateLimitSetting{}, nil
 }
 
-// newContractInventoryRouter registers the full production route set with
+// newContractInventoryRouter registers the kernel route set with
 // zero-value handler dependencies. Registration only captures method values
 // and middleware closures, so it never touches a database or network.
+//
+// Plane split: the kernel RegisterRoutes mounts kernel routes only; the
+// v1/control planes mount via composition (v1.RegisterContractV1RoutesOnEngine,
+// v1.RegisterContractV1BillingRoutesOnEngine,
+// control.RegisterContractControlRoutesOnEngine). This router therefore
+// covers the kernel buckets; plane routes are pinned by their own
+// envelope/parity gates (TestContractV1EnvelopeUnification,
+// TestContractControlEnvelopeUnification, control policy parity).
 func newContractInventoryRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -150,7 +158,7 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			"operationId: getBoardDocument",
 			"operationId: replaceBoardDocument",
 			// #820/#821 (#809 Phase 4-03/4-04): workspace upload/media
-			// surface restored (contract_v1 upload/media routes live);
+			// surface restored (v1 upload/media routes live);
 			// the 8 upload/media operationIds are pinned here.
 			"operationId: createWorkspaceUpload",
 			"operationId: getWorkspaceUpload",
@@ -272,20 +280,20 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 
 // TestContractV1EnvelopeUnification pins USER-RULED envelope unification
 // (parent #809, Baseline §12: delete compatibility envelopes): every v1
-// handler file (contract_v1*.go, production code) renders through
+// handler file (v1/*.go, production code) renders through
 // platform/contract ({data,meta?} / {error:{code,message,details,
 // request_id}}) and must not import the legacy platform/response
 // ({code,msg,message_safe}) envelope.
 //
 // Documented protocol exceptions keep their non-contract shape, and all of
-// them live OUTSIDE contract_v1*.go, so the allowlist below is
+// them live OUTSIDE v1/*.go, so the allowlist below is
 // intentionally empty:
 //   - health/readiness probes: routes.go (healthResponse/readyResponse).
 //   - provider webhooks: payments webhook handler (Stripe signature
 //     protocol, infra bucket).
-//   - SSE: contract_v1_events.go streamWorkspaceEvents via sse.WriteIDEvent
+//   - SSE: v1/events.go streamWorkspaceEvents via sse.WriteIDEvent
 //     (framing protocol, no JSON envelope at all).
-//   - binary: contract_v1_media.go content/derivative via c.Data and
+//   - binary: v1/media.go content/derivative via c.Data and
 //     renderV1BinaryError via c.String (plain bytes/status, no JSON).
 //   - cross-cutting middleware (body-limit, timeout, rate-limit, recovery):
 //     routes_middleware.go, security.go, rate_limit.go, observability.go.
@@ -293,17 +301,23 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 // There are currently no 204 / presigned-redirect sites in v1; v1 deletes
 // return 200 {data:{deleted:...}} by contract (status semantics frozen,
 // envelope shape only).
+//
+// Plane split: v1 handlers live in v1/*.go. WalkDir(".") recurses into
+// v1/. The dir check below pins the placement (only v1/ files asserted).
 func TestContractV1EnvelopeUnification(t *testing.T) {
 	// Allowlist of v1 handler files permitted to import
 	// platform/response. Empty: every documented exception lives outside
-	// contract_v1*.go (see above). Additions require a protocol-exception
+	// v1/*.go (see above). Additions require a protocol-exception
 	// justification in this comment.
 	allowlisted := map[string]bool{}
 	err := filepath.WalkDir(".", func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() || !strings.HasPrefix(entry.Name(), "contract_v1") ||
+		if filepath.Dir(path) != "v1" {
+			return nil
+		}
+		if entry.IsDir() ||
 			!strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
 			return nil
 		}
@@ -316,7 +330,7 @@ func TestContractV1EnvelopeUnification(t *testing.T) {
 		}
 		if strings.Contains(string(raw), "ideaboard/api/internal/platform/response") {
 			t.Errorf("v1 handler %s imports platform/response; migrate to platform/contract Render* "+
-				"(envelope unification; documented exceptions stay outside contract_v1*.go, see allowlist above)", path)
+				"(envelope unification; documented exceptions stay outside v1/*.go, see allowlist above)", path)
 		}
 		return nil
 	})
@@ -333,6 +347,9 @@ func TestContractV1EnvelopeUnification(t *testing.T) {
 // control responses are the two documented protocol exceptions, which
 // bypass translation via controlProxyRaw: the binary brand-logo
 // (image/svg+xml) and the SSE monitor stream (text/event-stream).
+//
+// Plane split: control routes live in control/routes.go;
+// the definition lives in control/proxy_envelope.go.
 func TestContractControlEnvelopeUnification(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "openapi.control.yaml"))
 	if err != nil {
@@ -342,13 +359,13 @@ func TestContractControlEnvelopeUnification(t *testing.T) {
 		t.Errorf("openapi.control.yaml must not contain x-control-envelope markers " +
 			"(control envelope is unified onto platform/contract; exceptions stay raw via controlProxyRaw, never marked)")
 	}
-	routesRaw, err := os.ReadFile("contract_control_routes.go")
+	routesRaw, err := os.ReadFile(filepath.Join("control", "routes.go"))
 	if err != nil {
-		t.Fatalf("read contract_control_routes.go: %v", err)
+		t.Fatalf("read control/routes.go: %v", err)
 	}
 	// Exactly the two documented exception call sites; every other
 	// proxied route translates via controlProxy (the controlProxyRaw
-	// definition itself lives in contract_control_proxy_envelope.go).
+	// definition itself lives in control/proxy_envelope.go).
 	if got := strings.Count(string(routesRaw), "controlProxyRaw("); got != 2 {
 		t.Errorf("controlProxyRaw definition + call sites = %d, want 2 (brand-logo + monitor stream)", got)
 	}

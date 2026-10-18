@@ -18,6 +18,15 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// ReconciliationRunner is the canonical sweep seam for the River
+// vision-billing worker: converge every unsettled operation in one pass.
+// Workers depend on this interface, never on *VisionBillingService.
+type ReconciliationRunner interface {
+	ReconcilePending(context.Context) error
+}
+
+var _ ReconciliationRunner = (*VisionBillingService)(nil)
+
 // ReconcilePending converges every operation older than visionPendingAfter
 // still awaiting settlement, at most 100 per pass ordered by age.
 func (s *VisionBillingService) ReconcilePending(ctx context.Context) error {

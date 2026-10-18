@@ -47,7 +47,7 @@ func (unsplashAdapter) Search(ctx context.Context, key string, search ports.Sear
 		values.Set("query", query)
 	}
 	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+values.Encode(), nil)
-	request.Header.Set("Authorization", "Client-ID "+key)
+	request.Header.Set(HeaderAuthorization, "Client-ID "+key)
 	body, err := fetchProviderBody(ctx, request, unsplashTarget, []string{"api.unsplash.com", "images.unsplash.com", "plus.unsplash.com", "unsplash.com"})
 	if err != nil {
 		return ports.SearchProviderPage{}, err

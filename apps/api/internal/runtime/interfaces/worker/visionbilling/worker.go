@@ -21,10 +21,10 @@ func (visionBillingReconciliationArgs) Kind() string { return "vision_billing_re
 
 type VisionBillingReconciliationWorker struct {
 	river.WorkerDefaults[visionBillingReconciliationArgs]
-	service *application.VisionBillingService
+	service application.ReconciliationRunner
 }
 
-func NewVisionBillingReconciliationWorker(service *application.VisionBillingService) *VisionBillingReconciliationWorker {
+func NewVisionBillingReconciliationWorker(service application.ReconciliationRunner) *VisionBillingReconciliationWorker {
 	return &VisionBillingReconciliationWorker{service: service}
 }
 

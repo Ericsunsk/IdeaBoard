@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+
+	"ideaboard/api/internal/media/imageformat"
 )
 
 // InjectCustomParams merges operator custom JSON over an encoded body. Only
@@ -38,7 +41,7 @@ func InjectCustomParams(encoded []byte, customParamsJSON, provider, model string
 		return true
 	})
 	if mergeErr != nil {
-		return nil, fmt.Errorf(msgInjectCustomParams, mergeErr)
+		return nil, fmt.Errorf(errorrender.MsgInjectCustomParams, mergeErr)
 	}
 	return encoded, nil
 }
@@ -48,13 +51,13 @@ func InjectCustomParams(encoded []byte, customParamsJSON, provider, model string
 // owns retryability.
 func CheckVendorError(parsed gjson.Result) error {
 	if errVal := parsed.Get("error.message"); errVal.Exists() && strings.TrimSpace(errVal.String()) != "" {
-		return fmt.Errorf(msgCheckVendorError, errVal.String())
+		return fmt.Errorf(errorrender.MsgCheckVendorError, errVal.String())
 	}
 	if errVal := parsed.Get("error"); errVal.Exists() && errVal.Type == gjson.String && strings.TrimSpace(errVal.String()) != "" {
-		return fmt.Errorf(msgCheckVendorError, errVal.String())
+		return fmt.Errorf(errorrender.MsgCheckVendorError, errVal.String())
 	}
 	if detailVal := parsed.Get("detail"); detailVal.Exists() && strings.TrimSpace(detailVal.String()) != "" {
-		return fmt.Errorf(msgCheckVendorError, detailVal.String())
+		return fmt.Errorf(errorrender.MsgCheckVendorError, detailVal.String())
 	}
 	return nil
 }
@@ -62,11 +65,16 @@ func CheckVendorError(parsed gjson.Result) error {
 // SniffImageStream wraps a binary image response body as a data URL.
 // It reports false for non-image bytes; the caller then runs JSON decode.
 // Vendor-agnostic, so the worker applies it once before dialect Decode.
+// The sniffed MIME is canonicalized through imageformat.NormalizeImageMIME
+// when the registry knows it; the image/ gate itself is unchanged.
 func SniffImageStream(body []byte) (string, bool) {
 	if len(body) == 0 {
 		return "", false
 	}
 	contentType := http.DetectContentType(body)
+	if normalized, ok := imageformat.NormalizeImageMIME(contentType); ok {
+		contentType = normalized
+	}
 	if !strings.HasPrefix(contentType, "image/") {
 		return "", false
 	}
@@ -89,11 +97,14 @@ func Base64ImageDataURL(candidate string) (string, bool) {
 	if len(decoded) == 0 {
 		return "", false
 	}
-	if contentType := http.DetectContentType(decoded); !strings.HasPrefix(contentType, "image/") {
-		return "", false
-	} else {
-		return "data:" + contentType + ";base64," + candidate, true
+	contentType := http.DetectContentType(decoded)
+	if normalized, ok := imageformat.NormalizeImageMIME(contentType); ok {
+		contentType = normalized
 	}
+	if !strings.HasPrefix(contentType, "image/") {
+		return "", false
+	}
+	return "data:" + contentType + ";base64," + candidate, true
 }
 
 // candidateCollector dedupes accepted image URLs in first-seen order. Bare
@@ -176,9 +187,9 @@ func topLevelKeysError(parsed gjson.Result) error {
 		})
 	}
 	if len(topKeys) > 0 {
-		return fmt.Errorf(msgTopLevelKeysError, strings.Join(topKeys, ", "))
+		return fmt.Errorf(errorrender.MsgTopLevelKeysError, strings.Join(topKeys, ", "))
 	}
-	return errors.New(msgTopLevelKeysError2)
+	return errors.New(errorrender.MsgTopLevelKeysError2)
 }
 
 // universalResponsePaths is the legacy extraction order, shared by every
@@ -232,11 +243,11 @@ func collectChatParts(parts []gjson.Result, collect *candidateCollector) {
 // transparent failure. Stage order mirrors the legacy extractor exactly.
 func decodeWithPaths(body []byte) ([]string, error) {
 	if len(strings.TrimSpace(string(body))) == 0 {
-		return nil, errors.New(msgDecodeWithPaths)
+		return nil, errors.New(errorrender.MsgDecodeWithPaths)
 	}
 	parsed := gjson.ParseBytes(body)
 	if !parsed.IsObject() && !parsed.IsArray() {
-		return nil, fmt.Errorf(msgDecodeWithPaths2, http.DetectContentType(body))
+		return nil, fmt.Errorf(errorrender.MsgDecodeWithPaths2, http.DetectContentType(body))
 	}
 	if err := CheckVendorError(parsed); err != nil {
 		return nil, err

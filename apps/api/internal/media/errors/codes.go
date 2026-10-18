@@ -1,4 +1,4 @@
-// Package mediaerrors defines the Canonical Media Object structured error
+// Package errors defines the Canonical Media Object structured error
 // taxonomy. It is the single source of truth for the error code constants
 // referenced by the media ingestion, derivative, reconciler, repair, and
 // provider paths (see issue #661).
@@ -8,7 +8,7 @@
 // Caller) so that retry/alert policies can stay uniform. Callers that need
 // to surface a stable user-visible code wrap a `*Error` and `errors.As`
 // against `*Error` to read the code; never use a raw string for comparison.
-package mediaerrors
+package errors
 
 // Code is the stable identifier for a media error. The wire form is the
 // underlying string constant; do not rename a constant without coordinating

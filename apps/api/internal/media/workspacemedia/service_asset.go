@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
 )
 
@@ -49,7 +50,7 @@ func (s *Service) GetAsset(ctx context.Context, workspaceID, assetID string) (*A
 	if err != nil {
 		return nil, err
 	}
-	if !IsAssetID(strings.TrimSpace(assetID)) {
+	if !contract.IsAssetID(strings.TrimSpace(assetID)) {
 		return nil, ErrNotFound
 	}
 	row, err := q.GetMediaAssetByPublicID(ctx, dbsqlc.GetMediaAssetByPublicIDParams{
@@ -66,7 +67,9 @@ func (s *Service) GetAsset(ctx context.Context, workspaceID, assetID string) (*A
 }
 
 // ListAssets pages live workspace assets newest-first. Unknown
-// workspaces list empty, matching the in-memory store.
+// workspaces list empty, matching the in-memory store. The offset is a
+// decoded AssetCursor position (see cursor.go); the (limit, offset)
+// signature is frozen pending the ListAssetsByCursor migration.
 func (s *Service) ListAssets(ctx context.Context, workspaceID string, limit, offset int) ([]*Asset, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -119,7 +122,7 @@ func (s *Service) ArchiveAsset(ctx context.Context, workspaceID, assetID string)
 		return nil, err
 	}
 	trimmedWorkspace := strings.TrimSpace(workspaceID)
-	if !IsAssetID(strings.TrimSpace(assetID)) {
+	if !contract.IsAssetID(strings.TrimSpace(assetID)) {
 		return nil, ErrNotFound
 	}
 	row, err := q.ArchiveMediaAsset(ctx, dbsqlc.ArchiveMediaAssetParams{
@@ -165,7 +168,7 @@ func (s *Service) UpdateAssetMetadata(ctx context.Context, workspaceID, assetID 
 		return nil, err
 	}
 	trimmedWorkspace := strings.TrimSpace(workspaceID)
-	if !IsAssetID(strings.TrimSpace(assetID)) {
+	if !contract.IsAssetID(strings.TrimSpace(assetID)) {
 		return nil, ErrNotFound
 	}
 	merge := params.Metadata

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/platform/validation"
+	"ideaboard/api/internal/platform/errorrender"
 )
 
 const maxUserKeywordLength = 64
@@ -61,7 +61,7 @@ func TestListUsersRejectsInvalidFilters(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected validation error")
 			}
-			if !validation.Is(err) {
+			if !errorrender.IsValidationError(err) {
 				t.Fatalf("error type = %T, want user list validation error", err)
 			}
 			if !strings.Contains(err.Error(), tt.want) {

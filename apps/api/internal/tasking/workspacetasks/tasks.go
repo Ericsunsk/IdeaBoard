@@ -329,6 +329,12 @@ type AssetInfo struct {
 // AssetReader checks byte-verified readiness. Production adapts the
 // workspace media asset store (#813 removed the legacy postgres
 // sibling; the replacement re-wires this seam); tests stub it.
+//
+// Seam contract (P0-4): implementations own the readiness comparison
+// (media GateAsset) and report it ONLY through sentinels —
+// ErrMediaArchived for archived assets, ErrMediaNotReady for non-ready
+// assets, ErrMediaNotFound for invisible ids. Callers propagate those
+// sentinels without inspecting AssetInfo status fields.
 type AssetReader interface {
 	GetAsset(ctx context.Context, workspaceID, assetID string) (*AssetInfo, error)
 }
@@ -336,13 +342,11 @@ type AssetReader interface {
 // ValidateCreate enforces the discriminated input union:
 // service against the workflow features registry, media_asset_ids
 // as asset_... only (no raw storage URLs), and params as a bounded map
-// with no storage internals or unknown fields.
+// with no storage internals or unknown fields. Slug validation reuses
+// the canonical workflow.ParseAIImageFeatureSlug.
 func ValidateCreate(kind string, mediaAssetIDs []string, params map[string]any) (string, error) {
 	canonical, ok := workflow.ParseAIImageFeatureSlug(strings.TrimSpace(kind))
 	if !ok {
-		if _, perr := workflow.ValidateWorkflowFeatureSlug(strings.TrimSpace(kind)); perr != nil {
-			return "", newValidationError(FieldError{Field: "service", Message: "unsupported"})
-		}
 		return "", newValidationError(FieldError{Field: "service", Message: "unsupported"})
 	}
 	if len(mediaAssetIDs) > MaxMediaInputs {
@@ -374,6 +378,15 @@ func ValidateWorkspacePrompt(prompt string) error {
 	return nil
 }
 
+// IsValidMaskAssetID reports whether id is a well-formed workspace public
+// asset_ mask reference. Single owner for the mask shape shared by
+// ValidateParams and canonical_intake.normalizeSubmitExecutionMap.
+func IsValidMaskAssetID(id string) bool {
+	trimmed := strings.TrimSpace(id)
+	return contract.IsAssetID(trimmed) &&
+		contract.IsValidPublicID(contract.PrefixAsset, trimmed)
+}
+
 // MaskAssetIDFromParams extracts the v1 mask reference
 // (params.mask_asset_id, a workspace public asset_... id minted by the
 // existing upload-session flow). The second return reports presence; shape
@@ -400,6 +413,7 @@ func MaskAssetIDFromParams(params map[string]any) (string, bool) {
 // fields fail closed (422) per Baseline 5.1; storage URLs fail closed
 // because persisted task params must never contain media URLs (the
 // canonical media contract carries AssetID + role facts only).
+// Persisted-media detection is owned by paramkeys.IsPersistedMediaURL.
 func ValidateParams(params map[string]any) error {
 	if params == nil {
 		return nil
@@ -408,62 +422,25 @@ func ValidateParams(params map[string]any) error {
 		if !paramkeys.IsKnownSubmitTaskParamKey(key) && !paramkeys.IsCanonicalTaskParamKey(key) {
 			return newValidationError(FieldError{Field: "params." + key, Message: "unknown_field"})
 		}
-		if paramkeys.IsPersistedMediaURLKey(key) {
-			return newValidationError(FieldError{Field: "params." + key, Message: "raw_media_url_forbidden"})
-		}
 		if key == paramkeys.MaskAssetID {
 			// Contract-typed mask reference: asset_... only. Data-URL and
 			// storage-URL masks cannot ride durable task params; the mask
 			// bytes must be uploaded through the existing upload-session
 			// flow first and linked here by asset id.
-			id, ok := value.(string)
-			if !ok || !contract.IsAssetID(strings.TrimSpace(id)) ||
-				!contract.IsValidPublicID(contract.PrefixAsset, strings.TrimSpace(id)) {
+			id, _ := value.(string)
+			if !IsValidMaskAssetID(id) {
 				return newValidationError(FieldError{Field: "params." + key, Message: "invalid"})
 			}
 			continue
 		}
-		if containsStorageURL(value) {
+		if paramkeys.IsPersistedMediaURL(key, value) {
+			if paramkeys.IsPersistedMediaURLKey(key) {
+				return newValidationError(FieldError{Field: "params." + key, Message: "raw_media_url_forbidden"})
+			}
 			return newValidationError(FieldError{Field: "params." + key, Message: "raw_storage_url_forbidden"})
 		}
 	}
 	return nil
-}
-
-func containsStorageURL(value any) bool {
-	switch typed := value.(type) {
-	case string:
-		lowered := strings.ToLower(strings.TrimSpace(typed))
-		for _, marker := range []string{"http://", "https://", "s3://", "storage_key", "ws-uploads", "uploads/ws", "builtin-local", "bucket"} {
-			if strings.Contains(lowered, marker) {
-				return true
-			}
-		}
-		return false
-	case []any:
-		for _, item := range typed {
-			if containsStorageURL(item) {
-				return true
-			}
-		}
-		return false
-	case []string:
-		for _, item := range typed {
-			if containsStorageURL(item) {
-				return true
-			}
-		}
-		return false
-	case map[string]any:
-		for _, item := range typed {
-			if containsStorageURL(item) {
-				return true
-			}
-		}
-		return false
-	default:
-		return false
-	}
 }
 
 // ValidateOutputRef enforces the output contract: asset refs carry only
@@ -518,15 +495,11 @@ func isValidChecksum(s string) bool {
 	return true
 }
 
-// NewTaskPublicID mints an opaque task_ identifier.
-func NewTaskPublicID() (string, error) {
-	return contract.MintPublicID(contract.PrefixTask, 12)
-}
-
 // NewExecutionToken mints a fresh execution token for retry fencing
 // (reset + River backoff, new token per attempt, bounded by retry_count).
 // Tokens are opaque hex with an exec_ prefix; they are never public ids
-// and never enter IsValidPublicID checks.
+// and never enter IsValidPublicID checks, so they intentionally bypass
+// contract.MintPublicID (which only mints prefixed public ids).
 func NewExecutionToken() (string, error) {
 	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {
@@ -535,30 +508,14 @@ func NewExecutionToken() (string, error) {
 	return "exec_" + hex.EncodeToString(buf), nil
 }
 
-// IsRetryableProviderError classifies provider failures: transient
-// (429/5xx/timeout/network) may consume the retry budget; deterministic
-// failures go terminal directly. Category-based classification keeps the
-// API slice free of provider SDK imports; the worker maps gateway errors
-// to these categories.
-func IsRetryableProviderError(statusCode int, err error) bool {
-	if statusCode == 429 || (statusCode >= 500 && statusCode <= 599) || statusCode == 408 {
-		return true
-	}
-	if err != nil {
-		msg := strings.ToLower(err.Error())
-		for _, marker := range []string{"timeout", "deadline exceeded", "network", "connection reset", "temporary", "econnreset", "econnrefused"} {
-			if strings.Contains(msg, marker) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // ShouldRetry reports whether a failed attempt may requeue (reset + River
 // backoff, new execution token) or must converge terminally. The budget
 // is MaxProviderRequeues whole-job redeliveries; deterministic failures
 // never retry regardless of budget.
+//
+// Retryability comes only from routing.AttemptFailure.Retryable (P0-4):
+// the worker maps provider errors through routing.ClassifyError and passes
+// the result here. There is no second provider-error taxonomy.
 func ShouldRetry(retryCount int, retryable bool) bool {
 	return retryable && retryCount < MaxProviderRequeues
 }

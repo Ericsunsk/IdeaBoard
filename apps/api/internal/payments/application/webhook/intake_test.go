@@ -1,4 +1,4 @@
-package webhook
+package webhook_test
 
 import (
 	"context"
@@ -14,13 +14,15 @@ import (
 	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/platform/secrets"
 	secretstest "ideaboard/api/internal/testsupport/secretstest"
+
+	"ideaboard/api/internal/payments/application/webhook"
 )
 
 // testFixtures wires a webhook Service whose provider and persistence seams
 // are in-memory fakes. The refund and dispute application services are real
 // so dispatch coverage exercises the true downstream boundary.
 type testFixtures struct {
-	service      *Service
+	service      *webhook.Service
 	config       *fakeConfiguration
 	inbox        *fakeInbox
 	convergence  *fakeConvergence
@@ -32,7 +34,7 @@ type testFixtures struct {
 	credentialID string
 }
 
-func newTestFixtures(t *testing.T, event paymentports.StripeWebhookEvent, verifyErr error) *testFixtures {
+func newTestFixtures(t *testing.T, event paymentports.StripeWebhookEvent, verifyErr error, publishers ...paymentports.PaymentEventPublisher) *testFixtures {
 	t.Helper()
 	secretstest.EnableEncryption(t)
 	webhookCipher, err := secrets.EncryptString("whsec_test")
@@ -77,8 +79,13 @@ func newTestFixtures(t *testing.T, event paymentports.StripeWebhookEvent, verify
 	if err != nil {
 		t.Fatalf("dispute service: %v", err)
 	}
-	service, err := NewService(Dependencies{
+	var events paymentports.PaymentEventPublisher
+	if len(publishers) > 0 {
+		events = publishers[0]
+	}
+	service, err := webhook.NewService(webhook.Dependencies{
 		Inbox: fx.inbox, Convergence: fx.convergence,
+		Events:   events,
 		Verifier: fx.verifier, CheckoutStore: fx.convergence, Checkout: fx.checkout,
 		Refund: refundService, Dispute: disputeService,
 		CheckoutGateway: fx.checkoutGw, DisputeGateway: fx.disputeGw,
@@ -124,7 +131,7 @@ func TestIntakeRecordsIgnoredEventsWithoutDispatch(t *testing.T) {
 	if !receipt.Ignored || receipt.EventID != "evt_unknown" {
 		t.Fatalf("receipt = %+v, want ignored evt_unknown", receipt)
 	}
-	if fx.inbox.lastResult != string(WebhookProcessingIgnored) {
+	if fx.inbox.lastResult != string(webhook.WebhookProcessingIgnored) {
 		t.Fatalf("inbox result = %q, want ignored", fx.inbox.lastResult)
 	}
 	if fx.checkoutGw.retrievals != 0 || fx.refundGw.calls != 0 || fx.disputeGw.calls != 0 {
@@ -137,7 +144,7 @@ func TestIntakeShortCircuitsProcessedDuplicate(t *testing.T) {
 	fx := newTestFixtures(t, paymentports.StripeWebhookEvent{
 		ID: "evt_processed", Type: "checkout.session.completed", ObjectID: "cs_processed", CreatedAt: now,
 	}, nil)
-	fx.inbox.existing = string(WebhookProcessingProcessed)
+	fx.inbox.existing = string(webhook.WebhookProcessingProcessed)
 	if receipt, err := fx.service.ReceiveStripeWebhook(context.Background(), []byte("{}"), "sig"); err != nil {
 		t.Fatalf("ReceiveStripeWebhook: %v", err)
 	} else if !receipt.Duplicate || receipt.Ignored {
@@ -170,7 +177,7 @@ func TestDispatchConvergesCheckoutThroughOrderLifecycle(t *testing.T) {
 	if fx.checkout.converges != 1 {
 		t.Fatalf("order lifecycle converges = %d, want 1", fx.checkout.converges)
 	}
-	if fx.inbox.lastResult != string(WebhookProcessingProcessed) {
+	if fx.inbox.lastResult != string(webhook.WebhookProcessingProcessed) {
 		t.Fatalf("inbox result = %q, want processed", fx.inbox.lastResult)
 	}
 }

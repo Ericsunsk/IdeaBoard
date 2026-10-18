@@ -34,8 +34,30 @@ func TestAssembleUsesManifestOrderAndIsDeterministic(t *testing.T) {
 	if string(one) != string(two) {
 		t.Fatalf("assembly is not deterministic: %q != %q", one, two)
 	}
-	if got, want := string(one), "CREATE TABLE first (id integer);\nCREATE TABLE second (id integer);\n"; got != want {
+	if got, want := string(one), generatedSchemaHeader+"\nCREATE TABLE first (id integer);\nCREATE TABLE second (id integer);\n"; got != want {
 		t.Fatalf("assembled schema=%q, want %q", got, want)
+	}
+}
+
+// TestRequiredFragmentNamesAreManifestSubset pins the subset relation between
+// requiredFragmentNames (15 canonical domains) and manifest.json (21
+// fragments): every required name must exist in the manifest, while the
+// manifest may carry ordered extensions (organization, workspace, events,
+// search, modelpool, control_audit) under the same assembly and release
+// gates.
+func TestRequiredFragmentNamesAreManifestSubset(t *testing.T) {
+	manifest, err := LoadManifest("../schema/manifest.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make(map[string]struct{}, len(manifest.Fragments))
+	for _, fragment := range manifest.Fragments {
+		names[fragment.Name] = struct{}{}
+	}
+	for _, required := range requiredFragmentNames {
+		if _, exists := names[required]; !exists {
+			t.Fatalf("required fragment %q is missing from manifest.json", required)
+		}
 	}
 }
 

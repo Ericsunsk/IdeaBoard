@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/workflow"
@@ -41,7 +42,7 @@ func (h *FeaturePromptHandler) Get(c *gin.Context) {
 			response.Error(c, 400, err.Error())
 			return
 		}
-		response.InternalError(c, 500, msgGet, err)
+		response.InternalError(c, 500, errorrender.MsgPromptsGet, err)
 		return
 	}
 	response.Success(c, config)
@@ -50,7 +51,7 @@ func (h *FeaturePromptHandler) Get(c *gin.Context) {
 func (h *FeaturePromptHandler) List(c *gin.Context) {
 	configs, err := h.promptRepo.ListConfigs(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, 500, msgGet, err)
+		response.InternalError(c, 500, errorrender.MsgPromptsGet, err)
 		return
 	}
 	response.SuccessDTO(c, featurePromptListResponse{Prompts: configs})
@@ -70,7 +71,7 @@ func (h *FeaturePromptHandler) Save(c *gin.Context) {
 	}
 	var req featurePromptPayload
 	if err := jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxFeaturePromptRequestBytes, &req); err != nil || req.Prompt == nil {
-		response.Error(c, 400, msgSave)
+		response.Error(c, 400, errorrender.MsgSave)
 		return
 	}
 	updatedBy := identityPrincipal.UserID()
@@ -80,7 +81,7 @@ func (h *FeaturePromptHandler) Save(c *gin.Context) {
 			response.Error(c, 400, err.Error())
 			return
 		}
-		response.InternalError(c, 500, msgSave2, err)
+		response.InternalError(c, 500, errorrender.MsgSave2, err)
 		return
 	}
 	response.Success(c, config)
@@ -89,7 +90,17 @@ func (h *FeaturePromptHandler) Save(c *gin.Context) {
 func featurePromptSlugFromRequest(c *gin.Context) (string, error) {
 	rawSlug := c.Param("slug")
 	if rawSlug == "" {
-		return "", errors.New(msgFeaturePromptSlugFromRequest)
+		return "", errors.New(errorrender.MsgFeaturePromptSlugFromRequest)
 	}
-	return workflow.ValidateWorkflowFeatureSlug(rawSlug)
+	// Reuses the canonical ParseAIImageFeatureSlug; the ValidateWorkflow*
+	// alias is never called directly here.
+	slug, ok := workflow.ParseAIImageFeatureSlug(rawSlug)
+	if !ok {
+		// Preserve the legacy ValidateWorkflowFeatureSlug message shape.
+		if _, err := workflow.ValidateWorkflowFeatureSlug(rawSlug); err != nil {
+			return "", err
+		}
+		return "", errors.New(errorrender.MsgFeaturePromptSlugFromRequest)
+	}
+	return slug, nil
 }

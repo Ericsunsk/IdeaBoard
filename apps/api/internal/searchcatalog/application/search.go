@@ -6,19 +6,24 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/searchcatalog/domain"
 	"ideaboard/api/internal/searchcatalog/ports"
 )
 
 const (
-	DefaultSearchLimit  = 24
-	MaxSearchLimit      = 48
+	// DefaultSearchLimit/MaxSearchLimit alias the contract kernel bounds
+	// (P0-5): the search edge validates through contract.ParseSearchLimit;
+	// the service keeps clamping semantics on the already-parsed value.
+	DefaultSearchLimit  = contract.DefaultSearchLimit
+	MaxSearchLimit      = contract.MaxSearchLimit
 	MaxSearchQueryRunes = 200
 	searchTimeout       = 12 * time.Second
 )
@@ -198,7 +203,7 @@ func aggregateProviderResults(active []domain.Provider, resultsByProvider map[do
 func normalizeQuery(raw string) (string, error) {
 	query := strings.Join(strings.Fields(strings.TrimSpace(raw)), " ")
 	if utf8.RuneCountInString(query) > MaxSearchQueryRunes {
-		return "", fmt.Errorf(msgNormalizeQuery, MaxSearchQueryRunes)
+		return "", fmt.Errorf(errorrender.MsgNormalizeQuery, MaxSearchQueryRunes)
 	}
 	return query, nil
 }
@@ -209,11 +214,11 @@ func decodeCursor(raw string) (searchCursor, error) {
 	}
 	decoded, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil {
-		return searchCursor{}, errors.New(msgDecodeCursor)
+		return searchCursor{}, errors.New(errorrender.MsgDecodeCursor)
 	}
 	var cursor searchCursor
 	if err := json.Unmarshal(decoded, &cursor); err != nil || cursor.Unsplash < 1 || cursor.Pexels < 1 {
-		return searchCursor{}, errors.New(msgDecodeCursor)
+		return searchCursor{}, errors.New(errorrender.MsgDecodeCursor)
 	}
 	return cursor, nil
 }

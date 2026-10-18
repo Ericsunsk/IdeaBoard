@@ -6,7 +6,7 @@
 //     `Idempotency-Key` header (header-only: no body fallback —
 //     contract.IdempotencyKeyFromHeader is the single reader).
 //   - Missing/invalid/conflicting keys are classified through
-//     `platform/apperror` (wire codes `idempotency_key_required` and
+//     `platform/errorrender` (wire codes `idempotency_key_required` and
 //     `idempotency_conflict`). Rewards maps the same outcomes onto its
 //     existing `reward_*` namespace instead of minting new codes.
 //   - Replay within ReplayTTL (24h) returns the first result.
@@ -33,7 +33,7 @@ import (
 	"sync"
 	"time"
 
-	"ideaboard/api/internal/platform/apperror"
+	"ideaboard/api/internal/platform/errorrender"
 )
 
 // Header is the wire header carrying the caller-chosen idempotency key.
@@ -49,29 +49,29 @@ const ReplayTTL = 24 * time.Hour
 
 const (
 	// CodeRequired renders when the key is missing or malformed (400).
-	CodeRequired apperror.Code = "idempotency_key_required"
+	CodeRequired errorrender.Code = "idempotency_key_required"
 	// CodeConflict renders when a key is reused with a different request (409).
-	CodeConflict apperror.Code = "idempotency_conflict"
+	CodeConflict errorrender.Code = "idempotency_conflict"
 )
 
 // MissingError classifies a missing key: the caller can retry with a key.
-func MissingError() *apperror.Error {
-	return apperror.BadRequest(CodeRequired, msgRequired)
+func MissingError() *errorrender.Error {
+	return errorrender.BadRequest(CodeRequired, errorrender.MsgRequired)
 }
 
 // InvalidError classifies a malformed key (over length).
-func InvalidError() *apperror.Error {
-	return apperror.BadRequest(CodeRequired, msgRequired2)
+func InvalidError() *errorrender.Error {
+	return errorrender.BadRequest(CodeRequired, errorrender.MsgRequired2)
 }
 
 // ConflictError classifies a key reused with a different request payload.
-func ConflictError() *apperror.Error {
-	return apperror.Conflict(CodeConflict, msgConflict)
+func ConflictError() *errorrender.Error {
+	return errorrender.Conflict(CodeConflict, errorrender.MsgConflict)
 }
 
 // IsConflict reports whether err is a key-reuse conflict (vs missing/invalid).
 func IsConflict(err error) bool {
-	return apperror.CodeOf(err) == CodeConflict
+	return errorrender.CodeOf(err) == CodeConflict
 }
 
 // Parse validates a raw header value: non-empty after trim, within length.

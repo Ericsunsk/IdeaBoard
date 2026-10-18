@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"net/http"
 	"strings"
 	"time"
@@ -233,13 +234,13 @@ func SplitGatewayModel(raw string) (provider, model, pathOverride string, err er
 	if i := strings.Index(rest, "@"); i >= 0 {
 		rest, pathOverride = rest[:i], strings.TrimSpace(rest[i+1:])
 		if pathOverride == "" || strings.ContainsAny(pathOverride, " \t\n") {
-			return "", "", "", errors.New(msgSplitGatewayModel)
+			return "", "", "", errors.New(errorrender.MsgSplitGatewayModel)
 		}
 	}
 	parts := strings.SplitN(strings.TrimSpace(rest), "/", 2)
 	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" ||
 		strings.ContainsAny(rest, " \t\n") {
-		return "", "", "", errors.New(msgSplitGatewayModel2)
+		return "", "", "", errors.New(errorrender.MsgSplitGatewayModel2)
 	}
 	return strings.ToLower(strings.TrimSpace(parts[0])), strings.TrimSpace(parts[1]), pathOverride, nil
 }

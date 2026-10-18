@@ -19,4 +19,6 @@ export interface WorkspaceMember {
   created_at?: string
   /** Workspace-visible member email for invite search and display assistance only (members-only visibility, unmasked by decision). Omitted when unavailable; never used as a write identity (member writes stay usr_ with unknown users converging to 404). */
   email?: string
+  /** Workspace-visible member avatar public URL with a content version query (members-only visibility). Omitted when the member has no custom avatar or the value is unavailable. */
+  avatar?: string
 }

@@ -5,14 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"net"
-	"net/url"
 	"strings"
 
 	"ideaboard/api/internal/library/domain"
-	"ideaboard/api/internal/media/storage/infrastructure/remote"
+	"ideaboard/api/internal/media/egress"
+	"ideaboard/api/internal/media/fetch"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 )
@@ -141,9 +139,10 @@ func (m *LibraryMaterializer) MaterializeWorkspaceAsset(ctx context.Context, wor
 	// Code-owned provider hosts (not the operator outbound policy): the
 	// fetch URL is already pinned to the closed provider world above, so
 	// the same list doubles as the transport allowlist. SSRF protection
-	// is unchanged (exact hosts, DNS-filtered downloader).
+	// is unchanged (exact hosts, DNS-filtered downloader). Gate owned by
+	// media/egress (https-only for library fetches).
 	allowHosts := domain.ProviderFetchHosts(strings.ToLower(strings.TrimSpace(asset.Provider)))
-	if err := checkLibraryEgressAllowlist(downloadURL, allowHosts); err != nil {
+	if err := egress.CheckHTTPSHostAllowlist(downloadURL, allowHosts); err != nil {
 		return "", err
 	}
 	data, err := m.fetcher.FetchSourceBytes(ctx, downloadURL, allowHosts)
@@ -202,120 +201,14 @@ func pickLibraryDownloadURL(asset *domain.V1Asset) (string, error) {
 	return "", fmt.Errorf("library materializer: provider %q reference has no fetchable URL", provider)
 }
 
-// checkLibraryEgressAllowlist enforces the closed-world egress gate
-// BEFORE any network: the URL must be https without userinfo and its
-// host must match the code-owned provider hosts exactly (bare host
-// matches any port, host:port matches exactly). Transport still
-// re-enforces the same hosts through the shared downloader's SSRF guard.
-func checkLibraryEgressAllowlist(rawURL string, allowHosts []string) error {
-	trimmed := strings.TrimSpace(rawURL)
-	parsed, err := url.Parse(trimmed)
-	if err != nil || strings.TrimSpace(parsed.Hostname()) == "" {
-		return errors.New("library materializer: provider URL is invalid")
-	}
-	if strings.ToLower(parsed.Scheme) != "https" {
-		return fmt.Errorf("library materializer: provider URL scheme %q is not allowed", strings.ToLower(parsed.Scheme))
-	}
-	if parsed.User != nil {
-		return errors.New("library materializer: provider URL is invalid")
-	}
-	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
-	port := strings.TrimSpace(parsed.Port())
-	if port == "" {
-		port = "443"
-	}
-	matched, configured := matchLibraryEgressHost(host, port, allowHosts)
-	if !configured {
-		return errors.New("library materializer: download allowlist is not configured")
-	}
-	if !matched {
-		return fmt.Errorf("library materializer: provider host %q is not allowlisted", host)
-	}
-	return nil
-}
-
-func matchLibraryEgressHost(host, port string, allowHosts []string) (matched, configured bool) {
-	for _, raw := range allowHosts {
-		entryHost, entryPort := normalizeLibraryEgressEntry(raw)
-		if entryHost == "" {
-			continue
-		}
-		configured = true
-		if entryHost != host {
-			continue
-		}
-		if entryPort == "" || entryPort == port {
-			return true, true
-		}
-	}
-	return false, configured
-}
-
-// normalizeLibraryEgressEntry splits one policy entry into its
-// normalized (host, port) pair, mirroring the outbound policy and
-// safehttp entry shapes. Unusable entries read as ("", "") and are
-// skipped.
-func normalizeLibraryEgressEntry(raw string) (string, string) {
-	value := strings.ToLower(strings.TrimSpace(raw))
-	if value == "" {
-		return "", ""
-	}
-	if parsed, err := url.Parse(value); err == nil && strings.TrimSpace(parsed.Hostname()) != "" {
-		host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
-		if host == "" {
-			return "", ""
-		}
-		port := strings.TrimSpace(parsed.Port())
-		if port == "" {
-			switch strings.ToLower(parsed.Scheme) {
-			case "http":
-				port = "80"
-			case "https":
-				port = "443"
-			}
-		}
-		return host, port
-	}
-	if strings.Contains(value, "/") {
-		return "", ""
-	}
-	if entryHost, entryPort, err := net.SplitHostPort(value); err == nil {
-		entryHost = strings.ToLower(strings.TrimSuffix(strings.Trim(strings.TrimSpace(entryHost), "[]"), "."))
-		if entryHost == "" {
-			return "", ""
-		}
-		return entryHost, strings.TrimSpace(entryPort)
-	}
-	host := strings.ToLower(strings.TrimSuffix(strings.Trim(strings.TrimSpace(value), "[]"), "."))
-	if host == "" {
-		return "", ""
-	}
-	return host, ""
-}
-
 // RemoteLibrarySourceFetcher is the production LibrarySourceFetcher. The
-// shared remote downloader owns the SSRF guard, timeout, and size cap;
-// this adapter only turns its temporary validated image file into bytes.
+// shared fetch seam (media/fetch, bounded by MaxUploadSizeBytes) owns the
+// download-to-bytes logic; this adapter only satisfies the fetcher shape.
 type RemoteLibrarySourceFetcher struct{}
 
 // Compile-time convergence with the fetch seam.
 var _ LibrarySourceFetcher = RemoteLibrarySourceFetcher{}
 
 func (RemoteLibrarySourceFetcher) FetchSourceBytes(ctx context.Context, rawURL string, allowHosts []string) ([]byte, error) {
-	file, err := remote.DownloadImageWithLimit(ctx, strings.TrimSpace(rawURL), allowHosts, workspacemedia.MaxUploadSizeBytes)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Cleanup()
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("rewind remote image: %w", err)
-	}
-	data, err := io.ReadAll(io.LimitReader(file, workspacemedia.MaxUploadSizeBytes+1))
-	if err != nil {
-		return nil, fmt.Errorf("read remote image: %w", err)
-	}
-	if int64(len(data)) > workspacemedia.MaxUploadSizeBytes {
-		return nil, fmt.Errorf("remote image exceeds size limit")
-	}
-	return data, nil
+	return fetch.FetchBytes(ctx, strings.TrimSpace(rawURL), allowHosts, workspacemedia.MaxUploadSizeBytes)
 }

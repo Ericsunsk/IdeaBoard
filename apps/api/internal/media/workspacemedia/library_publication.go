@@ -44,7 +44,9 @@ func (a *LibraryPublicationAuthorizer) AuthorizeManual(ctx context.Context, tx p
 	if err != nil {
 		return err
 	}
-	if asset.IsArchived() || asset.Status != AssetStatusReady {
+	// Single readiness gate (P0-4): any gate denial (archived or non-ready)
+	// converges to not-found for publication, as before.
+	if err := GateAsset(asset); err != nil {
 		return librarydomain.ErrV1AssetNotFound
 	}
 	provenances, err := q.ListMediaAssetTaskOrigins(ctx, dbsqlc.ListMediaAssetTaskOriginsParams{WorkspacePublicID: workspaceID, PublicID: asset.ID})
@@ -150,7 +152,9 @@ func (a *LibraryPublicationAuthorizer) AuthorizeAutomatic(ctx context.Context, t
 	if err != nil {
 		return false, err
 	}
-	if asset.IsArchived() || asset.Status != AssetStatusReady {
+	// Single readiness gate (P0-4): any gate denial (archived or non-ready)
+	// converges to not-found for publication, as before.
+	if err := GateAsset(asset); err != nil {
 		return false, librarydomain.ErrV1AssetNotFound
 	}
 	for _, output := range outputs {

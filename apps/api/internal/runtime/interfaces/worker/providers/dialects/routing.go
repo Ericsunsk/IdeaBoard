@@ -2,9 +2,10 @@ package dialects
 
 import (
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"strings"
 
-	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
+	providerdomain "ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -20,7 +21,7 @@ import (
 // shaping. Vertex, Cloudflare and custom providers ride generic until vendor
 // payload evidence justifies a dedicated file.
 type Route struct {
-	Adapter   domain.ProviderRuntimeAdapter
+	Adapter   providerdomain.ProviderRuntimeAdapter
 	Namespace string
 	Path      string
 	Source    workflow.GatewayPathSource
@@ -39,7 +40,7 @@ func Resolve(operation workflow.RuntimeOperation, provider, model, pathOverride,
 		return Route{}, err
 	}
 	switch adapter {
-	case domain.ProviderRuntimeAdapterCutout:
+	case providerdomain.ProviderRuntimeAdapterCutout:
 		path := strings.Trim(strings.TrimSpace(pathOverride), "/")
 		source := workflow.GatewayPathSourceOverride
 		if path == "" {
@@ -56,7 +57,7 @@ func Resolve(operation workflow.RuntimeOperation, provider, model, pathOverride,
 			IsChat:    workflow.IsChatModel(provider, model, ""),
 			Dialect:   dialectFromJudgment(workflow.IsChatModel(provider, model, ""), provider),
 		}, nil
-	case domain.ProviderRuntimeAdapterUpscale:
+	case providerdomain.ProviderRuntimeAdapterUpscale:
 		path := strings.Trim(strings.TrimSpace(pathOverride), "/")
 		source := workflow.GatewayPathSourceOverride
 		if path == "" {
@@ -86,18 +87,18 @@ func Resolve(operation workflow.RuntimeOperation, provider, model, pathOverride,
 
 // adapterForOperation routes one runtime operation to its execution adapter
 // without endpoint configuration. It inlines the former
-// domain.AdapterForOperation verbatim: same cases, same error text.
-func adapterForOperation(operation workflow.RuntimeOperation) (domain.ProviderRuntimeAdapter, error) {
+// providerdomain.AdapterForOperation verbatim: same cases, same error text.
+func adapterForOperation(operation workflow.RuntimeOperation) (providerdomain.ProviderRuntimeAdapter, error) {
 	switch operation {
 	case workflow.RuntimeOperationRender, workflow.RuntimeOperationVariations, workflow.RuntimeOperationFusion, workflow.RuntimeOperationGeneration,
 		workflow.RuntimeOperationInpaint, workflow.RuntimeOperationOutpaint:
-		return domain.ProviderRuntimeAdapterModelImage, nil
+		return providerdomain.ProviderRuntimeAdapterModelImage, nil
 	case workflow.RuntimeOperationCutout:
-		return domain.ProviderRuntimeAdapterCutout, nil
+		return providerdomain.ProviderRuntimeAdapterCutout, nil
 	case workflow.RuntimeOperationUpscale:
-		return domain.ProviderRuntimeAdapterUpscale, nil
+		return providerdomain.ProviderRuntimeAdapterUpscale, nil
 	default:
-		return 0, fmt.Errorf(msgAdapterForOperation, string(operation))
+		return 0, fmt.Errorf(errorrender.MsgAdapterForOperation, string(operation))
 	}
 }
 

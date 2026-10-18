@@ -18,6 +18,8 @@ CREATE TABLE boards (
   -- Access configuration changes atomically advance the independent ETag version.
   access_version BIGINT NOT NULL DEFAULT 1,
   CONSTRAINT uq_boards_public_id UNIQUE (public_id),
+  -- Kernel prefix pin: mirrors contract.PrefixBoard; the SQL CHECK and
+  -- contract.IsBoardID must accept the same shape.
   CONSTRAINT chk_boards_public_id CHECK (public_id LIKE 'board\_%'),
   CONSTRAINT chk_boards_title CHECK (length(btrim(title)) BETWEEN 1 AND 200),
   CONSTRAINT chk_boards_workspace_access CHECK (workspace_access IN ('none', 'viewer', 'editor')),

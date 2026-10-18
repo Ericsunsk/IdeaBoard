@@ -14,7 +14,7 @@ import (
 	"ideaboard/api/internal/library/domain"
 	storageports "ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/media/workspacemedia"
-	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
 )
 
@@ -116,7 +116,7 @@ func (p *stubPolicyProvider) GetOutboundPolicy(context.Context) (settings.Outbou
 
 func stubLibraryEgress(t *testing.T, hosts []string) {
 	t.Helper()
-	restore := outbound.ConfigurePolicyProvider(&stubPolicyProvider{
+	restore := safehttp.ConfigurePolicyProvider(&stubPolicyProvider{
 		setting: settings.OutboundPolicySetting{AllowHosts: hosts},
 	})
 	t.Cleanup(restore)

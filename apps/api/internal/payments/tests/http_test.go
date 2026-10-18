@@ -10,10 +10,10 @@ import (
 	"time"
 
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/testsupport/secretstest"
 
 	"github.com/gin-gonic/gin"
@@ -29,8 +29,8 @@ func TestStripeWebhookHTTPContractUsesUnauthenticatedExactRawBody(t *testing.T) 
 	verifier := &fakeWebhookVerifier{event: paymentports.StripeWebhookEvent{
 		ID: "evt_http", Type: "customer.updated", ObjectID: "cus_http", CreatedAt: time.Now(),
 	}}
-	repo := paymentpostgres.NewRepository(db)
-	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	repo := newTestPaymentStores(db)
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testsupport.FakeMissingWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook_http", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",

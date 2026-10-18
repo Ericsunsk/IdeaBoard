@@ -202,7 +202,10 @@ func NewServiceWithReconciliation(pool *pgxpool.Pool, dispatcher ports.Reconcili
 }
 
 // InTx lets Tasking compose Credits commands into its existing PostgreSQL
-// transaction. The caller owns commit and rollback.
+// transaction. The caller owns commit and rollback. Callers without an
+// application-lifetime Service (notably the Payments repositories) use the
+// package-level CommandsInTx instead; both share NewTransactionCommands and
+// the default postgres backend set.
 func (s *Service) InTx(tx pgx.Tx) ports.Commands {
 	if s == nil || s.commands == nil {
 		return commands.NewTransactionCommands(tx, commands.Backend{})
@@ -211,8 +214,9 @@ func (s *Service) InTx(tx pgx.Tx) ports.Commands {
 }
 
 // CommandsInTx composes Credits commands into an existing pgx transaction
-// without requiring an application-lifetime Service. The caller owns commit
-// and rollback.
+// without requiring an application-lifetime Service. It is the canonical
+// seam for standalone repositories; Service owners keep using (s *Service).InTx.
+// The caller owns commit and rollback.
 func CommandsInTx(tx pgx.Tx) (ports.Commands, error) {
 	if tx == nil {
 		return nil, fmt.Errorf("credits: transaction is nil")
@@ -229,15 +233,9 @@ func (s *Service) LifecycleInTx(tx pgx.Tx) ports.WalletLifecycle {
 	return appwallet.NewLifecycleTransaction(tx, s.walletBackend)
 }
 
-func (s *Service) RestrictionsInTx(tx pgx.Tx) ports.WalletRestrictionCommands {
-	if s == nil || s.wallet == nil {
-		return appwallet.NewRestrictionTransaction(tx, appwallet.Backend{})
-	}
-	return appwallet.NewRestrictionTransaction(tx, s.walletBackend)
-}
-
 // RestrictionsInTx lets callers compose restriction changes with their pgx
-// transaction and the same Credits-owned SECURITY DEFINER seam.
+// transaction and the same Credits-owned SECURITY DEFINER seam. It is the
+// canonical restriction seam.
 func RestrictionsInTx(tx pgx.Tx) ports.WalletRestrictionCommands {
 	return appwallet.NewRestrictionTransaction(tx, defaultPostgresBackends.wallet)
 }

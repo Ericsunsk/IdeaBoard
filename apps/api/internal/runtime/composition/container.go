@@ -11,6 +11,7 @@ import (
 	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/runtime/application/lifecycle"
 	"ideaboard/api/internal/runtime/application/orchestration"
+	"ideaboard/api/internal/runtime/composition/wiring"
 	configinfra "ideaboard/api/internal/runtime/infrastructure/config"
 	databaseinfra "ideaboard/api/internal/runtime/infrastructure/database"
 	httpinfra "ideaboard/api/internal/runtime/infrastructure/http"
@@ -27,7 +28,7 @@ type appContainer struct {
 
 	db             *pgxpool.Pool
 	riverPool      *pgxpool.Pool
-	workerRuntime  appWorkerRuntime
+	workerRuntime  wiring.AppWorkerRuntime
 	healthCheckers []ports.HealthChecker
 }
 
@@ -46,40 +47,40 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	}
 
 	ctx := context.Background()
-	dbs, err := openAppDatabases(ctx, cfg)
+	dbs, err := wiring.OpenAppDatabases(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	repos, err := newAppRepositories(ctx, dbs.db)
+	repos, err := wiring.NewAppRepositories(ctx, dbs.DB)
 	if err != nil {
-		closeStartupResources(dbs.db, dbs.riverPool)
+		wiring.CloseStartupResources(dbs.DB, dbs.RiverPool)
 		return nil, fmt.Errorf("failed to ensure user storage uid: %w", err)
 	}
 
-	services, err := newAppDomainServices(ctx, cfg, repos, dbs.riverPool)
+	services, err := wiring.NewAppDomainServices(ctx, cfg, repos, dbs.RiverPool)
 	if err != nil {
-		closeStartupResources(dbs.db, dbs.riverPool)
+		wiring.CloseStartupResources(dbs.DB, dbs.RiverPool)
 		return nil, err
 	}
 
-	taskServices, workerRuntime, err := newAppTaskRuntime(ctx, cfg, dbs, repos, services, redmetrics.DefaultSet())
+	taskServices, workerRuntime, err := wiring.NewAppTaskRuntime(ctx, cfg, dbs, repos, services, redmetrics.DefaultSet())
 	if err != nil {
-		closeStartupResources(dbs.db, dbs.riverPool)
+		wiring.CloseStartupResources(dbs.DB, dbs.RiverPool)
 		return nil, err
 	}
-	dbHealthChecker := databaseinfra.NewHealthChecker(&databaseinfra.Pools{Pool: dbs.db, RiverPool: dbs.riverPool})
-	router, err := newAppRouter(cfg, repos, services, taskServices, dbHealthChecker, redmetrics.DefaultSet())
+	dbHealthChecker := databaseinfra.NewHealthChecker(&databaseinfra.Pools{Pool: dbs.DB, RiverPool: dbs.RiverPool})
+	router, err := wiring.NewAppRouter(cfg, repos, services, taskServices, dbHealthChecker, redmetrics.DefaultSet())
 	if err != nil {
-		closeStartupResources(dbs.db, dbs.riverPool)
+		wiring.CloseStartupResources(dbs.DB, dbs.RiverPool)
 		return nil, err
 	}
-	natsHealthChecker := natsinfra.NewEventBusFromUnderlying(workerRuntime.eventBus)
+	natsHealthChecker := natsinfra.NewEventBusFromUnderlying(workerRuntime.EventBus())
 
 	return &appContainer{
 		router:        router,
-		db:            dbs.db,
-		riverPool:     dbs.riverPool,
+		db:            dbs.DB,
+		riverPool:     dbs.RiverPool,
 		workerRuntime: workerRuntime,
 		healthCheckers: []ports.HealthChecker{
 			dbHealthChecker,
@@ -114,7 +115,7 @@ type App struct {
 	coordinator    *lifecycle.Coordinator
 	httpServer     ports.Runner
 	metricsServer  ports.Runner
-	workerRuntime  appWorkerRuntime
+	workerRuntime  wiring.AppWorkerRuntime
 	healthCheckers []ports.HealthChecker
 	closer         *appContainer
 }
@@ -160,7 +161,7 @@ func (c *appContainer) Close() error {
 		return nil
 	}
 	var closeErr error
-	if err := c.workerRuntime.close(); err != nil {
+	if err := c.workerRuntime.Close(); err != nil {
 		closeErr = err
 	}
 	if c.riverPool != nil {

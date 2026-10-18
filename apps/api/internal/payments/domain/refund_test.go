@@ -1,6 +1,9 @@
-package domain
+package domain_test
 
-import "testing"
+import (
+	"ideaboard/api/internal/payments/domain"
+	"testing"
+)
 
 func TestProportionalRefundIdeas(t *testing.T) {
 	tests := []struct {
@@ -14,7 +17,7 @@ func TestProportionalRefundIdeas(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := ProportionalRefundIdeas(test.amountMinor, test.subtotal, test.ideas); got != test.want {
+			if got := domain.ProportionalRefundIdeas(test.amountMinor, test.subtotal, test.ideas); got != test.want {
 				t.Fatalf("ProportionalRefundIdeas() = %d, want %d", got, test.want)
 			}
 		})
@@ -22,13 +25,13 @@ func TestProportionalRefundIdeas(t *testing.T) {
 }
 
 func TestProportionalRefundAmount(t *testing.T) {
-	if got := ProportionalRefundAmount(10, 3, 0, 1); got != 3 {
+	if got := domain.ProportionalRefundAmount(10, 3, 0, 1); got != 3 {
 		t.Fatalf("first refund amount = %d, want 3", got)
 	}
-	if got := ProportionalRefundAmount(10, 3, 1, 1); got != 3 {
+	if got := domain.ProportionalRefundAmount(10, 3, 1, 1); got != 3 {
 		t.Fatalf("second refund amount = %d, want 3", got)
 	}
-	if got := ProportionalRefundAmount(10, 3, 2, 1); got != 4 {
+	if got := domain.ProportionalRefundAmount(10, 3, 2, 1); got != 4 {
 		t.Fatalf("third refund amount = %d, want 4", got)
 	}
 }

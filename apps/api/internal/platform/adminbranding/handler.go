@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/response"
-	"ideaboard/api/internal/platform/validation"
 
 	"github.com/gin-gonic/gin"
 )
@@ -44,7 +44,7 @@ func (h *Handler) List(c *gin.Context) {
 	}
 	overrides, err := store.List(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, msgList, err)
+		response.InternalError(c, http.StatusInternalServerError, errorrender.MsgPlatformAdminbrandingList, err)
 		return
 	}
 	response.SuccessDTO(c, listResponse{Overrides: overrides})
@@ -64,7 +64,7 @@ func (h *Handler) Upsert(c *gin.Context) {
 	}
 	var request updateRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		response.Error(c, http.StatusBadRequest, msgUpsert)
+		response.Error(c, http.StatusBadRequest, errorrender.MsgUpsert)
 		return
 	}
 	logoKey := strings.TrimSpace(request.LogoKey)
@@ -100,7 +100,7 @@ func (h *Handler) Delete(c *gin.Context) {
 // port denies fail-closed so platform never serves admin writes by default.
 func (h *Handler) checkAdmin(c *gin.Context) bool {
 	if h == nil || h.requireAdmin == nil {
-		response.Error(c, http.StatusForbidden, msgCheckAdmin)
+		response.Error(c, http.StatusForbidden, errorrender.MsgCheckAdmin)
 		return false
 	}
 	return h.requireAdmin(c)
@@ -108,7 +108,7 @@ func (h *Handler) checkAdmin(c *gin.Context) bool {
 
 func (h *Handler) requireStore(c *gin.Context) (Store, bool) {
 	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusInternalServerError, msgRequireStore, errors.New("admin brand logo override store is unavailable"))
+		response.InternalError(c, http.StatusInternalServerError, errorrender.MsgRequireStore, errors.New("admin brand logo override store is unavailable"))
 		return nil, false
 	}
 	return h.store, true
@@ -119,7 +119,7 @@ func parseTarget(c *gin.Context) (Scope, string, bool) {
 	targetKey := strings.TrimSpace(c.Param("target_key"))
 	if err := ValidateTarget(scope, targetKey); err != nil {
 		slog.Warn("admin brand logo target invalid", "err", err)
-		response.Error(c, http.StatusBadRequest, msgParseTarget)
+		response.Error(c, http.StatusBadRequest, errorrender.MsgParseTarget)
 		return "", "", false
 	}
 	return scope, targetKey, true
@@ -129,11 +129,11 @@ func (h *Handler) respondStoreError(c *gin.Context, err error) bool {
 	if err == nil {
 		return false
 	}
-	if validation.Is(err) {
+	if errorrender.IsValidationError(err) {
 		slog.Warn("admin brand logo validation failed", "err", err)
-		response.Error(c, http.StatusBadRequest, msgParseTarget)
+		response.Error(c, http.StatusBadRequest, errorrender.MsgParseTarget)
 		return true
 	}
-	response.InternalError(c, http.StatusInternalServerError, msgRespondStoreError, err)
+	response.InternalError(c, http.StatusInternalServerError, errorrender.MsgRespondStoreError, err)
 	return true
 }

@@ -24,7 +24,7 @@ func (r *Repository) ReplaceStripeConfiguration(ctx context.Context, expectedRev
 	}
 	var stored paymentconfiguration.StoredStripeConfiguration
 	var shutdown *paymentconfiguration.PaymentCheckoutShutdown
-	err := r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, _ pgx.Tx) error {
+	err := r.DBWithContext(ctx).withTx(func(q *dbsqlc.Queries, _ pgx.Tx) error {
 		previous, previousErr := q.GetPaymentStripeConfiguration(ctx)
 		if err := validateConfigurationRevision(previous, previousErr, expectedRevision); err != nil {
 			return err
@@ -111,7 +111,7 @@ func (r *Repository) CompletePaymentCheckoutShutdown(ctx context.Context, id str
 	if err != nil {
 		return fmt.Errorf("invalid Checkout shutdown ID")
 	}
-	_, err = r.dbWithContext(ctx).queries().CompletePaymentCheckoutShutdown(ctx, dbsqlc.CompletePaymentCheckoutShutdownParams{
+	_, err = r.DBWithContext(ctx).Queries().CompletePaymentCheckoutShutdown(ctx, dbsqlc.CompletePaymentCheckoutShutdownParams{
 		ID: pgtype.UUID{Bytes: parsed, Valid: true}, CompletedAt: pgtype.Timestamptz{Time: completedAt, Valid: true},
 	})
 	return err
@@ -121,7 +121,7 @@ func (r *Repository) RecordConfigurationAudit(ctx context.Context, audit payment
 	if r == nil || r.db == nil {
 		return fmt.Errorf("payments repository: database unavailable")
 	}
-	return insertConfigurationAudit(ctx, r.dbWithContext(ctx).queries(), audit)
+	return insertConfigurationAudit(ctx, r.DBWithContext(ctx).Queries(), audit)
 }
 
 func insertConfigurationAudit(ctx context.Context, q *dbsqlc.Queries, audit paymentconfiguration.Audit) error {
@@ -151,7 +151,7 @@ func storedStripeConfiguration(settings dbsqlc.PaymentStripeConfiguration, crede
 func storedStripeCredential(row dbsqlc.PaymentStripeCredential) paymentconfiguration.StoredStripeConfiguration {
 	return paymentconfiguration.StoredStripeConfiguration{
 		CredentialID: pgUUIDString(row.ID), AccountID: row.AccountID, Mode: paymentports.StripeMode(row.Mode), ChargesEnabled: row.ChargesEnabled,
-		PaymentMethodConfigurationID: pgTextString(row.PaymentMethodConfigurationID),
+		PaymentMethodConfigurationID: PgTextString(row.PaymentMethodConfigurationID),
 		StripeProductID:              row.StripeProductID, StripeWebhookEndpointID: row.StripeWebhookEndpointID,
 		APIKeyCiphertext: row.ApiKeyCiphertext, WebhookSecretCiphertext: row.WebhookSecretCiphertext,
 		SecretMaterialKind: row.SecretMaterialKind, CreatedBy: row.CreatedBy, CreatedAt: dbutil.TimeValue(row.CreatedAt),

@@ -1,4 +1,4 @@
-package httpapi
+package http
 
 import (
 	"context"
@@ -108,7 +108,7 @@ func RecoveryMiddleware() gin.HandlerFunc {
 					"stack", string(debug.Stack()),
 				)
 				if !c.Writer.Written() {
-					response.Error(c, http.StatusInternalServerError, msgRecoveryMiddleware)
+					response.Error(c, http.StatusInternalServerError, MsgRecoveryMiddleware)
 				}
 				c.Abort()
 			}

@@ -29,7 +29,7 @@ func (pexelsAdapter) Search(ctx context.Context, key string, search ports.Search
 		values.Set("query", query)
 	}
 	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+values.Encode(), nil)
-	request.Header.Set("Authorization", key)
+	request.Header.Set(HeaderAuthorization, key)
 	body, err := fetchProviderBody(ctx, request, pexelsTarget, []string{"api.pexels.com", "images.pexels.com", "pexels.com"})
 	if err != nil {
 		return ports.SearchProviderPage{}, err

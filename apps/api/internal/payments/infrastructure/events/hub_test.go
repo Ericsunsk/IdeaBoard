@@ -1,4 +1,4 @@
-package paymentevents
+package events_test
 
 import (
 	"encoding/json"
@@ -7,12 +7,14 @@ import (
 
 	platformevents "ideaboard/api/internal/events"
 	paymentports "ideaboard/api/internal/payments/ports"
+
+	"ideaboard/api/internal/payments/infrastructure/events"
 )
 
 type PaymentEvent = paymentports.PaymentEvent
 
 func TestPaymentEventHubScopesEventsByUserAndKeepsLatest(t *testing.T) {
-	hub := NewHub()
+	hub := events.NewHub()
 	userHub := platformevents.NewUserEventHub()
 	hub.SetUserEventHub(userHub)
 	first, unsubscribeFirst := subscribePaymentUserEvents(t, userHub, 42)

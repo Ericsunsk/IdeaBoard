@@ -3,6 +3,7 @@ package dialects
 import (
 	"encoding/json"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 )
 
 // ChatDialect shapes OpenAI-compatible chat-multimodal payloads. It serves
@@ -37,7 +38,7 @@ func (ChatDialect) Encode(req Request) ([]byte, error) {
 		"modalities": []string{"text", "image"},
 	})
 	if err != nil {
-		return nil, fmt.Errorf(msgEncode, err)
+		return nil, fmt.Errorf(errorrender.MsgEncode, err)
 	}
 	return encoded, nil
 }

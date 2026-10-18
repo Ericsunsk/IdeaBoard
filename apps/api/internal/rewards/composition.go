@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	"ideaboard/api/internal/rewards/application/redemptions"
 	"ideaboard/api/internal/rewards/application/rewardcodes"
 	"ideaboard/api/internal/rewards/domain"
@@ -112,10 +111,6 @@ func (s *Service) ListRedemptions(ctx context.Context, input ports.ListRedemptio
 type UserHandler = rewardhttp.UserHandler
 type AdminCommandHandler = rewardhttp.AdminCommandHandler
 type AdminReadHandler = rewardhttp.AdminReadHandler
-
-func RuntimePrivilegePolicy() dbprivileges.Policy {
-	return postgres.RuntimePrivilegePolicy()
-}
 
 type IdentityProjection = ports.IdentityProjection
 type IdentityProjectionReader = ports.IdentityProjectionReader

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"ideaboard/api/internal/platform/errorrender"
 	"path"
 	"strings"
 )
@@ -14,7 +15,7 @@ func ImageDerivativeObjectKey(sourceKey, assetID, tier, format string) (string, 
 		return "", err
 	}
 	if assetID == "" || tier == "" || format == "" {
-		return "", errors.New(msgImageDerivativeObjectKey)
+		return "", errors.New(errorrender.MsgImageDerivativeObjectKey)
 	}
 	return NormalizeUploadObjectKey(path.Join(
 		path.Dir(normalized), ImageDerivativeDirectory, assetID, tier+"."+format,

@@ -2,6 +2,7 @@ package stripe
 
 import (
 	"context"
+	"ideaboard/api/internal/platform/errorrender"
 	"strings"
 	"time"
 
@@ -15,7 +16,7 @@ var _ paymentports.DisputeGateway = (*Adapter)(nil)
 func (a *Adapter) RetrieveDispute(ctx context.Context, apiKey, disputeID string) (paymentports.StripeDispute, error) {
 	disputeID = strings.TrimSpace(disputeID)
 	if disputeID == "" {
-		return paymentports.StripeDispute{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgRetrieveDispute, nil)
+		return paymentports.StripeDispute{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, errorrender.MsgRetrieveDispute, nil)
 	}
 	client, err := a.checkoutClient(apiKey)
 	if err != nil {
@@ -25,12 +26,12 @@ func (a *Adapter) RetrieveDispute(ctx context.Context, apiKey, disputeID string)
 	dispute, err := client.V1Disputes.Retrieve(ctx, disputeID, nil)
 	a.observe(err, startedAt)
 	if err != nil {
-		return paymentports.StripeDispute{}, mapStripeError(msgRetrieveDispute2, err)
+		return paymentports.StripeDispute{}, mapStripeError(errorrender.MsgRetrieveDispute2, err)
 	}
 	fact := stripeDisputeFact(dispute)
 	if fact.ID == "" || fact.Status == "" || fact.ChargeID == "" || fact.AmountMinor <= 0 ||
 		fact.Currency == "" || fact.CreatedAt.Unix() <= 0 {
-		return paymentports.StripeDispute{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgRetrieveDispute3, nil)
+		return paymentports.StripeDispute{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, errorrender.MsgRetrieveDispute3, nil)
 	}
 	return fact, nil
 }

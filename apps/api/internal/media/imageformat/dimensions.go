@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"image"
 	"image/gif"
 	_ "image/gif"
@@ -35,7 +36,7 @@ func InspectBytes(data []byte, ext string) (Facts, error) {
 func InspectDetectedBytes(data []byte) (Facts, error) {
 	ext := DetectImageExtensionFromBytes(data)
 	if ext == "" {
-		return Facts{}, errors.New(msgInspectDetectedBytes)
+		return Facts{}, errors.New(errorrender.MsgInspectDetectedBytes)
 	}
 	return InspectBytes(data, ext)
 }
@@ -45,19 +46,19 @@ func InspectDetectedBytes(data []byte) (Facts, error) {
 func Inspect(source io.ReadSeeker, ext string) (facts Facts, err error) {
 	normalizedExt, ok := NormalizeImageExtension(ext)
 	if !ok {
-		return Facts{}, fmt.Errorf(msgInspect, ext)
+		return Facts{}, fmt.Errorf(errorrender.MsgInspect, ext)
 	}
 	if source == nil {
-		return Facts{}, errors.New(msgInspectDetectedBytes)
+		return Facts{}, errors.New(errorrender.MsgInspectDetectedBytes)
 	}
 	defer func() {
 		if _, seekErr := source.Seek(0, io.SeekStart); err == nil && seekErr != nil {
-			err = fmt.Errorf(msgInspect2, seekErr)
+			err = fmt.Errorf(errorrender.MsgInspect2, seekErr)
 		}
 	}()
 
 	if _, err = source.Seek(0, io.SeekStart); err != nil {
-		return Facts{}, fmt.Errorf(msgInspect3, err)
+		return Facts{}, fmt.Errorf(errorrender.MsgInspect3, err)
 	}
 	if err = ValidateImageReader(source, normalizedExt); err != nil {
 		return Facts{}, err
@@ -85,24 +86,24 @@ func Inspect(source io.ReadSeeker, ext string) (facts Facts, err error) {
 
 func decodeImageConfig(source io.ReadSeeker) (image.Config, string, error) {
 	if _, err := source.Seek(0, io.SeekStart); err != nil {
-		return image.Config{}, "", fmt.Errorf(msgInspect3, err)
+		return image.Config{}, "", fmt.Errorf(errorrender.MsgInspect3, err)
 	}
 	cfg, format, err := image.DecodeConfig(source)
 	if err != nil {
-		return image.Config{}, "", fmt.Errorf(msgDecodeImageConfig, err)
+		return image.Config{}, "", fmt.Errorf(errorrender.MsgDecodeImageConfig, err)
 	}
 	return cfg, format, nil
 }
 
 func validateImageDimensions(cfg image.Config, format string) error {
 	if cfg.Width <= 0 || cfg.Height <= 0 || format == "" {
-		return errors.New(msgValidateImageDimensions)
+		return errors.New(errorrender.MsgValidateImageDimensions)
 	}
 	if cfg.Width > MaxImageDimensionPixels || cfg.Height > MaxImageDimensionPixels {
-		return fmt.Errorf(msgValidateImageDimensions2, cfg.Width, cfg.Height)
+		return fmt.Errorf(errorrender.MsgValidateImageDimensions2, cfg.Width, cfg.Height)
 	}
 	if int64(cfg.Width)*int64(cfg.Height) > MaxImageTotalPixels {
-		return fmt.Errorf(msgValidateImageDimensions3, cfg.Width, cfg.Height)
+		return fmt.Errorf(errorrender.MsgValidateImageDimensions3, cfg.Width, cfg.Height)
 	}
 	return nil
 }
@@ -112,11 +113,11 @@ func inspectGIFAnimation(source io.ReadSeeker, ext string) (bool, error) {
 		return false, nil
 	}
 	if _, err := source.Seek(0, io.SeekStart); err != nil {
-		return false, fmt.Errorf(msgInspectGIFAnimation, err)
+		return false, fmt.Errorf(errorrender.MsgInspectGIFAnimation, err)
 	}
 	decoded, err := gif.DecodeAll(source)
 	if err != nil {
-		return false, fmt.Errorf(msgInspectGIFAnimation, err)
+		return false, fmt.Errorf(errorrender.MsgInspectGIFAnimation, err)
 	}
 	return len(decoded.Image) > 1, nil
 }

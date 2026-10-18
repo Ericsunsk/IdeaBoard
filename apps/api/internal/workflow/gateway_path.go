@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"ideaboard/api/internal/platform/errorrender"
 	"net/http"
 	"strings"
 	"time"
@@ -59,17 +60,17 @@ const (
 func (s GatewayPathSource) Label() string {
 	switch s {
 	case GatewayPathSourceOverride:
-		return msgLabel
+		return errorrender.MsgLabel
 	case GatewayPathSourceOpenRouter:
-		return msgLabel2
+		return errorrender.MsgLabel2
 	case GatewayPathSourceAnthropic:
-		return msgLabel3
+		return errorrender.MsgLabel3
 	case GatewayPathSourceFal:
-		return msgLabel4
+		return errorrender.MsgLabel4
 	case GatewayPathSourceChat:
-		return msgLabel5
+		return errorrender.MsgLabel5
 	case GatewayPathSourceGenerations:
-		return msgLabel6
+		return errorrender.MsgLabel6
 	default:
 		return string(s)
 	}

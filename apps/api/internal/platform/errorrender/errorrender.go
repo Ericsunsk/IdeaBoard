@@ -1,4 +1,5 @@
-// Package errorrender converges per-domain HTTP error matching and rendering.
+// Package errorrender is the single error-handling home: taxonomy,
+// validation sentinel, and HTTP rendering converge here.
 //
 // Each domain keeps its row table with wire-stable code/copy. Matching uses
 // errors.Is with first-win order; rendering goes through response.MachineError
@@ -6,6 +7,10 @@
 // trust boundary holds in one seam. Default/unmatched failures log at Error
 // level with domain-supplied messages and attrs; 4xx matches render without
 // logging.
+//
+// The former platform/apperror (taxonomy.go) and platform/validation
+// (validation.go) implementations moved here; those packages remain as
+// deprecated aliases over this implementation — no duplicated logic.
 package errorrender
 
 import (

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"log/slog"
 	"strings"
 
@@ -137,11 +138,11 @@ func (s *Service) resolveSecrets(ctx context.Context, command paymentcontracts.C
 		var err error
 		input.currentAPIKey, err = secrets.DecryptMaterialString(current.APIKeyCiphertext, current.SecretMaterialKind)
 		if err != nil {
-			return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", msgResolveSecrets, nil, paymentcontracts.ErrStripeConfigurationInvalid)
+			return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", errorrender.MsgResolveSecrets, nil, paymentcontracts.ErrStripeConfigurationInvalid)
 		}
 		input.currentWebhookSecret, err = secrets.DecryptMaterialString(current.WebhookSecretCiphertext, current.SecretMaterialKind)
 		if err != nil {
-			return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", msgResolveSecrets2, nil, paymentcontracts.ErrStripeConfigurationInvalid)
+			return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", errorrender.MsgResolveSecrets2, nil, paymentcontracts.ErrStripeConfigurationInvalid)
 		}
 	}
 	input.apiKey = strings.TrimSpace(command.APIKey)
@@ -196,11 +197,11 @@ func (s *Service) persistCredentialMaterial(ctx context.Context, command payment
 	}
 	apiKey, err := secrets.EncryptString(input.apiKey)
 	if err != nil {
-		return "", "", "", s.recordFailure(ctx, command.ActorID, "encryption_failed", msgPersistCredentialMaterial, map[string]any{"mode": input.mode}, paymentcontracts.ErrStripeConfigurationInvalid)
+		return "", "", "", s.recordFailure(ctx, command.ActorID, "encryption_failed", errorrender.MsgPersistCredentialMaterial, map[string]any{"mode": input.mode}, paymentcontracts.ErrStripeConfigurationInvalid)
 	}
 	webhook, err := secrets.EncryptString(prepared.WebhookSecret)
 	if err != nil {
-		return "", "", "", s.recordFailure(ctx, command.ActorID, "encryption_failed", msgPersistCredentialMaterial2, map[string]any{"mode": input.mode}, paymentcontracts.ErrStripeConfigurationInvalid)
+		return "", "", "", s.recordFailure(ctx, command.ActorID, "encryption_failed", errorrender.MsgPersistCredentialMaterial2, map[string]any{"mode": input.mode}, paymentcontracts.ErrStripeConfigurationInvalid)
 	}
 	return "", apiKey, webhook, nil
 }

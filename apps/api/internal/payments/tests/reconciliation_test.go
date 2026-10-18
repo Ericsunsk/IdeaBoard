@@ -8,7 +8,6 @@ import (
 	"fmt"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentreconciliation "ideaboard/api/internal/payments/application/reconciliation"
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"strings"
 	"testing"
 	"time"
@@ -24,7 +23,7 @@ func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotenc
 	now := time.Now().UTC()
 	checkout := newLifecycleCheckoutGateway()
 	db, service, _, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	// This is a timeout recovery: a local deadline elapsed before the original
 	// provider response could be bound. Stripe idempotency, not that deadline,
 	// decides whether a Session exists.
@@ -61,7 +60,7 @@ func TestPaymentReconciliationPreservesCreatingOrderWhenPurchasePolicyIsUnavaila
 	now := time.Now().UTC()
 	checkout := newLifecycleCheckoutGateway()
 	db, service, _, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	configuration := activeTestStripeConfiguration(t, repo)
 	now = now.Add(3 * time.Minute)
 	order := createReconciliationIntent(t, repo, 42, 504, now.Add(time.Hour))
@@ -151,7 +150,7 @@ func TestPaymentReconciliationRecoversLostWebhookPaidSessionExactlyOnce(t *testi
 
 func TestPaymentReconciliationClaimsAtMostOneHundredAndFencesStaleWorkers(t *testing.T) {
 	db := testdb.Open(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	publishTestStripeConfiguration(t, repo, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
 	now := time.Now().UTC()
 	for index := int64(0); index < 101; index++ {
@@ -198,7 +197,7 @@ WHERE payment_order_id = $1`, first[0].Order.ID, now.Add(-2*time.Minute), now.Ad
 
 func TestPaymentReconciliationConcurrentWorkersClaimEachOrderOnce(t *testing.T) {
 	db := testdb.Open(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	publishTestStripeConfiguration(t, repo, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
 	now := time.Now().UTC()
 	for index := int64(0); index < 12; index++ {
@@ -235,7 +234,7 @@ func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 	now := time.Now().UTC().Add(25 * time.Hour)
 	checkout := reconciliationDeterministicFailureGateway{}
 	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	order := createReconciliationIntent(t, repo, 42, 503, now.Add(time.Hour))
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("deterministic provider failure must not cause River retry: %v", err)
@@ -279,11 +278,11 @@ func TestPaymentReconciliationFailureSummaryNeverPersistsUnknownProviderBody(t *
 	}
 }
 
-func createReconciliationIntent(t *testing.T, repo *paymentpostgres.Repository, userID, quantity int64, expiresAt time.Time) paymentsdomain.PaymentOrder {
+func createReconciliationIntent(t *testing.T, repo *testPaymentStores, userID, quantity int64, expiresAt time.Time) paymentsdomain.PaymentOrder {
 	return createReconciliationIntentForStripeAccount(t, repo, userID, quantity, expiresAt, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
 }
 
-func createReconciliationIntentForStripeAccount(t *testing.T, repo *paymentpostgres.Repository, userID, quantity int64, expiresAt time.Time, accountID, productID string) paymentsdomain.PaymentOrder {
+func createReconciliationIntentForStripeAccount(t *testing.T, repo *testPaymentStores, userID, quantity int64, expiresAt time.Time, accountID, productID string) paymentsdomain.PaymentOrder {
 	t.Helper()
 	configuration := activeTestStripeConfiguration(t, repo)
 	if configuration.AccountID != accountID || configuration.StripeProductID != productID {

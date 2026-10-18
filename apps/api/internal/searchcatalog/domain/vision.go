@@ -72,3 +72,15 @@ func (e *VisionProviderError) Unwrap() error {
 	}
 	return e.Err
 }
+
+// Is matches peer *VisionProviderError values by failure Kind so the HTTP
+// edge can map provider kinds through the shared table-driven renderer
+// (errors.Is against per-kind exemplars). Non-provider targets never
+// match; the cause chain still classifies through Unwrap.
+func (e *VisionProviderError) Is(target error) bool {
+	if e == nil {
+		return false
+	}
+	peer, ok := target.(*VisionProviderError)
+	return ok && e.Kind == peer.Kind
+}

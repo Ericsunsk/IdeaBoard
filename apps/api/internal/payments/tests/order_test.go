@@ -2,7 +2,6 @@ package tests
 
 import (
 	"errors"
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ import (
 
 func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) {
 	db := testdb.Open(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	configuration := publishTestStripeConfiguration(t, repo, "acct_order", "prod_idea")
 	input := paymentsdomain.CreatePaymentOrderIntentInput{
 		ID:                   "0198cd29-f457-7e4b-b95e-6cfde41b7111",
@@ -70,7 +69,7 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 }
 
 func TestCreatePaymentOrderIntentRejectsInvalidStripeCredentialID(t *testing.T) {
-	repo := paymentpostgres.NewRepository(testdb.Open(t))
+	repo := newTestPaymentStores(testdb.Open(t))
 	_, _, err := repo.CreatePaymentOrderIntent(t.Context(), paymentsdomain.CreatePaymentOrderIntentInput{
 		ID: "0198cd29-f457-7e4b-b95e-6cfde41b7111", PublicToken: "0198cd29-f457-7e4b-b95e-6cfde41b7222",
 	})

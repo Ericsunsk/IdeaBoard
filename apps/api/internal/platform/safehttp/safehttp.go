@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"net"
 	"net/http"
 	"net/netip"
@@ -34,8 +35,8 @@ type resolvedPolicy struct {
 	allowedIPPorts   map[string]bool
 }
 
-func ValidateURLWithAllowHosts(rawURL string, allowHosts ...string) (*url.URL, error) {
-	policy, err := resolvePolicyWithTimeout(context.Background(), rawURL, defaultTimeout, allowHosts...)
+func ValidateURLWithAllowHostsCtx(ctx context.Context, rawURL string, allowHosts ...string) (*url.URL, error) {
+	policy, err := resolvePolicyWithTimeout(ctx, rawURL, defaultTimeout, allowHosts...)
 	if err != nil {
 		return nil, err
 	}
@@ -54,16 +55,16 @@ func resolvePolicyWithTimeout(ctx context.Context, rawURL string, resolveTimeout
 
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, fmt.Errorf(msgResolvePolicyWithTimeout, ErrPolicyViolation)
+		return nil, fmt.Errorf(errorrender.MsgResolvePolicyWithTimeout, ErrPolicyViolation)
 	}
 
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return nil, fmt.Errorf(msgResolvePolicyWithTimeout2, ErrPolicyViolation)
+		return nil, fmt.Errorf(errorrender.MsgResolvePolicyWithTimeout2, ErrPolicyViolation)
 	}
 
 	host := parsed.Hostname()
 	if host == "" {
-		return nil, fmt.Errorf(msgResolvePolicyWithTimeout3, ErrPolicyViolation)
+		return nil, fmt.Errorf(errorrender.MsgResolvePolicyWithTimeout3, ErrPolicyViolation)
 	}
 
 	if resolveTimeout <= 0 {
@@ -80,10 +81,10 @@ func resolvePolicyWithTimeout(ctx context.Context, rawURL string, resolveTimeout
 		if ctxErr := resolveCtx.Err(); ctxErr != nil {
 			return nil, ctxErr
 		}
-		return nil, errors.New(msgResolvePolicyWithTimeout4)
+		return nil, errors.New(errorrender.MsgResolvePolicyWithTimeout4)
 	}
 	if len(addrs) == 0 {
-		return nil, errors.New(msgResolvePolicyWithTimeout5)
+		return nil, errors.New(errorrender.MsgResolvePolicyWithTimeout5)
 	}
 
 	if _, err := filterAllowedIPs(host, defaultPort(parsed), addrs, normalizedAllowedHosts, normalizedAllowedHostPorts, allowedIPs, allowedIPPorts); err != nil {
@@ -123,7 +124,7 @@ func DoWithAllowHosts(
 
 	req, err := http.NewRequestWithContext(ctx, method, policy.parsed.String(), nil)
 	if err != nil {
-		return nil, errors.New(msgDoWithAllowHosts)
+		return nil, errors.New(errorrender.MsgDoWithAllowHosts)
 	}
 	if buildRequest != nil {
 		buildRequest(req)
@@ -142,7 +143,7 @@ func DoWithAllowHosts(
 			// re-validated against the allowlist + IP policy, and fewer
 			// hops shrink the redirect-chain SSRF surface.
 			if len(via) >= 3 {
-				return errors.New(msgDoWithAllowHosts2)
+				return errors.New(errorrender.MsgDoWithAllowHosts2)
 			}
 			_, err := validateURLWithContext(req.Context(), req.URL.String(), effectiveTimeout(timeout), allowHosts...)
 			return err
@@ -178,7 +179,7 @@ func DoPublicRequest(ctx context.Context, req *http.Request, timeout time.Durati
 
 func doRequest(ctx context.Context, req *http.Request, timeout time.Duration, allowHosts []string, validate func(*url.URL) error) (*http.Response, error) {
 	if req == nil || req.URL == nil {
-		return nil, errors.New(msgDoRequestWithAllowHosts)
+		return nil, errors.New(errorrender.MsgDoRequestWithAllowHosts)
 	}
 	if validate != nil {
 		if err := validate(req.URL); err != nil {
@@ -209,7 +210,7 @@ func doRequest(ctx context.Context, req *http.Request, timeout time.Duration, al
 			}
 			// Same 3-hop cap as DoWithAllowHosts (see above).
 			if len(via) >= 3 {
-				return errors.New(msgDoWithAllowHosts2)
+				return errors.New(errorrender.MsgDoWithAllowHosts2)
 			}
 			_, err := validateURLWithContext(next.Context(), next.URL.String(), effectiveTimeout(timeout), allowHosts...)
 			return err
@@ -254,7 +255,7 @@ func transportForRequest(ctx context.Context, req *http.Request, policy *resolve
 	actual, loaded := safeTransportPool.LoadOrStore(key, transport)
 	stored, ok := actual.(*http.Transport)
 	if !ok {
-		return nil, errors.New(msgTransportForRequest)
+		return nil, errors.New(errorrender.MsgTransportForRequest)
 	}
 	if !loaded {
 		pruneSafeTransportPoolIfNeeded()
@@ -541,7 +542,7 @@ func restrictedDialContext(allowedHosts map[string]bool, allowedHostPorts map[st
 		if lastErr != nil {
 			return nil, lastErr
 		}
-		return nil, errors.New(msgRestrictedDialContext)
+		return nil, errors.New(errorrender.MsgRestrictedDialContext)
 	}
 }
 
@@ -552,10 +553,10 @@ func lookupDialIPs(ctx context.Context, host string) ([]net.IPAddr, error) {
 
 	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
 	if err != nil {
-		return nil, errors.New(msgResolvePolicyWithTimeout4)
+		return nil, errors.New(errorrender.MsgResolvePolicyWithTimeout4)
 	}
 	if len(addrs) == 0 {
-		return nil, errors.New(msgResolvePolicyWithTimeout5)
+		return nil, errors.New(errorrender.MsgResolvePolicyWithTimeout5)
 	}
 	return addrs, nil
 }
@@ -566,7 +567,7 @@ func filterAllowedIPs(host string, port string, addrs []net.IPAddr, allowedHosts
 	allowLoopback := allowedHosts["localhost"] || allowedHostPorts[hostPortKey("localhost", port)]
 
 	if strings.EqualFold(host, "localhost") && !hostAllowed {
-		return nil, fmt.Errorf(msgFilterAllowedIPs, ErrPolicyViolation)
+		return nil, fmt.Errorf(errorrender.MsgFilterAllowedIPs, ErrPolicyViolation)
 	}
 
 	allowed := make([]net.IPAddr, 0, len(addrs))
@@ -583,7 +584,7 @@ func filterAllowedIPs(host string, port string, addrs []net.IPAddr, allowedHosts
 	}
 
 	if len(allowed) == 0 {
-		return nil, fmt.Errorf(msgFilterAllowedIPs2, ErrPolicyViolation)
+		return nil, fmt.Errorf(errorrender.MsgFilterAllowedIPs2, ErrPolicyViolation)
 	}
 
 	return allowed, nil

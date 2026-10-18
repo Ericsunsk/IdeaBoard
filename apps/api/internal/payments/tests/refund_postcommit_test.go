@@ -12,8 +12,6 @@ import (
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/testdb"
-
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 )
 
 type countingRefundPublisher struct {
@@ -35,7 +33,7 @@ func (f *countingRefundPublisher) total() int {
 
 func TestPaymentRefundPublishDefersToPostCommit(t *testing.T) {
 	db, _ := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	resolver, err := paymentcredentials.NewResolver(repo)

@@ -111,8 +111,8 @@
               <div class="flex items-center gap-3 min-w-0 flex-1">
                 <Avatar class="size-8 shrink-0">
                   <AvatarImage
-                    v-if="userAvatarSrc(entry)"
-                    :src="userAvatarSrc(entry)!"
+                    v-if="resolveMemberAvatar(entry, userStore.user)"
+                    :src="resolveMemberAvatar(entry, userStore.user)!"
                     :alt="memberDisplayName(entry)"
                   />
                   <AvatarFallback
@@ -286,7 +286,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { resolveSizedAvatarUrl } from '../../../../core/media/avatarUrl'
+import { resolveMemberAvatar } from '../../../../core/media/avatarUrl'
 import { useUserStore } from '../../../auth'
 import { accountCardPanelClass } from '../shared/ui'
 import { memberDisplayName, useWorkspaceMemberSection } from './useWorkspaceMemberSection'
@@ -307,13 +307,6 @@ function memberInitial(entry: WorkspaceMemberEntry): string {
     return entry.email.charAt(0).toUpperCase()
   }
   return entry.userId.replace(/^usr_/, '').charAt(0).toUpperCase() || 'U'
-}
-
-function userAvatarSrc(entry: WorkspaceMemberEntry): string | undefined {
-  if (entry.userId === userStore.user?.public_id && userStore.user?.avatar) {
-    return resolveSizedAvatarUrl(userStore.user.avatar, 64)
-  }
-  return undefined
 }
 
 const section = useWorkspaceMemberSection({

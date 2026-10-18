@@ -1,4 +1,4 @@
-package events
+package eventbus
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/events"
+	eventnats "ideaboard/api/internal/events/nats"
 	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/config"
 	taskservice "ideaboard/api/internal/tasking/application/task"
@@ -78,7 +79,7 @@ func NewTaskStatusEventPublisher(
 	hub *taskservice.EventHub,
 	resolver TaskResolver,
 	userHubs ...*events.UserEventHub,
-) (events.TaskStatusPublisher, *events.NATSJetStreamEventBus, error) {
+) (events.TaskStatusPublisher, *eventnats.NATSJetStreamEventBus, error) {
 	var userHub *events.UserEventHub
 	if len(userHubs) > 0 {
 		userHub = userHubs[0]
@@ -91,7 +92,7 @@ func NewTaskStatusEventPublisher(
 		return nil, nil, fmt.Errorf("NATS_EVENT_BUS_ENABLED=true requires NATS_PASSWORD")
 	}
 
-	bus, err := events.NewNATSJetStreamEventBus(ctx, events.NATSJetStreamConfig{
+	bus, err := eventnats.NewNATSJetStreamEventBus(ctx, eventnats.NATSJetStreamConfig{
 		URL:            cfg.NATSURL,
 		StreamName:     cfg.NATSStreamName,
 		SubjectPrefix:  cfg.NATSSubjectPrefix,
@@ -115,7 +116,7 @@ func NewTaskStatusEventPublisher(
 // ConfigureUserEventFanout subscribes to remote distributed events and attaches local payment listeners.
 func ConfigureUserEventFanout(
 	ctx context.Context,
-	bus *events.NATSJetStreamEventBus,
+	bus *eventnats.NATSJetStreamEventBus,
 	userHub *events.UserEventHub,
 	paymentService *payments.Service,
 ) error {

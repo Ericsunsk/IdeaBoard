@@ -9,6 +9,8 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
+	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
+	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport"
 
@@ -19,7 +21,7 @@ func TestRewardRedeemPreservesCommittedOutcomeWithoutPostCommitIdentityProjectio
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "Projection failure", Code: "PROJECTION-FAILURE-2026", CreditAmount: 31,
 		IdempotencyKey: "projection-failure", ActorUserID: 1,
 	})
@@ -28,7 +30,7 @@ func TestRewardRedeemPreservesCommittedOutcomeWithoutPostCommitIdentityProjectio
 	}
 	provisionRewardWallet(t, pool, creditService, 3)
 
-	handler := NewUserHandler(service)
+	handler := rewardhttp.NewUserHandler(service)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	var authenticated principal.Principal
@@ -93,9 +95,9 @@ func performProjectionFailureRedeem(t *testing.T, router http.Handler) *httptest
 	return recorder
 }
 
-func decodeRewardRedeemResult(t *testing.T, recorder *httptest.ResponseRecorder) RedeemResult {
+func decodeRewardRedeemResult(t *testing.T, recorder *httptest.ResponseRecorder) ports.RedeemResult {
 	t.Helper()
-	var response rewardHTTPResponse[RedeemResult]
+	var response rewardHTTPResponse[ports.RedeemResult]
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode Redeem response: %v; body=%s", err, recorder.Body.String())
 	}

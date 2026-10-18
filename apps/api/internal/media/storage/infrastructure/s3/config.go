@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"net/url"
 	"path"
 	"strings"
 
 	"ideaboard/api/internal/media/storage/domain"
-	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/safehttp"
 )
 
 const storageSecretAccessKeyName = "secret_access_key"
@@ -125,14 +126,14 @@ func configBool(cfg map[string]interface{}, key string) bool {
 func parseS3Endpoint(raw string) (string, bool, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", true, errors.New(msgParseS3Endpoint)
+		return "", true, errors.New(errorrender.MsgParseS3Endpoint)
 	}
 	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
 		raw = "https://" + raw
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" {
-		return "", true, errors.New(msgParseS3Endpoint)
+		return "", true, errors.New(errorrender.MsgParseS3Endpoint)
 	}
 	return parsed.Host, parsed.Scheme != "http", nil
 }
@@ -140,14 +141,14 @@ func parseS3Endpoint(raw string) (string, bool, error) {
 func normalizePublicDomain(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", errors.New(msgNormalizePublicDomain)
+		return "", errors.New(errorrender.MsgNormalizePublicDomain)
 	}
 	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
 		raw = "https://" + raw
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" {
-		return "", errors.New(msgNormalizePublicDomain2)
+		return "", errors.New(errorrender.MsgNormalizePublicDomain2)
 	}
 	basePath := strings.TrimSuffix(path.Clean(parsed.Path), "/")
 	if basePath == "." || basePath == "/" {
@@ -165,8 +166,8 @@ func validateS3EndpointPolicy(ctx context.Context, endpoint string) error {
 	if !secure {
 		endpointURL = "http://" + endpointHost
 	}
-	if _, err := outbound.ValidateConfiguredEndpoint(endpointURL, outbound.AllowHosts(ctx)...); err != nil {
-		return errors.New(msgValidateS3EndpointPolicy)
+	if _, err := safehttp.ValidateConfiguredEndpointCtx(ctx, endpointURL, safehttp.AllowHosts(ctx)...); err != nil {
+		return errors.New(errorrender.MsgValidateS3EndpointPolicy)
 	}
 	return nil
 }

@@ -29,6 +29,16 @@ const SnapshotSchemaVersion = 4
 // independent of canvas zoom; it is never inferred per device.
 const DefaultSceneTier = "preview"
 
+// Catalog policy: the single source for the persisted Gallery scene
+// budgets. CatalogLimits, contract.md §Budgets, and the budget tests all
+// reference these values; change them here only (values are unchanged).
+const (
+	CatalogMaxNodes       = 500
+	CatalogMaxConnections = 1000
+	CatalogMaxMediaRefs   = 1500
+	CatalogMaxSceneBytes  = 65536
+)
+
 var (
 	// ErrEmptyContentVersion rejects extraction without a content identity.
 	ErrEmptyContentVersion = errors.New("previewscene: content version is empty")

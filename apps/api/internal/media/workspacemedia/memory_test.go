@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
 
@@ -28,7 +29,7 @@ func mustCreateSession(t *testing.T, ctx context.Context, store WorkspaceMediaSt
 	if err != nil {
 		t.Fatalf("CreateSession failed: %v", err)
 	}
-	if !IsUploadID(session.ID) {
+	if !contract.IsUploadID(session.ID) {
 		t.Fatalf("session id = %q, want upload_ shape", session.ID)
 	}
 	if session.Status != StatusPending {
@@ -67,7 +68,7 @@ func TestMemorySessionLifecycle(t *testing.T) {
 	if completed.Status != StatusCompleted || completed.AssetID == "" {
 		t.Fatalf("completed = %+v, want completed with asset", completed)
 	}
-	if !IsAssetID(asset.ID) {
+	if !contract.IsAssetID(asset.ID) {
 		t.Fatalf("asset id = %q, want asset_ shape", asset.ID)
 	}
 	if asset.Status != AssetStatusReady {

@@ -7,10 +7,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"ideaboard/api/internal/credits/domain"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
+	"ideaboard/api/internal/testsupport"
 )
 
 func int64Ptr(v int64) *int64 { return &v }
@@ -217,8 +217,6 @@ func (stubConvergenceStore) ListPaymentDisputesForOrder(context.Context, string)
 	return nil, nil
 }
 
-type stubWalletReader struct{}
-
 func TestListRechargesKeepsCutoffLimitPlusOneCursorAndSort(t *testing.T) {
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	firstAt := now.Add(-time.Hour)
@@ -230,7 +228,7 @@ func TestListRechargesKeepsCutoffLimitPlusOneCursorAndSort(t *testing.T) {
 		{OrderID: uuid.MustParse("0198cd29-f457-7e4b-b95e-6cfde41b8332"), OccurredAt: secondAt, IdeaQuantity: 500, Status: "credited", PaidTotalMinor: &paid, PaidCurrency: "usd", ReceiptURL: "https://example.com/r"},
 		{OrderID: uuid.MustParse("0198cd29-f457-7e4b-b95e-6cfde41b8333"), OccurredAt: thirdAt, IdeaQuantity: 500, Status: "credited", PaidTotalMinor: &paid, PaidCurrency: "usd", ReceiptURL: "https://example.com/r"},
 	}}
-	svc, err := NewService(stubConfigurationStore{}, store, stubConvergenceStore{}, stubWalletReader{}, func() time.Time { return now })
+	svc, err := NewService(stubConfigurationStore{}, store, stubConvergenceStore{}, testsupport.FakeMissingWalletReader{}, func() time.Time { return now })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +265,7 @@ func TestListAdminPaymentOrdersKeepsLimitPlusOneCursorAndSort(t *testing.T) {
 		},
 		total: 3,
 	}
-	svc, err := NewService(stubConfigurationStore{}, store, stubConvergenceStore{}, stubWalletReader{}, func() time.Time { return now })
+	svc, err := NewService(stubConfigurationStore{}, store, stubConvergenceStore{}, testsupport.FakeMissingWalletReader{}, func() time.Time { return now })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,12 +286,4 @@ func TestListAdminPaymentOrdersKeepsLimitPlusOneCursorAndSort(t *testing.T) {
 	if cursor.OrderID != "0198cd29-f457-7e4b-b95e-6cfde41b8332" {
 		t.Fatalf("cursor order = %q", cursor.OrderID)
 	}
-}
-
-func (stubWalletReader) GetWallet(context.Context, int64) (domain.WalletDetails, error) {
-	return domain.WalletDetails{}, domain.ErrWalletNotFound
-}
-
-func (stubWalletReader) ListLedger(context.Context, domain.ListLedgerInput) (domain.LedgerPage, error) {
-	return domain.LedgerPage{}, domain.ErrWalletNotFound
 }

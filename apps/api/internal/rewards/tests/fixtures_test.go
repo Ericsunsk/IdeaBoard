@@ -3,98 +3,20 @@ package tests
 import (
 	"bytes"
 	"context"
-	"testing"
-	"time"
-
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/rewards"
-	"ideaboard/api/internal/rewards/domain"
-	creditsadapter "ideaboard/api/internal/rewards/infrastructure/credits"
+	rewardscredits "ideaboard/api/internal/rewards/infrastructure/credits"
 	"ideaboard/api/internal/rewards/infrastructure/postgres"
-	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
-	"ideaboard/api/internal/rewards/ports"
+	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type (
-	CreateRewardCodeCommand     = ports.CreateRewardCodeCommand
-	CreatedRewardCode           = ports.CreatedRewardCode
-	UpdateRewardCodeCommand     = ports.UpdateRewardCodeCommand
-	UpdatedRewardCode           = ports.UpdatedRewardCode
-	SetRewardCodeEnabledCommand = ports.SetRewardCodeEnabledCommand
-	DeleteRewardCodeCommand     = ports.DeleteRewardCodeCommand
-	DeletedRewardCode           = ports.DeletedRewardCode
-	SearchRewardCodesInput      = ports.SearchRewardCodesInput
-	RewardCodePage              = ports.RewardCodePage
-	ListAdminRedemptionsInput   = ports.ListAdminRedemptionsInput
-	AdminRedemptionPage         = ports.AdminRedemptionPage
-	AdminRedemptionSummary      = ports.AdminRedemptionSummary
-	GetAdminRedemptionInput     = ports.GetAdminRedemptionInput
-	AdminRedemptionDetail       = ports.AdminRedemptionDetail
-	RedeemCommand               = ports.RedeemCommand
-	Redemption                  = ports.Redemption
-	RedeemResult                = ports.RedeemResult
-	RedemptionHistoryItem       = ports.RedemptionHistoryItem
-	ListRedemptionsInput        = ports.ListRedemptionsInput
-	RedemptionHistoryPage       = ports.RedemptionHistoryPage
-	RewardCode                  = ports.RewardCode
-	RewardCodeStatus            = ports.RewardCodeStatus
-	Service                     = rewards.Service
-	UserHandler                 = rewards.UserHandler
-	AdminCommandHandler         = rewards.AdminCommandHandler
-	AdminReadHandler            = rewards.AdminReadHandler
-	IdentityProjection          = rewards.IdentityProjection
-	ServiceOptions              = rewards.ServiceOptions
-	CodeKey                     = rewards.CodeKey
-	CodeKeyring                 = rewards.CodeKeyring
-
-	redemptionHandlerOptions = rewards.RedemptionHandlerOptions
-)
-
-var (
-	ErrInvalidCommand      = domain.ErrInvalidCode
-	ErrCodeCollision       = domain.ErrCodeCollision
-	ErrRewardCodeConflict  = domain.ErrRewardCodeConflict
-	ErrCodeUnavailable     = domain.ErrCodeUnavailable
-	ErrRewardCodeNotFound  = domain.ErrRewardCodeNotFound
-	ErrCapBelowRedemptions = domain.ErrCapBelowRedemptions
-	ErrRewardCodeRedeemed  = domain.ErrRewardCodeRedeemed
-	ErrRedemptionNotFound  = domain.ErrRedemptionNotFound
-)
-
-const (
-	RewardCodeStatusExpired   = ports.RewardCodeStatusExpired
-	RewardCodeStatusExhausted = ports.RewardCodeStatusExhausted
-	RewardCodeStatusDisabled  = ports.RewardCodeStatusDisabled
-	RewardCodeStatusEnabled   = ports.RewardCodeStatusEnabled
-
-	defaultRedemptionAttemptLimit = rewards.DefaultRedemptionAttemptLimit
-)
-
-var (
-	NewUserHandler            = rewardhttp.NewUserHandler
-	NewAdminCommandHandler    = rewardhttp.NewAdminCommandHandler
-	NewAdminReadHandler       = rewardhttp.NewAdminReadHandler
-	RuntimePrivilegePolicy    = rewards.RuntimePrivilegePolicy
-	NewService                = newRewardsService
-	NewServiceWithOptions     = newRewardsServiceWithOptions
-	NewCodeKeyring            = rewards.NewCodeKeyring
-	newUserHandlerWithOptions = rewardhttp.NewUserHandlerWithOptions
-)
-
 func newTestRewardService(t *testing.T, pool *pgxpool.Pool, creditService *credits.Service) *rewards.Service {
 	t.Helper()
 	return newTestRewardServiceAt(t, pool, creditService, time.Now())
-}
-
-func newRewardsService(pool *pgxpool.Pool, creditService *credits.Service, keyring rewards.CodeKeyring) *rewards.Service {
-	return rewards.NewService(pool, creditsadapter.New(creditService), keyring)
-}
-
-func newRewardsServiceWithOptions(pool *pgxpool.Pool, creditService *credits.Service, keyring rewards.CodeKeyring, opts rewards.ServiceOptions) *rewards.Service {
-	return rewards.NewServiceWithOptions(pool, creditsadapter.New(creditService), keyring, opts)
 }
 
 func newTestRewardServiceAt(
@@ -104,7 +26,7 @@ func newTestRewardServiceAt(
 	now time.Time,
 ) *rewards.Service {
 	t.Helper()
-	return rewards.NewServiceWithOptions(pool, creditsadapter.New(creditService), newTestRewardKeyring(t), rewards.ServiceOptions{
+	return rewards.NewServiceWithOptions(pool, rewardscredits.New(creditService), newTestRewardKeyring(t), rewards.ServiceOptions{
 		Now: func() time.Time { return now },
 	})
 }
@@ -138,4 +60,10 @@ func provisionRewardWallet(t *testing.T, pool *pgxpool.Pool, creditService *cred
 
 func lockRewardCodeID(ctx context.Context, tx pgx.Tx, rewardCodeID int64) error {
 	return postgres.LockRewardCodeID(ctx, tx, rewardCodeID)
+}
+
+// Reward-code resource helpers (merged from code_service_helpers_test.go,
+// renamed by resource: reward-code service test helpers).
+func rewardCodeString(value string) *string {
+	return &value
 }

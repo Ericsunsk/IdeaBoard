@@ -1,13 +1,16 @@
-package readmodel
+package readmodel_test
 
-import "testing"
+import (
+	"ideaboard/api/internal/payments/application/readmodel"
+	"testing"
+)
 
 // TestRechargeHistoryStatusWireWords pins the history overlay
 // vocabulary: typing must not change the strings on the wire.
 func TestRechargeHistoryStatusWireWords(t *testing.T) {
-	for status, want := range map[RechargeHistoryStatus]string{
-		RechargeHistoryCredited: "credited", RechargeHistoryCancelled: "cancelled",
-		RechargeHistoryRefunded: "refunded",
+	for status, want := range map[readmodel.RechargeHistoryStatus]string{
+		readmodel.RechargeHistoryCredited: "credited", readmodel.RechargeHistoryCancelled: "cancelled",
+		readmodel.RechargeHistoryRefunded: "refunded",
 	} {
 		if string(status) != want {
 			t.Errorf("RechargeHistoryStatus = %q, want %q", string(status), want)

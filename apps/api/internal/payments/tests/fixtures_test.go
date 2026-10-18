@@ -1,13 +1,15 @@
 package tests
 
 import (
-	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
 	payments "ideaboard/api/internal/payments"
 
 	"context"
 	"encoding/json"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
+	"ideaboard/api/internal/payments/infrastructure/postgres/adminreads"
+	"ideaboard/api/internal/payments/infrastructure/postgres/disputes"
+	"ideaboard/api/internal/payments/infrastructure/postgres/refunds"
 	"strings"
 	"testing"
 	"time"
@@ -16,35 +18,40 @@ import (
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
-	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
+	"ideaboard/api/internal/payments/infrastructure/events"
 	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testsupport/secretstest"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func mustNewCheckoutWorkflow(t *testing.T, deps payments.CheckoutWorkflowDependencies) *payments.CheckoutWorkflow {
-	t.Helper()
-	workflow, err := payments.NewCheckoutWorkflow(deps)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return workflow
+type paymentAdminReads = adminreads.Store
+type paymentRefunds = refunds.Store
+type paymentDisputes = disputes.Store
+
+// testPaymentStores shares one root repository across the split aggregates.
+type testPaymentStores struct {
+	*paymentpostgres.Repository
+	*paymentAdminReads
+	*paymentRefunds
+	*paymentDisputes
 }
 
-func mustNewStripeFactsWorkflow(t *testing.T, deps payments.StripeFactsWorkflowDependencies) *payments.StripeFactsWorkflow {
-	t.Helper()
-	workflow, err := payments.NewStripeFactsWorkflow(deps)
-	if err != nil {
-		t.Fatal(err)
+func newTestPaymentStores(db *pgxpool.Pool) *testPaymentStores {
+	repo := paymentpostgres.NewRepository(db)
+	return &testPaymentStores{
+		Repository:        repo,
+		paymentAdminReads: adminreads.NewStore(repo),
+		paymentRefunds:    refunds.NewStore(repo),
+		paymentDisputes:   disputes.NewStore(repo),
 	}
-	return workflow
 }
 
-func mustNewPaymentsService(t *testing.T, checkout *payments.CheckoutWorkflow, facts *payments.StripeFactsWorkflow) *payments.Service {
+func mustNewPaymentsService(t *testing.T, deps payments.ServiceDependencies) *payments.Service {
 	t.Helper()
-	service, err := payments.NewService(checkout, facts)
+	service, err := payments.NewService(deps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,10 +59,10 @@ func mustNewPaymentsService(t *testing.T, checkout *payments.CheckoutWorkflow, f
 }
 
 // newCompleteTestPaymentsService deliberately has no default collaborators:
-// callers state every workflow dependency used by the complete transport seam.
+// callers state every service dependency used by the complete transport seam.
 func newCompleteTestPaymentsService(
 	t *testing.T,
-	repo *paymentpostgres.Repository,
+	repo *testPaymentStores,
 	runtime *payments.PaymentRuntime,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
@@ -70,39 +77,37 @@ func newCompleteTestPaymentsService(
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkout := mustNewCheckoutWorkflow(t, payments.CheckoutWorkflowDependencies{
+	return mustNewPaymentsService(t, payments.ServiceDependencies{
 		Configuration: repo, ConfigurationGateway: configurationGateway, ShutdownEnqueuer: shutdownEnqueuer,
-		Store: repo, CheckoutGateway: checkoutGateway, Wallets: wallets, Convergence: repo, Transitions: transitions,
+		Store: repo, CheckoutGateway: checkoutGateway, Wallets: wallets, Convergence: repo,
+		Inbox: repo, Verifier: verifier, RefundGateway: refundGateway, DisputeGateway: disputeGateway,
+		Transitions: transitions,
 	})
-	facts := mustNewStripeFactsWorkflow(t, payments.StripeFactsWorkflowDependencies{
-		Configuration: repo, Inbox: repo, Convergence: repo, Verifier: verifier, RefundGateway: refundGateway,
-		DisputeGateway: disputeGateway, CheckoutStore: repo, CheckoutGateway: checkoutGateway,
-		CheckoutRecovery: checkout, Transitions: transitions,
-	})
-	return mustNewPaymentsService(t, checkout, facts)
 }
 
-func newCompleteTestCheckoutWorkflow(
+func newCompleteTestCheckoutService(
 	t *testing.T,
-	repo *paymentpostgres.Repository,
+	repo *testPaymentStores,
 	runtime *payments.PaymentRuntime,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
 	wallets ports.WalletReader,
 	shutdownEnqueuer paymentconfiguration.ShutdownEnqueuer,
-) *payments.CheckoutWorkflow {
+) *payments.Service {
 	t.Helper()
 	transitions, err := payments.NewPaymentOrderTransitions(repo, runtime)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return mustNewCheckoutWorkflow(t, payments.CheckoutWorkflowDependencies{
+	return mustNewPaymentsService(t, payments.ServiceDependencies{
 		Configuration: repo, ConfigurationGateway: configurationGateway, ShutdownEnqueuer: shutdownEnqueuer,
-		Store: repo, CheckoutGateway: checkoutGateway, Wallets: wallets, Convergence: repo, Transitions: transitions,
+		Store: repo, CheckoutGateway: checkoutGateway, Wallets: wallets, Convergence: repo,
+		Inbox: repo, Verifier: testWebhookVerifier{}, RefundGateway: testRefundGateway{}, DisputeGateway: testDisputeGateway{},
+		Transitions: transitions,
 	})
 }
 
-func publishTestStripeConfiguration(t *testing.T, repo *paymentpostgres.Repository, accountID, productID string) paymentconfiguration.StoredStripeConfiguration {
+func publishTestStripeConfiguration(t *testing.T, repo *testPaymentStores, accountID, productID string) paymentconfiguration.StoredStripeConfiguration {
 	t.Helper()
 	secretstest.EnableEncryption(t)
 	apiKeyCiphertext, err := secrets.EncryptString("sk_test_fixture")
@@ -126,7 +131,7 @@ func publishTestStripeConfiguration(t *testing.T, repo *paymentpostgres.Reposito
 	return configuration
 }
 
-func activeTestStripeConfiguration(t *testing.T, repo *paymentpostgres.Repository) paymentconfiguration.StoredStripeConfiguration {
+func activeTestStripeConfiguration(t *testing.T, repo *testPaymentStores) paymentconfiguration.StoredStripeConfiguration {
 	t.Helper()
 	configuration, err := repo.GetStripeConfiguration(t.Context())
 	if err != nil {
@@ -135,7 +140,7 @@ func activeTestStripeConfiguration(t *testing.T, repo *paymentpostgres.Repositor
 	return configuration
 }
 
-func createAdminPaymentOrder(t *testing.T, repo *paymentpostgres.Repository, userID int64, publicOrderNumber string, quantity int64) paymentsdomain.PaymentOrder {
+func createAdminPaymentOrder(t *testing.T, repo *testPaymentStores, userID int64, publicOrderNumber string, quantity int64) paymentsdomain.PaymentOrder {
 	t.Helper()
 	configuration := activeTestStripeConfiguration(t, repo)
 	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), paymentsdomain.CreatePaymentOrderIntentInput{
@@ -199,18 +204,9 @@ func (testWebhookVerifier) Verify(context.Context, []byte, string, string, time.
 	return paymentports.StripeWebhookEvent{}, paymentports.ErrInvalidWebhookSignature
 }
 
-type testWalletReader struct{}
-
-func (testWalletReader) GetWallet(context.Context, int64) (domain.WalletDetails, error) {
-	return domain.WalletDetails{}, domain.ErrWalletNotFound
-}
-func (testWalletReader) ListLedger(context.Context, domain.ListLedgerInput) (domain.LedgerPage, error) {
-	return domain.LedgerPage{}, domain.ErrWalletNotFound
-}
-
 // NewEventHub is a test-only composition helper for integration tests that
 // exercise multiple Payments application services together.
-func NewEventHub() *paymentevents.Hub { return paymentevents.NewHub() }
+func NewEventHub() *events.Hub { return events.NewHub() }
 
 type PaymentEvent = paymentports.PaymentEvent
 

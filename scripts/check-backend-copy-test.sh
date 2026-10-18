@@ -64,4 +64,37 @@ for canonical in '视觉搜索暂不可用' '参数错误' '分页游标无效' 
   fi
 done
 
+# Case 4: the runtimehttp kernel table must stay alias-only
+# (ADR-0017 follow-up). An alias-only errors.go passes; a table with a
+# reintroduced string literal fails even when the wording is canonical.
+alias_file="$tmp/apps/api/internal/runtime/interfaces/http/errors.go"
+mkdir -p "$(dirname "$alias_file")"
+cat > "$alias_file" <<'EOF'
+package http
+
+import "ideaboard/api/internal/platform/errorrender"
+
+const (
+	MsgBadRequest = errorrender.MsgBadRequest
+)
+EOF
+if REPO_ROOT="$tmp" bash "$checker" >/dev/null 2>&1; then
+  echo "OK: alias-only kernel table passes"
+else
+  echo "FAIL: alias-only kernel table should pass" >&2
+  exit 1
+fi
+cat > "$alias_file" <<'EOF'
+package http
+
+const (
+	MsgBadRequest = "请求体读取失败"
+)
+EOF
+if REPO_ROOT="$tmp" bash "$checker" >/dev/null 2>&1; then
+  echo "FAIL: literal kernel table should fail" >&2
+  exit 1
+fi
+echo "OK: literal kernel table fails"
+
 echo "check-backend-copy self-test: OK"

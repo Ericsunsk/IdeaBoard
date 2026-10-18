@@ -201,10 +201,26 @@ const (
 	CodeBillingServiceUnavailable Code = "billing_service_unavailable"
 	CodeBillingOperationFailed    Code = "billing_operation_failed"
 
+	// Credits codes (credits/interfaces/http edge). Wire-stable: do not
+	// rename without coordinating callers. The legacy numeric envelope
+	// moved to the machine envelope in the P0-6 convergence; statuses and
+	// safe copy are unchanged, only the code field is now machine-stable.
+	CodeCreditInvalidInput              Code = "credit_invalid_input"
+	CodeCreditIdempotencyConflict       Code = "credit_idempotency_conflict"
+	CodeCreditWalletNotFound            Code = "credit_wallet_not_found"
+	CodeCreditWalletFrozen              Code = "credit_wallet_frozen"
+	CodeCreditWalletRestricted          Code = "credit_wallet_restricted"
+	CodeCreditInsufficientCredits       Code = "credit_insufficient_credits"
+	CodeCreditChargeNotFound            Code = "credit_charge_not_found"
+	CodeCreditRefundExceedsCharge       Code = "credit_refund_exceeds_charge"
+	CodeCreditReconciliationNotFound    Code = "credit_reconciliation_not_found"
+	CodeCreditReconciliationUnavailable Code = "credit_reconciliation_unavailable"
+	CodeCreditOperationFailed           Code = "credit_operation_failed"
+
 	// Rewards codes (rewards/interfaces/http edge). Wire-stable: do not
 	// rename without coordinating the frontend caller that branches on
 	// them. The v1 workspace redeem surface
-	// (runtime/interfaces/http/contract_v1_billing_gaps.go) aliases
+	// (runtime/interfaces/http/v1/billing_gaps.go) aliases
 	// CodeRewardCodeUnavailable, CodeRewardWalletLocked, and
 	// CodeRewardRedeemConflict from here; statuses stay explicit at
 	// each render site.
@@ -345,6 +361,7 @@ func StatusOf(code Code) int {
 	switch code {
 	case CodePaginationCursorInvalid, CodeIdempotencyKeyRequired, CodeBadRequest,
 		CodeBillingInvalidInput,
+		CodeCreditInvalidInput,
 		CodeRewardInvalidInput, CodeRewardCodeIDInvalid, CodeRewardRedemptionIDInvalid,
 		CodeRewardPaginationInvalid, CodeRewardCodeInvalid,
 		CodeBoardInvalidInput, CodeBoardMemberRoleInvalid, CodeBoardMemberSelfInvalid,
@@ -377,6 +394,7 @@ func StatusOf(code Code) int {
 		CodeLibraryFolderNotFound, CodeLibraryAssetNotFound, CodeLibraryMaterializationNotFound,
 		CodeTaskNotFound, CodeEventNotFound, CodeEventSubscriptionNotFound, CodeControlNotFound,
 		CodeBillingSKUNotFound,
+		CodeCreditWalletNotFound, CodeCreditChargeNotFound, CodeCreditReconciliationNotFound,
 		CodeRewardCodeNotFound, CodeRewardRedemptionNotFound,
 		CodeIdentityUserNotFound, CodeSearchProviderNotFound:
 		return http.StatusNotFound
@@ -394,6 +412,7 @@ func StatusOf(code Code) int {
 		CodeRewardCodeConflict, CodeRewardCodeIdempotencyConflict,
 		CodeRewardCodeCapInvalid, CodeRewardCodeRedeemed, CodeRewardRedeemConflict,
 		CodeRewardWalletLocked,
+		CodeCreditIdempotencyConflict,
 		CodeBoardNameConflict, CodeBoardIDConflict,
 		CodeIdentityConflict, CodeStripeConfigurationChanged, CodeCheckoutConflict,
 		CodeWalletNotRechargeable,
@@ -403,6 +422,7 @@ func StatusOf(code Code) int {
 		CodeServiceResolutionUnavailable,
 		CodeBillingPricingUnavailable,
 		CodeBillingQuoteTotalExceeded, CodeRewardCodeUnavailable,
+		CodeCreditInsufficientCredits, CodeCreditRefundExceedsCharge,
 		CodeStripeConfigurationUnprocessable,
 		CodePaymentAlreadyCompleted, CodeCheckoutSessionExpired, CodeCheckoutRequestRejected:
 		return http.StatusUnprocessableEntity
@@ -412,6 +432,7 @@ func StatusOf(code Code) int {
 	case CodeServiceUnavailable, CodeBillingQuoteUnavailable,
 		CodeSearchProviderUnavailable, CodeSearchVisionNotConfigured,
 		CodeBillingServiceUnavailable, CodeRewardServiceUnavailable,
+		CodeCreditReconciliationUnavailable,
 		CodeStorageServiceUnavailable, CodeIdentityServiceUnavailable,
 		CodeStripeProviderUnavailable, CodePaymentServiceUnavailable,
 		CodePurchasesUnavailable, CodeWebhookConfigurationMissing,
@@ -434,10 +455,13 @@ func StatusOf(code Code) int {
 	case CodeBoardAccessConflict:
 		return http.StatusPreconditionFailed
 	case CodeBillingOperationFailed, CodeRewardOperationFailed, CodeRewardRedeemFailed,
+		CodeCreditOperationFailed,
 		CodeBoardOperationFailed, CodeStorageOperationFailed, CodeIdentityOperationFailed:
 		// Explicit 500 pins: same as the fail-closed default, kept so
 		// the registry documents every promoted code's exact status.
 		return http.StatusInternalServerError
+	case CodeCreditWalletFrozen, CodeCreditWalletRestricted:
+		return http.StatusLocked
 	default:
 		return http.StatusInternalServerError
 	}

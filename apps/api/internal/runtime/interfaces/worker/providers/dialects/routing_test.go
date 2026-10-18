@@ -6,26 +6,26 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
+	providerdomain "ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
 	"ideaboard/api/internal/workflow"
 )
 
 func TestResolveAdapterDispatch(t *testing.T) {
 	route, err := Resolve(workflow.RuntimeOperationInpaint, "openai", "gpt-image-1", "", "")
 	require.NoError(t, err)
-	assert.Equal(t, domain.ProviderRuntimeAdapterModelImage, route.Adapter)
+	assert.Equal(t, providerdomain.ProviderRuntimeAdapterModelImage, route.Adapter)
 
 	route, err = Resolve(workflow.RuntimeOperationCutout, "fal", "birefnet", "", "")
 	require.NoError(t, err)
-	assert.Equal(t, domain.ProviderRuntimeAdapterCutout, route.Adapter)
+	assert.Equal(t, providerdomain.ProviderRuntimeAdapterCutout, route.Adapter)
 
 	route, err = Resolve(workflow.RuntimeOperationUpscale, "fal", "aura-sr", "", "")
 	require.NoError(t, err)
-	assert.Equal(t, domain.ProviderRuntimeAdapterUpscale, route.Adapter)
+	assert.Equal(t, providerdomain.ProviderRuntimeAdapterUpscale, route.Adapter)
 
 	route, err = Resolve(workflow.RuntimeOperationRender, "openai", "gpt-image-1", "", "")
 	require.NoError(t, err)
-	assert.Equal(t, domain.ProviderRuntimeAdapterModelImage, route.Adapter)
+	assert.Equal(t, providerdomain.ProviderRuntimeAdapterModelImage, route.Adapter)
 
 	_, err = Resolve("invalid_op", "openai", "m", "", "")
 	require.Error(t, err)

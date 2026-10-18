@@ -1,4 +1,4 @@
-package httpapi
+package http
 
 // Route registration tests for the post-#809 surface: frontend fallback,
 // branding, and public search. Legacy /api/user and /api/admin route

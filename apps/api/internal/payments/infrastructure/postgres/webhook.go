@@ -17,7 +17,7 @@ func (r *Repository) InsertStripeWebhookEvent(ctx context.Context, event payment
 	if r == nil || r.db == nil {
 		return false, fmt.Errorf("payments repository: database unavailable")
 	}
-	rows, err := r.dbWithContext(ctx).queries().InsertPaymentWebhookEvent(ctx, dbsqlc.InsertPaymentWebhookEventParams{
+	rows, err := r.DBWithContext(ctx).Queries().InsertPaymentWebhookEvent(ctx, dbsqlc.InsertPaymentWebhookEventParams{
 		StripeEventID: event.ID, EventType: event.Type, StripeObjectID: event.ObjectID,
 		PaymentIntentID: event.PaymentIntentID, ChargeID: event.ChargeID,
 		Livemode: event.Livemode, StripeCreatedAt: dbutil.TimestamptzFromTime(event.CreatedAt), ProcessingResult: result,
@@ -33,7 +33,7 @@ func (r *Repository) GetStripeWebhookEvent(ctx context.Context, eventID string) 
 	if r == nil || r.db == nil {
 		return "", fmt.Errorf("payments repository: database unavailable")
 	}
-	event, err := r.dbWithContext(ctx).queries().GetPaymentWebhookEvent(ctx, eventID)
+	event, err := r.DBWithContext(ctx).Queries().GetPaymentWebhookEvent(ctx, eventID)
 	if err != nil {
 		return "", fmt.Errorf("get Stripe webhook event: %w", err)
 	}
@@ -44,7 +44,7 @@ func (r *Repository) ClaimStripeWebhookEvent(ctx context.Context, eventID string
 	if r == nil || r.db == nil {
 		return false, fmt.Errorf("payments repository: database unavailable")
 	}
-	rows, err := r.dbWithContext(ctx).queries().ClaimPaymentWebhookEvent(ctx, eventID)
+	rows, err := r.DBWithContext(ctx).Queries().ClaimPaymentWebhookEvent(ctx, eventID)
 	if err != nil {
 		return false, fmt.Errorf("claim Stripe webhook event: %w", err)
 	}
@@ -55,8 +55,8 @@ func (r *Repository) MarkStripeWebhookEventProcessed(ctx context.Context, eventI
 	if r == nil || r.db == nil {
 		return fmt.Errorf("payments repository: database unavailable")
 	}
-	rows, err := r.dbWithContext(ctx).queries().MarkPaymentWebhookEventProcessed(ctx, dbsqlc.MarkPaymentWebhookEventProcessedParams{
-		StripeEventID: eventID, ProcessingResult: result, ErrorSummary: boundedText(errorSummary, 500),
+	rows, err := r.DBWithContext(ctx).Queries().MarkPaymentWebhookEventProcessed(ctx, dbsqlc.MarkPaymentWebhookEventProcessedParams{
+		StripeEventID: eventID, ProcessingResult: result, ErrorSummary: BoundedText(errorSummary, 500),
 		ProcessedAt: pgtype.Timestamptz{Time: processedAt, Valid: true},
 	})
 	if err != nil {

@@ -41,6 +41,48 @@ func TestRedactingHandlerMasksSensitiveKeys(t *testing.T) {
 	}
 }
 
+func TestRedactingHandlerMasksDashVariantKeys(t *testing.T) {
+	for _, appEnv := range []string{"development", "production"} {
+		output := logThroughRedactor(t, appEnv, func(logger *slog.Logger) {
+			logger.Info("connecting",
+				"host", "127.0.0.1",
+				"api-key", "sk-live-123",
+				"private-key", "pem-body",
+				"pwd", "hunter2",
+				"user_id", 42,
+			)
+		})
+		for _, leaked := range []string{"sk-live-123", "pem-body", "hunter2"} {
+			if strings.Contains(output, leaked) {
+				t.Fatalf("env %q log leaks sensitive value %q: %s", appEnv, leaked, output)
+			}
+		}
+		for _, want := range []string{"127.0.0.1", "42", "[REDACTED]"} {
+			if !strings.Contains(output, want) {
+				t.Fatalf("env %q log dropped non-sensitive %q: %s", appEnv, want, output)
+			}
+		}
+	}
+}
+
+func TestRedactingHandlerScrubsSecretAndAPIKeyPairs(t *testing.T) {
+	for _, appEnv := range []string{"development", "production"} {
+		t.Run(appEnv, func(t *testing.T) {
+			output := logThroughRedactor(t, appEnv, func(logger *slog.Logger) {
+				logger.Error("call failed", "detail", "login secret=hunter2 api_key=sk-123 host=db")
+			})
+			for _, secret := range []string{"hunter2", "sk-123"} {
+				if strings.Contains(output, secret) {
+					t.Fatalf("log leaked credential %q: %s", secret, output)
+				}
+			}
+			if strings.Count(output, redactedValue) != 2 || !strings.Contains(output, "host=db") {
+				t.Fatalf("expected two redactions and diagnostic context: %s", output)
+			}
+		})
+	}
+}
+
 func TestRedactingHandlerScrubsEmbeddedCredentialPairs(t *testing.T) {
 	output := logThroughRedactor(t, "production", func(logger *slog.Logger) {
 		logger.Error("dial failed", "err", "connect postgres://ideaboard:hunter2@db:5432/app?sslmode=require failed")
@@ -138,6 +180,11 @@ func TestScrubSensitivePairsBoundaries(t *testing.T) {
 		{`password="a\" b" host=db`, "password=[REDACTED] host=db"},
 		{"password='unterminated value", "password=[REDACTED]"},
 		{"token=abc&password=xyz;pwd=def\rhost=db", "token=[REDACTED]&password=[REDACTED];pwd=[REDACTED]\rhost=db"},
+		{"secret=hunter2 host=db", "secret=[REDACTED] host=db"},
+		{"SECRET='a b' host=db", "SECRET=[REDACTED] host=db"},
+		{"api_key=sk-123&x=1", "api_key=[REDACTED]&x=1"},
+		{"api-key=sk-123 host=db", "api-key=[REDACTED] host=db"},
+		{"apikey=sk-123;host=db", "apikey=[REDACTED];host=db"},
 		{"İ 错误 PASSWORD=abc host=db", "İ 错误 PASSWORD=[REDACTED] host=db"},
 		{"\xff token=abc", "\xff token=[REDACTED]"},
 		{"postgres://u:@db postgres://u:secret@db", "postgres://u:@db postgres://u:[REDACTED]@db"},

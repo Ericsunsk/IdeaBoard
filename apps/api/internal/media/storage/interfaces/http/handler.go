@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"ideaboard/api/internal/media/storage/domain"
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -63,7 +64,7 @@ func (h *Handler) CreateProfile(c *gin.Context) {
 
 	profile, err := h.saveProfile(c, &req)
 	if err != nil {
-		writeStorageCommandError(c, msgCreateProfile, err)
+		writeStorageCommandError(c, errorrender.MsgCreateProfile, err)
 		return
 	}
 	response.SuccessDTO(c, storageProfileWithMessageResponse{
@@ -86,7 +87,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 
 	profile, err := h.saveProfile(c, &req)
 	if err != nil {
-		writeStorageCommandError(c, msgCreateProfile, err)
+		writeStorageCommandError(c, errorrender.MsgCreateProfile, err)
 		return
 	}
 	response.SuccessDTO(c, storageProfileWithMessageResponse{
@@ -101,10 +102,10 @@ func (h *Handler) DeleteProfile(c *gin.Context) {
 		return
 	}
 	if err := h.service.DeleteProfile(c.Request.Context(), c.Param("id")); err != nil {
-		writeStorageCommandError(c, msgDeleteProfile, err)
+		writeStorageCommandError(c, errorrender.MsgMediaStorageInterfacesHTTPDeleteProfile, err)
 		return
 	}
-	response.SuccessDTO(c, storageMessageResponse{Message: msgDeleteProfile2})
+	response.SuccessDTO(c, storageMessageResponse{Message: errorrender.MsgMediaStorageInterfacesHTTPDeleteProfile2})
 }
 
 func (h *Handler) ApplyProfile(c *gin.Context) {
@@ -114,12 +115,12 @@ func (h *Handler) ApplyProfile(c *gin.Context) {
 	}
 	profile, err := h.service.ApplyProfile(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		writeStorageCommandError(c, msgApplyProfile, err)
+		writeStorageCommandError(c, errorrender.MsgApplyProfile, err)
 		return
 	}
 	response.SuccessDTO(c, storageProfileWithMessageResponse{
 		Profile: profile,
-		Message: msgApplyProfile2,
+		Message: errorrender.MsgApplyProfile2,
 	})
 }
 
@@ -129,10 +130,10 @@ func (h *Handler) TestProfile(c *gin.Context) {
 		return
 	}
 	if err := h.service.TestProfile(c.Request.Context(), c.Param("id")); err != nil {
-		writeStorageCommandError(c, msgTestProfile, err)
+		writeStorageCommandError(c, errorrender.MsgTestProfile, err)
 		return
 	}
-	response.SuccessDTO(c, storageMessageResponse{Message: msgTestProfile2})
+	response.SuccessDTO(c, storageMessageResponse{Message: errorrender.MsgTestProfile2})
 }
 
 func (h *Handler) GetBucketInfo(c *gin.Context) {
@@ -142,7 +143,7 @@ func (h *Handler) GetBucketInfo(c *gin.Context) {
 	}
 	info, err := h.service.GetBucketInfo(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		writeStorageCommandError(c, msgGetBucketInfo, err)
+		writeStorageCommandError(c, errorrender.MsgMediaStorageInterfacesHTTPGetBucketInfo, err)
 		return
 	}
 	response.SuccessDTO(c, storageBucketInfoResponse{Info: info})
@@ -175,7 +176,7 @@ type userMessageError interface {
 
 func (h *Handler) saveProfile(c *gin.Context, req *domain.StorageProfile) (*domain.StorageProfile, error) {
 	if h.service == nil {
-		return nil, errors.New(msgSaveProfile)
+		return nil, errors.New(errorrender.MsgMediaStorageInterfacesHTTPSaveProfile)
 	}
 	if storageShouldApplyProfile(c) {
 		return h.service.SaveAndApplyProfile(c.Request.Context(), req)
@@ -189,7 +190,7 @@ func storageShouldApplyProfile(c *gin.Context) bool {
 
 func storageSaveProfileMessage(c *gin.Context) string {
 	if storageShouldApplyProfile(c) {
-		return msgStorageSaveProfileMessage
+		return errorrender.MsgStorageSaveProfileMessage
 	}
-	return msgStorageSaveProfileMessage2
+	return errorrender.MsgStorageSaveProfileMessage2
 }

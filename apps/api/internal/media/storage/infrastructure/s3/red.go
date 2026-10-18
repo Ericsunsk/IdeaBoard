@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/platform/outboundhttp"
+	"ideaboard/api/internal/platform/safehttp"
 
 	"github.com/minio/minio-go/v7"
 )
@@ -20,40 +20,40 @@ const s3DataTarget = s3DeliveryTarget
 // the shared outbound RED set. The SDK itself is untouched: callers time
 // the call and report the outcome here.
 func observeS3Data(err error, latency time.Duration) {
-	outboundhttp.DefaultMetrics.Observe(s3DataTarget, classifyS3Error(err), latency)
+	safehttp.DefaultMetrics.Observe(s3DataTarget, classifyS3Error(err), latency)
 }
 
 func classifyS3Error(err error) string {
 	if err == nil {
-		return outboundhttp.OutcomeSuccess
+		return safehttp.OutcomeSuccess
 	}
 	if errors.Is(err, context.Canceled) {
-		return outboundhttp.OutcomeCanceled
+		return safehttp.OutcomeCanceled
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return outboundhttp.OutcomeTimeout
+		return safehttp.OutcomeTimeout
 	}
 	var response minio.ErrorResponse
 	if errors.As(err, &response) {
 		if response.StatusCode == 0 {
 			// Transport-level minio failures carry no HTTP status.
-			return outboundhttp.OutcomeTransportErr
+			return safehttp.OutcomeTransportErr
 		}
-		return outboundhttp.OutcomeForStatus(response.StatusCode)
+		return safehttp.OutcomeForStatus(response.StatusCode)
 	}
 	var responsePtr *minio.ErrorResponse
 	if errors.As(err, &responsePtr) && responsePtr != nil {
 		if responsePtr.StatusCode == 0 {
-			return outboundhttp.OutcomeTransportErr
+			return safehttp.OutcomeTransportErr
 		}
-		return outboundhttp.OutcomeForStatus(responsePtr.StatusCode)
+		return safehttp.OutcomeForStatus(responsePtr.StatusCode)
 	}
 	// StatObject miss probes (NoSuchKey) surface as plain errors without an
 	// ErrorResponse on some backends; they are control flow, not failures.
 	if isS3NotFoundError(err) {
-		return outboundhttp.OutcomeSuccess
+		return safehttp.OutcomeSuccess
 	}
-	return outboundhttp.OutcomeTransportErr
+	return safehttp.OutcomeTransportErr
 }
 
 func isS3NotFoundError(err error) bool {

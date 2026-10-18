@@ -56,3 +56,4 @@ Billing is the platform-level product identity and Credit pricing context. Users
 ## Non-goals
 
 - No tiered pricing, scheduled pricing, subscription, invoice, tax, promotion, or physical DELETE of Catalog items carrying durable Billing history in v1.
+- Fiat-to-Idea recharge stays outside the SKU Catalog: Payments owns the fixed 500~500,000 Idea schedule at 100 Ideas per USD (`payments/domain`), Billing owns Idea-to-service consumption prices. Quick presets reuse the same 100:1 rate, so no Catalog SKU is needed for top-up and user-visible prices are unchanged.

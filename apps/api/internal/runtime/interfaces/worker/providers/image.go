@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -15,7 +16,7 @@ import (
 
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/platform/config"
-	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/safehttp"
 
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/webp"
@@ -49,7 +50,7 @@ func trustedImageDownloadHosts(ctx context.Context, publicOrigins config.PublicO
 	for _, host := range trustedRuntimeAssetHosts(publicOrigins) {
 		appendHost(host)
 	}
-	for _, host := range outbound.AllowHosts(ctx) {
+	for _, host := range safehttp.AllowHosts(ctx) {
 		appendHost(host)
 	}
 
@@ -71,11 +72,11 @@ func normalizeOpenAIEditMultipartImage(filename, mimeType string, data []byte) (
 	default:
 		decoded, _, err := image.Decode(bytes.NewReader(data))
 		if err != nil {
-			return "", "", nil, fmt.Errorf(msgNormalizeOpenAIEditMultipartImage, err)
+			return "", "", nil, fmt.Errorf(errorrender.MsgNormalizeOpenAIEditMultipartImage, err)
 		}
 		var encoded bytes.Buffer
 		if err := png.Encode(&encoded, decoded); err != nil {
-			return "", "", nil, fmt.Errorf(msgNormalizeOpenAIEditMultipartImage2, err)
+			return "", "", nil, fmt.Errorf(errorrender.MsgNormalizeOpenAIEditMultipartImage2, err)
 		}
 		return ensureFilenameHasImageExt(filename, "image/png"), "image/png", encoded.Bytes(), nil
 	}

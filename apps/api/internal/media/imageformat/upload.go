@@ -3,6 +3,7 @@ package imageformat
 import (
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"image"
 	"io"
 	"mime/multipart"
@@ -14,11 +15,11 @@ import (
 // negotiation or a client-side rename.
 func InspectFileHeader(fh *multipart.FileHeader) (Facts, error) {
 	if fh == nil {
-		return Facts{}, errors.New(msgInspectDetectedBytes)
+		return Facts{}, errors.New(errorrender.MsgInspectDetectedBytes)
 	}
 	f, err := fh.Open()
 	if err != nil {
-		return Facts{}, fmt.Errorf(msgInspectFileHeader, err)
+		return Facts{}, fmt.Errorf(errorrender.MsgInspectFileHeader, err)
 	}
 	defer f.Close()
 	facts, err := InspectDetected(f)
@@ -30,10 +31,10 @@ func InspectFileHeader(fh *multipart.FileHeader) (Facts, error) {
 	// decoder is introduced; all other accepted upload formats are fully decoded.
 	if facts.Extension != ".avif" {
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			return Facts{}, fmt.Errorf(msgInspect3, err)
+			return Facts{}, fmt.Errorf(errorrender.MsgInspect3, err)
 		}
 		if _, _, err := image.Decode(f); err != nil {
-			return Facts{}, fmt.Errorf(msgInspectFileHeader2, err)
+			return Facts{}, fmt.Errorf(errorrender.MsgInspectFileHeader2, err)
 		}
 	}
 	return facts, nil
@@ -43,22 +44,22 @@ func InspectFileHeader(fh *multipart.FileHeader) (Facts, error) {
 // running the normal signature and image-config validation.
 func InspectDetected(source io.ReadSeeker) (Facts, error) {
 	if source == nil {
-		return Facts{}, errors.New(msgInspectDetectedBytes)
+		return Facts{}, errors.New(errorrender.MsgInspectDetectedBytes)
 	}
 	if _, err := source.Seek(0, io.SeekStart); err != nil {
-		return Facts{}, fmt.Errorf(msgInspect3, err)
+		return Facts{}, fmt.Errorf(errorrender.MsgInspect3, err)
 	}
 	header := make([]byte, 64*1024)
 	n, readErr := io.ReadFull(source, header)
 	if readErr != nil && readErr != io.EOF && readErr != io.ErrUnexpectedEOF {
-		return Facts{}, fmt.Errorf(msgInspect3, readErr)
+		return Facts{}, fmt.Errorf(errorrender.MsgInspect3, readErr)
 	}
 	ext := DetectImageExtensionFromBytes(header[:n])
 	if ext == "" {
-		return Facts{}, errors.New(msgInspectDetectedBytes)
+		return Facts{}, errors.New(errorrender.MsgInspectDetectedBytes)
 	}
 	if _, err := source.Seek(0, io.SeekStart); err != nil {
-		return Facts{}, fmt.Errorf(msgInspect3, err)
+		return Facts{}, fmt.Errorf(errorrender.MsgInspect3, err)
 	}
 	return Inspect(source, ext)
 }
@@ -67,13 +68,13 @@ func InspectDetected(source io.ReadSeeker) (Facts, error) {
 func ValidateImageBytes(data []byte, ext string) error {
 	normalizedExt, ok := NormalizeImageExtension(ext)
 	if !ok {
-		return fmt.Errorf(msgInspect, ext)
+		return fmt.Errorf(errorrender.MsgInspect, ext)
 	}
 
 	signatures := imageSignaturesByExtension(normalizedExt)
 	required := requiredImageHeaderLength(signatures)
 	if len(data) < required {
-		return errors.New(msgInspectDetectedBytes)
+		return errors.New(errorrender.MsgInspectDetectedBytes)
 	}
 
 	return validateImageMagic(data[:required], normalizedExt)
@@ -84,10 +85,10 @@ func ValidateImageBytes(data []byte, ext string) error {
 func ValidateImageReader(r io.Reader, ext string) error {
 	normalizedExt, ok := NormalizeImageExtension(ext)
 	if !ok {
-		return fmt.Errorf(msgInspect, ext)
+		return fmt.Errorf(errorrender.MsgInspect, ext)
 	}
 	if r == nil {
-		return errors.New(msgInspectDetectedBytes)
+		return errors.New(errorrender.MsgInspectDetectedBytes)
 	}
 
 	signatures := imageSignaturesByExtension(normalizedExt)
@@ -95,7 +96,7 @@ func ValidateImageReader(r io.Reader, ext string) error {
 	buf := make([]byte, required)
 	n, err := io.ReadFull(r, buf)
 	if err != nil || n < required {
-		return errors.New(msgInspectDetectedBytes)
+		return errors.New(errorrender.MsgInspectDetectedBytes)
 	}
 
 	return validateImageMagic(buf, normalizedExt)
@@ -114,14 +115,14 @@ func requiredImageHeaderLength(signatures []imageSignature) int {
 func validateImageMagic(buf []byte, ext string) error {
 	normalizedExt, ok := NormalizeImageExtension(ext)
 	if !ok {
-		return fmt.Errorf(msgInspect, ext)
+		return fmt.Errorf(errorrender.MsgInspect, ext)
 	}
 	// A confident shared-database detection decides directly: a different
 	// allowlisted format is a mismatch, an unknown one (heic, svg, …) can
 	// never satisfy the claimed extension.
 	if detected := detectExtensionViaMimetype(buf); detected != "" {
 		if detected != normalizedExt {
-			return errors.New(msgValidateImageMagic)
+			return errors.New(errorrender.MsgValidateImageMagic)
 		}
 		return nil
 	}
@@ -130,11 +131,11 @@ func validateImageMagic(buf []byte, ext string) error {
 	signatures := imageSignaturesByExtension(normalizedExt)
 	for _, sig := range signatures {
 		if len(buf) < sig.offset+len(sig.bytes) {
-			return errors.New(msgInspectDetectedBytes)
+			return errors.New(errorrender.MsgInspectDetectedBytes)
 		}
 		for i, b := range sig.bytes {
 			if buf[sig.offset+i] != b {
-				return errors.New(msgValidateImageMagic)
+				return errors.New(errorrender.MsgValidateImageMagic)
 			}
 		}
 	}

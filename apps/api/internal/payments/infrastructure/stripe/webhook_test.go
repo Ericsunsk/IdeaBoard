@@ -1,4 +1,4 @@
-package stripe
+package stripe_test
 
 import (
 	"encoding/hex"
@@ -11,10 +11,12 @@ import (
 
 	"github.com/stripe/stripe-go/v86"
 	"github.com/stripe/stripe-go/v86/webhook"
+
+	paymentstripe "ideaboard/api/internal/payments/infrastructure/stripe"
 )
 
 func TestVerifyAcceptsExactRawBodyAndRejectsExpiredOrInvalidSignatures(t *testing.T) {
-	adapter := New()
+	adapter := paymentstripe.New()
 	secret := "whsec_fixture"
 	now := time.Now().UTC().Truncate(time.Second)
 	payload := []byte(fmt.Sprintf(`{"id":"evt_adapter","object":"event","api_version":%q,"created":%d,"livemode":false,"type":"checkout.session.completed","data":{"object":{"id":"cs_adapter"}}}`, stripe.APIVersion, now.Unix()))
@@ -41,7 +43,7 @@ func TestVerifyAcceptsExactRawBodyAndRejectsExpiredOrInvalidSignatures(t *testin
 }
 
 func TestVerifyExtractsRefundAndDisputeOrderReferences(t *testing.T) {
-	adapter := New()
+	adapter := paymentstripe.New()
 	secret := "whsec_fixture"
 	now := time.Now().UTC().Truncate(time.Second)
 	tests := []struct {

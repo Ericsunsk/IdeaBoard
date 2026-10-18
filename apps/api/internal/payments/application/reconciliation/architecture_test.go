@@ -1,4 +1,4 @@
-package reconciliation
+package reconciliation_test
 
 import (
 	"go/parser"

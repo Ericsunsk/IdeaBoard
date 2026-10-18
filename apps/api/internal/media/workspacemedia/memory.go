@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"ideaboard/api/internal/platform/contract"
 )
 
 // InMemoryWorkspaceMediaStore is a mutex-guarded WorkspaceMediaStore
@@ -141,7 +143,7 @@ func (s *InMemoryWorkspaceMediaStore) CreateSession(ctx context.Context, params 
 	if strings.TrimSpace(params.WorkspaceID) == "" {
 		return nil, ErrNotFound
 	}
-	publicID, err := NewUploadPublicID()
+	publicID, err := contract.MintPublicID(contract.PrefixUpload, 12)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +218,7 @@ func (s *InMemoryWorkspaceMediaStore) CompleteSession(ctx context.Context, works
 		session.UpdatedAt = s.clock()
 		return nil, nil, mismatch
 	}
-	publicID, err := NewAssetPublicID()
+	publicID, err := contract.MintPublicID(contract.PrefixAsset, 12)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -289,7 +291,9 @@ func (s *InMemoryWorkspaceMediaStore) GetAsset(ctx context.Context, workspaceID,
 	return copyAsset(asset), nil
 }
 
-// ListAssets pages live workspace assets newest-first.
+// ListAssets pages live workspace assets newest-first. The offset is a
+// decoded AssetCursor position (see cursor.go); the (limit, offset)
+// signature is frozen pending the ListAssetsByCursor migration.
 func (s *InMemoryWorkspaceMediaStore) ListAssets(ctx context.Context, workspaceID string, limit, offset int) ([]*Asset, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

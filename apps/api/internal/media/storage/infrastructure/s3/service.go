@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
+	"ideaboard/api/internal/platform/errorrender"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -22,8 +23,7 @@ import (
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
-	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/outboundhttp"
+	"ideaboard/api/internal/platform/safehttp"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -39,7 +39,7 @@ const maxRemoteFileSize = 50 * 1024 * 1024
 // s3DeliveryOutbound is the shared standard outbound client for storage
 // delivery reads (public/signed URL fetch): timeout cap, bounded retries
 // and Retry-After respect match the gateway migration (#766).
-var s3DeliveryOutbound = outboundhttp.NewClient(outboundhttp.Config{})
+var s3DeliveryOutbound = safehttp.NewClient(safehttp.Config{})
 
 // s3DeliveryTarget names storage delivery egress in outbound logs/metrics.
 const s3DeliveryTarget = "s3-storage"
@@ -55,13 +55,13 @@ func s3GetWithPolicy(ctx context.Context, rawURL string) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := s3DeliveryOutbound.Do(ctx, req, outboundhttp.RequestOptions{
-		Timeout:    outboundhttp.DefaultTimeout,
-		AllowHosts: outbound.AllowHosts(ctx),
+	resp, err := s3DeliveryOutbound.Do(ctx, req, safehttp.RequestOptions{
+		Timeout:    safehttp.DefaultTimeout,
+		AllowHosts: safehttp.AllowHosts(ctx),
 		Target:     s3DeliveryTarget,
 	})
 	if err != nil {
-		var statusErr *outboundhttp.HTTPStatusError
+		var statusErr *safehttp.HTTPStatusError
 		if errors.As(err, &statusErr) {
 			preview := statusErr.Body
 			return &http.Response{
@@ -188,7 +188,7 @@ func (s *S3CompatibleService) UploadRefWithConfig(ctx context.Context, file *mul
 
 	src, err := file.Open()
 	if err != nil {
-		return nil, fmt.Errorf(msgUploadRefWithConfig, err)
+		return nil, fmt.Errorf(errorrender.MsgUploadRefWithConfig, err)
 	}
 	defer src.Close()
 
@@ -198,7 +198,7 @@ func (s *S3CompatibleService) UploadRefWithConfig(ctx context.Context, file *mul
 func (s *S3CompatibleService) UploadBytesWithConfigRef(ctx context.Context, filename string, data []byte, cfg *S3CompatibleConfig, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	facts, err := imageformat.InspectDetectedBytes(data)
 	if err != nil {
-		return nil, fmt.Errorf(msgUploadBytesWithConfigRef, err)
+		return nil, fmt.Errorf(errorrender.MsgUploadBytesWithConfigRef, err)
 	}
 	filename = domain.CanonicalStorageFilename(filename, facts.Extension)
 	opts.ObjectKey = domain.CanonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
@@ -222,14 +222,14 @@ func (s *S3CompatibleService) PutBytesAtKeyWithConfig(ctx context.Context, objec
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {
-		return errors.New(msgPutBytesAtKeyWithConfig)
+		return errors.New(errorrender.MsgPutBytesAtKeyWithConfig)
 	}
 	if strings.TrimSpace(contentType) == "" {
 		contentType = "application/octet-stream"
 	}
 	generation, err := s.nextObjectGeneration(ctx, client, cfg, key)
 	if err != nil {
-		return fmt.Errorf(msgPutBytesAtKeyWithConfig2, err)
+		return fmt.Errorf(errorrender.MsgPutBytesAtKeyWithConfig2, err)
 	}
 	body := bytes.NewReader(data)
 	if err := s.putObjectWithRetry(ctx, cfg, body, func(attemptCtx context.Context) error {
@@ -245,7 +245,7 @@ func (s *S3CompatibleService) PutBytesAtKeyWithConfig(ctx context.Context, objec
 		observeS3Data(putErr, time.Since(startedAt))
 		return putErr
 	}); err != nil {
-		return fmt.Errorf(msgPutBytesAtKeyWithConfig3, err)
+		return fmt.Errorf(errorrender.MsgPutBytesAtKeyWithConfig3, err)
 	}
 	return nil
 }
@@ -259,13 +259,13 @@ func (s *S3CompatibleService) uploadReaderWithConfigRef(ctx context.Context, fil
 		return nil, err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return nil, errors.New(msgUploadReaderWithConfigRef)
+		return nil, errors.New(errorrender.MsgUploadReaderWithConfigRef)
 	}
 	if body == nil {
-		return nil, errors.New(msgUploadReaderWithConfigRef2)
+		return nil, errors.New(errorrender.MsgUploadReaderWithConfigRef2)
 	}
 	if size < 0 {
-		return nil, errors.New(msgUploadReaderWithConfigRef3)
+		return nil, errors.New(errorrender.MsgUploadReaderWithConfigRef3)
 	}
 
 	client, err := s.prepareUploadClient(ctx, cfg)
@@ -278,7 +278,7 @@ func (s *S3CompatibleService) uploadReaderWithConfigRef(ctx context.Context, fil
 
 func (s *S3CompatibleService) prepareUploadClient(ctx context.Context, cfg *S3CompatibleConfig) (*minio.Client, error) {
 	if !s.IsConfigEnabled(cfg) {
-		return nil, errors.New(msgUploadReaderWithConfigRef)
+		return nil, errors.New(errorrender.MsgUploadReaderWithConfigRef)
 	}
 	return s.clientWithConfig(ctx, cfg)
 }
@@ -297,11 +297,11 @@ func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client
 	}
 	body, checksum, err := prepareChecksumBody(body)
 	if err != nil {
-		return nil, fmt.Errorf(msgPutReaderWithConfigRef, err)
+		return nil, fmt.Errorf(errorrender.MsgPutReaderWithConfigRef, err)
 	}
 	generation, err := s.nextObjectGeneration(ctx, client, cfg, key)
 	if err != nil {
-		return nil, fmt.Errorf(msgPutBytesAtKeyWithConfig2, err)
+		return nil, fmt.Errorf(errorrender.MsgPutBytesAtKeyWithConfig2, err)
 	}
 
 	err = s.putObjectWithRetry(ctx, cfg, body, func(attemptCtx context.Context) error {
@@ -318,7 +318,7 @@ func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client
 		return putErr
 	})
 	if err != nil {
-		return nil, fmt.Errorf(msgPutReaderWithConfigRef2, err)
+		return nil, fmt.Errorf(errorrender.MsgPutReaderWithConfigRef2, err)
 	}
 
 	publicURL, err := s.PublicObjectURL(cfg, key)
@@ -383,7 +383,7 @@ func (s *S3CompatibleService) putObjectWithRetry(
 	return s.retryR2PermissionDenied(ctx, cfg, "object upload", func(attempt int) error {
 		if attempt > 0 {
 			if _, err := seeker.Seek(0, io.SeekStart); err != nil {
-				return fmt.Errorf(msgPutObjectWithRetry, err)
+				return fmt.Errorf(errorrender.MsgPutObjectWithRetry, err)
 			}
 		}
 		return put(ctx)
@@ -427,7 +427,7 @@ func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey st
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {
-		return errors.New(msgPutBytesAtKeyWithConfig)
+		return errors.New(errorrender.MsgPutBytesAtKeyWithConfig)
 	}
 	client, err := s.clientWithConfig(ctx, cfg)
 	if err != nil {
@@ -440,7 +440,7 @@ func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey st
 		return removeErr
 	})
 	if err != nil {
-		return fmt.Errorf(msgDeleteWithConfig, err)
+		return fmt.Errorf(errorrender.MsgDeleteWithConfig, err)
 	}
 	return nil
 }
@@ -450,11 +450,11 @@ func (s *S3CompatibleService) ReadWithConfig(ctx context.Context, objectKey stri
 		return nil, err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return nil, errors.New(msgUploadReaderWithConfigRef)
+		return nil, errors.New(errorrender.MsgUploadReaderWithConfigRef)
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {
-		return nil, errors.New(msgPutBytesAtKeyWithConfig)
+		return nil, errors.New(errorrender.MsgPutBytesAtKeyWithConfig)
 	}
 	return s.readDeliveryObject(ctx, key, cfg, maxBytes)
 }
@@ -475,24 +475,24 @@ func (s *S3CompatibleService) readDeliveryObject(ctx context.Context, key string
 		signedURL, signedErr := s.SignedURLWithConfig(ctx, key, time.Minute, cfg)
 		if signedErr != nil {
 			if err != nil {
-				return nil, fmt.Errorf(msgReadDeliveryObject, err)
+				return nil, fmt.Errorf(errorrender.MsgReadDeliveryObject, err)
 			}
-			return nil, fmt.Errorf(msgReadDeliveryObject, signedErr)
+			return nil, fmt.Errorf(errorrender.MsgReadDeliveryObject, signedErr)
 		}
 		response, err = s3GetWithPolicy(ctx, signedURL)
 		if err != nil {
-			return nil, fmt.Errorf(msgReadDeliveryObject2, err)
+			return nil, fmt.Errorf(errorrender.MsgReadDeliveryObject2, err)
 		}
 	}
 	if response == nil {
-		return nil, errors.New(msgReadDeliveryObject3)
+		return nil, errors.New(errorrender.MsgReadDeliveryObject3)
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusNotFound {
 		return nil, domain.ErrStoredObjectNotFound
 	}
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf(msgReadDeliveryObject4, response.StatusCode)
+		return nil, fmt.Errorf(errorrender.MsgReadDeliveryObject4, response.StatusCode)
 	}
 
 	data, err := readStorageObject(response.Body, maxBytes)
@@ -516,11 +516,11 @@ func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, object
 		return err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return errors.New(msgUploadReaderWithConfigRef)
+		return errors.New(errorrender.MsgUploadReaderWithConfigRef)
 	}
 	prefix := strings.TrimSpace(objectKeyPrefix)
 	if prefix == "" {
-		return errors.New(msgDeletePrefixWithConfig)
+		return errors.New(errorrender.MsgDeletePrefixWithConfig)
 	}
 
 	client, err := s.clientWithConfig(ctx, cfg)
@@ -551,7 +551,7 @@ func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, object
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf(msgDeletePrefixWithConfig2, err)
+		return fmt.Errorf(errorrender.MsgDeletePrefixWithConfig2, err)
 	}
 	return nil
 }
@@ -561,11 +561,11 @@ func (s *S3CompatibleService) ListObjectKeysWithConfig(ctx context.Context, obje
 		return nil, err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return nil, errors.New(msgUploadReaderWithConfigRef)
+		return nil, errors.New(errorrender.MsgUploadReaderWithConfigRef)
 	}
 	prefix := strings.Trim(strings.TrimSpace(objectKeyPrefix), "/")
 	if prefix == "" {
-		return nil, errors.New(msgDeletePrefixWithConfig)
+		return nil, errors.New(errorrender.MsgDeletePrefixWithConfig)
 	}
 	client, err := s.clientWithConfig(ctx, cfg)
 	if err != nil {
@@ -589,11 +589,11 @@ func (s *S3CompatibleService) SignedURLWithConfig(ctx context.Context, objectKey
 		return "", err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return "", errors.New(msgUploadReaderWithConfigRef)
+		return "", errors.New(errorrender.MsgUploadReaderWithConfigRef)
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {
-		return "", errors.New(msgPutBytesAtKeyWithConfig)
+		return "", errors.New(errorrender.MsgPutBytesAtKeyWithConfig)
 	}
 	if expiry <= 0 {
 		expiry = time.Hour
@@ -604,7 +604,7 @@ func (s *S3CompatibleService) SignedURLWithConfig(ctx context.Context, objectKey
 	}
 	signed, err := client.PresignedGetObject(ctx, strings.TrimSpace(cfg.BucketName), key, expiry, nil)
 	if err != nil {
-		return "", fmt.Errorf(msgSignedURLWithConfig, err)
+		return "", fmt.Errorf(errorrender.MsgSignedURLWithConfig, err)
 	}
 	return signed.String(), nil
 }
@@ -618,7 +618,7 @@ func (s *S3CompatibleService) VerifyObjectGeneration(ctx context.Context, object
 		return fmt.Errorf("%w: object key is empty", domain.ErrObjectGenerationUnavailable)
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return fmt.Errorf(msgVerifyObjectGeneration, domain.ErrObjectGenerationUnavailable)
+		return fmt.Errorf(errorrender.MsgVerifyObjectGeneration, domain.ErrObjectGenerationUnavailable)
 	}
 	var actual int64
 	var err error
@@ -682,20 +682,20 @@ func (s *S3CompatibleService) nextObjectGeneration(ctx context.Context, client *
 
 func (s *S3CompatibleService) validateBaseConfig(ctx context.Context, cfg *S3CompatibleConfig) error {
 	if cfg == nil {
-		return errors.New(msgValidateBaseConfig)
+		return errors.New(errorrender.MsgValidateBaseConfig)
 	}
 	if strings.TrimSpace(cfg.AccessKeyID) == "" || cfg.SecretAccessKey == "" || strings.TrimSpace(cfg.BucketName) == "" {
-		return errors.New(msgValidateBaseConfig2)
+		return errors.New(errorrender.MsgValidateBaseConfig2)
 	}
 	if strings.TrimSpace(cfg.Endpoint) == "" {
-		return errors.New(msgValidateBaseConfig3)
+		return errors.New(errorrender.MsgValidateBaseConfig3)
 	}
 	return validateS3EndpointPolicy(ctx, cfg.Endpoint)
 }
 
 func (s *S3CompatibleService) clientWithConfig(ctx context.Context, cfg *S3CompatibleConfig) (*minio.Client, error) {
 	if cfg == nil {
-		return nil, errors.New(msgValidateBaseConfig)
+		return nil, errors.New(errorrender.MsgValidateBaseConfig)
 	}
 	if err := validateS3EndpointPolicy(ctx, cfg.Endpoint); err != nil {
 		return nil, err
@@ -727,7 +727,7 @@ func (s *S3CompatibleService) clientWithConfig(ctx context.Context, cfg *S3Compa
 		Transport:    transport,
 	})
 	if err != nil {
-		return nil, fmt.Errorf(msgClientWithConfig, err)
+		return nil, fmt.Errorf(errorrender.MsgClientWithConfig, err)
 	}
 
 	actual, _ := s.clientCache.LoadOrStore(cacheKey, client)
@@ -740,7 +740,7 @@ func s3ClientTransport(cfg *S3CompatibleConfig, secure bool) (http.RoundTripper,
 	}
 	transport, err := minio.DefaultTransport(secure)
 	if err != nil {
-		return nil, fmt.Errorf(msgS3ClientTransport, err)
+		return nil, fmt.Errorf(errorrender.MsgS3ClientTransport, err)
 	}
 	transport.DisableKeepAlives = true
 	return transport, nil
@@ -798,13 +798,13 @@ func readStorageObject(src io.Reader, maxBytes int64) ([]byte, error) {
 	}
 	data, err := io.ReadAll(io.LimitReader(src, maxBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf(msgReadDeliveryObject, err)
+		return nil, fmt.Errorf(errorrender.MsgReadDeliveryObject, err)
 	}
 	if int64(len(data)) > maxBytes {
-		return nil, fmt.Errorf(msgReadStorageObject, maxBytes/1024/1024)
+		return nil, fmt.Errorf(errorrender.MsgMediaStorageInfrastructureS3ReadStorageObject, maxBytes/1024/1024)
 	}
 	if len(data) == 0 {
-		return nil, errors.New(msgReadStorageObject2)
+		return nil, errors.New(errorrender.MsgMediaStorageInfrastructureS3ReadStorageObject2)
 	}
 	return data, nil
 }

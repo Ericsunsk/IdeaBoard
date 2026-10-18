@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"ideaboard/api/internal/platform/validation"
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
@@ -97,7 +97,7 @@ func TestRuntimeSettingsLoginLockoutUpdateRejectsOutOfRange(t *testing.T) {
 		{Threshold: 10, DurationSeconds: 86401},
 		{Threshold: 0, DurationSeconds: 0},
 	} {
-		if _, err := service.UpdateLoginLockout(t.Context(), setting); !validation.Is(err) {
+		if _, err := service.UpdateLoginLockout(t.Context(), setting); !errorrender.IsValidationError(err) {
 			t.Fatalf("UpdateLoginLockout(%+v) error = %v, want validation error", setting, err)
 		}
 	}

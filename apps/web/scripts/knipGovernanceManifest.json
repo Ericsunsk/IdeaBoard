@@ -17026,7 +17026,7 @@
       "exports": ["WorkspaceList"]
     },
     "src/api/generated-query/public/model/workspaceMember.ts": {
-      "sha256": "ac192a6fca98d6e4ab7d58be6e1048458ad291af8500c124e3919b112fa0b958",
+      "sha256": "3fa26f4c2c5877a386741fe1ee9db49100064408f9e9eea17f95a314503afedc",
       "exports": ["WorkspaceMember"]
     },
     "src/api/generated-query/public/model/workspaceMemberEnvelope.ts": {

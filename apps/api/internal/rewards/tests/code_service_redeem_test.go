@@ -7,6 +7,8 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/rewards/application/redemptions"
+	rewardsdomain "ideaboard/api/internal/rewards/domain"
+	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/testdb"
 	"sync"
 	"testing"
@@ -19,7 +21,7 @@ func TestRewardCodeCreateSearchRedeemAndReplay(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	command := CreateRewardCodeCommand{
+	command := ports.CreateRewardCodeCommand{
 		DisplayName: "新用户奖励", Code: "JOIN-IDEA-2026", CreditAmount: 88,
 		MaxRedemptions: 1, IdempotencyKey: "reward-code-create-001", ActorUserID: 1,
 	}
@@ -28,7 +30,7 @@ func TestRewardCodeCreateSearchRedeemAndReplay(t *testing.T) {
 		t.Fatalf("CreateRewardCode() error = %v", err)
 	}
 	if created.Plaintext != "JOINIDEA2026" || created.Replayed ||
-		!created.RewardCode.Enabled || created.RewardCode.Status != RewardCodeStatusEnabled ||
+		!created.RewardCode.Enabled || created.RewardCode.Status != ports.RewardCodeStatusEnabled ||
 		created.RewardCode.MaskedCodeHint != "•••• 2026" {
 		t.Fatalf("created RewardCode = %+v", created)
 	}
@@ -39,7 +41,7 @@ func TestRewardCodeCreateSearchRedeemAndReplay(t *testing.T) {
 	if replay.RewardCode.ID != created.RewardCode.ID || !replay.Replayed || replay.Plaintext != "" {
 		t.Fatalf("replayed RewardCode = %+v, want same metadata without plaintext", replay)
 	}
-	page, err := service.SearchRewardCodes(t.Context(), SearchRewardCodesInput{})
+	page, err := service.SearchRewardCodes(t.Context(), ports.SearchRewardCodesInput{})
 	if err != nil || len(page.RewardCodes) != 1 || page.RewardCodes[0].ID != created.RewardCode.ID {
 		t.Fatalf("SearchRewardCodes() = %+v error=%v", page, err)
 	}
@@ -58,18 +60,18 @@ func TestRewardCodeCreateSearchRedeemAndReplay(t *testing.T) {
 
 	provisionRewardWallet(t, pool, creditService, 3)
 	provisionRewardWallet(t, pool, creditService, 7)
-	first, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: command.Code})
+	first, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: command.Code})
 	if err != nil || first.Replayed || first.CreditedAmount != 88 || first.Redemption.RewardCodeID != created.RewardCode.ID {
 		t.Fatalf("first Redeem() = %+v error=%v", first, err)
 	}
-	sameUserReplay, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: command.Code})
+	sameUserReplay, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: command.Code})
 	if err != nil || !sameUserReplay.Replayed || sameUserReplay.Redemption.ID != first.Redemption.ID {
 		t.Fatalf("same-user replay = %+v error=%v", sameUserReplay, err)
 	}
-	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: command.Code}); !errors.Is(err, ErrCodeUnavailable) {
+	if _, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 7, Code: command.Code}); !errors.Is(err, rewardsdomain.ErrCodeUnavailable) {
 		t.Fatalf("final-cap Redeem() error = %v, want unified unavailable", err)
 	}
-	history, err := service.ListRedemptions(t.Context(), ListRedemptionsInput{UserID: 3})
+	history, err := service.ListRedemptions(t.Context(), ports.ListRedemptionsInput{UserID: 3})
 	if err != nil || len(history.Redemptions) != 1 || history.Redemptions[0].RewardCodeDisplayName != "新用户奖励" {
 		t.Fatalf("ListRedemptions() = %+v error=%v", history, err)
 	}
@@ -90,7 +92,7 @@ func TestRewardCodeGrantFailureRollsBackCapacityAndRedemption(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	realCredits := credits.NewService(pool)
 	service := newTestRewardService(t, pool, realCredits)
-	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "失败回滚奖励", Code: "ROLLBACK-2026", CreditAmount: 9,
 		MaxRedemptions: 1, IdempotencyKey: "reward-code-rollback", ActorUserID: 1,
 	})
@@ -98,8 +100,8 @@ func TestRewardCodeGrantFailureRollsBackCapacityAndRedemption(t *testing.T) {
 		t.Fatal(err)
 	}
 	provisionRewardWallet(t, pool, realCredits, 3)
-	service = rewards.NewServiceWithOptions(pool, failingGrantCreditService{reader: realCredits}, newTestRewardKeyring(t), ServiceOptions{})
-	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "ROLLBACK-2026"}); err == nil {
+	service = rewards.NewServiceWithOptions(pool, failingGrantCreditService{reader: realCredits}, newTestRewardKeyring(t), rewards.ServiceOptions{})
+	if _, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "ROLLBACK-2026"}); err == nil {
 		t.Fatal("Redeem() succeeded with injected Credit Grant failure")
 	}
 	var count, redemptions int
@@ -120,7 +122,7 @@ func TestRewardCodeExpirationIsEndExclusive(t *testing.T) {
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	expiresAt := time.Now().UTC().Add(time.Hour)
-	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "限时奖励", Code: "EXPIRES-2030", CreditAmount: 5,
 		ExpiresAt: &expiresAt, IdempotencyKey: "expires-boundary", ActorUserID: 1,
 	})
@@ -134,7 +136,7 @@ SET expires_at = clock_timestamp()
 WHERE id = $1`, created.RewardCode.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "EXPIRES-2030"}); !errors.Is(err, ErrCodeUnavailable) {
+	if _, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "EXPIRES-2030"}); !errors.Is(err, rewardsdomain.ErrCodeUnavailable) {
 		t.Fatalf("Redeem() at expires_at error = %v, want unified ErrCodeUnavailable", err)
 	}
 	var count int64
@@ -151,7 +153,7 @@ func TestRewardCodeRedemptionUsesDatabaseTimeWhenApplicationClockIsAhead(t *test
 	creditService := credits.NewService(pool)
 	expiresAt := time.Now().UTC().Add(time.Hour)
 	service := newTestRewardService(t, pool, creditService)
-	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "数据库时间奖励", Code: "DB-CLOCK-2030", CreditAmount: 5,
 		ExpiresAt: &expiresAt, IdempotencyKey: "database-clock-authority", ActorUserID: 1,
 	})
@@ -160,7 +162,7 @@ func TestRewardCodeRedemptionUsesDatabaseTimeWhenApplicationClockIsAhead(t *test
 	}
 	provisionRewardWallet(t, pool, creditService, 3)
 	skewedService := newTestRewardServiceAt(t, pool, creditService, expiresAt.Add(time.Hour))
-	result, err := skewedService.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "DB-CLOCK-2030"})
+	result, err := skewedService.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "DB-CLOCK-2030"})
 	if err != nil || result.CreditedAmount != 5 {
 		t.Fatalf("Redeem() with ahead application clock = %+v error=%v", result, err)
 	}
@@ -178,7 +180,7 @@ func TestRewardCodeConcurrentFinalCapacityAndSameUserReplay(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "并发奖励", Code: "RACE-CODE-2026", CreditAmount: 5,
 		MaxRedemptions: 1, IdempotencyKey: "reward-code-race", ActorUserID: 1,
 	})
@@ -194,7 +196,7 @@ func TestRewardCodeConcurrentFinalCapacityAndSameUserReplay(t *testing.T) {
 		wait.Add(1)
 		go func(index int, userID int64) {
 			defer wait.Done()
-			_, errorsByUser[index] = service.Redeem(t.Context(), RedeemCommand{UserID: userID, Code: "RACE-CODE-2026"})
+			_, errorsByUser[index] = service.Redeem(t.Context(), ports.RedeemCommand{UserID: userID, Code: "RACE-CODE-2026"})
 		}(index, userID)
 	}
 	wait.Wait()
@@ -203,7 +205,7 @@ func TestRewardCodeConcurrentFinalCapacityAndSameUserReplay(t *testing.T) {
 		switch {
 		case redeemError == nil:
 			successes++
-		case errors.Is(redeemError, ErrCodeUnavailable):
+		case errors.Is(redeemError, rewardsdomain.ErrCodeUnavailable):
 			unavailable++
 		default:
 			t.Fatalf("unexpected concurrent Redeem() error = %v", redeemError)
@@ -220,21 +222,21 @@ func TestRewardCodeConcurrentFinalCapacityAndSameUserReplay(t *testing.T) {
 		t.Fatalf("redemption_count=%d, want 1", count)
 	}
 
-	sameUserCode, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	sameUserCode, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "同用户并发奖励", Code: "SAME-USER-2026", CreditAmount: 6,
 		MaxRedemptions: 0, IdempotencyKey: "reward-code-same-user", ActorUserID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	results := make([]RedeemResult, 2)
+	results := make([]ports.RedeemResult, 2)
 	sameUserErrors := make([]error, 2)
 	var replayWait sync.WaitGroup
 	for index := range results {
 		replayWait.Add(1)
 		go func(index int) {
 			defer replayWait.Done()
-			results[index], sameUserErrors[index] = service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "SAME-USER-2026"})
+			results[index], sameUserErrors[index] = service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "SAME-USER-2026"})
 		}(index)
 	}
 	replayWait.Wait()
@@ -262,7 +264,7 @@ func TestRewardCodeDeleteAndRedeemSerializeWithoutOrphanFacts(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "Delete Redeem Race", Code: "DELETE-REDEEM-2030", CreditAmount: 9,
 		IdempotencyKey: "delete-redeem-race", ActorUserID: 1,
 	})
@@ -281,7 +283,7 @@ func TestRewardCodeDeleteAndRedeemSerializeWithoutOrphanFacts(t *testing.T) {
 	}
 
 	type deleteOutcome struct {
-		deleted DeletedRewardCode
+		deleted ports.DeletedRewardCode
 		err     error
 	}
 	deleteReady := make(chan struct{})
@@ -292,7 +294,7 @@ func TestRewardCodeDeleteAndRedeemSerializeWithoutOrphanFacts(t *testing.T) {
 	go func() {
 		close(deleteReady)
 		<-start
-		deleted, err := service.DeleteRewardCode(t.Context(), DeleteRewardCodeCommand{
+		deleted, err := service.DeleteRewardCode(t.Context(), ports.DeleteRewardCodeCommand{
 			RewardCodeID: created.RewardCode.ID, ActorUserID: 1,
 		})
 		deleteDone <- deleteOutcome{deleted: deleted, err: err}
@@ -300,7 +302,7 @@ func TestRewardCodeDeleteAndRedeemSerializeWithoutOrphanFacts(t *testing.T) {
 	go func() {
 		close(redeemReady)
 		<-start
-		_, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "DELETE-REDEEM-2030"})
+		_, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "DELETE-REDEEM-2030"})
 		redeemDone <- err
 	}()
 	<-deleteReady
@@ -356,11 +358,11 @@ WHERE datname = current_database()
 		t.Fatalf("orphan Reward facts redemptions=%d grants=%d", orphanRedemptions, orphanGrants)
 	}
 	switch {
-	case deleteResult.err == nil && errors.Is(redeemErr, ErrCodeUnavailable):
+	case deleteResult.err == nil && errors.Is(redeemErr, rewardsdomain.ErrCodeUnavailable):
 		if deleteResult.deleted.RewardCodeID != created.RewardCode.ID || rewardCodes != 0 || redemptions != 0 || grants != 0 {
 			t.Fatalf("delete-first facts deleted=%+v codes=%d redemptions=%d grants=%d", deleteResult.deleted, rewardCodes, redemptions, grants)
 		}
-	case errors.Is(deleteResult.err, ErrRewardCodeRedeemed) && redeemErr == nil:
+	case errors.Is(deleteResult.err, rewardsdomain.ErrRewardCodeRedeemed) && redeemErr == nil:
 		if rewardCodes != 1 || redemptions != 1 || grants != 1 {
 			t.Fatalf("redeem-first facts codes=%d redemptions=%d grants=%d", rewardCodes, redemptions, grants)
 		}

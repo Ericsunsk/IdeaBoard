@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"log/slog"
 	"net/url"
 	"strings"
@@ -30,7 +31,7 @@ type StorageCapabilityError struct {
 
 func (e *StorageCapabilityError) Error() string {
 	if e == nil || len(e.Missing) == 0 {
-		return msgError
+		return errorrender.MsgMediaStorageInfrastructureS3Error
 	}
 	missing := make([]string, 0, len(e.Missing))
 	bucketActions := make([]string, 0, 1)
@@ -46,15 +47,15 @@ func (e *StorageCapabilityError) Error() string {
 	}
 	scope := make([]string, 0, 2)
 	if len(bucketActions) > 0 {
-		scope = append(scope, fmt.Sprintf(msgError2, strings.Join(bucketActions, "、")))
+		scope = append(scope, fmt.Sprintf(errorrender.MsgError2, strings.Join(bucketActions, "、")))
 	}
 	if len(objectActions) > 0 {
-		scope = append(scope, fmt.Sprintf(msgError3, strings.Join(objectActions, "、")))
+		scope = append(scope, fmt.Sprintf(errorrender.MsgError3, strings.Join(objectActions, "、")))
 	}
 	if isCloudflareR2Endpoint(e.Endpoint) {
-		return fmt.Sprintf(msgError4, strings.Join(missing, "、"))
+		return fmt.Sprintf(errorrender.MsgError4, strings.Join(missing, "、"))
 	}
-	return fmt.Sprintf(msgError5, strings.Join(missing, "、"), strings.Join(scope, "；"))
+	return fmt.Sprintf(errorrender.MsgError5, strings.Join(missing, "、"), strings.Join(scope, "；"))
 }
 
 func (e *StorageCapabilityError) UserMessage() string {
@@ -69,12 +70,12 @@ type StorageProbeError struct {
 
 func (e *StorageProbeError) Error() string {
 	if e == nil || e.Cause == nil {
-		return msgError
+		return errorrender.MsgMediaStorageInfrastructureS3Error
 	}
 	if code := s3ErrorCode(e.Cause); code != "" {
-		return fmt.Sprintf(msgError6, e.Capability, code, e.Cause)
+		return fmt.Sprintf(errorrender.MsgError6, e.Capability, code, e.Cause)
 	}
-	return fmt.Sprintf(msgError7, e.Capability, e.Cause)
+	return fmt.Sprintf(errorrender.MsgError7, e.Capability, e.Cause)
 }
 
 func (e *StorageProbeError) Unwrap() error {
@@ -90,21 +91,21 @@ func (e *StorageProbeError) UserMessage() string {
 		provider = "Cloudflare R2"
 	}
 	if e.Capability == StorageCapabilityPublicRead {
-		return fmt.Sprintf(msgUserMessage, provider)
+		return fmt.Sprintf(errorrender.MsgUserMessage, provider)
 	}
 	code := s3ErrorCode(e.Cause)
 	switch code {
 	case "AuthorizationHeaderMalformed":
 		if provider == "Cloudflare R2" {
-			return msgUserMessage2
+			return errorrender.MsgUserMessage2
 		}
-		return msgUserMessage3
+		return errorrender.MsgUserMessage3
 	case "SignatureDoesNotMatch", "InvalidAccessKeyId", "InvalidToken":
-		return fmt.Sprintf(msgUserMessage4, provider)
+		return fmt.Sprintf(errorrender.MsgUserMessage4, provider)
 	case "NoSuchBucket":
-		return fmt.Sprintf(msgUserMessage5, provider)
+		return fmt.Sprintf(errorrender.MsgUserMessage5, provider)
 	default:
-		return fmt.Sprintf(msgUserMessage6, provider, e.Capability)
+		return fmt.Sprintf(errorrender.MsgUserMessage6, provider, e.Capability)
 	}
 }
 
@@ -210,7 +211,7 @@ func (s *S3CompatibleService) probeCapabilitiesOnce(ctx context.Context, cfg *S3
 			} else if deliveryErr != nil {
 				return newStorageProbeError(cfg, StorageCapabilityPublicRead, deliveryErr)
 			} else if delivered == nil || string(delivered.Data) != s3CapabilityProbePayload {
-				return newStorageProbeError(cfg, StorageCapabilityPublicRead, errors.New(msgProbeCapabilitiesOnce))
+				return newStorageProbeError(cfg, StorageCapabilityPublicRead, errors.New(errorrender.MsgProbeCapabilitiesOnce))
 			}
 		}
 	}
@@ -227,14 +228,14 @@ type s3BucketExistenceChecker interface {
 
 func ensureS3BucketAccessible(ctx context.Context, client s3BucketExistenceChecker, bucketName string) error {
 	if client == nil {
-		return errors.New(msgEnsureS3BucketAccessible)
+		return errors.New(errorrender.MsgEnsureS3BucketAccessible)
 	}
 	exists, err := client.BucketExists(ctx, bucketName)
 	if err != nil {
-		return fmt.Errorf(msgEnsureS3BucketAccessible2, err)
+		return fmt.Errorf(errorrender.MsgEnsureS3BucketAccessible2, err)
 	}
 	if !exists {
-		return errors.New(msgEnsureS3BucketAccessible3)
+		return errors.New(errorrender.MsgEnsureS3BucketAccessible3)
 	}
 	return nil
 }

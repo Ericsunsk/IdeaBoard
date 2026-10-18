@@ -3,6 +3,7 @@ package configuration
 import (
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"net/url"
 	"regexp"
 	"strings"
@@ -65,7 +66,7 @@ func ValidatePreparedConfiguration(prepared paymentports.PreparedStripeConfigura
 func GatewayFailure(err error) (paymentports.GatewayErrorCode, string, error) {
 	var gatewayErr *paymentports.GatewayError
 	if !errors.As(err, &gatewayErr) {
-		return paymentports.GatewayErrorProviderUnavailable, msgGatewayFailure, paymentcontracts.ErrStripeProviderUnavailable
+		return paymentports.GatewayErrorProviderUnavailable, errorrender.MsgGatewayFailure, paymentcontracts.ErrStripeProviderUnavailable
 	}
 	summary := gatewayErr.Error()
 	if summary == "" {

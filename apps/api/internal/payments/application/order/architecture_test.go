@@ -1,4 +1,4 @@
-package order
+package order_test
 
 import (
 	"go/parser"

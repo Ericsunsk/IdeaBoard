@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -107,7 +108,7 @@ func (s *Service) CreateSession(ctx context.Context, params CreateSessionParams)
 		return nil, err
 	}
 	canonicalMIME := CanonicalMIME(mimeType)
-	minted, err := NewUploadPublicID()
+	minted, err := contract.MintPublicID(contract.PrefixUpload, 12)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +125,7 @@ func (s *Service) CreateSession(ctx context.Context, params CreateSessionParams)
 			TargetBoardID:     targetBoardID,
 		})
 		if isSessionPublicIDConflict(err) {
-			minted, err = NewUploadPublicID()
+			minted, err = contract.MintPublicID(contract.PrefixUpload, 12)
 			if err != nil {
 				return nil, err
 			}
@@ -141,7 +142,7 @@ func (s *Service) CreateSession(ctx context.Context, params CreateSessionParams)
 
 // getSessionRow loads the scoped session row without lifecycle effects.
 func getSessionRow(ctx context.Context, q *dbsqlc.Queries, workspacePublicID, uploadID string) (dbsqlc.UploadSession, error) {
-	if !IsUploadID(strings.TrimSpace(uploadID)) {
+	if !contract.IsUploadID(strings.TrimSpace(uploadID)) {
 		return dbsqlc.UploadSession{}, ErrNotFound
 	}
 	row, err := q.GetUploadSessionByPublicID(ctx, dbsqlc.GetUploadSessionByPublicIDParams{
@@ -259,7 +260,7 @@ func (s *Service) CompleteSession(ctx context.Context, workspaceID, uploadID str
 		return nil, nil, err
 	}
 	trimmedWorkspace := strings.TrimSpace(workspaceID)
-	if !IsUploadID(strings.TrimSpace(uploadID)) {
+	if !contract.IsUploadID(strings.TrimSpace(uploadID)) {
 		return nil, nil, ErrNotFound
 	}
 	if facts.Width < 0 || facts.Height < 0 || facts.Width > 32768 || facts.Height > 32768 {
@@ -294,8 +295,8 @@ func (s *Service) CompleteSession(ctx context.Context, workspaceID, uploadID str
 			return mismatch
 		}
 		minted := strings.TrimSpace(asset.PublicID)
-		if !IsAssetID(minted) {
-			minted, err = NewAssetPublicID()
+		if !contract.IsAssetID(minted) {
+			minted, err = contract.MintPublicID(contract.PrefixAsset, 12)
 			if err != nil {
 				return err
 			}
@@ -328,7 +329,7 @@ func (s *Service) CompleteSession(ctx context.Context, workspaceID, uploadID str
 				Metadata:        []byte(`{}`),
 			})
 			if isAssetPublicIDConflict(err) {
-				minted, err = NewAssetPublicID()
+				minted, err = contract.MintPublicID(contract.PrefixAsset, 12)
 				if err != nil {
 					return err
 				}

@@ -13,8 +13,8 @@
 //
 // Quick Saves: the workspace tables require folder_id NOT NULL, so the
 // seam's unfiled ("") state maps to the workspace Quick Saves system
-// folder (is_system + is_default, name 'Quick Saves'), ensured on
-// demand. Deleting a user folder moves its assets to Quick Saves first
+// folder (is_system + is_default, name domain.QuickSavesFolderName),
+// ensured on demand. Deleting a user folder moves its assets to Quick Saves first
 // (same tx), mirroring the in-memory "become unfiled" semantics.
 // System folders are immutable: rename/delete statements exclude them.
 //
@@ -54,6 +54,9 @@ type Service struct {
 
 // Compile-time convergence with the v1 persistence seam.
 var _ ports.WorkspaceLibraryStore = (*Service)(nil)
+
+// The postgres backend satisfies the narrow v1 seam via the full store.
+var _ ports.V1Store = (*Service)(nil)
 
 // errWorkspaceNotFound stays unexported: callers map it to the
 // folder/asset not-found error of their operation so hidden workspaces

@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"ideaboard/api/internal/platform/errorrender"
 	"mime/multipart"
 	"path/filepath"
 	"strings"
@@ -22,9 +23,8 @@ import (
 // to the previously inline literals. The table lives in service.go (not a
 // separate message.go) because the hexagonal-boundary architecture test
 // only allows service.go at the storage root.
-const (
-	msgNewServiceWithLocalRoot = "不支持的存储类型" // NewServiceWithLocalRoot
-)
+
+// NewServiceWithLocalRoot
 
 type Service struct {
 	s3CompatibleService *s3.S3CompatibleService
@@ -53,7 +53,7 @@ func NewServiceWithLocalRoot(profileRepo ports.ProfileRepository, publicAPIOrigi
 		case domain.StorageProviderS3Compatible:
 			return s3Driver, nil
 		default:
-			return nil, errors.New(msgNewServiceWithLocalRoot)
+			return nil, errors.New(errorrender.MsgNewServiceWithLocalRoot)
 		}
 	})
 

@@ -261,7 +261,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | [canonical_intake.go](./apps/api/internal/tasking/application/task/canonical_intake.go)            | Task submission intake   |
 | [river_queue.go](./apps/api/internal/tasking/infrastructure/queue/river_queue.go)                  | River enqueue adapter    |
 | [worker.go](./apps/api/internal/runtime/interfaces/worker/river/worker.go)                         | River worker adapter     |
-| [workspace_task_worker.go](./apps/api/internal/tasking/interfaces/worker/workspace_task_worker.go) | Worker task processing   |
+| [worker.go](./apps/api/internal/tasking/interfaces/worker/worker.go)                          | Worker task processing   |
 | [request.go](./apps/api/internal/runtime/interfaces/worker/providers/request.go)                   | Provider request shaping |
 
 ### Prompt config
@@ -325,7 +325,7 @@ sqlc:
 - Atlas migrations 位于 `apps/api/internal/db/migrations/`，由 `apps/api/atlas.hcl` 与 `atlas.sum` 管理。
 - Atlas migration 生成使用 `atlas migrate diff`；完整性与 Fresh replay 使用 `scripts/atlas-migration-check.sh`。CI 先在隔离 database 执行 `atlas migrate validate`，再在集成 database 执行 Fresh apply 与 incremental idempotency apply；不要把 Atlas Pro-only 的 `atlas migrate lint` 加入流水线。
 - API schema 由独立 `api-migrate` image 执行 Atlas versioned migrations，再执行 `finalize-migrate` 完成 River 与 runtime privilege setup。Pre-launch rebaseline 只能原子删除旧 SQL chain 并新增一个更高版本 baseline，随后重建 Fresh Database；不得手工编辑 Atlas revisions 表。
-- 新增数据库表及相关 sequence 时，必须同步 [runtime privilege policy](./apps/api/internal/platform/database/runtime_privileges.go) 与 [启动权限断言](./apps/api/internal/runtime/composition/database_wiring_db_test.go)，按 runtime 实际用途授予最小权限。
+- 新增数据库表及相关 sequence 时，必须同步 [runtime privilege policy](./apps/api/internal/platform/database/privileges/runtime.go) 与 [启动权限断言](./apps/api/internal/runtime/composition/wiring/database_wiring_privilege_test.go)，按 runtime 实际用途授予最小权限。
 - Schema source 的唯一 lifecycle 是 `schema-release`：修改 domain fragment 或 manifest 后先用 `--write-artifact` 生成 `schema.sql`，再运行默认 check；CI 和 release gate 只运行默认 check。
 - clean-break release 只支持 Fresh Database。旧数据库必须先导出需要保留的数据，再重建并按当前 baseline 初始化；不能使用旧 migration binary 做跨 baseline 升级或回滚。
 - `api-migrate` 在 `atlas migrate apply` 之前会比对数据库记录的 Atlas revisions 与镜像内 `internal/db/migrations/` 的版本集合。出现缺失版本（错误的 image digest、回滚到旧 image、migration 文件被改名或删除、CI 变量错配）时 migrator **不会**自动清库，而是以 `clean break reset is not allowed` 失败，并列出缺失的 version。确认是预期的 pre-launch clean break、且已导出需要保留的数据后，才在 migration 容器上设置 `ATLAS_CLEAN_BREAK_ALLOW_RESET=true` 重跑：这是唯一的 opt-in 开关，值非法时按 `false` 处理并计入 `Config.InvalidEnv`。drop 前会把 `current_database()`、缺失 version 与 public schema 行数摘要写入结构化日志。

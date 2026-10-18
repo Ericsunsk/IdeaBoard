@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/platform/database"
 	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	"ideaboard/api/internal/testdb"
 
@@ -29,7 +28,7 @@ func TestRiverRuntimeRoleHasOperationalPrivilegesWithoutMigrationOwnership(t *te
 		_, _ = db.Exec(context.Background(), `DROP OWNED BY `+roleSQL)
 		_, _ = db.Exec(context.Background(), `DROP ROLE IF EXISTS `+roleSQL)
 	})
-	policies := []dbprivileges.Policy{database.RuntimePrivilegePolicy(), RuntimePrivilegePolicy()}
+	policies := []dbprivileges.Policy{dbprivileges.RuntimePrivilegePolicy(), RuntimePrivilegePolicy()}
 	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
 		t.Fatalf("configure runtime privilege policies error = %v", err)
 	}

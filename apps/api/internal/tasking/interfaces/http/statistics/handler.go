@@ -1,4 +1,4 @@
-package statisticshttp
+package http
 
 import (
 	"context"
@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/sse"
-	"ideaboard/api/internal/platform/validation"
 	statisticsapp "ideaboard/api/internal/tasking/application/statistics"
 	tasks "ideaboard/api/internal/tasking/domain"
 
@@ -64,7 +64,7 @@ func NewHandler(service *statisticsapp.Service, monitor MonitorInfoProvider) *Ha
 func (h *Handler) GetMonitor(c *gin.Context) {
 	snapshot, err := h.buildMonitorSnapshot(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, 500, msgGetMonitor, err)
+		response.InternalError(c, 500, errorrender.MsgGetMonitor, err)
 		return
 	}
 	response.Success(c, snapshot)
@@ -76,7 +76,7 @@ func (h *Handler) StreamMonitor(c *gin.Context) {
 	}
 	if count := h.monitorStreamCount.Add(1); count > monitorStreamMaxConcurrent {
 		h.monitorStreamCount.Add(-1)
-		response.MachineError(c, http.StatusTooManyRequests, string(contract.CodeTaskMonitorConcurrencyLimited), msgTaskMonitorConcurrencyLimited)
+		response.MachineError(c, http.StatusTooManyRequests, string(contract.CodeTaskMonitorConcurrencyLimited), errorrender.MsgTaskMonitorConcurrencyLimited)
 		return
 	}
 	defer h.monitorStreamCount.Add(-1)
@@ -84,7 +84,7 @@ func (h *Handler) StreamMonitor(c *gin.Context) {
 	ctx := c.Request.Context()
 	snapshot, err := h.buildMonitorSnapshot(ctx)
 	if err != nil {
-		response.InternalError(c, 500, msgGetMonitor, err)
+		response.InternalError(c, 500, errorrender.MsgGetMonitor, err)
 		return
 	}
 
@@ -113,7 +113,7 @@ func (h *Handler) StreamMonitor(c *gin.Context) {
 				slog.Warn("admin monitor SSE snapshot failed", "err", err)
 				if err := sse.WriteEvent(c, monitorSnapshotErrorEvent, response.Response{
 					Code: http.StatusInternalServerError,
-					Msg:  msgGetMonitor,
+					Msg:  errorrender.MsgGetMonitor,
 				}); err != nil {
 					return
 				}
@@ -176,11 +176,11 @@ func writeMonitorSnapshot(c *gin.Context, snapshot *adminMonitorSnapshot) bool {
 func (h *Handler) GetStatistics(c *gin.Context) {
 	stats, err := h.service.GetStatistics(c.Request.Context(), c.Query("range"))
 	if err != nil {
-		if validation.Is(err) {
+		if errorrender.IsValidationError(err) {
 			response.MachineError(c, http.StatusBadRequest, string(contract.CodeTaskStatisticsRequestInvalid), validationMessage(err))
 			return
 		}
-		response.InternalError(c, 500, msgGetStatistics, err)
+		response.InternalError(c, 500, errorrender.MsgGetStatistics, err)
 		return
 	}
 	response.Success(c, stats)
@@ -192,7 +192,7 @@ func (h *Handler) BackfillStatistics(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if !errors.Is(err, io.EOF) {
-			response.MachineError(c, http.StatusBadRequest, string(contract.CodeTaskStatisticsRequestInvalid), msgTaskStatisticsRequestInvalid)
+			response.MachineError(c, http.StatusBadRequest, string(contract.CodeTaskStatisticsRequestInvalid), errorrender.MsgTaskStatisticsRequestInvalid)
 			return
 		}
 	}
@@ -203,19 +203,19 @@ func (h *Handler) BackfillStatistics(c *gin.Context) {
 
 	result, err := h.service.BackfillStatistics(c.Request.Context(), req.Range)
 	if err != nil {
-		if validation.Is(err) {
+		if errorrender.IsValidationError(err) {
 			response.MachineError(c, http.StatusBadRequest, string(contract.CodeTaskStatisticsRequestInvalid), validationMessage(err))
 			return
 		}
-		response.InternalError(c, 500, msgBackfillStatistics, err)
+		response.InternalError(c, 500, errorrender.MsgBackfillStatistics, err)
 		return
 	}
 	response.Success(c, result)
 }
 
 func validationMessage(err error) string {
-	if validation.Is(err) && err.Error() != "" {
+	if errorrender.IsValidationError(err) && err.Error() != "" {
 		return err.Error()
 	}
-	return msgValidationMessage
+	return errorrender.MsgValidationMessage
 }

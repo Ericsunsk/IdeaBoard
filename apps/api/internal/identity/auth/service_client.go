@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"io"
 	"net/http"
 	"net/url"
@@ -16,8 +17,7 @@ import (
 	"ideaboard/api/internal/identity/authidentity"
 	"ideaboard/api/internal/identity/trust"
 	"ideaboard/api/internal/platform/config"
-	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/outboundhttp"
+	"ideaboard/api/internal/platform/safehttp"
 )
 
 var (
@@ -339,11 +339,11 @@ func (c *ServiceClient) GetSocialProviderCapabilities(ctx context.Context) (*Soc
 // key is intentionally not sent because this is a public-session route.
 func (c *ServiceClient) ImpersonateUser(ctx context.Context, cookieHeader string, authUserID string) ([]string, error) {
 	if c == nil || c.httpClient == nil || strings.TrimSpace(c.baseURL) == "" {
-		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: msgAuthMiddleware}
+		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: errorrender.MsgAuthMiddleware}
 	}
 	normalizedID := strings.TrimSpace(authUserID)
 	if normalizedID == "" {
-		return nil, &ImpersonationError{Status: http.StatusBadRequest, Message: msgImpersonateUser}
+		return nil, &ImpersonationError{Status: http.StatusBadRequest, Message: errorrender.MsgIdentityAuthImpersonateUser}
 	}
 	body, err := json.Marshal(map[string]string{"userId": normalizedID})
 	if err != nil {
@@ -359,14 +359,14 @@ func (c *ServiceClient) ImpersonateUser(ctx context.Context, cookieHeader string
 	}
 	upstreamResponse, err := c.httpClient.Do(request)
 	if err != nil {
-		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: msgImpersonateUser2}
+		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: errorrender.MsgIdentityAuthImpersonateUser2}
 	}
 	defer upstreamResponse.Body.Close()
 	if _, err := io.Copy(io.Discard, upstreamResponse.Body); err != nil {
-		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: msgImpersonateUser3}
+		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: errorrender.MsgIdentityAuthImpersonateUser3}
 	}
 	if upstreamResponse.StatusCode < http.StatusOK || upstreamResponse.StatusCode >= http.StatusMultipleChoices {
-		return nil, &ImpersonationError{Status: upstreamResponse.StatusCode, Message: msgImpersonateUser4}
+		return nil, &ImpersonationError{Status: upstreamResponse.StatusCode, Message: errorrender.MsgIdentityAuthImpersonateUser4}
 	}
 	cookies := upstreamResponse.Header.Values("Set-Cookie")
 	for _, cookie := range cookies {
@@ -374,7 +374,7 @@ func (c *ServiceClient) ImpersonateUser(ctx context.Context, cookieHeader string
 			return append([]string(nil), cookies...), nil
 		}
 	}
-	return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: msgImpersonateUser5}
+	return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: errorrender.MsgIdentityAuthImpersonateUser5}
 }
 
 func convertMailConfigSummary(value internalcontract.MailConfigSummary) *MailConfigSummary {
@@ -876,10 +876,10 @@ func contractFailure(action string, status int, body []byte) error {
 func mailConfigContractFailure(action string, status int, body []byte) error {
 	failure, err := decodeContractFailure(body)
 	if err != nil {
-		return &MailConfigError{Status: http.StatusBadGateway, Message: fmt.Sprintf(msgMailConfigContractFailure, err)}
+		return &MailConfigError{Status: http.StatusBadGateway, Message: fmt.Sprintf(errorrender.MsgMailConfigContractFailure, err)}
 	}
 	if failure.Code != status {
-		return &MailConfigError{Status: http.StatusBadGateway, Message: fmt.Sprintf(msgMailConfigContractFailure2, failure.Code, status)}
+		return &MailConfigError{Status: http.StatusBadGateway, Message: fmt.Sprintf(errorrender.MsgMailConfigContractFailure2, failure.Code, status)}
 	}
 	return &MailConfigError{Status: status, Message: nonEmpty(failure.Msg, fmt.Sprintf("%s failed", action))}
 }
@@ -887,10 +887,10 @@ func mailConfigContractFailure(action string, status int, body []byte) error {
 func socialProviderContractFailure(action string, status int, body []byte) error {
 	failure, err := decodeContractFailure(body)
 	if err != nil {
-		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: msgSocialProviderContractFailure}
+		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: errorrender.MsgSocialProviderContractFailure}
 	}
 	if failure.Code != status {
-		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: fmt.Sprintf(msgMailConfigContractFailure2, failure.Code, status)}
+		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: fmt.Sprintf(errorrender.MsgMailConfigContractFailure2, failure.Code, status)}
 	}
 	return &SocialProviderSettingsError{Status: status, Message: nonEmpty(failure.Msg, fmt.Sprintf("%s failed", action))}
 }
@@ -1015,7 +1015,7 @@ func normalizeEnsureRole(role ...string) internalcontract.AuthRole {
 // are mutating POST/PUT/DELETE, so client-side retries could duplicate side
 // effects; the standard client still pins egress through the SSRF allowlist
 // and records every call in logs/metrics.
-var authServiceOutbound = outboundhttp.NewClient(outboundhttp.Config{})
+var authServiceOutbound = safehttp.NewClient(safehttp.Config{})
 
 // authServiceTarget names Auth egress in outbound logs/metrics.
 const authServiceTarget = "auth-service"
@@ -1039,20 +1039,20 @@ func (t *authOutboundRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 	if req != nil && req.Context() != nil {
 		ctx = req.Context()
 	}
-	allowHosts := outbound.AllowHosts(ctx)
+	allowHosts := safehttp.AllowHosts(ctx)
 	if t != nil {
 		if host := strings.TrimSpace(t.host); host != "" {
 			allowHosts = append(allowHosts, host)
 		}
 	}
-	resp, err := authServiceOutbound.Do(ctx, req, outboundhttp.RequestOptions{
+	resp, err := authServiceOutbound.Do(ctx, req, safehttp.RequestOptions{
 		Timeout:     timeout,
 		MaxAttempts: 1,
 		AllowHosts:  allowHosts,
 		Target:      authServiceTarget,
 	})
 	if err != nil {
-		var statusErr *outboundhttp.HTTPStatusError
+		var statusErr *safehttp.HTTPStatusError
 		if errors.As(err, &statusErr) {
 			return synthesizeAuthResponse(req, statusErr), nil
 		}
@@ -1070,7 +1070,7 @@ func (t *authOutboundRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 // synthesizeAuthResponse converts an exhausted retryable Auth status back
 // to the response shape the generated contract client expects. Error
 // envelopes are small JSON, so the bounded preview keeps them intact.
-func synthesizeAuthResponse(req *http.Request, statusErr *outboundhttp.HTTPStatusError) *http.Response {
+func synthesizeAuthResponse(req *http.Request, statusErr *safehttp.HTTPStatusError) *http.Response {
 	preview := ""
 	status := 0
 	var retryAfter time.Duration

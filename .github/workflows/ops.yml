@@ -50,6 +50,8 @@ jobs:
           bash -n scripts/ci-gate-test.sh
           bash -n scripts/ci-parity.sh
           bash -n scripts/ci-parity-test.sh
+          bash -n scripts/ci-pr-size-guard.sh
+          bash -n scripts/ci-pr-size-guard-test.sh
           bash -n scripts/ci-migration-integration.sh
           bash -n scripts/ci-migration-integration-test.sh
           bash -n scripts/atlas-migration-check.sh
@@ -114,6 +116,8 @@ jobs:
             scripts/ci-gate-test.sh \
             scripts/ci-parity.sh \
             scripts/ci-parity-test.sh \
+            scripts/ci-pr-size-guard.sh \
+            scripts/ci-pr-size-guard-test.sh \
             scripts/ci-migration-integration.sh \
             scripts/ci-migration-integration-test.sh \
             scripts/atlas-migration-check.sh \

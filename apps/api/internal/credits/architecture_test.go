@@ -1,4 +1,4 @@
-package credits
+package credits_test
 
 import (
 	"io/fs"

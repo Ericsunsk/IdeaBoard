@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"log/slog"
 	"net/url"
 	"strings"
 
 	"ideaboard/api/internal/platform/config"
-	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
+	providerdomain "ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
@@ -170,8 +171,8 @@ type providerCallResult struct {
 type ProviderCallTimeline = runtimeports.ProviderCallTimeline
 type ProviderCallOutput = runtimeports.ProviderCallOutput
 
-// Adapter identity lives in domain (single enum); this package switches on
-// domain.ProviderRuntimeAdapter* directly instead of converting.
+// Adapter identity lives in providerdomain (single enum); this package switches on
+// providerdomain.ProviderRuntimeAdapter* directly instead of converting.
 
 // CallDrawingAPIWithAssignment executes drawing operation for an assigned account.
 
@@ -238,7 +239,7 @@ func marshalProviderTaskResult(taskID string, result map[string]interface{}) (st
 		return "", runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryFinalizeError,
-			fmt.Errorf(msgMarshalProviderTaskResult, taskID, err),
+			fmt.Errorf(errorrender.MsgMarshalProviderTaskResult, taskID, err),
 		)
 	}
 	return string(resultJSON), nil
@@ -252,7 +253,7 @@ func (c *Executor) materializeProviderResultImages(ctx context.Context, userID i
 		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			errors.New(msgMaterializeProviderResultImages),
+			errors.New(errorrender.MsgMaterializeProviderResultImages),
 		)
 	}
 
@@ -272,21 +273,21 @@ func (c *Executor) materializeProviderResultImages(ctx context.Context, userID i
 		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			fmt.Errorf(msgMaterializeProviderResultImages2, storeErr),
+			fmt.Errorf(errorrender.MsgMaterializeProviderResultImages2, storeErr),
 		)
 	}
 	if len(materialized.Items) == 0 {
 		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			errors.New(msgMaterializeProviderResultImages3),
+			errors.New(errorrender.MsgMaterializeProviderResultImages3),
 		)
 	}
 	if len(materialized.Items) != len(imageURLs) {
 		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			fmt.Errorf(msgMaterializeProviderResultImages4, len(imageURLs), len(materialized.Items)),
+			fmt.Errorf(errorrender.MsgMaterializeProviderResultImages4, len(imageURLs), len(materialized.Items)),
 		)
 	}
 	for index, sourceURL := range imageURLs {
@@ -338,5 +339,5 @@ func normalizeProviderResultImageURLs(result providerCallResult) []string {
 
 func resolveProviderPublicImageURL(c *Executor, ref, label string) (string, error) {
 	var baseParsedURL = c.publicOrigins.APIParsedURL()
-	return domain.ResolveProviderPublicImageURL(baseParsedURL, ref, label)
+	return providerdomain.ResolveProviderPublicImageURL(baseParsedURL, ref, label)
 }

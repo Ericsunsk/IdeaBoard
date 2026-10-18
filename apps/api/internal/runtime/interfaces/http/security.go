@@ -1,4 +1,4 @@
-package httpapi
+package http
 
 import (
 	"context"
@@ -48,7 +48,7 @@ func RequestTimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 		if ctx.Err() == context.DeadlineExceeded && !c.Writer.Written() {
-			response.Error(c, http.StatusServiceUnavailable, msgRateLimitMiddleware)
+			response.Error(c, http.StatusServiceUnavailable, MsgRateLimitMiddleware)
 			c.Abort()
 		}
 	}

@@ -1,4 +1,4 @@
-package httpapi
+package http
 
 import (
 	"net/http"
@@ -66,7 +66,7 @@ func requestBodyLimitMiddleware(limitBytes int64) gin.HandlerFunc {
 		}
 
 		if c.Request.ContentLength > limitBytes {
-			response.Error(c, http.StatusRequestEntityTooLarge, msgBadRequest2)
+			response.Error(c, http.StatusRequestEntityTooLarge, MsgBadRequest2)
 			c.Abort()
 			return
 		}

@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"strings"
 	"sync"
 	"testing"
@@ -25,6 +24,7 @@ import (
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 )
 
 type refundGatewayFake struct {
@@ -69,7 +69,7 @@ func (f *refundGatewayFake) RetrieveRefund(_ context.Context, _ string, refundID
 
 func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-13*24*time.Hour))
 
@@ -141,7 +141,7 @@ func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T
 
 func TestPaymentRefundReservationCommitsBeforeAmbientControlTransaction(t *testing.T) {
 	db, _ := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 
@@ -199,7 +199,7 @@ func TestPaymentRefundReservationCommitsBeforeAmbientControlTransaction(t *testi
 
 func TestPaymentRefundServiceChainCommitsBeforeStripeUnderAmbientControlTx(t *testing.T) {
 	db, _ := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	resolver, err := paymentcredentials.NewResolver(repo)
@@ -277,7 +277,7 @@ func TestPaymentRefundServiceChainCommitsBeforeStripeUnderAmbientControlTx(t *te
 
 func TestExternalDashboardRefundUsesTypedHoldUnderRestriction(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	// A spending restriction blocks the generic spending Hold but must not
@@ -319,7 +319,7 @@ func TestExternalDashboardRefundUsesTypedHoldUnderRestriction(t *testing.T) {
 
 func TestExternalDashboardRefundInsufficientIdeasSurfacesRecoverableError(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	// Spend 400 of 500 Ideas so the Dashboard refund cannot be recovered.
@@ -343,7 +343,7 @@ func TestExternalDashboardRefundInsufficientIdeasSurfacesRecoverableError(t *tes
 
 func TestExternalDashboardRefundBlockedOnFrozenWallet(t *testing.T) {
 	db := testdb.Open(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	if _, err := db.Exec(t.Context(), `SELECT set_credit_wallet_status(42, 'frozen')`); err != nil {
@@ -365,7 +365,7 @@ func TestProportionalRefundAmountUsesCumulativeRounding(t *testing.T) {
 
 func TestPaymentRefundRejectsExactFourteenDayBoundary(t *testing.T) {
 	db := testdb.Open(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-paymentsdomain.RefundEligibilityWindow))
 	_, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
@@ -379,7 +379,7 @@ func TestPaymentRefundRejectsExactFourteenDayBoundary(t *testing.T) {
 
 func TestPaymentRefundTerminalFactsCannotRegress(t *testing.T) {
 	db := testdb.Open(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
@@ -399,7 +399,7 @@ func TestPaymentRefundTerminalFactsCannotRegress(t *testing.T) {
 
 func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Now().UTC()
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
@@ -420,25 +420,19 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkout, err := payments.NewCheckoutWorkflow(payments.CheckoutWorkflowDependencies{
+	service, err := payments.NewService(payments.ServiceDependencies{
 		Configuration: repo, ConfigurationGateway: testStripeGateway{}, ShutdownEnqueuer: testShutdownEnqueuer{},
-		Store: repo, CheckoutGateway: testCheckoutGateway{}, Wallets: testWalletReader{}, Convergence: repo, Transitions: transitions,
+		Store: repo, CheckoutGateway: testCheckoutGateway{}, Wallets: testsupport.FakeMissingWalletReader{}, Convergence: repo,
+		Inbox: repo, Verifier: testWebhookVerifier{},
+		RefundGateway: gateway, DisputeGateway: testDisputeGateway{}, Transitions: transitions,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	facts, err := payments.NewStripeFactsWorkflow(payments.StripeFactsWorkflowDependencies{
-		Configuration: repo, Inbox: repo, Convergence: repo, Verifier: testWebhookVerifier{},
-		RefundGateway: gateway, DisputeGateway: testDisputeGateway{}, CheckoutStore: repo,
-		CheckoutGateway: testCheckoutGateway{}, CheckoutRecovery: checkout, Transitions: transitions,
-	})
-	if err != nil {
+	if err := service.ReconcileDuePaymentRefunds(t.Context(), now.Add(3*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if err := facts.ReconcileDuePaymentRefunds(t.Context(), now.Add(3*time.Minute)); err != nil {
-		t.Fatal(err)
-	}
-	if err := facts.ReconcileDuePaymentRefunds(t.Context(), now.Add(4*time.Minute)); err != nil {
+	if err := service.ReconcileDuePaymentRefunds(t.Context(), now.Add(4*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	settled, err := repo.GetPaymentRefundByID(t.Context(), refund.ID)
@@ -456,7 +450,7 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 
 func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	errs := make(chan error, 2)
@@ -490,7 +484,7 @@ func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) 
 	}
 }
 
-func createCreditedRefundOrder(t *testing.T, db *pgxpool.Pool, repo *paymentpostgres.Repository, paidAt time.Time) paymentsdomain.PaymentOrder {
+func createCreditedRefundOrder(t *testing.T, db *pgxpool.Pool, repo *testPaymentStores, paidAt time.Time) paymentsdomain.PaymentOrder {
 	t.Helper()
 	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
 	if _, err := db.Exec(t.Context(), `SELECT provision_credit_wallet(42)`); err != nil {

@@ -318,7 +318,7 @@ type MigrationToolingConfig struct {
 	// break path that drops and recreates the public schema. It defaults to
 	// false: a database whose Atlas revisions are absent from the shipped
 	// migration directory must fail the deploy, never silently reset itself.
-	// See composition.reconcileCleanBreakDatabase.
+	// See wiring.reconcileCleanBreak (runtime/composition/wiring).
 	CleanBreakAllowReset bool
 }
 

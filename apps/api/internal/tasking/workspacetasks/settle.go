@@ -10,6 +10,7 @@ import (
 
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/generation/routing"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/telemetry"
 	"ideaboard/api/internal/workflow"
 
@@ -45,19 +46,12 @@ type Service struct {
 	resolver *routing.RoutingResolver
 	// saveSnapshot persists the pinned snapshot in the settlement transaction.
 	saveSnapshot RoutingSnapshotSaver
-	// allowNonTransactional is set only by NewTestServiceForTests. Production
-	// settlement must always use the atomic PostgreSQL seams below.
-	allowNonTransactional bool
 	// submissionClaims is the durable submit idempotency fact store. See
 	// ServiceDeps.SubmissionClaims: production settlement fails closed
 	// without it.
 	submissionClaims TxSubmissionClaimStore
-	// boards resolves the caller's Board posture for Board-bound submits
-	// (#937). Nil fails closed for bound submits (rejected) and for
-	// bound reads (invisible); Board-less tasks never consult it.
-	boards BoardAuthorizer
-	events []TaskEvent
-	now    func() time.Time
+	events           []TaskEvent
+	now              func() time.Time
 }
 
 // ServiceDeps wires the settlement seams. TaskRead and TaskLifecycle are
@@ -87,12 +81,7 @@ type ServiceDeps struct {
 	// (ErrSettlementUnavailable), so a missing wiring fails closed instead
 	// of degrading into an unfenced create.
 	SubmissionClaims TxSubmissionClaimStore
-	// Boards resolves the caller's Board posture for Board-bound submits
-	// (#937). REQUIRED when any submit carries a Board ID (production
-	// wiring always supplies it); a bound submit with a nil authorizer
-	// fails closed instead of degrading into an unbound task.
-	Boards     BoardAuthorizer
-	Acceptance SubmissionAuthorizer
+	Acceptance       SubmissionAuthorizer
 }
 
 // SubmissionAuthorizer accepts current membership, Board capability and all input
@@ -109,17 +98,8 @@ func NewService(deps ServiceDeps) *Service {
 		quoter:      deps.Quoter, holder: deps.Holder,
 		queue: deps.Queue, assets: deps.Assets,
 		resolver: deps.Resolver, saveSnapshot: deps.SnapshotSaver, now: time.Now,
-		submissionClaims: deps.SubmissionClaims, boards: deps.Boards, acceptance: deps.Acceptance,
+		submissionClaims: deps.SubmissionClaims, acceptance: deps.Acceptance,
 	}
-}
-
-// NewTestServiceForTests builds a service for unit fixtures that do not have
-// PostgreSQL transaction seams. It is intentionally separate from NewService
-// so production wiring cannot silently use compensating settlement writes.
-func NewTestServiceForTests(deps ServiceDeps) *Service {
-	service := NewService(deps)
-	service.allowNonTransactional = true
-	return service
 }
 
 // SetClockForTests injects a deterministic clock.
@@ -147,7 +127,7 @@ func (s *Service) stageWithTokenAt(taskID, workspaceID string, status Status, ex
 		occurredAt = s.clock()
 	}
 	s.events = append(s.events, TaskEvent{
-		EventID: events.StableTaskEventID(taskID, events.TaskStatus(status), executionToken),
+		EventID: events.StableEventID(taskID, string(status), executionToken),
 		TaskID:  taskID, WorkspaceID: workspaceID, Status: status, OccurredAt: occurredAt.UTC(),
 	})
 }
@@ -283,14 +263,15 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	if resolution == "" {
 		resolution = workflow.OutputResolution1K
 	}
-	// Availability resolves authoritatively below and the snapshot pins
-	// atomically with the settlement transaction. The worker fails closed on a
-	// missing snapshot, and credits.Commands stays the sole ledger writer.
-	var snapshot BillingSnapshot
+	// Availability resolves authoritatively inside the settlement
+	// transaction below and the snapshot pins atomically with it. The
+	// worker fails closed on a missing snapshot, and credits.Commands
+	// stays the sole ledger writer.
 	workspaceID := strings.TrimSpace(input.WorkspaceID)
 	// Mint the task id up front so the claim can name it. A replay returns
-	// this same id instead of minting a second one.
-	taskID, err := NewTaskPublicID()
+	// this same id instead of minting a second one. Mint owned by
+	// platform/contract; no domain wrapper.
+	taskID, err := contract.MintPublicID(contract.PrefixTask, 12)
 	if err != nil {
 		return nil, err
 	}
@@ -306,71 +287,11 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	if created, handled, err := s.createInTx(ctx, input, kind, resolution, quantity, taskID, token, claim); handled {
 		return created, err
 	}
-	if !s.allowNonTransactional {
-		return nil, ErrSettlementUnavailable
-	}
-	var binding TaskBoardBinding
-	if trimmed := strings.TrimSpace(input.BoardID); trimmed != "" {
-		access, err := s.resolveSubmitBoardAccess(ctx, input.WorkspaceID, trimmed, input.OwnerUserID, input.WorkspaceRole)
-		if err != nil {
-			return nil, err
-		}
-		binding = TaskBoardBinding{BoardID: trimmed, AccessVersion: access.AccessVersion}
-	}
-	if err := s.verifyInputAssets(ctx, input.WorkspaceID, input.MediaAssetIDs, input.Params); err != nil {
-		return nil, err
-	}
-	// Test-only fixtures without transaction seams resolve before Quote/Hold so
-	// an empty pool reserves nothing. Production cannot enter this branch.
-	routingSnap, err := s.resolveSnapshot(ctx, kind, resolution)
-	if err != nil {
-		return nil, err
-	}
-	snapshot, err = s.quoter.Quote(ctx, kind, resolution, quantity)
-	if err != nil {
-		return nil, err
-	}
-	var holdTxID string
-	if snapshot.TotalCredits > 0 {
-		holdTxID, err = s.holder.Hold(ctx, input.OwnerUserID, snapshot.TotalCredits, TaskSubmitHoldKey(workspaceID, key), taskID)
-		if err != nil {
-			return nil, err
-		}
-		snapshot.HoldTransactionID = holdTxID
-		snapshot.SettlementState = "held"
-	} else {
-		snapshot.SettlementState = "free"
-	}
-	task := pendingTaskWithBinding(input, kind, taskID, token, binding, snapshot)
-	created, err := s.taskLifecycle.CreateTask(ctx, task)
-	if err != nil {
-		if holdTxID != "" {
-			_ = s.holder.Release(ctx, holdTxID, snapshot.TotalCredits, taskID)
-		}
-		return nil, err
-	}
-	if s.saveSnapshot != nil {
-		if err := s.saveSnapshot(ctx, nil, created.ID, routingSnap); err != nil {
-			_ = s.taskLifecycle.DeleteTask(ctx, created.WorkspaceID, created.ID)
-			if holdTxID != "" {
-				_ = s.holder.Release(ctx, holdTxID, snapshot.TotalCredits, taskID)
-			}
-			return nil, fmt.Errorf("workspacetasks: pin routing snapshot: %w", err)
-		}
-	}
-	if err := s.queue.Enqueue(ctx, created); err != nil {
-		_ = s.taskLifecycle.DeleteTask(ctx, created.WorkspaceID, created.ID)
-		if holdTxID != "" {
-			_ = s.holder.Release(ctx, holdTxID, snapshot.TotalCredits, taskID)
-		}
-		return nil, fmt.Errorf("workspacetasks: enqueue: %w", err)
-	}
-	s.stageWithTokenAt(created.ID, created.WorkspaceID, StatusPending, created.ExecutionToken, created.UpdatedAt)
-	return created, nil
+	return nil, ErrSettlementUnavailable
 }
 
 // pendingTaskWithBinding captures the accepted inputs and Board binding for
-// both transactional and test-only compensating settlement.
+// transactional settlement.
 func pendingTaskWithBinding(input CreateInput, kind, taskID, token string, binding TaskBoardBinding, snapshot BillingSnapshot) *WorkspaceTask {
 	return &WorkspaceTask{
 		ID: taskID, WorkspaceID: strings.TrimSpace(input.WorkspaceID), OwnerUserID: input.OwnerUserID,
@@ -410,39 +331,18 @@ func cloneParams(in map[string]any) map[string]any {
 	return out
 }
 
-func (s *Service) verifyInputAssets(ctx context.Context, workspaceID string, ids []string, params map[string]any) error {
-	if s.assets == nil {
-		return nil
+// mapAssetGateError propagates the readiness sentinel from the AssetReader
+// seam: archived and non-ready stay distinct; anything else (invisible ids
+// and transport faults) converges to media-not-found, matching the previous
+// gate's error mapping for seam errors.
+func mapAssetGateError(err error) error {
+	if errors.Is(err, ErrMediaArchived) {
+		return ErrMediaArchived
 	}
-	for i, id := range ids {
-		info, err := s.assets.GetAsset(ctx, workspaceID, id)
-		if err != nil {
-			return fmt.Errorf("workspacetasks: input asset %d: %w", i, ErrMediaNotFound)
-		}
-		if info.Archived {
-			return fmt.Errorf("workspacetasks: input asset %d archived: %w", i, ErrMediaArchived)
-		}
-		if strings.ToLower(strings.TrimSpace(info.Status)) != "ready" {
-			return fmt.Errorf("workspacetasks: input asset %d not ready: %w", i, ErrMediaNotReady)
-		}
+	if errors.Is(err, ErrMediaNotReady) {
+		return ErrMediaNotReady
 	}
-	// The v1 mask reference (params.mask_asset_id) gates on the same
-	// ready/archived semantics as image inputs: invisible, non-ready, or
-	// archived masks fail the submit (404/409/410), never a late worker
-	// failure.
-	if maskID, ok := MaskAssetIDFromParams(params); ok {
-		info, err := s.assets.GetAsset(ctx, workspaceID, maskID)
-		if err != nil {
-			return fmt.Errorf("workspacetasks: mask asset: %w", ErrMediaNotFound)
-		}
-		if info.Archived {
-			return fmt.Errorf("workspacetasks: mask asset archived: %w", ErrMediaArchived)
-		}
-		if strings.ToLower(strings.TrimSpace(info.Status)) != "ready" {
-			return fmt.Errorf("workspacetasks: mask asset not ready: %w", ErrMediaNotReady)
-		}
-	}
-	return nil
+	return ErrMediaNotFound
 }
 
 // Cancel flips pending/running to cancelled atomically with Release.
@@ -457,31 +357,7 @@ func (s *Service) Cancel(ctx context.Context, workspaceID, taskID string, actorU
 	if flipped, already, handled, err := s.cancelInTx(ctx, workspaceID, taskID, actorUserID, reason); handled {
 		return flipped, already, err
 	}
-	if !s.allowNonTransactional {
-		return nil, false, ErrSettlementUnavailable
-	}
-	before, err := s.taskRead.GetTask(ctx, workspaceID, taskID)
-	if err != nil {
-		return nil, false, err
-	}
-	if before.IsTerminal() {
-		return before, true, nil
-	}
-	flipped, already, err := s.taskLifecycle.CancelTask(ctx, workspaceID, taskID, actorUserID, reason)
-	if err != nil {
-		return nil, false, err
-	}
-	if already {
-		return flipped, true, nil
-	}
-	if s.holder != nil && flipped.BillingSnapshot.HoldTransactionID != "" && flipped.BillingSnapshot.TotalCredits > 0 {
-		if releaseErr := s.holder.Release(ctx, flipped.BillingSnapshot.HoldTransactionID, flipped.BillingSnapshot.TotalCredits, taskID); releaseErr != nil {
-			return nil, false, fmt.Errorf("workspacetasks: release on cancel: %w", releaseErr)
-		}
-		flipped.BillingSnapshot.SettlementState = "released"
-	}
-	s.stageWithTokenAt(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken, flipped.UpdatedAt)
-	return flipped, false, nil
+	return nil, false, ErrSettlementUnavailable
 }
 
 // Complete flips running to completed atomically with Capture. Outputs
@@ -503,33 +379,7 @@ func (s *Service) Complete(ctx context.Context, workspaceID, taskID string, outp
 	if completed, handled, err := s.completeInTx(ctx, workspaceID, taskID, outputs); handled {
 		return completed, err
 	}
-	if !s.allowNonTransactional {
-		return nil, ErrSettlementUnavailable
-	}
-	completed, err := s.taskLifecycle.CompleteTask(ctx, workspaceID, taskID, outputs)
-	if err != nil {
-		return nil, err
-	}
-	if s.holder != nil && completed.BillingSnapshot.HoldTransactionID != "" && completed.BillingSnapshot.TotalCredits > 0 {
-		capture := int64(len(outputs)) * completed.BillingSnapshot.UnitCredits
-		if capture > completed.BillingSnapshot.TotalCredits {
-			capture = completed.BillingSnapshot.TotalCredits
-		}
-		release := completed.BillingSnapshot.TotalCredits - capture
-		if capture > 0 {
-			if captureErr := s.holder.Capture(ctx, completed.BillingSnapshot.HoldTransactionID, capture, taskID); captureErr != nil {
-				return nil, fmt.Errorf("workspacetasks: capture on complete: %w", captureErr)
-			}
-		}
-		if release > 0 {
-			if releaseErr := s.holder.Release(ctx, completed.BillingSnapshot.HoldTransactionID, release, taskID); releaseErr != nil {
-				return nil, fmt.Errorf("workspacetasks: release remainder on complete: %w", releaseErr)
-			}
-		}
-		completed.BillingSnapshot.SettlementState = "captured"
-	}
-	s.stageWithTokenAt(taskID, workspaceID, StatusCompleted, completed.ExecutionToken, completed.UpdatedAt)
-	return completed, nil
+	return nil, ErrSettlementUnavailable
 }
 
 // Fail flips running/pending to failed atomically with Release.
@@ -542,21 +392,7 @@ func (s *Service) Fail(ctx context.Context, workspaceID, taskID, errorMsg string
 	if failed, handled, err := s.failInTx(ctx, workspaceID, taskID, errorMsg); handled {
 		return failed, err
 	}
-	if !s.allowNonTransactional {
-		return nil, ErrSettlementUnavailable
-	}
-	failed, err := s.taskLifecycle.FailTask(ctx, workspaceID, taskID, errorMsg)
-	if err != nil {
-		return nil, err
-	}
-	if s.holder != nil && failed.BillingSnapshot.HoldTransactionID != "" && failed.BillingSnapshot.TotalCredits > 0 {
-		if releaseErr := s.holder.Release(ctx, failed.BillingSnapshot.HoldTransactionID, failed.BillingSnapshot.TotalCredits, taskID); releaseErr != nil {
-			return nil, fmt.Errorf("workspacetasks: release on fail: %w", releaseErr)
-		}
-		failed.BillingSnapshot.SettlementState = "released"
-	}
-	s.stageWithTokenAt(taskID, workspaceID, StatusFailed, failed.ExecutionToken, failed.UpdatedAt)
-	return failed, nil
+	return nil, ErrSettlementUnavailable
 }
 
 // Retry consumes one retry budget entry (reset + new execution token,
@@ -585,38 +421,21 @@ func (s *Service) Retry(ctx context.Context, workspaceID, taskID string, retryab
 	if retried, handled, err := s.retryInTx(ctx, workspaceID, taskID, token); handled {
 		return retried, err
 	}
-	if !s.allowNonTransactional {
-		return nil, ErrSettlementUnavailable
-	}
-	retried, err := s.taskLifecycle.TransitionForRetry(ctx, workspaceID, taskID, token)
-	if err != nil {
-		return nil, err
-	}
-	if s.queue != nil {
-		if enqueueErr := s.queue.Enqueue(ctx, retried); enqueueErr != nil {
-			return nil, fmt.Errorf("workspacetasks: requeue: %w", enqueueErr)
-		}
-	}
-	return retried, nil
+	return nil, ErrSettlementUnavailable
 }
 
 func (s *Service) verifyOutputAssets(ctx context.Context, workspaceID string, outputs []OutputRef) error {
 	if s.assets == nil {
 		return nil
 	}
+	// Sentinel-only readiness (P0-4): the AssetReader seam owns the
+	// archived/ready comparison and reports it through sentinels.
 	for _, ref := range outputs {
 		if ref.Kind != OutputKindAsset {
 			continue
 		}
-		info, err := s.assets.GetAsset(ctx, workspaceID, ref.AssetID)
-		if err != nil {
-			return fmt.Errorf("workspacetasks: output asset: %w", ErrMediaNotFound)
-		}
-		if info.Archived {
-			return fmt.Errorf("workspacetasks: output asset archived: %w", ErrMediaArchived)
-		}
-		if strings.ToLower(strings.TrimSpace(info.Status)) != "ready" {
-			return fmt.Errorf("workspacetasks: output asset not ready: %w", ErrMediaNotReady)
+		if _, err := s.assets.GetAsset(ctx, workspaceID, ref.AssetID); err != nil {
+			return fmt.Errorf("workspacetasks: output asset: %w", mapAssetGateError(err))
 		}
 	}
 	return nil

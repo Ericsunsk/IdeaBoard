@@ -1,8 +1,9 @@
-package domain
+package providerdomain
 
 import (
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"net/url"
 	"strings"
 )
@@ -12,23 +13,23 @@ import (
 func ResolveProviderPublicImageURL(baseParsedURL *url.URL, ref, label string) (string, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
-		return "", fmt.Errorf(msgResolveProviderPublicImageURL, label)
+		return "", fmt.Errorf(errorrender.MsgResolveProviderPublicImageURL, label)
 	}
 	parsed, err := url.Parse(ref)
 	if err != nil {
-		return "", fmt.Errorf(msgResolveProviderPublicImageURL2, label, err)
+		return "", fmt.Errorf(errorrender.MsgResolveProviderPublicImageURL2, label, err)
 	}
 	if parsed.Scheme == "" && strings.HasPrefix(ref, "/uploads/") {
 		if baseParsedURL == nil {
-			return "", errors.New(msgResolveProviderPublicImageURL3)
+			return "", errors.New(errorrender.MsgResolveProviderPublicImageURL3)
 		}
 		parsed = baseParsedURL.ResolveReference(parsed)
 	}
 	if !strings.EqualFold(parsed.Scheme, "https") {
-		return "", fmt.Errorf(msgResolveProviderPublicImageURL4, label)
+		return "", fmt.Errorf(errorrender.MsgResolveProviderPublicImageURL4, label)
 	}
 	if parsed.Host == "" {
-		return "", fmt.Errorf(msgResolveProviderPublicImageURL5, label)
+		return "", fmt.Errorf(errorrender.MsgResolveProviderPublicImageURL5, label)
 	}
 	return parsed.String(), nil
 }

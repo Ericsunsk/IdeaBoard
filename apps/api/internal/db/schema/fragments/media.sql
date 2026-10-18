@@ -15,6 +15,8 @@ CREATE TABLE upload_sessions (
   expired_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT uq_upload_sessions_public_id UNIQUE (public_id),
+  -- Kernel prefix pin: mirrors contract.PrefixUpload (see also
+  -- contract.IsUploadID).
   CONSTRAINT chk_upload_sessions_public_id CHECK (public_id LIKE 'upload\_%'),
   CONSTRAINT chk_upload_sessions_size_positive CHECK (declared_size_bytes > 0),
   CONSTRAINT chk_upload_sessions_status CHECK (status IN ('pending','transferring','completed','expired','failed')),
@@ -51,6 +53,8 @@ CREATE TABLE media_assets (
   archived_at TIMESTAMPTZ NULL,
   CONSTRAINT uq_media_assets_public_id UNIQUE (public_id),
   CONSTRAINT uq_media_assets_storage_key UNIQUE (storage_key),
+  -- Kernel prefix pin: mirrors contract.PrefixAsset (see also
+  -- contract.IsAssetID).
   CONSTRAINT chk_media_assets_public_id CHECK (public_id LIKE 'asset\_%'),
   CONSTRAINT chk_media_assets_size_positive CHECK (size_bytes > 0),
   CONSTRAINT chk_media_assets_media_kind CHECK (media_kind IN ('image','video','audio','document','other')),
@@ -73,6 +77,8 @@ CREATE TABLE media_asset_task_origins (
   submitter_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   board_public_id TEXT NULL,
   CONSTRAINT media_asset_task_origins_pkey PRIMARY KEY (workspace_id, task_public_id, output_index),
+  -- Kernel prefix pins: task_public_id mirrors contract.PrefixTask and
+  -- board_public_id mirrors contract.PrefixBoard.
   CONSTRAINT chk_media_asset_task_origins_task CHECK (task_public_id LIKE 'task\_%'),
   CONSTRAINT chk_media_asset_task_origins_output_index CHECK (output_index >= 0),
   CONSTRAINT chk_media_asset_task_origins_board CHECK (board_public_id IS NULL OR board_public_id LIKE 'board\_%')

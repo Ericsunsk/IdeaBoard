@@ -207,8 +207,8 @@ func commitSettlementTx(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
 
-// captureSplit mirrors the compensating path: per-output unit billing capped
-// at the held total, remainder released. Both legs run in the same tx.
+// captureSplit derives the per-output unit billing capped at the held
+// total, with the remainder released. Both legs run in the same tx.
 func captureSplit(completed *WorkspaceTask, outputCount int) (capture, release int64) {
 	total := completed.BillingSnapshot.TotalCredits
 	unit := completed.BillingSnapshot.UnitCredits
@@ -301,7 +301,11 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	}
 	routingSnap, err := s.resolver.ResolveInTx(ctx, tx, kind, resolution)
 	if err != nil {
-		return nil, true, err
+		var inputErr *routing.InvalidRoutingInputError
+		if errors.As(err, &inputErr) {
+			return nil, true, newValidationError(FieldError{Field: inputErr.Field, Message: "invalid"})
+		}
+		return nil, true, fmt.Errorf("workspacetasks: routing unavailable: %w", err)
 	}
 	snapshot, err := txQuoter.QuoteInTx(ctx, tx, kind, resolution, quantity)
 	if err != nil {
@@ -498,8 +502,7 @@ func (s *Service) failInTx(ctx context.Context, workspaceID, taskID, errorMsg st
 }
 
 // cancelInTx flips to cancelled atomically with Release in ONE transaction.
-// An already-terminal row replays idempotently without billing or events,
-// matching the compensating path.
+// An already-terminal row replays idempotently without billing or events.
 func (s *Service) cancelInTx(ctx context.Context, workspaceID, taskID string, actorUserID int64, reason string) (*WorkspaceTask, bool, bool, error) {
 	transactor, txHolder, txStore, ok := s.terminalSeams()
 	if !ok {

@@ -15,7 +15,7 @@ import (
 
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers/dialects"
-	"ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
+	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
@@ -24,7 +24,7 @@ import (
 
 func gatewayTestFactory(serverURL string) runtimeports.GatewayClientFactory {
 	return func(context.Context) (runtimeports.GatewayClient, error) {
-		return infrastructure.NewGatewayClient(infrastructure.GatewayClientConfig{BaseURL: serverURL, Token: "test-token"})
+		return providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{BaseURL: serverURL, Token: "test-token"})
 	}
 }
 

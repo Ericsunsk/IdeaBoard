@@ -33,13 +33,7 @@ func (f *fakeBoardAuthorizer) ResolveBoardAccess(_ context.Context, _, _ string,
 }
 
 func boardTestService(boards BoardAuthorizer) (*InMemoryStore, *Service) {
-	store := NewInMemoryStoreForTests()
-	service := NewTestServiceForTests(ServiceDeps{
-		TaskRead: store, TaskLifecycle: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-		Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Resolver: allowTestPoolResolver(),
-		Boards: boards,
-	})
-	return store, service
+	return boardTestServiceInTx(boards)
 }
 
 func ownerBoardAccess() *BoardAccess {
@@ -246,6 +240,40 @@ func TestAuthorizeTaskCancelMatrix(t *testing.T) {
 	for _, tc := range cases {
 		if got := AuthorizeTaskCancel(tc.task, tc.caller, tc.access); got != tc.want {
 			t.Errorf("%s = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestBoardPolicyCheckMatrix pins the single shared gate once: submit
+// distinguishes not-found/archived/forbidden, read keeps archived reads,
+// cancel needs a live writer, and the zero facts deny everything.
+func TestBoardPolicyCheckMatrix(t *testing.T) {
+	owner := BoardTaskFacts{CanRead: true, CanGenerate: true, CanWrite: true}
+	viewer := BoardTaskFacts{CanRead: true}
+	archivedOwner := BoardTaskFacts{CanRead: true, CanGenerate: false, CanWrite: false, Archived: true}
+
+	cases := []struct {
+		name  string
+		facts BoardTaskFacts
+		op    BoardOperation
+		want  BoardDecision
+	}{
+		{"submit owner allows", owner, BoardOpSubmit, BoardDecisionAllow},
+		{"submit invisible is not-found", BoardTaskFacts{}, BoardOpSubmit, BoardDecisionNotFound},
+		{"submit archived is archived", archivedOwner, BoardOpSubmit, BoardDecisionArchived},
+		{"submit viewer is forbidden", viewer, BoardOpSubmit, BoardDecisionForbidden},
+		{"read viewer allows", viewer, BoardOpRead, BoardDecisionAllow},
+		{"read archived allows", archivedOwner, BoardOpRead, BoardDecisionAllow},
+		{"read invisible is not-found", BoardTaskFacts{}, BoardOpRead, BoardDecisionNotFound},
+		{"cancel owner allows", owner, BoardOpCancel, BoardDecisionAllow},
+		{"cancel viewer is forbidden", viewer, BoardOpCancel, BoardDecisionForbidden},
+		{"cancel archived is archived", archivedOwner, BoardOpCancel, BoardDecisionArchived},
+		{"cancel invisible is forbidden", BoardTaskFacts{}, BoardOpCancel, BoardDecisionForbidden},
+		{"unknown op is not-found", owner, BoardOperation("manage"), BoardDecisionNotFound},
+	}
+	for _, tc := range cases {
+		if got := BoardPolicy.Check(tc.facts, tc.op); got != tc.want {
+			t.Errorf("%s = %q, want %q", tc.name, got, tc.want)
 		}
 	}
 }

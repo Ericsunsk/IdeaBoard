@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -63,17 +62,17 @@ func (h *UserHandler) Redeem(c *gin.Context) {
 		return
 	}
 	finishMetrics := h.metrics.Start()
-	key, err := idempotency.Parse(c.GetHeader(idempotency.Header))
+	key, err := contract.IdempotencyKeyFromHeader(c)
 	if err != nil {
 		finishMetrics(redemptionOutcomeInvalid, 0, err)
 		idempotency.DefaultMetrics.ObserveError(err)
-		writeRewardInputError(c, codeRewardInvalidInput, msgRewardInvalidInput)
+		writeRewardInputError(c, codeRewardInvalidInput, errorrender.MsgRewardInvalidInput)
 		return
 	}
 	var request redeemRequest
 	if err := decodeRewardJSON(c, &request); err != nil {
 		finishMetrics(redemptionOutcomeInvalid, 0, err)
-		writeRewardInputError(c, codeRewardInvalidInput, msgRewardInvalidInput)
+		writeRewardInputError(c, codeRewardInvalidInput, errorrender.MsgRewardInvalidInput)
 		return
 	}
 	requestHash := idempotency.HashRequest(strings.TrimSpace(request.Code))
@@ -94,7 +93,7 @@ func (h *UserHandler) Redeem(c *gin.Context) {
 		if idempotency.IsConflict(err) {
 			finishMetrics(redemptionOutcomeInvalid, 0, err)
 			idempotency.DefaultMetrics.Observe(idempotency.OutcomeConflict)
-			errorrender.Render(c, http.StatusConflict, codeRewardCodeIdempotencyConflict, msgRewardCodeIdempotencyConflict)
+			errorrender.Render(c, http.StatusConflict, codeRewardCodeIdempotencyConflict, errorrender.MsgRewardCodeIdempotencyConflict)
 			return
 		}
 		finishMetrics(redemptionOutcomeForError(err), 0, err)
@@ -140,21 +139,21 @@ func (h *UserHandler) ListRedemptions(c *gin.Context) {
 	if !ok {
 		return
 	}
-	input := ports.ListRedemptionsInput{UserID: identityPrincipal.UserID(), Limit: 20}
-	if raw, exists := c.GetQuery("before_id"); exists {
-		raw = strings.TrimSpace(raw)
-		value, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || value <= 0 {
-			writeRewardInputError(c, codeRewardPaginationInvalid, msgRewardPaginationInvalid)
+	input := ports.ListRedemptionsInput{UserID: identityPrincipal.UserID(), Limit: contract.DefaultRewardLimit}
+	if raw, exists := c.GetQuery(contract.BeforeIDParam); exists {
+		trimmed := strings.TrimSpace(raw)
+		value, err := contract.ParseBeforeID(trimmed)
+		if err != nil || trimmed == "" {
+			writeRewardInputError(c, codeRewardPaginationInvalid, errorrender.MsgRewardPaginationInvalid)
 			return
 		}
 		input.BeforeID = value
 	}
-	if raw, exists := c.GetQuery("limit"); exists {
-		raw = strings.TrimSpace(raw)
-		value, err := strconv.Atoi(raw)
-		if err != nil || value < 1 || value > 100 {
-			writeRewardInputError(c, codeRewardPaginationInvalid, msgRewardPaginationInvalid2)
+	if raw, exists := c.GetQuery(contract.LimitParam); exists {
+		trimmed := strings.TrimSpace(raw)
+		value, err := contract.ParseRewardLimit(trimmed)
+		if err != nil || trimmed == "" {
+			writeRewardInputError(c, codeRewardPaginationInvalid, errorrender.MsgRewardPaginationInvalid2)
 			return
 		}
 		input.Limit = value

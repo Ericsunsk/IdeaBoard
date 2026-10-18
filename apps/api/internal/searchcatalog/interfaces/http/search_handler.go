@@ -1,9 +1,8 @@
-package httpapi
+package http
 
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"ideaboard/api/internal/media/derivatives/domain"
@@ -27,14 +26,14 @@ func NewSearchHandler(service *application.SearchService, previews *preview.Serv
 
 func (h *SearchHandler) Search(c *gin.Context) {
 	if h == nil || h.service == nil {
-		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchUnavailable), msgSearchUnavailable)
+		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchUnavailable), errorrender.MsgSearchUnavailable)
 		return
 	}
 	limit := application.DefaultSearchLimit
-	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil || parsed < 1 || parsed > application.MaxSearchLimit {
-			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchLimitInvalid), msgSearchLimitInvalid)
+	if raw := strings.TrimSpace(c.Query(contract.LimitParam)); raw != "" {
+		parsed, err := contract.ParseSearchLimit(raw)
+		if err != nil {
+			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchLimitInvalid), errorrender.MsgSearchLimitInvalid)
 			return
 		}
 		limit = parsed
@@ -42,15 +41,15 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	result, err := h.service.Search(c.Request.Context(), c.Query("q"), c.Query("cursor"), limit)
 	if err != nil {
 		msg := err.Error()
-		if strings.Contains(msg, msgSearch) {
-			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchQueryInvalid), fmt.Sprintf(msgSearchQueryInvalid, application.MaxSearchQueryRunes))
+		if strings.Contains(msg, errorrender.MsgSearch) {
+			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchQueryInvalid), fmt.Sprintf(errorrender.MsgSearchQueryInvalid, application.MaxSearchQueryRunes))
 			return
 		}
-		if strings.Contains(msg, msgSearch2) {
-			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchCursorInvalid), msgSearchCursorInvalid)
+		if strings.Contains(msg, errorrender.MsgSearch2) {
+			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchCursorInvalid), errorrender.MsgSearchCursorInvalid)
 			return
 		}
-		contract.RenderError(c, http.StatusBadGateway, contract.CodeSearchUnavailable, msgSearchUnavailable2)
+		contract.RenderError(c, http.StatusBadGateway, contract.CodeSearchUnavailable, errorrender.MsgSearchUnavailable2)
 		return
 	}
 	type displayResult struct {

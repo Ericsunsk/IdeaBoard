@@ -17,6 +17,15 @@ type ConfigurationStore interface {
 	GetStripeConfiguration(context.Context) (paymentconfiguration.StoredStripeConfiguration, error)
 }
 
+// Runner is the canonical sweep seam for the River payment-reconciliation
+// worker: converge every due order/refund/dispute claim in one pass. Workers
+// depend on this interface, never on *Service.
+type Runner interface {
+	ReconcileDuePaymentOrders(context.Context) error
+}
+
+var _ Runner = (*Service)(nil)
+
 type ConvergenceStore interface {
 	ClaimDuePaymentOrderReconciliations(context.Context, time.Time) ([]Claim, error)
 	CompletePaymentOrderReconciliationClaim(context.Context, Claim, Outcome) (bool, error)

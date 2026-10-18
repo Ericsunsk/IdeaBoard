@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	identitydomain "ideaboard/api/internal/identity/users/domain"
 )
 
 const CanonicalEmailIdentityKind = "canonical_email"
@@ -96,9 +98,9 @@ func NormalizeProvisioningIdentity(input ProvisioningIdentity) (ProvisioningIden
 
 	role := strings.ToLower(strings.TrimSpace(input.Role))
 	if role == "" {
-		role = "user"
+		role = identitydomain.RoleUser
 	}
-	if role != "user" && role != "admin" {
+	if role != identitydomain.RoleUser && role != identitydomain.RoleAdmin {
 		return ProvisioningIdentity{}, fmt.Errorf("%w: role must be user or admin", ErrUntrustedIdentity)
 	}
 

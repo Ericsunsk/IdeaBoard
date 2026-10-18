@@ -36,16 +36,16 @@ func (h *InternalHandler) UpdateLoginMetadata(c *gin.Context) {
 	}
 	var req ports.LoginMetadataRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errorrender.Render(c, http.StatusBadRequest, codeIdentityRequestInvalid, msgRespondRuntimeSettingsWriteError)
+		errorrender.Render(c, http.StatusBadRequest, codeIdentityRequestInvalid, errorrender.MsgRespondRuntimeSettingsWriteError)
 		return
 	}
 	req.AuthUserID, req.IP, req.Country = strings.TrimSpace(req.AuthUserID), strings.TrimSpace(req.IP), strings.ToUpper(strings.TrimSpace(req.Country))
 	if req.AuthUserID == "" || len(req.AuthUserID) > maxAuthUserIDLength || (req.IP != "" && net.ParseIP(req.IP) == nil) || !validLoginCountry(req.Country) {
-		errorrender.Render(c, http.StatusBadRequest, codeIdentityRequestInvalid, msgRespondRuntimeSettingsWriteError)
+		errorrender.Render(c, http.StatusBadRequest, codeIdentityRequestInvalid, errorrender.MsgRespondRuntimeSettingsWriteError)
 		return
 	}
 	if err := h.updater.UpdateLastLoginMetadata(c.Request.Context(), req.AuthUserID, req.IP, req.Country); err != nil {
-		response.InternalError(c, http.StatusInternalServerError, msgUpdateLoginMetadata, err)
+		response.InternalError(c, http.StatusInternalServerError, errorrender.MsgUpdateLoginMetadata, err)
 		return
 	}
 	response.SuccessDTO(c, gin.H{"updated": true})

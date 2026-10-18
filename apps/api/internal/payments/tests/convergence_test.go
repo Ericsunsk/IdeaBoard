@@ -4,7 +4,6 @@ import (
 	"errors"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"sync"
 	"testing"
 	"time"
@@ -32,7 +31,7 @@ func TestPaidPaymentOrderAndPurchaseCreditConvergeAtomicallyOnce(t *testing.T) {
 		t.Fatalf("seed Wallet: %v", err)
 	}
 
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	order := createBoundPaymentOrder(t, repo)
 	facts := paidCheckoutFacts(order)
 	creditedAt := time.Date(2026, 8, 1, 12, 10, 0, 0, time.UTC)
@@ -98,7 +97,7 @@ func TestPaidPaymentOrderFactConflictRollsBackWithoutCredit(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	order := createBoundPaymentOrder(t, repo)
 	facts := paidCheckoutFacts(order)
 	facts.RequestHash = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
@@ -122,7 +121,7 @@ func TestPaidPaymentOrderFactConflictRollsBackWithoutCredit(t *testing.T) {
 	}
 }
 
-func createBoundPaymentOrder(t *testing.T, repo *paymentpostgres.Repository) paymentsdomain.PaymentOrder {
+func createBoundPaymentOrder(t *testing.T, repo *testPaymentStores) paymentsdomain.PaymentOrder {
 	t.Helper()
 	configuration := publishTestStripeConfiguration(t, repo, "acct_payment", "prod_idea")
 	input := paymentsdomain.CreatePaymentOrderIntentInput{

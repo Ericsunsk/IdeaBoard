@@ -18,6 +18,8 @@ CREATE TABLE tasks (
   cancelled_at TIMESTAMPTZ NULL,
   cancelled_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT uq_tasks_public_id UNIQUE (public_id),
+  -- Kernel prefix pin: mirrors contract.PrefixTask; the SQL CHECK and
+  -- contract.IsTaskID must accept the same shape.
   CONSTRAINT chk_tasks_public_id CHECK (public_id LIKE 'task\_%'),
   CONSTRAINT chk_tasks_status CHECK (status IN ('pending','running','completed','failed','cancelled')),
   CONSTRAINT chk_tasks_priority CHECK (priority BETWEEN 1 AND 4),

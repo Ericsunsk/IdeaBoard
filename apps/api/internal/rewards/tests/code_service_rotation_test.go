@@ -5,6 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/rewards"
+	rewardsdomain "ideaboard/api/internal/rewards/domain"
+	rewardscredits "ideaboard/api/internal/rewards/infrastructure/credits"
+	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/testdb"
 	"strings"
 	"sync"
@@ -14,14 +18,14 @@ import (
 func TestRewardCodeCreateReplaySurvivesHMACRotation(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	oldKey := CodeKey{Version: "old", Secret: bytes.Repeat([]byte{0x31}, 32)}
-	newKey := CodeKey{Version: "new", Secret: bytes.Repeat([]byte{0x32}, 32)}
-	oldKeyring, err := NewCodeKeyring(oldKey, nil)
+	oldKey := rewards.CodeKey{Version: "old", Secret: bytes.Repeat([]byte{0x31}, 32)}
+	newKey := rewards.CodeKey{Version: "new", Secret: bytes.Repeat([]byte{0x32}, 32)}
+	oldKeyring, err := rewards.NewCodeKeyring(oldKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := NewService(pool, creditService, oldKeyring)
-	command := CreateRewardCodeCommand{
+	service := rewards.NewService(pool, rewardscredits.New(creditService), oldKeyring)
+	command := ports.CreateRewardCodeCommand{
 		DisplayName: "轮换奖励", Code: "ROTATE-CODE-2026", CreditAmount: 12,
 		IdempotencyKey: "reward-code-rotation", ActorUserID: 1,
 	}
@@ -29,11 +33,11 @@ func TestRewardCodeCreateReplaySurvivesHMACRotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rotatedKeyring, err := NewCodeKeyring(newKey, &oldKey)
+	rotatedKeyring, err := rewards.NewCodeKeyring(newKey, &oldKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rotatedService := NewService(pool, creditService, rotatedKeyring)
+	rotatedService := rewards.NewService(pool, rewardscredits.New(creditService), rotatedKeyring)
 	replay, err := rotatedService.CreateRewardCode(t.Context(), command)
 	if err != nil || replay.RewardCode.ID != created.RewardCode.ID || !replay.Replayed || replay.Plaintext != "" {
 		t.Fatalf("rotation replay = %+v error=%v", replay, err)
@@ -43,36 +47,36 @@ func TestRewardCodeCreateReplaySurvivesHMACRotation(t *testing.T) {
 func TestRewardCodeCreateReplaySurvivesReverseHMACRotation(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	oldKey := CodeKey{Version: "reverse-old", Secret: bytes.Repeat([]byte{0x33}, 32)}
-	newKey := CodeKey{Version: "reverse-new", Secret: bytes.Repeat([]byte{0x34}, 32)}
-	oldKeyring, err := NewCodeKeyring(oldKey, nil)
+	oldKey := rewards.CodeKey{Version: "reverse-old", Secret: bytes.Repeat([]byte{0x33}, 32)}
+	newKey := rewards.CodeKey{Version: "reverse-new", Secret: bytes.Repeat([]byte{0x34}, 32)}
+	oldKeyring, err := rewards.NewCodeKeyring(oldKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rotatedKeyring, err := NewCodeKeyring(newKey, &oldKey)
+	rotatedKeyring, err := rewards.NewCodeKeyring(newKey, &oldKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	command := CreateRewardCodeCommand{
+	command := ports.CreateRewardCodeCommand{
 		DisplayName: "反向轮换奖励", Code: "REVERSE-ROTATE-2026", CreditAmount: 14,
 		IdempotencyKey: "reward-code-reverse-rotation", ActorUserID: 1,
 	}
-	created, err := NewService(pool, creditService, rotatedKeyring).CreateRewardCode(t.Context(), command)
+	created, err := rewards.NewService(pool, rewardscredits.New(creditService), rotatedKeyring).CreateRewardCode(t.Context(), command)
 	if err != nil {
 		t.Fatal(err)
 	}
-	replay, err := NewService(pool, creditService, oldKeyring).CreateRewardCode(t.Context(), command)
+	replay, err := rewards.NewService(pool, rewardscredits.New(creditService), oldKeyring).CreateRewardCode(t.Context(), command)
 	if err != nil || replay.RewardCode.ID != created.RewardCode.ID || !replay.Replayed || replay.Plaintext != "" {
 		t.Fatalf("reverse rotation replay = %+v error=%v", replay, err)
 	}
 	differentCode := command
 	differentCode.Code = "DIFFERENT-ROTATE-2026"
-	if _, err := NewService(pool, creditService, oldKeyring).CreateRewardCode(t.Context(), differentCode); !errors.Is(err, ErrRewardCodeConflict) {
+	if _, err := rewards.NewService(pool, rewardscredits.New(creditService), oldKeyring).CreateRewardCode(t.Context(), differentCode); !errors.Is(err, rewardsdomain.ErrRewardCodeConflict) {
 		t.Fatalf("same idempotency with different Code error = %v, want conflict", err)
 	}
 	differentPayload := command
 	differentPayload.CreditAmount++
-	if _, err := NewService(pool, creditService, rotatedKeyring).CreateRewardCode(t.Context(), differentPayload); !errors.Is(err, ErrRewardCodeConflict) {
+	if _, err := rewards.NewService(pool, rewardscredits.New(creditService), rotatedKeyring).CreateRewardCode(t.Context(), differentPayload); !errors.Is(err, rewardsdomain.ErrRewardCodeConflict) {
 		t.Fatalf("same idempotency with different payload error = %v, want conflict", err)
 	}
 }
@@ -80,31 +84,31 @@ func TestRewardCodeCreateReplaySurvivesReverseHMACRotation(t *testing.T) {
 func TestRewardCodeCreateConcurrentIdempotencyAcrossRollingKeyrings(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	oldKey := CodeKey{Version: "concurrent-old", Secret: bytes.Repeat([]byte{0x35}, 32)}
-	newKey := CodeKey{Version: "concurrent-new", Secret: bytes.Repeat([]byte{0x36}, 32)}
-	oldKeyring, err := NewCodeKeyring(oldKey, nil)
+	oldKey := rewards.CodeKey{Version: "concurrent-old", Secret: bytes.Repeat([]byte{0x35}, 32)}
+	newKey := rewards.CodeKey{Version: "concurrent-new", Secret: bytes.Repeat([]byte{0x36}, 32)}
+	oldKeyring, err := rewards.NewCodeKeyring(oldKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rotatedKeyring, err := NewCodeKeyring(newKey, &oldKey)
+	rotatedKeyring, err := rewards.NewCodeKeyring(newKey, &oldKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	services := []*Service{
-		NewService(pool, creditService, oldKeyring),
-		NewService(pool, creditService, rotatedKeyring),
+	services := []*rewards.Service{
+		rewards.NewService(pool, rewardscredits.New(creditService), oldKeyring),
+		rewards.NewService(pool, rewardscredits.New(creditService), rotatedKeyring),
 	}
-	command := CreateRewardCodeCommand{
+	command := ports.CreateRewardCodeCommand{
 		DisplayName: "并发轮换奖励", Code: "CONCURRENT-ROTATE-2026", CreditAmount: 16,
 		IdempotencyKey: "reward-code-concurrent-rotation", ActorUserID: 1,
 	}
-	results := make([]CreatedRewardCode, len(services))
+	results := make([]ports.CreatedRewardCode, len(services))
 	errorsByService := make([]error, len(services))
 	start := make(chan struct{})
 	var wait sync.WaitGroup
 	for index, service := range services {
 		wait.Add(1)
-		go func(index int, service *Service) {
+		go func(index int, service *rewards.Service) {
 			defer wait.Done()
 			<-start
 			results[index], errorsByService[index] = service.CreateRewardCode(t.Context(), command)
@@ -133,29 +137,29 @@ func TestRewardCodeCreateConcurrentIdempotencyAcrossRollingKeyrings(t *testing.T
 func TestRewardCodeCreateSerializesSamePlaintextAcrossRollingKeyrings(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	oldKey := CodeKey{Version: "rolling-old", Secret: bytes.Repeat([]byte{0x41}, 32)}
-	newKey := CodeKey{Version: "rolling-new", Secret: bytes.Repeat([]byte{0x42}, 32)}
-	oldKeyring, err := NewCodeKeyring(oldKey, nil)
+	oldKey := rewards.CodeKey{Version: "rolling-old", Secret: bytes.Repeat([]byte{0x41}, 32)}
+	newKey := rewards.CodeKey{Version: "rolling-new", Secret: bytes.Repeat([]byte{0x42}, 32)}
+	oldKeyring, err := rewards.NewCodeKeyring(oldKey, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	newKeyring, err := NewCodeKeyring(newKey, &oldKey)
+	newKeyring, err := rewards.NewCodeKeyring(newKey, &oldKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	services := []*Service{
-		NewService(pool, creditService, oldKeyring),
-		NewService(pool, creditService, newKeyring),
+	services := []*rewards.Service{
+		rewards.NewService(pool, rewardscredits.New(creditService), oldKeyring),
+		rewards.NewService(pool, rewardscredits.New(creditService), newKeyring),
 	}
 	errorsByService := make([]error, len(services))
 	start := make(chan struct{})
 	var wait sync.WaitGroup
 	for index, service := range services {
 		wait.Add(1)
-		go func(index int, service *Service) {
+		go func(index int, service *rewards.Service) {
 			defer wait.Done()
 			<-start
-			_, errorsByService[index] = service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+			_, errorsByService[index] = service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 				DisplayName: "滚动实例奖励", Code: "ROLLING-CODE-2026", CreditAmount: 10,
 				IdempotencyKey: fmt.Sprintf("rolling-instance-%d", index), ActorUserID: 1,
 			})
@@ -168,7 +172,7 @@ func TestRewardCodeCreateSerializesSamePlaintextAcrossRollingKeyrings(t *testing
 		switch {
 		case createError == nil:
 			successes++
-		case errors.Is(createError, ErrCodeCollision):
+		case errors.Is(createError, rewardsdomain.ErrCodeCollision):
 			collisions++
 		default:
 			t.Fatalf("unexpected rolling create error = %v", createError)
@@ -190,21 +194,21 @@ func TestRewardCodeRotationIsAtomicReplaySafeAndRevokesOldCode(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "轮换奖励", Code: "OLD-ROTATE-2030", CreditAmount: 12,
 		IdempotencyKey: "rotate-management", ActorUserID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	other, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "其他奖励", Code: "OTHER-ROTATE-2030", CreditAmount: 1,
 		IdempotencyKey: "rotate-other", ActorUserID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	rotations := make([]UpdatedRewardCode, 2)
+	rotations := make([]ports.UpdatedRewardCode, 2)
 	rotationErrors := make([]error, 2)
 	start := make(chan struct{})
 	var wait sync.WaitGroup
@@ -213,7 +217,7 @@ func TestRewardCodeRotationIsAtomicReplaySafeAndRevokesOldCode(t *testing.T) {
 		go func(index int) {
 			defer wait.Done()
 			<-start
-			rotations[index], rotationErrors[index] = service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+			rotations[index], rotationErrors[index] = service.UpdateRewardCode(t.Context(), ports.UpdateRewardCodeCommand{
 				RewardCodeID: created.RewardCode.ID, DisplayName: "轮换奖励", CreditAmount: 12,
 				MaxRedemptions: 0, Code: rewardCodeString("NEW-ROTATE-2030"), ActorUserID: 1,
 			})
@@ -239,17 +243,17 @@ func TestRewardCodeRotationIsAtomicReplaySafeAndRevokesOldCode(t *testing.T) {
 	if replayed != 1 || plaintextResponses != 1 {
 		t.Fatalf("concurrent rotations = %+v, want one rotation and one replay", rotations)
 	}
-	replay, err := service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+	replay, err := service.UpdateRewardCode(t.Context(), ports.UpdateRewardCodeCommand{
 		RewardCodeID: created.RewardCode.ID, DisplayName: "轮换奖励", CreditAmount: 12,
 		MaxRedemptions: 0, Code: rewardCodeString("NEW-ROTATE-2030"), ActorUserID: 1,
 	})
 	if err != nil || replay.Replayed == nil || !*replay.Replayed || replay.Plaintext != "" {
 		t.Fatalf("rotation replay = %+v error=%v", replay, err)
 	}
-	if _, err := service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+	if _, err := service.UpdateRewardCode(t.Context(), ports.UpdateRewardCodeCommand{
 		RewardCodeID: created.RewardCode.ID, DisplayName: "不应提交", CreditAmount: 99,
 		MaxRedemptions: 0, Code: rewardCodeString("OTHER-ROTATE-2030"), ActorUserID: 1,
-	}); !errors.Is(err, ErrCodeCollision) {
+	}); !errors.Is(err, rewardsdomain.ErrCodeCollision) {
 		t.Fatalf("rotation collision error = %v", err)
 	}
 	var displayName string
@@ -265,10 +269,10 @@ func TestRewardCodeRotationIsAtomicReplaySafeAndRevokesOldCode(t *testing.T) {
 		t.Fatal("rotation collision fixture reused RewardCode")
 	}
 	provisionRewardWallet(t, pool, creditService, 3)
-	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "OLD-ROTATE-2030"}); !errors.Is(err, ErrCodeUnavailable) {
+	if _, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "OLD-ROTATE-2030"}); !errors.Is(err, rewardsdomain.ErrCodeUnavailable) {
 		t.Fatalf("old Code Redeem() error = %v", err)
 	}
-	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "NEW-ROTATE-2030"}); err != nil {
+	if _, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "NEW-ROTATE-2030"}); err != nil {
 		t.Fatalf("new Code Redeem() error = %v", err)
 	}
 	var totalActions, rotationActions int
@@ -304,14 +308,14 @@ func TestRewardCodeDeleteRequiresZeroRedemptionsAndPreservesJournalSnapshot(t *t
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	deletable, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	deletable, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "误建奖励", Code: "DELETE-CODE-2030", CreditAmount: 3,
 		IdempotencyKey: "delete-code", ActorUserID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	deleted, err := service.DeleteRewardCode(t.Context(), DeleteRewardCodeCommand{
+	deleted, err := service.DeleteRewardCode(t.Context(), ports.DeleteRewardCodeCommand{
 		RewardCodeID: deletable.RewardCode.ID, ActorUserID: 1,
 	})
 	if err != nil || deleted.RewardCodeID != deletable.RewardCode.ID {
@@ -339,7 +343,7 @@ WHERE reward_code_id_snapshot = $1 AND action_type = 'delete_reward_code'`, dele
 			definitions, aliases, journalCodeID, journalSnapshotID, journalSnapshotName)
 	}
 
-	redeemed, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	redeemed, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "已兑奖励", Code: "REDEEMED-DELETE-2030", CreditAmount: 4,
 		IdempotencyKey: "redeemed-delete", ActorUserID: 1,
 	})
@@ -347,12 +351,12 @@ WHERE reward_code_id_snapshot = $1 AND action_type = 'delete_reward_code'`, dele
 		t.Fatal(err)
 	}
 	provisionRewardWallet(t, pool, creditService, 3)
-	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "REDEEMED-DELETE-2030"}); err != nil {
+	if _, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "REDEEMED-DELETE-2030"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.DeleteRewardCode(t.Context(), DeleteRewardCodeCommand{
+	if _, err := service.DeleteRewardCode(t.Context(), ports.DeleteRewardCodeCommand{
 		RewardCodeID: redeemed.RewardCode.ID, ActorUserID: 1,
-	}); !errors.Is(err, ErrRewardCodeRedeemed) {
+	}); !errors.Is(err, rewardsdomain.ErrRewardCodeRedeemed) {
 		t.Fatalf("redeemed DeleteRewardCode() error = %v", err)
 	}
 }

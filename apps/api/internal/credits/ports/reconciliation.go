@@ -203,3 +203,13 @@ type Reconciliation interface {
 	ListReconciliationRuns(context.Context, ListReconciliationInput) (ReconciliationRunPage, error)
 	ListGlobalReconciliationFindings(context.Context, ReconciliationFindingStatus, ListReconciliationInput) (ReconciliationFindingPage, error)
 }
+
+// ReconciliationRunner is the canonical run-scoped execution seam for the
+// River credit-reconciliation worker: the subset of Reconciliation the
+// worker needs (execute/fail/inspect one run). Workers depend on this
+// interface, never on *Service.
+type ReconciliationRunner interface {
+	ExecuteReconciliation(context.Context, int64) error
+	FailReconciliation(context.Context, int64, error) error
+	GetReconciliationRun(context.Context, int64) (ReconciliationRun, error)
+}

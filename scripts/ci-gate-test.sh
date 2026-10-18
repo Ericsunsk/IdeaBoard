@@ -17,6 +17,7 @@ run_gate() {
     OPS_REQUIRED="${OPS_REQUIRED:-false}" OPS_RESULT="${OPS_RESULT:-skipped}" \
     MEDIA_CONTRACT_REQUIRED="${MEDIA_CONTRACT_REQUIRED:-true}" MEDIA_CONTRACT_RESULT="${MEDIA_CONTRACT_RESULT:-success}" \
     HANDBOOK_CONTRACT_REQUIRED="${HANDBOOK_CONTRACT_REQUIRED:-true}" HANDBOOK_CONTRACT_RESULT="${HANDBOOK_CONTRACT_RESULT:-success}" \
+    PR_SIZE_GUARD_REQUIRED="${PR_SIZE_GUARD_REQUIRED:-true}" PR_SIZE_GUARD_RESULT="${PR_SIZE_GUARD_RESULT:-success}" \
     "${script_dir}/ci-gate.sh"
 }
 
@@ -26,6 +27,7 @@ grep -Fq '| Web | false | skipped |' "${fixture_dir}/summary.md"
 grep -Fq '| Backend browser smoke | derived | skipped |' "${fixture_dir}/summary.md"
 grep -Fq '| Media contract | true | success |' "${fixture_dir}/summary.md"
 grep -Fq '| Handbook contract | true | success |' "${fixture_dir}/summary.md"
+grep -Fq '| PR size guard | true | success |' "${fixture_dir}/summary.md"
 
 : >"${fixture_dir}/summary.md"
 API_REQUIRED=true API_RESULT=success BROWSER_SMOKE_RESULT=success run_gate
@@ -51,6 +53,11 @@ fi
 
 if HANDBOOK_CONTRACT_REQUIRED=true HANDBOOK_CONTRACT_RESULT=failure run_gate; then
   echo 'CI gate unexpectedly accepted a failed Handbook contract lane' >&2
+  exit 1
+fi
+
+if PR_SIZE_GUARD_REQUIRED=true PR_SIZE_GUARD_RESULT=failure run_gate; then
+  echo 'CI gate unexpectedly accepted a failed PR size guard lane' >&2
   exit 1
 fi
 

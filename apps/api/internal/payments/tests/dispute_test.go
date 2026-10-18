@@ -6,7 +6,6 @@ import (
 	"ideaboard/api/internal/credits/ports"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	paymentports "ideaboard/api/internal/payments/ports"
 	"testing"
 	"time"
@@ -18,7 +17,7 @@ import (
 
 func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC)
 	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	creditService := credits.NewService(pool)
@@ -77,7 +76,7 @@ func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 
 func TestPaymentDisputeFullDebitRetainsRestrictionAfterLoss(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 5, 12, 30, 0, 0, time.UTC)
 	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	dispute, changed, err := repo.ConvergePaymentDispute(t.Context(), paymentports.StripeDispute{
@@ -95,7 +94,7 @@ func TestPaymentDisputeFullDebitRetainsRestrictionAfterLoss(t *testing.T) {
 
 func TestWonDisputeDiscoveredAfterCloseDoesNotCreateTransientRecovery(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 5, 13, 0, 0, 0, time.UTC)
 	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 
@@ -119,7 +118,7 @@ func TestWonDisputeDiscoveredAfterCloseDoesNotCreateTransientRecovery(t *testing
 
 func TestPaymentDisputeAndLaterRefundShareTheOrderIdeaCap(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 5, 14, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 
@@ -151,7 +150,7 @@ func TestPaymentDisputeAndLaterRefundShareTheOrderIdeaCap(t *testing.T) {
 
 func TestPaymentRefundAndLaterDisputeShareTheOrderIdeaCap(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 5, 14, 30, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 
@@ -177,7 +176,7 @@ func TestPaymentRefundAndLaterDisputeShareTheOrderIdeaCap(t *testing.T) {
 
 func TestPaymentDisputeSerializesWithConcurrentConsumption(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 5, 15, 0, 0, 0, time.UTC)
 	_ = createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
 	creditService := credits.NewService(pool)

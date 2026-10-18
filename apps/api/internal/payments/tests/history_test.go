@@ -4,7 +4,6 @@ import (
 	payments "ideaboard/api/internal/payments"
 
 	"errors"
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"strings"
 	"testing"
 	"time"
@@ -15,13 +14,14 @@ import (
 	paymentrefund "ideaboard/api/internal/payments/application/refund"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 )
 
 func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	seedRechargeableWallet(t, pool, 42)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Now().UTC()
 	order := createBoundPaymentOrder(t, repo)
 	configuration := activeTestStripeConfiguration(t, repo)
@@ -53,7 +53,7 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 		t.Fatal(err)
 	}
 
-	service := newCompleteTestCheckoutWorkflow(t, repo, payments.NewPaymentRuntime(nil, func() time.Time { return now.Add(2 * time.Hour) }), testStripeGateway{}, testCheckoutGateway{}, creditService, testShutdownEnqueuer{})
+	service := newCompleteTestCheckoutService(t, repo, payments.NewPaymentRuntime(nil, func() time.Time { return now.Add(2 * time.Hour) }), testStripeGateway{}, testCheckoutGateway{}, creditService, testShutdownEnqueuer{})
 	page, err := service.ListRecharges(t.Context(), 42, "", 20)
 	if err != nil {
 		t.Fatalf("ListRecharges() error = %v", err)
@@ -80,7 +80,7 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 	if len(otherPage.Items) != 0 {
 		t.Fatalf("cross-user items = %+v", otherPage.Items)
 	}
-	expiredService := newCompleteTestCheckoutWorkflow(t, repo, payments.NewPaymentRuntime(nil, func() time.Time { return now.AddDate(1, 0, 0).Add(24 * time.Hour) }), testStripeGateway{}, testCheckoutGateway{}, creditService, testShutdownEnqueuer{})
+	expiredService := newCompleteTestCheckoutService(t, repo, payments.NewPaymentRuntime(nil, func() time.Time { return now.AddDate(1, 0, 0).Add(24 * time.Hour) }), testStripeGateway{}, testCheckoutGateway{}, creditService, testShutdownEnqueuer{})
 	expiredPage, err := expiredService.ListRecharges(t.Context(), 42, "", 20)
 	if err != nil {
 		t.Fatalf("ListRecharges() after history window error = %v", err)
@@ -98,10 +98,10 @@ func TestRechargeHistoryCursorRejectsOversizedRawValue(t *testing.T) {
 
 func TestListRechargesShowsPartialAndFullRefundState(t *testing.T) {
 	db := testdb.Open(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
-	service := newCompleteTestCheckoutWorkflow(t, repo, payments.NewPaymentRuntime(nil, func() time.Time { return now }), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testShutdownEnqueuer{})
+	service := newCompleteTestCheckoutService(t, repo, payments.NewPaymentRuntime(nil, func() time.Time { return now }), testStripeGateway{}, testCheckoutGateway{}, testsupport.FakeMissingWalletReader{}, testShutdownEnqueuer{})
 
 	first, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 200,

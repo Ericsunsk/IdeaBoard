@@ -1,9 +1,9 @@
 package checkout
 
 import (
-	"time"
-
+	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentports "ideaboard/api/internal/payments/ports"
+	"time"
 )
 
 // PaymentCustomer is the Stripe customer identity used by Checkout. It is
@@ -17,3 +17,8 @@ type PaymentCustomer struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
+
+// merged from internal/payments/application/checkout/shutdown.go (structural consolidation; symbols unchanged).
+// PaymentCheckoutShutdown is owned by configuration publication while
+// checkout consumes it to expire stale sessions.
+type PaymentCheckoutShutdown = paymentconfiguration.PaymentCheckoutShutdown

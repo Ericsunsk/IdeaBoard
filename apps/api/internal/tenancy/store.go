@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/events"
+	eventoutbox "ideaboard/api/internal/events/outbox"
 )
 
 // Membership roles (agreed with the DB sibling stream).
@@ -116,9 +116,8 @@ type CreateWorkspaceParams struct {
 }
 
 // Store is the AGREED tenancy persistence interface the DB sibling
-// implements against sqlc. Handlers program to this interface only, so
-// tests run against the in-memory fallback while production swaps in the
-// postgres implementation without handler changes.
+// implements against sqlc. Production swaps in the postgres
+// implementation without handler changes.
 type Store interface {
 	WorkspaceStore
 	OrganizationStore
@@ -128,7 +127,7 @@ type Store interface {
 type MemberGrantCleanup struct {
 	BoardPublicID string
 	AccessVersion int64
-	AccessSignals []events.BoardAccessOutboxRecord
+	AccessSignals []eventoutbox.BoardAccessOutboxRecord
 }
 
 // WorkspaceMemberGrantStore joins Board access cleanup to a membership departure.

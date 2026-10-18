@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -62,8 +63,8 @@ func VisionSearchItem() billing.BillableItemDefinition {
 		SKU:             "ai-search:vision",
 		Namespace:       "ai-search",
 		ProductKind:     "search-feature",
-		DisplayName:     msgVisionSearchItem,
-		Description:     msgVisionSearchItem2,
+		DisplayName:     errorrender.MsgVisionSearchItem,
+		Description:     errorrender.MsgVisionSearchItem2,
 		SortOrder:       10,
 		PricingVariants: []billing.OutputResolution{billing.OutputResolution1K},
 	}

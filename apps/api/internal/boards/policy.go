@@ -2,8 +2,11 @@ package boards
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+
+	"ideaboard/api/internal/tenancy"
 )
 
 // Board access requires current Workspace membership, including for the creator.
@@ -66,9 +69,11 @@ type Capabilities struct {
 
 // IsWorkspaceMemberRole reports whether a Workspace role permits Board access.
 // Unknown or empty roles fail closed, including for the Board creator.
+// Roles are the tenancy kernel facts (tenancy.RoleOwner/Admin/Member);
+// board-local roles (RoleOwner/Editor/Viewer) are a separate taxonomy.
 func IsWorkspaceMemberRole(workspaceRole string) bool {
 	switch strings.TrimSpace(workspaceRole) {
-	case "owner", "admin", "member":
+	case tenancy.RoleOwner, tenancy.RoleAdmin, tenancy.RoleMember:
 		return true
 	default:
 		return false
@@ -198,3 +203,41 @@ func ParseAccessIfMatch(raw string) (int64, error) {
 	}
 	return version, nil
 }
+
+// merged from internal/boards/model.go (structural consolidation; symbols unchanged).
+type AccessRole string
+
+const (
+	RoleOwner  AccessRole = "owner"
+	RoleEditor AccessRole = "editor"
+	RoleViewer AccessRole = "viewer"
+)
+
+var (
+	ErrNotFound           = errors.New("board not found")
+	ErrInvalidInput       = errors.New("invalid board input")
+	ErrIDConflict         = errors.New("board id conflict")
+	ErrPermissionDenied   = errors.New("board permission denied")
+	ErrMemberNotFound     = errors.New("board member not found")
+	ErrRevisionConflict   = errors.New("board revision conflict")
+	ErrAccessConflict     = errors.New("board access conflict")
+	ErrPreconditionNeeded = errors.New("board access precondition required")
+)
+
+// WorkspaceAccess is the common role for a Board’s selected Workspace members.
+// none disables sharing and has no selected members.
+type WorkspaceAccess string
+
+const (
+	WorkspaceAccessNone   WorkspaceAccess = "none"
+	WorkspaceAccessViewer WorkspaceAccess = "viewer"
+	WorkspaceAccessEditor WorkspaceAccess = "editor"
+)
+
+// AccessState is the Board's actual sharing posture.
+type AccessState string
+
+const (
+	AccessStatePrivate   AccessState = "private"
+	AccessStateWorkspace AccessState = "workspace"
+)

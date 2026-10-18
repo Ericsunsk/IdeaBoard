@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"strings"
 	"time"
 
@@ -77,7 +78,7 @@ func (s *Service) SaveAndApplyProfile(ctx context.Context, profile *domain.Stora
 
 func (s *Service) saveProfile(ctx context.Context, profile *domain.StorageProfile, apply bool) (*domain.StorageProfile, error) {
 	if profile == nil {
-		return nil, errors.New(msgSaveProfile)
+		return nil, errors.New(errorrender.MsgMediaStorageApplicationProfilesSaveProfile)
 	}
 
 	profiles, err := s.LoadProfilesWithSecrets(ctx)
@@ -104,7 +105,7 @@ func (s *Service) saveProfile(ctx context.Context, profile *domain.StorageProfil
 func (s *Service) resolveProfileSaveTarget(profiles []domain.StorageProfile, profile *domain.StorageProfile) (int, *domain.StorageProfile, error) {
 	meta, ok := s.meta[profile.Provider]
 	if !ok {
-		return -1, nil, errors.New(msgResolveProfileSaveTarget)
+		return -1, nil, errors.New(errorrender.MsgResolveProfileSaveTarget)
 	}
 
 	for i := range profiles {
@@ -112,7 +113,7 @@ func (s *Service) resolveProfileSaveTarget(profiles []domain.StorageProfile, pro
 			continue
 		}
 		if profiles[i].Provider != profile.Provider {
-			return -1, nil, errors.New(msgResolveProfileSaveTarget2)
+			return -1, nil, errors.New(errorrender.MsgResolveProfileSaveTarget2)
 		}
 		return i, &profiles[i], nil
 	}
@@ -121,7 +122,7 @@ func (s *Service) resolveProfileSaveTarget(profiles []domain.StorageProfile, pro
 		profile.ID = fmt.Sprintf("%s-%d", profile.Provider, time.Now().UnixNano())
 	}
 	if profile.Provider == domain.StorageProviderLocal && !meta.CreateAllowed {
-		return -1, nil, errors.New(msgResolveProfileSaveTarget3)
+		return -1, nil, errors.New(errorrender.MsgResolveProfileSaveTarget3)
 	}
 	return -1, &domain.StorageProfile{ID: profile.ID, Provider: profile.Provider}, nil
 }
@@ -136,7 +137,7 @@ func (s *Service) prepareProfileSave(ctx context.Context, existing, incoming dom
 		return domain.StorageProfile{}, false, err
 	}
 	if next.IsCurrent && !next.Enabled {
-		return domain.StorageProfile{}, false, errors.New(msgPrepareProfileSave)
+		return domain.StorageProfile{}, false, errors.New(errorrender.MsgPrepareProfileSave)
 	}
 	if apply {
 		if err := s.EnsureProfileReadyForRuntime(ctx, next); err != nil {
@@ -168,10 +169,10 @@ func (s *Service) DeleteProfile(ctx context.Context, id string) error {
 			continue
 		}
 		if profile.Builtin {
-			return errors.New(msgDeleteProfile)
+			return errors.New(errorrender.MsgMediaStorageApplicationProfilesDeleteProfile)
 		}
 		if profile.IsCurrent {
-			return errors.New(msgDeleteProfile2)
+			return errors.New(errorrender.MsgMediaStorageApplicationProfilesDeleteProfile2)
 		}
 		return s.repo.DeleteProfile(ctx, id)
 	}
@@ -239,7 +240,7 @@ func (s *Service) EnsureProfileReadyForRuntime(ctx context.Context, profile doma
 		return err
 	}
 	if !driver.IsProfileReady(profile) {
-		return errors.New(msgEnsureProfileReadyForRuntime)
+		return errors.New(errorrender.MsgEnsureProfileReadyForRuntime)
 	}
 	return driver.TestProfile(ctx, &profile)
 }
@@ -271,7 +272,7 @@ func (s *Service) ResolveActiveProfile(ctx context.Context) (*domain.StorageProf
 	if len(profiles) > 0 {
 		return &profiles[0], nil
 	}
-	return nil, errors.New(msgResolveActiveProfile)
+	return nil, errors.New(errorrender.MsgResolveActiveProfile)
 }
 
 func (s *Service) loadProfiles(ctx context.Context) ([]domain.StorageProfile, error) {
@@ -331,7 +332,7 @@ func (s *Service) EnsureDefaultProfiles(ctx context.Context) error {
 func (s *Service) DefaultLocalStorageProfile(isCurrent bool) domain.StorageProfile {
 	return domain.StorageProfile{
 		ID:        builtinLocalProfileID,
-		Name:      msgDefaultProviderMeta,
+		Name:      errorrender.MsgDefaultProviderMeta,
 		Provider:  domain.StorageProviderLocal,
 		Enabled:   true,
 		IsCurrent: isCurrent,
@@ -360,11 +361,11 @@ func (s *Service) normalizeProfile(existing domain.StorageProfile, incoming doma
 	if next.Name == "" {
 		switch next.Provider {
 		case domain.StorageProviderLocal:
-			next.Name = msgDefaultProviderMeta
+			next.Name = errorrender.MsgDefaultProviderMeta
 		case domain.StorageProviderS3Compatible:
-			next.Name = msgDefaultProviderMeta3
+			next.Name = errorrender.MsgDefaultProviderMeta3
 		default:
-			next.Name = msgNormalizeProfile
+			next.Name = errorrender.MsgNormalizeProfile
 		}
 	}
 	next.Enabled = incoming.Enabled
@@ -405,10 +406,10 @@ func (s *Service) normalizeProfile(existing domain.StorageProfile, incoming doma
 
 func (s *Service) validateProfile(profile domain.StorageProfile) error {
 	if strings.TrimSpace(profile.Name) == "" {
-		return errors.New(msgValidateProfile)
+		return errors.New(errorrender.MsgValidateProfile)
 	}
 	if _, ok := s.meta[profile.Provider]; !ok {
-		return errors.New(msgResolveProfileSaveTarget)
+		return errors.New(errorrender.MsgResolveProfileSaveTarget)
 	}
 	return nil
 }

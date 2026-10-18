@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"ideaboard/api/internal/platform/outboundhttp"
+	"ideaboard/api/internal/platform/safehttp"
 
 	"github.com/stripe/stripe-go/v86"
 )
@@ -19,7 +19,7 @@ const Target = "stripe"
 // touching the SDK itself: one counter + latency observation per SDK call
 // with the closed outbound outcome set.
 type Recorder struct {
-	metrics *outboundhttp.Metrics
+	metrics *safehttp.Metrics
 }
 
 // NewRecorder builds a Stripe RED recorder. Nil metrics falls back to the
@@ -30,15 +30,15 @@ func NewRecorder() *Recorder {
 }
 
 // NewRecorderWithMetrics builds a recorder writing to m (nil-safe).
-func NewRecorderWithMetrics(m *outboundhttp.Metrics) *Recorder {
+func NewRecorderWithMetrics(m *safehttp.Metrics) *Recorder {
 	return &Recorder{metrics: m}
 }
 
-func (r *Recorder) metricsOrDefault() *outboundhttp.Metrics {
+func (r *Recorder) metricsOrDefault() *safehttp.Metrics {
 	if r != nil && r.metrics != nil {
 		return r.metrics
 	}
-	return outboundhttp.DefaultMetrics
+	return safehttp.DefaultMetrics
 }
 
 // Observe records one finished SDK call. err == nil is success; Stripe
@@ -49,24 +49,24 @@ func (r *Recorder) Observe(err error, latency time.Duration) {
 
 func classifyStripeError(err error) string {
 	if err == nil {
-		return outboundhttp.OutcomeSuccess
+		return safehttp.OutcomeSuccess
 	}
 	if errors.Is(err, context.Canceled) {
-		return outboundhttp.OutcomeCanceled
+		return safehttp.OutcomeCanceled
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return outboundhttp.OutcomeTimeout
+		return safehttp.OutcomeTimeout
 	}
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
-		return outboundhttp.OutcomeTimeout
+		return safehttp.OutcomeTimeout
 	}
 	var stripeErr *stripe.Error
 	if errors.As(err, &stripeErr) {
 		if stripeErr.HTTPStatusCode == 0 {
-			return outboundhttp.OutcomeTransportErr
+			return safehttp.OutcomeTransportErr
 		}
-		return outboundhttp.OutcomeForStatus(stripeErr.HTTPStatusCode)
+		return safehttp.OutcomeForStatus(stripeErr.HTTPStatusCode)
 	}
-	return outboundhttp.OutcomeTransportErr
+	return safehttp.OutcomeTransportErr
 }

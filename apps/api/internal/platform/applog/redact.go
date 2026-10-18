@@ -17,6 +17,7 @@ const redactedValue = "[REDACTED]"
 var sensitiveKeyFragments = []string{
 	"password",
 	"passwd",
+	"pwd",
 	"secret",
 	"token",
 	"authorization",
@@ -24,7 +25,9 @@ var sensitiveKeyFragments = []string{
 	"cookie",
 	"api_key",
 	"apikey",
+	"api-key",
 	"private_key",
+	"private-key",
 	"credit_card",
 	"card_number",
 }
@@ -39,6 +42,10 @@ var sensitiveValuePrefixes = []string{
 	"passwd=",
 	"pwd=",
 	"token=",
+	"secret=",
+	"api_key=",
+	"api-key=",
+	"apikey=",
 }
 
 // RedactingHandler wraps an slog.Handler and replaces sensitive attribute

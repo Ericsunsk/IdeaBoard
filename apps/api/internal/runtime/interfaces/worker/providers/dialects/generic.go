@@ -3,6 +3,7 @@ package dialects
 import (
 	"encoding/json"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 
 	"ideaboard/api/internal/workflow"
 )
@@ -40,7 +41,7 @@ func (GenericDialect) Encode(req Request) ([]byte, error) {
 	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf(msgEncode3, err)
+		return nil, fmt.Errorf(errorrender.MsgEncode3, err)
 	}
 	return encoded, nil
 }

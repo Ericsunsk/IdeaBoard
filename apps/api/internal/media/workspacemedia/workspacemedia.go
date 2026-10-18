@@ -40,13 +40,13 @@ package workspacemedia
 import (
 	"context"
 	"errors"
+	"ideaboard/api/internal/media/imageformat"
+	storagedomain "ideaboard/api/internal/media/storage/domain"
+	storageports "ideaboard/api/internal/media/storage/ports"
+	"ideaboard/api/internal/tasking/workspacetasks"
 	"path"
 	"strings"
 	"time"
-
-	"ideaboard/api/internal/media/imageformat"
-	storagedomain "ideaboard/api/internal/media/storage/domain"
-	"ideaboard/api/internal/platform/contract"
 )
 
 // SessionStatus is the upload session lifecycle state. The underlying
@@ -147,7 +147,12 @@ var (
 	// malformed shape at lookup, or cross-workspace id). Handlers
 	// render it as 404 (upload_not_found / media_not_found) per
 	// Baseline 4 anti-enumeration.
-	ErrNotFound = errors.New("workspacemedia: not found")
+	//
+	// Alias, not a copy (P0-4): readiness and visibility sentinels live
+	// only in the task registry (workspacetasks) and the canonical media
+	// taxonomy (media/errors). errors.Is against either name matches the
+	// same fact.
+	ErrNotFound = workspacetasks.ErrNotFound
 	// ErrExpired reports a lazily-expired session (410 upload_expired).
 	ErrExpired = errors.New("workspacemedia: upload expired")
 	// ErrStateConflict reports a terminal-state mutation attempt
@@ -163,13 +168,11 @@ type FieldError struct {
 }
 
 // ValidationError is a 422-class failure with field details.
-type ValidationError struct {
-	Fields map[string]string
-}
-
-func (e *ValidationError) Error() string {
-	return "workspacemedia: validation failed"
-}
+//
+// Alias, not a copy (P0-4): the validation shape lives only in the task
+// registry (workspacetasks.ValidationError). Composite literals and
+// errors.As against either name target the same type.
+type ValidationError = workspacetasks.ValidationError
 
 // NewFieldValidationError builds a single-field 422 failure for callers
 // validating completion echoes outside ValidateCreateInput.
@@ -346,6 +349,11 @@ type AssetStore interface {
 	GetAsset(ctx context.Context, workspaceID, assetID string) (*Asset, error)
 	// ListAssets returns creation-ordered (newest first) non-archived
 	// assets; limit is clamped to [1,100] like the contract kernel.
+	// The offset is the decoded position of an opaque AssetCursor
+	// (see cursor.go); raw offsets never cross the HTTP boundary.
+	// Signature freeze: the (limit, offset) seam stays until the
+	// ListAssetsByCursor migration lands; do not add callers that
+	// compute offsets arithmetically from user input.
 	ListAssets(ctx context.Context, workspaceID string, limit, offset int) ([]*Asset, error)
 	// ArchiveAsset stamps the archive lifecycle marker. Repeat
 	// archives converge on the stored row (idempotent per asset).
@@ -425,21 +433,9 @@ func MediaKindForMIME(mimeType string) string {
 	return MediaKindImage
 }
 
-// NewUploadPublicID mints an opaque upload_ session identifier.
-func NewUploadPublicID() (string, error) {
-	return contract.MintPublicID(contract.PrefixUpload, 12)
-}
-
-// NewAssetPublicID mints an opaque asset_ identifier for durable assets.
-func NewAssetPublicID() (string, error) {
-	return contract.MintPublicID(contract.PrefixAsset, 12)
-}
-
-// IsUploadID reports upload_ shape (opaque URL segment for {upload_id}).
-func IsUploadID(id string) bool { return contract.IsUploadID(id) }
-
-// IsAssetID reports asset_ shape (opaque URL segment for {asset_id}).
-func IsAssetID(id string) bool { return contract.IsAssetID(id) }
+// Minting and shape checks are owned by platform/contract
+// (MintPublicID/IsValidPublicID + IsUploadID/IsAssetID); this package
+// calls them directly with PrefixUpload/PrefixAsset and keeps no wrappers.
 
 // SlotKey reserves the server-side storage locator for a session. The
 // key never leaves the server: transfer instructions carry only the
@@ -484,4 +480,12 @@ func SanitizeFilename(filename string) string {
 		trimmed = string(runes[:MaxFilenameRunes])
 	}
 	return trimmed
+}
+
+// merged from internal/media/workspacemedia/objects.go (structural consolidation; symbols unchanged).
+// MediaObjects stores original bytes at reserved slots and reads them for
+// upload verification and content delivery.
+type MediaObjects interface {
+	ReadObjectAtProfile(ctx context.Context, profileID, objectKey string, maxBytes int64) (*storageports.StoredUploadObject, error)
+	PutObjectAtProfile(ctx context.Context, profileID, objectKey string, data []byte, contentType string) error
 }

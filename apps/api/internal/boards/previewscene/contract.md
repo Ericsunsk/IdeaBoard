@@ -65,7 +65,8 @@ Document endpoint 遇到缺失 identity 或 Scene 时从 stored bytes 纯计算�
 `budgets` 记录 `max_nodes`、`max_connections`、`max_media_refs`、`max_scene_bytes`；null 表示未施加该项限制。
 `omitted` 记录被预算省略的 nodes、connections、media refs、groups、group members，`truncated` 标记任意省略。
 
-`CatalogLimits` 固定为 500 nodes、1000 connections、1500 media refs、65536 bytes。
+`CatalogLimits` 固定为 500 nodes、1000 connections、1500 media refs、65536 bytes
+（唯一来源：`scene.go` 的 `CatalogMaxNodes`、`CatalogMaxConnections`、`CatalogMaxMediaRefs`、`CatalogMaxSceneBytes`；改值只改该处）。
 所有持久化和返回的 Catalog Scene 都经 `DeriveCatalog` 执行这些限制。
 
 Enforcement 保持 Snapshot 顺序：

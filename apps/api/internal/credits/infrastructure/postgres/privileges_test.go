@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/platform/database"
 	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	"ideaboard/api/internal/testdb"
 
@@ -56,7 +55,7 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 		_, _ = db.Exec(context.Background(), `DROP OWNED BY `+roleSQL)
 		_, _ = db.Exec(context.Background(), `DROP ROLE IF EXISTS `+roleSQL)
 	})
-	policies := []dbprivileges.Policy{database.RuntimePrivilegePolicy(), postgres.RuntimePrivilegePolicy()}
+	policies := []dbprivileges.Policy{dbprivileges.RuntimePrivilegePolicy(), postgres.RuntimePrivilegePolicy()}
 	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
 		t.Fatalf("configure runtime privilege policies error = %v", err)
 	}
@@ -84,7 +83,7 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 	if result.Wallet.Available != 25 {
 		t.Fatalf("runtime role Grant() result = %+v", result)
 	}
-	restriction, err := service.RestrictionsInTx(tx).RestrictWallet(ctx, ports.RestrictWalletCommand{
+	restriction, err := credits.RestrictionsInTx(tx).RestrictWallet(ctx, ports.RestrictWalletCommand{
 		UserID:        42,
 		Type:          "runtime_test",
 		Source:        "privilege_test",
@@ -96,7 +95,7 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 		_ = tx.Rollback(ctx)
 		t.Fatalf("runtime role RestrictWallet() error = %v", err)
 	}
-	if _, err := service.RestrictionsInTx(tx).ReleaseWalletRestriction(ctx, ports.ReleaseWalletRestrictionCommand{
+	if _, err := credits.RestrictionsInTx(tx).ReleaseWalletRestriction(ctx, ports.ReleaseWalletRestrictionCommand{
 		RestrictionID: restriction.RestrictionID,
 		Reason:        "verify restriction release capability",
 		Actor:         domain.Actor{Type: domain.ActorService, ID: "runtime-test"},
@@ -340,7 +339,7 @@ func assertTemporaryCreditTablesCannotShadowLedger(
 	if result.Wallet.Available != 37 {
 		t.Fatalf("Grant() under temp shadow attack result = %+v", result)
 	}
-	restriction, err := credits.NewService(pool).RestrictionsInTx(tx).RestrictWallet(ctx, ports.RestrictWalletCommand{
+	restriction, err := credits.RestrictionsInTx(tx).RestrictWallet(ctx, ports.RestrictWalletCommand{
 		UserID:        42,
 		Type:          "temp_shadow",
 		Source:        "privilege_test",
@@ -351,7 +350,7 @@ func assertTemporaryCreditTablesCannotShadowLedger(
 	if err != nil {
 		t.Fatalf("RestrictWallet() under temp shadow attack error = %v", err)
 	}
-	if _, err := credits.NewService(pool).RestrictionsInTx(tx).ReleaseWalletRestriction(ctx, ports.ReleaseWalletRestrictionCommand{
+	if _, err := credits.RestrictionsInTx(tx).ReleaseWalletRestriction(ctx, ports.ReleaseWalletRestrictionCommand{
 		RestrictionID: restriction.RestrictionID,
 		Reason:        "complete temp shadow verification",
 		Actor:         domain.Actor{Type: domain.ActorService, ID: "runtime-test"},

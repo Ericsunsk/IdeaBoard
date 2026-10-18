@@ -9,6 +9,12 @@ import (
 )
 
 const (
+	// Fixed fiat-to-Idea recharge schedule: 500~500,000 Ideas at 100
+	// Ideas per USD (BaseAmountMinor equals IdeaQuantity in USD cents).
+	// This is the Payments-owned fiat boundary and intentionally stays
+	// outside the Billing SKU catalog: Billing prices Idea-to-service
+	// consumption (unit Credits per SKU/resolution), Payments prices
+	// fiat-to-Idea recharge. Quick presets reuse the same 100:1 rate.
 	MinimumPurchaseIdeas       int64 = 500
 	MaximumPurchaseIdeas       int64 = 500_000
 	IdeasPerUSD                int64 = 100

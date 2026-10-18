@@ -3,6 +3,7 @@ package prompts
 import (
 	"context"
 	"errors"
+	"ideaboard/api/internal/platform/errorrender"
 	"time"
 
 	"ideaboard/api/internal/db/dbutil"
@@ -13,7 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var ErrFeaturePromptUnsupported = errors.New(msgFeaturePromptUnsupported)
+var ErrFeaturePromptUnsupported = errors.New(errorrender.MsgFeaturePromptUnsupported)
 
 type FeaturePromptRepository struct {
 	q *dbsqlc.Queries

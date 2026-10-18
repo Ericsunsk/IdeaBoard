@@ -43,6 +43,9 @@ import (
 	"ideaboard/api/internal/platform/contract"
 )
 
+// WorkspaceEventHandler handles a remote-origin v1 envelope.
+type WorkspaceEventHandler func(ctx context.Context, envelope V1Envelope) error
+
 // IsBoardScopedEventType reports whether typ names a board-content
 // envelope subject to per-recipient board-access filtering.
 func IsBoardScopedEventType(typ string) bool {
@@ -117,33 +120,19 @@ func AccessChangedVersion(envelope V1Envelope) (int64, bool) {
 	return probe.AccessVersion, true
 }
 
-// StableBoardAccessEventID derives one deterministic evt_ id for a
-// directed access signal. The (board, member, version) triple converges:
-// a live emit and a later outbox replay of the same revocation mint the
-// same id, so the hot log, NATS MsgID dedup, and webhook dedup collapse
-// them to one delivery.
-func StableBoardAccessEventID(boardPublicID, memberPublicID string, accessVersion int64) string {
-	sum := sha256.Sum256([]byte(strings.TrimSpace(boardPublicID) + "\x00" + strings.TrimSpace(memberPublicID) + "\x00" + int64ToString(accessVersion)))
+// StableEventID derives one deterministic evt_ id for an outbox fact. The
+// parts converge: a live emit and a later outbox replay of the same fact
+// mint the same id, so the hot log, NATS MsgID dedup, and webhook dedup
+// collapse them to one delivery. Callers pass the fact's identity words in
+// order (task: task id + status + execution token; board access: board +
+// member + version); each part is trimmed before the NUL join.
+func StableEventID(parts ...string) string {
+	trimmed := make([]string, len(parts))
+	for i, part := range parts {
+		trimmed[i] = strings.TrimSpace(part)
+	}
+	sum := sha256.Sum256([]byte(strings.Join(trimmed, "\x00")))
 	return contract.PrefixEvent + hex.EncodeToString(sum[:12])
-}
-
-func int64ToString(version int64) string {
-	if version == 0 {
-		return "0"
-	}
-	negative := version < 0
-	if negative {
-		version = -version
-	}
-	var digits []byte
-	for version > 0 {
-		digits = append([]byte{byte('0' + version%10)}, digits...)
-		version /= 10
-	}
-	if negative {
-		digits = append([]byte{'-'}, digits...)
-	}
-	return string(digits)
 }
 
 // NewWorkspaceEventBridgeHandler returns the cross-instance fanout

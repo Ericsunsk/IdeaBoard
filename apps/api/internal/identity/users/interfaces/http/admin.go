@@ -12,7 +12,6 @@ import (
 	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
-	"ideaboard/api/internal/platform/validation"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -67,7 +66,7 @@ func RespondIdentityAdminCommandError(c *gin.Context, err error) {
 
 func (h *AdminHandler) requireRuntimeSettings(c *gin.Context) (*settings.RuntimeSettingsService, bool) {
 	if h == nil || h.runtimeSettings == nil {
-		errorrender.Render(c, http.StatusServiceUnavailable, codeIdentityServiceUnavailable, msgIdentityServiceUnavailable)
+		errorrender.Render(c, http.StatusServiceUnavailable, codeIdentityServiceUnavailable, errorrender.MsgIdentityServiceUnavailable)
 		return nil, false
 	}
 	return h.runtimeSettings, true
@@ -76,7 +75,7 @@ func (h *AdminHandler) requireRuntimeSettings(c *gin.Context) (*settings.Runtime
 func (h *AdminHandler) requireIdentityAdminCommands(c *gin.Context) (ports.IdentityAdminCommands, bool) {
 	if h == nil || h.identityCommands == nil {
 		slog.Error("identity admin commands not configured")
-		errorrender.Render(c, http.StatusInternalServerError, codeIdentityOperationFailed, msgIdentityOperationFailed)
+		errorrender.Render(c, http.StatusInternalServerError, codeIdentityOperationFailed, errorrender.MsgIdentityOperationFailed)
 		return nil, false
 	}
 	return h.identityCommands, true
@@ -86,7 +85,7 @@ func (h *AdminHandler) respondRuntimeSettingsReadError(c *gin.Context, err error
 	if err == nil {
 		return false
 	}
-	response.InternalError(c, 500, msgRespondRuntimeSettingsReadError, err)
+	response.InternalError(c, 500, errorrender.MsgRespondRuntimeSettingsReadError, err)
 	return true
 }
 
@@ -94,11 +93,11 @@ func (h *AdminHandler) respondRuntimeSettingsWriteError(c *gin.Context, err erro
 	if err == nil {
 		return false
 	}
-	if validation.Is(err) {
-		writeIdentityRequestInvalid(c, identityValidationMessage(err, msgRespondRuntimeSettingsWriteError))
+	if errorrender.IsValidationError(err) {
+		writeIdentityRequestInvalid(c, identityValidationMessage(err, errorrender.MsgRespondRuntimeSettingsWriteError))
 		return true
 	}
-	response.InternalError(c, 500, msgRespondRuntimeSettingsWriteError2, err)
+	response.InternalError(c, 500, errorrender.MsgRespondRuntimeSettingsWriteError2, err)
 	return true
 }
 
@@ -107,7 +106,7 @@ func (h *AdminHandler) respondRuntimeSettingsWriteError(c *gin.Context, err erro
 func getTargetUserPublicIDParam(c *gin.Context) (string, bool) {
 	publicID, err := uuid.Parse(strings.TrimSpace(c.Param("public_id")))
 	if err != nil {
-		errorrender.Render(c, http.StatusBadRequest, codeIdentityUserPublicIDInvalid, msgIdentityUserPublicIDInvalid)
+		errorrender.Render(c, http.StatusBadRequest, codeIdentityUserPublicIDInvalid, errorrender.MsgIdentityUserPublicIDInvalid)
 		return "", false
 	}
 	return publicID.String(), true

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
@@ -15,6 +16,39 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// PaymentOrderFacts carries the order identity and paid facts shared by the
+// refunds and disputes subpackages when they resolve an order by its Stripe
+// charge ID. It lives on the order aggregate (root) because both subpackages
+// load it the same way.
+type PaymentOrderFacts struct {
+	ID           string
+	PublicNumber string
+	UserID       int64
+	Status       paymentsdomain.PaymentOrderStatus
+	IdeaQuantity int64
+	PaidSubtotal int64
+	PaidTotal    int64
+	PaidCurrency string
+	PaidAt       time.Time
+}
+
+// LoadPaymentOrderFactsForCharge locks the order behind a Stripe charge so
+// refund and dispute intake serialize on the same row.
+func LoadPaymentOrderFactsForCharge(ctx context.Context, q Queryer, chargeID string) (PaymentOrderFacts, error) {
+	var order PaymentOrderFacts
+	var paidAt pgtype.Timestamptz
+	err := q.QueryRow(ctx, `SELECT id::text, public_order_number, user_id, status, idea_quantity, paid_subtotal_minor, paid_total_minor, paid_currency, paid_at FROM payment_orders WHERE stripe_charge_id = $1 FOR UPDATE`, chargeID).Scan(
+		&order.ID, &order.PublicNumber, &order.UserID, &order.Status, &order.IdeaQuantity, &order.PaidSubtotal, &order.PaidTotal, &order.PaidCurrency, &paidAt,
+	)
+	if err != nil {
+		return PaymentOrderFacts{}, err
+	}
+	if paidAt.Valid {
+		order.PaidAt = paidAt.Time
+	}
+	return order, nil
+}
 
 // CreatePaymentOrderIntent persists an idempotent checkout intent while
 // serializing concurrent requests for the same user/client key.
@@ -36,7 +70,7 @@ func (r *Repository) CreatePaymentOrderIntent(ctx context.Context, input payment
 	}
 	var order paymentsdomain.PaymentOrder
 	var reused bool
-	err = r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx pgx.Tx) error {
+	err = r.DBWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx pgx.Tx) error {
 		lockKey := fmt.Sprintf("%d:%s", input.UserID, input.ClientIdempotencyKey)
 		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 8188403870220423781))`, lockKey); err != nil {
 			return fmt.Errorf("lock payment order idempotency: %w", err)
@@ -77,7 +111,7 @@ func (r *Repository) UpsertPaymentCustomer(ctx context.Context, customer payment
 	if r == nil || r.db == nil {
 		return paymentcheckout.PaymentCustomer{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	row, err := r.dbWithContext(ctx).queries().UpsertPaymentCustomer(ctx, dbsqlc.UpsertPaymentCustomerParams{
+	row, err := r.DBWithContext(ctx).Queries().UpsertPaymentCustomer(ctx, dbsqlc.UpsertPaymentCustomerParams{
 		UserID: customer.UserID, StripeAccountID: customer.StripeAccountID,
 		StripeMode: string(customer.StripeMode), StripeCustomerID: customer.StripeCustomerID,
 	})
@@ -98,7 +132,7 @@ func (r *Repository) BindPaymentOrderCheckout(ctx context.Context, input payment
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("parse payment order ID: %w", err)
 	}
-	row, err := r.dbWithContext(ctx).queries().BindPaymentOrderCheckout(ctx, dbsqlc.BindPaymentOrderCheckoutParams{
+	row, err := r.DBWithContext(ctx).Queries().BindPaymentOrderCheckout(ctx, dbsqlc.BindPaymentOrderCheckoutParams{
 		ID: pgUUIDToPgType(id), StripeCustomerID: input.StripeCustomerID,
 		StripeCheckoutSessionID: pgtype.Text{String: input.StripeSessionID, Valid: true},
 		CheckoutUrl:             input.CheckoutURL, ExpiresAt: dbutil.TimestamptzFromTime(input.ExpiresAt),
@@ -109,11 +143,11 @@ func (r *Repository) BindPaymentOrderCheckout(ctx context.Context, input payment
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("bind payment Checkout Session: %w", err)
 	}
-	existing, readErr := r.dbWithContext(ctx).queries().GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
+	existing, readErr := r.DBWithContext(ctx).Queries().GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
 	if readErr != nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("read payment order after bind conflict: %w", readErr)
 	}
-	if existing.StripeCustomerID != input.StripeCustomerID || pgTextString(existing.StripeCheckoutSessionID) != input.StripeSessionID ||
+	if existing.StripeCustomerID != input.StripeCustomerID || PgTextString(existing.StripeCheckoutSessionID) != input.StripeSessionID ||
 		existing.CheckoutUrl != input.CheckoutURL || !dbutil.TimeValue(existing.ExpiresAt).Equal(input.ExpiresAt) {
 		return paymentsdomain.PaymentOrder{}, paymentsdomain.ErrCheckoutIdempotencyConflict
 	}
@@ -128,9 +162,9 @@ func (r *Repository) MarkPaymentOrderAsyncPending(ctx context.Context, orderID s
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("parse payment order ID: %w", err)
 	}
-	row, err := r.dbWithContext(ctx).queries().MarkPaymentOrderAsyncPending(ctx, pgUUIDToPgType(id))
+	row, err := r.DBWithContext(ctx).Queries().MarkPaymentOrderAsyncPending(ctx, pgUUIDToPgType(id))
 	if errors.Is(err, pgx.ErrNoRows) {
-		row, err = r.dbWithContext(ctx).queries().GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
+		row, err = r.DBWithContext(ctx).Queries().GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
 	}
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("mark payment order async pending: %w", err)
@@ -146,9 +180,9 @@ func (r *Repository) MarkPaymentOrderFailed(ctx context.Context, orderID string)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("parse payment order ID: %w", err)
 	}
-	row, err := r.dbWithContext(ctx).queries().MarkPaymentOrderFailed(ctx, pgUUIDToPgType(id))
+	row, err := r.DBWithContext(ctx).Queries().MarkPaymentOrderFailed(ctx, pgUUIDToPgType(id))
 	if errors.Is(err, pgx.ErrNoRows) {
-		row, err = r.dbWithContext(ctx).queries().GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
+		row, err = r.DBWithContext(ctx).Queries().GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
 	}
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("mark payment order failed: %w", err)
@@ -161,7 +195,7 @@ func (r *Repository) MarkPaymentOrderExpired(ctx context.Context, orderID string
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, false, paymentcontracts.ErrPaymentOrderNotFound
 	}
-	queries := r.dbWithContext(ctx).queries()
+	queries := r.DBWithContext(ctx).Queries()
 	row, err := queries.MarkPaymentOrderExpired(ctx, pgUUIDToPgType(id))
 	if err == nil {
 		return PaymentOrder(row), true, nil
@@ -181,7 +215,7 @@ func (r *Repository) MarkPaymentOrderCancelled(ctx context.Context, userID int64
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, false, paymentcontracts.ErrPaymentOrderNotFound
 	}
-	queries := r.dbWithContext(ctx).queries()
+	queries := r.DBWithContext(ctx).Queries()
 	row, err := queries.MarkPaymentOrderCancelled(ctx, dbsqlc.MarkPaymentOrderCancelledParams{ID: pgUUIDToPgType(id), UserID: userID})
 	if err == nil {
 		return PaymentOrder(row), true, nil

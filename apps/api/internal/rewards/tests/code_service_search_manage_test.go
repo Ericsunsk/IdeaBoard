@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/rewards"
+	rewardsdomain "ideaboard/api/internal/rewards/domain"
+	rewardscredits "ideaboard/api/internal/rewards/infrastructure/credits"
+	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/testdb"
 	"strings"
 	"testing"
@@ -14,13 +18,13 @@ func TestSearchRewardCodesFiltersCountsAndPaginates(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	now := time.Date(2030, time.July, 22, 8, 0, 0, 0, time.UTC)
-	service := NewServiceWithOptions(pool, creditService, newTestRewardKeyring(t), ServiceOptions{
+	service := rewards.NewServiceWithOptions(pool, rewardscredits.New(creditService), newTestRewardKeyring(t), rewards.ServiceOptions{
 		Now: func() time.Time { return now },
 	})
 
-	create := func(displayName, code, idempotencyKey string, maxRedemptions int64, expiresAt *time.Time) CreatedRewardCode {
+	create := func(displayName, code, idempotencyKey string, maxRedemptions int64, expiresAt *time.Time) ports.CreatedRewardCode {
 		t.Helper()
-		created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+		created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 			DisplayName: displayName, Code: code, CreditAmount: 10,
 			MaxRedemptions: maxRedemptions, ExpiresAt: expiresAt,
 			IdempotencyKey: idempotencyKey, ActorUserID: 1,
@@ -36,27 +40,27 @@ func TestSearchRewardCodesFiltersCountsAndPaginates(t *testing.T) {
 	expiresAt := now.Add(time.Hour)
 	expired := create("冬季限时奖励", "WINTER-EXPIRED-2030", "search-expired", 1, &expiresAt)
 	exhausted := create("容量奖励", "CAPACITY-2030", "search-exhausted", 1, nil)
-	if _, err := service.SetRewardCodeEnabled(t.Context(), SetRewardCodeEnabledCommand{
+	if _, err := service.SetRewardCodeEnabled(t.Context(), ports.SetRewardCodeEnabledCommand{
 		RewardCodeID: premium.RewardCode.ID, Enabled: false, ActorUserID: 1,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	provisionRewardWallet(t, pool, creditService, 3)
-	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "CAPACITY-2030"}); err != nil {
+	if _, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "CAPACITY-2030"}); err != nil {
 		t.Fatal(err)
 	}
 	provisionRewardWallet(t, pool, creditService, 7)
-	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: "WINTER-EXPIRED-2030"}); err != nil {
+	if _, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 7, Code: "WINTER-EXPIRED-2030"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.SetRewardCodeEnabled(t.Context(), SetRewardCodeEnabledCommand{
+	if _, err := service.SetRewardCodeEnabled(t.Context(), ports.SetRewardCodeEnabledCommand{
 		RewardCodeID: expired.RewardCode.ID, Enabled: false, ActorUserID: 1,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	now = now.Add(2 * time.Hour)
 
-	assertSearch := func(input SearchRewardCodesInput, wantIDs ...int64) RewardCodePage {
+	assertSearch := func(input ports.SearchRewardCodesInput, wantIDs ...int64) ports.RewardCodePage {
 		t.Helper()
 		page, err := service.SearchRewardCodes(t.Context(), input)
 		if err != nil {
@@ -73,36 +77,36 @@ func TestSearchRewardCodesFiltersCountsAndPaginates(t *testing.T) {
 		return page
 	}
 
-	assertSearch(SearchRewardCodesInput{Query: "夏季"}, premium.RewardCode.ID, summer.RewardCode.ID)
-	assertSearch(SearchRewardCodesInput{Query: "summer-premium-2030"}, premium.RewardCode.ID)
-	previousKey := CodeKey{Version: "test-v1", Secret: bytes.Repeat([]byte{0x2a}, 32)}
-	rollingKeyring, err := NewCodeKeyring(
-		CodeKey{Version: "test-v2", Secret: bytes.Repeat([]byte{0x2b}, 32)},
+	assertSearch(ports.SearchRewardCodesInput{Query: "夏季"}, premium.RewardCode.ID, summer.RewardCode.ID)
+	assertSearch(ports.SearchRewardCodesInput{Query: "summer-premium-2030"}, premium.RewardCode.ID)
+	previousKey := rewards.CodeKey{Version: "test-v1", Secret: bytes.Repeat([]byte{0x2a}, 32)}
+	rollingKeyring, err := rewards.NewCodeKeyring(
+		rewards.CodeKey{Version: "test-v2", Secret: bytes.Repeat([]byte{0x2b}, 32)},
 		&previousKey,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rollingService := NewServiceWithOptions(pool, creditService, rollingKeyring, ServiceOptions{
+	rollingService := rewards.NewServiceWithOptions(pool, rewardscredits.New(creditService), rollingKeyring, rewards.ServiceOptions{
 		Now: func() time.Time { return now },
 	})
-	rollingPage, err := rollingService.SearchRewardCodes(t.Context(), SearchRewardCodesInput{
+	rollingPage, err := rollingService.SearchRewardCodes(t.Context(), ports.SearchRewardCodesInput{
 		Query: "SUMMER-PREMIUM-2030",
 	})
 	if err != nil || rollingPage.Total != 1 || len(rollingPage.RewardCodes) != 1 ||
 		rollingPage.RewardCodes[0].ID != premium.RewardCode.ID {
 		t.Fatalf("rolling HMAC search = %+v error=%v", rollingPage, err)
 	}
-	assertSearch(SearchRewardCodesInput{Status: RewardCodeStatusDisabled}, premium.RewardCode.ID)
-	assertSearch(SearchRewardCodesInput{Status: RewardCodeStatusExpired}, expired.RewardCode.ID)
-	assertSearch(SearchRewardCodesInput{Status: RewardCodeStatusExhausted}, exhausted.RewardCode.ID)
-	assertSearch(SearchRewardCodesInput{Status: RewardCodeStatusEnabled}, summer.RewardCode.ID)
+	assertSearch(ports.SearchRewardCodesInput{Status: ports.RewardCodeStatusDisabled}, premium.RewardCode.ID)
+	assertSearch(ports.SearchRewardCodesInput{Status: ports.RewardCodeStatusExpired}, expired.RewardCode.ID)
+	assertSearch(ports.SearchRewardCodesInput{Status: ports.RewardCodeStatusExhausted}, exhausted.RewardCode.ID)
+	assertSearch(ports.SearchRewardCodesInput{Status: ports.RewardCodeStatusEnabled}, summer.RewardCode.ID)
 
-	first, err := service.SearchRewardCodes(t.Context(), SearchRewardCodesInput{Limit: 2})
+	first, err := service.SearchRewardCodes(t.Context(), ports.SearchRewardCodesInput{Limit: 2})
 	if err != nil || first.Total != 4 || len(first.RewardCodes) != 2 || first.NextBeforeID == 0 {
 		t.Fatalf("first keyset page = %+v error=%v", first, err)
 	}
-	second, err := service.SearchRewardCodes(t.Context(), SearchRewardCodesInput{
+	second, err := service.SearchRewardCodes(t.Context(), ports.SearchRewardCodesInput{
 		BeforeID: first.NextBeforeID, Limit: 2,
 	})
 	if err != nil || second.Total != 4 || len(second.RewardCodes) != 2 || second.NextBeforeID != 0 {
@@ -116,15 +120,15 @@ func TestSearchRewardCodesFiltersCountsAndPaginates(t *testing.T) {
 		}
 	}
 
-	invalidInputs := []SearchRewardCodesInput{
+	invalidInputs := []ports.SearchRewardCodesInput{
 		{Status: "unknown"},
 		{BeforeID: -1},
 		{Limit: 101},
 		{Query: strings.Repeat("x", 129)},
 	}
 	for _, input := range invalidInputs {
-		if _, err := service.SearchRewardCodes(t.Context(), input); !errors.Is(err, ErrInvalidCommand) {
-			t.Fatalf("SearchRewardCodes(%+v) error = %v, want ErrInvalidCommand", input, err)
+		if _, err := service.SearchRewardCodes(t.Context(), input); !errors.Is(err, rewardsdomain.ErrInvalidCode) {
+			t.Fatalf("SearchRewardCodes(%+v) error = %v, want ErrInvalidCode", input, err)
 		}
 	}
 }
@@ -134,11 +138,11 @@ func TestSearchRewardCodesUsesSingleTimestampForFilterAndRowStatus(t *testing.T)
 	creditService := credits.NewService(pool)
 	createdAt := time.Date(2030, time.July, 22, 8, 0, 0, 0, time.UTC)
 	keyring := newTestRewardKeyring(t)
-	createService := NewServiceWithOptions(pool, creditService, keyring, ServiceOptions{
+	createService := rewards.NewServiceWithOptions(pool, rewardscredits.New(creditService), keyring, rewards.ServiceOptions{
 		Now: func() time.Time { return createdAt },
 	})
 	expiresAt := createdAt.Add(time.Hour)
-	created, err := createService.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	created, err := createService.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "边界状态奖励", Code: "SNAPSHOT-STATUS-2030", CreditAmount: 10,
 		MaxRedemptions: 0, ExpiresAt: &expiresAt, IdempotencyKey: "snapshot-status", ActorUserID: 1,
 	})
@@ -147,7 +151,7 @@ func TestSearchRewardCodesUsesSingleTimestampForFilterAndRowStatus(t *testing.T)
 	}
 
 	clockCalls := 0
-	searchService := NewServiceWithOptions(pool, creditService, keyring, ServiceOptions{
+	searchService := rewards.NewServiceWithOptions(pool, rewardscredits.New(creditService), keyring, rewards.ServiceOptions{
 		Now: func() time.Time {
 			clockCalls++
 			if clockCalls == 1 {
@@ -157,11 +161,11 @@ func TestSearchRewardCodesUsesSingleTimestampForFilterAndRowStatus(t *testing.T)
 		},
 	})
 
-	page, err := searchService.SearchRewardCodes(t.Context(), SearchRewardCodesInput{
-		Status: RewardCodeStatusEnabled,
+	page, err := searchService.SearchRewardCodes(t.Context(), ports.SearchRewardCodesInput{
+		Status: ports.RewardCodeStatusEnabled,
 	})
 	if err != nil || page.Total != 1 || len(page.RewardCodes) != 1 ||
-		page.RewardCodes[0].ID != created.RewardCode.ID || page.RewardCodes[0].Status != RewardCodeStatusEnabled ||
+		page.RewardCodes[0].ID != created.RewardCode.ID || page.RewardCodes[0].Status != ports.RewardCodeStatusEnabled ||
 		clockCalls != 1 {
 		t.Fatalf("snapshot search = %+v error=%v clockCalls=%d", page, err, clockCalls)
 	}
@@ -170,7 +174,7 @@ func TestSearchRewardCodesUsesSingleTimestampForFilterAndRowStatus(t *testing.T)
 func TestRewardCodeMigrationCatalogAndAppendOnlyGuards(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	service := newTestRewardService(t, pool, credits.NewService(pool))
-	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "Schema Guard", Code: "SCHEMA-GUARD-2026", CreditAmount: 1,
 		IdempotencyKey: "schema-guard", ActorUserID: 1,
 	})
@@ -216,9 +220,9 @@ func TestRewardCodeKeyRetirementRejectsDisabledAndExpiredDefinitions(t *testing.
 			_, pool := testdb.OpenWithPool(t)
 			creditService := credits.NewService(pool)
 			now := time.Date(2030, time.July, 21, 8, 0, 0, 0, time.UTC)
-			oldKey := CodeKey{Version: "retiring-old", Secret: bytes.Repeat([]byte{0x51}, 32)}
-			newKey := CodeKey{Version: "retiring-new", Secret: bytes.Repeat([]byte{0x52}, 32)}
-			oldKeyring, err := NewCodeKeyring(oldKey, nil)
+			oldKey := rewards.CodeKey{Version: "retiring-old", Secret: bytes.Repeat([]byte{0x51}, 32)}
+			newKey := rewards.CodeKey{Version: "retiring-new", Secret: bytes.Repeat([]byte{0x52}, 32)}
+			oldKeyring, err := rewards.NewCodeKeyring(oldKey, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -227,10 +231,10 @@ func TestRewardCodeKeyRetirementRejectsDisabledAndExpiredDefinitions(t *testing.
 				expires := now.Add(time.Hour)
 				expiresAt = &expires
 			}
-			oldService := NewServiceWithOptions(pool, creditService, oldKeyring, ServiceOptions{
+			oldService := rewards.NewServiceWithOptions(pool, rewardscredits.New(creditService), oldKeyring, rewards.ServiceOptions{
 				Now: func() time.Time { return now },
 			})
-			created, err := oldService.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+			created, err := oldService.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 				DisplayName: "待恢复奖励", Code: "RETIRE-CODE-2026", CreditAmount: 10,
 				ExpiresAt: expiresAt, IdempotencyKey: "retire-key-state", ActorUserID: 1,
 			})
@@ -241,20 +245,20 @@ func TestRewardCodeKeyRetirementRejectsDisabledAndExpiredDefinitions(t *testing.
 				_, err = pool.Exec(t.Context(), `UPDATE reward_codes SET enabled = FALSE WHERE id = $1`, created.RewardCode.ID)
 			} else {
 				now = now.Add(2 * time.Hour)
-				var page RewardCodePage
-				page, err = oldService.SearchRewardCodes(t.Context(), SearchRewardCodesInput{})
-				if err == nil && (len(page.RewardCodes) != 1 || page.RewardCodes[0].Status != RewardCodeStatusExpired) {
+				var page ports.RewardCodePage
+				page, err = oldService.SearchRewardCodes(t.Context(), ports.SearchRewardCodesInput{})
+				if err == nil && (len(page.RewardCodes) != 1 || page.RewardCodes[0].Status != ports.RewardCodeStatusExpired) {
 					t.Fatalf("expired RewardCode page = %+v", page)
 				}
 			}
 			if err != nil {
 				t.Fatal(err)
 			}
-			newKeyring, err := NewCodeKeyring(newKey, nil)
+			newKeyring, err := rewards.NewCodeKeyring(newKey, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := NewService(pool, creditService, newKeyring).ValidateActiveCodeKeyVersions(t.Context()); err == nil {
+			if err := rewards.NewService(pool, rewardscredits.New(creditService), newKeyring).ValidateActiveCodeKeyVersions(t.Context()); err == nil {
 				t.Fatalf("ValidateActiveCodeKeyVersions() error = nil for %s RewardCode", state)
 			}
 		})
@@ -266,7 +270,7 @@ func TestRewardCodeManagementChangesOnlyFutureRedemptionsAndEnforcesCap(t *testi
 	creditService := credits.NewService(pool)
 	now := time.Date(2030, time.July, 22, 8, 0, 0, 0, time.UTC)
 	service := newTestRewardServiceAt(t, pool, creditService, now)
-	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "初始奖励", Code: "MANAGE-CODE-2030", CreditAmount: 10,
 		IdempotencyKey: "manage-code", ActorUserID: 1,
 	})
@@ -275,36 +279,36 @@ func TestRewardCodeManagementChangesOnlyFutureRedemptionsAndEnforcesCap(t *testi
 	}
 	provisionRewardWallet(t, pool, creditService, 3)
 	provisionRewardWallet(t, pool, creditService, 7)
-	first, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "MANAGE-CODE-2030"})
+	first, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "MANAGE-CODE-2030"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	updated, err := service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+	updated, err := service.UpdateRewardCode(t.Context(), ports.UpdateRewardCodeCommand{
 		RewardCodeID: created.RewardCode.ID, DisplayName: "后续奖励", CreditAmount: 20,
 		MaxRedemptions: 1, ActorUserID: 1,
 	})
-	if err != nil || updated.RewardCode.Status != RewardCodeStatusExhausted {
+	if err != nil || updated.RewardCode.Status != ports.RewardCodeStatusExhausted {
 		t.Fatalf("exhausting update = %+v error=%v", updated, err)
 	}
-	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: "MANAGE-CODE-2030"}); !errors.Is(err, ErrCodeUnavailable) {
+	if _, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 7, Code: "MANAGE-CODE-2030"}); !errors.Is(err, rewardsdomain.ErrCodeUnavailable) {
 		t.Fatalf("exhausted Redeem() error = %v", err)
 	}
-	updated, err = service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+	updated, err = service.UpdateRewardCode(t.Context(), ports.UpdateRewardCodeCommand{
 		RewardCodeID: created.RewardCode.ID, DisplayName: "后续奖励", CreditAmount: 20,
 		MaxRedemptions: 0, ActorUserID: 1,
 	})
-	if err != nil || updated.RewardCode.Status != RewardCodeStatusEnabled {
+	if err != nil || updated.RewardCode.Status != ports.RewardCodeStatusEnabled {
 		t.Fatalf("unlimited update = %+v error=%v", updated, err)
 	}
-	second, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: "MANAGE-CODE-2030"})
+	second, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 7, Code: "MANAGE-CODE-2030"})
 	if err != nil || second.CreditedAmount != 20 {
 		t.Fatalf("future redemption = %+v error=%v", second, err)
 	}
-	if _, err := service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+	if _, err := service.UpdateRewardCode(t.Context(), ports.UpdateRewardCodeCommand{
 		RewardCodeID: created.RewardCode.ID, DisplayName: "后续奖励", CreditAmount: 20,
 		MaxRedemptions: 1, ActorUserID: 1,
-	}); !errors.Is(err, ErrCapBelowRedemptions) {
+	}); !errors.Is(err, rewardsdomain.ErrCapBelowRedemptions) {
 		t.Fatalf("cap below redemption count error = %v", err)
 	}
 
@@ -323,24 +327,24 @@ FROM reward_redemptions WHERE id = $1`, first.Redemption.ID).Scan(
 	}
 
 	expiredAt := now.Add(-time.Minute)
-	updated, err = service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+	updated, err = service.UpdateRewardCode(t.Context(), ports.UpdateRewardCodeCommand{
 		RewardCodeID: created.RewardCode.ID, DisplayName: "后续奖励", CreditAmount: 20,
 		MaxRedemptions: 0, ExpiresAt: &expiredAt, ActorUserID: 1,
 	})
-	if err != nil || updated.RewardCode.Status != RewardCodeStatusExpired {
+	if err != nil || updated.RewardCode.Status != ports.RewardCodeStatusExpired {
 		t.Fatalf("expired update = %+v error=%v", updated, err)
 	}
-	enabledUpdated, err := service.SetRewardCodeEnabled(t.Context(), SetRewardCodeEnabledCommand{
+	enabledUpdated, err := service.SetRewardCodeEnabled(t.Context(), ports.SetRewardCodeEnabledCommand{
 		RewardCodeID: created.RewardCode.ID, Enabled: false, ActorUserID: 1,
 	})
-	if err != nil || enabledUpdated.Enabled || enabledUpdated.Status != RewardCodeStatusExpired {
+	if err != nil || enabledUpdated.Enabled || enabledUpdated.Status != ports.RewardCodeStatusExpired {
 		t.Fatalf("expired state takes precedence over disabled intent = %+v error=%v", enabledUpdated, err)
 	}
 	var actionsBefore int
 	if err := pool.QueryRow(t.Context(), `SELECT COUNT(*) FROM reward_admin_actions`).Scan(&actionsBefore); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.SetRewardCodeEnabled(t.Context(), SetRewardCodeEnabledCommand{
+	if _, err := service.SetRewardCodeEnabled(t.Context(), ports.SetRewardCodeEnabledCommand{
 		RewardCodeID: created.RewardCode.ID, Enabled: false, ActorUserID: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -358,7 +362,7 @@ func TestRewardCodeRedemptionSnapshotsSurviveRenameAndRotation(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
 		DisplayName: "兑换时名称", Code: "SNAPSHOT-OLD-2030", CreditAmount: 10,
 		IdempotencyKey: "redemption-snapshot", ActorUserID: 1,
 	})
@@ -367,31 +371,31 @@ func TestRewardCodeRedemptionSnapshotsSurviveRenameAndRotation(t *testing.T) {
 	}
 	provisionRewardWallet(t, pool, creditService, 3)
 	provisionRewardWallet(t, pool, creditService, 7)
-	first, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "SNAPSHOT-OLD-2030"})
+	first, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "SNAPSHOT-OLD-2030"})
 	if err != nil || first.HistoryItem.RewardCodeDisplayName != "兑换时名称" || first.HistoryItem.MaskedCodeHint != "•••• 2030" {
 		t.Fatalf("first redemption = %+v error=%v", first, err)
 	}
-	if _, err := service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+	if _, err := service.UpdateRewardCode(t.Context(), ports.UpdateRewardCodeCommand{
 		RewardCodeID: created.RewardCode.ID, DisplayName: "未来名称", CreditAmount: 20,
 		MaxRedemptions: 0, Code: rewardCodeString("SNAPSHOT-NEW-2040"), ActorUserID: 1,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	replay, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "SNAPSHOT-NEW-2040"})
+	replay, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "SNAPSHOT-NEW-2040"})
 	if err != nil || !replay.Replayed || replay.HistoryItem != first.HistoryItem {
 		t.Fatalf("replayed redemption = %+v error=%v, want original snapshot %+v", replay, err, first.HistoryItem)
 	}
-	oldHistory, err := service.ListRedemptions(t.Context(), ListRedemptionsInput{UserID: 3})
+	oldHistory, err := service.ListRedemptions(t.Context(), ports.ListRedemptionsInput{UserID: 3})
 	if err != nil || len(oldHistory.Redemptions) != 1 || oldHistory.Redemptions[0] != first.HistoryItem {
 		t.Fatalf("old user history = %+v error=%v, want original snapshot %+v", oldHistory, err, first.HistoryItem)
 	}
 
-	second, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: "SNAPSHOT-NEW-2040"})
+	second, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 7, Code: "SNAPSHOT-NEW-2040"})
 	if err != nil || second.Replayed || second.HistoryItem.RewardCodeDisplayName != "未来名称" || second.HistoryItem.MaskedCodeHint != "•••• 2040" {
 		t.Fatalf("future redemption = %+v error=%v", second, err)
 	}
-	newHistory, err := service.ListRedemptions(t.Context(), ListRedemptionsInput{UserID: 7})
+	newHistory, err := service.ListRedemptions(t.Context(), ports.ListRedemptionsInput{UserID: 7})
 	if err != nil || len(newHistory.Redemptions) != 1 || newHistory.Redemptions[0] != second.HistoryItem {
 		t.Fatalf("new user history = %+v error=%v, want future snapshot %+v", newHistory, err, second.HistoryItem)
 	}

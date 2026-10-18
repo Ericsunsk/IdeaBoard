@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
+	providerdomain "ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 )
@@ -41,13 +41,13 @@ func TestMarshalProviderTaskResultReturnsContextualError(t *testing.T) {
 }
 
 func TestGatewayCallTimeoutStandardBudget(t *testing.T) {
-	if got := gatewayCallTimeout(domain.ProviderRuntimeAdapterCutout); got != defaultGatewayCallTimeout {
+	if got := gatewayCallTimeout(providerdomain.ProviderRuntimeAdapterCutout); got != defaultGatewayCallTimeout {
 		t.Fatalf("cutout timeout = %v, want %v", got, defaultGatewayCallTimeout)
 	}
-	if got := gatewayCallTimeout(domain.ProviderRuntimeAdapterModelImage); got != 300*time.Second {
+	if got := gatewayCallTimeout(providerdomain.ProviderRuntimeAdapterModelImage); got != 300*time.Second {
 		t.Fatalf("model image timeout = %v, want %v", got, 300*time.Second)
 	}
-	if got := gatewayCallTimeout(domain.ProviderRuntimeAdapterUpscale); got != 300*time.Second {
+	if got := gatewayCallTimeout(providerdomain.ProviderRuntimeAdapterUpscale); got != 300*time.Second {
 		t.Fatalf("upscale timeout = %v, want %v", got, 300*time.Second)
 	}
 }

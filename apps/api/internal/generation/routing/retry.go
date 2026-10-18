@@ -1,6 +1,11 @@
 package routing
 
-import "ideaboard/api/internal/platform/retrypolicy"
+import (
+	"errors"
+	"strings"
+
+	"ideaboard/api/internal/platform/retrypolicy"
+)
 
 // AttemptFailure describes one failed execution attempt in
 // provider-neutral terms (ADR-0012 rule 6). The worker (later wave) maps
@@ -78,4 +83,92 @@ func (f AttemptFailure) Retryable() bool {
 // meaning "no HTTP status") is not retryable by status alone.
 func RetryableHTTPStatus(status int) bool {
 	return retrypolicy.RetryableHTTPStatus(status)
+}
+
+// timeoutMarkers records deadline-exceeded and timeout failures distinctly
+// from network errors. Single home for the timeout family (P0-4): the
+// worker and tasking must not keep their own copies.
+var timeoutMarkers = []string{"timeout", "deadline exceeded"}
+
+// networkMarkers records connection resets, refused connections,
+// DNS/transport failures, and other transient I/O errors. Single home for
+// the network family (P0-4).
+var networkMarkers = []string{
+	"network", "connection reset", "temporary", "econnreset", "econnrefused",
+}
+
+// contentSafetyMarkers forces terminal convergence for content-safety
+// rejections regardless of status code. Matching is a fail-closed direction
+// only (terminal, never fallback), so the list stays tight to canonical
+// provider phrasing. Single home (P0-4).
+var contentSafetyMarkers = []string{
+	"content safety", "content-safety", "content_safety", "safety rejection",
+}
+
+func containsFailureMarker(haystack string, markers []string) bool {
+	for _, marker := range markers {
+		if strings.Contains(haystack, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// httpStatusCoder extracts an upstream HTTP status through the structural
+// seam (concrete upstream errors implement HTTPStatus() int), without
+// importing provider SDKs, net, or HTTP clients.
+type httpStatusCoder interface {
+	HTTPStatus() int
+}
+
+// ClassifyFailure maps one provider-seam failure onto the AttemptFailure
+// taxonomy: the single retry taxonomy (P0-4, ADR-0012 rule 6). Deterministic
+// markers take precedence (a 500 carrying a business rejection is
+// terminal); a failure with no marker at all fails closed to terminal and
+// never spends the fallback budget.
+func ClassifyFailure(httpStatus int, message string) AttemptFailure {
+	var failure AttemptFailure
+	failure.HTTPStatus = httpStatus
+	lowered := strings.ToLower(message)
+	switch httpStatus {
+	case 400, 422:
+		failure.InvalidParams = true
+	case 401, 403:
+		failure.AuthFailed = true
+	case 402:
+		failure.InsufficientCredits = true
+	case 404:
+		failure.NotFound = true
+	}
+	if containsFailureMarker(lowered, contentSafetyMarkers) {
+		failure.ContentSafetyRejected = true
+	}
+	if failure.Deterministic() {
+		return failure
+	}
+	if containsFailureMarker(lowered, timeoutMarkers) {
+		failure.Timeout = true
+	}
+	if containsFailureMarker(lowered, networkMarkers) {
+		failure.NetworkError = true
+	}
+	return failure
+}
+
+// ClassifyError maps one provider-seam error onto the AttemptFailure
+// taxonomy: the upstream HTTP status arrives through the structural
+// HTTPStatus() int seam, timeout/network/content-safety markers through the
+// message families above. A nil error maps to the zero failure (which is
+// terminal and never retryable). This is the only provider-error mapping;
+// callers must not sniff timeout/network strings themselves.
+func ClassifyError(err error) AttemptFailure {
+	if err == nil {
+		return AttemptFailure{}
+	}
+	status := 0
+	var coder httpStatusCoder
+	if errors.As(err, &coder) {
+		status = coder.HTTPStatus()
+	}
+	return ClassifyFailure(status, err.Error())
 }

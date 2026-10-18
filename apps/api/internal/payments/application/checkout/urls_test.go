@@ -1,9 +1,11 @@
-package checkout
+package checkout_test
 
 import (
 	"strings"
 	"testing"
 	"time"
+
+	"ideaboard/api/internal/payments/application/checkout"
 )
 
 func TestNormalizeReturnBaseURL(t *testing.T) {
@@ -20,7 +22,7 @@ func TestNormalizeReturnBaseURL(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := NormalizeReturnBaseURL(test.raw)
+			got, err := checkout.NormalizeReturnBaseURL(test.raw)
 			if test.ok {
 				if err != nil || got != test.want {
 					t.Fatalf("NormalizeReturnBaseURL() = %q, %v; want %q", got, err, test.want)
@@ -35,11 +37,11 @@ func TestNormalizeReturnBaseURL(t *testing.T) {
 }
 
 func TestReturnURLAndNewPublicOrderNumber(t *testing.T) {
-	returnURL := ReturnURL("https://app.example.com", "token value", "success")
+	returnURL := checkout.ReturnURL("https://app.example.com", "token value", "success")
 	if !strings.Contains(returnURL, "payment_return=token+value") || !strings.HasSuffix(returnURL, "checkout_return=success") {
 		t.Fatalf("ReturnURL() = %q", returnURL)
 	}
-	number, err := NewPublicOrderNumber(time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC))
+	number, err := checkout.NewPublicOrderNumber(time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC))
 	if err != nil || !strings.HasPrefix(number, "IBP-20260903-") || len(number) != len("IBP-20260903-")+12 {
 		t.Fatalf("NewPublicOrderNumber() = %q, %v", number, err)
 	}

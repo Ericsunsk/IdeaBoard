@@ -9,6 +9,7 @@ CREATE TABLE library_folders (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT uq_library_folders_public_id UNIQUE (public_id),
   CONSTRAINT uq_library_folders_workspace_name UNIQUE (workspace_id, name),
+  -- Kernel prefix pin: mirrors contract.PrefixLibraryFolder.
   CONSTRAINT chk_library_folders_public_id CHECK (public_id LIKE 'lfolder\_%'),
   CONSTRAINT chk_library_folders_name CHECK (length(btrim(name)) BETWEEN 1 AND 100),
   CONSTRAINT chk_library_folders_system_shape CHECK (NOT is_system OR is_default)
@@ -51,6 +52,7 @@ CREATE TABLE library_assets (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT uq_library_assets_public_id UNIQUE (public_id),
+  -- Kernel prefix pin: mirrors contract.PrefixLibraryAsset.
   CONSTRAINT chk_library_assets_public_id CHECK (public_id LIKE 'lasset\_%'),
   CONSTRAINT chk_library_assets_title CHECK (length(title) <= 255),
   CONSTRAINT chk_library_assets_author CHECK (length(author) <= 255),
@@ -58,6 +60,7 @@ CREATE TABLE library_assets (
     (media_asset_id IS NULL AND width IS NOT NULL AND height IS NOT NULL AND width >= 0 AND height >= 0)
     OR (media_asset_id IS NOT NULL AND width IS NULL AND height IS NULL)
   ),
+  -- Lineage pin: task_id mirrors contract.PrefixTask when present.
   CONSTRAINT chk_library_assets_lineage CHECK (
     (task_id IS NULL AND task_result_index IS NULL)
     OR (task_id IS NOT NULL AND task_id LIKE 'task\_%' AND task_result_index IS NOT NULL AND task_result_index >= 0)
@@ -102,6 +105,7 @@ CREATE TABLE library_materializations (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   completed_at TIMESTAMPTZ NULL,
   CONSTRAINT uq_library_materializations_public_id UNIQUE (public_id),
+  -- Kernel prefix pin: mirrors contract.PrefixLibraryMaterialization.
   CONSTRAINT chk_library_materializations_public_id CHECK (public_id LIKE 'lmat\_%'),
   CONSTRAINT chk_library_materializations_status CHECK (status IN ('pending','processing','completed','failed')),
   CONSTRAINT chk_library_materializations_completion CHECK (

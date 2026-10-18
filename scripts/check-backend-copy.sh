@@ -3,10 +3,15 @@
 #
 # Backend copy vocabulary guard.
 #
-# Backend user-facing copy lives in per-context tables
-# (apps/api/internal/**/message.go plus the Han-literal
-# apps/api/internal/**/errors.go extensions); storage stays
-# distributed, wording is managed centrally in the "Backend Copy
+# Backend user-facing copy lives in the centralized table
+# (apps/api/internal/platform/errorrender/copy.go, see docs/adr/0017-backend-copy-centralization.md
+# plus its runtimehttp-kernel follow-up; the scan still covers the legacy
+# apps/api/internal/**/message.go and apps/api/internal/**/errors.go names
+# for transitional or skipped packages). The runtimehttp kernel table
+# (apps/api/internal/runtime/interfaces/http/errors.go) is alias-only and
+# must stay free of string literals (pinned by the alias guard below);
+# wording lives exactly once in copy.go.
+# wording is managed centrally in the "Backend Copy
 # Vocabulary" section of apps/api/CONTEXT.md. This script is the
 # mechanical pin: every banned variant below must never reappear
 # as a double-quoted literal in those tables.
@@ -70,7 +75,7 @@ banned_variants=(
 tables=()
 while IFS= read -r table; do
   tables+=("$table")
-done < <(find "$repo_root/apps/api/internal" -type f \( -name 'message.go' -o -name 'errors.go' \) | sort)
+done < <(find "$repo_root/apps/api/internal" -type f \( -name 'message.go' -o -name 'errors.go' -o -name 'copy.go' \) | sort)
 (( ${#tables[@]} > 0 )) || die "no message.go/errors.go tables found under $repo_root/apps/api/internal"
 
 fail=0
@@ -89,6 +94,28 @@ if ((fail != 0)); then
   printf '\nDeprecated backend copy reappeared (%d hit(s))\n' "$hits" >&2
   printf 'Replace with the canonical wording from the "Backend Copy Vocabulary" table in apps/api/CONTEXT.md.\n' >&2
   exit 1
+fi
+
+# The runtimehttp kernel table converged into errorrender/copy.go
+# (ADR-0017 follow-up): it must hold alias-only consts
+# (MsgX = errorrender.MsgY) and no string literals. Comment lines,
+# the package/import preamble, and the const block delimiters are
+# exempt; every other line must be a bare alias assignment.
+kernel_aliases="$repo_root/apps/api/internal/runtime/interfaces/http/errors.go"
+if [[ -f "$kernel_aliases" ]]; then
+  kernel_leftover="$(sed -e 's|//.*$||' "$kernel_aliases" \
+    | grep -v '^[[:space:]]*$' \
+    | grep -v '^[[:space:]]*package ' \
+    | grep -v '^[[:space:]]*import' \
+    | grep -v '"ideaboard' \
+    | grep -v '^[[:space:]]*const' \
+    | grep -v '^[[:space:]]*)$' \
+    | grep -Ev '^[[:space:]]*Msg[A-Za-z0-9_]+[[:space:]]*=[[:space:]]*errorrender\.Msg[A-Za-z0-9_]+[[:space:]]*$' || true)"
+  if [[ -n "$kernel_leftover" ]]; then
+    printf 'NON-ALIAS content in %s:\n%s\n' "$kernel_aliases" "$kernel_leftover" >&2
+    printf 'Kernel copy must stay alias-only; add wording in platform/errorrender/copy.go.\n' >&2
+    exit 1
+  fi
 fi
 
 echo "backend copy: OK (${#banned_variants[@]} banned variants absent across ${#tables[@]} tables)"

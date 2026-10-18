@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/platform/errorrender"
 	"strings"
 	"time"
 
@@ -162,7 +163,7 @@ func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string
 		limit = DefaultRechargeHistoryLimit
 	}
 	if limit < 1 || limit > MaxRechargeHistoryLimit {
-		return paymentcontracts.RechargeHistoryPage{}, fmt.Errorf(msgListRecharges, paymentcontracts.ErrRechargeHistoryLimit, MaxRechargeHistoryLimit)
+		return paymentcontracts.RechargeHistoryPage{}, fmt.Errorf(errorrender.MsgListRecharges, paymentcontracts.ErrRechargeHistoryLimit, MaxRechargeHistoryLimit)
 	}
 	parsedCursor, err := DecodeRechargeHistoryCursor(cursor)
 	if err != nil {

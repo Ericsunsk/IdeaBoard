@@ -10,6 +10,11 @@ import (
 // InMemoryStore is a mutex-guarded Store implementation for tests ONLY.
 // It must never be wired in production; the DB sibling swaps it out with
 // a postgres/sqlc implementation of Store.
+//
+// The board membership scope below is a separate seam
+// (boards.WorkspaceMembershipScope), not part of Store.
+var _ Store = (*InMemoryStore)(nil)
+
 type InMemoryStore struct {
 	mu            sync.Mutex
 	nextID        int64

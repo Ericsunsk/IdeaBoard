@@ -3,6 +3,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"math"
 
 	"ideaboard/api/internal/workflow/paramkeys"
@@ -139,7 +140,7 @@ func normalizeVariationsContract(params map[string]interface{}) error {
 	}
 	strength, ok := readNumberField(obj, paramkeys.Strength)
 	if !ok {
-		return errors.New(msgNormalizeVariationsContract)
+		return errors.New(errorrender.MsgNormalizeVariationsContract)
 	}
 	obj[paramkeys.Strength] = clampPercent(strength)
 	params[ParamKeyVariation] = obj
@@ -154,16 +155,16 @@ func normalizeOutpaintContract(params map[string]interface{}) error {
 	for _, key := range []string{paramkeys.TargetWidth, paramkeys.TargetHeight, paramkeys.ImageOffsetX, paramkeys.ImageOffsetY} {
 		value, ok := readNumberField(obj, key)
 		if !ok {
-			return fmt.Errorf(msgNormalizeOutpaintContract, key)
+			return fmt.Errorf(errorrender.MsgNormalizeOutpaintContract, key)
 		}
 		if math.IsNaN(value) || math.IsInf(value, 0) || math.Trunc(value) != value {
-			return fmt.Errorf(msgNormalizeOutpaintContract2, key)
+			return fmt.Errorf(errorrender.MsgNormalizeOutpaintContract2, key)
 		}
 		if (key == paramkeys.TargetWidth || key == paramkeys.TargetHeight) && value <= 0 {
-			return fmt.Errorf(msgNormalizeOutpaintContract3, key)
+			return fmt.Errorf(errorrender.MsgNormalizeOutpaintContract3, key)
 		}
 		if (key == paramkeys.ImageOffsetX || key == paramkeys.ImageOffsetY) && value < 0 {
-			return fmt.Errorf(msgNormalizeOutpaintContract4, key)
+			return fmt.Errorf(errorrender.MsgNormalizeOutpaintContract4, key)
 		}
 		obj[key] = value
 	}
@@ -178,10 +179,10 @@ func normalizeUpscaleContract(params map[string]interface{}) error {
 	}
 	scale, ok := readNumberField(obj, paramkeys.Scale)
 	if !ok {
-		return errors.New(msgNormalizeUpscaleContract)
+		return errors.New(errorrender.MsgNormalizeUpscaleContract)
 	}
 	if scale < 1 || scale > 4 || math.Abs(scale*10-math.Round(scale*10)) > 1e-9 {
-		return errors.New(msgNormalizeUpscaleContract2)
+		return errors.New(errorrender.MsgNormalizeUpscaleContract2)
 	}
 	obj[paramkeys.Scale] = math.Round(scale*10) / 10
 	params[ParamKeyUpscale] = obj
@@ -195,7 +196,7 @@ func normalizeFusionContract(params map[string]interface{}) error {
 	}
 	weights, ok := ReadFusionInputWeights(params)
 	if !ok || len(weights) == 0 {
-		return errors.New(msgNormalizeFusionContract)
+		return errors.New(errorrender.MsgNormalizeFusionContract)
 	}
 	obj[paramkeys.InputWeights] = weights
 	obj[paramkeys.Mode] = "weighted_reference"
@@ -206,7 +207,7 @@ func normalizeFusionContract(params map[string]interface{}) error {
 func requiredWorkflowObjectParam(params map[string]interface{}, key string) (map[string]interface{}, error) {
 	obj, ok := readWorkflowObjectParam(params, key)
 	if !ok {
-		return nil, fmt.Errorf(msgRequiredWorkflowObjectParam, key)
+		return nil, fmt.Errorf(errorrender.MsgRequiredWorkflowObjectParam, key)
 	}
 	return obj, nil
 }

@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"io"
 	"os"
 	"strings"
@@ -72,7 +73,7 @@ func KeyVersion() string {
 
 func RequireEncryptionEnabled() error {
 	if !IsEncryptionEnabled() {
-		return errors.New(msgRequireEncryptionEnabled)
+		return errors.New(errorrender.MsgRequireEncryptionEnabled)
 	}
 	return nil
 }
@@ -85,15 +86,15 @@ func Encrypt(plaintext []byte) (string, error) {
 	}
 	block, err := aes.NewCipher(EncryptionKey)
 	if err != nil {
-		return "", fmt.Errorf(msgEncrypt, err)
+		return "", fmt.Errorf(errorrender.MsgEncrypt, err)
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", fmt.Errorf(msgEncrypt2, err)
+		return "", fmt.Errorf(errorrender.MsgEncrypt2, err)
 	}
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", fmt.Errorf(msgEncrypt3, err)
+		return "", fmt.Errorf(errorrender.MsgEncrypt3, err)
 	}
 	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
@@ -110,19 +111,19 @@ func Decrypt(encoded string) ([]byte, error) {
 	}
 	ciphertext, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
-		return nil, fmt.Errorf(msgDecrypt, err)
+		return nil, fmt.Errorf(errorrender.MsgDecrypt, err)
 	}
 	block, err := aes.NewCipher(EncryptionKey)
 	if err != nil {
-		return nil, fmt.Errorf(msgEncrypt, err)
+		return nil, fmt.Errorf(errorrender.MsgEncrypt, err)
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, fmt.Errorf(msgEncrypt2, err)
+		return nil, fmt.Errorf(errorrender.MsgEncrypt2, err)
 	}
 	nonceSize := gcm.NonceSize()
 	if len(ciphertext) < nonceSize {
-		return nil, errors.New(msgDecrypt2)
+		return nil, errors.New(errorrender.MsgDecrypt2)
 	}
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
 	return gcm.Open(nil, nonce, ciphertext, nil)

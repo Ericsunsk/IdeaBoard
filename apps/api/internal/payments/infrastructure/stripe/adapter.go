@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"net/http"
 	"strings"
 	"time"
@@ -51,23 +52,23 @@ func (a *Adapter) PrepareConfiguration(ctx context.Context, input paymentports.P
 	account, err := client.V1Accounts.Retrieve(ctx, nil)
 	a.observe(err, startedAt)
 	if err != nil {
-		return paymentports.PreparedStripeConfiguration{}, mapStripeError(msgPrepareConfiguration, err)
+		return paymentports.PreparedStripeConfiguration{}, mapStripeError(errorrender.MsgPrepareConfiguration, err)
 	}
 	if account == nil || strings.TrimSpace(account.ID) == "" {
-		return paymentports.PreparedStripeConfiguration{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgPrepareConfiguration2, nil)
+		return paymentports.PreparedStripeConfiguration{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, errorrender.MsgPrepareConfiguration2, nil)
 	}
 	if !account.ChargesEnabled {
-		return paymentports.PreparedStripeConfiguration{}, paymentports.NewGatewayError(paymentports.GatewayErrorCapabilityMissing, msgPrepareConfiguration3, nil)
+		return paymentports.PreparedStripeConfiguration{}, paymentports.NewGatewayError(paymentports.GatewayErrorCapabilityMissing, errorrender.MsgPrepareConfiguration3, nil)
 	}
 	startedAt = time.Now()
 	paymentMethodConfiguration, err := client.V1PaymentMethodConfigurations.Retrieve(ctx, input.PaymentMethodConfigurationID, nil)
 	a.observe(err, startedAt)
 	if err != nil {
-		return paymentports.PreparedStripeConfiguration{}, mapStripeError(msgPrepareConfiguration4, err)
+		return paymentports.PreparedStripeConfiguration{}, mapStripeError(errorrender.MsgPrepareConfiguration4, err)
 	}
 	if paymentMethodConfiguration == nil || paymentMethodConfiguration.ID != input.PaymentMethodConfigurationID ||
 		paymentMethodConfiguration.Livemode != (input.Mode == paymentports.StripeModeLive) || !paymentMethodConfiguration.Active {
-		return paymentports.PreparedStripeConfiguration{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgPrepareConfiguration5, nil)
+		return paymentports.PreparedStripeConfiguration{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, errorrender.MsgPrepareConfiguration5, nil)
 	}
 	product, err := a.ensureProduct(ctx, client, input, account.ID)
 	if err != nil {
@@ -93,7 +94,7 @@ func (a *Adapter) ensureProduct(ctx context.Context, client *stripe.Client, inpu
 			return a.updateProduct(ctx, client, product.ID, input.ProductTaxCode)
 		}
 		if err != nil && !isStripeNotFound(err) {
-			return nil, mapStripeError(msgEnsureProduct, err)
+			return nil, mapStripeError(errorrender.MsgEnsureProduct, err)
 		}
 	}
 
@@ -109,7 +110,7 @@ func (a *Adapter) ensureProduct(ctx context.Context, client *stripe.Client, inpu
 	}
 	if err := list.Err(); err != nil {
 		a.observe(err, listStartedAt)
-		return nil, mapStripeError(msgEnsureProduct2, err)
+		return nil, mapStripeError(errorrender.MsgEnsureProduct2, err)
 	}
 	a.observe(nil, listStartedAt)
 
@@ -123,10 +124,10 @@ func (a *Adapter) ensureProduct(ctx context.Context, client *stripe.Client, inpu
 	product, err := client.V1Products.Create(ctx, params)
 	a.observe(err, createStartedAt)
 	if err != nil {
-		return nil, mapStripeError(msgEnsureProduct3, err)
+		return nil, mapStripeError(errorrender.MsgEnsureProduct3, err)
 	}
 	if product == nil || strings.TrimSpace(product.ID) == "" {
-		return nil, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgEnsureProduct4, nil)
+		return nil, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, errorrender.MsgEnsureProduct4, nil)
 	}
 	return product, nil
 }
@@ -140,10 +141,10 @@ func (a *Adapter) updateProduct(ctx context.Context, client *stripe.Client, prod
 	})
 	a.observe(err, startedAt)
 	if err != nil {
-		return nil, mapStripeError(msgUpdateProduct, err)
+		return nil, mapStripeError(errorrender.MsgUpdateProduct, err)
 	}
 	if product == nil || strings.TrimSpace(product.ID) == "" {
-		return nil, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgEnsureProduct4, nil)
+		return nil, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, errorrender.MsgEnsureProduct4, nil)
 	}
 	return product, nil
 }
@@ -161,7 +162,7 @@ func (a *Adapter) ensureWebhookEndpoint(ctx context.Context, client *stripe.Clie
 			return updated, input.ExistingWebhookSecret, nil
 		}
 		if err != nil && !isStripeNotFound(err) {
-			return nil, "", mapStripeError(msgEnsureWebhookEndpoint, err)
+			return nil, "", mapStripeError(errorrender.MsgEnsureWebhookEndpoint, err)
 		}
 	}
 
@@ -175,10 +176,10 @@ func (a *Adapter) ensureWebhookEndpoint(ctx context.Context, client *stripe.Clie
 	endpoint, err := client.V1WebhookEndpoints.Create(ctx, params)
 	a.observe(err, createStartedAt)
 	if err != nil {
-		return nil, "", mapStripeError(msgEnsureWebhookEndpoint2, err)
+		return nil, "", mapStripeError(errorrender.MsgEnsureWebhookEndpoint2, err)
 	}
 	if endpoint == nil || strings.TrimSpace(endpoint.ID) == "" || strings.TrimSpace(endpoint.Secret) == "" {
-		return nil, "", paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgEnsureWebhookEndpoint3, nil)
+		return nil, "", paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, errorrender.MsgEnsureWebhookEndpoint3, nil)
 	}
 	return endpoint, endpoint.Secret, nil
 }
@@ -192,10 +193,10 @@ func (a *Adapter) updateWebhookEndpoint(ctx context.Context, client *stripe.Clie
 	})
 	a.observe(err, startedAt)
 	if err != nil {
-		return nil, mapStripeError(msgUpdateWebhookEndpoint, err)
+		return nil, mapStripeError(errorrender.MsgUpdateWebhookEndpoint, err)
 	}
 	if endpoint == nil || strings.TrimSpace(endpoint.ID) == "" {
-		return nil, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgEnsureWebhookEndpoint3, nil)
+		return nil, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, errorrender.MsgEnsureWebhookEndpoint3, nil)
 	}
 	return endpoint, nil
 }
@@ -229,17 +230,17 @@ func isStripeNotFound(err error) bool {
 func mapStripeError(operation string, err error) error {
 	var stripeErr *stripe.Error
 	if !errors.As(err, &stripeErr) {
-		return paymentports.NewGatewayError(paymentports.GatewayErrorProviderUnavailable, operation+msgMapStripeError, err)
+		return paymentports.NewGatewayError(paymentports.GatewayErrorProviderUnavailable, operation+errorrender.MsgMapStripeError, err)
 	}
 	code := paymentports.GatewayErrorProviderUnavailable
-	message := operation + msgMapStripeError
+	message := operation + errorrender.MsgMapStripeError
 	switch stripeErr.HTTPStatusCode {
 	case http.StatusUnauthorized:
-		code, message = paymentports.GatewayErrorInvalidKey, msgMapStripeError2
+		code, message = paymentports.GatewayErrorInvalidKey, errorrender.MsgMapStripeError2
 	case http.StatusForbidden:
-		code, message = paymentports.GatewayErrorPermissionDenied, msgMapStripeError3
+		code, message = paymentports.GatewayErrorPermissionDenied, errorrender.MsgMapStripeError3
 	case http.StatusBadRequest, http.StatusNotFound:
-		code, message = paymentports.GatewayErrorInvalidResponse, msgMapStripeError4
+		code, message = paymentports.GatewayErrorInvalidResponse, errorrender.MsgMapStripeError4
 	}
 	return paymentports.NewGatewayError(code, message, err)
 }
@@ -256,7 +257,7 @@ func mapStripeCreateError(operation string, err error) error {
 	case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
 		return paymentports.NewGatewayError(
 			paymentports.GatewayErrorRequestRejected,
-			operation+msgMapStripeCreateError,
+			operation+errorrender.MsgMapStripeCreateError,
 			err,
 		)
 	default:

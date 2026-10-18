@@ -1,4 +1,4 @@
-package httpapi
+package http
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/identity/auth"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	identityports "ideaboard/api/internal/identity/users/ports"
+	"ideaboard/api/internal/media/derivatives/infrastructure/preview"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
@@ -21,25 +22,18 @@ import (
 )
 
 type Dependencies struct {
-	Auth                AuthDeps
 	PublicSearchHandler *searchhttp.SearchHandler
 	CORSMiddleware      gin.HandlerFunc
 	RateLimit           settings.RateLimitSettingProvider
 	Branding            settings.BrandingSettingProvider
 	PaymentWebhook      *paymenthttp.WebhookHandler
 	Internal            InternalRouteDeps
-	// ContractV1 wires the real Public Data Plane handlers (issue #801).
-	// Nil Store keeps workspace/org/member endpoints fail-closed with 501
-	// until the DB sibling implements tenancy.Store against sqlc.
-	ContractV1 ContractV1Deps
-	// ContractV1Billing wires the workspace billing surface (issue #804:
-	// billing account, credits balance/ledger, billing records, usage,
-	// checkout sessions). Zero value keeps the endpoints fail-closed.
-	ContractV1Billing ContractV1BillingDeps
-	// ContractControl wires the Control Plane administration surface
-	// (issue #808). Zero value keeps every control route fail-closed
-	// with 501/503.
-	ContractControl ContractControlDeps
+	// MediaPreviews serves the kernel public preview route
+	// (/api/media/previews/:token/:tier). Split from ContractV1Deps
+	// during the plane split: the kernel owns this public route while
+	// v1 owns the workspace media surface. Composition wires the same
+	// instance to both Dependencies.MediaPreviews and the v1 deps.
+	MediaPreviews *preview.Service
 	// REDMetrics feeds the per-route latency/error middleware. Nil keeps the
 	// middleware a pass-through; production wires the Prometheus set.
 	REDMetrics *redmetrics.Set
@@ -73,25 +67,18 @@ const (
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {
 	registerGlobalMiddleware(r, deps)
 	registerPublicRoutes(r, deps.Branding, deps.PublicSearchHandler, deps.ReadyChecker)
-	registerPublicMediaRoutes(r, deps.ContractV1.MediaPreviews)
+	registerPublicMediaRoutes(r, deps.MediaPreviews)
 	registerPaymentWebhookRoutes(r, deps.PaymentWebhook)
 	registerInternalRoutes(r, deps.Internal)
-	// Contract kernel v1 routes (issue #800 kernel, #801 handlers):
-	// the /api/v1 Public Data Plane plus the /api/control/v1 Control
-	// Plane (issue #808: capability auth, separate rate limits, audit).
+	// Plane split: the /api/v1 Public Data Plane (v1.RegisterContractV1RoutesOnEngine +
+	// v1.RegisterContractV1BillingRoutesOnEngine) and the /api/control/v1
+	// Control Plane (control.RegisterContractControlRoutesOnEngine) are
+	// mounted by composition (registerHTTPRoutes), not here, so the kernel
+	// never imports v1/control (no import cycle: planes import the kernel).
 	// Legacy /api/user and /api/admin routes were deleted by the #809
 	// hard cut (no compatibility aliases, no dual-read/dual-write).
 	// Registered before the SPA fallback so explicit contract routes
 	// win over NoRoute.
-	registerContractV1RoutesOnEngine(r, deps.Auth, deps.ContractV1)
-	// Workspace billing surface (issue #804): implicit per-workspace
-	// billing account + credits/billing/payments read and checkout
-	// contracts.
-	RegisterContractV1BillingRoutesOnEngine(r, deps.Auth, deps.ContractV1Billing)
-	// Control Plane administration (issue #808): separate capability
-	// chain, rate-limit bucket, and mandatory audit.
-	RegisterContractControlRoutesOnEngine(r, deps.Auth, deps.ContractControl)
-
 	RegisterFrontendRoutes(r, frontendFS, frontendOptions)
 }
 
@@ -133,7 +120,7 @@ func readyHandler(checker ports.HealthChecker) gin.HandlerFunc {
 		defer cancel()
 		status := checker.CheckHealth(ctx)
 		if !status.Ready {
-			response.Error(c, http.StatusServiceUnavailable, msgReadyHandler)
+			response.Error(c, http.StatusServiceUnavailable, MsgReadyHandler)
 			return
 		}
 		response.SuccessDTO(c, readyResponse{Status: "ok", Ready: true, Component: status.Name})
@@ -143,12 +130,12 @@ func readyHandler(checker ports.HealthChecker) gin.HandlerFunc {
 func publicBrandingSettingsHandler(provider settings.BrandingSettingProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if provider == nil {
-			response.InternalError(c, http.StatusInternalServerError, msgPublicBrandingSettingsHandler, errors.New("branding settings provider is not initialized"))
+			response.InternalError(c, http.StatusInternalServerError, MsgPublicBrandingSettingsHandler, errors.New("branding settings provider is not initialized"))
 			return
 		}
 		branding, err := provider.GetBranding(c.Request.Context())
 		if err != nil {
-			response.InternalError(c, http.StatusInternalServerError, msgServiceUnavailable22, err)
+			response.InternalError(c, http.StatusInternalServerError, MsgServiceUnavailable22, err)
 			return
 		}
 		// The service already returns the display form (stored logo keys

@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"strings"
 
 	"ideaboard/api/internal/media/imageformat"
@@ -22,18 +23,18 @@ func ParseDataImageURL(raw string, maxDecodedBytes int) (*DataImage, error) {
 	trimmed := strings.TrimSpace(raw)
 	lower := strings.ToLower(trimmed)
 	if !strings.HasPrefix(lower, "data:image/") {
-		return nil, errors.New(msgParseDataImageURL)
+		return nil, errors.New(errorrender.MsgParseDataImageURL)
 	}
 	comma := strings.Index(trimmed, ",")
 	if comma <= 5 {
-		return nil, errors.New(msgParseDataImageURL2)
+		return nil, errors.New(errorrender.MsgParseDataImageURL2)
 	}
 	header := trimmed[5:comma]
 	payload := trimmed[comma+1:]
 	parts := strings.Split(header, ";")
 	mimeType := strings.ToLower(strings.TrimSpace(parts[0]))
 	if !strings.HasPrefix(mimeType, "image/") {
-		return nil, errors.New(msgParseDataImageURL2)
+		return nil, errors.New(errorrender.MsgParseDataImageURL2)
 	}
 	isBase64 := false
 	for _, part := range parts[1:] {
@@ -43,18 +44,18 @@ func ParseDataImageURL(raw string, maxDecodedBytes int) (*DataImage, error) {
 		}
 	}
 	if !isBase64 {
-		return nil, errors.New(msgParseDataImageURL2)
+		return nil, errors.New(errorrender.MsgParseDataImageURL2)
 	}
 	decoded, err := base64.StdEncoding.DecodeString(payload)
 	if err != nil {
-		return nil, errors.New(msgParseDataImageURL2)
+		return nil, errors.New(errorrender.MsgParseDataImageURL2)
 	}
 	if maxDecodedBytes > 0 && len(decoded) > maxDecodedBytes {
-		return nil, errors.New(msgParseDataImageURL3)
+		return nil, errors.New(errorrender.MsgParseDataImageURL3)
 	}
 	ext := imageExtensionFromMIME(mimeType)
 	if ext == "" {
-		return nil, errors.New(msgParseDataImageURL4)
+		return nil, errors.New(errorrender.MsgParseDataImageURL4)
 	}
 	return &DataImage{
 		MIMEType: mimeType,
@@ -74,7 +75,7 @@ func ForEachParamMediaRef(params map[string]interface{}, onRef func(key string, 
 		}
 		value, ok := raw.(string)
 		if !ok {
-			return fmt.Errorf(msgForEachParamMediaRef, key)
+			return fmt.Errorf(errorrender.MsgForEachParamMediaRef, key)
 		}
 		if err := onRef(key, value); err != nil {
 			return err
@@ -121,7 +122,7 @@ func forEachStringList(raw interface{}, key string, strict bool, onValue func(st
 			value, ok := item.(string)
 			if !ok {
 				if strict {
-					return fmt.Errorf(msgForEachStringList, key)
+					return fmt.Errorf(errorrender.MsgForEachStringList, key)
 				}
 				continue
 			}
@@ -131,7 +132,7 @@ func forEachStringList(raw interface{}, key string, strict bool, onValue func(st
 		}
 	default:
 		if strict {
-			return fmt.Errorf(msgForEachStringList, key)
+			return fmt.Errorf(errorrender.MsgForEachStringList, key)
 		}
 	}
 	return nil

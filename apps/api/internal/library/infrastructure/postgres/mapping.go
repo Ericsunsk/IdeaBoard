@@ -67,8 +67,8 @@ func assetFromRow(workspacePublicID string, view dbsqlc.GetLibraryAssetByPublicI
 // ensureQuickSavesFolderRow ensures the workspace Quick Saves system
 // folder (INSERT ... ON CONFLICT DO NOTHING + read back the winner, so
 // concurrent callers converge). A user folder squatting the exact
-// 'Quick Saves' name surfaces as a name conflict: the operator must
-// rename it before Quick Saves can exist.
+// domain.QuickSavesFolderName surfaces as a name conflict: the operator
+// must rename it before Quick Saves can exist.
 func ensureQuickSavesFolderRow(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID int64) (dbsqlc.LibraryFolder, error) {
 	publicID, err := domain.NewV1FolderPublicID()
 	if err != nil {

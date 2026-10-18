@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/platform/validation"
+	"ideaboard/api/internal/platform/errorrender"
 	tasks "ideaboard/api/internal/tasking/domain"
 )
 
@@ -78,7 +78,7 @@ func normalizeStatisticsRange(raw string) (StatisticsRange, int, error) {
 	case StatisticsRange1Y:
 		return StatisticsRange1Y, 365, nil
 	default:
-		return "", 0, validation.New(msgNormalizeStatisticsRange)
+		return "", 0, errorrender.NewValidationError(errorrender.MsgNormalizeStatisticsRange)
 	}
 }
 
@@ -109,17 +109,17 @@ type executionPressureBucket struct {
 }
 
 var monitorExecutionPressureBuckets = []executionPressureBucket{
-	{key: "fast_completed", label: msgGetTaskStats, basePressure: 8},
-	{key: "slow_completed", label: msgGetTaskStats2, basePressure: 28},
-	{key: "normal_pending", label: msgGetTaskStats3, basePressure: 22},
-	{key: "backlog_pending", label: msgGetTaskStats4, basePressure: 58},
-	{key: "normal_running", label: msgGetTaskStats5, basePressure: 32},
-	{key: "stuck_running", label: msgGetTaskStats6, basePressure: 82},
-	{key: "fast_failed", label: msgGetTaskStats7, basePressure: 78},
-	{key: "slow_failed", label: msgGetTaskStats8, basePressure: 94},
-	{key: "cancelled", label: msgGetTaskStats9, basePressure: 34},
-	{key: "retrying", label: msgGetTaskStats10, basePressure: 68},
-	{key: "other", label: msgGetTaskStats11, basePressure: 40},
+	{key: "fast_completed", label: errorrender.MsgGetTaskStats, basePressure: 8},
+	{key: "slow_completed", label: errorrender.MsgGetTaskStats2, basePressure: 28},
+	{key: "normal_pending", label: errorrender.MsgGetTaskStats3, basePressure: 22},
+	{key: "backlog_pending", label: errorrender.MsgGetTaskStats4, basePressure: 58},
+	{key: "normal_running", label: errorrender.MsgGetTaskStats5, basePressure: 32},
+	{key: "stuck_running", label: errorrender.MsgGetTaskStats6, basePressure: 82},
+	{key: "fast_failed", label: errorrender.MsgGetTaskStats7, basePressure: 78},
+	{key: "slow_failed", label: errorrender.MsgGetTaskStats8, basePressure: 94},
+	{key: "cancelled", label: errorrender.MsgGetTaskStats9, basePressure: 34},
+	{key: "retrying", label: errorrender.MsgGetTaskStats10, basePressure: 68},
+	{key: "other", label: errorrender.MsgGetTaskStats11, basePressure: 40},
 }
 
 func (s *Service) GetMonitorExecutionPressure(ctx context.Context) ([]MonitorExecutionPressurePoint, error) {
@@ -574,7 +574,7 @@ func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Tim
 		}
 		model := strings.TrimSpace(row.ModelName)
 		if model == "" {
-			model = msgBuildIntradayTrendItems
+			model = errorrender.MsgBuildIntradayTrendItems
 		}
 		bucket.models[model] += row.OutputCount
 	}
@@ -710,42 +710,42 @@ func buildFailureCategories(rows []statisticscontracts.ExecutionFailureCategoryA
 func bottleneckSourceLabel(source string) string {
 	switch source {
 	case tasks.BottleneckSourceQueue:
-		return msgBottleneckSourceLabel
+		return errorrender.MsgBottleneckSourceLabel
 	case tasks.BottleneckSourceWorker:
-		return msgBottleneckSourceLabel2
+		return errorrender.MsgBottleneckSourceLabel2
 	case tasks.BottleneckSourceProvider:
-		return msgBottleneckSourceLabel3
+		return errorrender.MsgBottleneckSourceLabel3
 	case tasks.BottleneckSourceStorage:
-		return msgBottleneckSourceLabel4
+		return errorrender.MsgBottleneckSourceLabel4
 	case tasks.BottleneckSourceFinalize:
-		return msgBottleneckSourceLabel5
+		return errorrender.MsgBottleneckSourceLabel5
 	case tasks.BottleneckSourceInput:
-		return msgBottleneckSourceLabel6
+		return errorrender.MsgBottleneckSourceLabel6
 	default:
-		return msgBottleneckSourceLabel7
+		return errorrender.MsgBottleneckSourceLabel7
 	}
 }
 
 func failureCategoryLabel(category string) string {
 	switch category {
 	case tasks.FailureCategoryInputInvalid:
-		return msgFailureCategoryLabel
+		return errorrender.MsgFailureCategoryLabel
 	case tasks.FailureCategoryAuth:
-		return msgFailureCategoryLabel2
+		return errorrender.MsgFailureCategoryLabel2
 	case tasks.FailureCategoryQuota:
-		return msgFailureCategoryLabel3
+		return errorrender.MsgFailureCategoryLabel3
 	case tasks.FailureCategoryTimeout:
-		return msgFailureCategoryLabel4
+		return errorrender.MsgFailureCategoryLabel4
 	case tasks.FailureCategoryProviderError:
-		return msgFailureCategoryLabel5
+		return errorrender.MsgFailureCategoryLabel5
 	case tasks.FailureCategoryStorageError:
-		return msgFailureCategoryLabel6
+		return errorrender.MsgFailureCategoryLabel6
 	case tasks.FailureCategoryFinalizeError:
-		return msgBottleneckSourceLabel5
+		return errorrender.MsgBottleneckSourceLabel5
 	case tasks.FailureCategoryCancelled:
-		return msgFailureCategoryLabel7
+		return errorrender.MsgFailureCategoryLabel7
 	default:
-		return msgFailureCategoryLabel8
+		return errorrender.MsgFailureCategoryLabel8
 	}
 }
 

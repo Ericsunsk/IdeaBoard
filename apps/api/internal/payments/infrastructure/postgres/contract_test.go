@@ -6,8 +6,7 @@ import (
 )
 
 var (
-	_ paymentpersistence.StripeConfigurationStore = (*postgres.Repository)(nil)
-	_ paymentpersistence.StripeWebhookInboxStore  = (*postgres.Repository)(nil)
-	_ paymentpersistence.PaymentCheckoutStore     = (*postgres.Repository)(nil)
-	_ paymentpersistence.PaymentConvergenceStore  = (*postgres.Repository)(nil)
+	_ paymentpersistence.StripeConfigurationStore     = (*postgres.Repository)(nil)
+	_ paymentpersistence.StripeWebhookInboxStore      = (*postgres.Repository)(nil)
+	_ paymentpersistence.PaymentOrderConvergenceStore = (*postgres.Repository)(nil)
 )

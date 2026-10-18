@@ -151,8 +151,8 @@
                               ]"
                             >
                               <AvatarImage
-                                v-if="userAvatarSrc(row)"
-                                :src="userAvatarSrc(row)!"
+                                v-if="resolveMemberAvatar(row, userStore.user)"
+                                :src="resolveMemberAvatar(row, userStore.user)!"
                                 :alt="memberDisplayName(row)"
                               />
                               <AvatarFallback class="text-xs font-semibold uppercase">
@@ -240,7 +240,7 @@ import type { ShareMemberRow } from '../../session/share/useShareRoster'
 import { useShareDialog, type ShareDialogDeps } from '../../session/share/useShareDialog'
 import { useUserStore } from '../../../auth'
 import type { SharePanel } from '../../session/share/useSharePanel'
-import { resolveSizedAvatarUrl } from '../../../../core/media/avatarUrl'
+import { resolveMemberAvatar } from '../../../../core/media/avatarUrl'
 import { shareDialogClasses, shareDialogContentClass } from './skin'
 
 const props = defineProps<{
@@ -361,16 +361,6 @@ function memberInitial(row: ShareMemberRow): string {
     return row.email.charAt(0).toUpperCase()
   }
   return row.userId.replace(/^usr_/, '').charAt(0).toUpperCase() || 'U'
-}
-
-function userAvatarSrc(row: ShareMemberRow): string | undefined {
-  if (row.userId === userStore.user?.public_id && userStore.user?.avatar) {
-    return resolveSizedAvatarUrl(userStore.user.avatar, 64)
-  }
-  if (row.avatar_url) {
-    return resolveSizedAvatarUrl(row.avatar_url, 64)
-  }
-  return undefined
 }
 
 function memberTitle(row: ShareMemberRow): string {

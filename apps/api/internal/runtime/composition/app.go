@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/runtime/composition/wiring"
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
 
 	"github.com/gin-gonic/gin"
@@ -63,7 +64,7 @@ func runServe() {
 func runMigrate() {
 	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
-	if err := Migrate(context.Background(), cfg, cfg.Migration.AtlasBinary, cfg.Migration.MigrationsDir); err != nil {
+	if err := wiring.Migrate(context.Background(), cfg, cfg.Migration.AtlasBinary, cfg.Migration.MigrationsDir); err != nil {
 		fatal("failed to migrate database schema", "err", err)
 	}
 	slog.Info("database migration completed")
@@ -94,7 +95,7 @@ func runInitCreditWallets(args []string) {
 	}
 	defer pool.Close()
 	creditService := credits.NewService(pool)
-	service := newIdentityLifecycle(pool, identitycreditsadapter.New(creditService), rawKey)
+	service := wiring.NewIdentityLifecycle(pool, identitycreditsadapter.New(creditService), rawKey)
 	if err := service.VerifyWelcomeIdentityKey(ctx); err != nil {
 		fatal("failed to verify Welcome identity key", "err", err)
 	}
@@ -114,7 +115,7 @@ func runInitCreditWallets(args []string) {
 func runFinalizeMigrate() {
 	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
-	if err := finalizeAppDatabases(context.Background(), cfg); err != nil {
+	if err := wiring.FinalizeAppDatabases(context.Background(), cfg); err != nil {
 		fatal("failed to finalize database migration", "err", err)
 	}
 	slog.Info("database migration finalization completed")
@@ -135,7 +136,7 @@ func runInitAdmin() {
 	}
 	defer pool.Close()
 	creditService := credits.NewService(pool)
-	lifecycle := newIdentityLifecycle(pool, identitycreditsadapter.New(creditService), rawKey)
+	lifecycle := wiring.NewIdentityLifecycle(pool, identitycreditsadapter.New(creditService), rawKey)
 	if err := lifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {
 		fatal("failed to verify Welcome identity key", "err", err)
 	}
@@ -179,7 +180,7 @@ func loadConfigOrFatal() *config.Config {
 	if err != nil {
 		fatal("invalid configuration", "err", err)
 	}
-	if err := validateImgproxyOrFatal(cfg); err != nil {
+	if err := wiring.ValidateImgproxyOrFatal(cfg); err != nil {
 		fatal("invalid imgproxy configuration", "err", err)
 	}
 	return cfg

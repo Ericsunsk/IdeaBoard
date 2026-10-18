@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"net/http"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/platform/telemetry"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers/dialects"
-	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
+	providerdomain "ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
@@ -43,7 +44,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	correlationID := task.EnsureCorrelationID()
 	model := strings.TrimSpace(input.Model)
 	if model == "" {
-		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, errors.New(msgCallGatewayAPI))
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, errors.New(errorrender.MsgRuntimeInterfacesWorkerProvidersCallGatewayAPI))
 	}
 	provider, modelName, pathOverride, err := runtimeports.SplitGatewayModel(model)
 	if err != nil {
@@ -55,7 +56,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	if pathOverride == "" && c != nil && c.modelRoutes != nil {
 		catalogPath, catalogParams, found, routeErr := c.modelRoutes.LookupRouteOverride(ctx, model)
 		if routeErr != nil {
-			return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryProviderError, fmt.Errorf(msgCallGatewayAPI2, routeErr))
+			return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryProviderError, fmt.Errorf(errorrender.MsgCallGatewayAPI2, routeErr))
 		}
 		if found {
 			pathOverride = catalogPath
@@ -112,7 +113,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 		return output, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			providerFailureCategory(err),
-			fmt.Errorf(msgCallGatewayAPI3, model, err),
+			fmt.Errorf(errorrender.MsgCallGatewayAPI3, model, err),
 		)
 	}
 	imageURLs := normalizeProviderResultImageURLs(callResult)
@@ -120,7 +121,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 		return output, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			tasks.FailureCategoryProviderError,
-			errors.New(msgCallGatewayAPI4),
+			errors.New(errorrender.MsgCallGatewayAPI4),
 		)
 	}
 	finalizeStartedAt := time.Now()
@@ -150,7 +151,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	}
 	if len(imageURLs) == 0 {
 		markFinalizeFinished()
-		return output, runtimeports.NewExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, errors.New(msgCallGatewayAPI5))
+		return output, runtimeports.NewExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, errors.New(errorrender.MsgCallGatewayAPI5))
 	}
 	imageURL := imageURLs[0]
 	finalizeFinishedAt := time.Now()
@@ -203,7 +204,7 @@ func baseGatewayTaskResult(task *tasks.TaskPayload, model string, callResult pro
 }
 
 // gatewayCallTimeout bounds one gateway attempt per adapter family.
-func gatewayCallTimeout(_ domain.ProviderRuntimeAdapter) time.Duration {
+func gatewayCallTimeout(_ providerdomain.ProviderRuntimeAdapter) time.Duration {
 	return defaultGatewayCallTimeout
 }
 
@@ -255,20 +256,20 @@ func (c *Executor) callGatewayAdapter(
 ) (providerCallResult, error) {
 	timeout := gatewayCallTimeout(route.Adapter)
 	switch route.Adapter {
-	case domain.ProviderRuntimeAdapterModelImage:
+	case providerdomain.ProviderRuntimeAdapterModelImage:
 		return c.callGatewayModelImage(ctx, taskID, feature, provider, model, customParams, route, providerReq, operation, timeout)
-	case domain.ProviderRuntimeAdapterCutout:
+	case providerdomain.ProviderRuntimeAdapterCutout:
 		payload, err := buildCutoutGatewayPayload(c, providerReq)
 		if err != nil {
 			return providerCallResult{}, err
 		}
-		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, msgBuildCutoutGatewayPayload, timeout)
-	case domain.ProviderRuntimeAdapterUpscale:
+		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, errorrender.MsgBuildCutoutGatewayPayload, timeout)
+	case providerdomain.ProviderRuntimeAdapterUpscale:
 		payload, err := buildUpscaleGatewayPayload(c, providerReq)
 		if err != nil {
 			return providerCallResult{}, err
 		}
-		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, msgBuildUpscaleGatewayPayload2, timeout)
+		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, errorrender.MsgBuildUpscaleGatewayPayload2, timeout)
 	default:
 		return providerCallResult{}, fmt.Errorf("unsupported provider runtime adapter %d", route.Adapter)
 	}

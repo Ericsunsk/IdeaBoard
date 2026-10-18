@@ -297,7 +297,9 @@ Vue UI -> application use case -> resource/adapter -> generated API
 5. 核心状态机转换（Task 生命周期、支付收银台、Board 同步等）拥有确定性测试覆盖。
 6. 特性通过根目录 `index.ts` 或明确的 public subpath 暴露清晰公共 API，移除所有废弃旧门面（Facade）和无引用的兼容路径。
 
-### 6. 目录结构与命名治理契约 (Directory & Naming Governance Contract)
+### 6. 目录结构与命名治理契约 (Directory & Naming Governance Contract, frontend-only)
+
+本节第 1–5 条仅适用于前端 (`apps/web`)：`kebab-case` 目录、`PascalCase.vue`、`camelCase.ts`、scope 根 `index.ts` 唯一出口、`dependency-cruiser` 门禁均为前端专属，不套用到 Go 后端（`kebab-case` 在 Go 包名中非法）。后端命名见本节第 6 条。
 
 为保持工程架构一致性、可预测性与长期整洁度，全库执行统一的目录组织、文件命名与边界导出治理标准：
 
@@ -325,6 +327,15 @@ Vue UI -> application use case -> resource/adapter -> generated API
 5. **渐进收敛治理推进策略 (Ratchet Governance Pattern)**：
    - **增量零容忍**：新增特性或新增文件必须 100% 遵守本规范。
    - **存量渐进收敛**：结合日常特性演进与业务迭代按模块分批治理，由各模块统一提供 `index.ts`，消除命名冗余与深层引用。
+
+6. **Go 后端命名规范 (Go Backend Naming)**：
+   - **包名等于目录短名**：`package` 名与所在目录短名一致；跨域同名短包（`domain`、`events`、`infrastructure`、`tests`）必须改名，`import` 别名打架视为 P0。
+   - **`foo/foo.go` 是正统写法**（`config.Config` 式调用），不算 stutter，不改；真正的 stutter 只限泛型名：`ports/ports.go`、`testhelpers/testhelpers.go`、`message.go × N`。
+   - **测试默认 `foo.go ↔ foo_test.go` 同名配对**；`architecture`、`carrier`、`smoke`、`fixtures`、`boundary`、`seam`、`tests/` 集成目录测试列白名单，不强制配对，但禁新增后缀（`_db`、`_pg`、`_v2`、`test_` 前缀一律禁）。
+   - **存储统一 `postgres`**（目录 + 文件），禁 `pg`；禁版本号进文件名（`v1_`、`_v2`、`modelsdev` 类拼写）。
+   - **生成文件与 migration 不在本次范围**：`sqlc/*`、`schema.sql` 与 Atlas migrations 只许按既有 lifecycle 动。
+   - **errors.go 约定保留：单消费者 errors.go 不合并**（per-package 文案单源，结构性合并不得碰 errors.go/message.go）。
+   - **DDD 按体量分层，不统一深度**：`application/` 下实现文件 ≤6 个保持平铺；超了才按用例簇建子目录（`application/<cluster>/`，如 `commands`、`reconciliation`），子目录名用用例簇名，禁 `service/impl` 类层名。薄域可无 `application/` 直读写。
 
 UI 实现细节遵循 [apps/web/DESIGN.md](./apps/web/DESIGN.md)。
 

@@ -1,4 +1,4 @@
-package webhook
+package webhook_test
 
 import (
 	"context"
@@ -51,12 +51,12 @@ func TestDispatchPublishesExternalRefundOnlyAfterConvergence(t *testing.T) {
 		ID: "evt_refund_order", Type: "refund.updated",
 		ObjectID: "re_order", ChargeID: "ch_order", CreatedAt: now,
 	}
-	fx := newTestFixtures(t, event, nil)
-	fx.refundGw.refund = paymentports.StripeRefund{ID: "re_order", ChargeID: "ch_order", AmountMinor: 100, Currency: "usd", Status: "succeeded"}
 	publishedAfterConvergence := false
-	fx.service.events = countingPublisher{fn: func(int64, paymentports.PaymentEvent) {
+	var fx *testFixtures
+	fx = newTestFixtures(t, event, nil, countingPublisher{fn: func(int64, paymentports.PaymentEvent) {
 		publishedAfterConvergence = fx.convergence.refundConverged
-	}}
+	}})
+	fx.refundGw.refund = paymentports.StripeRefund{ID: "re_order", ChargeID: "ch_order", AmountMinor: 100, Currency: "usd", Status: "succeeded"}
 	if _, err := fx.service.ReceiveStripeWebhook(context.Background(), []byte("{}"), "sig"); err != nil {
 		t.Fatalf("ReceiveStripeWebhook: %v", err)
 	}
@@ -74,10 +74,9 @@ func TestDispatchConvergesDisputeThroughCanonicalRetrieve(t *testing.T) {
 		ID: "evt_dispute", Type: "charge.dispute.created",
 		ObjectID: "dp_test", ChargeID: "ch_test", CreatedAt: now,
 	}
-	fx := newTestFixtures(t, event, nil)
-	fx.disputeGw.dispute = paymentports.StripeDispute{ID: "dp_test", ChargeID: "ch_test"}
 	published := 0
-	fx.service.events = countingPublisher{fn: func(int64, paymentports.PaymentEvent) { published++ }}
+	fx := newTestFixtures(t, event, nil, countingPublisher{fn: func(int64, paymentports.PaymentEvent) { published++ }})
+	fx.disputeGw.dispute = paymentports.StripeDispute{ID: "dp_test", ChargeID: "ch_test"}
 	receipt, err := fx.service.ReceiveStripeWebhook(context.Background(), []byte("{}"), "sig")
 	if err != nil {
 		t.Fatalf("ReceiveStripeWebhook: %v", err)

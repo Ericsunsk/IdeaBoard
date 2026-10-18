@@ -1,10 +1,12 @@
-package postgres
+package postgres_test
 
 import (
 	"strings"
 	"testing"
 
 	"ideaboard/api/internal/testdb"
+
+	"ideaboard/api/internal/payments/infrastructure/postgres"
 )
 
 // TestQueryPaymentOrderExposurePinsOccupiedIdeas pins the shared
@@ -53,23 +55,15 @@ VALUES (gen_random_uuid(), $1::uuid, 42, 'dp_exposure_won', 'ch_exposure', 'clos
 		t.Fatalf("seed won dispute: %v", err)
 	}
 
-	exposure, err := queryPaymentOrderExposure(ctx, db, orderID)
+	exposure, err := postgres.QueryPaymentOrderExposure(ctx, db, orderID)
 	if err != nil {
 		t.Fatalf("query payment order exposure: %v", err)
 	}
-	if exposure.refundedIdeas != 175 || exposure.refundedAmount != 17500 {
-		t.Fatalf("refunded exposure = (%d, %d), want (175, 17500)", exposure.refundedIdeas, exposure.refundedAmount)
+	if exposure.RefundedIdeas != 175 || exposure.RefundedAmount != 17500 {
+		t.Fatalf("refunded exposure = (%d, %d), want (175, 17500)", exposure.RefundedIdeas, exposure.RefundedAmount)
 	}
-	if exposure.disputedIdeas != 0 || exposure.disputedAmount != 0 {
-		t.Fatalf("disputed exposure = (%d, %d), want (0, 0)", exposure.disputedIdeas, exposure.disputedAmount)
-	}
-
-	already, disputed, err := loadPendingRefundBalances(ctx, db, orderID)
-	if err != nil {
-		t.Fatalf("load pending refund balances: %v", err)
-	}
-	if already != 175 || disputed != 0 {
-		t.Fatalf("pending refund balances = (%d, %d), want (175, 0)", already, disputed)
+	if exposure.DisputedIdeas != 0 || exposure.DisputedAmount != 0 {
+		t.Fatalf("disputed exposure = (%d, %d), want (0, 0)", exposure.DisputedIdeas, exposure.DisputedAmount)
 	}
 
 	emptyID := "22222222-2222-4222-8222-222222222222"
@@ -79,11 +73,11 @@ VALUES ($1::uuid, 'IBP-20240101-EXPOSURE0002', gen_random_uuid(), 42, 'test-expo
 		emptyID, strings.Repeat("b", 64), credentialID); err != nil {
 		t.Fatalf("seed empty payment order: %v", err)
 	}
-	empty, err := queryPaymentOrderExposure(ctx, db, emptyID)
+	empty, err := postgres.QueryPaymentOrderExposure(ctx, db, emptyID)
 	if err != nil {
 		t.Fatalf("query empty payment order exposure: %v", err)
 	}
-	if empty != (paymentOrderExposure{}) {
+	if empty != (postgres.PaymentOrderExposure{}) {
 		t.Fatalf("empty exposure = %+v, want zeros", empty)
 	}
 }

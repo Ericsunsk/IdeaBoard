@@ -1,6 +1,12 @@
 package workflow
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+	"ideaboard/api/internal/media/mediarefs"
+	"ideaboard/api/internal/platform/errorrender"
+	"ideaboard/api/internal/workflow/paramkeys"
+)
 
 type GenerationPrimitive string
 
@@ -38,4 +44,30 @@ func (count RequestedOutputCount) Int() int { return int(count) }
 func (count RequestedOutputCount) Validate() error {
 	_, err := ParseRequestedOutputCount(count.Int())
 	return err
+}
+
+// merged from internal/workflow/generation_submit_contract.go (structural consolidation; symbols unchanged).
+const MaxGenerationReferenceImages = 4
+
+// ValidateGenerationSubmitContract keeps execution mode derived from the
+// ordered reference set. Callers cannot override the compiler primitive.
+func ValidateGenerationSubmitContract(params map[string]interface{}) error {
+	if params == nil {
+		return nil
+	}
+	for _, key := range []string{"mode", "primitive"} {
+		if _, exists := params[key]; exists {
+			return fmt.Errorf(errorrender.MsgValidateGenerationSubmitContract, key)
+		}
+	}
+	for _, key := range []string{paramkeys.ReferenceImageURLs, paramkeys.MaskImageURL, paramkeys.UseMask} {
+		if _, exists := params[key]; exists {
+			return errors.New(errorrender.MsgValidateGenerationSubmitContract2)
+		}
+	}
+	imageURLs := mediarefs.CollectStringList(params[paramkeys.ImageURLs])
+	if len(imageURLs) > MaxGenerationReferenceImages {
+		return fmt.Errorf(errorrender.MsgValidateGenerationSubmitContract3, MaxGenerationReferenceImages)
+	}
+	return nil
 }

@@ -1,4 +1,4 @@
-package postgres
+package postgres_test
 
 import (
 	"go/parser"
@@ -10,15 +10,13 @@ import (
 )
 
 func TestPostgresAdapterDoesNotImportPaymentsComposition(t *testing.T) {
-	entries, err := os.ReadDir(".")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
-			continue
+	err := filepath.WalkDir(".", func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		path := filepath.Join(".", entry.Name())
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			return nil
+		}
 		file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
 		if err != nil {
 			t.Fatalf("parse %s: %v", path, err)
@@ -28,5 +26,9 @@ func TestPostgresAdapterDoesNotImportPaymentsComposition(t *testing.T) {
 				t.Errorf("Postgres adapter file %s imports composition package", path)
 			}
 		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"ideaboard/api/internal/credits"
-	"ideaboard/api/internal/platform/database"
 	dbprivileges "ideaboard/api/internal/platform/database/privileges"
+	rewardspostgres "ideaboard/api/internal/rewards/infrastructure/postgres"
+	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
@@ -22,7 +23,7 @@ func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T
 	db, pool := testdb.OpenWithPool(t)
 	ctx := t.Context()
 	service := newTestRewardService(t, pool, credits.NewService(pool))
-	created, err := service.CreateRewardCode(ctx, CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(ctx, ports.CreateRewardCodeCommand{
 		DisplayName: "Runtime 权限奖励", Code: "RUNTIME26", CreditAmount: 20,
 		MaxRedemptions: 2, IdempotencyKey: "runtime-privileges", ActorUserID: 1,
 	})
@@ -42,7 +43,7 @@ func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T
 		_, _ = db.Exec(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL)
 	})
 
-	policies := []dbprivileges.Policy{database.RuntimePrivilegePolicy(), RuntimePrivilegePolicy()}
+	policies := []dbprivileges.Policy{dbprivileges.RuntimePrivilegePolicy(), rewardspostgres.RuntimePrivilegePolicy()}
 	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
 		t.Fatalf("configure runtime privilege policies: %v", err)
 	}
@@ -156,9 +157,9 @@ func TestRuntimeRoleCanUseRewardAdminServiceCommands(t *testing.T) {
 	db, ownerPool := testdb.OpenWithPool(t)
 	ctx := t.Context()
 	ownerService := newTestRewardService(t, ownerPool, credits.NewService(ownerPool))
-	createFixture := func(name, code, idempotencyKey string) CreatedRewardCode {
+	createFixture := func(name, code, idempotencyKey string) ports.CreatedRewardCode {
 		t.Helper()
-		created, err := ownerService.CreateRewardCode(ctx, CreateRewardCodeCommand{
+		created, err := ownerService.CreateRewardCode(ctx, ports.CreateRewardCodeCommand{
 			DisplayName: name, Code: code, CreditAmount: 20,
 			MaxRedemptions: 2, IdempotencyKey: idempotencyKey, ActorUserID: 1,
 		})
@@ -174,7 +175,7 @@ func TestRuntimeRoleCanUseRewardAdminServiceCommands(t *testing.T) {
 
 	runtimeRole := testdb.CreateRestrictedRole(t, db, "rewards_service_runtime")
 	policies := []dbprivileges.Policy{
-		database.RuntimePrivilegePolicy(), creditpostgres.RuntimePrivilegePolicy(), RuntimePrivilegePolicy(),
+		dbprivileges.RuntimePrivilegePolicy(), creditpostgres.RuntimePrivilegePolicy(), rewardspostgres.RuntimePrivilegePolicy(),
 	}
 	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
 		t.Fatalf("configure runtime privilege policies: %v", err)
@@ -183,23 +184,23 @@ func TestRuntimeRoleCanUseRewardAdminServiceCommands(t *testing.T) {
 	runtimePool := testdb.OpenPoolAsRole(t, ownerPool, runtimeRole)
 	runtimeService := newTestRewardService(t, runtimePool, credits.NewService(runtimePool))
 
-	if _, err := runtimeService.DeleteRewardCode(ctx, DeleteRewardCodeCommand{
+	if _, err := runtimeService.DeleteRewardCode(ctx, ports.DeleteRewardCodeCommand{
 		RewardCodeID: deletable.RewardCode.ID, ActorUserID: 1,
 	}); err != nil {
 		t.Fatalf("delete RewardCode through runtime service: %v", err)
 	}
-	if _, err := runtimeService.UpdateRewardCode(ctx, UpdateRewardCodeCommand{
+	if _, err := runtimeService.UpdateRewardCode(ctx, ports.UpdateRewardCodeCommand{
 		RewardCodeID: updatable.RewardCode.ID, ActorUserID: 1,
 		DisplayName: "Runtime 已更新奖励", CreditAmount: 30, MaxRedemptions: 3,
 	}); err != nil {
 		t.Fatalf("update RewardCode through runtime service: %v", err)
 	}
-	if _, err := runtimeService.SetRewardCodeEnabled(ctx, SetRewardCodeEnabledCommand{
+	if _, err := runtimeService.SetRewardCodeEnabled(ctx, ports.SetRewardCodeEnabledCommand{
 		RewardCodeID: updatable.RewardCode.ID, ActorUserID: 1, Enabled: false,
 	}); err != nil {
 		t.Fatalf("disable RewardCode through runtime service: %v", err)
 	}
-	if result, err := runtimeService.Redeem(ctx, RedeemCommand{
+	if result, err := runtimeService.Redeem(ctx, ports.RedeemCommand{
 		UserID: 3, Code: "RUNTIME-REDEEM-26",
 	}); err != nil || result.Redemption.RewardCodeID != redeemable.RewardCode.ID {
 		t.Fatalf("redeem RewardCode through runtime service: result=%+v error=%v", result, err)

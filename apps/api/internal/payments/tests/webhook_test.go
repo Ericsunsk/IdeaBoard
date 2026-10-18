@@ -5,7 +5,6 @@ import (
 
 	"context"
 	"errors"
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"slices"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
 
@@ -46,7 +46,7 @@ func TestSupportedStripeWebhookEventTypesAreTheExactCanonicalSet(t *testing.T) {
 func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-WEBHOOK00001", 501)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), paymentsdomain.BindPaymentOrderCheckoutInput{
@@ -75,7 +75,7 @@ func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *tes
 		ID: "evt_1", Type: "refund.updated", ObjectID: "re_1", PaymentIntentID: "pi_webhook",
 		Livemode: false, CreatedAt: verifiedAt.Add(-time.Minute),
 	}}
-	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(NewEventHub(), func() time.Time { return verifiedAt }), gateway, testCheckoutGateway{}, testWalletReader{}, verifier,
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(NewEventHub(), func() time.Time { return verifiedAt }), gateway, testCheckoutGateway{}, testsupport.FakeMissingWalletReader{}, verifier,
 		&refundGatewayFake{retrieve: map[string]paymentports.StripeRefund{"re_1": {ID: "re_1", Status: "succeeded"}}}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
@@ -126,8 +126,8 @@ func TestReceiveStripeWebhookIgnoresVerifiedUnknownEventAndRejectsUnverifiedPayl
 	verifier := &fakeWebhookVerifier{event: paymentports.StripeWebhookEvent{
 		ID: "evt_unknown", Type: "customer.updated", ObjectID: "cus_1", CreatedAt: time.Now(),
 	}}
-	repo := paymentpostgres.NewRepository(db)
-	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	repo := newTestPaymentStores(db)
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testsupport.FakeMissingWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_unknown", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",
@@ -167,8 +167,8 @@ func TestReceiveStripeWebhookAcceptsARetainedCredentialSecret(t *testing.T) {
 			ID: "evt_retained", Type: "customer.updated", ObjectID: "cus_retained", CreatedAt: time.Now(),
 		},
 	}
-	repo := paymentpostgres.NewRepository(db)
-	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	repo := newTestPaymentStores(db)
+	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testsupport.FakeMissingWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook_old", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",

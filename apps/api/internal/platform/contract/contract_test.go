@@ -499,6 +499,18 @@ func TestStatusMatrixWorkspaceKernelCodes(t *testing.T) {
 
 		CodeControlNotFound: http.StatusNotFound,
 
+		CodeCreditInvalidInput:              http.StatusBadRequest,
+		CodeCreditIdempotencyConflict:       http.StatusConflict,
+		CodeCreditWalletNotFound:            http.StatusNotFound,
+		CodeCreditWalletFrozen:              http.StatusLocked,
+		CodeCreditWalletRestricted:          http.StatusLocked,
+		CodeCreditInsufficientCredits:       http.StatusUnprocessableEntity,
+		CodeCreditChargeNotFound:            http.StatusNotFound,
+		CodeCreditRefundExceedsCharge:       http.StatusUnprocessableEntity,
+		CodeCreditReconciliationNotFound:    http.StatusNotFound,
+		CodeCreditReconciliationUnavailable: http.StatusServiceUnavailable,
+		CodeCreditOperationFailed:           http.StatusInternalServerError,
+
 		CodeTaskMonitorConcurrencyLimited: http.StatusTooManyRequests,
 		CodeTaskStatisticsRequestInvalid:  http.StatusBadRequest,
 	}

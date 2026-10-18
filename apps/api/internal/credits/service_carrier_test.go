@@ -1,4 +1,4 @@
-package credits
+package credits_test
 
 // Control audit atomicity, step 3: the credits ports join the ambient
 // guard transaction instead of committing in their own.
@@ -22,6 +22,8 @@ import (
 	"ideaboard/api/internal/credits/testhelpers"
 	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/testdb"
+
+	"ideaboard/api/internal/credits"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -57,7 +59,7 @@ func beginCarrier(t *testing.T, ctx context.Context, pool *pgxpool.Pool) (pgx.Tx
 
 func TestGrantJoinsAmbientCarrierTx(t *testing.T) {
 	pool := testdb.Open(t)
-	service := NewService(pool)
+	service := credits.NewService(pool)
 	ctx := context.Background()
 	testhelpers.EnsureAdminOperationUser(t, pool, 4201)
 
@@ -97,7 +99,7 @@ func TestGrantJoinsAmbientCarrierTx(t *testing.T) {
 
 func TestGrantRollsBackWithAmbientCarrier(t *testing.T) {
 	pool := testdb.Open(t)
-	service := NewService(pool)
+	service := credits.NewService(pool)
 	ctx := context.Background()
 	testhelpers.EnsureAdminOperationUser(t, pool, 4202)
 
@@ -133,7 +135,7 @@ func TestGrantRollsBackWithAmbientCarrier(t *testing.T) {
 
 func TestRestrictWalletJoinsAmbientCarrierTx(t *testing.T) {
 	pool := testdb.Open(t)
-	service := NewService(pool)
+	service := credits.NewService(pool)
 	ctx := context.Background()
 	const userID = 4203
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
@@ -184,7 +186,7 @@ func TestRestrictWalletJoinsAmbientCarrierTx(t *testing.T) {
 
 func TestReleaseWalletRestrictionRollsBackWithAmbientCarrier(t *testing.T) {
 	pool := testdb.Open(t)
-	service := NewService(pool)
+	service := credits.NewService(pool)
 	ctx := context.Background()
 	const userID = 4204
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)

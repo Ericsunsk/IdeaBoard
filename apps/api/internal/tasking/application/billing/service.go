@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/platform/errorrender"
 	"strconv"
 	"strings"
 	"time"
@@ -192,7 +193,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, command HoldCom
 		hold, holdErr := s.credits.InTx(tx).Hold(ctx, ports.HoldCommand{
 			UserID:   userID,
 			Amount:   amount,
-			Metadata: taskCommandMetadata("task-hold:"+taskID, domain.ActorUser, fmt.Sprint(userID), "task_submission", msgHoldAndPersist, taskID),
+			Metadata: taskCommandMetadata("task-hold:"+taskID, domain.ActorUser, fmt.Sprint(userID), "task_submission", errorrender.MsgHoldAndPersist, taskID),
 		})
 		if errors.Is(holdErr, domain.ErrInsufficientCredits) {
 			return Snapshot{}, ErrInsufficientCredits

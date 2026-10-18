@@ -24,6 +24,7 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
@@ -63,7 +64,7 @@ func TestRewardCodeCreateJoinsAmbientCarrierTx(t *testing.T) {
 	ctx := context.Background()
 
 	tx, carrier := beginRewardCarrier(t, ctx, pool)
-	created, err := service.CreateRewardCode(carrier, CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(carrier, ports.CreateRewardCodeCommand{
 		DisplayName: "carrier commit", Code: "CARRIER-JOIN-77", CreditAmount: 50,
 		MaxRedemptions: 1, IdempotencyKey: "reward-carrier-commit-001", ActorUserID: 1,
 	})
@@ -102,7 +103,7 @@ func TestRewardCodeCreateRollsBackWithAmbientCarrier(t *testing.T) {
 	ctx := context.Background()
 
 	tx, carrier := beginRewardCarrier(t, ctx, pool)
-	if _, err := service.CreateRewardCode(carrier, CreateRewardCodeCommand{
+	if _, err := service.CreateRewardCode(carrier, ports.CreateRewardCodeCommand{
 		DisplayName: "carrier rollback", Code: "CARRIER-ROLLBACK-78", CreditAmount: 50,
 		MaxRedemptions: 1, IdempotencyKey: "reward-carrier-rollback-001", ActorUserID: 1,
 	}); err != nil {
@@ -126,7 +127,7 @@ func TestRewardCodeReplayDoesNotReleaseAmbientCarrier(t *testing.T) {
 	ctx := context.Background()
 
 	tx, carrier := beginRewardCarrier(t, ctx, pool)
-	command := CreateRewardCodeCommand{
+	command := ports.CreateRewardCodeCommand{
 		DisplayName: "carrier replay", Code: "CARRIER-REPLAY-79", CreditAmount: 50,
 		MaxRedemptions: 1, IdempotencyKey: "reward-carrier-replay-001", ActorUserID: 1,
 	}

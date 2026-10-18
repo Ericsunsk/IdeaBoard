@@ -1,4 +1,4 @@
-package ports
+package ports_test
 
 import (
 	"go/parser"

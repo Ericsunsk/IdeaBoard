@@ -60,7 +60,7 @@ func (s *InMemoryWorkspaceLibraryStore) RegisterManagedMediaForTests(workspacePu
 	}
 }
 
-var _ ports.WorkspaceLibraryStore = (*InMemoryWorkspaceLibraryStore)(nil)
+var _ ports.V1Store = (*InMemoryWorkspaceLibraryStore)(nil)
 var _ ports.MaterializationClaimer = (*InMemoryWorkspaceLibraryStore)(nil)
 
 // NewInMemoryWorkspaceLibraryStoreForTests builds an empty test-only store.
@@ -466,35 +466,6 @@ func (s *InMemoryWorkspaceLibraryStore) ResolveAssets(ctx context.Context, works
 	return results, nil
 }
 
-// CreateMaterialization opens a pending job for an owned asset. The
-// caller drives pending -> running -> completed|failed through
-// SetMaterializationResult as the separate durable job settles.
-func (s *InMemoryWorkspaceLibraryStore) CreateMaterialization(ctx context.Context, workspacePublicID, assetPublicID, publicID string) (*domain.V1Materialization, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if !domain.IsV1MaterializationID(publicID) {
-		return nil, domain.ErrV1MaterializationNotFound
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.assets[workspacePublicID][assetPublicID] == nil {
-		return nil, domain.ErrV1AssetNotFound
-	}
-	now := s.clock()
-	record := &domain.V1Materialization{
-		WorkspacePublicID: workspacePublicID, PublicID: publicID,
-		AssetPublicID: assetPublicID, Status: domain.V1MaterializationPending,
-		CreatedAt: now, UpdatedAt: now,
-	}
-	if s.materializations[workspacePublicID] == nil {
-		s.materializations[workspacePublicID] = make(map[string]*domain.V1Materialization)
-	}
-	s.materializations[workspacePublicID][publicID] = record
-	s.materializationOrder[workspacePublicID] = append(s.materializationOrder[workspacePublicID], publicID)
-	return copyV1Materialization(record), nil
-}
-
 // ClaimMaterialization atomically converges internal triggers in the test
 // store, matching the postgres advisory-lock implementation.
 func (s *InMemoryWorkspaceLibraryStore) ClaimMaterialization(ctx context.Context, workspacePublicID, assetPublicID, publicID string) (*domain.V1Materialization, bool, error) {
@@ -526,20 +497,6 @@ func (s *InMemoryWorkspaceLibraryStore) ClaimMaterialization(ctx context.Context
 	s.materializations[workspacePublicID][publicID] = record
 	s.materializationOrder[workspacePublicID] = append(s.materializationOrder[workspacePublicID], publicID)
 	return copyV1Materialization(record), true, nil
-}
-
-// GetMaterialization returns the status-addressable job snapshot.
-func (s *InMemoryWorkspaceLibraryStore) GetMaterialization(ctx context.Context, workspacePublicID, materializationPublicID string) (*domain.V1Materialization, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	record := s.materializations[workspacePublicID][materializationPublicID]
-	if record == nil {
-		return nil, domain.ErrV1MaterializationNotFound
-	}
-	return copyV1Materialization(record), nil
 }
 
 // ListMaterializations returns every workspace job in creation order

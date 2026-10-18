@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/platform/errorrender"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/ports"
 	"strconv"
@@ -251,7 +252,7 @@ func (s *Service) grantRewardCodeCredits(ctx context.Context, tx pgx.Tx, userID 
 	grant, err := s.credits.Grant(ctx, tx, CreditGrantRequest{
 		UserID: userID,
 		Amount: rewardCode.CreditAmount, IdempotencyKey: "reward-code-redemption:" + reference,
-		ActorType: "user", ActorID: strconv.FormatInt(userID, 10), Source: "reward_redemption", Reason: msgGrantRewardCodeCredits,
+		ActorType: "user", ActorID: strconv.FormatInt(userID, 10), Source: "reward_redemption", Reason: errorrender.MsgGrantRewardCodeCredits,
 		BusinessReferenceType: "reward_code_redemption", BusinessReferenceID: "rc:" + reference,
 	})
 	if err != nil {

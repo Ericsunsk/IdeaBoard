@@ -3,11 +3,11 @@ package workspacemedia
 import (
 	"context"
 	"errors"
-	"strings"
-
+	"fmt"
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/tasking/workspacetasks"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -36,22 +36,32 @@ func (a *TaskSubmissionAuthorizer) AuthorizeSubmission(ctx context.Context, tx p
 	}
 	if boardID := strings.TrimSpace(input.BoardID); boardID != "" {
 		if a.TaskBoards == nil {
-			return binding, workspacetasks.ErrBoardNotFound
+			return binding, workspacetasks.ErrSettlementUnavailable
 		}
 		access, err := a.TaskBoards.ResolveBoardAccess(ctx, workspaceID, boardID, input.OwnerUserID, role)
 		if err != nil {
 			return binding, err
 		}
-		if access == nil || !access.CanRead {
+		// The submit gate is the shared board policy (P0-2): the same
+		// submit/read/cancel Check tasking uses. Nil postures deny as
+		// not-found; the decision maps onto the tasking submit sentinels.
+		var facts workspacetasks.BoardTaskFacts
+		if access != nil {
+			facts = workspacetasks.BoardTaskFacts{
+				CanRead: access.CanRead, CanGenerate: access.CanGenerate,
+				CanWrite: access.CanWrite, Archived: access.Archived,
+			}
+		}
+		switch workspacetasks.BoardPolicy.Check(facts, workspacetasks.BoardOpSubmit) {
+		case workspacetasks.BoardDecisionAllow:
+			binding = workspacetasks.TaskBoardBinding{BoardID: boardID, AccessVersion: access.AccessVersion}
+		case workspacetasks.BoardDecisionArchived:
+			return binding, workspacetasks.ErrBoardArchived
+		case workspacetasks.BoardDecisionForbidden:
+			return binding, workspacetasks.ErrForbidden
+		default:
 			return binding, workspacetasks.ErrBoardNotFound
 		}
-		if access.Archived {
-			return binding, workspacetasks.ErrBoardArchived
-		}
-		if !access.CanGenerate {
-			return binding, workspacetasks.ErrForbidden
-		}
-		binding = workspacetasks.TaskBoardBinding{BoardID: boardID, AccessVersion: access.AccessVersion}
 	}
 	ids := append([]string(nil), input.MediaAssetIDs...)
 	if maskID, ok := workspacetasks.MaskAssetIDFromParams(input.Params); ok {
@@ -65,12 +75,46 @@ func (a *TaskSubmissionAuthorizer) AuthorizeSubmission(ctx context.Context, tx p
 		if err != nil {
 			return binding, err
 		}
-		if asset.IsArchived() {
-			return binding, workspacetasks.ErrMediaArchived
-		}
-		if asset.Status != AssetStatusReady {
-			return binding, workspacetasks.ErrMediaNotReady
+		// Single readiness gate (P0-4): GateAsset owns the
+		// archived/ready comparison; its sentinels cross the seam as-is.
+		if err := GateAsset(asset); err != nil {
+			return binding, err
 		}
 	}
 	return binding, nil
+}
+
+// merged from internal/media/workspacemedia/taskassets.go (structural consolidation; symbols unchanged).
+// TaskAssetAdapter supplies readiness facts for worker execution of accepted
+// immutable inputs. Submission authorization belongs to TaskSubmissionAuthorizer.
+type TaskAssetAdapter struct {
+	Store AssetStore
+}
+
+// Compile-time convergence with the task seam.
+var _ workspacetasks.AssetReader = (*TaskAssetAdapter)(nil)
+
+// GetAsset projects one workspace-scoped asset to the minimal
+// ready-gate facts tasks need. Unknown, malformed, and
+// cross-workspace ids converge to ErrMediaNotFound (invisible, never
+// a distinct status).
+func (a *TaskAssetAdapter) GetAsset(ctx context.Context, workspaceID, assetID string) (*workspacetasks.AssetInfo, error) {
+	if a == nil || a.Store == nil {
+		return nil, fmt.Errorf("workspacemedia: task asset store is not configured: %w", workspacetasks.ErrMediaNotFound)
+	}
+	asset, err := a.Store.GetAsset(ctx, strings.TrimSpace(workspaceID), strings.TrimSpace(assetID))
+	if err != nil {
+		return nil, fmt.Errorf("workspacemedia: task asset lookup: %w", workspacetasks.ErrMediaNotFound)
+	}
+	// Single readiness gate (P0-4): archived and non-ready deny through
+	// GateAsset; the sentinel (not the status string) crosses the seam.
+	if err := GateAsset(asset); err != nil {
+		return nil, fmt.Errorf("workspacemedia: task asset %s gate: %w", asset.ID, err)
+	}
+	return &workspacetasks.AssetInfo{
+		ID:          asset.ID,
+		WorkspaceID: asset.WorkspaceID,
+		Status:      asset.Status,
+		Archived:    false,
+	}, nil
 }

@@ -135,9 +135,33 @@ func (r RoutingRequirement) ModelRequirement() RoutingModelRequirement {
 
 func (r RoutingRequirement) OutputResolution() string { return r.outputResolution }
 
+// ReadOption tunes execution-plan compilation without forking entry
+// points. The zero value reads live caller media facts; ReadReady
+// synthesizes contract-valid media facts from policy for
+// readiness/quote paths where user media does not exist yet.
+type ReadOption int
+
+const (
+	// ReadLive compiles against the caller's media facts (submit path).
+	ReadLive ReadOption = iota
+	// ReadReady synthesizes media facts from policy (readiness path).
+	ReadReady
+)
+
 // CompileFeatureExecutionPlan resolves all stable execution facts for one
 // canonical AI image Workflow without I/O or runtime resource selection.
-func CompileFeatureExecutionPlan(input CompileFeatureExecutionInput) (FeatureExecutionPlan, error) {
+// Output count and resolution are determined here exactly once
+// (compileRequestedOutputCount/compileOutputResolution); downstream
+// stamping (canonical_intake.finalizeSubmitTypedParams) only propagates
+// these compiled facts into the typed map so persisted Controls cannot
+// disagree with the plan.
+func CompileFeatureExecutionPlan(input CompileFeatureExecutionInput, opts ...ReadOption) (FeatureExecutionPlan, error) {
+	ready := false
+	for _, opt := range opts {
+		if opt == ReadReady {
+			ready = true
+		}
+	}
 	feature, ok := ParseAIImageFeatureSlug(input.Feature)
 	if !ok {
 		return FeatureExecutionPlan{}, newFeatureContractValidationError(
@@ -151,11 +175,27 @@ func CompileFeatureExecutionPlan(input CompileFeatureExecutionInput) (FeatureExe
 		)
 	}
 
-	outputCount, err := compileRequestedOutputCount(feature, definition.outputCountPolicy, input.Params.RequestedOutputCount)
+	params := input.Params
+	if ready {
+		// Readiness synthesis (moved from CompileFeatureReadinessPlan):
+		// resolve routing and Billing facts without requiring media
+		// that only exists when the user executes the operation.
+		switch definition.imageInputPolicy {
+		case ImageInputOptional:
+			params.ImageInputCount = 0
+		case ImageInputRequired:
+			params.ImageInputCount = 1
+		case MultipleImageInputsRequired:
+			params.ImageInputCount = 2
+		}
+		params.HasMaskInput = definition.maskInputPolicy == MaskInputRequired
+	}
+
+	outputCount, err := compileRequestedOutputCount(feature, definition.outputCountPolicy, params.RequestedOutputCount)
 	if err != nil {
 		return FeatureExecutionPlan{}, err
 	}
-	outputResolution, err := compileOutputResolution(feature, definition.outputResolutionPolicy, input.Params.OutputResolution)
+	outputResolution, err := compileOutputResolution(feature, definition.outputResolutionPolicy, params.OutputResolution)
 	if err != nil {
 		return FeatureExecutionPlan{}, err
 	}
@@ -166,8 +206,8 @@ func CompileFeatureExecutionPlan(input CompileFeatureExecutionInput) (FeatureExe
 			maskInputPolicy:    definition.maskInputPolicy,
 		},
 		runtimeMediaFacts{
-			imageInputCount: input.Params.ImageInputCount,
-			hasMaskInput:    input.Params.HasMaskInput,
+			imageInputCount: params.ImageInputCount,
+			hasMaskInput:    params.HasMaskInput,
 		},
 	); violation != nil {
 		return FeatureExecutionPlan{}, newFeatureContractValidationError(
@@ -175,7 +215,7 @@ func CompileFeatureExecutionPlan(input CompileFeatureExecutionInput) (FeatureExe
 		)
 	}
 	generationPrimitive := GenerationPrimitiveTextToImage
-	if input.Params.ImageInputCount > 0 {
+	if params.ImageInputCount > 0 {
 		generationPrimitive = GenerationPrimitiveImageToImage
 	}
 	runtimeInvocation := definition.runtimeInvocation
@@ -199,8 +239,8 @@ func CompileFeatureExecutionPlan(input CompileFeatureExecutionInput) (FeatureExe
 		runtimeInputs: RuntimeInputSemantics{
 			generationPrimitive: generationPrimitive,
 			invocation:          runtimeInvocation,
-			imageInputCount:     input.Params.ImageInputCount,
-			hasMaskInput:        input.Params.HasMaskInput,
+			imageInputCount:     params.ImageInputCount,
+			hasMaskInput:        params.HasMaskInput,
 			imageInputPolicy:    definition.imageInputPolicy,
 			maskInputPolicy:     definition.maskInputPolicy,
 			originalImagePolicy: definition.originalImagePolicy,
@@ -211,31 +251,10 @@ func CompileFeatureExecutionPlan(input CompileFeatureExecutionInput) (FeatureExe
 
 // CompileFeatureReadinessPlan resolves routing and Billing facts without
 // requiring media that only exists when the user executes the operation.
+// Thin alias over CompileFeatureExecutionPlan with the ReadReady option;
+// the single compiler owns output_count/resolution determination.
 func CompileFeatureReadinessPlan(input CompileFeatureExecutionInput) (FeatureExecutionPlan, error) {
-	feature, ok := ParseAIImageFeatureSlug(input.Feature)
-	if !ok {
-		return FeatureExecutionPlan{}, newFeatureContractValidationError(
-			FeatureContractUnknownFeature, strings.TrimSpace(input.Feature), "feature", input.Feature,
-		)
-	}
-	definition, ok := imageFeatureExecutionDefinitions[feature]
-	if !ok {
-		return FeatureExecutionPlan{}, newFeatureContractValidationError(
-			FeatureContractUnknownFeature, feature, "feature", input.Feature,
-		)
-	}
-
-	params := input.Params
-	switch definition.imageInputPolicy {
-	case ImageInputOptional:
-		params.ImageInputCount = 0
-	case ImageInputRequired:
-		params.ImageInputCount = 1
-	case MultipleImageInputsRequired:
-		params.ImageInputCount = 2
-	}
-	params.HasMaskInput = definition.maskInputPolicy == MaskInputRequired
-	return CompileFeatureExecutionPlan(CompileFeatureExecutionInput{Feature: feature, Params: params})
+	return CompileFeatureExecutionPlan(input, ReadReady)
 }
 
 type runtimeMediaPolicy struct {

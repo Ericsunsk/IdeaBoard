@@ -24,7 +24,7 @@ func (r *Repository) ClaimDuePaymentOrderReconciliations(ctx context.Context, no
 	}
 	now = now.UTC()
 	token := uuid.New()
-	rows, err := r.dbWithContext(ctx).queries().ClaimDuePaymentOrderReconciliations(ctx, dbsqlc.ClaimDuePaymentOrderReconciliationsParams{
+	rows, err := r.DBWithContext(ctx).Queries().ClaimDuePaymentOrderReconciliations(ctx, dbsqlc.ClaimDuePaymentOrderReconciliationsParams{
 		StaleBefore: dbutil.TimestamptzFromTime(now.Add(-2 * time.Minute)), NowAt: dbutil.TimestamptzFromTime(now), RowLimit: paymentReconciliationBatchSize,
 		ClaimToken: pgtype.UUID{Bytes: token, Valid: true}, ClaimUntil: dbutil.TimestamptzFromTime(now.Add(paymentreconciliation.Lease)),
 	})
@@ -60,9 +60,9 @@ func (r *Repository) CompletePaymentOrderReconciliationClaim(
 	if checkedAt.IsZero() {
 		return false, fmt.Errorf("payments repository: reconciliation check time is required")
 	}
-	rows, err := r.dbWithContext(ctx).queries().CompletePaymentOrderReconciliationClaim(ctx, dbsqlc.CompletePaymentOrderReconciliationClaimParams{
+	rows, err := r.DBWithContext(ctx).Queries().CompletePaymentOrderReconciliationClaim(ctx, dbsqlc.CompletePaymentOrderReconciliationClaimParams{
 		CheckedAt: dbutil.TimestamptzFromTime(checkedAt), NextAttemptAt: dbutil.TimestamptzFromTime(outcome.NextAttemptAt.UTC()),
-		ErrorCode: boundedText(outcome.ErrorCode, 64), ErrorSummary: boundedText(outcome.ErrorSummary, 500),
+		ErrorCode: BoundedText(outcome.ErrorCode, 64), ErrorSummary: BoundedText(outcome.ErrorSummary, 500),
 		ClearAnomaly: outcome.ClearAnomaly, MarkAnomalous: outcome.Anomalous,
 		PaymentOrderID: pgUUIDToPgType(orderID), ClaimToken: pgUUIDToPgType(token), ClaimGeneration: claim.Generation,
 	})
@@ -79,7 +79,7 @@ func (r *Repository) ListPaymentReconciliationAnomalies(ctx context.Context, lim
 	if limit <= 0 || limit > paymentReconciliationBatchSize {
 		limit = paymentReconciliationBatchSize
 	}
-	rows, err := r.dbWithContext(ctx).queries().ListPaymentReconciliationAnomalies(ctx, limit)
+	rows, err := r.DBWithContext(ctx).Queries().ListPaymentReconciliationAnomalies(ctx, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list payment reconciliation anomalies: %w", err)
 	}

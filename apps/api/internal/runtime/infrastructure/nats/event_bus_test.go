@@ -1,15 +1,15 @@
-package natsinfra_test
+package nats_test
 
 import (
 	"context"
 	"testing"
 
 	"ideaboard/api/internal/platform/config"
-	natsinfra "ideaboard/api/internal/runtime/infrastructure/nats"
+	"ideaboard/api/internal/runtime/infrastructure/nats"
 )
 
 func TestDisabledEventBusReturnsNil(t *testing.T) {
-	bus, err := natsinfra.NewEventBus(context.Background(), config.EventBusConfig{
+	bus, err := nats.NewEventBus(context.Background(), config.EventBusConfig{
 		Enabled: false,
 	})
 	if err != nil {

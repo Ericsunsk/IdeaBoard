@@ -27,16 +27,12 @@ type paymentReconciliationScheduleJobArgs struct{}
 
 func (paymentReconciliationScheduleJobArgs) Kind() string { return "payment_reconciliation_schedule" }
 
-type paymentReconciliationService interface {
-	ReconcileDuePaymentOrders(context.Context) error
-}
-
 type PaymentReconciliationWorker struct {
 	river.WorkerDefaults[paymentReconciliationScheduleJobArgs]
-	service paymentReconciliationService
+	service paymentreconciliation.Runner
 }
 
-func NewPaymentReconciliationWorker(service paymentReconciliationService) *PaymentReconciliationWorker {
+func NewPaymentReconciliationWorker(service paymentreconciliation.Runner) *PaymentReconciliationWorker {
 	return &PaymentReconciliationWorker{service: service}
 }
 

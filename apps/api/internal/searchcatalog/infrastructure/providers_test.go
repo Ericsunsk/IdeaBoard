@@ -8,14 +8,14 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/platform/outboundhttp"
+	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/searchcatalog/domain"
 	"ideaboard/api/internal/searchcatalog/ports"
 )
 
-type providerHTTPStub func(context.Context, *http.Request, outboundhttp.RequestOptions) (*http.Response, error)
+type providerHTTPStub func(context.Context, *http.Request, safehttp.RequestOptions) (*http.Response, error)
 
-func (stub providerHTTPStub) Do(ctx context.Context, request *http.Request, options outboundhttp.RequestOptions) (*http.Response, error) {
+func (stub providerHTTPStub) Do(ctx context.Context, request *http.Request, options safehttp.RequestOptions) (*http.Response, error) {
 	return stub(ctx, request, options)
 }
 
@@ -42,9 +42,9 @@ func TestProviderAdaptersRequestAndMapping(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			called := false
-			stubProviderHTTP(t, func(_ context.Context, request *http.Request, options outboundhttp.RequestOptions) (*http.Response, error) {
+			stubProviderHTTP(t, func(_ context.Context, request *http.Request, options safehttp.RequestOptions) (*http.Response, error) {
 				called = true
-				if request.Method != http.MethodGet || request.URL.Path != test.path || request.Header.Get("Authorization") != test.authorization {
+				if request.Method != http.MethodGet || request.URL.Path != test.path || request.Header.Get(HeaderAuthorization) != test.authorization {
 					t.Fatalf("unexpected request: %s %s", request.Method, request.URL.Path)
 				}
 				query := request.URL.Query()
@@ -84,9 +84,9 @@ func TestProviderAdaptersPropagateFailures(t *testing.T) {
 	for _, adapter := range []ports.SearchProviderAdapter{NewUnsplashAdapter(), NewPexelsAdapter()} {
 		for _, failure := range []string{"status", "outbound status", "body", "json", "body cap"} {
 			t.Run(string(adapter.Provider())+"/"+failure, func(t *testing.T) {
-				stubProviderHTTP(t, func(context.Context, *http.Request, outboundhttp.RequestOptions) (*http.Response, error) {
+				stubProviderHTTP(t, func(context.Context, *http.Request, safehttp.RequestOptions) (*http.Response, error) {
 					if failure == "outbound status" {
-						return nil, &outboundhttp.HTTPStatusError{StatusCode: http.StatusForbidden}
+						return nil, &safehttp.HTTPStatusError{StatusCode: http.StatusForbidden}
 					}
 					response := &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("invalid json"))}
 					switch failure {

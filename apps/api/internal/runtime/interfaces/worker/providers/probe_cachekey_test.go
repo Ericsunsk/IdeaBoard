@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
-	"ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
+	providerdomain "ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
+	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
 )
 
 type gatewayCapture struct {
@@ -48,9 +48,9 @@ func TestProbeModelSuccess(t *testing.T) {
 		map[string]string{"cf-aig-model": "openai/gpt-4o-mini"}, `{"data":[]}`)
 	defer server.Close()
 
-	client, err := infrastructure.NewGatewayClient(infrastructure.GatewayClientConfig{BaseURL: server.URL, Token: "test-token"})
+	client, err := providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{BaseURL: server.URL, Token: "test-token"})
 	if err != nil {
-		t.Fatalf("infrastructure.NewGatewayClient() error = %v", err)
+		t.Fatalf("providerinfra.NewGatewayClient() error = %v", err)
 	}
 	verdict, err := ProbeModel(context.Background(), client, "openrouter", "google/gemini-3.1-flash-lite-image", "api/v1/models", 5*time.Second)
 	if err != nil {
@@ -78,9 +78,9 @@ func TestProbeModelErrorResponseIsReachable(t *testing.T) {
 	server := newGatewayCaptureServer(t, &capture, http.StatusUnauthorized, nil, `{"error":"bad key"}`)
 	defer server.Close()
 
-	client, err := infrastructure.NewGatewayClient(infrastructure.GatewayClientConfig{BaseURL: server.URL, Token: "test-token"})
+	client, err := providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{BaseURL: server.URL, Token: "test-token"})
 	if err != nil {
-		t.Fatalf("infrastructure.NewGatewayClient() error = %v", err)
+		t.Fatalf("providerinfra.NewGatewayClient() error = %v", err)
 	}
 	verdict, err := ProbeModel(context.Background(), client, "openrouter", "google/gemini-3.1-flash-lite-image", "api/v1/models", 5*time.Second)
 	if err == nil {
@@ -97,9 +97,9 @@ func TestProbeModelErrorResponseIsReachable(t *testing.T) {
 }
 
 func TestProbeModelRejectsBadInput(t *testing.T) {
-	client, err := infrastructure.NewGatewayClient(infrastructure.GatewayClientConfig{BaseURL: "http://127.0.0.1:1", Token: "test-token"})
+	client, err := providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{BaseURL: "http://127.0.0.1:1", Token: "test-token"})
 	if err != nil {
-		t.Fatalf("infrastructure.NewGatewayClient() error = %v", err)
+		t.Fatalf("providerinfra.NewGatewayClient() error = %v", err)
 	}
 	if _, err := ProbeModel(context.Background(), nil, "openrouter", "m", "api/v1/models", time.Second); err == nil {
 		t.Fatal("nil client accepted")
@@ -110,11 +110,11 @@ func TestProbeModelRejectsBadInput(t *testing.T) {
 }
 
 func TestBuildTextCacheKey(t *testing.T) {
-	first, err := domain.BuildTextCacheKey("render", "openai/gpt-image-1", []byte(`{"prompt":"cat"}`))
+	first, err := providerdomain.BuildTextCacheKey("render", "openai/gpt-image-1", []byte(`{"prompt":"cat"}`))
 	if err != nil {
-		t.Fatalf("domain.BuildTextCacheKey() error = %v", err)
+		t.Fatalf("providerdomain.BuildTextCacheKey() error = %v", err)
 	}
-	second, err := domain.BuildTextCacheKey("render", "openai/gpt-image-1", []byte(`{"prompt":"cat"}`))
+	second, err := providerdomain.BuildTextCacheKey("render", "openai/gpt-image-1", []byte(`{"prompt":"cat"}`))
 	if err != nil || first != second {
 		t.Fatalf("key not deterministic: %q vs %q (%v)", first, second, err)
 	}
@@ -131,7 +131,7 @@ func TestBuildTextCacheKey(t *testing.T) {
 		{"model scopes", "render", "google/imagen-3", []byte(`{"prompt":"cat"}`)},
 		{"body scopes", "render", "openai/gpt-image-1", []byte(`{"prompt":"dog"}`)},
 	} {
-		other, err := domain.BuildTextCacheKey(tc.feature, tc.model, tc.body)
+		other, err := providerdomain.BuildTextCacheKey(tc.feature, tc.model, tc.body)
 		if err != nil {
 			t.Fatalf("%s: %v", tc.name, err)
 		}
@@ -149,7 +149,7 @@ func TestBuildTextCacheKey(t *testing.T) {
 		{"empty model", "f", "", []byte(`{}`)},
 		{"empty body", "f", "m", nil},
 	} {
-		if _, err := domain.BuildTextCacheKey(tc.feature, tc.model, tc.body); err == nil {
+		if _, err := providerdomain.BuildTextCacheKey(tc.feature, tc.model, tc.body); err == nil {
 			t.Fatalf("%s accepted, want error", tc.name)
 		}
 	}

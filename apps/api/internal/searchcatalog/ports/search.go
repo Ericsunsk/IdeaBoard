@@ -2,7 +2,6 @@ package ports
 
 import (
 	"context"
-
 	"ideaboard/api/internal/searchcatalog/domain"
 )
 
@@ -26,4 +25,12 @@ type SearchProviderPage struct {
 type SearchProviderAdapter interface {
 	Provider() domain.Provider
 	Search(context.Context, string, SearchRequest) (SearchProviderPage, error)
+}
+
+// merged from internal/searchcatalog/ports/provider.go (structural consolidation; symbols unchanged).
+// ProviderTestAdapter probes one web search provider with a raw API key and
+// classifies the outcome for the admin connection-test flow.
+type ProviderTestAdapter interface {
+	Provider() domain.Provider
+	Test(context.Context, string) (domain.FailureCategory, string, error)
 }

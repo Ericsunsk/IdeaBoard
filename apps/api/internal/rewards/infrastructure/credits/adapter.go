@@ -1,4 +1,4 @@
-package creditsadapter
+package credits
 
 import (
 	"context"
@@ -21,14 +21,15 @@ func New(service *credits.Service) *Adapter { return &Adapter{service: service} 
 
 func (a *Adapter) ReadWallet(ctx context.Context, userID int64) (redemptions.WalletSnapshot, error) {
 	wallet, err := a.service.GetWallet(ctx, userID)
-	if errors.Is(err, creditsdomain.ErrWalletNotFound) {
-		return redemptions.WalletSnapshot{}, ports.ErrWalletNotFound
-	}
-	if errors.Is(err, creditsdomain.ErrWalletFrozen) {
-		return redemptions.WalletSnapshot{}, rewardsdomain.ErrWalletFrozen
-	}
 	if err != nil {
-		return redemptions.WalletSnapshot{}, err
+		switch {
+		case errors.Is(err, creditsdomain.ErrWalletNotFound):
+			return redemptions.WalletSnapshot{}, ports.ErrWalletNotFound
+		case errors.Is(err, creditsdomain.ErrWalletFrozen):
+			return redemptions.WalletSnapshot{}, rewardsdomain.ErrWalletFrozen
+		default:
+			return redemptions.WalletSnapshot{}, err
+		}
 	}
 	return redemptions.WalletSnapshot{Available: wallet.Available}, nil
 }

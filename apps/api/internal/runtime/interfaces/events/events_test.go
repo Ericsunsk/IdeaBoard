@@ -1,4 +1,4 @@
-package events_test
+package eventbus_test
 
 import (
 	"context"

@@ -7,7 +7,6 @@ import (
 	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
-	"ideaboard/api/internal/platform/validation"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,19 +37,19 @@ const (
 
 func writeIdentityRequestInvalid(c *gin.Context, message string) {
 	if message == "" {
-		message = msgRespondRuntimeSettingsWriteError
+		message = errorrender.MsgRespondRuntimeSettingsWriteError
 	}
 	errorrender.Render(c, http.StatusBadRequest, codeIdentityRequestInvalid, message)
 }
 
 func identityValidationMessage(err error, fallback string) string {
-	if validation.Is(err) && err.Error() != "" {
+	if errorrender.IsValidationError(err) && err.Error() != "" {
 		return err.Error()
 	}
 	if fallback != "" {
 		return fallback
 	}
-	return msgRespondRuntimeSettingsWriteError
+	return errorrender.MsgRespondRuntimeSettingsWriteError
 }
 
 // respondIdentityAdminCommandError renders typed admin command failures
@@ -60,17 +59,17 @@ func identityValidationMessage(err error, fallback string) string {
 func respondIdentityAdminCommandError(c *gin.Context, err error) {
 	var commandErr *ports.IdentityAdminCommandError
 	if err == nil {
-		errorrender.Render(c, http.StatusInternalServerError, codeIdentityOperationFailed, msgIdentityOperationFailed3)
+		errorrender.Render(c, http.StatusInternalServerError, codeIdentityOperationFailed, errorrender.MsgIdentityOperationFailed3)
 		return
 	}
 	if !errors.As(err, &commandErr) {
 		errorrender.RenderDefault(c, "identity admin command failed",
-			http.StatusInternalServerError, codeIdentityOperationFailed, msgIdentityOperationFailed3, err)
+			http.StatusInternalServerError, codeIdentityOperationFailed, errorrender.MsgIdentityOperationFailed3, err)
 		return
 	}
 	safeMessage := commandErr.Message
 	if safeMessage == "" {
-		safeMessage = msgIdentityOperationFailed3
+		safeMessage = errorrender.MsgIdentityOperationFailed3
 	}
 	switch commandErr.Kind {
 	case ports.IdentityAdminInvalid, ports.IdentityAdminTargetNotFound, ports.IdentityAdminAuthIdentityNotFound:
@@ -88,7 +87,7 @@ func respondIdentityAdminCommandError(c *gin.Context, err error) {
 			"kind", string(commandErr.Kind))
 	default:
 		errorrender.RenderDefault(c, "identity admin operation failed",
-			http.StatusInternalServerError, codeIdentityOperationFailed, msgIdentityOperationFailed3, err,
+			http.StatusInternalServerError, codeIdentityOperationFailed, errorrender.MsgIdentityOperationFailed3, err,
 			"kind", string(commandErr.Kind))
 	}
 }
@@ -97,27 +96,26 @@ func respondIdentityAdminCommandError(c *gin.Context, err error) {
 // is the single source of truth for one rendered message; call
 // sites reference these names so copy changes stay in one place.
 // Values are byte-identical to the previously inline literals.
-const (
-	msgIdentityServiceUnavailable        = "系统设置服务未配置"                  // codeIdentityServiceUnavailable
-	msgIdentityOperationFailed           = "身份管理命令未配置"                  // codeIdentityOperationFailed
-	msgRespondRuntimeSettingsReadError   = "读取系统设置失败"                   // RespondRuntimeSettingsReadError @ admin.go
-	msgRespondRuntimeSettingsWriteError  = "参数错误"                       // RespondRuntimeSettingsWriteError @ admin.go
-	msgRespondRuntimeSettingsWriteError2 = "保存设置失败"                     // RespondRuntimeSettingsWriteError @ admin.go
-	msgIdentityUserPublicIDInvalid       = "无效的用户 public_id"            // codeIdentityUserPublicIDInvalid
-	msgImpersonateUser                   = "伪装登录失败"                     // ImpersonateUser @ admin_impersonate.go
-	msgIdentityOperationFailed2          = "伪装登录服务未配置"                  // codeIdentityOperationFailed
-	msgIdentityUserNotFound              = "用户不存在"                      // codeIdentityUserNotFound
-	msgImpersonateUser2                  = "读取用户失败"                     // ImpersonateUser @ admin_impersonate.go
-	msgImpersonateUser3                  = "不能模拟当前登录管理员自己"              // ImpersonateUser @ admin_impersonate.go
-	msgImpersonateUser4                  = "不能模拟管理员账号"                  // ImpersonateUser @ admin_impersonate.go
-	msgImpersonateUser5                  = "目标用户缺少 auth_user_id，无法模拟登录" // ImpersonateUser @ admin_impersonate.go
-	msgIdentityUpstreamUnavailable       = "认证服务伪装登录失败"                 // codeIdentityUpstreamUnavailable
-	msgIdentityUpstreamRejected          = "认证服务拒绝伪装登录"                 // codeIdentityUpstreamRejected
-	msgIdentityRequestInvalid            = "目标用户无法进行伪装登录"               // codeIdentityRequestInvalid
-	msgUpdateOutboundPolicy              = "参数错误，allow_hosts 为必填"       // UpdateOutboundPolicy @ admin_settings.go
-	msgUpdateOutboundPolicy2             = "allow_hosts 不能为空"           // UpdateOutboundPolicy @ admin_settings.go
-	msgListUsers                         = "获取用户列表失败"                   // ListUsers @ admin_users.go
-	msgBanUser                           = "expires_in_days 不能小于 0"     // BanUser @ admin_users.go
-	msgIdentityOperationFailed3          = "管理员操作失败"                    // codeIdentityOperationFailed
-	msgUpdateLoginMetadata               = "更新登录信息失败"                   // UpdateLoginMetadata @ internal.go
-)
+
+// codeIdentityServiceUnavailable
+// codeIdentityOperationFailed
+// RespondRuntimeSettingsReadError @ admin.go
+// RespondRuntimeSettingsWriteError @ admin.go
+// RespondRuntimeSettingsWriteError @ admin.go
+// codeIdentityUserPublicIDInvalid
+// ImpersonateUser @ administration_impersonate.go
+// codeIdentityOperationFailed
+// codeIdentityUserNotFound
+// ImpersonateUser @ administration_impersonate.go
+// ImpersonateUser @ administration_impersonate.go
+// ImpersonateUser @ administration_impersonate.go
+// ImpersonateUser @ administration_impersonate.go
+// codeIdentityUpstreamUnavailable
+// codeIdentityUpstreamRejected
+// codeIdentityRequestInvalid
+// UpdateOutboundPolicy @ administration_settings.go
+// UpdateOutboundPolicy @ administration_settings.go
+// ListUsers @ administration_users.go
+// BanUser @ administration_users.go
+// codeIdentityOperationFailed
+// UpdateLoginMetadata @ internal.go

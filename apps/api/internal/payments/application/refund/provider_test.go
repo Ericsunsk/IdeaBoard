@@ -1,4 +1,4 @@
-package refund
+package refund_test
 
 import (
 	"errors"
@@ -7,6 +7,8 @@ import (
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
+
+	"ideaboard/api/internal/payments/application/refund"
 )
 
 func TestValidateProviderRefund(t *testing.T) {
@@ -24,7 +26,7 @@ func TestValidateProviderRefund(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := ValidateProviderRefund(local, test.provider)
+			err := refund.ValidateProviderRefund(local, test.provider)
 			if test.wantErr {
 				if !errors.Is(err, paymentcontracts.ErrRefundProviderConflict) {
 					t.Fatalf("error = %v, want ErrRefundProviderConflict", err)
@@ -39,7 +41,7 @@ func TestValidateProviderRefund(t *testing.T) {
 }
 
 func TestValidateProviderRefundRejectsMismatchedRefundID(t *testing.T) {
-	err := ValidateProviderRefund(
+	err := refund.ValidateProviderRefund(
 		paymentsdomain.PaymentRefund{StripeChargeID: "ch_123", StripeRefundID: "re_existing", AmountMinor: 1, Currency: "usd"},
 		paymentports.StripeRefund{ID: "re_other", ChargeID: "ch_123", AmountMinor: 1, Currency: "usd"},
 	)

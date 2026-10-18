@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/outboundhttp"
+	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/searchcatalog/domain"
 	"ideaboard/api/internal/searchcatalog/ports"
 )
@@ -23,16 +23,21 @@ const providerTestTimeout = 8 * time.Second
 // gateway migration (#766). Per-call Timeout/Target stay explicit so
 // Unsplash and Pexels remain separately observable.
 type providerHTTPClient interface {
-	Do(context.Context, *http.Request, outboundhttp.RequestOptions) (*http.Response, error)
+	Do(context.Context, *http.Request, safehttp.RequestOptions) (*http.Response, error)
 }
 
-var providerOutbound providerHTTPClient = outboundhttp.NewClient(outboundhttp.Config{})
+var providerOutbound providerHTTPClient = safehttp.NewClient(safehttp.Config{})
 
 // providerTarget names supplier egress in outbound logs/metrics.
 const (
 	unsplashTarget = "unsplash"
 	pexelsTarget   = "pexels"
 )
+
+// HeaderAuthorization is the standard HTTP Authorization carrier for external
+// supplier calls (Pexels raw key, Unsplash Client-ID scheme). Single home for
+// the header name so supplier adapters never hand-write the literal.
+const HeaderAuthorization = "Authorization"
 
 type httpProviderAdapter struct {
 	provider domain.Provider
@@ -53,46 +58,46 @@ func (a *httpProviderAdapter) Provider() domain.Provider { return a.provider }
 func (a *httpProviderAdapter) Test(ctx context.Context, apiKey string) (domain.FailureCategory, string, error) {
 	request, err := a.request(ctx, apiKey)
 	if err != nil {
-		return domain.FailureUnknown, msgTest, err
+		return domain.FailureUnknown, errorrender.MsgSearchcatalogInfrastructureTest, err
 	}
-	allowHosts := append(outbound.AllowHosts(ctx), a.providerHost())
-	response, err := providerOutbound.Do(ctx, request, outboundhttp.RequestOptions{
+	allowHosts := append(safehttp.AllowHosts(ctx), a.providerHost())
+	response, err := providerOutbound.Do(ctx, request, safehttp.RequestOptions{
 		Timeout:    providerTestTimeout,
 		AllowHosts: allowHosts,
 		Target:     a.providerTarget(),
 	})
 	if err != nil {
-		var statusErr *outboundhttp.HTTPStatusError
+		var statusErr *safehttp.HTTPStatusError
 		if errors.As(err, &statusErr) {
 			return providerTestStatusFailure(statusErr.StatusCode)
 		}
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return domain.FailureNetwork, msgTest2, err
+			return domain.FailureNetwork, errorrender.MsgTest2, err
 		}
-		return domain.FailureNetwork, msgTest3, err
+		return domain.FailureNetwork, errorrender.MsgTest3, err
 	}
 	defer response.Body.Close()
 	body, readErr := io.ReadAll(io.LimitReader(response.Body, 64*1024))
 	if readErr != nil {
-		return domain.FailureResponse, msgTest4, readErr
+		return domain.FailureResponse, errorrender.MsgTest4, readErr
 	}
 	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
-		return domain.FailureCredentials, msgTest5, fmt.Errorf("provider returned status %d", response.StatusCode)
+		return domain.FailureCredentials, errorrender.MsgTest5, fmt.Errorf("provider returned status %d", response.StatusCode)
 	}
 	if response.StatusCode == http.StatusTooManyRequests {
-		return domain.FailureQuota, msgTest6, fmt.Errorf("provider returned status %d", response.StatusCode)
+		return domain.FailureQuota, errorrender.MsgTest6, fmt.Errorf("provider returned status %d", response.StatusCode)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return domain.FailureUnknown, msgTest7, fmt.Errorf("provider returned status %d", response.StatusCode)
+		return domain.FailureUnknown, errorrender.MsgTest7, fmt.Errorf("provider returned status %d", response.StatusCode)
 	}
 	if len(body) == 0 {
-		return domain.FailureResponse, msgTest8, errors.New("empty provider response")
+		return domain.FailureResponse, errorrender.MsgTest8, errors.New("empty provider response")
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return domain.FailureResponse, msgTest9, err
+		return domain.FailureResponse, errorrender.MsgTest9, err
 	}
-	return "", msgTest10, nil
+	return "", errorrender.MsgTest10, nil
 }
 
 func (a *httpProviderAdapter) providerHost() string {
@@ -117,11 +122,11 @@ func providerTestStatusFailure(status int) (domain.FailureCategory, string, erro
 	err := fmt.Errorf("provider returned status %d", status)
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return domain.FailureCredentials, msgTest5, err
+		return domain.FailureCredentials, errorrender.MsgTest5, err
 	case http.StatusTooManyRequests:
-		return domain.FailureQuota, msgTest6, err
+		return domain.FailureQuota, errorrender.MsgTest6, err
 	default:
-		return domain.FailureUnknown, msgTest7, err
+		return domain.FailureUnknown, errorrender.MsgTest7, err
 	}
 }
 
@@ -139,7 +144,7 @@ func pexelsTestRequest(ctx context.Context, apiKey string) (*http.Request, error
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("Authorization", apiKey)
+	request.Header.Set(HeaderAuthorization, apiKey)
 	return request, nil
 }
 
@@ -155,13 +160,13 @@ const providerSearchTimeout = 12 * time.Second
 const maxProviderBody = 4 << 20
 
 func fetchProviderBody(ctx context.Context, request *http.Request, target string, hosts []string) ([]byte, error) {
-	response, err := providerOutbound.Do(ctx, request, outboundhttp.RequestOptions{
+	response, err := providerOutbound.Do(ctx, request, safehttp.RequestOptions{
 		Timeout:    providerSearchTimeout,
-		AllowHosts: append(outbound.AllowHosts(ctx), hosts...),
+		AllowHosts: append(safehttp.AllowHosts(ctx), hosts...),
 		Target:     target,
 	})
 	if err != nil {
-		var statusErr *outboundhttp.HTTPStatusError
+		var statusErr *safehttp.HTTPStatusError
 		if errors.As(err, &statusErr) {
 			return nil, fmt.Errorf("%s status %d", target, statusErr.StatusCode)
 		}

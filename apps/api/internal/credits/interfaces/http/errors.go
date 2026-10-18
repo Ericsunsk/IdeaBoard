@@ -1,66 +1,65 @@
 package http
 
 import (
-	"errors"
 	"net/http"
 
 	"ideaboard/api/internal/credits/domain"
-	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/platform/errorrender"
 
 	"github.com/gin-gonic/gin"
 )
 
-// creditErrorMapping binds one stable outcome to its wire rendering. The
-// table is the single source of truth for credits HTTP error rendering;
-// add rows here instead of scattering errors.Is checks across handlers.
-type creditErrorMapping struct {
-	target   error
-	status   int
-	message  string
-	internal bool
-}
+// Credit error codes are wire-stable. Do not rename a code without
+// coordinating the caller that branches on it. Messages stay
+// intentionally safe for public display.
+//
+// Classification lives here at the HTTP edge so credits domain sentinels
+// stay dependency-free; every credits failure below renders through the
+// machine envelope. The values below alias the kernel registry
+// (platform/contract.CodeCredit*): the registry is the single source of
+// truth, these names keep the edge diffs trivial. Wire statuses and copy
+// are unchanged from the legacy numeric envelope.
+const (
+	codeCreditInvalidInput            = string(contract.CodeCreditInvalidInput)
+	codeCreditIdempotencyConflict     = string(contract.CodeCreditIdempotencyConflict)
+	codeCreditWalletNotFound          = string(contract.CodeCreditWalletNotFound)
+	codeCreditWalletFrozen            = string(contract.CodeCreditWalletFrozen)
+	codeCreditWalletRestricted        = string(contract.CodeCreditWalletRestricted)
+	codeCreditInsufficientCredits     = string(contract.CodeCreditInsufficientCredits)
+	codeCreditChargeNotFound          = string(contract.CodeCreditChargeNotFound)
+	codeCreditRefundExceedsCharge     = string(contract.CodeCreditRefundExceedsCharge)
+	codeCreditReconciliationNotFound  = string(contract.CodeCreditReconciliationNotFound)
+	codeCreditReconciliationAvailable = string(contract.CodeCreditReconciliationUnavailable)
+	codeCreditOperationFailed         = string(contract.CodeCreditOperationFailed)
+)
 
-var creditErrorTable = []creditErrorMapping{
-	{target: domain.ErrInvalidCommand, status: http.StatusBadRequest, message: msgPackage},
-	{target: domain.ErrIdempotencyConflict, status: http.StatusConflict, message: msgPackage2},
-	{target: domain.ErrWalletNotFound, status: http.StatusNotFound, message: msgPackage3},
-	{target: domain.ErrWalletFrozen, status: http.StatusLocked, message: msgPackage4},
-	{target: domain.ErrWalletRestricted, status: http.StatusLocked, message: msgPackage5},
-	{target: domain.ErrInsufficientCredits, status: http.StatusUnprocessableEntity, message: msgPackage6},
-	{target: domain.ErrChargeNotFound, status: http.StatusNotFound, message: msgPackage7},
-	{target: domain.ErrRefundExceedsCharge, status: http.StatusUnprocessableEntity, message: msgPackage8},
-	{target: domain.ErrReconciliationNotFound, status: http.StatusNotFound, message: msgPackage9},
-	{target: domain.ErrReconciliationUnavailable, status: http.StatusServiceUnavailable, message: msgPackage10, internal: true},
+// creditErrorTable is the single source of truth for credits HTTP error
+// rendering; add rows here instead of scattering errors.Is checks across
+// handlers. Rows are ordered from the most specific outcome to the most
+// generic; the first match wins.
+var creditErrorTable = []errorrender.Mapping{
+	{Targets: []error{domain.ErrInvalidCommand}, Status: http.StatusBadRequest, Code: codeCreditInvalidInput, Message: errorrender.MsgCreditsInterfacesHTTPPackage},
+	{Targets: []error{domain.ErrIdempotencyConflict}, Status: http.StatusConflict, Code: codeCreditIdempotencyConflict, Message: errorrender.MsgPackage2},
+	{Targets: []error{domain.ErrWalletNotFound}, Status: http.StatusNotFound, Code: codeCreditWalletNotFound, Message: errorrender.MsgPackage3},
+	{Targets: []error{domain.ErrWalletFrozen}, Status: http.StatusLocked, Code: codeCreditWalletFrozen, Message: errorrender.MsgPackage4},
+	{Targets: []error{domain.ErrWalletRestricted}, Status: http.StatusLocked, Code: codeCreditWalletRestricted, Message: errorrender.MsgPackage5},
+	{Targets: []error{domain.ErrInsufficientCredits}, Status: http.StatusUnprocessableEntity, Code: codeCreditInsufficientCredits, Message: errorrender.MsgPackage6},
+	{Targets: []error{domain.ErrChargeNotFound}, Status: http.StatusNotFound, Code: codeCreditChargeNotFound, Message: errorrender.MsgPackage7},
+	{Targets: []error{domain.ErrRefundExceedsCharge}, Status: http.StatusUnprocessableEntity, Code: codeCreditRefundExceedsCharge, Message: errorrender.MsgPackage8},
+	{Targets: []error{domain.ErrReconciliationNotFound}, Status: http.StatusNotFound, Code: codeCreditReconciliationNotFound, Message: errorrender.MsgPackage9},
+	{Targets: []error{domain.ErrReconciliationUnavailable}, Status: http.StatusServiceUnavailable, Code: codeCreditReconciliationAvailable, Message: errorrender.MsgPackage10},
 }
 
 func writeCreditError(c *gin.Context, err error) {
-	for _, m := range creditErrorTable {
-		if errors.Is(err, m.target) {
-			if m.internal {
-				response.InternalError(c, m.status, m.message, err)
-				return
-			}
-			response.Error(c, m.status, m.message)
-			return
-		}
-	}
-	response.InternalError(c, http.StatusInternalServerError, msgWriteCreditError, err)
+	errorrender.RenderMapped(c, err, creditErrorTable, errorrender.MappedOptions{
+		DefaultStatus:  http.StatusInternalServerError,
+		DefaultCode:    codeCreditOperationFailed,
+		DefaultMessage: errorrender.MsgWriteCreditError,
+		UnmatchedLog:   "credit operation failed",
+		// The reconciliation outage row stays server-attributable like
+		// the legacy InternalError path; 4xx matches render silently.
+		MatchedLogAtOrAbove: 500,
+		MatchedLog:          "credit operation failed",
+	})
 }
-
-// Backend-owned user-facing copy for this package. Each constant
-// is the single source of truth for one rendered message; call
-// sites reference these names so copy changes stay in one place.
-// Values are byte-identical to the previously inline literals.
-const (
-	msgPackage          = "参数错误"            // Package @ errors.go
-	msgPackage2         = "幂等键已用于不同的Idea操作" // Package @ errors.go
-	msgPackage3         = "Idea钱包不存在"       // Package @ errors.go
-	msgPackage4         = "Idea钱包已冻结"       // Package @ errors.go
-	msgPackage5         = "Idea钱包当前受限"      // Package @ errors.go
-	msgPackage6         = "Idea不足"          // Package @ errors.go
-	msgPackage7         = "原扣款记录不存在"        // Package @ errors.go
-	msgPackage8         = "退款金额超过原扣款剩余额度"   // Package @ errors.go
-	msgPackage9         = "Idea对账任务不存在"     // Package @ errors.go
-	msgPackage10        = "Idea对账服务暂不可用"    // Package @ errors.go
-	msgWriteCreditError = "Idea操作失败"        // WriteCreditError @ errors.go
-)

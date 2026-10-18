@@ -4,6 +4,8 @@ import (
 	"errors"
 	"math"
 	"testing"
+
+	creditsdomain "ideaboard/api/internal/credits/domain"
 )
 
 func TestCanonicalizeSKUDefinesGlobalNamespaceContract(t *testing.T) {
@@ -64,5 +66,14 @@ func TestPriceSnapshotTotalFailsClosed(t *testing.T) {
 	overflow := PriceSnapshot{UnitCredits: MaxQuoteCredits}
 	if _, err := overflow.Total(math.MaxInt64); !errors.Is(err, ErrQuoteTotalExceeded) {
 		t.Fatalf("overflow Total() error = %v, want ErrQuoteTotalExceeded", err)
+	}
+}
+
+func TestMaxQuoteCreditsMatchesCreditLedgerBound(t *testing.T) {
+	// Billing quotes price Credits, so its overflow bound must stay identical
+	// to the ledger's MaxCreditAmount. credits/domain owns the arithmetic
+	// bound; this test pins the parity instead of duplicating the constant.
+	if MaxQuoteCredits != creditsdomain.MaxCreditAmount {
+		t.Fatalf("MaxQuoteCredits = %d, want credits MaxCreditAmount = %d", MaxQuoteCredits, creditsdomain.MaxCreditAmount)
 	}
 }

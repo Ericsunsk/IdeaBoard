@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"io"
 	"mime/multipart"
 	"os"
@@ -81,10 +82,10 @@ func (d *LocalStorageDriver) localPath(objectKey string) (string, error) {
 	full := filepath.Join(d.root, filepath.FromSlash(objectKey))
 	relative, err := filepath.Rel(d.root, full)
 	if err != nil {
-		return "", fmt.Errorf(msgLocalPath, err)
+		return "", fmt.Errorf(errorrender.MsgLocalPath, err)
 	}
 	if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return "", errors.New(msgLocalPath2)
+		return "", errors.New(errorrender.MsgLocalPath2)
 	}
 	return full, nil
 }
@@ -109,7 +110,7 @@ func (d *LocalStorageDriver) GetBucketInfo(ctx context.Context, profile *domain.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return nil, errors.New(msgGetBucketInfo)
+	return nil, errors.New(errorrender.MsgMediaStorageInfrastructureLocalGetBucketInfo)
 }
 
 func (d *LocalStorageDriver) UploadRef(ctx context.Context, profile *domain.StorageProfile, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
@@ -118,14 +119,14 @@ func (d *LocalStorageDriver) UploadRef(ctx context.Context, profile *domain.Stor
 	}
 	facts, err := imageformat.InspectFileHeader(file)
 	if err != nil {
-		return nil, fmt.Errorf(msgUploadRef, err)
+		return nil, fmt.Errorf(errorrender.MsgUploadRef, err)
 	}
 	filename := domain.CanonicalStorageFilename(file.Filename, facts.Extension)
 	opts.ObjectKey = domain.CanonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
 
 	src, err := file.Open()
 	if err != nil {
-		return nil, fmt.Errorf(msgUploadRef2, err)
+		return nil, fmt.Errorf(errorrender.MsgUploadRef2, err)
 	}
 	defer src.Close()
 
@@ -145,7 +146,7 @@ func (d *LocalStorageDriver) StoreBytesRef(ctx context.Context, profile *domain.
 	}
 	facts, err := imageformat.InspectDetectedBytes(data)
 	if err != nil {
-		return nil, fmt.Errorf(msgStoreBytesRef, err)
+		return nil, fmt.Errorf(errorrender.MsgStoreBytesRef, err)
 	}
 	filename = domain.CanonicalStorageFilename(filename, facts.Extension)
 	opts.ObjectKey = domain.CanonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
@@ -196,31 +197,31 @@ func (d *LocalStorageDriver) SaveReaderLocalRef(ctx context.Context, filename st
 	}
 	objectKey, err = domain.NormalizeUploadObjectKey(objectKey)
 	if err != nil {
-		return nil, fmt.Errorf(msgSaveReaderLocalRef, err)
+		return nil, fmt.Errorf(errorrender.MsgSaveReaderLocalRef, err)
 	}
 	dst, err := d.localPath(objectKey)
 	if err != nil {
 		return nil, err
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
-		return nil, fmt.Errorf(msgSaveReaderLocalRef2, err)
+		return nil, fmt.Errorf(errorrender.MsgSaveReaderLocalRef2, err)
 	}
 	dstFile, err := os.CreateTemp(filepath.Dir(dst), ".upload-*")
 	if err != nil {
-		return nil, fmt.Errorf(msgSaveReaderLocalRef3, err)
+		return nil, fmt.Errorf(errorrender.MsgSaveReaderLocalRef3, err)
 	}
 	temporaryPath := dstFile.Name()
 	defer os.Remove(temporaryPath)
 	hash := sha256.New()
 	if err := copyExactWithBuffer(io.MultiWriter(dstFile, hash), src, size); err != nil {
 		_ = dstFile.Close()
-		return nil, fmt.Errorf(msgSaveReaderLocalRef3, err)
+		return nil, fmt.Errorf(errorrender.MsgSaveReaderLocalRef3, err)
 	}
 	if err := dstFile.Close(); err != nil {
-		return nil, fmt.Errorf(msgSaveReaderLocalRef3, err)
+		return nil, fmt.Errorf(errorrender.MsgSaveReaderLocalRef3, err)
 	}
 	if err := publishLocalUpload(temporaryPath, dst, size, hash.Sum(nil)); err != nil {
-		return nil, fmt.Errorf(msgSaveReaderLocalRef3, err)
+		return nil, fmt.Errorf(errorrender.MsgSaveReaderLocalRef3, err)
 	}
 	if strings.TrimSpace(contentType) == "" {
 		contentType = inferStoredUploadContentType(filename, nil)
@@ -281,15 +282,15 @@ func (d *LocalStorageDriver) PutObject(ctx context.Context, profile *domain.Stor
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
-		return fmt.Errorf(msgSaveReaderLocalRef2, err)
+		return fmt.Errorf(errorrender.MsgSaveReaderLocalRef2, err)
 	}
 	tmpDst := fmt.Sprintf("%s.tmp.%d", dst, time.Now().UnixNano())
 	if err := os.WriteFile(tmpDst, data, 0600); err != nil {
-		return fmt.Errorf(msgSaveReaderLocalRef3, err)
+		return fmt.Errorf(errorrender.MsgSaveReaderLocalRef3, err)
 	}
 	if err := os.Rename(tmpDst, dst); err != nil {
 		_ = os.Remove(tmpDst)
-		return fmt.Errorf(msgSaveReaderLocalRef3, err)
+		return fmt.Errorf(errorrender.MsgSaveReaderLocalRef3, err)
 	}
 	return nil
 }
@@ -311,7 +312,7 @@ func (d *LocalStorageDriver) Read(ctx context.Context, profile *domain.StoragePr
 		if os.IsNotExist(err) {
 			return nil, domain.ErrStoredObjectNotFound
 		}
-		return nil, fmt.Errorf(msgRead, err)
+		return nil, fmt.Errorf(errorrender.MsgRead, err)
 	}
 	defer file.Close()
 	data, err := readStorageObject(file, maxBytes)
@@ -342,7 +343,7 @@ func (d *LocalStorageDriver) Delete(ctx context.Context, profile *domain.Storage
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return fmt.Errorf(msgDelete, err)
+		return fmt.Errorf(errorrender.MsgMediaStorageInfrastructureLocalDelete, err)
 	}
 	d.cleanupEmptyParentDirs(localPath)
 	return nil
@@ -361,7 +362,7 @@ func (d *LocalStorageDriver) DeleteByPrefix(ctx context.Context, profile *domain
 		return err
 	}
 	if err := os.RemoveAll(localPath); err != nil {
-		return fmt.Errorf(msgDeleteByPrefix, err)
+		return fmt.Errorf(errorrender.MsgDeleteByPrefix, err)
 	}
 	d.cleanupEmptyParentDirs(localPath)
 	return nil
@@ -486,13 +487,13 @@ func readStorageObject(src io.Reader, maxBytes int64) ([]byte, error) {
 	}
 	data, err := io.ReadAll(io.LimitReader(src, maxBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf(msgRead, err)
+		return nil, fmt.Errorf(errorrender.MsgRead, err)
 	}
 	if int64(len(data)) > maxBytes {
-		return nil, fmt.Errorf(msgReadStorageObject, maxBytes/1024/1024)
+		return nil, fmt.Errorf(errorrender.MsgMediaStorageInfrastructureLocalReadStorageObject, maxBytes/1024/1024)
 	}
 	if len(data) == 0 {
-		return nil, errors.New(msgReadStorageObject2)
+		return nil, errors.New(errorrender.MsgMediaStorageInfrastructureLocalReadStorageObject2)
 	}
 	return data, nil
 }

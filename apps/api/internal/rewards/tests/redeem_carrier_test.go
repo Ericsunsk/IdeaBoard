@@ -26,6 +26,8 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/rewards"
+	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/testdb"
 )
 
@@ -39,9 +41,9 @@ func countRedemptionRows(t *testing.T, ctx context.Context, querier rewardCarrie
 	return redemptions, grants
 }
 
-func seedRedeemableCode(t *testing.T, service *Service, displayName, code, idempotencyKey string) int64 {
+func seedRedeemableCode(t *testing.T, service *rewards.Service, displayName, code, idempotencyKey string) int64 {
 	t.Helper()
-	created, err := service.CreateRewardCode(context.Background(), CreateRewardCodeCommand{
+	created, err := service.CreateRewardCode(context.Background(), ports.CreateRewardCodeCommand{
 		DisplayName: displayName, Code: code, CreditAmount: 50,
 		MaxRedemptions: 0, IdempotencyKey: idempotencyKey, ActorUserID: 1,
 	})
@@ -61,7 +63,7 @@ func TestRedeemJoinsAmbientCarrierTx(t *testing.T) {
 	provisionRewardWallet(t, pool, creditService, 3)
 
 	tx, carrier := beginRewardCarrier(t, ctx, pool)
-	result, err := service.Redeem(carrier, RedeemCommand{UserID: 3, Code: "REDEEM-CARRIER-81"})
+	result, err := service.Redeem(carrier, ports.RedeemCommand{UserID: 3, Code: "REDEEM-CARRIER-81"})
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("Redeem() on carrier error = %v", err)
@@ -107,7 +109,7 @@ func TestRedeemRollsBackWithAmbientCarrier(t *testing.T) {
 	provisionRewardWallet(t, pool, creditService, 3)
 
 	tx, carrier := beginRewardCarrier(t, ctx, pool)
-	if _, err := service.Redeem(carrier, RedeemCommand{UserID: 3, Code: "REDEEM-ROLLBACK-82"}); err != nil {
+	if _, err := service.Redeem(carrier, ports.RedeemCommand{UserID: 3, Code: "REDEEM-ROLLBACK-82"}); err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("Redeem() on carrier error = %v", err)
 	}
@@ -137,7 +139,7 @@ func TestRedeemReplayOnAmbientCarrierDoesNotDoubleGrant(t *testing.T) {
 	provisionRewardWallet(t, pool, creditService, 3)
 
 	tx, carrier := beginRewardCarrier(t, ctx, pool)
-	first, err := service.Redeem(carrier, RedeemCommand{UserID: 3, Code: "REDEEM-REPLAY-83"})
+	first, err := service.Redeem(carrier, ports.RedeemCommand{UserID: 3, Code: "REDEEM-REPLAY-83"})
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("first Redeem() on carrier error = %v", err)
@@ -152,7 +154,7 @@ func TestRedeemReplayOnAmbientCarrierDoesNotDoubleGrant(t *testing.T) {
 	// release here would discard the carrier (and the guard's audit
 	// row with it), and the commit below would fail on a closed
 	// transaction.
-	second, err := service.Redeem(carrier, RedeemCommand{UserID: 3, Code: "REDEEM-REPLAY-83"})
+	second, err := service.Redeem(carrier, ports.RedeemCommand{UserID: 3, Code: "REDEEM-REPLAY-83"})
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("second Redeem() on carrier error = %v", err)

@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"math"
 	"regexp"
 	"strings"
@@ -32,7 +33,6 @@ const (
 const ReservedVisionSlug = "vision"
 
 var supportedWorkflowFeatureSlugs = registeredImageFeatureSlugs()
-var supportedTaskFeatureSlugs = supportedFeatureSlugSet(supportedWorkflowFeatureSlugs)
 var aiImageWorkflowFeatures = supportedFeatureSlugSet(supportedWorkflowFeatureSlugs)
 
 // AIImageFeatureSlugs is the canonical product registry for workflows that
@@ -50,12 +50,14 @@ func IsAIImageFeature(raw string) bool {
 }
 
 func ParseAIImageFeatureSlug(raw string) (string, bool) {
-	slug, ok := ParseWorkflowFeatureSlug(raw)
-	if !ok {
+	// Single canonical owner for feature-slug validation. New callers
+	// use this directly; Parse/ValidateWorkflow* are thin
+	// aliases below so ValidateCreate/handler never fork the set.
+	slug := normalizeWorkflowFeatureSlug(raw)
+	if slug == "" || !workflowFeatureSlugRe.MatchString(slug) {
 		return "", false
 	}
-	_, ok = aiImageWorkflowFeatures[slug]
-	if !ok {
+	if _, ok := aiImageWorkflowFeatures[slug]; !ok {
 		return "", false
 	}
 	return slug, true
@@ -80,20 +82,19 @@ func normalizeWorkflowFeatureSlug(raw string) string {
 }
 
 func ParseWorkflowFeatureSlug(raw string) (string, bool) {
-	slug := normalizeWorkflowFeatureSlug(raw)
-	if slug == "" || !workflowFeatureSlugRe.MatchString(slug) {
-		return "", false
-	}
-	if _, ok := supportedTaskFeatureSlugs[slug]; !ok {
-		return "", false
-	}
-	return slug, true
+	// Legacy alias: the workflow/task/AI-image registries share one
+	// canonical list, so this delegates to the single owner
+	// ParseAIImageFeatureSlug. New callers use ParseAIImageFeatureSlug
+	// directly.
+	return ParseAIImageFeatureSlug(raw)
 }
 
 func ValidateWorkflowFeatureSlug(raw string) (string, error) {
-	slug, ok := ParseWorkflowFeatureSlug(raw)
+	// Legacy alias: delegates to the canonical ParseAIImageFeatureSlug
+	// so ValidateCreate/handler never fork slug validation.
+	slug, ok := ParseAIImageFeatureSlug(raw)
 	if !ok {
-		return "", fmt.Errorf(msgValidateWorkflowFeatureSlug, raw)
+		return "", fmt.Errorf(errorrender.MsgValidateWorkflowFeatureSlug, raw)
 	}
 	return slug, nil
 }
@@ -209,9 +210,11 @@ func ResolveWorkflowFeatureSlug(params map[string]interface{}) (string, error) {
 	if !ok {
 		return "", nil
 	}
-	slug, err := ValidateWorkflowFeatureSlug(rawFeature)
-	if err != nil {
-		return "", err
+	// Reuses the canonical ParseAIImageFeatureSlug so param-derived
+	// slugs never fork validation.
+	slug, ok := ParseAIImageFeatureSlug(rawFeature)
+	if !ok {
+		return "", fmt.Errorf(errorrender.MsgValidateWorkflowFeatureSlug, rawFeature)
 	}
 	return slug, nil
 }

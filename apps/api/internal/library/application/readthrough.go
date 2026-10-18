@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"ideaboard/api/internal/library/domain"
-	"ideaboard/api/internal/library/ports"
 	materializerassets "ideaboard/api/internal/media/assets"
 )
 
@@ -53,14 +52,17 @@ const (
 const DefaultReadThroughSettleTimeout = 10 * time.Second
 
 // ReadThroughStore is the typed persistence seam for the
-// orchestration. Composition injects the postgres Service (which
-// implements the listing + atomic claim); tests inject the in-memory
-// store. Request-time type assertions against implied capabilities
-// are gone: the compiler enforces the seam.
+// orchestration. Composition injects the postgres Service; tests inject
+// the in-memory store. It lists exactly what the orchestrator calls:
+// GetAsset + ListMaterializations for resolve/replay, ClaimMaterialization
+// for the atomic trigger, SetMaterializationResult for settle. Request-time
+// type assertions against implied capabilities are gone: the compiler
+// enforces the seam.
 type ReadThroughStore interface {
-	ports.WorkspaceLibraryStore
+	GetAsset(ctx context.Context, workspacePublicID, assetPublicID string) (*domain.V1Asset, error)
 	ListMaterializations(ctx context.Context, workspacePublicID string) ([]*domain.V1Materialization, error)
 	ClaimMaterialization(ctx context.Context, workspacePublicID, assetPublicID, publicID string) (*domain.V1Materialization, bool, error)
+	SetMaterializationResult(ctx context.Context, workspacePublicID, materializationPublicID string, status domain.V1MaterializationStatus, mediaAssetID, errorCode, errorMessage string) (*domain.V1Materialization, error)
 }
 
 // Executor runs detached best-effort fetches off the request path.

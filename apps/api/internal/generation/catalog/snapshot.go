@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/generation/routing"
@@ -115,4 +116,45 @@ func LoadRoutingSnapshot(ctx context.Context, q *dbsqlc.Queries, taskPublicID st
 		return routing.RoutingSnapshot{}, fmt.Errorf("%w: %w", ErrRoutingSnapshotCorrupt, err)
 	}
 	return snap, nil
+}
+
+// DecodePinnedSnapshot parses and validates pinned snapshot bytes read
+// with a task row (the worker's in-memory copy). It is the single owner
+// of the parse+verify+service-match sequence previously duplicated in
+// the worker's resolveExecutionSnapshot; the DB-reading
+// LoadRoutingSnapshot above shares validateSnapshot with it. The worker
+// calls only this (it must not re-read the live pool, and its narrow
+// store seam carries no snapshot queries).
+func DecodePinnedSnapshot(service string, raw json.RawMessage) (routing.RoutingSnapshot, error) {
+	if len(raw) == 0 {
+		return routing.RoutingSnapshot{}, fmt.Errorf("%w: blank snapshot", ErrRoutingSnapshotMissing)
+	}
+	var snap routing.RoutingSnapshot
+	if err := json.Unmarshal(raw, &snap); err != nil {
+		return routing.RoutingSnapshot{}, fmt.Errorf("%w: %w", ErrRoutingSnapshotCorrupt, err)
+	}
+	if err := validateSnapshot(snap); err != nil {
+		return routing.RoutingSnapshot{}, fmt.Errorf("%w: %w", ErrRoutingSnapshotCorrupt, err)
+	}
+	if !strings.EqualFold(strings.TrimSpace(snap.Service), strings.TrimSpace(service)) {
+		return routing.RoutingSnapshot{}, fmt.Errorf("%w: snapshot service %q does not match task service %q",
+			ErrRoutingSnapshotCorrupt, snap.Service, service)
+	}
+	return snap, nil
+}
+
+// SelectExecutionModel resolves the gateway target for one execution
+// from the pinned snapshot and the persisted fallback state. When a
+// model_fallback attempt already exists (fallback consumed by an
+// earlier execution), the current model is the retry candidate and no
+// further fallback is allowed: at most one fallback per task. Single
+// owner for the policy previously duplicated in the worker.
+func SelectExecutionModel(snap routing.RoutingSnapshot, fallbackConsumed bool) (model string, allowFallback bool) {
+	if fallbackConsumed {
+		if snap.HasRetryCandidate() {
+			return snap.RetryCandidate, false
+		}
+		return snap.SelectedModel, false
+	}
+	return snap.SelectedModel, snap.HasRetryCandidate()
 }

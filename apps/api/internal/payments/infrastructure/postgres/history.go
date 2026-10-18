@@ -39,7 +39,7 @@ func (r *Repository) ListPaymentRechargeHistory(
 		params.CursorPaidAt = pgtype.Timestamptz{Time: occurredAt, Valid: true}
 		params.CursorID = pgtype.UUID{Bytes: id, Valid: true}
 	}
-	rows, err := r.dbWithContext(ctx).queries().ListPaymentRechargeHistory(ctx, params)
+	rows, err := r.DBWithContext(ctx).Queries().ListPaymentRechargeHistory(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("list payment recharge history: %w", err)
 	}

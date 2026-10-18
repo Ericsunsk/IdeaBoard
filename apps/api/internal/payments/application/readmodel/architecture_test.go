@@ -1,4 +1,4 @@
-package readmodel
+package readmodel_test
 
 import (
 	"go/parser"

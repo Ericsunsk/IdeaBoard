@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/testsupport/testenv"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -308,7 +309,7 @@ func TestMediaServiceLifecycle(t *testing.T) {
 	if completed.Status != StatusCompleted || completed.AssetID != asset.ID {
 		t.Fatalf("completed = %+v, want completed with asset link", completed)
 	}
-	if !IsAssetID(asset.ID) || asset.Status != AssetStatusReady {
+	if !contract.IsAssetID(asset.ID) || asset.Status != AssetStatusReady {
 		t.Fatalf("asset = %+v, want ready asset_ row", asset)
 	}
 	if asset.Width != 100 || asset.Height != 80 {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/events"
+	eventnats "ideaboard/api/internal/events/nats"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/domain"
 	natsinfra "ideaboard/api/internal/runtime/infrastructure/nats"
@@ -41,7 +41,7 @@ func TestNATSHealthCheckerWhenDisabled(t *testing.T) {
 
 func TestNATSHealthCheckerWhenEnabledDisconnected(t *testing.T) {
 	// Constructing an EventBus with an uninitialized bus pointer (no active connection)
-	checker := natsinfra.NewEventBusFromUnderlying(&events.NATSJetStreamEventBus{})
+	checker := natsinfra.NewEventBusFromUnderlying(&eventnats.NATSJetStreamEventBus{})
 	status := checker.CheckHealth(t.Context())
 
 	if status.Name != "nats" {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { resolveSizedAvatarUrl } from './avatarUrl'
+import { resolveMemberAvatar, resolveSizedAvatarUrl } from './avatarUrl'
 
 const ROUTE = '/api/v1/public/users/AVTR01/avatar'
 
@@ -52,5 +52,52 @@ describe('resolveSizedAvatarUrl', () => {
     for (const value of [undefined, null, '', '   ', 42]) {
       expect(resolveSizedAvatarUrl(value, 88, 1)).toBeUndefined()
     }
+  })
+})
+
+describe('resolveMemberAvatar', () => {
+  const ROUTE = '/api/v1/public/users/AVTR01/avatar?v=abc123'
+
+  it('sizes the roster entry avatar first', () => {
+    expect(resolveMemberAvatar({ userId: 'usr_a', avatar_url: ROUTE }, null)).toBe(
+      `${ROUTE}&size=64`,
+    )
+  })
+
+  it('falls back to the viewer session avatar for the viewer entry', () => {
+    expect(
+      resolveMemberAvatar({ userId: 'usr_me' }, { public_id: 'usr_me', avatar: ROUTE }),
+    ).toBe(`${ROUTE}&size=64`)
+  })
+
+  it('prefers the entry avatar over the viewer avatar', () => {
+    expect(
+      resolveMemberAvatar(
+        { userId: 'usr_me', avatar_url: '/avatar-entry.png' },
+        { public_id: 'usr_me', avatar: ROUTE },
+      ),
+    ).toBe('/avatar-entry.png')
+  })
+
+  it('passes external URLs through unsized', () => {
+    expect(
+      resolveMemberAvatar({ userId: 'usr_a', avatar_url: 'https://cdn.example/a.png' }, null),
+    ).toBe('https://cdn.example/a.png')
+    expect(
+      resolveMemberAvatar(
+        { userId: 'usr_me' },
+        { public_id: 'usr_me', avatar: 'https://cdn.example/me.png' },
+      ),
+    ).toBe('https://cdn.example/me.png')
+  })
+
+  it('returns undefined without an entry avatar or viewer match', () => {
+    expect(resolveMemberAvatar({ userId: 'usr_a' }, null)).toBeUndefined()
+    expect(
+      resolveMemberAvatar({ userId: 'usr_a' }, { public_id: 'usr_me', avatar: ROUTE }),
+    ).toBeUndefined()
+    expect(
+      resolveMemberAvatar({ userId: 'usr_me' }, { public_id: 'usr_me', avatar: '   ' }),
+    ).toBeUndefined()
   })
 })

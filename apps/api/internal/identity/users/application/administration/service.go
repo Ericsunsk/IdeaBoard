@@ -12,7 +12,7 @@ import (
 	"ideaboard/api/internal/identity/users/domain"
 	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/platform/database"
-	"ideaboard/api/internal/platform/validation"
+	"ideaboard/api/internal/platform/errorrender"
 )
 
 const maxUserKeywordLength = 64
@@ -77,10 +77,10 @@ func normalizeUserListRequest(req *ports.UserListRequest) (int16, bool, error) {
 	req.Keyword = strings.TrimSpace(req.Keyword)
 	req.Role = normalizeUserListRole(req.Role)
 	if utf8.RuneCountInString(req.Keyword) > maxUserKeywordLength {
-		return 0, false, validation.New(msgNormalizeUserListRequest)
+		return 0, false, errorrender.NewValidationError(errorrender.MsgNormalizeUserListRequest)
 	}
 	if req.Role != "" && req.Role != domain.RoleAdmin && req.Role != domain.RoleUser {
-		return 0, false, validation.New(msgSetRole)
+		return 0, false, errorrender.NewValidationError(errorrender.MsgSetRole)
 	}
 	status, hasStatus, err := normalizeUserListStatus(req.Status)
 	if err != nil {
@@ -101,7 +101,7 @@ func (s *Service) enrichUserList(ctx context.Context, users []*domain.User) ([]*
 		return list, nil
 	}
 	if s.creditBalanceReader == nil {
-		return nil, errors.New(msgEnrichUserList)
+		return nil, errors.New(errorrender.MsgEnrichUserList)
 	}
 	userIDs := make([]int64, 0, len(users))
 	for _, user := range users {
@@ -109,7 +109,7 @@ func (s *Service) enrichUserList(ctx context.Context, users []*domain.User) ([]*
 	}
 	balances, err := s.creditBalanceReader.GetAvailableBalances(ctx, userIDs)
 	if err != nil {
-		return nil, fmt.Errorf(msgEnrichUserList2, err)
+		return nil, fmt.Errorf(errorrender.MsgEnrichUserList2, err)
 	}
 	identities := make(map[string]authidentity.UserIdentity)
 	if s.emailReader != nil {
@@ -121,13 +121,13 @@ func (s *Service) enrichUserList(ctx context.Context, users []*domain.User) ([]*
 		}
 		identities, err = s.emailReader.GetUserEmails(ctx, authUserIDs)
 		if err != nil {
-			return nil, fmt.Errorf(msgEnrichUserList3, err)
+			return nil, fmt.Errorf(errorrender.MsgEnrichUserList3, err)
 		}
 	}
 	for _, user := range users {
 		availableCredits, ok := balances[user.ID]
 		if !ok {
-			return nil, fmt.Errorf(msgEnrichUserList4, user.ID)
+			return nil, fmt.Errorf(errorrender.MsgEnrichUserList4, user.ID)
 		}
 		identity := identities[authUserIDValue(user.AuthUserID)]
 		list = append(list, &ports.AdminUserListItem{
@@ -167,7 +167,7 @@ func normalizeUserListStatus(raw string) (int16, bool, error) {
 	}
 	status, err := strconv.Atoi(value)
 	if err != nil || (status != 0 && status != 1) {
-		return 0, false, validation.New(msgNormalizeUserListStatus)
+		return 0, false, errorrender.NewValidationError(errorrender.MsgNormalizeUserListStatus)
 	}
 	return int16(status), true, nil
 }
@@ -175,16 +175,16 @@ func normalizeUserListStatus(raw string) (int16, bool, error) {
 // UpdateStatus 更新用户状态
 func (s *Service) UpdateStatus(ctx context.Context, userID int64, status int16) error {
 	if status != 0 && status != 1 {
-		return errors.New(msgUpdateStatus)
+		return errors.New(errorrender.MsgUpdateStatus)
 	}
 
 	if s.lifecycle == nil {
-		return errors.New(msgUpdateStatus2)
+		return errors.New(errorrender.MsgUpdateStatus2)
 	}
 	err := s.lifecycle.SetUserStatus(ctx, userID, status)
 	if err != nil {
 		if database.IsNotFound(err) {
-			return errors.New(msgLoadTarget3)
+			return errors.New(errorrender.MsgLoadTarget3)
 		}
 		return err
 	}
@@ -194,12 +194,12 @@ func (s *Service) UpdateStatus(ctx context.Context, userID int64, status int16) 
 func (s *Service) UpdateRole(ctx context.Context, userID int64, role string) error {
 	normalizedRole := strings.ToLower(strings.TrimSpace(role))
 	if normalizedRole != domain.RoleAdmin && normalizedRole != domain.RoleUser {
-		return errors.New(msgUpdateRole)
+		return errors.New(errorrender.MsgUpdateRole)
 	}
 
 	if err := s.repo.UpdateRoleByID(ctx, userID, normalizedRole); err != nil {
 		if database.IsNotFound(err) {
-			return errors.New(msgLoadTarget3)
+			return errors.New(errorrender.MsgLoadTarget3)
 		}
 		return err
 	}
@@ -209,12 +209,12 @@ func (s *Service) UpdateRole(ctx context.Context, userID int64, role string) err
 // DeleteUser 删除用户
 func (s *Service) DeleteUser(ctx context.Context, userID int64, authDeleter ports.AuthUserDeleter) error {
 	if s.lifecycle == nil {
-		return errors.New(msgDeleteUser)
+		return errors.New(errorrender.MsgDeleteUser)
 	}
 	err := s.lifecycle.DeleteUser(ctx, userID, authDeleter, s.uploadCleaner)
 	if err != nil {
 		if database.IsNotFound(err) {
-			return errors.New(msgLoadTarget3)
+			return errors.New(errorrender.MsgLoadTarget3)
 		}
 		return err
 	}

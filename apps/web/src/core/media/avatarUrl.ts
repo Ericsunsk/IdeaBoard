@@ -33,3 +33,32 @@ export function resolveSizedAvatarUrl(
   url.searchParams.set('size', String(resolveAvatarSizeVariant(cssWidthPx, devicePixelRatio)))
   return `${url.pathname}${url.search}${url.hash}`
 }
+
+/** Minimal roster identity for member avatar resolution. */
+export type MemberAvatarEntry = {
+  userId: string
+  avatar_url?: string | null | undefined
+}
+
+/** Minimal session viewer for the self-avatar fallback. */
+export type MemberAvatarViewer =
+  | { public_id?: string | null | undefined; avatar?: string | null | undefined }
+  | null
+  | undefined
+
+/**
+ * Resolves one member avatar for display at 64px CSS width: the roster
+ * entry URL first, then the viewer's own session avatar when the entry
+ * is the viewer, else undefined. External URLs pass through unsized.
+ */
+export function resolveMemberAvatar(
+  entry: MemberAvatarEntry,
+  currentUser: MemberAvatarViewer,
+): string | undefined {
+  const fromEntry = resolveSizedAvatarUrl(entry.avatar_url, 64)
+  if (fromEntry) return fromEntry
+  if (entry.userId && currentUser?.public_id && entry.userId === currentUser.public_id) {
+    return resolveSizedAvatarUrl(currentUser.avatar, 64)
+  }
+  return undefined
+}

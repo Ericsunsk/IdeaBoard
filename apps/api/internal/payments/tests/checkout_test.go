@@ -7,7 +7,6 @@ import (
 
 	"context"
 	"errors"
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"strconv"
 	"testing"
 	"time"
@@ -390,7 +389,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 		CreatedAt: verifiedAt.Add(-time.Minute),
 	}}
 	events := NewEventHub()
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(events, func() time.Time { return verifiedAt }), configurationGateway, checkoutGateway, creditService, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook_purchase", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
@@ -490,11 +489,11 @@ func TestStripeKeyChangePreservesUnsettledOrderCredential(t *testing.T) {
 	if err != nil || stored.AccountID != "acct_replacement" {
 		t.Fatalf("Stripe configuration did not rotate: %+v, %v", stored, err)
 	}
-	orders, err := paymentpostgres.NewRepository(db).ListActivePaymentOrders(t.Context(), 42)
+	orders, err := newTestPaymentStores(db).ListActivePaymentOrders(t.Context(), 42)
 	if err != nil || len(orders) != 1 {
 		t.Fatalf("active orders = %+v, %v", orders, err)
 	}
-	credential, err := paymentpostgres.NewRepository(db).GetStripeCredential(t.Context(), orders[0].StripeCredentialID)
+	credential, err := newTestPaymentStores(db).GetStripeCredential(t.Context(), orders[0].StripeCredentialID)
 	if err != nil || credential.AccountID != "acct_original" {
 		t.Fatalf("order credential = %+v, %v", credential, err)
 	}
@@ -690,7 +689,7 @@ func newConfiguredPurchaseServiceWithClock(
 	now func() time.Time,
 ) *payments.Service {
 	t.Helper()
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(NewEventHub(), now),
 		configurationGateway, checkoutGateway, wallets, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{

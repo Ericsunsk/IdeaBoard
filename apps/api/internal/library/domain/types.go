@@ -21,6 +21,12 @@ const (
 	ProviderPexels   = "pexels"
 	AllAssetsFolder  = "all"
 	QuickSavesFolder = "quick-saves"
+	// QuickSavesFolderName is the canonical display name of the workspace
+	// Quick Saves system folder. It must match the durable seam in
+	// db/queries/workspace_library.sql (EnsureQuickSavesFolder INSERT and
+	// GetQuickSavesFolder lookup) plus its generated sqlc mirrors; change
+	// the value in SQL and here together, never in one place only.
+	QuickSavesFolderName = "Quick Saves"
 	// DefaultPageSize tracks the shared pagination standard.
 	DefaultPageSize = pagination.DefaultLimit
 	// MaxPageSize tracks the shared pagination standard.

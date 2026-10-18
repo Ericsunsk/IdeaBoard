@@ -1,4 +1,4 @@
-package domain
+package providerdomain
 
 // ProviderRuntimeAdapter identifies the execution flow adapter for a runtime
 // operation. Operation dispatch lives in the single routing seam

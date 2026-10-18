@@ -1,7 +1,7 @@
 package contract
 
 import (
-	"ideaboard/api/internal/platform/apperror"
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/idempotency"
 
 	"github.com/gin-gonic/gin"
@@ -94,5 +94,5 @@ func IsIdempotencyConflict(err error) bool {
 	if idempotency.IsConflict(err) {
 		return true
 	}
-	return apperror.CodeOf(err) == apperror.Code(CodeTaskIdempotencyConflict)
+	return errorrender.CodeOf(err) == errorrender.Code(CodeTaskIdempotencyConflict)
 }

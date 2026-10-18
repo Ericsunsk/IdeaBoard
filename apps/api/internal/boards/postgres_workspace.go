@@ -18,7 +18,7 @@ import (
 	"ideaboard/api/internal/boards/previewscene"
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/events"
+	eventoutbox "ideaboard/api/internal/events/outbox"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tenancy"
@@ -896,8 +896,8 @@ func (s *PostgresWorkspaceBoardStore) ReplaceBoardAccess(ctx context.Context, wo
 			if err != nil {
 				return err
 			}
-			record := events.NewBoardAccessOutboxRecord(workspacePublicID, boardPublicID, tenancy.FormatUserPublicID(uuid.UUID(user.PublicID.Bytes)), out.AccessVersion, occurredAt)
-			if err := events.NewBoardAccessOutboxStore(s.db).InsertTx(ctx, tx, record); err != nil {
+			record := eventoutbox.NewBoardAccessOutboxRecord(workspacePublicID, boardPublicID, tenancy.FormatUserPublicID(uuid.UUID(user.PublicID.Bytes)), out.AccessVersion, occurredAt)
+			if err := eventoutbox.NewBoardAccessOutboxStore(s.db).InsertTx(ctx, tx, record); err != nil {
 				return err
 			}
 			out.AccessSignals = append(out.AccessSignals, record)
@@ -975,8 +975,8 @@ func (s *PostgresWorkspaceBoardStore) RemoveWorkspaceMemberGrants(ctx context.Co
 					return err
 				}
 				publicID := tenancy.FormatUserPublicID(uuid.UUID(user.PublicID.Bytes))
-				record := events.NewBoardAccessOutboxRecord(workspacePublicID, row.PublicID, publicID, cleanup.AccessVersion, occurredAt)
-				if err := events.NewBoardAccessOutboxStore(s.db).InsertTx(ctx, tx, record); err != nil {
+				record := eventoutbox.NewBoardAccessOutboxRecord(workspacePublicID, row.PublicID, publicID, cleanup.AccessVersion, occurredAt)
+				if err := eventoutbox.NewBoardAccessOutboxStore(s.db).InsertTx(ctx, tx, record); err != nil {
 					return err
 				}
 				cleanup.AccessSignals = append(cleanup.AccessSignals, record)

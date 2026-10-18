@@ -1,4 +1,4 @@
-package httpinfra
+package http
 
 import (
 	"net/http"

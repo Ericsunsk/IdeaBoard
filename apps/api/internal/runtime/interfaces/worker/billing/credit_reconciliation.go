@@ -55,18 +55,12 @@ func (d *CreditReconciliationDispatcher) DispatchReconciliationRun(
 	return err
 }
 
-type creditReconciliationWorkerService interface {
-	ExecuteReconciliation(context.Context, int64) error
-	FailReconciliation(context.Context, int64, error) error
-	GetReconciliationRun(context.Context, int64) (ports.ReconciliationRun, error)
-}
-
 type CreditReconciliationWorker struct {
 	river.WorkerDefaults[creditReconciliationJobArgs]
-	service creditReconciliationWorkerService
+	service ports.ReconciliationRunner
 }
 
-func NewCreditReconciliationWorker(service creditReconciliationWorkerService) *CreditReconciliationWorker {
+func NewCreditReconciliationWorker(service ports.ReconciliationRunner) *CreditReconciliationWorker {
 	return &CreditReconciliationWorker{service: service}
 }
 

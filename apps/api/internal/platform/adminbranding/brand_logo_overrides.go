@@ -10,7 +10,7 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/platform/validation"
+	"ideaboard/api/internal/platform/errorrender"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -125,17 +125,17 @@ func Validate(scope Scope, targetKey, logoKey string) error {
 		return err
 	}
 	if _, ok := allowedLogoKeys[strings.TrimSpace(logoKey)]; !ok {
-		return validation.New(msgValidate)
+		return errorrender.NewValidationError(errorrender.MsgValidate)
 	}
 	return nil
 }
 
 func ValidateTarget(scope Scope, targetKey string) error {
 	if !scope.Valid() {
-		return validation.New(msgValidateTarget)
+		return errorrender.NewValidationError(errorrender.MsgValidateTarget)
 	}
 	if !validTargetKey.MatchString(strings.TrimSpace(targetKey)) {
-		return validation.New(msgValidateTarget2)
+		return errorrender.NewValidationError(errorrender.MsgValidateTarget2)
 	}
 	return nil
 }

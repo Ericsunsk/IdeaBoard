@@ -11,6 +11,8 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
+	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
+	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport"
 
@@ -21,9 +23,9 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	userHandler := NewUserHandler(service)
-	adminCommandHandler := NewAdminCommandHandler(service)
-	adminReadHandler := NewAdminReadHandler(service, nil)
+	userHandler := rewardhttp.NewUserHandler(service)
+	adminCommandHandler := rewardhttp.NewAdminCommandHandler(service)
+	adminReadHandler := rewardhttp.NewAdminReadHandler(service, nil)
 	gin.SetMode(gin.TestMode)
 
 	adminRouter := gin.New()
@@ -43,21 +45,21 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		"credit_amount":   25,
 		"max_redemptions": 0,
 	}
-	created, createRecorder := performRewardWriteWithKey[CreatedRewardCode](
+	created, createRecorder := performRewardWriteWithKey[ports.CreatedRewardCode](
 		t, adminRouter, http.MethodPost, "/admin/rewards/codes", request, "http-reward-code-create", http.StatusOK,
 	)
 	if createRecorder.Header().Get("Cache-Control") != "no-store" ||
 		created.Plaintext != "HTTPREWARD2026" || created.Replayed {
 		t.Fatalf("create response = %+v Cache-Control=%q", created, createRecorder.Header().Get("Cache-Control"))
 	}
-	replay, replayRecorder := performRewardWriteWithKey[CreatedRewardCode](
+	replay, replayRecorder := performRewardWriteWithKey[ports.CreatedRewardCode](
 		t, adminRouter, http.MethodPost, "/admin/rewards/codes", request, "http-reward-code-create", http.StatusOK,
 	)
 	if replayRecorder.Header().Get("Cache-Control") != "no-store" ||
 		!replay.Replayed || replay.Plaintext != "" || replay.RewardCode.ID != created.RewardCode.ID {
 		t.Fatalf("create replay = %+v Cache-Control=%q", replay, replayRecorder.Header().Get("Cache-Control"))
 	}
-	page, searchRecorder := performRewardRequestWithRecorder[RewardCodePage](
+	page, searchRecorder := performRewardRequestWithRecorder[ports.RewardCodePage](
 		t, adminRouter, http.MethodPost, "/admin/rewards/codes/search", map[string]any{"limit": 20}, http.StatusOK,
 	)
 	if searchRecorder.Header().Get("Cache-Control") != "no-store" || len(page.RewardCodes) != 1 || page.Total != 1 {
@@ -67,7 +69,7 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		strings.Contains(searchRecorder.Body.String(), "HTTP-REWARD-2026") {
 		t.Fatalf("search response leaked raw Code: %s", searchRecorder.Body.String())
 	}
-	exactPage, exactRecorder := performRewardRequestWithRecorder[RewardCodePage](
+	exactPage, exactRecorder := performRewardRequestWithRecorder[ports.RewardCodePage](
 		t, adminRouter, http.MethodPost, "/admin/rewards/codes/search",
 		map[string]any{"query": "HTTP-REWARD-2026"}, http.StatusOK,
 	)
@@ -77,34 +79,34 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		strings.Contains(exactRecorder.Body.String(), "HTTPREWARD2026") {
 		t.Fatalf("exact Code search = %+v body=%s", exactPage, exactRecorder.Body.String())
 	}
-	enabledForPagination, _ := performRewardWriteWithKey[CreatedRewardCode](
+	enabledForPagination, _ := performRewardWriteWithKey[ports.CreatedRewardCode](
 		t, adminRouter, http.MethodPost, "/admin/rewards/codes", map[string]any{
 			"display_name": "HTTP 分页奖励", "code": "HTTP-PAGE-ENABLED-2026", "credit_amount": 5,
 			"max_redemptions": 0,
 		}, "http-page-enabled", http.StatusOK,
 	)
-	disabledForFilter, _ := performRewardWriteWithKey[CreatedRewardCode](
+	disabledForFilter, _ := performRewardWriteWithKey[ports.CreatedRewardCode](
 		t, adminRouter, http.MethodPost, "/admin/rewards/codes", map[string]any{
 			"display_name": "HTTP 停用奖励", "code": "HTTP-PAGE-DISABLED-2026", "credit_amount": 5,
 			"max_redemptions": 0,
 		}, "http-page-disabled", http.StatusOK,
 	)
 	disabledPath := fmt.Sprintf("/admin/rewards/codes/%d/enabled", disabledForFilter.RewardCode.ID)
-	performRewardRequestWithRecorder[RewardCode](
+	performRewardRequestWithRecorder[ports.RewardCode](
 		t, adminRouter, http.MethodPatch, disabledPath, map[string]any{"enabled": false}, http.StatusOK,
 	)
-	firstEnabledPage, _ := performRewardRequestWithRecorder[RewardCodePage](
+	firstEnabledPage, _ := performRewardRequestWithRecorder[ports.RewardCodePage](
 		t, adminRouter, http.MethodPost, "/admin/rewards/codes/search",
-		map[string]any{"status": RewardCodeStatusEnabled, "limit": 1}, http.StatusOK,
+		map[string]any{"status": ports.RewardCodeStatusEnabled, "limit": 1}, http.StatusOK,
 	)
 	if firstEnabledPage.Total != 2 || len(firstEnabledPage.RewardCodes) != 1 ||
 		firstEnabledPage.RewardCodes[0].ID != enabledForPagination.RewardCode.ID ||
 		firstEnabledPage.NextBeforeID != enabledForPagination.RewardCode.ID {
 		t.Fatalf("first enabled search page = %+v", firstEnabledPage)
 	}
-	secondEnabledPage, _ := performRewardRequestWithRecorder[RewardCodePage](
+	secondEnabledPage, _ := performRewardRequestWithRecorder[ports.RewardCodePage](
 		t, adminRouter, http.MethodPost, "/admin/rewards/codes/search", map[string]any{
-			"status": RewardCodeStatusEnabled, "before_id": firstEnabledPage.NextBeforeID, "limit": 1,
+			"status": ports.RewardCodeStatusEnabled, "before_id": firstEnabledPage.NextBeforeID, "limit": 1,
 		}, http.StatusOK,
 	)
 	if secondEnabledPage.Total != 2 || len(secondEnabledPage.RewardCodes) != 1 ||
@@ -151,7 +153,7 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		t.Fatalf("conflict response leaked raw Code: %s", conflictRecorder.Body.String())
 	}
 	codePath := fmt.Sprintf("/admin/rewards/codes/%d", created.RewardCode.ID)
-	updated, updateRecorder := performRewardRequestWithRecorder[UpdatedRewardCode](
+	updated, updateRecorder := performRewardRequestWithRecorder[ports.UpdatedRewardCode](
 		t, adminRouter, http.MethodPatch, codePath, map[string]any{
 			"display_name": "HTTP 新用户奖励", "credit_amount": 25, "max_redemptions": 0,
 		}, http.StatusOK,
@@ -161,16 +163,16 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		strings.Contains(updateRecorder.Body.String(), "replayed") {
 		t.Fatalf("update = %+v Cache-Control=%q", updated, updateRecorder.Header().Get("Cache-Control"))
 	}
-	disabled, _ := performRewardRequestWithRecorder[RewardCode](
+	disabled, _ := performRewardRequestWithRecorder[ports.RewardCode](
 		t, adminRouter, http.MethodPatch, codePath+"/enabled", map[string]any{"enabled": false}, http.StatusOK,
 	)
-	if disabled.Enabled || disabled.Status != RewardCodeStatusDisabled {
+	if disabled.Enabled || disabled.Status != ports.RewardCodeStatusDisabled {
 		t.Fatalf("disabled RewardCode = %+v", disabled)
 	}
-	performRewardRequestWithRecorder[RewardCode](
+	performRewardRequestWithRecorder[ports.RewardCode](
 		t, adminRouter, http.MethodPatch, codePath+"/enabled", map[string]any{"enabled": true}, http.StatusOK,
 	)
-	rotated, rotateRecorder := performRewardRequestWithRecorder[UpdatedRewardCode](
+	rotated, rotateRecorder := performRewardRequestWithRecorder[ports.UpdatedRewardCode](
 		t, adminRouter, http.MethodPatch, codePath, map[string]any{
 			"display_name": "HTTP 新用户奖励", "credit_amount": 25, "max_redemptions": 0,
 			"code": "HTTP-ROTATED-2026",
@@ -180,7 +182,7 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		rotated.Plaintext != "HTTPROTATED2026" || rotated.Replayed == nil || *rotated.Replayed {
 		t.Fatalf("rotate = %+v Cache-Control=%q", rotated, rotateRecorder.Header().Get("Cache-Control"))
 	}
-	rotateReplay, _ := performRewardRequestWithRecorder[UpdatedRewardCode](
+	rotateReplay, _ := performRewardRequestWithRecorder[ports.UpdatedRewardCode](
 		t, adminRouter, http.MethodPatch, codePath, map[string]any{
 			"display_name": "HTTP 新用户奖励", "credit_amount": 25, "max_redemptions": 0,
 			"code": "HTTP-ROTATED-2026",
@@ -189,13 +191,13 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 	if rotateReplay.Replayed == nil || !*rotateReplay.Replayed || rotateReplay.Plaintext != "" {
 		t.Fatalf("rotate replay = %+v", rotateReplay)
 	}
-	temporary, _ := performRewardWriteWithKey[CreatedRewardCode](
+	temporary, _ := performRewardWriteWithKey[ports.CreatedRewardCode](
 		t, adminRouter, http.MethodPost, "/admin/rewards/codes", map[string]any{
 			"display_name": "待删除", "code": "HTTP-DELETE-2026", "credit_amount": 1,
 			"max_redemptions": 0,
 		}, "http-delete", http.StatusOK,
 	)
-	deleted, _ := performRewardRequestWithRecorder[DeletedRewardCode](
+	deleted, _ := performRewardRequestWithRecorder[ports.DeletedRewardCode](
 		t, adminRouter, http.MethodDelete,
 		fmt.Sprintf("/admin/rewards/codes/%d", temporary.RewardCode.ID), nil, http.StatusOK,
 	)
@@ -211,7 +213,7 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 	})
 	userRouter.POST("/user/rewards/redeem", userHandler.Redeem)
 	userRouter.GET("/user/rewards/redemptions", userHandler.ListRedemptions)
-	redeemed, redeemRecorder := performRewardWriteWithKey[RedeemResult](
+	redeemed, redeemRecorder := performRewardWriteWithKey[ports.RedeemResult](
 		t, userRouter, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "HTTP-ROTATED-2026"}, "http-reward-redeem", http.StatusOK,
 	)
 	if redeemRecorder.Header().Get("Cache-Control") != "no-store" || redeemed.CreditedAmount != 25 {
@@ -248,7 +250,7 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 	if invalidRecorder.Header().Get("Cache-Control") != "no-store" || strings.Contains(invalidRecorder.Body.String(), invalidRaw) {
 		t.Fatalf("invalid response leaked raw Code: %s", invalidRecorder.Body.String())
 	}
-	_, historyRecorder := performRewardRequestWithRecorder[RedemptionHistoryPage](
+	_, historyRecorder := performRewardRequestWithRecorder[ports.RedemptionHistoryPage](
 		t, userRouter, http.MethodGet, "/user/rewards/redemptions", nil, http.StatusOK,
 	)
 	if historyRecorder.Header().Get("Cache-Control") != "no-store" ||

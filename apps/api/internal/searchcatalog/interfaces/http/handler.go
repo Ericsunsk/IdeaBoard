@@ -1,4 +1,4 @@
-package httpapi
+package http
 
 import (
 	"context"
@@ -60,12 +60,12 @@ func NewHandler(repository providerConfigStore, adapters ...ports.ProviderTestAd
 
 func (h *Handler) List(c *gin.Context) {
 	if h == nil || h.repository == nil {
-		errorrender.Render(c, http.StatusInternalServerError, string(contract.CodeSearchProviderUnavailable), msgSearchProviderUnavailable)
+		errorrender.Render(c, http.StatusInternalServerError, string(contract.CodeSearchProviderUnavailable), errorrender.MsgSearchProviderUnavailable)
 		return
 	}
 	configs, err := h.repository.List(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, msgList, err)
+		response.InternalError(c, http.StatusInternalServerError, errorrender.MsgSearchcatalogInterfacesHTTPList, err)
 		return
 	}
 	response.SuccessDTO(c, ProviderListResponse{Providers: configs})
@@ -79,30 +79,30 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	if h == nil || h.repository == nil {
-		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchProviderUnavailable), msgSearchProviderUnavailable)
+		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchProviderUnavailable), errorrender.MsgSearchProviderUnavailable)
 		return
 	}
 	provider, ok := parseProvider(c.Param("provider"))
 	if !ok {
-		errorrender.Render(c, http.StatusNotFound, string(contract.CodeSearchProviderNotFound), msgSearchProviderNotFound)
+		errorrender.Render(c, http.StatusNotFound, string(contract.CodeSearchProviderNotFound), errorrender.MsgSearchProviderNotFound)
 		return
 	}
 	var request UpdateProviderRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchRequestInvalid), msgSearchRequestInvalid)
+		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchRequestInvalid), errorrender.MsgSearchRequestInvalid)
 		return
 	}
 	saveErr := h.repository.Save(c.Request.Context(), provider, request.APIKey, request.Enabled, admin.UserID())
 	if saveErr != nil {
 		if errors.Is(saveErr, domain.ErrProviderTestRequired) {
-			errorrender.Render(c, http.StatusConflict, string(contract.CodeSearchProviderTestRequired), msgSearchProviderTestRequired)
+			errorrender.Render(c, http.StatusConflict, string(contract.CodeSearchProviderTestRequired), errorrender.MsgSearchProviderTestRequired)
 			return
 		}
 		if strings.Contains(saveErr.Error(), "api key cannot be empty") {
-			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchProviderAPIKeyInvalid), msgSearchProviderAPIKeyInvalid)
+			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchProviderAPIKeyInvalid), errorrender.MsgSearchProviderAPIKeyInvalid)
 			return
 		}
-		response.InternalError(c, http.StatusInternalServerError, msgUpdate, saveErr)
+		response.InternalError(c, http.StatusInternalServerError, errorrender.MsgSearchcatalogInterfacesHTTPUpdate, saveErr)
 		return
 	}
 	response.Success(c, nil)
@@ -116,22 +116,22 @@ func (h *Handler) Test(c *gin.Context) {
 		return
 	}
 	if h == nil || h.repository == nil {
-		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchProviderUnavailable), msgSearchProviderUnavailable)
+		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchProviderUnavailable), errorrender.MsgSearchProviderUnavailable)
 		return
 	}
 	provider, ok := parseProvider(c.Param("provider"))
 	if !ok {
-		errorrender.Render(c, http.StatusNotFound, string(contract.CodeSearchProviderNotFound), msgSearchProviderNotFound)
+		errorrender.Render(c, http.StatusNotFound, string(contract.CodeSearchProviderNotFound), errorrender.MsgSearchProviderNotFound)
 		return
 	}
 	adapter := h.adapters[provider]
 	if adapter == nil {
-		errorrender.Render(c, http.StatusInternalServerError, string(contract.CodeSearchProviderUnavailable), msgSearchProviderUnavailable2)
+		errorrender.Render(c, http.StatusInternalServerError, string(contract.CodeSearchProviderUnavailable), errorrender.MsgSearchProviderUnavailable2)
 		return
 	}
 	key, err := h.repository.RawAPIKey(c.Request.Context(), provider)
 	if err != nil {
-		errorrender.Render(c, http.StatusConflict, string(contract.CodeSearchProviderAPIKeyRequired), msgSearchProviderAPIKeyRequired)
+		errorrender.Render(c, http.StatusConflict, string(contract.CodeSearchProviderAPIKeyRequired), errorrender.MsgSearchProviderAPIKeyRequired)
 		return
 	}
 	category, message, testErr := adapter.Test(c.Request.Context(), key)
@@ -140,11 +140,11 @@ func (h *Handler) Test(c *gin.Context) {
 		state = domain.TestStateFailed
 	}
 	if err := h.repository.RecordTest(c.Request.Context(), provider, state, category, message, admin.UserID()); err != nil {
-		response.InternalError(c, http.StatusInternalServerError, msgTest, err)
+		response.InternalError(c, http.StatusInternalServerError, errorrender.MsgSearchcatalogInterfacesHTTPTest, err)
 		return
 	}
 	if testErr != nil {
-		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchProviderTestFailed), msgSearchProviderTestFailed)
+		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchProviderTestFailed), errorrender.MsgSearchProviderTestFailed)
 		return
 	}
 	response.SuccessDTO(c, TestProviderResponse{Provider: provider, TestState: state, Message: message})

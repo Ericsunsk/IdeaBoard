@@ -2,7 +2,6 @@ package workspacetasks
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"ideaboard/api/internal/platform/contract"
@@ -80,6 +79,125 @@ type BoardAuthorizer interface {
 	ResolveBoardAccess(ctx context.Context, workspacePublicID, boardPublicID string, userID int64, workspaceRole string) (*BoardAccess, error)
 }
 
+// BoardOperation is the task-facing board operation unified across the
+// tasking submit/read/cancel gates and the media submit gate. One operation
+// vocabulary keeps every call site on the same fail-closed semantics.
+//
+// The gate operates on resolved capability booleans only, never on board
+// role strings: the role mapping lives exactly once in Boards (ResolveRole)
+// and reaches here as facts through the ResolveBoardAccess seam, so this
+// file copies no role rules (see TestBoardRoleRulesStayUncopiedOutsideBoards).
+type BoardOperation string
+
+const (
+	// BoardOpSubmit gates task submission (generate capability on a live board).
+	BoardOpSubmit BoardOperation = "submit"
+	// BoardOpRead gates task content reads (any visible role, archived included).
+	BoardOpRead BoardOperation = "read"
+	// BoardOpCancel gates task cancellation by non-submitters (writer on a live board).
+	BoardOpCancel BoardOperation = "cancel"
+)
+
+// BoardTaskFacts is the minimal capability snapshot for task-facing gates.
+// The zero value denies every operation.
+type BoardTaskFacts struct {
+	CanRead     bool
+	CanGenerate bool
+	CanWrite    bool
+	Archived    bool
+}
+
+// BoardDecision is the deny reason for task-facing gates. Submit maps each
+// reason to its own sentinel (not-found / archived / forbidden); read and
+// cancel converge every denial to invisible. Pure value, no new error
+// registry: callers map to their existing domain sentinels.
+type BoardDecision string
+
+const (
+	// BoardDecisionAllow authorizes the operation.
+	BoardDecisionAllow BoardDecision = "allow"
+	// BoardDecisionNotFound denies an invisible caller or a caller without
+	// read (submit/read). Handlers render 404 and never leak existence.
+	BoardDecisionNotFound BoardDecision = "not_found"
+	// BoardDecisionArchived denies generation and writer cancellation on an
+	// archived board (submit/cancel). Reads stay allowed.
+	BoardDecisionArchived BoardDecision = "archived"
+	// BoardDecisionForbidden denies a visible live caller lacking the
+	// operation capability (submit without generate, cancel without write).
+	BoardDecisionForbidden BoardDecision = "forbidden"
+)
+
+type boardPolicy struct{}
+
+// BoardPolicy is the single task-facing board gate (P0-2). Tasking
+// (submit/read/cancel) and media (submit) delegate to BoardPolicy.Check;
+// the per-call-site error/bool mapping preserves each gate's exact
+// fail-closed semantics. Pure function.
+var BoardPolicy = boardPolicy{}
+
+// Check applies the unified gate: submit needs read on a live board plus
+// generate; read needs read (archived keeps reads); cancel needs write on
+// a live board. Unknown operations deny as not-found. Pure function.
+func (boardPolicy) Check(facts BoardTaskFacts, op BoardOperation) BoardDecision {
+	switch op {
+	case BoardOpSubmit:
+		if !facts.CanRead {
+			return BoardDecisionNotFound
+		}
+		if facts.Archived {
+			return BoardDecisionArchived
+		}
+		if !facts.CanGenerate {
+			return BoardDecisionForbidden
+		}
+		return BoardDecisionAllow
+	case BoardOpRead:
+		if !facts.CanRead {
+			return BoardDecisionNotFound
+		}
+		return BoardDecisionAllow
+	case BoardOpCancel:
+		if facts.Archived {
+			return BoardDecisionArchived
+		}
+		if !facts.CanWrite {
+			return BoardDecisionForbidden
+		}
+		return BoardDecisionAllow
+	default:
+		return BoardDecisionNotFound
+	}
+}
+
+// boardTaskFacts projects one resolved posture onto the shared board gate.
+// A nil posture projects to the zero facts, which deny every operation.
+func boardTaskFacts(access *BoardAccess) BoardTaskFacts {
+	if access == nil {
+		return BoardTaskFacts{}
+	}
+	return BoardTaskFacts{
+		CanRead: access.CanRead, CanGenerate: access.CanGenerate,
+		CanWrite: access.CanWrite, Archived: access.Archived,
+	}
+}
+
+// checkBoardSubmit maps the shared submit decision onto the tasking submit
+// sentinels: invisible Boards read as ErrBoardNotFound; archived Boards
+// read as ErrBoardArchived; visible Boards without generate capability read
+// as ErrForbidden.
+func checkBoardSubmit(access *BoardAccess) error {
+	switch BoardPolicy.Check(boardTaskFacts(access), BoardOpSubmit) {
+	case BoardDecisionAllow:
+		return nil
+	case BoardDecisionArchived:
+		return ErrBoardArchived
+	case BoardDecisionForbidden:
+		return ErrForbidden
+	default:
+		return ErrBoardNotFound
+	}
+}
+
 // AuthorizeTaskRead reports whether a caller may read one Task (detail,
 // outputs, or list membership). The submitter always passes; otherwise the
 // linked Board must currently grant read. Board-less tasks are
@@ -100,33 +218,7 @@ func AuthorizeTaskRead(task *WorkspaceTask, callerUserID int64, access *BoardAcc
 	if strings.TrimSpace(access.BoardID) != strings.TrimSpace(task.BoardID) {
 		return false
 	}
-	return access.CanRead
-}
-
-// resolveSubmitBoardAccess resolves the caller's live Board posture for a
-// Board-bound submit. Invisible Boards (unknown id or no effective role)
-// read as ErrBoardNotFound; archived Boards read as ErrBoardArchived;
-// visible Boards without generate capability read as ErrForbidden. A nil
-// authorizer fails closed: bound submits are rejected rather than
-// degrading into unbound tasks.
-func (s *Service) resolveSubmitBoardAccess(ctx context.Context, workspaceID, boardID string, userID int64, workspaceRole string) (*BoardAccess, error) {
-	if s.boards == nil {
-		return nil, fmt.Errorf("workspacetasks: board authorizer unavailable: %w", ErrSettlementUnavailable)
-	}
-	access, err := s.boards.ResolveBoardAccess(ctx, strings.TrimSpace(workspaceID), strings.TrimSpace(boardID), userID, workspaceRole)
-	if err != nil {
-		return nil, err
-	}
-	if access == nil || !access.CanRead {
-		return nil, ErrBoardNotFound
-	}
-	if access.Archived {
-		return nil, ErrBoardArchived
-	}
-	if !access.CanGenerate {
-		return nil, ErrForbidden
-	}
-	return access, nil
+	return BoardPolicy.Check(boardTaskFacts(access), BoardOpRead) == BoardDecisionAllow
 }
 
 // AuthorizeTaskCancel reports whether a caller may cancel one Task: the
@@ -145,5 +237,5 @@ func AuthorizeTaskCancel(task *WorkspaceTask, callerUserID int64, access *BoardA
 	if access == nil || access.Archived {
 		return false
 	}
-	return access.CanWrite
+	return BoardPolicy.Check(boardTaskFacts(access), BoardOpCancel) == BoardDecisionAllow
 }

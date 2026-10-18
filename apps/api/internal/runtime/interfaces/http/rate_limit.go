@@ -1,4 +1,4 @@
-package httpapi
+package http
 
 import (
 	"context"
@@ -61,13 +61,13 @@ func rateLimitMiddleware(provider settings.RateLimitSettingProvider) gin.Handler
 		policy := resolveRateLimitPolicy(c.Request.Context(), provider)
 		if err := c.Request.Context().Err(); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				response.Error(c, http.StatusServiceUnavailable, msgRateLimitMiddleware)
+				response.Error(c, http.StatusServiceUnavailable, MsgRateLimitMiddleware)
 			}
 			c.Abort()
 			return
 		}
 		if !rateLimitStore.allow(ip, policy) {
-			response.Error(c, http.StatusTooManyRequests, msgRateLimitMiddleware2)
+			response.Error(c, http.StatusTooManyRequests, MsgRateLimitMiddleware2)
 			c.Abort()
 			return
 		}

@@ -1,4 +1,4 @@
-package infrastructure
+package providerinfra
 
 import (
 	"context"
@@ -12,12 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	"ideaboard/api/internal/testsupport/testenv"
-
-	"ideaboard/api/internal/platform/outboundhttp"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -29,7 +27,7 @@ func (gatewayTestOutboundPolicy) GetOutboundPolicy(context.Context) (settings.Ou
 }
 
 func TestMain(m *testing.M) {
-	restore := outbound.ConfigurePolicyProvider(gatewayTestOutboundPolicy{})
+	restore := safehttp.ConfigurePolicyProvider(gatewayTestOutboundPolicy{})
 	code := m.Run()
 	restore()
 	os.Exit(code)
@@ -98,7 +96,7 @@ func TestGatewayClientUsesRequestTimeAllowlistWithoutAppendingTarget(t *testing.
 	defer server.Close()
 	client := newGatewayTestClient(t, server)
 	policy := &mutableGatewayTestPolicy{hosts: []string{"127.0.0.1"}}
-	restore := outbound.ConfigurePolicyProvider(policy)
+	restore := safehttp.ConfigurePolicyProvider(policy)
 	defer restore()
 
 	if _, err := client.Do(context.Background(), runtimeports.GatewayRequest{
@@ -169,11 +167,11 @@ func newGatewayFastRetryClient(t *testing.T, server *httptest.Server) *GatewayCl
 	client, err := NewGatewayClient(GatewayClientConfig{
 		BaseURL: server.URL,
 		Token:   "test-token",
-		Outbound: outboundhttp.NewClient(outboundhttp.Config{
+		Outbound: safehttp.NewClient(safehttp.Config{
 			MaxAttempts:       3,
 			MaxRetryAfterWait: time.Second,
 			Sleep:             func(context.Context, time.Duration) error { return nil },
-			Metrics:           outboundhttp.NewMetrics(prometheus.NewRegistry()),
+			Metrics:           safehttp.NewMetrics(prometheus.NewRegistry()),
 		}),
 	})
 	if err != nil {

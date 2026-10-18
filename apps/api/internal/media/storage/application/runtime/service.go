@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"io"
 	"mime/multipart"
 	"net/textproto"
@@ -67,7 +68,7 @@ func (s *Service) UploadRefWithOptions(ctx context.Context, file *multipart.File
 func (s *Service) UploadRefAtProfile(ctx context.Context, profileID string, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	profile, err := s.profiles.ResolveProfileByID(ctx, profileID)
 	if err != nil {
-		return nil, fmt.Errorf(msgUploadRefAtProfile, err)
+		return nil, fmt.Errorf(errorrender.MsgUploadRefAtProfile, err)
 	}
 	return s.UploadRefWithProfile(ctx, *profile, file, opts)
 }
@@ -83,7 +84,7 @@ func (s *Service) PrepareUploadRefFromFile(ctx context.Context, file *multipart.
 	}
 	checksum, err := checksumMultipartFile(file)
 	if err != nil {
-		return nil, fmt.Errorf(msgPrepareUploadRefFromFile, err)
+		return nil, fmt.Errorf(errorrender.MsgPrepareUploadRefFromFile, err)
 	}
 	key := strings.TrimSpace(opts.ObjectKey)
 	if key == "" {
@@ -96,7 +97,7 @@ func (s *Service) PrepareUploadRefFromFile(ctx context.Context, file *multipart.
 	}
 	key, err = domain.NormalizeUploadObjectKey(key)
 	if err != nil {
-		return nil, fmt.Errorf(msgPrepareUploadRefFromFile2, err)
+		return nil, fmt.Errorf(errorrender.MsgPrepareUploadRefFromFile2, err)
 	}
 	driver, err := s.drivers.GetDriver(profile.Provider)
 	if err != nil {
@@ -125,7 +126,7 @@ func (s *Service) PrepareUploadRefFromFile(ctx context.Context, file *multipart.
 
 func checksumMultipartFile(file *multipart.FileHeader) (string, error) {
 	if file == nil {
-		return "", errors.New(msgChecksumMultipartFile)
+		return "", errors.New(errorrender.MsgChecksumMultipartFile)
 	}
 	src, err := file.Open()
 	if err != nil {
@@ -156,7 +157,7 @@ func (s *Service) PrepareUploadRef(ctx context.Context, filename string, opts po
 	}
 	key, err = domain.NormalizeUploadObjectKey(key)
 	if err != nil {
-		return nil, fmt.Errorf(msgPrepareUploadRefFromFile2, err)
+		return nil, fmt.Errorf(errorrender.MsgPrepareUploadRefFromFile2, err)
 	}
 	driver, err := s.drivers.GetDriver(profile.Provider)
 	if err != nil {
@@ -197,7 +198,7 @@ func (s *Service) StoreMediaRef(ctx context.Context, sourceRef string, opts port
 func (s *Service) StoreMediaRefAtProfile(ctx context.Context, profileID, sourceRef string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	profile, err := s.profiles.ResolveProfileByID(ctx, profileID)
 	if err != nil {
-		return nil, fmt.Errorf(msgUploadRefAtProfile, err)
+		return nil, fmt.Errorf(errorrender.MsgUploadRefAtProfile, err)
 	}
 	return s.StoreMediaRefWithProfile(ctx, *profile, sourceRef, opts)
 }
@@ -225,7 +226,7 @@ func (s *Service) StoreBytesRef(ctx context.Context, filename string, data []byt
 func (s *Service) StoreBytesRefAtProfile(ctx context.Context, profileID, filename string, data []byte, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	profile, err := s.profiles.ResolveProfileByID(ctx, profileID)
 	if err != nil {
-		return nil, fmt.Errorf(msgUploadRefAtProfile, err)
+		return nil, fmt.Errorf(errorrender.MsgUploadRefAtProfile, err)
 	}
 	return s.StoreBytesRefWithProfile(ctx, *profile, filename, data, opts)
 }
@@ -241,7 +242,7 @@ func (s *Service) StoreBytesRefWithProfile(ctx context.Context, profile domain.S
 func (s *Service) StoreRemoteRefAtProfile(ctx context.Context, profileID, remoteURL string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	profile, err := s.profiles.ResolveProfileByID(ctx, profileID)
 	if err != nil {
-		return nil, fmt.Errorf(msgUploadRefAtProfile, err)
+		return nil, fmt.Errorf(errorrender.MsgUploadRefAtProfile, err)
 	}
 	return s.StoreRemoteRefWithProfile(ctx, *profile, remoteURL, opts)
 }
@@ -272,7 +273,7 @@ func (s *Service) UploadRefWithProfile(ctx context.Context, profile domain.Stora
 func (s *Service) PutObjectAtProfile(ctx context.Context, profileID, objectKey string, data []byte, contentType string) error {
 	profile, err := s.profiles.ResolveProfileByID(ctx, profileID)
 	if err != nil {
-		return fmt.Errorf(msgPutObjectAtProfile, err)
+		return fmt.Errorf(errorrender.MsgPutObjectAtProfile, err)
 	}
 	driver, err := s.drivers.GetDriver(profile.Provider)
 	if err != nil {
@@ -284,7 +285,7 @@ func (s *Service) PutObjectAtProfile(ctx context.Context, profileID, objectKey s
 func (s *Service) ReadObjectAtProfile(ctx context.Context, profileID, objectKey string, maxBytes int64) (*ports.StoredUploadObject, error) {
 	profile, err := s.profiles.ResolveProfileByID(ctx, profileID)
 	if err != nil {
-		return nil, fmt.Errorf(msgPutObjectAtProfile, err)
+		return nil, fmt.Errorf(errorrender.MsgPutObjectAtProfile, err)
 	}
 	driver, err := s.drivers.GetDriver(profile.Provider)
 	if err != nil {
@@ -382,10 +383,10 @@ func (s *Service) UsesObjectStorage(ctx context.Context) bool {
 func canonicalizeMultipartImageWithFacts(file *multipart.FileHeader) (imageformat.Facts, error) {
 	facts, err := imageformat.InspectFileHeader(file)
 	if err != nil {
-		return imageformat.Facts{}, fmt.Errorf(msgCanonicalizeMultipartImageWithFacts, err)
+		return imageformat.Facts{}, fmt.Errorf(errorrender.MsgCanonicalizeMultipartImageWithFacts, err)
 	}
 	if file == nil {
-		return imageformat.Facts{}, errors.New(msgChecksumMultipartFile)
+		return imageformat.Facts{}, errors.New(errorrender.MsgChecksumMultipartFile)
 	}
 	file.Filename = domain.CanonicalStorageFilename(file.Filename, facts.Extension)
 	if file.Header == nil {
@@ -404,9 +405,12 @@ func (s *Service) PublicUploadURL(objectKey string) string {
 }
 
 func decodeDataURL(dataURL string) (string, []byte, error) {
+	// Thin adapter over the single data-URL seam mediarefs.ParseDataImageURL
+	// (shared with the provider-result inline path); filename minting stays
+	// local to the upload path.
 	parsed, err := mediarefs.ParseDataImageURL(dataURL, maxRemoteFileSize)
 	if err != nil {
-		return "", nil, errors.New(msgDecodeDataURL)
+		return "", nil, errors.New(errorrender.MsgDecodeDataURL)
 	}
 	return fmt.Sprintf("gen_%d%s", time.Now().UnixNano(), parsed.Ext), parsed.Data, nil
 }

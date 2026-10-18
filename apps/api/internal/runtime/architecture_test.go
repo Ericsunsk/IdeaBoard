@@ -128,6 +128,50 @@ func TestRuntimeLayerAndAdapterIsolation(t *testing.T) {
 	})
 }
 
+func TestCompositionSubpackageIsolation(t *testing.T) {
+	// P1 composition split: composition/ is the sole assembly root.
+	// control/ and wiring/ are leaf subpackages (package control, package
+	// wiring). The dependency arrow is root -> child only: leaves must
+	// never import the root, and control must never import wiring.
+	// wiring -> control is the single allowed sibling edge (HTTP wiring
+	// assembles the guard sinks); the reverse would be a cycle.
+	checkPackageForbiddenImports(t, "composition/control", []string{
+		"ideaboard/api/internal/runtime/composition",
+	})
+	checkCompositionWiringImports(t)
+}
+
+func checkCompositionWiringImports(t *testing.T) {
+	t.Helper()
+	const root = "ideaboard/api/internal/runtime/composition"
+	err := filepath.WalkDir("composition/wiring", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !isSourceCodeFile(d.Name()) {
+			return nil
+		}
+		fset := token.NewFileSet()
+		node, parseErr := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
+		if parseErr != nil {
+			t.Fatalf("parse %s: %v", path, parseErr)
+		}
+		for _, imp := range node.Imports {
+			importPath := strings.Trim(imp.Path.Value, `"`)
+			if importPath == root {
+				t.Errorf("package composition/wiring file %s imports forbidden composition root %q (root -> child only)", path, importPath)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk composition/wiring: %v", err)
+	}
+}
+
 func checkPackageForbiddenImports(t *testing.T, pkgDir string, forbidden []string) {
 	t.Helper()
 	err := filepath.WalkDir(pkgDir, func(path string, d fs.DirEntry, err error) error {

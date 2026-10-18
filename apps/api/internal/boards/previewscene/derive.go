@@ -110,11 +110,12 @@ func snapshotForExtraction(stored []byte) ([]byte, bool) {
 
 // CatalogLimits bounds each persisted Gallery scene independently of document size.
 // Truncated and omitted fields preserve the distinction from a complete layout.
+// Values come from the CatalogMax* policy constants above.
 func CatalogLimits() Limits {
-	maxNodes := int64(500)
-	maxConnections := int64(1000)
-	maxMediaRefs := int64(1500)
-	maxSceneBytes := int64(65536)
+	maxNodes := int64(CatalogMaxNodes)
+	maxConnections := int64(CatalogMaxConnections)
+	maxMediaRefs := int64(CatalogMaxMediaRefs)
+	maxSceneBytes := int64(CatalogMaxSceneBytes)
 	return Limits{
 		MaxNodes:       &maxNodes,
 		MaxConnections: &maxConnections,

@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/platform/database"
 	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	"ideaboard/api/internal/testdb"
 
@@ -33,7 +32,7 @@ func TestRuntimeRoleCanUseTypedBillingCommandsButCannotMutateCatalogDirectly(t *
 			t.Errorf("drop runtime role: %v", err)
 		}
 	})
-	policies := []dbprivileges.Policy{database.RuntimePrivilegePolicy(), RuntimePrivilegePolicy()}
+	policies := []dbprivileges.Policy{dbprivileges.RuntimePrivilegePolicy(), RuntimePrivilegePolicy()}
 	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
 		t.Fatalf("configure runtime privilege policies error = %v", err)
 	}

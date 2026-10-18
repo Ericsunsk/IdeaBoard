@@ -49,14 +49,12 @@ var (
 // is the single source of truth for one rendered message; call
 // sites reference these names so copy changes stay in one place.
 // Values are byte-identical to the previously inline literals.
-const (
-	msgNormalizeStorageUserSegment      = "用户存储标识无效"             // NormalizeStorageUserSegment @ upload_path.go
-	msgNormalizeUploadSegment           = "上传标识无效"               // NormalizeUploadSegment @ upload_path.go
-	msgImageDerivativeObjectKey         = "图片派生对象参数无效"           // ImageDerivativeObjectKey @ derivative_key.go
-	msgStableUploadObjectKey            = "上传文件名无效"              // StableUploadObjectKey @ object_key.go
-	msgTaskOutputUserUploadObjectPrefix = "用户ID无效"               // TaskOutputUserUploadObjectPrefix @ upload_policy.go
-	msgLibraryAssetUploadDirPrefix      = "素材库媒体标识无效"            // LibraryAssetUploadDirPrefix @ upload_policy.go
-	msgNormalizeUploadObjectKeyEmpty    = "文件路径不能为空"             // NormalizeUploadObjectKey @ upload_policy.go
-	msgNormalizeUploadObjectKey         = "仅允许操作 uploads 目录下的文件" // NormalizeUploadObjectKey @ upload_policy.go
-	msgNormalizeUploadObjectPrefix      = "文件前缀不能为空"             // NormalizeUploadObjectPrefix @ upload_policy.go
-)
+
+// NormalizeStorageUserSegment @ upload_path.go
+// ImageDerivativeObjectKey @ derivative_key.go
+// StableUploadObjectKey @ object_key.go
+// TaskOutputUserUploadObjectPrefix @ upload_policy.go
+// LibraryAssetUploadDirPrefix @ upload_policy.go
+// NormalizeUploadObjectKey @ upload_policy.go
+// NormalizeUploadObjectKey @ upload_policy.go
+// NormalizeUploadObjectPrefix @ upload_policy.go

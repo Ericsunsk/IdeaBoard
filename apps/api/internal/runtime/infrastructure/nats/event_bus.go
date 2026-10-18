@@ -1,11 +1,11 @@
-package natsinfra
+package nats
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"ideaboard/api/internal/events"
+	eventnats "ideaboard/api/internal/events/nats"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/domain"
 	"ideaboard/api/internal/runtime/ports"
@@ -16,7 +16,7 @@ var _ ports.HealthChecker = (*EventBus)(nil)
 
 // EventBus wraps NATS JetStream event bus for the runtime platform.
 type EventBus struct {
-	bus *events.NATSJetStreamEventBus
+	bus *eventnats.NATSJetStreamEventBus
 }
 
 // NewEventBus connects to NATS JetStream using the provided configuration.
@@ -24,7 +24,7 @@ func NewEventBus(ctx context.Context, cfg config.EventBusConfig) (*EventBus, err
 	if !cfg.Enabled {
 		return nil, nil
 	}
-	natsBus, err := events.NewNATSJetStreamEventBus(ctx, events.NATSJetStreamConfig{
+	natsBus, err := eventnats.NewNATSJetStreamEventBus(ctx, eventnats.NATSJetStreamConfig{
 		URL:            cfg.NATSURL,
 		StreamName:     cfg.NATSStreamName,
 		SubjectPrefix:  cfg.NATSSubjectPrefix,
@@ -40,12 +40,12 @@ func NewEventBus(ctx context.Context, cfg config.EventBusConfig) (*EventBus, err
 }
 
 // NewEventBusFromUnderlying wraps an existing NATSJetStreamEventBus into an EventBus adapter.
-func NewEventBusFromUnderlying(bus *events.NATSJetStreamEventBus) *EventBus {
+func NewEventBusFromUnderlying(bus *eventnats.NATSJetStreamEventBus) *EventBus {
 	return &EventBus{bus: bus}
 }
 
 // UnderlyingBus returns the wrapped NATSJetStreamEventBus.
-func (b *EventBus) UnderlyingBus() *events.NATSJetStreamEventBus {
+func (b *EventBus) UnderlyingBus() *eventnats.NATSJetStreamEventBus {
 	if b == nil {
 		return nil
 	}

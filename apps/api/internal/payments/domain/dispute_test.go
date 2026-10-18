@@ -1,17 +1,20 @@
-package domain
+package domain_test
 
-import "testing"
+import (
+	"ideaboard/api/internal/payments/domain"
+	"testing"
+)
 
 func TestCanonicalPaymentDisputeStatus(t *testing.T) {
-	tests := map[string]PaymentDisputeStatus{
-		"won":            PaymentDisputeWon,
-		"warning_closed": PaymentDisputeWon,
-		"lost":           PaymentDisputeLost,
-		"under_review":   PaymentDisputeOpen,
-		"":               PaymentDisputeOpen,
+	tests := map[string]domain.PaymentDisputeStatus{
+		"won":            domain.PaymentDisputeWon,
+		"warning_closed": domain.PaymentDisputeWon,
+		"lost":           domain.PaymentDisputeLost,
+		"under_review":   domain.PaymentDisputeOpen,
+		"":               domain.PaymentDisputeOpen,
 	}
 	for providerStatus, want := range tests {
-		if got := CanonicalPaymentDisputeStatus(providerStatus); got != want {
+		if got := domain.CanonicalPaymentDisputeStatus(providerStatus); got != want {
 			t.Errorf("CanonicalPaymentDisputeStatus(%q) = %q, want %q", providerStatus, got, want)
 		}
 	}
@@ -29,7 +32,7 @@ func TestProportionalDisputeIdeas(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := ProportionalDisputeIdeas(test.amountMinor, test.paidTotal, test.ideas); got != test.want {
+			if got := domain.ProportionalDisputeIdeas(test.amountMinor, test.paidTotal, test.ideas); got != test.want {
 				t.Fatalf("ProportionalDisputeIdeas() = %d, want %d", got, test.want)
 			}
 		})

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -137,7 +138,7 @@ func lockWorkspaceMemberRole(ctx context.Context, q *dbsqlc.Queries, workspaceID
 func loadAuthorizedAsset(ctx context.Context, q *dbsqlc.Queries, workspaceID, assetID string, userID int64, role string, access BoardAccess) (*Asset, error) {
 	workspaceID = strings.TrimSpace(workspaceID)
 	assetID = strings.TrimSpace(assetID)
-	if !IsAssetID(assetID) {
+	if !contract.IsAssetID(assetID) {
 		return nil, ErrNotFound
 	}
 	row, err := q.GetMediaAssetByPublicID(ctx, dbsqlc.GetMediaAssetByPublicIDParams{WorkspacePublicID: workspaceID, PublicID: assetID})

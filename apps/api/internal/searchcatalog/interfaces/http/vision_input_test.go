@@ -1,4 +1,4 @@
-package httpapi
+package http
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	librarydomain "ideaboard/api/internal/library/domain"
-	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/searchcatalog/domain"
 
@@ -29,7 +29,7 @@ func TestLibraryVisionHostAllowlist(t *testing.T) {
 }
 
 func TestVisionImageAllowHostsIncludesCuratedCDNs(t *testing.T) {
-	restore := outbound.ConfigurePolicyProvider(visionTestOutboundPolicy{hosts: []string{"vision.example"}})
+	restore := safehttp.ConfigurePolicyProvider(visionTestOutboundPolicy{hosts: []string{"vision.example"}})
 	defer restore()
 
 	got := visionImageAllowHosts(context.Background())

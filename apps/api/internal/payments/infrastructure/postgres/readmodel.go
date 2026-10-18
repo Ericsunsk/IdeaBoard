@@ -22,7 +22,7 @@ func (r *Repository) GetStripeConfiguration(ctx context.Context) (paymentconfigu
 	if r == nil || r.db == nil {
 		return paymentconfiguration.StoredStripeConfiguration{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	q := r.dbWithContext(ctx).queries()
+	q := r.DBWithContext(ctx).Queries()
 	settings, err := q.GetPaymentStripeConfiguration(ctx)
 	if err != nil {
 		return paymentconfiguration.StoredStripeConfiguration{}, err
@@ -39,7 +39,7 @@ func (r *Repository) GetStripeCredential(ctx context.Context, credentialID strin
 	if err != nil {
 		return paymentconfiguration.StoredStripeConfiguration{}, database.ErrNotFound
 	}
-	credential, err := r.dbWithContext(ctx).queries().GetPaymentStripeCredential(ctx, pgUUIDToPgType(id))
+	credential, err := r.DBWithContext(ctx).Queries().GetPaymentStripeCredential(ctx, pgUUIDToPgType(id))
 	if err != nil {
 		return paymentconfiguration.StoredStripeConfiguration{}, err
 	}
@@ -51,7 +51,7 @@ func (r *Repository) GetStripeCredentialForOrder(ctx context.Context, orderID st
 	if err != nil {
 		return paymentconfiguration.StoredStripeConfiguration{}, database.ErrNotFound
 	}
-	credential, err := r.dbWithContext(ctx).queries().GetPaymentStripeCredentialForOrder(ctx, pgUUIDToPgType(id))
+	credential, err := r.DBWithContext(ctx).Queries().GetPaymentStripeCredentialForOrder(ctx, pgUUIDToPgType(id))
 	if err != nil {
 		return paymentconfiguration.StoredStripeConfiguration{}, err
 	}
@@ -59,7 +59,7 @@ func (r *Repository) GetStripeCredentialForOrder(ctx context.Context, orderID st
 }
 
 func (r *Repository) GetStripeCredentialForOrderNumber(ctx context.Context, orderNumber string) (paymentconfiguration.StoredStripeConfiguration, error) {
-	credential, err := r.dbWithContext(ctx).queries().GetPaymentStripeCredentialForOrderNumber(ctx, orderNumber)
+	credential, err := r.DBWithContext(ctx).Queries().GetPaymentStripeCredentialForOrderNumber(ctx, orderNumber)
 	if err != nil {
 		return paymentconfiguration.StoredStripeConfiguration{}, err
 	}
@@ -67,7 +67,7 @@ func (r *Repository) GetStripeCredentialForOrderNumber(ctx context.Context, orde
 }
 
 func (r *Repository) ListStripeCredentials(ctx context.Context) ([]paymentconfiguration.StoredStripeConfiguration, error) {
-	rows, err := r.dbWithContext(ctx).queries().ListPaymentStripeCredentials(ctx)
+	rows, err := r.DBWithContext(ctx).Queries().ListPaymentStripeCredentials(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (r *Repository) GetPaymentCheckoutShutdown(ctx context.Context, id string) 
 	if err != nil {
 		return paymentconfiguration.PaymentCheckoutShutdown{}, pgx.ErrNoRows
 	}
-	row, err := r.dbWithContext(ctx).queries().GetPaymentCheckoutShutdown(ctx, pgUUIDToPgType(parsed))
+	row, err := r.DBWithContext(ctx).Queries().GetPaymentCheckoutShutdown(ctx, pgUUIDToPgType(parsed))
 	if err != nil {
 		return paymentconfiguration.PaymentCheckoutShutdown{}, err
 	}
@@ -91,7 +91,7 @@ func (r *Repository) GetPaymentCheckoutShutdown(ctx context.Context, id string) 
 }
 
 func (r *Repository) ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]paymentconfiguration.PaymentCheckoutShutdown, error) {
-	rows, err := r.dbWithContext(ctx).queries().ListActivePaymentCheckoutShutdowns(ctx)
+	rows, err := r.DBWithContext(ctx).Queries().ListActivePaymentCheckoutShutdowns(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (r *Repository) ListPaymentOrdersForCheckoutShutdown(ctx context.Context, s
 	if limit < 1 {
 		return nil, fmt.Errorf("invalid Checkout shutdown batch limit")
 	}
-	rows, err := r.dbWithContext(ctx).queries().ListPaymentOrdersForCheckoutShutdown(ctx, dbsqlc.ListPaymentOrdersForCheckoutShutdownParams{
+	rows, err := r.DBWithContext(ctx).Queries().ListPaymentOrdersForCheckoutShutdown(ctx, dbsqlc.ListPaymentOrdersForCheckoutShutdownParams{
 		StripeAccountID: shutdown.StripeAccountID, StripeCredentialID: pgtype.UUID{Bytes: uuid.MustParse(shutdown.StripeCredentialID), Valid: true},
 		CreatedAt: dbutil.TimestamptzFromTime(shutdown.CutoffAt), Limit: limit,
 	})
@@ -124,7 +124,7 @@ func (r *Repository) GetPaymentCustomer(ctx context.Context, userID int64, accou
 	if r == nil || r.db == nil {
 		return paymentcheckout.PaymentCustomer{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	row, err := r.dbWithContext(ctx).queries().GetPaymentCustomer(ctx, dbsqlc.GetPaymentCustomerParams{
+	row, err := r.DBWithContext(ctx).Queries().GetPaymentCustomer(ctx, dbsqlc.GetPaymentCustomerParams{
 		UserID: userID, StripeAccountID: accountID, StripeMode: string(mode),
 	})
 	if err != nil {
@@ -144,7 +144,7 @@ func (r *Repository) GetPaymentOrderByPublicToken(ctx context.Context, userID in
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, database.ErrNotFound
 	}
-	row, err := r.dbWithContext(ctx).queries().GetPaymentOrderByPublicToken(ctx, dbsqlc.GetPaymentOrderByPublicTokenParams{
+	row, err := r.DBWithContext(ctx).Queries().GetPaymentOrderByPublicToken(ctx, dbsqlc.GetPaymentOrderByPublicTokenParams{
 		PublicToken: pgUUIDToPgType(publicToken), UserID: userID,
 	})
 	if err != nil {
@@ -158,7 +158,7 @@ func (r *Repository) GetPaymentOrderByID(ctx context.Context, orderID string) (p
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, database.ErrNotFound
 	}
-	row, err := r.dbWithContext(ctx).queries().GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
+	row, err := r.DBWithContext(ctx).Queries().GetPaymentOrderByID(ctx, pgUUIDToPgType(id))
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, err
 	}
@@ -169,7 +169,7 @@ func (r *Repository) GetPaymentOrderByCheckoutSession(ctx context.Context, accou
 	if r == nil || r.db == nil || strings.TrimSpace(accountID) == "" || strings.TrimSpace(sessionID) == "" {
 		return paymentsdomain.PaymentOrder{}, database.ErrNotFound
 	}
-	row, err := r.dbWithContext(ctx).queries().GetPaymentOrderByCheckoutSession(ctx, dbsqlc.GetPaymentOrderByCheckoutSessionParams{
+	row, err := r.DBWithContext(ctx).Queries().GetPaymentOrderByCheckoutSession(ctx, dbsqlc.GetPaymentOrderByCheckoutSessionParams{
 		StripeAccountID:         accountID,
 		StripeCheckoutSessionID: pgtype.Text{String: sessionID, Valid: true},
 	})
@@ -183,7 +183,7 @@ func (r *Repository) ListActivePaymentOrders(ctx context.Context, userID int64) 
 	if r == nil || r.db == nil || userID <= 0 {
 		return nil, fmt.Errorf("payments repository: invalid active order query")
 	}
-	rows, err := r.dbWithContext(ctx).queries().ListActivePaymentOrders(ctx, userID)
+	rows, err := r.DBWithContext(ctx).Queries().ListActivePaymentOrders(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list active payment orders: %w", err)
 	}
@@ -198,7 +198,7 @@ func (r *Repository) ListUserPendingPaymentOrders(ctx context.Context, userID in
 	if r == nil || r.db == nil || userID <= 0 {
 		return nil, fmt.Errorf("payments repository: invalid pending order query")
 	}
-	rows, err := r.dbWithContext(ctx).queries().ListUserPendingPaymentOrders(ctx, userID)
+	rows, err := r.DBWithContext(ctx).Queries().ListUserPendingPaymentOrders(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list user pending payment orders: %w", err)
 	}
@@ -213,7 +213,7 @@ func (r *Repository) ListUnsettledPaymentOrders(ctx context.Context) ([]payments
 	if r == nil || r.db == nil {
 		return nil, fmt.Errorf("payments repository: database unavailable")
 	}
-	rows, err := r.dbWithContext(ctx).queries().ListUnsettledPaymentOrders(ctx)
+	rows, err := r.DBWithContext(ctx).Queries().ListUnsettledPaymentOrders(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list unsettled payment orders: %w", err)
 	}

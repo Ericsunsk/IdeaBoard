@@ -2,7 +2,6 @@ package tests
 
 import (
 	"errors"
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"testing"
 	"time"
 
@@ -39,7 +38,7 @@ func TestDisablePurchasesFastPathExpiresExistingCheckout(t *testing.T) {
 		t.Fatalf("CreateCheckout after disable error = %v, want paymentsdomain.ErrPurchasesUnavailable", err)
 	}
 
-	shutdowns, err := paymentpostgres.NewRepository(db).ListActivePaymentCheckoutShutdowns(t.Context())
+	shutdowns, err := newTestPaymentStores(db).ListActivePaymentCheckoutShutdowns(t.Context())
 	if err != nil || len(shutdowns) != 1 {
 		t.Fatalf("active shutdowns = %+v, %v", shutdowns, err)
 	}
@@ -66,7 +65,7 @@ func TestDisabledReconciliationDoesNotCreateCheckout(t *testing.T) {
 	configurationGateway := configuredFakeStripeGateway("acct_shutdown_reconciliation", "prod_shutdown_reconciliation")
 	checkoutGateway := &fakeCheckoutGateway{}
 	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, creditService)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	now := time.Now().UTC()
 	order := createReconciliationIntentForStripeAccount(t, repo, 42, 501, now.Add(time.Hour), "acct_shutdown_reconciliation", "prod_shutdown_reconciliation")
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{

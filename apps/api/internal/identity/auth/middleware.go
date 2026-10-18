@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"net/http"
 	"strings"
 
@@ -29,14 +30,14 @@ type IdentityProvisioner interface {
 func AuthMiddleware(authService *ServiceClient, userRepo localUserReader, lifecycle IdentityProvisioner) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if authService == nil || userRepo == nil {
-			response.InternalError(c, http.StatusInternalServerError, msgAuthMiddleware, fmt.Errorf("auth middleware dependencies missing"))
+			response.InternalError(c, http.StatusInternalServerError, errorrender.MsgAuthMiddleware, fmt.Errorf("auth middleware dependencies missing"))
 			c.Abort()
 			return
 		}
 
 		cookieHeader := strings.TrimSpace(c.GetHeader("Cookie"))
 		if cookieHeader == "" {
-			response.Error(c, http.StatusUnauthorized, msgAuthMiddleware2)
+			response.Error(c, http.StatusUnauthorized, errorrender.MsgAuthMiddleware2)
 			c.Abort()
 			return
 		}
@@ -48,9 +49,9 @@ func AuthMiddleware(authService *ServiceClient, userRepo localUserReader, lifecy
 			}
 			switch {
 			case errors.Is(err, ErrSessionUnauthorized):
-				response.Error(c, http.StatusUnauthorized, msgAuthMiddleware3)
+				response.Error(c, http.StatusUnauthorized, errorrender.MsgAuthMiddleware3)
 			default:
-				response.InternalError(c, http.StatusBadGateway, msgAuthMiddleware4, err)
+				response.InternalError(c, http.StatusBadGateway, errorrender.MsgAuthMiddleware4, err)
 			}
 			c.Abort()
 			return
@@ -62,22 +63,22 @@ func AuthMiddleware(authService *ServiceClient, userRepo localUserReader, lifecy
 				return
 			}
 			if database.IsNotFound(err) {
-				response.Error(c, http.StatusUnauthorized, msgAuthMiddleware5)
+				response.Error(c, http.StatusUnauthorized, errorrender.MsgAuthMiddleware5)
 			} else {
-				response.InternalError(c, http.StatusServiceUnavailable, msgAuthMiddleware6, err)
+				response.InternalError(c, http.StatusServiceUnavailable, errorrender.MsgAuthMiddleware6, err)
 			}
 			c.Abort()
 			return
 		}
 		if user.Status != 1 {
-			response.Error(c, http.StatusUnauthorized, msgAuthMiddleware5)
+			response.Error(c, http.StatusUnauthorized, errorrender.MsgAuthMiddleware5)
 			c.Abort()
 			return
 		}
 
 		identityPrincipal, err := principal.New(user.ID, user.PublicID, identity.AuthUserID, user.DisplayName, user.Role)
 		if err != nil || principal.Set(c, identityPrincipal) != nil {
-			response.Error(c, http.StatusUnauthorized, msgAuthMiddleware5)
+			response.Error(c, http.StatusUnauthorized, errorrender.MsgAuthMiddleware5)
 			c.Abort()
 			return
 		}
@@ -130,7 +131,7 @@ func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		identityPrincipal, exists := principal.From(c)
 		if !exists || !identityPrincipal.IsAdmin() {
-			response.Error(c, http.StatusForbidden, msgAdminMiddleware)
+			response.Error(c, http.StatusForbidden, errorrender.MsgAdminMiddleware)
 			c.Abort()
 			return
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"io"
 	"net/http"
 	"os"
@@ -12,7 +13,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/media/imageformat"
-	"ideaboard/api/internal/platform/outboundhttp"
+	"ideaboard/api/internal/platform/safehttp"
 )
 
 const MaxRemoteFileSize = 50 * 1024 * 1024
@@ -70,7 +71,7 @@ func DownloadImage(ctx context.Context, remoteURL string, allowHosts []string) (
 // remoteImageOutbound is the shared standard outbound client for remote
 // image fetches: timeout cap, bounded retries and Retry-After respect match
 // the gateway migration (#766).
-var remoteImageOutbound = outboundhttp.NewClient(outboundhttp.Config{})
+var remoteImageOutbound = safehttp.NewClient(safehttp.Config{})
 
 // remoteImageTarget names remote image egress in outbound logs/metrics.
 const remoteImageTarget = "remote-image"
@@ -80,16 +81,16 @@ const remoteImageTarget = "remote-image"
 // error, exactly like the single-shot response it replaces, so the
 // status-to-error mapping below keeps working. Only transport/timeout
 // failures surface as errors.
-func remoteImageResponse(ctx context.Context, remoteURL string, opts outboundhttp.RequestOptions) (*http.Response, error) {
+func remoteImageResponse(ctx context.Context, remoteURL string, opts safehttp.RequestOptions) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, remoteURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	opts.Timeout = outboundhttp.DefaultTimeout
+	opts.Timeout = safehttp.DefaultTimeout
 	opts.Target = remoteImageTarget
 	resp, err := remoteImageOutbound.Do(ctx, req, opts)
 	if err != nil {
-		var statusErr *outboundhttp.HTTPStatusError
+		var statusErr *safehttp.HTTPStatusError
 		if errors.As(err, &statusErr) {
 			preview := statusErr.Body
 			return &http.Response{
@@ -107,7 +108,7 @@ func remoteImageResponse(ctx context.Context, remoteURL string, opts outboundhtt
 }
 
 func DownloadImageWithLimit(ctx context.Context, remoteURL string, allowHosts []string, maxSize int64) (*ImageFile, error) {
-	return downloadImage(ctx, remoteURL, outboundhttp.RequestOptions{AllowHosts: allowHosts}, maxSize)
+	return downloadImage(ctx, remoteURL, safehttp.RequestOptions{AllowHosts: allowHosts}, maxSize)
 }
 
 // DownloadPublicImage restricts preview fetches to public HTTPS provider hosts on every hop.
@@ -115,26 +116,26 @@ func DownloadPublicImage(ctx context.Context, remoteURL string, hosts []string, 
 	if len(hosts) == 0 {
 		return nil, errors.New("public image hosts are required")
 	}
-	return downloadImage(ctx, remoteURL, outboundhttp.RequestOptions{PublicHosts: hosts}, maxSize)
+	return downloadImage(ctx, remoteURL, safehttp.RequestOptions{PublicHosts: hosts}, maxSize)
 }
 
-func downloadImage(ctx context.Context, remoteURL string, opts outboundhttp.RequestOptions, maxSize int64) (*ImageFile, error) {
+func downloadImage(ctx context.Context, remoteURL string, opts safehttp.RequestOptions, maxSize int64) (*ImageFile, error) {
 	if maxSize <= 0 {
 		maxSize = MaxRemoteFileSize
 	}
 	resp, err := remoteImageResponse(ctx, remoteURL, opts)
 	if err != nil {
-		return nil, fmt.Errorf(msgDownloadImageWithLimit, err)
+		return nil, fmt.Errorf(errorrender.MsgDownloadImageWithLimit, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf(msgDownloadImageWithLimit2, resp.StatusCode)
+		return nil, fmt.Errorf(errorrender.MsgDownloadImageWithLimit2, resp.StatusCode)
 	}
 
 	tmpFile, err := os.CreateTemp("", "ideaboard-remote-image-*")
 	if err != nil {
-		return nil, fmt.Errorf(msgDownloadImageWithLimit3, err)
+		return nil, fmt.Errorf(errorrender.MsgDownloadImageWithLimit3, err)
 	}
 	cleanupTemp := true
 	defer func() {
@@ -146,18 +147,18 @@ func downloadImage(ctx context.Context, remoteURL string, opts outboundhttp.Requ
 
 	size, err := copyWithBuffer(tmpFile, io.LimitReader(resp.Body, maxSize+1))
 	if err != nil {
-		return nil, fmt.Errorf(msgDownloadImageWithLimit4, err)
+		return nil, fmt.Errorf(errorrender.MsgDownloadImageWithLimit4, err)
 	}
 	if size > maxSize {
-		return nil, fmt.Errorf(msgDownloadImageWithLimit5, maxSize/1024/1024)
+		return nil, fmt.Errorf(errorrender.MsgDownloadImageWithLimit5, maxSize/1024/1024)
 	}
 
 	facts, err := imageformat.InspectDetected(tmpFile)
 	if err != nil {
-		return nil, fmt.Errorf(msgDownloadImageWithLimit6, err)
+		return nil, fmt.Errorf(errorrender.MsgDownloadImageWithLimit6, err)
 	}
 	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
-		return nil, fmt.Errorf(msgDownloadImageWithLimit7, err)
+		return nil, fmt.Errorf(errorrender.MsgDownloadImageWithLimit7, err)
 	}
 
 	filename := fmt.Sprintf("remote_%d%s", time.Now().UnixNano(), facts.Extension)

@@ -25,6 +25,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"sync"
 
 	"ideaboard/api/internal/credits"
@@ -55,7 +56,7 @@ func taskCommandMetadata(idempotencyKey, taskID string, userID int64) domain.Com
 		IdempotencyKey:    idempotencyKey,
 		Actor:             domain.Actor{Type: domain.ActorUser, ID: fmt.Sprint(userID)},
 		Source:            "task_submission",
-		Reason:            msgTaskCommandMetadata,
+		Reason:            errorrender.MsgTaskCommandMetadata,
 		BusinessReference: domain.BusinessReference{Type: "task", ID: taskID},
 	}
 }

@@ -18,7 +18,6 @@ import (
 	"ideaboard/api/internal/media/storage/infrastructure/postgres"
 	"ideaboard/api/internal/media/storage/infrastructure/s3"
 	"ideaboard/api/internal/media/storage/ports"
-	_ "ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 )

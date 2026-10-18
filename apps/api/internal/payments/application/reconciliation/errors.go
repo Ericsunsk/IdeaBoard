@@ -2,6 +2,7 @@ package reconciliation
 
 import (
 	"errors"
+	"ideaboard/api/internal/platform/errorrender"
 	"strings"
 
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
@@ -15,36 +16,36 @@ func FailureDetail(err error) (string, string) {
 		return string(gatewayErr.Code()), boundedText(gatewayErr.Error(), 500)
 	}
 	if errors.Is(err, paymentcontracts.ErrStripeProviderUnavailable) {
-		return string(paymentports.GatewayErrorProviderUnavailable), msgFailureDetail
+		return string(paymentports.GatewayErrorProviderUnavailable), errorrender.MsgFailureDetail
 	}
 	if errors.Is(err, paymentcontracts.ErrStripeConfigurationInvalid) {
-		return "configuration_invalid", msgFailureDetail2
+		return "configuration_invalid", errorrender.MsgFailureDetail2
 	}
 	if errors.Is(err, paymentcontracts.ErrStripeConfigurationNotFound) {
-		return "configuration_not_found", msgFailureDetail3
+		return "configuration_not_found", errorrender.MsgFailureDetail3
 	}
 	if errors.Is(err, paymentsdomain.ErrPurchasesUnavailable) {
-		return "configuration_unavailable", msgFailureDetail4
+		return "configuration_unavailable", errorrender.MsgFailureDetail4
 	}
 	if errors.Is(err, paymentcontracts.ErrInvalidStripeAPIKey) {
-		return string(paymentports.GatewayErrorInvalidKey), msgFailureDetail5
+		return string(paymentports.GatewayErrorInvalidKey), errorrender.MsgFailureDetail5
 	}
 	if errors.Is(err, paymentcontracts.ErrStripePermissionDenied) {
-		return string(paymentports.GatewayErrorPermissionDenied), msgFailureDetail6
+		return string(paymentports.GatewayErrorPermissionDenied), errorrender.MsgFailureDetail6
 	}
 	if errors.Is(err, paymentcontracts.ErrStripeAccountUnavailable) {
-		return string(paymentports.GatewayErrorAccountUnavailable), msgFailureDetail7
+		return string(paymentports.GatewayErrorAccountUnavailable), errorrender.MsgFailureDetail7
 	}
 	if errors.Is(err, paymentcontracts.ErrStripeCapabilityUnavailable) {
-		return string(paymentports.GatewayErrorCapabilityMissing), msgFailureDetail8
+		return string(paymentports.GatewayErrorCapabilityMissing), errorrender.MsgFailureDetail8
 	}
 	if errors.Is(err, paymentsdomain.ErrWalletNotRechargeable) {
-		return "wallet_not_rechargeable", msgFailureDetail9
+		return "wallet_not_rechargeable", errorrender.MsgFailureDetail9
 	}
 	if errors.Is(err, paymentsdomain.ErrCheckoutIdempotencyConflict) {
-		return "identity_conflict", msgFailureDetail10
+		return "identity_conflict", errorrender.MsgFailureDetail10
 	}
-	return "ledger_retry", msgFailureDetail11
+	return "ledger_retry", errorrender.MsgFailureDetail11
 }
 
 func OperationalErrorSummary(err error, fallback string) string {
@@ -111,16 +112,15 @@ func boundedText(value string, limit int) string {
 // is the single source of truth for one rendered message; call
 // sites reference these names so copy changes stay in one place.
 // Values are byte-identical to the previously inline literals.
-const (
-	msgFailureDetail   = "Stripe 服务暂不可用"                    // FailureDetail @ errors.go
-	msgFailureDetail2  = "当前 Stripe 配置无效"                   // FailureDetail @ errors.go
-	msgFailureDetail3  = "当前 Stripe 配置尚未完成"                 // FailureDetail @ errors.go
-	msgFailureDetail4  = "当前 Stripe 配置无法收敛该订单"              // FailureDetail @ errors.go
-	msgFailureDetail5  = "Stripe API Key 无效"                // FailureDetail @ errors.go
-	msgFailureDetail6  = "当前 Stripe API Key 权限不足"           // FailureDetail @ errors.go
-	msgFailureDetail7  = "当前 Stripe 账户不可用"                  // FailureDetail @ errors.go
-	msgFailureDetail8  = "当前 Stripe 账户暂不具备收款能力"             // FailureDetail @ errors.go
-	msgFailureDetail9  = "当前账户暂不可充值"                        // FailureDetail @ errors.go
-	msgFailureDetail10 = "Stripe Checkout Session 与订单绑定不一致" // FailureDetail @ errors.go
-	msgFailureDetail11 = "账本写入失败"                           // FailureDetail @ errors.go
-)
+
+// FailureDetail @ errors.go
+// FailureDetail @ errors.go
+// FailureDetail @ errors.go
+// FailureDetail @ errors.go
+// FailureDetail @ errors.go
+// FailureDetail @ errors.go
+// FailureDetail @ errors.go
+// FailureDetail @ errors.go
+// FailureDetail @ errors.go
+// FailureDetail @ errors.go
+// FailureDetail @ errors.go

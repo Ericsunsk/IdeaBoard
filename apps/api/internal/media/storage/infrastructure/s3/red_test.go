@@ -5,28 +5,28 @@ import (
 	"errors"
 	"testing"
 
-	"ideaboard/api/internal/platform/outboundhttp"
+	"ideaboard/api/internal/platform/safehttp"
 
 	"github.com/minio/minio-go/v7"
 )
 
 func TestClassifyS3ErrorMapsClosedOutcomes(t *testing.T) {
-	if got := classifyS3Error(nil); got != outboundhttp.OutcomeSuccess {
+	if got := classifyS3Error(nil); got != safehttp.OutcomeSuccess {
 		t.Fatalf("nil = %q, want success", got)
 	}
-	if got := classifyS3Error(context.Canceled); got != outboundhttp.OutcomeCanceled {
+	if got := classifyS3Error(context.Canceled); got != safehttp.OutcomeCanceled {
 		t.Fatalf("canceled = %q, want canceled", got)
 	}
-	if got := classifyS3Error(context.DeadlineExceeded); got != outboundhttp.OutcomeTimeout {
+	if got := classifyS3Error(context.DeadlineExceeded); got != safehttp.OutcomeTimeout {
 		t.Fatalf("deadline = %q, want timeout", got)
 	}
-	if got := classifyS3Error(minio.ErrorResponse{StatusCode: 403}); got != outboundhttp.OutcomeClientError {
+	if got := classifyS3Error(minio.ErrorResponse{StatusCode: 403}); got != safehttp.OutcomeClientError {
 		t.Fatalf("403 = %q, want http_4xx", got)
 	}
-	if got := classifyS3Error(minio.ErrorResponse{StatusCode: 503}); got != outboundhttp.OutcomeServerError {
+	if got := classifyS3Error(minio.ErrorResponse{StatusCode: 503}); got != safehttp.OutcomeServerError {
 		t.Fatalf("503 = %q, want http_5xx", got)
 	}
-	if got := classifyS3Error(errors.New("connection reset")); got != outboundhttp.OutcomeTransportErr {
+	if got := classifyS3Error(errors.New("connection reset")); got != safehttp.OutcomeTransportErr {
 		t.Fatalf("plain = %q, want transport_error", got)
 	}
 }

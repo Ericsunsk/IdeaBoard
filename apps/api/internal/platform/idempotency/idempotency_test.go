@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/platform/apperror"
+	"ideaboard/api/internal/platform/errorrender"
 )
 
 func TestParseRequiresKey(t *testing.T) {
-	if _, err := Parse(""); err == nil || apperror.CodeOf(err) != CodeRequired {
+	if _, err := Parse(""); err == nil || errorrender.CodeOf(err) != CodeRequired {
 		t.Fatalf("Parse empty = %v, want missing", err)
 	}
 	if _, err := Parse("   "); err == nil {

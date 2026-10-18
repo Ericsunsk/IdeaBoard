@@ -8,9 +8,8 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/media/mediarefs"
-	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/jsonlimit"
-	"ideaboard/api/internal/platform/validation"
 	tasksubmission "ideaboard/api/internal/tasking/application/submission"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/tasking/workspacetasks"
@@ -59,7 +58,7 @@ const CompilerWorkspaceMediaAssetIDsParam = "__workspace_media_asset_ids"
 func CompileWorkspaceParams(feature, userPrompt string, params map[string]interface{}) (string, error) {
 	feature = strings.TrimSpace(feature)
 	if feature == "" {
-		return "", validation.New(msgCompileWorkspaceParams)
+		return "", errorrender.NewValidationError(errorrender.MsgCompileWorkspaceParams)
 	}
 	working := make(map[string]interface{}, len(params)+1)
 	for key, value := range params {
@@ -77,7 +76,7 @@ func CompileWorkspaceParams(feature, userPrompt string, params map[string]interf
 		return "", err
 	}
 	if plan.PromptPolicy() == workflow.PromptPolicyRequired && prompt == "" {
-		return "", validation.New(msgCompileWorkspaceParams2)
+		return "", errorrender.NewValidationError(errorrender.MsgCompileWorkspaceParams2)
 	}
 	if plan.PromptPolicy() == workflow.PromptPolicyIgnored {
 		prompt = ""
@@ -103,8 +102,15 @@ func CompileWorkspaceParams(feature, userPrompt string, params map[string]interf
 func normalizeSubmitExecutionMap(params map[string]interface{}, featureSlug string) error {
 	params["service"] = featureSlug
 	delete(params, "model")
-	if err := validateWorkspaceMaskParam(params); err != nil {
-		return err
+	// v1 mask reference fail-closes here before any plan work; shape is
+	// owned by workspacetasks.IsValidMaskAssetID (same predicate as
+	// workspacetasks.ValidateParams) so durable params never carry media
+	// bytes or URLs.
+	if raw, ok := params[paramkeys.MaskAssetID]; ok {
+		id, _ := raw.(string)
+		if !workspacetasks.IsValidMaskAssetID(id) {
+			return errorrender.NewValidationError(errorrender.MsgValidateWorkspaceMaskParam)
+		}
 	}
 	if err := workflow.NormalizeStructuredPromptContractParams(params, featureSlug); err != nil {
 		return err
@@ -118,25 +124,6 @@ func normalizeSubmitExecutionMap(params map[string]interface{}, featureSlug stri
 		if err := normalizeFusionParams(params); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-// validateWorkspaceMaskParam fail-closes the v1 mask reference before any
-// plan work: params.mask_asset_id must be a workspace public asset_... id
-// when present. Data-URL and storage-URL masks are rejected here (mirrored
-// in workspacetasks.ValidateParams) because durable task params must never
-// contain media bytes or URLs; mask bytes arrive via the existing
-// upload-session flow and are linked here by asset id.
-func validateWorkspaceMaskParam(params map[string]interface{}) error {
-	raw, ok := params[paramkeys.MaskAssetID]
-	if !ok {
-		return nil
-	}
-	id, ok := raw.(string)
-	if !ok || !contract.IsAssetID(strings.TrimSpace(id)) ||
-		!contract.IsValidPublicID(contract.PrefixAsset, strings.TrimSpace(id)) {
-		return validation.New(msgValidateWorkspaceMaskParam)
 	}
 	return nil
 }
@@ -182,14 +169,14 @@ func compileFeatureExecutionParams(params map[string]interface{}, featureSlug st
 	if raw, ok := params[paramkeys.OutputCount]; ok {
 		value, ok := readExactIntParam(raw)
 		if !ok {
-			return result, validation.New(msgCompileFeatureExecutionParams)
+			return result, errorrender.NewValidationError(errorrender.MsgCompileFeatureExecutionParams)
 		}
 		result.RequestedOutputCount = &value
 	}
 	if raw, ok := params[paramkeys.OutputResolution]; ok {
 		value, ok := raw.(string)
 		if !ok {
-			return result, validation.New(msgCompileFeatureExecutionParams2)
+			return result, errorrender.NewValidationError(errorrender.MsgCompileFeatureExecutionParams2)
 		}
 		result.OutputResolution = &value
 	}
@@ -212,15 +199,15 @@ func mapFeatureContractValidationError(err error) error {
 	}
 	switch contractErr.Code {
 	case workflow.FeatureContractUnknownFeature:
-		return validation.New(msgMapFeatureContractValidationError)
+		return errorrender.NewValidationError(errorrender.MsgMapFeatureContractValidationError)
 	case workflow.FeatureContractInvalidOutputCount:
-		return validation.New(msgMapFeatureContractValidationError2)
+		return errorrender.NewValidationError(errorrender.MsgMapFeatureContractValidationError2)
 	case workflow.FeatureContractUnsupportedResolution:
-		return validation.New(msgMapFeatureContractValidationError3)
+		return errorrender.NewValidationError(errorrender.MsgMapFeatureContractValidationError3)
 	case workflow.FeatureContractInvalidRuntimeInput:
-		return validation.New(msgMapFeatureContractValidationError4)
+		return errorrender.NewValidationError(errorrender.MsgMapFeatureContractValidationError4)
 	default:
-		return validation.New(msgMapFeatureContractValidationError5)
+		return errorrender.NewValidationError(errorrender.MsgMapFeatureContractValidationError5)
 	}
 }
 
@@ -229,14 +216,14 @@ func marshalWorkflowTaskParams(params *tasks.WorkflowTaskParams, source map[stri
 		return "", nil
 	}
 	if source != nil && jsonlimit.ValueDepth(source) > maxSubmitTaskParamsDepth {
-		return "", errors.New(msgMarshalWorkflowTaskParams)
+		return "", errors.New(errorrender.MsgMarshalWorkflowTaskParams)
 	}
 	payload, err := json.Marshal(params)
 	if err != nil {
-		return "", errors.New(msgMarshalWorkflowTaskParams2)
+		return "", errors.New(errorrender.MsgMarshalWorkflowTaskParams2)
 	}
 	if len(payload) > maxSubmitTaskParamsBytes {
-		return "", fmt.Errorf(msgMarshalWorkflowTaskParams3, maxSubmitTaskParamsBytes/1024/1024)
+		return "", fmt.Errorf(errorrender.MsgMarshalWorkflowTaskParams3, maxSubmitTaskParamsBytes/1024/1024)
 	}
 	return string(payload), nil
 }
@@ -429,7 +416,7 @@ func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug strin
 	// v1 mask reference (workspace public asset_... id from the
 	// upload-session flow). Wins over the legacy numeric MaskImageAssetID
 	// when both are present; shape was fail-closed in
-	// validateWorkspaceMaskParam above.
+	// normalizeSubmitExecutionMap above via workspacetasks.IsValidMaskAssetID.
 	if id, ok := params[paramkeys.MaskAssetID].(string); ok && strings.TrimSpace(id) != "" {
 		media.Mask = &tasks.MediaRef{PublicAssetID: strings.TrimSpace(id), Role: tasks.MediaRoleMask}
 		hasMedia = true
@@ -502,40 +489,31 @@ func mediaRefsFromPublicAssetIDs(assetIDs []string, role string) []tasks.MediaRe
 }
 
 func normalizeFusionParams(params map[string]interface{}) error {
+	// Workflow normalizes the fusion shape and mode first; submission only
+	// enforces image/weight counts and normalizes the weights to sum 1.
 	if params == nil {
 		return nil
 	}
 	imageURLs := mediarefs.CollectStringList(params[paramkeys.ImageURLs])
 	if len(imageURLs) < 2 || len(imageURLs) > 4 {
-		return errors.New(msgNormalizeFusionParams)
-	}
-	rawFusion, ok := params[paramkeys.Fusion]
-	if !ok {
-		return errors.New(msgNormalizeFusionParams2)
-	}
-	fusion, ok := rawFusion.(map[string]interface{})
-	if !ok {
-		return errors.New(msgNormalizeFusionParams3)
-	}
-	if _, ok := fusion[paramkeys.InputWeights]; !ok {
-		return errors.New(msgNormalizeFusionParams2)
+		return errors.New(errorrender.MsgNormalizeFusionParams)
 	}
 	weights, ok := workflow.ReadFusionInputWeights(params)
 	if !ok {
-		return errors.New(msgNormalizeFusionParams4)
+		return errors.New(errorrender.MsgNormalizeFusionParams4)
 	}
 	if len(weights) != len(imageURLs) {
-		return errors.New(msgNormalizeFusionParams5)
+		return errors.New(errorrender.MsgNormalizeFusionParams5)
 	}
 	normalizedWeights, err := normalizeFusionInputWeights(weights)
 	if err != nil {
 		return err
 	}
-	normalizedFusion := make(map[string]interface{}, len(fusion)+2)
+	fusion := params[paramkeys.Fusion].(map[string]interface{})
+	normalizedFusion := make(map[string]interface{}, len(fusion))
 	for key, value := range fusion {
 		normalizedFusion[key] = value
 	}
-	normalizedFusion[paramkeys.Mode] = "weighted_reference"
 	normalizedFusion[paramkeys.InputWeights] = normalizedWeights
 	params[paramkeys.Fusion] = normalizedFusion
 	return nil
@@ -546,16 +524,16 @@ func normalizeFusionInputWeights(weights []float64) ([]float64, error) {
 	total := 0.0
 	for _, weight := range weights {
 		if math.IsNaN(weight) || math.IsInf(weight, 0) {
-			return nil, errors.New(msgNormalizeFusionInputWeights)
+			return nil, errors.New(errorrender.MsgNormalizeFusionInputWeights)
 		}
 		if weight < 0 {
-			return nil, errors.New(msgNormalizeFusionInputWeights2)
+			return nil, errors.New(errorrender.MsgNormalizeFusionInputWeights2)
 		}
 		out = append(out, weight)
 		total += weight
 	}
 	if total <= 0 {
-		return nil, errors.New(msgNormalizeFusionInputWeights3)
+		return nil, errors.New(errorrender.MsgNormalizeFusionInputWeights3)
 	}
 	for index := range out {
 		out[index] /= total

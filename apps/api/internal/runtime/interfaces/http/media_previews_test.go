@@ -1,4 +1,4 @@
-package httpapi
+package http
 
 import (
 	"context"
@@ -73,7 +73,7 @@ func TestPublicMediaPreviewRoutesWithoutSearchOrWorkspace(t *testing.T) {
 	}
 	path := display.Variants[0].URL
 	router := gin.New()
-	RegisterRoutes(router, Dependencies{ContractV1: ContractV1Deps{MediaPreviews: previews}}, nil, FrontendRouteOptions{})
+	RegisterRoutes(router, Dependencies{MediaPreviews: previews}, nil, FrontendRouteOptions{})
 	for _, tt := range []struct {
 		name   string
 		path   string
@@ -152,7 +152,7 @@ func TestRenderedImagePublicPrivateErrorPolicy(t *testing.T) {
 				want = tt.public
 				writePublicPreview(ctx, imgproxy.Image{}, time.Time{}, tt.err)
 			} else {
-				writeRenderedImage(ctx, imgproxy.Image{}, tt.err, "private, max-age=300")
+				WriteRenderedImage(ctx, imgproxy.Image{}, tt.err, "private, max-age=300")
 			}
 			if recorder.Code != want || recorder.Header().Get("Cache-Control") != "no-store" {
 				t.Fatalf("public=%v status=%d, want %d with no-store", isPublic, recorder.Code, want)

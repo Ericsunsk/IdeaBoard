@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"ideaboard/api/internal/platform/validation"
+	"ideaboard/api/internal/platform/errorrender"
 )
 
 const (
@@ -78,7 +78,7 @@ func (s *RuntimeSettingsService) UpdateSupportChannels(ctx context.Context, sett
 
 func NormalizeSupportChannelsSetting(setting SupportChannelsSetting) (SupportChannelsSetting, error) {
 	if len(setting.Channels) > maxSupportChannels {
-		return SupportChannelsSetting{}, validation.New(msgNormalizeSupportChannels)
+		return SupportChannelsSetting{}, errorrender.NewValidationError(errorrender.MsgNormalizeSupportChannels)
 	}
 	channels := make([]SupportChannel, 0, len(setting.Channels))
 	ids := make(map[string]struct{}, len(setting.Channels))
@@ -88,10 +88,10 @@ func NormalizeSupportChannelsSetting(setting SupportChannelsSetting) (SupportCha
 		channel.Kind = strings.TrimSpace(channel.Kind)
 		channel.URL = strings.TrimSpace(channel.URL)
 		if !validSupportChannelID(channel.ID) || channel.Name == "" || utf8.RuneCountInString(channel.Name) > 80 || !validSupportChannelKind(channel.Kind) || !validSupportChannelURL(channel.URL) || channel.SortOrder < 0 {
-			return SupportChannelsSetting{}, validation.New(msgNormalizeSupportChannel)
+			return SupportChannelsSetting{}, errorrender.NewValidationError(errorrender.MsgNormalizeSupportChannel)
 		}
 		if _, exists := ids[channel.ID]; exists {
-			return SupportChannelsSetting{}, validation.New(msgNormalizeSupportChannel2)
+			return SupportChannelsSetting{}, errorrender.NewValidationError(errorrender.MsgNormalizeSupportChannel2)
 		}
 		ids[channel.ID] = struct{}{}
 		channels = append(channels, channel)

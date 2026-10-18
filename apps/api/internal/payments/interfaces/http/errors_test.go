@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"ideaboard/api/internal/platform/errorrender"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,14 +18,15 @@ import (
 func TestPaymentErrorRenderFallsBackToFixedSafeMessage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	const secret = "sk_live_must_not_escape"
+	sentinel := errors.New("sentinel")
 	mapping := paymentErrorMapping{
-		targets: []error{errors.New("sentinel")},
-		status:  http.StatusBadRequest,
-		code:    "test_empty_message",
+		Targets: []error{sentinel},
+		Status:  http.StatusBadRequest,
+		Code:    "test_empty_message",
 	}
 	router := gin.New()
 	router.GET("/err", func(c *gin.Context) {
-		mapping.render(c, errors.Join(errors.New("sentinel"), errors.New("raw "+secret)))
+		renderMappedPaymentError(c, errors.Join(sentinel, errors.New("raw "+secret)), []paymentErrorMapping{mapping}, http.StatusBadRequest, errorrender.MsgPaymentsInterfacesHTTPRender)
 	})
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/err", nil))

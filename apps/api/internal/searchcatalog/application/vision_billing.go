@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/errorrender"
 	"log/slog"
 	"strings"
 	"time"
@@ -191,7 +192,7 @@ func validateVisionInput(input searchdomain.VisionInput) error {
 		return err
 	}
 	if utf8RuneCount(strings.Join(strings.Fields(strings.TrimSpace(input.UserText)), " ")) > MaxSearchQueryRunes {
-		return fmt.Errorf(msgNormalizeQuery, MaxSearchQueryRunes)
+		return fmt.Errorf(errorrender.MsgNormalizeQuery, MaxSearchQueryRunes)
 	}
 	return nil
 }
@@ -223,22 +224,22 @@ func visionFailureDetails(err error) (string, string, int) {
 	if errors.As(err, &providerErr) {
 		switch providerErr.Kind {
 		case searchdomain.VisionProviderFailureCredentials:
-			return "vision_search_credentials", msgVisionFailureDetails, 502
+			return "vision_search_credentials", errorrender.MsgVisionFailureDetails, 502
 		case searchdomain.VisionProviderFailureQuota:
-			return "vision_search_quota", msgVisionFailureDetails2, 502
+			return "vision_search_quota", errorrender.MsgVisionFailureDetails2, 502
 		case searchdomain.VisionProviderFailureResponse:
-			return "vision_search_schema_error", msgVisionFailureDetails3, 502
+			return "vision_search_schema_error", errorrender.MsgVisionFailureDetails3, 502
 		}
 	}
 	switch {
 	case errors.Is(err, searchdomain.ErrVisionSchema):
-		return "vision_search_schema_error", msgVisionFailureDetails3, 502
+		return "vision_search_schema_error", errorrender.MsgVisionFailureDetails3, 502
 	case errors.Is(err, searchdomain.ErrVisionNotConfigured):
-		return "vision_search_not_configured", msgVisionFailureDetails4, 503
+		return "vision_search_not_configured", errorrender.MsgVisionFailureDetails4, 503
 	case errors.Is(err, searchdomain.ErrVisionInput), errors.Is(err, searchdomain.ErrVisionImageInvalid), errors.Is(err, searchdomain.ErrVisionImageUnavailable):
-		return "vision_search_input_invalid", msgVisionFailureDetails5, 400
+		return "vision_search_input_invalid", errorrender.MsgVisionFailureDetails5, 400
 	default:
-		return "vision_search_provider_error", msgVisionFailureDetails6, 502
+		return "vision_search_provider_error", errorrender.MsgVisionFailureDetails6, 502
 	}
 }
 

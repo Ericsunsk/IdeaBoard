@@ -1,9 +1,8 @@
 package reconciliation
 
 import (
-	"time"
-
 	paymentsdomain "ideaboard/api/internal/payments/domain"
+	"time"
 )
 
 // Claim fences a short-lived worker lease. External provider calls happen
@@ -34,3 +33,11 @@ type Anomaly struct {
 	AnomalousAt       time.Time
 	CreatedAt         time.Time
 }
+
+// merged from internal/payments/application/reconciliation/policy.go (structural consolidation; symbols unchanged).
+const (
+	Interval      = 5 * time.Minute
+	OperableDelay = time.Hour
+	AnomalyAge    = 24 * time.Hour
+	Lease         = 5 * time.Minute
+)

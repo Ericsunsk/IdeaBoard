@@ -1,12 +1,14 @@
-package domain
+package domain_test
 
 import (
 	"math"
 	"testing"
+
+	"ideaboard/api/internal/credits/domain"
 )
 
 func TestNewCreditAmountAcceptsPositiveIntegers(t *testing.T) {
-	amount, err := NewCreditAmount(125)
+	amount, err := domain.NewCreditAmount(125)
 	if err != nil {
 		t.Fatalf("NewCreditAmount() error = %v", err)
 	}
@@ -17,14 +19,14 @@ func TestNewCreditAmountAcceptsPositiveIntegers(t *testing.T) {
 
 func TestNewCreditAmountRejectsNonPositiveValues(t *testing.T) {
 	for _, value := range []int64{-1, 0} {
-		if _, err := NewCreditAmount(value); err == nil {
+		if _, err := domain.NewCreditAmount(value); err == nil {
 			t.Fatalf("NewCreditAmount(%d) succeeded", value)
 		}
 	}
 }
 
 func TestNewCreditAmountRejectsValuesThatCannotBeSafelyAdded(t *testing.T) {
-	if _, err := NewCreditAmount(math.MaxInt64); err == nil {
+	if _, err := domain.NewCreditAmount(math.MaxInt64); err == nil {
 		t.Fatal("NewCreditAmount(math.MaxInt64) succeeded")
 	}
 }

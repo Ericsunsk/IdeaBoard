@@ -33,7 +33,8 @@ func saveReadThroughAsset(t *testing.T, store *InMemoryWorkspaceLibraryStore, ws
 func TestInMemoryListMaterializations(t *testing.T) {
 	ctx := context.Background()
 	store := NewInMemoryWorkspaceLibraryStoreForTests()
-	asset := saveReadThroughAsset(t, store, "ws_list", "photo-list-1")
+	firstAsset := saveReadThroughAsset(t, store, "ws_list", "photo-list-1")
+	secondAsset := saveReadThroughAsset(t, store, "ws_list", "photo-list-2")
 
 	if empty, err := store.ListMaterializations(ctx, "ws_list"); err != nil || len(empty) != 0 {
 		t.Fatalf("list empty = %d %v, want 0 nil", len(empty), err)
@@ -42,14 +43,16 @@ func TestInMemoryListMaterializations(t *testing.T) {
 		t.Fatalf("list unknown workspace = %d %v, want empty", len(missing), err)
 	}
 
+	// Claim (the production trigger path) converges per asset, so the
+	// ordering fixture uses one job per asset.
 	var ids []string
-	for range 2 {
+	for _, asset := range []string{firstAsset, secondAsset} {
 		matID, err := domain.NewV1MaterializationPublicID()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := store.CreateMaterialization(ctx, "ws_list", asset, matID); err != nil {
-			t.Fatalf("CreateMaterialization: %v", err)
+		if _, _, err := store.ClaimMaterialization(ctx, "ws_list", asset, matID); err != nil {
+			t.Fatalf("ClaimMaterialization: %v", err)
 		}
 		ids = append(ids, matID)
 	}
@@ -61,10 +64,14 @@ func TestInMemoryListMaterializations(t *testing.T) {
 		t.Fatalf("list order = %v, want creation order %v", all, ids)
 	}
 	for _, record := range all {
-		if record.AssetPublicID != asset || record.Status != domain.V1MaterializationPending {
-			t.Fatalf("record = %+v, want pending link to %q", record, asset)
+		if record.Status != domain.V1MaterializationPending {
+			t.Fatalf("record = %+v, want pending", record)
 		}
 	}
+	if all[0].AssetPublicID != firstAsset || all[1].AssetPublicID != secondAsset {
+		t.Fatalf("records = %+v, want links to %q, %q", all, firstAsset, secondAsset)
+	}
+	_ = secondAsset
 }
 
 func TestInMemoryClaimMaterializationConvergesConcurrentCalls(t *testing.T) {

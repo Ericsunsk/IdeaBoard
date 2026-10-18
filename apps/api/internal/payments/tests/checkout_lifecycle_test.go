@@ -10,8 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
-	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
+	"ideaboard/api/internal/payments/infrastructure/events"
 	"sync"
 	"testing"
 
@@ -585,13 +584,13 @@ func TestCheckoutLifecycleReturnExpiryAllowsVerifiedLatePayment(t *testing.T) {
 	}
 }
 
-func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout paymentports.CheckoutGateway, verifier paymentports.StripeWebhookVerifier) (*pgxpool.Pool, *payments.Service, *credits.Service, *paymentevents.Hub) {
+func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout paymentports.CheckoutGateway, verifier paymentports.StripeWebhookVerifier) (*pgxpool.Pool, *payments.Service, *credits.Service, *events.Hub) {
 	t.Helper()
 	secretstest.EnableEncryption(t)
 	db, pool := testdb.OpenWithPool(t)
 	wallets := credits.NewService(pool)
 	seedCheckoutLifecycleWallet(t, wallets, 42)
-	repo := paymentpostgres.NewRepository(db)
+	repo := newTestPaymentStores(db)
 	hub := NewEventHub()
 	service := newCompleteTestPaymentsService(t, repo, payments.NewPaymentRuntime(hub, func() time.Time { return now.UTC() }),
 		lifecycleStripeGateway{}, checkout, wallets, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
