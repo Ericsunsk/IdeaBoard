@@ -9,8 +9,6 @@ import (
 	"ideaboard/api/internal/tenancy"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -551,6 +549,39 @@ func TestAccessPostgresListFilters(t *testing.T) {
 	}
 }
 
+// boardMediaBackfillCTE vendors the existing-document backfill query from
+// migration 20261017120000_board_media_access.sql (#936), squashed verbatim
+// into 20261020000000_baseline.sql by the clean-break rebaseline. It is pinned
+// here so this test no longer reads migration files; keep it aligned with the
+// shipped backfill semantics (typed jsonpath references only, idempotent
+// ON CONFLICT DO NOTHING). It intentionally lives in this test, not in
+// internal/db/schema/schema.sql, which carries the live schema only.
+const boardMediaBackfillCTE = `WITH documents AS (
+  SELECT b.internal_id AS board_id, b.workspace_id,
+         CASE WHEN d.snapshot_data ? 'payload' THEN d.snapshot_data -> 'payload'
+              ELSE d.snapshot_data END AS payload
+  FROM boards AS b
+  INNER JOIN board_documents AS d ON d.board_id = b.internal_id
+), media_references AS (
+  SELECT d.board_id, d.workspace_id, btrim(ref.value #>> '{}') AS asset_public_id
+  FROM documents AS d
+  CROSS JOIN LATERAL (VALUES
+    ('$.imageNodes[*].sourceMediaRef.assetId'::jsonpath),
+    ('$.imageNodes[*].outputImages[*].mediaRef.assetId'::jsonpath),
+    ('$.promptNodes[*].inputImages[*].mediaRef.assetId'::jsonpath),
+    ('$.fusionNodes[*].inputImages[*].mediaRef.assetId'::jsonpath),
+    ('$.fusionNodes[*].outputImages[*].mediaRef.assetId'::jsonpath)
+  ) AS paths(path)
+  CROSS JOIN LATERAL jsonb_path_query(d.payload, paths.path) AS ref(value)
+  WHERE jsonb_typeof(ref.value) = 'string'
+)
+INSERT INTO board_document_media_refs (board_id, media_asset_id)
+SELECT DISTINCT r.board_id, m.internal_id
+FROM media_references AS r
+INNER JOIN media_assets AS m ON m.public_id = r.asset_public_id AND m.workspace_id = r.workspace_id
+WHERE r.asset_public_id ~ '^asset_[A-Za-z0-9_-]+$'
+ON CONFLICT (board_id, media_asset_id) DO NOTHING;`
+
 func TestAccessPostgresExistingDocumentReferencesBackfill(t *testing.T) {
 	env, ctx, pool := openAccessPGEnv(t)
 	assets := make([]*Asset, 6)
@@ -580,14 +611,7 @@ func TestAccessPostgresExistingDocumentReferencesBackfill(t *testing.T) {
 	if _, err := env.boards.ReplaceDocument(ctx, env.ws, boardID, env.owner, 1, 1, pgDocEnvelope(t)); err != nil {
 		t.Fatal(err)
 	}
-	migration, err := os.ReadFile(filepath.Join("..", "..", "db", "migrations", "20261017120000_board_media_access.sql"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, backfill, ok := strings.Cut(string(migration), "WITH documents AS (")
-	if !ok {
-		t.Fatal("reference backfill statement missing")
-	}
+	backfill := boardMediaBackfillCTE
 	envelope, err := json.Marshal(map[string]any{"schema_version": 1, "payload": json.RawMessage(payload)})
 	if err != nil {
 		t.Fatal(err)
@@ -600,7 +624,7 @@ func TestAccessPostgresExistingDocumentReferencesBackfill(t *testing.T) {
 			t.Fatal(err)
 		}
 		for range 2 {
-			if _, err := pool.Exec(ctx, "WITH documents AS ("+backfill); err != nil {
+			if _, err := pool.Exec(ctx, backfill); err != nil {
 				t.Fatal(err)
 			}
 		}
