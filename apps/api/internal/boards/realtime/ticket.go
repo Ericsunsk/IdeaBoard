@@ -63,6 +63,10 @@ var (
 // writers get write, every other reader gets read. Callers pass
 // boards.CapabilitiesFor(role, ok, archived).CanWrite so the ticket cap
 // never diverges from the board policy.
+//
+// payload.Cap has no decision point in Go: the write gate lives in the
+// sidecar (setWriter by ticket cap), with AppendYUpdate/CompactYDocument
+// re-checking the author against current board state in real time.
 func CapFor(canWrite bool) string {
 	if canWrite {
 		return CapWrite

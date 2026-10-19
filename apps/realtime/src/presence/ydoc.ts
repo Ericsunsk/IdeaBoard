@@ -7,9 +7,6 @@
 // dropped before broadcast AND before compaction, so transient UI state never
 // reaches the update log or the snapshot.
 
-export const yDocNodesKey = 'nodes'
-export const yDocEdgesKey = 'edges'
-
 export const maxYUpdateBytes = 1 << 20
 export const maxYCompactEntries = 10_000
 

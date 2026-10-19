@@ -6,7 +6,6 @@ const OPTIONS = {
   apiInternalURL: 'http://127.0.0.1:6000',
   internalKey: 'test-internal-key',
   ticket: 'first-segment.second-segment',
-  payload: { bid: 'board-1', av: 7, uid: 'user-1' },
 }
 
 function envelope(admit: unknown): string {
@@ -27,16 +26,16 @@ function stubFetch(
 }
 
 describe('admitToRoom', () => {
-  it('admits on 200 with admit:true and sends ticket plus echo fields', async () => {
+  it('admits on 200 with admit:true and sends only the ticket', async () => {
     const seen: { url?: string; key?: string | null } = {}
     const result = await admitToRoom({ ...OPTIONS, fetchFn: stubFetch(200, envelope(true), seen) })
     assert.deepEqual(result, { admitted: true, status: 200 })
     const url = new URL(seen.url!)
     assert.equal(url.pathname, '/internal/realtime/admit')
     assert.equal(url.searchParams.get('ticket'), OPTIONS.ticket)
-    assert.equal(url.searchParams.get('bid'), 'board-1')
-    assert.equal(url.searchParams.get('uid'), 'user-1')
-    assert.equal(url.searchParams.get('av'), '7')
+    assert.equal(url.searchParams.get('bid'), null)
+    assert.equal(url.searchParams.get('uid'), null)
+    assert.equal(url.searchParams.get('av'), null)
     assert.equal(seen.key, 'test-internal-key')
   })
 

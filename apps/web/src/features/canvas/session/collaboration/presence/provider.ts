@@ -1,9 +1,7 @@
 // Y.js presence provider seam (standard yjs + y-websocket client).
 //
 // The provider hosts one shared Y.Doc per room. Presence uses `awareness`
-// only; the Canvas collaboration session mounts the frozen
-// `nodes`/`edges` shared maps on the same doc for workspace boards.
-// Viewers consume document state without committing local graph changes.
+// only. Viewers consume document state without committing local graph changes.
 // The socket is same-origin `/realtime?ticket=<ticket>` (ADR-0019): the
 // sidecar only upgrades that exact path and derives the room from the
 // ticket payload, so the stock `/<room>` suffix the provider appends is
@@ -40,7 +38,7 @@ type PresenceProviderPort = {
 
 export type PresenceProviderHandle = {
   provider: PresenceProviderPort
-  /** Shared room doc (awareness + doc-binding `nodes`/`edges` maps). */
+  /** Shared room doc for the awareness channel. */
   doc: Y.Doc
   dispose: () => void
 }

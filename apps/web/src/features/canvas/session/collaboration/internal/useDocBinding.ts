@@ -2,8 +2,9 @@ import type { BoardSnapshot } from '../../../../board/ports/canvas'
 // Live doc-binding bridge (shared Y.Doc <-> CRDT binding).
 //
 // Attaches `createDocBinding` to the presence room's shared doc when both
-// the doc and the local device id are known. The binding observes remote
-// `nodes`/`edges` maps into the canonical graph projection. Local writes are
+// the doc and the local device id are known. The collaboration session
+// mounts the `nodes`/`edges` shared maps on the same doc for workspace
+// boards. The binding observes remote `nodes`/`edges` maps into the canonical graph projection. Local writes are
 // capability guarded and origin tagged; changed ids wait through sync and
 // are cleared when the board changes.
 

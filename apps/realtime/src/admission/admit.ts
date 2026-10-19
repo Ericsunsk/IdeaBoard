@@ -3,19 +3,16 @@
 // fail-closed on any transport, non-2xx, or body outcome.
 //
 // Go contract (apps/api/internal/runtime/interfaces/http/internal_realtime.go):
-// primary query is ?ticket=<full ticket>; bid/av/uid may echo the verified
-// payload claims (they must match). Go answers 200 + {code:0, data:{admit}}
+// primary query is ?ticket=<full ticket>; Go answers 200 + {code:0, data:{admit}}
 // in every verified case, so this client branches on the admit boolean, not
 // on the HTTP status. fetchFn is injectable for tests.
 
-import type { TicketPayload } from './ticket.js'
 import { internalFetch, type InternalFetchResponse } from '../infrastructure/internalHttp.js'
 
 export type AdmitOptions = {
   apiInternalURL: string
   internalKey: string
   ticket: string
-  payload: Pick<TicketPayload, 'bid' | 'av' | 'uid'>
   timeoutMs?: number
   fetchFn?: typeof internalFetch
 }
@@ -38,9 +35,6 @@ export async function admitToRoom(options: AdmitOptions): Promise<AdmitResult> {
     return { admitted: false, status: 0 }
   }
   endpoint.searchParams.set('ticket', options.ticket)
-  endpoint.searchParams.set('bid', options.payload.bid)
-  endpoint.searchParams.set('uid', options.payload.uid)
-  endpoint.searchParams.set('av', String(options.payload.av))
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)

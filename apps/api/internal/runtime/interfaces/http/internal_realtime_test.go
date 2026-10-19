@@ -152,14 +152,11 @@ func TestInternalRealtimeAdmitTicketRoundTrip(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, `"admit":true`) {
 		t.Fatalf("admit = %d %s, want 200 admit:true", code, body)
 	}
-	// Echoed bid/av/uid matching the ticket also admits.
-	payload, err := boardrealtime.Verify(admitTestTicketSecret, ticket, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	code, body = serveAdmit(t, f.handler, admitTestInternalKey, "?ticket="+ticket+"&bid="+f.boardID+"&av="+fmt.Sprintf("%d", payload.AV)+"&uid="+uid)
+	// Extra bid/av/uid query params are ignored: only ticket is recognized.
+	// Even mismatched echoes alongside a valid ticket still admit.
+	code, body = serveAdmit(t, f.handler, admitTestInternalKey, "?ticket="+ticket+"&bid=board_mismatch&av=9999&uid=usr_mismatch")
 	if code != http.StatusOK || !strings.Contains(body, `"admit":true`) {
-		t.Fatalf("admit with echoed claims = %d %s, want 200 admit:true", code, body)
+		t.Fatalf("admit with ignored echoes = %d %s, want 200 admit:true", code, body)
 	}
 }
 

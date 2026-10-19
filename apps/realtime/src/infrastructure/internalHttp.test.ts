@@ -73,7 +73,6 @@ test('admission timeout denies a stalled real HTTP response body', { timeout: 2_
         apiInternalURL: url,
         internalKey: 'test-internal-key',
         ticket: 'test-ticket',
-        payload: { bid: 'board-1', av: 1, uid: 'user-1' },
         timeoutMs: 20,
       })
       assert.deepEqual(result, { admitted: false, status: 0 })

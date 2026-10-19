@@ -481,8 +481,6 @@ const softLocks = useSoftLocks({
   peers: presence.remotePeers,
   selectedIds: selectedElementIds,
   deviceId: presence.localClientId,
-  userId: computed(() => presenceUser.value?.id ?? ''),
-  userName: computed(() => presenceUser.value?.name ?? ''),
   canWrite: canWritePresence,
 })
 type CanvasLibraryIslandInstance = {

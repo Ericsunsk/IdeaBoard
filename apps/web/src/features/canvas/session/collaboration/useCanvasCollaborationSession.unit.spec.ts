@@ -190,13 +190,10 @@ describe('Canvas collaboration session', () => {
     doc.destroy()
   })
 
-  test('blocks edits after sharing until synchronization, then resumes after reconnect', async () => {
+  test('blocks edits until synchronization, then resumes after reconnect', async () => {
     const harness = setup()
-    harness.accessState.value = 'private'
-    expect(harness.session.isReadOnly.value).toBe(false)
-    harness.accessState.value = 'workspace'
-    expect(harness.session.isReadOnly.value).toBe(true)
     expect(harness.session.canWrite.value).toBe(false)
+    expect(harness.session.isReadOnly.value).toBe(true)
     const doc = new Y.Doc()
     harness.transport.sharedDoc.value = doc
     await nextTick()

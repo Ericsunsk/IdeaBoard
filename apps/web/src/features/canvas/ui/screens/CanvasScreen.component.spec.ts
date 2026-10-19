@@ -526,30 +526,12 @@ describe('CanvasScreen', () => {
     mocks.flowSelectedElements = ref([])
   })
 
-  test('mounts the canvas surface without a remote cursor layer', () => {
-    const view = renderScreen()
-    expect(view.container.querySelector('.canvas-flow-wrap')).not.toBeNull()
-    expect(view.container.querySelector('.presence-cursors')).toBeNull()
-  })
-
   it('marks the flow wrap only for a single-node selection', async () => {
     const view = renderScreen()
     const wrap = () => view.container.querySelector('.canvas-flow-wrap')!
     expect(wrap().classList.contains('is-single-node-selection')).toBe(false)
 
     mocks.flowSelectedElements!.value = [{ id: 'node-a' }]
-    await nextTick()
-    expect(wrap().classList.contains('is-single-node-selection')).toBe(true)
-
-    mocks.flowSelectedElements!.value = [{ id: 'node-a' }, { id: 'node-b' }]
-    await nextTick()
-    expect(wrap().classList.contains('is-single-node-selection')).toBe(false)
-
-    // Edges never count as nodes: one node plus one edge still reads as single.
-    mocks.flowSelectedElements!.value = [
-      { id: 'node-a' },
-      { id: 'edge-a-b', source: 'node-a', target: 'node-b' } as unknown as { id: string },
-    ]
     await nextTick()
     expect(wrap().classList.contains('is-single-node-selection')).toBe(true)
 

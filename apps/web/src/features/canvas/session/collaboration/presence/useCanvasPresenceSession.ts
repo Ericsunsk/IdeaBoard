@@ -150,8 +150,7 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
       // Liveness-bound peers go stale with the socket on every close.
       remotePeers.value = []
       // Permanent sidecar refusals (4401 ticket, 4403 admit) must not
-      // reconnect-loop: the kick model converges through the ticket window,
-      // and a later board/user change re-settles from the watcher.
+      // reconnect-loop: a later board/user change re-settles from the watcher.
       if (isPermanentPresenceClose(event?.code)) return
       scheduleReconnect(token)
     }

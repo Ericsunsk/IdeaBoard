@@ -24,8 +24,6 @@ function buildRemotePeer(overrides: Partial<RemotePresencePeer> = {}): RemotePre
 function buildPeer(overrides: Partial<SoftLockPeer> = {}): SoftLockPeer {
   return {
     deviceId: 41,
-    userId: 'usr_ada',
-    name: 'Ada',
     selection: ['node-1'],
     canWrite: true,
     ...overrides,
@@ -43,27 +41,23 @@ describe('soft lock selection intent', () => {
 
 describe('soft lock resolution', () => {
   test('smaller deviceId strictly wins concurrent claims', () => {
-    const locks = resolveNodeLocks([
-      buildPeer({ deviceId: 9, userId: 'usr_bob', name: 'Bob' }),
-      buildPeer({ deviceId: 3, userId: 'usr_ada', name: 'Ada' }),
-    ])
+    const locks = resolveNodeLocks([buildPeer({ deviceId: 9 }), buildPeer({ deviceId: 3 })])
     expect(locks.get('node-1')?.deviceId).toBe(3)
-    expect(locks.get('node-1')?.name).toBe('Ada')
   })
 
   test('keeps the existing owner on ties and larger incoming ids', () => {
     const locks = resolveNodeLocks([
       buildPeer({ deviceId: 5 }),
-      buildPeer({ deviceId: 5, userId: 'usr_bob', name: 'Bob' }),
-      buildPeer({ deviceId: 9, userId: 'usr_cat', name: 'Cat' }),
+      buildPeer({ deviceId: 5 }),
+      buildPeer({ deviceId: 9 }),
     ])
     expect(locks.get('node-1')?.deviceId).toBe(5)
   })
 
-  test('ignores viewers and multi-select peers', () => {
+  test('ignores empty selections and multi-select peers', () => {
     const locks = resolveNodeLocks([
-      buildPeer({ deviceId: 1, selection: ['node-9'], canWrite: false }),
-      buildPeer({ deviceId: 2, userId: 'usr_multi', name: 'Multi', selection: ['a', 'b'] }),
+      buildPeer({ deviceId: 1, selection: [] }),
+      buildPeer({ deviceId: 2, selection: ['a', 'b'] }),
     ])
     expect(locks.has('node-9')).toBe(false)
     expect(locks.size).toBe(0)
@@ -87,10 +81,7 @@ describe('soft lock resolution', () => {
     )
     expect(peer).toEqual({
       deviceId: 12,
-      userId: 'usr_bob',
-      name: 'Bob',
       selection: ['node-5'],
-      canWrite: true,
     })
     const locks = resolveNodeLocks([peer])
     expect(locks.get('node-5')?.deviceId).toBe(12)

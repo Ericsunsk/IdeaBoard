@@ -180,7 +180,9 @@ func (h *internalRealtimeHandler) CompactYDocument(c *gin.Context) {
 // renderYDocStoreError maps Y seam failures to the internal status contract:
 // capability and validation failures are permanent (4xx, the sidecar drops),
 // storage failures are retryable (503, the sidecar retries). Collaborator
-// writes never report 409: the store compacts without an expected revision.
+// writes never report 409: the store compacts without an expected revision,
+// so ErrRevisionConflict cannot occur on this path; any such anomaly (and
+// any other store failure) shares the retryable 503 default.
 func renderYDocStoreError(c *gin.Context, err error) {
 	switch err {
 	case boards.ErrInvalidInput:
@@ -191,8 +193,6 @@ func renderYDocStoreError(c *gin.Context, err error) {
 		errorrender.Render(c, http.StatusForbidden, string(contract.CodeBoardForbidden), "forbidden")
 	case boards.ErrV1Archived:
 		errorrender.Render(c, http.StatusConflict, string(contract.CodeBoardArchived), "board is archived")
-	case boards.ErrRevisionConflict:
-		response.InternalError(c, http.StatusServiceUnavailable, "board revision anomaly", err)
 	default:
 		response.InternalError(c, http.StatusServiceUnavailable, "board y-doc store unavailable", err)
 	}

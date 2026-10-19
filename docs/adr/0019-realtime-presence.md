@@ -60,3 +60,10 @@ Y 层更新不再一律丢弃——`cap=write` 连接的 SyncStep2 / Update 落 
 `apps/realtime/src/infrastructure/env.ts` 同名同值），`X-Internal-Key`
 取值统一为 `AUTH_INTERNAL_KEY`（与 API/Auth 共用同一 internal key）。
 现行名以 code schema 为准，正文旧名仅作历史记录。
+
+修订附录（2026-10-20，admit 契约）：`GET /internal/realtime/admit`
+只消费 `?ticket=<signed ticket>`，`bid/av/uid` 一律从验签后的 payload
+读取，不再发送或校验独立 echoed claims；额外 query 参数被忽略。
+缺少 ticket 返回 400；过期、篡改或当前权限不再有效的 ticket 返回
+`200 + {code: 0, data: {admit: false}}`。Sidecar 仍先本地验签，再调用
+Go 复核当前 Board 状态，并仅在 `admit === true` 时接入 room。

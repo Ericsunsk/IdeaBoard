@@ -13,16 +13,12 @@ import type { RemotePresencePeer } from '../../../session/collaboration'
 
 export type SoftLockPeer = {
   deviceId: number
-  userId: string
-  name: string
   selection: readonly string[]
   canWrite?: boolean | undefined
 }
 
 export type SoftLockOwner = {
   deviceId: number
-  userId: string
-  name: string
 }
 
 /** Single-selection lock intent: exactly one non-blank id claims, else null. */
@@ -38,19 +34,14 @@ export function getSingleSelectionLockIntent(selection: readonly string[]): stri
 
 function isWritable(peer: SoftLockPeer): boolean {
   if (peer.canWrite === false) return false
-  if (!Number.isInteger(peer.deviceId)) return false
-  if (!peer.userId.trim() || !peer.name.trim()) return false
-  return true
+  return Number.isInteger(peer.deviceId)
 }
 
 /** Map one awareness peer to its lock contender (viewer peers stay mappable). */
-export function toSoftLockPeer(peer: RemotePresencePeer, canWrite = true): SoftLockPeer {
+export function toSoftLockPeer(peer: RemotePresencePeer): SoftLockPeer {
   return {
     deviceId: peer.clientId,
-    userId: peer.state.user.id,
-    name: peer.state.user.name,
     selection: peer.state.selection.nodeIds,
-    canWrite,
   }
 }
 
@@ -69,8 +60,6 @@ export function resolveNodeLocks(peers: readonly SoftLockPeer[]): Map<string, So
     if (existing && peer.deviceId >= existing.deviceId) continue
     locks.set(intent, {
       deviceId: peer.deviceId,
-      userId: peer.userId,
-      name: peer.name,
     })
   }
   return locks

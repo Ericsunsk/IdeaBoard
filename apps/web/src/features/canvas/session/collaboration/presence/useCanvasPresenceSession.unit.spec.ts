@@ -276,7 +276,7 @@ describe('canvas presence broadcast', () => {
     mounted.scope.stop()
   })
 
-  test('syncs remote peers and drops malformed or self states', async () => {
+  test('syncs remote peers and drops self states', async () => {
     const mounted = mountPresence()
     await flushAsync()
     const fake = mounted.fakes[0]
@@ -290,10 +290,6 @@ describe('canvas presence broadcast', () => {
         selection: { nodeIds: [] },
       }),
     )
-    fake.emitRemote(9, {
-      user: { id: '' },
-      selection: { nodeIds: [] },
-    })
     expect(mounted.presence.remotePeers.value).toHaveLength(1)
     const peer = mounted.presence.remotePeers.value[0]
     expect(peer?.clientId).toBe(7)

@@ -5,7 +5,6 @@ import (
 	"crypto/subtle"
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -55,9 +54,9 @@ type internalRealtimeAdmitDTO struct {
 // gated against current board state (ticket av == current access_version,
 // board live, caller still holds board read). Expired/tampered/stale/
 // revoked/archived tickets read as admit:false (200), never 4xx, so the
-// realtime server branches on one boolean. The documented ?bid=&av=&uid=
-// fields are the ticket payload claims: when provided alongside ticket
-// they must match it (else 400). Admission always requires a signed ticket.
+// realtime server branches on one boolean. Only ticket is recognized:
+// any extra bid/av/uid query params are ignored, never validated.
+// Admission always requires a signed ticket.
 type internalRealtimeHandler struct {
 	boards       RealtimeBoardResolver
 	workspaces   RealtimeWorkspaceResolver
@@ -115,9 +114,6 @@ func (h *internalRealtimeHandler) Admit(c *gin.Context) {
 		return
 	}
 	ticket := strings.TrimSpace(c.Query("ticket"))
-	queryBID := strings.TrimSpace(c.Query("bid"))
-	queryAVRaw := strings.TrimSpace(c.Query("av"))
-	queryUID := strings.TrimSpace(c.Query("uid"))
 
 	if ticket == "" {
 		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeBadRequest), "ticket is required")
@@ -130,23 +126,6 @@ func (h *internalRealtimeHandler) Admit(c *gin.Context) {
 		// the realtime server branches on admit only.
 		response.SuccessDTO(c, internalRealtimeAdmitDTO{Admit: false})
 		return
-	}
-	// When the caller echoes the payload claims as query params they
-	// must match the verified ticket (caller bug otherwise).
-	if queryBID != "" && queryBID != payload.BID {
-		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeBadRequest), "invalid request")
-		return
-	}
-	if queryUID != "" && queryUID != payload.UID {
-		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeBadRequest), "invalid request")
-		return
-	}
-	if queryAVRaw != "" {
-		claimedAV, parseErr := strconv.ParseInt(queryAVRaw, 10, 64)
-		if parseErr != nil || claimedAV != payload.AV {
-			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeBadRequest), "invalid request")
-			return
-		}
 	}
 	admit := h.ticketAdmit(c.Request.Context(), payload)
 	response.SuccessDTO(c, internalRealtimeAdmitDTO{Admit: admit})
@@ -173,6 +152,9 @@ func (h *internalRealtimeHandler) ticketAdmit(ctx context.Context, payload board
 	if err != nil {
 		return false
 	}
+	// payload.Cap has no decision point in Go: admit gates read only.
+	// Write gating lives in the sidecar (setWriter by ticket cap) plus
+	// per-author real-time re-checks in AppendYUpdate/CompactYDocument.
 	return boards.CheckCapability(role, visible, boards.CapRead) == nil
 }
 

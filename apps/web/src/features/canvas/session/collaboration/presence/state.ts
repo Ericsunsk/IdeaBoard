@@ -115,8 +115,8 @@ function parsePresenceSelection(raw: unknown): PresenceSelectionState | null {
 
 /**
  * Validate one remote awareness state. Returns null for malformed frames
- * (dropped, never rendered). Unknown collaboration fields ride the
- * sidecar untouched; only the frontend reads them here.
+ * (dropped, never rendered). Unknown fields are dropped; only the
+ * canonical `user`/`selection` contract is read.
  */
 export function parsePresenceAwarenessState(raw: unknown): PresenceAwarenessState | null {
   if (!raw || typeof raw !== 'object') return null

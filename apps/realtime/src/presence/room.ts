@@ -32,21 +32,21 @@ type Entry = {
   failed: boolean
 }
 
+const MAX_PERSISTENCE_DEPTH = 1000
+
 export class DurableRooms {
   private readonly entries = new Map<string, Entry>()
   private readonly compactEveryUpdates: number
-  private readonly maxPersistenceDepth: number
   private closed = false
+  private compactSkippedTotal = 0
 
   constructor(
     private readonly options: {
       persistence: RoomPersistence
       compactEveryUpdates?: number
-      maxPersistenceDepth?: number
     },
   ) {
     this.compactEveryUpdates = Math.max(1, options.compactEveryUpdates ?? 50)
-    this.maxPersistenceDepth = Math.max(1, options.maxPersistenceDepth ?? 1000)
   }
 
   /** Reserve a recovered room before HTTP upgrades into a live socket. */
@@ -111,6 +111,7 @@ export class DurableRooms {
     connections: number
     ignoredDocUpdates: number
     appliedDocUpdates: number
+    compactSkippedTotal: number
   } {
     let connections = 0
     let ignoredDocUpdates = 0
@@ -120,7 +121,13 @@ export class DurableRooms {
       ignoredDocUpdates += room.ignoredDocUpdates
       appliedDocUpdates += room.appliedDocUpdates
     }
-    return { rooms: this.entries.size, connections, ignoredDocUpdates, appliedDocUpdates }
+    return {
+      rooms: this.entries.size,
+      connections,
+      ignoredDocUpdates,
+      appliedDocUpdates,
+      compactSkippedTotal: this.compactSkippedTotal,
+    }
   }
 
   /** Stop admission, drain accepted writes, and release the entire registry. */
@@ -140,7 +147,7 @@ export class DurableRooms {
   private createEntry(bid: string, ticket: string): Entry {
     const room = new PresenceRoom(bid, {
       canAcceptDocUpdate: (sender) => {
-        if (!this.closed && !entry.failed && entry.depth < this.maxPersistenceDepth) return true
+        if (!this.closed && !entry.failed && entry.depth < MAX_PERSISTENCE_DEPTH) return true
         sender.close(
           1013,
           entry.failed ? 'document persistence unavailable' : 'document persistence queue is full',
@@ -156,7 +163,6 @@ export class DurableRooms {
         // Doc. Compaction must never include a not-yet-acknowledged tail.
         let snapshot: string | null = null
         if (entry.updatesSinceCompact >= this.compactEveryUpdates) {
-          entry.updatesSinceCompact = 0
           try {
             snapshot = buildYCompactEnvelope(
               1,
@@ -166,8 +172,11 @@ export class DurableRooms {
               ),
               Y.encodeStateAsUpdate(room.doc),
             )
+            entry.updatesSinceCompact = 0
           } catch {
             // An invalid snapshot does not affect its opaque update append.
+            // Keep the counter so a later update retries compaction.
+            this.compactSkippedTotal += 1
           }
         }
         entry.pending = entry.pending

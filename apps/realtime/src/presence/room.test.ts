@@ -166,7 +166,7 @@ it('rejects a full persistence queue before applying or broadcasting the update'
   const storage = memoryPersistence()
   const blocked = deferred()
   storage.blockAppend = blocked.promise
-  const rooms = new DurableRooms({ persistence: storage.persistence, maxPersistenceDepth: 1 })
+  const rooms = new DurableRooms({ persistence: storage.persistence })
   const writer = new Y.Doc()
   try {
     const sender = socket()
@@ -179,13 +179,17 @@ it('rejects a full persistence queue before applying or broadcasting the update'
       uid: 'reader',
       canWrite: false,
     })
-    first.receive(updateFrame(writer, 'image-1'))
-    first.receive(updateFrame(writer, 'image-2'))
+    for (let i = 0; i < 1000; i += 1) {
+      first.receive(updateFrame(writer, `image-${i}`))
+    }
+    first.receive(updateFrame(writer, 'image-overflow'))
     assert.deepEqual(sender.closed, [1013])
-    assert.equal(rooms.metrics.appliedDocUpdates, 1)
+    assert.equal(rooms.metrics.appliedDocUpdates, 1000)
     assert.equal(rooms.metrics.ignoredDocUpdates, 1)
-    assert.equal(peer.sent.length, 1)
-    assert.deepEqual(Object.keys(readNodes(second)), ['image-1'])
+    assert.equal(peer.sent.length, 1000)
+    const nodes = readNodes(second)
+    assert.equal(Object.keys(nodes).length, 1000)
+    assert.equal('image-overflow' in nodes, false)
     first.close()
     second.close()
   } finally {
@@ -365,5 +369,61 @@ it('stops admissions and drains accepted writes before closing the persistence a
     blocked.resolve()
     writer.destroy()
     await rooms.close()
+  }
+})
+
+it('retries compaction after a sanitize failure without resetting the counter', async () => {
+  const seed = new Y.Doc()
+  try {
+    for (let i = 0; i < 10_001; i += 1) {
+      const key = `seed-${i}`
+      seed.getMap('nodes').set(key, { id: key, type: 'image' })
+    }
+    const snapshot = {
+      schema_version: 1,
+      payload: {
+        nodes: {},
+        edges: {},
+        y_state: Buffer.from(Y.encodeStateAsUpdate(seed)).toString('base64'),
+      },
+    }
+    const calls: string[] = []
+    const persistence: RoomPersistence = {
+      async load() {
+        return { snapshot, updates: [] }
+      },
+      async append(_bid, _update, uid) {
+        calls.push(`append:${uid}`)
+        return true
+      },
+      async compactNow(_bid, _value, uid) {
+        calls.push(`compact:${uid}`)
+        return true
+      },
+      close() {},
+    }
+    const rooms = new DurableRooms({ persistence, compactEveryUpdates: 2 })
+    const writer = new Y.Doc()
+    try {
+      const connection = (await rooms.prepare('board', 'ticket')).attach(socket(), {
+        uid: 'writer',
+        canWrite: true,
+      })
+      connection.receive(updateFrame(writer, 'extra-1'))
+      connection.receive(updateFrame(writer, 'extra-2'))
+      connection.receive(updateFrame(writer, 'extra-3'))
+      // Both attempts past the threshold fail closed on the entry budget and
+      // keep the counter so the next update retries instead of waiting.
+      assert.equal(rooms.metrics.compactSkippedTotal, 2)
+      connection.close()
+      await rooms.close()
+      assert.deepEqual(calls, ['append:writer', 'append:writer', 'append:writer'])
+      assert.equal(rooms.metrics.compactSkippedTotal, 2)
+    } finally {
+      writer.destroy()
+      await rooms.close()
+    }
+  } finally {
+    seed.destroy()
   }
 })

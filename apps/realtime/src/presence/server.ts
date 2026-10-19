@@ -38,7 +38,6 @@ export type RealtimeServerConfig = {
   ticketSecret: string
   internalKey: string
   apiInternalURL: string
-  admitTimeoutMs?: number
   /** Applied updates per room between compaction posts. Defaults to 50. */
   compactEveryUpdates?: number
   /** Persist retry budget. Defaults to 5. */
@@ -145,8 +144,6 @@ export function createRealtimeServer(config: RealtimeServerConfig): {
       apiInternalURL: config.apiInternalURL,
       internalKey: config.internalKey,
       ticket,
-      payload: verified.payload,
-      timeoutMs: config.admitTimeoutMs,
       fetchFn: config.fetchFn,
     })
     if (!admit.admitted) {

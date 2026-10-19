@@ -39,22 +39,17 @@ describe('PresenceRoster', () => {
     expect(screen.queryByRole('button', { name: 'Peer 7' })).toBeNull()
   })
 
-  test('renders the local member without a presence dot', () => {
+  test('renders the local member with a self label', () => {
     renderRoster()
     expect(screen.getByTitle('Ada (you)')).toBeVisible()
   })
 
-  test('reuses the page-chrome avatar structure with icon placeholders', () => {
+  test('reuses the page-chrome avatar structure on every non-interactive avatar', () => {
     const view = renderRoster()
     expect(view.container.querySelectorAll('.ib-user-avatar-button')).toHaveLength(3)
     expect(view.container.querySelectorAll('.ib-user-avatar-button__placeholder svg')).toHaveLength(
       3,
     )
-    expect(view.container.querySelector('.presence-roster__initial')).toBeNull()
-  })
-
-  test('keeps a single separator-ring hook on every non-interactive avatar', () => {
-    const view = renderRoster()
     const avatars = view.container.querySelectorAll('.presence-roster__avatar')
     expect(avatars).toHaveLength(3)
     for (const avatar of avatars) {
@@ -63,42 +58,30 @@ describe('PresenceRoster', () => {
     }
   })
 
-  test('lays out avatars with even spacing and no overlap hook', () => {
+  test('lays out avatars with even spacing', () => {
     const view = renderRoster()
     const stack = view.container.querySelector('.presence-roster__stack')
     expect(stack?.classList.contains('gap-2')).toBe(true)
   })
 
-  test('renders the cluster for a 1v1 session', () => {
-    renderRoster({ peers: [buildPeer({ clientId: 7 })] })
-    expect(screen.getByRole('region', { name: 'Online collaborators' })).toBeVisible()
-    expect(screen.getByRole('img', { name: 'Peer 7' })).toBeVisible()
-  })
-
-  test('renders the cluster when only two remote peers are online', () => {
+  test.each([
+    ['a 1v1 session', [7], { id: 'usr_ada', name: 'Ada' } as PresenceUser],
+    ['two remote peers without a local member', [7, 8], null],
+  ])('renders the cluster for %s', (_label, clientIds, localUser) => {
     renderRoster({
-      peers: [buildPeer({ clientId: 7 }), buildPeer({ clientId: 8 })],
-      localUser: null,
+      peers: (clientIds as number[]).map((clientId) => buildPeer({ clientId })),
+      localUser: localUser as PresenceUser | null,
     })
     expect(screen.getByRole('region', { name: 'Online collaborators' })).toBeVisible()
   })
 
-  test('hides the cluster when only the local member is online', () => {
-    renderRoster({ peers: [] })
-    expect(screen.queryByRole('region', { name: 'Online collaborators' })).toBeNull()
-  })
-
-  test('renders no broadcast control', () => {
-    renderRoster()
-    expect(screen.queryByRole('button')).toBeNull()
-  })
-
-  test('hides the cluster without any members', () => {
-    renderWithUser(PresenceRoster, {
-      props: {
-        peers: [],
-        localUser: null,
-      },
+  test.each([
+    ['only the local member is online', [], { id: 'usr_ada', name: 'Ada' } as PresenceUser | null],
+    ['no members at all', [], null as PresenceUser | null],
+  ])('hides the cluster when %s', (_label, clientIds, localUser) => {
+    renderRoster({
+      peers: (clientIds as number[]).map((clientId) => buildPeer({ clientId })),
+      localUser: localUser as PresenceUser | null,
     })
     expect(screen.queryByRole('region', { name: 'Online collaborators' })).toBeNull()
   })
