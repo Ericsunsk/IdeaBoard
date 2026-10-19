@@ -141,7 +141,7 @@ export default {
   },
   presence: {
     rosterLabel: 'Colaboradores en línea',
-    selfLabel: '{name} (tú)',
+    editingLabel: '{name} · Editando',
   },
   contextMenu: {
     label: 'Acciones de nodos del lienzo',

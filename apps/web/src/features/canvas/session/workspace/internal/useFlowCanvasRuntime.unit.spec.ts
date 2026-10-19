@@ -628,6 +628,12 @@ describe('useFlowCanvasRuntime', () => {
   it('projects collaboration through canonical commits without snapshot autosave or remote echo', async () => {
     const doc = new Y.Doc()
     const initial = createSnapshot()
+    initial.imageNodes[0] = {
+      ...initial.imageNodes[0]!,
+      outputStatus: 'running',
+      pendingTaskId: 'task-activity',
+      pendingClientActionId: 'action-activity',
+    }
     const scope = effectScope()
     const transport = {
       sharedDoc: shallowRef<Y.Doc | null>(null),
@@ -649,8 +655,15 @@ describe('useFlowCanvasRuntime', () => {
     transport.isDocSynced.value = true
     collaboration.syncSnapshot(initial, ['image-1', 'prompt-1', 'prompt-2'], ['connection-3'])
     await harness.runtime.persistence.loadInitialOrRouteBoard()
+    collaboration.activity.clear()
     const store = harness.runtime.graphEditing.readCanvasGraphStore()
+    // Hydration, unchanged writes and selection stay outside the editing signal.
+    expect(collaboration.activity.isEditing.value).toBe(false)
+    store.beginTransaction('node-update').updateNode('prompt-1', { x: 400 }).commit()
+    await harness.applyNativeNodeChanges([{ type: 'select', id: 'prompt-1', selected: true }])
+    expect(collaboration.activity.isEditing.value).toBe(false)
     store.beginTransaction('node-update').updateNode('prompt-1', { x: 777 }).commit()
+    expect(collaboration.activity.isEditing.value).toBe(true)
     await harness.flushNativeGraphChanges()
     expect(onLocalSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -665,7 +678,14 @@ describe('useFlowCanvasRuntime', () => {
     })
     await harness.runtime.persistence.flushAutosave()
     expect(harness.savedSnapshots).toEqual([])
+    collaboration.activity.clear()
+    harness.runtime.persistence.history.undo()
+    expect(collaboration.activity.isEditing.value).toBe(true)
+    collaboration.activity.clear()
+    harness.runtime.persistence.history.redo()
+    expect(collaboration.activity.isEditing.value).toBe(true)
     onLocalSnapshot.mockClear()
+    collaboration.activity.clear()
     const remotePrompt = doc
       .getMap<{ position: { x: number; y: number } }>('nodes')
       .get('prompt-1')!
@@ -678,6 +698,29 @@ describe('useFlowCanvasRuntime', () => {
     expect(store.exportSnapshot().promptNodes[0]?.x).toBe(888)
     expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position.x).toBe(888)
     expect(onLocalSnapshot).not.toHaveBeenCalled()
+    expect(collaboration.activity.isEditing.value).toBe(false)
+    const lease = harness.executionCore.captureActiveLeases(['image-1'])[0]!
+    expect(lease).toBeDefined()
+    const completion = harness.executionCore.materializeBatch([
+      { lease, result: { url: 'https://example.com/automatic-result.png', ratio: 1 } },
+    ])
+    expect(completion.didChange).toBe(true)
+    expect(onLocalSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        imageNodes: expect.arrayContaining([
+          expect.objectContaining({ sourceImageUrl: 'https://example.com/automatic-result.png' }),
+        ]),
+      }),
+      ['image-1'],
+      [],
+    )
+    expect(collaboration.activity.isEditing.value).toBe(false)
+    // A real manual edit without undo history still has user attribution.
+    store
+      .beginTransaction('node-update', { shouldRecordHistory: false })
+      .updateNode('prompt-1', { text: 'manual edit without history' })
+      .commit()
+    expect(collaboration.activity.isEditing.value).toBe(true)
     scope.stop()
     doc.destroy()
   })

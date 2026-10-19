@@ -32,6 +32,7 @@ type CanvasGraphSessionRuntimeOptions = {
   onLocalSnapshot?:
     | ((snapshot: BoardSnapshot, nodeIds: readonly string[], edgeIds: readonly string[]) => void)
     | undefined
+  onLocalEdit?: (() => void) | undefined
   canWriteGraph?: (() => boolean) | undefined
 }
 
@@ -152,6 +153,7 @@ export function createCanvasGraphSessionRuntime(
       if (session !== graphSession || session.boardId !== options.boardSession.currentBoardId.value)
         return
       if (event.sideEffects.shouldMarkDirty) {
+        if (event.summary.origin === 'user') options.onLocalEdit?.()
         options.onLocalSnapshot?.(
           session.exportSnapshot(options.boardBaseSnapshot.value),
           [

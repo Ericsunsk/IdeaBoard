@@ -16,6 +16,7 @@ import {
   type CanvasGraphNodeRecord,
   type CanvasGraphReadPort,
   type CanvasGraphStore,
+  type CanvasGraphTransactionOptions,
 } from '../../../core/graph'
 import type { MediaRef } from '../../../../../core/media/mediaRef'
 import { createPrefixedId } from '../../../../../core/utils/ids'
@@ -44,7 +45,7 @@ type UseFlowMediaInputImagesOptions = {
   updateSnapshotNodeBase: (
     nodeId: string,
     mutate: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
-    options?: { shouldRecordHistory?: boolean; shouldMarkDirty?: boolean },
+    options?: CanvasGraphTransactionOptions,
   ) => void
   readCanvasGraphStore: () => CanvasGraphReadPort
   writeCanvasGraphStore?: () => CanvasGraphStore
@@ -215,7 +216,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
             ? snapshotNode
             : { ...snapshotNode, inputImages: nextImages }
         },
-        { shouldRecordHistory: false, shouldMarkDirty: true },
+        { origin: 'system', shouldRecordHistory: false, shouldMarkDirty: true },
       )
     })
   }

@@ -258,7 +258,7 @@ function useGraphEditingLibraryImport(
       nodeMutations.updateSnapshotNode(
         nodeId,
         (snapshot) => (snapshot.type === 'image-node' ? mutate(snapshot) : snapshot),
-        { shouldRecordHistory: false },
+        { origin: 'system', shouldRecordHistory: false },
       ),
     createImageNodeAtPosition: (x, y, initialSnapshotPatch) =>
       nodeMutations.createNodeAtPosition('image', x, y, initialSnapshotPatch),

@@ -132,7 +132,7 @@ export default {
   },
   presence: {
     rosterLabel: '在线协作者',
-    selfLabel: '{name}（你）',
+    editingLabel: '{name} · 正在编辑',
   },
   contextMenu: {
     label: '画布节点操作',

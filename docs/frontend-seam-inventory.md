@@ -18984,6 +18984,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasScreenSurfaceInteractions.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
           "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "type-only"
@@ -19014,9 +19019,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 11,
+      "measuredFanIn": 12,
       "measuredFanOut": 7,
-      "targetFanIn": 11,
+      "targetFanIn": 12,
       "targetFanOut": 7,
       "ownershipScope": ["src/features/canvas/session/collaboration/"],
       "publicExports": [
@@ -23565,7 +23570,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/core/nodes/imageActions.ts`                             | canonical | canvas        | 1       | 7 → 7                    | 1 → 1                     |
 | `src/features/canvas/core/nodes/serviceLabelKey.ts`                          | canonical | canvas        | 1       | 5 → 5                    | 1 → 1                     |
 | `src/features/canvas/session/board-session/index.ts`                         | canonical | canvas        | 14      | 10 → 10                  | 20 → 20                   |
-| `src/features/canvas/session/collaboration/index.ts`                         | canonical | canvas        | 6       | 11 → 11                  | 7 → 7                     |
+| `src/features/canvas/session/collaboration/index.ts`                         | canonical | canvas        | 6       | 12 → 12                  | 7 → 7                     |
 | `src/features/canvas/session/execution/board-attachment/index.ts`            | canonical | canvas        | 2       | 13 → 13                  | 0 → 0                     |
 | `src/features/canvas/session/execution/index.ts`                             | canonical | canvas        | 64      | 31 → 31                  | 47 → 47                   |
 | `src/features/canvas/session/execution/pending-execution/core.ts`            | canonical | canvas        | 17      | 14 → 14                  | 7 → 7                     |

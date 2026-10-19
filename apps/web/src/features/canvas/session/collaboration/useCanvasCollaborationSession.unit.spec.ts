@@ -228,3 +228,27 @@ describe('Canvas collaboration session', () => {
     harness.scope.stop()
   })
 })
+
+test('clears activity on board switch, downgrade, and readiness loss', async () => {
+  const harness = setup()
+  const doc = new Y.Doc()
+  harness.transport.sharedDoc.value = doc
+  await nextTick()
+  harness.transport.isDocSynced.value = true
+  const activity = harness.session.activity
+  activity.begin('drag')
+  expect(activity.isEditing.value).toBe(true)
+  harness.boardId.value = 'board-b'
+  expect(activity.isEditing.value).toBe(false)
+  activity.begin('drag')
+  harness.canWrite.value = false
+  expect(activity.isEditing.value).toBe(false)
+  activity.recordEdit()
+  expect(activity.isEditing.value).toBe(false)
+  harness.canWrite.value = true
+  activity.recordEdit()
+  harness.transport.isDocSynced.value = false
+  expect(activity.isEditing.value).toBe(false)
+  harness.scope.stop()
+  doc.destroy()
+})

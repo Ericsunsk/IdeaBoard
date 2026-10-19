@@ -2,6 +2,8 @@ import { computed, onScopeDispose, ref, toValue, watch, type MaybeRefOrGetter, t
 import type * as Y from 'yjs'
 import type { BoardSnapshot } from '../../../board/ports/canvas'
 import { useDocBinding } from './internal/useDocBinding'
+import { useMemberActivity } from './internal/useMemberActivity'
+import type { PresenceActivity } from './presence/state'
 
 type BoardContext = {
   boardId: MaybeRefOrGetter<string | null | undefined>
@@ -16,6 +18,7 @@ type CollaborationTransport = {
 }
 
 type TransportContext = {
+  activity: Ref<PresenceActivity | null>
   boardId: Ref<string | null>
   accessState: Ref<string | null>
   canWrite: Ref<boolean>
@@ -30,7 +33,13 @@ export function useCanvasCollaborationSession<T extends CollaborationTransport>(
   const boardId = ref<string | null>(null)
   const accessState = ref<string | null>(null)
   const hasWriteCapability = ref(false)
-  const transport = options.createTransport({ boardId, accessState, canWrite: hasWriteCapability })
+  const activityState = ref<PresenceActivity | null>(null)
+  const transport = options.createTransport({
+    boardId,
+    accessState,
+    canWrite: hasWriteCapability,
+    activity: activityState,
+  })
   const isEnabled = computed(() => accessState.value === 'workspace' && !!boardId.value)
   // Shared Boards have one persistence path. Until the room is ready,
   // local edits would exist only in memory and disappear on leave/reload.
@@ -42,6 +51,7 @@ export function useCanvasCollaborationSession<T extends CollaborationTransport>(
       transport.sharedDoc.value !== null &&
       transport.localClientId.value !== null,
   )
+  const activity = useMemberActivity({ isEnabled: canWrite, state: activityState })
   const isReadOnly = computed(() => isEnabled.value && !canWrite.value)
   const binding = useDocBinding({
     boardId,
@@ -79,6 +89,7 @@ export function useCanvasCollaborationSession<T extends CollaborationTransport>(
           toValue(context.canWrite),
         ] as const,
       ([id, access, canWriteBoard]) => {
+        if (boardId.value !== (id ?? null)) activity.clear()
         boardId.value = id ?? null
         accessState.value = access ?? null
         hasWriteCapability.value = canWriteBoard
@@ -113,6 +124,7 @@ export function useCanvasCollaborationSession<T extends CollaborationTransport>(
     bindBoard,
     attachGraph,
     detachGraph,
+    activity,
     syncSnapshot: binding.syncSnapshot,
   }
 }

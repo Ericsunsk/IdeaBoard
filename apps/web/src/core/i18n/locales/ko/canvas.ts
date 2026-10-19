@@ -138,7 +138,7 @@ export default {
   },
   presence: {
     rosterLabel: '온라인 공동 작업자',
-    selfLabel: '{name} (나)',
+    editingLabel: '{name} · 편집 중',
   },
   contextMenu: {
     label: '캔버스 노드 작업',

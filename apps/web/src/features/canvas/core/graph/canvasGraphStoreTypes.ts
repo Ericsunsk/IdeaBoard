@@ -151,6 +151,7 @@ export type CanvasGraphCommitEvent = Readonly<{
 export type CanvasGraphPatchDirection = 'forward' | 'backward'
 
 export type CanvasGraphTransactionSummary = {
+  origin: 'user' | 'system'
   id: string
   reason: CanvasGraphTransactionReason
   didChange: boolean
@@ -171,6 +172,8 @@ export type CanvasGraphTransactionSummary = {
 }
 
 export type CanvasGraphTransactionOptions = {
+  /** Attribution is independent of persistence and undo/history policy. */
+  origin?: 'user' | 'system'
   shouldRecordHistory?: boolean
   shouldMarkDirty?: boolean
 }

@@ -10,6 +10,7 @@ import {
   type CanvasVueFlowAdapter,
 } from '../../../session/flow-adapter'
 import { useCanvasGroupPresentationInteraction } from '../../nodes/groups'
+import type { CanvasCollaborationSession } from '../../../session/collaboration'
 import type { CanvasWorkspaceRuntime } from '../../../session/workspace'
 import { useCanvasNodeContextMenu } from '../useCanvasNodeContextMenu'
 import type { useFlowActiveNodePanels } from '../useFlowActiveNodePanels'
@@ -29,6 +30,7 @@ export type CanvasScreenLibrarySaveBridge = {
 
 type CanvasScreenSurfaceInteractionOptions = {
   workspace: CanvasWorkspaceRuntime
+  activity?: Pick<CanvasCollaborationSession['activity'], 'begin' | 'end'>
   flowPaneAdapter: CanvasVueFlowAdapter
   canvasWrapRef: Ref<HTMLElement | null>
   activeTool: Ref<'select' | 'hand'>
@@ -97,8 +99,50 @@ function useScreenGrouping(
       frames: viewModel.graphEditing.grouping.groupFrames,
       action: viewModel.graphEditing.grouping.selectionGroupAction,
       selectAtPoint: commands.graphEditing.grouping.selectGroupAtPoint,
-      drag: commands.graphEditing.grouping.groupDrag,
-      resize: commands.graphEditing.grouping.groupResize,
+      drag: {
+        ...commands.graphEditing.grouping.groupDrag,
+        begin: (...args) => {
+          const isStarted = commands.graphEditing.grouping.groupDrag.begin(...args)
+          if (isStarted) options.activity?.begin('groupDrag')
+          return isStarted
+        },
+        commit: () => {
+          try {
+            return commands.graphEditing.grouping.groupDrag.commit()
+          } finally {
+            options.activity?.end('groupDrag')
+          }
+        },
+        cancel: () => {
+          try {
+            return commands.graphEditing.grouping.groupDrag.cancel()
+          } finally {
+            options.activity?.end('groupDrag')
+          }
+        },
+      },
+      resize: {
+        ...commands.graphEditing.grouping.groupResize,
+        begin: (...args) => {
+          const isStarted = commands.graphEditing.grouping.groupResize.begin(...args)
+          if (isStarted) options.activity?.begin('groupResize')
+          return isStarted
+        },
+        commit: () => {
+          try {
+            return commands.graphEditing.grouping.groupResize.commit()
+          } finally {
+            options.activity?.end('groupResize')
+          }
+        },
+        cancel: () => {
+          try {
+            return commands.graphEditing.grouping.groupResize.cancel()
+          } finally {
+            options.activity?.end('groupResize')
+          }
+        },
+      },
       onAction: performSelectionGroupAction,
     },
     pane: {
@@ -132,9 +176,24 @@ function useScreenNodeDragInteractions(
       })
     : null
   const dragInteractions = useFlowNodeDragInteractions({
-    beginNodeDragTransaction: commands.flowPane.nodeDragTransactions.begin,
-    commitNodeDragTransaction: commands.flowPane.nodeDragTransactions.commit,
-    finishNodeDragAsLibrarySave: commands.flowPane.nodeDragTransactions.finishAsLibrarySave,
+    beginNodeDragTransaction: (nodeIds) => {
+      commands.flowPane.nodeDragTransactions.begin(nodeIds)
+      if (commands.flowPane.nodeDragTransactions.isActive()) options.activity?.begin('nodeDrag')
+    },
+    commitNodeDragTransaction: () => {
+      try {
+        commands.flowPane.nodeDragTransactions.commit()
+      } finally {
+        options.activity?.end('nodeDrag')
+      }
+    },
+    finishNodeDragAsLibrarySave: () => {
+      try {
+        commands.flowPane.nodeDragTransactions.finishAsLibrarySave()
+      } finally {
+        options.activity?.end('nodeDrag')
+      }
+    },
     isDuplicateModifierPressed: options.isDuplicateModifierPressed,
     beginFlowNodeDragDuplicateTracking: commands.graphEditing.beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking: commands.graphEditing.finishFlowNodeDragDuplicateTracking,

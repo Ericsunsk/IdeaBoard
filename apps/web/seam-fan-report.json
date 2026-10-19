@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "4a8a75cb715f10f9e8ce0ee80ec9346de7918f6c",
+  "checkpointSha": "ee9332bc5d5c8d8c46fc6377b27c45f52bde6070",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -29645,6 +29645,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasScreenSurfaceInteractions.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
           "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "type-only"
@@ -29675,7 +29680,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 11,
+      "fanIn": 12,
       "fanOut": 7,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
@@ -29751,6 +29756,21 @@
           "from": "src/features/canvas/session/collaboration/internal/useDocBinding.unit.spec.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/useMemberActivity.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/useMemberActivity.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/useMemberActivity.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/collaboration/presence/provider.ts",
@@ -29867,7 +29887,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 11,
+      "targetFanIn": 12,
       "targetFanOut": 7,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -40229,6 +40249,11 @@
         {
           "from": "src/features/canvas/ui/screens/internal/useCanvasScreenSurfaceInteractions.ts",
           "to": "src/features/board/ports/canvas.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/internal/useCanvasScreenSurfaceInteractions.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "type-only"
         },
         {

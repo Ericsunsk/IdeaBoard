@@ -15,6 +15,8 @@ import {
   EVENT_STREAM_RECONNECT_MAX_DELAY_MS,
 } from '../../../../../core/config/timing'
 import {
+  PRESENCE_ACTIVITY_LEASE_MS,
+  type PresenceActivity,
   isPermanentPresenceClose,
   parsePresenceAwarenessState,
   parseSelectionIds,
@@ -43,6 +45,7 @@ type CanvasPresenceSessionOptions = {
   localUser?: Ref<PresenceUser | null> | undefined
   /** Whether this client may write (editors true, viewers false). */
   canWrite?: MaybeRefOrGetter<boolean> | undefined
+  activity?: Ref<PresenceActivity | null>
   selectedIds: MaybeRefOrGetter<readonly string[]>
   deps?: CanvasPresenceDeps | undefined
 }
@@ -79,8 +82,11 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
   const requestTicket = options.deps?.requestTicket ?? requestBoardRealtimeTicket
   const createProvider = options.deps?.createProvider ?? createYPresenceProvider
 
+  const activityLeases = new Map<number, { sequence: number; expiresAt: number }>()
+  let activityExpiryTimer: ReturnType<typeof setTimeout> | undefined
   let handle: PresenceProviderHandle | null = null
   let detachProviderListeners: (() => void) | null = null
+  let isConnectionClosed = false
   let connectToken = 0
   let isDisposed = false
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -99,6 +105,9 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
 
   function teardown(): void {
     clearReconnectTimer()
+    clearTimeout(activityExpiryTimer)
+    activityLeases.clear()
+    if (options.activity) options.activity.value = null
     detachProviderListeners?.()
     detachProviderListeners = null
     handle?.dispose()
@@ -121,23 +130,64 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
     handle.provider.awareness.setLocalState({
       user: buildBroadcastUser(user),
       selection: { nodeIds: selectionIds },
+      ...(options.activity?.value && toValue(options.canWrite ?? true) && isDocSynced.value
+        ? { activity: options.activity.value }
+        : {}),
     })
+  }
+
+  function readActivityLease(
+    clientId: number,
+    activity: PresenceActivity | null | undefined,
+    now: number,
+  ) {
+    if (!activity) {
+      activityLeases.delete(clientId)
+      return null
+    }
+    let lease = activityLeases.get(clientId)
+    if (activity.sequence !== lease?.sequence) {
+      lease = { sequence: activity.sequence, expiresAt: now + PRESENCE_ACTIVITY_LEASE_MS }
+      activityLeases.set(clientId, lease)
+    }
+    return lease ?? null
   }
 
   function onAwarenessChange(): void {
     const awareness = handle?.provider.awareness
-    if (!awareness) return
+    if (!awareness || isConnectionClosed) return
     const selfId = awareness.clientID
+    clearTimeout(activityExpiryTimer)
+    const now = performance.now()
+    let nextExpiry = Infinity
+    const present = new Set<number>()
     const peers: RemotePresencePeer[] = []
     for (const [clientId, raw] of awareness.getStates()) {
       if (clientId === selfId) continue
       const state = parsePresenceAwarenessState(raw)
-      if (state) peers.push({ clientId, state })
+      if (!state) continue
+      present.add(clientId)
+      const lease = readActivityLease(clientId, state.activity, now)
+      const isEditing = lease !== null && lease.expiresAt > now
+      if (isEditing) nextExpiry = Math.min(nextExpiry, lease!.expiresAt)
+      peers.push({ clientId, state, ...(isEditing ? { isEditing: true } : {}) })
     }
+    for (const clientId of activityLeases.keys()) {
+      if (!present.has(clientId)) activityLeases.delete(clientId)
+    }
+    if (Number.isFinite(nextExpiry))
+      activityExpiryTimer = setTimeout(onAwarenessChange, nextExpiry - now)
     remotePeers.value = peers
   }
 
   function onProviderStatus(status: string): void {
+    if (status === 'disconnected') {
+      isConnectionClosed = true
+      isDocSynced.value = false
+      clearTimeout(activityExpiryTimer)
+      activityLeases.clear()
+      remotePeers.value = []
+    }
     if (status === 'connected') {
       reconnectDelayMs = EVENT_STREAM_RECONNECT_INITIAL_DELAY_MS
       return
@@ -146,7 +196,11 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
 
   function onConnectionClose(token: number): (event: PresenceCloseEvent) => void {
     return (event) => {
+      isConnectionClosed = true
       isDocSynced.value = false
+      if (options.activity) options.activity.value = null
+      clearTimeout(activityExpiryTimer)
+      activityLeases.clear()
       // Liveness-bound peers go stale with the socket on every close.
       remotePeers.value = []
       // Permanent sidecar refusals (4401 ticket, 4403 admit) must not
@@ -175,6 +229,7 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
 
   function attachProvider(token: number, next: PresenceProviderHandle): void {
     handle = next
+    isConnectionClosed = false
     const awareness = next.provider.awareness
     localClientId.value = awareness.clientID
     sharedDoc.value = next.doc ?? null
@@ -239,6 +294,9 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
       options.accessState?.value,
       options.workspaceId?.value,
       options.localUser?.value,
+      // Ticket capability is fixed when the socket is admitted. Awareness
+      // alone cannot promote a read connection into a document writer.
+      toValue(options.canWrite ?? true),
     ],
     settle,
     { immediate: true },
@@ -248,6 +306,8 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
   watch(() => [toValue(options.selectedIds), toValue(options.canWrite ?? true)], publishSnapshot, {
     deep: true,
   })
+
+  watch(() => options.activity?.value, publishSnapshot, { flush: 'sync' })
 
   onScopeDispose(() => {
     isDisposed = true

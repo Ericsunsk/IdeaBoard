@@ -71,6 +71,7 @@ function createDraft(base: CanvasGraphStoreState): CanvasGraphTransactionDraft {
 }
 
 const RECORD_HISTORY: Required<CanvasGraphTransactionOptions> = {
+  origin: 'user',
   shouldRecordHistory: true,
   shouldMarkDirty: true,
 }
@@ -96,6 +97,7 @@ describe('canvasGraphHistoryProjection', () => {
       didChange: true,
       hasDomainChanges: true,
       changedNodeIds: [promptId],
+      origin: 'user',
       shouldRecordHistory: true,
       shouldMarkDirty: true,
     })
@@ -166,7 +168,7 @@ describe('canvasGraphHistoryProjection', () => {
 
     const materialized = createSummary(
       'result-materialize',
-      { shouldRecordHistory: false, shouldMarkDirty: true },
+      { origin: 'system', shouldRecordHistory: false, shouldMarkDirty: true },
       base,
       changes,
       draft,
@@ -176,7 +178,7 @@ describe('canvasGraphHistoryProjection', () => {
 
     const silent = createSummary(
       'node-update',
-      { shouldRecordHistory: false, shouldMarkDirty: false },
+      { origin: 'system', shouldRecordHistory: false, shouldMarkDirty: false },
       base,
       changes,
       draft,

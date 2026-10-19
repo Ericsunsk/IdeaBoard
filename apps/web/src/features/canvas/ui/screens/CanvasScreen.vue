@@ -315,7 +315,10 @@ watch(
   connectionStartHandle,
   (handle) => {
     handleProximitySurface.setSuspended(handle !== null)
-    if (handle === null) connectionDropLifecycle.cancel()
+    if (handle === null) {
+      connectionDropLifecycle.cancel()
+      collaboration.activity.end('connect')
+    } else collaboration.activity.begin('connect')
   },
   { immediate: true, flush: 'sync' },
 )
@@ -491,6 +494,7 @@ type CanvasLibraryIslandInstance = {
 const canvasLibraryIslandRef = ref<CanvasLibraryIslandInstance>(null)
 const surface = useCanvasScreenSurfaceInteractions({
   workspace,
+  activity: collaboration.activity,
   flowPaneAdapter,
   canvasWrapRef,
   activeTool,

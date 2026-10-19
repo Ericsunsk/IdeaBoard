@@ -13,6 +13,7 @@ import {
   type CanvasGraphNodeId,
   type CanvasGraphNodeIdForKind,
   type CanvasGraphStore,
+  type CanvasGraphTransactionOptions,
 } from '../../../core/graph'
 import {
   getCanvasNodePortInputLimit,
@@ -31,11 +32,6 @@ type UseFlowNodeMutationsOptions = {
   readCanvasGraphStore: () => CanvasGraphStore
   graphAdapter: CanvasVueFlowGraphAdapter
   onWarning: (message: string) => void
-}
-
-type UpdateSnapshotNodeOptions = {
-  shouldRecordHistory?: boolean
-  shouldMarkDirty?: boolean
 }
 
 type InitialSnapshotPatch<T extends CanvasCreatableNodeKind> = Partial<CanvasNodeItemByKind[T]>
@@ -204,7 +200,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   function updateSnapshotNode(
     nodeId: string,
     patcher: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
-    mutationOptions: UpdateSnapshotNodeOptions = {},
+    mutationOptions: CanvasGraphTransactionOptions = {},
   ) {
     const node = (options.nodes.value as Node[]).find((item) => item.id === nodeId)
     const graphNodeId = isCanvasGraphNodeId(nodeId) ? nodeId : null
@@ -216,6 +212,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const nextSnapshotNode = patcher(snapshotNode)
     if (nextSnapshotNode === snapshotNode) return
     const transaction = store.beginTransaction('node-update', {
+      origin: mutationOptions.origin ?? 'user',
       shouldRecordHistory: mutationOptions.shouldRecordHistory ?? true,
       shouldMarkDirty: mutationOptions.shouldMarkDirty ?? true,
     })

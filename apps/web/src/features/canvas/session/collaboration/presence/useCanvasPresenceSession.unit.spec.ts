@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { effectScope, ref } from 'vue'
+import { effectScope, nextTick, ref } from 'vue'
 import type * as Y from 'yjs'
 import {
   EVENT_STREAM_RECONNECT_BACKOFF_FACTOR,
   EVENT_STREAM_RECONNECT_INITIAL_DELAY_MS,
 } from '../../../../../core/config/timing'
-import type { PresenceAwarenessState, PresenceUser } from './state'
+import type { PresenceActivity, PresenceAwarenessState, PresenceUser } from './state'
 import { useCanvasPresenceSession } from './useCanvasPresenceSession'
 import type {
   PresenceCloseEvent,
@@ -135,6 +135,7 @@ function mountPresence(input?: {
   const localUser = ref<PresenceUser | null>(buildLocalUser())
   const canWrite = ref<boolean>(input?.canWrite ?? true)
   const selectedIds = ref<string[]>([])
+  const activity = ref<PresenceActivity | null>(null)
   const scope = effectScope()
   const presence = scope.run(() =>
     useCanvasPresenceSession({
@@ -144,6 +145,7 @@ function mountPresence(input?: {
       localUser,
       canWrite,
       selectedIds,
+      activity,
       deps: { requestTicket: ticketFn, createProvider: providerFn },
     }),
   )
@@ -159,6 +161,7 @@ function mountPresence(input?: {
     localUser,
     canWrite,
     selectedIds,
+    activity,
   }
 }
 
@@ -224,6 +227,50 @@ describe('canvas presence connection gate', () => {
     expect(mounted.ticketFn).toHaveBeenCalledTimes(1)
   })
 
+  test.each([false, true])(
+    're-signs the ticket and waits for room sync when write capability changes from %s',
+    async (canWriteInitially) => {
+      const mounted = mountPresence({ canWrite: canWriteInitially })
+      await flushAsync()
+      const previous = mounted.fakes[0]!
+      previous.emitRemote(7, buildRemoteState())
+      expect(mounted.presence.remotePeers.value).toHaveLength(1)
+
+      let resolveTicket!: (ticket: string) => void
+      mounted.ticketFn.mockImplementationOnce(
+        () => new Promise<string>((resolve) => (resolveTicket = resolve)),
+      )
+      const replacement = buildFakePresence()
+      vi.mocked(mounted.providerFn).mockImplementationOnce(async () => {
+        mounted.fakes.push(replacement)
+        return {
+          ...replacement.handle,
+          provider: { ...replacement.handle.provider, isSynced: false },
+        }
+      })
+      mounted.canWrite.value = !canWriteInitially
+      await nextTick()
+
+      expect(previous.getIsDisposed()).toBe(true)
+      expect(mounted.ticketFn).toHaveBeenCalledTimes(2)
+      expect(mounted.presence.isDocSynced.value).toBe(false)
+      expect(mounted.presence.localClientId.value).toBeNull()
+      expect(mounted.presence.remotePeers.value).toEqual([])
+      previous.emitSync(true)
+      expect(mounted.presence.isDocSynced.value).toBe(false)
+
+      resolveTicket('renewed-capability-ticket')
+      await flushAsync()
+      expect(mounted.providerFn).toHaveBeenLastCalledWith(
+        expect.objectContaining({ ticket: 'renewed-capability-ticket', room: 'board-1' }),
+      )
+      expect(mounted.presence.isDocSynced.value).toBe(false)
+      replacement.emitSync(true)
+      expect(mounted.presence.isDocSynced.value).toBe(true)
+      mounted.scope.stop()
+    },
+  )
+
   test('switching boards tears down the old room and signs the new one', async () => {
     const mounted = mountPresence()
     await flushAsync()
@@ -272,7 +319,8 @@ describe('canvas presence broadcast', () => {
 
     mounted.canWrite.value = false
     await flushAsync()
-    expect(mounted.fakes[0]?.localPublishes.at(-1)?.selection.nodeIds).toEqual([])
+    expect(mounted.fakes[0]?.getIsDisposed()).toBe(true)
+    expect(mounted.fakes[1]?.localPublishes.at(-1)?.selection.nodeIds).toEqual([])
     mounted.scope.stop()
   })
 
@@ -472,5 +520,71 @@ describe('canvas presence collaboration fields', () => {
     const mounted = mountPresence()
     await flushAsync()
     expect(mounted.presence.localClientId.value).toBe(41)
+  })
+})
+
+describe('editing awareness', () => {
+  test('publishes activity independently from selection without rotating the ticket', async () => {
+    const mounted = mountPresence()
+    await flushAsync()
+    mounted.activity.value = { sequence: 1 }
+    expect(mounted.fakes[0]!.localPublishes.at(-1)?.activity).toEqual({ sequence: 1 })
+    mounted.activity.value = null
+    expect(mounted.fakes[0]!.localPublishes.at(-1)?.activity).toBeUndefined()
+    expect(mounted.ticketFn).toHaveBeenCalledTimes(1)
+    mounted.scope.stop()
+  })
+
+  test('expires activity without removing member/selection and requires a fresh sequence', async () => {
+    const mounted = mountPresence()
+    await flushAsync()
+    const fake = mounted.fakes[0]!
+    fake.emitRemote(7, buildRemoteState({ activity: { sequence: 1 } }))
+    expect(mounted.presence.remotePeers.value[0]?.isEditing).toBe(true)
+    vi.advanceTimersByTime(4_000)
+    fake.emitRemote(
+      7,
+      buildRemoteState({ activity: { sequence: 1 }, selection: { nodeIds: ['other'] } }),
+    )
+    vi.advanceTimersByTime(1_000)
+    expect(mounted.presence.remotePeers.value[0]?.isEditing).toBeUndefined()
+    expect(mounted.presence.remotePeers.value[0]?.state.selection.nodeIds).toEqual(['other'])
+    fake.emitRemote(7, buildRemoteState({ activity: { sequence: 2 } }))
+    expect(mounted.presence.remotePeers.value[0]?.isEditing).toBe(true)
+    fake.emitRemote(7, buildRemoteState())
+    expect(mounted.presence.remotePeers.value[0]?.isEditing).toBeUndefined()
+    expect(vi.getTimerCount()).toBe(0)
+    mounted.scope.stop()
+  })
+
+  test.each([
+    null,
+    true,
+    { sequence: -1 },
+    { sequence: Infinity },
+    { sequence: '1' },
+    { sequence: 0.5 },
+  ])('ignores malformed activity %j without losing member identity', async (activity) => {
+    const mounted = mountPresence()
+    await flushAsync()
+    mounted.fakes[0]!.emitRemote(7, { ...buildRemoteState(), activity })
+    expect(mounted.presence.remotePeers.value).toHaveLength(1)
+    expect(mounted.presence.remotePeers.value[0]?.isEditing).toBeUndefined()
+    expect(vi.getTimerCount()).toBe(0)
+    mounted.scope.stop()
+  })
+
+  test('disconnect clears activity and prevents stale awareness from reappearing', async () => {
+    const mounted = mountPresence()
+    await flushAsync()
+    mounted.activity.value = { sequence: 1 }
+    const fake = mounted.fakes[0]!
+    fake.emitRemote(7, buildRemoteState({ activity: { sequence: 1 } }))
+    fake.emitClose(4403)
+    expect(mounted.activity.value).toBeNull()
+    fake.emitRemote(7, buildRemoteState({ activity: { sequence: 2 } }))
+    expect(mounted.presence.remotePeers.value).toEqual([])
+    mounted.scope.stop()
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

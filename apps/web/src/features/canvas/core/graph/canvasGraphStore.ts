@@ -122,6 +122,7 @@ export class CanvasGraphStore {
     options: CanvasGraphTransactionOptions = {},
   ): CanvasGraphTransaction {
     return new CanvasGraphTransaction(this, reason, {
+      origin: options.origin ?? 'user',
       shouldRecordHistory: options.shouldRecordHistory ?? true,
       shouldMarkDirty: options.shouldMarkDirty ?? true,
     })
@@ -142,6 +143,7 @@ export class CanvasGraphStore {
       return createSummary(
         direction === 'forward' ? 'history-redo' : 'history-undo',
         {
+          origin: options.origin ?? 'user',
           shouldRecordHistory: false,
           shouldMarkDirty: options.shouldMarkDirty ?? true,
         },
@@ -162,6 +164,7 @@ export class CanvasGraphStore {
     recordAppliedOrderPatch(this.state.groupOrder, draft.groupOrder, draft.groupOrderPatches)
 
     const resolvedOptions: Required<CanvasGraphTransactionOptions> = {
+      origin: options.origin ?? 'user',
       shouldRecordHistory: options.shouldRecordHistory ?? false,
       shouldMarkDirty: options.shouldMarkDirty ?? true,
     }

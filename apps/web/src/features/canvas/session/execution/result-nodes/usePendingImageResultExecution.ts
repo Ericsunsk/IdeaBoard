@@ -300,6 +300,7 @@ export function usePendingImageResultExecution(
       return connection
     })
     const transaction = store.beginTransaction('node-update', {
+      origin: 'system',
       shouldRecordHistory: false,
       shouldMarkDirty: true,
     })
@@ -333,6 +334,7 @@ export function usePendingImageResultExecution(
   ) {
     const store = writeGraphStore()
     const transaction = store.beginTransaction('node-update', {
+      origin: 'system',
       shouldRecordHistory: false,
       shouldMarkDirty: true,
     })
@@ -361,6 +363,7 @@ export function usePendingImageResultExecution(
   function removePendingResults(resultNodeIds: readonly string[]) {
     const store = writeGraphStore()
     const transaction = store.beginTransaction('delete', {
+      origin: 'system',
       shouldRecordHistory: false,
       shouldMarkDirty: true,
     })

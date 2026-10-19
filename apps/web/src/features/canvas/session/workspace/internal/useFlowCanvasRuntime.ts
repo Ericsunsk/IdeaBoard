@@ -216,6 +216,7 @@ function createCanvasRuntimeSession(
   return createCanvasGraphSessionRuntime({
     ...integration,
     onLocalSnapshot: options.collaboration?.syncSnapshot,
+    onLocalEdit: options.collaboration?.activity.recordEdit,
     canWriteGraph: options.canWriteGraph,
     nodes: options.nodes,
     edges: options.edges,

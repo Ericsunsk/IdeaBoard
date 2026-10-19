@@ -22,14 +22,21 @@ type PresenceSelectionState = {
   nodeIds: string[]
 }
 
+export type PresenceActivity = { sequence: number }
+
+/** Local receiver lease; independent of peer wall clocks and online membership. */
+export const PRESENCE_ACTIVITY_LEASE_MS = 5_000
+
 export type PresenceAwarenessState = {
   user: PresenceUser
   selection: PresenceSelectionState
+  activity?: PresenceActivity | null
 }
 
 export type RemotePresencePeer = {
   clientId: number
   state: PresenceAwarenessState
+  isEditing?: boolean
 }
 
 /**
@@ -116,7 +123,7 @@ function parsePresenceSelection(raw: unknown): PresenceSelectionState | null {
 /**
  * Validate one remote awareness state. Returns null for malformed frames
  * (dropped, never rendered). Unknown fields are dropped; only the
- * canonical `user`/`selection` contract is read.
+ * canonical identity, selection and editing activity contract is read.
  */
 export function parsePresenceAwarenessState(raw: unknown): PresenceAwarenessState | null {
   if (!raw || typeof raw !== 'object') return null
@@ -125,5 +132,11 @@ export function parsePresenceAwarenessState(raw: unknown): PresenceAwarenessStat
   if (!user) return null
   const selection = parsePresenceSelection(record.selection)
   if (!selection) return null
-  return { user, selection }
+  const activity = record.activity
+  if (activity == null) return { user, selection }
+  if (typeof activity !== 'object') return { user, selection }
+  const sequence = (activity as Record<string, unknown>).sequence
+  if (typeof sequence !== 'number' || !Number.isSafeInteger(sequence) || sequence <= 0)
+    return { user, selection }
+  return { user, selection, activity: { sequence } }
 }

@@ -51,6 +51,7 @@ export function createSummary(
   return {
     id: `canvas-graph-tx-${++transactionSequence}`,
     reason,
+    origin: options.origin,
     didChange,
     hasDomainChanges: changes.hasDomainChanges,
     changedNodeIds,

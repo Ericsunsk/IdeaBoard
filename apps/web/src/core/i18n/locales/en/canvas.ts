@@ -134,7 +134,7 @@ export default {
   },
   presence: {
     rosterLabel: 'Online collaborators',
-    selfLabel: '{name} (you)',
+    editingLabel: '{name} · Editing',
   },
   contextMenu: {
     label: 'Canvas node actions',
