@@ -1,4 +1,4 @@
-import type { CanvasCollaborationSession } from '../../collaboration/useCanvasCollaborationSession'
+import type { CanvasCollaborationSession } from '../../collaboration'
 import { computed, onScopeDispose, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { useCanvasGraphHistory } from '../../graph-editing'

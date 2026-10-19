@@ -5,14 +5,14 @@ import {
   EVENT_STREAM_RECONNECT_BACKOFF_FACTOR,
   EVENT_STREAM_RECONNECT_INITIAL_DELAY_MS,
 } from '../../../../../core/config/timing'
-import type { PresenceAwarenessState, PresenceUser } from './state'
-import { presencePeerColor } from './state'
+import type { PresenceAwarenessState, PresenceUser } from '../../../session/collaboration'
+import { presencePeerColor } from '../../../session/collaboration'
 import type {
   PresenceCloseEvent,
   PresenceProviderFactory,
   PresenceProviderHandle,
   PresenceProviderStatus,
-} from './provider'
+} from '../../../session/collaboration'
 import { useCanvasPresence } from './useCanvasPresence'
 
 type FakePresence = {

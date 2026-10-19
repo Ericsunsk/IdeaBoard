@@ -90,20 +90,8 @@ export function verifyTicket(
   }
   const [first, second] = parts as [string, string]
 
-  const payloadText = decodeSegment(first)
   const signatureText = decodeSegment(second)
-  if (payloadText === null || signatureText === null) {
-    return { ok: false, reason: 'malformed ticket' }
-  }
-  let payload: unknown
-  try {
-    payload = JSON.parse(payloadText)
-  } catch {
-    return { ok: false, reason: 'malformed ticket payload' }
-  }
-  if (!isTicketPayload(payload)) {
-    return { ok: false, reason: 'malformed ticket payload' }
-  }
+  if (signatureText === null) return { ok: false, reason: 'malformed ticket' }
 
   const expectedHex = createHmac('sha256', secret).update(first, 'utf8').digest('hex')
   const provided = Buffer.from(signatureText)
@@ -114,6 +102,20 @@ export function verifyTicket(
     !timingSafeEqual(provided, expected)
   ) {
     return { ok: false, reason: 'invalid ticket signature' }
+  }
+
+  const payloadText = decodeSegment(first)
+  if (payloadText === null) {
+    return { ok: false, reason: 'malformed ticket' }
+  }
+  let payload: unknown
+  try {
+    payload = JSON.parse(payloadText)
+  } catch {
+    return { ok: false, reason: 'malformed ticket payload' }
+  }
+  if (!isTicketPayload(payload)) {
+    return { ok: false, reason: 'malformed ticket payload' }
   }
 
   if (payload.exp * 1000 <= nowMs) {

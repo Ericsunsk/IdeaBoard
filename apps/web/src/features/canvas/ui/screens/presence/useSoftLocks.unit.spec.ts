@@ -3,7 +3,7 @@
 import { describe, expect, test } from 'vitest'
 import { ref } from 'vue'
 import { useSoftLocks } from './useSoftLocks'
-import type { RemotePresencePeer } from './state'
+import type { RemotePresencePeer } from '../../../session/collaboration'
 
 function buildPeer(clientId: number, nodeId: string | null): RemotePresencePeer {
   return {

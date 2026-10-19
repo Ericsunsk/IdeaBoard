@@ -44,6 +44,15 @@ describe('verifyTicket', () => {
     if (!result.ok) assert.equal(result.reason, 'invalid ticket signature')
   })
 
+  it('checks the signature before parsing an untrusted payload', () => {
+    const first = Buffer.from('not-json').toString('base64url')
+    const second = Buffer.from('0'.repeat(64)).toString('base64url')
+    assert.deepEqual(verifyTicket(`${first}.${second}`, SECRET), {
+      ok: false,
+      reason: 'invalid ticket signature',
+    })
+  })
+
   it('rejects an expired ticket', () => {
     const ticket = signTicket(payload({ exp: Math.floor(Date.now() / 1000) - 1 }), SECRET)
     const result = verifyTicket(ticket, SECRET)

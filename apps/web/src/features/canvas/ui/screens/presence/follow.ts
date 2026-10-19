@@ -6,7 +6,7 @@
 // invite banner, and the presenter reads a live follower count from peers
 // whose `followingDeviceId` points at the presenter's device id.
 
-import type { RemotePresencePeer } from './state'
+import type { RemotePresencePeer } from '../../../session/collaboration'
 
 export type FollowViewport = {
   x: number

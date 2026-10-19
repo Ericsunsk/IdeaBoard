@@ -119,12 +119,11 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Realtime presence sidecar (y-websocket, awareness-only): single-replica
-    # upstream with WebSocket upgrade passthrough. Streaming timeouts mirror
-    # the workspace tasks (10m) / events (1h) style; presence sockets stay
-    # open, so the events-style 1h bound applies. Document writes never flow
-    # here (ADR-0019); board persistence stays on /api/** under ADR-0006
-    # optimistic revision + 409.
+    # Realtime collaboration sidecar (y-websocket): single-replica upstream
+    # carrying Y.Doc synchronization and ephemeral awareness (ADR-0020).
+    # Accepted document updates persist through the internal Go API; private
+    # Boards keep snapshot writes on /api/** (ADR-0006). Long-lived sockets
+    # use the same 1h timeout as the workspace events stream.
     location = /realtime {
         proxy_pass ${NGINX_REALTIME_UPSTREAM};
         proxy_http_version 1.1;

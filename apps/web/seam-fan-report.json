@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "checkpointSha": "fc476a5acb31d843f712192fe189e540cb817168",
+  "checkpointSha": "6f5f8f7bf7e944c9b32786347f76fbb07fc33ce6",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
-  "totals": { "seams": 273, "violations": 0, "boardDeepImports": 0, "shims": 0 },
+  "totals": { "seams": 274, "violations": 0, "boardDeepImports": 0, "shims": 0 },
   "shims": [],
   "undeclaredDeepImports": [],
   "seams": {
@@ -39,11 +39,6 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/ticket.ts",
-          "to": "src/api/client.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/library/session/resource.ts",
           "to": "src/api/client.ts",
           "kind": "type-only"
@@ -64,7 +59,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 13,
+      "fanIn": 12,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/ofetch/dist/node.cjs",
@@ -88,7 +83,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 13,
+      "targetFanIn": 12,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -9668,7 +9663,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/useCanvasPresence.ts",
+          "from": "src/features/canvas/session/collaboration/presence/useCanvasPresenceSession.ts",
           "to": "src/core/config/timing.ts",
           "kind": "runtime"
         },
@@ -23521,6 +23516,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/session/adapters/boardRealtimeTicket.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardRealtimeTicket.contract.spec.ts",
+          "to": "src/test/msw.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/api/generated-query/public/boards/boards.ts",
           "kind": "runtime"
@@ -25479,6 +25484,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/session/adapters/boardRealtimeTicket.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardRealtimeTicket.contract.spec.ts",
+          "to": "src/test/msw.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/session/adapters/boardsResource.ts",
           "to": "src/api/generated-query/public/boards/boards.ts",
           "kind": "runtime"
@@ -26763,6 +26778,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/collaboration/presence/useCanvasPresenceSession.ts",
+          "to": "src/features/board/ports/canvasSession.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/workspace/canvasWorkspaceTaskAdapter.ts",
           "to": "src/features/board/ports/canvasSession.ts",
           "kind": "runtime"
@@ -26793,7 +26813,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 10,
+      "fanIn": 11,
       "fanOut": 68,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
@@ -26969,6 +26989,16 @@
         {
           "from": "src/features/board/core/schema/stateSchema.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardRealtimeTicket.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/session/adapters/boardRealtimeTicket.contract.spec.ts",
+          "to": "src/test/msw.ts",
           "kind": "runtime"
         },
         {
@@ -28221,7 +28251,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 10,
+      "targetFanIn": 11,
       "targetFanOut": 68,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -29605,6 +29635,298 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/canvas/session/board-session/"],
+      "impureRuntimePaths": []
+    },
+    "src/features/canvas/session/collaboration/index.ts": {
+      "consumerEdges": [
+        {
+          "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceRuntimeParts.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/useBoardRuntime.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/CanvasScreen.vue",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/CursorsOverlay.component.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/CursorsOverlay.vue",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.vue",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/follow.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/follow.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/follow.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/locks.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/locks.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/useCanvasPresence.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/usePresenceFollow.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/usePresenceFollow.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/useSoftLocks.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/useSoftLocks.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        }
+      ],
+      "fanIn": 19,
+      "fanOut": 7,
+      "fanOutTargets": [
+        "node_modules/vitest/dist/index.js",
+        "node_modules/vue/index.js",
+        "node_modules/y-websocket/dist/y-websocket.cjs",
+        "node_modules/yjs/dist/yjs.cjs",
+        "src/core/config/timing.ts",
+        "src/features/board/ports/canvas.ts",
+        "src/features/board/ports/canvasSession.ts"
+      ],
+      "outboundEdges": [
+        {
+          "from": "src/features/canvas/session/collaboration/internal/binding.ts",
+          "to": "src/features/board/ports/canvas.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/binding.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/binding.unit.spec.ts",
+          "to": "src/features/board/ports/canvas.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/mapping.ts",
+          "to": "src/features/board/ports/canvas.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/mapping.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/mapping.unit.spec.ts",
+          "to": "src/features/board/ports/canvas.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/useDocBinding.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/useDocBinding.ts",
+          "to": "node_modules/yjs/dist/yjs.cjs",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/useDocBinding.ts",
+          "to": "src/features/board/ports/canvas.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/useDocBinding.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/useDocBinding.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/useDocBinding.unit.spec.ts",
+          "to": "node_modules/yjs/dist/yjs.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/internal/useDocBinding.unit.spec.ts",
+          "to": "src/features/board/ports/canvas.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/presence/provider.ts",
+          "to": "node_modules/y-websocket/dist/y-websocket.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/presence/provider.ts",
+          "to": "node_modules/yjs/dist/yjs.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/presence/provider.ts",
+          "to": "node_modules/yjs/dist/yjs.cjs",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/presence/provider.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/presence/provider.unit.spec.ts",
+          "to": "node_modules/y-websocket/dist/y-websocket.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/presence/provider.unit.spec.ts",
+          "to": "node_modules/yjs/dist/yjs.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/presence/state.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/presence/useCanvasPresenceSession.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/presence/useCanvasPresenceSession.ts",
+          "to": "node_modules/yjs/dist/yjs.cjs",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/presence/useCanvasPresenceSession.ts",
+          "to": "src/core/config/timing.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/presence/useCanvasPresenceSession.ts",
+          "to": "src/features/board/ports/canvasSession.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/useCanvasCollaborationSession.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/useCanvasCollaborationSession.ts",
+          "to": "node_modules/yjs/dist/yjs.cjs",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/useCanvasCollaborationSession.ts",
+          "to": "src/features/board/ports/canvas.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/useCanvasCollaborationSession.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/useCanvasCollaborationSession.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/useCanvasCollaborationSession.unit.spec.ts",
+          "to": "node_modules/yjs/dist/yjs.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/collaboration/useCanvasCollaborationSession.unit.spec.ts",
+          "to": "src/features/board/ports/canvas.ts",
+          "kind": "runtime"
+        }
+      ],
+      "undeclaredConsumers": [],
+      "missingConsumers": [],
+      "undeclaredDeepImports": [],
+      "missingDeepImports": [],
+      "targetFanIn": 19,
+      "targetFanOut": 7,
+      "advisories": {
+        "fanInTargetMismatch": false,
+        "fanOutTargetMismatch": false,
+        "newFanOutTargets": [],
+        "missingFanOutTargets": []
+      },
+      "shimCount": 0,
+      "ownershipScope": ["src/features/canvas/session/collaboration/"],
       "impureRuntimePaths": []
     },
     "src/features/canvas/session/execution/board-attachment/index.ts": {
@@ -34105,7 +34427,7 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 24,
+      "fanOut": 23,
       "fanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/vitest/dist/index.js",
@@ -34121,8 +34443,7 @@
         "src/features/canvas/core/graph/index.ts",
         "src/features/canvas/core/nodes/canvasNodeUi.ts",
         "src/features/canvas/session/board-session/index.ts",
-        "src/features/canvas/session/collaboration/internal/mapping.ts",
-        "src/features/canvas/session/collaboration/useCanvasCollaborationSession.ts",
+        "src/features/canvas/session/collaboration/index.ts",
         "src/features/canvas/session/execution/index.ts",
         "src/features/canvas/session/execution/task-lifecycle/canvasTaskLifecycle.ts",
         "src/features/canvas/session/flow-adapter/index.ts",
@@ -34260,7 +34581,7 @@
         },
         {
           "from": "src/features/canvas/session/workspace/internal/createCanvasWorkspaceRuntimeParts.ts",
-          "to": "src/features/canvas/session/collaboration/useCanvasCollaborationSession.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "type-only"
         },
         {
@@ -34340,7 +34661,7 @@
         },
         {
           "from": "src/features/canvas/session/workspace/internal/useBoardRuntime.ts",
-          "to": "src/features/canvas/session/collaboration/useCanvasCollaborationSession.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "type-only"
         },
         {
@@ -34415,7 +34736,7 @@
         },
         {
           "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.ts",
-          "to": "src/features/canvas/session/collaboration/useCanvasCollaborationSession.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "type-only"
         },
         {
@@ -34475,12 +34796,7 @@
         },
         {
           "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.unit.spec.ts",
-          "to": "src/features/canvas/session/collaboration/internal/mapping.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/workspace/internal/useFlowCanvasRuntime.unit.spec.ts",
-          "to": "src/features/canvas/session/collaboration/useCanvasCollaborationSession.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "runtime"
         },
         {
@@ -34584,7 +34900,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 24,
+      "targetFanOut": 23,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -39320,7 +39636,7 @@
         }
       ],
       "fanIn": 1,
-      "fanOut": 64,
+      "fanOut": 61,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -39334,11 +39650,9 @@
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
-        "node_modules/y-websocket/dist/y-websocket.cjs",
         "node_modules/yjs/dist/yjs.cjs",
         "photoswipe/lightbox",
         "photoswipe/style.css",
-        "src/api/client.ts",
         "src/api/mediaAssetDelivery.ts",
         "src/api/mediaWorkspaceScope.ts",
         "src/api/upload.ts",
@@ -39364,7 +39678,7 @@
         "src/features/canvas/core/nodes/imageActionRegistry.ts",
         "src/features/canvas/session/browser/canvasViewportStorage.ts",
         "src/features/canvas/session/browser/domEventTargets.ts",
-        "src/features/canvas/session/collaboration/useCanvasCollaborationSession.ts",
+        "src/features/canvas/session/collaboration/index.ts",
         "src/features/canvas/session/flow-adapter/index.ts",
         "src/features/canvas/session/graph-editing/index.ts",
         "src/features/canvas/session/image-workflow/index.ts",
@@ -39383,7 +39697,6 @@
         "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/test/factories/index.ts",
-        "src/test/msw.ts",
         "src/test/render.ts",
         "vitest/browser"
       ],
@@ -39490,7 +39803,7 @@
         },
         {
           "from": "src/features/canvas/ui/screens/CanvasScreen.vue",
-          "to": "src/features/canvas/session/collaboration/useCanvasCollaborationSession.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "runtime"
         },
         {
@@ -39985,6 +40298,11 @@
         },
         {
           "from": "src/features/canvas/ui/screens/presence/CursorsOverlay.component.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/CursorsOverlay.component.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
         },
@@ -40014,6 +40332,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/screens/presence/CursorsOverlay.vue",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -40022,6 +40345,11 @@
           "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
@@ -40054,6 +40382,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.vue",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/screens/presence/SpotlightBanner.component.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -40079,8 +40412,28 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/screens/presence/follow.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/ui/screens/presence/follow.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/follow.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/follow.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/locks.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "runtime"
         },
         {
@@ -40089,54 +40442,9 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/provider.ts",
-          "to": "node_modules/y-websocket/dist/y-websocket.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/screens/presence/provider.ts",
-          "to": "node_modules/yjs/dist/yjs.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/screens/presence/provider.ts",
-          "to": "node_modules/yjs/dist/yjs.cjs",
+          "from": "src/features/canvas/ui/screens/presence/locks.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/ui/screens/presence/provider.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/screens/presence/provider.unit.spec.ts",
-          "to": "node_modules/y-websocket/dist/y-websocket.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/screens/presence/provider.unit.spec.ts",
-          "to": "node_modules/yjs/dist/yjs.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/screens/presence/state.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/screens/presence/ticket.contract.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/screens/presence/ticket.contract.spec.ts",
-          "to": "src/test/msw.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/screens/presence/ticket.ts",
-          "to": "src/api/client.ts",
-          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/ui/screens/presence/useCanvasPresence.ts",
@@ -40145,12 +40453,7 @@
         },
         {
           "from": "src/features/canvas/ui/screens/presence/useCanvasPresence.ts",
-          "to": "node_modules/yjs/dist/yjs.cjs",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/ui/screens/presence/useCanvasPresence.ts",
-          "to": "src/core/config/timing.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "runtime"
         },
         {
@@ -40172,6 +40475,16 @@
           "from": "src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts",
           "to": "src/core/config/timing.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/screens/presence/usePresenceFollow.ts",
@@ -40179,6 +40492,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/screens/presence/usePresenceFollow.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/ui/screens/presence/usePresenceFollow.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -40187,6 +40505,11 @@
           "from": "src/features/canvas/ui/screens/presence/usePresenceFollow.unit.spec.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/usePresenceFollow.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/screens/presence/useSoftLocks.ts",
@@ -40194,6 +40517,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/screens/presence/useSoftLocks.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/ui/screens/presence/useSoftLocks.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -40202,6 +40530,11 @@
           "from": "src/features/canvas/ui/screens/presence/useSoftLocks.unit.spec.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/useSoftLocks.unit.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/screens/useCanvasImageLightbox.ts",
@@ -40364,7 +40697,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 1,
-      "targetFanOut": 64,
+      "targetFanOut": 61,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

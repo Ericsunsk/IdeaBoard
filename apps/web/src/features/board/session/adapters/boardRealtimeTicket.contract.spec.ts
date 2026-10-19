@@ -5,8 +5,8 @@
 // in the canvas. The ticket is opaque: only its presence and shape are
 // asserted, never its contents.
 import { describe, expect, test } from 'vitest'
-import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
-import { PresenceTicketError, requestPresenceTicket } from './ticket'
+import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
+import { BoardPayloadError, requestBoardRealtimeTicket } from './boardsResource'
 
 const TICKET_PATH = '/api/v1/workspaces/ws-1/boards/board-1/realtime-ticket'
 
@@ -18,27 +18,27 @@ describe('presence ticket transport', () => {
       ),
     )
 
-    await expect(requestPresenceTicket('ws-1', 'board-1')).resolves.toBe('tkt_1')
+    await expect(requestBoardRealtimeTicket('ws-1', 'board-1')).resolves.toBe('tkt_1')
   })
 
   test('fails closed on transport errors', async () => {
     useMswHandlers(http.post(TICKET_PATH, () => HttpResponse.json({}, { status: 500 })))
 
-    await expect(requestPresenceTicket('ws-1', 'board-1')).rejects.toBeInstanceOf(
-      PresenceTicketError,
-    )
+    await expect(requestBoardRealtimeTicket('ws-1', 'board-1')).rejects.toThrow()
   })
 
   test('fails closed on malformed envelopes', async () => {
     useMswHandlers(http.post(TICKET_PATH, () => HttpResponse.json({ data: { ticket: '  ' } })))
 
-    await expect(requestPresenceTicket('ws-1', 'board-1')).rejects.toBeInstanceOf(
-      PresenceTicketError,
+    await expect(requestBoardRealtimeTicket('ws-1', 'board-1')).rejects.toBeInstanceOf(
+      BoardPayloadError,
     )
   })
 
   test('fails closed without a workspace board', async () => {
-    await expect(requestPresenceTicket('', 'board-1')).rejects.toBeInstanceOf(PresenceTicketError)
-    await expect(requestPresenceTicket('ws-1', '')).rejects.toBeInstanceOf(PresenceTicketError)
+    await expect(requestBoardRealtimeTicket('', 'board-1')).rejects.toBeInstanceOf(
+      BoardPayloadError,
+    )
+    await expect(requestBoardRealtimeTicket('ws-1', '')).rejects.toBeInstanceOf(BoardPayloadError)
   })
 })

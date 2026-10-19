@@ -6,7 +6,7 @@
 // tween; clicking the avatar again or pressing Escape exits.
 
 import { computed, ref, watch, type Ref } from 'vue'
-import { FOLLOW_VIEWPORT_TWEEN_MS, type RemotePresencePeer } from './state'
+import { FOLLOW_VIEWPORT_TWEEN_MS, type RemotePresencePeer } from '../../../session/collaboration'
 import { countSpotlightFollowers, findSpotlightInvite, resolveFollowViewport } from './follow'
 
 type PresenceViewportSetter = (

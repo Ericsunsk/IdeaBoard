@@ -1,4 +1,4 @@
-import type { CanvasCollaborationSession } from '../../collaboration/useCanvasCollaborationSession'
+import type { CanvasCollaborationSession } from '../../collaboration'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import type { BoardSnapshot, ImageNodeItem } from '../../../../board/ports/canvas'
 import { useCanvasViewportRuntime } from '../../../session/flow-adapter'

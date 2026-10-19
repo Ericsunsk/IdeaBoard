@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { setUserLocale } from '../../../../../core/i18n'
 import { renderWithUser, screen } from '../../../../../test/render'
 import PresenceRoster from './PresenceRoster.vue'
-import type { RemotePresencePeer } from './state'
+import type { RemotePresencePeer } from '../../../session/collaboration'
 
 function buildPeer(input: {
   clientId: number

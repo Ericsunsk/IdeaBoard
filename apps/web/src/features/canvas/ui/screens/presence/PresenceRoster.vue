@@ -95,7 +95,7 @@ import {
   resolvePeerColor,
   type PresenceUser,
   type RemotePresencePeer,
-} from './state'
+} from '../../../session/collaboration'
 
 const props = defineProps<{
   peers: RemotePresencePeer[]

@@ -6,8 +6,8 @@ import {
   isSpotlightPresenter,
   resolveFollowViewport,
 } from './follow'
-import { FOLLOW_VIEWPORT_TWEEN_MS } from './state'
-import type { RemotePresencePeer } from './state'
+import { FOLLOW_VIEWPORT_TWEEN_MS } from '../../../session/collaboration'
+import type { RemotePresencePeer } from '../../../session/collaboration'
 
 function buildPeer(overrides: Partial<RemotePresencePeer> = {}): RemotePresencePeer {
   return {

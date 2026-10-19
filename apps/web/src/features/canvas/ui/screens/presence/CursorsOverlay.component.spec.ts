@@ -4,7 +4,7 @@ import { renderWithUser, screen } from '../../../../../test/render'
 import { makeSessionUser } from '../../../../../test/factories'
 import { useUserStore } from '../../../../auth'
 import PresenceCursorsOverlay from './CursorsOverlay.vue'
-import type { RemotePresencePeer } from './state'
+import type { RemotePresencePeer } from '../../../session/collaboration'
 
 function buildPeer(overrides: Partial<RemotePresencePeer> = {}): RemotePresencePeer {
   return {

@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { effectScope, ref } from 'vue'
 import { usePresenceFollow } from './usePresenceFollow'
-import type { RemotePresencePeer } from './state'
+import type { RemotePresencePeer } from '../../../session/collaboration'
 
 function buildPeer(input: {
   clientId: number

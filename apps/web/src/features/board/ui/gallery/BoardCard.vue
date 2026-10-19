@@ -62,7 +62,7 @@
           <AvatarImage v-if="ownerAvatarSrc" :src="ownerAvatarSrc" :alt="ownerAvatarEntry.userId" />
           <!-- Explicit delay: reka treats delayMs 0 (the wrapper default)
             as "never render", so the initial needs a real timer. -->
-          <AvatarFallback :delay-ms="300" class="text-[10px] font-semibold uppercase">
+          <AvatarFallback :delay-ms="300" class="text-admin-micro font-semibold uppercase">
             {{ ownerAvatarInitial }}
           </AvatarFallback>
         </Avatar>
@@ -90,11 +90,7 @@
             <MoreHoriz class="size-[18px]" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          side="top"
-          align="end"
-          @close-auto-focus="onMenuCloseAutoFocus"
-        >
+        <DropdownMenuContent side="top" align="end" @close-auto-focus="onMenuCloseAutoFocus">
           <DropdownMenuItem
             v-for="item in menuItems"
             :key="item.label"
@@ -167,9 +163,7 @@ const ownerAvatarEntry = computed(() => {
   return { userId, avatar_url: props.board.ownerAvatarUrl ?? undefined }
 })
 const ownerAvatarSrc = computed(() =>
-  ownerAvatarEntry.value
-    ? resolveMemberAvatar(ownerAvatarEntry.value, userStore.user)
-    : undefined,
+  ownerAvatarEntry.value ? resolveMemberAvatar(ownerAvatarEntry.value, userStore.user) : undefined,
 )
 const ownerAvatarInitial = computed(() => {
   const userId = ownerAvatarEntry.value?.userId ?? ''
@@ -280,11 +274,7 @@ function onRenameBlur(event: FocusEvent) {
   }
   if (typeof document !== 'undefined') {
     const active = document.activeElement
-    if (
-      active instanceof Node &&
-      active !== document.body &&
-      cardRootEl.value?.contains(active)
-    ) {
+    if (active instanceof Node && active !== document.body && cardRootEl.value?.contains(active)) {
       return
     }
   }

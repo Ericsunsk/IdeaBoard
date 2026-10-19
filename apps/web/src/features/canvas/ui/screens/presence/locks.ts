@@ -8,7 +8,11 @@
 // - Viewers never participate: entries with `canWrite === false` are
 //   ignored (viewers broadcast an empty selection, see `useCanvasPresence`).
 
-import { presencePeerColor, resolvePeerSelectionIds, type RemotePresencePeer } from './state'
+import {
+  presencePeerColor,
+  resolvePeerSelectionIds,
+  type RemotePresencePeer,
+} from '../../../session/collaboration'
 
 export type SoftLockPeer = {
   deviceId: number

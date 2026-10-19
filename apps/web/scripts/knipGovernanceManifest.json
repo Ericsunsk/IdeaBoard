@@ -11642,26 +11642,20 @@
         "evidence": ["src/features/canvas/ui/overlays/index.ts#useCanvasCustomLayerOverlay"]
       }
     },
-    "src/features/canvas/ui/screens/presence/provider.ts": {
+    "src/features/canvas/session/collaboration/presence/provider.ts": {
       "toBareRealtimeUrl": {
         "kind": "test-contract",
-        "evidence": ["src/features/canvas/ui/screens/presence/provider.unit.spec.ts"]
+        "evidence": ["src/features/canvas/session/collaboration/presence/provider.unit.spec.ts"]
       },
       "PresenceProviderStatus": {
         "kind": "test-contract",
         "evidence": ["src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts"]
       }
     },
-    "src/features/canvas/ui/screens/presence/state.ts": {
+    "src/features/canvas/session/collaboration/presence/state.ts": {
       "buildPresenceServerUrl": {
         "kind": "test-contract",
-        "evidence": ["src/features/canvas/ui/screens/presence/state.unit.spec.ts"]
-      }
-    },
-    "src/features/canvas/ui/screens/presence/ticket.ts": {
-      "PresenceTicketError": {
-        "kind": "test-contract",
-        "evidence": ["src/features/canvas/ui/screens/presence/ticket.contract.spec.ts"]
+        "evidence": ["src/features/canvas/session/collaboration/presence/state.unit.spec.ts"]
       }
     },
     "src/features/canvas/ui/screens/presence/locks.ts": {
@@ -14361,6 +14355,28 @@
       "ApiStripeConfigurationSummary": {
         "kind": "test-contract",
         "evidence": ["src/features/admin/settings/session/payment/resource.contract.spec.ts"]
+      }
+    },
+    "src/features/canvas/session/collaboration/index.ts": {
+      "PresenceAwarenessState": {
+        "kind": "test-contract",
+        "evidence": ["src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts"]
+      },
+      "PresenceCloseEvent": {
+        "kind": "test-contract",
+        "evidence": ["src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts"]
+      },
+      "PresenceProviderFactory": {
+        "kind": "test-contract",
+        "evidence": ["src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts"]
+      },
+      "PresenceProviderHandle": {
+        "kind": "test-contract",
+        "evidence": ["src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts"]
+      },
+      "PresenceProviderStatus": {
+        "kind": "test-contract",
+        "evidence": ["src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts"]
       }
     }
   },

@@ -12,8 +12,8 @@ import (
 // buys uniform `--help`, unknown-flag rejection, and completion for free; an
 // unknown command now errors instead of silently booting the server.
 //
-// `--mode` overrides API_MODE for the serve path only (ADR-0021); every
-// other subcommand ignores it.
+// `--mode` overrides API_MODE for the root serve path only (ADR-0021);
+// maintenance subcommands reject it.
 func newRootCommand() *cobra.Command {
 	var modeOverride string
 	root := &cobra.Command{
@@ -24,7 +24,7 @@ func newRootCommand() *cobra.Command {
 			return nil
 		},
 	}
-	root.PersistentFlags().StringVar(&modeOverride, "mode", "", "process role: all|http-only|worker-only (overrides API_MODE for serve)")
+	root.Flags().StringVar(&modeOverride, "mode", "", "process role: all|http-only|worker-only (overrides API_MODE for serve)")
 	root.AddCommand(
 		newMigrateCommand(),
 		newInitAdminCommand(),

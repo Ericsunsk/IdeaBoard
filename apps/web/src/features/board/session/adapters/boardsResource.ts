@@ -5,6 +5,7 @@ import {
   getBoardAccess,
   getBoardDocument,
   listBoards,
+  issueBoardRealtimeTicket,
   replaceBoardDocument,
   restoreBoard,
   updateBoard,
@@ -565,4 +566,19 @@ export async function replaceBoardSharing(
     }),
   )
   return toShareAccessFact(envelope.data)
+}
+
+/** Mints an opaque room ticket for the explicitly selected workspace Board. */
+export async function requestBoardRealtimeTicket(
+  workspaceId: string,
+  boardId: string,
+  options: Pick<BoardsRequestOptions, 'signal'> = {},
+): Promise<string> {
+  const workspace = workspaceId.trim()
+  const board = boardId.trim()
+  if (!workspace || !board) throw new BoardPayloadError('realtime ticket scope')
+  const envelope = await issueBoardRealtimeTicket(workspace, board, requestConfig(options))
+  const ticket = envelope?.data?.ticket
+  if (typeof ticket !== 'string' || !ticket.trim()) throw new BoardPayloadError('realtime ticket')
+  return ticket.trim()
 }

@@ -33,3 +33,6 @@ export {
 } from '../session/revocation/convergeAccessLoss'
 
 export { getBoardScope, isBoardScopeCurrent, type BoardScope } from '../session/catalog/scope'
+
+// Room admission uses the sole Board generated-query adapter.
+export { requestBoardRealtimeTicket } from '../session/adapters/boardsResource'

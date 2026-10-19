@@ -1,8 +1,7 @@
 import type { Edge, EdgeChange, GraphNode, GraphEdge, Node, NodeChange } from '@vue-flow/core'
 import { computed, effectScope, nextTick, ref, shallowRef } from 'vue'
 import * as Y from 'yjs'
-import { useCanvasCollaborationSession } from '../../collaboration/useCanvasCollaborationSession'
-import { snapshotToDocEntries } from '../../collaboration/internal/mapping'
+import { useCanvasCollaborationSession } from '../../collaboration'
 import { describe, expect, it, vi } from 'vitest'
 import type { BoardSession, SaveStatus } from '../../board-session'
 import {
@@ -629,9 +628,6 @@ describe('useFlowCanvasRuntime', () => {
   it('projects collaboration through canonical commits without snapshot autosave or remote echo', async () => {
     const doc = new Y.Doc()
     const initial = createSnapshot()
-    const initialEntries = snapshotToDocEntries(initial)
-    for (const [id, value] of initialEntries.nodes) doc.getMap('nodes').set(id, value)
-    for (const [id, value] of initialEntries.edges) doc.getMap('edges').set(id, value)
     const scope = effectScope()
     const transport = {
       sharedDoc: shallowRef<Y.Doc | null>(null),
@@ -650,6 +646,7 @@ describe('useFlowCanvasRuntime', () => {
     })
     transport.sharedDoc.value = doc
     await nextTick()
+    collaboration.syncSnapshot(initial, ['image-1', 'prompt-1', 'prompt-2'], ['connection-3'])
     transport.isDocSynced.value = true
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     const store = harness.runtime.graphEditing.readCanvasGraphStore()
@@ -669,11 +666,14 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.flushAutosave()
     expect(harness.savedSnapshots).toEqual([])
     onLocalSnapshot.mockClear()
-    const remote = createSnapshot()
-    remote.promptNodes[0]!.x = 888
-    const remoteEntries = snapshotToDocEntries(remote)
+    const remotePrompt = doc
+      .getMap<{ position: { x: number; y: number } }>('nodes')
+      .get('prompt-1')!
     doc.transact(() => {
-      for (const [id, value] of remoteEntries.nodes) doc.getMap('nodes').set(id, value)
+      doc.getMap('nodes').set('prompt-1', {
+        ...remotePrompt,
+        position: { ...remotePrompt.position, x: 888 },
+      })
     }, 'remote-peer')
     expect(store.exportSnapshot().promptNodes[0]?.x).toBe(888)
     expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position.x).toBe(888)

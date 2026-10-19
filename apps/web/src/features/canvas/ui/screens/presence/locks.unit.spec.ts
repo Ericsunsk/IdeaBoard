@@ -8,7 +8,7 @@ import {
   toSoftLockPeer,
   type SoftLockPeer,
 } from './locks'
-import type { RemotePresencePeer } from './state'
+import type { RemotePresencePeer } from '../../../session/collaboration'
 
 function buildRemotePeer(overrides: Partial<RemotePresencePeer> = {}): RemotePresencePeer {
   return {

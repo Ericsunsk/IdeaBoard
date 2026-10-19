@@ -15,7 +15,7 @@
       :style="{ left: peer.left, top: peer.top }"
     >
       <svg
-        class="presence-cursors__arrow"
+        class="presence-cursors__arrow drop-shadow-sm"
         :style="{ color: peer.color }"
         viewBox="0 0 16 20"
         focusable="false"
@@ -52,7 +52,7 @@ import {
   resolvePeerCursorPoint,
   flowPointToScreenPoint,
   type RemotePresencePeer,
-} from './state'
+} from '../../../session/collaboration'
 
 const props = defineProps<{
   peers: RemotePresencePeer[]
@@ -109,7 +109,6 @@ const positionedPeers = computed(() =>
   display: block;
   width: 14px;
   height: 18px;
-  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.35));
 }
 
 .presence-cursors__arrow path {

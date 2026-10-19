@@ -7,7 +7,7 @@ import {
   toSoftLockPeer,
   type SoftLockOwner,
 } from './locks'
-import type { RemotePresencePeer } from './state'
+import type { RemotePresencePeer } from '../../../session/collaboration'
 
 type UseSoftLocksOptions = {
   peers: MaybeRefOrGetter<readonly RemotePresencePeer[]>

@@ -1,4 +1,4 @@
-import type { CanvasCollaborationSession } from '../../collaboration/useCanvasCollaborationSession'
+import type { CanvasCollaborationSession } from '../../collaboration'
 import { computed, ref, shallowRef } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
