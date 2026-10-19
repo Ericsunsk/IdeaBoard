@@ -241,6 +241,7 @@ export type TransactionChangeSet = {
  * and its transaction subsystem do not form an import cycle.
  */
 export type CanvasGraphTransactionHost = {
+  _canWriteDomain(): boolean
   _readState(): CanvasGraphStoreState
   _publishCommit(summary: CanvasGraphTransactionSummary): void
   _createTransactionDraft(): CanvasGraphTransactionDraft

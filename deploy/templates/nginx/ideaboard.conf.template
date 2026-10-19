@@ -119,6 +119,31 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # Realtime presence sidecar (y-websocket, awareness-only): single-replica
+    # upstream with WebSocket upgrade passthrough. Streaming timeouts mirror
+    # the workspace tasks (10m) / events (1h) style; presence sockets stay
+    # open, so the events-style 1h bound applies. Document writes never flow
+    # here (ADR-0019); board persistence stays on /api/** under ADR-0006
+    # optimistic revision + 409.
+    location = /realtime {
+        proxy_pass ${NGINX_REALTIME_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+        add_header X-Accel-Buffering "no" always;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     location /api/ {
         proxy_pass ${NGINX_API_UPSTREAM};
         proxy_http_version 1.1;

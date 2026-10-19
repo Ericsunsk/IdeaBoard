@@ -109,6 +109,30 @@ function createLargeSnapshot(nodeCount: number): BoardSnapshot {
 }
 
 describe('CanvasGraphStore', () => {
+  it('rejects domain commits and undo when capability is revoked while preserving selection', () => {
+    const snapshot = createEmptyBoardSnapshot()
+    snapshot.imageNodes = [createImageNode(1, 10, 20)]
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+    const edit = store.beginTransaction('node-update').updateNode('image-1', { x: 50 }).commit()
+    let canWrite = false
+    store.setDomainWritePolicy(() => canWrite)
+    const commits = vi.fn()
+    store.subscribe(commits)
+    const blocked = store.beginTransaction('node-update').updateNode('image-1', { x: 99 }).commit()
+    expect(blocked.didChange).toBe(false)
+    expect(store.getNode('image-1')?.snapshot.x).toBe(50)
+    expect(store.applyCommitPatch(edit.commitPatch, 'backward').didChange).toBe(false)
+    expect(commits).not.toHaveBeenCalled()
+    expect(
+      store.beginTransaction('node-update').selectNode('image-1', true).commit().didChange,
+    ).toBe(true)
+    canWrite = true
+    expect(
+      store.beginTransaction('node-update').updateNode('image-1', { x: 70 }).commit().didChange,
+    ).toBe(true)
+    expect(store.getNode('image-1')?.snapshot.x).toBe(70)
+  })
+
   afterEach(() => {
     delete window.__canvasInteractionBenchmarkCounters
   })

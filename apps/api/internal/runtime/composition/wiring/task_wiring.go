@@ -28,6 +28,7 @@ import (
 	outboxworker "ideaboard/api/internal/runtime/interfaces/worker/outbox"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers"
 	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
+	"ideaboard/api/internal/runtime/interfaces/worker/retention"
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
 	visionbilling "ideaboard/api/internal/runtime/interfaces/worker/visionbilling"
 	runtimeports "ideaboard/api/internal/runtime/ports"
@@ -39,6 +40,7 @@ import (
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	taskworker "ideaboard/api/internal/tasking/interfaces/worker"
 	"ideaboard/api/internal/tasking/workspacetasks"
+	tenancypurge "ideaboard/api/internal/tenancy/application/purge"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -105,6 +107,11 @@ type AppWorkerRuntime struct {
 	eventBus    *eventnats.NATSJetStreamEventBus
 	queueName   string
 	concurrency int
+	// consume reports whether this process starts the River client. An
+	// http-only process (ADR-0021) keeps the client for transactional
+	// enqueue but never consumes: no workers are registered and Start
+	// leaves the client stopped, so queued jobs wait for a worker process.
+	consume bool
 	// queueMetrics polls River depth/lag gauges for every known queue
 	// (see riverpolicy.RiverRetryMatrix); nil keeps the runtime
 	// uninstrumented (tests).
@@ -120,13 +127,15 @@ func (r AppWorkerRuntime) Kind() domain.ComponentKind {
 }
 
 func (r AppWorkerRuntime) Start(ctx context.Context) error {
-	if r.riverClient == nil {
-		return nil
+	if r.consume && r.riverClient != nil {
+		slog.Info("River worker starting", "queue", r.queueName, "concurrency", r.concurrency)
+		if err := r.riverClient.Start(ctx); err != nil {
+			return err
+		}
 	}
-	slog.Info("River worker starting", "queue", r.queueName, "concurrency", r.concurrency)
-	if err := r.riverClient.Start(ctx); err != nil {
-		return err
-	}
+	// queueMetrics keeps polling in every mode: the depth/lag gauges read
+	// database truth and are scraped from the HTTP process, so an http-only
+	// process still exports queue signals while never consuming.
 	if r.queueMetrics == nil {
 		return nil
 	}
@@ -381,46 +390,42 @@ func NewAppTaskRuntime(
 	// #809 hard cut: the legacy task-retention periodic jobs are dropped
 	// with the retention service (no legacy store left to purge against).
 	// Workspace task lifecycle retention is #809-close work.
+	// Archived workspace purge: non-Default workspaces archived longer ago
+	// than WORKSPACE_PURGE_AFTER_DAYS (default 7) are hard-deleted with
+	// their boards and files on the same daily maintenance schedule;
+	// billing records are retained.
+	workspacePurgeService := tenancypurge.NewService(dbs.DB, services.storageService)
+	workspacePurgeWorker := retention.NewWorkspacePurgeWorker(
+		workspacePurgeService, cfg.Worker.EffectiveWorkspacePurgeAfterDays())
+	workspacePurgePeriodicJobs := retention.WorkspacePurgePeriodicJobs()
 	taskStatusOutboxPeriodicJobs := outboxworker.PeriodicJobs()
 	boardAccessOutboxPeriodicJobs := outboxworker.BoardAccessPeriodicJobs()
-	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs)+len(settlementSweepPeriodicJobs)+len(taskStatusOutboxPeriodicJobs)+len(boardAccessOutboxPeriodicJobs)+len(identityPeriodicJobs))
-	periodicJobs = append(periodicJobs, creditPeriodicJobs...)
-	periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
-	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
-	periodicJobs = append(periodicJobs, visionBillingPeriodicJobs...)
-	periodicJobs = append(periodicJobs, settlementSweepPeriodicJobs...)
-	periodicJobs = append(periodicJobs, taskStatusOutboxPeriodicJobs...)
-	periodicJobs = append(periodicJobs, boardAccessOutboxPeriodicJobs...)
-	periodicJobs = append(periodicJobs, identityPeriodicJobs...)
+	// ADR-0021: an http-only process enqueues but never consumes. Workers
+	// stay unregistered and periodic schedules stay home on the worker
+	// process, so exactly one scheduler exists per deployment (local `all`
+	// keeps the pre-split behavior). The enqueue-only client below still
+	// serves the submit transaction (SetClient) without fetching anything.
+	runWorkers := cfg.Mode.RunsWorkers()
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs)+len(settlementSweepPeriodicJobs)+len(taskStatusOutboxPeriodicJobs)+len(boardAccessOutboxPeriodicJobs)+len(identityPeriodicJobs)+len(workspacePurgePeriodicJobs))
+	if runWorkers {
+		periodicJobs = append(periodicJobs, creditPeriodicJobs...)
+		periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
+		periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
+		periodicJobs = append(periodicJobs, visionBillingPeriodicJobs...)
+		periodicJobs = append(periodicJobs, settlementSweepPeriodicJobs...)
+		periodicJobs = append(periodicJobs, taskStatusOutboxPeriodicJobs...)
+		periodicJobs = append(periodicJobs, boardAccessOutboxPeriodicJobs...)
+		periodicJobs = append(periodicJobs, identityPeriodicJobs...)
+		periodicJobs = append(periodicJobs, workspacePurgePeriodicJobs...)
+	}
 	// #809 hard cut: the legacy River task worker (old job kinds) is
 	// gone (see workerriver.NewRiverClient). Stray old-kind jobs
 	// fail loudly as unknown kinds; the workspace_task_execute consumer
-	// and all periodic workers ride this same client.
-	riverClient, err := workerriver.NewRiverClient(dbs.RiverPool, workerriver.RiverServerOptions{
-		QueueName:   riverpolicy.RiverQueueDefault,
-		Concurrency: workerConcurrency,
-		AdditionalQueues: map[string]river.QueueConfig{
-			workerbilling.CreditReconciliationQueue:    {MaxWorkers: 1},
-			workerbilling.PaymentReconciliationQueue:   {MaxWorkers: 1},
-			workerbilling.PaymentCheckoutShutdownQueue: {MaxWorkers: 1},
-			visionbilling.VisionBillingQueue:           {MaxWorkers: 1},
-			// #833: signed webhook deliveries ride their own queue with
-			// the shared concurrency config (no new infra); serial
-			// workers match the maintenance-queue precedent and the 1m
-			// per-attempt timeout bounds head-of-line blocking.
-			riverpolicy.RiverQueueWebhookDeliver: {MaxWorkers: 1},
-			// Final-timeout settlement sweep: one serial maintenance worker on
-			// the shared client (same precedent as the queues above). Serial is
-			// deliberate: the sweep converges abandoned holds, so overlapping
-			// runs would contend on the same per-task settle transactions for no
-			// throughput gain.
-			riverpolicy.RiverQueueTaskSettlementSweep: {MaxWorkers: 1},
-			// Identity admin reconciliation: one serial maintenance worker.
-			// Serial is deliberate: overlapping scans would contend on the
-			// same finding fingerprints for no throughput gain.
-			identityreconciliation.IdentityReconciliationQueue: {MaxWorkers: 1},
-		},
-		RegisterWorkers: func(workers *river.Workers) {
+	// and all periodic workers ride this same client. Nil in http-only
+	// mode (see runWorkers above): the client then only enqueues.
+	var registerWorkers func(workers *river.Workers)
+	if runWorkers {
+		registerWorkers = func(workers *river.Workers) {
 			river.AddWorker(workers, workerbilling.NewCreditReconciliationWorker(services.creditService))
 			river.AddWorker(workers, workerbilling.NewCreditReconciliationScheduleWorker(services.creditService))
 			river.AddWorker(workers, workerbilling.NewPaymentReconciliationWorker(services.paymentService))
@@ -445,9 +450,51 @@ func NewAppTaskRuntime(
 			// schedule worker ride the same client (no new infra).
 			river.AddWorker(workers, identityreconciliation.NewExecuteWorker(identityAdminReconciler))
 			river.AddWorker(workers, identityreconciliation.NewScheduleWorker(identityAdminReconciler, identityAdminDispatcher))
-		},
-		PeriodicJobs: periodicJobs,
-	})
+			// Archived workspace purge rides the same client on the
+			// serial retention queue.
+			river.AddWorker(workers, workspacePurgeWorker)
+		}
+	}
+	var riverClient *river.Client[pgx.Tx]
+	if runWorkers {
+		riverClient, err = workerriver.NewRiverClient(dbs.RiverPool, workerriver.RiverServerOptions{
+			QueueName:   riverpolicy.RiverQueueDefault,
+			Concurrency: workerConcurrency,
+			AdditionalQueues: map[string]river.QueueConfig{
+				workerbilling.CreditReconciliationQueue:    {MaxWorkers: 1},
+				workerbilling.PaymentReconciliationQueue:   {MaxWorkers: 1},
+				workerbilling.PaymentCheckoutShutdownQueue: {MaxWorkers: 1},
+				visionbilling.VisionBillingQueue:           {MaxWorkers: 1},
+				// Workspace purge: one serial maintenance worker on the
+				// shared client (same precedent as the queues above).
+				// Serial is deliberate: overlapping purge runs would
+				// contend on the same workspace rows for no gain.
+				riverpolicy.RiverQueueTaskRetention: {MaxWorkers: 1},
+				// #833: signed webhook deliveries ride their own queue with
+				// the shared concurrency config (no new infra); serial
+				// workers match the maintenance-queue precedent and the 1m
+				// per-attempt timeout bounds head-of-line blocking.
+				riverpolicy.RiverQueueWebhookDeliver: {MaxWorkers: 1},
+				// Final-timeout settlement sweep: one serial maintenance worker on
+				// the shared client (same precedent as the queues above). Serial is
+				// deliberate: the sweep converges abandoned holds, so overlapping
+				// runs would contend on the same per-task settle transactions for no
+				// throughput gain.
+				riverpolicy.RiverQueueTaskSettlementSweep: {MaxWorkers: 1},
+				// Identity admin reconciliation: one serial maintenance worker.
+				// Serial is deliberate: overlapping scans would contend on the
+				// same finding fingerprints for no throughput gain.
+				identityreconciliation.IdentityReconciliationQueue: {MaxWorkers: 1},
+			},
+			RegisterWorkers: registerWorkers,
+			PeriodicJobs:    periodicJobs,
+		})
+	} else {
+		// HTTP-only instances are insert-only River clients. Leaving Workers nil
+		// is River's supported producer topology: jobs can be enqueued in the
+		// submit transaction and are consumed by the worker-only peer.
+		riverClient, err = workerriver.NewRiverProducer(dbs.RiverPool)
+	}
 	if err != nil {
 		if eventBus != nil {
 			_ = eventBus.Close()
@@ -488,6 +535,7 @@ func NewAppTaskRuntime(
 		eventBus:     eventBus,
 		queueName:    riverpolicy.RiverQueueDefault,
 		concurrency:  workerConcurrency,
+		consume:      runWorkers,
 		queueMetrics: redmetrics.NewMultiRefresher(redMetrics, riverQueueStatsByQueue(riverQueue), redmetrics.DefaultRefreshInterval),
 	}, nil
 }

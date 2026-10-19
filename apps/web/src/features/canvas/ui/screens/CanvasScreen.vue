@@ -45,6 +45,17 @@
           @focus-scope-change="canvasLibrary.commands.setFocusWithin"
         />
       </template>
+      <template #presence>
+        <PresenceRoster
+          :peers="presence.remotePeers.value"
+          :local-user="presenceUser"
+          :following-client-id="followingDeviceId"
+          :is-spotlighting="isSpotlighting"
+          :follower-count="follow.followerCount.value"
+          @follow-toggle="follow.toggleFollow"
+          @spotlight-toggle="toggleSpotlight"
+        />
+      </template>
     </CanvasChrome>
 
     <div
@@ -71,7 +82,7 @@
         @node-click="onFlowNodeClick"
         @connect-start="connectionDropLifecycle.onConnectStart"
         @connect-end="onFlowConnectEnd"
-        @node-drag-start="onNodeDragStart"
+        @node-drag-start="onGuardedNodeDragStart"
         @node-drag-stop="onNodeDragStop"
         @selection-start="vueFlowSelectionBindings.onSelectionStart"
         @selection-end="vueFlowSelectionBindings.onSelectionEnd"
@@ -101,6 +112,15 @@
         />
       </VueFlow>
       <ImageToolPresentation :image-tools="imageTools" />
+      <CursorsOverlay :peers="presence.remotePeers.value" :viewport="presenceViewport" />
+      <div v-if="spotlightInvite" class="canvas-spotlight-banner">
+        <SpotlightBanner
+          :spotlighter-name="spotlightName"
+          :spotlighter-color="spotlightColor"
+          @accept="follow.acceptInvite"
+          @ignore="follow.dismissInvite"
+        />
+      </div>
       <CanvasNodeContextMenu
         :is-visible="nodeContextMenu.isVisible"
         :x="nodeContextMenu.x"
@@ -121,7 +141,13 @@ import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { uploadApi } from '../../../../api/upload.ts'
 import { USER_BOARDS_PATH } from '../../../workspace/routePaths.ts'
-import { PanOnScrollMode, useVueFlow, VueFlow, type FlowProps } from '@vue-flow/core'
+import {
+  PanOnScrollMode,
+  useVueFlow,
+  VueFlow,
+  type FlowProps,
+  type NodeDragEvent,
+} from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useCanvasImageLightbox } from './useCanvasImageLightbox'
@@ -166,6 +192,14 @@ import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSu
 import type { CanvasScreenLibrarySaveBridge } from './internal/useCanvasScreenSurfaceInteractions'
 import { createCanvasScreenNodePresentation } from './internal/createCanvasScreenNodePresentation'
 import { useCanvasScreenLifecycle } from './internal/useCanvasScreenLifecycle'
+import { useCanvasPresence } from './presence/useCanvasPresence'
+import { usePresenceFollow } from './presence/usePresenceFollow'
+import CursorsOverlay from './presence/CursorsOverlay.vue'
+import PresenceRoster from './presence/PresenceRoster.vue'
+import SpotlightBanner from './presence/SpotlightBanner.vue'
+import { presencePeerColor, resolvePeerColor, type PresenceUser } from './presence/state'
+import { useCanvasCollaborationSession } from '../../session/collaboration/useCanvasCollaborationSession'
+import { useSoftLocks } from './presence/useSoftLocks'
 import { useCanvasLibraryIsland } from './internal/useCanvasLibraryIsland'
 import { useCanvasLibraryDrop } from './internal/useCanvasLibraryDrop'
 import {
@@ -177,6 +211,7 @@ import {
 import type { CanvasLibraryImportDescriptor } from '../../../library'
 import { useAppToast } from '../../../../core/composables/useAppToast'
 import { i18n } from '../../../../core/i18n'
+import { useUserStore } from '../../../auth'
 
 const props = defineProps<{
   route: RouteLocationNormalizedLoaded
@@ -220,6 +255,46 @@ const canvasWorkspaceId = workspaceSelectionStore.selectedId
 function requireCanvasWorkspaceId(): string {
   return requireWorkspaceId(canvasWorkspaceId.value)
 }
+const userStore = useUserStore()
+const presenceUser = computed<PresenceUser | null>(() => {
+  const sessionUser = userStore.user
+  const id = sessionUser?.public_id?.trim() || getUserIdentity().userUid.trim()
+  if (!id) return null
+  const name = sessionUser?.display_name?.trim() || id.replace(/^usr_/, '') || id
+  const avatarUrl = sessionUser?.avatar?.trim()
+  return {
+    id,
+    name,
+    color: presencePeerColor(id),
+    ...(avatarUrl ? { avatarUrl } : {}),
+  }
+})
+const presenceViewport = flowPaneAdapter.viewport
+const followingDeviceId = ref<number | null>(null)
+const isSpotlighting = ref(false)
+// Viewers (and archived boards) never write: empty selection broadcasts,
+// no soft-lock claims, no Y.Doc mutations.
+const collaboration = useCanvasCollaborationSession({
+  createTransport: (context) =>
+    useCanvasPresence({
+      ...context,
+      workspaceId: canvasWorkspaceId,
+      localUser: presenceUser,
+      followingDeviceId,
+      isSpotlighting,
+      flow: {
+        screenToFlowCoordinate: flowPaneAdapter.screenToFlowCoordinate,
+        getSelectedElementIds: () =>
+          flowPaneAdapter.getSelectedElements.value.map((element) => element.id),
+        viewport: presenceViewport,
+      },
+      element: canvasWrapRef,
+    }),
+})
+const presence = collaboration.transport
+const canWritePresence = collaboration.canWrite
+const isCollaborationReadOnly = collaboration.isReadOnly
+
 const imageToolUi = useCanvasScreenImageToolUi({ activeTool, canvasWrapRef })
 const { openNodeImagePreview, openImageUrlPreview } = useCanvasImageLightbox()
 const graphEditingBrowser = createCanvasGraphEditingBrowserAdapter()
@@ -241,6 +316,7 @@ const workspace = useCanvasWorkspaceRuntime({
   imageWorkflowUi: imageToolUi.imageWorkflowUi,
   logoutAndRedirect,
   openRecharge,
+  collaboration,
 })
 const viewModel = workspace.viewModel
 const commands = workspace.commands
@@ -401,6 +477,73 @@ const libraryDropTargets = useCanvasLibraryDrop({
   add: (asset, point) => commands.graphEditing.libraryImport.add(asset, point),
 })
 const { isFlowInteractionActive, isFlowViewportPanInteractionActive } = viewModel.graphEditing
+// Live presence (Y.js awareness-only): connects only for workspace-posture
+// boards, broadcasts the local cursor/selection/viewport/follow/spotlight
+// with dual-speed throttling (cursor ~30ms, dragging ~100ms), and renders
+// remote cursors with name flags. The header roster toggles Follow (500ms
+// viewport tween, click again or Escape exits) and Spotlight (presenters
+// invite the room via an alertdialog banner and read a live follower
+// count). Viewers broadcast cursor-only (empty selection, no lock claims,
+// no writes); private boards and drafts never connect.
+const follow = usePresenceFollow({
+  peers: presence.remotePeers,
+  localClientId: presence.localClientId,
+  setViewport: (viewport, followOptions) => {
+    const setter = flowPaneAdapter.setViewport
+    if (typeof setter !== 'function') return undefined
+    return setter(viewport, followOptions)
+  },
+  followingClientId: followingDeviceId,
+})
+const spotlightInvite = follow.activeInvite
+const spotlightName = computed(() => {
+  const invite = spotlightInvite.value
+  if (!invite) return ''
+  return invite.state.user.name.trim() || invite.state.user.id
+})
+const spotlightColor = computed(() => {
+  const invite = spotlightInvite.value
+  return invite ? resolvePeerColor(invite.state) : ''
+})
+
+function toggleSpotlight(): void {
+  if (isSpotlighting.value) {
+    isSpotlighting.value = false
+    return
+  }
+  follow.stopFollow()
+  isSpotlighting.value = true
+}
+
+// Escape order: dismiss the spotlight invite first, then exit Follow,
+// then fall through to the shell transient-UI dismissal.
+function onCanvasEscape(): boolean {
+  if (spotlightInvite.value) {
+    follow.dismissInvite()
+    return true
+  }
+  if (follow.handleEscape()) return true
+  return onEscapeShortcut()
+}
+
+// Soft locks + Y.Doc binding (TapNow §3§5): a single-node selection claims
+// a purely client-side lock (smaller deviceId wins, viewers abstain).
+// Locked nodes render a colored outline + owner tag (see `nodePropsFor`
+// below) and are excluded from drag cohorts. The binding observes the
+// room's `nodes`/`edges` maps with the local device origin. Canonical graph
+// commits write only their changed ids; remote snapshots replace the graph
+// projection without generating another local commit.
+const selectedElementIds = computed(() =>
+  flowPaneAdapter.getSelectedElements.value.map((element) => element.id),
+)
+const softLocks = useSoftLocks({
+  peers: presence.remotePeers,
+  selectedIds: selectedElementIds,
+  deviceId: presence.localClientId,
+  userId: computed(() => presenceUser.value?.id ?? ''),
+  userName: computed(() => presenceUser.value?.name ?? ''),
+  canWrite: canWritePresence,
+})
 type CanvasLibraryIslandInstance = {
   setExternalDragHover: (hit: LibraryDropHit | null) => void
   getSelectedFolderKey: () => string
@@ -460,6 +603,10 @@ const nodePresentation = createCanvasScreenNodePresentation({
   imageStages: imageToolUi.imageStages,
   isDuplicateModifierPressed,
   nodeInteractions: surface.nodeInteractions,
+  lockOwnerFor: (nodeId) => {
+    const owner = softLocks.nodeLocksById.value.get(nodeId)
+    return owner ? { name: owner.name, color: owner.color } : null
+  },
 })
 const {
   nodePresentationIntentRouter,
@@ -471,6 +618,21 @@ const isCanvasShortcutSuppressed = computed(
 )
 const onCanvasDrop = commands.graphEditing.onCanvasDrop
 const onExportSelectedImages = commands.graphEditing.onExportSelectedImages
+
+// Soft-lock drag guard: nodes locked by another editor leave the drag cohort.
+// GraphSession commits final coordinates on drop and publishes that commit.
+function onGuardedNodeDragStart(payload: NodeDragEvent) {
+  const editable = softLocks.filterEditable(payload.nodes.map((node) => node.id))
+  if (editable.length === 0) return
+  if (editable.length === payload.nodes.length) {
+    onNodeDragStart(payload)
+    return
+  }
+  onNodeDragStart({
+    ...payload,
+    nodes: payload.nodes.filter((node) => editable.includes(node.id)),
+  })
+}
 
 function addLibraryAssetToCanvas(asset: CanvasLibraryImportDescriptor) {
   const bounds = canvasWrapRef.value?.getBoundingClientRect()
@@ -503,27 +665,35 @@ const chromeProps = computed(() => ({
   },
 }))
 
+const isEditLocked = computed(
+  () =>
+    isFlowCanvasLocked.value ||
+    isBoardArchived.value ||
+    isBoardReadOnly.value ||
+    isCollaborationReadOnly.value,
+)
+
 const vueFlowProps = computed(() => {
   const isSelectTool = activeTool.value === 'select'
   const isHandTool = activeTool.value === 'hand'
-  // Archived boards reuse the existing canvas lock: while the archived
-  // banner is visible the graph is read-only and autosaves cannot dirty it.
-  // Read-only boards (viewer without write, from server capabilities) lock
-  // the same way. Any residual programmatic edit still funnels through the
-  // save path, where 409 `board_archived` / 403 `board_forbidden`
-  // re-asserts the banner without toast spam.
-  const isCanvasLocked = isFlowCanvasLocked.value || isBoardArchived.value || isBoardReadOnly.value
+  // Edit lock covers every non-writable state: flow tool lock, archived,
+  // and viewer read-only (server capabilities). Any residual programmatic
+  // edit still funnels through the save path, where 409 `board_archived` /
+  // 403 `board_forbidden` re-asserts the banner without toast spam.
+  // Camera lock is separate: viewer (read-only) never locks navigation so
+  // the canvas stays explorable; only flow lock and archived lock pan/zoom.
+  const isCameraLocked = isFlowCanvasLocked.value || isBoardArchived.value
 
   return {
-    panOnDrag: isCanvasLocked ? false : isHandTool ? [0, 1, 2] : [1, 2],
-    nodesDraggable: !isCanvasLocked && !isHandTool,
-    nodesConnectable: !isCanvasLocked && !isHandTool,
-    elementsSelectable: !isCanvasLocked && !isHandTool,
-    selectNodesOnDrag: !isCanvasLocked && isSelectTool,
-    selectionKeyCode: !isCanvasLocked && isSelectTool,
-    multiSelectionKeyCode: !isCanvasLocked && isSelectTool ? 'Shift' : null,
+    panOnDrag: isCameraLocked ? false : isHandTool ? [0, 1, 2] : [1, 2],
+    nodesDraggable: !isEditLocked.value && !isHandTool,
+    nodesConnectable: !isEditLocked.value && !isHandTool,
+    elementsSelectable: !isEditLocked.value && !isHandTool,
+    selectNodesOnDrag: !isEditLocked.value && isSelectTool,
+    selectionKeyCode: !isEditLocked.value && isSelectTool,
+    multiSelectionKeyCode: !isEditLocked.value && isSelectTool ? 'Shift' : null,
     deleteKeyCode:
-      isCanvasLocked || isCanvasShortcutSuppressed.value ? null : ['Backspace', 'Delete'],
+      isEditLocked.value || isCanvasShortcutSuppressed.value ? null : ['Backspace', 'Delete'],
     edgesUpdatable: false,
     connectOnClick: false,
     defaultEdgeOptions: {
@@ -535,12 +705,12 @@ const vueFlowProps = computed(() => {
     minZoom: CANVAS_VIEWPORT_MIN_ZOOM,
     maxZoom: CANVAS_VIEWPORT_MAX_ZOOM,
     zoomOnScroll: false,
-    panOnScroll: !isCanvasLocked,
+    panOnScroll: !isCameraLocked,
     panActivationKeyCode: null,
     panOnScrollSpeed: 1.2,
     autoPanSpeed: 15,
     zoomOnDoubleClick: false,
-    zoomOnPinch: !isCanvasLocked,
+    zoomOnPinch: !isCameraLocked,
     panOnScrollMode: PanOnScrollMode.Free,
     onlyRenderVisibleElements: false,
     ...connectionAdapter.vueFlowBindings,
@@ -585,7 +755,7 @@ useCanvasScreenLifecycle({
   keyboard: {
     onDeleteInlineSelection,
     isShortcutSuppressed: () => isCanvasShortcutSuppressed.value,
-    onEscape: onEscapeShortcut,
+    onEscape: onCanvasEscape,
     onPanViewport,
     setActiveTool,
     onSpacePressedChange: (isPressed) => {
@@ -616,5 +786,18 @@ useCanvasScreenLifecycle({
   z-index: 2;
   overscroll-behavior: none;
   overscroll-behavior-x: none;
+}
+
+.canvas-spotlight-banner {
+  pointer-events: none;
+  position: absolute;
+  top: calc(var(--canvas-chrome-inset, 16px) + 56px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  width: max-content;
+  max-width: calc(100% - 32px);
 }
 </style>

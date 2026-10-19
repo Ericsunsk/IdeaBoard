@@ -107,10 +107,12 @@ DEPLOY_API_IMAGE=""
 DEPLOY_API_MIGRATE_IMAGE=""
 DEPLOY_AUTH_IMAGE=""
 DEPLOY_AUTH_MIGRATE_IMAGE=""
+DEPLOY_REALTIME_IMAGE=""
 PREVIOUS_API_IMAGE=""
 PREVIOUS_API_MIGRATE_IMAGE=""
 PREVIOUS_AUTH_IMAGE=""
 PREVIOUS_AUTH_MIGRATE_IMAGE=""
+PREVIOUS_REALTIME_IMAGE=""
 DEPLOY_AUTOMATION_RESULT_FILE="${IDEABOARD_DEPLOY_RESULT_FILE:-}"
 
 if [[ "$command" == "delete" || "$command" == "uninstall" ]]; then
@@ -279,6 +281,12 @@ auth_host_port() {
   printf '%s\n' "${value:-6001}"
 }
 
+realtime_host_port() {
+  local value
+  value="$(env_or_file_value REALTIME_HOST_PORT)"
+  printf '%s\n' "${value:-6002}"
+}
+
 api_metrics_host_port() {
   local value
   value="$(env_or_file_value API_METRICS_HOST_PORT)"
@@ -311,6 +319,12 @@ nginx_auth_health_upstream() {
 
 nginx_real_ip_include() {
   env_or_file_value NGINX_REAL_IP_INCLUDE
+}
+
+nginx_realtime_upstream() {
+  local value
+  value="$(env_or_file_value NGINX_REALTIME_UPSTREAM)"
+  printf '%s\n' "${value:-http://127.0.0.1:$(realtime_host_port)}"
 }
 
 image_source_repo_from_ref() {
@@ -419,6 +433,7 @@ validate_env_file() {
     IDEABOARD_API_MIGRATE_IMAGE \
     IDEABOARD_AUTH_IMAGE \
     IDEABOARD_AUTH_MIGRATE_IMAGE \
+    IDEABOARD_REALTIME_IMAGE \
     POSTGRES_PASSWORD \
     API_DB_PASSWORD \
     AUTH_DB_PASSWORD \
@@ -447,11 +462,14 @@ validate_env_file() {
   local auth_migrate_image
   local auth_repo
   local auth_migrate_repo
+  local realtime_image
+  local realtime_repo
   local nats_password
   api_image="$(env_value IDEABOARD_API_IMAGE)"
   api_migrate_image="$(env_value IDEABOARD_API_MIGRATE_IMAGE)"
   auth_image="$(env_value IDEABOARD_AUTH_IMAGE)"
   auth_migrate_image="$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
+  realtime_image="$(env_value IDEABOARD_REALTIME_IMAGE)"
 
   if ! is_ideaboard_image_ref "$api_image" "api"; then
     echo "Please set IDEABOARD_API_IMAGE to a full immutable GHCR digest ref, e.g. ghcr.io/owner/repo/ideaboard-api@sha256:..." >&2
@@ -469,11 +487,16 @@ validate_env_file() {
     echo "Please set IDEABOARD_AUTH_MIGRATE_IMAGE to a full immutable GHCR digest ref, e.g. ghcr.io/owner/repo/ideaboard-auth-migrate@sha256:..." >&2
     return 1
   fi
+  if ! is_ideaboard_image_ref "$realtime_image" "realtime"; then
+    echo "Please set IDEABOARD_REALTIME_IMAGE to a full immutable GHCR digest ref, e.g. ghcr.io/owner/repo/ideaboard-realtime@sha256:..." >&2
+    return 1
+  fi
   api_repo="$(image_source_repo_from_ref "$api_image")"
   api_migrate_repo="$(image_source_repo_from_ref "$api_migrate_image")"
   auth_repo="$(image_source_repo_from_ref "$auth_image")"
   auth_migrate_repo="$(image_source_repo_from_ref "$auth_migrate_image")"
-  if ! [[ "$api_repo" == "$api_migrate_repo" && "$api_repo" == "$auth_repo" && "$api_repo" == "$auth_migrate_repo" ]]; then
+  realtime_repo="$(image_source_repo_from_ref "$realtime_image")"
+  if ! [[ "$api_repo" == "$api_migrate_repo" && "$api_repo" == "$auth_repo" && "$api_repo" == "$auth_migrate_repo" && "$api_repo" == "$realtime_repo" ]]; then
     echo "All IDEABOARD_*_IMAGE values must come from the same GHCR owner/repo." >&2
     return 1
   fi
@@ -586,6 +609,7 @@ preflight_checks() {
   check_port_available_or_used_by_compose "$(api_host_port)" "api" "ideaboard-api"
   check_port_available_or_used_by_compose "$(api_metrics_host_port)" "api metrics" "ideaboard-api"
   check_port_available_or_used_by_compose "$(auth_host_port)" "auth" "ideaboard-auth"
+  check_port_available_or_used_by_compose "$(realtime_host_port)" "realtime" "ideaboard-realtime"
   if [[ -n "$(nginx_real_ip_include)" && ! -r "$(nginx_real_ip_include)" ]]; then
     die "NGINX_REAL_IP_INCLUDE is not readable: $(nginx_real_ip_include)"
   fi
@@ -1113,6 +1137,7 @@ wait_for_backend_health() {
   wait_for_http_local "api upstream" "${api_upstream%/}/api/health"
   wait_for_http_local "api metrics" "http://127.0.0.1:$(api_metrics_host_port)/metrics"
   wait_for_http_local "auth upstream" "$(nginx_auth_health_upstream)"
+  wait_for_http_local "realtime upstream" "$(nginx_realtime_upstream)/health"
 }
 
 is_false_value() {
@@ -1281,6 +1306,7 @@ init_release_context() {
   PREVIOUS_API_MIGRATE_IMAGE="$(env_value IDEABOARD_API_MIGRATE_IMAGE)"
   PREVIOUS_AUTH_IMAGE="$(env_value IDEABOARD_AUTH_IMAGE)"
   PREVIOUS_AUTH_MIGRATE_IMAGE="$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
+  PREVIOUS_REALTIME_IMAGE="$(env_value IDEABOARD_REALTIME_IMAGE)"
   DEPLOY_ENV_SNAPSHOT="$(mktemp "$RELEASE_STATE_DIR/env.${DEPLOY_RELEASE_ID}.XXXXXX")"
   cp "$BASE_ENV_FILE" "$DEPLOY_ENV_SNAPSHOT"
   chmod 600 "$DEPLOY_ENV_SNAPSHOT"
@@ -1309,13 +1335,15 @@ write_release_manifest() {
     "api": $(json_value "${DEPLOY_API_IMAGE:-$(env_value IDEABOARD_API_IMAGE)}"),
     "api-migrate": $(json_value "${DEPLOY_API_MIGRATE_IMAGE:-$(env_value IDEABOARD_API_MIGRATE_IMAGE)}"),
     "auth": $(json_value "${DEPLOY_AUTH_IMAGE:-$(env_value IDEABOARD_AUTH_IMAGE)}"),
-    "auth-migrate": $(json_value "${DEPLOY_AUTH_MIGRATE_IMAGE:-$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)}")
+    "auth-migrate": $(json_value "${DEPLOY_AUTH_MIGRATE_IMAGE:-$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)}"),
+    "realtime": $(json_value "${DEPLOY_REALTIME_IMAGE:-$(env_value IDEABOARD_REALTIME_IMAGE)}")
   },
   "previous_images": {
     "api": $(json_value "$PREVIOUS_API_IMAGE"),
     "api-migrate": $(json_value "$PREVIOUS_API_MIGRATE_IMAGE"),
     "auth": $(json_value "$PREVIOUS_AUTH_IMAGE"),
-    "auth-migrate": $(json_value "$PREVIOUS_AUTH_MIGRATE_IMAGE")
+    "auth-migrate": $(json_value "$PREVIOUS_AUTH_MIGRATE_IMAGE"),
+    "realtime": $(json_value "$PREVIOUS_REALTIME_IMAGE")
   },
   "backups": {
     "postgres": $(json_value "$DEPLOY_POSTGRES_BACKUP"),
@@ -1366,6 +1394,7 @@ capture_deploy_image_refs() {
   DEPLOY_API_MIGRATE_IMAGE="$(env_value IDEABOARD_API_MIGRATE_IMAGE)"
   DEPLOY_AUTH_IMAGE="$(env_value IDEABOARD_AUTH_IMAGE)"
   DEPLOY_AUTH_MIGRATE_IMAGE="$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
+  DEPLOY_REALTIME_IMAGE="$(env_value IDEABOARD_REALTIME_IMAGE)"
 }
 
 print_recovery_hint() {
@@ -1382,7 +1411,8 @@ print_recovery_hint() {
   echo "Previous API migration image: $PREVIOUS_API_MIGRATE_IMAGE" >&2
   echo "Previous Auth image: $PREVIOUS_AUTH_IMAGE" >&2
   echo "Previous Auth migration image: $PREVIOUS_AUTH_MIGRATE_IMAGE" >&2
-  echo "Inspect logs: ideaboard logs --tail=200 api auth postgres nats" >&2
+  echo "Previous Realtime image: $PREVIOUS_REALTIME_IMAGE" >&2
+  echo "Inspect logs: ideaboard logs --tail=200 api api-worker auth realtime postgres nats" >&2
   if (( DEPLOY_MIGRATION_STARTED == 0 )); then
     if (( DEPLOY_ENV_RESTORE_ALLOWED == 1 )); then
       echo "Migration did not start; .env was restored to the previous image refs." >&2
@@ -1491,6 +1521,7 @@ print_env_image_refs() {
   echo "Configured image refs:"
   echo "  api: $(env_value IDEABOARD_API_IMAGE)"
   echo "  auth: $(env_value IDEABOARD_AUTH_IMAGE)"
+  echo "  realtime: $(env_value IDEABOARD_REALTIME_IMAGE)"
   echo "  api-migrate: $(env_value IDEABOARD_API_MIGRATE_IMAGE)"
   echo "  auth-migrate: $(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
 }
@@ -1577,6 +1608,7 @@ apply_update_manifest() {
   local api_migrate_image
   local auth_image
   local auth_migrate_image
+  local realtime_image
   local tag
   local commit
   local checkout_commit
@@ -1588,12 +1620,14 @@ apply_update_manifest() {
   if [[ -z "$auth_migrate_image" ]]; then
     auth_migrate_image="$(json_image_field "auth_migrate" "$manifest_file")"
   fi
-  [[ -n "$api_image" && -n "$api_migrate_image" && -n "$auth_image" && -n "$auth_migrate_image" ]] || \
-    die "release manifest must contain images.api, images.api-migrate, images.auth, and images.auth-migrate"
+  realtime_image="$(json_image_field "realtime" "$manifest_file")"
+  [[ -n "$api_image" && -n "$api_migrate_image" && -n "$auth_image" && -n "$auth_migrate_image" && -n "$realtime_image" ]] || \
+    die "release manifest must contain images.api, images.api-migrate, images.auth, images.auth-migrate, and images.realtime"
   is_ideaboard_image_ref "$api_image" "api" || die "release manifest has invalid api image ref"
   is_ideaboard_image_ref "$api_migrate_image" "api-migrate" || die "release manifest has invalid api-migrate image ref"
   is_ideaboard_image_ref "$auth_image" "auth" || die "release manifest has invalid auth image ref"
   is_ideaboard_image_ref "$auth_migrate_image" "auth-migrate" || die "release manifest has invalid auth-migrate image ref"
+  is_ideaboard_image_ref "$realtime_image" "realtime" || die "release manifest has invalid realtime image ref"
 
   tag="$(json_string_field "tag" "$manifest_file")"
   commit="$(json_string_field "commit" "$manifest_file")"
@@ -1607,6 +1641,7 @@ apply_update_manifest() {
   set_env_value IDEABOARD_API_MIGRATE_IMAGE "$api_migrate_image"
   set_env_value IDEABOARD_AUTH_IMAGE "$auth_image"
   set_env_value IDEABOARD_AUTH_MIGRATE_IMAGE "$auth_migrate_image"
+  set_env_value IDEABOARD_REALTIME_IMAGE "$realtime_image"
   DEPLOY_IMAGE_UPDATE_PENDING=1
 }
 
@@ -1673,19 +1708,23 @@ restore_previous_image_refs() {
   local api_migrate_image
   local auth_image
   local auth_migrate_image
+  local realtime_image
   api_image="$(json_object_string_field "images" "api" "$PREVIOUS_RELEASE_FILE")"
   api_migrate_image="$(json_object_string_field "images" "api-migrate" "$PREVIOUS_RELEASE_FILE")"
   auth_image="$(json_object_string_field "images" "auth" "$PREVIOUS_RELEASE_FILE")"
   auth_migrate_image="$(json_object_string_field "images" "auth-migrate" "$PREVIOUS_RELEASE_FILE")"
-  [[ -n "$api_image" && -n "$api_migrate_image" && -n "$auth_image" && -n "$auth_migrate_image" ]] || die "previous release manifest is missing image refs"
+  realtime_image="$(json_object_string_field "images" "realtime" "$PREVIOUS_RELEASE_FILE")"
+  [[ -n "$api_image" && -n "$api_migrate_image" && -n "$auth_image" && -n "$auth_migrate_image" && -n "$realtime_image" ]] || die "previous release manifest is missing image refs"
   is_ideaboard_image_ref "$api_image" "api" || die "previous release manifest has invalid api image ref"
   is_ideaboard_image_ref "$api_migrate_image" "api-migrate" || die "previous release manifest has invalid api-migrate image ref"
   is_ideaboard_image_ref "$auth_image" "auth" || die "previous release manifest has invalid auth image ref"
   is_ideaboard_image_ref "$auth_migrate_image" "auth-migrate" || die "previous release manifest has invalid auth-migrate image ref"
+  is_ideaboard_image_ref "$realtime_image" "realtime" || die "previous release manifest has invalid realtime image ref"
   set_env_value IDEABOARD_API_IMAGE "$api_image"
   set_env_value IDEABOARD_API_MIGRATE_IMAGE "$api_migrate_image"
   set_env_value IDEABOARD_AUTH_IMAGE "$auth_image"
   set_env_value IDEABOARD_AUTH_MIGRATE_IMAGE "$auth_migrate_image"
+  set_env_value IDEABOARD_REALTIME_IMAGE "$realtime_image"
 }
 
 run_previous_rollback() {
@@ -1821,6 +1860,7 @@ verify_image_signatures() {
   verify_image_signature "$(env_value IDEABOARD_API_MIGRATE_IMAGE)"
   verify_image_signature "$(env_value IDEABOARD_AUTH_IMAGE)"
   verify_image_signature "$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
+  verify_image_signature "$(env_value IDEABOARD_REALTIME_IMAGE)"
   DEPLOY_COSIGN_GATE="passed"
 }
 
@@ -1866,6 +1906,7 @@ render_host_nginx_config() {
   NGINX_API_UPSTREAM="$(nginx_api_upstream)" \
   NGINX_AUTH_UPSTREAM="$(nginx_auth_upstream)" \
     NGINX_AUTH_HEALTH_UPSTREAM="$(nginx_auth_health_upstream)" \
+    NGINX_REALTIME_UPSTREAM="$(nginx_realtime_upstream)" \
     NGINX_REAL_IP_INCLUDE="$(nginx_real_ip_include)" \
     NGINX_SERVER_NAME="${NGINX_SERVER_NAME:-$(env_or_file_value NGINX_SERVER_NAME)}" \
     NGINX_WEB_ROOT="${NGINX_WEB_ROOT:-/usr/share/nginx/html}" \

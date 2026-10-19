@@ -93,7 +93,7 @@ function documentData(params: { id: string; revision?: number | undefined; state
     board_id: params.id,
     revision: params.revision ?? 1,
     schema_version: schemaVersion,
-    document: { schema_version: schemaVersion, payload },
+    document: { schema_version: schemaVersion, payload: { ...payload, y_state: 'AAA=' } },
     updated_at: new Date(params.state.updatedAt).toISOString(),
   }
 }

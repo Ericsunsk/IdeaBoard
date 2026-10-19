@@ -27,7 +27,7 @@ export interface Workspace {
   /** RFC3339 UTC timestamp. */
   created_at: string
   /**
-   * RFC3339 UTC timestamp; null unless archived.
+   * RFC3339 UTC timestamp; null unless archived. Archived non-Default workspaces are permanently deleted 7 days after this timestamp.
    * @nullable
    */
   archived_at?: string | null

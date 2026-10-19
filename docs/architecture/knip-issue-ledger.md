@@ -19,10 +19,10 @@ Normal 与 production configuration 当前均通过。每次 `lint:knip` 重新�
 
 <!-- KNIP_SUMMARY_START -->
 
-| Mode       | Exit | Issues |
-| ---------- | ---- | ------ |
-| normal     | 0    |        |
-| production | 0    |        |
+| Mode | Exit | Issues |
+|---|---|---|
+| normal | 0 |  |
+| production | 0 |  |
 
 <!-- KNIP_SUMMARY_END -->
 
@@ -32,8 +32,9 @@ Normal 与 production configuration 当前均通过。每次 `lint:knip` 重新�
 
 <!-- KNIP_ISSUES_START -->
 
-| ID  | Mode / Category | File : Line | Symbol | Disposition | Owner | Evidence / Next Check |
-| --- | --------------- | ----------- | ------ | ----------- | ----- | --------------------- |
+| ID | Mode / Category | File : Line | Symbol | Disposition | Owner | Evidence / Next Check |
+|---|---|---|---|---|---|---|
+
 
 <!-- KNIP_ISSUES_END -->
 

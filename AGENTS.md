@@ -57,6 +57,7 @@ Use the smallest relevant check:
 - Backend tests/build: `cd apps/api && go test ./...` / `go build ./...`
 - DB query/schema changes: `cd apps/api && go tool sqlc generate`
 - Auth build: `cd apps/auth && npm run build`
+- Realtime build: `cd apps/realtime && npm run build`
 
 If you cannot run a relevant check, say so and explain the residual risk.
 

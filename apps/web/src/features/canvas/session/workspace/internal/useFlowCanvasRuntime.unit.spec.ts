@@ -1,5 +1,8 @@
 import type { Edge, EdgeChange, GraphNode, GraphEdge, Node, NodeChange } from '@vue-flow/core'
-import { computed, nextTick, ref, shallowRef } from 'vue'
+import { computed, effectScope, nextTick, ref, shallowRef } from 'vue'
+import * as Y from 'yjs'
+import { useCanvasCollaborationSession } from '../../collaboration/useCanvasCollaborationSession'
+import { snapshotToDocEntries } from '../../collaboration/internal/mapping'
 import { describe, expect, it, vi } from 'vitest'
 import type { BoardSession, SaveStatus } from '../../board-session'
 import {
@@ -299,7 +302,10 @@ function createExecutionRuntimeHarness() {
   return { executionCore, executionRuntime }
 }
 
-function createRuntimeHarness(snapshot = createSnapshot()) {
+function createRuntimeHarness(
+  snapshot = createSnapshot(),
+  collaboration: Pick<UseFlowCanvasRuntimeOptions, 'collaboration'> = {},
+) {
   const fullNodes = shallowRef<Node[]>([])
   const fullEdges = shallowRef<Edge[]>([])
   const nodes = fullNodes
@@ -339,6 +345,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   }
 
   const runtimeOptions: UseFlowCanvasRuntimeOptions = {
+    ...collaboration,
     nodes,
     edges,
     boardBaseSnapshot,
@@ -619,6 +626,62 @@ function clickNodeThroughGrouping(
 }
 
 describe('useFlowCanvasRuntime', () => {
+  it('projects collaboration through canonical commits without snapshot autosave or remote echo', async () => {
+    const doc = new Y.Doc()
+    const initial = createSnapshot()
+    const initialEntries = snapshotToDocEntries(initial)
+    for (const [id, value] of initialEntries.nodes) doc.getMap('nodes').set(id, value)
+    for (const [id, value] of initialEntries.edges) doc.getMap('edges').set(id, value)
+    const scope = effectScope()
+    const transport = {
+      sharedDoc: shallowRef<Y.Doc | null>(null),
+      localClientId: ref(41),
+      isDocSynced: ref(false),
+    }
+    const collaboration = scope.run(() =>
+      useCanvasCollaborationSession({ createTransport: () => transport }),
+    )!
+    const onLocalSnapshot = vi.spyOn(collaboration, 'syncSnapshot')
+    const harness = scope.run(() => createRuntimeHarness(initial, { collaboration }))!
+    collaboration.bindBoard({
+      boardId: harness.routeBoardId,
+      accessState: ref('workspace'),
+      canWrite: ref(true),
+    })
+    transport.sharedDoc.value = doc
+    await nextTick()
+    transport.isDocSynced.value = true
+    await harness.runtime.persistence.loadInitialOrRouteBoard()
+    const store = harness.runtime.graphEditing.readCanvasGraphStore()
+    store.beginTransaction('node-update').updateNode('prompt-1', { x: 777 }).commit()
+    await harness.flushNativeGraphChanges()
+    expect(onLocalSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        promptNodes: expect.arrayContaining([expect.objectContaining({ id: 1, x: 777 })]),
+      }),
+      ['prompt-1'],
+      [],
+    )
+    expect(doc.getMap('nodes').get('prompt-1')).toMatchObject({
+      id: 'prompt-1',
+      position: { x: 777 },
+    })
+    await harness.runtime.persistence.flushAutosave()
+    expect(harness.savedSnapshots).toEqual([])
+    onLocalSnapshot.mockClear()
+    const remote = createSnapshot()
+    remote.promptNodes[0]!.x = 888
+    const remoteEntries = snapshotToDocEntries(remote)
+    doc.transact(() => {
+      for (const [id, value] of remoteEntries.nodes) doc.getMap('nodes').set(id, value)
+    }, 'remote-peer')
+    expect(store.exportSnapshot().promptNodes[0]?.x).toBe(888)
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position.x).toBe(888)
+    expect(onLocalSnapshot).not.toHaveBeenCalled()
+    scope.stop()
+    doc.destroy()
+  })
+
   it('hydrates the full graph into the Vue Flow store', async () => {
     const harness = createRuntimeHarness()
     const hydrateSession = vi.spyOn(CanvasGraphSession, 'hydrate')

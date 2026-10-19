@@ -144,6 +144,7 @@ export class CanvasGraphTransaction {
   commit(): CanvasGraphTransactionSummary {
     this.assertOpen()
     const changes = normalizeTransactionChanges(this.draft)
+    if (changes.hasDomainChanges && !this.store._canWriteDomain()) return this.cancel()
     const didChange = hasVisibleChanges(changes)
     const commitPatch = createCommitPatch(this.draft)
     if (didChange) this.store._commitTransaction(this.draft)

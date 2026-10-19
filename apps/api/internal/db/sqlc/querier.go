@@ -110,6 +110,7 @@ type Querier interface {
 	// transaction (see InsertWorkspaceTaskOutput).
 	CompleteWorkspaceTask(ctx context.Context, arg CompleteWorkspaceTaskParams) (Task, error)
 	CountAdminPaymentOrders(ctx context.Context, arg CountAdminPaymentOrdersParams) (int64, error)
+	CountBoardYUpdates(ctx context.Context, arg CountBoardYUpdatesParams) (int64, error)
 	// Counts honor the user/keyword filters but never the status filter, so
 	// the status pills keep their global breakdown while a status is active.
 	CountControlTasks(ctx context.Context, arg CountControlTasksParams) ([]CountControlTasksRow, error)
@@ -253,6 +254,7 @@ type Querier interface {
 	// authorizing in the same accepting transaction while upload-target,
 	// owner, library, task, and other-board sources stay untouched.
 	DeleteBoardDocumentMediaRefs(ctx context.Context, arg DeleteBoardDocumentMediaRefsParams) error
+	DeleteBoardYUpdates(ctx context.Context, arg DeleteBoardYUpdatesParams) error
 	DeleteControlIdempotencyRecord(ctx context.Context, arg DeleteControlIdempotencyRecordParams) error
 	DeleteLibraryAsset(ctx context.Context, arg DeleteLibraryAssetParams) (int64, error)
 	DeleteLibraryFolder(ctx context.Context, arg DeleteLibraryFolderParams) (int64, error)
@@ -284,6 +286,10 @@ type Querier interface {
 	GetActiveStorageProfileSecretVersion(ctx context.Context, arg GetActiveStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	GetAdminPaymentOrder(ctx context.Context, orderNumber string) (GetAdminPaymentOrderRow, error)
 	GetBillingAccountByWorkspaceID(ctx context.Context, workspaceID pgtype.Int8) (BillingAccount, error)
+	// Global presence-ticket lookup: board public ids are globally unique
+	// (uq_boards_public_id), so the realtime admit path resolves the owning
+	// workspace from the ticket bid alone without a wid query param.
+	GetBoardByPublicID(ctx context.Context, boardPublicID string) (GetBoardByPublicIDRow, error)
 	GetBoardRevisionByID(ctx context.Context, arg GetBoardRevisionByIDParams) (GetBoardRevisionByIDRow, error)
 	GetBoardRevisionByNumber(ctx context.Context, arg GetBoardRevisionByNumberParams) (GetBoardRevisionByNumberRow, error)
 	GetControlIdempotency(ctx context.Context, arg GetControlIdempotencyParams) (GetControlIdempotencyRow, error)
@@ -358,6 +364,11 @@ type Querier interface {
 	HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error)
 	InsertBoardDocument(ctx context.Context, arg InsertBoardDocumentParams) error
 	InsertBoardRevision(ctx context.Context, arg InsertBoardRevisionParams) (InsertBoardRevisionRow, error)
+	// Y.Doc collaboration update log (ADR-0020). Updates are opaque CRDT bytes
+	// written by the realtime sidecar; the Go side never decodes them. Compaction
+	// posts a sanitized snapshot that lands in board_documents + board_revisions
+	// in one transaction and then trims this log (DeleteBoardYUpdates).
+	InsertBoardYUpdate(ctx context.Context, arg InsertBoardYUpdateParams) (InsertBoardYUpdateRow, error)
 	// Control Plane audit record writes (#809). Best-effort durable sink
 	// behind the control guard's structured slog record; audit failures
 	// never fail the guarded request.
@@ -387,6 +398,7 @@ type Querier interface {
 	ListAdminPaymentOrders(ctx context.Context, arg ListAdminPaymentOrdersParams) ([]ListAdminPaymentOrdersRow, error)
 	ListBackfilledDatesByRange(ctx context.Context, arg ListBackfilledDatesByRangeParams) ([]pgtype.Date, error)
 	ListBoardRevisions(ctx context.Context, arg ListBoardRevisionsParams) ([]ListBoardRevisionsRow, error)
+	ListBoardYUpdates(ctx context.Context, arg ListBoardYUpdatesParams) ([]ListBoardYUpdatesRow, error)
 	// ListBoardsReferencingMediaAsset lists the workspace-scoped board public
 	// ids whose accepted document references one asset (#936: board-reference
 	// source, read from board_document_media_refs). Served through the narrow

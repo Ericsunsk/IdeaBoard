@@ -29,12 +29,17 @@ type CanvasGraphSessionRuntimeOptions = {
   projectCommittedGroupNodeLayer: (node: Node) => Node
   onGroupsChanged: (groups: BoardSnapshot['groups']) => void
   scheduleMicrotask?: ((callback: () => void) => void) | undefined
+  onLocalSnapshot?:
+    | ((snapshot: BoardSnapshot, nodeIds: readonly string[], edgeIds: readonly string[]) => void)
+    | undefined
+  canWriteGraph?: (() => boolean) | undefined
 }
 
 export type CanvasGraphSessionRuntime = {
   isAttached: () => boolean
   readCanvasGraphStore: () => CanvasGraphStore
   replaceGraphSnapshot: (snapshot: BoardSnapshot, reason: 'hydrate' | 'save-reconcile') => void
+  applyRemoteSnapshot: (snapshot: BoardSnapshot) => void
   exportGraphSnapshot: (baseSnapshot: BoardSnapshot) => BoardSnapshot
   commitGraph: (
     graph: { nodes: Node[]; edges: Edge[] },
@@ -141,10 +146,23 @@ export function createCanvasGraphSessionRuntime(
 
     dispose()
     const session = CanvasGraphSession.hydrate(boardId, snapshot, canvasGraphStoreTelemetryProbe)
+    session.store.setDomainWritePolicy(options.canWriteGraph ?? (() => true))
     graphSession = session
     const unsubscribeHistory = session.subscribe((event) => {
       if (session !== graphSession || session.boardId !== options.boardSession.currentBoardId.value)
         return
+      if (event.sideEffects.shouldMarkDirty) {
+        options.onLocalSnapshot?.(
+          session.exportSnapshot(options.boardBaseSnapshot.value),
+          [
+            ...event.summary.changedNodeIds,
+            ...event.summary.removedNodeIds,
+            ...event.summary.changedGroupIds,
+            ...event.summary.removedGroupIds,
+          ],
+          [...event.summary.changedEdgeIds, ...event.summary.removedEdgeIds],
+        )
+      }
       if (event.sideEffects.shouldRecordHistory) options.history.record(event.patch)
       if (event.sideEffects.shouldMarkDirty) options.markDirty()
     })
@@ -182,10 +200,26 @@ export function createCanvasGraphSessionRuntime(
     return requireGraphSession().exportSnapshot(baseSnapshot)
   }
 
+  function applyRemoteSnapshot(snapshot: BoardSnapshot): void {
+    const session = requireGraphSession()
+    if (snapshot.schemaVersion !== options.boardBaseSnapshot.value.schemaVersion) return
+    options.boardBaseSnapshot.value = snapshot
+    session.replace(snapshot)
+    const flow = boardSnapshotToFlow(session.exportSnapshot(snapshot))
+    options.graphAdapter.replaceFullProjection(
+      options.preserveCurrentSelection({
+        nodes: options.projectCurrentGroupNodeLayers(flow.nodes as Node[]),
+        edges: flow.edges as Edge[],
+      }),
+    )
+    options.onGroupsChanged(snapshot.groups)
+  }
+
   const runtime = {
     isAttached,
     readCanvasGraphStore,
     replaceGraphSnapshot,
+    applyRemoteSnapshot,
     exportGraphSnapshot,
     commitGraph,
     dispose,

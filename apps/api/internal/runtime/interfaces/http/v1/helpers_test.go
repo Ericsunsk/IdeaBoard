@@ -692,8 +692,9 @@ func TestV1CreateMultipleNonDefaultWorkspaces(t *testing.T) {
 
 // TestV1ArchiveDefaultWorkspaceProtected proves the Default workspace
 // cannot be archived (403 workspace_default_protected) while plain rows
-// archive normally. Workspaces are never hard-deleted, so this guard
-// covers the only delete path.
+// archive normally. Archived non-Default workspaces are hard-deleted 7
+// days later by the workspace purge, so this guard covers the Default
+// exemption on the archive path.
 func TestV1ArchiveDefaultWorkspaceProtected(t *testing.T) {
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()

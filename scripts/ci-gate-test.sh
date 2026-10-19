@@ -12,6 +12,7 @@ run_gate() {
     WEB_REQUIRED="${WEB_REQUIRED:-false}" WEB_RESULT="${WEB_RESULT:-skipped}" \
     API_REQUIRED="${API_REQUIRED:-false}" API_RESULT="${API_RESULT:-skipped}" \
     AUTH_REQUIRED="${AUTH_REQUIRED:-false}" AUTH_RESULT="${AUTH_RESULT:-skipped}" \
+    REALTIME_REQUIRED="${REALTIME_REQUIRED:-false}" REALTIME_RESULT="${REALTIME_RESULT:-skipped}" \
     MIGRATION_REQUIRED="${MIGRATION_REQUIRED:-false}" MIGRATION_RESULT="${MIGRATION_RESULT:-skipped}" \
     DOCKER_REQUIRED="${DOCKER_REQUIRED:-false}" BROWSER_SMOKE_RESULT="${BROWSER_SMOKE_RESULT:-skipped}" \
     OPS_REQUIRED="${OPS_REQUIRED:-false}" OPS_RESULT="${OPS_RESULT:-skipped}" \
@@ -32,6 +33,15 @@ grep -Fq '| PR size guard | true | success |' "${fixture_dir}/summary.md"
 : >"${fixture_dir}/summary.md"
 API_REQUIRED=true API_RESULT=success BROWSER_SMOKE_RESULT=success run_gate
 grep -Fq '| API | true | success |' "${fixture_dir}/summary.md"
+
+: >"${fixture_dir}/summary.md"
+REALTIME_REQUIRED=true REALTIME_RESULT=success BROWSER_SMOKE_RESULT=success run_gate
+grep -Fq '| Realtime | true | success |' "${fixture_dir}/summary.md"
+
+if REALTIME_REQUIRED=true REALTIME_RESULT=failure BROWSER_SMOKE_RESULT=success run_gate; then
+  echo 'CI gate unexpectedly accepted a failed required Realtime lane' >&2
+  exit 1
+fi
 
 if API_REQUIRED=true API_RESULT=failure BROWSER_SMOKE_RESULT=success run_gate; then
   echo 'CI gate unexpectedly accepted a failed required API lane' >&2

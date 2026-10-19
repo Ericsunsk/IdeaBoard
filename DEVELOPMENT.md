@@ -81,6 +81,16 @@ cd apps/api
 go run ./cmd
 ```
 
+本地默认 `API_MODE=all`（单进程同时跑 HTTP 与 River workers）。拆分冒烟时用同一二进制起双进程（同库，需先 migrate）：
+
+```bash
+cd apps/api
+go run ./cmd --mode=http-only &
+go run ./cmd --mode=worker-only &
+```
+
+`--mode` 覆盖 `API_MODE`；生产 compose 由 `docker/compose.yml` 按 service 固定字面值（`api` 为 http-only，`api-worker` 为 worker-only），见 ADR-0021。
+
 启动 Web：
 
 ```bash

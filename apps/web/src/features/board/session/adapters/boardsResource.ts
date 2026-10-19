@@ -109,10 +109,16 @@ export type WorkspaceBoardMeta = {
   isCreator: boolean
   /**
    * Whether the caller is explicitly selected for sharing, consumed from
-   * `relationship.has_direct_grant`; the team range also requires a noncreator.
+   * `relationship.has_direct_grant`.
    */
   hasDirectGrant: boolean
   creatorUserId: string
+  /**
+   * Workspace-visible owner avatar public URL (server-enriched under the
+   * member-list rule, omitted when unavailable). Display-only: never used
+   * as an identity or permission fact.
+   */
+  ownerAvatarUrl?: string | undefined
 }
 
 export type WorkspaceBoardDocument = {
@@ -210,7 +216,14 @@ function toWorkspaceBoardMeta(board: Board): WorkspaceBoardMeta {
     isCreator: board.relationship?.is_creator === true,
     hasDirectGrant: board.relationship?.has_direct_grant === true,
     creatorUserId: toUserPublicId(board.creator_user_id, 'creator_user_id'),
+    ...toOwnerAvatarUrl(board.owner_avatar),
   }
+}
+
+function toOwnerAvatarUrl(value: unknown): { ownerAvatarUrl: string } | Record<string, never> {
+  if (typeof value !== 'string') return {}
+  const trimmed = value.trim()
+  return trimmed ? { ownerAvatarUrl: trimmed } : {}
 }
 
 function toWorkspaceBoardDocument(document: BoardDocument): WorkspaceBoardDocument {

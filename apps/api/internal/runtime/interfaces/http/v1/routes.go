@@ -127,6 +127,11 @@ type ContractV1Deps struct {
 	// with 501. Production wires NewMemberLookupService over the users
 	// repository plus the Auth lookup reader; tests inject fakes.
 	MemberLookup V1MemberLookupProvider
+	// RealtimeTicketSecret is the HMAC secret for board presence tickets
+	// (REALTIME_TICKET_SECRET). Empty fails the realtime-ticket endpoint
+	// closed with 500 (no fallback default); Load records the missing
+	// key in Config.InvalidEnv so production startup fails fast.
+	RealtimeTicketSecret string
 }
 
 // requireV1IdempotencyKey enforces the shared header-only idempotency contract

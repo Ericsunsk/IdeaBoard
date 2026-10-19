@@ -454,7 +454,7 @@ export const getArchiveWorkspaceUrl = (workspaceId: string) => {
 }
 
 /**
- * Archives the workspace. No Idempotency-Key is required. The Default workspace is never archived: attempts render 403 workspace_default_protected. Workspaces are never hard-deleted, so this guard covers the only delete path.
+ * Archives the workspace. No Idempotency-Key is required. The Default workspace is never archived: attempts render 403 workspace_default_protected. Archived non-Default workspaces are permanently deleted 7 days after archiving (WORKSPACE_PURGE_AFTER_DAYS), including boards and files; billing records are retained.
  * @summary Archive a workspace (owner/admin only)
  */
 export const archiveWorkspace = async (

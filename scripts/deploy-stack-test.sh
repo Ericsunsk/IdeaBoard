@@ -70,7 +70,8 @@ cat > "${fixture_dir}/release-manifest.json" <<EOF
     "api": "ghcr.io/ericsunsk/ideaboard/ideaboard-api@sha256:${digest}",
     "api-migrate": "ghcr.io/ericsunsk/ideaboard/ideaboard-api-migrate@sha256:${digest}",
     "auth": "ghcr.io/ericsunsk/ideaboard/ideaboard-auth@sha256:${digest}",
-    "auth-migrate": "ghcr.io/ericsunsk/ideaboard/ideaboard-auth-migrate@sha256:${digest}"
+    "auth-migrate": "ghcr.io/ericsunsk/ideaboard/ideaboard-auth-migrate@sha256:${digest}",
+    "realtime": "ghcr.io/ericsunsk/ideaboard/ideaboard-realtime@sha256:${digest}"
   }
 }
 EOF

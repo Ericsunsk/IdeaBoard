@@ -69,7 +69,8 @@ jobs:
               (.images.api | startswith($expected_image_repository + "/ideaboard-api@sha256:") and test("@sha256:[0-9a-f]{64}$")) and
               (.images["api-migrate"] | startswith($expected_image_repository + "/ideaboard-api-migrate@sha256:") and test("@sha256:[0-9a-f]{64}$")) and
               (.images.auth | startswith($expected_image_repository + "/ideaboard-auth@sha256:") and test("@sha256:[0-9a-f]{64}$")) and
-              (.images["auth-migrate"] | startswith($expected_image_repository + "/ideaboard-auth-migrate@sha256:") and test("@sha256:[0-9a-f]{64}$"))
+              (.images["auth-migrate"] | startswith($expected_image_repository + "/ideaboard-auth-migrate@sha256:") and test("@sha256:[0-9a-f]{64}$")) and
+              (.images.realtime | startswith($expected_image_repository + "/ideaboard-realtime@sha256:") and test("@sha256:[0-9a-f]{64}$"))
             ' "${manifest}" > /dev/null
 
       - name: Configure restricted SSH transport

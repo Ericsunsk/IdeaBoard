@@ -31,6 +31,16 @@ export type CatalogEntry = {
   workspaceAccess?: GalleryBoardWorkspaceAccess | undefined
   isCreator?: boolean | undefined
   hasDirectGrant?: boolean | undefined
+  /**
+   * Creator User public identity (usr_ opaque), display-only owner fact
+   * carried verbatim from the board payload; absent on local drafts.
+   */
+  creatorUserId?: string | undefined
+  /**
+   * Workspace-visible owner avatar public URL (display-only); absent when
+   * the server omits it or on local drafts.
+   */
+  ownerAvatarUrl?: string | undefined
 }
 
 export type CatalogSortMode = 'recent' | 'name'

@@ -24,6 +24,7 @@ type Config struct {
 	Worker        WorkerConfig
 	Credits       CreditsConfig
 	Rewards       RewardsConfig
+	Realtime      RealtimeConfig
 	Storage       StorageConfig
 	Imgproxy      ImgproxyConfig
 	// AdminSeed carries the init-admin provisioning inputs. They are
@@ -42,6 +43,11 @@ type Config struct {
 	// tolerates them with a warning; LoadAndValidate rejects them in
 	// production so misconfiguration cannot silently run with defaults.
 	InvalidEnv []string
+	// Mode selects the process role of this binary (ADR-0021): all runs
+	// HTTP + River workers in one process (local development default),
+	// http-only serves API/SSE and only enqueues River jobs, worker-only
+	// consumes River queues with no HTTP listeners.
+	Mode ProcessMode
 }
 
 type CreditsConfig struct {
@@ -50,6 +56,14 @@ type CreditsConfig struct {
 
 type RewardsConfig struct {
 	CodeHMACKeys string
+}
+
+// RealtimeConfig carries the board realtime-ticket HMAC secret read from
+// REALTIME_TICKET_SECRET. Empty fails the ticket endpoint closed with 500
+// (no fallback default); Load records the missing key in InvalidEnv so
+// production startup fails fast via ValidateEnvStrict.
+type RealtimeConfig struct {
+	TicketSecret string
 }
 
 type DatabaseConfig struct {
@@ -239,6 +253,11 @@ type WorkerConfig struct {
 	// TaskRetentionDays bounds raw task row lifetime; statistics aggregates
 	// and financial facts are retained independently of this window.
 	TaskRetentionDays int
+	// WorkspacePurgeAfterDays bounds archived workspace lifetime: a
+	// non-Default workspace archived longer ago than this window is
+	// hard-deleted with its boards and files. Billing records, the credit
+	// ledger, and user rows are retained independently of this window.
+	WorkspacePurgeAfterDays int
 }
 
 const (
@@ -253,6 +272,12 @@ const (
 	maxTaskRetentionDays     = 90
 )
 
+const (
+	DefaultWorkspacePurgeAfterDays = 7
+	minWorkspacePurgeAfterDays     = 1
+	maxWorkspacePurgeAfterDays     = 90
+)
+
 func (c WorkerConfig) EffectiveConcurrency() int {
 	if c.Concurrency < minRiverWorkerConcurrency || c.Concurrency > maxRiverWorkerConcurrency {
 		return DefaultRiverWorkerConcurrency
@@ -260,11 +285,65 @@ func (c WorkerConfig) EffectiveConcurrency() int {
 	return c.Concurrency
 }
 
+// ProcessMode selects the runtime role of the API process (ADR-0021). It is
+// deploy-level topology, not business policy: the same binary and database
+// serve every mode, only the started components differ.
+type ProcessMode string
+
+const (
+	// ProcessModeAll runs HTTP listeners and River workers in one process.
+	// It preserves the pre-split behavior and stays the local default.
+	ProcessModeAll ProcessMode = "all"
+	// ProcessModeHTTPOnly serves API/SSE and enqueues River jobs without
+	// registering workers or scheduling periodic jobs.
+	ProcessModeHTTPOnly ProcessMode = "http-only"
+	// ProcessModeWorkerOnly consumes River queues with no HTTP listeners.
+	ProcessModeWorkerOnly ProcessMode = "worker-only"
+)
+
+// ParseProcessMode normalizes a raw mode value, reporting validity
+// separately so Load can record fallback defaults in Config.InvalidEnv.
+// Empty means unset (valid, use the default); unknown tokens are invalid.
+func ParseProcessMode(raw string) (ProcessMode, bool) {
+	value := ProcessMode(strings.ToLower(strings.TrimSpace(raw)))
+	if value == "" {
+		return ProcessModeAll, true
+	}
+	switch value {
+	case ProcessModeAll, ProcessModeHTTPOnly, ProcessModeWorkerOnly:
+		return value, true
+	default:
+		return ProcessModeAll, false
+	}
+}
+
+// ServesHTTP reports whether the process binds HTTP listeners (API + metrics).
+func (m ProcessMode) ServesHTTP() bool {
+	return m != ProcessModeWorkerOnly
+}
+
+// RunsWorkers reports whether the process registers River workers and
+// schedules periodic jobs. An http-only process still enqueues jobs from
+// the submit transaction; it just never consumes them.
+func (m ProcessMode) RunsWorkers() bool {
+	return m != ProcessModeHTTPOnly
+}
+
 func (c WorkerConfig) EffectiveTaskRetentionDays() int {
 	if c.TaskRetentionDays < minTaskRetentionDays || c.TaskRetentionDays > maxTaskRetentionDays {
 		return DefaultTaskRetentionDays
 	}
 	return c.TaskRetentionDays
+}
+
+// EffectiveWorkspacePurgeAfterDays clamps the archived-workspace purge
+// window into the supported range, falling back to the default for unset
+// or invalid values.
+func (c WorkerConfig) EffectiveWorkspacePurgeAfterDays() int {
+	if c.WorkspacePurgeAfterDays < minWorkspacePurgeAfterDays || c.WorkspacePurgeAfterDays > maxWorkspacePurgeAfterDays {
+		return DefaultWorkspacePurgeAfterDays
+	}
+	return c.WorkspacePurgeAfterDays
 }
 
 type EventBusConfig struct {
@@ -357,11 +436,13 @@ type envConfig struct {
 	NATSPort            string `env:"NATS_PORT"`
 	RiverConcurrency    string `env:"RIVER_WORKER_CONCURRENCY"`
 	TaskRetentionDays   string `env:"TASK_RETENTION_DAYS"`
+	WorkspacePurgeDays  string `env:"WORKSPACE_PURGE_AFTER_DAYS"`
 
 	AppPort               string `env:"APP_PORT"`
 	AppHost               string `env:"APP_HOST"`
 	MetricsAddr           string `env:"METRICS_ADDR"`
 	AppEnv                string `env:"APP_ENV"`
+	AppMode               string `env:"API_MODE"`
 	AppCORSAllowedOrigins string `env:"APP_CORS_ALLOWED_ORIGINS"`
 	AppTrustedProxies     string `env:"APP_TRUSTED_PROXIES"`
 	PublicOrigin          string `env:"PUBLIC_ORIGIN"`
@@ -372,6 +453,7 @@ type envConfig struct {
 	StorageLocalRoot          string `env:"STORAGE_LOCAL_ROOT"`
 	CreditsWelcomeIdentityKey string `env:"CREDITS_WELCOME_IDENTITY_KEY"`
 	RewardsCodeHMACKeys       string `env:"REWARDS_CODE_HMAC_KEYS"`
+	RealtimeTicketSecret      string `env:"REALTIME_TICKET_SECRET"`
 	ImgproxyKeyHex            string `env:"IMGPROXY_KEY"`
 	ImgproxySaltHex           string `env:"IMGPROXY_SALT"`
 
@@ -442,6 +524,11 @@ func Load() *Config {
 		invalidEnv = append(invalidEnv, "TASK_RETENTION_DAYS")
 		slog.Warn("invalid integer env; fallback to default", "key", "TASK_RETENTION_DAYS", "value", strings.TrimSpace(raw.TaskRetentionDays), "default", DefaultTaskRetentionDays)
 	}
+	workspacePurgeDays, workspacePurgeValid := boundedIntEnv(raw.WorkspacePurgeDays, DefaultWorkspacePurgeAfterDays, minWorkspacePurgeAfterDays, maxWorkspacePurgeAfterDays)
+	if !workspacePurgeValid {
+		invalidEnv = append(invalidEnv, "WORKSPACE_PURGE_AFTER_DAYS")
+		slog.Warn("invalid integer env; fallback to default", "key", "WORKSPACE_PURGE_AFTER_DAYS", "value", strings.TrimSpace(raw.WorkspacePurgeDays), "default", DefaultWorkspacePurgeAfterDays)
+	}
 	poolMaxOpen, poolMaxOpenValid := boundedIntEnv(raw.DBPoolMaxOpen, DefaultPoolMaxOpenConns, minPoolMaxOpenConns, maxPoolMaxOpenConns)
 	if !poolMaxOpenValid {
 		invalidEnv = append(invalidEnv, "DB_POOL_MAX_OPEN")
@@ -479,6 +566,23 @@ func Load() *Config {
 	if !cleanBreakValid {
 		invalidEnv = append(invalidEnv, "ATLAS_CLEAN_BREAK_ALLOW_RESET")
 		slog.Warn("invalid boolean env; fallback to default", "key", "ATLAS_CLEAN_BREAK_ALLOW_RESET", "value", strings.TrimSpace(raw.AtlasCleanBreakAllowReset), "default", false)
+	}
+	// API_MODE selects the ADR-0021 process role. An unparseable value
+	// falls back to all-process (local default) and is reported, so
+	// production startup fails fast instead of silently running merged.
+	processMode, processModeValid := ParseProcessMode(raw.AppMode)
+	if !processModeValid {
+		invalidEnv = append(invalidEnv, "API_MODE")
+		slog.Warn("invalid process mode env; fallback to default", "key", "API_MODE", "value", strings.TrimSpace(raw.AppMode), "default", string(ProcessModeAll))
+	}
+	// REALTIME_TICKET_SECRET has no fallback default: an empty value keeps
+	// the ticket endpoint fail-closed with 500 and is recorded here so
+	// production startup fails fast via ValidateEnvStrict instead of
+	// silently serving presence without tickets.
+	realtimeTicketSecret := strings.TrimSpace(raw.RealtimeTicketSecret)
+	if realtimeTicketSecret == "" {
+		invalidEnv = append(invalidEnv, "REALTIME_TICKET_SECRET")
+		slog.Warn("realtime ticket secret is not set; the realtime-ticket endpoint stays fail-closed with 500", "key", "REALTIME_TICKET_SECRET")
 	}
 
 	return &Config{
@@ -521,10 +625,11 @@ func Load() *Config {
 			InternalAPIKey: strings.TrimSpace(raw.AuthServiceInternalAPIKey),
 			TimeoutSeconds: DefaultAuthServiceTimeoutSeconds,
 		},
-		Worker:  WorkerConfig{Concurrency: workerConcurrency, TaskRetentionDays: retentionDays},
-		Credits: CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
-		Rewards: RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
-		Storage: StorageConfig{LocalRoot: strings.TrimSpace(raw.StorageLocalRoot)},
+		Worker:   WorkerConfig{Concurrency: workerConcurrency, TaskRetentionDays: retentionDays, WorkspacePurgeAfterDays: workspacePurgeDays},
+		Credits:  CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
+		Rewards:  RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
+		Realtime: RealtimeConfig{TicketSecret: realtimeTicketSecret},
+		Storage:  StorageConfig{LocalRoot: strings.TrimSpace(raw.StorageLocalRoot)},
 		Imgproxy: ImgproxyConfig{
 			BaseURL: imgproxyBaseURL,
 			KeyHex:  strings.TrimSpace(raw.ImgproxyKeyHex),
@@ -543,6 +648,7 @@ func Load() *Config {
 		Secrets: SecretsConfig{
 			EncryptionKey: strings.TrimSpace(raw.SecretsEncryptionKey),
 		},
+		Mode:       processMode,
 		InvalidEnv: invalidEnv,
 	}
 }

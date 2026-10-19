@@ -17,6 +17,13 @@
 // in postgres) and the in-memory fallback is mutex-guarded so concurrent
 // provision converges to a single Default workspace.
 //
+// Archive is a soft delete (workspaces.archived_at). Non-Default workspaces
+// archived longer ago than the configured window (default 7 days,
+// config.DefaultWorkspacePurgeAfterDays) are hard-deleted with their boards
+// and files by the daily workspace purge
+// (internal/tenancy/application/purge, scheduled with the retention
+// worker); billing records, the credit ledger, and user rows are retained.
+//
 // The in-memory store (memory.go) stays at the top level next to the Store
 // interface as its test-only double; it must never be wired in production.
 // The durable backend lives in infrastructure/postgres and swaps it out by

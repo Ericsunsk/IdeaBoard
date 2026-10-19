@@ -110,6 +110,27 @@ CREATE TABLE board_document_media_refs (
 
 CREATE INDEX idx_board_document_media_refs_asset ON board_document_media_refs (media_asset_id, board_id);
 
+-- Y.Doc collaboration update log (ADR-0020). One row per received Y update,
+-- aggregated per board: the realtime sidecar applies client SyncStep2/Update
+-- frames to its room Doc (nodes/edges maps keyed by id), broadcasts them to
+-- room peers for WS incremental convergence, and persists the opaque update
+-- bytes here via POST /internal/realtime/y-updates. The Go side never decodes
+-- CRDT bytes; compaction is driven by the sidecar posting a sanitized
+-- snapshot to POST /internal/realtime/compactions, which validates it with
+-- the same ValidateV1DocumentStrict rules, writes board_documents, and appends
+-- one board_revisions row in the same transaction (then trims this log).
+-- Non-collaborator writes keep the ADR-0006 If-Match + 409 path untouched.
+CREATE TABLE board_y_updates (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  board_id BIGINT NOT NULL REFERENCES boards(internal_id) ON DELETE CASCADE,
+  author_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  update_data BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_board_y_updates_data CHECK (length(update_data) BETWEEN 1 AND 1048576)
+);
+
+CREATE INDEX idx_board_y_updates_board ON board_y_updates (board_id, internal_id);
+
 -- Restricted upload target (#936). The board a Canvas/Library/Search upload
 -- is captured for, recorded at session create (pre-complete) and verified
 -- by the handler against the caller's board write access — never trusted

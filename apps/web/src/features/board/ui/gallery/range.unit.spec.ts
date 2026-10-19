@@ -16,42 +16,119 @@ beforeEach(() => {
 })
 
 describe('gallery range derivation', () => {
-  test('partitions owned and selected Boards without inherited Workspace access', () => {
+  test('overlaps creator-shared boards in personal and team', () => {
     const own = makeBoardMeta('own', 'Own', 1, {
       revision: 1,
+      accessState: 'private',
+      isCreator: true,
+      hasDirectGrant: false,
+      workspaceAccess: 'none',
+    })
+    const selected = makeBoardMeta('selected', 'Selected', 1, {
+      revision: 1,
+      accessState: 'workspace',
+      isCreator: false,
+      hasDirectGrant: true,
+      workspaceAccess: 'viewer',
+    })
+    // Creator-shared: the owner stays in the catalog with
+    // access_state=workspace, so it belongs to both ranges (overlap
+    // semantics: personal is ownership, team is workspace-shared).
+    const sharedBySelf = makeBoardMeta('shared-by-self', 'Shared By Self', 1, {
+      revision: 1,
+      accessState: 'workspace',
       isCreator: true,
       hasDirectGrant: false,
       workspaceAccess: 'editor',
     })
+    expect(
+      filterBoardsByRange([own, selected, sharedBySelf], 'personal').map((board) => board.id),
+    ).toEqual(['own', 'shared-by-self'])
+    expect(
+      filterBoardsByRange([own, selected, sharedBySelf], 'team').map((board) => board.id),
+    ).toEqual(['selected', 'shared-by-self'])
+    expect(isTeamBoard(own)).toBe(false)
+    expect(isPersonalBoard(selected)).toBe(false)
+    expect(isTeamBoard(sharedBySelf)).toBe(true)
+    expect(isPersonalBoard(sharedBySelf)).toBe(true)
+  })
+
+  test('requires server access_state before including a board in team', () => {
     const selected = makeBoardMeta('selected', 'Selected', 1, {
       revision: 1,
       isCreator: false,
       hasDirectGrant: true,
       workspaceAccess: 'viewer',
     })
-    const unchecked = makeBoardMeta('unchecked', 'Unchecked', 1, {
-      revision: 1,
-      isCreator: false,
-      hasDirectGrant: false,
-      workspaceAccess: 'editor',
-    })
-    expect(
-      filterBoardsByRange([own, selected, unchecked], 'personal').map((board) => board.id),
-    ).toEqual(['own'])
-    expect(
-      filterBoardsByRange([own, selected, unchecked], 'team').map((board) => board.id),
-    ).toEqual(['selected'])
-    expect(isTeamBoard(own)).toBe(false)
-    expect(isPersonalBoard(selected)).toBe(false)
+    expect(isTeamBoard(selected)).toBe(false)
   })
 
-  test('Off does not place a formerly selected Board in either range', () => {
+  test('ranges overlap on creator-shared boards and filter independently', () => {
+    const boards = [
+      makeBoardMeta('own', 'Own', 1, {
+        revision: 1,
+        accessState: 'private',
+        isCreator: true,
+        hasDirectGrant: false,
+        workspaceAccess: 'none',
+      }),
+      makeBoardMeta('selected', 'Selected', 1, {
+        revision: 1,
+        accessState: 'workspace',
+        isCreator: false,
+        hasDirectGrant: true,
+        workspaceAccess: 'viewer',
+      }),
+      makeBoardMeta('shared-by-self', 'Shared By Self', 1, {
+        revision: 1,
+        accessState: 'workspace',
+        isCreator: true,
+        hasDirectGrant: false,
+        workspaceAccess: 'editor',
+      }),
+      makeBoardMeta('off', 'Off', 1, {
+        revision: 1,
+        accessState: 'private',
+        isCreator: false,
+        hasDirectGrant: false,
+        workspaceAccess: 'none',
+      }),
+      makeBoardMeta('draft', 'Draft', 1),
+    ]
+    for (const board of boards) {
+      if (board.id === 'shared-by-self') {
+        // The overlap: creator-shared boards appear in both ranges.
+        expect(isPersonalBoard(board)).toBe(true)
+        expect(isTeamBoard(board)).toBe(true)
+      } else if (board.id === 'off') {
+        // Synced private boards the caller neither created nor holds a
+        // grant for never occur in the authorized catalog; under ownership
+        // semantics they land in neither range.
+        expect(isPersonalBoard(board)).toBe(false)
+        expect(isTeamBoard(board)).toBe(false)
+      } else {
+        expect(isPersonalBoard(board) !== isTeamBoard(board)).toBe(true)
+      }
+    }
+    const personalIds = filterBoardsByRange(boards, 'personal').map((board) => board.id)
+    const teamIds = filterBoardsByRange(boards, 'team').map((board) => board.id)
+    // Ranges are non-exclusive counts: personal is ownership
+    // (isCreator or unsynced draft), team is workspace-shared.
+    expect(personalIds.sort()).toEqual(['draft', 'own', 'shared-by-self'])
+    expect(teamIds.sort()).toEqual(['selected', 'shared-by-self'])
+  })
+
+  test('synced private boards without a creator flag land in neither range', () => {
     const off = makeBoardMeta('off', 'Off', 1, {
       revision: 1,
+      accessState: 'private',
       isCreator: false,
       hasDirectGrant: false,
       workspaceAccess: 'none',
     })
+    // Unreachable in the authorized catalog (a synced private board the
+    // caller neither created nor holds a grant for is purged); ownership
+    // semantics keep it out of both ranges.
     expect(isPersonalBoard(off)).toBe(false)
     expect(isTeamBoard(off)).toBe(false)
   })

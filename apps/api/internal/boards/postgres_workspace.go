@@ -407,6 +407,28 @@ func (s *PostgresWorkspaceBoardStore) GetBoard(ctx context.Context, workspacePub
 	return s.getBoard(ctx, workspacePublicID, boardPublicID)
 }
 
+// GetBoardByPublicID resolves one board by its globally unique public id,
+// returning the workspace-rooted fact (WorkspacePublicID filled) for the
+// realtime admit path, which carries only the ticket bid. Unknown ids read
+// as ErrNotFound; archived rows stay visible here (admit gates them).
+func (s *PostgresWorkspaceBoardStore) GetBoardByPublicID(ctx context.Context, boardPublicID string) (*V1Board, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	trimmed := strings.TrimSpace(boardPublicID)
+	if !contract.IsBoardID(trimmed) {
+		return nil, ErrNotFound
+	}
+	row, err := s.dbWithContext(ctx).q.GetBoardByPublicID(ctx, trimmed)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return mapPostgresBoardRow(dbsqlc.GetWorkspaceBoardRow(row))
+}
+
 // RenameBoard renames a live board; the revision counter is untouched.
 func (s *PostgresWorkspaceBoardStore) RenameBoard(ctx context.Context, workspacePublicID, boardPublicID, name string, actorUserID int64) (*V1Board, error) {
 	if err := ctx.Err(); err != nil {
@@ -501,6 +523,12 @@ func (s *PostgresWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 	if actorUserID <= 0 || expectedRevision <= 0 || schemaVersion < 1 || len(snapshot) == 0 {
 		return nil, ErrInvalidInput
 	}
+	return s.acceptDocument(ctx, workspacePublicID, boardPublicID, actorUserID, &expectedRevision, schemaVersion, snapshot)
+}
+
+// acceptDocument owns the document, revision, catalog, and media-ref transaction.
+// A nil expectedRevision accepts a sanitized Y compaction and trims its update log.
+func (s *PostgresWorkspaceBoardStore) acceptDocument(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID int64, expectedRevision *int64, schemaVersion int32, snapshot json.RawMessage) (*V1Board, error) {
 	workspacePublicID = strings.TrimSpace(workspacePublicID)
 	trimmedID := strings.TrimSpace(boardPublicID)
 	var updated *V1Board
@@ -521,7 +549,7 @@ func (s *PostgresWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 		if locked.ArchivedAt.Valid {
 			return ErrV1Archived
 		}
-		if int64(locked.DocumentVersion) != expectedRevision {
+		if expectedRevision != nil && int64(locked.DocumentVersion) != *expectedRevision {
 			return ErrRevisionConflict
 		}
 		assetIDs := previewscene.ExtractMediaAssetIDs(snapshot)
@@ -548,7 +576,7 @@ func (s *PostgresWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 		if err != nil {
 			return err
 		}
-		nextRevision := expectedRevision + 1
+		nextRevision := int64(locked.DocumentVersion) + 1
 		document := make(json.RawMessage, len(snapshot))
 		copy(document, snapshot)
 		// Document accept, content identity, and projection publish in
@@ -603,6 +631,15 @@ func (s *PostgresWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 				WorkspacePublicID: workspacePublicID,
 				BoardPublicID:     trimmedID,
 				AssetPublicID:     assetPublicID,
+			}); err != nil {
+				return err
+			}
+		}
+		if expectedRevision == nil {
+			// Commit the compaction and log trim atomically.
+			if err := q.DeleteBoardYUpdates(ctx, dbsqlc.DeleteBoardYUpdatesParams{
+				WorkspacePublicID: workspacePublicID,
+				BoardPublicID:     trimmedID,
 			}); err != nil {
 				return err
 			}

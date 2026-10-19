@@ -31,10 +31,13 @@ func Run(args []string) {
 	}
 }
 
-func runServe() {
+func runServe(applyMode func(*config.Config)) {
 	cfg := loadConfigOrFatal()
+	if applyMode != nil {
+		applyMode(cfg)
+	}
 	configureRuntimeLogging(cfg)
-	slog.Info("server starting", "storage_profiles", true)
+	slog.Info("server starting", "storage_profiles", true, "mode", string(cfg.Mode))
 
 	requireAuthInternalKeyForProduction(cfg)
 	gin.SetMode(gin.ReleaseMode)

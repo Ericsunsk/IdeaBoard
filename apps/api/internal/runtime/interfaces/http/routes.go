@@ -42,7 +42,19 @@ type Dependencies struct {
 	ReadyChecker ports.HealthChecker
 }
 
-type InternalRouteDeps struct{ UserHandler *identityhttp.InternalHandler }
+type InternalRealtimeHandler interface {
+	Admit(c *gin.Context)
+	LoadYDocument(c *gin.Context)
+	// PersistYUpdate serves POST /internal/realtime/y-updates (ADR-0020).
+	PersistYUpdate(c *gin.Context)
+	// CompactYDocument serves POST /internal/realtime/compactions (ADR-0020).
+	CompactYDocument(c *gin.Context)
+}
+
+type InternalRouteDeps struct {
+	UserHandler     *identityhttp.InternalHandler
+	RealtimeHandler InternalRealtimeHandler
+}
 
 type FrontendRouteOptions struct {
 	WarnMissingIndex bool
@@ -154,5 +166,11 @@ func registerPaymentWebhookRoutes(r *gin.Engine, handler *paymenthttp.WebhookHan
 func registerInternalRoutes(r *gin.Engine, deps InternalRouteDeps) {
 	if deps.UserHandler != nil {
 		r.POST("/internal/users/login-metadata", deps.UserHandler.UpdateLoginMetadata)
+	}
+	if deps.RealtimeHandler != nil {
+		r.GET("/internal/realtime/admit", deps.RealtimeHandler.Admit)
+		r.GET("/internal/realtime/document", deps.RealtimeHandler.LoadYDocument)
+		r.POST("/internal/realtime/y-updates", deps.RealtimeHandler.PersistYUpdate)
+		r.POST("/internal/realtime/compactions", deps.RealtimeHandler.CompactYDocument)
 	}
 }

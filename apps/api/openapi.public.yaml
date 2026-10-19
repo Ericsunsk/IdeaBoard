@@ -409,8 +409,9 @@ paths:
       description: >-
         Archives the workspace. No Idempotency-Key is required.
         The Default workspace is never archived: attempts render 403
-        workspace_default_protected. Workspaces are never hard-deleted, so
-        this guard covers the only delete path.
+        workspace_default_protected. Archived non-Default workspaces are
+        permanently deleted 7 days after archiving (WORKSPACE_PURGE_AFTER_DAYS),
+        including boards and files; billing records are retained.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       responses:
@@ -1194,6 +1195,52 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+  /workspaces/{workspace_id}/boards/{board_id}/realtime-ticket:
+    post:
+      tags: [Boards]
+      operationId: issueBoardRealtimeTicket
+      summary: Issue a short-lived board presence ticket (any board role)
+      description: >-
+        Mints a 60-second HMAC presence ticket binding the current board
+        access_version to the caller for the Y.js collaboration server
+        (ticket = base64url(payload).base64url(hex hmac-sha256), payload
+        {bid, av, cap, exp, uid}; cap is read|write derived from
+        CapabilitiesFor, uid is the caller usr_ identity). Viewers may
+        mint; malformed ids, unknown boards, and callers holding no
+        effective board role converge to 404 board_not_found. Archived
+        boards render 409 board_archived. A missing REALTIME_TICKET_SECRET
+        renders 500 service_unavailable (no fallback default). The Y.js
+        server admits the bearer via GET /internal/realtime/admit. No
+        Idempotency-Key is required: issuance is a read-like POST with no
+        state write.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/BoardId'
+      responses:
+        '200':
+          description: Presence ticket with its RFC3339 expiry.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RealtimeTicketEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          description: Ticket secret unconfigured (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /workspaces/{workspace_id}/billing-account:
     get:
       tags: [WorkspaceBilling]
@@ -3690,7 +3737,7 @@ components:
           type: string
           format: date-time
           nullable: true
-          description: RFC3339 UTC timestamp; null unless archived.
+          description: RFC3339 UTC timestamp; null unless archived. Archived non-Default workspaces are permanently deleted 7 days after this timestamp.
     Organization:
       type: object
       required: [id, name, created_at]
@@ -3944,6 +3991,13 @@ components:
         creator_user_id:
           type: string
           description: Creator User public identity (usr_ opaque).
+        owner_avatar:
+          type: string
+          description: >-
+            Workspace-visible owner avatar public URL with a content
+            version query (members-only visibility, same rule as the
+            member list). Omitted when the owner has no custom avatar
+            or the value is unavailable.
         workspace_access:
           $ref: '#/components/schemas/WorkspaceAccess'
         access_version:
@@ -4048,6 +4102,29 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/BoardAccess'
+    RealtimeTicket:
+      type: object
+      required: [ticket, expires_at]
+      additionalProperties: false
+      properties:
+        ticket:
+          type: string
+          minLength: 1
+          description: >-
+            Opaque presence bearer (base64url(payload).base64url(hex
+            hmac-sha256), payload {bid, av, cap, exp, uid}); valid 60
+            seconds, admitted via GET /internal/realtime/admit.
+        expires_at:
+          type: string
+          format: date-time
+          description: RFC3339 UTC expiry of the ticket (issued time + 60 seconds).
+    RealtimeTicketEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/RealtimeTicket'
     UpdateBoardAccessRequest:
       type: object
       required: [data]

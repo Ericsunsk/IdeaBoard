@@ -21,12 +21,14 @@ jobs:
       web: ${{ steps.classify.outputs.web }}
       api: ${{ steps.classify.outputs.api }}
       auth: ${{ steps.classify.outputs.auth }}
+      realtime: ${{ steps.classify.outputs.realtime }}
       migration_integration: ${{ steps.classify.outputs.migration_integration }}
       docker: ${{ steps.classify.outputs.docker }}
       ops: ${{ steps.classify.outputs.ops }}
       web_audit: ${{ steps.classify.outputs.web_audit }}
       api_audit: ${{ steps.classify.outputs.api_audit }}
       auth_audit: ${{ steps.classify.outputs.auth_audit }}
+      realtime_audit: ${{ steps.classify.outputs.realtime_audit }}
       docs_only: ${{ steps.classify.outputs.docs_only }}
     steps:
       - name: Checkout
@@ -75,6 +77,14 @@ jobs:
     with:
       build_images: ${{ needs.changes.outputs.docker == 'true' }}
       audit_dependencies: ${{ needs.changes.outputs.auth_audit == 'true' }}
+  realtime:
+    name: Realtime Verification
+    if: needs.changes.outputs.realtime == 'true'
+    needs: [changes]
+    uses: ./.github/workflows/realtime.yml
+    with:
+      build_images: ${{ needs.changes.outputs.docker == 'true' }}
+      audit_dependencies: ${{ needs.changes.outputs.realtime_audit == 'true' }}
   migration-integration:
     name: Migration Integration
     if: needs.changes.outputs.migration_integration == 'true'
@@ -85,7 +95,7 @@ jobs:
       head_sha: ${{ github.event.pull_request.head.sha || github.sha }}
   backend-browser-smoke:
     name: Backend Browser Smoke
-    if: ${{ needs.changes.outputs.web != 'true' && (needs.changes.outputs.api == 'true' || needs.changes.outputs.auth == 'true' || needs.changes.outputs.docker == 'true') }}
+    if: ${{ needs.changes.outputs.web != 'true' && (needs.changes.outputs.api == 'true' || needs.changes.outputs.auth == 'true' || needs.changes.outputs.realtime == 'true' || needs.changes.outputs.docker == 'true') }}
     needs: [changes]
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.62.1-noble
@@ -172,7 +182,7 @@ jobs:
   ci-gate:
     name: CI Gate
     if: always()
-    needs: [changes, web, api, auth, migration-integration, backend-browser-smoke, ops, media-contract, handbook-contract, pr-size-guard]
+    needs: [changes, web, api, auth, realtime, migration-integration, backend-browser-smoke, ops, media-contract, handbook-contract, pr-size-guard]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -189,6 +199,8 @@ jobs:
           API_RESULT: ${{ needs.api.result }}
           AUTH_REQUIRED: ${{ needs.changes.outputs.auth }}
           AUTH_RESULT: ${{ needs.auth.result }}
+          REALTIME_REQUIRED: ${{ needs.changes.outputs.realtime }}
+          REALTIME_RESULT: ${{ needs.realtime.result }}
           MIGRATION_REQUIRED: ${{ needs.changes.outputs.migration_integration }}
           MIGRATION_RESULT: ${{ needs.migration-integration.result }}
           DOCKER_REQUIRED: ${{ needs.changes.outputs.docker }}

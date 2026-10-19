@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/principal"
@@ -29,6 +30,10 @@ import (
 // behavior without a boards store.
 
 func newV1BoardsTestEngine(store tenancy.Store, boardsStore boards.WorkspaceBoardStore, dir *staticUserDirectory) *gin.Engine {
+	return newV1BoardsTestEngineWithDisplay(store, boardsStore, dir, nil)
+}
+
+func newV1BoardsTestEngineWithDisplay(store tenancy.Store, boardsStore boards.WorkspaceBoardStore, dir *staticUserDirectory, display V1MemberDisplayProvider) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(runtimehttp.ContractRequestIDMiddleware())
@@ -61,7 +66,7 @@ func newV1BoardsTestEngine(store tenancy.Store, boardsStore boards.WorkspaceBoar
 		c.Next()
 	})
 	v1 := router.Group(runtimehttp.ContractV1GroupPath)
-	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, ContractV1Deps{Store: store, Users: dir, Boards: boardsStore})
+	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, ContractV1Deps{Store: store, Users: dir, Boards: boardsStore, MemberDisplay: display})
 	return router
 }
 
@@ -653,6 +658,49 @@ func TestV1BoardsCatalogCarriesScene(t *testing.T) {
 	}
 	if after := catalogCard(t, f, f.boardID); after["content_version"] != docVersion {
 		t.Fatalf("conflict changed the content version: %v", after["content_version"])
+	}
+}
+
+func TestV1BoardsCatalogOwnerAvatar(t *testing.T) {
+	f := newV1BoardsFixture(t)
+
+	// Without a display provider the field stays omitted and the request
+	// still renders 200 (fail-closed enrichment).
+	if card := catalogCard(t, f, f.boardID); card["creator_user_id"] == "" {
+		t.Fatalf("catalog card must carry creator_user_id: %v", card)
+	} else if _, present := card["owner_avatar"]; present {
+		t.Fatalf("catalog card without a display provider must omit owner_avatar: %v", card)
+	}
+
+	// With a provider the owner's avatar rides the card; single-board
+	// reads resolve the same fact through the same helper.
+	const avatarURL = "/api/v1/public/users/AVTR01/avatar?v=abcd1234"
+	f.engine = newV1BoardsTestEngineWithDisplay(f.store, f.boards, f.dir,
+		&fakeMemberDisplay{facts: map[int64]V1MemberDisplay{f.owner: {Avatar: avatarURL}}})
+	if card := catalogCard(t, f, f.boardID); card["owner_avatar"] != avatarURL {
+		t.Fatalf("owner_avatar = %v, want %q", card["owner_avatar"], avatarURL)
+	}
+	status, _, payload := doV1(t, f.engine, v1Call{method: http.MethodGet, path: f.boardPath(""), userID: f.owner})
+	if status != 200 {
+		t.Fatalf("get = %d %v, want 200", status, payload)
+	}
+	if got, _ := payload["data"].(map[string]any)["owner_avatar"].(string); got != avatarURL {
+		t.Fatalf("single-board owner_avatar = %q, want %q", got, avatarURL)
+	}
+
+	// Provider failure fails closed: omitted on both paths, still 200.
+	failing := &fakeMemberDisplay{failNext: errors.New("display boom")}
+	f.engine = newV1BoardsTestEngineWithDisplay(f.store, f.boards, f.dir, failing)
+	if card := catalogCard(t, f, f.boardID); card["owner_avatar"] != nil {
+		t.Fatalf("failing provider must omit owner_avatar: %v", card)
+	}
+	failing.failNext = errors.New("display boom")
+	status, _, payload = doV1(t, f.engine, v1Call{method: http.MethodGet, path: f.boardPath(""), userID: f.owner})
+	if status != 200 {
+		t.Fatalf("get with failing provider = %d %v, want 200", status, payload)
+	}
+	if _, present := payload["data"].(map[string]any)["owner_avatar"]; present {
+		t.Fatalf("failing provider must omit single-board owner_avatar: %v", payload)
 	}
 }
 

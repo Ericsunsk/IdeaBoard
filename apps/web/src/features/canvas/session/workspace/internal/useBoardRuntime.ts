@@ -1,4 +1,5 @@
-import { computed, ref, shallowRef, type Ref } from 'vue'
+import type { CanvasCollaborationSession } from '../../collaboration/useCanvasCollaborationSession'
+import { computed, ref, shallowRef } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { createEmptyBoardSnapshot, type BoardSnapshot } from '../../../../board/ports/canvas'
@@ -24,6 +25,7 @@ type UseBoardRuntimeOptions = {
   hydratePendingImageLeases?: (snapshot: BoardSnapshot) => void
   cancelTasks: (taskIds: readonly string[]) => void
   vueFlowGraphActions?: CanvasVueFlowGraphActions
+  collaboration?: CanvasCollaborationSession | undefined
 }
 
 function boardSessionIdentityKey(identity: { userId: number; userUid: string }): string {
@@ -32,19 +34,25 @@ function boardSessionIdentityKey(identity: { userId: number; userUid: string }):
   return `${identity.userId}:${userUid}`
 }
 
+function createBoardRuntimeState() {
+  return {
+    nodes: shallowRef<Node[]>([]),
+    edges: shallowRef<Edge[]>([]),
+    boardBaseSnapshot: shallowRef(createEmptyBoardSnapshot()),
+    isLoadingBoardSnapshot: ref(false),
+    isSavingBoard: ref(false),
+    isDirty: ref(false),
+    saveStatus: ref<SaveStatus>('idle'),
+  }
+}
+
 export function useBoardRuntime(options: UseBoardRuntimeOptions) {
   const message = {
     warning: options.feedback.warning,
     success: options.feedback.saveSucceeded,
     error: options.feedback.saveFailed,
   }
-  const nodes: Ref<Node[]> = shallowRef([])
-  const edges: Ref<Edge[]> = shallowRef([])
-  const boardBaseSnapshot: Ref<BoardSnapshot> = shallowRef(createEmptyBoardSnapshot())
-  const isLoadingBoardSnapshot: Ref<boolean> = ref(false)
-  const isSavingBoard: Ref<boolean> = ref(false)
-  const isDirty: Ref<boolean> = ref(false)
-  const saveStatus: Ref<SaveStatus> = ref('idle')
+  const state = createBoardRuntimeState()
   const autosaveResumeSignal = computed(() => boardSessionIdentityKey(options.getUserIdentity()))
 
   const boardSession = useBoardSession({
@@ -56,7 +64,7 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
     },
     isDraftDirty: (boardId) =>
       boardId === stringParam(options.route.query.boardId) &&
-      (isDirty.value || isSavingBoard.value),
+      (state.isDirty.value || state.isSavingBoard.value),
   })
 
   // Save-409 archived fan-out: the sync coordinator owns the save outcome,
@@ -68,13 +76,7 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
   }
 
   const flowRuntime = useFlowCanvasRuntime({
-    nodes,
-    edges,
-    boardBaseSnapshot,
-    isDirty,
-    saveStatus,
-    isLoadingBoardSnapshot,
-    isSavingBoard,
+    ...state,
     autosaveResumeSignal,
     boardSession,
     executionCore: options.executionCore,
@@ -85,6 +87,11 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
     onError: options.feedback.saveFailed,
     onArchived: handleBoardArchived,
     vueFlowGraphActions: options.vueFlowGraphActions,
+    collaboration: options.collaboration,
+    canWriteGraph: () =>
+      !boardHeader.isBoardReadOnly.value &&
+      !boardHeader.isBoardArchived.value &&
+      (!options.collaboration?.isEnabled.value || options.collaboration.canWrite.value),
   })
 
   const boardHeader = useBoardHeaderActions({
@@ -93,6 +100,11 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
     router: options.router,
     route: options.route,
     flushAutosave: () => flowRuntime.persistence.flushAutosave(),
+  })
+  options.collaboration?.bindBoard({
+    boardId: boardSession.currentBoardId,
+    accessState: boardHeader.boardAccessState,
+    canWrite: () => !boardHeader.isBoardReadOnly.value && !boardHeader.isBoardArchived.value,
   })
   markBoardArchived = boardHeader.markArchivedFromSave
 
@@ -118,11 +130,11 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
 
   const runtime = {
     boardSession: {
-      boardBaseSnapshot,
+      boardBaseSnapshot: state.boardBaseSnapshot,
       currentBoardId: flowRuntime.persistence.currentBoardId,
-      isDirty,
-      isSavingBoard,
-      saveStatus,
+      isDirty: state.isDirty,
+      isSavingBoard: state.isSavingBoard,
+      saveStatus: state.saveStatus,
       loadInitialOrRouteBoard,
       flushAutosave: flowRuntime.persistence.flushAutosave,
       history: flowRuntime.persistence.history,

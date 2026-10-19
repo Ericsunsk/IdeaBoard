@@ -17,6 +17,7 @@ var configEnvKeys = []string{
 	"DB_NAME",
 	"DB_SSLMODE",
 	"APP_ENV",
+	"API_MODE",
 	"APP_PORT",
 	"APP_HOST",
 	"METRICS_ADDR",
@@ -35,11 +36,13 @@ var configEnvKeys = []string{
 	"RIVER_POOL_MAX_CONNS",
 	"RIVER_POOL_MIN_CONNS",
 	"TASK_RETENTION_DAYS",
+	"WORKSPACE_PURGE_AFTER_DAYS",
 	"NATS_PASSWORD",
 	"NATS_HOST",
 	"NATS_PORT",
 	"NATS_EVENT_BUS_ENABLED",
 	"REWARDS_CODE_HMAC_KEYS",
+	"REALTIME_TICKET_SECRET",
 	"STORAGE_LOCAL_ROOT",
 	"IMGPROXY_KEY",
 	"IMGPROXY_SALT",
@@ -305,6 +308,7 @@ func TestValidateEnvStrictRejectsFallbacksInProduction(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("RIVER_WORKER_CONCURRENCY", "lots")
 	t.Setenv("NATS_EVENT_BUS_ENABLED", "maybe")
+	t.Setenv("REALTIME_TICKET_SECRET", "test-realtime-ticket-secret")
 
 	cfg := Load()
 	if len(cfg.InvalidEnv) != 2 {
@@ -316,6 +320,7 @@ func TestValidateEnvStrictRejectsFallbacksInProduction(t *testing.T) {
 
 	resetConfigEnv(t)
 	t.Setenv("RIVER_WORKER_CONCURRENCY", "lots")
+	t.Setenv("REALTIME_TICKET_SECRET", "test-realtime-ticket-secret")
 	devCfg := Load()
 	if len(devCfg.InvalidEnv) != 1 {
 		t.Fatalf("dev InvalidEnv = %v, want malformed key tracked", devCfg.InvalidEnv)
@@ -464,6 +469,27 @@ func TestLoadTaskRetentionConfig(t *testing.T) {
 	}
 }
 
+func TestLoadWorkspacePurgeConfig(t *testing.T) {
+	resetConfigEnv(t)
+	if got := Load().Worker.EffectiveWorkspacePurgeAfterDays(); got != DefaultWorkspacePurgeAfterDays {
+		t.Fatalf("default workspace purge = %d, want %d", got, DefaultWorkspacePurgeAfterDays)
+	}
+	t.Setenv("WORKSPACE_PURGE_AFTER_DAYS", "14")
+	if got := Load().Worker.EffectiveWorkspacePurgeAfterDays(); got != 14 {
+		t.Fatalf("configured workspace purge = %d, want 14", got)
+	}
+}
+
+func TestLoadWorkspacePurgeConfigRejectsOutOfRange(t *testing.T) {
+	for _, raw := range []string{"0", "91", "lots", "-3"} {
+		resetConfigEnv(t)
+		t.Setenv("WORKSPACE_PURGE_AFTER_DAYS", raw)
+		if got := Load().Worker.EffectiveWorkspacePurgeAfterDays(); got != DefaultWorkspacePurgeAfterDays {
+			t.Fatalf("workspace purge %q = %d, want default %d", raw, got, DefaultWorkspacePurgeAfterDays)
+		}
+	}
+}
+
 func TestLoadAdminSeedAndMigrationTooling(t *testing.T) {
 	resetConfigEnv(t)
 	cfg := Load()
@@ -597,6 +623,7 @@ func TestValidateRejectsProductionInvalidEnv(t *testing.T) {
 	t.Setenv("DB_PASSWORD", "production-runtime-secret-value")
 	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
 	t.Setenv("RIVER_WORKER_CONCURRENCY", "12")
+	t.Setenv("REALTIME_TICKET_SECRET", "test-realtime-ticket-secret")
 	cfg := Load()
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Validate() error = %v", err)
@@ -611,5 +638,96 @@ func TestValidateRejectsProductionInvalidEnv(t *testing.T) {
 	bad := Load()
 	if err := bad.Validate(); err == nil {
 		t.Fatal("Validate succeeded with invalid production pool env, want error")
+	}
+}
+
+func TestLoadRealtimeTicketSecret(t *testing.T) {
+	resetConfigEnv(t)
+	if got := Load().Realtime.TicketSecret; got != "" {
+		t.Fatalf("default realtime ticket secret = %q, want empty (fail-closed, no fallback)", got)
+	}
+	found := false
+	for _, key := range Load().InvalidEnv {
+		if key == "REALTIME_TICKET_SECRET" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("InvalidEnv = %v, want REALTIME_TICKET_SECRET tracked", Load().InvalidEnv)
+	}
+
+	resetConfigEnv(t)
+	t.Setenv("REALTIME_TICKET_SECRET", "  test-realtime-secret  ")
+	if got := Load().Realtime.TicketSecret; got != "test-realtime-secret" {
+		t.Fatalf("realtime ticket secret = %q, want trimmed value", got)
+	}
+}
+
+func TestParseProcessMode(t *testing.T) {
+	for raw, want := range map[string]ProcessMode{
+		"":                ProcessModeAll,
+		"all":             ProcessModeAll,
+		"http-only":       ProcessModeHTTPOnly,
+		"worker-only":     ProcessModeWorkerOnly,
+		"  WORKER-ONLY  ": ProcessModeWorkerOnly,
+	} {
+		got, valid := ParseProcessMode(raw)
+		if !valid || got != want {
+			t.Fatalf("ParseProcessMode(%q) = (%q, %v), want (%q, true)", raw, got, valid, want)
+		}
+	}
+	if got, valid := ParseProcessMode("microservice"); valid || got != ProcessModeAll {
+		t.Fatalf("ParseProcessMode(microservice) = (%q, %v), want (all, false)", got, valid)
+	}
+}
+
+func TestProcessModeComponentMatrix(t *testing.T) {
+	cases := []struct {
+		mode       ProcessMode
+		serveHTTP  bool
+		runWorkers bool
+	}{
+		{ProcessModeAll, true, true},
+		{ProcessModeHTTPOnly, true, false},
+		{ProcessModeWorkerOnly, false, true},
+	}
+	for _, tc := range cases {
+		if got := tc.mode.ServesHTTP(); got != tc.serveHTTP {
+			t.Fatalf("%q ServesHTTP() = %v, want %v", tc.mode, got, tc.serveHTTP)
+		}
+		if got := tc.mode.RunsWorkers(); got != tc.runWorkers {
+			t.Fatalf("%q RunsWorkers() = %v, want %v", tc.mode, got, tc.runWorkers)
+		}
+	}
+}
+
+func TestLoadProcessMode(t *testing.T) {
+	resetConfigEnv(t)
+	if got := Load().Mode; got != ProcessModeAll {
+		t.Fatalf("default process mode = %q, want all", got)
+	}
+
+	resetConfigEnv(t)
+	t.Setenv("API_MODE", "worker-only")
+	if got := Load().Mode; got != ProcessModeWorkerOnly {
+		t.Fatalf("process mode = %q, want worker-only", got)
+	}
+
+	resetConfigEnv(t)
+	t.Setenv("API_MODE", "sidecar")
+	cfg := Load()
+	if cfg.Mode != ProcessModeAll {
+		t.Fatalf("invalid process mode fallback = %q, want all", cfg.Mode)
+	}
+	found := false
+	for _, key := range cfg.InvalidEnv {
+		if key == "API_MODE" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("InvalidEnv = %v, want API_MODE tracked", cfg.InvalidEnv)
 	}
 }

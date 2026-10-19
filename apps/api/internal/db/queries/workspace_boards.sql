@@ -19,6 +19,21 @@ INNER JOIN board_documents AS d ON d.board_id = b.internal_id
 WHERE w.public_id = sqlc.arg(workspace_public_id) AND b.public_id = sqlc.arg(board_public_id)
 LIMIT 1;
 
+-- name: GetBoardByPublicID :one
+-- Global presence-ticket lookup: board public ids are globally unique
+-- (uq_boards_public_id), so the realtime admit path resolves the owning
+-- workspace from the ticket bid alone without a wid query param.
+SELECT b.internal_id, b.public_id, w.public_id AS workspace_public_id,
+  b.owner_user_id, b.title, b.workspace_access, b.access_version,
+  b.created_at, b.updated_at, b.archived_at,
+  d.document_version, d.schema_version, d.snapshot_data,
+  d.content_version, d.preview_scene
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+INNER JOIN board_documents AS d ON d.board_id = b.internal_id
+WHERE b.public_id = sqlc.arg(board_public_id)
+LIMIT 1;
+
 -- name: ListWorkspaceBoardCatalog :many
 -- Limit authorized identifiers before joining scene bodies. The count row
 -- preserves offset validation even when the requested page is empty. The
@@ -333,3 +348,43 @@ INNER JOIN board_document_media_refs AS r ON r.media_asset_id = m.internal_id
 INNER JOIN boards AS b ON b.internal_id = r.board_id
 WHERE m.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id)
 ORDER BY b.public_id ASC;
+
+-- Y.Doc collaboration update log (ADR-0020). Updates are opaque CRDT bytes
+-- written by the realtime sidecar; the Go side never decodes them. Compaction
+-- posts a sanitized snapshot that lands in board_documents + board_revisions
+-- in one transaction and then trims this log (DeleteBoardYUpdates).
+
+-- name: InsertBoardYUpdate :one
+INSERT INTO board_y_updates (board_id, author_user_id, update_data)
+SELECT b.internal_id, sqlc.arg(author_user_id), sqlc.arg(update_data)
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE w.public_id = sqlc.arg(workspace_public_id)
+  AND b.public_id = sqlc.arg(board_public_id)
+RETURNING internal_id, created_at;
+
+-- name: ListBoardYUpdates :many
+SELECT u.internal_id, u.author_user_id, u.update_data, u.created_at
+FROM board_y_updates AS u
+INNER JOIN boards AS b ON b.internal_id = u.board_id
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE w.public_id = sqlc.arg(workspace_public_id)
+  AND b.public_id = sqlc.arg(board_public_id)
+ORDER BY u.internal_id ASC
+LIMIT sqlc.arg(row_limit);
+
+-- name: CountBoardYUpdates :one
+SELECT count(*)
+FROM board_y_updates AS u
+INNER JOIN boards AS b ON b.internal_id = u.board_id
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE w.public_id = sqlc.arg(workspace_public_id)
+  AND b.public_id = sqlc.arg(board_public_id);
+
+-- name: DeleteBoardYUpdates :exec
+DELETE FROM board_y_updates AS u
+USING boards AS b, workspaces AS w
+WHERE u.board_id = b.internal_id
+  AND w.internal_id = b.workspace_id
+  AND w.public_id = sqlc.arg(workspace_public_id)
+  AND b.public_id = sqlc.arg(board_public_id);

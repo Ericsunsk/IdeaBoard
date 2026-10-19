@@ -310,6 +310,8 @@ export function useCanvasScreenSurfaceInteractions(options: CanvasScreenSurfaceI
       viewModel.boardChrome.isBoardMenuOpen.value || viewModel.boardChrome.isRenamingBoard.value,
   })
 
+  // Mirrors CanvasScreen isCameraLocked: flow lock and archived lock pan,
+  // while viewer read-only never does so the canvas stays explorable.
   const isPanEnabled = computed(
     () => !isFlowCanvasLocked.value && !viewModel.boardChrome.isBoardArchived.value,
   )

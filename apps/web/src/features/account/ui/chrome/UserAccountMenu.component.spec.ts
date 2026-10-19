@@ -741,7 +741,11 @@ describe('UserAccountMenu', () => {
       expect(archiveButton).toBeEnabled()
 
       await view.user.click(archiveButton)
-      expect(screen.getByText('Archive "Team"? It will leave your workspace list.')).toBeVisible()
+      expect(
+        screen.getByText(
+          'Archive "Team"? It will leave your workspace list and be permanently deleted after 7 days, including boards and files.',
+        ),
+      ).toBeVisible()
 
       await view.user.click(screen.getByRole('button', { name: 'Confirm archive' }))
       await waitFor(() => expect(workspace.onArchive).toHaveBeenCalledWith('ws_team2'))

@@ -3,6 +3,7 @@ package v1
 // Workspace-scoped Board routes share one selected-member authorization policy.
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
@@ -38,6 +39,7 @@ func (h *contractV1Handler) registerBoardRoutes(group *gin.RouterGroup) {
 	group.GET("/workspaces/:workspace_id/boards/:board_id/revisions/:revision_id", h.getBoardRevision)
 	group.GET("/workspaces/:workspace_id/boards/:board_id/access", h.getBoardAccess)
 	group.PUT("/workspaces/:workspace_id/boards/:board_id/access", h.updateBoardAccess)
+	group.POST("/workspaces/:workspace_id/boards/:board_id/realtime-ticket", h.issueRealtimeTicket)
 }
 
 func (h *contractV1Handler) requireBoardsStore(c *gin.Context) bool {
@@ -229,15 +231,20 @@ func toBoardCapabilitiesDTO(caps boards.Capabilities) v1BoardCapabilitiesDTO {
 }
 
 type v1BoardDTO struct {
-	ID              string                 `json:"id"`
-	WorkspaceID     string                 `json:"workspace_id"`
-	Name            string                 `json:"name"`
-	Revision        int64                  `json:"revision"`
-	SchemaVersion   int32                  `json:"schema_version"`
-	ContentVersion  string                 `json:"content_version,omitempty"`
-	PreviewScene    json.RawMessage        `json:"preview_scene,omitempty"`
-	ArchivedAt      *string                `json:"archived_at,omitempty"`
-	CreatorUserID   string                 `json:"creator_user_id"`
+	ID             string          `json:"id"`
+	WorkspaceID    string          `json:"workspace_id"`
+	Name           string          `json:"name"`
+	Revision       int64           `json:"revision"`
+	SchemaVersion  int32           `json:"schema_version"`
+	ContentVersion string          `json:"content_version,omitempty"`
+	PreviewScene   json.RawMessage `json:"preview_scene,omitempty"`
+	ArchivedAt     *string         `json:"archived_at,omitempty"`
+	CreatorUserID  string          `json:"creator_user_id"`
+	// OwnerAvatar is the workspace-visible owner avatar public URL
+	// (runtimehttp.V1PublicAvatarURLForRow projection, same rule as the
+	// member list). Omitted when the owner has no custom avatar or the
+	// provider is unavailable; never fails the request.
+	OwnerAvatar     string                 `json:"owner_avatar,omitempty"`
 	WorkspaceAccess string                 `json:"workspace_access"`
 	AccessVersion   int64                  `json:"access_version"`
 	AccessState     string                 `json:"access_state"`
@@ -266,6 +273,47 @@ func (h *contractV1Handler) toBoardCreatorDTO(c *gin.Context, ownerUserID int64)
 	return tenancy.FormatUserPublicID(publicID), true
 }
 
+// boardOwnerAvatars resolves owner avatar display facts for board payloads
+// through the member-display provider (same visibility rule as the member
+// list: workspace members only, avatar public URL projection). Single code
+// path for the catalog page and single-board reads: callers only pass
+// owner ids from boards in the requested workspace, so facts never leak
+// across workspaces. It fails closed: a nil provider, lookup error, or
+// missing fact leaves the corresponding entry omitted while the request
+// still renders 2xx. Only the avatar fact is consumed; emails stay out of
+// board payloads.
+func (h *contractV1Handler) boardOwnerAvatars(ctx context.Context, ownerIDs []int64) map[int64]string {
+	out := make(map[int64]string)
+	if h.deps.MemberDisplay == nil || len(ownerIDs) == 0 {
+		return out
+	}
+	seen := make(map[int64]struct{}, len(ownerIDs))
+	deduped := make([]int64, 0, len(ownerIDs))
+	for _, id := range ownerIDs {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		deduped = append(deduped, id)
+	}
+	if len(deduped) == 0 {
+		return out
+	}
+	display, err := h.deps.MemberDisplay.GetMemberDisplay(ctx, deduped)
+	if err != nil || len(display) == 0 {
+		return out
+	}
+	for _, id := range deduped {
+		if avatar := strings.TrimSpace(display[id].Avatar); avatar != "" {
+			out[id] = avatar
+		}
+	}
+	return out
+}
+
 // toBoardDTOFull renders one board with its access facts: creator public
 // identity, common sharing role, monotonic access version, derived posture,
 // caller relationship, and capabilities. The catalog path stays down the
@@ -289,21 +337,24 @@ func (h *contractV1Handler) toBoardDTOFull(c *gin.Context, board *boards.V1Board
 		}
 	}
 	entry := boards.CatalogEntryOf(board, role, hasDirectGrant, len(members) > 0)
-	return toBoardDTO(entry, creator, callerUserID), true
+	avatar := h.boardOwnerAvatars(c.Request.Context(), []int64{board.OwnerUserID})[board.OwnerUserID]
+	return toBoardDTO(entry, creator, avatar, callerUserID), true
 }
 
 // toBoardCatalogDTO renders one Gallery catalog card: metadata plus the
 // stored scene projection (never the full document or the full ACL), with
-// the caller's effective role facts carried from the catalog query.
-func (h *contractV1Handler) toBoardCatalogDTO(c *gin.Context, entry *boards.V1BoardCatalogEntry, callerUserID int64) (v1BoardDTO, bool) {
+// the caller's effective role facts carried from the catalog query. The
+// owner avatar rides the same member-display rule as the member list and
+// stays omitted when unavailable.
+func (h *contractV1Handler) toBoardCatalogDTO(c *gin.Context, entry *boards.V1BoardCatalogEntry, avatar string, callerUserID int64) (v1BoardDTO, bool) {
 	creator, ok := h.toBoardCreatorDTO(c, entry.OwnerUserID)
 	if !ok {
 		return v1BoardDTO{}, false
 	}
-	return toBoardDTO(entry, creator, callerUserID), true
+	return toBoardDTO(entry, creator, avatar, callerUserID), true
 }
 
-func toBoardDTO(entry *boards.V1BoardCatalogEntry, creator string, callerUserID int64) v1BoardDTO {
+func toBoardDTO(entry *boards.V1BoardCatalogEntry, creator, avatar string, callerUserID int64) v1BoardDTO {
 	dto := v1BoardDTO{
 		ID:              entry.PublicID,
 		WorkspaceID:     entry.WorkspacePublicID,
@@ -313,6 +364,7 @@ func toBoardDTO(entry *boards.V1BoardCatalogEntry, creator string, callerUserID 
 		ContentVersion:  entry.ContentVersion,
 		PreviewScene:    entry.PreviewScene,
 		CreatorUserID:   creator,
+		OwnerAvatar:     avatar,
 		WorkspaceAccess: string(entry.WorkspaceAccess),
 		AccessVersion:   entry.AccessVersion,
 		AccessState:     string(entry.AccessState),
@@ -400,8 +452,13 @@ func (h *contractV1Handler) listBoards(c *gin.Context) {
 			return
 		}
 		data := make([]v1BoardDTO, 0, len(page.Entries))
+		ownerIDs := make([]int64, 0, len(page.Entries))
 		for _, entry := range page.Entries {
-			dto, ok := h.toBoardCatalogDTO(c, entry, wctx.Principal.UserID())
+			ownerIDs = append(ownerIDs, entry.OwnerUserID)
+		}
+		avatars := h.boardOwnerAvatars(c.Request.Context(), ownerIDs)
+		for _, entry := range page.Entries {
+			dto, ok := h.toBoardCatalogDTO(c, entry, avatars[entry.OwnerUserID], wctx.Principal.UserID())
 			if !ok {
 				return
 			}

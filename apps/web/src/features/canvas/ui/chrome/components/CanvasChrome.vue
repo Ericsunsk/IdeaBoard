@@ -18,6 +18,10 @@
       @navigate-back="emit('navigate-back')"
     />
 
+    <div class="canvas-chrome-presence-slot">
+      <slot name="presence" />
+    </div>
+
     <UserAccountMenu
       class="canvas-chrome-action-group"
       :avatar-url="account.avatarUrl"
@@ -223,3 +227,17 @@ function handleLibraryFocusOut(event: FocusEvent) {
   emit('library-focus-change', false)
 }
 </script>
+
+<style scoped>
+.canvas-chrome-presence-slot {
+  pointer-events: none;
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+}
+
+.canvas-chrome-presence-slot:empty {
+  display: none;
+}
+</style>

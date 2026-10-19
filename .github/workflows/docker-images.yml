@@ -97,6 +97,12 @@ jobs:
             file: ./apps/auth/Dockerfile
             target: migrator
             cache_scope: ideaboard-auth-migrate
+          - name: realtime
+            display: Realtime
+            context: ./apps/realtime
+            file: ./apps/realtime/Dockerfile
+            target: runtime
+            cache_scope: ideaboard-realtime
 
     steps:
       - name: Checkout
@@ -249,7 +255,7 @@ jobs:
         env:
           SOURCE_COMMIT: ${{ needs.preflight.outputs.source_commit }}
         run: |
-          for image in api api-migrate auth auth-migrate; do
+          for image in api api-migrate auth auth-migrate realtime; do
             test -s "release-assets/${image}.json" || {
               echo "Missing metadata for ${image}" >&2
               exit 1
@@ -269,6 +275,7 @@ jobs:
             --slurpfile api_migrate release-assets/api-migrate.json \
             --slurpfile auth release-assets/auth.json \
             --slurpfile auth_migrate release-assets/auth-migrate.json \
+            --slurpfile realtime release-assets/realtime.json \
             '{
               repository: $repository,
               tag: $tag,
@@ -282,7 +289,8 @@ jobs:
                 api: $api[0].ref,
                 "api-migrate": $api_migrate[0].ref,
                 auth: $auth[0].ref,
-                "auth-migrate": $auth_migrate[0].ref
+                "auth-migrate": $auth_migrate[0].ref,
+                realtime: $realtime[0].ref
               },
               cosign: {
                 certificate_identity: $cosign_identity,
@@ -375,6 +383,9 @@ jobs:
                 test("@sha256:[0-9a-f]{64}$")) and
               (.images["auth-migrate"] |
                 startswith($expected_image_repository + "/ideaboard-auth-migrate@sha256:") and
+                test("@sha256:[0-9a-f]{64}$")) and
+              (.images.realtime |
+                startswith($expected_image_repository + "/ideaboard-realtime@sha256:") and
                 test("@sha256:[0-9a-f]{64}$"))
             ' "${manifest}" > /dev/null
 
@@ -456,6 +467,7 @@ jobs:
           api_migrate_digest="$(digest_or_unavailable api-migrate)"
           auth_digest="$(digest_or_unavailable auth)"
           auth_migrate_digest="$(digest_or_unavailable auth-migrate)"
+          realtime_digest="$(digest_or_unavailable realtime)"
           failed_stage='not-started'
           recovery_hint='review_failed_workflow_step'
           if jq -e '
@@ -478,6 +490,7 @@ jobs:
             echo "| API migration digest | \`${api_migrate_digest}\` |"
             echo "| Auth digest | \`${auth_digest}\` |"
             echo "| Auth migration digest | \`${auth_migrate_digest}\` |"
+            echo "| Realtime digest | \`${realtime_digest}\` |"
             echo "| Failed stage | \`${failed_stage}\` |"
             echo "| Recovery hint | \`${recovery_hint}\` |"
           } >> "${GITHUB_STEP_SUMMARY}"

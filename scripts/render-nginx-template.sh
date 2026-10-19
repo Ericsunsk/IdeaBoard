@@ -18,6 +18,7 @@ fi
 NGINX_API_UPSTREAM="${NGINX_API_UPSTREAM:-http://127.0.0.1:6000}"
 NGINX_AUTH_UPSTREAM="${NGINX_AUTH_UPSTREAM:-http://127.0.0.1:6001}"
 NGINX_AUTH_HEALTH_UPSTREAM="${NGINX_AUTH_HEALTH_UPSTREAM:-http://127.0.0.1:6001/api/health}"
+NGINX_REALTIME_UPSTREAM="${NGINX_REALTIME_UPSTREAM:-http://127.0.0.1:6002}"
 NGINX_WEB_ROOT="${NGINX_WEB_ROOT:-/usr/share/nginx/html}"
 NGINX_ROOT_DIRECTIVE="${NGINX_ROOT_DIRECTIVE:-try_files \$uri \$uri/ /index.html}"
 NGINX_REAL_IP_INCLUDE="${NGINX_REAL_IP_INCLUDE:-}"
@@ -62,6 +63,7 @@ sed \
   -e "s|\${NGINX_API_UPSTREAM}|$(escape_sed_replacement "$NGINX_API_UPSTREAM")|g" \
   -e "s|\${NGINX_AUTH_UPSTREAM}|$(escape_sed_replacement "$NGINX_AUTH_UPSTREAM")|g" \
   -e "s|\${NGINX_AUTH_HEALTH_UPSTREAM}|$(escape_sed_replacement "$NGINX_AUTH_HEALTH_UPSTREAM")|g" \
+  -e "s|\${NGINX_REALTIME_UPSTREAM}|$(escape_sed_replacement "$NGINX_REALTIME_UPSTREAM")|g" \
   -e "s|\${NGINX_WEB_ROOT}|$(escape_sed_replacement "$NGINX_WEB_ROOT")|g" \
   -e "s|\${NGINX_ROOT_DIRECTIVE}|$(escape_sed_replacement "$NGINX_ROOT_DIRECTIVE")|g" \
   -e "s|\${NGINX_REAL_IP_INCLUDE_DIRECTIVE}|$(escape_sed_replacement "$NGINX_REAL_IP_INCLUDE_DIRECTIVE")|g" \

@@ -239,6 +239,47 @@ describe('boardsResource create', () => {
   })
 })
 
+describe('boardsResource owner facts', () => {
+  test('carries the owner avatar URL for card display', async () => {
+    mocks.listBoards.mockResolvedValue({
+      data: [
+        boardDto({
+          creator_user_id: 'usr_owner',
+          owner_avatar: ' /api/v1/public/users/AVTR01/avatar?v=1 ',
+        }),
+      ],
+      meta: { has_more: false },
+    })
+
+    const [meta] = await fetchWorkspaceBoards(WORKSPACE_ID)
+
+    expect(meta?.creatorUserId).toBe('usr_owner')
+    expect(meta?.ownerAvatarUrl).toBe('/api/v1/public/users/AVTR01/avatar?v=1')
+  })
+
+  test('omits the owner avatar when the server omits it', async () => {
+    mocks.listBoards.mockResolvedValue({ data: [boardDto()], meta: { has_more: false } })
+
+    const [meta] = await fetchWorkspaceBoards(WORKSPACE_ID)
+
+    expect(meta?.ownerAvatarUrl).toBeUndefined()
+  })
+
+  test.each([['  '], [42], [null]])(
+    'omits blank or non-string owner avatars (%s)',
+    async (avatar) => {
+      mocks.listBoards.mockResolvedValue({
+        data: [boardDto({ owner_avatar: avatar })],
+        meta: { has_more: false },
+      })
+
+      const [meta] = await fetchWorkspaceBoards(WORKSPACE_ID)
+
+      expect(meta?.ownerAvatarUrl).toBeUndefined()
+    },
+  )
+})
+
 describe('boardsResource range facts', () => {
   test('carries has_direct_grant for the personal-range derivation', async () => {
     mocks.listBoards.mockResolvedValue({

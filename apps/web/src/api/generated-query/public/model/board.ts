@@ -52,6 +52,8 @@ export interface Board {
   archived_at?: string | null
   /** Creator User public identity (usr_ opaque). */
   creator_user_id: string
+  /** Workspace-visible owner avatar public URL with a content version query (members-only visibility, same rule as the member list). Omitted when the owner has no custom avatar or the value is unavailable. */
+  owner_avatar?: string
   workspace_access: WorkspaceAccess
   /**
    * Independent monotonic access counter, served as the access-<version> ETag on the access resource. Access mutations bump it; document writes never do.

@@ -70,10 +70,15 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		return nil, err
 	}
 	dbHealthChecker := databaseinfra.NewHealthChecker(&databaseinfra.Pools{Pool: dbs.DB, RiverPool: dbs.RiverPool})
-	router, err := wiring.NewAppRouter(cfg, repos, services, taskServices, dbHealthChecker, redmetrics.DefaultSet())
-	if err != nil {
-		wiring.CloseStartupResources(dbs.DB, dbs.RiverPool)
-		return nil, err
+	// ADR-0021: a worker-only process never builds the HTTP router. Every
+	// other mode needs it for API/SSE traffic.
+	var router *gin.Engine
+	if cfg.Mode.ServesHTTP() {
+		router, err = wiring.NewAppRouter(cfg, repos, services, taskServices, dbHealthChecker, redmetrics.DefaultSet())
+		if err != nil {
+			wiring.CloseStartupResources(dbs.DB, dbs.RiverPool)
+			return nil, err
+		}
 	}
 	natsHealthChecker := natsinfra.NewEventBusFromUnderlying(workerRuntime.EventBus())
 
@@ -98,16 +103,23 @@ func BuildApp(cfg *config.Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	httpServer := httpinfra.NewHTTPServerRunner(cfg, container.router)
-	metricsServer := httpinfra.NewMetricsServerRunner(cfg)
-	return &App{
+	app := &App{
 		coordinator:    lifecycle.NewCoordinator(lifecycle.DefaultShutdownBudget),
-		httpServer:     httpServer,
-		metricsServer:  metricsServer,
 		workerRuntime:  container.workerRuntime,
-		healthCheckers: append(container.healthCheckers, httpServer, metricsServer),
+		healthCheckers: container.healthCheckers,
 		closer:         container,
-	}, nil
+	}
+	// ADR-0021: a worker-only process binds no HTTP listeners at all (no
+	// API routes, no metrics endpoint); its runners stay nil and are
+	// skipped by startup/shutdown below.
+	if cfg.Mode.ServesHTTP() {
+		httpServer := httpinfra.NewHTTPServerRunner(cfg, container.router)
+		metricsServer := httpinfra.NewMetricsServerRunner(cfg)
+		app.httpServer = httpServer
+		app.metricsServer = metricsServer
+		app.healthCheckers = append(app.healthCheckers, httpServer, metricsServer)
+	}
+	return app, nil
 }
 
 // App represents the process runtime root adhering to platform lifecycle invariants.
@@ -123,13 +135,35 @@ type App struct {
 // Start executes the ordered startup sequence and marks runtime ready.
 func (a *App) Start(ctx context.Context) error {
 	return orchestration.ExecuteStartup(ctx, a.coordinator, orchestration.StartupDependencies{
-		Runners: []ports.Runner{
-			a.workerRuntime,
-			a.httpServer,
-			a.metricsServer,
-		},
+		Runners:        a.startupRunners(),
 		HealthCheckers: a.healthCheckers,
 	})
+}
+
+// startupRunners lists runners in dependency order: workers first, then
+// HTTP listeners. Nil listeners (worker-only mode, ADR-0021) are skipped,
+// so a worker process starts only the River runtime while an http-only
+// process still starts it without River consumption (enqueue-only).
+func (a *App) startupRunners() []ports.Runner {
+	runners := []ports.Runner{a.workerRuntime}
+	if a.httpServer != nil {
+		runners = append(runners, a.httpServer)
+	}
+	if a.metricsServer != nil {
+		runners = append(runners, a.metricsServer)
+	}
+	return runners
+}
+
+// shutdownRunners reverses startup order, preserving the pre-split drain
+// sequence (workers stop before listeners release).
+func (a *App) shutdownRunners() []ports.Runner {
+	started := a.startupRunners()
+	runners := make([]ports.Runner, 0, len(started))
+	for i := len(started) - 1; i >= 0; i-- {
+		runners = append(runners, started[i])
+	}
+	return runners
 }
 
 // WaitForShutdownSignal blocks until an OS termination signal is caught.
@@ -141,11 +175,7 @@ func (a *App) WaitForShutdownSignal() {
 
 // Shutdown gracefully stops runners within the shutdown budget.
 func (a *App) Shutdown(ctx context.Context) error {
-	return a.coordinator.DrainAndShutdown(ctx, []ports.Runner{
-		a.metricsServer,
-		a.httpServer,
-		a.workerRuntime,
-	})
+	return a.coordinator.DrainAndShutdown(ctx, a.shutdownRunners())
 }
 
 // Close releases database connections and underlying system resources.

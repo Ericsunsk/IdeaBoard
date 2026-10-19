@@ -13,6 +13,7 @@ var apiOwnedTableNames = []string{
 	"board_document_media_refs",
 	"board_memberships",
 	"board_revisions",
+	"board_y_updates",
 	"boards",
 	// control_idempotency_records shares the full-DML grant: Claim inserts
 	// the in-progress fact, Complete/Abandon settle it, and PurgeExpired
@@ -55,6 +56,7 @@ var apiOwnedSequenceNames = []string{
 	"billing_accounts_internal_id_seq",
 	"board_access_event_outbox_internal_id_seq",
 	"board_revisions_internal_id_seq",
+	"board_y_updates_internal_id_seq",
 	"boards_internal_id_seq",
 	"control_audit_records_internal_id_seq",
 	"event_deliveries_internal_id_seq",

@@ -25,7 +25,7 @@ It is not a business context and must never decay into a wiring package; no busi
 - `Coordinator` drives state-machine lifecycle coordination and owns the shutdown budget and drain.
 - `ExecuteStartup` owns the dependency-graph startup plan.
 - `App` is the lifecycle-managed application object built by the composition root.
-- `composition` is the sole assembly root and CLI dispatcher; business packages and other runtime subpackages hold no global wiring.
+- `composition` is the sole assembly root and CLI dispatcher; business packages and other runtime subpackages hold no global wiring. Process role (`API_MODE=all|http-only|worker-only`, ADR-0021) only selects which runners start: http-only skips River worker registration and periodic schedules (enqueue-only), worker-only skips all HTTP listeners.
 - `interfaces/http` owns HTTP routing and transport adaptation only.
 - `interfaces/worker` owns queue consumption and provider execution adaptation only.
 - `adapters/billingregistry` owns the Workflow-to-Billing mapping adaptation.

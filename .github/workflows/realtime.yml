@@ -1,0 +1,74 @@
+name: Realtime
+
+on:
+  workflow_call:
+    inputs:
+      build_images:
+        required: false
+        type: boolean
+        default: false
+      audit_dependencies:
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  DOCKER_BUILD_RECORD_UPLOAD: 'false'
+
+jobs:
+  quality:
+    name: Realtime Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with: { cache-dependency-path: apps/realtime/package-lock.json }
+      - uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/realtime
+          omit-optional: 'true'
+      - name: Lint Realtime
+        working-directory: apps/realtime
+        run: npm run lint
+      - name: Test Realtime
+        working-directory: apps/realtime
+        run: npm test
+      - name: Build Realtime
+        working-directory: apps/realtime
+        run: npm run build
+      - name: Production dependency audit
+        if: inputs.audit_dependencies
+        working-directory: apps/realtime
+        run: npm audit --omit=dev --audit-level=high
+  image:
+    name: Realtime PR Images
+    if: inputs.build_images
+    needs: [quality]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: realtime
+            target: runtime
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: ./apps/realtime
+          file: ./apps/realtime/Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: false
+          tags: ideaboard-${{ matrix.name }}:pr
+          cache-from: type=gha,scope=ideaboard-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=ideaboard-${{ matrix.name }}

@@ -83,6 +83,15 @@ export class CanvasGraphStore {
   private revision = 0
   private readonly telemetry: CanvasGraphStoreTelemetry
   private readonly commitListeners = new Set<(event: CanvasGraphCommitEvent) => void>()
+  private canWriteDomain = () => true
+
+  setDomainWritePolicy(canWrite: () => boolean): void {
+    this.canWriteDomain = canWrite
+  }
+
+  _canWriteDomain(): boolean {
+    return this.canWriteDomain()
+  }
 
   constructor(
     snapshot: BoardSnapshot = createEmptyBoardSnapshot(),
@@ -128,7 +137,7 @@ export class CanvasGraphStore {
     direction: CanvasGraphPatchDirection,
     options: CanvasGraphTransactionOptions = {},
   ): CanvasGraphTransactionSummary {
-    if (!canApplyCommitPatch(this.state, patch, direction)) {
+    if (!this._canWriteDomain() || !canApplyCommitPatch(this.state, patch, direction)) {
       const draft = this._createTransactionDraft()
       return createSummary(
         direction === 'forward' ? 'history-redo' : 'history-undo',

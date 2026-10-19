@@ -60,9 +60,10 @@ const (
 	CodeMembershipTransitionForbidden   Code = "membership_transition_forbidden"
 	// Default workspace lifecycle codes (Default resolution). Wire-stable:
 	// do not rename without coordinating the OpenAPI contract and callers.
-	// Archiving (the only delete path; workspaces are never hard-deleted)
-	// and renaming a Default workspace render 403
-	// workspace_default_protected; minting a second live Default for the
+	// Archiving or renaming a Default workspace renders 403
+	// workspace_default_protected (archived non-Default workspaces are
+	// hard-deleted 7 days later; only the Default workspace itself is never
+	// deleted); minting a second live Default for the
 	// same owner renders 409 workspace_default_conflict.
 	CodeWorkspaceDefaultProtected Code = "workspace_default_protected"
 	CodeWorkspaceDefaultConflict  Code = "workspace_default_conflict"

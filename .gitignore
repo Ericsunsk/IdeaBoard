@@ -6,6 +6,7 @@ apps/web/.benchmark-reports/
 apps/web/docs/frontend-governance-baseline-*.md
 coverage/
 apps/auth/dist/
+apps/realtime/dist/
 logs/
 *.log
 npm-debug.log*

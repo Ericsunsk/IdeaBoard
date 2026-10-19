@@ -46,9 +46,9 @@ afterEach(async () => {
 
 describe('BoardCard access posture', () => {
   test.each([
-    ['private', 'Private'],
-    ['workspace', 'Workspace'],
-  ] as const)('renders the %s posture as icon plus text', (accessState, copy) => {
+    ['private', 'Private', 2],
+    ['workspace', 'Workspace', 1],
+  ] as const)('renders the %s posture as text', (accessState, copy, expectedSvg) => {
     const view = renderCard(
       makeBoardMeta('board-1', 'Campaign', 2, {
         revision: 1,
@@ -61,9 +61,10 @@ describe('BoardCard access posture', () => {
     )
 
     expect(screen.getByText(copy)).toBeVisible()
-    // Icon plus text: the badge svg rides beside the copy (the card menu
-    // trigger owns the other svg).
-    expect(svgCount(view)).toBe(2)
+    // Private pairs the text with the badge icon (badge svg + menu svg);
+    // workspace pairs the text with the owner avatar and carries no badge
+    // icon (these boards carry no creator identity so no avatar renders).
+    expect(svgCount(view)).toBe(expectedSvg)
   })
 
   test('shows no badge before the server mints access facts', () => {

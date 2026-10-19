@@ -38,6 +38,7 @@ expected_locations=(
   "location /api/auth/"
   "location ~ ^/api/v1/workspaces/[^/]+/tasks(/|$)"
   "location ~ ^/api/v1/workspaces/[^/]+/events(/|$)"
+  "location = /realtime"
   "location /api/"
 )
 
@@ -69,7 +70,7 @@ if (( pragma_count != expected_count )); then
 fi
 
 # SSE routes must disable buffering so the gateway can stream events.
-if [[ "$(grep -cE '^[[:space:]]*proxy_buffering off' "$output" || true)" -lt 2 ]]; then
+if [[ "$(grep -cE '^[[:space:]]*proxy_buffering off' "$output" || true)" -lt 3 ]]; then
   printf 'render-nginx-template-test: SSE route must set proxy_buffering off\n' >&2
   exit 2
 fi
@@ -80,8 +81,18 @@ if NGINX_SERVER_NAME="api.ideaboard.art" \
   printf 'render-nginx-template-test: identical primary and legacy hosts must fail closed\n' >&2
   exit 2
 fi
-if [[ "$(grep -cE 'add_header X-Accel-Buffering "no" always' "$output" || true)" -lt 2 ]]; then
+if [[ "$(grep -cE 'add_header X-Accel-Buffering "no" always' "$output" || true)" -lt 3 ]]; then
   printf 'render-nginx-template-test: SSE route must set X-Accel-Buffering: no\n' >&2
+  exit 2
+fi
+
+# Realtime presence must passthrough the WebSocket upgrade.
+if ! grep -qF 'proxy_set_header Upgrade $http_upgrade;' "$output"; then
+  printf 'render-nginx-template-test: realtime route must passthrough Upgrade\n' >&2
+  exit 2
+fi
+if ! grep -qF 'proxy_set_header Connection "upgrade";' "$output"; then
+  printf 'render-nginx-template-test: realtime route must passthrough Connection upgrade\n' >&2
   exit 2
 fi
 
@@ -95,7 +106,7 @@ if grep -qF "$client_forwarded_proto" "$output" || grep -qF "$proxy_forwarded_pr
 fi
 forwarded_proto_pattern="proxy_set_header X-Forwarded-Proto \$scheme;"
 forwarded_proto_count="$(grep -cF "$forwarded_proto_pattern" "$output" || true)"
-if (( forwarded_proto_count != 6 )); then
+if (( forwarded_proto_count != 7 )); then
   printf 'render-nginx-template-test: X-Forwarded-Proto count = %d, want 6\n' "$forwarded_proto_count" >&2
   exit 2
 fi

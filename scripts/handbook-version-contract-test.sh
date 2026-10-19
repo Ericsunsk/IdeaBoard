@@ -22,10 +22,11 @@ fi
 # Minimal fixture tree that satisfies every contract clause.
 make_fixture() {
   local root="$1"
-  mkdir -p "$root/apps/auth" "$root/apps/api" "$root/docs/runbooks"
+  mkdir -p "$root/apps/auth" "$root/apps/realtime" "$root/apps/api" "$root/docs/runbooks"
   printf '22.23.2' >"$root/.node-version"
   printf 'module ideaboard/api\n\ngo 1.26.6\n' >"$root/apps/api/go.mod"
   printf '# syntax=docker/dockerfile:1.7\n\nARG NODE_VERSION=22.23.2\n' >"$root/apps/auth/Dockerfile"
+  printf '# syntax=docker/dockerfile:1.7\n\nARG NODE_VERSION=22.23.2\n' >"$root/apps/realtime/Dockerfile"
   # shellcheck disable=SC2016 # $BUILDPLATFORM is a Dockerfile literal in the fixture.
   printf '# syntax=docker/dockerfile:1.7\n\nFROM --platform=$BUILDPLATFORM golang:1.26.6-bookworm AS builder\n' >"$root/apps/api/Dockerfile"
   # shellcheck disable=SC2016 # Backticks are markdown code spans in the fixture.

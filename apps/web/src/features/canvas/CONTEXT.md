@@ -4,6 +4,12 @@ Canvas Workspace owns editing a Canvas Board: node orchestration, graph interact
 It coordinates one Board Session through the Workspace Runtime facade plus Screen, Chrome, Flow Pane, and image workflow modules.
 It does NOT own the Board document contract, repository, or sync fact source (owned by `features/board`), nor provider-side task execution.
 
+## Collaboration Session
+
+`session/collaboration` owns the live document lifecycle behind one session interface. The Screen supplies the presence transport adapter and consumes presentation state; Workspace binds the Board context, and Flow attaches its canonical GraphSession adapter after HTTP hydration. Board residency, room readiness, write capability, changed-id synchronization, remote replacement and scope disposal stay inside the session. The synchronized Y.Doc is the remote replay buffer; callers keep no second pending snapshot. Collaborative commits bypass snapshot autosave and remote replacements bypass local commit/history/echo. Private Boards retain the existing snapshot persistence path (ADR-0020).
+
+Document mapping consumes the canonical `board/ports/canvas` contract and validates remote frames there. No screen-owned snapshot schema mirror or caller casts are allowed. Soft locks and awareness presentation stay in `ui/screens/presence`.
+
 ## Domain Language
 
 | Term                                | Meaning                                                                                                                                                                                                                                                                                                                                                                         |

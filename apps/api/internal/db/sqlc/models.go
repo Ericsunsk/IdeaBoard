@@ -145,6 +145,14 @@ type BoardRevision struct {
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
+type BoardYUpdate struct {
+	InternalID   int64              `json:"internal_id"`
+	BoardID      int64              `json:"board_id"`
+	AuthorUserID int64              `json:"author_user_id"`
+	UpdateData   []byte             `json:"update_data"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
 type ControlAuditRecord struct {
 	InternalID           int64              `json:"internal_id"`
 	PublicID             string             `json:"public_id"`

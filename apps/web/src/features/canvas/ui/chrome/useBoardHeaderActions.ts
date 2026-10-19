@@ -103,6 +103,15 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     return boardRepository.viewModel.byId.value.get(boardId)?.name ?? boardId
   })
 
+  // Presence gate fact: the server-computed access posture riding the
+  // hydrated catalog entry, consumed verbatim. Presence connects only on
+  // `workspace`; private or never-hydrated boards stay disconnected.
+  const boardAccessState = computed(() => {
+    const boardId = `${options.currentBoardId.value ?? ''}`.trim()
+    if (!boardId) return undefined
+    return boardRepository.viewModel.byId.value.get(boardId)?.accessState
+  })
+
   // Read-only display derives from the server-computed capabilities riding
   // the hydrated catalog entry: canWrite false renders the read-only
   // banner and gates rename affordances. Boards without a capability fact
@@ -300,6 +309,7 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     catalogRecovery,
     isBoardArchived,
     isBoardReadOnly,
+    boardAccessState,
     isRestoringArchivedBoard,
     refreshArchivedState,
     markArchivedFromSave,

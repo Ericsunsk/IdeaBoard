@@ -1,5 +1,6 @@
 <template>
   <article
+    ref="cardRootEl"
     class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-panel border border-border bg-card text-left hover:border-border/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     role="button"
     tabindex="0"
@@ -40,7 +41,7 @@
         maxlength="60"
         @click.stop
         @input="onRenameInput"
-        @blur="emit('commit-rename')"
+        @blur="onRenameBlur"
         @keyup.enter.stop.prevent="emit('commit-rename')"
         @keyup.esc.stop.prevent="emit('cancel-rename')"
       />
@@ -57,8 +58,17 @@
         {{ t('board.edited', { date: displayDate }) }}
       </div>
       <div v-if="accessBadge" :class="catalogClasses.accessBadge">
+        <Avatar v-if="ownerAvatarEntry" class="size-5">
+          <AvatarImage v-if="ownerAvatarSrc" :src="ownerAvatarSrc" :alt="ownerAvatarEntry.userId" />
+          <!-- Explicit delay: reka treats delayMs 0 (the wrapper default)
+            as "never render", so the initial needs a real timer. -->
+          <AvatarFallback :delay-ms="300" class="text-[10px] font-semibold uppercase">
+            {{ ownerAvatarInitial }}
+          </AvatarFallback>
+        </Avatar>
         <component
           :is="accessBadge.icon"
+          v-else-if="accessBadge.icon"
           :class="catalogClasses.accessBadgeIcon"
           aria-hidden="true"
         />
@@ -80,7 +90,11 @@
             <MoreHoriz class="size-[18px]" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="end">
+        <DropdownMenuContent
+          side="top"
+          align="end"
+          @close-auto-focus="onMenuCloseAutoFocus"
+        >
           <DropdownMenuItem
             v-for="item in menuItems"
             :key="item.label"
@@ -96,9 +110,10 @@
 </template>
 
 <script setup lang="ts">
-import { Group, MoreHoriz, User } from '@iconoir/vue'
-import { computed, nextTick, ref, watch } from 'vue'
+import { MoreHoriz, User } from '@iconoir/vue'
+import { computed, nextTick, ref, watch, type Component } from 'vue'
 import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -106,6 +121,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useI18n } from 'vue-i18n'
+import { resolveMemberAvatar } from '../../../../core/media/avatarUrl'
+import { useUserStore } from '../../../auth'
 import type { CatalogEntry } from './contract'
 import type { BoardListSceneEntry } from '../../session/sync/boardQueries'
 import SceneThumbnail from './SceneThumbnail.vue'
@@ -135,15 +152,39 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const userStore = useUserStore()
 
-// Server access posture as icon + text (never color alone): the card
-// renders the `access_state` fact verbatim and never derives it locally.
-// Boards without the fact (never-synced local drafts) show no badge until
-// the server mints their identity.
-const accessBadge = computed(() => {
+// Owner avatar row (bare size-5 avatar, no ring): team
+// (workspace-posture) cards render the creator avatar; private cards and
+// boards without server access facts render no avatar at all (the row is
+// conditionally hidden, never an empty placeholder). Owner-is-self also
+// renders (uniform row; the session avatar is the fallback when the
+// payload lacks a URL). Facts are display-only, never permission inputs.
+const ownerAvatarEntry = computed(() => {
+  if (props.board.accessState !== 'workspace') return null
+  const userId = props.board.creatorUserId?.trim()
+  if (!userId) return null
+  return { userId, avatar_url: props.board.ownerAvatarUrl ?? undefined }
+})
+const ownerAvatarSrc = computed(() =>
+  ownerAvatarEntry.value
+    ? resolveMemberAvatar(ownerAvatarEntry.value, userStore.user)
+    : undefined,
+)
+const ownerAvatarInitial = computed(() => {
+  const userId = ownerAvatarEntry.value?.userId ?? ''
+  return userId.replace(/^usr_/, '').charAt(0).toUpperCase() || 'U'
+})
+
+// Server access posture as text (never color alone): the card renders the
+// `access_state` fact verbatim and never derives it locally. Boards without
+// the fact (never-synced local drafts) show no badge until the server mints
+// their identity. Workspace cards pair the text with the owner avatar (no
+// icon); private cards pair the text with the badge icon and no avatar.
+const accessBadge = computed((): { icon?: Component; label: string } | null => {
   switch (props.board.accessState) {
     case 'workspace':
-      return { icon: Group, label: t('board.accessWorkspace') }
+      return { label: t('board.accessWorkspace') }
     case 'private':
       return { icon: User, label: t('board.accessPrivate') }
     default:
@@ -161,13 +202,25 @@ const canWriteBoard = computed(() =>
 )
 const canShareBoard = computed(() => props.board.capabilities?.manage === true)
 
+const cardRootEl = ref<HTMLElement | null>(null)
+// Timestamp of the last menu-driven rename request. Reka fires
+// closeAutoFocus after the select event, before the parent's prop update
+// lands, so the child tracks the request locally to suppress the focus
+// steal. One-shot: consumed by the next closeAutoFocus handler.
+const renameRequestAt = ref(0)
+
+function requestRename() {
+  renameRequestAt.value = Date.now()
+  emit('rename-action')
+}
+
 const menuItems = computed(() => [
   ...(canWriteBoard.value
     ? [
         {
           key: 'rename',
           label: t('common.actions.rename'),
-          command: () => emit('rename-action'),
+          command: requestRename,
         },
       ]
     : []),
@@ -212,6 +265,40 @@ watch(
 
 function onRenameInput(event: Event) {
   emit('rename-input', (event.target as HTMLInputElement).value)
+}
+
+// Blur commits only when focus truly leaves the card. The Reka menu close
+// returns focus to its trigger (inside the card); that spurious blur must
+// not enter the async PATCH chain. An explicit relatedTarget decides; only
+// when it is null (runtime quirk) do we fall back to document.activeElement.
+function onRenameBlur(event: FocusEvent) {
+  const next = event.relatedTarget as Node | null
+  if (next instanceof Node) {
+    if (cardRootEl.value?.contains(next)) return
+    emit('commit-rename')
+    return
+  }
+  if (typeof document !== 'undefined') {
+    const active = document.activeElement
+    if (
+      active instanceof Node &&
+      active !== document.body &&
+      cardRootEl.value?.contains(active)
+    ) {
+      return
+    }
+  }
+  emit('commit-rename')
+}
+
+// Suppress the Reka closeAutoFocus focus steal for the rename-triggering
+// menu close so the rename input keeps focus. Normal menu closes (no rename
+// pending, not renaming) keep the default focus-restore behavior.
+function onMenuCloseAutoFocus(event: Event) {
+  const isRecentRenameRequest = Date.now() - renameRequestAt.value < 500
+  if (!props.isRenaming && !isRecentRenameRequest) return
+  event.preventDefault()
+  renameRequestAt.value = 0
 }
 
 function onCardKeyboardActivate(event: KeyboardEvent) {

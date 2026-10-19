@@ -73,6 +73,8 @@ api_migrate_image="$(jq -er '.images["api-migrate"] | strings' "${MANIFEST_FILE}
 auth_image="$(jq -er '.images.auth | strings' "${MANIFEST_FILE}")" || die 'manifest Auth image is missing'
 auth_migrate_image="$(jq -er '.images["auth-migrate"] | strings' "${MANIFEST_FILE}")" || \
   die 'manifest Auth Migration image is missing'
+realtime_image="$(jq -er '.images.realtime | strings' "${MANIFEST_FILE}")" || \
+  die 'manifest Realtime image is missing'
 [[ "${tag}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || \
   die 'manifest tag must match vMAJOR.MINOR.PATCH'
 [[ "${commit}" =~ ^[0-9a-f]{40}$ ]] || die 'manifest commit must be a full Git SHA'
@@ -83,6 +85,8 @@ validate_image_ref "${api_migrate_image}" api-migrate || \
 validate_image_ref "${auth_image}" auth || die 'manifest Auth image must use the expected immutable digest'
 validate_image_ref "${auth_migrate_image}" auth-migrate || \
   die 'manifest Auth Migration image must use the expected immutable digest'
+validate_image_ref "${realtime_image}" realtime || \
+  die 'manifest Realtime image must use the expected immutable digest'
 
 ENTRYPOINT_STAGE="lock"
 mkdir -p "$(dirname "${LOCK_FILE}")"

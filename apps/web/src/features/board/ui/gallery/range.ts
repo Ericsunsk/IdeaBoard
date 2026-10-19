@@ -16,24 +16,24 @@ function isGalleryRange(value: unknown): value is BoardGalleryRange {
  * share these predicates without importing the store or adapter types.
  */
 export type RangeBoardFacts = {
+  accessState?: string | undefined
   isCreator?: boolean | undefined
-  hasDirectGrant?: boolean | undefined
-  workspaceAccess?: string | undefined
   revision?: number | undefined
 }
 
-/** Own creations and unsynced local drafts. */
+/**
+ * Personal boards by ownership: boards the caller created (`isCreator`)
+ * plus never-synced local drafts (`revision === undefined`).
+ * Creator-shared boards stay personal after sharing, so they appear in
+ * both personal and team; ranges overlap and are counted independently.
+ */
 export function isPersonalBoard(board: RangeBoardFacts): boolean {
   return board.isCreator === true || board.revision === undefined
 }
 
-/** Boards shared by another Creator with the current selected member. */
+/** Every workspace-shared board, including boards the caller shared. */
 export function isTeamBoard(board: RangeBoardFacts): boolean {
-  return (
-    board.isCreator === false &&
-    board.hasDirectGrant === true &&
-    (board.workspaceAccess === 'viewer' || board.workspaceAccess === 'editor')
-  )
+  return board.accessState === 'workspace'
 }
 
 export function filterBoardsByRange<TBoard extends RangeBoardFacts>(

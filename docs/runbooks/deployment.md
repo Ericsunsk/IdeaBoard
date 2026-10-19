@@ -50,8 +50,8 @@ graph LR
 - Cloudflare Pages 托管 `apps/web/dist`，并由 `ideaboard.art` Gateway 暴露应用。
 - Cloudflare DNS/Proxy 暴露 `ideaboard.art` 并提供 WAF / Rate Limiting / Cache Rules。
 - VPS 宿主机 Nginx 反代同域 `/api/*`、`/api/auth/*` 到 Docker Compose 中的 API/Auth。媒体通过 Media Asset、public avatar/logo API 返回图片字节；imgproxy 只接受 API 内部的签名渲染请求。
-- Docker Compose 管理 API、Auth、PostgreSQL、NATS JetStream 与 `api-uploads` volume。
-- River 任务队列写入 PostgreSQL；JetStream 只承载状态事件、audit 与实时 fanout。
+- Docker Compose 管理 API（http-only）、API Worker（worker-only）、Auth、PostgreSQL、NATS JetStream 与 `api-uploads` volume。`api` 与 `api-worker` 是同一镜像、同一数据库的双进程（ADR-0021，`API_MODE` 区分），不是微服务。
+- River 任务队列写入 PostgreSQL；JetStream 只承载状态事件、audit 与实时 fanout。全部 River 队列由 `api-worker` 消费（含 drawing/GPU 长耗时、`media_reclamation`、retention/sweep、对账），`api` 只负责 API/SSE 与事务内入队；periodic 调度只跑在 worker 侧。`api-worker` 保持单副本，水平扩展只加 `api`。
 
 任务 retry 分三层：网关内部重试（单请求最多 5 次，Cloudflare 侧 fallback 链）；网关耗尽后 transient 失败（429/5xx/超时/网络）允许最多 2 次 worker 层重投（reset + River backoff 整任务重投，新 token，以 `tasks.retry_count` 为界，见 ADR-0010）；River `MaxAttempts=25` 是 worker panic、process error、临时基础设施故障的队列层 retry（整任务重投）。Worker timeout（网关 300s/worker 360s/River 17m 嵌套）与 `MaxAttempts` 是代码持有的 typed policy；worker concurrency 通过 `RIVER_WORKER_CONCURRENCY` 配置，默认 5、范围 1–64，重启 API/Worker 后生效。NATS retention 固定为 7 天。Admin 只管理 Egress allowlist（AI 出口唯一是 Cloudflare AI Gateway，图片下载经 safehttp 做 SSRF 防护），按请求读取并在保存后即时生效。
 
@@ -114,6 +114,7 @@ GitHub Actions
   -> ghcr.io/<owner>/<repo>/ideaboard-api-migrate@sha256:<digest>
   -> ghcr.io/<owner>/<repo>/ideaboard-auth@sha256:<digest>
   -> ghcr.io/<owner>/<repo>/ideaboard-auth-migrate@sha256:<digest>
+  -> ghcr.io/<owner>/<repo>/ideaboard-realtime@sha256:<digest>
 
 VPS
   -> ideaboard update --manifest release-manifest.json
@@ -128,11 +129,11 @@ VPS
 
 生产部署不要把 VPS 端 bootstrap 绑定到 `main`；请始终使用明确的发布 tag 或 commit SHA。镜像部署值必须使用 GitHub Actions 输出的 digest 引用。
 
-Docker Images workflow 只消费目标 commit 已成功的 `CI Gate`，然后构建、扫描、签名并发布 immutable `sha-<commit>` images。BuildKit provenance 与 SBOM 作为 image attestations 生成；workflow 只上传 `release-manifest.json`，不再额外生成或发布平台 SBOM 文件。该 manifest 是推荐升级输入，记录本次 workflow 的 `repository` / `tag` / `ref` / `commit` / `run_id`、四张 GHCR digest 镜像引用和 Cosign OIDC identity。当前 Production 节点使用 `linux/arm64`。
+Docker Images workflow 只消费目标 commit 已成功的 `CI Gate`，然后构建、扫描、签名并发布 immutable `sha-<commit>` images。BuildKit provenance 与 SBOM 作为 image attestations 生成；workflow 只上传 `release-manifest.json`，不再额外生成或发布平台 SBOM 文件。该 manifest 是推荐升级输入，记录本次 workflow 的 `repository` / `tag` / `ref` / `commit` / `run_id`、五张 GHCR digest 镜像引用和 Cosign OIDC identity。当前 Production 节点使用 `linux/arm64`。Realtime 为无 DB 的 presence sidecar，只发布 runtime 单镜像、无 migrator 镜像。
 
-严格 SemVer tag（例如 `v0.1.0`）还会触发同一 workflow 内的 Production deployment；Docker Images 的手动 workflow 只构建、扫描、签名 artifact，不会自动进入 Production deployment。deployment job 只下载本次 workflow 生成的 `release-manifest`，在建立 SSH 连接前验证 manifest 的 tag、commit、ref 和四张 image digest，然后把 manifest 通过 stdin 发送给 VPS 上的 restricted forced command。VPS entrypoint 继续负责 checkout 对应 commit、Cosign 验签、backup、migration、health、smoke 和 release state；GitHub Actions 不重新 build、不解析 mutable image tag，也不读取应用运行时 Secret。
+严格 SemVer tag（例如 `v0.1.0`）还会触发同一 workflow 内的 Production deployment；Docker Images 的手动 workflow 只构建、扫描、签名 artifact，不会自动进入 Production deployment。deployment job 只下载本次 workflow 生成的 `release-manifest`，在建立 SSH 连接前验证 manifest 的 tag、commit、ref 和五张 image digest，然后把 manifest 通过 stdin 发送给 VPS 上的 restricted forced command。VPS entrypoint 继续负责 checkout 对应 commit、Cosign 验签、backup、migration、health、smoke 和 release state；GitHub Actions 不重新 build、不解析 mutable image tag，也不读取应用运行时 Secret。
 
-如果既有 image 已成功构建但 Production deployment 失败，请在 Actions 中运行 [Deploy Existing Production Release](../../.github/workflows/deploy-production.yml)，只填写失败发布的 strict SemVer `release_tag`。该 workflow 从对应 GitHub Release 下载原始 `release-manifest.json`，校验四张 immutable digest 后直接执行部署，不包含 image build、scan、sign 或 push。它与常规 Production deployment 共用 `production-deployment` concurrency，并仍需 `production` Environment approval；Migration 阶段或之后的失败不会自动重试。
+如果既有 image 已成功构建但 Production deployment 失败，请在 Actions 中运行 [Deploy Existing Production Release](../../.github/workflows/deploy-production.yml)，只填写失败发布的 strict SemVer `release_tag`。该 workflow 从对应 GitHub Release 下载原始 `release-manifest.json`，校验五张 immutable digest 后直接执行部署，不包含 image build、scan、sign 或 push。它与常规 Production deployment 共用 `production-deployment` concurrency，并仍需 `production` Environment approval；Migration 阶段或之后的失败不会自动重试。
 
 ### Production 自动部署通道
 
@@ -171,7 +172,7 @@ git tag v0.1.0 <verified-main-commit>
 git push origin v0.1.0
 ```
 
-Production deployment 使用固定 concurrency group 串行执行，新的发布不会取消正在进行的发布。SSH connection timeout 为 15 秒，远程 deployment 最长运行 25 分钟；失败时 workflow fail closed，并在 GitHub job summary 中记录 tag、commit、四张 image digest、失败阶段和受控 recovery hint。restricted entrypoint 会丢弃部署过程的原始 stdout/stderr，SSH 只返回 allow-listed JSON 结果；GitHub 不接收未脱敏的容器日志或 inspection output。migration 后失败不会自动 restore PostgreSQL，仍按本 runbook 的人工回滚流程处理。
+Production deployment 使用固定 concurrency group 串行执行，新的发布不会取消正在进行的发布。SSH connection timeout 为 15 秒，远程 deployment 最长运行 25 分钟；失败时 workflow fail closed，并在 GitHub job summary 中记录 tag、commit、五张 image digest、失败阶段和受控 recovery hint。restricted entrypoint 会丢弃部署过程的原始 stdout/stderr，SSH 只返回 allow-listed JSON 结果；GitHub 不接收未脱敏的容器日志或 inspection output。migration 后失败不会自动 restore PostgreSQL，仍按本 runbook 的人工回滚流程处理。
 
 发布路径只推送 immutable SHA image（`sha-<commit>` tag，不推广 mutable alias），当前 Production 节点只构建 `linux/arm64` 单架构；通过 BuildKit 为该单架构 image 生成 max-mode provenance 和 SBOM attestation，不再额外生成或发布平台 SBOM 文件；固定版本且经过 repo-local SHA-256 校验的 Grype 只扫描 `linux/arm64` image，拦截 `high` 及以上漏洞；Cosign keyless OIDC 对最终 image digest 签名，全部成功后才写入 release manifest。Grype 版本与 archive trust anchor 分别由 [`.grype-version`](../../.grype-version) 和 [`.grype-checksums`](../../.grype-checksums) 管理，例外统一维护在 [`.grype.yaml`](../../.grype.yaml)，新增例外时只加窄范围规则并记录原因与复查日期。
 
@@ -241,7 +242,7 @@ ideaboard update --manifest release-manifest.json
 
 `ideaboard update --manifest ...` 会执行：
 
-1. 读取 manifest 中的四张 immutable image digest 并写入 `.env`；缺少 manifest 会 fail closed。
+1. 读取 manifest 中的五张 immutable image digest 并写入 `.env`；缺少 manifest 会 fail closed。
 2. 校验当前 stack checkout 与 manifest 的完整 commit SHA 一致；拒绝 mutable tag/latest，不从 registry tag 反查 digest。
 3. 创建 `.env` snapshot 与 `docker/releases/history/*.json` 发布记录。
 4. 执行 preflight、Cosign 验签、pull、backup、migration、重启与 smoke gate。
@@ -355,6 +356,7 @@ sudo systemctl reload nginx
 NGINX_API_UPSTREAM=http://127.0.0.1:6000
 NGINX_AUTH_UPSTREAM=http://127.0.0.1:6001
 NGINX_AUTH_HEALTH_UPSTREAM=http://127.0.0.1:6001/api/health
+NGINX_REALTIME_UPSTREAM=http://127.0.0.1:6002
 ```
 
 如需明确绑定主站域名，可设置 `NGINX_SERVER_NAME=ideaboard.art` 后重新执行 `ideaboard nginx-conf`。
@@ -446,7 +448,7 @@ ideaboard preflight
 ideaboard doctor
 ideaboard doctor --deep
 ideaboard status
-ideaboard logs --tail=200 api auth postgres nats
+ideaboard logs --tail=200 api api-worker auth postgres nats
 ideaboard restart
 ideaboard stop
 ```
@@ -472,7 +474,7 @@ ideaboard delete --yes
 | `RIVER_POOL_MAX_CONNS`         | 10   | 1–32   | River pgxpool 上限                                  |
 | `RIVER_POOL_MIN_CONNS`         | 1    | 1–16   | River pgxpool 下限，不超过上限                      |
 
-单实例连接预算 = `DB_POOL_MAX_OPEN + RIVER_POOL_MAX_CONNS`（默认 35），必须留出 migrations / CLI / fixtures 余量，远低于 PostgreSQL `max_connections`（默认 100）。改动重启 API 后生效；非法值回退默认并在生产启动期直接失败（`Config.InvalidEnv`），开发环境仅 warning。
+单实例连接预算 = `DB_POOL_MAX_OPEN + RIVER_POOL_MAX_CONNS`（默认 35），必须留出 migrations / CLI / fixtures 余量，远低于 PostgreSQL `max_connections`（默认 100）。改动重启 `api` 与 `api-worker` 后生效；非法值回退默认并在生产启动期直接失败（`Config.InvalidEnv`），开发环境仅 warning。
 
 启动期 fail-fast 链（按顺序，任一失败进程直接退出）：`Config.Validate`（DB 口令/SSL、非法 env、PUBLIC_ORIGIN、`APP_SECRETS_ENCRYPTION_KEY` presence）→ `AUTH_INTERNAL_KEY`（生产 32+ 字符非占位）→ imgproxy 配置 → secrets key 格式校验（base64 32-byte）→ runtime 权限校验。`PUBLIC_ORIGIN` 缺失不再等到首次拼 URL 才暴露。
 
@@ -509,7 +511,7 @@ OpenAPI breaking-change 门禁：CI `API / OpenAPI Breaking Changes` job 用 oas
 排障优先顺序：
 
 1. `ideaboard doctor`
-2. `ideaboard logs --tail=200 api auth postgres nats`
+2. `ideaboard logs --tail=200 api api-worker auth postgres nats`
 3. `ideaboard doctor --deep`
 4. 检查 `/opt/stacks/ideaboard/docker/releases/current.json` 与 `previous.json`
 5. 检查 `/opt/stacks/ideaboard-backups/`
@@ -574,14 +576,14 @@ ideaboard update --manifest release-manifest.json
 ideaboard rollback --to previous
 ```
 
-脚本会把 previous manifest 中的四张 image digest 写回 `.env`、重新 pull/验签、启动服务并跑 smoke gate。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
+脚本会把 previous manifest 中的五张 image digest 写回 `.env`、重新 pull/验签、启动服务并跑 smoke gate。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
 
 确认最近 backup：
 
 ```bash
 ideaboard doctor
 ls -lh /opt/stacks/ideaboard-backups/
-docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env logs --tail=200 api auth postgres nats
+docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env logs --tail=200 api api-worker auth postgres nats
 ```
 
 受控 restore drill 建议至少记录：

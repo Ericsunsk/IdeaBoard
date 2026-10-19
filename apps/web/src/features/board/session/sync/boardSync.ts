@@ -87,13 +87,16 @@ type ResolvedHydrateBoardsFromServerOptions = {
 
 function toLocalAccessFacts(board: WorkspaceBoardMeta): Partial<BoardMeta> {
   // Server-computed capabilities ride hydration untouched: the catalog
-  // never derives edit rights from roles or membership locally.
+  // never derives edit rights from roles or membership locally. Owner
+  // identity facts (creator + avatar) ride along display-only.
   return {
-    ...(board.capabilities === undefined ? {} : { capabilities: board.capabilities }),
-    ...(board.accessState === undefined ? {} : { accessState: board.accessState }),
-    ...(board.workspaceAccess === undefined ? {} : { workspaceAccess: board.workspaceAccess }),
-    ...(board.isCreator === undefined ? {} : { isCreator: board.isCreator }),
-    ...(board.hasDirectGrant === undefined ? {} : { hasDirectGrant: board.hasDirectGrant }),
+    capabilities: board.capabilities,
+    accessState: board.accessState,
+    workspaceAccess: board.workspaceAccess,
+    isCreator: board.isCreator,
+    hasDirectGrant: board.hasDirectGrant,
+    creatorUserId: board.creatorUserId,
+    ...(board.ownerAvatarUrl === undefined ? {} : { ownerAvatarUrl: board.ownerAvatarUrl }),
   }
 }
 
@@ -138,7 +141,12 @@ function toLocalState(boardId: string, document: WorkspaceBoardDocument): BoardS
     !Array.isArray(snapshot.payload)
       ? (snapshot.payload as Record<string, unknown>)
       : null
-  const payload = { ...(nested ?? snapshot ?? {}), schemaVersion: document.schemaVersion }
+  const { y_state: _crdtState, ...boardPayload } = nested ?? snapshot ?? {}
+  const payload = {
+    ...boardPayload,
+    schemaVersion: document.schemaVersion,
+    updatedAt: document.updatedAt,
+  }
   const result = normalizeBoardState(stripLegacyBoardPreviewFields(payload), {
     mode: 'result',
     boundary: 'server-hydration',

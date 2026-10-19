@@ -122,15 +122,19 @@ describe('gallery range controller', () => {
     const harness = createHarness()
 
     expect(harness.controller.viewModel.range.value).toBe('personal')
+    // Ranges overlap and count independently (non-exclusive): personal is
+    // ownership (own + creator-shared both + unsynced draft), team is
+    // workspace-shared (selected + team + creator-shared both).
     expect(harness.controller.viewModel.visibleBoards.value.map((board) => board.id)).toEqual([
       'draft',
       'both',
       'own',
     ])
-    expect(harness.controller.viewModel.rangeCounts.value).toEqual({ personal: 3, team: 2 })
+    expect(harness.controller.viewModel.rangeCounts.value).toEqual({ personal: 3, team: 3 })
 
     harness.controller.commands.setRange('team')
     expect(harness.controller.viewModel.visibleBoards.value.map((board) => board.id)).toEqual([
+      'both',
       'selected',
       'team',
     ])
@@ -143,6 +147,7 @@ describe('gallery range controller', () => {
     harness.controller.commands.setSearchKeyword('')
     harness.controller.commands.setSortMode('name')
     expect(harness.controller.viewModel.visibleBoards.value.map((board) => board.id)).toEqual([
+      'both',
       'selected',
       'team',
     ])
@@ -164,6 +169,7 @@ describe('gallery range controller', () => {
       'draft',
     ])
     expect(harness.controller.viewModel.visibleBoards.value.map((board) => board.id)).toEqual([
+      'both',
       'selected',
       'team',
     ])

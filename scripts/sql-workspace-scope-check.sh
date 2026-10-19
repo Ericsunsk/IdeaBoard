@@ -70,6 +70,17 @@ predicate_allowlist=(
   # guard, so concurrent runs converge without touching other rows.
   "ScanBoardDocumentsMissingPreview"
   "UpdateBoardDocumentPreview"
+  # Global board lookup by ticket bid (internal realtime admit/y-updates/
+  # compactions only, X-Internal-Key gated): board public ids are globally
+  # unique (uq_boards_public_id) and the ticket carries bid/av/uid with no
+  # wid, so the owning workspace is resolved from the row itself. Every
+  # caller re-derives the workspace from the returned row and re-gates:
+  # admit checks ticket av == access_version plus current workspace
+  # membership and board CapRead (archived/unknown fail closed);
+  # y-updates/compactions pass the derived (workspace_public_id,
+  # board_public_id) into the workspace-scoped store tx, which re-locks
+  # and enforces CapWrite. Never wired to a user-supplied wid.
+  "GetBoardByPublicID"
 )
 
 fail=0

@@ -46,6 +46,7 @@ export {
   type CanvasSnapshotNodeCollectionKey,
 } from '../core/document/nodeRegistry'
 export {
+  BOARD_STATE_SCHEMA_VERSION,
   IMAGE_OUTPUT_COUNT_PRESET_OPTIONS,
   createEmptyBoardSnapshot,
   requireImageNodeOutputCount,

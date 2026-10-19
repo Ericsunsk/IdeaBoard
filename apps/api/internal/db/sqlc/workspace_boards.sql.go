@@ -98,6 +98,27 @@ func (q *Queries) ClearBoardMemberships(ctx context.Context, arg ClearBoardMembe
 	return result.RowsAffected(), nil
 }
 
+const countBoardYUpdates = `-- name: CountBoardYUpdates :one
+SELECT count(*)
+FROM board_y_updates AS u
+INNER JOIN boards AS b ON b.internal_id = u.board_id
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE w.public_id = $1
+  AND b.public_id = $2
+`
+
+type CountBoardYUpdatesParams struct {
+	WorkspacePublicID string `json:"workspace_public_id"`
+	BoardPublicID     string `json:"board_public_id"`
+}
+
+func (q *Queries) CountBoardYUpdates(ctx context.Context, arg CountBoardYUpdatesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countBoardYUpdates, arg.WorkspacePublicID, arg.BoardPublicID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createWorkspaceBoard = `-- name: CreateWorkspaceBoard :one
 
 INSERT INTO boards (public_id, workspace_id, owner_user_id, title)
@@ -173,6 +194,25 @@ func (q *Queries) DeleteBoardDocumentMediaRefs(ctx context.Context, arg DeleteBo
 	return err
 }
 
+const deleteBoardYUpdates = `-- name: DeleteBoardYUpdates :exec
+DELETE FROM board_y_updates AS u
+USING boards AS b, workspaces AS w
+WHERE u.board_id = b.internal_id
+  AND w.internal_id = b.workspace_id
+  AND w.public_id = $1
+  AND b.public_id = $2
+`
+
+type DeleteBoardYUpdatesParams struct {
+	WorkspacePublicID string `json:"workspace_public_id"`
+	BoardPublicID     string `json:"board_public_id"`
+}
+
+func (q *Queries) DeleteBoardYUpdates(ctx context.Context, arg DeleteBoardYUpdatesParams) error {
+	_, err := q.db.Exec(ctx, deleteBoardYUpdates, arg.WorkspacePublicID, arg.BoardPublicID)
+	return err
+}
+
 const deleteWorkspaceMemberBoardGrants = `-- name: DeleteWorkspaceMemberBoardGrants :execrows
 DELETE FROM board_memberships AS m
 USING boards AS b, workspaces AS w
@@ -198,6 +238,63 @@ func (q *Queries) DeleteWorkspaceMemberBoardGrants(ctx context.Context, arg Dele
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const getBoardByPublicID = `-- name: GetBoardByPublicID :one
+SELECT b.internal_id, b.public_id, w.public_id AS workspace_public_id,
+  b.owner_user_id, b.title, b.workspace_access, b.access_version,
+  b.created_at, b.updated_at, b.archived_at,
+  d.document_version, d.schema_version, d.snapshot_data,
+  d.content_version, d.preview_scene
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+INNER JOIN board_documents AS d ON d.board_id = b.internal_id
+WHERE b.public_id = $1
+LIMIT 1
+`
+
+type GetBoardByPublicIDRow struct {
+	InternalID        int64              `json:"internal_id"`
+	PublicID          string             `json:"public_id"`
+	WorkspacePublicID string             `json:"workspace_public_id"`
+	OwnerUserID       pgtype.Int8        `json:"owner_user_id"`
+	Title             string             `json:"title"`
+	WorkspaceAccess   string             `json:"workspace_access"`
+	AccessVersion     int64              `json:"access_version"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
+	DocumentVersion   int32              `json:"document_version"`
+	SchemaVersion     int32              `json:"schema_version"`
+	SnapshotData      []byte             `json:"snapshot_data"`
+	ContentVersion    pgtype.Text        `json:"content_version"`
+	PreviewScene      []byte             `json:"preview_scene"`
+}
+
+// Global presence-ticket lookup: board public ids are globally unique
+// (uq_boards_public_id), so the realtime admit path resolves the owning
+// workspace from the ticket bid alone without a wid query param.
+func (q *Queries) GetBoardByPublicID(ctx context.Context, boardPublicID string) (GetBoardByPublicIDRow, error) {
+	row := q.db.QueryRow(ctx, getBoardByPublicID, boardPublicID)
+	var i GetBoardByPublicIDRow
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.WorkspacePublicID,
+		&i.OwnerUserID,
+		&i.Title,
+		&i.WorkspaceAccess,
+		&i.AccessVersion,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ArchivedAt,
+		&i.DocumentVersion,
+		&i.SchemaVersion,
+		&i.SnapshotData,
+		&i.ContentVersion,
+		&i.PreviewScene,
+	)
+	return i, err
 }
 
 const getBoardRevisionByID = `-- name: GetBoardRevisionByID :one
@@ -465,6 +562,45 @@ func (q *Queries) InsertBoardRevision(ctx context.Context, arg InsertBoardRevisi
 	return i, err
 }
 
+const insertBoardYUpdate = `-- name: InsertBoardYUpdate :one
+
+INSERT INTO board_y_updates (board_id, author_user_id, update_data)
+SELECT b.internal_id, $1, $2
+FROM boards AS b
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE w.public_id = $3
+  AND b.public_id = $4
+RETURNING internal_id, created_at
+`
+
+type InsertBoardYUpdateParams struct {
+	AuthorUserID      int64  `json:"author_user_id"`
+	UpdateData        []byte `json:"update_data"`
+	WorkspacePublicID string `json:"workspace_public_id"`
+	BoardPublicID     string `json:"board_public_id"`
+}
+
+type InsertBoardYUpdateRow struct {
+	InternalID int64              `json:"internal_id"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+// Y.Doc collaboration update log (ADR-0020). Updates are opaque CRDT bytes
+// written by the realtime sidecar; the Go side never decodes them. Compaction
+// posts a sanitized snapshot that lands in board_documents + board_revisions
+// in one transaction and then trims this log (DeleteBoardYUpdates).
+func (q *Queries) InsertBoardYUpdate(ctx context.Context, arg InsertBoardYUpdateParams) (InsertBoardYUpdateRow, error) {
+	row := q.db.QueryRow(ctx, insertBoardYUpdate,
+		arg.AuthorUserID,
+		arg.UpdateData,
+		arg.WorkspacePublicID,
+		arg.BoardPublicID,
+	)
+	var i InsertBoardYUpdateRow
+	err := row.Scan(&i.InternalID, &i.CreatedAt)
+	return i, err
+}
+
 const insertWorkspaceBoardMembershipIgnore = `-- name: InsertWorkspaceBoardMembershipIgnore :execrows
 INSERT INTO board_memberships (board_id, user_id)
 SELECT b.internal_id, $1
@@ -534,6 +670,55 @@ func (q *Queries) ListBoardRevisions(ctx context.Context, arg ListBoardRevisions
 			&i.RevisionData,
 			&i.SourceRevision,
 			&i.AuthorUserID,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBoardYUpdates = `-- name: ListBoardYUpdates :many
+SELECT u.internal_id, u.author_user_id, u.update_data, u.created_at
+FROM board_y_updates AS u
+INNER JOIN boards AS b ON b.internal_id = u.board_id
+INNER JOIN workspaces AS w ON w.internal_id = b.workspace_id
+WHERE w.public_id = $1
+  AND b.public_id = $2
+ORDER BY u.internal_id ASC
+LIMIT $3
+`
+
+type ListBoardYUpdatesParams struct {
+	WorkspacePublicID string `json:"workspace_public_id"`
+	BoardPublicID     string `json:"board_public_id"`
+	RowLimit          int32  `json:"row_limit"`
+}
+
+type ListBoardYUpdatesRow struct {
+	InternalID   int64              `json:"internal_id"`
+	AuthorUserID int64              `json:"author_user_id"`
+	UpdateData   []byte             `json:"update_data"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListBoardYUpdates(ctx context.Context, arg ListBoardYUpdatesParams) ([]ListBoardYUpdatesRow, error) {
+	rows, err := q.db.Query(ctx, listBoardYUpdates, arg.WorkspacePublicID, arg.BoardPublicID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListBoardYUpdatesRow
+	for rows.Next() {
+		var i ListBoardYUpdatesRow
+		if err := rows.Scan(
+			&i.InternalID,
+			&i.AuthorUserID,
+			&i.UpdateData,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

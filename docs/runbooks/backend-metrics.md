@@ -71,8 +71,8 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 
 ### C. `ideaboard_river_queue_depth` 持续增长 / `lag_seconds` 超过分钟级
 
-1. 先看 worker 是否在消费：`running` attempt 数（Admin monitor）与 `RIVER_WORKER_CONCURRENCY`（默认 5，范围 1–64，重启生效）。
-2. 若 depth 涨、running 为 0：worker 进程异常或 River client 未启动；检查启动日志与 `/api/readyz`。
+1. 先看 worker 是否在消费：`running` attempt 数（Admin monitor）与 `RIVER_WORKER_CONCURRENCY`（默认 5，范围 1–64，改后重启 `api-worker` 生效）。depth/lag gauge 由 http `api` 进程导出（轮询 DB 真相），消费只发生在 `api-worker`。
+2. 若 depth 涨、running 为 0：`api-worker` 进程异常或 River client 未启动；检查 `api-worker` 启动日志（其健康检查只是 DB 存活探针，`0 running` 必须看日志与本节 gauge，不要看 `/api/readyz`）。
 3. 若 depth 涨、running 满：消费能力不足——检查网关 P95（下游慢会拖住 worker 360s 执行预算）或临时调大 concurrency。
 4. 若 lag 抖动但 depth 不大：偶发长任务（大图/高分辨率）属正常；持续超过 10 分钟按 C.3 处理。
 5. 注意：NATS 与此无关（NATS 只是 event 层，不承载任务队列）。

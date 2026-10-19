@@ -147,11 +147,19 @@ func NewAppRouter(
 	// registerGlobalMiddleware so every route shares the error envelope.
 	// Plane split: the kernel mounts kernel routes only; v1/control mounts
 	// ride their own packages (no kernel -> plane import, no cycle).
+	tenancyStore := tenancypg.NewStore(repos.db)
+	userDirectory := runtimehttp.NewUsersRepositoryDirectory(repos.userRepo)
 	registerHTTPRoutes(router,
 		runtimehttp.Dependencies{
 			PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()}), mediaPreviews),
 			PaymentWebhook:      paymentWebhookHandler,
-			Internal:            runtimehttp.InternalRouteDeps{UserHandler: identityhttp.NewInternalHandler(repos.userRepo, cfg.Auth.InternalAPIKey)},
+			Internal: runtimehttp.InternalRouteDeps{
+				UserHandler: identityhttp.NewInternalHandler(repos.userRepo, cfg.Auth.InternalAPIKey),
+				// Board presence admit for the Y.js server: same ticket
+				// secret as issuance, same X-Internal-Key guard shape as
+				// the identity internal routes.
+				RealtimeHandler: runtimehttp.NewInternalRealtimeHandler(boardStore, tenancyStore, userDirectory, cfg.Realtime.TicketSecret, cfg.Auth.InternalAPIKey),
+			},
 			CORSMiddleware:      httpinfra.BuildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 			RateLimit:           services.runtimeSettings,
 			Branding:            services.runtimeSettings,
@@ -162,8 +170,8 @@ func NewAppRouter(
 		authDeps,
 		v1.ContractV1Deps{
 			SupportChannels: services.runtimeSettings,
-			Store:           tenancypg.NewStore(repos.db),
-			Users:           runtimehttp.NewUsersRepositoryDirectory(repos.userRepo),
+			Store:           tenancyStore,
+			Users:           userDirectory,
 			// Workspace-member display facts (email + avatar) reuse the Admin
 			// emailReader join (users -> AuthUserIDs -> Auth emails) plus
 			// the avatar projection off the same rows; members without
@@ -179,6 +187,9 @@ func NewAppRouter(
 			// Workspace board store is live (postgres mapping over
 			// board_documents/board_revisions, #809 follow-up landed).
 			Boards: boardStore,
+			// Board presence ticket secret (REALTIME_TICKET_SECRET):
+			// empty stays fail-closed with 500 at issuance.
+			RealtimeTicketSecret: cfg.Realtime.TicketSecret,
 			// Acknowledge immediate delivery of transaction-committed access signals.
 			BoardAccessOutbox: eventoutbox.NewBoardAccessOutboxStore(repos.db),
 			// Workspace library and media stores are live. Library

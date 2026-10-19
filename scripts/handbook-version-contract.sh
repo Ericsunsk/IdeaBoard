@@ -8,7 +8,7 @@
 #   - Go toolchain: `apps/api/go.mod` (`go` directive)
 #
 # Consumers that must stay consistent, verified here:
-#   - `apps/auth/Dockerfile` (`ARG NODE_VERSION=` pin, standalone-build fallback)
+#   - `apps/auth/Dockerfile` / `apps/realtime/Dockerfile` (`ARG NODE_VERSION=` pin, standalone-build fallback)
 #   - `apps/api/Dockerfile` (`golang:<version>-...` base image pin)
 #   - CI workflows consume the canonical files via
 #     `.github/actions/setup-node` / `.github/actions/setup-go`
@@ -32,12 +32,15 @@ deny() {
   fail=1
 }
 
-# --- 1. Node: .node-version vs auth Dockerfile pin ---
+# --- 1. Node: .node-version vs auth/realtime Dockerfile pins ---
 node_version="$(tr -d '[:space:]' <"$repo_root/.node-version")"
 [[ -n "${node_version}" ]] || deny "root .node-version is empty"
 docker_node="$(sed -n 's/^ARG NODE_VERSION=//p' "$repo_root/apps/auth/Dockerfile" | tr -d '[:space:]')"
 [[ -n "${docker_node}" ]] || deny "apps/auth/Dockerfile has no ARG NODE_VERSION pin"
 [[ "${docker_node}" == "${node_version}" ]] || deny "apps/auth/Dockerfile NODE_VERSION=${docker_node} != .node-version ${node_version}"
+realtime_node="$(sed -n 's/^ARG NODE_VERSION=//p' "$repo_root/apps/realtime/Dockerfile" | tr -d '[:space:]')"
+[[ -n "${realtime_node}" ]] || deny "apps/realtime/Dockerfile has no ARG NODE_VERSION pin"
+[[ "${realtime_node}" == "${node_version}" ]] || deny "apps/realtime/Dockerfile NODE_VERSION=${realtime_node} != .node-version ${node_version}"
 
 # --- 2. Go: go.mod vs api Dockerfile base image pin ---
 go_version="$(sed -n 's/^go \([0-9][0-9.]*\)$/\1/p' "$repo_root/apps/api/go.mod" | head -n 1)"

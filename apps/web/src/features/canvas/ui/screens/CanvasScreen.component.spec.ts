@@ -6,7 +6,7 @@ import {
   type GraphNode,
   type NodeProps,
 } from '@vue-flow/core'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, test, vi } from 'vitest'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { render } from '../../../../test/render'
@@ -299,6 +299,7 @@ function createRuntimeViewModel() {
       catalogRecovery: ref({ status: 'idle' }),
       isBoardArchived: ref(false),
       isBoardReadOnly: ref(false),
+      boardAccessState: ref(undefined),
       isRestoringArchivedBoard: ref(false),
       currentBoardName: ref('Board A'),
       boardOptions: ref([]),
@@ -504,6 +505,12 @@ describe('CanvasScreen', () => {
     mocks.flowProps = {}
   })
 
+  test('mounts the presence cursor layer without peers on private posture', () => {
+    const view = renderScreen()
+    expect(view.container.querySelector('.presence-cursors')).not.toBeNull()
+    expect(view.container.querySelector('.presence-cursors__peer')).toBeNull()
+  })
+
   it('uses direct trackpad navigation and middle/right panning in select mode', () => {
     renderScreen()
     expect(mocks.flowProps).toMatchObject({
@@ -537,14 +544,12 @@ describe('CanvasScreen', () => {
     expect(mocks.flowProps.panOnDrag).toEqual([1, 2])
   })
 
-  it.each(['locked', 'archived', 'read-only'] as const)(
+  it.each(['locked', 'archived'] as const)(
     'disables navigation for %s boards',
     async (state) => {
       const view = renderScreen()
       if (state === 'archived')
         view.harness.runtime.viewModel.boardChrome.isBoardArchived.value = true
-      else if (state === 'read-only')
-        view.harness.runtime.viewModel.boardChrome.isBoardReadOnly.value = true
       else view.harness.runtime.viewModel.imageWorkflow.tools.locks.isCanvasLocked.value = true
       await nextTick()
       expect(mocks.flowProps).toMatchObject({
@@ -557,6 +562,24 @@ describe('CanvasScreen', () => {
       } satisfies Partial<FlowProps>)
     },
   )
+
+  it('keeps navigation enabled for read-only boards while disabling editing', async () => {
+    const view = renderScreen()
+    view.harness.runtime.viewModel.boardChrome.isBoardReadOnly.value = true
+    await nextTick()
+    expect(mocks.flowProps).toMatchObject({
+      nodesDraggable: false,
+      nodesConnectable: false,
+      elementsSelectable: false,
+      selectNodesOnDrag: false,
+      selectionKeyCode: false,
+      panOnScroll: true,
+      zoomOnPinch: true,
+      zoomOnDoubleClick: false,
+    } satisfies Partial<FlowProps>)
+    expect(mocks.flowProps.panOnDrag).not.toBe(false)
+    expect(mocks.flowProps.panOnDrag).toEqual([1, 2])
+  })
 
   it('uses temporary Space Hand mode and restores the selected tool on release', async () => {
     renderScreen()

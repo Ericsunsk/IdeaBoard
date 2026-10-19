@@ -296,7 +296,11 @@ type InMemoryWorkspaceBoardStore struct {
 	// BoardMediaRefReader port only.
 	mediaRefs map[string]map[string]struct{}
 	nextRevID int64
-	now       func() time.Time
+	// yupdates is the Y.Doc update log twin of board_y_updates (ADR-0020):
+	// opaque per-board update bytes trimmed by every CompactYDocument.
+	yupdates      map[string][]*YUpdateRecord
+	nextYUpdateID int64
+	now           func() time.Time
 }
 
 // NewInMemoryWorkspaceBoardStoreForTests builds an empty test-only store.
@@ -308,6 +312,7 @@ func NewInMemoryWorkspaceBoardStoreForTests(workspaceMembers WorkspaceMembership
 		members:          make(map[string]map[int64]*V1BoardMember),
 		revisions:        make(map[string][]*V1Revision),
 		mediaRefs:        make(map[string]map[string]struct{}),
+		yupdates:         make(map[string][]*YUpdateRecord),
 		now:              time.Now,
 	}
 }
@@ -557,6 +562,27 @@ func (s *InMemoryWorkspaceBoardStore) GetBoard(ctx context.Context, workspacePub
 	return copyV1Board(board), nil
 }
 
+// GetBoardByPublicID resolves one board by its globally unique public id
+// for the realtime admit path (ticket bid alone, no wid query param).
+// Unknown ids read as ErrNotFound; archived rows stay visible here.
+func (s *InMemoryWorkspaceBoardStore) GetBoardByPublicID(ctx context.Context, boardPublicID string) (*V1Board, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	trimmed := strings.TrimSpace(boardPublicID)
+	if trimmed == "" {
+		return nil, ErrNotFound
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, byBoard := range s.boards {
+		if board, ok := byBoard[trimmed]; ok {
+			return copyV1Board(board), nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
 // RenameBoard renames a live board; the revision counter is untouched.
 func (s *InMemoryWorkspaceBoardStore) RenameBoard(ctx context.Context, workspacePublicID, boardPublicID, name string, actorUserID int64) (*V1Board, error) {
 	if err := ctx.Err(); err != nil {
@@ -649,6 +675,12 @@ func (s *InMemoryWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 	if actorUserID <= 0 || expectedRevision <= 0 || schemaVersion < 1 || len(snapshot) == 0 {
 		return nil, ErrInvalidInput
 	}
+	return s.acceptDocument(ctx, workspacePublicID, boardPublicID, actorUserID, &expectedRevision, schemaVersion, snapshot)
+}
+
+// acceptDocument is the single document-accept path. A nil expectedRevision
+// accepts a sanitized Y compaction and clears its update log under the same lock.
+func (s *InMemoryWorkspaceBoardStore) acceptDocument(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID int64, expectedRevision *int64, schemaVersion int32, snapshot json.RawMessage) (*V1Board, error) {
 	return withWorkspaceMembers(ctx, s.workspaceMembers, workspacePublicID, func(roleFor func(int64) string) (*V1Board, error) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -664,12 +696,13 @@ func (s *InMemoryWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 		if board.ArchivedAt != nil {
 			return nil, ErrV1Archived
 		}
-		if board.Revision != expectedRevision {
+		if expectedRevision != nil && board.Revision != *expectedRevision {
 			return nil, ErrRevisionConflict
 		}
 		document := make(json.RawMessage, len(snapshot))
 		copy(document, snapshot)
 		version, scene, _ := previewscene.DeriveCatalog(document)
+		previous := board.Revision
 		board.Revision++
 		board.SchemaVersion = schemaVersion
 		board.Document = document
@@ -684,7 +717,7 @@ func (s *InMemoryWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 			Revision:       board.Revision,
 			SchemaVersion:  schemaVersion,
 			Snapshot:       document,
-			SourceRevision: expectedRevision,
+			SourceRevision: previous,
 			CreatedBy:      actorUserID,
 			CreatedAt:      board.UpdatedAt,
 		})
@@ -697,6 +730,9 @@ func (s *InMemoryWorkspaceBoardStore) ReplaceDocument(ctx context.Context, works
 			refs[assetPublicID] = struct{}{}
 		}
 		s.mediaRefs[key] = refs
+		if expectedRevision == nil {
+			delete(s.yupdates, key)
+		}
 		return copyV1Board(board), nil
 	})
 }

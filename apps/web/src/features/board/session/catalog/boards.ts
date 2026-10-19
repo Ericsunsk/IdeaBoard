@@ -48,6 +48,17 @@ export interface BoardMeta {
    * (`relationship.has_direct_grant`); absent on unsynced local Boards.
    */
   hasDirectGrant?: boolean | undefined
+  /**
+   * Creator User public identity (usr_ opaque), carried verbatim from the
+   * board payload for owner display; absent on unsynced local Boards.
+   * Never used as a permission fact.
+   */
+  creatorUserId?: string | undefined
+  /**
+   * Workspace-visible owner avatar public URL (display-only); absent when
+   * the server omits it or on unsynced local Boards.
+   */
+  ownerAvatarUrl?: string | undefined
 }
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boards.v2'
@@ -113,18 +124,34 @@ function toValidHasDirectGrant(value: unknown): boolean | undefined {
   return typeof value === 'boolean' ? value : undefined
 }
 
+function toValidCreatorUserId(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const normalized = value.trim()
+  return /^usr_[A-Za-z0-9_-]+$/.test(normalized) ? normalized : undefined
+}
+
+function toValidOwnerAvatarUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const normalized = value.trim()
+  return normalized ? normalized : undefined
+}
+
 function toValidAccessFacts(record: Record<string, unknown>): Partial<BoardMeta> {
   const capabilities = toValidCapabilities(record.capabilities)
   const accessState = toValidAccessState(record.accessState)
   const workspaceAccess = toValidWorkspaceAccess(record.workspaceAccess)
   const isCreator = typeof record.isCreator === 'boolean' ? record.isCreator : undefined
   const hasDirectGrant = toValidHasDirectGrant(record.hasDirectGrant)
+  const creatorUserId = toValidCreatorUserId(record.creatorUserId)
+  const ownerAvatarUrl = toValidOwnerAvatarUrl(record.ownerAvatarUrl)
   return {
     ...(capabilities === undefined ? {} : { capabilities }),
     ...(accessState === undefined ? {} : { accessState }),
     ...(workspaceAccess === undefined ? {} : { workspaceAccess }),
     ...(isCreator === undefined ? {} : { isCreator }),
     ...(hasDirectGrant === undefined ? {} : { hasDirectGrant }),
+    ...(creatorUserId === undefined ? {} : { creatorUserId }),
+    ...(ownerAvatarUrl === undefined ? {} : { ownerAvatarUrl }),
   }
 }
 
@@ -263,11 +290,7 @@ export function createBoard(name = 'Untitled'): BoardMeta {
   return board
 }
 
-/**
- * Registers a server-minted board identity locally (v1 create flow: the
- * server owns id/revision). Replaces any same-id entry; never mints.
- */
-export function registerBoardMeta(input: {
+type RegisterBoardMetaInput = {
   id: string
   name: string
   createdAt?: number
@@ -279,16 +302,12 @@ export function registerBoardMeta(input: {
   workspaceAccess?: BoardWorkspaceAccess | undefined
   isCreator?: boolean | undefined
   hasDirectGrant?: boolean | undefined
-}): BoardMeta | null {
-  const id = input.id.trim()
-  const name = normalizeBoardName(input.name)
-  if (!id || !name) return null
-  const now = Date.now()
-  const board: BoardMeta = withCurrentWorkspace({
-    id,
-    name,
-    createdAt: Number.isFinite(input.createdAt) ? Number(input.createdAt) : now,
-    updatedAt: Number.isFinite(input.updatedAt) ? Number(input.updatedAt) : now,
+  creatorUserId?: string | undefined
+  ownerAvatarUrl?: string | undefined
+}
+
+function toRegisterBoardFacts(input: RegisterBoardMetaInput): Partial<BoardMeta> {
+  return {
     ...(input.revision === undefined ? {} : { revision: input.revision }),
     ...(typeof input.archivedAt === 'string' && input.archivedAt
       ? { archivedAt: input.archivedAt }
@@ -298,6 +317,26 @@ export function registerBoardMeta(input: {
     ...(input.workspaceAccess === undefined ? {} : { workspaceAccess: input.workspaceAccess }),
     ...(input.isCreator === undefined ? {} : { isCreator: input.isCreator }),
     ...(input.hasDirectGrant === undefined ? {} : { hasDirectGrant: input.hasDirectGrant }),
+    ...(input.creatorUserId === undefined ? {} : { creatorUserId: input.creatorUserId }),
+    ...(input.ownerAvatarUrl === undefined ? {} : { ownerAvatarUrl: input.ownerAvatarUrl }),
+  }
+}
+
+/**
+ * Registers a server-minted board identity locally (v1 create flow: the
+ * server owns id/revision). Replaces any same-id entry; never mints.
+ */
+export function registerBoardMeta(input: RegisterBoardMetaInput): BoardMeta | null {
+  const id = input.id.trim()
+  const name = normalizeBoardName(input.name)
+  if (!id || !name) return null
+  const now = Date.now()
+  const board: BoardMeta = withCurrentWorkspace({
+    id,
+    name,
+    createdAt: Number.isFinite(input.createdAt) ? Number(input.createdAt) : now,
+    updatedAt: Number.isFinite(input.updatedAt) ? Number(input.updatedAt) : now,
+    ...toRegisterBoardFacts(input),
   })
   const valid = toValidBoardMeta(board)
   if (!valid) return null

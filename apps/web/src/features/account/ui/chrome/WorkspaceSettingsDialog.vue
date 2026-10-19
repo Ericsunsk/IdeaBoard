@@ -244,7 +244,7 @@
                   <Button
                     v-if="!confirmingArchiveId"
                     type="button"
-                    variant="outline"
+                    variant="destructive"
                     size="sm"
                     class="h-9 shrink-0"
                     :is-disabled="isDefaultWorkspaceItem(activeWorkspace) || isArchiving"
@@ -269,6 +269,7 @@
                   <div class="flex items-center gap-2">
                     <Button
                       type="button"
+                      variant="destructive"
                       size="sm"
                       class="h-9 shrink-0"
                       :is-loading="isArchiving"

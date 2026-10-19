@@ -159,7 +159,7 @@ jobs:
             -w /work \
             --entrypoint hadolint \
             hadolint/hadolint@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d \
-            apps/api/Dockerfile apps/auth/Dockerfile
+            apps/api/Dockerfile apps/auth/Dockerfile apps/realtime/Dockerfile
 
       - name: Install yamllint
         shell: bash

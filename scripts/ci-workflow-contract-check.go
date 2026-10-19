@@ -79,12 +79,14 @@ func checkCI(ci workflow) {
 	requireEqual(object(jobs, "web")["uses"], "./.github/workflows/web.yml", "Web job must call web.yml")
 	requireEqual(object(jobs, "api")["uses"], "./.github/workflows/api.yml", "API job must call api.yml")
 	requireEqual(object(jobs, "auth")["uses"], "./.github/workflows/auth.yml", "Auth job must call auth.yml")
+	requireEqual(object(jobs, "realtime")["uses"], "./.github/workflows/realtime.yml", "Realtime job must call realtime.yml")
 	requireEqual(object(jobs, "migration-integration")["uses"], "./.github/workflows/migration-integration.yml", "Migration job must call migration-integration.yml")
 	rejectKey(jobs, "security", "Scheduled security checks must remain outside CI")
 
 	gate := object(jobs, "ci-gate")
 	requireEqual(gate["name"], "CI Gate", "Required check must remain CI Gate")
 	requireStringIn(gate, "needs", "changes", "CI Gate must depend on change classification")
+	requireStringIn(gate, "needs", "realtime", "CI Gate must depend on realtime")
 	requireStringIn(gate, "needs", "migration-integration", "CI Gate must depend on migration integration")
 	requireStringIn(gate, "needs", "media-contract", "CI Gate must depend on Media contract")
 	mediaContract := object(jobs, "media-contract")
@@ -102,10 +104,12 @@ func checkCI(ci workflow) {
 	gateEnv := object(gateStep, "env")
 	requireEqual(gateEnv["MEDIA_CONTRACT_REQUIRED"], "true", "Media contract must always be a required CI lane")
 	requireEqual(gateEnv["MEDIA_CONTRACT_RESULT"], "${{ needs.media-contract.result }}", "CI Gate must receive the Media contract result")
+	requireEqual(gateEnv["REALTIME_REQUIRED"], "${{ needs.changes.outputs.realtime }}", "CI Gate must receive the Realtime required flag")
+	requireEqual(gateEnv["REALTIME_RESULT"], "${{ needs.realtime.result }}", "CI Gate must receive the Realtime result")
 }
 
 func checkReusableWorkflows(root string) {
-	for _, name := range []string{"web.yml", "api.yml", "auth.yml", "migration-integration.yml", "ops.yml"} {
+	for _, name := range []string{"web.yml", "api.yml", "auth.yml", "realtime.yml", "migration-integration.yml", "ops.yml"} {
 		parsed := loadWorkflow(root, name)
 		triggers := object(parsed, "on")
 		requireKey(triggers, "workflow_call", name+" must expose workflow_call")
@@ -129,6 +133,9 @@ func checkReusableWorkflows(root string) {
 
 	auth := loadWorkflow(root, "auth.yml")
 	requireEqual(object(auth, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "Auth workflow must not upload Docker build records")
+
+	realtime := loadWorkflow(root, "realtime.yml")
+	requireEqual(object(realtime, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "Realtime workflow must not upload Docker build records")
 
 	web := loadWorkflow(root, "web.yml")
 	checkWebVerification(root, web)

@@ -1,3 +1,4 @@
+import type { CanvasCollaborationSession } from '../../collaboration/useCanvasCollaborationSession'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import type { BoardSnapshot, ImageNodeItem } from '../../../../board/ports/canvas'
 import { useCanvasViewportRuntime } from '../../../session/flow-adapter'
@@ -35,6 +36,7 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   imageWorkflowUi: CanvasImageWorkflowUiAdapter
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
   openRecharge: () => void
+  collaboration?: CanvasCollaborationSession | undefined
 }
 
 export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRuntimeOptions) {
@@ -58,6 +60,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     },
     cancelTasks: taskLifecycle.cancelTasks,
     vueFlowGraphActions: options.flowPaneAdapter.vueFlowGraphActions,
+    collaboration: options.collaboration,
   })
 
   const graph = createCanvasWorkspaceGraphRuntime({

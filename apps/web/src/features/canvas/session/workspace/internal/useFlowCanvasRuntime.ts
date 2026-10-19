@@ -1,3 +1,4 @@
+import type { CanvasCollaborationSession } from '../../collaboration/useCanvasCollaborationSession'
 import { computed, onScopeDispose, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { useCanvasGraphHistory } from '../../graph-editing'
@@ -55,6 +56,8 @@ export type UseFlowCanvasRuntimeOptions = {
   onArchived?: ((boardId: string) => void) | undefined
   scheduleMicrotask?: ((callback: () => void) => void) | undefined
   vueFlowGraphActions?: CanvasVueFlowGraphActions | undefined
+  collaboration?: CanvasCollaborationSession | undefined
+  canWriteGraph?: (() => boolean) | undefined
 }
 
 function useCanvasExecutionProjection(options: UseFlowCanvasRuntimeOptions) {
@@ -212,6 +215,8 @@ function createCanvasRuntimeSession(
 ) {
   return createCanvasGraphSessionRuntime({
     ...integration,
+    onLocalSnapshot: options.collaboration?.syncSnapshot,
+    canWriteGraph: options.canWriteGraph,
     nodes: options.nodes,
     edges: options.edges,
     boardBaseSnapshot: options.boardBaseSnapshot,
@@ -295,6 +300,20 @@ function commitStagedNodeDrag(
   )
 }
 
+function useCanvasRuntimeAutosave(
+  options: UseFlowCanvasRuntimeOptions,
+  canRun: () => boolean,
+  save: (options?: { isSilent?: boolean | undefined }) => Promise<boolean>,
+) {
+  return useBoardAutosave({
+    isDirty: options.isDirty,
+    isSaving: options.isSavingBoard,
+    resumeSignal: options.autosaveResumeSignal,
+    canRun: () => !options.collaboration?.isEnabled.value && canRun(),
+    save,
+  })
+}
+
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const renderNodes = options.nodes
   const renderEdgesRef = options.edges
@@ -346,11 +365,16 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const loadInitialOrRouteBoard = async () => {
     nodeDragLifecycle.cancel()
     groupRuntime?.internal.resetTransientSelectionState()
+    options.collaboration?.detachGraph()
     graphSessionRuntime?.dispose()
     options.executionCore.detachBoard()
     const result = await boardSync.loadInitialOrRouteBoard()
     if (result.status === 'empty' || result.status === 'loaded') {
       applyBoardSnapshot(result.snapshot, 'hydrate-replace')
+      options.collaboration?.attachGraph((snapshot) => {
+        nodeDragLifecycle.cancel()
+        requireGraphSessionRuntime().applyRemoteSnapshot(snapshot)
+      })
     }
     groupRuntime?.internal.handleCommittedGroupsChanged()
     return result
@@ -369,18 +393,16 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     return result.isSaved
   }
 
-  const { markDirtyAndSchedule, flushAutosave } = useBoardAutosave({
-    isDirty: options.isDirty,
-    isSaving: options.isSavingBoard,
-    resumeSignal: options.autosaveResumeSignal,
-    canRun: () => canRunBoardAutosave(nodeDragLifecycle, options.boardSession.currentBoardId.value),
-    save: (autosaveOptions?: { isSilent?: boolean | undefined }) =>
-      saveCurrentBoardSnapshot({
-        isSilent: autosaveOptions?.isSilent,
-      }),
-  })
+  const { markDirtyAndSchedule, flushAutosave } = useCanvasRuntimeAutosave(
+    options,
+    () => canRunBoardAutosave(nodeDragLifecycle, options.boardSession.currentBoardId.value),
+    saveCurrentBoardSnapshot,
+  )
 
   function markDirty() {
+    // Collaborative commits persist through the Y.Doc bridge. Marking a
+    // snapshot draft dirty here would let it override a later server read.
+    if (options.collaboration?.isEnabled.value) return
     if (!boardSync.canSaveBoard()) return
     localEditVersion.value += 1
     options.isDirty.value = true

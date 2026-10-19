@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by ADR-0020 (collaborator path only)
 owner: Board
 decision_date: 2026-09-11
 supersedes: none
@@ -18,3 +18,9 @@ Board writes 使用 optimistic revision concurrency。Client 发送 observed doc
 - `apps/web/src/features/board/session/adapters/boardsResource.ts` 将 base revision 映射为 `If-Match`，并读取 response document revision。
 
 Board writes 不再使用 atomic compare-and-swap，或 offline multi-writer reconciliation 需要更复杂 conflict model 时，应重新 review 此决策。
+
+## Status
+
+Superseded by [ADR-0020](./0020-board-ydoc-collaboration.md) for the collaborator path only:
+协作者写走 Y 收敛（`board_y_updates` + 快照压缩，无 expected revision、无 409）。
+本 ADR 的非协作路径（`If-Match` + 409、`ETag` contract）继续有效；上文原文冻结，不做改写。

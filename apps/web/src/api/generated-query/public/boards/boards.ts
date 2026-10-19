@@ -34,6 +34,7 @@ import type {
   BoardRevisionDetailEnvelope,
   ConflictResponse,
   CreateBoardRequest,
+  ErrorEnvelope,
   ForbiddenResponse,
   ListBoardRevisionsParams,
   ListBoardsParams,
@@ -42,6 +43,7 @@ import type {
   PaginatedBoards,
   PreconditionFailedResponse,
   PreconditionRequiredResponse,
+  RealtimeTicketEnvelope,
   ReplaceBoardDocumentRequest,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
@@ -1362,4 +1364,97 @@ export const useUpdateBoardAccess = <
   TContext
 > => {
   return useMutation(getUpdateBoardAccessMutationOptions(options), queryClient)
+}
+export const getIssueBoardRealtimeTicketUrl = (workspaceId: string, boardId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/boards/${encodeURIComponent(String(boardId))}/realtime-ticket`
+}
+
+/**
+ * Mints a 60-second HMAC presence ticket binding the current board access_version to the caller for the Y.js collaboration server (ticket = base64url(payload).base64url(hex hmac-sha256), payload {bid, av, cap, exp, uid}; cap is read|write derived from CapabilitiesFor, uid is the caller usr_ identity). Viewers may mint; malformed ids, unknown boards, and callers holding no effective board role converge to 404 board_not_found. Archived boards render 409 board_archived. A missing REALTIME_TICKET_SECRET renders 500 service_unavailable (no fallback default). The Y.js server admits the bearer via GET /internal/realtime/admit. No Idempotency-Key is required: issuance is a read-like POST with no state write.
+ * @summary Issue a short-lived board presence ticket (any board role)
+ */
+export const issueBoardRealtimeTicket = async (
+  workspaceId: string,
+  boardId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<RealtimeTicketEnvelope> => {
+  return publicMutator<RealtimeTicketEnvelope>(
+    getIssueBoardRealtimeTicketUrl(workspaceId, boardId),
+    {
+      ...options,
+      method: 'POST',
+    },
+  )
+}
+
+export const getIssueBoardRealtimeTicketMutationKey = () => ['issueBoardRealtimeTicket'] as const
+
+export const getIssueBoardRealtimeTicketMutationOptions = <
+  TError = UnauthorizedResponse | NotFoundResponse | ConflictResponse | ErrorEnvelope,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issueBoardRealtimeTicket>>,
+    TError,
+    IssueBoardRealtimeTicketMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issueBoardRealtimeTicket>>,
+  TError,
+  IssueBoardRealtimeTicketMutationVariables,
+  TContext
+> => {
+  const mutationKey = getIssueBoardRealtimeTicketMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issueBoardRealtimeTicket>>,
+    IssueBoardRealtimeTicketMutationVariables
+  > = (props) => {
+    const { workspaceId, boardId } = props ?? {}
+
+    return issueBoardRealtimeTicket(workspaceId, boardId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type IssueBoardRealtimeTicketMutationResult = NonNullable<
+  Awaited<ReturnType<typeof issueBoardRealtimeTicket>>
+>
+
+export type IssueBoardRealtimeTicketMutationError =
+  UnauthorizedResponse | NotFoundResponse | ConflictResponse | ErrorEnvelope
+export type IssueBoardRealtimeTicketMutationVariables = { workspaceId: string; boardId: string }
+
+/**
+ * @summary Issue a short-lived board presence ticket (any board role)
+ */
+export const useIssueBoardRealtimeTicket = <
+  TError = UnauthorizedResponse | NotFoundResponse | ConflictResponse | ErrorEnvelope,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof issueBoardRealtimeTicket>>,
+      TError,
+      IssueBoardRealtimeTicketMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof issueBoardRealtimeTicket>>,
+  TError,
+  IssueBoardRealtimeTicketMutationVariables,
+  TContext
+> => {
+  return useMutation(getIssueBoardRealtimeTicketMutationOptions(options), queryClient)
 }
