@@ -804,3 +804,26 @@ func TestLiveSSEMembershipRemovalDeniesOwnedContentAndPreservesDirectedLoss(t *t
 		}
 	}
 }
+
+func TestBoardDocumentPublisherUsesCanonicalWorkspaceEnvelope(t *testing.T) {
+	log := events.NewWorkspaceEventLog()
+	publish := NewBoardDocumentPublisher(log, nil, nil)
+	publish(context.Background(), "ws_shared123", "board_shared123", "usr_author123", 8)
+	envelopes, _, _ := log.ReplayAfter("ws_shared123", "evt_unknown123", events.WorkspaceEventFilter{})
+	if len(envelopes) != 1 {
+		t.Fatalf("published %d workspace envelopes, want one", len(envelopes))
+	}
+	envelope := envelopes[0]
+	if envelope.Type != events.EventV1BoardDocumentReplaced || envelope.WorkspaceID != "ws_shared123" ||
+		envelope.Actor != (events.V1Actor{Type: events.V1ActorUser, ID: "usr_author123"}) ||
+		envelope.Resource != (events.V1Resource{Type: events.V1ResourceBoard, ID: "board_shared123"}) {
+		t.Fatalf("wrong compaction envelope: %+v", envelope)
+	}
+	var data events.V1BoardDocumentReplacedData
+	if err := json.Unmarshal(envelope.Data, &data); err != nil || data.BoardID != "board_shared123" || data.Revision != 8 {
+		t.Fatalf("wrong compaction revision payload: %+v, %v", data, err)
+	}
+	if err := events.ValidateV1Envelope(envelope); err != nil {
+		t.Fatalf("compaction must use canonical envelope contract: %v", err)
+	}
+}

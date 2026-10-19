@@ -37,6 +37,10 @@ type RealtimeUserResolver interface {
 	ResolveUserID(ctx context.Context, publicID uuid.UUID) (int64, error)
 }
 
+// BoardDocumentPublisher announces a committed snapshot through the canonical
+// workspace event pipeline. The author is the already-resolved public user ID.
+type BoardDocumentPublisher func(ctx context.Context, workspaceID, boardID, authorUID string, revision int64)
+
 // internalRealtimeAdmitDTO is the admit boolean body (internal
 // machine surface, not the public contract envelope).
 type internalRealtimeAdmitDTO struct {
@@ -58,22 +62,24 @@ type internalRealtimeAdmitDTO struct {
 // any extra bid/av/uid query params are ignored, never validated.
 // Admission always requires a signed ticket.
 type internalRealtimeHandler struct {
-	boards       RealtimeBoardResolver
-	workspaces   RealtimeWorkspaceResolver
-	users        RealtimeUserResolver
-	ticketSecret string
-	internalKey  string
+	boards          RealtimeBoardResolver
+	workspaces      RealtimeWorkspaceResolver
+	users           RealtimeUserResolver
+	ticketSecret    string
+	internalKey     string
+	publishDocument BoardDocumentPublisher
 }
 
 // NewInternalRealtimeHandler builds the admit handler. Empty secrets fail
 // closed at request time (500), never with a fallback default.
-func NewInternalRealtimeHandler(boardStore RealtimeBoardResolver, workspaces RealtimeWorkspaceResolver, users RealtimeUserResolver, ticketSecret, internalKey string) InternalRealtimeHandler {
+func NewInternalRealtimeHandler(boardStore RealtimeBoardResolver, workspaces RealtimeWorkspaceResolver, users RealtimeUserResolver, ticketSecret, internalKey string, publishDocument BoardDocumentPublisher) InternalRealtimeHandler {
 	return &internalRealtimeHandler{
-		boards:       boardStore,
-		workspaces:   workspaces,
-		users:        users,
-		ticketSecret: strings.TrimSpace(ticketSecret),
-		internalKey:  strings.TrimSpace(internalKey),
+		boards:          boardStore,
+		workspaces:      workspaces,
+		users:           users,
+		ticketSecret:    strings.TrimSpace(ticketSecret),
+		internalKey:     strings.TrimSpace(internalKey),
+		publishDocument: publishDocument,
 	}
 }
 

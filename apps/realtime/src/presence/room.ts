@@ -29,10 +29,16 @@ type Entry = {
   reservations: number
   depth: number
   updatesSinceCompact: number
+  updateSequence: number
+  compactedSequence: number
+  lastWriterUid: string | null
+  invalidSnapshotSequence: number | null
+  compactTimer: ReturnType<typeof setTimeout> | undefined
   failed: boolean
 }
 
 const MAX_PERSISTENCE_DEPTH = 1000
+const MAX_COMPACT_DELAY_MS = 1000
 
 export class DurableRooms {
   private readonly entries = new Map<string, Entry>()
@@ -84,6 +90,13 @@ export class DurableRooms {
           current.room.addConn(conn)
           current.room.setWriter(conn, identity.canWrite)
           current.identities.set(conn, identity)
+          // Recovery has no historical author at this seam. An admitted editor
+          // may materialize the durable tail as a new snapshot revision; a
+          // viewer must never be promoted into its write actor.
+          if (identity.canWrite && current.updateSequence > current.compactedSequence) {
+            current.lastWriterUid = identity.uid
+            this.scheduleCompaction(bid, current)
+          }
           cancel()
           let connected = true
           return {
@@ -94,6 +107,7 @@ export class DurableRooms {
               connected = false
               current.identities.delete(conn)
               current.room.removeConn(conn)
+              if (current.room.connectionCount === 0) this.queueCompaction(bid, current)
               this.prune(bid, current)
             },
           }
@@ -134,8 +148,9 @@ export class DurableRooms {
   async close(): Promise<void> {
     this.closed = true
     await Promise.allSettled(
-      [...this.entries.values()].map(async (entry) => {
+      [...this.entries.entries()].map(async ([bid, entry]) => {
         await entry.ready
+        this.queueCompaction(bid, entry)
         await entry.pending
         entry.room.destroy()
       }),
@@ -159,26 +174,8 @@ export class DurableRooms {
         if (!identity) return
         entry.depth += 1
         entry.updatesSinceCompact += 1
-        // Capture at acceptance, before a later queued update can enter the
-        // Doc. Compaction must never include a not-yet-acknowledged tail.
-        let snapshot: string | null = null
-        if (entry.updatesSinceCompact >= this.compactEveryUpdates) {
-          try {
-            snapshot = buildYCompactEnvelope(
-              1,
-              sanitizeYSnapshot(
-                room.doc.getMap('nodes').toJSON(),
-                room.doc.getMap('edges').toJSON(),
-              ),
-              Y.encodeStateAsUpdate(room.doc),
-            )
-            entry.updatesSinceCompact = 0
-          } catch {
-            // An invalid snapshot does not affect its opaque update append.
-            // Keep the counter so a later update retries compaction.
-            this.compactSkippedTotal += 1
-          }
-        }
+        entry.updateSequence += 1
+        entry.lastWriterUid = identity.uid
         entry.pending = entry.pending
           .then(async () => {
             if (entry.failed) return
@@ -187,8 +184,6 @@ export class DurableRooms {
               this.failEntry(entry)
               return
             }
-            if (snapshot === null) return
-            await this.options.persistence.compactNow(bid, snapshot, identity.uid)
           })
           .catch(() => {
             // A rejected update is already in the in-memory Doc. Never compact
@@ -199,6 +194,11 @@ export class DurableRooms {
             entry.depth -= 1
             this.prune(bid, entry)
           })
+        if (entry.updatesSinceCompact >= this.compactEveryUpdates) {
+          this.queueCompaction(bid, entry)
+        } else {
+          this.scheduleCompaction(bid, entry)
+        }
       },
     })
     const entry: Entry = {
@@ -209,12 +209,19 @@ export class DurableRooms {
       reservations: 0,
       depth: 0,
       updatesSinceCompact: 0,
+      updateSequence: 0,
+      compactedSequence: 0,
+      lastWriterUid: null,
+      invalidSnapshotSequence: null,
+      compactTimer: undefined,
       failed: false,
     }
     entry.ready = Promise.resolve()
       .then(() => this.options.persistence.load(ticket))
       .then(({ snapshot, updates }) => {
         room.hydrate(snapshot, updates)
+        entry.updateSequence = updates.length
+        entry.updatesSinceCompact = updates.length
       })
       .catch((error: unknown) => {
         if (this.entries.get(bid) === entry) this.entries.delete(bid)
@@ -226,6 +233,7 @@ export class DurableRooms {
 
   private failEntry(entry: Entry): void {
     entry.failed = true
+    this.clearCompactionTimer(entry)
     for (const conn of entry.identities.keys()) {
       try {
         conn.close(1013, 'document persistence unavailable')
@@ -235,8 +243,72 @@ export class DurableRooms {
     }
   }
 
+  private scheduleCompaction(bid: string, entry: Entry): void {
+    // Do not debounce: continuous edits and connected viewers must not defer
+    // projection indefinitely. All triggers use the same persistence queue.
+    if (this.closed || entry.failed || entry.compactTimer || !entry.lastWriterUid) return
+    entry.compactTimer = setTimeout(() => {
+      entry.compactTimer = undefined
+      if (this.entries.get(bid) === entry && !this.closed) this.queueCompaction(bid, entry)
+    }, MAX_COMPACT_DELAY_MS)
+    entry.compactTimer.unref()
+  }
+
+  private clearCompactionTimer(entry: Entry): void {
+    clearTimeout(entry.compactTimer)
+    entry.compactTimer = undefined
+  }
+
+  private queueCompaction(bid: string, entry: Entry): void {
+    this.clearCompactionTimer(entry)
+    const authorUid = entry.lastWriterUid
+    const sequence = entry.updateSequence
+    if (!authorUid || entry.failed || sequence <= entry.compactedSequence) return
+    // An admission reserved before disconnect may attach while this drains.
+    // Freeze the snapshot now so later, unacknowledged edits cannot enter it.
+    const snapshot = this.captureSnapshot(entry)
+    if (snapshot === null) return
+    entry.updatesSinceCompact = 0
+    entry.depth += 1
+    entry.pending = entry.pending
+      .then(async () => {
+        if (entry.failed || sequence <= entry.compactedSequence) return
+        if (await this.options.persistence.compactNow(bid, snapshot, authorUid)) {
+          entry.compactedSequence = sequence
+        }
+      })
+      // The opaque tail is already durable. A failed projection must not
+      // discard it or prevent room cleanup and later recovery.
+      .catch(() => {})
+      .finally(() => {
+        entry.depth -= 1
+        this.prune(bid, entry)
+      })
+  }
+
+  private captureSnapshot(entry: Entry): string | null {
+    if (entry.invalidSnapshotSequence === entry.updateSequence) return null
+    try {
+      return buildYCompactEnvelope(
+        1,
+        sanitizeYSnapshot(
+          entry.room.doc.getMap('nodes').toJSON(),
+          entry.room.doc.getMap('edges').toJSON(),
+        ),
+        Y.encodeStateAsUpdate(entry.room.doc),
+      )
+    } catch {
+      // The opaque update remains durable; retry only after another edit
+      // can change the invalid document, never again for the same state.
+      entry.invalidSnapshotSequence = entry.updateSequence
+      this.compactSkippedTotal += 1
+      return null
+    }
+  }
+
   private prune(bid: string, entry: Entry): void {
     if (entry.reservations > 0 || entry.depth > 0 || entry.room.connectionCount > 0) return
+    this.clearCompactionTimer(entry)
     if (this.entries.get(bid) === entry) this.entries.delete(bid)
     entry.room.destroy()
   }

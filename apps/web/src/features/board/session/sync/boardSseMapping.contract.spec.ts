@@ -202,6 +202,30 @@ describe('board SSE mapping', () => {
   })
 
   describe('query invalidation mapping ownership', () => {
+    it('refreshes the catalog projection after document replacement, independently of a dirty draft', async () => {
+      const observer = await observeList()
+      const emit = connect(() => true)
+      apiState.boardsResponse.data = []
+      remoteRevision(10)
+      emit(8)
+      emit(10)
+      await vi.advanceTimersByTimeAsync(500)
+      expect(observer.getCurrentResult().data?.[0]?.revision).toBe(10)
+      expect(mocks.request).toHaveBeenCalledTimes(2)
+    })
+
+    it('refreshes a stale catalog even when the document already has the event revision', async () => {
+      const observer = await observeList()
+      apiState.boardsResponse.data = []
+      remoteRevision(10)
+      await observeDocument()
+      const emit = connect()
+      emit(10)
+      await vi.advanceTimersByTimeAsync(500)
+      expect(observer.getCurrentResult().data?.[0]?.revision).toBe(10)
+      expect(mocks.request).toHaveBeenCalledTimes(3)
+    })
+
     it('invalidates the document on document_replaced with 500ms coalesce', async () => {
       const observer = await observeDocument()
       const emit = connect()
@@ -534,7 +558,7 @@ describe('board SSE mapping', () => {
           envelopeFixture({ id: 'evt_rev8', data: { board_id: 'board-1', revision: 8 } }),
         )
         await vi.advanceTimersByTimeAsync(500)
-        expect(mocks.request).toHaveBeenCalledTimes(3)
+        expect(mocks.request).toHaveBeenCalledTimes(4)
 
         emitAccessChanged('evt_access9-dup', { board_id: 'board-1', access_version: 9 })
         await vi.advanceTimersByTimeAsync(0)

@@ -4,7 +4,8 @@
 （`Y.Doc` + `getMap('nodes')` / `getMap('edges')`，keyed by id），跑 awareness
 （identity/selection）与文档增量同步。详见
 [ADR-0019](../../docs/adr/0019-realtime-presence.md)（接入与 presence）与
-[ADR-0020](../../docs/adr/0020-board-ydoc-collaboration.md)（Y.Doc 协同）。
+[ADR-0020](../../docs/adr/0020-board-ydoc-collaboration.md)（Y.Doc 协同），以及
+[ADR-0022](../../docs/adr/0022-collaborative-board-preview-publication.md)（snapshot 发布）。
 
 ## 行为契约
 
@@ -25,8 +26,12 @@
   `retriedTotal`，耗尽记 `failedTotal`）。awareness 仍标准转发，不走持久化。
 - 压缩：每 room 每 `RT_Y_COMPACT_EVERY` 个应用更新（默认 50）向 Go
   `POST /internal/realtime/compactions` 提交一次 stripTransient 后的快照；
+  未达到次数时，从首个未投影更新起 1 秒内排队压缩，后续更新不延后期限；
+  最后一个连接离开和 shutdown 同样触发。以上触发共用 append → compact
+  串行队列，完成时间受落盘延迟及重试影响。
   Go 以 `ValidateV1DocumentStrict` 同规则校验后写入 `board_documents` 并追加
   一行 `board_revisions`（同一事务），再清空该 board 的 update log。
+  commit 后沿用 `board.document_replaced` 通知刷新 catalog preview。
   首屏仍走 HTTP 快照（`GET board` + previewscene，不动）；非协作写仍走
   ADR-0006 `If-Match` + 409。
 - 拒绝码沿用 y-websocket 关码约定（4400–4499 = permanent，不重连）：
@@ -41,6 +46,10 @@ adapter。最后一个连接离开后，room 的 Doc 保留到已接受的写入
 compaction 在对应更新被接受时固定快照，只有其 append 及先前更新全部 ACK 后才提交，
 不会把后续待写更新提前带入快照。terminal append failure 会关闭该 room 的连接、
 停止其后续写入和压缩；新连接从 durable snapshot + tail 重新恢复。
+恢复出的 tail 在获准 write 的 editor 打开后同样进入压缩队列，无须新编辑；
+该 editor 是新 snapshot revision 的 actor，不改写原 update 作者，Go 仍检查
+当前写权限和 media 访问。只有 viewer 打开时不发起 snapshot 写入，保留 tail
+供后续 editor 通过正常生命周期生成投影。
 
 ## 运行方式
 

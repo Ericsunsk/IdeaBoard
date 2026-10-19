@@ -135,7 +135,7 @@ describe('production Board repository Query integration', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('latest from HTTP')
     expect(getBoardById('board-1')?.revision).toBe(10)
-    expect(mocks.request).toHaveBeenCalledTimes(3)
+    expect(mocks.request).toHaveBeenCalledTimes(4)
   })
 
   it('aborts the actual hydrate on workspace navigation and ignores a late document', async () => {
@@ -197,12 +197,12 @@ describe('production Board repository Query integration', () => {
     const reads = mocks.request.mock.calls.length
     emit('board.document_replaced', 10)
     await vi.advanceTimersByTimeAsync(500)
-    expect(mocks.request).toHaveBeenCalledTimes(reads + 1)
+    expect(mocks.request).toHaveBeenCalledTimes(reads + 2)
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('new collaborator edit')
     expect(getBoardById('board-1')?.revision).toBe(10)
   })
 
-  it('marks a conflicted local draft stale without a GET or advancing its base', async () => {
+  it('marks a conflicted local draft stale without a document GET or advancing its base', async () => {
     vi.useFakeTimers()
     const catalog = repository()
     await catalog.commands.hydrate()
@@ -213,7 +213,8 @@ describe('production Board repository Query integration', () => {
     const reads = mocks.request.mock.calls.length
     emit('board.document_replaced', 10)
     await vi.advanceTimersByTimeAsync(500)
-    expect(mocks.request).toHaveBeenCalledTimes(reads)
+    expect(mocks.request).toHaveBeenCalledTimes(reads + 1)
+    expect(mocks.request.mock.calls[reads]?.[0]).not.toContain('/document')
     expect(
       queryClient.getQueryState(boardQueryKeys.document(WORKSPACE_ID, 'board-1'))?.isInvalidated,
     ).toBe(true)
@@ -246,7 +247,8 @@ describe('production Board repository Query integration', () => {
     const reads = mocks.request.mock.calls.length
     emit('board.document_replaced', 10)
     await vi.advanceTimersByTimeAsync(500)
-    expect(mocks.request).toHaveBeenCalledTimes(reads)
+    expect(mocks.request).toHaveBeenCalledTimes(reads + 1)
+    expect(mocks.request.mock.calls[reads]?.[0]).not.toContain('/document')
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('edit during save')
     expect(getBoardById('board-1')?.revision).toBe(8)
   })
@@ -263,13 +265,14 @@ describe('production Board repository Query integration', () => {
     const reads = mocks.request.mock.calls.length
     emit('board.document_replaced', 10)
     await vi.advanceTimersByTimeAsync(500)
-    expect(mocks.request).toHaveBeenCalledTimes(reads)
+    expect(mocks.request).toHaveBeenCalledTimes(reads + 1)
+    expect(mocks.request.mock.calls[reads]?.[0]).not.toContain('/document')
     expect(getBoardById('board-1')?.revision).toBe(7)
     isLiveDirty = false
     scope.stop()
     emit('board.document_replaced', 11)
     await vi.advanceTimersByTimeAsync(500)
-    expect(mocks.request).toHaveBeenCalledTimes(reads + 1)
+    expect(mocks.request).toHaveBeenCalledTimes(reads + 3)
     expect(getBoardById('board-1')?.revision).toBe(10)
   })
 
@@ -311,12 +314,13 @@ describe('production Board repository Query integration', () => {
       })
     event(10)
     await vi.advanceTimersByTimeAsync(500)
-    expect(mocks.request).toHaveBeenCalledTimes(reads)
+    expect(mocks.request).toHaveBeenCalledTimes(reads + 1)
+    expect(mocks.request.mock.calls[reads]?.[0]).not.toContain('/document')
     expect(getBoardById('board-1')?.revision).toBe(7)
     scope.stop()
     event(11)
     await vi.advanceTimersByTimeAsync(500)
-    expect(mocks.request).toHaveBeenCalledTimes(reads + 1)
+    expect(mocks.request).toHaveBeenCalledTimes(reads + 3)
     expect(getBoardById('board-1')?.revision).toBe(10)
   })
 
@@ -332,7 +336,8 @@ describe('production Board repository Query integration', () => {
     const reads = mocks.request.mock.calls.length
     emit('board.document_replaced', 10)
     await vi.advanceTimersByTimeAsync(500)
-    expect(mocks.request).toHaveBeenCalledTimes(reads)
+    expect(mocks.request).toHaveBeenCalledTimes(reads + 1)
+    expect(mocks.request.mock.calls[reads]?.[0]).not.toContain('/document')
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('offline draft')
     expect(getBoardById('board-1')?.revision).toBe(7)
   })

@@ -6,7 +6,7 @@
 // content — not even on `document_replaced`.
 //
 // Mapping:
-// - `board.document_replaced` → invalidate the document, coalesced to one
+// - `board.document_replaced` → invalidate the catalog and document, coalesced to one
 //   refetch per 500ms window. Frames at or below the observed revision are
 //   dropped (reorder/duplicate protection). Draft-dirty boards are marked
 //   stale without refetching, so the draft under the cursor is never
@@ -23,7 +23,7 @@ import { queryClient } from '../../../../core/query/queryClient'
 import { subscribeWorkspaceEvent } from '../../../../api/workspaceEventStream'
 import { getBoardById } from '../catalog/boards'
 import { getBoardScope, subscribeBoardScopeChange } from '../catalog/scope'
-import type { WorkspaceBoardDocument } from '../adapters/boardsResource'
+import type { WorkspaceBoardDocument, WorkspaceBoardMeta } from '../adapters/boardsResource'
 import { boardQueryKeys } from './boardQueryKeys'
 import { isBoardDraftDirty } from './boardDraftState'
 
@@ -49,6 +49,17 @@ function isThenable(value: unknown): value is Promise<unknown> {
   )
 }
 
+function oldestCachedBoardRevision(client: QueryClient, workspaceId: string, boardId: string) {
+  const document = client.getQueryData<WorkspaceBoardDocument>(
+    boardQueryKeys.document(workspaceId, boardId),
+  )
+  const catalog = client.getQueryData<WorkspaceBoardMeta[]>(boardQueryKeys.list(workspaceId))
+  return Math.min(
+    document?.revision ?? 0,
+    catalog?.find((board) => board.id === boardId)?.revision ?? 0,
+  )
+}
+
 export function subscribeBoardQueryInvalidation(
   client: QueryClient,
   workspaceId: string,
@@ -65,9 +76,14 @@ export function subscribeBoardQueryInvalidation(
   let timer: ReturnType<typeof setTimeout> | undefined
   const flush = () => {
     timer = undefined
+    if (pending.size > 0) {
+      void client.invalidateQueries({ queryKey: boardQueryKeys.list(workspaceId), exact: true })
+    }
     for (const [boardId, revision] of pending) {
       observedRevisions.set(boardId, revision)
       const queryKey = boardQueryKeys.document(workspaceId, boardId)
+      const cached = client.getQueryData<WorkspaceBoardDocument>(queryKey)
+      if (revision <= (cached?.revision ?? 0)) continue
       if (isDraftDirty(boardId)) {
         // Mark stale without refetching: an active observer keeps
         // rendering the draft instead of replacing it mid-edit.
@@ -111,11 +127,8 @@ export function subscribeBoardQueryInvalidation(
       const boardId = envelope.resource.id
       if (envelope.type === 'board.document_replaced') {
         const revision = Number(envelope.data.revision)
-        const cached = client.getQueryData<WorkspaceBoardDocument>(
-          boardQueryKeys.document(workspaceId, boardId),
-        )
         const knownRevision = Math.max(
-          cached?.revision ?? 0,
+          oldestCachedBoardRevision(client, workspaceId, boardId),
           observedRevisions.get(boardId) ?? 0,
           pending.get(boardId) ?? 0,
         )

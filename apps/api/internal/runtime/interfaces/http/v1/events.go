@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/events"
+	eventnats "ideaboard/api/internal/events/nats"
 	eventwebhook "ideaboard/api/internal/events/webhook"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
@@ -330,6 +331,18 @@ func (h *contractV1Handler) deleteEventSubscription(c *gin.Context) {
 	})
 }
 
+// NewBoardDocumentPublisher shares the public document mutation event pipeline
+// with internal Y.Doc compactions. Both call it only after a snapshot commits.
+func NewBoardDocumentPublisher(log *events.WorkspaceEventLog, bus *eventnats.NATSJetStreamEventBus, webhooks *eventwebhook.WebhookStore) runtimehttp.BoardDocumentPublisher {
+	h := &contractV1Handler{deps: ContractV1Deps{Events: log, EventBus: bus, Webhooks: webhooks}}
+	return func(ctx context.Context, workspaceID, boardID, authorUID string, revision int64) {
+		h.emitWorkspaceEventWithActor(ctx, events.V1Actor{Type: events.V1ActorUser, ID: authorUID},
+			workspaceID, events.EventV1BoardDocumentReplaced,
+			events.V1Resource{Type: events.V1ResourceBoard, ID: boardID},
+			events.V1BoardDocumentReplacedData{BoardID: boardID, Revision: revision}, "", time.Time{})
+	}
+}
+
 // emitWorkspaceEvent mints one envelope and fans it out best-effort:
 // hot-log append (SSE replay + live), NATS publish (cross-instance
 // transport), webhook dispatch (signed deliveries). A mint failure is
@@ -351,6 +364,10 @@ func (h *contractV1Handler) emitWorkspaceEventWithID(ctx context.Context, identi
 	if strings.TrimSpace(eventID) != "" {
 		actor = events.V1Actor{Type: events.V1ActorService, ID: "tasking"}
 	}
+	h.emitWorkspaceEventWithActor(ctx, actor, workspaceID, typ, resource, data, eventID, occurredAt)
+}
+
+func (h *contractV1Handler) emitWorkspaceEventWithActor(ctx context.Context, actor events.V1Actor, workspaceID, typ string, resource events.V1Resource, data any, eventID string, occurredAt time.Time) {
 	var envelope events.V1Envelope
 	var err error
 	if strings.TrimSpace(eventID) != "" {

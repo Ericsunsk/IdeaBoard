@@ -174,6 +174,12 @@ func (h *internalRealtimeHandler) CompactYDocument(c *gin.Context) {
 		renderYDocStoreError(c, err)
 		return
 	}
+	// The store commits the canonical snapshot and catalog projection together.
+	// Publish the accepted revision through the same workspace event pipeline as
+	// public snapshot replacement; rejected writes never reach this point.
+	if h.publishDocument != nil {
+		h.publishDocument(c.Request.Context(), updated.WorkspacePublicID, updated.PublicID, strings.TrimSpace(body.AuthorUID), updated.Revision)
+	}
 	response.SuccessDTO(c, internalYCompactDTO{Compacted: true, Revision: updated.Revision})
 }
 

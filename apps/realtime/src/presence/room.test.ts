@@ -109,6 +109,215 @@ function readNodes(connection: RoomConnection): Record<string, unknown> {
   }
 }
 
+it('materializes short edits within one second while a viewer keeps the room alive', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const storage = memoryPersistence()
+  const rooms = new DurableRooms({ persistence: storage.persistence })
+  const writer = new Y.Doc()
+  try {
+    const connection = (await rooms.prepare('board', 'ticket')).attach(socket(), {
+      uid: 'writer',
+      canWrite: true,
+    })
+    const viewer = (await rooms.prepare('board', 'ticket')).attach(socket(), {
+      uid: 'reader',
+      canWrite: false,
+    })
+    connection.receive(updateFrame(writer, 'image-1'))
+    t.mock.timers.tick(600)
+    connection.receive(updateFrame(writer, 'image-2'))
+    connection.close()
+    t.mock.timers.tick(400)
+    await new Promise(setImmediate)
+    assert.equal(rooms.metrics.connections, 1)
+    assert.equal(storage.snapshots.length, 1)
+    assert.deepEqual(Object.keys(JSON.parse(storage.snapshots[0]!).payload.nodes), [
+      'image-1',
+      'image-2',
+    ])
+    viewer.close()
+  } finally {
+    writer.destroy()
+    await rooms.close()
+  }
+})
+
+it('materializes a restored durable tail for an admitted editor without requiring new edits', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const storage = memoryPersistence()
+  const seed = new Y.Doc()
+  updateFrame(seed, 'restored-image')
+  await storage.persistence.append('board', Y.encodeStateAsUpdate(seed), 'original-writer')
+  storage.calls.length = 0
+  const rooms = new DurableRooms({ persistence: storage.persistence })
+  try {
+    const viewer = (await rooms.prepare('board', 'ticket')).attach(socket(), {
+      uid: 'reader',
+      canWrite: false,
+    })
+    assert.deepEqual(Object.keys(readNodes(viewer)), ['restored-image'])
+    t.mock.timers.tick(1000)
+    await new Promise(setImmediate)
+    assert.deepEqual(storage.calls, [])
+    const editor = (await rooms.prepare('board', 'ticket')).attach(socket(), {
+      uid: 'current-editor',
+      canWrite: true,
+    })
+    t.mock.timers.tick(1000)
+    await new Promise(setImmediate)
+    assert.deepEqual(storage.calls, ['compact:current-editor'])
+    assert.deepEqual(Object.keys(JSON.parse(storage.snapshots[0]!).payload.nodes), [
+      'restored-image',
+    ])
+    editor.close()
+    viewer.close()
+  } finally {
+    seed.destroy()
+    await rooms.close()
+  }
+})
+
+it('never materializes a restored tail when only viewers open and leave', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const storage = memoryPersistence()
+  const seed = new Y.Doc()
+  updateFrame(seed, 'restored-image')
+  await storage.persistence.append('board', Y.encodeStateAsUpdate(seed), 'original-writer')
+  storage.calls.length = 0
+  const rooms = new DurableRooms({ persistence: storage.persistence })
+  try {
+    const viewer = (await rooms.prepare('board', 'ticket')).attach(socket(), {
+      uid: 'reader',
+      canWrite: false,
+    })
+    viewer.close()
+    t.mock.timers.tick(2000)
+    await new Promise(setImmediate)
+    assert.equal(rooms.metrics.rooms, 0)
+    assert.deepEqual(storage.calls, [])
+  } finally {
+    seed.destroy()
+    await rooms.close()
+  }
+})
+
+it('keeps timed snapshots behind append acknowledgements and cancels them on terminal failure', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const storage = memoryPersistence()
+  const blocked = deferred()
+  storage.persistence.append = async () => {
+    await blocked.promise
+    return false
+  }
+  const rooms = new DurableRooms({ persistence: storage.persistence })
+  const writer = new Y.Doc()
+  try {
+    const connection = (await rooms.prepare('board', 'ticket')).attach(socket(), {
+      uid: 'writer',
+      canWrite: true,
+    })
+    connection.receive(updateFrame(writer, 'rejected-image'))
+    t.mock.timers.tick(1000)
+    await new Promise(setImmediate)
+    assert.deepEqual(storage.calls, [])
+    blocked.resolve()
+    await new Promise(setImmediate)
+    connection.close()
+    t.mock.timers.tick(2000)
+    await new Promise(setImmediate)
+    assert.equal(rooms.metrics.rooms, 0)
+    assert.deepEqual(storage.calls, [])
+  } finally {
+    blocked.resolve()
+    writer.destroy()
+    await rooms.close()
+  }
+})
+
+it('materializes a short editing session before releasing the last connection', async () => {
+  const storage = memoryPersistence()
+  const rooms = new DurableRooms({ persistence: storage.persistence })
+  const writer = new Y.Doc()
+  try {
+    const connection = (await rooms.prepare('board', 'ticket')).attach(socket(), {
+      uid: 'writer',
+      canWrite: true,
+    })
+    connection.receive(updateFrame(writer, 'image-1'))
+    connection.close()
+    // A fresh viewer waits for the previous session's durable projection,
+    // even though it never reached the default 50-update compact threshold.
+    const viewer = (await rooms.prepare('board', 'ticket')).attach(socket(), {
+      uid: 'reader',
+      canWrite: false,
+    })
+    assert.equal(storage.snapshots.length, 1)
+    assert.deepEqual(Object.keys(JSON.parse(storage.snapshots[0]!).payload.nodes), ['image-1'])
+    assert.equal(rooms.metrics.rooms, 1)
+    viewer.close()
+  } finally {
+    writer.destroy()
+    await rooms.close()
+  }
+})
+
+it('freezes final compaction before a reserved reconnect accepts more edits', async () => {
+  const storage = memoryPersistence()
+  const append = storage.persistence.append
+  const blocked = deferred()
+  let appends = 0
+  storage.persistence.append = async (bid, update, uid) => {
+    if (++appends === 1) {
+      await blocked.promise
+      return append(bid, update, uid)
+    }
+    return false
+  }
+  const rooms = new DurableRooms({ persistence: storage.persistence })
+  const writer = new Y.Doc()
+  try {
+    const first = (await rooms.prepare('board', 'ticket')).attach(socket(), {
+      uid: 'first',
+      canWrite: true,
+    })
+    const reserved = await rooms.prepare('board', 'ticket')
+    first.receive(updateFrame(writer, 'image-1'))
+    first.close()
+    const second = reserved.attach(socket(), { uid: 'second', canWrite: true })
+    second.receive(updateFrame(writer, 'image-2'))
+    second.close()
+    blocked.resolve()
+    await rooms.close()
+    assert.equal(storage.snapshots.length, 1)
+    assert.deepEqual(Object.keys(JSON.parse(storage.snapshots[0]!).payload.nodes), ['image-1'])
+    assert.deepEqual(storage.calls, ['append:first', 'compact:first'])
+  } finally {
+    blocked.resolve()
+    writer.destroy()
+    await rooms.close()
+  }
+})
+
+it('materializes unprojected edits during shutdown without waiting for client disconnect', async () => {
+  const storage = memoryPersistence()
+  const rooms = new DurableRooms({ persistence: storage.persistence })
+  const writer = new Y.Doc()
+  try {
+    const connection = (await rooms.prepare('board', 'ticket')).attach(socket(), {
+      uid: 'writer',
+      canWrite: true,
+    })
+    connection.receive(updateFrame(writer, 'image-1'))
+    await rooms.close()
+    assert.equal(storage.snapshots.length, 1)
+    assert.deepEqual(Object.keys(JSON.parse(storage.snapshots[0]!).payload.nodes), ['image-1'])
+    assert.deepEqual(storage.calls, ['append:writer', 'compact:writer'])
+  } finally {
+    writer.destroy()
+    await rooms.close()
+  }
+})
+
 it('owns append/compact ordering, retains a disconnected Doc until drain, and recovers after pruning', async () => {
   const storage = memoryPersistence()
   const blocked = deferred()
@@ -166,7 +375,8 @@ it('rejects a full persistence queue before applying or broadcasting the update'
   const storage = memoryPersistence()
   const blocked = deferred()
   storage.blockAppend = blocked.promise
-  const rooms = new DurableRooms({ persistence: storage.persistence })
+  // Isolate the append budget from queued snapshot jobs.
+  const rooms = new DurableRooms({ persistence: storage.persistence, compactEveryUpdates: 10_000 })
   const writer = new Y.Doc()
   try {
     const sender = socket()

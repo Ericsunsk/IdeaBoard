@@ -1,4 +1,5 @@
 ---
+status: superseded by ADR-0022 (snapshot publication only)
 owner: Boards
 decision_date: 2026-10-19
 supersedes: 0006-board-optimistic-revision-concurrency.md (collaborator path only)
@@ -69,3 +70,6 @@ hydration：`Y.Doc` + `getMap('nodes')` / `getMap('edges')` keyed by id，HTTP
 ## Status
 
 Accepted
+
+2026-10-20：压缩时机与“不发布 document event”部分由
+[ADR-0022](./0022-collaborative-board-preview-publication.md) 替代；其余决策继续有效。

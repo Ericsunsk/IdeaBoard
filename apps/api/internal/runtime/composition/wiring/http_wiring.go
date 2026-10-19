@@ -158,7 +158,8 @@ func NewAppRouter(
 				// Board presence admit for the Y.js server: same ticket
 				// secret as issuance, same X-Internal-Key guard shape as
 				// the identity internal routes.
-				RealtimeHandler: runtimehttp.NewInternalRealtimeHandler(boardStore, tenancyStore, userDirectory, cfg.Realtime.TicketSecret, cfg.Auth.InternalAPIKey),
+				RealtimeHandler: runtimehttp.NewInternalRealtimeHandler(boardStore, tenancyStore, userDirectory, cfg.Realtime.TicketSecret, cfg.Auth.InternalAPIKey,
+					v1.NewBoardDocumentPublisher(taskServices.workspaceEvents, taskServices.workspaceEventBus, taskServices.webhooks)),
 			},
 			CORSMiddleware: httpinfra.BuildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 			RateLimit:      services.runtimeSettings,

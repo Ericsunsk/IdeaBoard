@@ -75,7 +75,7 @@ func TestInternalRealtimeAdmitPostgresSuccess(t *testing.T) {
 		t.Fatalf("issue ticket failed: %v", err)
 	}
 
-	handler := NewInternalRealtimeHandler(boardStore, tenancyStore, NewUsersRepositoryDirectory(userRepo), admitTestTicketSecret, admitTestInternalKey)
+	handler := NewInternalRealtimeHandler(boardStore, tenancyStore, NewUsersRepositoryDirectory(userRepo), admitTestTicketSecret, admitTestInternalKey, nil)
 	code, body := serveAdmit(t, handler, admitTestInternalKey, "?ticket="+ticket)
 	if code != http.StatusOK || !strings.Contains(body, `"admit":true`) {
 		t.Fatalf("pg admit = %d %s, want 200 admit:true", code, body)

@@ -170,6 +170,55 @@ func TestInternalYCompactRoundTrip(t *testing.T) {
 	}
 }
 
+func TestInternalYCompactPublishesOnlyCommittedSnapshots(t *testing.T) {
+	f := newAdmitFixture(t)
+	editorUID := tenancy.FormatUserPublicID(f.dir.ensure(f.editor))
+	published := 0
+	handler := NewInternalRealtimeHandler(f.boards, f.store, f.dir, admitTestTicketSecret, admitTestInternalKey,
+		func(ctx context.Context, workspaceID, boardID, authorUID string, revision int64) {
+			published++
+			committed, err := f.boards.GetBoard(ctx, workspaceID, boardID)
+			if err != nil || committed.Revision != revision || revision != 2 {
+				t.Fatalf("publication must follow revision commit: board=%v revision=%d err=%v", committed, revision, err)
+			}
+			if workspaceID != f.workspace.PublicID || boardID != f.boardID || authorUID != editorUID {
+				t.Fatalf("wrong committed snapshot identity: %q %q %q", workspaceID, boardID, authorUID)
+			}
+		})
+	route := "/internal/realtime/compactions"
+	snapshot := yCompactBody(f.boardID, editorUID, `{"nodes":{},"edges":{}}`)
+	if code, body := serveYDoc(t, handler, admitTestInternalKey, route, snapshot); code != http.StatusOK {
+		t.Fatalf("compact = %d %s, want 200", code, body)
+	}
+	if published != 1 {
+		t.Fatalf("compaction published %d events, want one committed snapshot notification", published)
+	}
+	// Validation, authorization, and archived-store failures never announce a revision.
+	invalid := `{"board_id":"` + f.boardID + `","snapshot":{"schema_version":0,"payload":{}},"author_uid":"` + editorUID + `"}`
+	if code, _ := serveYDoc(t, handler, admitTestInternalKey, route, invalid); code != http.StatusBadRequest {
+		t.Fatalf("invalid compact = %d, want 400", code)
+	}
+	if code, _ := serveYDoc(t, handler, "wrong-key", route, snapshot); code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized compact = %d, want 401", code)
+	}
+	const outsider = int64(204)
+	outsiderUID := tenancy.FormatUserPublicID(f.dir.ensure(outsider))
+	f.store.SeedWorkspaceMember(f.workspace.PublicID, outsider, tenancy.RoleMember)
+	if code, _ := serveYDoc(t, handler, admitTestInternalKey, route,
+		yCompactBody(f.boardID, outsiderUID, `{"nodes":{},"edges":{}}`)); code != http.StatusNotFound {
+		t.Fatalf("ungranted compact = %d, want 404", code)
+	}
+	if _, err := f.boards.ArchiveBoard(context.Background(), f.workspace.PublicID, f.boardID, f.owner); err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := serveYDoc(t, handler, admitTestInternalKey, route, snapshot); code != http.StatusConflict {
+		t.Fatalf("archived compact = %d, want 409", code)
+	}
+	if published != 1 {
+		t.Fatalf("rejected compactions published events: got %d, want 1", published)
+	}
+}
+
 func TestInternalYCompactRejectsArchived(t *testing.T) {
 	f := newAdmitFixture(t)
 	editorUID := tenancy.FormatUserPublicID(f.dir.ensure(f.editor))
@@ -225,7 +274,7 @@ func TestInternalYDocPostgresRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	viewerUID := tenancy.FormatUserPublicID(viewerRow.PublicID)
-	handler := NewInternalRealtimeHandler(boardStore, tenancyStore, NewUsersRepositoryDirectory(userRepo), admitTestTicketSecret, admitTestInternalKey)
+	handler := NewInternalRealtimeHandler(boardStore, tenancyStore, NewUsersRepositoryDirectory(userRepo), admitTestTicketSecret, admitTestInternalKey, nil)
 
 	code, body := serveYDoc(t, handler, admitTestInternalKey, "/internal/realtime/y-updates", yUpdateBody(boardID, viewerUID, []byte{0x5}))
 	if code != http.StatusOK || !strings.Contains(body, `"persisted":true`) {

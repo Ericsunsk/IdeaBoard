@@ -94,7 +94,7 @@ func newAdmitFixture(t *testing.T) *admitFixture {
 	if _, err := boardStore.ReplaceBoardAccess(ctx, ws.PublicID, boardID, owner, 1, boards.WorkspaceAccessEditor, []int64{editor, viewer}); err != nil {
 		t.Fatal(err)
 	}
-	handler := NewInternalRealtimeHandler(boardStore, store, dir, admitTestTicketSecret, admitTestInternalKey)
+	handler := NewInternalRealtimeHandler(boardStore, store, dir, admitTestTicketSecret, admitTestInternalKey, nil)
 	return &admitFixture{store: store, boards: boardStore, dir: dir, handler: handler, workspace: ws, boardID: boardID, owner: owner, editor: editor, viewer: viewer}
 }
 
@@ -120,7 +120,7 @@ func TestInternalRealtimeAdmitRequiresInternalKey(t *testing.T) {
 	if code, _ := serveAdmit(t, f.handler, admitTestInternalKey+"x", "?bid="+f.boardID+"&av=2&uid="+uid); code != http.StatusUnauthorized {
 		t.Fatalf("wrong key = %d, want 401", code)
 	}
-	broken := NewInternalRealtimeHandler(f.boards, f.store, f.dir, admitTestTicketSecret, "")
+	broken := NewInternalRealtimeHandler(f.boards, f.store, f.dir, admitTestTicketSecret, "", nil)
 	if code, _ := serveAdmit(t, broken, admitTestInternalKey, "?bid="+f.boardID+"&av=2&uid="+uid); code != http.StatusInternalServerError {
 		t.Fatalf("empty configured key = %d, want 500", code)
 	}
