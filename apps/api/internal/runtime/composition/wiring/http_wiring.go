@@ -113,11 +113,11 @@ func NewAppRouter(
 	controlIdempotencyDurable := idempotency.NewControlStore(repos.db)
 
 	router := gin.New()
-	// ClientIP feeds per-IP rate limiting. Trust only the configured reverse
-	// proxies so X-Forwarded-For cannot be spoofed by direct clients.
-	// Production behind Nginx/Cloudflare must set APP_TRUSTED_PROXIES.
-	if err := router.SetTrustedProxies(cfg.App.TrustedProxies); err != nil {
-		return nil, fmt.Errorf("invalid trusted proxies %v: %w", cfg.App.TrustedProxies, err)
+	// ClientIP feeds per-IP rate limiting. Only production Compose trusts
+	// private bridge peers; host development accepts loopback proxies only.
+	trustedProxies := cfg.App.TrustedProxies()
+	if err := router.SetTrustedProxies(trustedProxies); err != nil {
+		return nil, fmt.Errorf("invalid trusted proxies %v: %w", trustedProxies, err)
 	}
 	// Library materialization read-through (issue #908): composition
 	// injects the typed store/materializer/executor seams. Media owns
@@ -160,12 +160,12 @@ func NewAppRouter(
 				// the identity internal routes.
 				RealtimeHandler: runtimehttp.NewInternalRealtimeHandler(boardStore, tenancyStore, userDirectory, cfg.Realtime.TicketSecret, cfg.Auth.InternalAPIKey),
 			},
-			CORSMiddleware:      httpinfra.BuildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
-			RateLimit:           services.runtimeSettings,
-			Branding:            services.runtimeSettings,
-			MediaPreviews:       mediaPreviews,
-			REDMetrics:          redMetrics,
-			ReadyChecker:        readyChecker,
+			CORSMiddleware: httpinfra.BuildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
+			RateLimit:      services.runtimeSettings,
+			Branding:       services.runtimeSettings,
+			MediaPreviews:  mediaPreviews,
+			REDMetrics:     redMetrics,
+			ReadyChecker:   readyChecker,
 		},
 		authDeps,
 		v1.ContractV1Deps{
@@ -187,7 +187,7 @@ func NewAppRouter(
 			// Workspace board store is live (postgres mapping over
 			// board_documents/board_revisions, #809 follow-up landed).
 			Boards: boardStore,
-			// Board presence ticket secret (REALTIME_TICKET_SECRET):
+			// Board presence ticket secret (RT_TICKET_SECRET):
 			// empty stays fail-closed with 500 at issuance.
 			RealtimeTicketSecret: cfg.Realtime.TicketSecret,
 			// Acknowledge immediate delivery of transaction-committed access signals.

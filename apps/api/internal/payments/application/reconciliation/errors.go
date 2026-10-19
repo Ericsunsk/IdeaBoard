@@ -107,20 +107,3 @@ func boundedText(value string, limit int) string {
 	}
 	return value[:limit]
 }
-
-// Backend-owned user-facing copy for this package. Each constant
-// is the single source of truth for one rendered message; call
-// sites reference these names so copy changes stay in one place.
-// Values are byte-identical to the previously inline literals.
-
-// FailureDetail @ errors.go
-// FailureDetail @ errors.go
-// FailureDetail @ errors.go
-// FailureDetail @ errors.go
-// FailureDetail @ errors.go
-// FailureDetail @ errors.go
-// FailureDetail @ errors.go
-// FailureDetail @ errors.go
-// FailureDetail @ errors.go
-// FailureDetail @ errors.go
-// FailureDetail @ errors.go

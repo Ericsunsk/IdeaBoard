@@ -72,7 +72,7 @@ func RiverTimeoutMatrix() []QueueTimeoutPolicy {
 		{
 			Queue:   RiverQueueTaskRetention,
 			Timeout: RiverJobTimeoutTaskRetention,
-			Worker:  "TaskRetentionWorker (serial single-worker queue)",
+			Worker:  "WorkspacePurgeWorker (serial single-worker queue)",
 			Notes:   "serial purge window; matches the historical 15min budget",
 		},
 		{

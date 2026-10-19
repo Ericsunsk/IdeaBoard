@@ -72,10 +72,9 @@ VPS 侧至少同步：
 ```bash
 # /opt/stacks/ideaboard/docker/.env
 PUBLIC_ORIGIN=https://ideaboard.art
-# API_BASE_URL=https://api.example.com
 ```
 
-`PUBLIC_ORIGIN` 以及设置时的 `API_BASE_URL` 必须是没有 path、凭证、query 或 fragment 的 http(s) Origin。`PUBLIC_ORIGIN` 是 canonical source，用于浏览器跳转与分享链接；`API_BASE_URL` 仅在 API 独立 host 时作为 override，用于 Stripe Webhook 和服务间 API 地址。浏览器请求必须通过 `ideaboard.art` 的 same-origin Gateway，API 启动时会 fail closed 校验。
+`PUBLIC_ORIGIN` 必须是没有 path、凭证、query 或 fragment 的 http(s) Origin。`PUBLIC_ORIGIN` 是 canonical source，用于浏览器跳转与分享链接；后端公开 API 地址恒等于 `PUBLIC_ORIGIN`（`API_BASE_URL` 已删除，无 override，原用于 Stripe Webhook 和服务间 API 地址的独立 host 场景已收敛到同域 Gateway）。浏览器请求必须通过 `ideaboard.art` 的 same-origin Gateway，API 启动时会 fail closed 校验。
 
 Cloudflare DNS 配置：
 
@@ -203,34 +202,34 @@ GITHUB_TOKEN="${TOKEN}" bash /tmp/bootstrap-vps.sh \
   --manifest "${MANIFEST}"
 ```
 
+image refs 的唯一持久化位置是 `docker/images.env`（gitignored，manifest deploy 自动创建）；
+它独立于 secret 通道，后续 `up` / rollback 始终使用该文件。
+
 `REF` 与 manifest 必须来自同一发布批次。Bootstrap 不接受隐式默认分支或 latest release；缺少 `--ref` 或 `--manifest` 会在 clone、配置写入和部署前直接失败。强制重装可加 `IDEABOARD_FORCE=1`；脚本会备份旧目录并恢复 `docker/.env`。Bootstrap 会在部署前检查 `cosign`，除非你已经在 `docker/.env` 里显式设置 `COSIGN_VERIFY=false`。
 
-推荐使用仓库内的 encrypted secret bundle 管理敏感值。先在安全的控制机生成并加密 bundle，将 age private key 只放在部署主机或 CI Secret Store：
+生产 secret 的 canonical 通道是 Infisical Cloud，完整配置和迁入步骤见
+[Secrets runbook](./secrets-infisical.md)。`POSTGRES_PASSWORD` 是本地 owner 凭据，
+禁止进 Cloud；部署时从 `docker/.env` 解密读取，首次缺少文件时自动生成。
+image refs 不进 Cloud，由 manifest 写入 `docker/images.env`。
 
 ```bash
-SOPS_AGE_RECIPIENT='age1...' \
-  ./scripts/secrets-init.sh deploy/secrets/production.sops.json
+scripts/infisical-run.sh --env prod -- scripts/deploy-stack.sh update --manifest release-manifest.json
 ```
 
-部署主机保存非敏感配置 `/opt/stacks/ideaboard/docker/.env`（镜像 digest、`PUBLIC_ORIGIN`、端口和部署开关），并通过环境变量指定 bundle 与 age identity：
+Cloud 模式的业务值只消费注入值；本地文件仅提供独立的 owner 口令。
+部署机从密码管理器临时 export `DOTENV_PRIVATE_KEY`（或使用本地 `.env.keys`）；脚本将
+加密 `docker/.env` 解密为 `0600` 临时文件，退出时删除。实际 secret 和私钥
+不进入 git 明文，也不写入 release history。
 
-```bash
-export IDEABOARD_SECRETS_BUNDLE=deploy/secrets/production.sops.json
-export SOPS_AGE_KEY_FILE=/secure/age/ideaboard-production.txt
-ideaboard update --manifest release-manifest.json
-```
+Release rollback snapshot 只保存非 secret 的 `docker/images.env`，失败且
+migration 未开始时恢复该文件，不切换 secret 来源、不回退 secret 轮换。
 
-`deploy-stack.sh` 会在权限为 `0600` 的受保护临时目录渲染 bundle，与非敏感 `.env` 合并后传给 Compose，退出时删除临时文件。age private key 不会进入任何 container。一次性切换到 bundle 后，不再在 `.env` 中维护下列敏感值；它们必须从 bundle 提供。
-
-Release rollback snapshot 只保存非敏感的基础 `.env`，不会复制解密后的 secret bundle；仍应按主机备份策略定期清理 release history，并在疑似泄露时轮换对应 purpose-specific secret。
-
-至少配置 `/opt/stacks/ideaboard/docker/.env` 中的非敏感项：
-
-- `PUBLIC_ORIGIN`
-- `API_BASE_URL`（可选 override）
-- `IDEABOARD_*_IMAGE`
-
-bundle 中的独立 security-boundary secrets 包括 `POSTGRES_PASSWORD`、`API_DB_PASSWORD`、`AUTH_DB_PASSWORD`、`AUTH_INTERNAL_KEY`、`APP_SECRETS_ENCRYPTION_KEY`、`BETTER_AUTH_SECRET`、`NATS_PASSWORD`、`IMGPROXY_KEY` 和 `IMGPROXY_SALT`。
+`docker/.env` 中的独立 security-boundary secrets 包括 `POSTGRES_PASSWORD`、
+`API_PG_PASSWORD`、`AUTH_PG_PASSWORD`、`AUTH_INTERNAL_KEY`、
+`APP_SECRETS_ENCRYPTION_KEY`、`BETTER_AUTH_SECRET`、`NATS_PASSWORD`、
+`IMGPROXY_KEY`、`IMGPROXY_SALT`、`RT_TICKET_SECRET`、
+`CREDITS_WELCOME_IDENTITY_KEY` 与 `REWARDS_CODE_HMAC_KEYS`；镜像 digest 独立保存在 `docker/images.env`；
+Cloud 的 `PUBLIC_ORIGIN` 随注入分发，额外端口与部署开关通过部署进程 env 提供。
 
 ### 3. 后续部署 / 升级
 
@@ -270,7 +269,7 @@ Migration 前失败会恢复 `.env` snapshot；migration 后失败不会自动 r
 
 `ideaboard` 是固定 schema owner；`ideaboard_api` 与 `ideaboard_auth` 是彼此独立的 limited runtime roles。三个 roles 必须使用不同密码；长期运行的 API/Auth 容器只接收各自 runtime credential，只有一次性的 `api-migrate` / `auth-migrate` 容器接收 owner credential。
 
-空 PostgreSQL 库由 API migration 以 `20260827000000_baseline.sql` 初始化业务 schema；Atlas 在 `atlas_schema_revisions` 中维护版本与校验信息，API runtime 不再自动迁移。Docker 部署会先运行 `api-migrate`，授予 runtime 常规业务表 DML，并将 Credits Ledger 收紧为只读 + typed Credit Commands；再运行 Auth migration，为 Auth runtime role 授予 Better Auth tables DML 与 `get_auth_runtime_settings()` 的 `EXECUTE`，最后启动服务。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只注入一次性的 migration process，不得进入长期运行的 API/Auth runtime；本地示例见 `docker/migration.env.example`。
+空 PostgreSQL 库由 API migration 以 `20260827000000_baseline.sql` 初始化业务 schema；Atlas 在 `atlas_schema_revisions` 中维护版本与校验信息，API runtime 不再自动迁移。Docker 部署会先运行 `api-migrate`，授予 runtime 常规业务表 DML，并将 Credits Ledger 收紧为只读 + typed Credit Commands；再运行 Auth migration，为 Auth runtime role 授予 Better Auth tables DML 与 `get_auth_runtime_settings()` 的 `EXECUTE`，最后启动服务。`PG_MIGRATION_USER` / `PG_MIGRATION_PASSWORD` 只注入一次性的 migration process，不得进入长期运行的 API/Auth runtime；本地示例见 `docker/migration.env.example`。
 
 Schema 变更必须经过同一条 Schema Release lifecycle：在 `apps/api` 中修改 domain fragment 或 manifest 后运行 `BASE_SHA=HEAD API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schemarelease --write-artifact` 生成 `internal/db/schema/schema.sql`，提交 snapshot 与 append-only migration；发布前和 CI 使用相同 command 但不带 `--write-artifact`，以只读方式检查 manifest assembly、snapshot drift、sqlc generation、migration immutability 和 PostgreSQL catalog semantics。不要调用已移除的旧 schema assembly 或 migration history scripts。
 
@@ -294,7 +293,9 @@ PostgreSQL init script 只在空 volume 创建 API/Auth runtime roles。项目�
 ### 6. 初始化管理员
 
 ```bash
-docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env run --rm \
+export DOTENV_PRIVATE_KEY="$(cat /secure/dotenv/ideaboard.key)"
+dotenvx run -f /opt/stacks/ideaboard/docker/.env -- \
+  docker compose --env-file /opt/stacks/ideaboard/docker/images.env -f /opt/stacks/ideaboard/docker/compose.yml run --rm \
   -e INIT_ADMIN_EMAIL='admin@example.com' \
   -e INIT_ADMIN_DISPLAY_NAME='Admin' \
   -e INIT_ADMIN_PASSWORD='your-strong-password' \
@@ -379,15 +380,17 @@ NGINX_REAL_IP_INCLUDE=/etc/nginx/cloudflare-real-ip.conf
 ### 8. 验证
 
 ```bash
-docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env ps
+export DOTENV_PRIVATE_KEY="$(cat /secure/dotenv/ideaboard.key)"
+dotenvx run -f /opt/stacks/ideaboard/docker/.env -- \
+  docker compose --env-file /opt/stacks/ideaboard/docker/images.env -f /opt/stacks/ideaboard/docker/compose.yml ps
 ideaboard smoke
 curl http://127.0.0.1:6000/api/health
 curl http://127.0.0.1:6001/api/health
-curl "${API_BASE_URL:-${PUBLIC_ORIGIN}}/api/health"
-curl "${API_BASE_URL:-${PUBLIC_ORIGIN}}/api/auth/get-session"
+curl "${PUBLIC_ORIGIN}/api/health"
+curl "${PUBLIC_ORIGIN}/api/auth/get-session"
 ```
 
-`/api/auth/get-session` 未登录时返回未认证是正常的；关键是宿主机反代服务能转发到 Auth Service。`ideaboard smoke` 会检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream，以及公网 `${API_BASE_URL:-${PUBLIC_ORIGIN}}/api/health`。
+`/api/auth/get-session` 未登录时返回未认证是正常的；关键是宿主机反代服务能转发到 Auth Service。`ideaboard smoke` 会检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream，以及公网 `${PUBLIC_ORIGIN}/api/health`。
 
 对象存储 live smoke 默认不依赖外部凭据；缺少 env 时会自动 skip。需要在隔离的 R2/S3-compatible bucket 上验证 upload/read/public URL/delete/profile reload contract 时，只通过 shell env 或 CI secret 注入凭据，不要把 secret 写入仓库、issue、日志或未加密 artifact：
 
@@ -463,18 +466,14 @@ ideaboard delete --yes
 
 ### Runtime 硬化（连接池 / 启动校验 / 重试矩阵）
 
-数据库连接池按部署调优（`apps/api/.env.example` 同步注释）：
+数据库连接池为代码常量（无 env 开关）：
 
-| 变量                           | 默认 | 范围   | 说明                                                |
-| ------------------------------ | ---- | ------ | --------------------------------------------------- |
-| `DB_POOL_MAX_OPEN`             | 25   | 1–64   | `database/sql` 池上限                               |
-| `DB_POOL_MAX_IDLE`             | 10   | 0–64   | idle 上限，超过 open 上限自动 clamp                 |
-| `DB_POOL_MAX_LIFETIME_MINUTES` | 30   | 1–1440 | 连接复用最大年龄（NAT/pgbouncer 后防 stale socket） |
-| `DB_POOL_MAX_IDLE_MINUTES`     | 5    | 1–1440 | idle 连接回收                                       |
-| `RIVER_POOL_MAX_CONNS`         | 10   | 1–32   | River pgxpool 上限                                  |
-| `RIVER_POOL_MIN_CONNS`         | 1    | 1–16   | River pgxpool 下限，不超过上限                      |
+| 常量                       | 默认 | 说明               |
+| -------------------------- | ---- | ------------------ |
+| `DefaultPoolMaxOpenConns`  | 25   | runtime pgxpool 上限 |
+| `DefaultRiverPoolMaxConns` | 10   | River pgxpool 上限 |
 
-单实例连接预算 = `DB_POOL_MAX_OPEN + RIVER_POOL_MAX_CONNS`（默认 35），必须留出 migrations / CLI / fixtures 余量，远低于 PostgreSQL `max_connections`（默认 100）。改动重启 `api` 与 `api-worker` 后生效；非法值回退默认并在生产启动期直接失败（`Config.InvalidEnv`），开发环境仅 warning。
+单实例连接预算 = 25 + 10 = 35，必须留出 migrations / CLI / fixtures 余量，远低于 PostgreSQL `max_connections`（默认 100）；总预算上限 `maxRuntimePoolBudget = 80` 由 `Config.Validate` 在启动期 enforcement。idle 与回收窗口同样为代码常量（见 `DefaultPoolMaxIdleConns` / `DefaultPoolMaxLifetimeMin` / `DefaultPoolMaxIdleTimeMin` / `DefaultRiverPoolMinConns`）。
 
 启动期 fail-fast 链（按顺序，任一失败进程直接退出）：`Config.Validate`（DB 口令/SSL、非法 env、PUBLIC_ORIGIN、`APP_SECRETS_ENCRYPTION_KEY` presence）→ `AUTH_INTERNAL_KEY`（生产 32+ 字符非占位）→ imgproxy 配置 → secrets key 格式校验（base64 32-byte）→ runtime 权限校验。`PUBLIC_ORIGIN` 缺失不再等到首次拼 URL 才暴露。
 
@@ -583,7 +582,9 @@ ideaboard rollback --to previous
 ```bash
 ideaboard doctor
 ls -lh /opt/stacks/ideaboard-backups/
-docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env logs --tail=200 api api-worker auth postgres nats
+export DOTENV_PRIVATE_KEY="$(cat /secure/dotenv/ideaboard.key)"
+dotenvx run -f /opt/stacks/ideaboard/docker/.env -- \
+  docker compose --env-file /opt/stacks/ideaboard/docker/images.env -f /opt/stacks/ideaboard/docker/compose.yml logs --tail=200 api api-worker auth postgres nats
 ```
 
 受控 restore drill 建议至少记录：

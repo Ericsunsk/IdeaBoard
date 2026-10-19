@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -14,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const defaultHealthcheckPort = "6000"
+const defaultHealthcheckURL = "http://127.0.0.1:6000/api/health"
 
 func main() {
 	os.Exit(run())
@@ -87,14 +86,13 @@ func runWorkerProbe() int {
 	return 0
 }
 
+// healthcheckURL resolves the HTTP probe target. Only HEALTHCHECK_URL is
+// honored; the server listener is a hardcoded code constant, so the default
+// stays in one place here.
 func healthcheckURL() string {
 	url := strings.TrimSpace(os.Getenv("HEALTHCHECK_URL"))
 	if url == "" {
-		port := strings.TrimSpace(os.Getenv("APP_PORT"))
-		if port == "" {
-			port = defaultHealthcheckPort
-		}
-		url = "http://" + net.JoinHostPort("127.0.0.1", port) + "/api/health"
+		url = defaultHealthcheckURL
 	}
 	return url
 }

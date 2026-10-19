@@ -26,9 +26,9 @@ revision + 409 语义：任何经 Y 层写入文档的第二通道都会绕开 r
 3. **接入鉴权。** 客户端连 `/realtime?ticket=`；
    ticket = `base64url(payload).base64url(hex hmac-sha256)`，
    payload `{bid, av, cap, exp, uid}`，
-   HMAC-SHA256 secret 取 `REALTIME_TICKET_SECRET`（与 Go mint 端同名）。
+   HMAC-SHA256 secret 取 `RT_TICKET_SECRET`（与 Go mint 端同名）。
    先本地验签 + `exp`，再调 Go 内网 `GET /internal/realtime/admit`
-   （`X-Internal-Key`，仿 `apps/auth` internal 调用：单发、2s 超时、
+   （`X-Internal-Key` 取 `AUTH_INTERNAL_KEY`，与 API/Auth 共用同一 internal key，仿 `apps/auth` internal 调用：单发、2s 超时、
    fail-closed），admit 才进 room。请求以 `?ticket=` 为主契约（`bid/av/uid`
    随附 echo 校验）；Go 一律 `200 + {code: 0, data: {admit}}` 应答，sidecar
    只认 `admit === true`。拒绝沿用 y-websocket 关码约定

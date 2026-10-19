@@ -5,7 +5,7 @@
 </p>
 
 > [!NOTE]
-> 本手册覆盖 [backend-hardening] 01（RED 最小指标集）。指标由 Prometheus `/metrics` 端点暴露（默认 `METRICS_ADDR=127.0.0.1:9091`），label 保持封闭集合：`route` 为 Gin 路由模板（未匹配记 `unmatched`）、`status` 为数字状态码、`feature` 为 workflow feature slug、`queue` 为 River 队列名。不记录 user ID、task ID、URL 或错误文本。
+> 本手册覆盖 [backend-hardening] 01（RED 最小指标集）。指标由 Prometheus `/metrics` 端点暴露（本地宿主监听 `127.0.0.1:9091`；production 容器监听 `0.0.0.0:9091`，经 Compose 映射至宿主 `127.0.0.1:9091`），label 保持封闭集合：`route` 为 Gin 路由模板（未匹配记 `unmatched`）、`status` 为数字状态码、`feature` 为 workflow feature slug、`queue` 为 River 队列名。不记录 user ID、task ID、URL 或错误文本。
 
 ## 指标清单
 
@@ -120,7 +120,7 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 | `credit_reconciliation` | CreditReconciliationScheduleWorker | 1min | 单次 schedule 写；超时基本可判为 DB 故障 |
 | `payment_reconciliation` | PaymentReconciliationWorker | 4min | Stripe/DB sweep；超时看 Payments 事故处理 |
 | `payment_checkout_shutdown` | PaymentCheckoutShutdownWorker / ScheduleWorker | 4min | 同上 |
-| `task_retention` | TaskRetentionWorker | 15min | 串行 purge 窗口；超时看保留窗口与锁竞争 |
+| `task_retention` | WorkspacePurgeWorker | 15min | 串行 purge 窗口；超时看保留窗口与锁竞争 |
 | `vision_billing` | VisionBillingReconciliationWorker | 4min | 低于 5min 调度周期；超时看 searchcatalog 计费链路（超时不会堆积到下个周期） |
 | `media_reclamation` | ReclaimWorker | 2min | 低于 5min claim lease；超时看 storage profile 与对象可达性 |
 | `media_reclamation` | ScheduleWorker | 2min | scan（上限 100）+ 入队扇出；超时看 DB 慢查询 |

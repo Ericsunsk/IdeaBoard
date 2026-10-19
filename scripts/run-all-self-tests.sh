@@ -14,7 +14,7 @@
 # comment instead of relying on the glob.
 #
 # Hermeticity: every *-test.sh as of this writing needs no network, secrets,
-# or Docker daemon (docker/go/npm/atlas/curl/sops are faked on PATH inside
+# or Docker daemon (docker/go/npm/atlas/curl are faked on PATH inside
 # fixtures; only jq, git, and the Go toolchain are real, all present in the
 # ops job). A future non-hermetic test must be skipped here with a reason
 # comment — never silently.

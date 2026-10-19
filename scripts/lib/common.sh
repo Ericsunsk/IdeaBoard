@@ -27,7 +27,7 @@
 #                           fine (rm -rf semantics). The trap is installed
 #                           once no matter how often cleanup_path is called.
 #                           Matches the render-nginx-template.sh /
-#                           render-cloudflare-real-ip-conf.sh / secrets-init.sh
+#                           render-cloudflare-real-ip-conf.sh
 #                           idiom: temp outputs that were moved into place are
 #                           simply absent at cleanup time (no-op).
 #

@@ -38,8 +38,8 @@ WORKDIR /app
 FROM runtime-base AS runtime
 
 ENV NODE_ENV=production \
-    REALTIME_HOST=0.0.0.0 \
-    REALTIME_PORT=6002
+    RT_HOST=0.0.0.0 \
+    RT_PORT=6002
 
 COPY --from=prod-deps --chown=node:node /app/package.json ./
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules

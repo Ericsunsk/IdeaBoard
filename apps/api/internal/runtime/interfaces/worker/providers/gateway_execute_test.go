@@ -234,7 +234,7 @@ func TestCallGatewayAPIStoresParsedOutputEnvelope(t *testing.T) {
 
 func TestCallGatewayAPIOpenRouterResolvesRelativeUploads(t *testing.T) {
 	executor := newTestProviderExecutorWithLocalStorage(t)
-	executor.publicOrigins = config.PublicOriginsConfig{API: "https://api.example.com"}
+	executor.publicOrigins = config.PublicOriginsConfig{Web: "https://api.example.com"}
 	executor.gatewayFactory = gatewayTestFactory("http://127.0.0.1:1")
 	source := buildTinyPNGBytes(t)
 	sourcePath := filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "source.png")

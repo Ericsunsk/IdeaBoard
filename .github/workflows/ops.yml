@@ -30,6 +30,9 @@ jobs:
       - name: Verify CI orchestration contracts
         run: bash scripts/run-all-self-tests.sh
 
+      - name: Check env schema and example drift
+        run: bash scripts/env-schema-check.sh
+
       - name: Check shell syntax
         shell: bash
         run: |
@@ -62,12 +65,6 @@ jobs:
           bash -n scripts/csp-policy-test.sh
           bash -n scripts/qa-production-cleanup.sh
           bash -n scripts/qa-production-cleanup-test.sh
-          bash -n scripts/secrets-init.sh
-          bash -n scripts/secrets-init-test.sh
-          bash -n scripts/secrets-render.sh
-          bash -n scripts/secrets-render-test.sh
-          bash -n scripts/secrets-validate.sh
-          bash -n scripts/secrets-validate-test.sh
           bash -n scripts/ci-media-package-boundary.sh
           bash -n scripts/ci-media-package-boundary-test.sh
           bash -n scripts/ci-legacy-media-zero-scan.sh
@@ -83,8 +80,16 @@ jobs:
           bash -n scripts/adr-template-check-test.sh
           bash -n scripts/check-backend-copy.sh
           bash -n scripts/check-backend-copy-test.sh
+          bash -n scripts/env-schema-check.sh
+          bash -n scripts/env-schema-check-test.sh
+          bash -n scripts/infisical-run.sh
+          bash -n scripts/infisical-drift-check.sh
+          bash -n scripts/infisical-drift-check-test.sh
+          bash -n scripts/web-frontend-env-check.sh
+          bash -n scripts/web-frontend-env-check-test.sh
           bash -n scripts/run-all-self-tests.sh
           bash -n scripts/lib/common.sh
+          bash -n scripts/lib/env-schema.sh
 
       - name: Install ShellCheck
         shell: bash
@@ -128,12 +133,6 @@ jobs:
             scripts/csp-policy-test.sh \
             scripts/qa-production-cleanup.sh \
             scripts/qa-production-cleanup-test.sh \
-            scripts/secrets-init.sh \
-            scripts/secrets-init-test.sh \
-            scripts/secrets-render.sh \
-            scripts/secrets-render-test.sh \
-            scripts/secrets-validate.sh \
-            scripts/secrets-validate-test.sh \
             scripts/ci-media-package-boundary.sh \
             scripts/ci-media-package-boundary-test.sh \
             scripts/ci-legacy-media-zero-scan.sh \
@@ -149,8 +148,16 @@ jobs:
             scripts/adr-template-check-test.sh \
             scripts/check-backend-copy.sh \
             scripts/check-backend-copy-test.sh \
+            scripts/env-schema-check.sh \
+            scripts/env-schema-check-test.sh \
+            scripts/infisical-run.sh \
+            scripts/infisical-drift-check.sh \
+            scripts/infisical-drift-check-test.sh \
+            scripts/web-frontend-env-check.sh \
+            scripts/web-frontend-env-check-test.sh \
             scripts/run-all-self-tests.sh \
-            scripts/lib/common.sh
+            scripts/lib/common.sh \
+            scripts/lib/env-schema.sh
 
       - name: Lint Dockerfiles
         run: |
@@ -266,5 +273,5 @@ jobs:
 
       - name: Validate Docker Compose config
         run: |
-          docker compose -f docker/compose.yml --env-file docker/.env.example config
-          docker compose -f docker/compose.yml -f docker/compose.npm.yml --env-file docker/.env.example config
+          docker compose -f docker/compose.yml --env-file docker/.env.example --env-file docker/images.env.example config
+          docker compose -f docker/compose.yml -f docker/compose.npm.yml --env-file docker/.env.example --env-file docker/images.env.example config

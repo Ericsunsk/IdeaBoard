@@ -128,7 +128,7 @@ type ContractV1Deps struct {
 	// repository plus the Auth lookup reader; tests inject fakes.
 	MemberLookup V1MemberLookupProvider
 	// RealtimeTicketSecret is the HMAC secret for board presence tickets
-	// (REALTIME_TICKET_SECRET). Empty fails the realtime-ticket endpoint
+	// (RT_TICKET_SECRET). Empty fails the realtime-ticket endpoint
 	// closed with 500 (no fallback default); Load records the missing
 	// key in Config.InvalidEnv so production startup fails fast.
 	RealtimeTicketSecret string

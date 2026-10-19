@@ -410,7 +410,7 @@ paths:
         Archives the workspace. No Idempotency-Key is required.
         The Default workspace is never archived: attempts render 403
         workspace_default_protected. Archived non-Default workspaces are
-        permanently deleted 7 days after archiving (WORKSPACE_PURGE_AFTER_DAYS),
+        permanently deleted 7 days after archiving,
         including boards and files; billing records are retained.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
@@ -1208,7 +1208,7 @@ paths:
         CapabilitiesFor, uid is the caller usr_ identity). Viewers may
         mint; malformed ids, unknown boards, and callers holding no
         effective board role converge to 404 board_not_found. Archived
-        boards render 409 board_archived. A missing REALTIME_TICKET_SECRET
+        boards render 409 board_archived. A missing RT_TICKET_SECRET
         renders 500 service_unavailable (no fallback default). The Y.js
         server admits the bearer via GET /internal/realtime/admit. No
         Idempotency-Key is required: issuance is a read-like POST with no

@@ -20,9 +20,9 @@ func parseRiverPoolTestConfig(t *testing.T) *pgxpool.Config {
 	return cfg
 }
 
-func TestApplyRiverPoolLimitsKeepsHistoricalDefaults(t *testing.T) {
+func TestApplyRiverPoolLimitsUsesFixedDefaults(t *testing.T) {
 	cfg := parseRiverPoolTestConfig(t)
-	applyRiverPoolLimits(cfg, config.PoolConfig{})
+	applyRiverPoolLimits(cfg)
 	if cfg.MaxConns != config.DefaultRiverPoolMaxConns {
 		t.Fatalf("MaxConns = %d, want default %d", cfg.MaxConns, config.DefaultRiverPoolMaxConns)
 	}
@@ -34,40 +34,5 @@ func TestApplyRiverPoolLimitsKeepsHistoricalDefaults(t *testing.T) {
 	}
 	if cfg.MaxConnIdleTime != time.Duration(config.DefaultPoolMaxIdleTimeMin)*time.Minute {
 		t.Fatalf("MaxConnIdleTime = %v, want %dm", cfg.MaxConnIdleTime, config.DefaultPoolMaxIdleTimeMin)
-	}
-}
-
-func TestApplyRiverPoolLimitsHonorsConfiguredValues(t *testing.T) {
-	cfg := parseRiverPoolTestConfig(t)
-	applyRiverPoolLimits(cfg, config.PoolConfig{
-		MaxOpenConns:   40,
-		MaxIdleConns:   20,
-		MaxLifetimeMin: 60,
-		MaxIdleTimeMin: 15,
-		RiverMaxConns:  16,
-		RiverMinConns:  2,
-	})
-	if cfg.MaxConns != 16 {
-		t.Fatalf("MaxConns = %d, want 16", cfg.MaxConns)
-	}
-	if cfg.MinConns != 2 {
-		t.Fatalf("MinConns = %d, want 2", cfg.MinConns)
-	}
-	if cfg.MaxConnLifetime != 60*time.Minute {
-		t.Fatalf("MaxConnLifetime = %v, want 60m", cfg.MaxConnLifetime)
-	}
-	if cfg.MaxConnIdleTime != 15*time.Minute {
-		t.Fatalf("MaxConnIdleTime = %v, want 15m", cfg.MaxConnIdleTime)
-	}
-}
-
-func TestApplyRiverPoolLimitsClampsInvalidValues(t *testing.T) {
-	cfg := parseRiverPoolTestConfig(t)
-	applyRiverPoolLimits(cfg, config.PoolConfig{RiverMaxConns: 500, RiverMinConns: 60})
-	if cfg.MaxConns != config.DefaultRiverPoolMaxConns {
-		t.Fatalf("MaxConns = %d, want default %d", cfg.MaxConns, config.DefaultRiverPoolMaxConns)
-	}
-	if cfg.MinConns != config.DefaultRiverPoolMinConns {
-		t.Fatalf("MinConns = %d, want default %d", cfg.MinConns, config.DefaultRiverPoolMinConns)
 	}
 }

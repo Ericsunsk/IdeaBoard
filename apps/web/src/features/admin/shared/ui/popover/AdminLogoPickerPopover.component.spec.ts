@@ -74,7 +74,6 @@ describe('AdminLogoPickerPopover', () => {
     expect(await screen.findByText('选择品牌 Logo')).toBeInTheDocument()
     expect(screen.getByText('智能识别')).toBeInTheDocument()
 
-    // Check category pills
     expect(screen.getByRole('button', { name: '全部' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '生图' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '国内' })).toBeInTheDocument()

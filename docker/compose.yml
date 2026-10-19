@@ -1,8 +1,17 @@
 name: ideaboard
 
+# Shared PostgreSQL connection surface (no DATABASE_URL by design: Go and
+# Node parse PG_* independently and a single URL would split parsing).
+# Each service merges this anchor and adds only its role user/password.
+x-pg-defaults: &pg-defaults
+  PG_HOST: postgres
+  PG_PORT: 5432
+  PG_DB: ideaboard
+  PG_SSLMODE: ${PG_SSLMODE:-disable}
+
 services:
   api:
-    image: ${IDEABOARD_API_IMAGE:?Set IDEABOARD_API_IMAGE in docker/.env}
+    image: ${IDEABOARD_API_IMAGE:?Set IDEABOARD_API_IMAGE in docker/images.env}
     container_name: ideaboard-api
     restart: unless-stopped
     depends_on:
@@ -19,36 +28,24 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
+      <<: *pg-defaults
       APP_ENV: production
       # ADR-0021 process role: this service serves API/SSE and enqueues
       # River jobs without consuming them. Literal (not ${}) so the
       # topology is code; local development keeps the `all` default.
       API_MODE: http-only
-      APP_HOST: 0.0.0.0
-      APP_PORT: 6000
-      METRICS_ADDR: 0.0.0.0:9091
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}
-      API_BASE_URL: ${API_BASE_URL:-${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}}
-      AUTH_SERVICE_BASE_URL: http://auth:6001
+      AUTH_INTERNAL_URL: http://auth:6001
       AUTH_INTERNAL_KEY: ${AUTH_INTERNAL_KEY:?Set AUTH_INTERNAL_KEY}
       # Board presence ticket HMAC secret (ADR-0019): must equal the
       # realtime sidecar value of the same name; empty fails issuance closed.
-      REALTIME_TICKET_SECRET: ${REALTIME_TICKET_SECRET:?Set REALTIME_TICKET_SECRET}
+      RT_TICKET_SECRET: ${RT_TICKET_SECRET:?Set RT_TICKET_SECRET}
       APP_SECRETS_ENCRYPTION_KEY: ${APP_SECRETS_ENCRYPTION_KEY:?Set APP_SECRETS_ENCRYPTION_KEY}
       CREDITS_WELCOME_IDENTITY_KEY: ${CREDITS_WELCOME_IDENTITY_KEY:?Set CREDITS_WELCOME_IDENTITY_KEY}
       REWARDS_CODE_HMAC_KEYS: ${REWARDS_CODE_HMAC_KEYS:?Set REWARDS_CODE_HMAC_KEYS}
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ideaboard_api
-      DB_PASSWORD: ${API_DB_PASSWORD:?Set API_DB_PASSWORD}
-      DB_NAME: ideaboard
-      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      API_PG_USER: ideaboard_api
+      API_PG_PASSWORD: ${API_PG_PASSWORD:?Set API_PG_PASSWORD}
       NATS_PASSWORD: ${NATS_PASSWORD:?Set NATS_PASSWORD}
-      NATS_HOST: nats
-      NATS_PORT: 4222
-      NATS_EVENT_BUS_ENABLED: ${NATS_EVENT_BUS_ENABLED:-true}
-      RIVER_WORKER_CONCURRENCY: ${RIVER_WORKER_CONCURRENCY:-5}
-      STORAGE_LOCAL_ROOT: ${STORAGE_LOCAL_ROOT:-/app}
       IMGPROXY_KEY: ${IMGPROXY_KEY:?Set IMGPROXY_KEY}
       IMGPROXY_SALT: ${IMGPROXY_SALT:?Set IMGPROXY_SALT}
     volumes:
@@ -85,7 +82,7 @@ services:
     # a database round-trip via the healthcheck binary (API_MODE selects
     # it); consumption progress is observed via River queue depth/lag, and
     # the depth/lag gauges stay exported from the http `api` process.
-    image: ${IDEABOARD_API_IMAGE:?Set IDEABOARD_API_IMAGE in docker/.env}
+    image: ${IDEABOARD_API_IMAGE:?Set IDEABOARD_API_IMAGE in docker/images.env}
     container_name: ideaboard-api-worker
     restart: unless-stopped
     depends_on:
@@ -98,32 +95,24 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
+      <<: *pg-defaults
       APP_ENV: production
       API_MODE: worker-only
-      # No APP_PORT/METRICS_ADDR: this process binds nothing.
+      # No listeners: this process binds nothing.
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}
-      API_BASE_URL: ${API_BASE_URL:-${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}}
-      AUTH_SERVICE_BASE_URL: http://auth:6001
+      AUTH_INTERNAL_URL: http://auth:6001
       AUTH_INTERNAL_KEY: ${AUTH_INTERNAL_KEY:?Set AUTH_INTERNAL_KEY}
       # Startup validation (Config.Validate + imgproxy + secrets key) runs
       # in every mode, so the worker carries the same secrets as `api`
       # even though it never mints tickets or signs derivative URLs.
-      REALTIME_TICKET_SECRET: ${REALTIME_TICKET_SECRET:?Set REALTIME_TICKET_SECRET}
+      RT_TICKET_SECRET: ${RT_TICKET_SECRET:?Set RT_TICKET_SECRET}
       APP_SECRETS_ENCRYPTION_KEY: ${APP_SECRETS_ENCRYPTION_KEY:?Set APP_SECRETS_ENCRYPTION_KEY}
       CREDITS_WELCOME_IDENTITY_KEY: ${CREDITS_WELCOME_IDENTITY_KEY:?Set CREDITS_WELCOME_IDENTITY_KEY}
       REWARDS_CODE_HMAC_KEYS: ${REWARDS_CODE_HMAC_KEYS:?Set REWARDS_CODE_HMAC_KEYS}
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ideaboard_api
-      DB_PASSWORD: ${API_DB_PASSWORD:?Set API_DB_PASSWORD}
-      DB_NAME: ideaboard
-      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      API_PG_USER: ideaboard_api
+      API_PG_PASSWORD: ${API_PG_PASSWORD:?Set API_PG_PASSWORD}
       NATS_PASSWORD: ${NATS_PASSWORD:?Set NATS_PASSWORD}
-      NATS_HOST: nats
-      NATS_PORT: 4222
-      NATS_EVENT_BUS_ENABLED: ${NATS_EVENT_BUS_ENABLED:-true}
       RIVER_WORKER_CONCURRENCY: ${RIVER_WORKER_CONCURRENCY:-5}
-      STORAGE_LOCAL_ROOT: ${STORAGE_LOCAL_ROOT:-/app}
       IMGPROXY_KEY: ${IMGPROXY_KEY:?Set IMGPROXY_KEY}
       IMGPROXY_SALT: ${IMGPROXY_SALT:?Set IMGPROXY_SALT}
     volumes:
@@ -140,7 +129,7 @@ services:
       - ideaboard-network
 
   api-migrate:
-    image: ${IDEABOARD_API_MIGRATE_IMAGE:?Set IDEABOARD_API_MIGRATE_IMAGE in docker/.env}
+    image: ${IDEABOARD_API_MIGRATE_IMAGE:?Set IDEABOARD_API_MIGRATE_IMAGE in docker/images.env}
     profiles:
       - tools
     cap_drop:
@@ -148,20 +137,16 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
+      <<: *pg-defaults
       APP_ENV: production
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ideaboard_api
-      DB_PASSWORD: ${API_DB_PASSWORD:?Set API_DB_PASSWORD}
-      DB_MIGRATION_USER: ideaboard
-      DB_MIGRATION_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-      DB_NAME: ideaboard
-      DB_SSLMODE: ${DB_SSLMODE:-disable}
-      STORAGE_LOCAL_ROOT: ${STORAGE_LOCAL_ROOT:-/app}
+      API_PG_USER: ideaboard_api
+      API_PG_PASSWORD: ${API_PG_PASSWORD:?Set API_PG_PASSWORD}
+      PG_MIGRATION_USER: ideaboard
+      PG_MIGRATION_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}
       APP_SECRETS_ENCRYPTION_KEY: ${APP_SECRETS_ENCRYPTION_KEY:?Set APP_SECRETS_ENCRYPTION_KEY}
       CREDITS_WELCOME_IDENTITY_KEY: ${CREDITS_WELCOME_IDENTITY_KEY:?Set CREDITS_WELCOME_IDENTITY_KEY}
-      # Intentionally omitted: REWARDS_CODE_HMAC_KEYS + AUTH_INTERNAL_KEY are runtime-only (composition.Migrate never parses the HMAC keyring or wires internal routes); NATS/IMGPROXY/API_INTERNAL_URL/BETTER_AUTH_SECRET never enter the migrate path.
+      # Intentionally omitted: REWARDS_CODE_HMAC_KEYS + AUTH_INTERNAL_KEY + RT_TICKET_SECRET are serving-only (ValidateForMigration never requires them; composition.Migrate never parses the HMAC keyring or wires internal routes); NATS/IMGPROXY/API_INTERNAL_URL/BETTER_AUTH_SECRET never enter the migrate path.
     volumes:
       - api-uploads:/app/uploads
     depends_on:
@@ -171,7 +156,7 @@ services:
       - ideaboard-network
 
   auth:
-    image: ${IDEABOARD_AUTH_IMAGE:?Set IDEABOARD_AUTH_IMAGE in docker/.env}
+    image: ${IDEABOARD_AUTH_IMAGE:?Set IDEABOARD_AUTH_IMAGE in docker/images.env}
     container_name: ideaboard-auth
     restart: unless-stopped
     cap_drop:
@@ -182,6 +167,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      <<: *pg-defaults
       NODE_ENV: production
       AUTH_HOST: 0.0.0.0
       AUTH_PORT: 6001
@@ -191,12 +177,8 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}
       API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:6000}
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ideaboard_auth
-      DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD}
-      DB_NAME: ideaboard
-      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      AUTH_PG_USER: ideaboard_auth
+      AUTH_PG_PASSWORD: ${AUTH_PG_PASSWORD:?Set AUTH_PG_PASSWORD}
     ports:
       - "127.0.0.1:${AUTH_HOST_PORT:-6001}:6001"
     healthcheck:
@@ -213,7 +195,7 @@ services:
       - ideaboard-network
 
   auth-migrate:
-    image: ${IDEABOARD_AUTH_MIGRATE_IMAGE:?Set IDEABOARD_AUTH_MIGRATE_IMAGE in docker/.env}
+    image: ${IDEABOARD_AUTH_MIGRATE_IMAGE:?Set IDEABOARD_AUTH_MIGRATE_IMAGE in docker/images.env}
     profiles:
       - tools
     cap_drop:
@@ -221,19 +203,16 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
+      <<: *pg-defaults
       NODE_ENV: production
       AUTH_INTERNAL_KEY: ${AUTH_INTERNAL_KEY:?Set AUTH_INTERNAL_KEY}
       APP_SECRETS_ENCRYPTION_KEY: ${APP_SECRETS_ENCRYPTION_KEY:?Set APP_SECRETS_ENCRYPTION_KEY}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ideaboard_auth
-      DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD}
-      DB_MIGRATION_USER: ideaboard
-      DB_MIGRATION_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-      DB_NAME: ideaboard
-      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      AUTH_PG_USER: ideaboard_auth
+      AUTH_PG_PASSWORD: ${AUTH_PG_PASSWORD:?Set AUTH_PG_PASSWORD}
+      PG_MIGRATION_USER: ideaboard
+      PG_MIGRATION_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       # Intentionally omitted: AUTH_HOST/PORT/TRUST_PROXY are listen-only and API_INTERNAL_URL defaults unused (the migrate path builds no login-metadata reporter); every loadEnv-required key above stays pinned.
     depends_on:
       postgres:
@@ -244,7 +223,7 @@ services:
   realtime:
     # Presence-only y-websocket sidecar (ADR-0019): single replica. Rooms are
     # in-memory with no cross-instance fanout; do not scale past 1.
-    image: ${IDEABOARD_REALTIME_IMAGE:?Set IDEABOARD_REALTIME_IMAGE in docker/.env}
+    image: ${IDEABOARD_REALTIME_IMAGE:?Set IDEABOARD_REALTIME_IMAGE in docker/images.env}
     container_name: ideaboard-realtime
     restart: unless-stopped
     cap_drop:
@@ -256,17 +235,16 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      REALTIME_HOST: 0.0.0.0
-      REALTIME_PORT: 6002
-      REALTIME_TICKET_SECRET: ${REALTIME_TICKET_SECRET:?Set REALTIME_TICKET_SECRET}
-      # Key mapping (ADR-0019): the sidecar sends X-Internal-Key with this
-      # value; Go validates it as AUTH_INTERNAL_KEY. Set both to the SAME
-      # secret value; do not rename either variable (each name is owned by
-      # its side: sidecar REALTIME_INTERNAL_KEY, Go AUTH_INTERNAL_KEY).
-      REALTIME_INTERNAL_KEY: ${REALTIME_INTERNAL_KEY:?Set REALTIME_INTERNAL_KEY}
-      API_INTERNAL_URL: ${REALTIME_API_INTERNAL_URL:-http://api:6000}
+      RT_HOST: 0.0.0.0
+      RT_PORT: 6002
+      RT_TICKET_SECRET: ${RT_TICKET_SECRET:?Set RT_TICKET_SECRET}
+      # Single shared internal key (ADR-0019): the sidecar sends
+      # X-Internal-Key with this value; Go validates the same
+      # AUTH_INTERNAL_KEY. One name on both sides; set it once.
+      AUTH_INTERNAL_KEY: ${AUTH_INTERNAL_KEY:?Set AUTH_INTERNAL_KEY}
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:6000}
     ports:
-      - "127.0.0.1:${REALTIME_HOST_PORT:-6002}:6002"
+      - "127.0.0.1:${RT_HOST_PORT:-6002}:6002"
     healthcheck:
       test:
         - CMD
@@ -324,8 +302,8 @@ services:
       POSTGRES_DB: ideaboard
       POSTGRES_USER: ideaboard
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-      API_DB_PASSWORD: ${API_DB_PASSWORD:?Set API_DB_PASSWORD}
-      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD}
+      API_PG_PASSWORD: ${API_PG_PASSWORD:?Set API_PG_PASSWORD}
+      AUTH_PG_PASSWORD: ${AUTH_PG_PASSWORD:?Set AUTH_PG_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./postgres/init-runtime-roles.sh:/docker-entrypoint-initdb.d/10-runtime-roles.sh:ro

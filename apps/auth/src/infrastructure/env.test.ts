@@ -10,7 +10,7 @@ const moduleEnvKeys = [
   'APP_ENV',
   'AUTH_HOST',
   'AUTH_INTERNAL_KEY',
-  'DB_SSLMODE',
+  'PG_SSLMODE',
   'NODE_ENV',
 ] as const
 const originalModuleEnv = new Map<string, string | undefined>()
@@ -23,7 +23,7 @@ before(async () => {
   process.env.APP_ENV = ''
   process.env.AUTH_HOST = '127.0.0.1'
   process.env.AUTH_INTERNAL_KEY = 'test-internal-key'
-  process.env.DB_SSLMODE = 'disable'
+  process.env.PG_SSLMODE = 'disable'
 
   const envModule = await import('./env.js')
   loadEnv = envModule.loadEnv
@@ -50,8 +50,8 @@ function productionSource(overrides: EnvSource = {}): EnvSource {
     AUTH_INTERNAL_KEY: strongInternalKey,
     BETTER_AUTH_SECRET: strongAuthSecret,
     PUBLIC_ORIGIN: 'https://app.example.com',
-    DB_PASSWORD: 'db-prod-value-123',
-    DB_SSLMODE: 'require',
+    AUTH_PG_PASSWORD: 'db-prod-value-123',
+    PG_SSLMODE: 'require',
     APP_SECRETS_ENCRYPTION_KEY: strongSecretsEncryptionKey,
     ...overrides,
   }
@@ -61,7 +61,7 @@ describe('loadEnv production guard', () => {
   it('loads valid production values from an injected source', () => {
     const config = loadEnv(
       productionSource({
-        DB_SSLMODE: 'verify-full',
+        PG_SSLMODE: 'verify-full',
       }),
     )
 
@@ -83,7 +83,7 @@ describe('loadEnv production guard', () => {
     assert.deepEqual(config.auth.trustedOrigins, ['https://app.example.com'])
   })
 
-  for (const field of ['AUTH_INTERNAL_KEY', 'BETTER_AUTH_SECRET', 'DB_PASSWORD'] as const) {
+  for (const field of ['AUTH_INTERNAL_KEY', 'BETTER_AUTH_SECRET', 'AUTH_PG_PASSWORD'] as const) {
     for (const value of [
       '',
       'placeholder',
@@ -137,14 +137,21 @@ describe('loadEnv production guard', () => {
     )
   })
 
-  it('accepts only allowlisted DB_SSLMODE values', () => {
+  it('accepts only allowlisted PG_SSLMODE values', () => {
     for (const value of ['disable', 'require', 'verify-full']) {
-      assert.equal(loadEnv(productionSource({ DB_SSLMODE: value })).database.sslMode, value)
+      assert.equal(loadEnv(productionSource({ PG_SSLMODE: value })).database.sslMode, value)
     }
 
     assert.throws(
-      () => loadEnv(productionSource({ DB_SSLMODE: 'prefer' })),
-      /DB_SSLMODE must be one of disable, require, or verify-full/,
+      () => loadEnv(productionSource({ PG_SSLMODE: 'prefer' })),
+      /PG_SSLMODE must be one of disable, require, or verify-full/,
+    )
+  })
+
+  it('lists every missing key in a single error', () => {
+    assert.throws(
+      () => loadEnv({ NODE_ENV: 'development' }),
+      /missing or invalid required env: AUTH_INTERNAL_KEY is required; AUTH_PG_PASSWORD is required/,
     )
   })
 })

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/platform/config"
+	eventnats "ideaboard/api/internal/events/nats"
 	eventbus "ideaboard/api/internal/runtime/interfaces/events"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"
@@ -69,23 +69,30 @@ func newTestTaskStatusInstance(
 ) (events.TaskStatusPublisher, *taskservice.EventHub) {
 	t.Helper()
 	hub := taskservice.NewEventHub()
-	publisher, eventBus, err := eventbus.NewTaskStatusEventPublisher(ctx, config.EventBusConfig{
-		Enabled:            true,
-		NATSURL:            natsURL,
-		NATSStreamName:     streamName,
-		NATSSubjectPrefix:  subjectPrefix,
-		NATSConsumerName:   consumerName,
-		NATSConnectTimeout: 5,
-		NATSRequestTimeout: 5,
-		NATSDrainTimeout:   2,
-	}, hub, nil)
+	// EventBusConfig carries only NATSURL (production uses JetStream
+	// defaults); tests needing isolated streams build the bus directly with
+	// the same handshake NewTaskStatusEventPublisher performs.
+	localPublisher := eventbus.TaskEventHubPublisher{Hub: hub}
+	bus, err := eventnats.NewNATSJetStreamEventBus(ctx, eventnats.NATSJetStreamConfig{
+		URL:            natsURL,
+		StreamName:     streamName,
+		SubjectPrefix:  subjectPrefix,
+		ConsumerName:   consumerName,
+		ConnectTimeout: 5 * time.Second,
+		RequestTimeout: 5 * time.Second,
+		DrainTimeout:   2 * time.Second,
+	})
 	if err != nil {
 		t.Fatalf("new Task status publisher %s failed: %v", consumerName, err)
 	}
+	remotePublisher := eventbus.TaskEventHubPublisher{Hub: hub}
+	if err := bus.SubscribeTaskStatus(ctx, remotePublisher.PublishTaskStatus); err != nil {
+		_ = bus.Close()
+		t.Fatalf("subscribe Task status %s failed: %v", consumerName, err)
+	}
+	publisher := eventbus.CompositeTaskStatusPublisher{Local: localPublisher, Remote: bus}
 	t.Cleanup(func() {
-		if eventBus != nil {
-			_ = eventBus.Close()
-		}
+		_ = bus.Close()
 	})
 	return publisher, hub
 }

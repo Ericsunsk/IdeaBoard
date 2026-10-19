@@ -23,6 +23,11 @@ jobs:
     permissions:
       contents: read
     environment: production
+    # INFISICAL_TOKEN resolves from the production Environment secret first
+    # (a repo secret of the same name is only a fallback). Reference by name
+    # only: never echo, write to disk, or trace the value.
+    env:
+      INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
 
     steps:
       - name: Checkout deployment client

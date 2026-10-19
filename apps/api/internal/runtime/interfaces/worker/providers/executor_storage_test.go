@@ -35,7 +35,7 @@ func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
 	}
 	executor := &ProviderExecutor{
 		resultMaterializer: materializer,
-		publicOrigins:      config.PublicOriginsConfig{Web: "https://app.example.test", API: "https://assets.example.test"},
+		publicOrigins:      config.PublicOriginsConfig{Web: "https://assets.example.test"},
 	}
 
 	urls, outputs, err := executor.materializeProviderResultImages(context.Background(), 42, "task-owned", "corr-owned", []string{dataURL})

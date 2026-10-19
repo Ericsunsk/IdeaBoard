@@ -16,7 +16,7 @@ func TestTrustedImageDownloadHostsIncludesProxyEnvAndTrustedAssets(t *testing.T)
 
 	got := trustedImageDownloadHosts(
 		context.Background(),
-		config.PublicOriginsConfig{API: "https://assets.example.com"},
+		config.PublicOriginsConfig{Web: "https://assets.example.com"},
 	)
 	want := map[string]bool{
 		"assets.example.com":     true,

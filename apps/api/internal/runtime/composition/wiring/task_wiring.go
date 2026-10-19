@@ -391,12 +391,12 @@ func NewAppTaskRuntime(
 	// with the retention service (no legacy store left to purge against).
 	// Workspace task lifecycle retention is #809-close work.
 	// Archived workspace purge: non-Default workspaces archived longer ago
-	// than WORKSPACE_PURGE_AFTER_DAYS (default 7) are hard-deleted with
-	// their boards and files on the same daily maintenance schedule;
-	// billing records are retained.
+	// than the hardcoded 7-day window (config.DefaultWorkspacePurgeAfterDays)
+	// are hard-deleted with their boards and files on the same daily
+	// maintenance schedule; billing records are retained.
 	workspacePurgeService := tenancypurge.NewService(dbs.DB, services.storageService)
 	workspacePurgeWorker := retention.NewWorkspacePurgeWorker(
-		workspacePurgeService, cfg.Worker.EffectiveWorkspacePurgeAfterDays())
+		workspacePurgeService, config.DefaultWorkspacePurgeAfterDays)
 	workspacePurgePeriodicJobs := retention.WorkspacePurgePeriodicJobs()
 	taskStatusOutboxPeriodicJobs := outboxworker.PeriodicJobs()
 	boardAccessOutboxPeriodicJobs := outboxworker.BoardAccessPeriodicJobs()

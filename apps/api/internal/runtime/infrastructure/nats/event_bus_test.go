@@ -9,9 +9,7 @@ import (
 )
 
 func TestDisabledEventBusReturnsNil(t *testing.T) {
-	bus, err := nats.NewEventBus(context.Background(), config.EventBusConfig{
-		Enabled: false,
-	})
+	bus, err := nats.NewEventBus(context.Background(), config.EventBusConfig{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

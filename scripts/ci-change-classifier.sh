@@ -19,7 +19,10 @@ while IFS= read -r changed_path; do
     apps/api/atlas.hcl) api=true; migration_integration=true; has_non_docs_change=true ;;
     apps/api/internal/db/migrations/* | apps/api/internal/db/schema/*) api=true; migration_integration=true; has_non_docs_change=true ;;
     apps/auth/src/migrate.ts | apps/auth/src/infrastructure/*[mM]igration* | apps/auth/Dockerfile) auth=true; docker=true; migration_integration=true; has_non_docs_change=true ;;
-    docker/postgres/* | docker/compose*.yml | docker/.env.example | docker/migration.env.example) ops=true; migration_integration=true; has_non_docs_change=true ;;
+    docker/postgres/* | docker/compose*.yml | docker/.env | docker/.env.example | docker/images.env.example | docker/migration.env.example) ops=true; migration_integration=true; has_non_docs_change=true ;;
+    apps/api/internal/platform/config/* | apps/api/.env.example) api=true; ops=true; has_non_docs_change=true ;;
+    apps/auth/src/infrastructure/env.ts | apps/auth/.env.example) auth=true; ops=true; has_non_docs_change=true ;;
+    apps/realtime/src/infrastructure/env.ts | apps/realtime/.env.example) realtime=true; ops=true; has_non_docs_change=true ;;
     apps/api/Dockerfile) api=true; docker=true; has_non_docs_change=true ;;
     apps/realtime/Dockerfile) realtime=true; docker=true; has_non_docs_change=true ;;
     apps/web/package.json | apps/web/package-lock.json) web=true; web_audit=true; has_non_docs_change=true ;;

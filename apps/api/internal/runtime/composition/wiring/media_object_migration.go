@@ -78,7 +78,7 @@ func prepareMediaObjectMigration(ctx context.Context, cfg *config.Config, databa
 	if len(migrations) == 0 {
 		return nil
 	}
-	root, err := os.OpenRoot(local.ResolveLocalStorageRoot(cfg.Storage.LocalRoot))
+	root, err := os.OpenRoot(local.ResolveLocalStorageRoot(config.DefaultStorageLocalRoot))
 	if err != nil {
 		return err
 	}

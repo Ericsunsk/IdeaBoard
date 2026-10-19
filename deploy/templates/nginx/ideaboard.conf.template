@@ -53,7 +53,7 @@ server {
     }
 
     # Better Auth admin plugin surface. Auth Service is also directly reachable
-    # by the Go API on the internal network (AUTH_SERVICE_BASE_URL), which is
+    # by the Go API on the internal network (AUTH_INTERNAL_URL), which is
     # how impersonation starts; the browser must never reach these endpoints
     # directly. Every high-risk action here (remove-user, set-role, ban,
     # set-user-password, revoke-session, ...) already has an internal-key

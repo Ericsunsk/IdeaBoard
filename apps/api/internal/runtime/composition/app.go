@@ -65,9 +65,9 @@ func runServe(applyMode func(*config.Config)) {
 }
 
 func runMigrate() {
-	cfg := loadConfigOrFatal()
+	cfg := loadMigrationConfigOrFatal()
 	configureRuntimeLogging(cfg)
-	if err := wiring.Migrate(context.Background(), cfg, cfg.Migration.AtlasBinary, cfg.Migration.MigrationsDir); err != nil {
+	if err := wiring.Migrate(context.Background(), cfg, config.DefaultAtlasBinary, config.DefaultMigrationDirectory); err != nil {
 		fatal("failed to migrate database schema", "err", err)
 	}
 	slog.Info("database migration completed")
@@ -92,7 +92,7 @@ func runInitCreditWallets(args []string) {
 		fatal("failed to parse verified identities", "err", err)
 	}
 	ctx := context.Background()
-	pool, err := workerriver.NewRiverPgxPoolWithConfig(ctx, database.PostgresDSN(cfg.Database), cfg.Database.Pool)
+	pool, err := workerriver.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
 	if err != nil {
 		fatal("failed to connect to database", "err", err)
 	}
@@ -116,7 +116,7 @@ func runInitCreditWallets(args []string) {
 }
 
 func runFinalizeMigrate() {
-	cfg := loadConfigOrFatal()
+	cfg := loadMigrationConfigOrFatal()
 	configureRuntimeLogging(cfg)
 	if err := wiring.FinalizeAppDatabases(context.Background(), cfg); err != nil {
 		fatal("failed to finalize database migration", "err", err)
@@ -133,7 +133,7 @@ func runInitAdmin() {
 		fatal("CREDITS_WELCOME_IDENTITY_KEY must be base64 encoded 32 bytes")
 	}
 	ctx := context.Background()
-	pool, err := workerriver.NewRiverPgxPoolWithConfig(ctx, database.PostgresDSN(cfg.Database), cfg.Database.Pool)
+	pool, err := workerriver.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
 	if err != nil {
 		fatal("failed to connect to database", "err", err)
 	}
@@ -148,6 +148,15 @@ func runInitAdmin() {
 	adminDisplayName := cfg.AdminSeed.DisplayName
 	if adminEmail == "" {
 		fatal("INIT_ADMIN_EMAIL is required")
+	}
+	if adminDisplayName == "" {
+		// Optional display name: default to the email local part so
+		// INIT_ADMIN_DISPLAY_NAME can stay unset. The derived value goes
+		// through the same Better Auth normalizeDisplayName path via
+		// EnsureUser, which rejects it if it normalizes to empty.
+		if idx := strings.IndexByte(adminEmail, '@'); idx > 0 {
+			adminDisplayName = strings.TrimSpace(adminEmail[:idx])
+		}
 	}
 	if adminDisplayName == "" {
 		fatal("INIT_ADMIN_DISPLAY_NAME is required")
@@ -185,6 +194,17 @@ func loadConfigOrFatal() *config.Config {
 	}
 	if err := wiring.ValidateImgproxyOrFatal(cfg); err != nil {
 		fatal("invalid imgproxy configuration", "err", err)
+	}
+	return cfg
+}
+
+// loadMigrationConfigOrFatal loads configuration for the migration-only
+// commands (migrate, finalize-migrate). Serving secrets are not required on
+// this path (see Config.ValidateForMigration); imgproxy is never contacted.
+func loadMigrationConfigOrFatal() *config.Config {
+	cfg := config.Load()
+	if err := cfg.ValidateForMigration(); err != nil {
+		fatal("invalid migration configuration", "err", err)
 	}
 	return cfg
 }

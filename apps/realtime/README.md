@@ -11,9 +11,9 @@
 - 客户端连 `/realtime?ticket=`。ticket =
   `base64url(payloadJSON).base64url(hexHmacSha256)`，
   payload `{bid, av, cap, exp, uid}`（`exp` 为 unix 秒），HMAC-SHA256 secret 取
-  `REALTIME_TICKET_SECRET`（与 Go mint 端同名同值）。
+  `RT_TICKET_SECRET`（与 Go mint 端同名同值）。
 - 流程：本地验签 + `exp` → 调 Go 内网 `GET /internal/realtime/admit`
-  （`X-Internal-Key` 取 `REALTIME_INTERNAL_KEY`，仿 `apps/auth` 的 internal 调用
+  （`X-Internal-Key` 取 `AUTH_INTERNAL_KEY`（与 API/Auth 共用同一 internal key），仿 `apps/auth` 的 internal 调用
   模式：单发 fetch、2s 超时、fail-closed）→ admit 才进 room。Go 以
   `?ticket=` 为主契约（`bid/av/uid` 随附 echo 校验），一律 `200 +
 {code: 0, data: {admit}}` 应答，sidecar 只认 `admit === true`。
@@ -23,7 +23,7 @@
   peers（WS 增量收敛），并经 `POST /internal/realtime/y-updates`
   持久化到 Go（4xx 永久丢弃、`droppedTotal`；5xx/网络按退避重试，
   `retriedTotal`，耗尽记 `failedTotal`）。awareness 仍标准转发，不走持久化。
-- 压缩：每 room 每 `REALTIME_Y_COMPACT_EVERY` 个应用更新（默认 50）向 Go
+- 压缩：每 room 每 `RT_Y_COMPACT_EVERY` 个应用更新（默认 50）向 Go
   `POST /internal/realtime/compactions` 提交一次 stripTransient 后的快照；
   Go 以 `ValidateV1DocumentStrict` 同规则校验后写入 `board_documents` 并追加
   一行 `board_revisions`（同一事务），再清空该 board 的 update log。
@@ -47,7 +47,7 @@ compaction 在对应更新被接受时固定快照，只有其 append 及先前�
 ```bash
 cd apps/realtime
 cp .env.example .env
-# 填 REALTIME_TICKET_SECRET（与 Go 同值）、REALTIME_INTERNAL_KEY
+# 填 RT_TICKET_SECRET（与 Go 同值）、AUTH_INTERNAL_KEY（与 Go/Auth 同值）
 npm install
 npm run dev     # 本地开发，tsx watch
 npm run build   # tsc typecheck + 产出 dist
@@ -62,14 +62,14 @@ compactFailedTotal}}`。
 
 ## 环境变量
 
-| 变量                              | 必填                                                         | 说明                               |
-| --------------------------------- | ------------------------------------------------------------ | ---------------------------------- |
-| `REALTIME_TICKET_SECRET`          | 是（生产 ≥32 字符、非 placeholder）                          | ticket HMAC secret，与 Go 同名同值 |
-| `REALTIME_INTERNAL_KEY`           | 是（生产 ≥32 字符、非 placeholder）                          | 调 Go 内网面的 `X-Internal-Key`    |
-| `API_INTERNAL_URL`                | 否（默认 `http://127.0.0.1:6000`，容器内 `http://api:6000`） | Go 内网地址                        |
-| `REALTIME_HOST` / `REALTIME_PORT` | 否（默认 `127.0.0.1` / `6002`）                              | 监听面                             |
-| `REALTIME_Y_COMPACT_EVERY`        | 否（默认 `50`）                                              | 每 room 多少个应用更新压缩一次     |
-| `REALTIME_Y_PERSIST_RETRIES`      | 否（默认 `5`）                                               | Y 落盘重试预算                     |
+| 变量                   | 必填                                                         | 说明                               |
+| ---------------------- | ------------------------------------------------------------ | ---------------------------------- |
+| `RT_TICKET_SECRET`     | 是（生产 ≥32 字符、非 placeholder）                          | ticket HMAC secret，与 Go 同名同值 |
+| `AUTH_INTERNAL_KEY`    | 是（生产 ≥32 字符、非 placeholder）                          | 调 Go 内网面的 `X-Internal-Key`    |
+| `API_INTERNAL_URL`     | 否（默认 `http://127.0.0.1:6000`，容器内 `http://api:6000`） | Go 内网地址                        |
+| `RT_HOST` / `RT_PORT`  | 否（默认 `127.0.0.1` / `6002`）                              | 监听面                             |
+| `RT_Y_COMPACT_EVERY`   | 否（默认 `50`）                                              | 每 room 多少个应用更新压缩一次     |
+| `RT_Y_PERSIST_RETRIES` | 否（默认 `5`）                                               | Y 落盘重试预算                     |
 
 ## 冒烟
 
@@ -77,11 +77,11 @@ compactFailedTotal}}`。
 # 1. 起一个假 Go admit（200 = 放行）
 node -e "require('http').createServer((q,r)=>{r.writeHead(q.url.startsWith('/internal/realtime/admit')?200:404);r.end('{}')}).listen(6000)"
 # 2. 起 sidecar（另开终端）
-cd apps/realtime && REALTIME_TICKET_SECRET=... REALTIME_INTERNAL_KEY=... npm run dev
+cd apps/realtime && RT_TICKET_SECRET=... AUTH_INTERNAL_KEY=... npm run dev
 # 3. 健康检查
 curl localhost:6002/health
 # 4. 伪 ticket 应被 4401 关闭；合法 ticket + 假 admit 应收到 SyncStep1 回包
 ```
 
-`REALTIME_TICKET_SECRET` 测试值可用 `signTicket`（`src/admission/ticket.ts`）
+`RT_TICKET_SECRET` 测试值可用 `signTicket`（`src/admission/ticket.ts`）
 现场签一个短 `exp` ticket。

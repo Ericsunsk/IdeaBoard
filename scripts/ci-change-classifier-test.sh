@@ -189,7 +189,7 @@ assert_output_line "${queries_output}" 'web=false'
 assert_output_line "${queries_output}" 'realtime=false'
 assert_output_line "${queries_output}" 'docs_only=false'
 
-docker_output="$(printf '%s\n' docker/compose.yml | "${classifier}")"
+docker_output="$(printf '%s\n' docker/compose.yml docker/.env | "${classifier}")"
 
 assert_output_line "${docker_output}" 'api=false'
 assert_output_line "${docker_output}" 'auth=false'
@@ -284,5 +284,13 @@ assert_output_line "${unknown_output}" 'realtime=true'
 assert_output_line "${unknown_output}" 'docker=true'
 assert_output_line "${unknown_output}" 'ops=true'
 assert_output_line "${unknown_output}" 'docs_only=false'
+
+env_surface_output="$(printf '%s\n' apps/api/internal/platform/config/config.go apps/api/.env.example apps/auth/src/infrastructure/env.ts apps/auth/.env.example apps/realtime/src/infrastructure/env.ts apps/realtime/.env.example | "${classifier}")"
+
+assert_output_line "${env_surface_output}" 'api=true'
+assert_output_line "${env_surface_output}" 'auth=true'
+assert_output_line "${env_surface_output}" 'realtime=true'
+assert_output_line "${env_surface_output}" 'ops=true'
+assert_output_line "${env_surface_output}" 'docs_only=false'
 
 echo 'CI change classifier contract tests passed'

@@ -61,16 +61,3 @@ var stripeWebhookErrorTable = []paymentErrorMapping{
 func writeStripeWebhookError(c *gin.Context, err error) {
 	renderMappedPaymentError(c, err, stripeWebhookErrorTable, http.StatusInternalServerError, errorrender.MsgWriteStripeWebhookError)
 }
-
-// Backend-owned user-facing copy for this package. Each constant
-// is the single source of truth for one rendered message; call
-// sites reference these names so copy changes stay in one place.
-// Values are byte-identical to the previously inline literals.
-
-// Render @ errors.go
-// RenderMappedPaymentError @ errors.go
-// RenderMappedPaymentError @ errors.go
-// WriteStripeWebhookError @ errors.go
-// ReceiveStripeWebhook @ webhook.go
-// ReceiveStripeWebhook @ webhook.go
-// ReceiveStripeWebhook @ webhook.go

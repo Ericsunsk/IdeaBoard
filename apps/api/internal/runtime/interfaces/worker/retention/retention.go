@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/riverpolicy"
-	retentioncontracts "ideaboard/api/internal/tasking/ports/retention"
 	purgecontracts "ideaboard/api/internal/tenancy/ports/purge"
 
 	"github.com/riverqueue/river"
@@ -26,48 +25,9 @@ const (
 // see one maintenance window in Asia/Shanghai time.
 var retentionLocation = time.FixedZone("Asia/Shanghai", 8*60*60)
 
-type taskRetentionScheduleJobArgs struct{}
+type retentionDailySchedule struct{}
 
-func (taskRetentionScheduleJobArgs) Kind() string { return "task_retention_schedule" }
-
-type retentionService interface {
-	PurgeExpiredTasks(ctx context.Context, retentionDays int) (retentioncontracts.PurgedTaskStats, error)
-}
-
-type TaskRetentionWorker struct {
-	river.WorkerDefaults[taskRetentionScheduleJobArgs]
-	service       retentionService
-	retentionDays int
-}
-
-func NewTaskRetentionWorker(service retentionService, retentionDays int) *TaskRetentionWorker {
-	return &TaskRetentionWorker{service: service, retentionDays: retentionDays}
-}
-
-func (w *TaskRetentionWorker) Work(ctx context.Context, job *river.Job[taskRetentionScheduleJobArgs]) error {
-	if w == nil || w.service == nil || job == nil {
-		return fmt.Errorf("invalid task retention job")
-	}
-	result, err := w.service.PurgeExpiredTasks(ctx, w.retentionDays)
-	if err != nil {
-		return err
-	}
-	slog.Info("task retention purge completed",
-		"retention_days", w.retentionDays,
-		"backfilled_dates", result.BackfilledDates,
-		"tasks_deleted", result.TasksDeleted,
-		"cancellations_deleted", result.CancellationsDeleted,
-	)
-	return nil
-}
-
-func (*TaskRetentionWorker) Timeout(*river.Job[taskRetentionScheduleJobArgs]) time.Duration {
-	return riverpolicy.RiverJobTimeoutTaskRetention
-}
-
-type taskRetentionDailySchedule struct{}
-
-func (taskRetentionDailySchedule) Next(current time.Time) time.Time {
+func (retentionDailySchedule) Next(current time.Time) time.Time {
 	local := current.In(retentionLocation)
 	next := time.Date(local.Year(), local.Month(), local.Day(), 3, 30, 0, 0, retentionLocation)
 	if !next.After(local) {
@@ -76,32 +36,9 @@ func (taskRetentionDailySchedule) Next(current time.Time) time.Time {
 	return next
 }
 
-func PeriodicJobs() []*river.PeriodicJob {
-	insertOpts := func() *river.InsertOpts {
-		return &river.InsertOpts{Queue: QueueName, MaxAttempts: riverpolicy.RiverMaxAttemptsTaskRetention, Priority: 4}
-	}
-	return []*river.PeriodicJob{
-		river.NewPeriodicJob(
-			taskRetentionDailySchedule{},
-			func() (river.JobArgs, *river.InsertOpts) {
-				return taskRetentionScheduleJobArgs{}, insertOpts()
-			},
-			&river.PeriodicJobOpts{ID: "task-retention-daily", RunOnStart: false},
-		),
-		river.NewPeriodicJob(
-			river.NeverSchedule(),
-			func() (river.JobArgs, *river.InsertOpts) {
-				return taskRetentionScheduleJobArgs{}, insertOpts()
-			},
-			&river.PeriodicJobOpts{ID: "task-retention-catch-up", RunOnStart: true},
-		),
-	}
-}
-
 // workspacePurgeScheduleJobArgs is the River kind for the archived
-// workspace purge. It rides the same serial queue, maintenance window
-// (daily 03:30 Asia/Shanghai), and timeout budget as the task retention
-// purge: expired archives converge once a day, never concurrently.
+// workspace purge. Expired archives converge once a day at 03:30
+// Asia/Shanghai on the serial maintenance queue, never concurrently.
 type workspacePurgeScheduleJobArgs struct{}
 
 func (workspacePurgeScheduleJobArgs) Kind() string { return "workspace_purge_schedule" }
@@ -154,7 +91,7 @@ func WorkspacePurgePeriodicJobs() []*river.PeriodicJob {
 	}
 	return []*river.PeriodicJob{
 		river.NewPeriodicJob(
-			taskRetentionDailySchedule{},
+			retentionDailySchedule{},
 			func() (river.JobArgs, *river.InsertOpts) {
 				return workspacePurgeScheduleJobArgs{}, insertOpts()
 			},

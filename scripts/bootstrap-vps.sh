@@ -194,6 +194,12 @@ install_cosign() {
 need_command git
 need_command docker
 
+# P1: docker/.env is committed dotenvx-encrypted; deployment decrypts it via
+# deploy-stack.sh. Warn early instead of failing mid-deploy without a key.
+if ! command -v dotenvx >/dev/null 2>&1; then
+  echo "Warning: dotenvx is not installed; docker/.env is dotenvx-encrypted (install: npm i -g @dotenvx/dotenvx)." >&2
+fi
+
 if ! docker compose version >/dev/null 2>&1; then
   echo "Missing command: docker compose" >&2
   exit 1
@@ -252,7 +258,11 @@ fi
 "$DEPLOY_SCRIPT" init-env
 
 if [[ -t 0 || -e /dev/tty ]]; then
-  "$EDITOR_BIN" "$STACK_DIR/docker/.env" </dev/tty >/dev/tty
+  if grep -qE '^[A-Z][A-Z0-9_]*=encrypted:' "$STACK_DIR/docker/.env" 2>/dev/null; then
+    echo "docker/.env is dotenvx-encrypted; change secrets with: dotenvx set KEY value -f $STACK_DIR/docker/.env (never edit ciphertext by hand)." >&2
+  else
+    "$EDITOR_BIN" "$STACK_DIR/docker/.env" </dev/tty >/dev/tty
+  fi
 fi
 
 if ! command -v cosign >/dev/null 2>&1 && ! cosign_verify_disabled; then

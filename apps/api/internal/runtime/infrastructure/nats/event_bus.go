@@ -3,7 +3,6 @@ package nats
 import (
 	"context"
 	"fmt"
-	"time"
 
 	eventnats "ideaboard/api/internal/events/nats"
 	"ideaboard/api/internal/platform/config"
@@ -21,17 +20,11 @@ type EventBus struct {
 
 // NewEventBus connects to NATS JetStream using the provided configuration.
 func NewEventBus(ctx context.Context, cfg config.EventBusConfig) (*EventBus, error) {
-	if !cfg.Enabled {
+	if cfg.NATSURL == "" {
 		return nil, nil
 	}
 	natsBus, err := eventnats.NewNATSJetStreamEventBus(ctx, eventnats.NATSJetStreamConfig{
-		URL:            cfg.NATSURL,
-		StreamName:     cfg.NATSStreamName,
-		SubjectPrefix:  cfg.NATSSubjectPrefix,
-		ConsumerName:   cfg.NATSConsumerName,
-		ConnectTimeout: time.Duration(cfg.NATSConnectTimeout) * time.Second,
-		RequestTimeout: time.Duration(cfg.NATSRequestTimeout) * time.Second,
-		DrainTimeout:   time.Duration(cfg.NATSDrainTimeout) * time.Second,
+		URL: cfg.NATSURL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize NATS JetStream event bus: %w", err)

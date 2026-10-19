@@ -9,7 +9,7 @@
 // public id, av is the current access_version, cap is read|write derived
 // from boards.CapabilitiesFor, exp is unix seconds (now+60s), and uid is
 // the caller usr_ public identity. The HMAC input is the base64url
-// payload segment itself (JWT-style), keyed by REALTIME_TICKET_SECRET.
+// payload segment itself (JWT-style), keyed by RT_TICKET_SECRET.
 //
 // The package is dependency-free (no DB/River/HTTP): issuance (Issue)
 // serves POST .../realtime-ticket, verification (Verify) plus the

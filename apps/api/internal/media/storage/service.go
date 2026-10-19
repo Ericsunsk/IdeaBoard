@@ -24,8 +24,6 @@ import (
 // separate message.go) because the hexagonal-boundary architecture test
 // only allows service.go at the storage root.
 
-// NewServiceWithLocalRoot
-
 type Service struct {
 	s3CompatibleService *s3.S3CompatibleService
 
@@ -39,7 +37,7 @@ func NewService(profileRepo ports.ProfileRepository, publicAPIOrigin string) *Se
 
 // NewServiceWithLocalRoot binds the builtin-local driver to a canonical
 // filesystem root. An empty root resolves the process working directory once
-// at construction; prefer passing the configured STORAGE_LOCAL_ROOT.
+// at construction; production wiring passes the hardcoded /app root.
 func NewServiceWithLocalRoot(profileRepo ports.ProfileRepository, publicAPIOrigin, localRoot string) *Service {
 	origin := strings.TrimRight(strings.TrimSpace(publicAPIOrigin), "/")
 	s3Svc := s3.NewS3CompatibleService()

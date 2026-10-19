@@ -77,7 +77,7 @@ func OpenAppDatabases(ctx context.Context, cfg *config.Config) (AppDatabases, er
 	return openAppDatabasesWithOpeners(ctx, cfg, appDatabaseOpeners{
 		postgres: database.NewPostgres,
 		river: func(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
-			return workerriver.NewRiverPgxPoolWithConfig(ctx, dsn, cfg.Database.Pool)
+			return workerriver.NewRiverPgxPool(ctx, dsn)
 		},
 	})
 }
@@ -128,7 +128,7 @@ func FinalizeAppDatabases(ctx context.Context, cfg *config.Config) error {
 		return fmt.Errorf("failed to connect migration database: %w", err)
 	}
 	defer migrationDB.Close()
-	migrationPool, err := workerriver.NewRiverPgxPoolWithConfig(ctx, database.PostgresDSN(migrationConfig), cfg.Database.Pool)
+	migrationPool, err := workerriver.NewRiverPgxPool(ctx, database.PostgresDSN(migrationConfig))
 	if err != nil {
 		return fmt.Errorf("failed to connect River migration pool: %w", err)
 	}
@@ -176,10 +176,10 @@ func verifyRuntimePrivileges(ctx context.Context, db dbprivileges.DBTX) error {
 func separatedMigrationDatabaseConfig(runtimeConfig config.DatabaseConfig) (config.DatabaseConfig, error) {
 	migrationUser := strings.TrimSpace(runtimeConfig.MigrationUser)
 	if migrationUser == "" || runtimeConfig.MigrationPassword == "" {
-		return config.DatabaseConfig{}, fmt.Errorf("DB_MIGRATION_USER and DB_MIGRATION_PASSWORD are required for migrations")
+		return config.DatabaseConfig{}, fmt.Errorf("PG_MIGRATION_USER and PG_MIGRATION_PASSWORD are required for migrations")
 	}
 	if migrationUser == strings.TrimSpace(runtimeConfig.User) {
-		return config.DatabaseConfig{}, fmt.Errorf("DB_MIGRATION_USER must differ from DB_USER so runtime cannot own schema objects")
+		return config.DatabaseConfig{}, fmt.Errorf("PG_MIGRATION_USER must differ from API_PG_USER so runtime cannot own schema objects")
 	}
 	migrationConfig := runtimeConfig
 	migrationConfig.User = migrationUser

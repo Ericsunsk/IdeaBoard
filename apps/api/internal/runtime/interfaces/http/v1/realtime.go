@@ -31,7 +31,7 @@ type v1RealtimeTicketDTO struct {
 // GetBoardRole/CheckCapability(CapRead), so viewers may mint while callers
 // without board read converge to 404 board_not_found (anti-enumeration).
 // Archived boards reject with 409 board_archived. A missing
-// REALTIME_TICKET_SECRET fails closed with 500 (no fallback default).
+// RT_TICKET_SECRET fails closed with 500 (no fallback default).
 // No Idempotency-Key is required: issuance is a read-like POST with no
 // state write (same class as quotes and batch reads).
 func (h *contractV1Handler) issueRealtimeTicket(c *gin.Context) {

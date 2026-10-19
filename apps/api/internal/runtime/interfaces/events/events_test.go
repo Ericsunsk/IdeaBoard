@@ -87,9 +87,7 @@ func TestCompositeTaskStatusPublisher(t *testing.T) {
 
 func TestNewTaskStatusEventPublisherDisabled(t *testing.T) {
 	hub := taskservice.NewEventHub()
-	pub, bus, err := eventinterfaces.NewTaskStatusEventPublisher(context.Background(), config.EventBusConfig{
-		Enabled: false,
-	}, hub, nil)
+	pub, bus, err := eventinterfaces.NewTaskStatusEventPublisher(context.Background(), config.EventBusConfig{}, hub, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -55,11 +55,13 @@ output/
 .env.*
 !apps/api/.env.example
 !apps/auth/.env.example
+!apps/realtime/.env.example
 !apps/web/.env.example
 !docker/.env.example
+# P1: docker/.env is dotenvx-encrypted and tracked (review key names only);
+# the private key stays in gitignored docker/.env.keys + password manager.
+!docker/.env
 docker/migration.env
-deploy/secrets/*.env
-deploy/secrets/*.plain.json
 
 # ===== Release Artifacts =====
 docker/releases/
@@ -68,3 +70,6 @@ docker/releases/
 .codebase-memory/
 
 .worktrees/
+
+# Deployment image refs are written from a release manifest, never encrypted.
+docker/images.env

@@ -6,10 +6,10 @@ describe('runAuthMigrations', () => {
   it('uses isolated migration credentials without mutating the source and always closes', async () => {
     const source = {
       AUTH_INTERNAL_KEY: 'test-internal-key',
-      DB_USER: 'auth_runtime',
-      DB_PASSWORD: 'runtime-password',
-      DB_MIGRATION_USER: 'schema_owner',
-      DB_MIGRATION_PASSWORD: 'owner-password',
+      AUTH_PG_USER: 'auth_runtime',
+      AUTH_PG_PASSWORD: 'runtime-password',
+      PG_MIGRATION_USER: 'schema_owner',
+      PG_MIGRATION_PASSWORD: 'owner-password',
     }
     const original = { ...source }
     const calls: string[] = []

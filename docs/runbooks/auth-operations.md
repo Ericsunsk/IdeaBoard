@@ -40,7 +40,7 @@
 `/api/auth/admin/*` 由三道机制收窄，而非仅靠开发约定：
 
 1. **Auth Service 权限收窄。** `apps/auth/src/application/auth.ts` 用 better-auth 的 `roles` 覆盖 admin plugin 默认角色，`admin` 角色只保留 `user:["impersonate"]`，其余 `user`/`session` 权限全部拒绝（`impersonate-admins` 也不授予，因此伪装管理员仍被拒）。回归测试见 `authConfig.test.ts` 的 `admin plugin permissions are narrowed to the one endpoint Go needs`。
-2. **反代兜底。** `deploy/templates/nginx/ideaboard.conf.template` 中 `location ~ ^/api/auth/admin/(?!stop-impersonating$)` 直接 `return 403`，浏览器只能访问 `stop-impersonating`。Go API 走内网 `AUTH_SERVICE_BASE_URL`（`http://auth:6001`）直连 Auth Service，不经过该反代，因此服务端口编排不受影响。
+2. **反代兜底。** `deploy/templates/nginx/ideaboard.conf.template` 中 `location ~ ^/api/auth/admin/(?!stop-impersonating$)` 直接 `return 403`，浏览器只能访问 `stop-impersonating`。Go API 走内网 `AUTH_INTERNAL_URL`（`http://auth:6001`）直连 Auth Service，不经过该反代，因此服务端口编排不受影响。
 3. **前端不注册 admin client。** `apps/web/src/core/auth/client.ts` 不再注册 `adminClient()`，因此不存在 `authClient.admin.removeUser` 这类可编译的调用入口。退出伪装改为直接 `POST /api/auth/admin/stop-impersonating`。
 
 > [!IMPORTANT]

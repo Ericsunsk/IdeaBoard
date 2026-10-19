@@ -44,17 +44,3 @@ var (
 	// programmer error).
 	ErrSiteAssetLogoObjectKeyInvalid = errors.New("site asset logo object key is invalid")
 )
-
-// Backend-owned user-facing copy for this package. Each constant
-// is the single source of truth for one rendered message; call
-// sites reference these names so copy changes stay in one place.
-// Values are byte-identical to the previously inline literals.
-
-// NormalizeStorageUserSegment @ upload_path.go
-// ImageDerivativeObjectKey @ derivative_key.go
-// StableUploadObjectKey @ object_key.go
-// TaskOutputUserUploadObjectPrefix @ upload_policy.go
-// LibraryAssetUploadDirPrefix @ upload_policy.go
-// NormalizeUploadObjectKey @ upload_policy.go
-// NormalizeUploadObjectKey @ upload_policy.go
-// NormalizeUploadObjectPrefix @ upload_policy.go

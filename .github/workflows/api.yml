@@ -254,8 +254,8 @@ jobs:
           docker exec \
             -e POSTGRES_USER=ideaboard \
             -e POSTGRES_DB=ideaboard_test \
-            -e API_DB_PASSWORD=ideaboard_api_test \
-            -e AUTH_DB_PASSWORD=ideaboard_auth_test \
+            -e API_PG_PASSWORD=ideaboard_api_test \
+            -e AUTH_PG_PASSWORD=ideaboard_auth_test \
             "${postgres_container}" \
             sh /tmp/init-runtime-roles.sh
       # Destructive-DDL tripwire (DROP TABLE/COLUMN/... grep) plus
@@ -302,16 +302,14 @@ jobs:
         working-directory: apps/api
         env:
           APP_ENV: production
-          DB_HOST: 127.0.0.1
-          DB_PORT: "5432"
-          DB_NAME: ideaboard_test
-          DB_SSLMODE: disable
-          DB_USER: ideaboard_api
-          DB_PASSWORD: ideaboard_api_test
-          API_DB_USER: ideaboard_api
-          API_DB_PASSWORD: ideaboard_api_test
-          DB_MIGRATION_USER: ideaboard
-          DB_MIGRATION_PASSWORD: ideaboard_test
+          PG_HOST: 127.0.0.1
+          PG_PORT: "5432"
+          PG_DB: ideaboard_test
+          PG_SSLMODE: disable
+          API_PG_USER: ideaboard_api
+          API_PG_PASSWORD: ideaboard_api_test
+          PG_MIGRATION_USER: ideaboard
+          PG_MIGRATION_PASSWORD: ideaboard_test
           APP_SECRETS_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           PUBLIC_ORIGIN: https://app.example.com
         run: go run ./cmd finalize-migrate

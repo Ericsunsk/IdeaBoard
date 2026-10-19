@@ -267,6 +267,8 @@ jobs:
       - name: Generated API drift
         working-directory: apps/web
         run: npm run api:check-generated
+      - name: Frontend env allowlist
+        run: bash scripts/web-frontend-env-check.sh
       - name: Production dependency audit
         if: inputs.audit_dependencies
         working-directory: apps/web

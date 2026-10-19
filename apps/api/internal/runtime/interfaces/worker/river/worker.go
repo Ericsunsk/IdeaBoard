@@ -140,20 +140,20 @@ func currentRiverSchema(ctx context.Context, dbPool *pgxpool.Pool) (string, erro
 	return schema, nil
 }
 
-// NewRiverPgxPoolWithConfig opens the River pgxpool with deploy-level sizing
-// from PoolConfig (env-tunable). A zero PoolConfig keeps the historical
-// budget (10 max / 1 min) through the Effective* accessors: combined with the
-// runtime pgxpool, a single API instance holds 35 conns against the
-// PostgreSQL default max_connections 100, with headroom for migrations, CLIs
-// and test fixtures. Idle recycling matches the runtime pool so both
-// age out together.
-func NewRiverPgxPoolWithConfig(ctx context.Context, dsn string, pool config.PoolConfig) (*pgxpool.Pool, error) {
+// NewRiverPgxPool opens the River pgxpool. Sizing is hardcoded
+// code constants by design (no env knobs): DefaultRiverPoolMaxConns bounds
+// the ceiling, DefaultRiverPoolMinConns pins the floor, and connection
+// recycling uses the DefaultPoolMax* constants. Combined with the runtime
+// pgxpool, a single API instance holds 35 conns against the PostgreSQL
+// default max_connections 100, with headroom for migrations, CLIs and test
+// fixtures. Idle recycling matches the runtime pool so both age out together.
+func NewRiverPgxPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
 	}
 	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
-	applyRiverPoolLimits(cfg, pool)
+	applyRiverPoolLimits(cfg)
 	cfg.HealthCheckPeriod = time.Minute
 	return pgxpool.NewWithConfig(ctx, cfg)
 }
@@ -161,11 +161,11 @@ func NewRiverPgxPoolWithConfig(ctx context.Context, dsn string, pool config.Pool
 // applyRiverPoolLimits pins sizing and recycling on a parsed pgxpool config
 // without opening connections, so pool tuning stays unit-testable without a
 // live database.
-func applyRiverPoolLimits(cfg *pgxpool.Config, pool config.PoolConfig) {
-	cfg.MaxConns = int32(pool.EffectiveRiverMaxConns())
-	cfg.MinConns = int32(pool.EffectiveRiverMinConns())
-	cfg.MaxConnLifetime = time.Duration(pool.EffectiveMaxLifetimeMin()) * time.Minute
-	cfg.MaxConnIdleTime = time.Duration(pool.EffectiveMaxIdleTimeMin()) * time.Minute
+func applyRiverPoolLimits(cfg *pgxpool.Config) {
+	cfg.MaxConns = int32(config.DefaultRiverPoolMaxConns)
+	cfg.MinConns = int32(config.DefaultRiverPoolMinConns)
+	cfg.MaxConnLifetime = time.Duration(config.DefaultPoolMaxLifetimeMin) * time.Minute
+	cfg.MaxConnIdleTime = time.Duration(config.DefaultPoolMaxIdleTimeMin) * time.Minute
 }
 
 type RiverTx = pgx.Tx

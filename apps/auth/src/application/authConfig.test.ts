@@ -14,7 +14,8 @@ test('native authentication security configuration stays explicit', async (t) =>
   const environment = loadEnv({
     NODE_ENV: 'test',
     AUTH_INTERNAL_KEY: 'test-internal-key',
-    DB_SSLMODE: 'disable',
+    AUTH_PG_PASSWORD: 'test-db-password',
+    PG_SSLMODE: 'disable',
   })
   const admissionPolicy = createAuthAdmissionPolicy({
     trustedOrigins: environment.auth.trustedOrigins,
@@ -80,7 +81,8 @@ test('static schema construction does not attach runtime provider configuration'
   const environment = loadEnv({
     NODE_ENV: 'test',
     AUTH_INTERNAL_KEY: 'test-internal-key',
-    DB_SSLMODE: 'disable',
+    AUTH_PG_PASSWORD: 'test-db-password',
+    PG_SSLMODE: 'disable',
   })
   const options = createStaticBetterAuthOptions(environment, {} as never)
 
@@ -100,7 +102,8 @@ test('admin plugin permissions are narrowed to the one endpoint Go needs', () =>
   const environment = loadEnv({
     NODE_ENV: 'test',
     AUTH_INTERNAL_KEY: 'test-internal-key',
-    DB_SSLMODE: 'disable',
+    AUTH_PG_PASSWORD: 'test-db-password',
+    PG_SSLMODE: 'disable',
   })
   const options = createBetterAuthOptions({
     environment,

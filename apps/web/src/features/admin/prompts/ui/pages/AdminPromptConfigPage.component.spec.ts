@@ -144,7 +144,6 @@ describe('AdminPromptConfigPage', () => {
     expect(screen.queryByText('编辑 · Inpaint')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Image · 局部重绘 提示词模板')).not.toBeInTheDocument()
 
-    // Check that variable button exists
     const variableButton = screen.getAllByRole('button', { name: '{{user_prompt}}' })[0]!
     expect(variableButton).toBeInTheDocument()
 
@@ -206,7 +205,6 @@ describe('AdminPromptConfigPage', () => {
     expect(screen.getAllByText('系统提示词预览').length).toBeGreaterThan(0)
     expect(screen.getAllByText('操作').length).toBeGreaterThan(0)
 
-    // Check status badges
     expect(screen.getAllByText('已配置').length).toBeGreaterThan(0)
     expect(screen.getAllByText('未配置').length).toBeGreaterThan(0)
 

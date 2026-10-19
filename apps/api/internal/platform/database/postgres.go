@@ -27,11 +27,12 @@ const (
 // single API instance holds 25 + 10 = 35 (see DefaultPoolMaxOpenConns and
 // DefaultRiverPoolMaxConns in platform/config).
 
-// NewPostgres opens the runtime pgxpool.Pool. Pool sizing comes from
-// config.Database.Pool (env-tunable, see PoolConfig); a zero value keeps the
-// historical defaults above. Startup retries use exponential backoff with
-// jitter and honor ctx cancellation so a hung database cannot wedge process
-// boot forever.
+// NewPostgres opens the runtime pgxpool.Pool. Pool sizing is hardcoded code
+// constants (see DefaultPoolMaxOpenConns in platform/config) while idle
+// sizing and connection recycling use the DefaultPoolMax* constants there;
+// startup retries use exponential
+// backoff with jitter and honor ctx cancellation so a hung database cannot
+// wedge process boot forever.
 func NewPostgres(ctx context.Context, cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 	connectCtx, cancel := postgresConnectContext(ctx)
 	defer cancel()
@@ -45,21 +46,20 @@ func NewPostgres(ctx context.Context, cfg config.DatabaseConfig) (*pgxpool.Pool,
 		}
 		poolCfg, err := pgxpool.ParseConfig(dsn)
 		if err == nil {
-			// pgxpool sizing is deploy-level tuning (PoolConfig,
-			// env-tunable). Zero values fall back to historical defaults
-			// through the Effective* accessors. The River worker maintains
+			// pgxpool sizing is hardcoded code constants
+			// (DefaultPoolMaxOpenConns for the ceiling; DefaultPoolMax*
+			// for idle sizing and recycling). The River worker maintains
 			// its own pgxpool.Pool; keep the combined total under the
 			// PostgreSQL max_connections limit.
-			pool := cfg.Pool
-			poolCfg.MaxConns = int32(pool.EffectiveMaxOpenConns())
-			idleLimit := newIdleConnectionLimiter(pool.EffectiveMaxIdleConns())
+			poolCfg.MaxConns = int32(config.DefaultPoolMaxOpenConns)
+			idleLimit := newIdleConnectionLimiter(config.DefaultPoolMaxIdleConns)
 			poolCfg.PrepareConn = idleLimit.prepareConn
 			poolCfg.AfterRelease = idleLimit.afterRelease
 			poolCfg.BeforeClose = idleLimit.beforeClose
-			poolCfg.MaxConnLifetime = time.Duration(pool.EffectiveMaxLifetimeMin()) * time.Minute
+			poolCfg.MaxConnLifetime = time.Duration(config.DefaultPoolMaxLifetimeMin) * time.Minute
 			// Idle connections behind NAT/pgbouncer go stale silently;
 			// recycle them instead of handing callers a dead socket.
-			poolCfg.MaxConnIdleTime = time.Duration(pool.EffectiveMaxIdleTimeMin()) * time.Minute
+			poolCfg.MaxConnIdleTime = time.Duration(config.DefaultPoolMaxIdleTimeMin) * time.Minute
 			poolCfg.HealthCheckPeriod = time.Minute
 			db, poolErr := pgxpool.NewWithConfig(connectCtx, poolCfg)
 			if poolErr == nil {

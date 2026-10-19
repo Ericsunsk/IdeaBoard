@@ -1370,7 +1370,7 @@ export const getIssueBoardRealtimeTicketUrl = (workspaceId: string, boardId: str
 }
 
 /**
- * Mints a 60-second HMAC presence ticket binding the current board access_version to the caller for the Y.js collaboration server (ticket = base64url(payload).base64url(hex hmac-sha256), payload {bid, av, cap, exp, uid}; cap is read|write derived from CapabilitiesFor, uid is the caller usr_ identity). Viewers may mint; malformed ids, unknown boards, and callers holding no effective board role converge to 404 board_not_found. Archived boards render 409 board_archived. A missing REALTIME_TICKET_SECRET renders 500 service_unavailable (no fallback default). The Y.js server admits the bearer via GET /internal/realtime/admit. No Idempotency-Key is required: issuance is a read-like POST with no state write.
+ * Mints a 60-second HMAC presence ticket binding the current board access_version to the caller for the Y.js collaboration server (ticket = base64url(payload).base64url(hex hmac-sha256), payload {bid, av, cap, exp, uid}; cap is read|write derived from CapabilitiesFor, uid is the caller usr_ identity). Viewers may mint; malformed ids, unknown boards, and callers holding no effective board role converge to 404 board_not_found. Archived boards render 409 board_archived. A missing RT_TICKET_SECRET renders 500 service_unavailable (no fallback default). The Y.js server admits the bearer via GET /internal/realtime/admit. No Idempotency-Key is required: issuance is a read-like POST with no state write.
  * @summary Issue a short-lived board presence ticket (any board role)
  */
 export const issueBoardRealtimeTicket = async (

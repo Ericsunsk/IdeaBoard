@@ -24,8 +24,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	cfg, err := config.LoadAndValidate()
-	if err != nil {
+	cfg := config.Load()
+	if err := cfg.ValidateForMigration(); err != nil {
 		fatal(err)
 	}
 	if err := wiring.Migrate(ctx, cfg, atlasBinary, migrationsDir); err != nil {

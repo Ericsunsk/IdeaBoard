@@ -42,10 +42,7 @@ COPY --from=builder --chown=65532:65532 /out/ideaboard-server /app/ideaboard-ser
 COPY --from=builder --chown=65532:65532 /out/ideaboard-healthcheck /app/ideaboard-healthcheck
 COPY --from=builder --chown=65532:65532 /out/uploads /app/uploads
 
-ENV APP_ENV=production \
-    APP_HOST=0.0.0.0 \
-    APP_PORT=6000 \
-    METRICS_ADDR=127.0.0.1:9091
+ENV APP_ENV=production
 
 EXPOSE 6000 9091
 

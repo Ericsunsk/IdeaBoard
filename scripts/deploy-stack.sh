@@ -31,7 +31,7 @@ ROOT_DIR="$(find_stack_root)"
 COMPOSE_FILE="$ROOT_DIR/docker/compose.yml"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/docker/.env}"
 BASE_ENV_FILE="$ENV_FILE"
-SECRETS_BUNDLE="${IDEABOARD_SECRETS_BUNDLE:-}"
+IMAGE_ENV_FILE="${IMAGE_ENV_FILE:-$ROOT_DIR/docker/images.env}"
 RENDERED_SECRETS_ENV=""
 ENV_EXAMPLE="$ROOT_DIR/docker/.env.example"
 BACKUP_DIR="${BACKUP_DIR:-$(cd "$ROOT_DIR/.." && pwd)/$(basename "$ROOT_DIR")-backups}"
@@ -193,7 +193,7 @@ generate_secret() {
   echo
 }
 
-generate_url_safe_secret() {
+generate_hex_secret() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 32
     return
@@ -202,10 +202,27 @@ generate_url_safe_secret() {
   echo
 }
 
+generate_rewards_keyring() {
+  local key
+  key="$(generate_secret)"
+  printf '{"current":{"version":"v1","key":"%s"},"previous":null}' "$key"
+}
+
 env_value() {
   local key="$1"
+  local file="$ENV_FILE"
   local value
-  value="$(awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE")"
+  case "$key" in
+    IDEABOARD_*_IMAGE) file="$IMAGE_ENV_FILE" ;;
+    POSTGRES_PASSWORD) ;; # PostgreSQL owner credentials stay local, never in Cloud.
+    *)
+      if [[ "${IDEABOARD_SECRETS_SOURCE:-}" == infisical ]]; then
+        printf '%s\n' "${!key:-}"
+        return
+      fi
+      ;;
+  esac
+  value="$(awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$file")"
   if [[ "$value" == '"'*'"' ]]; then
     value="${value:1:${#value}-2}"
   fi
@@ -224,8 +241,12 @@ env_or_file_value() {
 set_env_value() {
   local key="$1"
   local value="$2"
+  local file="$ENV_FILE"
+  case "$key" in
+    IDEABOARD_*_IMAGE) file="$IMAGE_ENV_FILE" ;;
+  esac
   local tmp
-  tmp="$(mktemp "$(dirname "$ENV_FILE")/.env.XXXXXX")"
+  tmp="$(mktemp "$(dirname "$file")/.env.XXXXXX")"
   awk -v key="$key" -v value="$value" '
     BEGIN { found = 0 }
     $0 ~ "^" key "=" {
@@ -237,25 +258,24 @@ set_env_value() {
     END {
       if (!found) print key "=" value
     }
-  ' "$ENV_FILE" > "$tmp"
-  mv "$tmp" "$ENV_FILE"
-  chmod 600 "$ENV_FILE"
-  if [[ -n "$SECRETS_BUNDLE" && "$BASE_ENV_FILE" != "$ENV_FILE" ]]; then
-    tmp="$(mktemp "$(dirname "$BASE_ENV_FILE")/.env.XXXXXX")"
-    awk -v key="$key" -v value="$value" '
-      BEGIN { found = 0 }
-      $0 ~ "^" key "=" { print key "=" value; found = 1; next }
-      { print }
-      END { if (!found) print key "=" value }
-    ' "$BASE_ENV_FILE" > "$tmp"
-    mv "$tmp" "$BASE_ENV_FILE"
-    chmod 600 "$BASE_ENV_FILE"
-  fi
+  ' "$file" > "$tmp"
+  mv "$tmp" "$file"
+  chmod 600 "$file"
 }
 
 is_placeholder() {
   local value="$1"
-  [[ -z "$value" || "$value" == replace-with-* || "$value" == "your-github-owner/your-repo" || "$value" == *"example.com"* ]]
+  local normalized
+  normalized="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
+  [[ -z "$value" || "$value" == replace-with-* || "$normalized" == replace_with-* || "$value" == "your-github-owner/your-repo" || "$value" == *"example.com"* ]] && return 0
+  # Shared placeholder blacklist, same rule as the Go API
+  # (isUnsafeProductionSecret) and the Node sidecars: weak exact tokens and
+  # placeholder/change-before-production markers are never valid secrets.
+  [[ "$normalized" == *"placeholder"* || "$normalized" == *"change-before-production"* ]] && return 0
+  case "$normalized" in
+  changeme | change-me | password | secret) return 0 ;;
+  esac
+  return 1
 }
 
 is_ideaboard_image_ref() {
@@ -283,7 +303,7 @@ auth_host_port() {
 
 realtime_host_port() {
   local value
-  value="$(env_or_file_value REALTIME_HOST_PORT)"
+  value="$(env_or_file_value RT_HOST_PORT)"
   printf '%s\n' "${value:-6002}"
 }
 
@@ -360,60 +380,78 @@ ensure_env_file() {
 
   chmod 600 "$ENV_FILE"
 
-  for key in POSTGRES_PASSWORD API_DB_PASSWORD AUTH_DB_PASSWORD AUTH_INTERNAL_KEY APP_SECRETS_ENCRYPTION_KEY BETTER_AUTH_SECRET; do
+  prepare_dotenvx_env
+  if [[ -n "$RENDERED_SECRETS_ENV" ]]; then
+    trap cleanup_rendered_secrets EXIT
+  fi
+  if is_placeholder "$(env_value POSTGRES_PASSWORD)"; then
+    [[ -z "$RENDERED_SECRETS_ENV" ]] || die "encrypted owner credentials are missing POSTGRES_PASSWORD; set it with dotenvx before deployment"
+    set_env_value POSTGRES_PASSWORD "$(generate_secret)"
+    echo "Generated POSTGRES_PASSWORD"
+  fi
+  # Cloud owns business secrets; local initialization only owns PostgreSQL.
+  [[ "${IDEABOARD_SECRETS_SOURCE:-}" != infisical ]] || return 0
+
+  for key in API_PG_PASSWORD AUTH_PG_PASSWORD AUTH_INTERNAL_KEY APP_SECRETS_ENCRYPTION_KEY BETTER_AUTH_SECRET RT_TICKET_SECRET; do
     if is_placeholder "$(env_value "$key")"; then
       set_env_value "$key" "$(generate_secret)"
       echo "Generated $key"
     fi
   done
   if is_placeholder "$(env_value NATS_PASSWORD)"; then
-    set_env_value NATS_PASSWORD "$(generate_url_safe_secret)"
+    set_env_value NATS_PASSWORD "$(generate_hex_secret)"
     echo "Generated NATS_PASSWORD"
   fi
-}
-
-set_env_value_from_file() {
-  local file="$1"
-  local key="$2"
-  local value="$3"
-  local tmp
-  tmp="$(mktemp "$(dirname "$file")/.env.XXXXXX")"
-  local found=0
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$line" == "$key="* ]]; then
-      printf '%s=%s\n' "$key" "$value" >> "$tmp"
-      found=1
-    else
-      printf '%s\n' "$line" >> "$tmp"
-    fi
-  done < "$file"
-  if (( found == 0 )); then
-    printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  if is_placeholder "$(env_value CREDITS_WELCOME_IDENTITY_KEY)"; then
+    set_env_value CREDITS_WELCOME_IDENTITY_KEY "$(generate_secret)"
+    echo "Generated CREDITS_WELCOME_IDENTITY_KEY"
   fi
-  mv "$tmp" "$file"
-  chmod 600 "$file"
+  if is_placeholder "$(env_value REWARDS_CODE_HMAC_KEYS)"; then
+    set_env_value REWARDS_CODE_HMAC_KEYS "$(generate_rewards_keyring)"
+    echo "Generated REWARDS_CODE_HMAC_KEYS"
+  fi
+  for key in IMGPROXY_KEY IMGPROXY_SALT; do
+    if is_placeholder "$(env_value "$key")"; then
+      set_env_value "$key" "$(generate_hex_secret)"
+      echo "Generated $key"
+    fi
+  done
 }
 
-prepare_secrets_bundle() {
-  [[ -n "$SECRETS_BUNDLE" ]] || return 0
-  [[ "$SECRETS_BUNDLE" = /* ]] || SECRETS_BUNDLE="$ROOT_DIR/$SECRETS_BUNDLE"
-  [[ -f "$SECRETS_BUNDLE" ]] || die "secret bundle does not exist: $SECRETS_BUNDLE"
-  [[ -f "$ENV_FILE" ]] || die "base environment file is required with IDEABOARD_SECRETS_BUNDLE: $ENV_FILE"
+# Secret channel: docker/.env is committed dotenvx-encrypted (opaque
+# `encrypted:` values + a DOTENV_PUBLIC_KEY header) and decrypted here to a
+# 0600 temp file, so every existing file reader (validate_env_file,
+# env_value, compose --env-file) keeps working on plaintext. The private key
+# never enters git: set DOTENV_PRIVATE_KEY, or place the key in
+# DOTENV_KEYS_FILE (default: the .env.keys file next to the env file).
+dotenvx_encrypted_file() {
+  local file="$1"
+  [[ -f "$file" ]] && grep -qE '^[A-Z][A-Z0-9_]*=encrypted:' "$file"
+}
 
-  local secret_env merged_env
-  secret_env="$(mktemp "${TMPDIR:-/tmp}/ideaboard-secrets.XXXXXX")"
-  merged_env="$(mktemp "${TMPDIR:-/tmp}/ideaboard-env.XXXXXX")"
-  RENDERED_SECRETS_ENV="$merged_env"
-  "$ROOT_DIR/scripts/secrets-render.sh" "$SECRETS_BUNDLE" "$secret_env"
-  chmod 600 "$secret_env"
-  cp "$ENV_FILE" "$merged_env"
-  chmod 600 "$merged_env"
-  while IFS= read -r line; do
-    [[ "$line" == *=* ]] || continue
-    set_env_value_from_file "$merged_env" "${line%%=*}" "${line#*=}"
-  done < "$secret_env"
-  rm -f -- "$secret_env"
-  ENV_FILE="$merged_env"
+prepare_dotenvx_env() {
+  dotenvx_encrypted_file "$ENV_FILE" || return 0
+  command -v dotenvx >/dev/null 2>&1 || die "docker/.env is dotenvx-encrypted but dotenvx is not installed (install: npm i -g @dotenvx/dotenvx; onboarding: DEVELOPMENT.md)"
+  local decrypted keys_file
+  decrypted="$(mktemp "${TMPDIR:-/tmp}/ideaboard-env.XXXXXX")"
+  keys_file="${DOTENV_KEYS_FILE:-$(dirname "$ENV_FILE")/.env.keys}"
+  if [[ -n "${DOTENV_PRIVATE_KEY:-}" ]]; then
+    if ! dotenvx decrypt -f "$ENV_FILE" --stdout >"$decrypted"; then
+      rm -f -- "$decrypted"
+      die "failed to decrypt $ENV_FILE with DOTENV_PRIVATE_KEY"
+    fi
+  elif [[ -f "$keys_file" ]]; then
+    if ! dotenvx decrypt -f "$ENV_FILE" -fk "$keys_file" --stdout >"$decrypted"; then
+      rm -f -- "$decrypted"
+      die "failed to decrypt $ENV_FILE with $keys_file"
+    fi
+  else
+    rm -f -- "$decrypted"
+    die "docker/.env is dotenvx-encrypted but no private key was found (set DOTENV_PRIVATE_KEY or place the key in $keys_file; onboarding: DEVELOPMENT.md)"
+  fi
+  chmod 600 "$decrypted"
+  RENDERED_SECRETS_ENV="$decrypted"
+  ENV_FILE="$decrypted"
 }
 
 cleanup_rendered_secrets() {
@@ -435,10 +473,13 @@ validate_env_file() {
     IDEABOARD_AUTH_MIGRATE_IMAGE \
     IDEABOARD_REALTIME_IMAGE \
     POSTGRES_PASSWORD \
-    API_DB_PASSWORD \
-    AUTH_DB_PASSWORD \
+    API_PG_PASSWORD \
+    AUTH_PG_PASSWORD \
     AUTH_INTERNAL_KEY \
     APP_SECRETS_ENCRYPTION_KEY \
+    CREDITS_WELCOME_IDENTITY_KEY \
+    REWARDS_CODE_HMAC_KEYS \
+    RT_TICKET_SECRET \
     BETTER_AUTH_SECRET \
     NATS_PASSWORD \
     IMGPROXY_KEY \
@@ -521,7 +562,11 @@ docker_compose() {
     compose_args+=("-f" "$override_file")
   fi
 
-  docker compose "${compose_args[@]}" --env-file "$ENV_FILE" "$@"
+  if [[ "${IDEABOARD_SECRETS_SOURCE:-}" != infisical ]]; then
+    compose_args+=(--env-file "$ENV_FILE")
+  fi
+  POSTGRES_PASSWORD="$(env_value POSTGRES_PASSWORD)" \
+    docker compose "${compose_args[@]}" --env-file "$IMAGE_ENV_FILE" "$@"
 }
 
 need_runtime_command() {
@@ -1146,15 +1191,6 @@ is_false_value() {
   [[ "$value" == "0" || "$value" == "false" || "$value" == "no" || "$value" == "off" ]]
 }
 
-event_bus_enabled() {
-  local value
-  value="$(env_value NATS_EVENT_BUS_ENABLED)"
-  if [[ -z "$value" ]]; then
-    value="true"
-  fi
-  ! is_false_value "$value"
-}
-
 check_river_schema() {
   local result
 
@@ -1177,11 +1213,6 @@ check_river_schema() {
 check_nats_event_stream() {
   local stream_name
   local body
-
-  if ! event_bus_enabled; then
-    echo "Skipping NATS stream check because NATS_EVENT_BUS_ENABLED=false"
-    return 0
-  fi
 
   stream_name="IDEABOARD_EVENTS"
 
@@ -1243,10 +1274,8 @@ check_public_api_health() {
   local timeout="${PUBLIC_API_HEALTH_WAIT_TIMEOUT_SECONDS:-120}"
   local elapsed=0
 
-  base_url="$(env_value API_BASE_URL)"
-  if [[ -z "$base_url" ]]; then
-    base_url="$(env_value PUBLIC_ORIGIN)"
-  fi
+  # API_BASE_URL 已删除：公开 API 地址恒等于 PUBLIC_ORIGIN。
+  base_url="$(env_value PUBLIC_ORIGIN)"
   base_url="${base_url%/}"
   [[ -n "$base_url" ]] || die "PUBLIC_ORIGIN is required for public API health checks"
 
@@ -1308,7 +1337,7 @@ init_release_context() {
   PREVIOUS_AUTH_MIGRATE_IMAGE="$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
   PREVIOUS_REALTIME_IMAGE="$(env_value IDEABOARD_REALTIME_IMAGE)"
   DEPLOY_ENV_SNAPSHOT="$(mktemp "$RELEASE_STATE_DIR/env.${DEPLOY_RELEASE_ID}.XXXXXX")"
-  cp "$BASE_ENV_FILE" "$DEPLOY_ENV_SNAPSHOT"
+  cp "$IMAGE_ENV_FILE" "$DEPLOY_ENV_SNAPSHOT"
   chmod 600 "$DEPLOY_ENV_SNAPSHOT"
 }
 
@@ -1377,15 +1406,8 @@ EOF
 
 restore_env_snapshot() {
   if [[ -n "$DEPLOY_ENV_SNAPSHOT" && -f "$DEPLOY_ENV_SNAPSHOT" ]]; then
-    cp "$DEPLOY_ENV_SNAPSHOT" "$BASE_ENV_FILE"
-    chmod 600 "$BASE_ENV_FILE"
-    if [[ -n "$SECRETS_BUNDLE" ]]; then
-      cleanup_rendered_secrets
-      ENV_FILE="$BASE_ENV_FILE"
-      prepare_secrets_bundle
-    else
-      ENV_FILE="$BASE_ENV_FILE"
-    fi
+    cp "$DEPLOY_ENV_SNAPSHOT" "$IMAGE_ENV_FILE"
+    chmod 600 "$IMAGE_ENV_FILE"
   fi
 }
 
@@ -1565,10 +1587,8 @@ run_doctor() {
     echo "Deep health checks:"
     run_backend_smoke_checks
     local base_url
-    base_url="$(env_value API_BASE_URL)"
-    if [[ -z "$base_url" ]]; then
-      base_url="$(env_value PUBLIC_ORIGIN)"
-    fi
+    # API_BASE_URL 已删除：公开 API 地址恒等于 PUBLIC_ORIGIN。
+    base_url="$(env_value PUBLIC_ORIGIN)"
     base_url="${base_url%/}"
     if [[ -n "$base_url" ]]; then
       echo "Checking public auth session route: ${base_url}/api/auth/get-session"
@@ -1676,8 +1696,8 @@ run_deploy_transaction() {
   DEPLOY_STAGE="smoke"
   run_backend_smoke_checks
 
-  complete_deploy_success
   docker_compose ps
+  complete_deploy_success
 }
 
 run_stack_migrations() {
@@ -1750,8 +1770,8 @@ run_previous_rollback() {
   DEPLOY_STAGE="smoke"
   run_backend_smoke_checks
 
-  complete_deploy_success
   docker_compose ps
+  complete_deploy_success
 }
 
 login_ghcr_if_configured() {
@@ -1878,8 +1898,7 @@ stage_workspace_uploads() (
   local container_id storage_root staging_dir
   container_id="$(docker_compose ps -a -q api)"
   [[ -n "$container_id" ]] || return 0
-  storage_root="$(env_value STORAGE_LOCAL_ROOT)"
-  storage_root="${storage_root:-/app}"
+  storage_root="/app"
   staging_dir="$(mktemp -d)"
   trap 'rm -rf -- "$staging_dir"' EXIT
 
@@ -1921,17 +1940,16 @@ render_cloudflare_real_ip_config() {
   bash "$ROOT_DIR/scripts/render-cloudflare-real-ip-conf.sh" "$output_path"
 }
 
-if [[ -n "$SECRETS_BUNDLE" ]]; then
-  prepare_secrets_bundle
-  trap cleanup_rendered_secrets EXIT
-else
-  ensure_env_file
+if [[ ! -f "$IMAGE_ENV_FILE" ]]; then
+  cp "$ROOT_DIR/docker/images.env.example" "$IMAGE_ENV_FILE"
+  chmod 600 "$IMAGE_ENV_FILE"
 fi
+ensure_env_file
 
 if [[ "$command" == "init-env" ]]; then
   if validate_env_file; then
-    if [[ -n "$SECRETS_BUNDLE" ]]; then
-      echo "Base environment and secret bundle are ready: $BASE_ENV_FILE"
+    if [[ -n "$RENDERED_SECRETS_ENV" ]]; then
+      echo "Encrypted environment is ready: $BASE_ENV_FILE"
     else
       echo "Environment file is ready: $ENV_FILE"
     fi
@@ -1986,6 +2004,10 @@ case "$command" in
   preflight)
     preflight_checks
     ;;
+  config)
+    validate_env_file || exit 1
+    docker_compose config --quiet
+    ;;
   rollback)
     validate_env_file || exit 1
     shift || true
@@ -2022,7 +2044,7 @@ case "$command" in
     ;;
   *)
     cat >&2 <<EOF
-Usage: ideaboard [update|deploy|preflight|doctor|smoke|restart|stop|status|logs|delete|uninstall|init-env|pull|up|migrate|rollback|ps]
+Usage: ideaboard [update|deploy|config|preflight|doctor|smoke|restart|stop|status|logs|delete|uninstall|init-env|pull|up|migrate|rollback|ps]
        ideaboard update --manifest <path-or-url>
        ideaboard deploy --manifest <path-or-url>
        ideaboard doctor [--deep]

@@ -27,7 +27,9 @@ func newTaskStatusEventPublisher(
 // newTestTaskStatusInstance builds one isolated publisher+hub pair against
 // the shared NATS test server. Test-only helper duplicated from
 // interfaces/events (same package cannot import _test helpers across
-// packages); production wiring has no duplication.
+// packages); production wiring has no duplication. EventBusConfig carries
+// only NATSURL, so tests needing isolated streams build the bus
+// directly with the same handshake NewTaskStatusEventPublisher performs.
 func newTestTaskStatusInstance(
 	t *testing.T,
 	ctx context.Context,
@@ -35,23 +37,27 @@ func newTestTaskStatusInstance(
 ) (events.TaskStatusPublisher, *taskservice.EventHub) {
 	t.Helper()
 	hub := taskservice.NewEventHub()
-	publisher, eventBus, err := newTaskStatusEventPublisher(ctx, config.EventBusConfig{
-		Enabled:            true,
-		NATSURL:            natsURL,
-		NATSStreamName:     streamName,
-		NATSSubjectPrefix:  subjectPrefix,
-		NATSConsumerName:   consumerName,
-		NATSConnectTimeout: 5,
-		NATSRequestTimeout: 5,
-		NATSDrainTimeout:   2,
-	}, hub)
+	localPublisher := eventinterfaces.TaskEventHubPublisher{Hub: hub}
+	bus, err := eventnats.NewNATSJetStreamEventBus(ctx, eventnats.NATSJetStreamConfig{
+		URL:            natsURL,
+		StreamName:     streamName,
+		SubjectPrefix:  subjectPrefix,
+		ConsumerName:   consumerName,
+		ConnectTimeout: 5 * time.Second,
+		RequestTimeout: 5 * time.Second,
+		DrainTimeout:   2 * time.Second,
+	})
 	if err != nil {
 		t.Fatalf("new Task status publisher %s failed: %v", consumerName, err)
 	}
+	remotePublisher := eventinterfaces.TaskEventHubPublisher{Hub: hub}
+	if err := bus.SubscribeTaskStatus(ctx, remotePublisher.PublishTaskStatus); err != nil {
+		_ = bus.Close()
+		t.Fatalf("subscribe Task status %s failed: %v", consumerName, err)
+	}
+	publisher := eventinterfaces.CompositeTaskStatusPublisher{Local: localPublisher, Remote: bus}
 	t.Cleanup(func() {
-		if eventBus != nil {
-			_ = eventBus.Close()
-		}
+		_ = bus.Close()
 	})
 	return publisher, hub
 }

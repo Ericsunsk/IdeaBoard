@@ -9,8 +9,8 @@ services:
       POSTGRES_DB: ideaboard
       POSTGRES_USER: ideaboard
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in docker/.env}
-      API_DB_PASSWORD: ${API_DB_PASSWORD:?Set API_DB_PASSWORD in docker/.env}
-      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in docker/.env}
+      API_PG_PASSWORD: ${API_PG_PASSWORD:?Set API_PG_PASSWORD in docker/.env}
+      AUTH_PG_PASSWORD: ${AUTH_PG_PASSWORD:?Set AUTH_PG_PASSWORD in docker/.env}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -41,6 +41,10 @@ services:
       - /data
       - -m
       - "8222"
+      - --user
+      - ideaboard
+      - --pass
+      - ${NATS_PASSWORD:?Set NATS_PASSWORD}
     ports:
       - "127.0.0.1:${NATS_CLIENT_PORT:-4222}:4222"
       - "127.0.0.1:${NATS_MONITOR_PORT:-8222}:8222"

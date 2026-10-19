@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -77,7 +76,7 @@ var _ ports.HealthChecker = (*ServerRunner)(nil)
 // NewHTTPServerRunner constructs a ports.Runner for main HTTP API traffic.
 func NewHTTPServerRunner(cfg *config.Config, handler *gin.Engine) *ServerRunner {
 	srv := &http.Server{
-		Addr:              ListenerAddr(cfg.App.Host, cfg.App.Port),
+		Addr:              listenerAddr(cfg, "6000"),
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
@@ -102,10 +101,7 @@ func newMetricsServerWithGatherer(cfg *config.Config, gatherer prometheus.Gather
 
 // NewMetricsServerRunnerWithGatherer constructs a metrics runner with a custom gatherer.
 func NewMetricsServerRunnerWithGatherer(cfg *config.Config, gatherer prometheus.Gatherer) *ServerRunner {
-	addr := "127.0.0.1:9091"
-	if cfg != nil && strings.TrimSpace(cfg.App.MetricsAddr) != "" {
-		addr = strings.TrimSpace(cfg.App.MetricsAddr)
-	}
+	addr := listenerAddr(cfg, "9091")
 	if gatherer == nil {
 		gatherer = prometheus.DefaultGatherer
 	}
@@ -127,10 +123,12 @@ func NewMetricsServerRunnerWithGatherer(cfg *config.Config, gatherer prometheus.
 	}
 }
 
-// ListenerAddr formats host and port for network binding.
-func ListenerAddr(host, port string) string {
-	if strings.TrimSpace(host) == "" {
-		return "127.0.0.1:" + port
+// listenerAddr exposes listeners only inside the production Compose network.
+// Host development stays on loopback, including the dedicated metrics port.
+func listenerAddr(cfg *config.Config, port string) string {
+	host := "127.0.0.1"
+	if cfg != nil && cfg.App.IsProduction() {
+		host = "0.0.0.0"
 	}
 	return net.JoinHostPort(host, port)
 }

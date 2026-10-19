@@ -13,37 +13,64 @@
 | PostgreSQL | `17+`                                       |
 | Atlas CLI  | `1.3.2`                                     |
 
-启动本地依赖：
+启动本地依赖（`docker/.env` 已是加密进 git 的文件，全新 clone 自带，
+不要再从 example 覆盖它；`migration.env` 仍是本机文件，缺失才创建）：
 
 ```bash
 cd docker
-cp .env.example .env
-cp migration.env.example migration.env
-# 至少修改 POSTGRES_PASSWORD、API_DB_PASSWORD 与 AUTH_DB_PASSWORD；
-# migration.env 的 DB_MIGRATION_PASSWORD 必须与 POSTGRES_PASSWORD 相同。
-docker compose -f compose.local.yml up -d
+test -f migration.env || cp migration.env.example migration.env
+# migration.env 的 PG_MIGRATION_PASSWORD 必须与 .env 解密后的 POSTGRES_PASSWORD 相同。
+dotenvx run -f .env -- docker compose -f compose.local.yml up -d
 ```
+
+NATS 本地端口为 `127.0.0.1:4222`，与 production 一样使用 `ideaboard` +
+`NATS_PASSWORD` 认证；依赖 Compose 与宿主应用必须消费同一 dev secret 集合。
+builtin-local 始终从进程 cwd 解析一次 root：宿主在 `apps/api` 启动，容器
+`WORKDIR /app`，两者的 `uploads/` 与 imgproxy mount 一致。
+本地 API 的 trusted proxies 仅 loopback；production Compose 才信任私网 bridge。
+
+### dotenvx（compose 边界的 secret 通道）
+
+`docker/.env` 是 dotenvx 加密后进 git 的文件（只 review key 名，不看值）；
+`docker/.env.example` 保持明文模板。本地应用进程（`go run` / `npm run dev`）
+不再读本机明文 `.env`（已删除），改走 Infisical Cloud 注入：
+
+```bash
+npm i -g @dotenvx/dotenvx
+# 本地起 API（示例，在 apps/api 下）：Cloud 取 dev 全集注入（默认 `/`），断网时改走 dotenvx 解密见下
+../../scripts/infisical-run.sh --env dev -- go run ./cmd --mode all
+# 私钥从密码管理器取，用完即清，不落地（本机不再保留 .env.keys 文件）；
+export DOTENV_PRIVATE_KEY='...'
+dotenvx run -f docker/.env -- docker compose -f docker/compose.local.yml up -d
+```
+
+新机器 onboarding：`git clone` + 放好私钥即可 `up`，不再需要逐项手填 secret。
+改 secret 走 PR（`dotenvx set KEY value -f docker/.env` 就地重加密，只产生
+key 名与密文 diff；`dotenvx get KEY -f docker/.env` 单值核对）。加密文件
+key 名受 `scripts/env-schema-check.sh` 的 F 门禁校验。
+
+本地可选 `direnv`（不强制）：在 `docker/.envrc` 写
+`export DOTENV_PRIVATE_KEY='...'`（用完即清，不落地），
+进目录自动加载，`dotenvx run` 不再需要手动 export。示例仅文档，不提交 `.envrc`。
 
 初始化数据库时必须先执行 API migration，再执行 Auth migration。Auth 的 limited runtime role 通过后者获得 Better Auth tables 和 typed runtime settings function 权限：
 
 ```bash
 cd apps/api
-cp .env.example .env
 set -a
-source ../../docker/.env
-source ../../docker/migration.env
+source ../../docker/migration.env   # owner 口令（PG_MIGRATION_*），只走本地，不进 Cloud
 set +a
-go run ./cmd migrate
+# 运行时 secret 走 Cloud 注入（与 migration.env 无重名 key，不冲突）
+../../scripts/infisical-run.sh --env dev -- go run ./cmd migrate
 ```
 
 ```bash
 cd apps/auth
-cp .env.example .env
 npm install
 set -a
 source ../../docker/migration.env
 set +a
-npm run migrate
+../../scripts/infisical-run.sh --env dev -- npm run migrate
 ```
 
 ### Atlas migration workflow
@@ -346,20 +373,20 @@ sqlc:
 
 | 变量                                                          | 说明                                                                                               |
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 当前 API/Auth 进程的 runtime PostgreSQL 连接；runtime role 不拥有 schema                           |
-| `DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD`                 | 仅 API/Auth migration command 使用的 schema owner；必须与 `DB_USER` 不同                           |
-| `AUTH_SERVICE_BASE_URL`                                       | Go 调用 Auth service 的地址                                                                        |
+| `PG_HOST` / `PG_PORT` / `API_PG_USER` / `API_PG_PASSWORD` / `AUTH_PG_USER` / `AUTH_PG_PASSWORD` / `PG_DB` | 当前 API/Auth 进程的 runtime PostgreSQL 连接；runtime role 不拥有 schema；API 与 Auth 用各自的 `*_PG_USER`/`*_PG_PASSWORD`，不再共用同一个旧库密码变量名 |
+| `PG_MIGRATION_USER` / `PG_MIGRATION_PASSWORD`                 | 仅 API/Auth migration command 使用的 schema owner；必须与 runtime user 不同                         |
+| `AUTH_INTERNAL_URL`                                           | Go 调用 Auth service 的内网地址（`API_INTERNAL_URL` 是反方向：Auth/Realtime 调用 Go）               |
 | `AUTH_INTERNAL_KEY`                                           | API/Auth internal endpoint 共享密钥                                                                |
 | `APP_SECRETS_ENCRYPTION_KEY`                                  | API key 和 storage secret 静态加密主密钥                                                           |
 | `REWARDS_CODE_HMAC_KEYS`                                      | Rewards Code current/previous keyed-HMAC JSON registry；key 至少 32 bytes，不能放入 Admin settings |
 | `BETTER_AUTH_SECRET`                                          | Better Auth 签名密钥，生产必须高熵                                                                 |
 | `PUBLIC_ORIGIN`                                               | Auth 对外基准 URL与 trusted origin                                                                 |
 
-Auth 使用相同的 owner/runtime separation：长期运行的 Auth 读取 `DB_USER=ideaboard_auth`，`npm run migrate` 通过 `DB_MIGRATION_USER` 临时使用 owner，并在完成后只授予 Better Auth tables 权限。本地 migration credential 只放在已忽略的 `docker/migration.env`，不要复制进 API/Auth runtime `.env`。
+Auth 使用相同的 owner/runtime separation：长期运行的 Auth 读取 `AUTH_PG_USER=ideaboard_auth`，`npm run migrate` 通过 `PG_MIGRATION_USER` 临时使用 owner，并在完成后只授予 Better Auth tables 权限。本地 migration credential 只放在已忽略的 `docker/migration.env`，不要复制进 API/Auth runtime `.env`。
 
-Docker compose / deploy 层的 `PUBLIC_ORIGIN` 是公开 Origin 的 canonical source；`API_BASE_URL` 仅在 API 使用独立 host 时作为 optional override。API runtime 仍分别生成 Web 跳转/分享链接与 Stripe Webhook/服务端素材地址；`PUBLIC_ORIGIN` 缺失或无效时拒绝启动。生产部署细节见 [docs/runbooks/deployment.md](./docs/runbooks/deployment.md)。
+Docker compose / deploy 层的 `PUBLIC_ORIGIN` 是公开 Origin 的 canonical source；后端公开 API 地址恒等于 `PUBLIC_ORIGIN`（`API_BASE_URL` 已删除，无 override）。API runtime 仍分别生成 Web 跳转/分享链接与 Stripe Webhook/服务端素材地址；`PUBLIC_ORIGIN` 缺失或无效时拒绝启动。生产部署细节见 [docs/runbooks/deployment.md](./docs/runbooks/deployment.md)。
 
-API 在独立 `METRICS_ADDR` listener 暴露 Prometheus `/metrics`，默认 `127.0.0.1:9091`。该 listener 只用于本机或私有监控网络，不得接入用户 API 反代或 Cloudflare。
+API 在独立 metrics listener 暴露 Prometheus `/metrics`；本地宿主只监听 `127.0.0.1:6000/9091`，production Compose 内监听 `0.0.0.0:6000/9091`（无独立 env 开关）；宿主机经 compose 以 `127.0.0.1:${API_METRICS_HOST_PORT:-9091}:9091` 映射。该 listener 只用于本机或私有监控网络，不得接入用户 API 反代或 Cloudflare。
 
 轮换 `REWARDS_CODE_HMAC_KEYS` 时先部署 new current + old previous；新 Code 只使用 current，lookup 同时验证两者。任何 persisted RewardCode 的 primary `key_version` 未配置时，API startup 都会 fail closed；disabled、expired 或未兑换都不例外。只有数据库中不再存在依赖 old version 的 RewardCode 时，才能移除 previous。
 

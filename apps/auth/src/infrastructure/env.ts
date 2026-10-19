@@ -53,7 +53,7 @@ function validateDatabaseSSLMode(value: string): DatabaseSSLMode {
   if (normalized === 'disable' || normalized === 'require' || normalized === 'verify-full') {
     return normalized
   }
-  throw new Error('DB_SSLMODE must be one of disable, require, or verify-full')
+  throw new Error('PG_SSLMODE must be one of disable, require, or verify-full')
 }
 
 export function loadEnv(source: EnvSource) {
@@ -66,49 +66,60 @@ export function loadEnv(source: EnvSource) {
     getEnv(source, 'BETTER_AUTH_SECRET', '') ||
     (productionRuntime ? '' : 'ideaboard-local-development-secret-change-before-production')
   const authBaseURL = publicOrigin || (productionRuntime ? '' : 'http://localhost:5173')
-  const trustedOrigins = [publicOrigin || authBaseURL]
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .filter((item, index, all) => all.indexOf(item) === index)
+  const trustedOrigins = authBaseURL ? [authBaseURL] : []
   const apiInternalURL = getEnv(source, 'API_INTERNAL_URL', '') || 'http://127.0.0.1:6000'
-  const dbPassword = getEnv(source, 'DB_PASSWORD', '')
+  const dbPassword = getEnv(source, 'AUTH_PG_PASSWORD', '')
   const secretsEncryptionKey = getEnv(source, 'APP_SECRETS_ENCRYPTION_KEY', '')
-  const dbSSLMode = validateDatabaseSSLMode(getEnv(source, 'DB_SSLMODE', 'disable'))
+  const dbSSLMode = validateDatabaseSSLMode(getEnv(source, 'PG_SSLMODE', 'disable'))
 
+  // Collect every missing or weak value before throwing so one startup
+  // attempt lists everything to fill instead of failing one key at a time.
+  const problems: string[] = []
   if (!authInternalKey) {
-    throw new Error('AUTH_INTERNAL_KEY is required')
+    problems.push('AUTH_INTERNAL_KEY is required')
+  }
+  if (!dbPassword) {
+    problems.push('AUTH_PG_PASSWORD is required')
   }
 
   if (productionRuntime) {
     if (isUnsafeProductionSecret(authInternalKey)) {
-      throw new Error(
+      problems.push(
         'AUTH_INTERNAL_KEY must be set to a non-placeholder value when NODE_ENV=production',
       )
-    }
-    if (authInternalKey.length < 32) {
-      throw new Error('AUTH_INTERNAL_KEY must be at least 32 characters long')
+    } else if (authInternalKey.length < 32) {
+      problems.push('AUTH_INTERNAL_KEY must be at least 32 characters long')
     }
     if (isUnsafeProductionSecret(authSecret)) {
-      throw new Error(
+      problems.push(
         'BETTER_AUTH_SECRET must be set to a non-placeholder value when NODE_ENV=production',
       )
-    }
-    if (authSecret.length < 32) {
-      throw new Error('BETTER_AUTH_SECRET must be at least 32 characters long')
+    } else if (authSecret.length < 32) {
+      problems.push('BETTER_AUTH_SECRET must be at least 32 characters long')
     }
     if (isUnsafeProductionSecret(dbPassword)) {
-      throw new Error('DB_PASSWORD must be set to a non-placeholder value when NODE_ENV=production')
+      problems.push(
+        'AUTH_PG_PASSWORD must be set to a non-placeholder value when NODE_ENV=production',
+      )
     }
     if (!isValidSecretEncryptionKey(secretsEncryptionKey)) {
-      throw new Error(
+      problems.push(
         'APP_SECRETS_ENCRYPTION_KEY must be base64 that decodes to exactly 32 bytes when NODE_ENV=production',
       )
     }
     if (!authBaseURL) {
-      throw new Error('PUBLIC_ORIGIN is required when NODE_ENV=production')
+      problems.push('PUBLIC_ORIGIN is required when NODE_ENV=production')
+    } else {
+      try {
+        validateProductionURL('PUBLIC_ORIGIN', authBaseURL, { requireHTTPS: true })
+      } catch (error) {
+        problems.push(error instanceof Error ? error.message : String(error))
+      }
     }
-    validateProductionURL('PUBLIC_ORIGIN', authBaseURL, { requireHTTPS: true })
-    validateProductionURL('PUBLIC_ORIGIN', trustedOrigins[0] ?? authBaseURL, { requireHTTPS: true })
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`missing or invalid required env: ${problems.join('; ')}`)
   }
 
   return {
@@ -123,11 +134,11 @@ export function loadEnv(source: EnvSource) {
       apiInternalURL,
     },
     database: {
-      host: getEnv(source, 'DB_HOST', '127.0.0.1'),
-      port: getEnvInt(source, 'DB_PORT', 5432),
-      user: getEnv(source, 'DB_USER', 'ideaboard'),
+      host: getEnv(source, 'PG_HOST', '127.0.0.1'),
+      port: getEnvInt(source, 'PG_PORT', 5432),
+      user: getEnv(source, 'AUTH_PG_USER', 'ideaboard_auth'),
       password: dbPassword,
-      database: getEnv(source, 'DB_NAME', 'ideaboard'),
+      database: getEnv(source, 'PG_DB', 'ideaboard'),
       sslMode: dbSSLMode,
     },
     secrets: {

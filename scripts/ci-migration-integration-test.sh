@@ -17,8 +17,11 @@ for command_name in docker go npm atlas; do
 #!/usr/bin/env bash
 set -euo pipefail
 printf '__COMMAND__' >>"${CI_MIGRATION_TEST_LOG}"
-if [[ -n "${DB_USER:-}" ]]; then
-  printf ' DB_USER=%q DB_PASSWORD=%q' "${DB_USER}" "${DB_PASSWORD:-}" >>"${CI_MIGRATION_TEST_LOG}"
+if [[ -n "${API_PG_USER:-}" ]]; then
+  printf ' API_PG_USER=%q API_PG_PASSWORD=%q' "${API_PG_USER}" "${API_PG_PASSWORD:-}" >>"${CI_MIGRATION_TEST_LOG}"
+fi
+if [[ -n "${AUTH_PG_USER:-}" ]]; then
+  printf ' AUTH_PG_USER=%q AUTH_PG_PASSWORD=%q' "${AUTH_PG_USER}" "${AUTH_PG_PASSWORD:-}" >>"${CI_MIGRATION_TEST_LOG}"
 fi
 printf ' %q' "$@" >>"${CI_MIGRATION_TEST_LOG}"
 printf '\n' >>"${CI_MIGRATION_TEST_LOG}"
@@ -36,15 +39,15 @@ PATH="${bin_dir}:${PATH}" \
 
 expected_order="${fixture_dir}/expected.log"
 cat >"${expected_order}" <<EOF
-npm run build
-docker cp ${repo_root}/docker/postgres/init-runtime-roles.sh test-postgres:/tmp/init-runtime-roles.sh
-docker exec -e POSTGRES_USER=ideaboard -e POSTGRES_DB=ideaboard_test -e API_DB_PASSWORD=ideaboard_api_test -e AUTH_DB_PASSWORD=ideaboard_auth_test test-postgres sh /tmp/init-runtime-roles.sh
-atlas migrate apply --dir file://${repo_root}/apps/api/internal/db/migrations --url postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test\\?sslmode=disable
-go DB_USER=ideaboard_api DB_PASSWORD=ideaboard_api_test run ./cmd finalize-migrate
-npm DB_USER=ideaboard_auth DB_PASSWORD=ideaboard_auth_test run migrate:dist
-atlas migrate apply --dir file://${repo_root}/apps/api/internal/db/migrations --url postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test\\?sslmode=disable
-go DB_USER=ideaboard_api DB_PASSWORD=ideaboard_api_test run ./cmd finalize-migrate
-npm DB_USER=ideaboard_auth DB_PASSWORD=ideaboard_auth_test run migrate:dist
+npm API_PG_USER=ideaboard_api API_PG_PASSWORD=ideaboard_api_test AUTH_PG_USER=ideaboard_auth AUTH_PG_PASSWORD=ideaboard_auth_test run build
+docker API_PG_USER=ideaboard_api API_PG_PASSWORD=ideaboard_api_test AUTH_PG_USER=ideaboard_auth AUTH_PG_PASSWORD=ideaboard_auth_test cp ${repo_root}/docker/postgres/init-runtime-roles.sh test-postgres:/tmp/init-runtime-roles.sh
+docker API_PG_USER=ideaboard_api API_PG_PASSWORD=ideaboard_api_test AUTH_PG_USER=ideaboard_auth AUTH_PG_PASSWORD=ideaboard_auth_test exec -e POSTGRES_USER=ideaboard -e POSTGRES_DB=ideaboard_test -e API_PG_PASSWORD=ideaboard_api_test -e AUTH_PG_PASSWORD=ideaboard_auth_test test-postgres sh /tmp/init-runtime-roles.sh
+atlas API_PG_USER=ideaboard_api API_PG_PASSWORD=ideaboard_api_test AUTH_PG_USER=ideaboard_auth AUTH_PG_PASSWORD=ideaboard_auth_test migrate apply --dir file://${repo_root}/apps/api/internal/db/migrations --url postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test\\?sslmode=disable
+go API_PG_USER=ideaboard_api API_PG_PASSWORD=ideaboard_api_test AUTH_PG_USER=ideaboard_auth AUTH_PG_PASSWORD=ideaboard_auth_test run ./cmd finalize-migrate
+npm API_PG_USER=ideaboard_api API_PG_PASSWORD=ideaboard_api_test AUTH_PG_USER=ideaboard_auth AUTH_PG_PASSWORD=ideaboard_auth_test run migrate:dist
+atlas API_PG_USER=ideaboard_api API_PG_PASSWORD=ideaboard_api_test AUTH_PG_USER=ideaboard_auth AUTH_PG_PASSWORD=ideaboard_auth_test migrate apply --dir file://${repo_root}/apps/api/internal/db/migrations --url postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test\\?sslmode=disable
+go API_PG_USER=ideaboard_api API_PG_PASSWORD=ideaboard_api_test AUTH_PG_USER=ideaboard_auth AUTH_PG_PASSWORD=ideaboard_auth_test run ./cmd finalize-migrate
+npm API_PG_USER=ideaboard_api API_PG_PASSWORD=ideaboard_api_test AUTH_PG_USER=ideaboard_auth AUTH_PG_PASSWORD=ideaboard_auth_test run migrate:dist
 EOF
 
 normalized_log="${fixture_dir}/normalized.log"

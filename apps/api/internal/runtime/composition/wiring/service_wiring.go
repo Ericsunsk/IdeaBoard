@@ -60,10 +60,11 @@ func NewAppDomainServices(ctx context.Context, cfg *config.Config, repos AppRepo
 	storageService := storage.NewServiceWithLocalRoot(
 		repos.storageProfileRepo,
 		// Browser-visible upload references must resolve through the same-origin
-		// gateway. API_BASE_URL remains reserved for webhooks and server-side
-		// integrations; using it here would leak a separate API host into the SPA.
+		// gateway (PUBLIC_ORIGIN). Webhooks and server-side integrations use
+		// the same origin; using anything else here would leak a separate
+		// host into the SPA.
 		cfg.PublicOrigins.Web,
-		cfg.Storage.LocalRoot,
+		config.DefaultStorageLocalRoot,
 	)
 	if err := storageService.EnsureDefaultProfiles(ctx); err != nil {
 		return AppDomainServices{}, fmt.Errorf("failed to ensure default storage profiles: %w", err)

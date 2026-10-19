@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
 
 	"github.com/gin-gonic/gin"
@@ -343,6 +344,117 @@ func TestClientIPFallsBackToRawRemoteAddrWhenGinCannotParse(t *testing.T) {
 
 	if got := clientIP(c); got != "not-a-host-port" {
 		t.Fatalf("clientIP fallback = %q, want raw RemoteAddr", got)
+	}
+}
+
+func TestClientIPResolvesRealIPBehindDockerBridgeGateway(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	if err := router.SetTrustedProxies((config.AppConfig{Env: "production"}).TrustedProxies()); err != nil {
+		t.Fatalf("SetTrustedProxies(%v) error = %v", (config.AppConfig{Env: "production"}).TrustedProxies(), err)
+	}
+	router.GET("/ip", func(c *gin.Context) {
+		c.String(http.StatusOK, clientIP(c))
+	})
+
+	// Under Docker bridge port mapping the container sees RemoteAddr as
+	// the bridge gateway IP; the host Nginx has already restored the real
+	// client IP into X-Forwarded-For.
+	cases := map[string]struct {
+		remoteAddr string
+		xff        string
+		want       string
+	}{
+		"single XFF through 172.16/12 gateway":  {remoteAddr: "172.18.0.1:41234", xff: "203.0.113.99", want: "203.0.113.99"},
+		"proxy-appended XFF through gateway":    {remoteAddr: "172.18.0.1:41234", xff: "203.0.113.99, 172.18.0.1", want: "203.0.113.99"},
+		"single XFF through 10/8 gateway":       {remoteAddr: "10.0.0.1:41234", xff: "198.51.100.23", want: "198.51.100.23"},
+		"single XFF through 192.168/16 gateway": {remoteAddr: "192.168.65.1:41234", xff: "198.51.100.24", want: "198.51.100.24"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/ip", nil)
+			req.RemoteAddr = tc.remoteAddr
+			req.Header.Set("X-Forwarded-For", tc.xff)
+			router.ServeHTTP(res, req)
+			if res.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d", res.Code, http.StatusOK)
+			}
+			if got := res.Body.String(); got != tc.want {
+				t.Fatalf("clientIP = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestClientIPIgnoresForgedXFFFromUntrustedDirectClient(t *testing.T) {
+	// Security boundary note: with private ranges trusted, anyone able to
+	// reach 6000 directly could forge X-Forwarded-For and evade per-IP
+	// rate limiting. This trust holds only because compose publishes 6000
+	// on 127.0.0.1 behind the same-origin host Nginx gateway. A direct
+	// public client presents an untrusted RemoteAddr, and Gin then ignores
+	// XFF entirely and returns the RemoteAddr host.
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	if err := router.SetTrustedProxies((config.AppConfig{Env: "production"}).TrustedProxies()); err != nil {
+		t.Fatalf("SetTrustedProxies(%v) error = %v", (config.AppConfig{Env: "production"}).TrustedProxies(), err)
+	}
+	router.GET("/ip", func(c *gin.Context) {
+		c.String(http.StatusOK, clientIP(c))
+	})
+
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/ip", nil)
+	req.RemoteAddr = "198.51.100.7:54321"
+	req.Header.Set("X-Forwarded-For", "203.0.113.99")
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", res.Code, http.StatusOK)
+	}
+	if got := res.Body.String(); got != "198.51.100.7" {
+		t.Fatalf("clientIP = %q, want RemoteAddr host (forged XFF must be ignored)", got)
+	}
+}
+
+func TestRateLimitDistinguishesClientsBehindSharedGateway(t *testing.T) {
+	// Regression for the gateway single-bucket collapse: without gateway
+	// trust every client behind the Docker bridge shares one gateway-IP
+	// bucket; with trust each real client IP gets its own bucket.
+	resetRateLimitStore()
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	if err := router.SetTrustedProxies((config.AppConfig{Env: "production"}).TrustedProxies()); err != nil {
+		t.Fatalf("SetTrustedProxies(%v) error = %v", (config.AppConfig{Env: "production"}).TrustedProxies(), err)
+	}
+	router.Use(rateLimitMiddleware(nil))
+	router.GET("/ping", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	doReq := func(realIP string) int {
+		res := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+		req.RemoteAddr = "172.18.0.1:41234"
+		req.Header.Set("X-Forwarded-For", realIP)
+		router.ServeHTTP(res, req)
+		return res.Code
+	}
+
+	// Exhaust client A's burst through the shared gateway.
+	for i := 0; i < defaultRateLimitBurst; i++ {
+		if code := doReq("203.0.113.50"); code != http.StatusOK {
+			t.Fatalf("client A request %d status = %d, want %d", i+1, code, http.StatusOK)
+		}
+	}
+	if code := doReq("203.0.113.50"); code != http.StatusTooManyRequests {
+		t.Fatalf("client A overflow status = %d, want %d", code, http.StatusTooManyRequests)
+	}
+	// Client B behind the same gateway must still have a full bucket.
+	if code := doReq("203.0.113.51"); code != http.StatusOK {
+		t.Fatalf("client B status = %d, want %d (buckets must not collapse into the gateway IP)", code, http.StatusOK)
 	}
 }
 

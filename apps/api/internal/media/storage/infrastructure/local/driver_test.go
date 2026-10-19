@@ -6,6 +6,7 @@ import (
 	"errors"
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
+	"ideaboard/api/internal/platform/config"
 	"os"
 	"path/filepath"
 	"sync"
@@ -52,7 +53,7 @@ func TestLocalStorageDriverReadWriteDelete(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chdir(origWD) })
 
-	driver := NewLocalStorageDriver("")
+	driver := NewLocalStorageDriverWithRoot("", config.DefaultStorageLocalRoot)
 	profile := &domain.StorageProfile{Provider: domain.StorageProviderLocal}
 	ctx := context.Background()
 
@@ -61,6 +62,9 @@ func TestLocalStorageDriverReadWriteDelete(t *testing.T) {
 		t.Fatalf("put object error: %v", err)
 	}
 
+	if _, err := os.Stat(filepath.Join(dir, "uploads/test/sample.bin")); err != nil {
+		t.Fatalf("upload must use process root shared with imgproxy: %v", err)
+	}
 	obj, err := driver.Read(ctx, profile, "uploads/test/sample.bin", 1024)
 	if err != nil {
 		t.Fatalf("read error: %v", err)

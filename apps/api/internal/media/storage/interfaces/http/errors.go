@@ -65,23 +65,3 @@ func writeStorageCommandError(c *gin.Context, fallback string, err error) {
 	errorrender.RenderDefault(c, "storage operation failed",
 		http.StatusInternalServerError, codeStorageOperationFailed, fallback, err)
 }
-
-// Backend-owned user-facing copy for this package. Each constant
-// is the single source of truth for one rendered message; call
-// sites reference these names so copy changes stay in one place.
-// Values are byte-identical to the previously inline literals.
-
-// codeStorageInvalidInput
-// codeStorageServiceUnavailable
-// codeStorageOperationFailed
-// CreateProfile @ handler.go
-// DeleteProfile @ handler.go
-// DeleteProfile @ handler.go
-// ApplyProfile @ handler.go
-// ApplyProfile @ handler.go
-// TestProfile @ handler.go
-// TestProfile @ handler.go
-// GetBucketInfo @ handler.go
-// SaveProfile @ handler.go
-// StorageSaveProfileMessage @ handler.go
-// StorageSaveProfileMessage @ handler.go

@@ -59,7 +59,7 @@ func RiverRetryMatrix() []QueueRetryPolicy {
 		{
 			Queue:       RiverQueueTaskRetention,
 			MaxAttempts: RiverMaxAttemptsTaskRetention,
-			Worker:      "TaskRetentionWorker (serial single-worker queue)",
+			Worker:      "WorkspacePurgeWorker (serial single-worker queue)",
 			Notes:       "purge runs are serial by design; failures must surface immediately, not retry into the next window",
 		},
 		{

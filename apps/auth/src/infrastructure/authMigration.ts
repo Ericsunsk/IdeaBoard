@@ -26,17 +26,17 @@ export async function runAuthMigrations(
   source: EnvSource,
   dependencies: AuthMigrationDependencies,
 ): Promise<void> {
-  const runtimeUser = requiredValue(source, 'DB_USER')
-  const migrationUser = requiredValue(source, 'DB_MIGRATION_USER')
-  const migrationPassword = requiredValue(source, 'DB_MIGRATION_PASSWORD')
+  const runtimeUser = requiredValue(source, 'AUTH_PG_USER')
+  const migrationUser = requiredValue(source, 'PG_MIGRATION_USER')
+  const migrationPassword = requiredValue(source, 'PG_MIGRATION_PASSWORD')
   if (runtimeUser === migrationUser) {
-    throw new Error('DB_MIGRATION_USER must differ from DB_USER')
+    throw new Error('PG_MIGRATION_USER must differ from AUTH_PG_USER')
   }
 
   const migrationEnvironment = loadEnv({
     ...source,
-    DB_USER: migrationUser,
-    DB_PASSWORD: migrationPassword,
+    AUTH_PG_USER: migrationUser,
+    AUTH_PG_PASSWORD: migrationPassword,
   })
   const database = dependencies.createDatabase(migrationEnvironment)
   try {

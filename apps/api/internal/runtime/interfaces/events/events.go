@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"ideaboard/api/internal/events"
 	eventnats "ideaboard/api/internal/events/nats"
@@ -85,21 +84,12 @@ func NewTaskStatusEventPublisher(
 		userHub = userHubs[0]
 	}
 	localPublisher := TaskEventHubPublisher{Hub: hub, UserHub: userHub, Resolver: resolver}
-	if !cfg.Enabled {
-		return localPublisher, nil, nil
-	}
 	if cfg.NATSURL == "" {
-		return nil, nil, fmt.Errorf("NATS_EVENT_BUS_ENABLED=true requires NATS_PASSWORD")
+		return localPublisher, nil, nil
 	}
 
 	bus, err := eventnats.NewNATSJetStreamEventBus(ctx, eventnats.NATSJetStreamConfig{
-		URL:            cfg.NATSURL,
-		StreamName:     cfg.NATSStreamName,
-		SubjectPrefix:  cfg.NATSSubjectPrefix,
-		ConsumerName:   cfg.NATSConsumerName,
-		ConnectTimeout: time.Duration(cfg.NATSConnectTimeout) * time.Second,
-		RequestTimeout: time.Duration(cfg.NATSRequestTimeout) * time.Second,
-		DrainTimeout:   time.Duration(cfg.NATSDrainTimeout) * time.Second,
+		URL: cfg.NATSURL,
 	})
 	if err != nil {
 		return nil, nil, err

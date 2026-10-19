@@ -25,14 +25,14 @@ type Config struct {
 	Credits       CreditsConfig
 	Rewards       RewardsConfig
 	Realtime      RealtimeConfig
-	Storage       StorageConfig
 	Imgproxy      ImgproxyConfig
 	// AdminSeed carries the init-admin provisioning inputs. They are
 	// command-scoped (only the init-admin command requires them), so
 	// Validate leaves them unchecked; the command fails fast instead.
 	AdminSeed AdminSeedConfig
-	// Migration carries the Atlas tooling knobs for the migrate path.
-	// Empty values resolve to DefaultAtlasBinary/DefaultMigrationDirectory.
+	// Migration carries the Atlas clean-break opt-in for the migrate path.
+	// The Atlas binary and migrations directory are hardcoded code
+	// constants (DefaultAtlasBinary/DefaultMigrationDirectory).
 	Migration MigrationToolingConfig
 	// Secrets carries the raw at-rest encryption key material. Presence is
 	// enforced by Validate; format (base64, 32 bytes) stays with the
@@ -59,7 +59,7 @@ type RewardsConfig struct {
 }
 
 // RealtimeConfig carries the board realtime-ticket HMAC secret read from
-// REALTIME_TICKET_SECRET. Empty fails the ticket endpoint closed with 500
+// RT_TICKET_SECRET. Empty fails the ticket endpoint closed with 500
 // (no fallback default); Load records the missing key in InvalidEnv so
 // production startup fails fast via ValidateEnvStrict.
 type RealtimeConfig struct {
@@ -75,25 +75,15 @@ type DatabaseConfig struct {
 	MigrationPassword string
 	Database          string
 	SSLMode           string
-	Pool              PoolConfig
 }
 
-// PoolConfig bounds the runtime pgxpool and the River pgxpool. Values are
-// deploy-level tuning (see docs/runbooks/deployment.md): the combined
-// runtime MaxOpenConns + River MaxConns of one API instance must stay
-// under PostgreSQL max_connections with headroom for migrations and CLIs.
-// Out-of-range values fall back to defaults and are recorded in
-// Config.InvalidEnv so production startup fails fast instead of silently
-// running with defaults.
-type PoolConfig struct {
-	MaxOpenConns   int
-	MaxIdleConns   int
-	MaxLifetimeMin int
-	MaxIdleTimeMin int
-	RiverMaxConns  int
-	RiverMinConns  int
-}
-
+// Pool sizing is hardcoded code constants by design (no env knobs; see
+// docs/runbooks/deployment.md): DefaultPoolMaxOpenConns bounds the runtime
+// pgxpool and DefaultRiverPoolMaxConns bounds the River pgxpool, while idle
+// sizing and connection recycling use the remaining DefaultPoolMax* /
+// DefaultRiverPoolMinConns constants. A single API instance holds
+// 25 + 10 = 35 connections against the default PostgreSQL
+// max_connections=100, leaving headroom for migrations, CLIs and fixtures.
 const (
 	DefaultPoolMaxOpenConns   = 25
 	DefaultPoolMaxIdleConns   = 10
@@ -103,116 +93,38 @@ const (
 	DefaultRiverPoolMinConns  = 1
 )
 
-const (
-	minPoolMaxOpenConns  = 1
-	maxPoolMaxOpenConns  = 64
-	minPoolMaxIdleConns  = 0
-	maxPoolMaxIdleConns  = 64
-	minPoolLifetimeMin   = 1
-	maxPoolLifetimeMin   = 1440
-	minPoolIdleTimeMin   = 1
-	maxPoolIdleTimeMin   = 1440
-	minRiverPoolMaxConns = 1
-	maxRiverPoolMaxConns = 32
-	minRiverPoolMinConns = 1
-	maxRiverPoolMinConns = 16
-	// Leave room on the default PostgreSQL max_connections=100 for migrations,
-	// CLIs and health tooling; runtime and River pools may consume at most 80.
-	maxRuntimePoolBudget = 80
-)
-
-// EffectiveMaxOpenConns clamps the configured ceiling into the supported
-// range, falling back to the default for unset or invalid values.
-func (c PoolConfig) EffectiveMaxOpenConns() int {
-	if c.MaxOpenConns < minPoolMaxOpenConns || c.MaxOpenConns > maxPoolMaxOpenConns {
-		return DefaultPoolMaxOpenConns
-	}
-	return c.MaxOpenConns
-}
-
-// EffectiveMaxIdleConns clamps idle connections and never exceeds the
-// effective open ceiling, so a misconfigured idle count cannot reserve more
-// than the pool allows.
-func (c PoolConfig) EffectiveMaxIdleConns() int {
-	maxOpen := c.EffectiveMaxOpenConns()
-	if c.MaxIdleConns < minPoolMaxIdleConns || c.MaxIdleConns > maxPoolMaxIdleConns {
-		return min(DefaultPoolMaxIdleConns, maxOpen)
-	}
-	if c.MaxIdleConns > maxOpen {
-		return maxOpen
-	}
-	return c.MaxIdleConns
-}
-
-// EffectiveMaxLifetimeMin bounds connection recycling age in minutes.
-func (c PoolConfig) EffectiveMaxLifetimeMin() int {
-	if c.MaxLifetimeMin < minPoolLifetimeMin || c.MaxLifetimeMin > maxPoolLifetimeMin {
-		return DefaultPoolMaxLifetimeMin
-	}
-	return c.MaxLifetimeMin
-}
-
-// EffectiveMaxIdleTimeMin bounds idle recycling age in minutes.
-func (c PoolConfig) EffectiveMaxIdleTimeMin() int {
-	if c.MaxIdleTimeMin < minPoolIdleTimeMin || c.MaxIdleTimeMin > maxPoolIdleTimeMin {
-		return DefaultPoolMaxIdleTimeMin
-	}
-	return c.MaxIdleTimeMin
-}
-
-// EffectiveRiverMaxConns clamps the River pgxpool ceiling.
-func (c PoolConfig) EffectiveRiverMaxConns() int {
-	if c.RiverMaxConns < minRiverPoolMaxConns || c.RiverMaxConns > maxRiverPoolMaxConns {
-		return DefaultRiverPoolMaxConns
-	}
-	return c.RiverMaxConns
-}
-
-// EffectiveRiverMinConns clamps the River pgxpool floor and never exceeds
-// the effective ceiling.
-func (c PoolConfig) EffectiveRiverMinConns() int {
-	maxConns := c.EffectiveRiverMaxConns()
-	if c.RiverMinConns < minRiverPoolMinConns || c.RiverMinConns > maxRiverPoolMinConns {
-		return DefaultRiverPoolMinConns
-	}
-	if c.RiverMinConns > maxConns {
-		return maxConns
-	}
-	return c.RiverMinConns
-}
-
 type AppConfig struct {
-	Port               string
-	Host               string
-	MetricsAddr        string
 	Env                string
 	CORSAllowedOrigins []string
-	// TrustedProxies are the reverse proxies (Nginx, Cloudflare, load
-	// balancer) whose X-Forwarded-For headers Gin may trust for ClientIP.
-	// ClientIP feeds per-IP rate limiting, so an open trust breaks abuse
-	// control via header spoofing. Defaults to loopback only; production
-	// behind a proxy must set APP_TRUSTED_PROXIES explicitly.
-	TrustedProxies []string
 }
 
-// PublicOriginsConfig is immutable deployment configuration. Web owns browser
-// navigation URLs; API owns webhooks and locally served assets. API defaults
-// to the public origin at load time, while the separate fields preserve URL
-// semantics and allow an explicit API host override when needed.
+// IsProduction selects the repository's production Compose topology.
+func (c AppConfig) IsProduction() bool {
+	return isProductionAppEnv(c.Env)
+}
+
+// TrustedProxies only trusts the Docker bridge in the owned production
+// topology, whose API port is published on host loopback behind Nginx.
+// Host development trusts loopback proxies only and binds loopback listeners.
+func (c AppConfig) TrustedProxies() []string {
+	proxies := []string{"127.0.0.1", "::1"}
+	if c.IsProduction() {
+		proxies = append(proxies, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+	}
+	return proxies
+}
+
+// PublicOriginsConfig is immutable deployment configuration. Web is the
+// single canonical public origin (PUBLIC_ORIGIN): it owns browser navigation
+// URLs as well as webhooks and locally served assets. APIURL and
+// APIParsedURL resolve through the same origin; there is no separate API
+// host override by design (same-origin Gateway).
 type PublicOriginsConfig struct {
 	Web string
-	API string
 }
 
 func (c PublicOriginsConfig) Validate() error {
-	if err := validatePublicOrigin("PUBLIC_ORIGIN", c.Web); err != nil {
-		return err
-	}
-	apiOrigin := c.API
-	if strings.TrimSpace(apiOrigin) == "" {
-		apiOrigin = c.Web
-	}
-	return validatePublicOrigin("API_BASE_URL", apiOrigin)
+	return validatePublicOrigin("PUBLIC_ORIGIN", c.Web)
 }
 
 func (c PublicOriginsConfig) WebURL(path string) string {
@@ -223,25 +135,14 @@ func (c PublicOriginsConfig) WebURL(path string) string {
 }
 
 func (c PublicOriginsConfig) APIURL(path string) string {
-	origin := c.API
-	if strings.TrimSpace(origin) == "" {
-		origin = c.Web
-	}
-	if validatePublicOrigin("API_BASE_URL", origin) != nil {
-		return ""
-	}
-	return joinPublicOrigin(origin, path)
+	return c.WebURL(path)
 }
 
 func (c PublicOriginsConfig) APIParsedURL() *url.URL {
-	origin := c.API
-	if strings.TrimSpace(origin) == "" {
-		origin = c.Web
-	}
-	if validatePublicOrigin("API_BASE_URL", origin) != nil {
+	if validatePublicOrigin("PUBLIC_ORIGIN", c.Web) != nil {
 		return nil
 	}
-	parsed, err := url.Parse(origin)
+	parsed, err := url.Parse(c.Web)
 	if err != nil {
 		return nil
 	}
@@ -250,14 +151,6 @@ func (c PublicOriginsConfig) APIParsedURL() *url.URL {
 
 type WorkerConfig struct {
 	Concurrency int
-	// TaskRetentionDays bounds raw task row lifetime; statistics aggregates
-	// and financial facts are retained independently of this window.
-	TaskRetentionDays int
-	// WorkspacePurgeAfterDays bounds archived workspace lifetime: a
-	// non-Default workspace archived longer ago than this window is
-	// hard-deleted with its boards and files. Billing records, the credit
-	// ledger, and user rows are retained independently of this window.
-	WorkspacePurgeAfterDays int
 }
 
 const (
@@ -266,17 +159,12 @@ const (
 	maxRiverWorkerConcurrency     = 64
 )
 
-const (
-	DefaultTaskRetentionDays = 7
-	minTaskRetentionDays     = 1
-	maxTaskRetentionDays     = 90
-)
-
-const (
-	DefaultWorkspacePurgeAfterDays = 7
-	minWorkspacePurgeAfterDays     = 1
-	maxWorkspacePurgeAfterDays     = 90
-)
+// DefaultWorkspacePurgeAfterDays is the hardcoded archived-workspace purge
+// window (days): a non-Default workspace archived longer ago than this
+// window is hard-deleted with its boards and files. Billing records, the
+// credit ledger, and user rows are retained independently of this window.
+// It is a code constant by design (no env knob); wiring passes it directly.
+const DefaultWorkspacePurgeAfterDays = 7
 
 func (c WorkerConfig) EffectiveConcurrency() int {
 	if c.Concurrency < minRiverWorkerConcurrency || c.Concurrency > maxRiverWorkerConcurrency {
@@ -329,32 +217,8 @@ func (m ProcessMode) RunsWorkers() bool {
 	return m != ProcessModeHTTPOnly
 }
 
-func (c WorkerConfig) EffectiveTaskRetentionDays() int {
-	if c.TaskRetentionDays < minTaskRetentionDays || c.TaskRetentionDays > maxTaskRetentionDays {
-		return DefaultTaskRetentionDays
-	}
-	return c.TaskRetentionDays
-}
-
-// EffectiveWorkspacePurgeAfterDays clamps the archived-workspace purge
-// window into the supported range, falling back to the default for unset
-// or invalid values.
-func (c WorkerConfig) EffectiveWorkspacePurgeAfterDays() int {
-	if c.WorkspacePurgeAfterDays < minWorkspacePurgeAfterDays || c.WorkspacePurgeAfterDays > maxWorkspacePurgeAfterDays {
-		return DefaultWorkspacePurgeAfterDays
-	}
-	return c.WorkspacePurgeAfterDays
-}
-
 type EventBusConfig struct {
-	Enabled            bool
-	NATSURL            string
-	NATSStreamName     string
-	NATSSubjectPrefix  string
-	NATSConsumerName   string
-	NATSConnectTimeout int
-	NATSRequestTimeout int
-	NATSDrainTimeout   int
+	NATSURL string
 }
 
 type AuthServiceConfig struct {
@@ -365,12 +229,10 @@ type AuthServiceConfig struct {
 
 const DefaultAuthServiceTimeoutSeconds = 5
 
-type StorageConfig struct {
-	// LocalRoot is the canonical filesystem root for the builtin-local
-	// storage driver. Empty resolves to the process working directory,
-	// canonicalized once at startup.
-	LocalRoot string
-}
+// DefaultStorageLocalRoot resolves once from the process working directory.
+// Host development starts in apps/api; container WORKDIR is /app. Both
+// share the same uploads layout with imgproxy.
+const DefaultStorageLocalRoot = "."
 
 // ImgproxyConfig binds the on-demand derivative renderer. Display tiers
 // resolve through signed imgproxy URLs; the async precompute chain is gone.
@@ -388,11 +250,10 @@ type AdminSeedConfig struct {
 	DisplayName string
 }
 
-// MigrationToolingConfig carries the Atlas tooling knobs read from
-// ATLAS_BINARY, ATLAS_MIGRATIONS_DIR and ATLAS_CLEAN_BREAK_ALLOW_RESET.
+// MigrationToolingConfig carries the Atlas clean-break opt-in read from
+// ATLAS_CLEAN_BREAK_ALLOW_RESET. The Atlas binary and migrations directory
+// are hardcoded code constants (DefaultAtlasBinary/DefaultMigrationDirectory).
 type MigrationToolingConfig struct {
-	AtlasBinary   string
-	MigrationsDir string
 	// CleanBreakAllowReset is the explicit opt-in for the destructive clean
 	// break path that drops and recreates the public schema. It defaults to
 	// false: a database whose Atlas revisions are absent from the shipped
@@ -408,60 +269,42 @@ type SecretsConfig struct {
 }
 
 const (
-	// DefaultAtlasBinary is the Atlas executable used when ATLAS_BINARY is unset.
+	// DefaultAtlasBinary is the Atlas executable (hardcoded; no env knob).
 	DefaultAtlasBinary = "atlas"
-	// DefaultMigrationDirectory is the Atlas migration directory used when
-	// ATLAS_MIGRATIONS_DIR is unset.
+	// DefaultMigrationDirectory is the Atlas migration directory
+	// (hardcoded; no env knob).
 	DefaultMigrationDirectory = "file://internal/db/migrations"
 )
 
+const defaultNATSPort = "4222"
+
 type envConfig struct {
-	DBHost              string `env:"DB_HOST"`
-	DBPort              string `env:"DB_PORT"`
-	DBUser              string `env:"DB_USER"`
-	DBPassword          string `env:"DB_PASSWORD"`
-	DBMigrationUser     string `env:"DB_MIGRATION_USER"`
-	DBMigrationPassword string `env:"DB_MIGRATION_PASSWORD"`
-	DBName              string `env:"DB_NAME"`
-	DBSSLMode           string `env:"DB_SSLMODE"`
-	DBPoolMaxOpen       string `env:"DB_POOL_MAX_OPEN"`
-	DBPoolMaxIdle       string `env:"DB_POOL_MAX_IDLE"`
-	DBPoolMaxLifetime   string `env:"DB_POOL_MAX_LIFETIME_MINUTES"`
-	DBPoolMaxIdleTime   string `env:"DB_POOL_MAX_IDLE_MINUTES"`
-	RiverPoolMaxConns   string `env:"RIVER_POOL_MAX_CONNS"`
-	RiverPoolMinConns   string `env:"RIVER_POOL_MIN_CONNS"`
-	NATSEventBusEnabled string `env:"NATS_EVENT_BUS_ENABLED"`
+	PGHost              string `env:"PG_HOST"`
+	PGPort              string `env:"PG_PORT"`
+	APIPGUser           string `env:"API_PG_USER"`
+	APIPGPassword       string `env:"API_PG_PASSWORD"`
+	PGMigrationUser     string `env:"PG_MIGRATION_USER"`
+	PGMigrationPassword string `env:"PG_MIGRATION_PASSWORD"`
+	PGDB                string `env:"PG_DB"`
+	PGSSLMode           string `env:"PG_SSLMODE"`
 	NATSPassword        string `env:"NATS_PASSWORD"`
-	NATSHost            string `env:"NATS_HOST"`
-	NATSPort            string `env:"NATS_PORT"`
 	RiverConcurrency    string `env:"RIVER_WORKER_CONCURRENCY"`
-	TaskRetentionDays   string `env:"TASK_RETENTION_DAYS"`
-	WorkspacePurgeDays  string `env:"WORKSPACE_PURGE_AFTER_DAYS"`
 
-	AppPort               string `env:"APP_PORT"`
-	AppHost               string `env:"APP_HOST"`
-	MetricsAddr           string `env:"METRICS_ADDR"`
-	AppEnv                string `env:"APP_ENV"`
-	AppMode               string `env:"API_MODE"`
-	AppCORSAllowedOrigins string `env:"APP_CORS_ALLOWED_ORIGINS"`
-	AppTrustedProxies     string `env:"APP_TRUSTED_PROXIES"`
-	PublicOrigin          string `env:"PUBLIC_ORIGIN"`
-	APIBaseURL            string `env:"API_BASE_URL"`
+	AppEnv       string `env:"APP_ENV"`
+	AppMode      string `env:"API_MODE"`
+	PublicOrigin string `env:"PUBLIC_ORIGIN"`
 
-	AuthServiceBaseURL        string `env:"AUTH_SERVICE_BASE_URL"`
+	AuthServiceBaseURL        string `env:"AUTH_INTERNAL_URL"`
 	AuthServiceInternalAPIKey string `env:"AUTH_INTERNAL_KEY"`
-	StorageLocalRoot          string `env:"STORAGE_LOCAL_ROOT"`
 	CreditsWelcomeIdentityKey string `env:"CREDITS_WELCOME_IDENTITY_KEY"`
 	RewardsCodeHMACKeys       string `env:"REWARDS_CODE_HMAC_KEYS"`
-	RealtimeTicketSecret      string `env:"REALTIME_TICKET_SECRET"`
+	RealtimeTicketSecret      string `env:"RT_TICKET_SECRET"`
 	ImgproxyKeyHex            string `env:"IMGPROXY_KEY"`
 	ImgproxySaltHex           string `env:"IMGPROXY_SALT"`
 
 	InitAdminEmail       string `env:"INIT_ADMIN_EMAIL"`
 	InitAdminPassword    string `env:"INIT_ADMIN_PASSWORD"`
 	InitAdminDisplayName string `env:"INIT_ADMIN_DISPLAY_NAME"`
-	AtlasBinary          string `env:"ATLAS_BINARY"`
-	AtlasMigrationsDir   string `env:"ATLAS_MIGRATIONS_DIR"`
 	// AtlasCleanBreakAllowReset gates DROP SCHEMA public CASCADE. It is a
 	// deliberate, self-describing opt-in rather than a bare boolean so the
 	// blast radius is obvious to whoever sets it in a deploy environment.
@@ -479,85 +322,38 @@ func Load() *Config {
 		slog.Warn("failed to parse environment config; using defaults where possible", "err", err)
 	}
 
-	raw.DBPassword = strings.TrimSpace(raw.DBPassword)
-	if raw.DBPassword == "" {
-		slog.Warn("DB_PASSWORD is not set; database connection may fail")
+	raw.APIPGPassword = strings.TrimSpace(raw.APIPGPassword)
+	if raw.APIPGPassword == "" {
+		slog.Warn("API_PG_PASSWORD is not set; database connection may fail")
 	}
-	raw.DBMigrationPassword = strings.TrimSpace(raw.DBMigrationPassword)
+	raw.PGMigrationPassword = strings.TrimSpace(raw.PGMigrationPassword)
 
 	appEnv := normalizeAppEnv(raw.AppEnv)
 	imgproxyBaseURL := "http://127.0.0.1:8080"
 	if isProductionAppEnv(appEnv) {
 		imgproxyBaseURL = "http://imgproxy:8080"
 	}
+	natsHost := "127.0.0.1"
+	if isProductionAppEnv(appEnv) {
+		natsHost = "nats"
+	}
 	natsURL := ""
 	natsPassword := strings.TrimSpace(raw.NATSPassword)
-	natsHost := stringEnvDefault(raw.NATSHost, "127.0.0.1")
-	natsPort := stringEnvDefault(raw.NATSPort, "4222")
 	if natsPassword != "" {
 		natsURL = (&url.URL{
 			Scheme: "nats",
 			User:   url.UserPassword("ideaboard", natsPassword),
-			Host:   net.JoinHostPort(natsHost, natsPort),
+			Host:   net.JoinHostPort(natsHost, defaultNATSPort),
 		}).String()
 	}
 
 	publicOrigin := normalizePublicOrigin(raw.PublicOrigin)
-	apiOrigin := normalizePublicOrigin(raw.APIBaseURL)
-	if apiOrigin == "" {
-		apiOrigin = publicOrigin
-	}
 
 	var invalidEnv []string
-	eventBusEnabled, eventBusValid := parseBoolEnv(raw.NATSEventBusEnabled, natsURL != "")
-	if !eventBusValid {
-		invalidEnv = append(invalidEnv, "NATS_EVENT_BUS_ENABLED")
-		slog.Warn("invalid boolean env; fallback to default", "key", "NATS_EVENT_BUS_ENABLED", "value", strings.TrimSpace(raw.NATSEventBusEnabled), "default", natsURL != "")
-	}
 	workerConcurrency, workerValid := boundedIntEnv(raw.RiverConcurrency, DefaultRiverWorkerConcurrency, minRiverWorkerConcurrency, maxRiverWorkerConcurrency)
 	if !workerValid {
 		invalidEnv = append(invalidEnv, "RIVER_WORKER_CONCURRENCY")
 		slog.Warn("invalid integer env; fallback to default", "key", "RIVER_WORKER_CONCURRENCY", "value", strings.TrimSpace(raw.RiverConcurrency), "default", DefaultRiverWorkerConcurrency)
-	}
-	retentionDays, retentionValid := boundedIntEnv(raw.TaskRetentionDays, DefaultTaskRetentionDays, minTaskRetentionDays, maxTaskRetentionDays)
-	if !retentionValid {
-		invalidEnv = append(invalidEnv, "TASK_RETENTION_DAYS")
-		slog.Warn("invalid integer env; fallback to default", "key", "TASK_RETENTION_DAYS", "value", strings.TrimSpace(raw.TaskRetentionDays), "default", DefaultTaskRetentionDays)
-	}
-	workspacePurgeDays, workspacePurgeValid := boundedIntEnv(raw.WorkspacePurgeDays, DefaultWorkspacePurgeAfterDays, minWorkspacePurgeAfterDays, maxWorkspacePurgeAfterDays)
-	if !workspacePurgeValid {
-		invalidEnv = append(invalidEnv, "WORKSPACE_PURGE_AFTER_DAYS")
-		slog.Warn("invalid integer env; fallback to default", "key", "WORKSPACE_PURGE_AFTER_DAYS", "value", strings.TrimSpace(raw.WorkspacePurgeDays), "default", DefaultWorkspacePurgeAfterDays)
-	}
-	poolMaxOpen, poolMaxOpenValid := boundedIntEnv(raw.DBPoolMaxOpen, DefaultPoolMaxOpenConns, minPoolMaxOpenConns, maxPoolMaxOpenConns)
-	if !poolMaxOpenValid {
-		invalidEnv = append(invalidEnv, "DB_POOL_MAX_OPEN")
-		slog.Warn("invalid integer env; fallback to default", "key", "DB_POOL_MAX_OPEN", "value", strings.TrimSpace(raw.DBPoolMaxOpen), "default", DefaultPoolMaxOpenConns)
-	}
-	poolMaxIdle, poolMaxIdleValid := boundedIntEnv(raw.DBPoolMaxIdle, DefaultPoolMaxIdleConns, minPoolMaxIdleConns, maxPoolMaxIdleConns)
-	if !poolMaxIdleValid {
-		invalidEnv = append(invalidEnv, "DB_POOL_MAX_IDLE")
-		slog.Warn("invalid integer env; fallback to default", "key", "DB_POOL_MAX_IDLE", "value", strings.TrimSpace(raw.DBPoolMaxIdle), "default", DefaultPoolMaxIdleConns)
-	}
-	poolLifetime, poolLifetimeValid := boundedIntEnv(raw.DBPoolMaxLifetime, DefaultPoolMaxLifetimeMin, minPoolLifetimeMin, maxPoolLifetimeMin)
-	if !poolLifetimeValid {
-		invalidEnv = append(invalidEnv, "DB_POOL_MAX_LIFETIME_MINUTES")
-		slog.Warn("invalid integer env; fallback to default", "key", "DB_POOL_MAX_LIFETIME_MINUTES", "value", strings.TrimSpace(raw.DBPoolMaxLifetime), "default", DefaultPoolMaxLifetimeMin)
-	}
-	poolIdleTime, poolIdleTimeValid := boundedIntEnv(raw.DBPoolMaxIdleTime, DefaultPoolMaxIdleTimeMin, minPoolIdleTimeMin, maxPoolIdleTimeMin)
-	if !poolIdleTimeValid {
-		invalidEnv = append(invalidEnv, "DB_POOL_MAX_IDLE_MINUTES")
-		slog.Warn("invalid integer env; fallback to default", "key", "DB_POOL_MAX_IDLE_MINUTES", "value", strings.TrimSpace(raw.DBPoolMaxIdleTime), "default", DefaultPoolMaxIdleTimeMin)
-	}
-	riverMaxConns, riverMaxValid := boundedIntEnv(raw.RiverPoolMaxConns, DefaultRiverPoolMaxConns, minRiverPoolMaxConns, maxRiverPoolMaxConns)
-	if !riverMaxValid {
-		invalidEnv = append(invalidEnv, "RIVER_POOL_MAX_CONNS")
-		slog.Warn("invalid integer env; fallback to default", "key", "RIVER_POOL_MAX_CONNS", "value", strings.TrimSpace(raw.RiverPoolMaxConns), "default", DefaultRiverPoolMaxConns)
-	}
-	riverMinConns, riverMinValid := boundedIntEnv(raw.RiverPoolMinConns, DefaultRiverPoolMinConns, minRiverPoolMinConns, maxRiverPoolMinConns)
-	if !riverMinValid {
-		invalidEnv = append(invalidEnv, "RIVER_POOL_MIN_CONNS")
-		slog.Warn("invalid integer env; fallback to default", "key", "RIVER_POOL_MIN_CONNS", "value", strings.TrimSpace(raw.RiverPoolMinConns), "default", DefaultRiverPoolMinConns)
 	}
 	// ATLAS_CLEAN_BREAK_ALLOW_RESET gates DROP SCHEMA public CASCADE. An
 	// unparseable value must fail closed (false) and be reported, never
@@ -575,61 +371,46 @@ func Load() *Config {
 		invalidEnv = append(invalidEnv, "API_MODE")
 		slog.Warn("invalid process mode env; fallback to default", "key", "API_MODE", "value", strings.TrimSpace(raw.AppMode), "default", string(ProcessModeAll))
 	}
-	// REALTIME_TICKET_SECRET has no fallback default: an empty value keeps
+	// RT_TICKET_SECRET has no fallback default: an empty value keeps
 	// the ticket endpoint fail-closed with 500 and is recorded here so
 	// production startup fails fast via ValidateEnvStrict instead of
 	// silently serving presence without tickets.
 	realtimeTicketSecret := strings.TrimSpace(raw.RealtimeTicketSecret)
 	if realtimeTicketSecret == "" {
-		invalidEnv = append(invalidEnv, "REALTIME_TICKET_SECRET")
-		slog.Warn("realtime ticket secret is not set; the realtime-ticket endpoint stays fail-closed with 500", "key", "REALTIME_TICKET_SECRET")
+		invalidEnv = append(invalidEnv, "RT_TICKET_SECRET")
+		slog.Warn("realtime ticket secret is not set; the realtime-ticket endpoint stays fail-closed with 500", "key", "RT_TICKET_SECRET")
 	}
 
 	return &Config{
 		Database: DatabaseConfig{
-			Host:              stringEnvDefault(raw.DBHost, "localhost"),
-			Port:              stringEnvDefault(raw.DBPort, "5432"),
-			User:              stringEnvDefault(raw.DBUser, "ideaboard"),
-			Password:          raw.DBPassword,
-			MigrationUser:     strings.TrimSpace(raw.DBMigrationUser),
-			MigrationPassword: raw.DBMigrationPassword,
-			Database:          stringEnvDefault(raw.DBName, "ideaboard"),
-			SSLMode:           stringEnvDefault(raw.DBSSLMode, "disable"),
-			Pool: PoolConfig{
-				MaxOpenConns:   poolMaxOpen,
-				MaxIdleConns:   poolMaxIdle,
-				MaxLifetimeMin: poolLifetime,
-				MaxIdleTimeMin: poolIdleTime,
-				RiverMaxConns:  riverMaxConns,
-				RiverMinConns:  riverMinConns,
-			},
+			Host:              stringEnvDefault(raw.PGHost, "127.0.0.1"),
+			Port:              stringEnvDefault(raw.PGPort, "5432"),
+			User:              stringEnvDefault(raw.APIPGUser, "ideaboard_api"),
+			Password:          raw.APIPGPassword,
+			MigrationUser:     strings.TrimSpace(raw.PGMigrationUser),
+			MigrationPassword: raw.PGMigrationPassword,
+			Database:          stringEnvDefault(raw.PGDB, "ideaboard"),
+			SSLMode:           stringEnvDefault(raw.PGSSLMode, "disable"),
 		},
 		Events: EventBusConfig{
-			Enabled: eventBusEnabled,
 			NATSURL: natsURL,
 		},
 		App: AppConfig{
-			Port:               stringEnvDefault(raw.AppPort, "6000"),
-			Host:               strings.TrimSpace(raw.AppHost),
-			MetricsAddr:        stringEnvDefault(raw.MetricsAddr, "127.0.0.1:9091"),
 			Env:                appEnv,
-			CORSAllowedOrigins: detectCORSAllowedOrigins(raw.AppCORSAllowedOrigins, appEnv),
-			TrustedProxies:     detectTrustedProxies(raw.AppTrustedProxies),
+			CORSAllowedOrigins: defaultCORSAllowedOrigins(appEnv),
 		},
 		PublicOrigins: PublicOriginsConfig{
 			Web: publicOrigin,
-			API: apiOrigin,
 		},
 		Auth: AuthServiceConfig{
 			BaseURL:        stringEnvDefault(raw.AuthServiceBaseURL, "http://127.0.0.1:6001"),
 			InternalAPIKey: strings.TrimSpace(raw.AuthServiceInternalAPIKey),
 			TimeoutSeconds: DefaultAuthServiceTimeoutSeconds,
 		},
-		Worker:   WorkerConfig{Concurrency: workerConcurrency, TaskRetentionDays: retentionDays, WorkspacePurgeAfterDays: workspacePurgeDays},
+		Worker:   WorkerConfig{Concurrency: workerConcurrency},
 		Credits:  CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
 		Rewards:  RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
 		Realtime: RealtimeConfig{TicketSecret: realtimeTicketSecret},
-		Storage:  StorageConfig{LocalRoot: strings.TrimSpace(raw.StorageLocalRoot)},
 		Imgproxy: ImgproxyConfig{
 			BaseURL: imgproxyBaseURL,
 			KeyHex:  strings.TrimSpace(raw.ImgproxyKeyHex),
@@ -641,8 +422,6 @@ func Load() *Config {
 			DisplayName: strings.TrimSpace(raw.InitAdminDisplayName),
 		},
 		Migration: MigrationToolingConfig{
-			AtlasBinary:          stringEnvDefault(raw.AtlasBinary, DefaultAtlasBinary),
-			MigrationsDir:        stringEnvDefault(raw.AtlasMigrationsDir, DefaultMigrationDirectory),
 			CleanBreakAllowReset: cleanBreakAllowReset,
 		},
 		Secrets: SecretsConfig{
@@ -653,14 +432,17 @@ func Load() *Config {
 	}
 }
 
-// LoadAndValidate loads deployment configuration and rejects unsafe database
-// settings before any connection attempt. Development keeps the local
-// DB_SSLMODE=disable default; production/release requires an explicit,
-// non-placeholder DB_PASSWORD and an allowlisted SSL mode. Production also
-// rejects env keys that failed parsing (see Config.InvalidEnv) so a typo like
-// RIVER_WORKER_CONCURRENCY="lots" cannot silently run with defaults.
-// Public origins are validated here as well so a missing PUBLIC_ORIGIN fails
-// fast at boot instead of surfacing from the first URL-building call site.
+// LoadAndValidate loads deployment configuration for the serving process
+// and rejects unsafe settings before any connection attempt. Development
+// keeps the local PG_SSLMODE=disable default; production/release requires
+// an explicit, non-placeholder API_PG_PASSWORD and an allowlisted SSL mode.
+// Production also rejects env keys that failed parsing (see
+// Config.InvalidEnv) so a typo like RIVER_WORKER_CONCURRENCY="lots" cannot
+// silently run with defaults.
+// Required serving secrets and origins are validated here as well
+// (see ValidateRequired) so a missing API_PG_PASSWORD fails fast at boot
+// with every missing key listed instead of surfacing from the first
+// connection attempt.
 // APP_SECRETS_ENCRYPTION_KEY presence is required in every environment,
 // matching the unconditional wiring requirement for at-rest secret encryption.
 func LoadAndValidate() (*Config, error) {
@@ -671,13 +453,20 @@ func LoadAndValidate() (*Config, error) {
 	return cfg, nil
 }
 
-// Validate runs every startup fail-fast check in one place: database
-// settings, malformed env fallbacks (production only), public origins, and
-// the at-rest secrets encryption key. Callers booting the process must fail
-// on the returned error before opening any connection or listener.
+// Validate runs every startup fail-fast check in one place: required
+// secrets and origins (listed together so one run reports everything
+// missing), database settings, malformed env fallbacks (production only),
+// public origins, and the at-rest secrets encryption key. Callers booting
+// the serving process must fail on the returned error before opening any
+// connection or listener. Migration-only entrypoints (migrate,
+// finalize-migrate) use ValidateForMigration instead: they legitimately run
+// without the serving secrets (internal keys, ticket secret, rewards).
 func (c *Config) Validate() error {
 	if c == nil {
 		return fmt.Errorf("config is required")
+	}
+	if err := c.ValidateRequired(); err != nil {
+		return err
 	}
 	if err := c.ValidateDatabase(); err != nil {
 		return err
@@ -685,13 +474,60 @@ func (c *Config) Validate() error {
 	if err := c.ValidateEnvStrict(); err != nil {
 		return err
 	}
-	if err := c.ValidateSecrets(); err != nil {
-		return err
+	return nil
+}
+
+// ValidateRequired rejects a serving process that is missing any required
+// secret or origin. Every missing key is reported in a single error so one
+// startup attempt lists everything to fill (env file or exported vars).
+func (c *Config) ValidateRequired() error {
+	if c == nil {
+		return fmt.Errorf("config is required")
 	}
-	if max := c.Database.Pool.EffectiveMaxOpenConns() + c.Database.Pool.EffectiveRiverMaxConns(); max > maxRuntimePoolBudget {
-		return fmt.Errorf("database pool budget %d exceeds maximum %d", max, maxRuntimePoolBudget)
+	var missing []string
+	if strings.TrimSpace(c.Database.Password) == "" {
+		missing = append(missing, "API_PG_PASSWORD")
+	}
+	if strings.TrimSpace(c.Auth.InternalAPIKey) == "" {
+		missing = append(missing, "AUTH_INTERNAL_KEY")
+	}
+	if strings.TrimSpace(c.Realtime.TicketSecret) == "" {
+		missing = append(missing, "RT_TICKET_SECRET")
+	}
+	if strings.TrimSpace(c.Secrets.EncryptionKey) == "" {
+		missing = append(missing, "APP_SECRETS_ENCRYPTION_KEY")
+	}
+	if strings.TrimSpace(c.Credits.WelcomeIdentityKey) == "" {
+		missing = append(missing, "CREDITS_WELCOME_IDENTITY_KEY")
+	}
+	if strings.TrimSpace(c.Rewards.CodeHMACKeys) == "" {
+		missing = append(missing, "REWARDS_CODE_HMAC_KEYS")
 	}
 	if err := c.PublicOrigins.Validate(); err != nil {
+		missing = append(missing, "PUBLIC_ORIGIN")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing or invalid required env: %s", strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+// ValidateForMigration runs the fail-fast checks for the migration-only
+// entrypoints (migrate, finalize-migrate). Those commands never mint
+// tickets, serve internal routes, or settle rewards, so they must not
+// require the serving secrets; database settings and the at-rest encryption
+// key are still enforced.
+func (c *Config) ValidateForMigration() error {
+	if c == nil {
+		return fmt.Errorf("config is required")
+	}
+	if err := c.ValidateDatabase(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(c.Database.Password) == "" {
+		return fmt.Errorf("API_PG_PASSWORD is required for migrations")
+	}
+	if err := c.ValidateSecrets(); err != nil {
 		return err
 	}
 	return nil
@@ -723,7 +559,7 @@ func (c *Config) ValidateDatabase() error {
 		return nil
 	}
 	if isUnsafeProductionSecret(c.Database.Password) {
-		return fmt.Errorf("DB_PASSWORD must be set to a non-placeholder value when APP_ENV=%s", c.App.Env)
+		return fmt.Errorf("API_PG_PASSWORD must be set to a non-placeholder value when APP_ENV=%s", c.App.Env)
 	}
 	return nil
 }
@@ -747,7 +583,7 @@ func validateDatabaseSSLMode(value string) error {
 	case "disable", "require", "verify-full":
 		return nil
 	default:
-		return fmt.Errorf("DB_SSLMODE must be one of disable, require, or verify-full")
+		return fmt.Errorf("PG_SSLMODE must be one of disable, require, or verify-full")
 	}
 }
 
@@ -789,22 +625,16 @@ func normalizeAppEnv(raw string) string {
 	return stringEnvDefault(raw, "development")
 }
 
-func detectCORSAllowedOrigins(raw, appEnv string) []string {
-	origins := splitCSVEnv(raw)
-	if len(origins) > 0 || isProductionAppEnv(appEnv) {
-		return origins
+// defaultCORSAllowedOrigins hardcodes the development allowlist. Production
+// is same-origin only (nil): no env knob can reopen cross-origin.
+func defaultCORSAllowedOrigins(appEnv string) []string {
+	if isProductionAppEnv(appEnv) {
+		return nil
 	}
 	return []string{
 		"http://localhost:5173",
 		"http://127.0.0.1:5173",
 	}
-}
-
-func detectTrustedProxies(raw string) []string {
-	if proxies := splitCSVEnv(raw); len(proxies) > 0 {
-		return proxies
-	}
-	return []string{"127.0.0.1", "::1"}
 }
 
 func isProductionAppEnv(env string) bool {
@@ -814,24 +644,6 @@ func isProductionAppEnv(env string) bool {
 	default:
 		return false
 	}
-}
-
-func splitCSVEnv(raw string) []string {
-	parts := strings.Split(raw, ",")
-	result := make([]string, 0, len(parts))
-	seen := make(map[string]struct{}, len(parts))
-	for _, part := range parts {
-		value := strings.TrimSpace(part)
-		if value == "" {
-			continue
-		}
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		result = append(result, value)
-	}
-	return result
 }
 
 func loadEnvFile() {
