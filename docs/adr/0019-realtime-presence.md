@@ -26,9 +26,9 @@ revision + 409 语义：任何经 Y 层写入文档的第二通道都会绕开 r
 3. **接入鉴权。** 客户端连 `/realtime?ticket=`；
    ticket = `base64url(payload).base64url(hex hmac-sha256)`，
    payload `{bid, av, cap, exp, uid}`，
-   HMAC-SHA256 secret 取 `RT_TICKET_SECRET`（与 Go mint 端同名）。
+   HMAC-SHA256 secret 取 `REALTIME_TICKET_SECRET`（与 Go mint 端同名）。
    先本地验签 + `exp`，再调 Go 内网 `GET /internal/realtime/admit`
-   （`X-Internal-Key` 取 `AUTH_INTERNAL_KEY`，与 API/Auth 共用同一 internal key，仿 `apps/auth` internal 调用：单发、2s 超时、
+   （`X-Internal-Key`，仿 `apps/auth` internal 调用：单发、2s 超时、
    fail-closed），admit 才进 room。请求以 `?ticket=` 为主契约（`bid/av/uid`
    随附 echo 校验）；Go 一律 `200 + {code: 0, data: {admit}}` 应答，sidecar
    只认 `admit === true`。拒绝沿用 y-websocket 关码约定
@@ -53,3 +53,10 @@ Accepted, partially superseded by [ADR-0020](./0020-board-ydoc-collaboration.md)
 Y 层更新不再一律丢弃——`cap=write` 连接的 SyncStep2 / Update 落 room Doc、
 广播给 peers 并持久化到 Go（`ignoredDocUpdates` 只计无写权限/畸形/超限丢弃）。
 接入鉴权、awareness 标准转发、ticket 窗口踢人模型维持不变；上文原文冻结。
+
+修订附录（2026-10-20，append-only：正文冻结不动）：正文的
+`REALTIME_TICKET_SECRET` 已改名为 `RT_TICKET_SECRET`（Go
+`apps/api/internal/platform/config/config.go` 与 sidecar
+`apps/realtime/src/infrastructure/env.ts` 同名同值），`X-Internal-Key`
+取值统一为 `AUTH_INTERNAL_KEY`（与 API/Auth 共用同一 internal key）。
+现行名以 code schema 为准，正文旧名仅作历史记录。

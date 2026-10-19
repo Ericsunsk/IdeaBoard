@@ -10,8 +10,7 @@ function buildPeer(clientId: number, nodeId: string | null): RemotePresencePeer 
     clientId,
     state: {
       user: { id: `usr_${clientId}`, name: `User${clientId}` },
-      cursor: null,
-      selection: { nodeIds: nodeId ? [nodeId] : [], marquee: null },
+      selection: { nodeIds: nodeId ? [nodeId] : [] },
     },
   }
 }

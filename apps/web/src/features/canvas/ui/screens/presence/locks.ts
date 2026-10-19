@@ -1,18 +1,15 @@
 // Soft node locks (TapNow §5, pure client determination).
 //
-// - Selecting a single node broadcasts `awareness.selection = [nodeId]`;
+// - Selecting a single node broadcasts `awareness.selection.nodeIds = [nodeId]`;
 //   multi-select or empty selection claims nothing.
 // - Every client recomputes locks locally from awareness states: no central
 //   lock manager. When two peers claim the same node, the smaller `deviceId`
 //   strictly wins (`incoming < existing` claims, otherwise yields).
 // - Viewers never participate: entries with `canWrite === false` are
-//   ignored (viewers broadcast an empty selection, see `useCanvasPresence`).
+//   ignored (viewers broadcast an empty selection, see
+//   `useCanvasPresenceSession`).
 
-import {
-  presencePeerColor,
-  resolvePeerSelectionIds,
-  type RemotePresencePeer,
-} from '../../../session/collaboration'
+import type { RemotePresencePeer } from '../../../session/collaboration'
 
 export type SoftLockPeer = {
   deviceId: number
@@ -26,7 +23,6 @@ export type SoftLockOwner = {
   deviceId: number
   userId: string
   name: string
-  color: string
 }
 
 /** Single-selection lock intent: exactly one non-blank id claims, else null. */
@@ -53,7 +49,7 @@ export function toSoftLockPeer(peer: RemotePresencePeer, canWrite = true): SoftL
     deviceId: peer.clientId,
     userId: peer.state.user.id,
     name: peer.state.user.name,
-    selection: resolvePeerSelectionIds(peer.state),
+    selection: peer.state.selection.nodeIds,
     canWrite,
   }
 }
@@ -75,7 +71,6 @@ export function resolveNodeLocks(peers: readonly SoftLockPeer[]): Map<string, So
       deviceId: peer.deviceId,
       userId: peer.userId,
       name: peer.name,
-      color: presencePeerColor(peer.userId),
     })
   }
   return locks

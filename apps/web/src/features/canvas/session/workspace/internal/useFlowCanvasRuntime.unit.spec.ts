@@ -646,8 +646,8 @@ describe('useFlowCanvasRuntime', () => {
     })
     transport.sharedDoc.value = doc
     await nextTick()
-    collaboration.syncSnapshot(initial, ['image-1', 'prompt-1', 'prompt-2'], ['connection-3'])
     transport.isDocSynced.value = true
+    collaboration.syncSnapshot(initial, ['image-1', 'prompt-1', 'prompt-2'], ['connection-3'])
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     const store = harness.runtime.graphEditing.readCanvasGraphStore()
     store.beginTransaction('node-update').updateNode('prompt-1', { x: 777 }).commit()

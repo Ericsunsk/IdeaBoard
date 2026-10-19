@@ -132,9 +132,15 @@ check_no_legacy() {
     # legacy name (VITE_API_BASE_URL, QA_API_BASE_URL, DB_HOSTNAME, ...)
     # are not flagged. -o prints file:match (no line number), so the match
     # itself is field 2.
-    hits="$(git -C "$ROOT_DIR" grep -E -w -o --no-color "$pattern" -- . ':!scripts/env-schema-check.sh' ':!scripts/env-schema-check-test.sh' 2>/dev/null | cut -d: -f2- | sort -u || true)"
+    # Frozen ADR history is exempt by file: docs/adr/0019-realtime-presence.md
+    # keeps the pre-rename REALTIME_TICKET_SECRET in its append-only frozen
+    # body, with the rename recorded in its Status appendix (2026-10-20).
+    # Live config still fails on any legacy name; only that file is skipped.
+    hits="$(git -C "$ROOT_DIR" grep -E -w -o --no-color "$pattern" -- . ':!scripts/env-schema-check.sh' ':!scripts/env-schema-check-test.sh' ':!docs/adr/0019-realtime-presence.md' 2>/dev/null | cut -d: -f2- | sort -u || true)"
   else
-    hits="$(grep -rwE -oh "$pattern" "$ROOT_DIR" --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist 2>/dev/null | sort -u || true)"
+    # Frozen ADR history (docs/adr/0019-realtime-presence.md) is exempt in
+    # both branches: its append-only frozen body keeps the pre-rename name.
+    hits="$(grep -rwE -oh "$pattern" "$ROOT_DIR" --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude=0019-realtime-presence.md 2>/dev/null | sort -u || true)"
   fi
   local hit
   while IFS= read -r hit; do
@@ -213,6 +219,12 @@ check_encrypted_env_keys() {
     [[ -z "$key" ]] && continue
     if [[ "$key" == IDEABOARD_*_IMAGE ]]; then
       fail "F: $DOCKER_ENV must not store image refs (use docker/images.env)"
+    fi
+    # RIVER_WORKER_CONCURRENCY is a plaintext deploy input (non-secret):
+    # it lives in docker/.env.example and the deploy process env, never in
+    # the encrypted file, so concurrency tweaks do not churn ciphertext.
+    if [[ "$key" == RIVER_WORKER_CONCURRENCY ]]; then
+      fail "F: $DOCKER_ENV must not store plaintext RIVER_WORKER_CONCURRENCY (use docker/.env.example or deployment process env)"
     fi
     if ! contains_key "$key" "$(printf '%s\nDOTENV_PUBLIC_KEY' "$known")"; then
       fail "F: $DOCKER_ENV sets unknown key $key"

@@ -139,16 +139,6 @@ export default {
   presence: {
     rosterLabel: '온라인 공동 작업자',
     selfLabel: '{name} (나)',
-    followMember: '{name} 따라가기',
-    unfollowMember: '{name} 따라가기 중지',
-    spotlightStart: '스포트라이트 시작',
-    spotlightStop: '스포트라이트 중지',
-    followerCount: '{count}명이 보는 중',
-    followerCountNone: '아직 보는 사람 없음',
-    inviteTitle: '{name}님이 스포트라이트를 시작했습니다',
-    inviteBody: '{name}님의 화면을 따라가며 동기화할까요?',
-    inviteAccept: '따라가기',
-    inviteIgnore: '무시',
   },
   contextMenu: {
     label: '캔버스 노드 작업',

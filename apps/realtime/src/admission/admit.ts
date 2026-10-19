@@ -9,6 +9,7 @@
 // on the HTTP status. fetchFn is injectable for tests.
 
 import type { TicketPayload } from './ticket.js'
+import { internalFetch, type InternalFetchResponse } from '../infrastructure/internalHttp.js'
 
 export type AdmitOptions = {
   apiInternalURL: string
@@ -16,7 +17,7 @@ export type AdmitOptions = {
   ticket: string
   payload: Pick<TicketPayload, 'bid' | 'av' | 'uid'>
   timeoutMs?: number
-  fetchFn?: typeof fetch
+  fetchFn?: typeof internalFetch
 }
 
 export type AdmitResult = {
@@ -29,7 +30,7 @@ const MAX_ADMIT_BODY_BYTES = 64 * 1024
 
 export async function admitToRoom(options: AdmitOptions): Promise<AdmitResult> {
   const timeoutMs = options.timeoutMs ?? ADMIT_TIMEOUT_MS
-  const fetchFn = options.fetchFn ?? fetch
+  const fetchFn = options.fetchFn ?? internalFetch
   let endpoint: URL
   try {
     endpoint = new URL('/internal/realtime/admit', `${options.apiInternalURL.replace(/\/$/, '')}/`)
@@ -59,7 +60,7 @@ export async function admitToRoom(options: AdmitOptions): Promise<AdmitResult> {
   }
 }
 
-async function readBoundedText(response: Response, maxBytes: number): Promise<string> {
+async function readBoundedText(response: InternalFetchResponse, maxBytes: number): Promise<string> {
   // No streaming reader: the admit body is a tiny envelope; cap it by
   // content-length when present, then re-check the decoded length.
   const declared = response.headers.get('content-length')

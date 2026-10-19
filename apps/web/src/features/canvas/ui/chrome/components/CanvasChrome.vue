@@ -28,6 +28,7 @@
       :user-email="account.userEmail"
       :balance="account.balance"
       :items="account.menuItems"
+      :workspace="account.workspace"
       :support-channels="supportChannels"
       :avatar-button-class="canvasChromeAvatarButtonClass"
     >

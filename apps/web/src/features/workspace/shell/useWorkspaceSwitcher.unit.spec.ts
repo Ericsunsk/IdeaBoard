@@ -84,11 +84,11 @@ function stubSelection(overrides: Record<string, unknown> = {}) {
   return selection
 }
 
-function renderSwitcher() {
+function renderSwitcher(options?: Parameters<typeof useWorkspaceSwitcher>[0]) {
   let switcher: ReturnType<typeof useWorkspaceSwitcher> | undefined
   const Consumer = defineComponent({
     setup() {
-      switcher = useWorkspaceSwitcher()
+      switcher = useWorkspaceSwitcher(options)
       return () => h('div')
     },
   })
@@ -111,11 +111,11 @@ describe('useWorkspaceSwitcher', () => {
     selectionMocks.useWorkspaceSelection.mockReset()
   })
 
-  test('lands on the gallery without the stale boardId when switching from canvas', () => {
+  test('lands on the gallery without the stale boardId when switching from canvas', async () => {
     const selection = stubSelection()
     const switcher = renderSwitcher()
 
-    switcher.switchToGalleryWorkspace('ws_team2')
+    await switcher.switchToGalleryWorkspace('ws_team2')
 
     expect(selection.selectWorkspace).toHaveBeenCalledWith('ws_team2')
     expect(routerMocks.push).toHaveBeenCalledWith({
@@ -125,18 +125,77 @@ describe('useWorkspaceSwitcher', () => {
     expect(routerMocks.replace).not.toHaveBeenCalled()
   })
 
-  test('replaces the query when already on the gallery and preserves other params', () => {
+  test('replaces the query when already on the gallery and preserves other params', async () => {
     stubSelection()
     routeState.path = USER_BOARDS_PATH
     routeState.query = { workspace: 'ws_old1', accountTab: 'profile' }
     const switcher = renderSwitcher()
 
-    switcher.switchToGalleryWorkspace('ws_team2')
+    await switcher.switchToGalleryWorkspace('ws_team2')
 
     expect(routerMocks.replace).toHaveBeenCalledWith({
       path: USER_BOARDS_PATH,
       query: { workspace: 'ws_team2', accountTab: 'profile' },
     })
+    expect(routerMocks.push).not.toHaveBeenCalled()
+  })
+
+  test.each(['select', 'create', 'archive'] as const)(
+    'waits for the current draft before %s changes workspace scope',
+    async (action) => {
+      let finishSave!: (isSaved: boolean) => void
+      const saved = new Promise<boolean>((resolve) => {
+        finishSave = resolve
+      })
+      const beforeWorkspaceChange = vi.fn(() => saved)
+      const selection = stubSelection({
+        provisionWorkspace: vi.fn().mockResolvedValue(TEAM),
+      })
+      resourceMocks.archiveWorkspace.mockResolvedValue(DEFAULT)
+      const switcher = renderSwitcher({ beforeWorkspaceChange })
+      const changing =
+        action === 'select'
+          ? switcher.switchToGalleryWorkspace(TEAM.publicId)
+          : action === 'create'
+            ? switcher.createAndSwitchWorkspace('Team')
+            : switcher.archiveWorkspaceItem(DEFAULT.publicId)
+
+      expect(beforeWorkspaceChange).toHaveBeenCalledOnce()
+      expect(selection.selectWorkspace).not.toHaveBeenCalled()
+      expect(selection.provisionWorkspace).not.toHaveBeenCalled()
+      expect(resourceMocks.archiveWorkspace).not.toHaveBeenCalled()
+      expect(routerMocks.push).not.toHaveBeenCalled()
+      finishSave(true)
+      await changing
+      expect(routerMocks.push).toHaveBeenCalledOnce()
+    },
+  )
+
+  test.each(['select', 'create', 'archive'] as const)(
+    'preserves workspace scope when the draft save fails during %s',
+    async (action) => {
+      const selection = stubSelection()
+      const switcher = renderSwitcher({ beforeWorkspaceChange: async () => false })
+      if (action === 'select') await switcher.switchToGalleryWorkspace(TEAM.publicId)
+      else if (action === 'create') {
+        await expect(switcher.createAndSwitchWorkspace('Team')).rejects.toThrow('not saved')
+      } else {
+        await expect(switcher.archiveWorkspaceItem(DEFAULT.publicId)).rejects.toThrow('not saved')
+      }
+      expect(selection.selectWorkspace).not.toHaveBeenCalled()
+      expect(selection.provisionWorkspace).not.toHaveBeenCalled()
+      expect(resourceMocks.archiveWorkspace).not.toHaveBeenCalled()
+      expect(routerMocks.push).not.toHaveBeenCalled()
+    },
+  )
+
+  test('preserves workspace scope when the draft flush rejects', async () => {
+    const selection = stubSelection()
+    const switcher = renderSwitcher({
+      beforeWorkspaceChange: () => Promise.reject(new Error('save failed')),
+    })
+    await expect(switcher.switchToGalleryWorkspace(TEAM.publicId)).rejects.toThrow('save failed')
+    expect(selection.selectWorkspace).not.toHaveBeenCalled()
     expect(routerMocks.push).not.toHaveBeenCalled()
   })
 
@@ -197,7 +256,7 @@ describe('useWorkspaceSwitcher', () => {
     expect(routerMocks.replace).not.toHaveBeenCalled()
   })
 
-  test('maps selection state to menu props with gallery and retry commands', () => {
+  test('maps selection state to menu props with gallery and retry commands', async () => {
     const selection = stubSelection({ status: ref('hidden'), error: ref({ status: 404 }) })
     const switcher = renderSwitcher()
 
@@ -213,7 +272,7 @@ describe('useWorkspaceSwitcher', () => {
     menuProps.onRetry()
     expect(selection.refetch).toHaveBeenCalledOnce()
 
-    menuProps.onSelect('ws_team2')
+    await menuProps.onSelect('ws_team2')
     expect(selection.selectWorkspace).toHaveBeenCalledWith('ws_team2')
     expect(routerMocks.push).toHaveBeenCalledWith({
       path: USER_BOARDS_PATH,

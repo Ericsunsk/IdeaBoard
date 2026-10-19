@@ -3,19 +3,8 @@
     ref="flowCanvasNodeRef"
     class="flow-canvas-node"
     :data-flow-node-id="props.nodeId"
-    :class="[
-      `is-${data.kind}`,
-      { 'is-selected': selected, 'is-running': isNodeRunning, 'is-locked': !!props.lockOwner },
-    ]"
-    :style="props.lockOwner ? { boxShadow: `0 0 0 2px ${props.lockOwner.color}` } : undefined"
+    :class="[`is-${data.kind}`, { 'is-selected': selected, 'is-running': isNodeRunning }]"
   >
-    <span v-if="props.lockOwner" class="flow-canvas-node__lock-tag" aria-hidden="true">
-      <span
-        class="flow-canvas-node__lock-dot"
-        :style="{ backgroundColor: props.lockOwner.color }"
-      />
-      <span class="flow-canvas-node__lock-name">{{ props.lockOwner.name }}</span>
-    </span>
     <div
       v-if="shouldShowDefaultDragZone"
       class="flow-canvas-node__drag-zone flow-canvas-node__drag-zone--default"
@@ -169,8 +158,6 @@ const props = withDefaults(
       isOutpaintModeActive?: boolean
       outpaintOverlayStyle?: Record<string, string> | null
       outpaintHandleRadius?: number
-      /** Soft-lock owner broadcast by a remote editor (undefined when unlocked). */
-      lockOwner?: { name: string; color: string } | null | undefined
     }
   >(),
   {
@@ -186,7 +173,6 @@ const props = withDefaults(
     isOutpaintModeActive: false,
     outpaintOverlayStyle: null,
     outpaintHandleRadius: 4,
-    lockOwner: undefined,
   },
 )
 
@@ -330,38 +316,5 @@ function noopMouse() {}
   background: var(--canvas-node-bg);
   color: var(--canvas-text-muted);
   font-size: 12px;
-}
-
-/* Soft-lock tag: reuses the presence name-flag language (card/border/
-/ foreground/floating/pill roles only — no new design tokens). */
-.flow-canvas-node__lock-tag {
-  position: absolute;
-  top: -26px;
-  left: 0;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px 2px 6px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background-color: var(--color-card);
-  box-shadow: var(--shadow-floating);
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.flow-canvas-node__lock-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  flex: none;
-}
-
-.flow-canvas-node__lock-name {
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--color-foreground);
 }
 </style>

@@ -37,7 +37,14 @@ export NODE_ENV="${NODE_ENV:-production}"
 
 (cd "${repo_root}/apps/auth" && npm run build)
 
-atlas_version="${ATLAS_VERSION:-1.3.2}"
+# Canonical Atlas pin lives in apps/api/Dockerfile (ARG ATLAS_VERSION).
+# ATLAS_VERSION env overrides it when set; never hardcode a literal here so
+# CI and images stay in lockstep with atlas-migration-check.sh callers.
+atlas_version="${ATLAS_VERSION:-}"
+if [[ -z "${atlas_version}" ]]; then
+  atlas_version="$(sed -n 's/^ARG ATLAS_VERSION=//p' "${repo_root}/apps/api/Dockerfile" | tr -d '[:space:]')"
+fi
+[[ -n "${atlas_version}" ]] || { printf 'ci-migration-integration: ATLAS_VERSION pin missing from apps/api/Dockerfile\n' >&2; exit 2; }
 atlas_arch="$(uname -m)"
 case "${atlas_arch}" in
   x86_64) atlas_arch=amd64 ;;

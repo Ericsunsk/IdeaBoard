@@ -1,0 +1,70 @@
+version: "0.5"
+
+processes:
+  docker-deps:
+    # Oneshot `up -d`: exits 0 once the infra is created/started; dependents
+    # gate on process_completed_successfully. (A foreground `up` proved
+    # fragile here: the supervisor lost the child with "unexpected EOF".)
+    # DB readiness itself is covered by each app's connect retries.
+    command: "scripts/infisical-run.sh --env dev -- docker compose -f docker/compose.local.yml up -d"
+    availability:
+      restart: on_failure
+      max_restarts: 5
+    readiness_probe:
+      exec:
+        command: "docker compose -f docker/compose.local.yml ps --status running -q postgres nats imgproxy | grep -v '^$' | wc -l | grep -q 3"
+      initial_delay_seconds: 1
+      period_seconds: 2
+      timeout_seconds: 5
+
+  api:
+    working_dir: "apps/api"
+    command: "../../scripts/infisical-run.sh --env dev -- go run ./cmd"
+    depends_on:
+      migrate:
+        condition: process_completed_successfully
+    availability:
+      restart: on_failure
+      max_restarts: 5
+
+  auth:
+    working_dir: "apps/auth"
+    command: "../../scripts/infisical-run.sh --env dev -- npm run dev"
+    depends_on:
+      migrate:
+        condition: process_completed_successfully
+    availability:
+      restart: on_failure
+      max_restarts: 5
+
+  realtime:
+    working_dir: "apps/realtime"
+    command: "../../scripts/infisical-run.sh --env dev -- npm run dev"
+    depends_on:
+      migrate:
+        condition: process_completed_successfully
+    availability:
+      restart: on_failure
+      max_restarts: 5
+
+  web:
+    working_dir: "apps/web"
+    command: "npm run dev"
+    depends_on:
+      migrate:
+        condition: process_completed_successfully
+    availability:
+      restart: on_failure
+      max_restarts: 5
+
+  migrate:
+    # One-shot: infra up 后跑 scripts/migrate.sh --env dev（API→Auth 强制顺序，
+    # 幂等：atlas apply 只补 pending，auth 侧全是 IF NOT EXISTS，重跑无操作）。
+    # api/auth/realtime/web  gate 在 process_completed_successfully 上；
+    # migrate 失败用 exit_on_failure 整栈停住并报错，不带病起服务。
+    command: "scripts/migrate.sh --env dev"
+    depends_on:
+      docker-deps:
+        condition: process_completed_successfully
+    availability:
+      restart: exit_on_failure

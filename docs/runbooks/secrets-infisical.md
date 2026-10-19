@@ -54,7 +54,7 @@ union 约 35 个 key，全部映射如下（值从 dotenvx 加密 `docker/.env` 
 | `RT_TICKET_SECRET` | `/` | api/realtime | 两端同名同值，改一处 |
 | `REWARDS_CODE_HMAC_KEYS` | `/` | api | JSON keyring；轮换走 two-stage（§4） |
 | `CREDITS_WELCOME_IDENTITY_KEY` | `/` | api | **fingerprint 绑定，误换 fail closed；非事故不轮换** |
-| `RIVER_WORKER_CONCURRENCY` | `/` | api-worker | 非 secret，随注入统一管理 |
+| `RIVER_WORKER_CONCURRENCY` | `/` | api-worker | 非 secret 明文部署输入（compose 缺省 5），可随注入统一管理，但永不进 dotenvx 加密 `docker/.env` |
 | `API_PG_USER`/`API_PG_PASSWORD` | `/` | api/api-worker/api-migrate | runtime role，与 owner 分离 |
 | `AUTH_PG_USER`/`AUTH_PG_PASSWORD` | `/` | auth/auth-migrate | runtime role，与 owner 分离 |
 | `AUTH_HOST`/`AUTH_PORT`/`AUTH_TRUST_PROXY` | `/` | auth | 监听面默认在代码，反代不在私网段才改写 |

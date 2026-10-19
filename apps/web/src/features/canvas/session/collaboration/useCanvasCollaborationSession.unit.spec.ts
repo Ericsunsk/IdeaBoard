@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, test, vi } from 'vitest'
 import { effectScope, nextTick, ref, shallowRef } from 'vue'
 import * as Y from 'yjs'
 import { createEmptyBoardSnapshot, type BoardSnapshot } from '../../../board/ports/canvas'
@@ -59,6 +59,7 @@ describe('Canvas collaboration session', () => {
     await nextTick()
     const apply = vi.fn()
     harness.session.attachGraph(apply)
+    expect(harness.session.canWrite.value).toBe(false)
     expect(harness.session.isReadOnly.value).toBe(true)
     expect(apply).not.toHaveBeenCalled()
     harness.transport.isDocSynced.value = true
@@ -187,5 +188,46 @@ describe('Canvas collaboration session', () => {
     expect(harness.session.isReadOnly.value).toBe(false)
     harness.scope.stop()
     doc.destroy()
+  })
+
+  test('blocks edits after sharing until synchronization, then resumes after reconnect', async () => {
+    const harness = setup()
+    harness.accessState.value = 'private'
+    expect(harness.session.isReadOnly.value).toBe(false)
+    harness.accessState.value = 'workspace'
+    expect(harness.session.isReadOnly.value).toBe(true)
+    expect(harness.session.canWrite.value).toBe(false)
+    const doc = new Y.Doc()
+    harness.transport.sharedDoc.value = doc
+    await nextTick()
+    harness.session.syncSnapshot(snapshot(20), ['prompt-1'], [])
+    harness.transport.isDocSynced.value = true
+    expect(doc.getMap('nodes').size).toBe(0)
+    expect(harness.session.canWrite.value).toBe(true)
+    expect(harness.session.isReadOnly.value).toBe(false)
+    harness.session.syncSnapshot(snapshot(30), ['prompt-1'], [])
+    expect(doc.getMap('nodes').get('prompt-1')).toMatchObject({ position: { x: 30 } })
+    harness.transport.isDocSynced.value = false
+    expect(harness.session.canWrite.value).toBe(false)
+    expect(harness.session.isReadOnly.value).toBe(true)
+    harness.session.syncSnapshot(snapshot(40), ['prompt-1'], [])
+    harness.transport.isDocSynced.value = true
+    expect(harness.session.canWrite.value).toBe(true)
+    expect(doc.getMap('nodes').get('prompt-1')).toMatchObject({ position: { x: 30 } })
+    harness.scope.stop()
+    doc.destroy()
+  })
+
+  it('keeps a workspace viewer read-only with or without room sync', () => {
+    const harness = setup()
+    harness.canWrite.value = false
+    expect(harness.session.canWrite.value).toBe(false)
+    expect(harness.session.isReadOnly.value).toBe(true)
+    expect(!harness.session.isEnabled.value || harness.session.canWrite.value).toBe(false)
+    harness.transport.isDocSynced.value = true
+    expect(harness.session.canWrite.value).toBe(false)
+    expect(harness.session.isReadOnly.value).toBe(true)
+    expect(!harness.session.isEnabled.value || harness.session.canWrite.value).toBe(false)
+    harness.scope.stop()
   })
 })

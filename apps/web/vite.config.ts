@@ -71,6 +71,15 @@ export default defineConfig({
         target: 'http://localhost:6000',
         changeOrigin: true,
       },
+      // Local realtime sidecar (y-websocket awareness + sync, :6002): the
+      // browser always dials same-origin `/realtime`, so Vite must forward
+      // the upgrade. `ws` is required — without it the handshake never
+      // reaches the sidecar and presence silently stays local-only.
+      '/realtime': {
+        target: 'http://localhost:6002',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 })

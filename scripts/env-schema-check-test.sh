@@ -170,6 +170,21 @@ write_tree "$legacy"
 printf 'PG_HOST=127.0.0.1\nAPI_PG_PASSWORD=\n# renamed from DB_PASSWORD\nDB_PASSWORD=old\n' >"$legacy/apps/api/.env.example"
 expect_fail "legacy name is rejected" "$legacy" "C:"
 
+# The frozen ADR-0019 body keeps the pre-rename REALTIME_TICKET_SECRET as
+# history (rename recorded in its Status appendix); the C gate exempts only
+# that file, every other legacy reference still fails.
+frozen_adr="$fixture_root/frozen-adr"
+write_tree "$frozen_adr"
+mkdir -p "$frozen_adr/docs/adr"
+printf 'frozen body cites REALTIME_TICKET_SECRET as history\n' >"$frozen_adr/docs/adr/0019-realtime-presence.md"
+expect_pass "frozen ADR-0019 legacy reference passes" "$frozen_adr"
+
+other_legacy="$fixture_root/other-legacy"
+write_tree "$other_legacy"
+mkdir -p "$other_legacy/docs/adr"
+printf 'new doc cites REALTIME_TICKET_SECRET as current\n' >"$other_legacy/docs/adr/0022-some-new-doc.md"
+expect_fail "legacy name outside frozen ADR-0019 is rejected" "$other_legacy" "C:"
+
 # Dockerfile carrying a removed legacy name (the real-world miss): the
 # recursive fallback scan covers files outside the known doc list.
 docker_legacy="$fixture_root/docker-legacy"
@@ -245,6 +260,11 @@ images_in_secrets="$fixture_root/images-in-secrets"
 write_tree "$images_in_secrets"
 printf 'IDEABOARD_API_IMAGE=encrypted:old-ref\n' >> "$images_in_secrets/docker/.env"
 expect_fail "image refs cannot return to frozen secrets" "$images_in_secrets" "must not store image refs"
+
+plaintext_in_secrets="$fixture_root/plaintext-in-secrets"
+write_tree "$plaintext_in_secrets"
+printf 'RIVER_WORKER_CONCURRENCY=encrypted:old-ciphertext\n' >> "$plaintext_in_secrets/docker/.env"
+expect_fail "plaintext concurrency cannot return to frozen secrets" "$plaintext_in_secrets" "must not store plaintext RIVER_WORKER_CONCURRENCY"
 
 if (( failures > 0 )); then
   echo "env-schema-check contract tests failed: $failures" >&2

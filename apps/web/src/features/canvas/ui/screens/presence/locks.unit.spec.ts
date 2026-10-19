@@ -15,8 +15,7 @@ function buildRemotePeer(overrides: Partial<RemotePresencePeer> = {}): RemotePre
     clientId: 41,
     state: {
       user: { id: 'usr_ada', name: 'Ada' },
-      cursor: null,
-      selection: { nodeIds: ['node-1'], marquee: null },
+      selection: { nodeIds: ['node-1'] },
     },
     ...overrides,
   }
@@ -82,8 +81,7 @@ describe('soft lock resolution', () => {
         clientId: 12,
         state: {
           user: { id: 'usr_bob', name: 'Bob' },
-          cursor: { position: { x: 1, y: 2 }, dragging: true },
-          selection: { nodeIds: ['node-5'], marquee: null },
+          selection: { nodeIds: ['node-5'] },
         },
       }),
     )

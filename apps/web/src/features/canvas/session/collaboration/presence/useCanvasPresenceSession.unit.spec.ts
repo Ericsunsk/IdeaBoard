@@ -5,15 +5,14 @@ import {
   EVENT_STREAM_RECONNECT_BACKOFF_FACTOR,
   EVENT_STREAM_RECONNECT_INITIAL_DELAY_MS,
 } from '../../../../../core/config/timing'
-import type { PresenceAwarenessState, PresenceUser } from '../../../session/collaboration'
-import { presencePeerColor } from '../../../session/collaboration'
+import type { PresenceAwarenessState, PresenceUser } from './state'
+import { useCanvasPresenceSession } from './useCanvasPresenceSession'
 import type {
   PresenceCloseEvent,
   PresenceProviderFactory,
   PresenceProviderHandle,
   PresenceProviderStatus,
-} from '../../../session/collaboration'
-import { useCanvasPresence } from './useCanvasPresence'
+} from './provider'
 
 type FakePresence = {
   handle: PresenceProviderHandle
@@ -103,8 +102,7 @@ function buildLocalUser(): PresenceUser {
 function buildRemoteState(overrides: Partial<PresenceAwarenessState> = {}): PresenceAwarenessState {
   return {
     user: { id: 'usr_bob', name: 'Bob' },
-    cursor: { position: { x: 3, y: 4 }, dragging: false },
-    selection: { nodeIds: ['node-1'], marquee: null },
+    selection: { nodeIds: ['node-1'] },
     ...overrides,
   }
 }
@@ -136,22 +134,16 @@ function mountPresence(input?: {
   const workspaceId = ref<string | null>('ws-1')
   const localUser = ref<PresenceUser | null>(buildLocalUser())
   const canWrite = ref<boolean>(input?.canWrite ?? true)
-  const element = ref<HTMLElement | null>(document.createElement('div'))
   const selectedIds = ref<string[]>([])
   const scope = effectScope()
   const presence = scope.run(() =>
-    useCanvasPresence({
+    useCanvasPresenceSession({
       boardId,
       accessState,
       workspaceId,
       localUser,
       canWrite,
-      flow: {
-        screenToFlowCoordinate: (point) => point,
-        getSelectedElementIds: () => [...selectedIds.value],
-        viewport: ref({ x: 0, y: 0, zoom: 1 }),
-      },
-      element,
+      selectedIds,
       deps: { requestTicket: ticketFn, createProvider: providerFn },
     }),
   )
@@ -166,15 +158,15 @@ function mountPresence(input?: {
     accessState,
     localUser,
     canWrite,
-    element,
     selectedIds,
   }
 }
 
-function movePointer(mounted: ReturnType<typeof mountPresence>, x: number, y: number): void {
-  mounted.element.value?.dispatchEvent(
-    new MouseEvent('pointermove', { bubbles: true, clientX: x, clientY: y }),
-  )
+type MountedPresence = ReturnType<typeof mountPresence>
+
+async function publishSelection(mounted: MountedPresence, nodeIds: string[]): Promise<void> {
+  mounted.selectedIds.value = [...nodeIds]
+  await flushAsync()
 }
 
 beforeEach(() => {
@@ -242,65 +234,46 @@ describe('canvas presence connection gate', () => {
     expect(mounted.fakes[0]?.getIsDisposed()).toBe(true)
     expect(mounted.ticketFn).toHaveBeenLastCalledWith('ws-1', 'board-2')
     expect(mounted.fakes).toHaveLength(2)
-    movePointer(mounted, 50, 60)
-    vi.advanceTimersByTime(40)
-    expect(mounted.fakes[1]?.localPublishes.at(-1)?.cursor).toMatchObject({
-      position: { x: 50, y: 60 },
+    await publishSelection(mounted, ['node-7'])
+    expect(mounted.fakes[1]?.localPublishes.at(-1)?.selection).toEqual({
+      nodeIds: ['node-7'],
     })
   })
 })
 
 describe('canvas presence broadcast', () => {
-  test('viewers on workspace boards broadcast cursor and selection', async () => {
+  test('publishes selection changes immediately', async () => {
     const mounted = mountPresence()
     await flushAsync()
     mounted.fakes[0]?.emitStatus('connected')
-    expect(mounted.presence.isPresenceConnected.value).toBe(true)
 
-    mounted.selectedIds.value = ['node-9']
-    vi.advanceTimersByTime(200)
-    movePointer(mounted, 10, 20)
+    await publishSelection(mounted, ['node-9'])
     const published = mounted.fakes[0]?.localPublishes ?? []
     const last = published[published.length - 1]
-    expect(last?.user).toEqual({ id: 'usr_ada', name: 'Ada', color: presencePeerColor('usr_ada') })
-    expect(last?.cursor?.position).toEqual({ x: 10, y: 20 })
-    expect(last?.cursor?.dragging).toBe(false)
-    expect(last?.selection).toEqual({ nodeIds: ['node-9'], marquee: null })
-    expect(last?.followingDeviceId).toBeNull()
-    expect(last?.isSpotlighting).toBe(false)
-    expect(last?.viewport).toEqual({ x: 0, y: 0, zoom: 1 })
+    expect(last?.user).toEqual({ id: 'usr_ada', name: 'Ada' })
+    expect(last?.selection).toEqual({ nodeIds: ['node-9'] })
   })
 
-  test('throttles cursor bursts to ~30ms with the latest position trailing', async () => {
-    const mounted = mountPresence()
-    await flushAsync()
-    const before = (mounted.fakes[0]?.localPublishes ?? []).length
-    vi.advanceTimersByTime(200)
-
-    for (let index = 0; index < 10; index += 1) {
-      movePointer(mounted, index, 0)
-    }
-    const publishes = mounted.fakes[0]?.localPublishes ?? []
-    expect(publishes.length - before).toBe(1)
-
-    vi.advanceTimersByTime(30)
-    const settled = mounted.fakes[0]?.localPublishes ?? []
-    expect(settled.length - before).toBe(2)
-    expect(settled[settled.length - 1]?.cursor?.position).toEqual({ x: 9, y: 0 })
-    expect(settled[settled.length - 1]?.cursor?.dragging).toBe(false)
-  })
-
-  test('viewers broadcast cursor-only and never claim selections', async () => {
+  test('viewers broadcast selection-free and never claim selections', async () => {
     const mounted = mountPresence({ canWrite: false })
     await flushAsync()
-    mounted.selectedIds.value = ['node-9']
     vi.advanceTimersByTime(200)
-    movePointer(mounted, 4, 5)
+    await publishSelection(mounted, ['node-9'])
     const published = mounted.fakes[0]?.localPublishes ?? []
     const last = published[published.length - 1]
-    expect(last?.cursor?.position).toEqual({ x: 4, y: 5 })
-    expect(last?.cursor?.dragging).toBe(false)
-    expect(last?.selection).toEqual({ nodeIds: [], marquee: null })
+    expect(last?.selection).toEqual({ nodeIds: [] })
+  })
+
+  test('clears lock claims when write capability is revoked without changing selection', async () => {
+    const mounted = mountPresence()
+    await flushAsync()
+    await publishSelection(mounted, ['node-9'])
+    expect(mounted.fakes[0]?.localPublishes.at(-1)?.selection.nodeIds).toEqual(['node-9'])
+
+    mounted.canWrite.value = false
+    await flushAsync()
+    expect(mounted.fakes[0]?.localPublishes.at(-1)?.selection.nodeIds).toEqual([])
+    mounted.scope.stop()
   })
 
   test('syncs remote peers and drops malformed or self states', async () => {
@@ -314,22 +287,48 @@ describe('canvas presence broadcast', () => {
       41,
       buildRemoteState({
         user: { id: 'usr_ada', name: 'Ada' },
-        cursor: { position: { x: 0, y: 0 }, dragging: false },
-        selection: { nodeIds: [], marquee: null },
+        selection: { nodeIds: [] },
       }),
     )
     fake.emitRemote(9, {
       user: { id: '' },
-      cursor: null,
-      selection: { nodeIds: [], marquee: null },
+      selection: { nodeIds: [] },
     })
     expect(mounted.presence.remotePeers.value).toHaveLength(1)
     const peer = mounted.presence.remotePeers.value[0]
     expect(peer?.clientId).toBe(7)
     expect(peer?.state.user).toEqual({ id: 'usr_bob', name: 'Bob' })
-    expect(peer?.state.cursor?.position).toEqual({ x: 3, y: 4 })
-    expect(peer?.state.cursor?.dragging).toBe(false)
-    expect(peer?.state.selection).toEqual({ nodeIds: ['node-1'], marquee: null })
+    expect(peer?.state.selection).toEqual({ nodeIds: ['node-1'] })
+  })
+
+  test('keeps every remote peer so the roster renders the full collaborator set', async () => {
+    const mounted = mountPresence()
+    await flushAsync()
+    const fake = mounted.fakes[0]
+    if (!fake) throw new Error('expected a provider')
+
+    fake.emitRemote(7, buildRemoteState())
+    fake.emitRemote(
+      8,
+      buildRemoteState({
+        user: { id: 'usr_cid', name: 'Cid' },
+        selection: { nodeIds: [] },
+      }),
+    )
+    fake.emitRemote(
+      41,
+      buildRemoteState({
+        user: { id: 'usr_ada', name: 'Ada' },
+        selection: { nodeIds: [] },
+      }),
+    )
+    const peers = mounted.presence.remotePeers.value
+    expect(peers.map((peer) => peer.clientId).sort((a, b) => a - b)).toEqual([7, 8])
+    expect(peers.find((peer) => peer.clientId === 8)?.state.user).toEqual({
+      id: 'usr_cid',
+      name: 'Cid',
+    })
+    mounted.scope.stop()
   })
 })
 
@@ -342,7 +341,7 @@ describe('canvas presence teardown', () => {
     mounted.scope.stop()
     expect(mounted.fakes[0]?.getIsDisposed()).toBe(true)
     const before = (mounted.fakes[0]?.localPublishes ?? []).length
-    movePointer(mounted, 50, 50)
+    await publishSelection(mounted, ['node-after-disposal'])
     vi.advanceTimersByTime(1000)
     expect((mounted.fakes[0]?.localPublishes ?? []).length).toBe(before)
     expect(mounted.ticketFn).toHaveBeenCalledTimes(1)
@@ -354,8 +353,7 @@ describe('canvas presence teardown', () => {
     mounted.fakes[0]?.emitStatus('connected')
     mounted.fakes[0]?.emitRemote(7, {
       user: { id: 'usr_bob', name: 'Bob' },
-      cursor: null,
-      selection: { nodeIds: [], marquee: null },
+      selection: { nodeIds: [] },
     })
     expect(mounted.presence.remotePeers.value).toHaveLength(1)
 
@@ -363,7 +361,6 @@ describe('canvas presence teardown', () => {
     await flushAsync()
     expect(mounted.fakes[0]?.getIsDisposed()).toBe(true)
     expect(mounted.presence.remotePeers.value).toEqual([])
-    expect(mounted.presence.isPresenceConnected.value).toBe(false)
   })
 
   test('ignores a late connect after unmount', async () => {
@@ -377,17 +374,12 @@ describe('canvas presence teardown', () => {
     const providerFn: PresenceProviderFactory = vi.fn(async () => buildFakePresence().handle)
     const scope = effectScope()
     scope.run(() =>
-      useCanvasPresence({
+      useCanvasPresenceSession({
         boardId: ref('board-1'),
         accessState: ref('workspace'),
         workspaceId: ref('ws-1'),
         localUser: ref(buildLocalUser()),
-        flow: {
-          screenToFlowCoordinate: (point) => point,
-          getSelectedElementIds: () => [],
-          viewport: ref({ x: 0, y: 0, zoom: 1 }),
-        },
-        element: ref(document.createElement('div')),
+        selectedIds: ref([]),
         deps: { requestTicket: ticketFn, createProvider: providerFn },
       }),
     )
@@ -427,7 +419,6 @@ describe('canvas presence reconnect', () => {
     await flushAsync()
     expect(mounted.ticketFn).toHaveBeenCalledTimes(1)
     expect(mounted.fakes).toHaveLength(1)
-    expect(mounted.presence.isPresenceConnected.value).toBe(false)
     expect(mounted.presence.remotePeers.value).toEqual([])
   })
 
@@ -481,46 +472,9 @@ describe('canvas presence reconnect', () => {
 })
 
 describe('canvas presence collaboration fields', () => {
-  test('exposes the local device id for follower counting', async () => {
+  test('exposes the local device id for presence tracking', async () => {
     const mounted = mountPresence()
     await flushAsync()
     expect(mounted.presence.localClientId.value).toBe(41)
-  })
-
-  test('broadcasts follow and spotlight flags immediately', async () => {
-    const ticketFn = vi.fn(async () => 'ticket-1')
-    const fake = buildFakePresence()
-    const providerFn: PresenceProviderFactory = vi.fn(async () => fake.handle)
-    const followingDeviceId = ref<number | null>(null)
-    const isSpotlighting = ref(false)
-    const scope = effectScope()
-    scope.run(() =>
-      useCanvasPresence({
-        boardId: ref('board-1'),
-        accessState: ref('workspace'),
-        workspaceId: ref('ws-1'),
-        localUser: ref(buildLocalUser()),
-        followingDeviceId,
-        isSpotlighting,
-        flow: {
-          screenToFlowCoordinate: (point) => point,
-          getSelectedElementIds: () => [],
-          viewport: ref({ x: 0, y: 0, zoom: 1 }),
-        },
-        element: ref(document.createElement('div')),
-        deps: { requestTicket: ticketFn, createProvider: providerFn },
-      }),
-    )
-    await flushAsync()
-    vi.advanceTimersByTime(200)
-
-    followingDeviceId.value = 7
-    isSpotlighting.value = true
-    await flushAsync()
-    const published = fake.localPublishes
-    const last = published[published.length - 1]
-    expect(last?.followingDeviceId).toBe(7)
-    expect(last?.isSpotlighting).toBe(true)
-    scope.stop()
   })
 })

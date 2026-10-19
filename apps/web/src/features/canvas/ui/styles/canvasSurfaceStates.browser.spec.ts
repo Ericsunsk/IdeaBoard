@@ -37,7 +37,7 @@ import '@testing-library/jest-dom/vitest'
 
 import { commands, page, userEvent as browserUser } from 'vitest/browser'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { createApp, defineComponent, h, ref, type App } from 'vue'
+import { createApp, defineComponent, h, nextTick, ref, type App } from 'vue'
 import { IconoirProvider } from '@iconoir/vue'
 import { VueFlow, useVueFlow } from '@vue-flow/core'
 import { i18n } from '../../../../core/i18n'
@@ -386,6 +386,86 @@ describe('Canvas surface states browser contract', () => {
       expect(busyInput.disabled).toBe(true)
     } finally {
       generating.unmount()
+    }
+  })
+
+  it('shows the group ring for multi-node selection and hides it for a single node', async () => {
+    const nodes = ref([
+      {
+        id: 'node-a',
+        position: { x: 50, y: 60 },
+        data: {},
+        style: { width: '120px', height: '60px' },
+      },
+      {
+        id: 'node-b',
+        position: { x: 400, y: 60 },
+        data: {},
+        style: { width: '120px', height: '60px' },
+      },
+    ])
+    let selectMany!: () => void
+    let selectOne!: () => void
+    const SelectionDriver = defineComponent({
+      setup() {
+        const { addSelectedNodes, removeSelectedElements, getSelectedElements } = useVueFlow()
+        selectMany = () => {
+          const current = [...getSelectedElements.value]
+          if (current.length > 0) removeSelectedElements(current)
+          addSelectedNodes([nodes.value[0]!, nodes.value[1]!] as never)
+        }
+        selectOne = () => {
+          const current = [...getSelectedElements.value]
+          if (current.length > 0) removeSelectedElements(current)
+          addSelectedNodes([nodes.value[0]!] as never)
+        }
+        return () => null
+      },
+    })
+    const host = mountApp(() =>
+      h('div', { class: 'canvas-flow-wrap', style: 'width: 1000px; height: 700px;' }, [
+        h(VueFlow, { nodes: nodes.value }, { default: () => h(SelectionDriver) }),
+      ]),
+    )
+    try {
+      await waitFor(() => host.query('.vue-flow__node'), 'flow node')
+      const wrap = host.query('.canvas-flow-wrap')!
+
+      // Multi-node selection paints the restored group ring on ::before.
+      selectMany()
+      const multiRect = await waitFor(
+        () => host.query('.vue-flow__nodesselection-rect'),
+        'multi selection rect',
+      )
+      expect(wrap.classList.contains('is-single-node-selection')).toBe(false)
+      const multiRing = window.getComputedStyle(multiRect, '::before')
+      expect(multiRing.content).not.toBe('none')
+      expect(multiRing.display).not.toBe('none')
+      expect(multiRing.borderTopWidth).toBe('1px')
+      const groupProbe = document.createElement('div')
+      groupProbe.style.color = 'var(--canvas-selection-group-border)'
+      host.root.append(groupProbe)
+      try {
+        expect(multiRing.borderTopColor).toBe(styleOf(groupProbe).color)
+      } finally {
+        groupProbe.remove()
+      }
+
+      // A single selected node keeps the rect mounted (Vue Flow renders it
+      // for any non-empty bbox) but the wrap flag suppresses the outer ring.
+      selectOne()
+      await waitFor(() => host.query('.vue-flow__nodesselection-rect'), 'single selection rect')
+      wrap.classList.add('is-single-node-selection')
+      await nextTick()
+      const singleRect = host.query('.vue-flow__nodesselection-rect')!
+      expect(window.getComputedStyle(singleRect, '::before').display).toBe('none')
+
+      // Removing the flag restores the ring for the same rect.
+      wrap.classList.remove('is-single-node-selection')
+      await nextTick()
+      expect(window.getComputedStyle(singleRect, '::before').display).not.toBe('none')
+    } finally {
+      host.unmount()
     }
   })
 })

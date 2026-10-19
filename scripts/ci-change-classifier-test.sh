@@ -172,6 +172,30 @@ assert_output_line "${atlas_hcl_output}" 'web=false'
 assert_output_line "${atlas_hcl_output}" 'realtime=false'
 assert_output_line "${atlas_hcl_output}" 'docs_only=false'
 
+migration_sql_output="$(printf '%s\n' apps/api/internal/db/migrations/20261020000001_board_y_updates.sql | "${classifier}")"
+
+assert_output_line "${migration_sql_output}" 'api=true'
+assert_output_line "${migration_sql_output}" 'migration_integration=true'
+assert_output_line "${migration_sql_output}" 'web=false'
+assert_output_line "${migration_sql_output}" 'realtime=false'
+assert_output_line "${migration_sql_output}" 'docs_only=false'
+
+atlas_sum_output="$(printf '%s\n' apps/api/internal/db/migrations/atlas.sum | "${classifier}")"
+
+assert_output_line "${atlas_sum_output}" 'api=true'
+assert_output_line "${atlas_sum_output}" 'migration_integration=true'
+assert_output_line "${atlas_sum_output}" 'web=false'
+assert_output_line "${atlas_sum_output}" 'realtime=false'
+assert_output_line "${atlas_sum_output}" 'docs_only=false'
+
+schema_output="$(printf '%s\n' apps/api/internal/db/schema/schema.sql | "${classifier}")"
+
+assert_output_line "${schema_output}" 'api=true'
+assert_output_line "${schema_output}" 'migration_integration=true'
+assert_output_line "${schema_output}" 'web=false'
+assert_output_line "${schema_output}" 'realtime=false'
+assert_output_line "${schema_output}" 'docs_only=false'
+
 auth_migration_output="$(printf '%s\n' apps/auth/src/infrastructure/authMigration.ts | "${classifier}")"
 
 assert_output_line "${auth_migration_output}" 'auth=true'

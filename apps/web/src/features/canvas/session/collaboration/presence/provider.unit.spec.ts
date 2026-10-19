@@ -36,11 +36,7 @@ describe('presence upgrade url', () => {
       expect(toBareRealtimeUrl(provider.url)).toBe('ws://localhost:6002/realtime?ticket=tkt_1')
       const state: PresenceAwarenessState = {
         user: { id: 'usr_ada', name: 'Ada' },
-        cursor: {
-          position: { x: 1, y: 2 },
-          dragging: false,
-        },
-        selection: { nodeIds: [], marquee: null },
+        selection: { nodeIds: [] },
       }
       provider.awareness.setLocalState(state)
       expect(Array.from(doc.share.keys())).toHaveLength(0)

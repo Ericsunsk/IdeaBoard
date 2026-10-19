@@ -1,5 +1,6 @@
 import type {
   UserAccountMenuItem,
+  UserAccountMenuWorkspace,
   UserIdeaBalanceControl,
 } from '../../../../account/ui/chrome/userAccountMenu.types'
 
@@ -35,6 +36,7 @@ export type CanvasChromeAccountState = {
   userEmail?: string | undefined
   balance: UserIdeaBalanceControl
   menuItems: UserAccountMenuItem[]
+  workspace?: UserAccountMenuWorkspace | undefined
 }
 
 export type CanvasChromeToolState = {

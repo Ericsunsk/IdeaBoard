@@ -1,10 +1,37 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { beforeEach, describe, expect, it, test, vi } from 'vitest'
+import { defineComponent, h, ref } from 'vue'
+import { render } from '../../../../../test/render'
+import {
+  getWorkspaceSelectionStore,
+  resetWorkspaceSelectionStore,
+  useWorkspaceSwitcher,
+} from '../../../../workspace'
+import { createBoardAutosavePolicy } from '../../board-session'
+import { createCanvasWorkspaceRuntimeFacade } from './createCanvasWorkspaceRuntimeFacade'
 import {
   createCanvasWorkspaceRuntime,
   createCanvasWorkspaceRuntimeParts,
 } from './createCanvasWorkspaceRuntimeParts'
 
+const scopeMocks = vi.hoisted(() => ({
+  useQuery: vi.fn(),
+  push: vi.fn(),
+  replace: vi.fn(),
+}))
+
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
+  useRoute: () => ({ path: '/user/canvas', query: { boardId: 'board-a' } }),
+  useRouter: () => ({ push: scopeMocks.push, replace: scopeMocks.replace }),
+}))
+vi.mock('@tanstack/vue-query', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tanstack/vue-query')>()),
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQuery: scopeMocks.useQuery,
+}))
+vi.mock('../../../../auth/session/userSession', () => ({
+  useUserStore: () => ({ user: { public_id: 'usr_test' } }),
+}))
 const mocks = vi.hoisted(() => ({
   feedback: {
     boardSession: {
@@ -431,6 +458,79 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(imageWorkflow.reattachPendingImageResults).toHaveBeenCalledTimes(1)
     expect(graph.resumePendingLibraryImports).toHaveBeenCalledTimes(1)
   })
+
+  test.each([true, false])(
+    'saves the old workspace draft before switching, save success: %s',
+    async (isSaved) => {
+      const { board, runtime } = createWorkspacePartsHarness()
+      resetWorkspaceSelectionStore()
+      const selectionStore = getWorkspaceSelectionStore()
+      selectionStore.select('ws_default1')
+      const selectedId = selectionStore.selectedId
+      const savedScopes: string[] = []
+      const policy = createBoardAutosavePolicy({
+        isDirty: () => board.boardSession.isDirty.value,
+        isSaving: () => board.boardSession.isSavingBoard.value,
+        canRun: () => selectedId.value === 'ws_default1',
+        markDirty: () => {
+          board.boardSession.isDirty.value = true
+        },
+        save: async () => {
+          savedScopes.push(selectedId.value ?? 'none')
+          if (isSaved) board.boardSession.isDirty.value = false
+          return isSaved
+        },
+      })
+      board.boardSession.flushAutosave.mockImplementation(policy.flushAutosave)
+      const facade = createCanvasWorkspaceRuntimeFacade(runtime)
+      scopeMocks.useQuery.mockReturnValue({
+        data: ref({
+          items: [
+            {
+              publicId: 'ws_default1',
+              name: 'Default',
+              organizationId: null,
+              isDefault: true,
+              archivedAt: null,
+            },
+            {
+              publicId: 'ws_team2',
+              name: 'Team',
+              organizationId: null,
+              isDefault: false,
+              archivedAt: null,
+            },
+          ],
+        }),
+        isPending: ref(false),
+        isError: ref(false),
+        error: ref(null),
+        refetch: vi.fn(),
+      })
+      let switcher!: ReturnType<typeof useWorkspaceSwitcher>
+      const view = render(
+        defineComponent({
+          setup() {
+            switcher = useWorkspaceSwitcher({
+              beforeWorkspaceChange: facade.commands.persistence.saveBeforeScopeChange,
+            })
+            return () => h('div')
+          },
+        }),
+      )
+      try {
+        await switcher.switchToGalleryWorkspace('ws_team2')
+        expect(savedScopes).toEqual(['ws_default1'])
+        expect(selectedId.value).toBe(isSaved ? 'ws_team2' : 'ws_default1')
+        expect(board.boardSession.isDirty.value).toBe(!isSaved)
+        expect(scopeMocks.push).toHaveBeenCalledTimes(isSaved ? 1 : 0)
+      } finally {
+        policy.dispose()
+        view.unmount()
+        resetWorkspaceSelectionStore()
+      }
+    },
+  )
 
   it('selects feedback and adapters for each Workspace runtime responsibility', () => {
     const { board, runtimeOptions, runtime } = createWorkspacePartsHarness()

@@ -32,15 +32,22 @@ export function useCanvasCollaborationSession<T extends CollaborationTransport>(
   const hasWriteCapability = ref(false)
   const transport = options.createTransport({ boardId, accessState, canWrite: hasWriteCapability })
   const isEnabled = computed(() => accessState.value === 'workspace' && !!boardId.value)
+  // Shared Boards have one persistence path. Until the room is ready,
+  // local edits would exist only in memory and disappear on leave/reload.
   const canWrite = computed(
-    () => isEnabled.value && hasWriteCapability.value && transport.isDocSynced.value,
+    () =>
+      isEnabled.value &&
+      hasWriteCapability.value &&
+      transport.isDocSynced.value &&
+      transport.sharedDoc.value !== null &&
+      transport.localClientId.value !== null,
   )
   const isReadOnly = computed(() => isEnabled.value && !canWrite.value)
   const binding = useDocBinding({
     boardId,
     doc: transport.sharedDoc,
     deviceId: transport.localClientId,
-    canWrite: () => isEnabled.value && hasWriteCapability.value,
+    canWrite,
     isReady: transport.isDocSynced,
   })
   let graph: { boardId: string; applySnapshot: (snapshot: BoardSnapshot) => void } | null = null

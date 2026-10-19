@@ -2,7 +2,7 @@
 
 `apps/realtime` 是 y-websocket 形态的协作 server：一 Doc 一 room
 （`Y.Doc` + `getMap('nodes')` / `getMap('edges')`，keyed by id），跑 awareness
-（cursor/selection）与文档增量同步。详见
+（identity/selection）与文档增量同步。详见
 [ADR-0019](../../docs/adr/0019-realtime-presence.md)（接入与 presence）与
 [ADR-0020](../../docs/adr/0020-board-ydoc-collaboration.md)（Y.Doc 协同）。
 

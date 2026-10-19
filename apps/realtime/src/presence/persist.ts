@@ -10,13 +10,15 @@
 // failures retry with bounded exponential backoff. Awareness stays standard
 // forwarding and never touches this path.
 
+import { internalFetch } from '../infrastructure/internalHttp.js'
+
 export type PersistOptions = {
   apiInternalURL: string
   internalKey: string
   maxRetries?: number
   baseDelayMs?: number
   maxDelayMs?: number
-  fetchFn?: typeof fetch
+  fetchFn?: typeof internalFetch
 }
 
 type PostResult = {
@@ -56,7 +58,7 @@ export class YUpdatePersister {
   private readonly maxRetries: number
   private readonly baseDelayMs: number
   private readonly maxDelayMs: number
-  private readonly fetchFn: typeof fetch
+  private readonly fetchFn: typeof internalFetch
   private readonly timers = new Map<ReturnType<typeof setTimeout>, () => void>()
   private closed = false
 
@@ -66,7 +68,7 @@ export class YUpdatePersister {
     this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES
     this.baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS
     this.maxDelayMs = options.maxDelayMs ?? DEFAULT_MAX_DELAY_MS
-    this.fetchFn = options.fetchFn ?? fetch
+    this.fetchFn = options.fetchFn ?? internalFetch
   }
 
   /** Bounded recovery transport; the room module owns replay/admission ordering. */
@@ -155,12 +157,6 @@ export class YUpdatePersister {
           },
           body: encoded,
         })
-        // Drain the body so the socket can be reused.
-        try {
-          await response.text()
-        } catch {
-          // Body drain is best effort.
-        }
         result = { ok: response.ok, status: response.status }
       } catch {
         result = { ok: false, status: 0 }

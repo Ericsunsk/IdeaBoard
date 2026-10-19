@@ -46,21 +46,14 @@
         />
       </template>
       <template #presence>
-        <PresenceRoster
-          :peers="presence.remotePeers.value"
-          :local-user="presenceUser"
-          :following-client-id="followingDeviceId"
-          :is-spotlighting="isSpotlighting"
-          :follower-count="follow.followerCount.value"
-          @follow-toggle="follow.toggleFollow"
-          @spotlight-toggle="toggleSpotlight"
-        />
+        <PresenceRoster :peers="presence.remotePeers.value" :local-user="presenceUser" />
       </template>
     </CanvasChrome>
 
     <div
       ref="canvasWrapRef"
       class="canvas-flow-wrap page-dot-bg"
+      :class="{ 'is-single-node-selection': isSingleNodeSelection }"
       :style="nodeUiStyle"
       @dragover.prevent="onCanvasDragOver"
       @drop.prevent="onCanvasDrop"
@@ -112,15 +105,6 @@
         />
       </VueFlow>
       <ImageToolPresentation :image-tools="imageTools" />
-      <CursorsOverlay :peers="presence.remotePeers.value" :viewport="presenceViewport" />
-      <div v-if="spotlightInvite" class="canvas-spotlight-banner">
-        <SpotlightBanner
-          :spotlighter-name="spotlightName"
-          :spotlighter-color="spotlightColor"
-          @accept="follow.acceptInvite"
-          @ignore="follow.dismissInvite"
-        />
-      </div>
       <CanvasNodeContextMenu
         :is-visible="nodeContextMenu.isVisible"
         :x="nodeContextMenu.x"
@@ -179,7 +163,11 @@ import {
   CANVAS_VIEWPORT_MAX_ZOOM,
   CANVAS_VIEWPORT_MIN_ZOOM,
 } from '../../session/browser/canvasViewportStorage.ts'
-import { useWorkspaceAccountControls, type WorkspaceNavigationAdapter } from '../../../workspace'
+import {
+  useWorkspaceAccountControls,
+  useWorkspaceSwitcher,
+  type WorkspaceNavigationAdapter,
+} from '../../../workspace'
 import { getWorkspaceSelectionStore } from '../../../workspace'
 import {
   observeOpenBoardAccessLoss,
@@ -192,12 +180,8 @@ import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSu
 import type { CanvasScreenLibrarySaveBridge } from './internal/useCanvasScreenSurfaceInteractions'
 import { createCanvasScreenNodePresentation } from './internal/createCanvasScreenNodePresentation'
 import { useCanvasScreenLifecycle } from './internal/useCanvasScreenLifecycle'
-import { useCanvasPresence } from './presence/useCanvasPresence'
-import { usePresenceFollow } from './presence/usePresenceFollow'
-import CursorsOverlay from './presence/CursorsOverlay.vue'
 import PresenceRoster from './presence/PresenceRoster.vue'
-import SpotlightBanner from './presence/SpotlightBanner.vue'
-import { presencePeerColor, resolvePeerColor, type PresenceUser } from '../../session/collaboration'
+import { useCanvasPresenceSession, type PresenceUser } from '../../session/collaboration'
 import { useCanvasCollaborationSession } from '../../session/collaboration'
 import { useSoftLocks } from './presence/useSoftLocks'
 import { useCanvasLibraryIsland } from './internal/useCanvasLibraryIsland'
@@ -265,30 +249,21 @@ const presenceUser = computed<PresenceUser | null>(() => {
   return {
     id,
     name,
-    color: presencePeerColor(id),
     ...(avatarUrl ? { avatarUrl } : {}),
   }
 })
-const presenceViewport = flowPaneAdapter.viewport
-const followingDeviceId = ref<number | null>(null)
-const isSpotlighting = ref(false)
+const selectedElementIds = computed(() =>
+  flowPaneAdapter.getSelectedElements.value.map((element) => element.id),
+)
 // Viewers (and archived boards) never write: empty selection broadcasts,
 // no soft-lock claims, no Y.Doc mutations.
 const collaboration = useCanvasCollaborationSession({
   createTransport: (context) =>
-    useCanvasPresence({
+    useCanvasPresenceSession({
       ...context,
       workspaceId: canvasWorkspaceId,
       localUser: presenceUser,
-      followingDeviceId,
-      isSpotlighting,
-      flow: {
-        screenToFlowCoordinate: flowPaneAdapter.screenToFlowCoordinate,
-        getSelectedElementIds: () =>
-          flowPaneAdapter.getSelectedElements.value.map((element) => element.id),
-        viewport: presenceViewport,
-      },
-      element: canvasWrapRef,
+      selectedIds: selectedElementIds,
     }),
 })
 const presence = collaboration.transport
@@ -381,6 +356,12 @@ const accountControls = useWorkspaceAccountControls({
   navigation: canvasNavigationAdapter,
   shouldShowHome: false,
 })
+// Avatar dropdown workspace row (same `useWorkspaceSwitcher` view-model as
+// the workspace/admin headers): list + switch with current highlight, plus
+// the gear settings dialog reused from `UserAccountMenu`.
+const workspaceSwitcher = useWorkspaceSwitcher({
+  beforeWorkspaceChange: commands.persistence.saveBeforeScopeChange,
+})
 
 // Share panel (issue #938): the canvas opens the single Share boundary
 // over the current board. Invites require the local draft to exist and
@@ -439,6 +420,7 @@ const canvasChromeAccount = computed<CanvasChromeAccountState>(() => ({
   userEmail: accountControls.viewModel.userEmail.value,
   balance: accountControls.viewModel.balance.value,
   menuItems: accountControls.viewModel.menuItems.value,
+  workspace: workspaceSwitcher.menuProps.value,
 }))
 const { zoomLevel, imageQuality } = viewModel.viewportControls
 const nodeUiStyle = computed(() => ({
@@ -477,64 +459,23 @@ const libraryDropTargets = useCanvasLibraryDrop({
   add: (asset, point) => commands.graphEditing.libraryImport.add(asset, point),
 })
 const { isFlowInteractionActive, isFlowViewportPanInteractionActive } = viewModel.graphEditing
-// Live presence (Y.js awareness-only): connects only for workspace-posture
-// boards, broadcasts the local cursor/selection/viewport/follow/spotlight
-// with dual-speed throttling (cursor ~30ms, dragging ~100ms), and renders
-// remote cursors with name flags. The header roster toggles Follow (500ms
-// viewport tween, click again or Escape exits) and Spotlight (presenters
-// invite the room via an alertdialog banner and read a live follower
-// count). Viewers broadcast cursor-only (empty selection, no lock claims,
-// no writes); private boards and drafts never connect.
-const follow = usePresenceFollow({
-  peers: presence.remotePeers,
-  localClientId: presence.localClientId,
-  setViewport: (viewport, followOptions) => {
-    const setter = flowPaneAdapter.setViewport
-    if (typeof setter !== 'function') return undefined
-    return setter(viewport, followOptions)
-  },
-  followingClientId: followingDeviceId,
-})
-const spotlightInvite = follow.activeInvite
-const spotlightName = computed(() => {
-  const invite = spotlightInvite.value
-  if (!invite) return ''
-  return invite.state.user.name.trim() || invite.state.user.id
-})
-const spotlightColor = computed(() => {
-  const invite = spotlightInvite.value
-  return invite ? resolvePeerColor(invite.state) : ''
-})
-
-function toggleSpotlight(): void {
-  if (isSpotlighting.value) {
-    isSpotlighting.value = false
-    return
-  }
-  follow.stopFollow()
-  isSpotlighting.value = true
-}
-
-// Escape order: dismiss the spotlight invite first, then exit Follow,
-// then fall through to the shell transient-UI dismissal.
-function onCanvasEscape(): boolean {
-  if (spotlightInvite.value) {
-    follow.dismissInvite()
-    return true
-  }
-  if (follow.handleEscape()) return true
-  return onEscapeShortcut()
-}
-
 // Soft locks + Y.Doc binding (TapNow §3§5): a single-node selection claims
 // a purely client-side lock (smaller deviceId wins, viewers abstain).
-// Locked nodes render a colored outline + owner tag (see `nodePropsFor`
-// below) and are excluded from drag cohorts. The binding observes the
+// Locks carry no node visualization; locked nodes are only excluded from
+// drag cohorts. The binding observes the
 // room's `nodes`/`edges` maps with the local device origin. Canonical graph
 // commits write only their changed ids; remote snapshots replace the graph
 // projection without generating another local commit.
-const selectedElementIds = computed(() =>
-  flowPaneAdapter.getSelectedElements.value.map((element) => element.id),
+// Vue Flow mounts `.vue-flow__nodesselection-rect` for a single selected
+// node as well (`!userSelectionActive && bbox`), so pure CSS cannot tell
+// single from multi. The adapter skin restores the multi-node group ring
+// on `::before`; this flag suppresses exactly the single-node case.
+const isSingleNodeSelection = computed(
+  () =>
+    flowPaneAdapter.getSelectedElements.value.filter((element) => {
+      const candidate = element as { source?: unknown; target?: unknown }
+      return !(typeof candidate.source === 'string' && typeof candidate.target === 'string')
+    }).length === 1,
 )
 const softLocks = useSoftLocks({
   peers: presence.remotePeers,
@@ -603,10 +544,6 @@ const nodePresentation = createCanvasScreenNodePresentation({
   imageStages: imageToolUi.imageStages,
   isDuplicateModifierPressed,
   nodeInteractions: surface.nodeInteractions,
-  lockOwnerFor: (nodeId) => {
-    const owner = softLocks.nodeLocksById.value.get(nodeId)
-    return owner ? { name: owner.name, color: owner.color } : null
-  },
 })
 const {
   nodePresentationIntentRouter,
@@ -755,7 +692,7 @@ useCanvasScreenLifecycle({
   keyboard: {
     onDeleteInlineSelection,
     isShortcutSuppressed: () => isCanvasShortcutSuppressed.value,
-    onEscape: onCanvasEscape,
+    onEscape: onEscapeShortcut,
     onPanViewport,
     setActiveTool,
     onSpacePressedChange: (isPressed) => {
@@ -786,18 +723,5 @@ useCanvasScreenLifecycle({
   z-index: 2;
   overscroll-behavior: none;
   overscroll-behavior-x: none;
-}
-
-.canvas-spotlight-banner {
-  pointer-events: none;
-  position: absolute;
-  top: calc(var(--canvas-chrome-inset, 16px) + 56px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 50;
-  display: flex;
-  justify-content: center;
-  width: max-content;
-  max-width: calc(100% - 32px);
 }
 </style>

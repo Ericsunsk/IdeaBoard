@@ -360,6 +360,11 @@ NGINX_AUTH_HEALTH_UPSTREAM=http://127.0.0.1:6001/api/health
 NGINX_REALTIME_UPSTREAM=http://127.0.0.1:6002
 ```
 
+API trusted proxies 无 env 开关：本地只信 loopback，production 追加私网段
+（`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`，见
+`AppConfig.TrustedProxies`）。裸机/拆分部署须把反代放在上述范围内，否则
+客户端 IP 与限流归因错误；Auth 侧确需覆盖才用 `AUTH_TRUST_PROXY`，API 侧改代码。
+
 如需明确绑定主站域名，可设置 `NGINX_SERVER_NAME=ideaboard.art` 后重新执行 `ideaboard nginx-conf`。
 
 如果 Gateway 域名使用 Cloudflare `Proxied`，并且 VPS 防火墙已限制 80/443 只接受 Cloudflare IP ranges，可以生成真实客户端 IP include：

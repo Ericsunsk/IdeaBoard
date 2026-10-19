@@ -3,8 +3,31 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('../../../../../core/composables/useSupportChannels', () => ({
   useSupportChannels: () => ({ channels: [] }),
 }))
-import { h } from 'vue'
-import { render, renderWithUser, screen } from '../../../../../test/render'
+vi.mock('../../../../account/ui/chrome/useWorkspaceMemberSection', () => ({
+  memberDisplayName: (entry: { userId: string }) => entry.userId,
+  useWorkspaceMemberSection: () => ({
+    roster: ref([]),
+    myRole: ref(null),
+    canManage: ref(false),
+    isOwner: ref(false),
+    isLoading: ref(false),
+    hasLoadError: ref(false),
+    retryRoster: vi.fn(),
+    isPending: () => false,
+    inviteEmail: ref(''),
+    inviteRole: ref('member'),
+    inviteError: ref(null),
+    pickInviteRole: vi.fn(),
+    inviteMember: vi.fn(),
+    changeMemberRole: vi.fn(),
+    confirmingRemoveId: ref(null),
+    requestRemove: vi.fn(),
+    cancelRemove: vi.fn(),
+    confirmRemove: vi.fn(),
+  }),
+}))
+import { h, ref } from 'vue'
+import { render, renderWithUser, screen, waitFor } from '../../../../../test/render'
 import CanvasChrome from './CanvasChrome.vue'
 
 describe('CanvasChrome', () => {
@@ -620,5 +643,131 @@ describe('CanvasChrome', () => {
     })
 
     expect(screen.getByRole('button', { name: 'Restore archived board' })).toBeDisabled()
+  })
+
+  describe('avatar workspace section', () => {
+    function workspaceProps(overrides?: Record<string, unknown>) {
+      const onSelect = vi.fn()
+      const workspace = {
+        items: [
+          {
+            publicId: 'ws_default1',
+            name: 'Personal',
+            organizationId: null,
+            isDefault: true,
+            archivedAt: null,
+          },
+          {
+            publicId: 'ws_team2',
+            name: 'Team',
+            organizationId: 'org_c3',
+            isDefault: false,
+            archivedAt: null,
+          },
+          {
+            publicId: 'ws_old3',
+            name: 'Old',
+            organizationId: null,
+            isDefault: false,
+            archivedAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+        selectedId: 'ws_default1',
+        status: 'ready',
+        onSelect,
+        onCreate: vi.fn(),
+        onRename: vi.fn(),
+        onArchive: vi.fn(),
+        onRetry: vi.fn(),
+        ...overrides,
+      }
+      return { workspace, onSelect }
+    }
+
+    function chromePropsWithWorkspace(workspace: Record<string, unknown>) {
+      return {
+        isInert: false,
+        isHidden: false,
+        board: {
+          currentName: 'Untitled',
+          options: [],
+          currentId: 'board-a',
+          isMenuOpen: false,
+          isRenaming: false,
+          isRenamePending: false,
+          isReadOnly: false,
+          catalogRecovery: { status: 'idle' },
+          archived: { isArchived: false, isRestoring: false },
+          setNameInputRef: vi.fn(),
+        },
+        account: {
+          balance: {
+            status: 'ready',
+            availableIdeas: 0,
+            displayValue: '0',
+            ariaLabel: 'Idea余额 0 Ideas',
+            command: vi.fn(),
+          },
+          menuItems: [{ key: 'profile', label: 'Account', command: vi.fn() }],
+          workspace,
+        },
+        tools: {
+          activeTool: 'select',
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
+        },
+        status: { isExportDisabled: false, zoomLevel: 100 },
+      }
+    }
+
+    it('renders the workspace row with the reused manage entry', async () => {
+      const { workspace } = workspaceProps()
+      const { user } = renderWithUser(CanvasChrome, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        props: chromePropsWithWorkspace(workspace) as any,
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Account menu' }))
+
+      expect(await screen.findByRole('menuitem', { name: 'Default' })).toBeVisible()
+      expect(screen.getByRole('button', { name: 'Manage workspaces' })).toBeVisible()
+    })
+
+    it('switches workspaces from the submenu and highlights the current row', async () => {
+      const { workspace, onSelect } = workspaceProps()
+      const { user } = renderWithUser(CanvasChrome, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        props: chromePropsWithWorkspace(workspace) as any,
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Account menu' }))
+      const trigger = await screen.findByRole('menuitem', { name: 'Default' })
+      trigger.dispatchEvent(
+        new PointerEvent('pointermove', {
+          bubbles: true,
+          cancelable: true,
+          pointerType: 'mouse',
+        }),
+      )
+
+      const teamOption = await screen.findByRole('menuitem', { name: 'Team' })
+      expect(teamOption).toBeVisible()
+      expect(screen.queryByRole('menuitem', { name: 'Old' })).not.toBeInTheDocument()
+
+      const currentOption = (await screen.findAllByRole('menuitem', { name: 'Default' })).find(
+        (entry) => entry.getAttribute('aria-current') === 'true',
+      )
+      expect(currentOption).toBeDefined()
+
+      await user.click(teamOption)
+      await waitFor(() => expect(onSelect).toHaveBeenCalledWith('ws_team2'))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Account menu' })).toHaveAttribute(
+          'aria-expanded',
+          'false',
+        ),
+      )
+    })
   })
 })

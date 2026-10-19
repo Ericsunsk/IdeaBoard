@@ -65,6 +65,7 @@ vi.mock('../../session/flow-adapter', async (importOriginal) => {
     useVueFlowAdapter: () => ({
       screenToFlowCoordinate: vi.fn((point: { x: number; y: number }) => point),
       viewport: ref({ x: 0, y: 0, zoom: 1 }),
+      getSelectedElements: ref([]),
       selectOnlyNode: vi.fn(() => true),
     }),
     useCanvasVueFlowHandleGeometryAdapter: () => ({
@@ -141,6 +142,16 @@ vi.mock('../../../workspace/shell/useWorkspaceAccountControls.ts', () => ({
   useWorkspaceAccountControls: () => ({
     viewModel: { avatarUrl: ref(null), userEmail: ref(null), balance: ref({}), menuItems: ref([]) },
     commands: { openAccount: vi.fn() },
+  }),
+}))
+
+vi.mock('../../../workspace/shell/useWorkspaceSwitcher.ts', () => ({
+  useWorkspaceSwitcher: () => ({
+    menuProps: ref(undefined),
+    switchToGalleryWorkspace: vi.fn(),
+    createAndSwitchWorkspace: vi.fn(),
+    renameWorkspaceItem: vi.fn(),
+    archiveWorkspaceItem: vi.fn(),
   }),
 }))
 

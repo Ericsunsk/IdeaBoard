@@ -127,6 +127,10 @@
   background: var(--canvas-selection-group-surface);
 }
 
+.canvas-flow-wrap.is-single-node-selection .vue-flow__nodesselection-rect::before {
+  display: none;
+}
+
 .canvas-flow-wrap .vue-flow__nodesselection {
   z-index: var(--canvas-selection-group-z);
 }

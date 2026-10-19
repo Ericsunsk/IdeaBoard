@@ -6,6 +6,11 @@ export function createCanvasWorkspaceRuntimeFacade(
 ): CanvasWorkspaceRuntime {
   const { board, graph, viewport, persistence, imageWorkflow } = parts
 
+  async function saveBeforeScopeChange(): Promise<boolean> {
+    await persistence.flushAutosave({ isSilent: false })
+    return !board.boardSession.isDirty.value && !board.boardSession.isSavingBoard.value
+  }
+
   return {
     viewModel: {
       boardChrome: {
@@ -57,6 +62,7 @@ export function createCanvasWorkspaceRuntimeFacade(
       },
       persistence: {
         flushAutosave: persistence.flushAutosave,
+        saveBeforeScopeChange,
         recoverBoardSession: persistence.recoverBoardSession,
       },
       viewportControls: {

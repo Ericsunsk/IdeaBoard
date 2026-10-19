@@ -4,6 +4,13 @@
 
 ## 本地开发
 
+本地一键起全栈：`process-compose up`（根目录 `process-compose.yml`，
+dashboard 端口固定 `8081`——`8080` 归本地 imgproxy，`PC_PORT_NUM` 已在文档注明勿改）。
+`up` 自动按 `docker-deps → migrate → api/auth/realtime/web` 顺序起：
+infra 容器先行，随后 one-shot `migrate` 跑 `scripts/migrate.sh --env dev`
+（API→Auth 强制顺序，幂等，重跑无操作），成功才放行四个应用进程；
+migrate 失败整栈停住并报错，不带病起服务。日常开发无需手跑 migrate。
+
 环境要求：
 
 | 组件       | 建议版本                                    |
@@ -16,6 +23,11 @@
 启动本地依赖（`docker/.env` 已是加密进 git 的文件，全新 clone 自带，
 不要再从 example 覆盖它；`migration.env` 仍是本机文件，缺失才创建）：
 
+> [!IMPORTANT]
+> 本地先填齐 7 个必填再起服务：`API_PG_PASSWORD`、`AUTH_INTERNAL_KEY`、
+> `RT_TICKET_SECRET`、`APP_SECRETS_ENCRYPTION_KEY`、`CREDITS_WELCOME_IDENTITY_KEY`、
+> `REWARDS_CODE_HMAC_KEYS`、`PUBLIC_ORIGIN`——缺一即启动 fail-closed（行为不变）。
+
 ```bash
 cd docker
 test -f migration.env || cp migration.env.example migration.env
@@ -25,9 +37,15 @@ dotenvx run -f .env -- docker compose -f compose.local.yml up -d
 
 NATS 本地端口为 `127.0.0.1:4222`，与 production 一样使用 `ideaboard` +
 `NATS_PASSWORD` 认证；依赖 Compose 与宿主应用必须消费同一 dev secret 集合。
-builtin-local 始终从进程 cwd 解析一次 root：宿主在 `apps/api` 启动，容器
+本地栈与生产 NATS 均为必填（`compose.local.yml` / `compose.yml` 缺 `NATS_PASSWORD`
+即 fail fast；文档与 Compose 已按必填对齐，不再标可选）。仅在不带 NATS 直跑
+API 二进制时（如单测）才回落到进程内 SSE fanout。builtin-local 始终从进程 cwd 解析一次 root：宿主在 `apps/api` 启动，容器
 `WORKDIR /app`，两者的 `uploads/` 与 imgproxy mount 一致。
 本地 API 的 trusted proxies 仅 loopback；production Compose 才信任私网 bridge。
+API 的 trusted proxies 是代码常量、无 env 开关（`AppConfig.TrustedProxies`）：
+本地只信 loopback，production 追加私网段（`10.0.0.0/8`、`172.16.0.0/12`、
+`192.168.0.0/16`）。裸机/拆分部署须把反代放在上述范围内（宿主 loopback 或
+RFC1918 内网），否则客户端 IP 与限流归因错误；确需其他网段时改代码，不加开关。
 
 ### dotenvx（compose 边界的 secret 通道）
 
@@ -53,25 +71,22 @@ key 名受 `scripts/env-schema-check.sh` 的 F 门禁校验。
 `export DOTENV_PRIVATE_KEY='...'`（用完即清，不落地），
 进目录自动加载，`dotenvx run` 不再需要手动 export。示例仅文档，不提交 `.envrc`。
 
-初始化数据库时必须先执行 API migration，再执行 Auth migration。Auth 的 limited runtime role 通过后者获得 Better Auth tables 和 typed runtime settings function 权限：
+手动/排障才直跑 `scripts/migrate.sh`（与 compose 内同一入口、同一幂等语义，
+重跑无操作）。Auth 的 limited runtime role 通过 Auth migration 获得 Better Auth tables 和 typed runtime settings function 权限：
 
 ```bash
-cd apps/api
-set -a
-source ../../docker/migration.env   # owner 口令（PG_MIGRATION_*），只走本地，不进 Cloud
-set +a
-# 运行时 secret 走 Cloud 注入（与 migration.env 无重名 key，不冲突）
-../../scripts/infisical-run.sh --env dev -- go run ./cmd migrate
+scripts/migrate.sh --env dev            # api→auth 一次跑完
+scripts/migrate.sh --env dev --only api # 只跑 API migration
+scripts/migrate.sh --env dev --only auth # 只跑 Auth migration（首次跑前先 cd apps/auth && npm install）
 ```
 
-```bash
-cd apps/auth
-npm install
-set -a
-source ../../docker/migration.env
-set +a
-../../scripts/infisical-run.sh --env dev -- npm run migrate
-```
+`docker/migration.env` 缺失时 migrate 直接报错并指引
+`cd docker && cp migration.env.example migration.env`，不用空值硬跑。
+
+脚本用 `infisical export --format=dotenv` 落 0600 临时文件再 `set -a; source`，合并 Cloud 全集与 `docker/migration.env`
+（owner 口令仍只走本地文件，不进 Cloud；不走 dotenvx，也不走会净空父 env 的 `infisical run`）。
+开跑前先等 postgres accept 连接（`pg_isready` 探活，60s 超时），再用运行时 role 直连 `SELECT 1` 预检：Cloud 口令与 volume 指纹不一致直接报错，不进 60 次重试；
+Welcome key 指纹对 guard 表比对，不一致提前报（fresh DB 无 guard 表时跳过并注明）。
 
 ### Atlas migration workflow
 
@@ -96,7 +111,7 @@ bash scripts/atlas-migration-check.sh
 
 如确需 destructive migration，SQL 文件必须包含 `-- destructive: approved`，并且只在经过 review 的环境中显式设置 `ATLAS_ALLOW_DESTRUCTIVE=1`；CI 默认始终拒绝。被拦截的 DDL 包括 `DROP TABLE` / `DROP COLUMN` / `DROP CONSTRAINT` / `DROP SCHEMA` / `DROP INDEX` / `DROP VIEW` / `DROP FUNCTION` / `DROP TRIGGER` / `TRUNCATE`，bare `DROP <object>` 与 `ALTER TABLE ... DROP <object>` 两种写法都会命中。
 
-然后分别启动 Auth 与 API：
+不用 process-compose、改为手动单起时，才分别启动 Auth 与 API：
 
 ```bash
 cd apps/auth
@@ -126,17 +141,16 @@ npm install
 npm run dev
 ```
 
-初始化管理员：
+初始化管理员（与 migrate 同形态，跑完自动 unset `INIT_ADMIN_*`；执行前 Auth Service 必须已启动）：
 
 ```bash
-cd apps/api
-INIT_ADMIN_EMAIL='admin@example.com' \
-INIT_ADMIN_DISPLAY_NAME='Admin' \
-INIT_ADMIN_PASSWORD='your-strong-password' \
-  go run ./cmd init-admin
+scripts/migrate.sh --env dev --only init-admin \
+  --admin-email 'admin@example.com' \
+  --admin-password 'your-strong-password' \
+  --display-name 'Admin'
 ```
 
-`INIT_ADMIN_PASSWORD` 必须为 10–128 个字符；执行命令前 Auth Service 必须已启动。
+`--admin-password` 必须为 10–128 个字符；`--display-name` 可省（默认取邮箱 local part）。
 
 初始化已有开发身份的 Credit Wallet 时，传入 Auth 导出的 trusted canonical registration identity JSON；该命令幂等，普通 API startup 不会扫描用户。`CREDITS_WELCOME_IDENTITY_KEY` 首次使用后会在数据库绑定 fingerprint，误更换会 fail closed，不能当作普通可轮换 secret：
 
@@ -148,10 +162,11 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 
 开发代理：
 
-| Path           | Target                  |
-| -------------- | ----------------------- |
-| `/api/auth/**` | `http://localhost:6001` |
-| `/api/**`      | `http://localhost:6000` |
+| Path            | Target                  |
+| --------------- | ----------------------- |
+| `/api/auth/**`  | `http://localhost:6001` |
+| `/api/**`       | `http://localhost:6000` |
+| `/realtime` WS  | `http://localhost:6002` |
 
 ## 验证矩阵
 

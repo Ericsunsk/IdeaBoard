@@ -44,7 +44,7 @@ function toMenuStatus(status: WorkspaceSelectionStatus): UserAccountMenuWorkspac
 // `/user/boards` with the new workspace param and no stale `boardId`.
 // Creation provisions (Idempotency-Key deduped in the store) and lands on
 // the new gallery; rename writes through PATCH and only refreshes the list.
-export function useWorkspaceSwitcher() {
+export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => Promise<boolean> }) {
   const userStore = useUserStore()
   const route = useRoute()
   const router = useRouter()
@@ -56,7 +56,7 @@ export function useWorkspaceSwitcher() {
     enabled: () => userStore.user != null,
   })
 
-  function switchToGalleryWorkspace(workspaceId: string): void {
+  function landOnGalleryWorkspace(workspaceId: string): void {
     selection.selectWorkspace(workspaceId)
     const query: LocationQueryRaw = {
       ...route.query,
@@ -68,14 +68,23 @@ export function useWorkspaceSwitcher() {
     else void router.push(target)
   }
 
+  async function switchToGalleryWorkspace(workspaceId: string): Promise<void> {
+    if ((await options?.beforeWorkspaceChange?.()) === false) return
+    landOnGalleryWorkspace(workspaceId)
+  }
+
   async function refreshWorkspaceList(): Promise<void> {
     await queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.list })
   }
 
   async function createAndSwitchWorkspace(name: string): Promise<WorkspaceSummary> {
+    // Provision selects the new workspace in the shared store immediately.
+    if ((await options?.beforeWorkspaceChange?.()) === false) {
+      throw new Error('Workspace change cancelled: current draft was not saved')
+    }
     const created = await selection.provisionWorkspace({ name })
     await refreshWorkspaceList()
-    switchToGalleryWorkspace(created.publicId)
+    landOnGalleryWorkspace(created.publicId)
     return created
   }
 
@@ -97,13 +106,16 @@ export function useWorkspaceSwitcher() {
 
   // Reuse the selection seam's fallback after archiving the selected workspace.
   async function archiveWorkspaceItem(workspaceId: string): Promise<WorkspaceSummary> {
+    const isSelectedWorkspace = selection.selectedId.value === workspaceId
+    if (isSelectedWorkspace && (await options?.beforeWorkspaceChange?.()) === false) {
+      throw new Error('Workspace change cancelled: current draft was not saved')
+    }
     const archived = await archiveWorkspace(workspaceId)
     // Refresh can already resolve the selection to Default while the URL still names the archived row.
-    const isSelectedWorkspace = selection.selectedId.value === workspaceId
     await refreshWorkspaceList()
     if (isSelectedWorkspace) {
       const fallbackId = selection.selectedId.value
-      if (fallbackId) switchToGalleryWorkspace(fallbackId)
+      if (fallbackId) landOnGalleryWorkspace(fallbackId)
     }
     return archived
   }

@@ -11649,7 +11649,9 @@
       },
       "PresenceProviderStatus": {
         "kind": "test-contract",
-        "evidence": ["src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts"]
+        "evidence": [
+          "src/features/canvas/session/collaboration/presence/useCanvasPresenceSession.unit.spec.ts"
+        ]
       }
     },
     "src/features/canvas/session/collaboration/presence/state.ts": {
@@ -14356,28 +14358,6 @@
         "kind": "test-contract",
         "evidence": ["src/features/admin/settings/session/payment/resource.contract.spec.ts"]
       }
-    },
-    "src/features/canvas/session/collaboration/index.ts": {
-      "PresenceAwarenessState": {
-        "kind": "test-contract",
-        "evidence": ["src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts"]
-      },
-      "PresenceCloseEvent": {
-        "kind": "test-contract",
-        "evidence": ["src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts"]
-      },
-      "PresenceProviderFactory": {
-        "kind": "test-contract",
-        "evidence": ["src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts"]
-      },
-      "PresenceProviderHandle": {
-        "kind": "test-contract",
-        "evidence": ["src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts"]
-      },
-      "PresenceProviderStatus": {
-        "kind": "test-contract",
-        "evidence": ["src/features/canvas/ui/screens/presence/useCanvasPresence.unit.spec.ts"]
-      }
     }
   },
   "generated": {
@@ -15835,7 +15815,7 @@
       "exports": ["UploadControlBrandingLogoBody"]
     },
     "src/api/generated-query/public/boards/boards.ts": {
-      "sha256": "8cc445c852c7898d18c35756b67a0bbd3be45242357452461376d6969174a2b7",
+      "sha256": "8adec9d55f81f94daa24c8213345eb0d3e791b6e896364e5500f4519505d7851",
       "exports": [
         "ArchiveBoardMutationError",
         "ArchiveBoardMutationResult",
@@ -17724,7 +17704,7 @@
       ]
     },
     "src/api/generated-query/public/workspaces/workspaces.ts": {
-      "sha256": "8f9188d99936dbed70c8b746578bcd0dcf5dd612c97083470a05ff7c04624e9a",
+      "sha256": "d43db43626d551a0864333511eb0d34832482abf747f469e00e8c667ae946009",
       "exports": [
         "ArchiveWorkspaceMutationError",
         "ArchiveWorkspaceMutationResult",

@@ -6,9 +6,11 @@ It does NOT own the Board document contract, repository, or sync fact source (ow
 
 ## Collaboration Session
 
-`session/collaboration` owns the live document lifecycle behind one session interface. The Screen adapts pointer events and consumes presentation state; the session owns the presence provider, ticket rotation, reconnect policy and awareness throttling; Workspace binds the Board context, and Flow attaches its canonical GraphSession adapter after HTTP hydration. Board residency, room readiness, write capability, changed-id synchronization, remote replacement and scope disposal stay inside the session. The synchronized Y.Doc is the remote replay buffer; callers keep no second pending snapshot. Collaborative commits bypass snapshot autosave and remote replacements bypass local commit/history/echo. Private Boards retain the existing snapshot persistence path (ADR-0020).
+`session/collaboration` owns the live document lifecycle behind one session interface. The Screen supplies local selection and consumes presentation state; the session owns the presence provider, ticket rotation, reconnect policy and awareness publication; Workspace binds the Board context, and Flow attaches its canonical GraphSession adapter after HTTP hydration. Board residency, room readiness, write capability, changed-id synchronization, remote replacement and scope disposal stay inside the session. Shared Boards accept edits only with server write capability and a synchronized room document, including after sharing or reconnecting. The synchronized Y.Doc is the remote replay buffer; callers keep no second pending snapshot. Collaborative commits bypass snapshot autosave and remote replacements bypass local commit/history/echo. Private Boards retain the existing snapshot persistence path (ADR-0020).
 
-Document mapping consumes the canonical `board/ports/canvas` contract and validates remote frames there. No screen-owned snapshot schema mirror or caller casts are allowed. Soft locks and awareness presentation stay in `ui/screens/presence`.
+Workspace selection, creation and selected-workspace archival must await `saveBeforeScopeChange` before mutating the selected scope. A completed flush is insufficient: dirty or saving Board state blocks the transition.
+
+Document mapping consumes the canonical `board/ports/canvas` contract and validates remote frames there. No screen-owned snapshot schema mirror or caller casts are allowed. Awareness carries identity and selected node ids only. Soft-lock conflict logic and roster-only awareness presentation stay in `ui/screens/presence` (no remote cursors, no follow/spotlight, no owner color frames or name tags, no local purple selection ring).
 
 ## Domain Language
 

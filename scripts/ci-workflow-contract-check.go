@@ -24,6 +24,7 @@ func main() {
 
 	checkCI(ci)
 	checkReusableWorkflows(root)
+	checkMigrationGate(root)
 	checkRelease(root, release)
 	checkDeployOnly(root)
 	checkActionPinning(root)
@@ -126,6 +127,11 @@ func checkReusableWorkflows(root string) {
 	requireEqual(object(apiTestStep, "env")["TEST_MODE"], "race", "API tests must run in race mode")
 	migrationGate := object(object(api, "jobs"), "migration-gate")
 	rejectKey(migrationGate, "if", "API migration verification must run on every invocation")
+	installAPIAtlas := requireStep(migrationGate, "Install Atlas")
+	installAPIAtlasRun := stringValue(installAPIAtlas["run"])
+	requireContains(installAPIAtlasRun, "apps/api/Dockerfile", "API migration gate must derive Atlas from the Dockerfile pin")
+	requireContains(installAPIAtlasRun, "ARG ATLAS_VERSION", "API migration gate must derive Atlas from the Dockerfile pin")
+	reject(strings.Contains(installAPIAtlasRun, "v1.3.2"), "API migration gate must not hardcode the Atlas version")
 	semanticCheck := requireStep(migrationGate, "Compare migration replay with schema snapshot")
 	requireEqual(semanticCheck["working-directory"], "apps/api", "Migration semantics must use the API project root")
 	requireContains(stringValue(semanticCheck["run"]), `go run ./cmd/schemarelease --base-sha "${ATLAS_BASE_SHA:-HEAD}"`, "Migration gate must compare migration replay and snapshot semantics")
@@ -158,6 +164,11 @@ func checkReusableWorkflows(root string) {
 	requireStepRun(verify, "bash scripts/ci-migration-integration-test.sh")
 	requireStepRun(verify, "bash scripts/atlas-migration-check.sh")
 	requireStepRun(verify, "./scripts/ci-migration-integration.sh")
+	installMigrationAtlas := requireStep(verify, "Install Atlas")
+	installMigrationAtlasRun := stringValue(installMigrationAtlas["run"])
+	requireContains(installMigrationAtlasRun, "apps/api/Dockerfile", "Migration integration must derive Atlas from the Dockerfile pin")
+	requireContains(installMigrationAtlasRun, "ARG ATLAS_VERSION", "Migration integration must derive Atlas from the Dockerfile pin")
+	reject(strings.Contains(installMigrationAtlasRun, "v1.3.2"), "Migration integration must not hardcode the Atlas version")
 	for _, step := range steps(verify) {
 		run, _ := step["run"].(string)
 		reject(strings.Contains(run, "npm run build") || strings.Contains(run, "npm run migrate:dist"), "Migration implementation must stay inside ci-migration-integration.sh")
@@ -171,6 +182,48 @@ func checkReusableWorkflows(root string) {
 	manifestBytes, err := os.ReadFile(filepath.Join(root, "scripts", "run-all-self-tests.sh"))
 	failIf(err)
 	requireContains(string(manifestBytes), "*-test.sh", "Self-test manifest must glob scripts/*-test.sh")
+}
+
+func checkMigrationGate(root string) {
+	// Atlas lint-equivalent gate: Community `migrate validate` plus the local
+	// static checks in atlas-migration-check.sh (Atlas Pro `migrate lint` is
+	// intentionally not a CI dependency). The checker owns the destructive
+	// pattern with the `-- destructive: approved` + ATLAS_ALLOW_DESTRUCTIVE
+	// escape hatch, the no-bypass risky patterns, the --dev-url Fresh replay,
+	// and the linear-history conflict detection.
+	checkerBytes, err := os.ReadFile(filepath.Join(root, "scripts", "atlas-migration-check.sh"))
+	failIf(err)
+	checkerText := string(checkerBytes)
+	for _, required := range []string{
+		"migrate validate",
+		"--dev-url",
+		"-- destructive: approved",
+		"ATLAS_ALLOW_DESTRUCTIVE",
+		"column type change is blocked",
+		"SET NOT NULL is blocked",
+		"NOT NULL without DEFAULT is blocked",
+		"history is immutable",
+		"duplicate migration version",
+		"does not sort after base max",
+		"atlas.sum is missing entry",
+	} {
+		requireContains(checkerText, required, "Atlas migration checker contract is missing "+required)
+	}
+
+	// The pinned Atlas version is derived from apps/api/Dockerfile everywhere
+	// it is downloaded; no literal may drift from the pin.
+	integrationBytes, err := os.ReadFile(filepath.Join(root, "scripts", "ci-migration-integration.sh"))
+	failIf(err)
+	requireContains(string(integrationBytes), "apps/api/Dockerfile", "Migration integration must derive Atlas from the Dockerfile pin")
+	requireContains(string(integrationBytes), "ARG ATLAS_VERSION", "Migration integration must derive Atlas from the Dockerfile pin")
+	reject(strings.Contains(string(integrationBytes), "1.3.2"), "Migration integration must not hardcode the Atlas version")
+
+	// Classifier must route migration SQL and atlas.sum to the migration lanes.
+	classifierBytes, err := os.ReadFile(filepath.Join(root, "scripts", "ci-change-classifier.sh"))
+	failIf(err)
+	requireContains(string(classifierBytes), "apps/api/internal/db/migrations/", "Classifier must route migration files")
+	requireContains(string(classifierBytes), "atlas.sum", "Classifier must route atlas.sum")
+	requireContains(string(classifierBytes), "migration_integration=true", "Classifier must set the migration integration lane")
 }
 
 func checkWebVerification(root string, web workflow) {

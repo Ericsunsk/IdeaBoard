@@ -84,9 +84,12 @@ EOF
 }
 
 # Direct process-env reads outside the typed schema (healthcheck override,
-# dotenv path selection). Kept minimal by design.
+# dotenv path selection, schemarelease/atlas tool-binary override for CI and
+# local runs; never a secret, never stored in Infisical). Kept minimal by
+# design.
 command_allowlist() {
   cat <<'EOF'
+ATLAS_BINARY
 ENV_FILE
 HEALTHCHECK_URL
 EOF

@@ -24,6 +24,7 @@ type GroupOptions = { grouping: { onAction: () => void } }
 
 const mocks = vi.hoisted(() => ({
   keyboardOptions: null as KeyboardOptions | null,
+  workspaceSwitcherOptions: null as { beforeWorkspaceChange: () => Promise<boolean> } | null,
   leaveGuardOptions: null as LeaveGuardOptions | null,
   groupOptions: null as GroupOptions | null,
   onFlowNodeMouseDown: vi.fn(),
@@ -35,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   flowProps: {} as Partial<FlowProps>,
   emitPaneContextMenu: (_event: MouseEvent) => {},
   groupContextMenu: vi.fn(),
+  flowSelectedElements: null as { value: Array<{ id: string }> } | null,
 }))
 
 vi.mock('../../session/workspace', () => ({
@@ -50,11 +52,15 @@ vi.mock('../../session/flow-adapter', async (importOriginal) => ({
     cancel: vi.fn(),
     dispose: vi.fn(),
   }),
-  useVueFlowAdapter: () => ({
-    screenToFlowCoordinate: vi.fn((point: { x: number; y: number }) => point),
-    viewport: ref({ x: 0, y: 0, zoom: 1 }),
-    selectOnlyNode: vi.fn(() => true),
-  }),
+  useVueFlowAdapter: () => {
+    if (!mocks.flowSelectedElements) mocks.flowSelectedElements = ref([])
+    return {
+      screenToFlowCoordinate: vi.fn((point: { x: number; y: number }) => point),
+      viewport: ref({ x: 0, y: 0, zoom: 1 }),
+      getSelectedElements: mocks.flowSelectedElements,
+      selectOnlyNode: vi.fn(() => true),
+    }
+  },
   useCanvasVueFlowHandleGeometryAdapter: () => ({
     prepare: vi.fn(),
     resolveAnchor: vi.fn(() => null),
@@ -129,6 +135,19 @@ vi.mock('../../../workspace/shell/useWorkspaceAccountControls.ts', () => ({
     viewModel: { avatarUrl: ref(null), userEmail: ref(null), balance: ref({}), menuItems: ref([]) },
     commands: { openAccount: vi.fn() },
   }),
+}))
+
+vi.mock('../../../workspace/shell/useWorkspaceSwitcher.ts', () => ({
+  useWorkspaceSwitcher: (options: { beforeWorkspaceChange: () => Promise<boolean> }) => {
+    mocks.workspaceSwitcherOptions = options
+    return {
+      menuProps: ref(undefined),
+      switchToGalleryWorkspace: vi.fn(),
+      createAndSwitchWorkspace: vi.fn(),
+      renameWorkspaceItem: vi.fn(),
+      archiveWorkspaceItem: vi.fn(),
+    }
+  },
 }))
 
 const ChromeStub = defineComponent({
@@ -391,6 +410,7 @@ function createRuntime() {
         },
         persistence: {
           flushAutosave,
+          saveBeforeScopeChange: vi.fn(async () => true),
           recoverBoardSession,
         },
         viewportControls: {
@@ -503,12 +523,39 @@ describe('CanvasScreen', () => {
     mocks.dragEvents.length = 0
     mocks.defaultEdgeOptions = undefined
     mocks.flowProps = {}
+    mocks.flowSelectedElements = ref([])
   })
 
-  test('mounts the presence cursor layer without peers on private posture', () => {
+  test('mounts the canvas surface without a remote cursor layer', () => {
     const view = renderScreen()
-    expect(view.container.querySelector('.presence-cursors')).not.toBeNull()
-    expect(view.container.querySelector('.presence-cursors__peer')).toBeNull()
+    expect(view.container.querySelector('.canvas-flow-wrap')).not.toBeNull()
+    expect(view.container.querySelector('.presence-cursors')).toBeNull()
+  })
+
+  it('marks the flow wrap only for a single-node selection', async () => {
+    const view = renderScreen()
+    const wrap = () => view.container.querySelector('.canvas-flow-wrap')!
+    expect(wrap().classList.contains('is-single-node-selection')).toBe(false)
+
+    mocks.flowSelectedElements!.value = [{ id: 'node-a' }]
+    await nextTick()
+    expect(wrap().classList.contains('is-single-node-selection')).toBe(true)
+
+    mocks.flowSelectedElements!.value = [{ id: 'node-a' }, { id: 'node-b' }]
+    await nextTick()
+    expect(wrap().classList.contains('is-single-node-selection')).toBe(false)
+
+    // Edges never count as nodes: one node plus one edge still reads as single.
+    mocks.flowSelectedElements!.value = [
+      { id: 'node-a' },
+      { id: 'edge-a-b', source: 'node-a', target: 'node-b' } as unknown as { id: string },
+    ]
+    await nextTick()
+    expect(wrap().classList.contains('is-single-node-selection')).toBe(true)
+
+    mocks.flowSelectedElements!.value = []
+    await nextTick()
+    expect(wrap().classList.contains('is-single-node-selection')).toBe(false)
   })
 
   it('uses direct trackpad navigation and middle/right panning in select mode', () => {
@@ -544,24 +591,21 @@ describe('CanvasScreen', () => {
     expect(mocks.flowProps.panOnDrag).toEqual([1, 2])
   })
 
-  it.each(['locked', 'archived'] as const)(
-    'disables navigation for %s boards',
-    async (state) => {
-      const view = renderScreen()
-      if (state === 'archived')
-        view.harness.runtime.viewModel.boardChrome.isBoardArchived.value = true
-      else view.harness.runtime.viewModel.imageWorkflow.tools.locks.isCanvasLocked.value = true
-      await nextTick()
-      expect(mocks.flowProps).toMatchObject({
-        panOnDrag: false,
-        panOnScroll: false,
-        zoomOnPinch: false,
-        zoomOnDoubleClick: false,
-        nodesDraggable: false,
-        elementsSelectable: false,
-      } satisfies Partial<FlowProps>)
-    },
-  )
+  it.each(['locked', 'archived'] as const)('disables navigation for %s boards', async (state) => {
+    const view = renderScreen()
+    if (state === 'archived')
+      view.harness.runtime.viewModel.boardChrome.isBoardArchived.value = true
+    else view.harness.runtime.viewModel.imageWorkflow.tools.locks.isCanvasLocked.value = true
+    await nextTick()
+    expect(mocks.flowProps).toMatchObject({
+      panOnDrag: false,
+      panOnScroll: false,
+      zoomOnPinch: false,
+      zoomOnDoubleClick: false,
+      nodesDraggable: false,
+      elementsSelectable: false,
+    } satisfies Partial<FlowProps>)
+  })
 
   it('keeps navigation enabled for read-only boards while disabling editing', async () => {
     const view = renderScreen()
@@ -909,6 +953,12 @@ describe('CanvasScreen', () => {
     route.query.boardId = 'board-b'
 
     await vi.waitFor(() => expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1))
+  })
+
+  test('flushes the active Board before the workspace switcher changes scope', async () => {
+    const { harness } = renderScreen()
+    await expect(mocks.workspaceSwitcherOptions!.beforeWorkspaceChange()).resolves.toBe(true)
+    expect(harness.runtime.commands.persistence.saveBeforeScopeChange).toHaveBeenCalledOnce()
   })
 
   it('saves through keyboard and leave-guard behavior', async () => {

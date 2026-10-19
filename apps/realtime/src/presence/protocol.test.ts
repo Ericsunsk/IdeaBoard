@@ -212,7 +212,7 @@ describe('PresenceRoom', () => {
     room.addConn(first)
     room.addConn(second)
     const source = new awarenessProtocol.Awareness(new Y.Doc())
-    source.setLocalState({ cursor: { x: 10, y: 20 } })
+    source.setLocalState({ selection: { nodeIds: ['n1'] } })
     const update = awarenessProtocol.encodeAwarenessUpdate(source, [source.clientID])
     assert.equal(room.handleMessage(first, frameAwarenessUpdate(update)), null)
     assert.equal(room.awareness.getStates().size, 1)
@@ -227,7 +227,7 @@ describe('PresenceRoom', () => {
     const conn = fakeConn()
     room.addConn(conn)
     const source = new awarenessProtocol.Awareness(new Y.Doc())
-    source.setLocalState({ cursor: { x: 1, y: 2 } })
+    source.setLocalState({ selection: { nodeIds: ['n1'] } })
     room.handleMessage(
       conn,
       frameAwarenessUpdate(awarenessProtocol.encodeAwarenessUpdate(source, [source.clientID])),

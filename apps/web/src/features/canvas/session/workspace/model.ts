@@ -106,6 +106,7 @@ type CanvasWorkspaceRuntimeCommands = {
   }
   persistence: {
     flushAutosave: (options?: { isSilent?: boolean }) => Promise<void>
+    saveBeforeScopeChange: () => Promise<boolean>
     recoverBoardSession: () => Promise<void>
   }
   viewportControls: {

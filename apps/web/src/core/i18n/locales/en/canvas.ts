@@ -135,16 +135,6 @@ export default {
   presence: {
     rosterLabel: 'Online collaborators',
     selfLabel: '{name} (you)',
-    followMember: 'Follow {name}',
-    unfollowMember: 'Stop following {name}',
-    spotlightStart: 'Start spotlight',
-    spotlightStop: 'Stop spotlight',
-    followerCount: '{count} watching',
-    followerCountNone: 'No followers yet',
-    inviteTitle: '{name} started a spotlight',
-    inviteBody: 'Follow {name}’s camera to stay in sync?',
-    inviteAccept: 'Follow',
-    inviteIgnore: 'Dismiss',
   },
   contextMenu: {
     label: 'Canvas node actions',

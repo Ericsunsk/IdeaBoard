@@ -133,16 +133,6 @@ export default {
   presence: {
     rosterLabel: '在线协作者',
     selfLabel: '{name}（你）',
-    followMember: '跟随 {name}',
-    unfollowMember: '停止跟随 {name}',
-    spotlightStart: '开始聚焦',
-    spotlightStop: '停止聚焦',
-    followerCount: '{count} 人正在跟随',
-    followerCountNone: '暂无跟随者',
-    inviteTitle: '{name} 发起了聚焦',
-    inviteBody: '跟随 {name} 的视角以保持同步？',
-    inviteAccept: '跟随',
-    inviteIgnore: '忽略',
   },
   contextMenu: {
     label: '画布节点操作',

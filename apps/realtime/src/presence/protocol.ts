@@ -1,7 +1,7 @@
 // Presence Y protocol handling (ADR-0020, was presence-only under ADR-0019).
 // Standard pieces only: yjs provides the room Doc (getMap('nodes') +
 // getMap('edges'), keyed by id), y-protocols/sync frames the handshake,
-// y-protocols/awareness carries cursor/selection, lib0 does the varuint
+// y-protocols/awareness carries identity/selection, lib0 does the varuint
 // framing. No custom message types.
 //
 // SyncStep1 is answered read-only (state vector of the room Doc) so

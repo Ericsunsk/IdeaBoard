@@ -59,7 +59,11 @@ jobs:
             aarch64|arm64) atlas_arch=arm64 ;;
             *) echo "unsupported architecture: ${atlas_arch}" >&2; exit 1 ;;
           esac
-          curl -fsSL "https://release.ariga.io/atlas/atlas-linux-${atlas_arch}-v1.3.2" -o /tmp/atlas
+          # Canonical Atlas pin lives in apps/api/Dockerfile (ARG ATLAS_VERSION);
+          # never hardcode a version literal here so CI and images stay in lockstep.
+          atlas_version="$(sed -n 's/^ARG ATLAS_VERSION=//p' apps/api/Dockerfile | tr -d '[:space:]')"
+          [[ -n "${atlas_version}" ]] || { echo 'ATLAS_VERSION pin missing from apps/api/Dockerfile' >&2; exit 1; }
+          curl -fsSL "https://release.ariga.io/atlas/atlas-linux-${atlas_arch}-v${atlas_version}" -o /tmp/atlas
           chmod 0555 /tmp/atlas
       - name: Test migration integration entrypoint
         run: bash scripts/ci-migration-integration-test.sh

@@ -24,7 +24,7 @@ describe('CanvasGroupFramesOverlay', () => {
   // P5 retirement (source-d880bb7135287592-1, source-6afca5dc03ee30d2-1,
   // source-2f051ca903761065-1, source-e488601f448c871a-1,
   // source-521edb4dab2d2fa4-1, source-88b49d390f914daa-1,
-  // source-cf435087c7b3738e-1): the "uses the cursor selection stroke
+  // source-cf435087c7b3738e-1): the "uses the selection stroke
   // width for the selected group frame ring" source-string assertions moved
   // to the source-policy/CanvasGroupFramesOverlay.component/89c121de
   // governance script (scripts/checkCanvasUiStyleContracts.ts, rule

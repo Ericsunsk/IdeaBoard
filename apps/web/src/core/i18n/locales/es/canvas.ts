@@ -142,16 +142,6 @@ export default {
   presence: {
     rosterLabel: 'Colaboradores en línea',
     selfLabel: '{name} (tú)',
-    followMember: 'Seguir a {name}',
-    unfollowMember: 'Dejar de seguir a {name}',
-    spotlightStart: 'Iniciar presentación',
-    spotlightStop: 'Detener presentación',
-    followerCount: '{count} siguiendo',
-    followerCountNone: 'Sin seguidores aún',
-    inviteTitle: '{name} inició una presentación',
-    inviteBody: '¿Seguir la cámara de {name} para mantenerte sincronizado?',
-    inviteAccept: 'Seguir',
-    inviteIgnore: 'Ignorar',
   },
   contextMenu: {
     label: 'Acciones de nodos del lienzo',

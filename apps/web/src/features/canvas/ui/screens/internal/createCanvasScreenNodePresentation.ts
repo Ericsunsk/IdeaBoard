@@ -21,7 +21,6 @@ export function createCanvasScreenNodePresentation(options: {
   nodeInteractions: ReturnType<
     CanvasWorkspaceRuntime['commands']['graphEditing']['createNodeInteractions']
   >
-  lockOwnerFor?: ((nodeId: string) => { name: string; color: string } | null) | undefined
 }) {
   const { viewModel, commands } = options.workspace
   const imageTools = {
@@ -98,7 +97,6 @@ export function createCanvasScreenNodePresentation(options: {
       selected: node.selected,
       dragging: node.dragging,
       isCopyMode: options.isDuplicateModifierPressed.value,
-      lockOwner: options.lockOwnerFor?.(node.id) ?? null,
       imagePresentation: imagePresentationFor(node.id),
       fusionPresentation: fusionPresentationFor(node.id),
       isGenerationAvailable: isGenerationAvailable.value,

@@ -15,20 +15,12 @@ import {
   EVENT_STREAM_RECONNECT_MAX_DELAY_MS,
 } from '../../../../../core/config/timing'
 import {
-  PRESENCE_CURSOR_BROADCAST_INTERVAL_MS,
-  PRESENCE_DRAG_BROADCAST_INTERVAL_MS,
-  PRESENCE_MAX_SELECTION_IDS,
-  createBroadcastThrottle,
   isPermanentPresenceClose,
-  isPresenceViewportState,
   parsePresenceAwarenessState,
-  presencePeerColor,
+  parseSelectionIds,
   resolvePresenceServerUrl,
   shouldConnectPresence,
-  type PresenceAwarenessState,
-  type PresenceCursorPoint,
   type PresenceUser,
-  type PresenceViewportState,
   type RemotePresencePeer,
 } from './state'
 import { requestBoardRealtimeTicket } from '../../../../board/ports/canvasSession'
@@ -44,30 +36,20 @@ type CanvasPresenceDeps = {
   createProvider?: PresenceProviderFactory | undefined
 }
 
-type CanvasPresenceFlow = {
-  getSelectedElementIds: () => string[]
-  viewport: Ref<{ x: number; y: number; zoom: number }>
-}
-
-export type CanvasPresenceSessionOptions = {
+type CanvasPresenceSessionOptions = {
   boardId?: Ref<string | null | undefined> | undefined
   accessState?: Ref<string | null | undefined> | undefined
   workspaceId?: Ref<string | null | undefined> | undefined
   localUser?: Ref<PresenceUser | null> | undefined
-  /** Device currently followed; broadcast as `followingDeviceId`. */
-  followingDeviceId?: Ref<number | null | undefined> | undefined
-  /** Whether this client broadcasts as a spotlight presenter. */
-  isSpotlighting?: Ref<boolean | undefined> | undefined
   /** Whether this client may write (editors true, viewers false). */
   canWrite?: MaybeRefOrGetter<boolean> | undefined
-  flow: CanvasPresenceFlow
+  selectedIds: MaybeRefOrGetter<readonly string[]>
   deps?: CanvasPresenceDeps | undefined
 }
 
 type CanvasPresenceSnapshot = {
   boardId: string
   workspaceId: string
-  user: PresenceUser
 }
 
 function readSnapshot(options: CanvasPresenceSessionOptions): CanvasPresenceSnapshot | null {
@@ -77,23 +59,7 @@ function readSnapshot(options: CanvasPresenceSessionOptions): CanvasPresenceSnap
   if (!shouldConnectPresence(boardId, options.accessState?.value) || !workspaceId || !user) {
     return null
   }
-  return { boardId, workspaceId, user }
-}
-
-function readSelectionIds(getSelectedElementIds: () => string[]): string[] {
-  let ids: string[]
-  try {
-    ids = getSelectedElementIds()
-  } catch {
-    return []
-  }
-  if (!Array.isArray(ids)) return []
-  const selected: string[] = []
-  for (const id of ids) {
-    if (typeof id === 'string' && id.trim()) selected.push(id.trim())
-    if (selected.length >= PRESENCE_MAX_SELECTION_IDS) break
-  }
-  return selected
+  return { boardId, workspaceId }
 }
 
 /** Broadcast identity using the canonical awareness fields. */
@@ -101,14 +67,12 @@ function buildBroadcastUser(user: PresenceUser): PresenceUser {
   return {
     id: user.id,
     name: user.name,
-    color: user.color?.trim() || presencePeerColor(user.id),
     ...(user.avatarUrl?.trim() ? { avatarUrl: user.avatarUrl.trim() } : {}),
   }
 }
 
 export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) {
   const remotePeers = shallowRef<RemotePresencePeer[]>([])
-  const isPresenceConnected = ref(false)
   const isDocSynced = ref(false)
   const localClientId = ref<number | null>(null)
   const sharedDoc = shallowRef<Y.Doc | null>(null)
@@ -121,8 +85,6 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
   let isDisposed = false
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let reconnectDelayMs = EVENT_STREAM_RECONNECT_INITIAL_DELAY_MS
-  let lastCursor: PresenceCursorPoint | null = null
-  let isLastDragging = false
 
   function isCurrent(token: number): boolean {
     return !isDisposed && token === connectToken
@@ -135,77 +97,31 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
     }
   }
 
-  function publish(state: PresenceAwarenessState): void {
-    handle?.provider.awareness.setLocalState(state)
-  }
-
-  const cursorThrottle = createBroadcastThrottle(PRESENCE_CURSOR_BROADCAST_INTERVAL_MS, publish)
-  const dragThrottle = createBroadcastThrottle(PRESENCE_DRAG_BROADCAST_INTERVAL_MS, publish)
-
-  function flushThrottles(): void {
-    cursorThrottle.flush()
-    dragThrottle.flush()
-  }
-
-  function cancelThrottles(): void {
-    cursorThrottle.cancel()
-    dragThrottle.cancel()
-  }
-
   function teardown(): void {
     clearReconnectTimer()
     detachProviderListeners?.()
     detachProviderListeners = null
     handle?.dispose()
     handle = null
-    cancelThrottles()
-    isPresenceConnected.value = false
     isDocSynced.value = false
     localClientId.value = null
     sharedDoc.value = null
     remotePeers.value = []
-    lastCursor = null
-    isLastDragging = false
   }
 
-  function readViewportSnapshot(): PresenceViewportState | null {
-    const viewport = options.flow.viewport.value
-    if (!viewport || !isPresenceViewportState(viewport)) return null
-    return { x: viewport.x, y: viewport.y, zoom: viewport.zoom }
-  }
-
-  function publishSnapshot(cursor: PresenceCursorPoint | null, isDragging: boolean): void {
+  function publishSnapshot(): void {
     const user = options.localUser?.value ?? null
     if (!handle || !user) return
-    const following = options.followingDeviceId?.value ?? null
-    // Viewers broadcast cursor-only: an empty selection keeps them out of
+    // Viewers broadcast selection-free: an empty selection keeps them out of
     // soft-lock contention (they cannot write).
     const selectionIds =
       toValue(options.canWrite ?? true) === false
         ? []
-        : readSelectionIds(options.flow.getSelectedElementIds)
-    const state: PresenceAwarenessState = {
+        : (parseSelectionIds(toValue(options.selectedIds)) ?? [])
+    handle.provider.awareness.setLocalState({
       user: buildBroadcastUser(user),
-      cursor: cursor ? { position: cursor, dragging: isDragging } : null,
-      selection: { nodeIds: selectionIds, marquee: null },
-      followingDeviceId: following,
-      isSpotlighting: options.isSpotlighting?.value === true,
-      viewport: readViewportSnapshot(),
-    }
-    if (isDragging) dragThrottle.push(state)
-    else cursorThrottle.push(state)
-  }
-
-  function publishLocal(cursor: PresenceCursorPoint | null, isDragging = false): void {
-    lastCursor = cursor
-    isLastDragging = isDragging
-    publishSnapshot(cursor, isDragging)
-  }
-
-  function publishPointer(cursor: PresenceCursorPoint | null, isDragging = false): void {
-    if (!handle) return
-    publishLocal(cursor, isDragging)
-    if (cursor === null) flushThrottles()
+      selection: { nodeIds: selectionIds },
+    })
   }
 
   function onAwarenessChange(): void {
@@ -224,15 +140,12 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
   function onProviderStatus(status: string): void {
     if (status === 'connected') {
       reconnectDelayMs = EVENT_STREAM_RECONNECT_INITIAL_DELAY_MS
-      isPresenceConnected.value = true
       return
     }
-    isPresenceConnected.value = false
   }
 
   function onConnectionClose(token: number): (event: PresenceCloseEvent) => void {
     return (event) => {
-      isPresenceConnected.value = false
       isDocSynced.value = false
       // Liveness-bound peers go stale with the socket on every close.
       remotePeers.value = []
@@ -308,8 +221,7 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
     detachProviderListeners?.()
     detachProviderListeners = null
     attachProvider(token, next)
-    publishLocal(null)
-    flushThrottles()
+    publishSnapshot()
   }
 
   function settle(): void {
@@ -320,12 +232,6 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
     reconnectDelayMs = EVENT_STREAM_RECONNECT_INITIAL_DELAY_MS
     if (!snapshot) return
     void connectWithTicket(token, snapshot)
-  }
-
-  function publishCollaborationNow(): void {
-    if (!handle) return
-    publishSnapshot(lastCursor, isLastDragging)
-    flushThrottles()
   }
 
   watch(
@@ -339,25 +245,15 @@ export function useCanvasPresenceSession(options: CanvasPresenceSessionOptions) 
     { immediate: true },
   )
 
-  // Camera and collaboration flags ride the same awareness state: viewport
-  // moves republish throttled, while follow/spotlight toggles flush at once.
-  watch(
-    () => options.flow.viewport.value,
-    () => {
-      if (handle) publishSnapshot(lastCursor, isLastDragging)
-    },
-    { deep: true },
-  )
-
-  watch(
-    () => [options.followingDeviceId?.value, options.isSpotlighting?.value],
-    publishCollaborationNow,
-  )
+  // Selection and write capability both affect lock claims.
+  watch(() => [toValue(options.selectedIds), toValue(options.canWrite ?? true)], publishSnapshot, {
+    deep: true,
+  })
 
   onScopeDispose(() => {
     isDisposed = true
     teardown()
   })
 
-  return { remotePeers, isPresenceConnected, isDocSynced, localClientId, sharedDoc, publishPointer }
+  return { remotePeers, isDocSynced, localClientId, sharedDoc }
 }
