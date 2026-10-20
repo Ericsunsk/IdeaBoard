@@ -67,10 +67,7 @@
   transition: none;
 }
 
-.canvas-flow-wrap .vue-flow__node:hover,
-.canvas-flow-wrap .vue-flow__node.selected,
-.canvas-flow-wrap .vue-flow__node:focus,
-.canvas-flow-wrap .vue-flow__node:focus-visible {
+.canvas-flow-wrap .vue-flow__node:is(:hover, .selected, :focus, :focus-visible) {
   box-shadow: none !important;
   border: 0 !important;
   outline: none !important;

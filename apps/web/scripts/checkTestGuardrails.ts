@@ -201,6 +201,12 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
 
 const componentClassAssertionExceptions: ExceptionMap<Exception> = {
+  'src/features/canvas/ui/screens/CanvasScreen.component.spec.ts': [
+    {
+      reason:
+        'Verifies the Canvas Screen → Vue Flow adapter selection-state binding; group-ring paint is covered by canvasSurfaceStates.browser.spec.ts.',
+    },
+  ],
   'src/features/canvas/ui/nodes/workflows/ImageNodeStage.component.spec.ts': [
     {
       reason: 'Verifies that the loading blur clears when the rendered image finishes loading.',

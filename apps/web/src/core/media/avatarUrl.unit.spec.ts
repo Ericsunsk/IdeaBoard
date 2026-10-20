@@ -65,9 +65,9 @@ describe('resolveMemberAvatar', () => {
   })
 
   it('falls back to the viewer session avatar for the viewer entry', () => {
-    expect(
-      resolveMemberAvatar({ userId: 'usr_me' }, { public_id: 'usr_me', avatar: ROUTE }),
-    ).toBe(`${ROUTE}&size=64`)
+    expect(resolveMemberAvatar({ userId: 'usr_me' }, { public_id: 'usr_me', avatar: ROUTE })).toBe(
+      `${ROUTE}&size=64`,
+    )
   })
 
   it('prefers the entry avatar over the viewer avatar', () => {

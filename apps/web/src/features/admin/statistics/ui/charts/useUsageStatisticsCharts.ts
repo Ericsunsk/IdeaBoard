@@ -19,7 +19,7 @@ import {
   baseChartOptions,
   baseChartPlugins,
   baseTooltipOptions,
-  defaultModelColors,
+  getDefaultModelColors,
   getModelColorByName,
 } from '../../core/usageStatisticsChartBase'
 import { formatCount } from '../../core/usageStatisticsTooltipText'
@@ -41,6 +41,7 @@ export function useUsageStatisticsCharts(options: {
 }) {
   const { trend } = options
   const trendData = computed(() => {
+    const modelColors = getDefaultModelColors()
     const trendRows = trend.adminStatistics.value?.trend || []
     const trendMap = new Map(trendRows.map((day) => [day.date, day]))
     return buildAdminTimeRangeBuckets(trend.timeRange.value).map((bucket) => {
@@ -56,7 +57,7 @@ export function useUsageStatisticsCharts(options: {
         return {
           label: seg.label,
           value: seg.value,
-          color: color || defaultModelColors[idx % defaultModelColors.length],
+          color: color || modelColors[idx % modelColors.length],
         }
       })
       // 后端截断 segments[:3] 是正常契约：只在未截断时检查背离，且 Set 封顶防长期累积。
@@ -83,6 +84,7 @@ export function useUsageStatisticsCharts(options: {
   })
 
   const trendSeriesModelOrder = computed(() => {
+    const modelColors = getDefaultModelColors()
     const byModel = new Map<string, { color: string; total: number }>()
     trendData.value.forEach((day) => {
       day.segments.forEach((segment, idx) => {
@@ -92,10 +94,7 @@ export function useUsageStatisticsCharts(options: {
           return
         }
         byModel.set(segment.label, {
-          color:
-            segment.color ||
-            defaultModelColors[idx % defaultModelColors.length] ||
-            adminChartTheme.mist,
+          color: segment.color || modelColors[idx % modelColors.length] || adminChartTheme.mist,
           total: segment.value,
         })
       })

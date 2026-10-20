@@ -1,5 +1,4 @@
 import { formatAdminDisplayError, useAdminToast } from '../../../shared'
-import type { AdminToastPort } from '../../../shared'
 
 // 反馈公约（admin）：订单退款 toast 文案收口到本 feedback 工厂，调用方只表达意图。
 
@@ -11,13 +10,10 @@ export type PaymentOrdersFeedback = {
   refundFailed: (error: unknown) => void
 }
 
-export function createPaymentOrdersFeedback(toast: AdminToastPort): PaymentOrdersFeedback {
+export function usePaymentOrdersFeedback(): PaymentOrdersFeedback {
+  const toast = useAdminToast()
   return {
     refundSubmitted: () => toast.success(ORDERS_REFUND_SUBMITTED),
     refundFailed: (error) => toast.error(formatAdminDisplayError(error, ORDERS_REFUND_FAILED)),
   }
-}
-
-export function usePaymentOrdersFeedback() {
-  return createPaymentOrdersFeedback(useAdminToast())
 }

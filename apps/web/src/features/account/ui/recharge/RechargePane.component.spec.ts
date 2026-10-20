@@ -487,9 +487,7 @@ describe('RechargePane', () => {
     expect(await within(pendingOrder).findByRole('alert')).toHaveTextContent(
       'Network error. Please try again.',
     )
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith('Could not abandon this order.'),
-    )
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Could not abandon this order.'))
   })
 
   it('shows the backend-owned processing result after a Checkout return', async () => {

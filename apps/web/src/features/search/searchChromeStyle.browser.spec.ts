@@ -255,7 +255,7 @@ async function renderSearchPage() {
 describe('Search chrome style browser contract', () => {
   beforeEach(async () => {
     await page.viewport(1400, 800)
-    document.documentElement.classList.remove('dark')
+    document.documentElement.classList.add('light')
     i18n.global.locale.value = 'en'
   })
 

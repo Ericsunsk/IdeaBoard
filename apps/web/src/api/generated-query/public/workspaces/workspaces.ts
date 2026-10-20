@@ -455,7 +455,7 @@ export const getDeleteWorkspaceUrl = (workspaceId: string) => {
 }
 
 /**
- * Hard-deletes the workspace with its boards and files; there is no recovery window and no restore path. Requires the Idempotency-Key header. Reusing a key with a different request renders 409 workspace_idempotency_conflict. The Default workspace is never deleted: attempts render 403 workspace_default_protected. Billing records, the credit ledger, user rows and control audit records are retained.
+ * Hard-deletes the workspace with its boards and files; there is no recovery window and no restore path. Requires the Idempotency-Key header. Reusing a key with a different request renders 409 workspace_idempotency_conflict. The Default workspace is never deleted: attempts render 403 workspace_default_protected. Pending or running tasks block deletion with 409 workspace_active_tasks until they finish or are cancelled through the task lifecycle. Billing records, the credit ledger, user rows and control audit records are retained.
  * @summary Delete a workspace immediately and irreversibly (owner/admin only)
  */
 export const deleteWorkspace = async (

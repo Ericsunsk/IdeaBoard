@@ -1,49 +1,12 @@
 /*
  * Tier 3: Scoped Canvas Tokens
  * Canvas workspace, node, edge and minimap rendering consumes Tier 2 roles.
- * Light and dark assignments share one owner and declare identical key sets.
+ * Rebind the aliases at each mode boundary so light subtrees resolve locally.
  */
 
 @layer base {
-  :root {
-    --color-canvas-workspace-bg: var(--color-workspace-bg);
-    --color-canvas-surface-bg: var(--color-workspace-surface);
-    --color-canvas-neutral-line: var(--color-tool-border);
-    --color-canvas-dot: var(--color-workspace-dot);
-    --color-canvas-edge: var(--color-workspace-connection);
-    --color-canvas-edge-selected: var(--color-workspace-connection-selected);
-    --color-canvas-edge-running: var(--color-workspace-connection-running);
-    --color-canvas-accent: var(--color-tool-accent);
-    --color-canvas-accent-hover: var(--color-tool-accent-hover);
-    --color-canvas-accent-pressed: var(--color-tool-accent-pressed);
-    --color-canvas-accent-soft: var(--color-tool-accent-soft);
-    --color-canvas-accent-wash: var(--color-tool-accent-soft);
-    --color-canvas-accent-border: var(--color-tool-accent-line);
-    --color-canvas-accent-border-soft: var(--color-tool-accent-line-soft);
-    --color-canvas-accent-tooltip-border: var(--color-tool-accent-tooltip-line);
-    --color-canvas-accent-shadow: var(--color-tool-accent-shadow);
-    --color-canvas-accent-shadow-hover: var(--color-tool-accent-shadow-hover);
-    --color-canvas-accent-glow: var(--color-tool-accent-glow);
-    --color-canvas-node-bg: var(--color-workspace-surface);
-    --color-canvas-node-border: var(--color-workspace-border);
-    --color-canvas-text-primary: var(--color-text-strong);
-    --color-canvas-text-secondary: var(--color-text-label);
-    --color-canvas-text-muted: var(--color-text-muted);
-    --color-canvas-text-control: var(--color-text-control);
-    --color-canvas-text-option: var(--color-text-option);
-    --color-canvas-text-inverse: var(--color-text-inverse);
-    --color-canvas-tooltip-bg: var(--color-tooltip-bg);
-    --color-canvas-tooltip-text: var(--color-tooltip-foreground);
-    --color-canvas-running-from: var(--color-progress-from);
-    --color-canvas-running-to: var(--color-progress-to);
-    --color-canvas-glass-bg: var(--color-tool-glass);
-    --color-canvas-minimap-node: var(--color-workspace-preview-node);
-    --color-canvas-minimap-viewport: var(--color-workspace-preview-viewport);
-    --color-canvas-minimap-mask: var(--color-workspace-preview-mask);
-  }
-
-  html.dark,
-  .dark {
+  :root,
+  .light {
     --color-canvas-workspace-bg: var(--color-workspace-bg);
     --color-canvas-surface-bg: var(--color-workspace-surface);
     --color-canvas-neutral-line: var(--color-tool-border);

@@ -2,7 +2,7 @@
 
 此文件是 Frontend public Seam 的当前治理契约。`json seam-inventory` block 是 dependency boundary、public API surface 和 Knip governance 共用的 machine source of truth。
 
-当前包含 273 个可用入口。Inventory 记录当前 ownership、exports、consumers 和 dependency contracts。Nested ownership scopes 可以重叠，fan-in/out 不得直接加总。
+当前包含 274 个可用入口。Inventory 记录当前 ownership、exports、consumers 和 dependency contracts。Nested ownership scopes 可以重叠，fan-in/out 不得直接加总。
 
 ## Schema
 
@@ -6108,11 +6108,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/components/ui/dialog/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/board/ui/share/ShareDialog.vue",
           "to": "src/components/ui/dialog/index.ts",
           "kind": "runtime"
@@ -6123,9 +6118,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 8,
+      "measuredFanIn": 7,
       "measuredFanOut": 4,
-      "targetFanIn": 8,
+      "targetFanIn": 7,
       "targetFanOut": 4,
       "ownershipScope": ["src/components/ui/dialog/"],
       "publicExports": [
@@ -6286,6 +6281,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/components/ui/input/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
           "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
@@ -6341,9 +6341,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 12,
+      "measuredFanIn": 13,
       "measuredFanOut": 5,
-      "targetFanIn": 12,
+      "targetFanIn": 13,
       "targetFanOut": 5,
       "ownershipScope": ["src/components/ui/input/"],
       "publicExports": ["Input", "InputVariants", "PasswordInput", "inputVariants"],
@@ -7341,6 +7341,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/components/UserConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
+          "to": "src/core/components/UserConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
@@ -7351,16 +7361,20 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
-      "measuredFanOut": 5,
-      "targetFanIn": 3,
-      "targetFanOut": 5,
+      "measuredFanIn": 5,
+      "measuredFanOut": 9,
+      "targetFanIn": 5,
+      "targetFanOut": 9,
       "ownershipScope": ["src/core/components/UserConfirmDialog.vue"],
       "publicExports": ["default"],
       "targetFanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/vue-i18n/index.js",
+        "node_modules/vue/index.js",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/index.ts",
+        "src/components/ui/input/index.ts",
+        "src/core/composables/useAppClipboard.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/theme/dialogMask.ts"
       ],
@@ -7449,6 +7463,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/core/composables/useAppClipboard.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/composables/useAppClipboard.unit.spec.ts",
           "to": "src/core/composables/useAppClipboard.ts",
           "kind": "runtime"
@@ -7474,9 +7493,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 5,
+      "measuredFanIn": 6,
       "measuredFanOut": 0,
-      "targetFanIn": 5,
+      "targetFanIn": 6,
       "targetFanOut": 0,
       "ownershipScope": ["src/core/composables/useAppClipboard.ts"],
       "publicExports": ["useAppClipboard"],
@@ -7510,7 +7529,17 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/RechargePane.vue",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -7595,9 +7624,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 21,
+      "measuredFanIn": 23,
       "measuredFanOut": 1,
-      "targetFanIn": 21,
+      "targetFanIn": 23,
       "targetFanOut": 1,
       "ownershipScope": ["src/core/composables/useAppToast.ts"],
       "publicExports": ["dismissAppToasts", "useAppToast"],
@@ -7779,6 +7808,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/dialog/AccountDialog.vue",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
@@ -7790,11 +7824,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         },
         {
           "from": "src/features/auth/components/AuthModalHost.vue",
-          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -8800,6 +8829,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/recharge/RechargePane.vue",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
@@ -8945,9 +8979,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 37,
+      "measuredFanIn": 38,
       "measuredFanOut": 1,
-      "targetFanIn": 37,
+      "targetFanIn": 38,
       "targetFanOut": 1,
       "ownershipScope": ["src/core/errors/errorCatalog.ts"],
       "publicExports": [
@@ -9664,7 +9698,12 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
+          "from": "src/features/canvas/ui/screens/presence/Roster.browser.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/Roster.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -9794,9 +9833,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 140,
+      "measuredFanIn": 141,
       "measuredFanOut": 5,
-      "targetFanIn": 140,
+      "targetFanIn": 141,
       "targetFanOut": 5,
       "ownershipScope": ["src/core/i18n/"],
       "publicExports": [
@@ -10594,7 +10633,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.vue",
+          "from": "src/features/canvas/ui/screens/presence/Roster.vue",
           "to": "src/core/lib/pageChrome.ts",
           "kind": "runtime"
         }
@@ -12461,9 +12500,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 4,
-      "measuredFanOut": 82,
+      "measuredFanOut": 84,
       "targetFanIn": 4,
-      "targetFanOut": 82,
+      "targetFanOut": 84,
       "ownershipScope": ["src/features/account/"],
       "publicExports": [
         "ACCOUNT_GUIDANCE_COPY_KEYS",
@@ -12628,9 +12667,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/components/DataTableColumn.vue",
         "src/core/components/DataTableFrame.vue",
         "src/core/components/IbFormField.vue",
+        "src/core/components/LoadErrorPanel.vue",
         "src/core/components/RangedLineChartCard.vue",
         "src/core/components/SiteBrandLogo.vue",
         "src/core/components/StatusBadge.vue",
+        "src/core/components/UserConfirmDialog.vue",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useAsyncAction.ts",
         "src/core/composables/useLogoutRedirect.ts",
@@ -13360,9 +13401,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 3,
-      "measuredFanOut": 1,
+      "measuredFanOut": 0,
       "targetFanIn": 3,
-      "targetFanOut": 1,
+      "targetFanOut": 0,
       "ownershipScope": ["src/features/admin/shared/core/taskMetricTokens.ts"],
       "publicExports": [
         "TaskMetricDefinition",
@@ -13373,7 +13414,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "monitorChartSpecs",
         "taskMetricDefinitions"
       ],
-      "targetFanOutTargets": ["src/features/admin/shared/core/adminThemeTokens.ts"],
+      "targetFanOutTargets": [],
       "notes": ""
     },
     {
@@ -13550,9 +13591,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/session/orders/usePaymentOrdersFeedback.ts",
+          "from": "src/features/admin/credits/session/orders/usePaymentOrdersFeedback.unit.spec.ts",
           "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/admin/credits/session/pricing/billableCatalogResource.ts",
@@ -14190,9 +14231,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 120,
+      "measuredFanIn": 121,
       "measuredFanOut": 53,
-      "targetFanIn": 120,
+      "targetFanIn": 121,
       "targetFanOut": 53,
       "ownershipScope": [
         "src/features/admin/shared/core/",
@@ -14326,7 +14367,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "adminChartTheme",
         "adminCompactIconButtonClass",
         "adminControlUnavailable",
-        "adminDarkThemeTokenFallbacks",
         "adminDashboardRootClass",
         "adminDialogChromeClass",
         "adminDialogChromeCloseClass",
@@ -14376,6 +14416,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "adminTableStyle",
         "adminTextButtonClass",
         "adminThemeTokenFallbacks",
+        "adminThemeTokenVars",
         "adminToolbarButtonClass",
         "adminToolbarMetricClass",
         "adminToolbarPageLabelClass",
@@ -15301,11 +15342,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/admin/shared/ui/chart/chartMotion.unit.spec.ts",
           "to": "src/features/admin/shared/ui/chart/chart.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/test/chartTheme.browser.spec.ts",
+          "to": "src/features/admin/shared/ui/chart/chart.ts",
+          "kind": "runtime"
         }
       ],
-      "measuredFanIn": 3,
+      "measuredFanIn": 4,
       "measuredFanOut": 6,
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 6,
       "ownershipScope": ["src/features/admin/shared/ui/chart/chart.ts"],
       "publicExports": [
@@ -16853,9 +16899,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 49,
-      "measuredFanOut": 68,
+      "measuredFanOut": 70,
       "targetFanIn": 49,
-      "targetFanOut": 68,
+      "targetFanOut": 70,
       "ownershipScope": ["src/features/board/"],
       "publicExports": [
         "BOARD_DOCUMENT_REPLACE_COALESCE_MS",
@@ -17109,6 +17155,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/components/LoadErrorPanel.vue",
+        "src/core/components/UserConfirmDialog.vue",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/config/pagination.ts",
@@ -17672,9 +17720,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 99,
-      "measuredFanOut": 68,
+      "measuredFanOut": 70,
       "targetFanIn": 99,
-      "targetFanOut": 68,
+      "targetFanOut": 70,
       "ownershipScope": ["src/features/board/"],
       "publicExports": [
         "BOARD_STATE_SCHEMA_VERSION",
@@ -17776,6 +17824,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/components/LoadErrorPanel.vue",
+        "src/core/components/UserConfirmDialog.vue",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/config/pagination.ts",
@@ -17879,9 +17929,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 11,
-      "measuredFanOut": 68,
+      "measuredFanOut": 70,
       "targetFanIn": 11,
-      "targetFanOut": 68,
+      "targetFanOut": 70,
       "ownershipScope": ["src/features/board/"],
       "publicExports": [
         "BoardRepository",
@@ -17944,6 +17994,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/components/LoadErrorPanel.vue",
+        "src/core/components/UserConfirmDialog.vue",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/config/pagination.ts",
@@ -18142,6 +18194,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/boardCardAccess.component.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
@@ -18187,9 +18244,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 30,
+      "measuredFanIn": 31,
       "measuredFanOut": 5,
-      "targetFanIn": 30,
+      "targetFanIn": 31,
       "targetFanOut": 5,
       "ownershipScope": ["src/features/board/testing/"],
       "publicExports": [
@@ -18995,12 +19052,12 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
+          "from": "src/features/canvas/ui/screens/presence/Roster.component.spec.ts",
           "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.vue",
+          "from": "src/features/canvas/ui/screens/presence/Roster.vue",
           "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "type-only"
         },
@@ -21485,15 +21542,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 1,
-      "measuredFanOut": 58,
+      "measuredFanOut": 59,
       "targetFanIn": 1,
-      "targetFanOut": 58,
+      "targetFanOut": 59,
       "ownershipScope": ["src/features/canvas/ui/screens/"],
       "publicExports": ["CanvasScreen"],
       "targetFanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/jest-dom/vitest.js",
+        "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vue-flow/core/dist/style.css",
         "node_modules/@vue-flow/core/dist/theme-default.css",
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
@@ -22005,9 +22063,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 27,
-      "measuredFanOut": 49,
+      "measuredFanOut": 50,
       "targetFanIn": 27,
-      "targetFanOut": 49,
+      "targetFanOut": 50,
       "ownershipScope": ["src/features/library/"],
       "publicExports": [
         "CanvasLibraryImportDescriptor",
@@ -22114,6 +22172,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/components/ui/dialog/index.ts",
         "src/components/ui/input/index.ts",
         "src/core/components/IbFormField.vue",
+        "src/core/components/LoadErrorPanel.vue",
         "src/core/components/UserConfirmDialog.vue",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useUserConfirmDialog.ts",
@@ -23120,13 +23179,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "targetFanIn": 4,
       "targetFanOut": 0,
       "ownershipScope": ["src/theme/composables/themeMode.ts"],
-      "publicExports": [
-        "StoredThemeMode",
-        "THEME_STORAGE_KEY",
-        "ThemeMode",
-        "isDarkThemeMode",
-        "normalizeThemeMode"
-      ],
+      "publicExports": ["StoredThemeMode", "THEME_STORAGE_KEY", "ThemeMode", "normalizeThemeMode"],
       "targetFanOutTargets": [],
       "notes": ""
     },
@@ -23142,6 +23195,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/chart.browser.spec.ts",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/chart.ts",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
@@ -23152,12 +23215,12 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/chart/chart.unit.spec.ts",
+          "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.contract.spec.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.contract.spec.ts",
+          "from": "src/test/chartTheme.browser.spec.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
@@ -23172,9 +23235,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 7,
+      "measuredFanIn": 9,
       "measuredFanOut": 3,
-      "targetFanIn": 7,
+      "targetFanIn": 9,
       "targetFanOut": 3,
       "ownershipScope": ["src/theme/composables/useTheme.ts"],
       "publicExports": ["THEME_STORAGE_KEY", "ThemeMode", "isDarkModeActive", "useTheme"],
@@ -23217,11 +23280,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/board/ui/share/ShareDialog.vue",
           "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
@@ -23232,9 +23290,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 8,
+      "measuredFanIn": 7,
       "measuredFanOut": 0,
-      "targetFanIn": 8,
+      "targetFanIn": 7,
       "targetFanOut": 0,
       "ownershipScope": ["src/theme/dialogMask.ts"],
       "publicExports": ["ibDialogMaskClass"],
@@ -23383,7 +23441,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/generated-query/public/workspace-rewards/workspace-rewards.ts`      | canonical | api           | 16      | 2 → 2                    | 4 → 4                     |
 | `src/api/generated-query/public/workspace-search/workspace-search.ts`        | canonical | api           | 16      | 3 → 3                    | 4 → 4                     |
 | `src/api/generated-query/public/workspaces/workspaces.ts`                    | canonical | api           | 40      | 2 → 2                    | 4 → 4                     |
-| `src/api/idempotencyKey.ts`                                                  | canonical | api           | 14      | 15 → 15                  | 0 → 0                     |
+| `src/api/idempotencyKey.ts`                                                  | canonical | api           | 15      | 15 → 15                  | 0 → 0                     |
 | `src/api/mediaAssetDelivery.ts`                                              | canonical | api           | 25      | 26 → 26                  | 4 → 4                     |
 | `src/api/mediaWorkspaceScope.ts`                                             | canonical | api           | 3       | 7 → 7                    | 0 → 0                     |
 | `src/api/sessionUserType.ts`                                                 | canonical | api           | 1       | 14 → 14                  | 0 → 0                     |
@@ -23398,12 +23456,12 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/app/router/index.ts`                                                    | canonical | app           | 1       | 1 → 1                    | 13 → 13                   |
 | `src/components/ui/avatar/index.ts`                                          | canonical | design-system | 3       | 5 → 5                    | 3 → 3                     |
 | `src/components/ui/badge/index.ts`                                           | canonical | design-system | 3       | 3 → 3                    | 3 → 3                     |
-| `src/components/ui/button/index.ts`                                          | canonical | design-system | 9       | 27 → 27                  | 6 → 6                     |
+| `src/components/ui/button/index.ts`                                          | canonical | design-system | 9       | 28 → 28                  | 6 → 6                     |
 | `src/components/ui/card/index.ts`                                            | canonical | design-system | 6       | 1 → 1                    | 4 → 4                     |
-| `src/components/ui/dialog/index.ts`                                          | canonical | design-system | 12      | 8 → 8                    | 4 → 4                     |
+| `src/components/ui/dialog/index.ts`                                          | canonical | design-system | 12      | 7 → 7                    | 4 → 4                     |
 | `src/components/ui/dropdown-menu/index.ts`                                   | canonical | design-system | 14      | 4 → 4                    | 4 → 4                     |
 | `src/components/ui/form/index.ts`                                            | canonical | design-system | 15      | 6 → 6                    | 5 → 5                     |
-| `src/components/ui/input/index.ts`                                           | canonical | design-system | 4       | 12 → 12                  | 5 → 5                     |
+| `src/components/ui/input/index.ts`                                           | canonical | design-system | 4       | 13 → 13                  | 5 → 5                     |
 | `src/components/ui/popover/index.ts`                                         | canonical | design-system | 4       | 3 → 3                    | 3 → 3                     |
 | `src/components/ui/select/index.ts`                                          | canonical | design-system | 14      | 2 → 2                    | 6 → 6                     |
 | `src/components/ui/skeleton/index.ts`                                        | canonical | design-system | 1       | 6 → 6                    | 2 → 2                     |
@@ -23425,11 +23483,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/components/SiteBrandLogo.vue`                                      | canonical | core          | 1       | 3 → 3                    | 0 → 0                     |
 | `src/core/components/StatusBadge.vue`                                        | canonical | core          | 3       | 4 → 4                    | 3 → 3                     |
 | `src/core/components/StudioName.vue`                                         | canonical | core          | 1       | 2 → 2                    | 1 → 1                     |
-| `src/core/components/UserConfirmDialog.vue`                                  | canonical | core          | 1       | 3 → 3                    | 5 → 5                     |
+| `src/core/components/UserConfirmDialog.vue`                                  | canonical | core          | 1       | 5 → 5                    | 9 → 9                     |
 | `src/core/components/formFieldContract.ts`                                   | canonical | core          | 2       | 2 → 2                    | 0 → 0                     |
 | `src/core/components/serviceIcons.ts`                                        | canonical | core          | 1       | 6 → 6                    | 3 → 3                     |
-| `src/core/composables/useAppClipboard.ts`                                    | canonical | core          | 1       | 5 → 5                    | 0 → 0                     |
-| `src/core/composables/useAppToast.ts`                                        | canonical | core          | 2       | 21 → 21                  | 1 → 1                     |
+| `src/core/composables/useAppClipboard.ts`                                    | canonical | core          | 1       | 6 → 6                    | 0 → 0                     |
+| `src/core/composables/useAppToast.ts`                                        | canonical | core          | 2       | 23 → 23                  | 1 → 1                     |
 | `src/core/composables/useAsyncAction.ts`                                     | canonical | core          | 3       | 16 → 16                  | 1 → 1                     |
 | `src/core/composables/useLogoutRedirect.ts`                                  | canonical | core          | 1       | 5 → 5                    | 1 → 1                     |
 | `src/core/composables/useMenuTriggerFocusRestore.ts`                         | canonical | core          | 1       | 1 → 1                    | 1 → 1                     |
@@ -23444,9 +23502,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/contracts/externalImageProviders.ts`                               | canonical | core          | 4       | 11 → 11                  | 0 → 0                     |
 | `src/core/contracts/generationContract.ts`                                   | canonical | core          | 18      | 23 → 23                  | 0 → 0                     |
 | `src/core/contracts/imageServices.ts`                                        | canonical | core          | 3       | 30 → 30                  | 0 → 0                     |
-| `src/core/errors/errorCatalog.ts`                                            | canonical | core          | 5       | 37 → 37                  | 1 → 1                     |
+| `src/core/errors/errorCatalog.ts`                                            | canonical | core          | 5       | 38 → 38                  | 1 → 1                     |
 | `src/core/i18n/formatters.ts`                                                | canonical | core          | 5       | 21 → 21                  | 2 → 2                     |
-| `src/core/i18n/index.ts`                                                     | canonical | core          | 7       | 140 → 140                | 5 → 5                     |
+| `src/core/i18n/index.ts`                                                     | canonical | core          | 7       | 141 → 141                | 5 → 5                     |
 | `src/core/i18n/localeCore.ts`                                                | canonical | core          | 5       | 5 → 5                    | 0 → 0                     |
 | `src/core/i18n/localeManifest.ts`                                            | canonical | core          | 2       | 5 → 5                    | 5 → 5                     |
 | `src/core/i18n/locales/en/index.ts`                                          | canonical | core          | 12      | 3 → 3                    | 0 → 0                     |
@@ -23488,7 +23546,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/utils/polling.ts`                                                  | canonical | core          | 5       | 6 → 6                    | 0 → 0                     |
 | `src/core/utils/storage.ts`                                                  | canonical | core          | 8       | 14 → 14                  | 0 → 0                     |
 | `src/core/utils/workspaceId.ts`                                              | canonical | core          | 2       | 8 → 8                    | 1 → 1                     |
-| `src/features/account/index.ts`                                              | canonical | account       | 130     | 4 → 4                    | 82 → 82                   |
+| `src/features/account/index.ts`                                              | canonical | account       | 130     | 4 → 4                    | 84 → 84                   |
 | `src/features/account/ui/chrome/SupportChannelQr.vue`                        | canonical | account       | 1       | 1 → 1                    | 9 → 9                     |
 | `src/features/account/ui/chrome/UserAccountMenu.vue`                         | canonical | account       | 1       | 6 → 6                    | 17 → 17                   |
 | `src/features/account/ui/chrome/UserCreditBalanceButton.vue`                 | canonical | account       | 1       | 1 → 1                    | 2 → 2                     |
@@ -23505,9 +23563,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/core/secretSchema.ts`                             | canonical | admin         | 1       | 2 → 2                    | 1 → 1                     |
 | `src/features/admin/shared/core/serviceAdminMeta.ts`                         | canonical | admin         | 8       | 2 → 2                    | 1 → 1                     |
 | `src/features/admin/shared/core/tableColumns.ts`                             | canonical | admin         | 2       | 2 → 2                    | 0 → 0                     |
-| `src/features/admin/shared/core/taskMetricTokens.ts`                         | canonical | admin         | 7       | 3 → 3                    | 1 → 1                     |
+| `src/features/admin/shared/core/taskMetricTokens.ts`                         | canonical | admin         | 7       | 3 → 3                    | 0 → 0                     |
 | `src/features/admin/shared/core/uiClasses.ts`                                | canonical | admin         | 40      | 17 → 17                  | 0 → 0                     |
-| `src/features/admin/shared/index.ts`                                         | canonical | admin         | 237     | 120 → 120                | 53 → 53                   |
+| `src/features/admin/shared/index.ts`                                         | canonical | admin         | 237     | 121 → 121                | 53 → 53                   |
 | `src/features/admin/shared/session/anomalyRules.ts`                          | canonical | admin         | 4       | 3 → 3                    | 3 → 3                     |
 | `src/features/admin/shared/session/brand/brandLogos.ts`                      | canonical | admin         | 14      | 6 → 6                    | 14 → 14                   |
 | `src/features/admin/shared/session/brand/useBrandLogoOverrides.ts`           | canonical | admin         | 1       | 1 → 1                    | 5 → 5                     |
@@ -23529,7 +23587,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/AdminSpinner.vue`                              | canonical | admin         | 1       | 3 → 3                    | 2 → 2                     |
 | `src/features/admin/shared/ui/chart/AdminChartCard.vue`                      | canonical | admin         | 1       | 1 → 1                    | 2 → 2                     |
 | `src/features/admin/shared/ui/chart/AdminRangedLineChartCard.vue`            | canonical | admin         | 1       | 1 → 1                    | 1 → 1                     |
-| `src/features/admin/shared/ui/chart/chart.ts`                                | canonical | admin         | 14      | 3 → 3                    | 6 → 6                     |
+| `src/features/admin/shared/ui/chart/chart.ts`                                | canonical | admin         | 14      | 4 → 4                    | 6 → 6                     |
 | `src/features/admin/shared/ui/feedback/AdminAlert.vue`                       | canonical | admin         | 2       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue`               | canonical | admin         | 1       | 3 → 3                    | 4 → 4                     |
 | `src/features/admin/shared/ui/feedback/AdminEmptyState.vue`                  | canonical | admin         | 1       | 1 → 1                    | 2 → 2                     |
@@ -23564,11 +23622,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue`            | canonical | admin         | 2       | 2 → 2                    | 2 → 2                     |
 | `src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue`                | canonical | admin         | 1       | 2 → 2                    | 3 → 3                     |
 | `src/features/auth/index.ts`                                                 | canonical | auth          | 28      | 36 → 36                  | 46 → 46                   |
-| `src/features/board/index.ts`                                                | canonical | board         | 218     | 49 → 49                  | 68 → 68                   |
-| `src/features/board/ports/canvas.ts`                                         | canonical | board         | 66      | 99 → 99                  | 68 → 68                   |
-| `src/features/board/ports/canvasSession.ts`                                  | canonical | board         | 27      | 11 → 11                  | 68 → 68                   |
+| `src/features/board/index.ts`                                                | canonical | board         | 218     | 49 → 49                  | 70 → 70                   |
+| `src/features/board/ports/canvas.ts`                                         | canonical | board         | 66      | 99 → 99                  | 70 → 70                   |
+| `src/features/board/ports/canvasSession.ts`                                  | canonical | board         | 27      | 11 → 11                  | 70 → 70                   |
 | `src/features/board/ports/testing.ts`                                        | canonical | board         | 2       | 6 → 6                    | 1 → 1                     |
-| `src/features/board/testing/index.ts`                                        | canonical | board         | 12      | 30 → 30                  | 5 → 5                     |
+| `src/features/board/testing/index.ts`                                        | canonical | board         | 12      | 31 → 31                  | 5 → 5                     |
 | `src/features/canvas/core/graph/canvasGraphStoreWriter.ts`                   | canonical | canvas        | 1       | 3 → 3                    | 2 → 2                     |
 | `src/features/canvas/core/graph/canvasGraphValueEquality.ts`                 | canonical | canvas        | 1       | 2 → 2                    | 0 → 0                     |
 | `src/features/canvas/core/graph/canvasGroupGeometry.ts`                      | canonical | canvas        | 18      | 11 → 11                  | 3 → 3                     |
@@ -23576,7 +23634,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/core/nodes/imageActions.ts`                             | canonical | canvas        | 1       | 7 → 7                    | 1 → 1                     |
 | `src/features/canvas/core/nodes/serviceLabelKey.ts`                          | canonical | canvas        | 1       | 5 → 5                    | 1 → 1                     |
 | `src/features/canvas/session/board-session/index.ts`                         | canonical | canvas        | 14      | 10 → 10                  | 20 → 20                   |
-| `src/features/canvas/session/collaboration/index.ts`                         | canonical | canvas        | 6       | 12 → 12                  | 7 → 7                     |
+| `src/features/canvas/session/collaboration/index.ts`                         | canonical | canvas        | 5       | 12 → 12                  | 7 → 7                     |
 | `src/features/canvas/session/execution/board-attachment/index.ts`            | canonical | canvas        | 2       | 13 → 13                  | 0 → 0                     |
 | `src/features/canvas/session/execution/index.ts`                             | canonical | canvas        | 64      | 31 → 31                  | 47 → 47                   |
 | `src/features/canvas/session/execution/pending-execution/core.ts`            | canonical | canvas        | 17      | 14 → 14                  | 7 → 7                     |
@@ -23604,7 +23662,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/ui/overlays/index.ts`                                   | canonical | canvas        | 5       | 9 → 9                    | 14 → 14                   |
 | `src/features/canvas/ui/pages/CanvasLandingPage.vue`                         | canonical | canvas        | 1       | 3 → 3                    | 10 → 10                   |
 | `src/features/canvas/ui/pages/CanvasPage.vue`                                | canonical | canvas        | 1       | 3 → 3                    | 4 → 4                     |
-| `src/features/canvas/ui/screens/index.ts`                                    | canonical | canvas        | 1       | 1 → 1                    | 58 → 58                   |
+| `src/features/canvas/ui/screens/index.ts`                                    | canonical | canvas        | 1       | 1 → 1                    | 59 → 59                   |
 | `src/features/canvas/ui/screens/useFlowActiveNodePanels.ts`                  | canonical | canvas        | 4       | 5 → 5                    | 1 → 1                     |
 | `src/features/canvas/ui/screens/useFlowCanvasInteractionState.ts`            | canonical | canvas        | 2       | 4 → 4                    | 1 → 1                     |
 | `src/features/legal/index.ts`                                                | canonical | legal         | 7       | 0 → 0                    | 6 → 6                     |
@@ -23614,7 +23672,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/legal/pages/RefundPolicyPage.vue`                              | canonical | legal         | 1       | 2 → 2                    | 2 → 2                     |
 | `src/features/legal/pages/TermsPage.vue`                                     | canonical | legal         | 1       | 3 → 3                    | 2 → 2                     |
 | `src/features/legal/routePaths.ts`                                           | canonical | legal         | 4       | 4 → 4                    | 0 → 0                     |
-| `src/features/library/index.ts`                                              | canonical | library       | 83      | 27 → 27                  | 49 → 49                   |
+| `src/features/library/index.ts`                                              | canonical | library       | 83      | 27 → 27                  | 50 → 50                   |
 | `src/features/search/index.ts`                                               | canonical | search        | 21      | 2 → 2                    | 48 → 48                   |
 | `src/features/workspace/index.ts`                                            | canonical | workspace     | 47      | 32 → 32                  | 53 → 53                   |
 | `src/features/workspace/routePaths.ts`                                       | canonical | workspace     | 8       | 33 → 33                  | 1 → 1                     |
@@ -23624,9 +23682,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/test/factories/index.ts`                                                | canonical | test          | 12      | 18 → 18                  | 1 → 1                     |
 | `src/theme/appOverlayMenu.ts`                                                | canonical | design-system | 5       | 6 → 6                    | 0 → 0                     |
 | `src/theme/composables/themeKeyboard.ts`                                     | canonical | design-system | 2       | 1 → 1                    | 2 → 2                     |
-| `src/theme/composables/themeMode.ts`                                         | canonical | design-system | 5       | 4 → 4                    | 0 → 0                     |
-| `src/theme/composables/useTheme.ts`                                          | canonical | design-system | 4       | 7 → 7                    | 3 → 3                     |
-| `src/theme/dialogMask.ts`                                                    | canonical | design-system | 1       | 8 → 8                    | 0 → 0                     |
+| `src/theme/composables/themeMode.ts`                                         | canonical | design-system | 4       | 4 → 4                    | 0 → 0                     |
+| `src/theme/composables/useTheme.ts`                                          | canonical | design-system | 4       | 9 → 9                    | 3 → 3                     |
+| `src/theme/dialogMask.ts`                                                    | canonical | design-system | 1       | 7 → 7                    | 0 → 0                     |
 | `src/theme/formControls.ts`                                                  | canonical | design-system | 4       | 10 → 10                  | 0 → 0                     |
 | `src/theme/lightboxScrim.ts`                                                 | canonical | design-system | 3       | 3 → 3                    | 0 → 0                     |
 

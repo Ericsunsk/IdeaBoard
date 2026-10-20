@@ -6,7 +6,6 @@ import {
   TaskStatus,
   type TaskMetricStatsSnapshot,
 } from './taskMetricTokens'
-import { adminThemeTokenFallbacks } from './adminThemeTokens'
 
 describe('taskMetricTokens', () => {
   it('defines the 6 core observability metrics in canonical lifecycle order', () => {
@@ -84,13 +83,10 @@ describe('taskMetricTokens', () => {
   })
 
   it('assigns unique and consistent chart colors matching status pill definitions', () => {
-    // Chart colors resolve from the Admin theme token fallbacks, so this asserts
-    // the shared source of truth rather than restating hex values.
-    const { danger, info, success, warning } = adminThemeTokenFallbacks
-    expect(getTaskMetricByStatus('pending')?.chartColor).toBe(info)
-    expect(getTaskMetricByStatus('running')?.chartColor).toBe(warning)
-    expect(getTaskMetricByStatus('completed')?.chartColor).toBe(success)
-    expect(getTaskMetricByStatus('failed')?.chartColor).toBe(danger)
+    expect(getTaskMetricByStatus('pending')?.chartColorRole).toBe('info')
+    expect(getTaskMetricByStatus('running')?.chartColorRole).toBe('warning')
+    expect(getTaskMetricByStatus('completed')?.chartColorRole).toBe('success')
+    expect(getTaskMetricByStatus('failed')?.chartColorRole).toBe('danger')
   })
 
   it('keeps filter pills neutral while chart lines retain semantic colors', () => {
@@ -101,7 +97,7 @@ describe('taskMetricTokens', () => {
       const metric = taskMetricDefinitions.find((item) => item.key === key)!
       expect(metric.dotClass).toBe('bg-muted-foreground')
       expect(metric.activePillClass).toBe(neutralActive)
-      expect(metric.chartColor).toBeTruthy()
+      expect(metric.chartColorRole).toBeTruthy()
     }
   })
 })

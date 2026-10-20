@@ -70,7 +70,7 @@ function makeLayers(): RetouchLayer[] {
 describe('Retouch focus-ring browser contract', () => {
   beforeEach(async () => {
     await page.viewport(1280, 800)
-    document.documentElement.classList.remove('dark')
+    document.documentElement.classList.add('light')
     i18n.global.locale.value = 'en'
     await setMotion(false)
   })

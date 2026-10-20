@@ -12,7 +12,8 @@ describe('useUsageStatisticsCharts', () => {
   })
 
   afterEach(() => {
-    useTheme().setTheme('light')
+    useTheme().setTheme('dark')
+    document.documentElement.style.removeProperty('--color-admin-chart-axis-line')
     vi.useRealTimers()
   })
 
@@ -20,20 +21,23 @@ describe('useUsageStatisticsCharts', () => {
     const { setTheme } = useTheme()
     setTheme('dark')
     await nextTick()
-    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    expect(document.documentElement.classList.contains('light')).toBe(false)
 
     const charts = makeCharts({
       adminStatistics: ref(null),
       timeRange: ref(GetAdminStatisticsRange['7d']),
     })
     const darkOptions = charts.trendChartOptions.value
-    expect(darkOptions.scales?.x).toMatchObject({ border: { color: '#3f3f46' } })
+    expect(darkOptions.scales?.x).toMatchObject({
+      border: { color: adminThemeTokenFallbacks.chartAxisLine },
+    })
 
+    document.documentElement.style.setProperty('--color-admin-chart-axis-line', '#e5e7eb')
     setTheme('light')
     await nextTick()
-    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(document.documentElement.classList.contains('light')).toBe(true)
     expect(charts.trendChartOptions.value.scales?.x).toMatchObject({
-      border: { color: adminThemeTokenFallbacks.chartAxisLine },
+      border: { color: '#e5e7eb' },
     })
     expect(charts.trendChartOptions.value).not.toBe(darkOptions)
   })

@@ -60,10 +60,10 @@ function renderComposer() {
   })
 }
 
-describe('Canvas prompt textarea ring browser contract', () => {
+describe.each(['dark', 'light'] as const)('Canvas prompt textarea ring in %s mode', (mode) => {
   beforeEach(async () => {
     await page.viewport(1280, 800)
-    document.documentElement.classList.remove('dark')
+    document.documentElement.classList.toggle('light', mode === 'light')
     i18n.global.locale.value = 'en'
     await setMotion(false)
   })
@@ -71,6 +71,7 @@ describe('Canvas prompt textarea ring browser contract', () => {
   afterEach(async () => {
     cleanup()
     document.body.innerHTML = ''
+    document.documentElement.classList.remove('light')
     await setMotion(false)
   })
 
@@ -86,12 +87,10 @@ describe('Canvas prompt textarea ring browser contract', () => {
       textarea.focus()
       expect(document.activeElement).toBe(textarea)
       expect(textarea.matches(':focus-visible')).toBe(true)
-      // The ring rides the 2px width the retired class pins; poll past the
-      // control transition to its end state.
+      // Poll until the shared textarea focus paint becomes visible.
       await expect.poll(() => styleOf(textarea).boxShadow).not.toBe('none')
       expect(styleOf(textarea).boxShadow).toContain('2px')
-      // Box-shadow only: the border never moves (outline would shift layout
-      // on a borderless control; the ring does not).
+      // Box-shadow only: focus leaves the control's border unchanged.
       expect(styleOf(textarea).borderWidth).toBe(restBorder)
       // Provenance: the ring tracks the shared ring token live — moving it
       // moves the textarea paint, so a hardcoded textarea-side value (or a

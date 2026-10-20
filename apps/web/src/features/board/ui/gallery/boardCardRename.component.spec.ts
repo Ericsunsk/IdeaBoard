@@ -30,9 +30,7 @@ describe('BoardCard rename blur guard', () => {
 
     // Parent startRename flips isRenaming; the menu close steals focus back
     // to the trigger, which must not commit.
-    await view.rerender(
-      cardProps({ isRenaming: true, renameDraft: 'Campaign' }) as never,
-    )
+    await view.rerender(cardProps({ isRenaming: true, renameDraft: 'Campaign' }) as never)
     const input = await screen.findByRole('textbox', { name: 'Rename' })
     expect(input).toBeVisible()
 

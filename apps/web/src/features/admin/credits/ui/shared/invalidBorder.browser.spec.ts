@@ -24,7 +24,7 @@ function styleOf(element: Element): CSSStyleDeclaration {
 describe('Admin invalid border browser contract', () => {
   beforeEach(async () => {
     await page.viewport(1280, 800)
-    document.documentElement.classList.remove('dark')
+    document.documentElement.classList.add('light')
   })
 
   afterEach(async () => {

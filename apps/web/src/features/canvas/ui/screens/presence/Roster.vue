@@ -37,7 +37,11 @@
               </span>
             </span>
             <Transition name="presence-activity">
-              <span v-if="item.isEditing" class="presence-roster__activity" aria-hidden="true" />
+              <span
+                v-if="item.isEditing"
+                class="presence-roster__activity size-2.5"
+                aria-hidden="true"
+              />
             </Transition>
           </span>
         </li>
@@ -128,8 +132,6 @@ function releaseLeavingAvatar(element: Element) {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: var(--primitive-size-10);
-  height: var(--primitive-size-10);
   border: 2px solid var(--color-page-chrome-bg);
   border-radius: var(--radius-pill);
   background: var(--success);

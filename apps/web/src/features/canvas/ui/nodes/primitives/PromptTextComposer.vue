@@ -189,11 +189,6 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
   border-color: var(--focus-border-color);
 }
 
-.prompt-text-composer.variant-node:focus-within {
-  border-radius: var(--radius-control);
-  box-shadow: 0 0 0 2px var(--focus-outline-color);
-}
-
 .prompt-text-composer.variant-floating .prompt-text-composer-image-row {
   --node-input-thumbnail-size: calc((100% - 18px) / 4);
   --node-tool-button-radius: var(--radius-control);

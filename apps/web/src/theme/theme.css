@@ -6,7 +6,7 @@
  * `@theme inline` maps their `--color-*` utility keys to runtime roles so
  * utilities resolve through the live
  * variable (dark-mode and subtree aware) without a second runtime value.
- * Domain utility values use plain `@theme`; Canvas and dark overrides are
+ * Domain defaults use dark values in `@theme`; Canvas and light overrides are
  * owned by tokens/canvas.css and tokens/admin.css / tokens/semantic.css.
  * Tier 2b Admin roles live in tokens/admin.css; type/z/motion roles live in
  * tokens/type.css, tokens/z.css, and tokens/motion.css.
@@ -20,13 +20,13 @@
 @import './tokens/type.css';
 @import './tokens/z.css';
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:not(:where(.light, .light *)));
 
 @theme {
   /*
    * Primary transparent tiers (accent-faint family). Derived from
    * --primary via color-mix so they track the brand violet in light
-   * mode and the white accent in dark mode. Explicit dark assignments in
+   * mode and the white accent in dark mode. Explicit light assignments in
    * semantic.css preserve mode parity.
    * Covers the bg-primary/*, border-primary/*, and ring-primary/* carriers
    * used across Admin surfaces.
@@ -91,11 +91,11 @@
   --color-canvas-minimap-mask: var(--color-workspace-preview-mask);
 
   /* ── Page surface tokens ─────────────────────────────────── */
-  --color-page-dot: var(--primitive-slate-150);
+  --color-page-dot: var(--palette-dark-border);
   --color-page-chrome-border: var(--color-board-card-border);
   --color-page-chrome-border-hover: var(--color-board-card-border-hover);
   --color-page-chrome-bg: var(--color-board-control-bg);
-  --color-page-chrome-bg-hover: var(--accent-hover);
+  --color-page-chrome-bg-hover: var(--primitive-neutral-790-alpha-85);
   --color-page-chrome-color: var(--color-board-card-action);
   --color-page-chrome-color-hover: var(--color-board-card-action-hover);
   --color-page-chrome-color-disabled: var(--color-board-card-text);
@@ -103,9 +103,9 @@
   --shadow-page-chrome: none;
   --spacing-overlay-gutter: var(--primitive-size-10);
   --color-overlay-bg: var(--popover);
-  --color-overlay-border: var(--palette-light-border);
-  --color-overlay-item: var(--palette-light-text-1);
-  --color-overlay-item-hover-bg: var(--palette-light-hover);
+  --color-overlay-border: var(--palette-dark-border);
+  --color-overlay-item: var(--palette-dark-text-2);
+  --color-overlay-item-hover-bg: var(--palette-dark-surface-hover);
   --color-overlay-danger: var(--destructive);
   --color-overlay-danger-hover-bg: color-mix(in srgb, var(--color-overlay-danger) 10%, transparent);
   --shadow-overlay-menu: none;
@@ -119,88 +119,88 @@
   --spacing-touch-target-coarse: var(--primitive-size-44);
 
   /* ── Marketing landing page tokens ───────────────────────── */
-  --color-home-hero-text: var(--primitive-zinc-875);
-  --color-home-hero-subtle: var(--primitive-zinc-650);
-  --color-home-note-bg: var(--primitive-stone-200);
-  --color-home-note-border: transparent;
-  --color-home-note-text: var(--color-home-hero-text);
+  --color-home-hero-text: var(--palette-dark-title);
+  --color-home-hero-subtle: var(--palette-dark-text-2);
+  --color-home-note-bg: var(--primitive-stone-900);
+  --color-home-note-border: var(--primitive-stone-800);
+  --color-home-note-text: var(--primitive-stone-75);
 
   /* ── Global Glass & Frosted Surface tokens ────────────── */
   --blur-glass: var(--primitive-blur-12);
 
   /* ── Board-level tokens ────────────────────────────────── */
-  --color-board-page: var(--palette-light-0);
-  --color-board-page-text: var(--palette-light-title);
-  --color-board-page-text-muted: var(--palette-light-text-label);
-  --color-board-page-glow: var(--primitive-violet-475-alpha-42);
+  --color-board-page: var(--palette-dark-0);
+  --color-board-page-text: var(--palette-dark-text-1);
+  --color-board-page-text-muted: var(--palette-dark-text-2);
+  --color-board-page-glow: var(--primitive-neutral-0-alpha-5);
   --color-board-page-glow-clear: transparent;
-  --color-board-primary: var(--color-brand-creative-accent-hover);
-  --color-board-primary-hover: var(--color-brand-creative-accent-pressed);
-  --color-board-focus-ring: var(--primitive-violet-650-alpha-16);
-  --color-board-focus-ring-strong: var(--primitive-violet-650-alpha-18);
-  --color-board-surface: var(--primitive-neutral-0-alpha-90);
-  --color-board-surface-strong: var(--card);
-  --color-board-control-bg: var(--primitive-neutral-0-alpha-85);
-  --color-board-control-text: var(--color-board-card-title);
-  --color-board-control-input-text: var(--color-board-card-title);
-  --color-board-control-icon: var(--palette-light-text-3);
-  --color-board-card-border: var(--palette-light-border);
-  --color-board-card-border-hover: var(--palette-light-border-hover);
-  --color-board-card-bg: var(--color-board-surface);
-  --color-board-card-preview-from: var(--palette-light-1);
-  --color-board-card-preview-to: var(--primitive-slate-50);
-  --color-board-card-preview-fade: var(--primitive-slate-50-alpha-92);
+  --color-board-primary: var(--primitive-neutral-25);
+  --color-board-primary-hover: var(--primitive-neutral-175);
+  --color-board-focus-ring: var(--primitive-neutral-0-alpha-20);
+  --color-board-focus-ring-strong: var(--primitive-neutral-0-alpha-30);
+  --color-board-surface: var(--primitive-neutral-910-alpha-85);
+  --color-board-surface-strong: var(--palette-dark-1);
+  --color-board-control-bg: var(--primitive-neutral-890-alpha-78);
+  --color-board-control-text: var(--palette-dark-text-1);
+  --color-board-control-input-text: var(--palette-dark-text-1);
+  --color-board-control-icon: var(--palette-dark-text-3);
+  --color-board-card-border: var(--palette-dark-border);
+  --color-board-card-border-hover: var(--palette-dark-border-hover);
+  --color-board-card-bg: var(--primitive-neutral-910-alpha-85);
+  --color-board-card-preview-from: var(--color-workspace-bg);
+  --color-board-card-preview-to: var(--color-workspace-bg);
+  --color-board-card-preview-fade: var(--primitive-neutral-940-alpha-88);
   --color-board-card-preview-fade-clear: transparent;
-  --color-board-card-preview-divider: var(--palette-light-border);
-  --color-board-card-input-border: var(--palette-light-border);
-  --color-board-card-input-bg: var(--primitive-neutral-0-alpha-90);
-  --color-board-card-title: var(--palette-light-title);
-  --color-board-card-text: var(--palette-light-text-2);
-  --color-board-card-action: var(--palette-light-text-label);
-  --color-board-card-action-hover: var(--palette-light-title);
-  --color-board-create-icon: var(--palette-light-border-hover);
-  --color-board-create-title: var(--color-board-card-title);
-  --color-board-loading-bg: var(--primitive-neutral-1000-alpha-4);
+  --color-board-card-preview-divider: var(--palette-dark-border);
+  --color-board-card-input-border: var(--palette-dark-border);
+  --color-board-card-input-bg: var(--palette-dark-3);
+  --color-board-card-title: var(--palette-dark-title);
+  --color-board-card-text: var(--palette-dark-text-2);
+  --color-board-card-action: var(--palette-dark-text-2);
+  --color-board-card-action-hover: var(--palette-dark-text-1);
+  --color-board-create-icon: var(--palette-dark-border-hover);
+  --color-board-create-title: var(--palette-dark-title);
+  --color-board-loading-bg: var(--primitive-neutral-890-alpha-45);
   --color-board-danger: var(--destructive);
   --color-board-danger-hover: var(--destructive-hover);
-  --color-board-dialog-title: var(--color-board-control-input-text);
-  --color-board-dialog-description: var(--color-board-page-text-muted);
+  --color-board-dialog-title: var(--palette-dark-title);
+  --color-board-dialog-description: var(--palette-dark-text-2);
   --shadow-board-focus: 0 0 0 3px var(--color-board-focus-ring);
   --shadow-board-focus-strong: 0 0 0 3px var(--color-board-focus-ring-strong);
-  --shadow-board-dialog: var(--primitive-shadow-22-58-soft);
+  --shadow-board-dialog: var(--board-dialog-shadow);
 
-  --color-brand-creative-accent: var(--primitive-violet-450);
-  --color-brand-creative-accent-hover: var(--primitive-violet-675);
-  --color-brand-creative-accent-pressed: var(--primitive-violet-750);
+  --color-brand-creative-accent: var(--primitive-neutral-25);
+  --color-brand-creative-accent-hover: var(--primitive-neutral-175);
+  --color-brand-creative-accent-pressed: var(--primitive-neutral-300);
   --color-brand-creative-accent-secondary: var(--primitive-purple-400);
-  --color-brand-creative-accent-soft: var(--primitive-violet-25);
-  --color-brand-creative-accent-ring: var(--primitive-violet-450-alpha-10);
+  --color-brand-creative-accent-soft: var(--primitive-neutral-0-alpha-8);
+  --color-brand-creative-accent-ring: var(--primitive-neutral-0-alpha-20);
   --color-brand-creative-focus-accent: var(--color-brand-creative-accent);
-  --color-dialog-mask: color-mix(in srgb, var(--foreground) 38%, transparent);
+  --color-dialog-mask: var(--primitive-neutral-1000-alpha-72);
   /*
    * Auth modal aliases.
    * These preserve the creative glass treatment while sourcing neutral values
    * from app semantics and expressive values from creative accent tokens.
    */
-  --color-auth-shell: color-mix(in srgb, var(--card) 80%, transparent);
-  --color-auth-shell-border: color-mix(in srgb, var(--card) 35%, transparent);
-  --color-auth-shell-glow: color-mix(in srgb, var(--color-brand-creative-accent) 18%, transparent);
-  --color-auth-shell-highlight: color-mix(in srgb, var(--card) 60%, transparent);
-  --color-auth-backdrop-from: color-mix(in srgb, var(--card) 30%, transparent);
-  --color-auth-backdrop-via: color-mix(in srgb, var(--card) 55%, transparent);
-  --color-auth-backdrop-to: color-mix(in srgb, var(--card) 80%, transparent);
-  --color-auth-text: var(--foreground);
-  --color-auth-title: var(--foreground);
-  --color-auth-muted: var(--muted-foreground);
-  --color-auth-subtle: var(--muted-foreground);
-  --color-auth-input: color-mix(in srgb, var(--card) 60%, transparent);
-  --color-auth-input-focus: var(--card);
-  --color-auth-input-border: var(--border);
-  --color-auth-input-border-hover: var(--border-hover);
+  --color-auth-shell: var(--primitive-neutral-925-alpha-88);
+  --color-auth-shell-border: var(--palette-dark-border);
+  --color-auth-shell-glow: var(--primitive-neutral-0-alpha-5);
+  --color-auth-shell-highlight: var(--primitive-neutral-0-alpha-10);
+  --color-auth-backdrop-from: var(--primitive-neutral-0-alpha-2);
+  --color-auth-backdrop-via: var(--primitive-neutral-0-alpha-1);
+  --color-auth-backdrop-to: transparent;
+  --color-auth-text: var(--palette-dark-text-1);
+  --color-auth-title: var(--palette-dark-title);
+  --color-auth-muted: var(--palette-dark-text-2);
+  --color-auth-subtle: var(--palette-dark-text-3);
+  --color-auth-input: var(--palette-dark-3);
+  --color-auth-input-focus: var(--palette-dark-2);
+  --color-auth-input-border: var(--palette-dark-border);
+  --color-auth-input-border-hover: var(--palette-dark-border-hover);
   --color-auth-input-placeholder: var(--muted-foreground);
   --color-auth-input-icon: var(--muted-foreground);
-  --color-auth-focus: var(--color-brand-creative-accent);
-  --color-auth-focus-ring: color-mix(in srgb, var(--color-brand-creative-accent) 10%, transparent);
+  --color-auth-focus: var(--primitive-neutral-25);
+  --color-auth-focus-ring: var(--primitive-neutral-0-alpha-20);
   --color-auth-error: var(--destructive);
   --color-auth-error-border: color-mix(in srgb, var(--destructive) 38%, var(--card));
   --color-auth-error-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
@@ -210,32 +210,24 @@
     var(--muted-foreground)
   );
   --color-auth-error-ring: color-mix(in srgb, var(--destructive) 10%, transparent);
-  --color-auth-primary-from: var(--color-brand-creative-accent);
-  --color-auth-primary-to: var(--color-brand-creative-accent-hover);
-  --color-auth-primary-text: var(--primary-foreground);
-  --color-auth-primary-shadow: color-mix(
-    in srgb,
-    var(--color-brand-creative-accent) 25%,
-    transparent
-  );
-  --color-auth-primary-shadow-hover: color-mix(
-    in srgb,
-    var(--color-brand-creative-accent) 35%,
-    transparent
-  );
-  --color-auth-link: var(--color-brand-creative-accent-hover);
-  --color-auth-link-hover: var(--color-brand-creative-accent-pressed);
-  --color-auth-close: var(--muted-foreground);
-  --color-auth-close-hover: var(--foreground);
+  --color-auth-primary-from: var(--primitive-neutral-25);
+  --color-auth-primary-to: var(--primitive-neutral-175);
+  --color-auth-primary-text: var(--palette-dark-0);
+  --color-auth-primary-shadow: transparent;
+  --color-auth-primary-shadow-hover: transparent;
+  --color-auth-link: var(--primitive-neutral-0);
+  --color-auth-link-hover: var(--primitive-neutral-200);
+  --color-auth-close: var(--palette-dark-text-2);
+  --color-auth-close-hover: var(--palette-dark-title);
 
   /* ── Toast semantic tokens ── */
-  --color-toast-bg: var(--primitive-neutral-0-alpha-92);
-  --color-toast-border: var(--palette-light-border);
-  --color-toast-text: var(--palette-light-text-1);
-  --color-toast-muted: var(--palette-light-text-2);
-  --color-toast-shadow: var(--primitive-shadow-10-24);
-  --color-toast-highlight: var(--primitive-slate-775-alpha-8);
-  --color-toast-button: var(--color-brand-creative-accent-hover);
+  --color-toast-bg: var(--primitive-neutral-910-alpha-94);
+  --color-toast-border: var(--palette-dark-border);
+  --color-toast-text: var(--palette-dark-text-1);
+  --color-toast-muted: var(--palette-dark-text-2);
+  --color-toast-shadow: var(--primitive-shadow-14-34-outline);
+  --color-toast-highlight: var(--primitive-neutral-0-alpha-3);
+  --color-toast-button: var(--primitive-neutral-0);
 
   /* ── shadcn-vue standard theme mappings ─────────────────── */
 
@@ -248,8 +240,8 @@
   --size-scrollbar: var(--primitive-size-10);
   --size-scrollbar-thumb-inset: var(--primitive-size-3);
   --color-scrollbar-track: transparent;
-  --color-scrollbar-thumb: color-mix(in srgb, var(--foreground) 58%, transparent);
-  --color-scrollbar-thumb-hover: color-mix(in srgb, var(--foreground) 72%, transparent);
+  --color-scrollbar-thumb: var(--primitive-neutral-0-alpha-20);
+  --color-scrollbar-thumb-hover: var(--primitive-neutral-0-alpha-35);
 
   --shadow-auth-shell:
     0 24px 50px -15px var(--color-auth-shell-glow),
@@ -260,8 +252,8 @@
   --shadow-floating: var(--primitive-shadow-xl);
   --shadow-raised: var(--primitive-shadow-sm);
   --shadow-auth-input: inset 0 1px 2px color-mix(in srgb, var(--foreground) 2%, transparent);
-  --shadow-auth-primary: 0 4px 14px var(--color-auth-primary-shadow);
-  --shadow-auth-primary-hover: 0 6px 20px var(--color-auth-primary-shadow-hover);
+  --shadow-auth-primary: var(--auth-primary-shadow);
+  --shadow-auth-primary-hover: var(--auth-primary-shadow-hover);
   --shadow-auth-focus: 0 0 0 3px var(--color-auth-focus-ring);
 }
 

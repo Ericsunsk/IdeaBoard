@@ -118,6 +118,8 @@ async function waitFor<T>(read: () => T | null, label: string): Promise<T> {
   }
 }
 
+const selectionRectSelector = '.vue-flow__nodesselection-rect'
+
 const ANCHOR_RECT = { top: 0, left: 0, width: 320, height: 480 }
 
 function flowHost() {
@@ -159,7 +161,7 @@ function flowHost() {
 describe('Canvas surface states browser contract', () => {
   beforeEach(async () => {
     await page.viewport(1400, 800)
-    document.documentElement.classList.remove('dark')
+    document.documentElement.classList.add('light')
     i18n.global.locale.value = 'en'
     await setMotion(false)
   })
@@ -219,10 +221,7 @@ describe('Canvas surface states browser contract', () => {
       // pointer click drives; the zero-height edge geometry defeats pointer
       // actionability checks, so the store entry point is used directly).
       selectEdge()
-      const selectedPath = await waitFor(
-        () => host.query<SVGElement>('.vue-flow__edge.selected .vue-flow__edge-path'),
-        'selected edge path',
-      )
+      await waitFor(() => host.query<SVGElement>('.vue-flow__edge.selected'), 'selected edge path')
       const selectedToken = styleOf(document.documentElement)
         .getPropertyValue('--color-canvas-edge-selected')
         .trim()
@@ -230,7 +229,7 @@ describe('Canvas surface states browser contract', () => {
       selectedProbe.style.color = 'var(--color-canvas-edge-selected)'
       host.root.append(selectedProbe)
       try {
-        expect(styleOf(selectedPath).stroke).toBe(styleOf(selectedProbe).color)
+        expect(styleOf(path).stroke).toBe(styleOf(selectedProbe).color)
         expect(selectedToken.length).toBeGreaterThan(0)
         // Provenance: moving the selected token moves the edge paint.
         host.root.ownerDocument.documentElement.style.setProperty(
@@ -238,7 +237,7 @@ describe('Canvas surface states browser contract', () => {
           'rgb(0, 200, 0)',
         )
         try {
-          expect(styleOf(selectedPath).stroke).toBe('rgb(0, 200, 0)')
+          expect(styleOf(path).stroke).toBe('rgb(0, 200, 0)')
         } finally {
           host.root.ownerDocument.documentElement.style.removeProperty(
             '--color-canvas-edge-selected',
@@ -247,10 +246,10 @@ describe('Canvas surface states browser contract', () => {
         // Negative provenance: the adapter owns no page-chrome alias —
         // moving those tokens leaves edge paint untouched.
         withToken('--color-page-chrome-border', 'rgb(255, 0, 0)', () => {
-          expect(styleOf(selectedPath).stroke).not.toBe('rgb(255, 0, 0)')
+          expect(styleOf(path).stroke).not.toBe('rgb(255, 0, 0)')
         })
         withToken('--color-page-chrome-bg', 'rgb(255, 0, 0)', () => {
-          expect(styleOf(selectedPath).stroke).not.toBe('rgb(255, 0, 0)')
+          expect(styleOf(path).stroke).not.toBe('rgb(255, 0, 0)')
         })
       } finally {
         selectedProbe.remove()
@@ -258,10 +257,7 @@ describe('Canvas surface states browser contract', () => {
 
       // The minimap mounts the shared surface classes and paints nodes
       // from the minimap token.
-      const minimap = await waitFor(
-        () => host.query('.vue-flow__minimap.canvas-minimap'),
-        'minimap',
-      )
+      const minimap = await waitFor(() => host.query('.canvas-minimap'), 'minimap')
       expect(minimap.classList.contains('page-chrome-surface')).toBe(true)
       const minimapNode = await waitFor(
         () => host.query<SVGElement>('.vue-flow__minimap-node'),
@@ -408,16 +404,24 @@ describe('Canvas surface states browser contract', () => {
     let selectOne!: () => void
     const SelectionDriver = defineComponent({
       setup() {
-        const { addSelectedNodes, removeSelectedElements, getSelectedElements } = useVueFlow()
+        const {
+          addSelectedNodes,
+          removeSelectedElements,
+          getSelectedElements,
+          findNode,
+          nodesSelectionActive: isNodesSelectionActive,
+        } = useVueFlow()
         selectMany = () => {
           const current = [...getSelectedElements.value]
           if (current.length > 0) removeSelectedElements(current)
-          addSelectedNodes([nodes.value[0]!, nodes.value[1]!] as never)
+          addSelectedNodes([findNode('node-a')!, findNode('node-b')!])
+          isNodesSelectionActive.value = true
         }
         selectOne = () => {
           const current = [...getSelectedElements.value]
           if (current.length > 0) removeSelectedElements(current)
-          addSelectedNodes([nodes.value[0]!] as never)
+          addSelectedNodes([findNode('node-a')!])
+          isNodesSelectionActive.value = true
         }
         return () => null
       },
@@ -434,7 +438,7 @@ describe('Canvas surface states browser contract', () => {
       // Multi-node selection paints the restored group ring on ::before.
       selectMany()
       const multiRect = await waitFor(
-        () => host.query('.vue-flow__nodesselection-rect'),
+        () => host.query(selectionRectSelector),
         'multi selection rect',
       )
       expect(wrap.classList.contains('is-single-node-selection')).toBe(false)
@@ -444,7 +448,7 @@ describe('Canvas surface states browser contract', () => {
       expect(multiRing.borderTopWidth).toBe('1px')
       const groupProbe = document.createElement('div')
       groupProbe.style.color = 'var(--canvas-selection-group-border)'
-      host.root.append(groupProbe)
+      wrap.append(groupProbe)
       try {
         expect(multiRing.borderTopColor).toBe(styleOf(groupProbe).color)
       } finally {
@@ -454,10 +458,10 @@ describe('Canvas surface states browser contract', () => {
       // A single selected node keeps the rect mounted (Vue Flow renders it
       // for any non-empty bbox) but the wrap flag suppresses the outer ring.
       selectOne()
-      await waitFor(() => host.query('.vue-flow__nodesselection-rect'), 'single selection rect')
+      await waitFor(() => host.query(selectionRectSelector), 'single selection rect')
       wrap.classList.add('is-single-node-selection')
       await nextTick()
-      const singleRect = host.query('.vue-flow__nodesselection-rect')!
+      const singleRect = host.query(selectionRectSelector)!
       expect(window.getComputedStyle(singleRect, '::before').display).toBe('none')
 
       // Removing the flag restores the ring for the same rect.

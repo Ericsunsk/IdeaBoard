@@ -192,21 +192,19 @@ function hasRawDesignColor(decl: TokenDecl): boolean {
   )
 }
 
-function isDarkSelector(selector: string): boolean {
-  return selector
-    .split(',')
-    .some((part) => /^(?:html)?\.dark$/.test(part.trim()) || part.includes(':where(.dark'))
+function isLightSelector(selector: string): boolean {
+  return selector.split(',').some((part) => /^(?:html)?\.light$/.test(part.trim()))
 }
 
-function scopeOfDecl(decl: postcss.Declaration): {
-  scope: DeclScope
+function scopesOfDecl(decl: postcss.Declaration): {
+  scopes: DeclScope[]
   isThemeKey: boolean
   isInlineTheme?: boolean
 } {
   let parent: postcss.Container | postcss.Document | undefined = decl.parent
   let inTheme = false
   let inInlineTheme = false
-  let dark = false
+  let light = false
   let root = false
   while (parent) {
     if (parent.type === 'atrule' && (parent as postcss.AtRule).name === 'theme') {
@@ -215,18 +213,18 @@ function scopeOfDecl(decl: postcss.Declaration): {
     }
     if (parent.type === 'rule') {
       const selector = (parent as postcss.Rule).selector
-      if (isDarkSelector(selector)) dark = true
-      else if (selector.trim() === ':root') root = true
+      if (isLightSelector(selector)) light = true
+      if (selector.split(',').some((part) => part.trim() === ':root')) root = true
     }
     parent = parent.parent
   }
   // `@theme inline` keys are compile-time utility mappings, never runtime
   // assignments; they carry no mode value for parity purposes.
-  if (inInlineTheme) return { scope: 'scoped', isThemeKey: false, isInlineTheme: true }
-  if (dark) return { scope: 'dark', isThemeKey: false }
-  if (inTheme && !inInlineTheme) return { scope: 'light', isThemeKey: true }
-  if (root) return { scope: 'light', isThemeKey: false }
-  return { scope: 'scoped', isThemeKey: false }
+  if (inInlineTheme) return { scopes: ['scoped'], isThemeKey: false, isInlineTheme: true }
+  if (light) return { scopes: root ? ['dark', 'light'] : ['light'], isThemeKey: false }
+  if (inTheme && !inInlineTheme) return { scopes: ['dark'], isThemeKey: true }
+  if (root) return { scopes: ['dark'], isThemeKey: false }
+  return { scopes: ['scoped'], isThemeKey: false }
 }
 
 function refsOf(value: string): string[] {
@@ -243,7 +241,10 @@ function declsOfSource(source: string, file: string): TokenDecl[] {
     const root = postcss.parse(source, { from: file })
     root.walkDecls((decl) => {
       if (decl.prop.startsWith('--')) {
-        decls.push({ file, name: decl.prop, value: decl.value.trim(), ...scopeOfDecl(decl) })
+        const { scopes, ...metadata } = scopesOfDecl(decl)
+        for (const scope of scopes) {
+          decls.push({ file, name: decl.prop, value: decl.value.trim(), scope, ...metadata })
+        }
       }
     })
   } catch {
@@ -328,7 +329,7 @@ export function scopeValues(
   // Runtime declarations override Tailwind's theme-layer defaults. Within
   // each scope, the last declaration wins, as it does in the stylesheet.
   for (const isThemeKey of [true, false]) {
-    for (const scope of ['scoped', 'light', ...(mode === 'dark' ? ['dark'] : [])]) {
+    for (const scope of ['scoped', 'dark', ...(mode === 'light' ? ['light'] : [])]) {
       for (const decl of decls) {
         if (decl.isThemeKey === isThemeKey && !decl.isInlineTheme && decl.scope === scope) {
           values.set(decl.name, decl)
@@ -383,7 +384,7 @@ export function checkTierDirection(decls: readonly TokenDecl[]): TokenViolation[
     if (decl.isInlineTheme) continue
     const fromTier = tierOfFile(decl.file)
     for (const ref of refsOf(decl.value)) {
-      const ownerValues = decl.scope === 'dark' ? [darkValues] : [lightValues, darkValues]
+      const ownerValues = decl.scope === 'light' ? [lightValues] : [darkValues, lightValues]
       for (const toTier of new Set(ownerValues.map((values) => tierOfName(values, ref)))) {
         if (toTier === undefined || FRAMEWORK_REFS.has(ref)) continue
         if (toTier === 't1') {

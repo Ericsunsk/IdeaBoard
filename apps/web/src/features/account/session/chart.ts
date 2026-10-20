@@ -16,32 +16,37 @@ import {
 import { resolveChartAnimation } from '../../../core/motion/chartMotion'
 import { formatIdeaAmount } from '../../../core/i18n/userIdeaCurrency'
 import { i18n } from '../../../core/i18n'
+import { isDarkModeActive } from '../../../theme/composables/useTheme'
 
 import type { UsageChartTheme, UsageTrendPoint } from '../core/chart'
 
-export function createUsageChartPlugins(theme: UsageChartTheme) {
+export function createUsageChartPlugins(readTheme: () => UsageChartTheme) {
   return [
     createChartEmptyStatePlugin({
       id: 'userUsageEmptyState',
-      textColor: theme.axisText,
-      fontFamily: theme.fontFamily,
+      get textColor() {
+        return readTheme().axisText
+      },
+      get fontFamily() {
+        return readTheme().fontFamily
+      },
     }),
   ]
 }
 
 /*
- * Static fallbacks mirror the light token hex behind each readColor() call
+ * Static fallbacks mirror the default dark tokens behind each readColor() call
  * (accent/ring, muted-foreground, border ×2, card, foreground) so charts
  * render the token palette even when CSS vars cannot resolve (SSR/tests).
  */
 const defaultTheme: UsageChartTheme = {
-  accent: '#9278e6',
-  accentFill: 'rgba(146, 120, 230, 0.1)',
-  axisText: '#62626a',
-  axisLine: '#ececec',
-  grid: '#ececec',
-  surface: '#ffffff',
-  text: '#313131',
+  accent: '#fcfcfc',
+  accentFill: 'rgba(255, 255, 255, 0.2)',
+  axisText: '#a3a3a3',
+  axisLine: 'rgba(255, 255, 255, 0.08)',
+  grid: 'rgba(255, 255, 255, 0.08)',
+  surface: 'rgba(20, 20, 20, 0.85)',
+  text: '#f5f5f5',
   fontFamily: chartFontFamilyStack,
 }
 
@@ -141,14 +146,15 @@ export function buildUsageTrendChart(
 export function resolveUsageChartTheme(
   styles: Pick<CSSStyleDeclaration, 'getPropertyValue'> | null = readDocumentStyles(),
 ): UsageChartTheme {
+  isDarkModeActive()
   return {
     accent: readColor(styles, '--color-brand-creative-accent', defaultTheme.accent),
     accentFill: readColor(styles, '--color-brand-creative-accent-ring', defaultTheme.accentFill),
-    axisText: readColor(styles, '--color-muted-foreground', defaultTheme.axisText),
-    axisLine: readColor(styles, '--color-border', defaultTheme.axisLine),
-    grid: readColor(styles, '--color-border', defaultTheme.grid),
-    surface: readColor(styles, '--color-card', defaultTheme.surface),
-    text: readColor(styles, '--color-foreground', defaultTheme.text),
+    axisText: readColor(styles, '--muted-foreground', defaultTheme.axisText),
+    axisLine: readColor(styles, '--border', defaultTheme.axisLine),
+    grid: readColor(styles, '--border', defaultTheme.grid),
+    surface: readColor(styles, '--card', defaultTheme.surface),
+    text: readColor(styles, '--foreground', defaultTheme.text),
     fontFamily: defaultTheme.fontFamily,
   }
 }

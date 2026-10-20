@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest'
 
 // Theme utilities resolve live runtime roles on the root and in subtrees.
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import '../app/style.css'
 
 function probe(): HTMLDivElement {
@@ -29,11 +29,13 @@ function utilityPaint(root: HTMLElement, className: string, property: string): s
 }
 
 afterEach(() => {
-  document.documentElement.classList.remove('dark')
+  document.documentElement.classList.remove('light')
   document.body.innerHTML = ''
 })
 
 describe('token engine paint equivalence (light)', () => {
+  beforeEach(() => document.documentElement.classList.add('light'))
+
   it.each([
     ['--background', 'background-color', 'rgb(251, 251, 251)'],
     ['--foreground', 'color', 'rgb(23, 23, 23)'],
@@ -59,9 +61,11 @@ describe('token engine paint equivalence (light)', () => {
   })
 })
 
-describe('token engine dark and subtree resolution', () => {
-  it('resolves dark roles on the dark root', () => {
-    document.documentElement.classList.add('dark')
+describe('token engine default dark and subtree resolution', () => {
+  it('resolves dark roles and native controls without a theme class', () => {
+    expect(document.documentElement.classList.contains('light')).toBe(false)
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(window.getComputedStyle(document.documentElement).colorScheme).toBe('dark')
     const root = probe()
     expect(paintOf(root, 'background-color', 'var(--background)')).toBe('rgb(13, 13, 13)')
     expect(paintOf(root, 'background-color', 'var(--primary)')).toBe('rgb(252, 252, 252)')
@@ -70,10 +74,38 @@ describe('token engine dark and subtree resolution', () => {
     )
   })
 
-  it('resolves dark roles in a dark subtree of a light root', () => {
+  it('resolves light roles and utilities in a light subtree of the default dark root', () => {
     const root = probe()
-    root.classList.add('dark')
-    expect(paintOf(root, 'background-color', 'var(--background)')).toBe('rgb(13, 13, 13)')
+    root.classList.add('light')
+    expect(paintOf(root, 'background-color', 'var(--background)')).toBe('rgb(251, 251, 251)')
+    expect(utilityPaint(root, 'bg-primary', 'background-color')).toBe('rgb(109, 95, 208)')
+    expect(paintOf(root, 'background-color', 'var(--color-canvas-node-bg)')).toBe(
+      'rgb(247, 247, 247)',
+    )
+  })
+
+  it.each(['root', 'subtree'])('keeps elevation utilities live in a light %s', (scope) => {
+    const root = probe()
+    expect(utilityPaint(root, 'shadow-board-dialog', 'box-shadow')).toContain(
+      'rgba(0, 0, 0, 0.65) 0px 22px 58px 0px',
+    )
+    expect(utilityPaint(root, 'shadow-auth-primary', 'box-shadow')).toBe('none')
+    expect(utilityPaint(root, 'shadow-auth-primary-hover', 'box-shadow')).toBe('none')
+
+    const lightScope = scope === 'root' ? document.documentElement : root
+    lightScope.classList.add('light')
+
+    expect(utilityPaint(root, 'shadow-board-dialog', 'box-shadow')).toContain(
+      'rgba(0, 0, 0, 0.12) 0px 22px 58px 0px',
+    )
+    for (const [utility, role] of [
+      ['shadow-auth-primary', '--auth-primary-shadow'],
+      ['shadow-auth-primary-hover', '--auth-primary-shadow-hover'],
+    ] as const) {
+      const expectedShadow = paintOf(root, 'box-shadow', `var(${role})`)
+      expect(expectedShadow).not.toBe('none')
+      expect(utilityPaint(root, utility, 'box-shadow')).toContain(expectedShadow)
+    }
   })
 
   it('follows element-level runtime overrides through utilities', () => {
@@ -87,6 +119,8 @@ describe('token engine dark and subtree resolution', () => {
 })
 
 describe('domain token runtime contracts', () => {
+  beforeEach(() => document.documentElement.classList.add('light'))
+
   it('resolves admin and board roles to their canonical paint', () => {
     const root = probe()
     expect(paintOf(root, 'background-color', 'var(--color-admin-card)')).toBe(
@@ -116,8 +150,8 @@ describe('domain token runtime contracts', () => {
     expect(utilityPaint(root, 'text-admin-body', 'font-size')).toBe('13px')
   })
 
-  it('resolves domain dark roles on the dark root', () => {
-    document.documentElement.classList.add('dark')
+  it('resolves domain dark roles on the default root', () => {
+    document.documentElement.classList.remove('light')
     const root = probe()
     expect(paintOf(root, 'background-color', 'var(--color-admin-bg)')).toBe('rgb(15, 15, 15)')
     expect(paintOf(root, 'background-color', 'var(--color-board-page)')).toBe('rgb(15, 15, 15)')

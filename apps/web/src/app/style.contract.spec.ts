@@ -124,10 +124,8 @@ describe('tier role native utility emission', () => {
       'bg-chart-1',
     ])
     expect(css).toMatch(/\.rounded-overlay\s*\{\s*border-radius: var\(--radius-overlay\)/)
-    // Authored elevation recipes resolve through physical ingredients.
-    expect(css).toMatch(
-      /\.shadow-board-dialog\s*\{[^}]*--tw-shadow: var\(--primitive-shadow-22-58-soft\)/,
-    )
+    // Mode-dependent elevation recipes resolve through live runtime roles.
+    expect(css).toMatch(/\.shadow-board-dialog\s*\{[^}]*--tw-shadow: var\(--board-dialog-shadow\)/)
     expect(css).toMatch(
       /\.shadow-focus-ring\s*\{[^}]*--tw-shadow: 0 0 0 3px var\(--tw-shadow-color, var\(--ring\)\)/,
     )

@@ -4,7 +4,6 @@
 // Admin-owned domain module owns the frozen value set. Feature code imports
 // it from here, never generated code, and generic `shared` modules must not
 // depend on it.
-import { adminThemeTokenFallbacks } from './adminThemeTokens'
 
 export const TaskStatus = {
   pending: 'pending',
@@ -35,7 +34,7 @@ export interface TaskMetricDefinition {
   readonly dotClass: string
   readonly activePillClass: string
   readonly hasChartLine: boolean
-  readonly chartColor?: string
+  readonly chartColorRole?: 'info' | 'warning' | 'success' | 'danger' | 'mist'
   readonly chartLabel?: string
   readonly getCount: (stats: TaskMetricStatsSnapshot) => number
 }
@@ -56,17 +55,13 @@ export const monitorChartSpecs = {
 /**
  * 任务指标元定义与视觉 Token (Single Source of Truth)
  *
- * chartColor 与 Admin 主题对齐（Admin shared 内聚，源头见 style.css --color-admin-*）：
- * pending/info, running/warning, completed/success, failed/danger, cancelled/mist。
- * Chart.js 绘制 canvas 需要具体色值，withAlpha 也无法处理 var()，因此这里取
- * adminThemeTokenFallbacks 里的 fallback，而不是就地再写一份 hex。
+ * chartColorRole describes the semantic series role; chart adapters resolve
+ * its concrete color from the current Admin runtime tokens at render time.
  *
  * 过滤 pills 是中性分类控件，不是状态表达：一律中性样式（bg-muted 载体 +
  * muted-foreground 圆点），不蹭 success/warning/info/destructive 状态色；
- * 图表线条仍保留语义色（chartColor），与状态 Pill（domain/status）同源。
+ * 图表线条仍保留语义色（chartColorRole），与状态 Pill（domain/status）同源。
  */
-const { chartMist, danger, info, success, warning } = adminThemeTokenFallbacks
-
 export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
   {
     key: 'all',
@@ -86,7 +81,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     dotClass: 'bg-muted-foreground',
     activePillClass: 'bg-muted text-foreground font-semibold ring-1 ring-border',
     hasChartLine: true,
-    chartColor: info,
+    chartColorRole: 'info',
     chartLabel: 'Pending',
     getCount: (stats) => stats.pending,
   },
@@ -98,7 +93,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     dotClass: 'bg-muted-foreground',
     activePillClass: 'bg-muted text-foreground font-semibold ring-1 ring-border',
     hasChartLine: true,
-    chartColor: warning,
+    chartColorRole: 'warning',
     chartLabel: 'Running',
     getCount: (stats) => stats.running,
   },
@@ -110,7 +105,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     dotClass: 'bg-muted-foreground',
     activePillClass: 'bg-muted text-foreground font-semibold ring-1 ring-border',
     hasChartLine: true,
-    chartColor: success,
+    chartColorRole: 'success',
     chartLabel: 'Success',
     getCount: (stats) => stats.completed,
   },
@@ -122,7 +117,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     dotClass: 'bg-muted-foreground',
     activePillClass: 'bg-muted text-foreground font-semibold ring-1 ring-border',
     hasChartLine: true,
-    chartColor: danger,
+    chartColorRole: 'danger',
     chartLabel: 'Errors',
     getCount: (stats) => stats.failed,
   },
@@ -134,7 +129,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     dotClass: 'bg-muted-foreground opacity-60',
     activePillClass: 'bg-muted text-muted-foreground font-semibold ring-1 ring-border',
     hasChartLine: true,
-    chartColor: chartMist,
+    chartColorRole: 'mist',
     chartLabel: 'Cancelled',
     getCount: (stats) => stats.cancelled,
   },

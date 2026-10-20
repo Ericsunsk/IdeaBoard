@@ -161,8 +161,8 @@ const { usage, displayRange, isInitialPending, isSwitching, error, retry } = use
 const summaryPanelClass = 'overflow-hidden rounded-panel border border-border bg-card shadow-sm'
 const summaryGridClass = 'grid grid-cols-2 sm:grid-cols-5'
 const summaryCellClass = 'min-h-[100px] min-w-0 p-4 sm:min-h-[108px] sm:p-5'
-const trendChartTheme = resolveUsageChartTheme()
-const trendChartPlugins = markRaw(createUsageChartPlugins(trendChartTheme))
+const trendChartTheme = computed(() => resolveUsageChartTheme())
+const trendChartPlugins = markRaw(createUsageChartPlugins(() => trendChartTheme.value))
 const trendDetailsCaptionId = useId()
 
 const rangeOptions = computed(
@@ -215,7 +215,7 @@ const metrics = computed(() => {
 })
 
 const trendRows = computed(() => usage.value?.trend || [])
-const trendChart = computed(() => buildUsageTrendChart(trendRows.value, trendChartTheme))
+const trendChart = computed(() => buildUsageTrendChart(trendRows.value, trendChartTheme.value))
 const displayRangeText = computed(() => rangeText(displayRange.value ?? selectedRange.value))
 const selectedRangeText = computed(() => rangeText(selectedRange.value))
 const trendCanvasAriaLabel = computed(() =>

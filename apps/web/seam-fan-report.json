@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "ee9332bc5d5c8d8c46fc6377b27c45f52bde6070",
+  "checkpointSha": "aed7eafccbc30b873e20cdf5f1cb8687f4d75553",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -5976,6 +5976,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/core/components/LoadErrorPanel.vue",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/components/UserConfirmDialog.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
@@ -6101,7 +6106,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 27,
+      "fanIn": 28,
       "fanOut": 6,
       "fanOutTargets": [
         "node_modules/class-variance-authority/dist/index.js",
@@ -6147,7 +6152,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 27,
+      "targetFanIn": 28,
       "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -6292,11 +6297,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/components/ui/dialog/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/board/ui/share/ShareDialog.vue",
           "to": "src/components/ui/dialog/index.ts",
           "kind": "runtime"
@@ -6307,7 +6307,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 8,
+      "fanIn": 7,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -6456,7 +6456,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 8,
+      "targetFanIn": 7,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -6870,6 +6870,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/components/ui/input/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
           "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
@@ -6925,7 +6930,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 12,
+      "fanIn": 13,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -6975,7 +6980,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 12,
+      "targetFanIn": 13,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -8521,6 +8526,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/components/UserConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
+          "to": "src/core/components/UserConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
@@ -8531,19 +8546,33 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 3,
-      "fanOut": 5,
+      "fanIn": 5,
+      "fanOut": 9,
       "fanOutTargets": [
+        "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/vue-i18n/index.js",
+        "node_modules/vue/index.js",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/index.ts",
+        "src/components/ui/input/index.ts",
+        "src/core/composables/useAppClipboard.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/theme/dialogMask.ts"
       ],
       "outboundEdges": [
         {
           "from": "src/core/components/UserConfirmDialog.vue",
+          "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/UserConfirmDialog.vue",
           "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/UserConfirmDialog.vue",
+          "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
@@ -8554,6 +8583,16 @@
         {
           "from": "src/core/components/UserConfirmDialog.vue",
           "to": "src/components/ui/dialog/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/components/ui/input/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/core/composables/useAppClipboard.ts",
           "kind": "runtime"
         },
         {
@@ -8571,8 +8610,8 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 3,
-      "targetFanOut": 5,
+      "targetFanIn": 5,
+      "targetFanOut": 9,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -8692,6 +8731,11 @@
     "src/core/composables/useAppClipboard.ts": {
       "consumerEdges": [
         {
+          "from": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/core/composables/useAppClipboard.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/composables/useAppClipboard.unit.spec.ts",
           "to": "src/core/composables/useAppClipboard.ts",
           "kind": "runtime"
@@ -8717,7 +8761,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 5,
+      "fanIn": 6,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -8725,7 +8769,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 5,
+      "targetFanIn": 6,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -8760,7 +8804,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/RechargePane.vue",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -8845,7 +8899,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 21,
+      "fanIn": 23,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/vue-sonner/lib/index.js"],
       "outboundEdges": [
@@ -8859,7 +8913,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 21,
+      "targetFanIn": 23,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -9081,6 +9135,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/dialog/AccountDialog.vue",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
@@ -9092,11 +9151,6 @@
         },
         {
           "from": "src/features/auth/components/AuthModalHost.vue",
-          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -10173,6 +10227,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/recharge/RechargePane.vue",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
@@ -10318,7 +10377,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 37,
+      "fanIn": 38,
       "fanOut": 1,
       "fanOutTargets": ["src/core/i18n/index.ts"],
       "outboundEdges": [
@@ -10332,7 +10391,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 37,
+      "targetFanIn": 38,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -11032,7 +11091,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
+          "from": "src/features/canvas/ui/screens/presence/Roster.browser.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/Roster.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -11158,7 +11222,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 140,
+      "fanIn": 141,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
@@ -11228,7 +11292,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 140,
+      "targetFanIn": 141,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -12083,7 +12147,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.vue",
+          "from": "src/features/canvas/ui/screens/presence/Roster.vue",
           "to": "src/core/lib/pageChrome.ts",
           "kind": "runtime"
         }
@@ -14153,7 +14217,7 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 82,
+      "fanOut": 84,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -14185,9 +14249,11 @@
         "src/core/components/DataTableColumn.vue",
         "src/core/components/DataTableFrame.vue",
         "src/core/components/IbFormField.vue",
+        "src/core/components/LoadErrorPanel.vue",
         "src/core/components/RangedLineChartCard.vue",
         "src/core/components/SiteBrandLogo.vue",
         "src/core/components/StatusBadge.vue",
+        "src/core/components/UserConfirmDialog.vue",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useAsyncAction.ts",
         "src/core/composables/useLogoutRedirect.ts",
@@ -14340,6 +14406,26 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/chart.browser.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/chart.browser.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/chart.browser.spec.ts",
+          "to": "src/app/style.css",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/chart.browser.spec.ts",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/chart.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -14362,6 +14448,11 @@
         {
           "from": "src/features/account/session/chart.ts",
           "to": "src/core/motion/chartMotion.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/chart.ts",
+          "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
         {
@@ -15021,6 +15112,11 @@
         },
         {
           "from": "src/features/account/ui/billing/BillingPane.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -15102,6 +15198,11 @@
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
           "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
+          "to": "src/test/toast.ts",
           "kind": "runtime"
         },
         {
@@ -15211,6 +15312,11 @@
         },
         {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
+          "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
           "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
         },
@@ -15232,6 +15338,11 @@
         {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
           "to": "src/components/ui/spinner/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
           "kind": "runtime"
         },
         {
@@ -15277,6 +15388,21 @@
         {
           "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
           "to": "src/components/ui/spinner/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/components/UserConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
         {
@@ -15641,6 +15767,11 @@
         },
         {
           "from": "src/features/account/ui/recharge/HistoryTable.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/HistoryTable.vue",
           "to": "src/core/i18n/formatters.ts",
           "kind": "runtime"
         },
@@ -15662,6 +15793,11 @@
         {
           "from": "src/features/account/ui/recharge/PendingOrders.vue",
           "to": "src/components/ui/skeleton/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/PendingOrders.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
           "kind": "runtime"
         },
         {
@@ -15716,6 +15852,11 @@
         },
         {
           "from": "src/features/account/ui/recharge/PurchaseCard.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -15755,6 +15896,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/recharge/RechargePane.component.spec.ts",
+          "to": "src/test/toast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/recharge/RechargePane.vue",
           "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
@@ -15762,6 +15908,16 @@
         {
           "from": "src/features/account/ui/recharge/RechargePane.vue",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/RechargePane.vue",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/RechargePane.vue",
+          "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
@@ -15847,6 +16003,11 @@
         {
           "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/core/components/DataTableFrame.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
           "kind": "runtime"
         },
         {
@@ -16045,7 +16206,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 82,
+      "targetFanOut": 84,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -16983,21 +17144,15 @@
         }
       ],
       "fanIn": 3,
-      "fanOut": 1,
-      "fanOutTargets": ["src/features/admin/shared/core/adminThemeTokens.ts"],
-      "outboundEdges": [
-        {
-          "from": "src/features/admin/shared/core/taskMetricTokens.ts",
-          "to": "src/features/admin/shared/core/adminThemeTokens.ts",
-          "kind": "runtime"
-        }
-      ],
+      "fanOut": 0,
+      "fanOutTargets": [],
+      "outboundEdges": [],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 3,
-      "targetFanOut": 1,
+      "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -17144,9 +17299,9 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/session/orders/usePaymentOrdersFeedback.ts",
+          "from": "src/features/admin/credits/session/orders/usePaymentOrdersFeedback.unit.spec.ts",
           "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/admin/credits/session/pricing/billableCatalogResource.ts",
@@ -17784,7 +17939,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 120,
+      "fanIn": 121,
       "fanOut": 53,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -18290,11 +18445,6 @@
         {
           "from": "src/features/admin/shared/ui/chart/chart.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/ui/chart/chart.unit.spec.ts",
-          "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
         {
@@ -19077,7 +19227,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 120,
+      "targetFanIn": 121,
       "targetFanOut": 53,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -20315,9 +20465,14 @@
           "from": "src/features/admin/shared/ui/chart/chartMotion.unit.spec.ts",
           "to": "src/features/admin/shared/ui/chart/chart.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/test/chartTheme.browser.spec.ts",
+          "to": "src/features/admin/shared/ui/chart/chart.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 3,
+      "fanIn": 4,
       "fanOut": 6,
       "fanOutTargets": [
         "node_modules/chart.js/dist/chart.cjs",
@@ -20363,7 +20518,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -23313,7 +23468,7 @@
         }
       ],
       "fanIn": 49,
-      "fanOut": 68,
+      "fanOut": 70,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
         "fs",
@@ -23346,6 +23501,8 @@
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/components/LoadErrorPanel.vue",
+        "src/core/components/UserConfirmDialog.vue",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/config/pagination.ts",
@@ -24232,6 +24389,11 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "src/test/deferred.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
           "to": "src/test/render.ts",
           "kind": "runtime"
         },
@@ -24262,11 +24424,6 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/components/ui/dialog/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/components/ui/select/index.ts",
           "kind": "runtime"
         },
@@ -24277,7 +24434,12 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
+          "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
+          "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
         },
         {
@@ -24297,17 +24459,7 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/lib/utils.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/theme/appOverlayMenu.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
         },
         {
@@ -24722,6 +24874,11 @@
         },
         {
           "from": "src/features/board/ui/share/ShareDialog.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/share/ShareDialog.vue",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -24751,7 +24908,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 49,
-      "targetFanOut": 68,
+      "targetFanOut": 70,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -25281,7 +25438,7 @@
         }
       ],
       "fanIn": 99,
-      "fanOut": 68,
+      "fanOut": 70,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
         "fs",
@@ -25314,6 +25471,8 @@
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/components/LoadErrorPanel.vue",
+        "src/core/components/UserConfirmDialog.vue",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/config/pagination.ts",
@@ -26200,6 +26359,11 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "src/test/deferred.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
           "to": "src/test/render.ts",
           "kind": "runtime"
         },
@@ -26230,11 +26394,6 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/components/ui/dialog/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/components/ui/select/index.ts",
           "kind": "runtime"
         },
@@ -26245,7 +26404,12 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
+          "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
+          "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
         },
         {
@@ -26265,17 +26429,7 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/lib/utils.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/theme/appOverlayMenu.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
         },
         {
@@ -26690,6 +26844,11 @@
         },
         {
           "from": "src/features/board/ui/share/ShareDialog.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/share/ShareDialog.vue",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -26719,7 +26878,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 99,
-      "targetFanOut": 68,
+      "targetFanOut": 70,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -26789,7 +26948,7 @@
         }
       ],
       "fanIn": 11,
-      "fanOut": 68,
+      "fanOut": 70,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
         "fs",
@@ -26822,6 +26981,8 @@
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/select/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/components/LoadErrorPanel.vue",
+        "src/core/components/UserConfirmDialog.vue",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/config/pagination.ts",
@@ -27708,6 +27869,11 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "src/test/deferred.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
           "to": "src/test/render.ts",
           "kind": "runtime"
         },
@@ -27738,11 +27904,6 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/components/ui/dialog/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/components/ui/select/index.ts",
           "kind": "runtime"
         },
@@ -27753,7 +27914,12 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
+          "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/gallery/BoardsPage.vue",
+          "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
         },
         {
@@ -27773,17 +27939,7 @@
         },
         {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/lib/utils.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/theme/appOverlayMenu.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
         },
         {
@@ -28198,6 +28354,11 @@
         },
         {
           "from": "src/features/board/ui/share/ShareDialog.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/board/ui/share/ShareDialog.vue",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
         },
@@ -28227,7 +28388,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 11,
-      "targetFanOut": 68,
+      "targetFanOut": 70,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -28405,6 +28566,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/board/ui/gallery/BoardsPage.component.spec.ts",
+          "to": "src/features/board/testing/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/boardCardAccess.component.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
@@ -28450,7 +28616,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 30,
+      "fanIn": 31,
       "fanOut": 5,
       "fanOutTargets": [
         "src/core/utils/auth.ts",
@@ -28495,7 +28661,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 30,
+      "targetFanIn": 31,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -29650,12 +29816,12 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
+          "from": "src/features/canvas/ui/screens/presence/Roster.component.spec.ts",
           "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.vue",
+          "from": "src/features/canvas/ui/screens/presence/Roster.vue",
           "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "type-only"
         },
@@ -39634,11 +39800,12 @@
         }
       ],
       "fanIn": 1,
-      "fanOut": 58,
+      "fanOut": 59,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/jest-dom/vitest.js",
+        "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/@vue-flow/core/dist/style.css",
         "node_modules/@vue-flow/core/dist/theme-default.css",
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
@@ -40282,52 +40449,82 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
+          "from": "src/features/canvas/ui/screens/presence/Roster.browser.spec.ts",
+          "to": "node_modules/@testing-library/jest-dom/vitest.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/Roster.browser.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/Roster.browser.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
+          "from": "src/features/canvas/ui/screens/presence/Roster.browser.spec.ts",
+          "to": "src/app/style.css",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/Roster.browser.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
-          "to": "src/features/canvas/session/collaboration/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.component.spec.ts",
+          "from": "src/features/canvas/ui/screens/presence/Roster.browser.spec.ts",
           "to": "src/test/render.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.vue",
+          "from": "src/features/canvas/ui/screens/presence/Roster.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/Roster.component.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/Roster.component.spec.ts",
+          "to": "src/features/canvas/session/collaboration/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/Roster.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/presence/Roster.vue",
           "to": "node_modules/@iconoir/vue/dist/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.vue",
+          "from": "src/features/canvas/ui/screens/presence/Roster.vue",
           "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.vue",
+          "from": "src/features/canvas/ui/screens/presence/Roster.vue",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.vue",
+          "from": "src/features/canvas/ui/screens/presence/Roster.vue",
           "to": "src/core/lib/pageChrome.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.vue",
+          "from": "src/features/canvas/ui/screens/presence/Roster.vue",
           "to": "src/core/media/avatarUrl.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/screens/presence/PresenceRoster.vue",
+          "from": "src/features/canvas/ui/screens/presence/Roster.vue",
           "to": "src/features/canvas/session/collaboration/index.ts",
           "kind": "type-only"
         },
@@ -40532,7 +40729,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 1,
-      "targetFanOut": 58,
+      "targetFanOut": 59,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -41130,7 +41327,7 @@
         }
       ],
       "fanIn": 27,
-      "fanOut": 49,
+      "fanOut": 50,
       "fanOutTargets": [
         "../../contracts/library/library-source.fixtures.json",
         "node_modules/@iconoir/vue/dist/index.js",
@@ -41151,6 +41348,7 @@
         "src/components/ui/dialog/index.ts",
         "src/components/ui/input/index.ts",
         "src/core/components/IbFormField.vue",
+        "src/core/components/LoadErrorPanel.vue",
         "src/core/components/UserConfirmDialog.vue",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useUserConfirmDialog.ts",
@@ -41605,6 +41803,11 @@
         },
         {
           "from": "src/features/library/ui/LibraryFloatingIsland.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/library/ui/LibraryFloatingIsland.vue",
           "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
         },
@@ -41759,7 +41962,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 27,
-      "targetFanOut": 49,
+      "targetFanOut": 50,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -44305,6 +44508,16 @@
       "consumerEdges": [
         { "from": "src/app/App.vue", "to": "src/theme/composables/useTheme.ts", "kind": "runtime" },
         {
+          "from": "src/features/account/session/chart.browser.spec.ts",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/chart.ts",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
@@ -44315,12 +44528,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/ui/chart/chart.unit.spec.ts",
+          "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.contract.spec.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/statistics/ui/charts/useUsageStatisticsCharts.contract.spec.ts",
+          "from": "src/test/chartTheme.browser.spec.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
@@ -44335,7 +44548,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 7,
+      "fanIn": 9,
       "fanOut": 3,
       "fanOutTargets": [
         "node_modules/@vueuse/core/dist/index.js",
@@ -44363,7 +44576,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 7,
+      "targetFanIn": 9,
       "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -44403,11 +44616,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/ui/gallery/BoardsPage.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/board/ui/share/ShareDialog.vue",
           "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
@@ -44418,7 +44626,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 8,
+      "fanIn": 7,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -44426,7 +44634,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 8,
+      "targetFanIn": 7,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,

@@ -6,7 +6,6 @@ import {
   resolveAlphaColor,
   scopeValues,
 } from '../../../../../scripts/checkTokenGraph'
-import { adminThemeTokenFallbacks } from './adminThemeTokens'
 
 /**
  * Contract: every text ramp clears WCAG 2.x AA against the surfaces it rests on.
@@ -90,7 +89,10 @@ const alphaStep = (id: string, token: Rgb, alpha: number, backdrop: Rgb) => ({
 /* Admin                                                                       */
 /* -------------------------------------------------------------------------- */
 
-const { bg, card: cardStrong, controlBg, textPrimary } = adminThemeTokenFallbacks
+const bg = readToken('--color-admin-bg')
+const cardStrong = readToken('--color-admin-card-strong')
+const controlBg = readToken('--color-admin-control-bg')
+const textPrimary = readToken('--color-admin-text-1')
 const bgRgb = parseHex(bg)
 const cardRgb = parseHex(cardStrong)
 const cardLayer = readRgbaToken('--color-admin-card')

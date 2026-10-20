@@ -11,7 +11,7 @@ import {
 } from '../../../../../core/lib/chartPrimitives'
 import { resolveChartAnimation } from '../../../../../core/motion/chartMotion'
 import { isDarkModeActive } from '../../../../../theme/composables/useTheme'
-import { adminDarkThemeTokenFallbacks, adminThemeTokenFallbacks } from '../../core/adminThemeTokens'
+import { adminThemeTokenFallbacks, adminThemeTokenVars } from '../../core/adminThemeTokens'
 
 export const adminChartStrokeWidth = 1
 const adminChartPointClipPadding = 6
@@ -26,65 +26,88 @@ const adminChartFontFamily = chartFontFamilyStack
 // Chart.js paints canvas colors and helpers like withAlpha need concrete values.
 // Each themed key resolves lazily per access so a theme switch applies the next
 // time options are built (no watcher/remount needed beyond Chart.js updates).
-function themedChartToken(
-  lightKey: keyof typeof adminThemeTokenFallbacks,
-  darkKey: keyof typeof adminDarkThemeTokenFallbacks,
-): string {
-  return isDarkModeActive()
-    ? adminDarkThemeTokenFallbacks[darkKey]
-    : adminThemeTokenFallbacks[lightKey]
+function themedChartToken(key: keyof typeof adminThemeTokenFallbacks): string {
+  // Keep computed chart options dependent on the shared theme selection.
+  isDarkModeActive()
+  const color =
+    typeof document === 'undefined'
+      ? ''
+      : getComputedStyle(document.documentElement).getPropertyValue(adminThemeTokenVars[key]).trim()
+  return color && !color.includes('var(') ? color : adminThemeTokenFallbacks[key]
 }
 
 export const adminChartTheme = {
   get tooltipBg() {
-    return themedChartToken('controlBg', 'tooltipBg')
+    return themedChartToken('controlBg')
   },
   get tooltipBorder() {
-    return themedChartToken('chartTooltipBorder', 'tooltipBorder')
+    return themedChartToken('chartTooltipBorder')
   },
   get tooltipText() {
-    return themedChartToken('chartTooltipText', 'tooltipText')
+    return themedChartToken('chartTooltipText')
   },
   get axisLine() {
-    return themedChartToken('chartAxisLine', 'axisLine')
+    return themedChartToken('chartAxisLine')
   },
   get axisText() {
-    return themedChartToken('textSecondary', 'axisText')
+    return themedChartToken('textSecondary')
   },
   get splitLine() {
-    return themedChartToken('chartSplitLine', 'splitLine')
+    return themedChartToken('chartSplitLine')
   },
   get legendText() {
-    return themedChartToken('chartLegendText', 'legendText')
+    return themedChartToken('chartLegendText')
   },
   get emptyText() {
-    return themedChartToken('textTertiary', 'emptyText')
+    return themedChartToken('textTertiary')
   },
   get cardBg() {
-    return themedChartToken('controlBg', 'cardBg')
+    return themedChartToken('controlBg')
   },
   get segmentBorder() {
-    return themedChartToken('textInverse', 'segmentBorder')
+    return themedChartToken('textInverse')
   },
   get mainText() {
-    return themedChartToken('textPrimary', 'mainText')
+    return themedChartToken('textPrimary')
   },
-  brand: adminThemeTokenFallbacks.accent,
-  slate: adminThemeTokenFallbacks.modelIndigo,
-  mist: adminThemeTokenFallbacks.chartMist,
-  cyan: adminThemeTokenFallbacks.modelCyan,
-  olive: adminThemeTokenFallbacks.chartOlive,
-  mauve: adminThemeTokenFallbacks.modelPurple,
-  success: adminThemeTokenFallbacks.success,
-  warning: adminThemeTokenFallbacks.warning,
-  danger: adminThemeTokenFallbacks.danger,
-  info: adminThemeTokenFallbacks.info,
+  get brand() {
+    return themedChartToken('accent')
+  },
+  get slate() {
+    return themedChartToken('modelIndigo')
+  },
+  get mist() {
+    return themedChartToken('chartMist')
+  },
+  get cyan() {
+    return themedChartToken('modelCyan')
+  },
+  get olive() {
+    return themedChartToken('chartOlive')
+  },
+  get mauve() {
+    return themedChartToken('modelPurple')
+  },
+  get success() {
+    return themedChartToken('success')
+  },
+  get warning() {
+    return themedChartToken('warning')
+  },
+  get danger() {
+    return themedChartToken('danger')
+  },
+  get info() {
+    return themedChartToken('info')
+  },
 }
 
 export const adminChartPlugins = markRaw<Plugin<ChartType>[]>([
   createChartEmptyStatePlugin({
     id: 'adminEmptyState',
-    textColor: adminChartTheme.emptyText,
+    get textColor() {
+      return adminChartTheme.emptyText
+    },
     fontFamily: adminChartFontFamily,
   }),
 ])

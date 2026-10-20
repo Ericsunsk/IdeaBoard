@@ -42,9 +42,7 @@ export type MemberAvatarEntry = {
 
 /** Minimal session viewer for the self-avatar fallback. */
 export type MemberAvatarViewer =
-  | { public_id?: string | null | undefined; avatar?: string | null | undefined }
-  | null
-  | undefined
+  { public_id?: string | null | undefined; avatar?: string | null | undefined } | null | undefined
 
 /**
  * Resolves one member avatar for display at 64px CSS width: the roster

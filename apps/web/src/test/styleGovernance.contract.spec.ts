@@ -1,9 +1,23 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import {
+  darkVariantUtilityPattern,
   primitiveReferencePattern,
   rawMotionUtilityPattern,
 } from '../../scripts/checkStyleGovernance'
+
+describe('theme variant governance', () => {
+  it.each(['dark:bg-black', 'hover:dark:text-white', 'dark:!border-white', 'dark:[color:red]'])(
+    'rejects the dark utility %s',
+    (utility) => {
+      expect([...utility.matchAll(darkVariantUtilityPattern)]).toHaveLength(1)
+    },
+  )
+
+  it('accepts color-mode object keys', () => {
+    expect([..."{ dark: '', light: 'light' }".matchAll(darkVariantUtilityPattern)]).toHaveLength(0)
+  })
+})
 
 describe('primitive reference governance', () => {
   it.each([

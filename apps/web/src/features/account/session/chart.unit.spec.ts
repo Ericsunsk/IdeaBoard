@@ -127,15 +127,15 @@ describe('buildUsageTrendChart', () => {
 })
 
 describe('resolveUsageChartTheme fallbacks', () => {
-  it('mirrors the light token hex when CSS vars cannot resolve', () => {
+  it('mirrors the default dark tokens when CSS vars cannot resolve', () => {
     expect(resolveUsageChartTheme(null)).toMatchObject({
-      accent: '#9278e6',
-      accentFill: 'rgba(146, 120, 230, 0.1)',
-      axisText: '#62626a',
-      axisLine: '#ececec',
-      grid: '#ececec',
-      surface: '#ffffff',
-      text: '#313131',
+      accent: '#fcfcfc',
+      accentFill: 'rgba(255, 255, 255, 0.2)',
+      axisText: '#a3a3a3',
+      axisLine: 'rgba(255, 255, 255, 0.08)',
+      grid: 'rgba(255, 255, 255, 0.08)',
+      surface: 'rgba(20, 20, 20, 0.85)',
+      text: '#f5f5f5',
     })
   })
 })

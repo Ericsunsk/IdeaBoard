@@ -22,7 +22,7 @@ export interface Workspace {
    * @maxLength 120
    */
   name: string
-  /** True for the owner's Default workspace: exactly one live row per user, never deleted or renamed, auto-provisioned when missing. Organization workspaces always report false. */
+  /** True for the owner's Default workspace: exactly one row per user, never deleted or renamed, auto-provisioned when missing. Organization workspaces always report false. */
   is_default?: boolean
   /** RFC3339 UTC timestamp. */
   created_at: string

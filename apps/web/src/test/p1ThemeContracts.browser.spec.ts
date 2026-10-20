@@ -50,7 +50,7 @@ describe('P1 theme, control state and focus browser contracts', () => {
   })
 
   beforeEach(async () => {
-    document.documentElement.classList.remove('dark')
+    document.documentElement.classList.add('light')
     i18n.global.locale.value = 'en'
     activeAdminConfirm.value = null
     await setMotion(false)
@@ -201,7 +201,7 @@ describe('P1 theme, control state and focus browser contracts', () => {
   it.each(['light', 'dark'] as const)(
     'renders real Input and Button focus state in %s mode',
     async (mode) => {
-      document.documentElement.classList.toggle('dark', mode === 'dark')
+      document.documentElement.classList.toggle('light', mode === 'light')
       renderWithUser(
         defineComponent({
           setup: () => () =>
@@ -329,7 +329,7 @@ describe('P1 theme, control state and focus browser contracts', () => {
       expect(styleOf(dark).transform).toBe('none')
       await page.screenshot({ path: `../../node_modules/.cache/p1-menu-${mode}.png` })
       await browserUser.keyboard('{Enter}')
-      await waitFor(() => expect(document.documentElement.classList.contains('dark')).toBe(true))
+      await waitFor(() => expect(document.documentElement.classList.contains('light')).toBe(false))
     },
   )
 

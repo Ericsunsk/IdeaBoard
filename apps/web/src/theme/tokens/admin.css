@@ -1,39 +1,40 @@
 /*
  * Tier 2b: Admin-distinct operational density, table/dialog/popover chrome,
  * chart roles and status visuals. Consumer scope: Admin surfaces and patterns.
- * Light values and utility keys live in `@theme`; dark values in `@layer base`.
+ * Default dark values and utility keys live in `@theme`; `.light` overrides
+ * live in `@layer base`.
  * Physical color, type, geometry and elevation ingredients belong to Tier 1.
  */
 
 @theme {
-  --color-admin-bg: var(--palette-light-0);
-  --color-admin-shell: var(--primitive-neutral-0-alpha-62);
-  --color-admin-card: var(--primitive-neutral-0-alpha-94);
-  --color-admin-card-strong: var(--palette-light-1);
-  --color-admin-border: var(--palette-light-border);
-  --color-admin-border-soft: var(--palette-light-border-soft);
-  --color-admin-border-hover: var(--palette-light-border-hover);
-  --color-admin-border-pressed: var(--palette-light-border-pressed);
-  --color-admin-text-1: var(--palette-light-text-1);
-  --color-admin-text-2: var(--palette-light-text-2);
+  --color-admin-bg: var(--palette-dark-0);
+  --color-admin-shell: var(--primitive-neutral-910-alpha-75);
+  --color-admin-card: var(--palette-dark-3);
+  --color-admin-card-strong: var(--palette-dark-1);
+  --color-admin-border: var(--palette-dark-border);
+  --color-admin-border-soft: var(--palette-dark-border-soft);
+  --color-admin-border-hover: var(--palette-dark-border-hover);
+  --color-admin-border-pressed: var(--palette-dark-border-pressed);
+  --color-admin-text-1: var(--palette-dark-text-1);
+  --color-admin-text-2: var(--palette-dark-text-2);
   /* `label` is the "group heading / fieldset legend" level: heavier than
      `text-2` but lighter than `text-1`. */
-  --color-admin-text-label: var(--palette-light-text-label);
-  --color-admin-text-3: var(--palette-light-text-3);
-  --color-admin-text-disabled: var(--palette-light-border-hover);
-  --color-admin-text-inverse: var(--palette-light-1);
-  --color-admin-title-color: var(--palette-light-title);
-  --color-admin-accent: var(--color-brand-creative-accent);
-  --color-admin-accent-hover: var(--color-brand-creative-accent-hover);
-  --color-admin-accent-pressed: var(--color-brand-creative-accent-pressed);
-  --color-admin-accent-soft: var(--primitive-violet-450-alpha-8);
-  --color-admin-accent-softer: var(--primitive-violet-450-alpha-5);
-  --color-admin-focus-ring: var(--primitive-violet-450-alpha-18);
+  --color-admin-text-label: var(--palette-dark-text-label);
+  --color-admin-text-3: var(--palette-dark-text-3);
+  --color-admin-text-disabled: var(--palette-dark-text-disabled);
+  --color-admin-text-inverse: var(--palette-dark-0);
+  --color-admin-title-color: var(--palette-dark-title);
+  --color-admin-accent: var(--primitive-neutral-25);
+  --color-admin-accent-hover: var(--primitive-neutral-175);
+  --color-admin-accent-pressed: var(--primitive-neutral-225);
+  --color-admin-accent-soft: var(--primitive-neutral-0-alpha-12);
+  --color-admin-accent-softer: var(--primitive-neutral-0-alpha-6);
+  --color-admin-focus-ring: var(--primitive-neutral-0-alpha-25);
   /*
    * Task status glow/bloom pair (monitor domain visual contract). The banner
    * gradient start (glow) and end stop (wash) plus the dot halo rings live
    * here so table and detail views share one source instead of raw rgba().
-   * Same values in dark (translucent status tints over near-black surfaces).
+   * Mode assignments preserve the existing status tints on each surface.
    */
   --color-admin-status-default-glow: var(--primitive-slate-400-alpha-12);
   --color-admin-status-pending-glow: var(--primitive-blue-550-alpha-10);
@@ -47,27 +48,27 @@
    * equivalent, so each provider owns one token and derives soft/border
    * carriers via opacity modifiers.
    */
-  --color-provider-purple: var(--primitive-purple-700);
-  --color-provider-orange: var(--primitive-orange-700);
-  --color-provider-blue: var(--primitive-blue-700);
-  --color-provider-rose: var(--primitive-rose-700);
-  --color-admin-surface-muted: var(--palette-light-2);
-  --color-admin-surface-hover: var(--palette-light-hover);
-  --color-admin-surface-pressed: var(--palette-light-surface-pressed);
-  --color-admin-control-bg: var(--palette-light-3);
-  --color-admin-nav-active-bg: var(--primitive-slate-825);
-  --color-admin-nav-active-bg-hover: var(--primitive-slate-875);
-  --color-admin-divider: var(--primitive-neutral-1000-alpha-8);
-  --color-admin-model-indigo: var(--primitive-blue-575);
-  --color-admin-model-purple: var(--color-brand-creative-accent);
-  --color-admin-model-cyan: var(--primitive-cyan-650);
+  --color-provider-purple: var(--primitive-purple-400);
+  --color-provider-orange: var(--primitive-orange-400);
+  --color-provider-blue: var(--primitive-blue-400);
+  --color-provider-rose: var(--primitive-rose-400);
+  --color-admin-surface-muted: var(--palette-dark-2);
+  --color-admin-surface-hover: var(--palette-dark-surface-hover);
+  --color-admin-surface-pressed: var(--palette-dark-surface-pressed);
+  --color-admin-control-bg: var(--palette-dark-3);
+  --color-admin-nav-active-bg: var(--primitive-neutral-0-alpha-10);
+  --color-admin-nav-active-bg-hover: var(--primitive-neutral-0-alpha-15);
+  --color-admin-divider: var(--primitive-neutral-0-alpha-8);
+  --color-admin-model-indigo: var(--primitive-indigo-400);
+  --color-admin-model-purple: var(--primitive-violet-400);
+  --color-admin-model-cyan: var(--primitive-sky-400);
   --color-admin-chart-tooltip-border: var(--color-admin-border);
-  --color-admin-chart-tooltip-text: var(--primitive-neutral-800);
-  --color-admin-chart-axis-line: var(--color-admin-border);
-  --color-admin-chart-split-line: var(--color-admin-surface-hover);
+  --color-admin-chart-tooltip-text: var(--palette-dark-text-1);
+  --color-admin-chart-axis-line: var(--color-admin-border-hover);
+  --color-admin-chart-split-line: var(--color-admin-border);
   --color-admin-chart-legend-text: var(--color-admin-text-2);
-  --color-admin-chart-mist: var(--primitive-neutral-450);
-  --color-admin-chart-olive: var(--primitive-olive-500);
+  --color-admin-chart-mist: var(--palette-dark-text-3);
+  --color-admin-chart-olive: var(--primitive-green-300);
 
   /* Admin layout spacing (shell/popover/drawer/empty-state widths). */
   --spacing-admin-shell: var(--primitive-size-1600);
@@ -91,45 +92,44 @@
 }
 
 @layer base {
-  html.dark,
-  .dark {
-    /* ── Admin dark surface tokens (shadcn zinc standard) ─── */
-    --color-admin-bg: var(--palette-dark-0);
-    --color-admin-shell: var(--primitive-neutral-910-alpha-75);
-    --color-admin-card: var(--palette-dark-3);
-    --color-admin-card-strong: var(--palette-dark-1);
-    --color-admin-border: var(--palette-dark-border);
-    --color-admin-border-soft: var(--palette-dark-border-soft);
-    --color-admin-border-hover: var(--palette-dark-border-hover);
-    --color-admin-border-pressed: var(--palette-dark-border-pressed);
+  .light {
+    /* ── Admin light surface tokens (shadcn zinc standard) ─── */
+    --color-admin-bg: var(--palette-light-0);
+    --color-admin-shell: var(--primitive-neutral-0-alpha-62);
+    --color-admin-card: var(--primitive-neutral-0-alpha-94);
+    --color-admin-card-strong: var(--palette-light-1);
+    --color-admin-border: var(--palette-light-border);
+    --color-admin-border-soft: var(--palette-light-border-soft);
+    --color-admin-border-hover: var(--palette-light-border-hover);
+    --color-admin-border-pressed: var(--palette-light-border-pressed);
 
-    /* ── Admin dark typography ramp (monotonic AAA/AA contrast) ── */
-    --color-admin-text-1: var(--palette-dark-text-1);
-    --color-admin-text-2: var(--palette-dark-text-2);
-    --color-admin-text-label: var(--palette-dark-text-label);
-    --color-admin-text-3: var(--palette-dark-text-3);
-    --color-admin-text-disabled: var(--palette-dark-text-disabled);
-    --color-admin-title-color: var(--palette-dark-title);
+    /* ── Admin light typography ramp (monotonic AAA/AA contrast) ── */
+    --color-admin-text-1: var(--palette-light-text-1);
+    --color-admin-text-2: var(--palette-light-text-2);
+    --color-admin-text-label: var(--palette-light-text-label);
+    --color-admin-text-3: var(--palette-light-text-3);
+    --color-admin-text-disabled: var(--palette-light-border-hover);
+    --color-admin-title-color: var(--palette-light-title);
 
-    /* ── Admin dark interactive surfaces ── */
-    --color-admin-surface-muted: var(--palette-dark-2);
-    --color-admin-surface-hover: var(--palette-dark-surface-hover);
-    --color-admin-surface-pressed: var(--palette-dark-surface-pressed);
-    --color-admin-control-bg: var(--palette-dark-3);
-    --color-admin-nav-active-bg: var(--primitive-neutral-0-alpha-10);
-    --color-admin-nav-active-bg-hover: var(--primitive-neutral-0-alpha-15);
-    --color-admin-divider: var(--primitive-neutral-0-alpha-8);
+    /* ── Admin light interactive surfaces ── */
+    --color-admin-surface-muted: var(--palette-light-2);
+    --color-admin-surface-hover: var(--palette-light-hover);
+    --color-admin-surface-pressed: var(--palette-light-surface-pressed);
+    --color-admin-control-bg: var(--palette-light-3);
+    --color-admin-nav-active-bg: var(--primitive-slate-825);
+    --color-admin-nav-active-bg-hover: var(--primitive-slate-875);
+    --color-admin-divider: var(--primitive-neutral-1000-alpha-8);
 
-    /* ── Admin dark accents & status colors ── */
-    --color-admin-accent: var(--primitive-neutral-25);
-    --color-admin-accent-hover: var(--primitive-neutral-175);
-    --color-admin-accent-pressed: var(--primitive-neutral-225);
-    --color-admin-accent-soft: var(--primitive-neutral-0-alpha-12);
-    --color-admin-accent-softer: var(--primitive-neutral-0-alpha-6);
-    --color-admin-focus-ring: var(--primitive-neutral-0-alpha-25);
-    --color-admin-text-inverse: var(--palette-dark-0);
+    /* ── Admin light accents & status colors ── */
+    --color-admin-accent: var(--color-brand-creative-accent);
+    --color-admin-accent-hover: var(--color-brand-creative-accent-hover);
+    --color-admin-accent-pressed: var(--color-brand-creative-accent-pressed);
+    --color-admin-accent-soft: var(--primitive-violet-450-alpha-8);
+    --color-admin-accent-softer: var(--primitive-violet-450-alpha-5);
+    --color-admin-focus-ring: var(--primitive-violet-450-alpha-18);
+    --color-admin-text-inverse: var(--palette-light-1);
 
-    /* Status glow/wash keep their light values in dark (explicit parity). */
+    /* Status glow/wash share their ingredients across both modes. */
     --color-admin-status-default-glow: var(--primitive-slate-400-alpha-12);
     --color-admin-status-pending-glow: var(--primitive-blue-550-alpha-10);
     --color-admin-status-running-glow: var(--primitive-amber-750-alpha-10);
@@ -137,23 +137,23 @@
     --color-admin-status-danger-glow: var(--primitive-rose-550-alpha-9p5);
     --color-admin-status-wash: var(--primitive-neutral-0-alpha-74);
 
-    /* Provider hues step up to the 400 scale for dark-surface contrast. */
-    --color-provider-purple: var(--primitive-purple-400);
-    --color-provider-orange: var(--primitive-orange-400);
-    --color-provider-blue: var(--primitive-blue-400);
-    --color-provider-rose: var(--primitive-rose-400);
+    /* Provider hues use the light-surface palette. */
+    --color-provider-purple: var(--primitive-purple-700);
+    --color-provider-orange: var(--primitive-orange-700);
+    --color-provider-blue: var(--primitive-blue-700);
+    --color-provider-rose: var(--primitive-rose-700);
 
-    --color-admin-model-indigo: var(--primitive-indigo-400);
-    --color-admin-model-purple: var(--primitive-violet-400);
-    --color-admin-model-cyan: var(--primitive-sky-400);
+    --color-admin-model-indigo: var(--primitive-blue-575);
+    --color-admin-model-purple: var(--color-brand-creative-accent);
+    --color-admin-model-cyan: var(--primitive-cyan-650);
 
-    /* ── Admin dark charts ── */
+    /* ── Admin light charts ── */
     --color-admin-chart-tooltip-border: var(--color-admin-border);
-    --color-admin-chart-tooltip-text: var(--palette-dark-text-1);
-    --color-admin-chart-axis-line: var(--color-admin-border-hover);
-    --color-admin-chart-split-line: var(--color-admin-border);
+    --color-admin-chart-tooltip-text: var(--primitive-neutral-800);
+    --color-admin-chart-axis-line: var(--color-admin-border);
+    --color-admin-chart-split-line: var(--color-admin-surface-hover);
     --color-admin-chart-legend-text: var(--color-admin-text-2);
-    --color-admin-chart-mist: var(--palette-dark-text-3);
-    --color-admin-chart-olive: var(--primitive-green-300);
+    --color-admin-chart-mist: var(--primitive-neutral-450);
+    --color-admin-chart-olive: var(--primitive-olive-500);
   }
 }

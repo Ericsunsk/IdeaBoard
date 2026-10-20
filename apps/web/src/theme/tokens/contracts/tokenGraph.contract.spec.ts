@@ -22,14 +22,14 @@ const decl = (
   file: string,
   name: string,
   value: string,
-  scope: TokenDecl['scope'] = 'light',
+  scope: TokenDecl['scope'] = 'dark',
 ): TokenDecl => ({ file, name, value, scope, isThemeKey: false })
 
 const themeDecl = (file: string, name: string, value: string): TokenDecl => ({
   file,
   name,
   value,
-  scope: 'light',
+  scope: 'dark',
   isThemeKey: true,
 })
 
@@ -118,7 +118,7 @@ describe('token graph integrity fixtures', () => {
   it('prefers runtime assignments over theme fallbacks in both modes', () => {
     const decls = [
       decl('theme/tokens/canvas.css', '--color-canvas-node-bg', '#ffffff'),
-      decl('theme/tokens/canvas.css', '--color-canvas-node-bg', '#000000', 'dark'),
+      decl('theme/tokens/canvas.css', '--color-canvas-node-bg', '#000000', 'light'),
       themeDecl('theme/theme.css', '--color-canvas-node-bg', 'var(--color-canvas-node-bg)'),
     ]
     expect(checkAcyclic(decls)).toEqual([])
@@ -129,7 +129,7 @@ describe('token graph integrity fixtures', () => {
       decl('theme/tokens/primitives.css', '--primitive-white', '#ffffff'),
       decl('theme/tokens/primitives.css', '--primitive-black', '#000000'),
       decl('theme/tokens/semantic.css', '--card', 'var(--primitive-white)'),
-      decl('theme/tokens/semantic.css', '--card', 'var(--primitive-black)', 'dark'),
+      decl('theme/tokens/semantic.css', '--card', 'var(--primitive-black)', 'light'),
       {
         ...decl('theme/theme.css', '--card', 'var(--card)', 'scoped'),
         isInlineTheme: true,
@@ -235,7 +235,7 @@ describe('token graph integrity fixtures', () => {
     const decls = [
       decl('theme/tokens/primitives.css', '--primitive-neutral-0', '#ffffff'),
       decl('theme/tokens/semantic.css', '--card', 'var(--primitive-neutral-0)'),
-      decl('theme/tokens/semantic.css', '--card', 'var(--primitive-neutral-0)', 'dark'),
+      decl('theme/tokens/semantic.css', '--card', 'var(--primitive-neutral-0)', 'light'),
       decl('theme/theme.css', '--spacing-overlay-gutter', '10px'),
       decl('theme/theme.css', '--color-scrollbar-track', 'transparent'),
       decl('theme/theme.css', '--shadow-admin-dialog', 'var(--shadow-xl)'),
@@ -261,7 +261,7 @@ describe('mode parity fixtures', () => {
   })
 
   it.each(['--primary', '--card', '--background', '--ring'])(
-    'rejects a missing dark assignment for bare role %s',
+    'rejects a missing light assignment for bare role %s',
     (name) => {
       expect(rules(checkParity([decl('theme/tokens/semantic.css', name, '#123456')]))).toContain(
         'mode-parity',

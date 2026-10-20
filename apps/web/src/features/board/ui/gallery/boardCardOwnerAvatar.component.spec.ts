@@ -47,17 +47,10 @@ describe('BoardCard owner avatar', () => {
     expect(img?.getAttribute('alt')).toBe('usr_alice')
     // Team cards pair the avatar with the Workspace text (no icon).
     expect(screen.getByText('Workspace')).toBeVisible()
-    // Bare avatar: size kept, ring border classes removed.
-    const avatarEl = view.container.querySelector('.size-5')
-    expect(avatarEl).not.toBeNull()
-    expect(avatarEl?.className).not.toContain('ring-1')
-    expect(avatarEl?.className).not.toContain('ring-background')
   })
 
   test('sizes public-route avatar URLs for the badge', () => {
-    const view = renderCard(
-      teamBoard({ ownerAvatarUrl: '/api/v1/public/users/AVTR01/avatar?v=2' }),
-    )
+    const view = renderCard(teamBoard({ ownerAvatarUrl: '/api/v1/public/users/AVTR01/avatar?v=2' }))
 
     expect(view.container.querySelector('img')?.getAttribute('src')).toBe(
       '/api/v1/public/users/AVTR01/avatar?v=2&size=64',

@@ -45,8 +45,8 @@ const fixtureCases: Fixture[] = [
   ...[
     ['token-closure', theme, '--color-destructive-soft'],
     ['token-alias', theme, '--color-canvas-text-control'],
-    ['dark-required', semantic, '--color-home-hero-text'],
-    ['dark-chart-alias', admin, '--color-admin-chart-axis-line'],
+    ['dark-required', theme, '--color-home-hero-text'],
+    ['token-alias', admin, '--color-admin-chart-axis-line'],
     ['primitive-closure', 'src/theme/tokens/primitives.css', '--primitive-neutral-950'],
   ].map(([rule, file, name]): Fixture => ({
     rule: rule!,
@@ -77,8 +77,8 @@ const fixtureCases: Fixture[] = [
   })),
   ...[
     ['ideaboard-color-mode', 'wrong-storage-key'],
-    ['(prefers-color-scheme: dark)', '(prefers-color-scheme: light)'],
-    ["classList.add('dark')", "classList.add('wrong-class')"],
+    ['(prefers-color-scheme: light)', '(prefers-color-scheme: dark)'],
+    ["classList.add('light')", "classList.add('wrong-class')"],
   ].map(([original, replacement]): Fixture => ({
     rule: 'synchronous-theme-boot',
     invalidate: (sources) => {
@@ -123,7 +123,7 @@ const fixtureCases: Fixture[] = [
     invalidate: (s) => {
       const file = 'src/features/admin/shared/core/adminThemeTokens.ts'
       s[file] = s[file]!.replace(
-        "'--color-admin-text-1', '#313131'",
+        "'--color-admin-text-1', '#f5f5f5'",
         "'--color-admin-text-1', '#ffffff'",
       )
     },
@@ -131,21 +131,21 @@ const fixtureCases: Fixture[] = [
   {
     rule: 'token-uniqueness',
     invalidate: (s) => {
-      s[admin] += '\nhtml.dark { --color-admin-bg: black; }'
+      s[admin] += '\n.light { --color-admin-bg: black; }'
     },
   },
   {
-    rule: 'dark-base-closure',
+    rule: 'light-base-closure',
     invalidate: (s) => {
-      s[canvas] += '\nhtml.dark { --color-canvas-unregistered: black; }'
+      s[canvas] += '\n.light { --color-canvas-unregistered: black; }'
     },
   },
   {
     rule: 'dark-required',
-    invalidate: (s) => changeDeclaration(s, semantic, '--color-home-hero-text', null),
+    invalidate: (s) => changeDeclaration(s, theme, '--color-home-hero-text', null),
   },
   {
-    rule: 'dark-chart-alias',
+    rule: 'token-alias',
     invalidate: (s) => {
       s[admin] = s[admin]!.replace(
         '--color-admin-chart-axis-line: var(--color-admin-border-hover)',
@@ -160,13 +160,13 @@ const fixtureCases: Fixture[] = [
   {
     rule: 'token-parity',
     invalidate: (s) => {
-      s[semantic] += '\nhtml.dark { --new-only-dark: black; }'
+      s[semantic] += '\n.light { --new-only-light: black; }'
     },
   },
   {
     rule: 'token-parity',
     invalidate: (s) => {
-      s['src/theme/tokens/canvas.css'] += '\n:root { --color-canvas-new-only-light: black; }'
+      s['src/theme/tokens/canvas.css'] += '\n:root { --color-canvas-new-only-dark: black; }'
     },
   },
   {

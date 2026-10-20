@@ -60,7 +60,9 @@
                     v-if="reference.previewUrl"
                     class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-4 z-popover w-14 opacity-0 scale-95 transition-[opacity,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover/thumb:opacity-100 group-hover/thumb:scale-100 origin-bottom"
                   >
-                    <div class="size-14 shrink-0 overflow-hidden rounded-control bg-card shadow-admin-popover">
+                    <div
+                      class="size-14 shrink-0 overflow-hidden rounded-control bg-card shadow-admin-popover"
+                    >
                       <img
                         :src="reference.previewUrl"
                         :alt="t('search.reference.previewAlt')"

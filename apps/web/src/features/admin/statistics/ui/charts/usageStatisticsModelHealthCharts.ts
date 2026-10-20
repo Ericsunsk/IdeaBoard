@@ -18,7 +18,7 @@ import {
 import {
   baseChartOptions,
   baseTooltipOptions,
-  defaultModelColors,
+  getDefaultModelColors,
   getModelColorByName,
 } from '../../core/usageStatisticsChartBase'
 import { formatCount, formatPercent1 } from '../../core/usageStatisticsTooltipText'
@@ -34,8 +34,9 @@ type ModelRiskPoint = {
 }
 
 export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminStatistics | null>) {
-  const modelRiskRows = computed(() =>
-    (adminStatistics.value?.model_health || [])
+  const modelRiskRows = computed(() => {
+    const modelColors = getDefaultModelColors()
+    return (adminStatistics.value?.model_health || [])
       .filter((item) => item.total > 0)
       .map((item, idx) => ({
         name: item.name === 'Unknown' ? '未识别模型' : item.name,
@@ -46,11 +47,11 @@ export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminSt
         avgSeconds: item.avg_seconds || 0,
         color:
           getModelColorByName(item.name) ||
-          defaultModelColors[idx % defaultModelColors.length] ||
+          modelColors[idx % modelColors.length] ||
           adminChartTheme.brand,
       }))
-      .slice(0, 12),
-  )
+      .slice(0, 12)
+  })
 
   const modelRiskChartData = computed<ChartData>(() => {
     const maxTotal = Math.max(1, ...modelRiskRows.value.map((item) => item.total))

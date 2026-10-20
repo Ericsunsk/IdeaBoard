@@ -1,5 +1,5 @@
 /*
- * Tier 2: Semantic Tokens (Light + Dark)
+ * Tier 2: Semantic Tokens (Default Dark + Explicit Light)
  * Design semantics mapped to Tier 1 physical primitives. Runtime roles use
  * bare names; the Tailwind utility namespace (--color-*) is bridged from
  * these roles via `@theme inline` in `theme/theme.css`, so utilities resolve
@@ -12,110 +12,11 @@
 
 @layer base {
   :root {
-    /* ── Surface Semantics ── */
-    --background: var(--primitive-neutral-50);
-    --foreground: var(--primitive-neutral-900);
-    --card: var(--primitive-neutral-0);
-    --card-foreground: var(--primitive-neutral-850);
-    --popover: var(--primitive-neutral-0);
-    --popover-foreground: var(--primitive-neutral-850);
+    /* Mode-dependent elevation stays live when Tailwind compiles shadow utilities. */
+    --board-dialog-shadow: var(--primitive-shadow-22-58-strong);
+    --auth-primary-shadow: none;
+    --auth-primary-shadow-hover: none;
 
-    /* ── Action & Accent Semantics ── */
-    --primary: var(--primitive-violet-700);
-    --primary-hover: var(--primitive-violet-750);
-    --primary-pressed: var(--primitive-violet-800);
-    --primary-foreground: var(--primitive-neutral-0);
-    --secondary: var(--primitive-neutral-100);
-    --secondary-hover: var(--primitive-neutral-150);
-    --secondary-foreground: var(--primitive-neutral-900);
-    --muted: var(--primitive-neutral-100);
-    --muted-foreground: var(--primitive-neutral-500);
-    --accent: var(--primitive-neutral-100);
-    --accent-hover: var(--primitive-neutral-150);
-    --accent-foreground: var(--primitive-neutral-900);
-    --destructive: var(--primitive-red-600);
-    --destructive-hover: var(--primitive-red-700);
-    --destructive-pressed: var(--primitive-red-800);
-    --destructive-foreground: var(--primitive-neutral-0);
-    --destructive-soft: var(--primitive-red-500-alpha-15);
-    --success: var(--primitive-green-650);
-    --success-hover: var(--primitive-green-700);
-    --success-foreground: var(--primitive-neutral-0);
-    --success-soft: var(--primitive-green-650-alpha-15);
-    --warning: var(--primitive-amber-600);
-    --warning-hover: var(--primitive-amber-700);
-    --warning-foreground: var(--primitive-neutral-0);
-    --warning-soft: var(--primitive-amber-600-alpha-15);
-    --info: var(--primitive-sky-600);
-    --info-hover: var(--primitive-sky-700);
-    --info-foreground: var(--primitive-neutral-0);
-    --info-soft: var(--primitive-sky-600-alpha-15);
-
-    /* ── Structural Borders & Interactive Focus ── */
-    --border: var(--primitive-zinc-200);
-    --border-hover: var(--primitive-zinc-300);
-    --input: var(--primitive-zinc-200);
-    --ring: var(--primitive-violet-650-alpha-25);
-
-    /* ── Glassmorphism ── */
-    --surface-glass: var(--primitive-neutral-0-alpha-85);
-    --border-glass: var(--primitive-neutral-0-alpha-40);
-
-    /* ── shadcn chart roles (unused; valid mode assignments, Tier 1 refs) ── */
-    --chart-1: var(--primitive-violet-500);
-    --chart-2: var(--primitive-blue-500);
-    --chart-3: var(--primitive-green-600);
-    --chart-4: var(--primitive-amber-600);
-    --chart-5: var(--primitive-red-500);
-
-    /* ── shadcn sidebar roles (unused; mirror card chrome, Tier 1 refs) ── */
-    --sidebar: var(--primitive-neutral-0);
-    --sidebar-foreground: var(--primitive-neutral-850);
-    --sidebar-primary: var(--primary);
-    --sidebar-primary-foreground: var(--primary-foreground);
-    --sidebar-accent: var(--primitive-neutral-100);
-    --sidebar-accent-foreground: var(--primitive-neutral-900);
-    --sidebar-border: var(--primitive-zinc-200);
-    --sidebar-ring: var(--primary);
-    /* Workspace, tool, text, tooltip and progress roles consumed by scoped Canvas tokens. */
-    --color-workspace-bg: var(--primitive-neutral-190);
-    --color-workspace-surface: var(--primitive-neutral-75);
-    --color-tool-border: var(--primitive-zinc-350-alpha-65);
-    --color-workspace-dot: var(--primitive-slate-250);
-    --color-workspace-connection: var(--primitive-neutral-1000-alpha-20);
-    --color-workspace-connection-selected: var(--primitive-neutral-1000-alpha-40);
-    --color-workspace-connection-running: var(--primitive-neutral-1000-alpha-40);
-    /* Resting accent keeps white action text at AA: violet-675 clears 4.5:1
-       (4.93:1); hover/pressed use violet-700 for a visible delta. */
-    --color-tool-accent: var(--primitive-violet-675);
-    --color-tool-accent-hover: var(--primitive-violet-700);
-    --color-tool-accent-pressed: var(--primitive-violet-700);
-    --color-tool-accent-soft: var(--primitive-violet-650-alpha-8);
-    --color-tool-accent-line: var(--primitive-violet-650-alpha-28);
-    --color-tool-accent-line-soft: var(--primitive-violet-650-alpha-22);
-    --color-tool-accent-tooltip-line: var(--primitive-violet-650-alpha-26);
-    --color-tool-accent-shadow: var(--primitive-violet-450-alpha-25);
-    --color-tool-accent-shadow-hover: var(--primitive-violet-450-alpha-35);
-    --color-tool-accent-glow: var(--primitive-violet-450-alpha-18);
-    --color-workspace-border: var(--palette-light-border);
-    --color-text-strong: var(--primitive-neutral-900);
-    --color-text-label: var(--palette-light-text-label);
-    --color-text-muted: var(--palette-light-text-2);
-    --color-text-control: var(--palette-light-text-label);
-    --color-text-option: var(--palette-light-text-2);
-    --color-text-inverse: var(--primitive-neutral-0);
-    --color-tooltip-bg: var(--primitive-zinc-900-alpha-94);
-    --color-tooltip-foreground: var(--primitive-zinc-100);
-    --color-progress-from: var(--primitive-violet-450);
-    --color-progress-to: var(--primitive-sky-350);
-    --color-tool-glass: var(--primitive-neutral-0-alpha-85);
-    --color-workspace-preview-node: var(--primitive-neutral-1000-alpha-28);
-    --color-workspace-preview-viewport: var(--primitive-neutral-1000-alpha-38);
-    --color-workspace-preview-mask: var(--primitive-neutral-1000-alpha-8);
-  }
-
-  html.dark,
-  .dark {
     /* ── Surface Semantics ── */
     --background: var(--primitive-neutral-950);
     --foreground: var(--primitive-neutral-100);
@@ -165,14 +66,14 @@
     --surface-glass: var(--primitive-neutral-890-alpha-78);
     --border-glass: var(--primitive-neutral-0-alpha-12);
 
-    /* ── shadcn chart roles (unused; step up one tier for dark contrast) ── */
+    /* ── shadcn chart roles (unused; valid mode assignments, Tier 1 refs) ── */
     --chart-1: var(--primitive-violet-400);
     --chart-2: var(--primitive-blue-400);
     --chart-3: var(--primitive-green-400);
     --chart-4: var(--primitive-amber-400);
     --chart-5: var(--primitive-red-400);
 
-    /* ── shadcn sidebar roles (unused; mirror dark card chrome) ── */
+    /* ── shadcn sidebar roles (unused; mirror card chrome, Tier 1 refs) ── */
     --sidebar: var(--primitive-neutral-910-alpha-85);
     --sidebar-foreground: var(--primitive-neutral-100);
     --sidebar-primary: var(--primary);
@@ -181,128 +82,240 @@
     --sidebar-accent-foreground: var(--primitive-neutral-0);
     --sidebar-border: var(--primitive-neutral-0-alpha-8);
     --sidebar-ring: var(--primary);
+    /* Workspace, tool, text, tooltip and progress roles consumed by scoped Canvas tokens. */
+    --color-workspace-bg: var(--palette-dark-0);
+    --color-workspace-surface: var(--palette-dark-3);
+    --color-tool-border: var(--primitive-neutral-0-alpha-12);
+    --color-workspace-dot: var(--palette-dark-border);
+    --color-workspace-connection: var(--primitive-neutral-0-alpha-22);
+    --color-workspace-connection-selected: var(--primitive-neutral-0);
+    --color-workspace-connection-running: var(--primitive-neutral-0-alpha-70);
+    /* Default dark actions use a white accent with dark action text.
+       Hover and pressed use the adjacent neutral ingredients. */
+    --color-tool-accent: var(--primitive-neutral-0);
+    --color-tool-accent-hover: var(--primitive-neutral-25);
+    --color-tool-accent-pressed: var(--primitive-neutral-175);
+    --color-tool-accent-soft: var(--primitive-neutral-0-alpha-12);
+    --color-tool-accent-line: var(--primitive-neutral-0-alpha-25);
+    --color-tool-accent-line-soft: var(--primitive-neutral-0-alpha-15);
+    --color-tool-accent-tooltip-line: var(--primitive-neutral-0-alpha-20);
+    --color-tool-accent-shadow: var(--primitive-neutral-1000-alpha-50);
+    --color-tool-accent-shadow-hover: var(--primitive-neutral-1000-alpha-65);
+    --color-tool-accent-glow: var(--primitive-neutral-0-alpha-15);
+    --color-workspace-border: var(--palette-dark-border);
+    --color-text-strong: var(--palette-dark-title);
+    --color-text-label: var(--palette-dark-text-label);
+    --color-text-muted: var(--palette-dark-text-2);
+    --color-text-control: var(--palette-dark-text-1);
+    --color-text-option: var(--palette-dark-text-2);
+    --color-text-inverse: var(--palette-dark-0);
+    --color-tooltip-bg: var(--primitive-neutral-910-alpha-96);
+    --color-tooltip-foreground: var(--palette-dark-text-1);
+    --color-progress-from: var(--primitive-violet-400);
+    --color-progress-to: var(--primitive-sky-400);
+    --color-tool-glass: var(--primitive-neutral-890-alpha-78);
+    --color-workspace-preview-node: var(--primitive-neutral-0-alpha-28);
+    --color-workspace-preview-viewport: var(--primitive-neutral-0-alpha-38);
+    --color-workspace-preview-mask: var(--primitive-neutral-0-alpha-12);
+  }
+
+  .light {
+    /* ── Surface Semantics ── */
+    --background: var(--primitive-neutral-50);
+    --foreground: var(--primitive-neutral-900);
+    --card: var(--primitive-neutral-0);
+    --card-foreground: var(--primitive-neutral-850);
+    --popover: var(--primitive-neutral-0);
+    --popover-foreground: var(--primitive-neutral-850);
+
+    /* ── Action & Accent Semantics ── */
+    --primary: var(--primitive-violet-700);
+    --primary-hover: var(--primitive-violet-750);
+    --primary-pressed: var(--primitive-violet-800);
+    --primary-foreground: var(--primitive-neutral-0);
+    --secondary: var(--primitive-neutral-100);
+    --secondary-hover: var(--primitive-neutral-150);
+    --secondary-foreground: var(--primitive-neutral-900);
+    --muted: var(--primitive-neutral-100);
+    --muted-foreground: var(--primitive-neutral-500);
+    --accent: var(--primitive-neutral-100);
+    --accent-hover: var(--primitive-neutral-150);
+    --accent-foreground: var(--primitive-neutral-900);
+    --destructive: var(--primitive-red-600);
+    --destructive-hover: var(--primitive-red-700);
+    --destructive-pressed: var(--primitive-red-800);
+    --destructive-foreground: var(--primitive-neutral-0);
+    --destructive-soft: var(--primitive-red-500-alpha-15);
+    --success: var(--primitive-green-650);
+    --success-hover: var(--primitive-green-700);
+    --success-foreground: var(--primitive-neutral-0);
+    --success-soft: var(--primitive-green-650-alpha-15);
+    --warning: var(--primitive-amber-600);
+    --warning-hover: var(--primitive-amber-700);
+    --warning-foreground: var(--primitive-neutral-0);
+    --warning-soft: var(--primitive-amber-600-alpha-15);
+    --info: var(--primitive-sky-600);
+    --info-hover: var(--primitive-sky-700);
+    --info-foreground: var(--primitive-neutral-0);
+    --info-soft: var(--primitive-sky-600-alpha-15);
+
+    /* ── Structural Borders & Interactive Focus ── */
+    --border: var(--primitive-zinc-200);
+    --border-hover: var(--primitive-zinc-300);
+    --input: var(--primitive-zinc-200);
+    --ring: var(--primitive-violet-650-alpha-25);
+
+    /* ── Glassmorphism ── */
+    --surface-glass: var(--primitive-neutral-0-alpha-85);
+    --border-glass: var(--primitive-neutral-0-alpha-40);
+
+    /* ── shadcn chart roles (unused; light-surface contrast) ── */
+    --chart-1: var(--primitive-violet-500);
+    --chart-2: var(--primitive-blue-500);
+    --chart-3: var(--primitive-green-600);
+    --chart-4: var(--primitive-amber-600);
+    --chart-5: var(--primitive-red-500);
+
+    /* ── shadcn sidebar roles (unused; mirror light card chrome) ── */
+    --sidebar: var(--primitive-neutral-0);
+    --sidebar-foreground: var(--primitive-neutral-850);
+    --sidebar-primary: var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent: var(--primitive-neutral-100);
+    --sidebar-accent-foreground: var(--primitive-neutral-900);
+    --sidebar-border: var(--primitive-zinc-200);
+    --sidebar-ring: var(--primary);
 
     /*
-     * Tier 2 domain roles (dark assignments). Light values + utility keys live
-     * in the `@theme` bridge (`theme/theme.css`); the dark overrides below are
-     * the runtime truth for dark mode. Explicit assignments keep mode parity
+     * Tier 2 domain roles (light overrides). Default dark values and utility
+     * keys live in the `@theme` bridge (`theme/theme.css`); these overrides
+     * activate only for an explicit light scope. Explicit assignments keep mode parity
      * for every role, including roles whose physical ingredients are shared.
      */
-    /* ── Brand creative accent (dark: white-accent treatment) ── */
-    --color-brand-creative-accent: var(--primitive-neutral-25);
-    --color-brand-creative-accent-hover: var(--primitive-neutral-175);
-    --color-brand-creative-accent-pressed: var(--primitive-neutral-300);
+    /* ── Brand creative accent (light: violet-accent treatment) ── */
+    --color-brand-creative-accent: var(--primitive-violet-450);
+    --color-brand-creative-accent-hover: var(--primitive-violet-675);
+    --color-brand-creative-accent-pressed: var(--primitive-violet-750);
     --color-brand-creative-accent-secondary: var(--primitive-purple-400);
-    --color-brand-creative-accent-soft: var(--primitive-neutral-0-alpha-8);
-    --color-brand-creative-accent-ring: var(--primitive-neutral-0-alpha-20);
-    /* ── Boards & Workspace dark tokens (Linear standard) ── */
-    --color-board-page: var(--palette-dark-0);
-    --color-board-primary: var(--primitive-neutral-25);
-    --color-board-primary-hover: var(--primitive-neutral-175);
-    --color-board-page-text: var(--palette-dark-text-1);
-    --color-board-page-text-muted: var(--palette-dark-text-2);
-    --color-board-page-glow: var(--primitive-neutral-0-alpha-5);
+    --color-brand-creative-accent-soft: var(--primitive-violet-25);
+    --color-brand-creative-accent-ring: var(--primitive-violet-450-alpha-10);
+    /* ── Boards & Workspace light tokens ── */
+    --color-board-page: var(--palette-light-0);
+    --color-board-primary: var(--color-brand-creative-accent-hover);
+    --color-board-primary-hover: var(--color-brand-creative-accent-pressed);
+    --color-board-page-text: var(--palette-light-title);
+    --color-board-page-text-muted: var(--palette-light-text-label);
+    --color-board-page-glow: var(--primitive-violet-475-alpha-42);
     --color-board-page-glow-clear: transparent;
-    --color-board-focus-ring: var(--primitive-neutral-0-alpha-20);
-    --color-board-focus-ring-strong: var(--primitive-neutral-0-alpha-30);
-    --color-board-surface: var(--primitive-neutral-910-alpha-85);
-    --color-board-surface-strong: var(--palette-dark-1);
-    --color-board-control-bg: var(--primitive-neutral-890-alpha-78);
-    --color-page-chrome-bg-hover: var(--primitive-neutral-790-alpha-85);
-    --color-board-control-text: var(--palette-dark-text-1);
-    --color-board-control-input-text: var(--palette-dark-text-1);
-    --color-board-control-icon: var(--palette-dark-text-3);
-    --color-board-card-border: var(--palette-dark-border);
-    --color-board-card-border-hover: var(--palette-dark-border-hover);
-    --color-board-card-bg: var(--primitive-neutral-910-alpha-85);
-    --color-board-card-preview-from: var(--color-workspace-bg);
-    --color-board-card-preview-to: var(--color-workspace-bg);
-    --color-board-card-preview-fade: var(--primitive-neutral-940-alpha-88);
+    --color-board-focus-ring: var(--primitive-violet-650-alpha-16);
+    --color-board-focus-ring-strong: var(--primitive-violet-650-alpha-18);
+    --color-board-surface: var(--primitive-neutral-0-alpha-90);
+    --color-board-surface-strong: var(--card);
+    --color-board-control-bg: var(--primitive-neutral-0-alpha-85);
+    --color-page-chrome-bg-hover: var(--accent-hover);
+    --color-board-control-text: var(--color-board-card-title);
+    --color-board-control-input-text: var(--color-board-card-title);
+    --color-board-control-icon: var(--palette-light-text-3);
+    --color-board-card-border: var(--palette-light-border);
+    --color-board-card-border-hover: var(--palette-light-border-hover);
+    --color-board-card-bg: var(--color-board-surface);
+    --color-board-card-preview-from: var(--palette-light-1);
+    --color-board-card-preview-to: var(--primitive-slate-50);
+    --color-board-card-preview-fade: var(--primitive-slate-50-alpha-92);
     --color-board-card-preview-fade-clear: transparent;
-    --color-board-card-preview-divider: var(--palette-dark-border);
-    --color-board-card-input-border: var(--palette-dark-border);
-    --color-board-card-input-bg: var(--palette-dark-3);
-    --color-board-card-title: var(--palette-dark-title);
-    --color-board-card-text: var(--palette-dark-text-2);
-    --color-board-card-action: var(--palette-dark-text-2);
-    --color-board-card-action-hover: var(--palette-dark-text-1);
-    --color-board-create-icon: var(--palette-dark-border-hover);
-    --color-board-create-title: var(--palette-dark-title);
-    --color-board-loading-bg: var(--primitive-neutral-890-alpha-45);
+    --color-board-card-preview-divider: var(--palette-light-border);
+    --color-board-card-input-border: var(--palette-light-border);
+    --color-board-card-input-bg: var(--primitive-neutral-0-alpha-90);
+    --color-board-card-title: var(--palette-light-title);
+    --color-board-card-text: var(--palette-light-text-2);
+    --color-board-card-action: var(--palette-light-text-label);
+    --color-board-card-action-hover: var(--palette-light-title);
+    --color-board-create-icon: var(--palette-light-border-hover);
+    --color-board-create-title: var(--color-board-card-title);
+    --color-board-loading-bg: var(--primitive-neutral-1000-alpha-4);
     --color-board-danger: var(--destructive);
     --color-board-danger-hover: var(--destructive-hover);
-    --color-board-dialog-title: var(--palette-dark-title);
-    --color-board-dialog-description: var(--palette-dark-text-2);
-    --shadow-board-dialog: var(--primitive-shadow-22-58-strong);
+    --color-board-dialog-title: var(--color-board-control-input-text);
+    --color-board-dialog-description: var(--color-board-page-text-muted);
+    --board-dialog-shadow: var(--primitive-shadow-22-58-soft);
 
     /* ── Page chrome, dots, overlays, scrims ── */
-    --color-page-dot: var(--palette-dark-border);
+    --color-page-dot: var(--primitive-slate-150);
     --color-overlay-bg: var(--popover);
-    --color-overlay-border: var(--palette-dark-border);
-    --color-overlay-item: var(--palette-dark-text-2);
-    --color-overlay-item-hover-bg: var(--palette-dark-surface-hover);
+    --color-overlay-border: var(--palette-light-border);
+    --color-overlay-item: var(--palette-light-text-1);
+    --color-overlay-item-hover-bg: var(--palette-light-hover);
     --color-scrim: var(--primitive-neutral-1000-alpha-40);
     --color-scrim-soft: var(--primitive-neutral-1000-alpha-30);
     --color-overlay-btn-bg: var(--primitive-neutral-1000-alpha-42);
     --color-overlay-btn-bg-hover: var(--primitive-neutral-1000-alpha-68);
 
     /* ── Scrollbars, masks ── */
-    --color-scrollbar-thumb: var(--primitive-neutral-0-alpha-20);
-    --color-scrollbar-thumb-hover: var(--primitive-neutral-0-alpha-35);
-    --color-dialog-mask: var(--primitive-neutral-1000-alpha-72);
+    --color-scrollbar-thumb: color-mix(in srgb, var(--foreground) 58%, transparent);
+    --color-scrollbar-thumb-hover: color-mix(in srgb, var(--foreground) 72%, transparent);
+    --color-dialog-mask: color-mix(in srgb, var(--foreground) 38%, transparent);
 
-    /* ── Marketing landing page dark tokens (Linear standard) ── */
-    --color-home-hero-text: var(--palette-dark-title);
-    --color-home-hero-subtle: var(--palette-dark-text-2);
-    --color-home-note-bg: var(--primitive-stone-900);
-    --color-home-note-border: var(--primitive-stone-800);
-    --color-home-note-text: var(--primitive-stone-75);
+    /* ── Marketing landing page light tokens ── */
+    --color-home-hero-text: var(--primitive-zinc-875);
+    --color-home-hero-subtle: var(--primitive-zinc-650);
+    --color-home-note-bg: var(--primitive-stone-200);
+    --color-home-note-border: transparent;
+    --color-home-note-text: var(--color-home-hero-text);
 
-    /* ── Auth modal dark theme tokens (Pure Neutral / White Accent) ── */
-    --color-auth-shell: var(--primitive-neutral-925-alpha-88);
-    --color-auth-shell-border: var(--palette-dark-border);
-    --color-auth-shell-glow: var(--primitive-neutral-0-alpha-5);
-    --color-auth-shell-highlight: var(--primitive-neutral-0-alpha-10);
-    --color-auth-backdrop-from: var(--primitive-neutral-0-alpha-2);
-    --color-auth-backdrop-via: var(--primitive-neutral-0-alpha-1);
-    --color-auth-backdrop-to: transparent;
-    --color-auth-text: var(--palette-dark-text-1);
-    --color-auth-title: var(--palette-dark-title);
-    --color-auth-muted: var(--palette-dark-text-2);
-    --color-auth-subtle: var(--palette-dark-text-3);
-    --color-auth-input: var(--palette-dark-3);
-    --color-auth-input-focus: var(--palette-dark-2);
-    --color-auth-input-border: var(--palette-dark-border);
-    --color-auth-input-border-hover: var(--palette-dark-border-hover);
-    --color-auth-focus: var(--primitive-neutral-25);
-    --color-auth-focus-ring: var(--primitive-neutral-0-alpha-20);
-    --color-auth-primary-from: var(--primitive-neutral-25);
-    --color-auth-primary-to: var(--primitive-neutral-175);
-    --color-auth-primary-text: var(--palette-dark-0);
-    --color-auth-primary-shadow: transparent;
-    --color-auth-primary-shadow-hover: transparent;
-    /*
-     * The dark auth primary is a near-white gradient
-     * on a near-black shell, so elevation already reads through luminance
-     * contrast plus the shell border. A white glow would halo into the shell
-     * and wash the dark action text; a violet glow would misrepresent the
-     * white-accent dark treatment, so the action uses no shadow.
-     */
-    --shadow-auth-primary: none;
-    --shadow-auth-primary-hover: none;
-    --color-auth-link: var(--primitive-neutral-0);
-    --color-auth-link-hover: var(--primitive-neutral-200);
-    --color-auth-close: var(--palette-dark-text-2);
-    --color-auth-close-hover: var(--palette-dark-title);
+    /* ── Auth modal light tokens (Violet Accent) ── */
+    --color-auth-shell: color-mix(in srgb, var(--card) 80%, transparent);
+    --color-auth-shell-border: color-mix(in srgb, var(--card) 35%, transparent);
+    --color-auth-shell-glow: color-mix(
+      in srgb,
+      var(--color-brand-creative-accent) 18%,
+      transparent
+    );
+    --color-auth-shell-highlight: color-mix(in srgb, var(--card) 60%, transparent);
+    --color-auth-backdrop-from: color-mix(in srgb, var(--card) 30%, transparent);
+    --color-auth-backdrop-via: color-mix(in srgb, var(--card) 55%, transparent);
+    --color-auth-backdrop-to: color-mix(in srgb, var(--card) 80%, transparent);
+    --color-auth-text: var(--foreground);
+    --color-auth-title: var(--foreground);
+    --color-auth-muted: var(--muted-foreground);
+    --color-auth-subtle: var(--muted-foreground);
+    --color-auth-input: color-mix(in srgb, var(--card) 60%, transparent);
+    --color-auth-input-focus: var(--card);
+    --color-auth-input-border: var(--border);
+    --color-auth-input-border-hover: var(--border-hover);
+    --color-auth-focus: var(--color-brand-creative-accent);
+    --color-auth-focus-ring: color-mix(
+      in srgb,
+      var(--color-brand-creative-accent) 10%,
+      transparent
+    );
+    --color-auth-primary-from: var(--color-brand-creative-accent);
+    --color-auth-primary-to: var(--color-brand-creative-accent-hover);
+    --color-auth-primary-text: var(--primary-foreground);
+    --color-auth-primary-shadow: color-mix(
+      in srgb,
+      var(--color-brand-creative-accent) 25%,
+      transparent
+    );
+    --color-auth-primary-shadow-hover: color-mix(
+      in srgb,
+      var(--color-brand-creative-accent) 35%,
+      transparent
+    );
+    --auth-primary-shadow: 0 4px 14px var(--color-auth-primary-shadow);
+    --auth-primary-shadow-hover: 0 6px 20px var(--color-auth-primary-shadow-hover);
+    --color-auth-link: var(--color-brand-creative-accent-hover);
+    --color-auth-link-hover: var(--color-brand-creative-accent-pressed);
+    --color-auth-close: var(--muted-foreground);
+    --color-auth-close-hover: var(--foreground);
 
-    /* ── Toast dark theme tokens (Pure Neutral True Black / Linear Standard) ── */
-    --color-toast-bg: var(--primitive-neutral-910-alpha-94);
-    --color-toast-border: var(--palette-dark-border);
-    --color-toast-text: var(--palette-dark-text-1);
-    --color-toast-muted: var(--palette-dark-text-2);
-    --color-toast-shadow: var(--primitive-shadow-14-34-outline);
-    --color-toast-highlight: var(--primitive-neutral-0-alpha-3);
-    --color-toast-button: var(--primitive-neutral-0);
+    /* ── Toast light tokens ── */
+    --color-toast-bg: var(--primitive-neutral-0-alpha-92);
+    --color-toast-border: var(--palette-light-border);
+    --color-toast-text: var(--palette-light-text-1);
+    --color-toast-muted: var(--palette-light-text-2);
+    --color-toast-shadow: var(--primitive-shadow-10-24);
+    --color-toast-highlight: var(--primitive-slate-775-alpha-8);
+    --color-toast-button: var(--color-brand-creative-accent-hover);
 
     /*
      * Derived roles resolve through mode-aware Tier 2 assignments and
@@ -342,37 +355,37 @@
     );
     --color-auth-error-ring: color-mix(in srgb, var(--destructive) 10%, transparent);
     /* Workspace, tool, text, tooltip and progress roles. */
-    --color-workspace-bg: var(--palette-dark-0);
-    --color-workspace-surface: var(--palette-dark-3);
-    --color-tool-border: var(--primitive-neutral-0-alpha-12);
-    --color-workspace-dot: var(--palette-dark-border);
-    --color-workspace-connection: var(--primitive-neutral-0-alpha-22);
-    --color-workspace-connection-selected: var(--primitive-neutral-0);
-    --color-workspace-connection-running: var(--primitive-neutral-0-alpha-70);
-    --color-tool-accent: var(--primitive-neutral-0);
-    --color-tool-accent-hover: var(--primitive-neutral-25);
-    --color-tool-accent-pressed: var(--primitive-neutral-175);
-    --color-tool-accent-soft: var(--primitive-neutral-0-alpha-12);
-    --color-tool-accent-line: var(--primitive-neutral-0-alpha-25);
-    --color-tool-accent-line-soft: var(--primitive-neutral-0-alpha-15);
-    --color-tool-accent-tooltip-line: var(--primitive-neutral-0-alpha-20);
-    --color-tool-accent-shadow: var(--primitive-neutral-1000-alpha-50);
-    --color-tool-accent-shadow-hover: var(--primitive-neutral-1000-alpha-65);
-    --color-tool-accent-glow: var(--primitive-neutral-0-alpha-15);
-    --color-workspace-border: var(--palette-dark-border);
-    --color-text-strong: var(--palette-dark-title);
-    --color-text-label: var(--palette-dark-text-label);
-    --color-text-muted: var(--palette-dark-text-2);
-    --color-text-control: var(--palette-dark-text-1);
-    --color-text-option: var(--palette-dark-text-2);
-    --color-text-inverse: var(--palette-dark-0);
-    --color-tooltip-bg: var(--primitive-neutral-910-alpha-96);
-    --color-tooltip-foreground: var(--palette-dark-text-1);
-    --color-progress-from: var(--primitive-violet-400);
-    --color-progress-to: var(--primitive-sky-400);
-    --color-tool-glass: var(--primitive-neutral-890-alpha-78);
-    --color-workspace-preview-node: var(--primitive-neutral-0-alpha-28);
-    --color-workspace-preview-viewport: var(--primitive-neutral-0-alpha-38);
-    --color-workspace-preview-mask: var(--primitive-neutral-0-alpha-12);
+    --color-workspace-bg: var(--primitive-neutral-190);
+    --color-workspace-surface: var(--primitive-neutral-75);
+    --color-tool-border: var(--primitive-zinc-350-alpha-65);
+    --color-workspace-dot: var(--primitive-slate-250);
+    --color-workspace-connection: var(--primitive-neutral-1000-alpha-20);
+    --color-workspace-connection-selected: var(--primitive-neutral-1000-alpha-40);
+    --color-workspace-connection-running: var(--primitive-neutral-1000-alpha-40);
+    --color-tool-accent: var(--primitive-violet-675);
+    --color-tool-accent-hover: var(--primitive-violet-700);
+    --color-tool-accent-pressed: var(--primitive-violet-700);
+    --color-tool-accent-soft: var(--primitive-violet-650-alpha-8);
+    --color-tool-accent-line: var(--primitive-violet-650-alpha-28);
+    --color-tool-accent-line-soft: var(--primitive-violet-650-alpha-22);
+    --color-tool-accent-tooltip-line: var(--primitive-violet-650-alpha-26);
+    --color-tool-accent-shadow: var(--primitive-violet-450-alpha-25);
+    --color-tool-accent-shadow-hover: var(--primitive-violet-450-alpha-35);
+    --color-tool-accent-glow: var(--primitive-violet-450-alpha-18);
+    --color-workspace-border: var(--palette-light-border);
+    --color-text-strong: var(--primitive-neutral-900);
+    --color-text-label: var(--palette-light-text-label);
+    --color-text-muted: var(--palette-light-text-2);
+    --color-text-control: var(--palette-light-text-label);
+    --color-text-option: var(--palette-light-text-2);
+    --color-text-inverse: var(--primitive-neutral-0);
+    --color-tooltip-bg: var(--primitive-zinc-900-alpha-94);
+    --color-tooltip-foreground: var(--primitive-zinc-100);
+    --color-progress-from: var(--primitive-violet-450);
+    --color-progress-to: var(--primitive-sky-350);
+    --color-tool-glass: var(--primitive-neutral-0-alpha-85);
+    --color-workspace-preview-node: var(--primitive-neutral-1000-alpha-28);
+    --color-workspace-preview-viewport: var(--primitive-neutral-1000-alpha-38);
+    --color-workspace-preview-mask: var(--primitive-neutral-1000-alpha-8);
   }
 }

@@ -30,9 +30,7 @@ function qualitySeriesStyle(key: 'completed' | 'failed') {
   const metric = taskMetricDefinitions.find((item) => item.key === key)
   return {
     label: metric?.chartLabel ?? (key === 'completed' ? '成功率' : '失败率'),
-    color:
-      metric?.chartColor ??
-      (key === 'completed' ? adminChartTheme.success : adminChartTheme.danger),
+    color: adminChartTheme[metric?.chartColorRole ?? (key === 'completed' ? 'success' : 'danger')],
   }
 }
 

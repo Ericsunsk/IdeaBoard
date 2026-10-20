@@ -117,6 +117,25 @@ describe('BoardCard motion browser contract', () => {
     await setMotion(false)
   })
 
+  it('keeps the workspace owner avatar compact and free of a decorative ring', () => {
+    const props = cardProps()
+    const { root, unmount } = mountApp(() =>
+      h(BoardCard, {
+        ...props,
+        board: { ...props.board, accessState: 'workspace', creatorUserId: 'usr_alice' },
+      }),
+    )
+    try {
+      const avatar = root.querySelector('.size-5')!
+      expect(avatar).not.toBeNull()
+      expect(avatar.getBoundingClientRect().width).toBe(20)
+      expect(avatar.getBoundingClientRect().height).toBe(20)
+      expect(styleOf(avatar).boxShadow).toBe('none')
+    } finally {
+      unmount()
+    }
+  })
+
   it('keeps hover and focus feedback on the stable card root', async () => {
     const { root, article, unmount } = renderCard()
     try {

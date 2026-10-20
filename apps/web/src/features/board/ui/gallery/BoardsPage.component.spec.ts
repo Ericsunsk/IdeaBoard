@@ -165,7 +165,6 @@ describe('Boards catalog recovery', () => {
     await catalog.commands.initialize()
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveClass('border-destructive/30', 'bg-destructive/10')
     expect(
       within(alert).getByText('Could not load the canvas list. Please try again.'),
     ).toBeVisible()

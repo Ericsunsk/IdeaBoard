@@ -41,9 +41,9 @@ token imports in dependency order
 the dark variant, the `@theme inline` bridge that maps standard semantic
 `--color-*` utility keys to runtime roles, and the explicit `type-*` role
 utilities. `src/theme/tokens/semantic.css` owns the canonical Tier 2 runtime
-roles plus Tier 2 domain dark assignments; `src/theme/tokens/admin.css` owns
-the Admin-distinct Tier 2b roles (light `@theme` + dark base); `src/theme/tokens/canvas.css`
-owns the Tier 3 canvas runtime (light + dark); `src/theme/tokens/motion.css`,
+roles plus Tier 2 domain light overrides; `src/theme/tokens/admin.css` owns
+the Admin-distinct Tier 2b roles (default dark `@theme` + `.light` overrides).
+`src/theme/tokens/canvas.css` owns the Tier 3 canvas runtime (light + dark); `src/theme/tokens/motion.css`,
 `type.css`, and `z.css` own motion, type, and stacking roles.
 `src/app/style.css` is the entry named by `components.json`; it imports
 theme, base, and atoms, and owns app-wide utilities, toast
@@ -68,15 +68,15 @@ Token ownership:
 
 - Tier 1 (`tokens/primitives.css`, `:root` only): mode-blind physical color
   ramps, radii, shadows, and the `palette-light-*` / `palette-dark-*`
-  ingredient scales under distinct names. Never `.dark` overrides here.
+  ingredient scales under distinct names. Never mode overrides here.
 - Tier 2 (`tokens/semantic.css` + `theme.css` bridge): canonical shadcn roles
   (`--background`, `--card`, `--foreground`, `--border`, `--primary`,
   `--muted`, `--chart-*`, `--sidebar-*`, and state variants) with explicit
-  light + dark assignments; Tier 2 domain dark assignments (brand, board,
-  auth, toast, overlay, page-chrome, home, scrollbar, mask) with light values
-  - utility keys in the `theme.css` `@theme` bridge. Bare names are
-    the runtime roles; the matching `--color-*` names exist only as
-    `@theme inline` utility keys (`bg-primary`, `text-foreground`, …).
+  light + dark assignments; Tier 2 domain light overrides (brand, board,
+  auth, toast, overlay, page-chrome, home, scrollbar, mask), with default dark
+  values and utility keys in the `theme.css` `@theme` bridge. Bare names are
+  the runtime roles; the matching standard `--color-*` names exist only as
+  `@theme inline` utility keys (`bg-primary`, `text-foreground`, …).
 - Tier 2b (`tokens/admin.css`): Admin-distinct operational density,
   table/dialog/popover chrome, chart, and status roles with bounded Admin
   consumer scope (see ADR-0016).
@@ -149,9 +149,11 @@ Deliberately kept, not omissions:
   product-prefixed alias tier is permitted.
 
 Type scale (`text-admin-*` sizes) is unaffected by the color-token freeze.
-Dark mode ships through token resolution (`html.dark` overrides in the tier
-owners: `tokens/admin.css`, `tokens/semantic.css`, `tokens/canvas.css`);
-`dark:` overrides stay banned because
+Dark is the default CSS palette on an unclassified `html`. Explicit light
+mode uses `.light` overrides in `tokens/admin.css`, `tokens/semantic.css`,
+and `tokens/canvas.css`; there is no `.dark` activation class. The head boot
+script and `useTheme` share this policy, preserve stored choices, and resolve
+explicit system mode from the browser preference. `dark:` overrides stay banned because
 semantic tokens already cover both modes.
 
 Out of freeze scope, by design:
@@ -159,10 +161,10 @@ Out of freeze scope, by design:
 - Elevation (`shadow-page-chrome-*`, `shadow-auth-*`, `shadow-board-*`):
   shadow tokens are elevation, not color. Components may keep domain-owned
   elevation tokens; generic `shadow-ib-*` aliases are forbidden.
-- Domain utility values use plain `@theme`; Canvas declarations and dark mode overrides live in
-  `tokens/canvas.css` and the tier-owner dark blocks (`tokens/admin.css`,
+- Domain utility values use plain `@theme`; Canvas declarations and light overrides live in
+  `tokens/canvas.css` and the tier-owner light blocks (`tokens/admin.css`,
   `tokens/semantic.css`). Existing Canvas declarations
-  are pinned by `token-alias`/`dark-base-closure`; no new duplicates may be added.
+  are pinned by `token-alias`/`light-base-closure`; no new duplicates may be added.
 
 ### Text Color Ramp Standard
 

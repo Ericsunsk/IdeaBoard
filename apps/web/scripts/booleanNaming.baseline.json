@@ -3319,7 +3319,6 @@
     "src/test/render.ts|FunctionDeclaration:withTestProviders/binding:WrappedVNode/property:inheritAttrs|property:inheritAttrs|1",
     "src/test/userAccountMenu.browser.spec.ts|property:bubbles|property:bubbles|1",
     "src/test/userAccountMenu.browser.spec.ts|property:props/property:supportChannels/property:enabled|property:enabled|1",
-    "src/theme/composables/themeMode.ts|FunctionDeclaration:isDarkThemeMode|parameter:prefersDark|1",
     "src/theme/composables/useTheme.ts|FunctionDeclaration:getThemeState/binding:mode/property:emitAuto|property:emitAuto|1",
     "src/theme/composables/useTheme.ts|FunctionDeclaration:getThemeState|variable:preferredDark|1"
   ]

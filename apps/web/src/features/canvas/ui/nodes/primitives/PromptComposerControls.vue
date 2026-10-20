@@ -3,6 +3,7 @@
     ref="inputRef"
     v-model="draft"
     name="canvas-prompt"
+    class="focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:outline-none"
     :class="textareaClass"
     :rows="rows"
     :placeholder="placeholder"

@@ -185,7 +185,7 @@ export function loadRetirementSources(root = webRoot): RetirementSources {
 function declarations(
   root: Root,
   filter: (name: string) => boolean = () => true,
-  scope?: 'theme' | 'root' | 'dark',
+  scope?: 'theme' | 'root' | 'light',
 ): Map<string, string> {
   const result = new Map<string, string>()
   root.walkDecls((decl) => {
@@ -195,11 +195,11 @@ function declarations(
       (scope === 'theme' && parent?.type === 'atrule' && parent.name === 'theme') ||
       (parent?.type === 'rule' &&
         (scope === 'root'
-          ? parent.selector.trim() === ':root'
-          : scope === 'dark' &&
+          ? parent.selector.split(',').some((selector) => selector.trim() === ':root')
+          : scope === 'light' &&
             parent.selector
               .split(',')
-              .some((selector) => /^(?:html)?\.dark$/.test(selector.trim()))))
+              .some((selector) => /^(?:html)?\.light$/.test(selector.trim()))))
     if (inScope && filter(decl.prop)) result.set(decl.prop, decl.value.trim())
   })
   return result
@@ -335,10 +335,13 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
       alias = value?.match(/^var\(\s*(--[\w-]+)\s*\)$/)?.[1]
     return alias ? resolveToken(alias, seen) : value
   }
-  const darkScopeFiles = [tokens + 'admin.css', tokens + 'semantic.css', tokens + 'canvas.css']
-  const dark = new Map<string, string>()
-  for (const file of darkScopeFiles)
-    for (const [name, value] of declarations(css(file), () => true, 'dark')) dark.set(name, value)
+  const modeScopeFiles = [tokens + 'admin.css', tokens + 'semantic.css', tokens + 'canvas.css']
+  const dark = new Map(base)
+  for (const file of modeScopeFiles)
+    for (const [name, value] of declarations(css(file), () => true, 'root')) dark.set(name, value)
+  const light = new Map(dark)
+  for (const file of modeScopeFiles)
+    for (const [name, value] of declarations(css(file), () => true, 'light')) light.set(name, value)
   const requireKeys = (
     rule: string,
     file: string,
@@ -358,8 +361,11 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
         fail(rule, file, `${name} must resolve through ${value}`)
   }
   requireKeys('token-closure', themeEntry, base, requiredTokens)
-  requireValues('scrollbar-role', themeEntry, base, {
+  requireValues('scrollbar-role', themeEntry, light, {
     '--color-scrollbar-thumb': 'color-mix(in srgb, var(--foreground) 58%, transparent)',
+  })
+  requireValues('scrollbar-role', themeEntry, dark, {
+    '--color-scrollbar-thumb': 'var(--primitive-neutral-0-alpha-20)',
   })
   for (const file of tokenOwners) {
     css(file).walkDecls((decl) => {
@@ -374,8 +380,29 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
   requireValues(
     'token-alias',
     themeEntry,
-    base,
+    light,
     Object.fromEntries(Object.entries(aliases).map(([name, target]) => [name, `var(${target})`])),
+  )
+  const darkAliases = {
+    ...aliases,
+    '--color-admin-chart-axis-line': '--color-admin-border-hover',
+    '--color-admin-chart-split-line': '--color-admin-border',
+    '--color-admin-accent': '--primitive-neutral-25',
+    '--color-admin-accent-hover': '--primitive-neutral-175',
+    '--color-admin-accent-pressed': '--primitive-neutral-225',
+    '--color-admin-model-purple': '--primitive-violet-400',
+    '--color-board-create-title': '--palette-dark-title',
+    '--color-board-control-text': '--palette-dark-text-1',
+    '--color-board-control-input-text': '--palette-dark-text-1',
+    '--color-board-dialog-title': '--palette-dark-title',
+  }
+  requireValues(
+    'token-alias',
+    themeEntry,
+    base,
+    Object.fromEntries(
+      Object.entries(darkAliases).map(([name, target]) => [name, `var(${target})`]),
+    ),
   )
   for (const [name, size] of Object.entries(typeScale)) {
     if (normalize(resolveToken(`--text-admin-${name}`) ?? '') !== `${size}px`)
@@ -432,15 +459,15 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
     if (!bridged.has(name)) fail('bridge-fallback', bridge, `Missing bridge ${name}`)
   const scopedTokens = (
     root: Root,
-    scope: 'root' | 'dark',
+    scope: 'root' | 'light',
     prefix: RegExp,
   ): Map<string, string> => {
     const values = new Map<string, string>()
     root.walkRules((rule) => {
       if (
-        scope === 'dark'
-          ? !rule.selector.split(',').some((selector) => /^(?:html)?\.dark$/.test(selector.trim()))
-          : rule.selector !== ':root'
+        scope === 'light'
+          ? !rule.selector.split(',').some((selector) => /^(?:html)?\.light$/.test(selector.trim()))
+          : !rule.selector.split(',').some((selector) => selector.trim() === ':root')
       )
         return
       rule.walkDecls((decl) => {
@@ -466,25 +493,21 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
     )
       fail('token-parity', file, 'Light and dark scopes must declare identical nonempty token sets')
   }
-  const darkDomain = new Map<string, string>()
-  for (const file of darkScopeFiles)
+  const lightDomain = new Map<string, string>()
+  for (const file of modeScopeFiles)
     for (const [name, value] of scopedTokens(
       css(file),
-      'dark',
+      'light',
       /^--color-(?:admin|board|canvas|home|auth|page-chrome|overlay|toast|brand-creative|page|dialog|scrollbar)-/,
     ).entries())
-      darkDomain.set(name, value)
-  if (!darkDomain.size || [...darkDomain.keys()].some((name) => !base.has(name)))
+      lightDomain.set(name, value)
+  if (!lightDomain.size || [...lightDomain.keys()].some((name) => !base.has(name)))
     fail(
-      'dark-base-closure',
+      'light-base-closure',
       tokens + 'semantic.css',
-      'Every dark domain token must exist in app theme',
+      'Every light override must have a default dark assignment',
     )
   requireKeys('dark-required', tokens + 'semantic.css', dark, darkRequired)
-  requireValues('dark-chart-alias', tokens + 'admin.css', dark, {
-    '--color-admin-chart-axis-line': 'var(--color-admin-border-hover)',
-    '--color-admin-chart-split-line': 'var(--color-admin-border)',
-  })
   const semanticRoot = css(tokens + 'semantic.css')
   parity(
     tokens + 'semantic.css',
@@ -498,14 +521,14 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
       semanticRoot,
       (name) =>
         name.startsWith('--') && !name.startsWith('--color-') && !name.startsWith('--shadow-'),
-      'dark',
+      'light',
     ),
   )
   const canvas = css(tokens + 'canvas.css')
   parity(
     tokens + 'canvas.css',
     scopedTokens(canvas, 'root', /^--color-canvas-/),
-    scopedTokens(canvas, 'dark', /^--color-canvas-/),
+    scopedTokens(canvas, 'light', /^--color-canvas-/),
   )
   requireKeys(
     'primitive-closure',
@@ -768,7 +791,10 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
       ['light', true, false],
       ['system', true, true],
       ['system', false, false],
+      ['auto', true, true],
+      ['auto', false, false],
       [null, true, true],
+      [null, false, true],
     ] as const) {
       const classes = new Set<string>()
       try {
@@ -780,7 +806,7 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
             },
             window: {
               matchMedia: (query: string) => ({
-                matches: query === '(prefers-color-scheme: dark)' && systemDark,
+                matches: query === '(prefers-color-scheme: light)' && !systemDark,
               }),
             },
             document: {
@@ -798,7 +824,7 @@ export function validateRetirementSources(sources: RetirementSources): Retiremen
           },
           { timeout: 100 },
         )
-        if (classes.has('dark') !== expected)
+        if (!classes.has('light') !== expected)
           fail('synchronous-theme-boot', 'index.html', `Theme boot fails mode ${mode}`)
       } catch {
         fail('synchronous-theme-boot', 'index.html', 'Theme policy does not execute synchronously')

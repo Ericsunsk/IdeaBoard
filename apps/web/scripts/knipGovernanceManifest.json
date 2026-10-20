@@ -14270,12 +14270,6 @@
           "docs/frontend-seam-inventory.md: src/theme/composables/themeMode.ts#ThemeMode"
         ]
       },
-      "isDarkThemeMode": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/theme/composables/themeMode.ts#isDarkThemeMode"
-        ]
-      },
       "normalizeThemeMode": {
         "kind": "canonical-public",
         "evidence": [
@@ -17016,7 +17010,7 @@
       "exports": ["VisionQueryId"]
     },
     "src/api/generated-query/public/model/workspace.ts": {
-      "sha256": "32454aa236689e70971e1e84d774875426cc67065209ba19a361cc4e1a51347f",
+      "sha256": "5a2bba22acb50669f1a2ff98ea1bfc6278d7ef360fe8bcf67072ce93df4c789e",
       "exports": ["Workspace"]
     },
     "src/api/generated-query/public/model/workspaceAccess.ts": {
@@ -17704,7 +17698,7 @@
       ]
     },
     "src/api/generated-query/public/workspaces/workspaces.ts": {
-      "sha256": "a8615e5ba5e61ab3ade451fb48b3425b97601d3b983ad37f9820a21d2e3e2b6c",
+      "sha256": "cfe148d2e2582b01d3e0fc2d69d1e4a4ef81fc46d63c84a3dbf68fe1398a5638",
       "exports": [
         "CreateWorkspaceMutationBody",
         "CreateWorkspaceMutationError",

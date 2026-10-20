@@ -6,11 +6,11 @@
       ;(function () {
         try {
           var mode = localStorage.getItem('ideaboard-color-mode')
-          var supportDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-          if (mode === 'dark' || ((!mode || mode === 'auto' || mode === 'system') && supportDark)) {
-            document.documentElement.classList.add('dark')
-          } else {
-            document.documentElement.classList.remove('dark')
+          var systemLight =
+            (mode === 'auto' || mode === 'system') &&
+            window.matchMedia('(prefers-color-scheme: light)').matches
+          if (mode === 'light' || systemLight) {
+            document.documentElement.classList.add('light')
           }
         } catch (e) {}
       })()

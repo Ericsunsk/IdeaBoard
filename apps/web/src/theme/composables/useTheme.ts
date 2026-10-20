@@ -1,7 +1,6 @@
-import { useColorMode, usePreferredDark } from '@vueuse/core'
-import { computed, type ComputedRef } from 'vue'
+import { useColorMode } from '@vueuse/core'
+import { computed, ref, type ComputedRef } from 'vue'
 import {
-  isDarkThemeMode,
   normalizeThemeMode,
   THEME_STORAGE_KEY,
   type StoredThemeMode,
@@ -16,21 +15,26 @@ let sharedIsDark: ComputedRef<boolean> | null = null
 
 function getThemeState(): { mode: ColorModeReturn; isDark: ComputedRef<boolean> } {
   if (!sharedMode || !sharedIsDark) {
-    const preferredDark = usePreferredDark()
+    const isDarkApplied = ref(true)
     const mode = useColorMode<StoredThemeMode>({
       selector: 'html',
       attribute: 'class',
       modes: {
-        ['dark']: 'dark',
-        light: '',
+        dark: '',
+        light: 'light',
       },
       storageKey: THEME_STORAGE_KEY,
+      initialValue: 'dark',
       emitAuto: true,
+      onChanged(resolvedMode, apply) {
+        apply(resolvedMode)
+        // Canvas renderers must read tokens after the root palette changes.
+        isDarkApplied.value = resolvedMode === 'dark'
+      },
     })
+    mode.value = normalizeThemeMode(mode.value)
     sharedMode = mode
-    sharedIsDark = computed(() => {
-      return isDarkThemeMode(mode.value, preferredDark.value)
-    })
+    sharedIsDark = computed(() => isDarkApplied.value)
   }
   return { mode: sharedMode, isDark: sharedIsDark }
 }
@@ -44,11 +48,7 @@ export function useTheme() {
   const { mode, isDark } = getThemeState()
 
   function setTheme(newMode: ThemeMode) {
-    if (newMode === 'system') {
-      mode.value = normalizeThemeMode(newMode)
-    } else {
-      mode.value = normalizeThemeMode(newMode)
-    }
+    mode.value = normalizeThemeMode(newMode)
   }
 
   return {

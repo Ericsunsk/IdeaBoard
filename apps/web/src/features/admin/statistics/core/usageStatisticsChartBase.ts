@@ -1,7 +1,7 @@
 import type { ChartOptions } from '../../../../core/lib/chartPrimitives'
 import { adminChartLegend, adminChartTheme } from '../../shared'
 
-export const defaultModelColors = [
+export const getDefaultModelColors = () => [
   adminChartTheme.brand,
   adminChartTheme.slate,
   adminChartTheme.cyan,
@@ -53,7 +53,7 @@ function colorForModel(name: string, palette: string[]) {
 export function getModelColorByName(name: string) {
   const key = normalizeModelName(name)
   if (!key) return null
-  return colorForModel(key, defaultModelColors)
+  return colorForModel(key, getDefaultModelColors())
 }
 
 export function buildDeltaFoot(current: number, previous: number, label: string) {

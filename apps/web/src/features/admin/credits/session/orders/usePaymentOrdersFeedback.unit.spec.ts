@@ -1,15 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createPaymentOrdersFeedback } from './usePaymentOrdersFeedback'
+import { usePaymentOrdersFeedback } from './usePaymentOrdersFeedback'
+
+const toast = vi.hoisted(() => ({
+  success: vi.fn(),
+  warning: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+}))
+
+vi.mock('../../../shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../shared')>()),
+  useAdminToast: () => toast,
+}))
 
 describe('PaymentOrders feedback', () => {
   it('keeps refund success and failure toasts explicit and safe', () => {
-    const toast = {
-      success: vi.fn(),
-      warning: vi.fn(),
-      error: vi.fn(),
-      info: vi.fn(),
-    }
-    const feedback = createPaymentOrdersFeedback(toast)
+    const feedback = usePaymentOrdersFeedback()
 
     feedback.refundSubmitted()
     feedback.refundFailed(new Error('refund boom'))

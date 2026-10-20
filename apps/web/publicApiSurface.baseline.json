@@ -2708,7 +2708,6 @@
     "adminChartTheme",
     "adminCompactIconButtonClass",
     "adminControlUnavailable",
-    "adminDarkThemeTokenFallbacks",
     "adminDashboardRootClass",
     "adminDialogChromeClass",
     "adminDialogChromeCloseClass",
@@ -2758,6 +2757,7 @@
     "adminTableStyle",
     "adminTextButtonClass",
     "adminThemeTokenFallbacks",
+    "adminThemeTokenVars",
     "adminToolbarButtonClass",
     "adminToolbarMetricClass",
     "adminToolbarPageLabelClass",
@@ -4026,7 +4026,6 @@
     "StoredThemeMode",
     "THEME_STORAGE_KEY",
     "ThemeMode",
-    "isDarkThemeMode",
     "normalizeThemeMode"
   ],
   "src/theme/composables/useTheme.ts": [

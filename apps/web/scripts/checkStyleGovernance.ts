@@ -32,6 +32,7 @@ const srcRoot = path.join(webRoot, 'src')
 const sourceExtensions = new Set(['.css', '.ts', '.vue'])
 
 export const primitiveReferencePattern = /var\(\s*--(?:primitive|palette)-[a-z0-9-]+(?=\s*[,)])/g
+export const darkVariantUtilityPattern = /\bdark:(?=[\w![(-])/g
 export const rawMotionUtilityPattern =
   /(?:duration-\[(?!var\(--motion-(?:control|enter|exit|feedback|image)-duration\)\])|ease-\[(?!var\(--motion-(?:control|enter|exit|feedback|image)-easing\)\])|animate-\[)[^\]]+\]/g
 
@@ -72,7 +73,7 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
   },
   'src/features/admin/shared/core/adminThemeTokens.ts': {
     counts: {
-      'raw-color': 52,
+      'raw-color': 41,
     },
     reason:
       'Admin theme token bridge owns the CSS var/fallback pairs; fallbacks keep third-party adapters and canvas rendering stable when CSS vars cannot resolve.',
@@ -121,7 +122,7 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
   },
   'src/features/canvas/ui/styles/canvas-vue-flow-adapter-skin.css': {
     counts: {
-      'vue-flow-internal-selector': 40,
+      'vue-flow-internal-selector': 38,
     },
     reason: 'Central adapter skin owns Vue Flow vendor DOM styling.',
   },
@@ -147,7 +148,7 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
 // waivers with reasons instead of forced mappings. Breakpoints use the named
 // mobile-first system (`sm/md/lg`, plus `xl` where already established);
 // arbitrary `max-[...]`/`min-[...]` variants are banned. Dark mode ships via
-// token resolution: `html.dark` overrides live in the tier owners
+// token resolution: dark defaults and `.light` overrides live in the tier owners
 // (`src/theme/tokens/admin.css`, `src/theme/tokens/semantic.css`,
 // `src/theme/tokens/canvas.css`), so `dark:` variants are banned outright —
 // components use semantic tokens that resolve in both modes instead.
@@ -188,9 +189,9 @@ const tokenCountRules = [
   },
   {
     id: 'dark-variant',
-    pattern: /dark:/g,
+    pattern: darkVariantUtilityPattern,
     message:
-      'Dark mode ships through semantic tokens (html.dark overrides in the tier owners); do not add dark: overrides, use tokens that resolve in both modes.',
+      'Dark mode ships through semantic tokens (default dark and explicit .light overrides in the tier owners); do not add dark: overrides, use tokens that resolve in both modes.',
   },
   {
     id: 'primitive-leak',
@@ -212,7 +213,7 @@ type TokenCountRuleId = (typeof tokenCountRules)[number]['id']
 const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   'src/features/account/session/chart.ts': {
     counts: {
-      'hex-color': 6,
+      'hex-color': 3,
     },
     reason: 'Account usage chart palette is a domain visual contract for chart series colors.',
   },

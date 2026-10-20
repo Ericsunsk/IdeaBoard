@@ -180,7 +180,7 @@ import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSu
 import type { CanvasScreenLibrarySaveBridge } from './internal/useCanvasScreenSurfaceInteractions'
 import { createCanvasScreenNodePresentation } from './internal/createCanvasScreenNodePresentation'
 import { useCanvasScreenLifecycle } from './internal/useCanvasScreenLifecycle'
-import PresenceRoster from './presence/PresenceRoster.vue'
+import PresenceRoster from './presence/Roster.vue'
 import { useCanvasPresenceSession, type PresenceUser } from '../../session/collaboration'
 import { useCanvasCollaborationSession } from '../../session/collaboration'
 import { useSoftLocks } from './presence/useSoftLocks'

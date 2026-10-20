@@ -70,7 +70,7 @@
   /*
    * ── Light Elevation Palette Scale (Linear/Vercel standard) ──
    * Mode-blind Tier 1 ingredients under distinct names. Tier 2 roles
-   * reference these via var(); no .dark overrides live here.
+   * reference these via var(); no mode overrides live here.
    */
   --palette-light-0: #fbfbfb; /* Level 0: Global canvas & workspace base */
   --palette-light-1: #ffffff; /* Level 1: Elevated card strong, dialog shell */

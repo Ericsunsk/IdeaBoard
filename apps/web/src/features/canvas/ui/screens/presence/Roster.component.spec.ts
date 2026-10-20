@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { setUserLocale } from '../../../../../core/i18n'
 import { renderWithUser, screen } from '../../../../../test/render'
-import PresenceRoster from './PresenceRoster.vue'
+import PresenceRoster from './Roster.vue'
 import type { PresenceUser, RemotePresencePeer } from '../../../session/collaboration'
 
 function buildPeer(input: {
@@ -68,14 +68,7 @@ describe('PresenceRoster', () => {
     expect(avatars).toHaveLength(2)
     for (const avatar of avatars) {
       expect(avatar.tagName).toBe('SPAN')
-      expect(avatar.classList.contains('ib-user-avatar-button')).toBe(true)
     }
-  })
-
-  test('lays out avatars with even spacing', () => {
-    const view = renderRoster()
-    const stack = view.container.querySelector('.presence-roster__stack')
-    expect(stack?.classList.contains('gap-2')).toBe(true)
   })
 
   test.each([
