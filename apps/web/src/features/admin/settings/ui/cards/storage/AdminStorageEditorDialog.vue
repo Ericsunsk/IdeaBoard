@@ -23,7 +23,7 @@
         <div class="flex items-center gap-3">
           <button
             type="button"
-            :class="[adminLogoButtonClass, 'size-11 p-2 shrink-0 shadow-xs']"
+            :class="[adminLogoButtonClass, 'size-11 p-2 shrink-0 shadow-raised']"
             :title="STORAGE_MESSAGES.switchLogoTitle"
             :aria-label="STORAGE_MESSAGES.switchLogoAria"
             :data-control-state="activeLogoTargetId === form.id ? 'selected' : 'idle'"
@@ -65,7 +65,7 @@
           class="group relative flex size-12 items-center justify-center rounded-control border p-2 cursor-pointer transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
           :class="
             selectedVendorKey === vendor.key
-              ? 'border-primary bg-card shadow-xs'
+              ? 'border-primary bg-card shadow-raised'
               : 'border-border bg-card hover:border-primary-line-bold'
           "
           :aria-label="vendor.label"
@@ -92,7 +92,7 @@
             :class="[
               'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control px-3 py-1 text-admin-caption font-medium transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer',
               activeConfigTab === tab.value
-                ? 'bg-card text-foreground shadow-xs font-semibold'
+                ? 'bg-card text-foreground shadow-raised font-semibold'
                 : 'hover:text-foreground text-muted-foreground',
             ]"
             @click="activeConfigTab = tab.value"

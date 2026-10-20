@@ -4,7 +4,7 @@
       v-show="open"
       v-library-drop
       :[LIBRARY_DROP_PANEL_ATTRIBUTE]="true"
-      class="chrome-presence library-island border border-page-chrome-border bg-popover shadow-page-chrome z-40 flex flex-col overflow-hidden rounded-overlay p-5 text-foreground max-w-[calc(100vw-32px)]"
+      class="chrome-presence library-island border border-page-chrome-border bg-popover shadow-page-chrome z-admin-overlay flex flex-col overflow-hidden rounded-overlay p-5 text-foreground max-w-[calc(100vw-32px)]"
       :class="[
         isCanvasPresentation ? 'relative h-full w-full' : searchIslandClass,
         isPanelHovered || isNativeHovering || isExternalPanelHovered ? 'ring-2 ring-primary' : '',

@@ -38,13 +38,13 @@ defineProps<{
 .user-credit-pill {
   display: inline-flex;
   width: auto;
-  min-width: 72px;
-  max-width: 152px;
+  min-width: 64px;
+  max-width: 116px;
   height: var(--page-chrome-control-size, 40px);
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 0 13px 0 11px;
+  gap: 5px;
+  padding: 0 9px;
   flex: none;
   overflow: hidden;
   border-radius: var(--radius-pill);
@@ -88,9 +88,9 @@ defineProps<{
 
 .user-credit-pill__balance {
   min-width: 2ch;
-  max-width: 12ch;
+  max-width: 8ch;
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--text-admin-meta);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   line-height: 1;
@@ -106,17 +106,17 @@ defineProps<{
   color: var(--destructive);
 }
 
-@media (max-width: 640px) {
+@media (min-width: 640px) {
   .user-credit-pill {
-    min-width: 64px;
-    max-width: 116px;
-    gap: 5px;
-    padding-inline: 9px;
+    min-width: 72px;
+    max-width: 152px;
+    gap: 7px;
+    padding: 0 13px 0 11px;
   }
 
   .user-credit-pill__balance {
-    max-width: 8ch;
-    font-size: var(--text-admin-meta);
+    max-width: 12ch;
+    font-size: var(--text-admin-body);
   }
 }
 </style>

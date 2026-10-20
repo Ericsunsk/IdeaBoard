@@ -1,6 +1,6 @@
 <template>
   <form
-    class="image-node-prompt-composer node-tool-surface absolute right-0 left-0 z-[42] grid grid-cols-[minmax(0,1fr)_auto] gap-[var(--node-tool-button-gap)] rounded-panel bg-[var(--canvas-glass-bg)] py-[5px] pr-[5px] pl-[13px] backdrop-blur-[var(--canvas-glass-blur)] [border:var(--node-tool-border-width)_solid_var(--canvas-glass-border)] [top:calc(100%_+_var(--node-prompt-composer-offset))]"
+    class="image-node-prompt-composer node-tool-surface absolute right-0 left-0 z-popover grid grid-cols-[minmax(0,1fr)_auto] gap-[var(--node-tool-button-gap)] rounded-panel bg-[var(--canvas-glass-bg)] py-[5px] pr-[5px] pl-[13px] backdrop-blur-[var(--canvas-glass-blur)] [border:var(--node-tool-border-width)_solid_var(--canvas-glass-border)] [top:calc(100%_+_var(--node-prompt-composer-offset))]"
     :class="{ 'count-stacked': shouldStackOutputCount, 'has-text': hasText }"
     :style="{ '--node-prompt-composer-offset': offset }"
     @submit.prevent
@@ -86,7 +86,7 @@ const shouldShowAspectRatio = computed(() => props.aspectRatio !== undefined)
 const hasText = computed(() => props.modelValue.trim().length > 0)
 const promptInputClass = computed(() =>
   [
-    'image-node-prompt-input min-w-0 cursor-text resize-none overflow-hidden border-0 bg-transparent px-0 py-1.5 text-xs leading-[18px] text-[var(--canvas-node-text-primary)] outline-none placeholder:text-[var(--canvas-node-text-muted)] disabled:cursor-wait',
+    'image-node-prompt-input min-w-0 cursor-text resize-none overflow-hidden border-0 bg-transparent px-0 py-1.5 text-admin-meta leading-body text-[var(--canvas-node-text-primary)] outline-none placeholder:text-[var(--canvas-node-text-muted)] disabled:cursor-wait',
     shouldStackOutputCount.value ? 'min-h-[73px] self-end' : 'self-center',
   ]
     .filter(Boolean)

@@ -2,7 +2,7 @@
   <!-- 创建新文件夹弹窗 -->
   <DialogRoot :open="createOpen" @update:open="emit('update:createOpen', $event)">
     <DialogPortal>
-      <DialogOverlay :class="ibDialogMaskClass" />
+      <DialogOverlay />
       <DialogContent
         class="bg-popover"
         :style="{ width: 'min(420px, calc(100vw - 32px))' }"
@@ -66,7 +66,7 @@
   <!-- 重命名文件夹弹窗 -->
   <DialogRoot :open="renameOpen" @update:open="emit('update:renameOpen', $event)">
     <DialogPortal>
-      <DialogOverlay :class="ibDialogMaskClass" />
+      <DialogOverlay />
       <DialogContent
         class="bg-popover"
         :style="{ width: 'min(420px, calc(100vw - 32px))' }"
@@ -142,7 +142,6 @@ import {
 } from '@/components/ui/dialog'
 import IbFormField from '../../../core/components/IbFormField.vue'
 import { ibFormInputClass, ibFormInputErrorClass } from '../../../theme/formControls'
-import { ibDialogMaskClass } from '../../../theme/dialogMask'
 import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
 
 const props = defineProps<{

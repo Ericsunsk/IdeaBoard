@@ -44,7 +44,7 @@
           <ShareAndroid class="canvas-chrome-icon" />
         </button>
         <button
-          :class="[canvasChromeExportControlClass, { 'is-active': !status.isExportDisabled }]"
+          :class="[canvasChromeActionControlClass, { 'is-active': !status.isExportDisabled }]"
           type="button"
           :aria-label="t('canvas.chrome.export')"
           :disabled="status.isExportDisabled"
@@ -209,9 +209,6 @@ const { channels: supportChannels } = useSupportChannels()
 const canvasChromeRoundControlClass = createPageChromeRoundControlClass('canvas-chrome-icon-button')
 const canvasChromeActionControlClass = createPageChromeRoundControlClass(
   'canvas-chrome-icon-button',
-)
-const canvasChromeExportControlClass = createPageChromeRoundControlClass(
-  'canvas-chrome-icon-button canvas-chrome-export-button',
 )
 const canvasChromeAvatarButtonClass = createPageChromeAccountRoundControlClass()
 

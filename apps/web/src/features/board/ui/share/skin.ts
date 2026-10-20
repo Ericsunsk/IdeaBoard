@@ -4,12 +4,12 @@
 // design tokens without artificial dividers.
 
 export const shareDialogContentClass =
-  'w-[440px] max-w-[calc(100vw-28px)] bg-popover shadow-[var(--shadow-board-dialog)]'
+  'w-[440px] max-w-[calc(100vw-28px)] bg-popover shadow-board-dialog'
 
 export const shareDialogClasses = {
   shell: 'flex min-w-0 flex-col gap-5 p-6',
   header: 'flex flex-col gap-1 pr-8',
-  title: 'm-0 text-lg font-semibold leading-snug tracking-tight text-foreground truncate',
+  title: 'm-0 text-lg font-semibold leading-tight tracking-tight text-foreground truncate',
   statusLine: 'm-0 text-sm leading-normal text-muted-foreground',
   section: 'flex flex-col gap-2',
   sectionTitle: 'm-0 text-sm font-semibold text-foreground',

@@ -11,10 +11,11 @@ import { i18n } from '../i18n'
 
 export type ChartData = ChartJsData<ChartType, unknown[], string>
 
-// Canvas 拿不到 CSS var：字体栈必须用 concrete value，与 style.css 的
-// html/body 基准同源。改这里时同步改 style.css，两处保持逐字节一致。
+// Canvas 拿不到 CSS var：字体栈必须用 concrete value，与 Tier 1
+// --primitive-font-inter-variable 同源（Inter Variable + CJK fallback chain +
+// system stack）。改这里时同步改 primitives.css，两处保持语义一致（CSS 侧可换行，TS 侧单行）。
 export const chartFontFamilyStack =
-  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+  "'Inter Variable', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
 export type ChartOptions = ChartJsOptions<ChartType>
 export type ChartTooltipItem = TooltipItem<ChartType>
 

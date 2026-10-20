@@ -269,10 +269,6 @@
   height: var(--canvas-chrome-icon-size);
 }
 
-.canvas-chrome-export-button {
-  --round-control-color-disabled: var(--canvas-text-control);
-}
-
 .canvas-chrome-status-control {
   display: flex;
   box-sizing: border-box;

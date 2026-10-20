@@ -3,7 +3,7 @@
     <section class="min-w-0" :aria-label="t('account.profile.overviewAria')">
       <div class="flex min-w-0 items-start gap-5 sm:items-center">
         <div
-          class="relative size-20 shrink-0 overflow-visible rounded-pill bg-card shadow-sm sm:size-[88px]"
+          class="relative size-20 shrink-0 overflow-visible rounded-pill bg-card shadow-raised sm:size-[88px]"
         >
           <button
             type="button"

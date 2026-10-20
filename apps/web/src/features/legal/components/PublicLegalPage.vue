@@ -4,13 +4,13 @@
       <div class="mx-auto flex w-full max-w-[860px] items-center justify-between gap-4 px-6 py-5">
         <RouterLink
           :to="HOME_PATH"
-          class="inline-flex min-h-8 items-center rounded-control text-base font-bold text-foreground no-underline focus-visible:outline-none focus-visible:shadow-focus-ring"
+          class="inline-flex min-h-8 items-center rounded-control text-admin-title font-bold text-foreground no-underline focus-visible:outline-none focus-visible:shadow-focus-ring"
         >
           {{ projectName }}
         </RouterLink>
         <RouterLink
           :to="HOME_PATH"
-          class="inline-flex min-h-8 items-center rounded-control px-2 text-sm font-semibold text-muted-foreground no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-foreground focus-visible:outline-none focus-visible:shadow-focus-ring"
+          class="inline-flex min-h-8 items-center rounded-control px-2 text-admin-content font-semibold text-muted-foreground no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-foreground focus-visible:outline-none focus-visible:shadow-focus-ring"
         >
           Back to home
         </RouterLink>
@@ -19,7 +19,7 @@
 
     <main class="mx-auto w-full max-w-[860px] px-4 py-8 sm:px-6 sm:py-12">
       <article
-        class="rounded-panel border border-border bg-card px-5 py-6 shadow-sm sm:rounded-overlay sm:px-10 sm:py-9"
+        class="rounded-panel border border-border bg-card px-5 py-6 shadow-raised sm:rounded-overlay sm:px-10 sm:py-9"
       >
         <header class="border-b border-border pb-7">
           <p class="m-0 text-admin-meta font-semibold tracking-wide text-muted-foreground">
@@ -30,7 +30,9 @@
           >
             {{ title }}
           </h1>
-          <p class="mt-3 mb-0 text-sm text-muted-foreground">Effective date: {{ version }}</p>
+          <p class="mt-3 mb-0 text-admin-content text-muted-foreground">
+            Effective date: {{ version }}
+          </p>
         </header>
 
         <div class="legal-copy pt-7 text-admin-title-sm leading-7 text-muted-foreground">

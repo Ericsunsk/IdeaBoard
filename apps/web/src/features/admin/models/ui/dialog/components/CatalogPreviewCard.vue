@@ -15,7 +15,7 @@
 
       <!-- 模型卡片 (主体与列表页共用 AdminModelCardBody) -->
       <div
-        class="flex flex-col overflow-hidden rounded-panel border border-border bg-card shadow-xs"
+        class="flex flex-col overflow-hidden rounded-panel border border-border bg-card shadow-raised"
       >
         <AdminModelCardBody :model="model" />
         <!-- 底栏 -->
@@ -33,7 +33,7 @@
     </div>
 
     <!-- 网关路由透视卡 (Cloudflare AI Gateway Route Inspector) -->
-    <div class="flex flex-col gap-2.5 rounded-panel border border-border bg-card p-4 shadow-xs">
+    <div class="flex flex-col gap-2.5 rounded-panel border border-border bg-card p-4 shadow-raised">
       <div class="flex items-center gap-2">
         <Globe class="size-4 text-primary" />
         <span class="text-xs font-semibold text-foreground">{{ MODELS_MESSAGES.routeTitle }}</span>

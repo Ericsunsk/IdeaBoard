@@ -17,7 +17,7 @@
         <div class="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 gap-2 pt-2">
           <button
             type="button"
-            class="inline-flex items-center justify-center rounded-control border border-input bg-card px-4 py-2 text-admin-body font-medium text-foreground shadow-xs hover:bg-muted active:bg-muted/80 cursor-pointer transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+            class="inline-flex items-center justify-center rounded-control border border-input bg-card px-4 py-2 text-admin-body font-medium text-foreground shadow-raised hover:bg-muted active:bg-muted/80 cursor-pointer transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
             :disabled="activeAdminConfirm?.loading"
             @click="activeAdminConfirm?.cancel()"
           >
@@ -26,7 +26,7 @@
           <button
             type="button"
             :class="[
-              'inline-flex items-center justify-center rounded-control px-4 py-2 text-admin-body font-medium shadow-xs cursor-pointer transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] disabled:opacity-50',
+              'inline-flex items-center justify-center rounded-control px-4 py-2 text-admin-body font-medium shadow-raised cursor-pointer transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] disabled:opacity-50',
               activeAdminConfirm?.intent === 'danger'
                 ? 'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed'
                 : 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed',

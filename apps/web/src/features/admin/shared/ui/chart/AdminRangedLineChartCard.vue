@@ -6,7 +6,7 @@
     header-class="p-6 pb-4"
     title-class="text-base font-bold text-foreground"
     range-group-class="inline-flex h-8 items-center rounded-control border border-border bg-muted p-1 text-xs text-muted-foreground"
-    range-selected-class="bg-card font-semibold text-foreground shadow-xs focus-visible:ring-ring"
+    range-selected-class="bg-card font-semibold text-foreground shadow-raised focus-visible:ring-ring"
     range-unselected-class="text-muted-foreground hover:text-foreground focus-visible:ring-ring"
   >
     <template #before-chart>

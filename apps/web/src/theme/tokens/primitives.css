@@ -54,6 +54,7 @@
   --primitive-blue-600: #2563eb;
 
   /* ── Radii Scale ── */
+  --primitive-radius-4: 4px;
   --primitive-radius-8: 8px;
   --primitive-radius-12: 12px;
   --primitive-radius-16: 16px;

@@ -74,7 +74,7 @@ defineExpose({ stageElement })
   position: relative;
   width: 100%;
   border: 0;
-  border-radius: 11px;
+  border-radius: var(--radius-panel);
   background: var(--node-stage-frame-bg);
   box-sizing: border-box;
   overflow: hidden;
@@ -95,7 +95,7 @@ defineExpose({ stageElement })
 
 .node-stage-frame--prompt {
   min-height: 280px;
-  border-radius: 16px;
+  border-radius: var(--radius-overlay);
   overflow: visible;
 }
 

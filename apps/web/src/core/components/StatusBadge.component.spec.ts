@@ -55,17 +55,17 @@ describe('StatusBadge', () => {
     }
     const dot = root.querySelector('[aria-hidden="true"] span:last-child')!
     expect(dot).toHaveClass(pin.dot)
-    expect(root.querySelector('.animate-ping') !== null).toBe(pin.pulseByDefault)
+    expect(root.querySelector('.status-badge-pulse') !== null).toBe(pin.pulseByDefault)
   })
 
   it('lets pulse prop override the default', async () => {
     const { container, rerender } = render(StatusBadge, {
       props: { label: 'forced', tone: 'neutral', pulse: true },
     })
-    expect(container.querySelector('.animate-ping')).not.toBeNull()
+    expect(container.querySelector('.status-badge-pulse')).not.toBeNull()
 
     await rerender({ label: 'forced', tone: 'success', pulse: false })
-    expect(container.querySelector('.animate-ping')).toBeNull()
+    expect(container.querySelector('.status-badge-pulse')).toBeNull()
   })
 
   it('applies size classes without changing the label API', async () => {
@@ -77,7 +77,7 @@ describe('StatusBadge', () => {
 
     await rerender({ label: 'medium-status', tone: 'info', size: 'medium' })
     const mediumRoot = screen.getByText('medium-status').parentElement!
-    expect(mediumRoot).toHaveClass('h-6', 'px-2.5', 'text-xs')
+    expect(mediumRoot).toHaveClass('h-6', 'px-2.5', 'text-admin-meta')
   })
 
   it('renders slot content and supports dotless display', () => {

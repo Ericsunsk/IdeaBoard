@@ -101,7 +101,7 @@ function onResizePointerDown(
 
 .canvas-group-frame-controls {
   --canvas-group-frame-edge-hit-size: 16px;
-  --canvas-group-frame-corner-hit-size: 24px;
+  --canvas-group-frame-corner-hit-size: var(--spacing-touch-target-aa);
 }
 
 .canvas-group-frame-body {

@@ -2,7 +2,6 @@ import { defineComponent } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AccountDialog from './AccountDialog.vue'
 import { renderWithUser, screen } from '../../../../test/render'
-import { ibDialogMaskClass } from '../../../../theme/dialogMask'
 import { defaultAccountTab, type AccountTab } from '../../core/tabs'
 
 const DialogRootStub = defineComponent({
@@ -132,15 +131,7 @@ describe('AccountDialog', () => {
   it('applies the shared overlay chrome through content class', () => {
     renderAccountDialog(true)
 
-    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveClass('shadow-admin-dialog')
-  })
-
-  it('reuses the shared dialog mask token for the overlay veil (no dialog-specific overlay token)', () => {
-    expect(ibDialogMaskClass).toContain('var(--color-dialog-mask)')
-
-    renderAccountDialog(true)
-
-    expect(screen.getByTestId('account-dialog-mask')).toHaveClass('!bg-[var(--color-dialog-mask)]')
+    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveClass('shadow-floating')
   })
 
   it('renders dialog-ready account management content when visible', () => {

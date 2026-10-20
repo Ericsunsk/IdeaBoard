@@ -88,7 +88,7 @@
   --canvas-group-frame-surface: var(--canvas-selection-group-surface);
   --canvas-group-frame-border: var(--canvas-selection-group-border);
   --canvas-selection-group-outset: 10px;
-  --canvas-selection-group-radius: 6px;
+  --canvas-selection-group-radius: var(--radius-control);
   --canvas-vue-flow-z: 1;
   --canvas-selection-group-z: 1;
   --canvas-group-frame-body-z: 0;
@@ -149,7 +149,7 @@
   margin: 0;
   padding: 4px;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 
 .vue-flow__minimap.canvas-minimap svg {

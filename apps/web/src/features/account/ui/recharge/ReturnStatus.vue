@@ -96,7 +96,7 @@ const showError = computed(
 )
 const statusClass = computed(() => {
   if (props.status?.status === 'credited') {
-    return 'border-emerald-500/25 bg-card text-foreground'
+    return 'border-success/25 bg-card text-foreground'
   }
   if (props.source === 'cancel') {
     return 'border-border bg-card text-foreground'

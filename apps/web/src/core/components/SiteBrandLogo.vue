@@ -17,7 +17,7 @@ withDefaults(
     src?: string
   }>(),
   {
-    fallbackClass: 'select-none text-center text-xs leading-none font-[850] tracking-normal',
+    fallbackClass: 'select-none text-center text-xs leading-none font-semibold tracking-normal',
     fallbackText: '',
     imageClass: '',
     src: '',

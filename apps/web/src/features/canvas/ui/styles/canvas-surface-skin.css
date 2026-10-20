@@ -19,10 +19,10 @@ body.canvas-overscroll-guard {
   --canvas-node-floating-ui-width: 287px;
 
   /* ── Canvas Typography Tokens ── */
-  --canvas-font-size-title: 15px;
-  --canvas-font-size-control: 12px;
-  --canvas-font-size-caption: 11px;
-  --canvas-font-size-micro: 10px;
+  --canvas-font-size-title: var(--text-admin-title-sm);
+  --canvas-font-size-control: var(--text-admin-meta);
+  --canvas-font-size-caption: var(--text-admin-caption);
+  --canvas-font-size-micro: var(--text-admin-micro);
 
   /* ── Canvas Elevation & Glass Tokens ── */
   --canvas-shadow-floating: var(--shadow-floating);

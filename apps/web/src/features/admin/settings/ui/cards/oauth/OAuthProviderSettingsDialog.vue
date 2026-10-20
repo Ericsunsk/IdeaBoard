@@ -20,7 +20,7 @@
           class="group relative flex items-center justify-between rounded-panel border p-3 cursor-pointer transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] select-none"
           :class="
             selectedProvider === provider.value
-              ? 'border-primary bg-primary-faint shadow-2xs'
+              ? 'border-primary bg-primary-faint shadow-raised'
               : 'border-border bg-muted/40 hover:border-border hover:bg-muted'
           "
           @click="selectedProvider = provider.value"
@@ -28,7 +28,7 @@
           <div class="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
-              class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border bg-card p-1.5 shadow-2xs"
+              class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-control border border-border bg-card p-1.5 shadow-raised"
               :aria-label="OAUTH_MESSAGES.oauthSelectLogoAria(provider.label)"
               @click.stop="openLogoPicker($event, provider.value)"
             >
@@ -73,7 +73,7 @@
       </AdminFormField>
 
       <!-- 2. 当前选中 Provider 的凭据与回调配置区 -->
-      <div class="flex flex-col gap-3.5 rounded-panel border border-border bg-card p-4 shadow-2xs">
+      <div class="flex flex-col gap-3.5 rounded-panel border border-border bg-card p-4 shadow-raised">
         <div class="flex items-center gap-2">
           <button
             type="button"
@@ -88,7 +88,7 @@
               aria-hidden="true"
             />
           </button>
-          <h3 class="m-0 text-admin-body-sm font-bold text-foreground">
+          <h3 class="m-0 text-admin-body font-bold text-foreground">
             {{ OAUTH_MESSAGES.oauthCredentialsTitle(providerLabel) }}
           </h3>
         </div>

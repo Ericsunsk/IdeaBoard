@@ -247,6 +247,8 @@
     --color-overlay-item-hover-bg: var(--palette-light-hover);
     --color-scrim: var(--primitive-neutral-1000-alpha-40);
     --color-scrim-soft: var(--primitive-neutral-1000-alpha-30);
+    --color-media-scrim: var(--primitive-neutral-1000);
+    --color-media-foreground: var(--primitive-neutral-0);
     --color-overlay-btn-bg: var(--primitive-neutral-1000-alpha-42);
     --color-overlay-btn-bg-hover: var(--primitive-neutral-1000-alpha-68);
 

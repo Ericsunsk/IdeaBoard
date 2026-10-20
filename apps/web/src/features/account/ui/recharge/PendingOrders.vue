@@ -10,7 +10,7 @@
 
     <div
       v-if="pending"
-      class="grid gap-2 rounded-panel border border-border bg-card p-4 shadow-sm"
+      class="grid gap-2 rounded-panel border border-border bg-card p-4 shadow-raised"
       role="status"
       :aria-label="t('account.topUp.pendingOrdersLoading')"
     >
@@ -32,7 +32,7 @@
         v-for="item in items"
         :key="item.public_token"
         :data-testid="`pending-payment-order-${item.public_token}`"
-        class="rounded-panel border border-border bg-card p-3.5 shadow-sm sm:p-4"
+        class="rounded-panel border border-border bg-card p-3.5 shadow-raised sm:p-4"
       >
         <div class="flex min-w-0 flex-col items-start justify-between gap-4 sm:flex-row">
           <div class="min-w-0">

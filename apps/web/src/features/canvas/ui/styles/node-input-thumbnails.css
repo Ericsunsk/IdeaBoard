@@ -55,7 +55,7 @@
   height: 14px;
   border: 0;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.88);
+  background: color-mix(in srgb, white 88%, transparent);
   color: #475569;
   display: grid;
   place-items: center;
@@ -68,7 +68,7 @@
 .node-input-thumbnail-remove:hover,
 .node-input-thumbnail-remove:focus-visible,
 .node-input-thumbnail-remove:active {
-  background: rgba(255, 255, 255, 0.88);
+  background: color-mix(in srgb, white 88%, transparent);
   color: #475569;
   box-shadow: none;
 }

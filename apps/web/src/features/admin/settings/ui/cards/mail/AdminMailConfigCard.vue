@@ -132,7 +132,7 @@
           :aria-label="SETTINGS_MESSAGES.mailDangerZoneTitle"
         >
           <div class="min-w-0 flex-1">
-            <p class="text-admin-body-sm font-bold text-destructive">
+            <p class="text-admin-body font-bold text-destructive">
               {{ SETTINGS_MESSAGES.mailDangerZoneTitle }}
             </p>
             <p class="mt-0.5 text-admin-caption text-muted-foreground">

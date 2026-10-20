@@ -9,7 +9,7 @@
       <div
         v-if="visible && activeResult"
         ref="dialogRef"
-        class="fixed inset-0 z-lightbox flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-black/65 backdrop-blur-2xl select-none"
+        class="fixed inset-0 z-lightbox flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-media-scrim/65 backdrop-blur-2xl select-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="search-lightbox-title"
@@ -19,18 +19,18 @@
       >
         <!-- 顶部极简悬浮信息与操作栏 -->
         <div
-          class="flex w-full max-w-6xl items-center justify-between z-20 shrink-0 mb-3 px-2"
+          class="flex w-full max-w-6xl items-center justify-between z-content shrink-0 mb-3 px-2"
           @click.stop
         >
           <!-- 左上角：纯净悬浮文字 (Title + Author) -->
           <div class="min-w-0 pr-4">
             <h3
               id="search-lightbox-title"
-              class="m-0 text-white text-base sm:text-lg font-semibold tracking-tight drop-shadow-md truncate max-w-[240px] sm:max-w-md"
+              class="m-0 text-media-foreground text-base sm:text-lg font-semibold tracking-tight drop-shadow-md truncate max-w-[240px] sm:max-w-md"
             >
               {{ activeResult.title || t('search.lightbox.inspiration') }}
             </h3>
-            <p class="mt-1 mb-0 text-white/70 text-xs drop-shadow-md">
+            <p class="mt-1 mb-0 text-media-foreground/70 text-xs drop-shadow-md">
               {{ activeResult.author }} · {{ activeResult.provider }}
             </p>
           </div>
@@ -69,9 +69,11 @@
             v-if="displayUrl"
             :src="displayUrl"
             :alt="activeResult.title || t('search.fallbackTitle')"
-            class="max-h-[82vh] max-w-full object-contain rounded-overlay shadow-2xl border-0 ring-0 outline-none select-none"
+            class="max-h-[82vh] max-w-full object-contain rounded-overlay shadow-floating border-0 ring-0 outline-none select-none"
           />
-          <p v-else class="text-sm text-white">{{ t('common.errors.imageLoadFailed') }}</p>
+          <p v-else class="text-sm text-media-foreground">
+            {{ t('common.errors.imageLoadFailed') }}
+          </p>
         </div>
       </div>
     </Transition>

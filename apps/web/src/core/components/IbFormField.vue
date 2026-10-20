@@ -20,7 +20,7 @@
 
     <div v-else-if="invalid" :id="errorId">
       <p
-        class="m-0 mt-1.5 border-0 bg-transparent p-0 text-xs font-semibold text-destructive"
+        class="m-0 mt-1.5 border-0 bg-transparent p-0 text-admin-meta font-semibold text-destructive"
         role="alert"
         data-severity="error"
       >

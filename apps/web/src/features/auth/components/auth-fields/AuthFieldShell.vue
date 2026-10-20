@@ -33,7 +33,7 @@
         />
         <span
           v-if="loading"
-          class="pointer-events-none absolute top-1/2 right-3.5 z-10 flex -translate-y-1/2 items-center justify-center text-muted-foreground"
+          class="pointer-events-none absolute top-1/2 right-3.5 flex -translate-y-1/2 items-center justify-center text-muted-foreground"
         >
           <span role="status" class="flex items-center">
             <Spinner class="size-4 shrink-0" aria-hidden="true" />

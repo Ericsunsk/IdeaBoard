@@ -11,7 +11,7 @@
     <template #header>
       <div class="flex items-center gap-3">
         <div
-          class="flex size-10 shrink-0 items-center justify-center rounded-control border border-border bg-muted text-admin-title-sm font-bold text-primary select-none shadow-2xs"
+          class="flex size-10 shrink-0 items-center justify-center rounded-control border border-border bg-muted text-admin-title-sm font-bold text-primary select-none shadow-raised"
         >
           {{ (user.displayName || 'U').substring(0, 1).toUpperCase() }}
         </div>
@@ -54,7 +54,7 @@
             class="rounded-control px-3 py-1 font-medium transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer"
             :class="
               activeTab === opt.value
-                ? 'bg-card text-foreground font-semibold shadow-xs'
+                ? 'bg-card text-foreground font-semibold shadow-raised'
                 : 'text-muted-foreground hover:text-foreground'
             "
             @click="handleTabChange(opt.value)"

@@ -158,7 +158,7 @@ const { usage, displayRange, isInitialPending, isSwitching, error, retry } = use
   selectedRange,
   () => props.active,
 )
-const summaryPanelClass = 'overflow-hidden rounded-panel border border-border bg-card shadow-sm'
+const summaryPanelClass = 'overflow-hidden rounded-panel border border-border bg-card shadow-raised'
 const summaryGridClass = 'grid grid-cols-2 sm:grid-cols-5'
 const summaryCellClass = 'min-h-[100px] min-w-0 p-4 sm:min-h-[108px] sm:p-5'
 const trendChartTheme = computed(() => resolveUsageChartTheme())

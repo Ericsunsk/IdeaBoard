@@ -42,6 +42,9 @@
   /* Overlay scrims (mobile drawer veil vs dialog/drawer veil). */
   --color-scrim: var(--primitive-neutral-1000-alpha-40);
   --color-scrim-soft: var(--primitive-neutral-1000-alpha-30);
+  /* Fixed dark media scrims retain readable light ink in either app theme. */
+  --color-media-scrim: var(--primitive-neutral-1000);
+  --color-media-foreground: var(--primitive-neutral-0);
   /*
    * Image overlay action fills (search result cards). Translucent black pills
    * floating over imagery/scrims; distinct from the full-veil scrims above.
@@ -95,7 +98,7 @@
   --color-page-chrome-border: var(--color-board-card-border);
   --color-page-chrome-border-hover: var(--color-board-card-border-hover);
   --color-page-chrome-bg: var(--color-board-control-bg);
-  --color-page-chrome-bg-hover: var(--primitive-neutral-790-alpha-85);
+  --color-page-chrome-bg-hover: var(--accent-hover);
   --color-page-chrome-color: var(--color-board-card-action);
   --color-page-chrome-color-hover: var(--color-board-card-action-hover);
   --color-page-chrome-color-disabled: var(--color-board-card-text);
@@ -148,7 +151,7 @@
   --color-board-card-border-hover: var(--palette-dark-border-hover);
   --color-board-card-bg: var(--primitive-neutral-910-alpha-85);
   --color-board-card-preview-from: var(--color-workspace-bg);
-  --color-board-card-preview-to: var(--color-workspace-bg);
+  --color-board-card-preview-to: var(--color-workspace-surface);
   --color-board-card-preview-fade: var(--primitive-neutral-940-alpha-88);
   --color-board-card-preview-fade-clear: transparent;
   --color-board-card-preview-divider: var(--palette-dark-border);
@@ -232,6 +235,7 @@
   /* ── shadcn-vue standard theme mappings ─────────────────── */
 
   --radius-*: initial;
+  --radius-tight: var(--primitive-radius-4);
   --radius-control: var(--primitive-radius-8);
   --radius-panel: var(--primitive-radius-12);
   --radius-overlay: var(--primitive-radius-16);

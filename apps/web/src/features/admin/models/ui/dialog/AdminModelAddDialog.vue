@@ -33,7 +33,7 @@
         <!-- 重新探测按钮 -->
         <button
           type="button"
-          class="inline-flex h-8 items-center gap-1.5 rounded-control border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground cursor-pointer disabled:opacity-50"
+          class="inline-flex h-8 items-center gap-1.5 rounded-control border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground shadow-raised transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground cursor-pointer disabled:opacity-50"
           :disabled="loading"
           @click="loadDetectedModels"
         >

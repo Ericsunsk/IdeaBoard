@@ -67,7 +67,7 @@
             </button>
             <div
               v-if="board.options.length === 0"
-              class="flex h-[34px] items-center px-2.5 text-xs text-[var(--canvas-text-subtle)]"
+              class="flex h-[34px] items-center px-2.5 text-admin-meta text-[var(--canvas-text-subtle)]"
             >
               No canvas
             </div>

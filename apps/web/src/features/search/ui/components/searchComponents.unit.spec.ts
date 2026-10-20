@@ -49,7 +49,7 @@ describe('Search presentation subcomponents', () => {
       })
       const closeButton = screen.getByRole('button', { name: /关闭|close/i })
       expect(closeButton.className).toContain('focus-visible:outline-none')
-      expect(closeButton.className).toContain('focus-visible:ring-white/80')
+      expect(closeButton.className).toContain('focus-visible:shadow-focus-ring')
     })
 
     it('traps focus, closes on Escape, and restores the opening trigger focus', async () => {

@@ -98,11 +98,11 @@ function onSubmit(prompt: string) {
   --outpaint-frame-stroke: 2px;
   --outpaint-frame-accent: var(--canvas-accent);
   --outpaint-frame-grid: var(--canvas-accent);
-  --outpaint-frame-contrast: rgba(255, 255, 255, 0.74);
+  --outpaint-frame-contrast: color-mix(in srgb, white 74%, transparent);
   --outpaint-handle-center-inset: calc(var(--outpaint-frame-stroke) / 2);
   position: absolute;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   box-sizing: border-box;
   pointer-events: auto;
   cursor: move;

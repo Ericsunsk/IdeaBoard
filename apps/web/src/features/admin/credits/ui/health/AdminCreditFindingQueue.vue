@@ -18,7 +18,7 @@
             class="rounded-control px-3 py-1 text-xs font-semibold transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer"
             :class="
               status === opt.value
-                ? 'bg-card text-foreground shadow-xs'
+                ? 'bg-card text-foreground shadow-raised'
                 : 'text-muted-foreground hover:text-foreground'
             "
             @click="status = opt.value"

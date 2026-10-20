@@ -4,8 +4,13 @@
 
 ## 本地开发
 
-本地一键起全栈：`process-compose up`（根目录 `process-compose.yml`，
-dashboard 端口固定 `8081`——`8080` 归本地 imgproxy，`PC_PORT_NUM` 已在文档注明勿改）。
+本地一键起全栈（根目录 `process-compose.yml`；dashboard 与本地 imgproxy
+错开端口——imgproxy 占 `8080`，dashboard 用 `PC_PORT_NUM=8081`）：
+
+```bash
+PC_PORT_NUM=8081 process-compose up
+```
+
 `up` 自动按 `docker-deps → migrate → api/auth/realtime/web` 顺序起：
 infra 容器先行，随后 one-shot `migrate` 跑 `scripts/migrate.sh --env dev`
 （API→Auth 强制顺序，幂等，重跑无操作），成功才放行四个应用进程；
@@ -50,8 +55,10 @@ RFC1918 内网），否则客户端 IP 与限流归因错误；确需其他网�
 ### dotenvx（compose 边界的 secret 通道）
 
 `docker/.env` 是 dotenvx 加密后进 git 的文件（只 review key 名，不看值）；
-`docker/.env.example` 保持明文模板。本地应用进程（`go run` / `npm run dev`）
-不再读本机明文 `.env`（已删除），改走 Infisical Cloud 注入：
+`docker/.env.example` 保持明文模板。本地全栈（`go run` / `npm run dev`）
+经 Infisical Cloud 注入，不依赖本机明文 `.env`（仓库内无跟踪的明文 `.env`，
+均为 gitignored）；entrypoint 的 dotenv 只在文件存在时才读且永不覆盖已注入值，
+单跑排障仍可用各应用的 `.env.example` 模板：
 
 ```bash
 npm i -g @dotenvx/dotenvx

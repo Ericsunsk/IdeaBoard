@@ -1,7 +1,7 @@
 <template>
   <DialogRoot :open="props.isVisible" @update:open="handleOpenUpdate">
     <DialogPortal>
-      <DialogOverlay :class="ibDialogMaskClass" @click="handleMaskClick" />
+      <DialogOverlay @click="handleMaskClick" />
       <DialogContent
         class="bg-popover"
         :style="{ width: 'min(420px, calc(100vw - 32px))' }"
@@ -98,7 +98,6 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { ibDialogMaskClass } from '../../theme/dialogMask'
 import {
   defineDialogSurfaceIntent,
   useOverlayInteractionLifecycle,

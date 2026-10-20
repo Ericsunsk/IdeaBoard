@@ -6,7 +6,7 @@
     >
       <div class="max-w-[520px] border-l-2 border-primary pl-5 sm:pl-6">
         <span
-          class="inline-flex size-11 items-center justify-center rounded-control border border-border bg-card text-primary shadow-sm"
+          class="inline-flex size-11 items-center justify-center rounded-control border border-border bg-card text-primary shadow-raised"
           aria-hidden="true"
         >
           <component :is="icon" class="size-5" />

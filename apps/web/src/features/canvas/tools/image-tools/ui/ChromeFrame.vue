@@ -49,7 +49,7 @@ const chromeStyle = computed(() => ({
   --image-tool-stack-gap: 8px;
   --image-tool-right-panel-width: 203px;
   --image-tool-border-width: var(--canvas-control-border-width);
-  --image-tool-button-size: 35px;
+  --image-tool-button-size: var(--canvas-control-size-md);
   --image-tool-button-radius: var(--radius-control);
   --image-tool-button-gap: var(--canvas-tool-button-gap);
   --image-tool-icon-size: 21px;

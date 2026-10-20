@@ -51,9 +51,6 @@ func TestRuntimeRoleCanUseTypedBillingCommandsButCannotMutateCatalogDirectly(t *
 			t.Errorf("RESET ROLE: %v", err)
 		}
 		conn.Release()
-		if false {
-			t.Errorf("close runtime connection: %v", err)
-		}
 	}()
 	if _, err := conn.Exec(ctx, `SET ROLE `+roleSQL); err != nil {
 		t.Fatalf("SET ROLE: %v", err)

@@ -3,7 +3,7 @@
     class="node-aspect-ratio-wrap relative h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)]"
   >
     <button
-      class="node-aspect-ratio-trigger canvas-tool-tooltip-trigger inline-flex h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)] flex-[0_0_var(--node-tool-button-size)] cursor-pointer items-center justify-center rounded-[var(--node-tool-button-radius)] border-[length:var(--node-tool-border-width)] border-solid border-[color:var(--node-tool-button-border)] bg-[var(--canvas-glass-bg)] p-0 text-xs leading-none font-bold text-[var(--canvas-text-control)] outline-none backdrop-blur-[var(--canvas-glass-blur)] disabled:cursor-wait disabled:opacity-[0.55]"
+      class="node-aspect-ratio-trigger canvas-tool-tooltip-trigger inline-flex h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)] flex-[0_0_var(--node-tool-button-size)] cursor-pointer items-center justify-center rounded-[var(--node-tool-button-radius)] border-[length:var(--node-tool-border-width)] border-solid border-[color:var(--node-tool-button-border)] bg-[var(--canvas-glass-bg)] p-0 text-admin-meta leading-none font-bold text-[var(--canvas-text-control)] outline-none backdrop-blur-[var(--canvas-glass-blur)] disabled:cursor-wait disabled:opacity-[0.55]"
       type="button"
       :class="{ active: isVisible }"
       :disabled="isDisabled"
@@ -15,7 +15,7 @@
         :data-ratio="ratio"
       >
         <span
-          class="grid h-5 w-5 place-items-center rounded-control border border-[var(--canvas-handle-border,currentColor)] text-[var(--canvas-text-subtle)]"
+          class="grid h-5 w-5 place-items-center rounded-tight border border-[var(--canvas-handle-border,currentColor)] text-[var(--canvas-text-subtle)]"
           aria-hidden="true"
         ></span>
       </span>
@@ -37,7 +37,7 @@
           :data-ratio="option"
         >
           <span
-            class="grid h-5 w-5 place-items-center rounded-control border border-[var(--canvas-handle-border,currentColor)] text-[var(--canvas-text-subtle)]"
+            class="grid h-5 w-5 place-items-center rounded-tight border border-[var(--canvas-handle-border,currentColor)] text-[var(--canvas-text-subtle)]"
             aria-hidden="true"
           ></span>
         </span>

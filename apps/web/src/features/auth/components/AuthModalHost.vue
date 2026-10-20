@@ -1,7 +1,7 @@
 <template>
   <DialogRoot :open="true" @update:open="handleOpenUpdate">
     <DialogPortal>
-      <DialogOverlay :class="ibDialogMaskClass" @click="handleMaskClick" />
+      <DialogOverlay @click="handleMaskClick" />
       <DialogContent
         :show-close="false"
         :class="cn(dialogContentBaseClass, authDialogContentClass)"
@@ -38,7 +38,6 @@ import { dialogContentBaseClass } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ibDialogMaskClass } from '../../../theme/dialogMask'
 import {
   defineDialogSurfaceIntent,
   useOverlayInteractionLifecycle,

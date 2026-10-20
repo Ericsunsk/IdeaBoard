@@ -302,16 +302,16 @@ describe('AdminModelEditDialog subcomponents', () => {
       // 静态属性不呼吸；✓/✗ 后缀保留区分。
       const supportedPill = (await screen.findByText(/工具调用✓/)).parentElement!
       expect(supportedPill).toHaveClass('bg-success-soft', 'text-success')
-      expect(supportedPill.querySelector('.animate-ping')).toBeNull()
+      expect(supportedPill.querySelector('.status-badge-pulse')).toBeNull()
       const unsupportedPill = (await screen.findByText(/推理✗/)).parentElement!
       expect(unsupportedPill).toHaveClass('bg-muted', 'text-muted-foreground')
-      expect(unsupportedPill.querySelector('.animate-ping')).toBeNull()
+      expect(unsupportedPill.querySelector('.status-badge-pulse')).toBeNull()
       // deprecated 红 Pill：状态原文 + 已下线预警（danger 语义载体，满圆 Badge）。
       const badge = await screen.findByText(/已下线预警/)
       expect(badge.textContent).toMatch(/deprecated/)
       const badgeRoot = badge.parentElement!
       expect(badgeRoot).toHaveClass('bg-destructive-soft', 'text-destructive', 'rounded-pill')
-      expect(badgeRoot.querySelector('.animate-ping')).toBeNull()
+      expect(badgeRoot.querySelector('.status-badge-pulse')).toBeNull()
       expect(screen.queryByText('暂无数据')).not.toBeInTheDocument()
     })
 
@@ -342,7 +342,7 @@ describe('AdminModelEditDialog subcomponents', () => {
       // beta 收口 neutral Pill：满圆 Badge + muted 载体，静态不呼吸。
       const betaRoot = screen.getByText('beta').parentElement!
       expect(betaRoot).toHaveClass('bg-muted', 'text-muted-foreground', 'rounded-pill')
-      expect(betaRoot.querySelector('.animate-ping')).toBeNull()
+      expect(betaRoot.querySelector('.status-badge-pulse')).toBeNull()
       // 部分缺失：模态/发布/家族行回落暂无数据，不炸版。
       expect(screen.getAllByText('暂无数据').length).toBeGreaterThanOrEqual(3)
     })

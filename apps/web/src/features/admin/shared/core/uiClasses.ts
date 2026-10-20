@@ -44,7 +44,7 @@ export const adminChartGridClass = 'grid grid-cols-1 gap-3.5 xl:grid-cols-12'
 export const adminChartCanvasClass = 'h-full w-full min-w-0'
 
 export const adminToolbarMetricClass =
-  'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-pill border border-border bg-card px-3 py-1.5 text-admin-body font-bold text-foreground shadow-xs'
+  'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-pill border border-border bg-card px-3 py-1.5 text-admin-body font-bold text-foreground shadow-raised'
 
 const adminFramedIconButtonBaseClass =
   '!h-9 !w-9 !border !border-border !bg-card !text-muted-foreground hover:!bg-muted hover:!text-foreground disabled:!text-muted-foreground/40 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] flex items-center justify-center p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
@@ -62,7 +62,7 @@ export const adminToolbarPageLabelClass =
   'flex h-7 items-center justify-center rounded-control border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground'
 
 export const adminLogoButtonClass =
-  'control-state flex shrink-0 items-center justify-center rounded-control border border-border bg-card shadow-xs cursor-pointer overflow-hidden transition-colors hover:border-primary hover:bg-card focus-visible:outline-none focus-visible:border-primary data-[control-state=selected]:border-primary data-[control-state=selected]:bg-card'
+  'control-state flex shrink-0 items-center justify-center rounded-control border border-border bg-card shadow-raised cursor-pointer overflow-hidden transition-colors hover:border-primary hover:bg-card focus-visible:outline-none focus-visible:border-primary data-[control-state=selected]:border-primary data-[control-state=selected]:bg-card'
 
 export const adminTextButtonClass = '!text-muted-foreground hover:!text-foreground'
 
@@ -111,4 +111,4 @@ export const adminDialogChromeCloseClass = 'text-muted-foreground hover:text-for
 // 全局唯一输入框 chrome（AdminInput/AdminNumberInput/AdminTextarea 共用）：
 // 遵循标准 shadcn 输入栏规范，无 hover 杂效，focus 用柔光 ring；尺寸/字号由各组件按 size 追加覆盖。
 export const adminInputChromeClass =
-  'flex w-full rounded-control border border-input bg-background text-foreground shadow-xs transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+  'flex w-full rounded-control border border-input bg-background text-foreground shadow-raised transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'

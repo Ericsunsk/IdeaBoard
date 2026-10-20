@@ -405,7 +405,7 @@ function getBlendWeightBadgeStyle(index: number) {
   padding: 2px 7px;
   border-radius: var(--radius-pill);
   border: 0;
-  background: rgba(255, 255, 255, 0.8);
+  background: color-mix(in srgb, white 80%, transparent);
   color: var(--canvas-text-body);
   font-size: var(--canvas-font-size-caption);
   line-height: 1.3;

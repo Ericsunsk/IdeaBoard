@@ -59,17 +59,17 @@ describe('AdminStatusPill', () => {
     const dot = root.querySelector('[aria-hidden="true"] span:last-child')!
     expect(dot).toHaveClass(pin.dot)
     // 脉冲默认语义：仅 success/warning。
-    expect(root.querySelector('.animate-ping') !== null).toBe(pin.pulseByDefault)
+    expect(root.querySelector('.status-badge-pulse') !== null).toBe(pin.pulseByDefault)
   })
 
   it('lets pulse prop override the default', async () => {
     const { container, rerender } = renderWithUser(AdminStatusPill, {
       props: { label: 'forced', variant: 'neutral', pulse: true },
     })
-    expect(container.querySelector('.animate-ping')).not.toBeNull()
+    expect(container.querySelector('.status-badge-pulse')).not.toBeNull()
 
     await rerender({ label: 'forced', variant: 'success', pulse: false })
-    expect(container.querySelector('.animate-ping')).toBeNull()
+    expect(container.querySelector('.status-badge-pulse')).toBeNull()
   })
 
   it('applies size classes without changing the label API', async () => {
@@ -82,7 +82,7 @@ describe('AdminStatusPill', () => {
       'text-admin-caption',
     )
     await rerender({ label: 'medium-pill', variant: 'info', size: 'medium' })
-    expect(screen.getByText('medium-pill').parentElement).toHaveClass('h-6', 'px-2.5', 'text-xs')
+    expect(screen.getByText('medium-pill').parentElement).toHaveClass('h-6', 'px-2.5', 'text-admin-meta')
   })
 
   it('forwards caller attributes to the same root through live prop updates', async () => {
@@ -104,7 +104,7 @@ describe('AdminStatusPill', () => {
     expect(screen.getByLabelText('status')).toBe(root)
     expect(root).toHaveTextContent('failed')
     expect(root).toHaveClass('bg-destructive-soft', 'h-5', 'w-full', 'font-bold')
-    expect(root.querySelector('.animate-ping')).toBeNull()
+    expect(root.querySelector('.status-badge-pulse')).toBeNull()
     expect(root).not.toHaveAttribute('tone')
     expect(root).not.toHaveAttribute('variant')
   })

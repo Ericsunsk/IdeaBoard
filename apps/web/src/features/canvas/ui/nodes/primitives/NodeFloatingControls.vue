@@ -12,7 +12,7 @@
   width: min(var(--canvas-node-floating-ui-width), calc(100vw - 32px));
   min-height: 0;
   translate: -50% 0;
-  z-index: 42;
+  z-index: var(--z-index-popover);
   pointer-events: none;
 }
 

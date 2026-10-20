@@ -32,7 +32,7 @@
 
     <!-- 🌟 Hover 渐变半透操作浮层 (顶栏左上角多选对勾 + 右上角搜图 + 底栏标题/作者 + 存入个人素材库) -->
     <div
-      class="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between p-3.5 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] bg-gradient-to-t from-black/80 via-transparent to-black/20 group-hover:opacity-100 group-focus-within:opacity-100"
+      class="pointer-events-none absolute inset-0 z-content flex flex-col justify-between p-3.5 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] bg-gradient-to-t from-media-scrim/80 via-transparent to-media-scrim/20 group-hover:opacity-100 group-focus-within:opacity-100"
       :class="isSelected ? 'opacity-100' : 'opacity-0'"
     >
       <!-- 顶栏：左上角极简多选对勾 + 右上角搜图参考圆纽 -->
@@ -43,7 +43,7 @@
           :class="
             isSelected
               ? '!bg-primary text-primary-foreground shadow-xs'
-              : 'bg-[var(--search-overlay-btn-bg)] text-white/80 hover:bg-[var(--search-overlay-btn-bg-hover)] hover:text-white backdrop-blur-[var(--blur-glass)]'
+              : 'bg-[var(--search-overlay-btn-bg)] text-media-foreground/80 hover:bg-[var(--search-overlay-btn-bg-hover)] hover:text-media-foreground backdrop-blur-[var(--blur-glass)]'
           "
           :title="
             isSelected ? t('search.tooltips.deselectImage') : t('search.tooltips.selectImage')
@@ -58,7 +58,7 @@
 
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--blur-glass)] transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill bg-[var(--search-overlay-btn-bg)] text-media-foreground backdrop-blur-[var(--blur-glass)] transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
           :class="{
             '!bg-primary !text-primary-foreground shadow-xs': isUsedAsReference,
           }"
@@ -73,10 +73,10 @@
       <!-- 底部信息与存入素材库按钮 -->
       <div class="pointer-events-auto flex items-end justify-between gap-3">
         <div class="min-w-0 flex-1">
-          <p class="m-0 truncate text-xs font-medium text-white leading-tight">
+          <p class="m-0 truncate text-xs font-medium text-media-foreground leading-tight">
             {{ result.title || t('search.lightbox.untitledReference') }}
           </p>
-          <p class="mt-1 mb-0 truncate text-admin-caption text-white/70 leading-tight">
+          <p class="mt-1 mb-0 truncate text-admin-caption text-media-foreground/70 leading-tight">
             {{
               t('search.attribution.byAuthorProvider', {
                 author: result.author,
@@ -88,7 +88,7 @@
 
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill shadow-admin-popover transition duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-pill shadow-floating transition duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           :class="
             isSaved
               ? 'bg-success text-success-foreground hover:bg-success-hover'

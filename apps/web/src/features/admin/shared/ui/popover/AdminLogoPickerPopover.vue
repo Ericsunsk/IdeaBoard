@@ -32,7 +32,7 @@
               class="shrink-0 cursor-pointer rounded-pill px-2 py-0.5 text-admin-caption font-medium transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
               :class="
                 currentCategory === cat.key
-                  ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                  ? 'bg-primary text-primary-foreground font-semibold shadow-raised'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
               "
               @click="currentCategory = cat.key"

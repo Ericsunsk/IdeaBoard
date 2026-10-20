@@ -1,7 +1,7 @@
 <template>
   <DialogRoot :open="props.isOpen" @update:open="emits('update:isOpen', $event)">
     <DialogPortal>
-      <DialogOverlay :class="ibDialogMaskClass" />
+      <DialogOverlay />
       <DialogContent
         :class="cn(dialogContentBaseClass, accountDialogContentClass, '!p-0 !overflow-hidden')"
         :show-close="false"
@@ -256,7 +256,7 @@
     dismiss while idle; the confirm commit locks every path while busy. -->
   <DialogRoot :open="isCreateDialogOpen" @update:open="handleCreateOpenUpdate">
     <DialogPortal>
-      <DialogOverlay :class="ibDialogMaskClass" @click="handleCreateMaskClick" />
+      <DialogOverlay @click="handleCreateMaskClick" />
       <DialogContent
         class="bg-popover"
         :style="{ width: 'min(420px, calc(100vw - 32px))' }"
@@ -371,7 +371,6 @@ import {
   useOverlayInteractionLifecycle,
 } from '../../../../core/composables/useOverlayInteractionLifecycle'
 import { userErrorCode } from '../../../../core/errors/errorCatalog'
-import { ibDialogMaskClass } from '../../../../theme/dialogMask'
 import type { UserAccountMenuWorkspaceItem } from './userAccountMenu.types'
 import { isDefaultWorkspaceItem } from './workspaceMenu'
 import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'

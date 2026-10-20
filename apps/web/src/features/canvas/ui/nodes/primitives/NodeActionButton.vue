@@ -74,7 +74,7 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 .node-action-btn.variant-stage-ghost {
   border: none;
   border-radius: var(--radius-control);
-  background: rgba(75, 85, 99, 0.72);
+  background: color-mix(in srgb, rgb(75 85 99) 72%, transparent);
   color: #f9fafb;
   min-height: 26px;
   padding: 0 10px;
@@ -82,7 +82,7 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 }
 
 .node-action-btn.variant-stage-ghost:hover:not(:disabled) {
-  background: rgba(75, 85, 99, 0.88);
+  background: color-mix(in srgb, rgb(75 85 99) 88%, transparent);
 }
 
 .node-action-btn.variant-tool:hover:not(:disabled),
@@ -99,8 +99,8 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 }
 
 .node-action-btn.variant-chip {
-  height: 24px;
-  min-height: 24px;
+  height: var(--spacing-touch-target-aa);
+  min-height: var(--spacing-touch-target-aa);
   padding: 0 9px;
   font-size: var(--canvas-font-size-micro);
   font-weight: 500;
@@ -108,7 +108,7 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 }
 
 .node-action-btn.variant-primary {
-  min-height: 32px;
+  min-height: var(--spacing-touch-target-min);
   border-color: var(--node-tool-button-brand);
   border-radius: var(--radius-pill);
   background: var(--node-tool-button-brand);

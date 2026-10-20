@@ -53,8 +53,8 @@
     var(--ideaboard-toast-bg);
   box-shadow: var(--ideaboard-toast-shadow);
   color: var(--ideaboard-toast-text);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
   /* Surface click dismisses (see installClickToDismiss in useAppToast). */
   cursor: pointer;
 }

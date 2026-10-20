@@ -1,11 +1,7 @@
 <template>
   <Badge :variant="badgeVariant" rounded :class="pillClass">
     <span v-if="props.dot" class="relative flex size-1.5" aria-hidden="true">
-      <span
-        v-if="shouldPulse"
-        class="absolute inline-flex size-full animate-ping rounded-pill opacity-75"
-        :class="dotColorClass"
-      />
+      <span v-if="shouldPulse" class="status-badge-pulse" :class="dotColorClass" />
       <span class="relative inline-flex size-1.5 rounded-pill" :class="dotColorClass" />
     </span>
     <span
@@ -92,7 +88,7 @@ const sizeClass = computed(() => {
   if (props.size === 'small') {
     return 'h-5 px-2 gap-1 text-admin-caption'
   }
-  return 'h-6 px-2.5 gap-1.5 text-xs'
+  return 'h-6 px-2.5 gap-1.5 text-admin-meta'
 })
 
 // py-0 settles the Badge base py-0.5: fixed-height pills need no vertical padding.
@@ -116,3 +112,37 @@ const dotColorClass = computed(() => {
   }
 })
 </script>
+
+<style scoped>
+/* Processing pulse: ping geometry on the feedback intent (≈1s loop) instead of
+ * the fixed Tailwind ping. Reduced motion collapses the feedback duration to
+ * zero and the guard below parks the dot, matching motionPolicy.ts. */
+.status-badge-pulse {
+  position: absolute;
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  opacity: 0.75;
+  animation: status-badge-ping calc(var(--motion-feedback-duration) * 6)
+    var(--motion-feedback-easing) infinite;
+}
+
+@keyframes status-badge-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+  75%,
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-badge-pulse {
+    animation: none;
+  }
+}
+</style>

@@ -176,7 +176,7 @@
 }
 
 .editing-controls-toggle-button {
-  width: 24px;
+  width: var(--spacing-touch-target-aa);
   height: var(--editing-controls-compact-control-height);
   display: inline-flex;
   align-items: center;
@@ -277,7 +277,7 @@
   transform: translate(-50%, 2px);
   min-width: 18px;
   padding: 3px 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background: var(--canvas-tooltip-bg);
   color: var(--canvas-tooltip-text);
   font-size: var(--editing-controls-meta-text-size);
@@ -346,13 +346,13 @@
 .editing-controls-slider-row__range--hue::-webkit-slider-thumb {
   border: 2px solid #ffffff;
   background: transparent;
-  box-shadow: 0 0 0 1px rgba(39, 41, 50, 0.22);
+  box-shadow: 0 0 0 1px color-mix(in srgb, rgb(39 41 50) 22%, transparent);
 }
 
 .editing-controls-slider-row__range--hue::-moz-range-thumb {
   border: 2px solid #ffffff;
   background: transparent;
-  box-shadow: 0 0 0 1px rgba(39, 41, 50, 0.22);
+  box-shadow: 0 0 0 1px color-mix(in srgb, rgb(39 41 50) 22%, transparent);
 }
 
 .editing-controls-slider-row__range--tonal {

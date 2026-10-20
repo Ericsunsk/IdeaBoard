@@ -46,6 +46,6 @@ describe('BillingPricingTable status column', () => {
     }
     expect(screen.getByText('Active').parentElement?.style.minWidth).toBe('84px')
     expect(screen.getByText('Disabled').parentElement?.style.minWidth).toBe('84px')
-    expect(container.querySelector('.animate-ping')).toBeNull()
+    expect(container.querySelector('.status-badge-pulse')).toBeNull()
   })
 })

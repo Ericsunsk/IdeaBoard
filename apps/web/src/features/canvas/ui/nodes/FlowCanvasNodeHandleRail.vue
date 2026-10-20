@@ -166,8 +166,8 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--spacing-touch-target-min);
+  height: var(--spacing-touch-target-min);
   border: calc(var(--flow-edge-width) * 1px) solid var(--handle-ring-color);
   border-radius: var(--radius-pill);
   background: transparent;

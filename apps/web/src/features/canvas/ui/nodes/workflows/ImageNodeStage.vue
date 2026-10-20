@@ -376,7 +376,7 @@ function submitOutpaint(prompt: string) {
 }
 
 .image-node-stage-image.is-tier-loading {
-  filter: blur(12px);
+  filter: blur(var(--blur-glass));
 }
 
 .canvas-image-enter-active,
@@ -457,7 +457,7 @@ function submitOutpaint(prompt: string) {
   width: 100%;
   height: 100%;
   border: 0;
-  border-radius: 11px;
+  border-radius: var(--radius-panel);
   background: var(--canvas-node-bg);
   color: var(--canvas-text-subtle);
   gap: 0;
@@ -496,7 +496,7 @@ function submitOutpaint(prompt: string) {
 }
 
 .image-node-stage-empty.is-loading {
-  background: rgba(255, 255, 255, 0.56);
+  background: color-mix(in srgb, white 56%, transparent);
   color: var(--canvas-text-subtle);
   cursor: default;
 }

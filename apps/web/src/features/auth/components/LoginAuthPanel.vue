@@ -2,7 +2,6 @@
   <div class="relative">
     <div :class="authModalShellClass">
       <div :class="authModalBackdropClass" aria-hidden="true"></div>
-      <AuthModalCloseButton :disabled="loading" @click="emit('close')" />
 
       <div :class="authModalHeaderClass">
         <p :class="authModalKickerClass">{{ t('auth.kickerWelcomeBack') }}</p>
@@ -11,7 +10,7 @@
 
       <form
         v-if="!resetMode"
-        class="relative z-[1] flex flex-col gap-3.5"
+        class="relative z-content flex flex-col gap-3.5"
         novalidate
         @submit.prevent="handleLogin"
       >
@@ -105,7 +104,7 @@
 
       <form
         v-else
-        class="relative z-[1] flex flex-col gap-3.5"
+        class="relative z-content flex flex-col gap-3.5"
         novalidate
         @submit.prevent="handleResetPassword"
       >
@@ -140,7 +139,7 @@
 
       <form
         v-if="resetMode && resetOtpSent"
-        class="relative z-[1] mt-3 flex flex-col gap-3.5"
+        class="relative z-content mt-3 flex flex-col gap-3.5"
         novalidate
         @submit.prevent="handleResetPasswordConfirm"
       >
@@ -184,6 +183,7 @@
           Sign up
         </button>
       </div>
+      <AuthModalCloseButton :disabled="loading" @click="emit('close')" />
     </div>
   </div>
 </template>

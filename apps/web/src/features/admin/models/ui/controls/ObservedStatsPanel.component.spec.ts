@@ -102,7 +102,7 @@ describe('ObservedStatsPanel', () => {
     const { rerender } = render(ObservedStatsPanel, { props: { observed: observed() } })
     const onSalePill = screen.getByText('GPT Image 1 · 在售').parentElement!
     expect(onSalePill).toHaveClass('bg-success-soft', 'text-success')
-    expect(onSalePill.querySelector('.animate-ping')).toBeNull()
+    expect(onSalePill.querySelector('.status-badge-pulse')).toBeNull()
     await rerender({
       observed: observed({
         skuMargins: [
@@ -124,7 +124,7 @@ describe('ObservedStatsPanel', () => {
     })
     const offSalePill = screen.getByText('Off Sale · 非在售').parentElement!
     expect(offSalePill).toHaveClass('bg-muted', 'text-muted-foreground')
-    expect(offSalePill.querySelector('.animate-ping')).toBeNull()
+    expect(offSalePill.querySelector('.status-badge-pulse')).toBeNull()
   })
 
   it('falls back gracefully without observations', () => {

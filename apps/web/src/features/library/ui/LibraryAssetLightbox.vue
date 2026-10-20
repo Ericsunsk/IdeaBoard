@@ -1,5 +1,5 @@
 <template>
-  <!-- 🌟 Demo 同款零遮挡全景高清 Lightbox 弹窗 (bg-black/65 backdrop-blur-2xl) -->
+  <!-- 🌟 Demo 同款零遮挡全景高清 Lightbox 弹窗 (bg-media-scrim/65 backdrop-blur-2xl) -->
   <Teleport to="body">
     <Transition
       enter-active-class="transition-opacity duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]"
@@ -9,22 +9,22 @@
     >
       <div
         v-if="!!asset"
-        class="fixed inset-0 z-lightbox flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-black/65 backdrop-blur-2xl select-none"
+        class="fixed inset-0 z-lightbox flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-media-scrim/65 backdrop-blur-2xl select-none"
         @click="emit('close')"
       >
         <!-- 顶部极简悬浮信息与操作栏 -->
         <div
-          class="flex w-full max-w-6xl items-center justify-between z-20 shrink-0 mb-3 px-2"
+          class="flex w-full max-w-6xl items-center justify-between z-content shrink-0 mb-3 px-2"
           @click.stop
         >
           <!-- 左上角：纯净悬浮文字 (Title + Author) -->
           <div class="min-w-0 pr-4">
             <h3
-              class="m-0 text-white text-base sm:text-lg font-semibold tracking-tight drop-shadow-md truncate max-w-[240px] sm:max-w-md"
+              class="m-0 text-media-foreground text-base sm:text-lg font-semibold tracking-tight drop-shadow-md truncate max-w-[240px] sm:max-w-md"
             >
               {{ asset.title || t('library.states.savedReference') }}
             </h3>
-            <p class="mt-1 mb-0 text-white/70 text-xs drop-shadow-md">
+            <p class="mt-1 mb-0 text-media-foreground/70 text-xs drop-shadow-md">
               {{ sourceAttribution }}
             </p>
           </div>
@@ -62,9 +62,11 @@
             v-if="displayUrl"
             :src="displayUrl"
             :alt="asset.title || t('library.states.savedReference')"
-            class="max-h-[82vh] max-w-full object-contain rounded-overlay shadow-2xl border-0 ring-0 outline-none select-none"
+            class="max-h-[82vh] max-w-full object-contain rounded-overlay shadow-floating border-0 ring-0 outline-none select-none"
           />
-          <p v-else class="text-sm text-white">{{ t('library.states.imageUnavailable') }}</p>
+          <p v-else class="text-sm text-media-foreground">
+            {{ t('library.states.imageUnavailable') }}
+          </p>
         </div>
       </div>
     </Transition>

@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "checkpointSha": "aed7eafccbc30b873e20cdf5f1cb8687f4d75553",
+  "checkpointSha": "6a1ae05316667407eecf38c72ce15592b41ef817",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
-  "totals": { "seams": 274, "violations": 0, "boardDeepImports": 0, "shims": 0 },
+  "totals": { "seams": 273, "violations": 0, "boardDeepImports": 0, "shims": 0 },
   "shims": [],
   "undeclaredDeepImports": [],
   "seams": {
@@ -8547,7 +8547,7 @@
         }
       ],
       "fanIn": 5,
-      "fanOut": 9,
+      "fanOut": 8,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/vue-i18n/index.js",
@@ -8556,8 +8556,7 @@
         "src/components/ui/dialog/index.ts",
         "src/components/ui/input/index.ts",
         "src/core/composables/useAppClipboard.ts",
-        "src/core/composables/useOverlayInteractionLifecycle.ts",
-        "src/theme/dialogMask.ts"
+        "src/core/composables/useOverlayInteractionLifecycle.ts"
       ],
       "outboundEdges": [
         {
@@ -8599,11 +8598,6 @@
           "from": "src/core/components/UserConfirmDialog.vue",
           "to": "src/core/composables/useOverlayInteractionLifecycle.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/core/components/UserConfirmDialog.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
@@ -8611,7 +8605,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 5,
-      "targetFanOut": 9,
+      "targetFanOut": 8,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -11071,11 +11065,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/ui/screens/CanvasScreen.vue",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -11222,7 +11211,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 141,
+      "fanIn": 140,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
@@ -11292,7 +11281,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 141,
+      "targetFanIn": 140,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -14217,7 +14206,7 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 84,
+      "fanOut": 83,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -14300,7 +14289,6 @@
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
         "src/theme/composables/useTheme.ts",
-        "src/theme/dialogMask.ts",
         "src/theme/formControls.ts",
         "vitest/browser"
       ],
@@ -15416,11 +15404,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
           "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
           "kind": "runtime"
@@ -15486,11 +15469,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/dialog/AccountDialog.component.spec.ts",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/ui/dialog/AccountDialog.vue",
           "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
@@ -15513,11 +15491,6 @@
         {
           "from": "src/features/account/ui/dialog/AccountDialog.vue",
           "to": "src/lib/utils.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/dialog/AccountDialog.vue",
-          "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
         },
         {
@@ -16206,7 +16179,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 84,
+      "targetFanOut": 83,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -22500,6 +22473,7 @@
         "src/api/sessionUserType.ts",
         "src/api/userSession.ts",
         "src/api/workspaceEventStream.ts",
+        "src/app/style.css",
         "src/components/ui/button/index.ts",
         "src/components/ui/dialog/index.ts",
         "src/components/ui/input/index.ts",
@@ -22533,7 +22507,6 @@
         "src/test/msw.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
-        "src/theme/dialogMask.ts",
         "src/theme/formControls.ts"
       ],
       "outboundEdges": [
@@ -22570,11 +22543,6 @@
         {
           "from": "src/features/auth/components/AuthModalHost.vue",
           "to": "src/lib/utils.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/auth/components/AuthModalHost.vue",
-          "to": "src/theme/dialogMask.ts",
           "kind": "runtime"
         },
         {
@@ -22810,6 +22778,36 @@
         {
           "from": "src/features/auth/components/auth-fields/useAuthForm.ts",
           "to": "src/core/utils/formValidation.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authClose.browser.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authClose.browser.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authClose.browser.spec.ts",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authClose.browser.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authClose.browser.spec.ts",
+          "to": "src/app/style.css",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/auth/components/authClose.browser.spec.ts",
+          "to": "src/test/render.ts",
           "kind": "runtime"
         },
         {
@@ -23468,7 +23466,7 @@
         }
       ],
       "fanIn": 49,
-      "fanOut": 70,
+      "fanOut": 69,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
         "fs",
@@ -23537,7 +23535,6 @@
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
-        "src/theme/dialogMask.ts",
         "url",
         "vitest/browser"
       ],
@@ -24896,11 +24893,6 @@
           "from": "src/features/board/ui/share/ShareDialog.vue",
           "to": "src/lib/utils.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/share/ShareDialog.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
@@ -24908,7 +24900,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 49,
-      "targetFanOut": 70,
+      "targetFanOut": 69,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -25438,7 +25430,7 @@
         }
       ],
       "fanIn": 99,
-      "fanOut": 70,
+      "fanOut": 69,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
         "fs",
@@ -25507,7 +25499,6 @@
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
-        "src/theme/dialogMask.ts",
         "url",
         "vitest/browser"
       ],
@@ -26866,11 +26857,6 @@
           "from": "src/features/board/ui/share/ShareDialog.vue",
           "to": "src/lib/utils.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/share/ShareDialog.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
@@ -26878,7 +26864,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 99,
-      "targetFanOut": 70,
+      "targetFanOut": 69,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -26948,7 +26934,7 @@
         }
       ],
       "fanIn": 11,
-      "fanOut": 70,
+      "fanOut": 69,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
         "fs",
@@ -27017,7 +27003,6 @@
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
-        "src/theme/dialogMask.ts",
         "url",
         "vitest/browser"
       ],
@@ -28376,11 +28361,6 @@
           "from": "src/features/board/ui/share/ShareDialog.vue",
           "to": "src/lib/utils.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/share/ShareDialog.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
         }
       ],
       "undeclaredConsumers": [],
@@ -28388,7 +28368,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 11,
-      "targetFanOut": 70,
+      "targetFanOut": 69,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -37293,7 +37273,7 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 41,
+      "fanOut": 40,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@testing-library/jest-dom/vitest.js",
@@ -37317,7 +37297,6 @@
         "src/features/canvas/core/execution/canvasTaskRequest.ts",
         "src/features/canvas/core/graph/canvasGroupGeometry.ts",
         "src/features/canvas/core/graph/index.ts",
-        "src/features/canvas/core/nodes/canvasNodeRegistry.ts",
         "src/features/canvas/core/nodes/canvasNodeUi.ts",
         "src/features/canvas/core/nodes/flowTypes.ts",
         "src/features/canvas/core/nodes/imageActionRegistry.ts",
@@ -38110,17 +38089,7 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
           "to": "src/features/board/ports/canvas.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
-          "to": "src/features/canvas/core/nodes/canvasNodeRegistry.ts",
           "kind": "runtime"
         },
         {
@@ -38469,7 +38438,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 41,
+      "targetFanOut": 40,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -38944,13 +38913,11 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 8,
+      "fanOut": 6,
       "fanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/vue/index.js",
-        "src/core/i18n/index.ts",
         "src/features/board/ports/canvas.ts",
-        "src/features/canvas/core/nodes/canvasNodeRegistry.ts",
         "src/features/canvas/core/nodes/canvasNodeUi.ts",
         "src/features/canvas/session/browser/canvasPerfProbe.ts",
         "src/features/canvas/session/flow-adapter/index.ts"
@@ -38968,17 +38935,7 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
           "to": "src/features/board/ports/canvas.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/ui/nodes/useFlowNodeUiState.ts",
-          "to": "src/features/canvas/core/nodes/canvasNodeRegistry.ts",
           "kind": "runtime"
         },
         {
@@ -39002,7 +38959,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 8,
+      "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -41327,7 +41284,7 @@
         }
       ],
       "fanIn": 27,
-      "fanOut": 50,
+      "fanOut": 49,
       "fanOutTargets": [
         "../../contracts/library/library-source.fixtures.json",
         "node_modules/@iconoir/vue/dist/index.js",
@@ -41375,7 +41332,6 @@
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
-        "src/theme/dialogMask.ts",
         "src/theme/formControls.ts",
         "src/theme/lightboxScrim.ts",
         "vitest/browser"
@@ -41898,11 +41854,6 @@
         },
         {
           "from": "src/features/library/ui/LibraryFolderDialogs.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
           "to": "src/theme/formControls.ts",
           "kind": "runtime"
         },
@@ -41962,7 +41913,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 27,
-      "targetFanOut": 50,
+      "targetFanOut": 49,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -42827,6 +42778,36 @@
         {
           "from": "src/features/search/ui/components/SearchSavePopover.vue",
           "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/mediaScrim.browser.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/mediaScrim.browser.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/mediaScrim.browser.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/mediaScrim.browser.spec.ts",
+          "to": "src/app/style.css",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/mediaScrim.browser.spec.ts",
+          "to": "src/test/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/ui/components/mediaScrim.browser.spec.ts",
+          "to": "src/test/render.ts",
           "kind": "runtime"
         },
         {
@@ -44586,64 +44567,6 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/theme/composables/useTheme.ts"],
-      "impureRuntimePaths": []
-    },
-    "src/theme/dialogMask.ts": {
-      "consumerEdges": [
-        {
-          "from": "src/core/components/UserConfirmDialog.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/dialog/AccountDialog.component.spec.ts",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/dialog/AccountDialog.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/auth/components/AuthModalHost.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/board/ui/share/ShareDialog.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/library/ui/LibraryFolderDialogs.vue",
-          "to": "src/theme/dialogMask.ts",
-          "kind": "runtime"
-        }
-      ],
-      "fanIn": 7,
-      "fanOut": 0,
-      "fanOutTargets": [],
-      "outboundEdges": [],
-      "undeclaredConsumers": [],
-      "missingConsumers": [],
-      "undeclaredDeepImports": [],
-      "missingDeepImports": [],
-      "targetFanIn": 7,
-      "targetFanOut": 0,
-      "advisories": {
-        "fanInTargetMismatch": false,
-        "fanOutTargetMismatch": false,
-        "newFanOutTargets": [],
-        "missingFanOutTargets": []
-      },
-      "shimCount": 0,
-      "ownershipScope": ["src/theme/dialogMask.ts"],
       "impureRuntimePaths": []
     },
     "src/theme/formControls.ts": {

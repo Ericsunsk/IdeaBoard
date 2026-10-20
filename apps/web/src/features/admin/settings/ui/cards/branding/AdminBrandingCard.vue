@@ -28,7 +28,7 @@
 
           <button
             v-if="brandingForm.logo_url"
-            class="absolute -top-1.5 -right-1.5 z-admin-sticky grid size-5 place-items-center rounded-pill border border-border bg-card text-muted-foreground leading-none shadow-xs transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-destructive focus-visible:outline-none disabled:cursor-not-allowed cursor-pointer"
+            class="absolute -top-1.5 -right-1.5 z-admin-sticky grid size-5 place-items-center rounded-pill border border-border bg-card text-muted-foreground leading-none shadow-raised transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-destructive focus-visible:outline-none disabled:cursor-not-allowed cursor-pointer"
             :class="
               isBrandingLoading || isBrandingSaving || uploading
                 ? 'opacity-40'

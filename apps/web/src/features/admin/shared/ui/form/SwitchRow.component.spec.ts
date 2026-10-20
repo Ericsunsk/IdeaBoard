@@ -30,22 +30,22 @@ describe('SwitchRow', () => {
     expect(placeholder.className).toContain('h-6')
   })
 
-  it('keeps ping off by default so variant flips never mount extra DOM', () => {
+  it('keeps pulse off by default so variant flips never mount extra DOM', () => {
     const { container } = renderWithUser(SwitchRow, {
       props: { pill: 'Active', pillVariant: 'success', statusMinWidth: '84px' },
     })
 
-    expect(container.querySelector('.animate-ping')).toBeNull()
+    expect(container.querySelector('.status-badge-pulse')).toBeNull()
   })
 
-  it('only adds the absolute ping layer when pulse is explicitly enabled', () => {
+  it('only adds the pulse layer when pulse is explicitly enabled', () => {
     const { container } = renderWithUser(SwitchRow, {
       props: { pill: 'Active', pillVariant: 'success', pulse: true, statusMinWidth: '84px' },
     })
 
-    const ping = container.querySelector('.animate-ping')
-    expect(ping).not.toBeNull()
-    expect(ping?.className).toContain('absolute')
+    const pulse = container.querySelector('.status-badge-pulse')
+    expect(pulse).not.toBeNull()
+    expect(pulse?.className).toContain('bg-success')
     expect(screen.getByTestId('switch-row-status-slot').style.minWidth).toBe('84px')
   })
 

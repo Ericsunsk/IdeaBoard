@@ -1,6 +1,6 @@
 <template>
   <section
-    class="flex flex-col gap-3.5 rounded-overlay border border-border bg-card p-4.5 shadow-2xs"
+    class="flex flex-col gap-3.5 rounded-overlay border border-border bg-card p-4.5 shadow-raised"
     aria-labelledby="admin-user-wallet-ledger-title"
   >
     <div class="overflow-hidden rounded-panel border border-border">
@@ -59,7 +59,7 @@
 
         <AdminColumn :header="t('admin.wallet.reasonAndReference')" style="min-width: 220px">
           <template #body="{ data }">
-            <div class="max-w-72 truncate text-admin-body-sm text-foreground" :title="data.reason">
+            <div class="max-w-72 truncate text-admin-body text-foreground" :title="data.reason">
               {{ emptyPlaceholder(data.reason) }}
             </div>
             <AdminMono

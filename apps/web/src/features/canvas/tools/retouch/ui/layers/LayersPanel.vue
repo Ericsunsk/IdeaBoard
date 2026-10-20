@@ -303,8 +303,8 @@ function resolveLayerIcon(layer: RetouchLayer): Component {
 }
 
 .retouch-layer-row__thumb {
-  width: 24px;
-  height: 24px;
+  width: var(--spacing-touch-target-aa);
+  height: var(--spacing-touch-target-aa);
   border: var(--retouch-panel-border-width) solid var(--canvas-surface-border-soft);
   border-radius: calc(var(--retouch-panel-control-radius) - 3px);
   display: grid;

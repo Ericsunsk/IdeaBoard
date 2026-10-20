@@ -1,6 +1,6 @@
 <template>
   <section
-    class="flex flex-col gap-3.5 rounded-panel border border-border bg-card p-4.5 shadow-2xs"
+    class="flex flex-col gap-3.5 rounded-panel border border-border bg-card p-4.5 shadow-raised"
     :aria-label="t('admin.wallet.overviewAria')"
   >
     <div class="flex flex-wrap items-center justify-between gap-4">

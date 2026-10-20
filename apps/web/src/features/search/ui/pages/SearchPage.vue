@@ -19,10 +19,10 @@
       ]"
     >
       <!-- 🌟 核心吸顶搜索控制中心 (保持原始呼吸间距，向下滚动时悬浮吸顶) -->
-      <div class="sticky top-16 z-30 flex flex-col items-center mb-6 pointer-events-none">
+      <div class="sticky top-16 z-admin-header flex flex-col items-center mb-6 pointer-events-none">
         <div class="flex w-full max-w-[720px] items-center gap-2 pointer-events-auto">
           <form
-            class="page-chrome-surface min-w-0 flex-1 rounded-pill p-1.5 focus-within:shadow-[0_0_0_3px_var(--color-page-chrome-focus-ring)]"
+            class="page-chrome-surface min-w-0 flex-1 rounded-pill p-1.5 focus-within:shadow-board-focus"
             @submit.prevent="submitQuery"
           >
             <div class="flex items-center gap-2">
@@ -61,7 +61,7 @@
                     class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-4 z-popover w-14 opacity-0 scale-95 transition-[opacity,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover/thumb:opacity-100 group-hover/thumb:scale-100 origin-bottom"
                   >
                     <div
-                      class="size-14 shrink-0 overflow-hidden rounded-control bg-card shadow-admin-popover"
+                      class="size-14 shrink-0 overflow-hidden rounded-control bg-card shadow-floating"
                     >
                       <img
                         :src="reference.previewUrl"
@@ -141,7 +141,7 @@
           <button
             :ref="libraryCommands.registerTrigger"
             type="button"
-            class="page-chrome-surface group grid size-11 shrink-0 place-items-center rounded-pill transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-[var(--color-page-chrome-border-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-page-chrome-focus-ring)] cursor-pointer"
+            class="page-chrome-surface group grid size-11 shrink-0 place-items-center rounded-pill transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-[var(--color-page-chrome-border-hover)] focus-visible:outline-none focus-visible:shadow-board-focus cursor-pointer"
             :class="[isTriggerHoveredDuringDrag ? '!scale-110 !border-primary' : '']"
             :aria-label="t('search.tooltips.toggleLibrary')"
             :title="t('search.tooltips.toggleLibrary')"

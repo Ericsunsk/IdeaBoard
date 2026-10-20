@@ -211,7 +211,7 @@ const {
   color: var(--canvas-text-muted);
   font-size: var(--canvas-font-size-micro);
   font-weight: 600;
-  line-height: 14px;
+  line-height: var(--leading-caption);
   white-space: nowrap;
 }
 

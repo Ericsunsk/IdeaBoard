@@ -114,7 +114,7 @@
 }
 
 .node-tool-send:hover:not(:disabled) {
-  transform: translateX(1px);
+  transform: var(--node-tool-icon-button-hover-transform);
   background: var(--canvas-accent-hover);
 }
 
@@ -128,7 +128,7 @@
   position: absolute;
   right: 0;
   bottom: calc(100% + var(--node-tool-button-gap));
-  z-index: 43;
+  z-index: var(--z-index-popover);
   border: var(--node-tool-border-width) solid var(--canvas-glass-border);
   border-radius: var(--radius-panel);
   background: var(--popover);

@@ -140,7 +140,7 @@
               class="rounded-control px-2.5 py-1 text-xs font-semibold transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
               :class="
                 isPresetActive(preset.days)
-                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  ? 'bg-primary text-primary-foreground shadow-raised'
                   : 'border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
               "
               :disabled="pending"

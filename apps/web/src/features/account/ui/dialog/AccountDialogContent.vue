@@ -24,7 +24,7 @@
           />
         </span>
         <span
-          class="min-w-0 truncate text-[19px] leading-[29px] font-bold tracking-normal text-foreground"
+          class="min-w-0 truncate text-[19px] leading-normal font-bold tracking-normal text-foreground"
         >
           {{ projectName }}
         </span>

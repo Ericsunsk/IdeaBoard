@@ -82,7 +82,7 @@
 
           <!-- 悬浮微渐变覆盖层 -->
           <div
-            class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/libcard:opacity-100 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] flex flex-col justify-between p-2 pointer-events-none"
+            class="absolute inset-0 bg-gradient-to-t from-media-scrim/80 via-transparent to-transparent opacity-0 group-hover/libcard:opacity-100 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] flex flex-col justify-between p-2 pointer-events-none"
           >
             <div class="flex justify-end gap-1.5 pointer-events-auto">
               <button
@@ -130,10 +130,12 @@
               </button>
             </div>
             <div class="min-w-0 pointer-events-auto">
-              <p class="m-0 truncate text-admin-caption font-medium text-white leading-tight">
+              <p
+                class="m-0 truncate text-admin-caption font-medium text-media-foreground leading-tight"
+              >
                 {{ asset.title || t('library.states.untitledReference') }}
               </p>
-              <p class="mt-0.5 mb-0 truncate text-admin-micro text-white/70">
+              <p class="mt-0.5 mb-0 truncate text-admin-micro text-media-foreground/70">
                 {{ asset.author || (asset.source === 'external' ? asset.provider : '') }}
               </p>
             </div>

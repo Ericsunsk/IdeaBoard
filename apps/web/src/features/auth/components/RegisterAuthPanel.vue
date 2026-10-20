@@ -2,7 +2,6 @@
   <div class="relative">
     <div :class="authCompactModalShellClass">
       <div :class="authModalBackdropClass" aria-hidden="true"></div>
-      <AuthModalCloseButton :disabled="loading" @click="emit('close')" />
 
       <div :class="authModalHeaderClass">
         <p :class="authModalKickerClass">{{ t('auth.kickerStartMaking') }}</p>
@@ -11,7 +10,7 @@
 
       <form
         v-if="!otpPending"
-        class="relative z-[1] flex flex-col gap-3.5"
+        class="relative z-content flex flex-col gap-3.5"
         novalidate
         @submit.prevent="handleRegister"
       >
@@ -135,7 +134,7 @@
 
       <form
         v-else
-        class="relative z-[1] flex flex-col gap-3.5"
+        class="relative z-content flex flex-col gap-3.5"
         novalidate
         @submit.prevent="handleVerifyOTP"
       >
@@ -173,6 +172,7 @@
           {{ t('auth.footer.signIn') }}
         </button>
       </div>
+      <AuthModalCloseButton :disabled="loading" @click="emit('close')" />
     </div>
   </div>
 </template>

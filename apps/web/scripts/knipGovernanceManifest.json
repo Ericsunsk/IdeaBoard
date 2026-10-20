@@ -14299,12 +14299,6 @@
         "evidence": ["docs/frontend-seam-inventory.md: src/theme/composables/useTheme.ts#useTheme"]
       }
     },
-    "src/theme/dialogMask.ts": {
-      "ibDialogMaskClass": {
-        "kind": "canonical-public",
-        "evidence": ["docs/frontend-seam-inventory.md: src/theme/dialogMask.ts#ibDialogMaskClass"]
-      }
-    },
     "src/theme/formControls.ts": {
       "ibFormFieldClass": {
         "kind": "canonical-public",

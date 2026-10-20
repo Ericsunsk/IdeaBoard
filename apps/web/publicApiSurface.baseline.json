@@ -4034,7 +4034,6 @@
     "isDarkModeActive",
     "useTheme"
   ],
-  "src/theme/dialogMask.ts": ["ibDialogMaskClass"],
   "src/theme/formControls.ts": [
     "ibFormFieldClass",
     "ibFormInputClass",

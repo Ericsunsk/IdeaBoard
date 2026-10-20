@@ -1,7 +1,7 @@
 <template>
   <DialogRoot :open="panel.isOpen.value" @update:open="handleOpenUpdate">
     <DialogPortal>
-      <DialogOverlay :class="ibDialogMaskClass" @click="handleMaskClick" />
+      <DialogOverlay @click="handleMaskClick" />
       <DialogContent
         :class="cn(dialogContentBaseClass, shareDialogContentClass)"
         :show-close="true"
@@ -227,7 +227,6 @@ import {
   defineDialogSurfaceIntent,
   useOverlayInteractionLifecycle,
 } from '../../../../core/composables/useOverlayInteractionLifecycle'
-import { ibDialogMaskClass } from '../../../../theme/dialogMask'
 import type { ShareMemberRow } from '../../session/share/useShareRoster'
 import { useShareDialog, type ShareDialogDeps } from '../../session/share/useShareDialog'
 import { useUserStore } from '../../../auth'

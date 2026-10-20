@@ -9,7 +9,7 @@
       :table-style="{ minWidth: '720px' }"
       :table-aria-label="t('account.topUp.historyTableAria')"
       :scroll-aria-label="t('account.topUp.historyTableAria')"
-      frame-class="rounded-panel border border-border bg-card shadow-sm"
+      frame-class="rounded-panel border border-border bg-card shadow-raised"
       :empty-title="t('account.topUp.historyEmptyTitle')"
     >
       <DataTableColumn

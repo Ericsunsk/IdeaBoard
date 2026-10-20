@@ -159,7 +159,7 @@ const promptTextInputClass = computed(() =>
   [
     'prompt-text-composer-input box-border min-h-0 w-full flex-auto cursor-text resize-none overflow-hidden border-0 bg-transparent font-[inherit] text-[var(--canvas-text-body)] outline-none placeholder:text-[var(--canvas-text-subtle)] disabled:cursor-wait',
     props.variant === 'floating'
-      ? 'px-1 py-1.5 text-xs leading-[18px]'
+      ? 'px-1 py-1.5 text-admin-meta leading-body'
       : 'p-0 text-admin-content leading-[1.6]',
   ].join(' '),
 )

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentorder "ideaboard/api/internal/payments/application/order"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
@@ -166,8 +165,3 @@ func (f *fakeRefundGateway) RetrieveRefund(_ context.Context, _, _ string) (paym
 	f.calls++
 	return f.refund, nil
 }
-
-var (
-	_ = paymentconfiguration.StoredStripeConfiguration{}
-	_ = paymentorder.SignalCompleted
-)

@@ -96,7 +96,7 @@
 .node-header-title [contenteditable='plaintext-only']:focus {
   outline: var(--focus-outline-width) solid var(--focus-outline-color);
   outline-offset: var(--focus-outline-offset);
-  border-radius: 4px;
+  border-radius: var(--radius-tight);
 }
 
 /* Interactive node chrome stays screen-sized while graph content remains zoomable. */

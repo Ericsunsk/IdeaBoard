@@ -1,5 +1,5 @@
 <template>
-  <div class="rounded-panel border border-border bg-card p-4 shadow-xs">
+  <div class="rounded-panel border border-border bg-card p-4 shadow-raised">
     <div class="mb-3 flex items-center justify-between border-b border-border pb-2.5">
       <h4 class="text-xs font-semibold text-foreground">{{ MODELS_MESSAGES.referenceTitle }}</h4>
       <button

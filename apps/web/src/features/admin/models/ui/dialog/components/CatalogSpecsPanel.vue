@@ -1,5 +1,5 @@
 <template>
-  <div class="rounded-panel border border-border bg-card p-4 shadow-xs">
+  <div class="rounded-panel border border-border bg-card p-4 shadow-raised">
     <div class="mb-3 flex items-center justify-between border-b border-border pb-2.5">
       <h4 class="text-xs font-semibold text-foreground">{{ MODELS_MESSAGES.specsTitle }}</h4>
       <span class="text-admin-caption text-muted-foreground">{{
@@ -48,7 +48,7 @@
               class="flex-1 rounded-control py-1 text-xs font-medium transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer text-center"
               :class="
                 hosting === MODEL_HOSTING_CLOUDFLARE
-                  ? 'bg-card text-success shadow-xs font-semibold'
+                  ? 'bg-card text-success shadow-raised font-semibold'
                   : 'text-muted-foreground hover:text-foreground'
               "
               @click="emit('update:hosting', MODEL_HOSTING_CLOUDFLARE)"
@@ -60,7 +60,7 @@
               class="flex-1 rounded-control py-1 text-xs font-medium transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer text-center"
               :class="
                 hosting === MODEL_HOSTING_THIRD_PARTY
-                  ? 'bg-card text-foreground shadow-xs font-semibold'
+                  ? 'bg-card text-foreground shadow-raised font-semibold'
                   : 'text-muted-foreground hover:text-foreground'
               "
               @click="emit('update:hosting', MODEL_HOSTING_THIRD_PARTY)"

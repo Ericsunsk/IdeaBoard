@@ -10,7 +10,7 @@
     @keydown.space.prevent="onCardKeyboardActivate"
   >
     <div
-      class="relative z-0 flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,var(--color-board-card-preview-from)_0%,var(--color-board-card-preview-to)_100%)]"
+      class="relative flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,var(--color-board-card-preview-from)_0%,var(--color-board-card-preview-to)_100%)]"
     >
       <SceneThumbnail
         v-if="sceneEntry?.scene && workspaceId"
@@ -30,7 +30,7 @@
       ></div>
     </div>
 
-    <div class="pointer-events-none absolute right-14 bottom-3 left-3 z-[2]">
+    <div class="pointer-events-none absolute right-14 bottom-3 left-3 z-content">
       <input
         v-if="isRenaming"
         ref="renameInputEl"
@@ -48,7 +48,7 @@
       <button
         v-else
         type="button"
-        class="pointer-events-auto block max-w-full cursor-pointer truncate border-0 bg-transparent p-0 text-left text-sm font-[650] text-foreground hover:underline focus-visible:outline-none focus-visible:underline"
+        class="pointer-events-auto block max-w-full cursor-pointer truncate border-0 bg-transparent p-0 text-left text-sm font-semibold text-foreground hover:underline focus-visible:outline-none focus-visible:underline"
         :aria-label="board.name"
         @click.stop="emit('click-board')"
       >
@@ -76,7 +76,7 @@
       </div>
     </div>
 
-    <div class="absolute right-3 bottom-3 z-[3]" @click.stop @pointerdown.stop>
+    <div class="absolute right-3 bottom-3 z-content" @click.stop @pointerdown.stop>
       <DropdownMenu v-model:open="isMenuOverlayOpen" @update:open="onMenuOpenChange">
         <DropdownMenuTrigger as-child>
           <Button

@@ -2,7 +2,7 @@ export const ibFormFieldClass =
   'flex min-w-0 flex-col gap-2 text-admin-body font-semibold text-foreground'
 
 export const ibFormInputIconClass =
-  'pointer-events-none absolute top-1/2 left-3.5 z-10 flex -translate-y-1/2 items-center justify-center text-muted-foreground'
+  'pointer-events-none absolute top-1/2 left-3.5 z-content flex -translate-y-1/2 items-center justify-center text-muted-foreground'
 
 export const ibFormInputClass =
   // User-side form standard: h-10 everywhere (auth modal, account panes).

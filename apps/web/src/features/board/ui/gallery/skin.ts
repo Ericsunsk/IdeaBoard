@@ -4,9 +4,9 @@ export const blankBoardPreviewSurfaceClass =
 export const catalogClasses = {
   page: 'app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain bg-background px-[var(--spacing-page-chrome-inset)] pt-[var(--spacing-page-chrome-inset)] pb-10 text-foreground [box-sizing:border-box] [-webkit-overflow-scrolling:touch] md:pb-16',
   pageBackground: 'ib-board-page-background page-dot-bg',
-  header: 'relative z-[1] flex flex-wrap items-center justify-between gap-x-4',
+  header: 'relative z-content flex flex-wrap items-center justify-between gap-x-4',
   brand: 'inline-flex min-w-0 max-w-[calc(100%-64px)] items-center',
-  main: 'relative z-[1] mx-auto mt-[46px] max-w-[1080px]',
+  main: 'relative z-content mx-auto mt-[46px] max-w-[1080px]',
   pageTitle:
     'm-0 break-words text-center text-[40px] leading-[1.05] font-bold tracking-normal md:text-[62px]',
   pageSubtitle:

@@ -1,7 +1,7 @@
 <template>
   <header
     :class="[
-      'z-40 flex flex-wrap items-center justify-between gap-x-4 pointer-events-none pb-2',
+      'z-admin-overlay flex flex-wrap items-center justify-between gap-x-4 pointer-events-none pb-2',
       sticky ? 'sticky top-0' : 'relative',
     ]"
   >
