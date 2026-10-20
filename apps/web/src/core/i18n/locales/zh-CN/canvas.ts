@@ -14,16 +14,12 @@ export default {
     inpaint: '局部重绘',
     editImage: '图像微调',
   },
-  workflow: {
-    generate: '生成',
-  },
   node: {
     image: '图像',
     prompt: '提示词',
     fusion: '融合',
     unsupported: '不支持的节点',
     preview: '预览',
-    processing: '处理中…',
   },
   states: {
     failed: '失败',
@@ -48,7 +44,7 @@ export default {
   controls: {
     prompt: '提示词',
     promptPlaceholder: '输入你的创意想法...',
-    send: '发送',
+    send: '应用',
     free: '免费',
     selectImageCountTooltip: '选择生成数量',
     imageCountLabel: '输出数量',
@@ -203,8 +199,8 @@ export default {
     duplicateLayer: '复制图层',
     mergeLayers: '向下合并图层',
     deleteLayer: '删除图层',
-    applyAsNewNode: '作为新节点应用',
-    applying: '正在应用…',
+    applyAsNewNode: '应用',
+    applying: '应用中…',
     sliderValueAria: '{label} 数值',
     sliderAria: '{label} 滑块',
     histogramControlsAria: '直方图控件',

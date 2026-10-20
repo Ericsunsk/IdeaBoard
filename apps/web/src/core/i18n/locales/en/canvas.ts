@@ -15,16 +15,12 @@ export default {
     inpaint: 'Inpaint',
     editImage: 'Retouch',
   },
-  workflow: {
-    generate: 'Generate',
-  },
   node: {
     image: 'Image',
     prompt: 'Prompt',
     fusion: 'Fusion',
     unsupported: 'Unsupported node',
     preview: 'Preview',
-    processing: 'Processing…',
   },
   states: {
     failed: 'Failed',
@@ -49,7 +45,7 @@ export default {
   controls: {
     prompt: 'Prompt',
     promptPlaceholder: 'type your idea...',
-    send: 'Send',
+    send: 'Apply',
     free: 'Free',
     selectImageCountTooltip: 'Select image count',
     imageCountLabel: 'Output count',
@@ -208,7 +204,7 @@ export default {
     duplicateLayer: 'Duplicate layer',
     mergeLayers: 'Merge layers',
     deleteLayer: 'Delete layer',
-    applyAsNewNode: 'Apply as new node',
+    applyAsNewNode: 'Apply',
     applying: 'Applying…',
     sliderValueAria: '{label} value',
     sliderAria: '{label} slider',

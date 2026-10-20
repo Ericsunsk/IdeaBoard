@@ -14,16 +14,12 @@ export default {
     inpaint: 'Pintar dentro',
     editImage: 'Retocar',
   },
-  workflow: {
-    generate: 'Generar',
-  },
   node: {
     image: 'Imagen',
     prompt: 'Indicación',
     fusion: 'Fusión',
     unsupported: 'Nodo no compatible',
     preview: 'Vista previa',
-    processing: 'Procesando…',
   },
   states: {
     failed: 'Error',
@@ -49,7 +45,7 @@ export default {
   controls: {
     prompt: 'Indicación',
     promptPlaceholder: 'escriba su idea...',
-    send: 'Enviar',
+    send: 'Aplicar',
     free: 'Gratis',
     selectImageCountTooltip: 'Seleccionar cantidad de imágenes',
     imageCountLabel: 'Cantidad de salida',
@@ -218,7 +214,7 @@ export default {
     duplicateLayer: 'Duplicar capa',
     mergeLayers: 'Combinar capas',
     deleteLayer: 'Eliminar capa',
-    applyAsNewNode: 'Aplicar como nuevo nodo',
+    applyAsNewNode: 'Aplicar',
     applying: 'Aplicando…',
     sliderValueAria: 'Valor de {label}',
     sliderAria: 'Control deslizante de {label}',

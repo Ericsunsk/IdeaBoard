@@ -93,7 +93,6 @@ describe('useFlowNodeUiState', () => {
       Record<string, boolean | undefined> | undefined
 
     expect(pendingInputs?.image).toBe(false)
-    expect(fusionState.primaryAction).toEqual({ label: 'Generate', isDisabled: false })
   })
 
   it('marks a multi-image input as pending when any connected image is still running', () => {
@@ -145,7 +144,6 @@ describe('useFlowNodeUiState', () => {
       Record<string, boolean | undefined> | undefined
 
     expect(pendingInputs?.image).toBe(true)
-    expect(fusionState.primaryAction).toEqual({ label: 'Waiting for Image', isDisabled: true })
   })
 
   it('preserves ui state identity across position-only node replacements', () => {
@@ -226,10 +224,6 @@ describe('useFlowNodeUiState', () => {
     expect(connectedFusionState).not.toBe(disconnectedFusionState)
     expect(connectedInputs?.image).toBe(true)
     expect(pendingInputs?.image).toBe(true)
-    expect(connectedFusionState.primaryAction).toEqual({
-      label: 'Waiting for Image',
-      isDisabled: true,
-    })
   })
 
   it('refreshes connection state when edges update with the same array identity', () => {
@@ -288,16 +282,14 @@ describe('useFlowNodeUiState', () => {
     })
     const readyState = getFlowNodeUiStateCached('fusion-1')
     expect(readyState.isRunning).toBe(false)
-    expect(readyState.primaryAction).toEqual({ label: 'Generate', isDisabled: false })
 
     // Start execution without touching the graph: the epoch bump alone must
-    // invalidate the cache so the running label appears immediately.
+    // invalidate the cache so the running state appears immediately.
     activeNodeIds.add('fusion-1')
     executionEpoch.value += 1
 
     const runningState = getFlowNodeUiStateCached('fusion-1')
     expect(runningState).not.toBe(readyState)
     expect(runningState.isRunning).toBe(true)
-    expect(runningState.primaryAction?.isDisabled).toBe(true)
   })
 })

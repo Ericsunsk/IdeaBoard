@@ -1,23 +1,16 @@
 import { computed, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { i18n } from '../../../../core/i18n'
 import {
   getCanvasNodePrimaryOutputPort,
-  getCanvasNodeRequiredInputPorts,
   getCanvasNodeVisibleInputPorts,
   isCanvasConnectionNodeType,
   isCanvasExecutionOutputNodeType,
 } from '../../../board/ports/canvas'
 import {
-  formatCanvasNodePortLabel,
-  getCanvasNodeExecutionActionLabels,
-} from '../../core/nodes/canvasNodeRegistry.ts'
-import {
   resolveWorkflowNodeOutputStatus,
   type CanvasConnectionNodeKind,
   type CanvasConnectionPort,
   type CanvasExecutionOutputNodeItem,
-  type CanvasExecutionOutputNodeKind,
   type CanvasNodeItem,
 } from '../../../board/ports/canvas'
 import type { NodeUiState, PromptNodeUiState } from '../../core/nodes/canvasNodeUi.ts'
@@ -104,14 +97,6 @@ function areRecordsEqual(
   return leftKeys.every((key) => Object.is(leftRecord[key], rightRecord[key]))
 }
 
-function arePrimaryActionsEqual(
-  left: NodeUiState['primaryAction'],
-  right: NodeUiState['primaryAction'],
-) {
-  if (!left || !right) return left === right
-  return left.label === right.label && left.isDisabled === right.isDisabled
-}
-
 function areConnectionStatesEqual(
   left: FlowNodeUiState['connection'],
   right: FlowNodeUiState['connection'],
@@ -127,7 +112,6 @@ function areConnectionStatesEqual(
 function areFlowNodeUiStatesEqual(left: FlowNodeUiState, right: FlowNodeUiState) {
   return (
     areConnectionStatesEqual(left.connection, right.connection) &&
-    arePrimaryActionsEqual(left.primaryAction, right.primaryAction) &&
     left.cacheStatus === right.cacheStatus &&
     left.isRunning === right.isRunning
   )
@@ -211,62 +195,6 @@ function getNodeConnectionStatus(
   }
 }
 
-function buildPrimaryAction(
-  nodeType: CanvasExecutionOutputNodeKind,
-  status: FlowNodeConnectionStatus,
-  isRunning: boolean,
-) {
-  const actionLabels = getCanvasNodeExecutionActionLabels(nodeType, (key) => i18n.global.t(key))
-  if (isRunning) {
-    return {
-      label: actionLabels.running,
-      isDisabled: true,
-    }
-  }
-
-  const requiredPorts = getCanvasNodeRequiredInputPorts(nodeType).map(
-    (port) => port.port as CanvasConnectionPort,
-  )
-  const disconnectedPorts = requiredPorts.filter((port) => !status.incoming[port])
-  if (disconnectedPorts.length > 0) {
-    const missingLabels = disconnectedPorts.map((port) =>
-      formatCanvasNodePortLabel(port, (key) => i18n.global.t(key)),
-    )
-    return {
-      label:
-        disconnectedPorts.length === 1
-          ? i18n.global.t('canvas.edges.connectRequiredInputLabel', {
-              label: missingLabels[0],
-            })
-          : i18n.global.t('canvas.edges.connectRequiredInputsLabel', {
-              count: disconnectedPorts.length,
-            }),
-      isDisabled: true,
-    }
-  }
-
-  const pendingPorts = getCanvasNodeVisibleInputPorts(nodeType)
-    .map((port) => port.port)
-    .filter((port) => !!status.incoming[port] && !!status.pendingIncoming[port])
-  if (pendingPorts.length > 0) {
-    const pendingLabels = pendingPorts.map((port) =>
-      formatCanvasNodePortLabel(port, (key) => i18n.global.t(key)),
-    )
-    return {
-      label:
-        pendingPorts.length === 1
-          ? i18n.global.t('canvas.edges.waitForInputLabel', { label: pendingLabels[0] })
-          : i18n.global.t('canvas.edges.waitForInputsLabel', { count: pendingPorts.length }),
-      isDisabled: true,
-    }
-  }
-
-  return {
-    label: actionLabels.ready,
-    isDisabled: false,
-  }
-}
-
 export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
   let previousUiStateByNodeId = new Map<string, FlowNodeUiState>()
 
@@ -340,7 +268,6 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       const isRunning = options.isNodeExecutionActive(node.id)
       setFlowNodeUiState(node.id, {
         connection,
-        primaryAction: buildPrimaryAction(nodeType, status, isRunning),
         cacheStatus: resolveWorkflowNodeOutputStatus(
           executionNode.outputStatus,
           executionNode.outputImages,

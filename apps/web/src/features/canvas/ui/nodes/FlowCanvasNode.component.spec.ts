@@ -152,7 +152,7 @@ describe('FlowCanvasNode prompt rendering', () => {
 
     expect(view.getAllByTestId('flow-node-handles')).toHaveLength(1)
     expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
-    expect(view.getByLabelText('Send')).not.toBeDisabled()
+    expect(view.getByLabelText('Apply')).not.toBeDisabled()
   })
 
   it('shows the stage ring and title selection state, then clears both on deselection', async () => {
@@ -210,7 +210,7 @@ describe('FlowCanvasNode prompt rendering', () => {
       isGenerationAvailable: false,
     })
 
-    expect(view.getByLabelText('Send')).toBeDisabled()
+    expect(view.getByLabelText('Apply')).toBeDisabled()
   })
 
   it('emits a semantic presentation intent when prompt text is edited', async () => {
@@ -226,7 +226,7 @@ describe('FlowCanvasNode prompt rendering', () => {
   it('emits a semantic presentation intent when prompt generation is requested', async () => {
     const view = renderFlowCanvasNode()
 
-    await fireEvent.click(view.getByLabelText('Send'))
+    await fireEvent.click(view.getByLabelText('Apply'))
 
     expect(view.emitted('node-intent')).toContainEqual([
       {
@@ -427,7 +427,7 @@ describe('FlowCanvasNode fusion presentation', () => {
     await fireEvent.contextMenu(stage)
     await fireEvent.click(view.getAllByLabelText('Remove image input')[0]!)
     await fireEvent.update(view.getByPlaceholderText('Enter fusion prompt'), '融合两张图片')
-    await fireEvent.click(view.getByLabelText('Send'))
+    await fireEvent.click(view.getByLabelText('Apply'))
 
     expect(view.emitted('node-intent')).toEqual(
       expect.arrayContaining([

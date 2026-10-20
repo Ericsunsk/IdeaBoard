@@ -54,7 +54,7 @@ describe('RetouchLayerActions', () => {
     const copyBtn = screen.getByRole('button', { name: 'Duplicate layer' })
     const mergeBtn = screen.getByRole('button', { name: 'Merge layers' })
     const removeBtn = screen.getByRole('button', { name: 'Delete layer' })
-    const applyBtn = screen.getByRole('button', { name: 'Apply as new node' })
+    const applyBtn = screen.getByRole('button', { name: 'Apply' })
 
     expect(addBtn).toBeInTheDocument()
     expect(copyBtn).toBeInTheDocument()
@@ -89,7 +89,7 @@ describe('RetouchLayerActions', () => {
     expect(screen.getByRole('button', { name: 'Duplicate layer' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Merge layers' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Delete layer' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Apply as new node' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled()
   })
 
   it('shows applying label when applying is active', () => {

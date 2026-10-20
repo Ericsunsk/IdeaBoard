@@ -15,16 +15,12 @@ export default {
     inpaint: '인페인팅',
     editImage: '리터치',
   },
-  workflow: {
-    generate: '생성',
-  },
   node: {
     image: '이미지',
     prompt: '프롬프트',
     fusion: '퓨전',
     unsupported: '지원되지 않는 노드',
     preview: '미리보기',
-    processing: '처리 중…',
   },
   states: {
     failed: '실패',
@@ -49,7 +45,7 @@ export default {
   controls: {
     prompt: '프롬프트',
     promptPlaceholder: '아이디어를 입력하세요...',
-    send: '보내기',
+    send: '적용',
     free: '무료',
     selectImageCountTooltip: '이미지 개수 선택',
     imageCountLabel: '출력 개수',
@@ -213,7 +209,7 @@ export default {
     duplicateLayer: '레이어 복제',
     mergeLayers: '레이어 병합',
     deleteLayer: '레이어 삭제',
-    applyAsNewNode: '새 노드로 적용',
+    applyAsNewNode: '적용',
     applying: '적용 중…',
     sliderValueAria: '{label} 값',
     sliderAria: '{label} 슬라이더',
