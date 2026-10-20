@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { resolveMemberAvatar, resolveSizedAvatarUrl } from './avatarUrl'
+import { resolveMemberAvatar, resolveMemberInitial, resolveSizedAvatarUrl } from './avatarUrl'
 
 const ROUTE = '/api/v1/public/users/AVTR01/avatar'
 
@@ -99,5 +99,27 @@ describe('resolveMemberAvatar', () => {
     expect(
       resolveMemberAvatar({ userId: 'usr_me' }, { public_id: 'usr_me', avatar: '   ' }),
     ).toBeUndefined()
+  })
+})
+
+describe('resolveMemberInitial', () => {
+  it('takes the email first letter first', () => {
+    expect(resolveMemberInitial({ userId: 'usr_a', email: 'a@example.com' })).toBe('A')
+    expect(resolveMemberInitial({ userId: 'other', email: 'boss@example.com' })).toBe('B')
+  })
+
+  it('strips the usr_ prefix from the userId fallback', () => {
+    expect(resolveMemberInitial({ userId: 'usr_a' })).toBe('A')
+    expect(resolveMemberInitial({ userId: 'other' })).toBe('O')
+  })
+
+  it('falls back to the userId when the email is empty', () => {
+    expect(resolveMemberInitial({ userId: 'usr_a', email: '' })).toBe('A')
+    expect(resolveMemberInitial({ userId: 'usr_a', email: null })).toBe('A')
+  })
+
+  it('returns U without an email or userId initial', () => {
+    expect(resolveMemberInitial({ userId: '' })).toBe('U')
+    expect(resolveMemberInitial({ userId: 'usr_' })).toBe('U')
   })
 })

@@ -80,7 +80,7 @@ func randomStorageUID(t *testing.T) string {
 // one public_id, backed by ux_workspaces_default_owner.
 func TestEnsureDefaultWorkspaceConcurrent(t *testing.T) {
 	db := newTenancyTestDB(t)
-	store := NewStore(db)
+	store := NewStore(db, nil)
 	userID := createTenancyTestUser(t, db)
 	ctx := context.Background()
 
@@ -116,7 +116,7 @@ func TestEnsureDefaultWorkspaceConcurrent(t *testing.T) {
 	}
 
 	var rowCount int64
-	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM workspaces WHERE owner_user_id = $1 AND organization_id IS NULL AND is_default AND archived_at IS NULL`, userID).Scan(&rowCount); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM workspaces WHERE owner_user_id = $1 AND organization_id IS NULL AND is_default`, userID).Scan(&rowCount); err != nil {
 		t.Fatalf("count default workspaces failed: %v", err)
 	}
 	if rowCount != 1 {
@@ -147,7 +147,7 @@ func TestEnsureDefaultWorkspaceConcurrent(t *testing.T) {
 // the workspace owner reference #804 will build on.
 func TestBillingAccountOwnerStubProvesSeam(t *testing.T) {
 	db := newTenancyTestDB(t)
-	store := NewStore(db)
+	store := NewStore(db, nil)
 	userID := createTenancyTestUser(t, db)
 	ctx := context.Background()
 
@@ -183,12 +183,12 @@ func TestBillingAccountOwnerStubProvesSeam(t *testing.T) {
 
 // TestDefaultWorkspaceSemantics pins the Bug2 product contract against
 // PostgreSQL: plain personal creates are unlimited and non-Default, a
-// second Default create is rejected, the Default row cannot be archived or
+// second Default create is rejected, the Default row cannot be deleted or
 // renamed, non-Default rows rename normally, and a user holding only plain
 // rows still gets a Default on ensure.
 func TestDefaultWorkspaceSemantics(t *testing.T) {
 	db := newTenancyTestDB(t)
-	store := NewStore(db)
+	store := NewStore(db, nil)
 	userID := createTenancyTestUser(t, db)
 	ctx := context.Background()
 
@@ -214,8 +214,8 @@ func TestDefaultWorkspaceSemantics(t *testing.T) {
 	if _, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "dup", OwnerUserID: userID, IsDefault: true}); !errors.Is(err, tenancy.ErrDefaultWorkspaceConflict) {
 		t.Fatalf("second Default err = %v, want ErrDefaultWorkspaceConflict", err)
 	}
-	if _, err := store.ArchiveWorkspace(ctx, def.PublicID); !errors.Is(err, tenancy.ErrDefaultWorkspaceProtected) {
-		t.Fatalf("archive default err = %v, want ErrDefaultWorkspaceProtected", err)
+	if err := store.DeleteWorkspace(ctx, def.PublicID); !errors.Is(err, tenancy.ErrDefaultWorkspaceProtected) {
+		t.Fatalf("delete default err = %v, want ErrDefaultWorkspaceProtected", err)
 	}
 	if _, err := store.UpdateWorkspace(ctx, def.PublicID, "Renamed Default"); !errors.Is(err, tenancy.ErrDefaultWorkspaceProtected) {
 		t.Fatalf("rename default err = %v, want ErrDefaultWorkspaceProtected", err)
@@ -224,7 +224,10 @@ func TestDefaultWorkspaceSemantics(t *testing.T) {
 	if err != nil || renamed.Name != "Renamed Plain" {
 		t.Fatalf("rename plain = %+v, %v; want renamed", renamed, err)
 	}
-	if _, err := store.ArchiveWorkspace(ctx, plain.PublicID); err != nil {
-		t.Fatalf("archive plain failed: %v", err)
+	if err := store.DeleteWorkspace(ctx, plain.PublicID); err != nil {
+		t.Fatalf("delete plain failed: %v", err)
+	}
+	if _, err := store.GetWorkspace(ctx, plain.PublicID); !errors.Is(err, tenancy.ErrNotFound) {
+		t.Fatalf("get deleted err = %v, want ErrNotFound", err)
 	}
 }

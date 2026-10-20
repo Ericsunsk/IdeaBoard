@@ -159,13 +159,6 @@ const (
 	maxRiverWorkerConcurrency     = 64
 )
 
-// DefaultWorkspacePurgeAfterDays is the hardcoded archived-workspace purge
-// window (days): a non-Default workspace archived longer ago than this
-// window is hard-deleted with its boards and files. Billing records, the
-// credit ledger, and user rows are retained independently of this window.
-// It is a code constant by design (no env knob); wiring passes it directly.
-const DefaultWorkspacePurgeAfterDays = 7
-
 func (c WorkerConfig) EffectiveConcurrency() int {
 	if c.Concurrency < minRiverWorkerConcurrency || c.Concurrency > maxRiverWorkerConcurrency {
 		return DefaultRiverWorkerConcurrency

@@ -39,13 +39,6 @@ func TestWorkerSubpackagesIsolation(t *testing.T) {
 	archtest.AssertNoForbiddenImports(t, "billing", []string{
 		"ideaboard/api/internal/runtime/interfaces/worker/providers",
 		"ideaboard/api/internal/runtime/interfaces/worker/river",
-		"ideaboard/api/internal/runtime/interfaces/worker/retention",
-		"ideaboard/api/internal/tasking/infrastructure/queue",
-	})
-	archtest.AssertNoForbiddenImports(t, "retention", []string{
-		"ideaboard/api/internal/runtime/interfaces/worker/providers",
-		"ideaboard/api/internal/runtime/interfaces/worker/river",
-		"ideaboard/api/internal/runtime/interfaces/worker/billing",
 		"ideaboard/api/internal/tasking/infrastructure/queue",
 	})
 	archtest.AssertNoForbiddenImports(t, "visionbilling", []string{

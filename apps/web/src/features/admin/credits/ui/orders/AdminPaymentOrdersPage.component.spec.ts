@@ -219,6 +219,32 @@ describe('AdminPaymentOrdersPage', () => {
     expect(resource.search).toHaveBeenCalledTimes(2)
   })
 
+  it('mirrors a failed refund in a toast while keeping the inline error', async () => {
+    const eligibleDetail = {
+      ...makeDetail(),
+      status: 'credited',
+      creditStatus: 'credited',
+      paidAt: new Date().toISOString(),
+      creditedAt: new Date().toISOString(),
+      refundableIdeaQuantity: 500,
+    }
+    resource.get.mockResolvedValueOnce(eligibleDetail)
+    resource.refund.mockRejectedValueOnce(new Error('refund boom'))
+    const { user } = renderPage()
+    await screen.findByText(orderNumber)
+    await user.click(screen.getAllByRole('button', { name: `查看订单 ${orderNumber}` })[0]!)
+
+    expect(await screen.findByText('发起退款')).toBeVisible()
+    await user.type(screen.getByLabelText('退款 Idea 数量'), '200')
+    await user.click(screen.getByRole('button', { name: '确认退款' }))
+
+    await waitFor(() => expect(resource.refund).toHaveBeenCalledOnce())
+    // Dual: dialog inline AdminAlert stays as position anchor, toast mirrors it.
+    expect(await screen.findByText('refund boom')).toBeVisible()
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('refund boom'))
+    expect(toast.success).not.toHaveBeenCalled()
+  })
+
   it('distinguishes initial and background refresh errors, then recovers without dropping data', async () => {
     resource.search.mockRejectedValueOnce(new Error('network unavailable'))
     const { user } = renderPage()

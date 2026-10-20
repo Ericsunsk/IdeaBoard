@@ -28,7 +28,6 @@ import (
 	outboxworker "ideaboard/api/internal/runtime/interfaces/worker/outbox"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers"
 	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
-	"ideaboard/api/internal/runtime/interfaces/worker/retention"
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
 	visionbilling "ideaboard/api/internal/runtime/interfaces/worker/visionbilling"
 	runtimeports "ideaboard/api/internal/runtime/ports"
@@ -40,7 +39,6 @@ import (
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	taskworker "ideaboard/api/internal/tasking/interfaces/worker"
 	"ideaboard/api/internal/tasking/workspacetasks"
-	tenancypurge "ideaboard/api/internal/tenancy/application/purge"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -390,14 +388,8 @@ func NewAppTaskRuntime(
 	// #809 hard cut: the legacy task-retention periodic jobs are dropped
 	// with the retention service (no legacy store left to purge against).
 	// Workspace task lifecycle retention is #809-close work.
-	// Archived workspace purge: non-Default workspaces archived longer ago
-	// than the hardcoded 7-day window (config.DefaultWorkspacePurgeAfterDays)
-	// are hard-deleted with their boards and files on the same daily
-	// maintenance schedule; billing records are retained.
-	workspacePurgeService := tenancypurge.NewService(dbs.DB, services.storageService)
-	workspacePurgeWorker := retention.NewWorkspacePurgeWorker(
-		workspacePurgeService, config.DefaultWorkspacePurgeAfterDays)
-	workspacePurgePeriodicJobs := retention.WorkspacePurgePeriodicJobs()
+	// Workspace deletion is an immediate irreversible hard delete: there
+	// is no archive/restore lifecycle and no background purge.
 	taskStatusOutboxPeriodicJobs := outboxworker.PeriodicJobs()
 	boardAccessOutboxPeriodicJobs := outboxworker.BoardAccessPeriodicJobs()
 	// ADR-0021: an http-only process enqueues but never consumes. Workers
@@ -406,7 +398,7 @@ func NewAppTaskRuntime(
 	// keeps the pre-split behavior). The enqueue-only client below still
 	// serves the submit transaction (SetClient) without fetching anything.
 	runWorkers := cfg.Mode.RunsWorkers()
-	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs)+len(settlementSweepPeriodicJobs)+len(taskStatusOutboxPeriodicJobs)+len(boardAccessOutboxPeriodicJobs)+len(identityPeriodicJobs)+len(workspacePurgePeriodicJobs))
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs)+len(settlementSweepPeriodicJobs)+len(taskStatusOutboxPeriodicJobs)+len(boardAccessOutboxPeriodicJobs)+len(identityPeriodicJobs))
 	if runWorkers {
 		periodicJobs = append(periodicJobs, creditPeriodicJobs...)
 		periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
@@ -416,7 +408,6 @@ func NewAppTaskRuntime(
 		periodicJobs = append(periodicJobs, taskStatusOutboxPeriodicJobs...)
 		periodicJobs = append(periodicJobs, boardAccessOutboxPeriodicJobs...)
 		periodicJobs = append(periodicJobs, identityPeriodicJobs...)
-		periodicJobs = append(periodicJobs, workspacePurgePeriodicJobs...)
 	}
 	// #809 hard cut: the legacy River task worker (old job kinds) is
 	// gone (see workerriver.NewRiverClient). Stray old-kind jobs
@@ -450,9 +441,6 @@ func NewAppTaskRuntime(
 			// schedule worker ride the same client (no new infra).
 			river.AddWorker(workers, identityreconciliation.NewExecuteWorker(identityAdminReconciler))
 			river.AddWorker(workers, identityreconciliation.NewScheduleWorker(identityAdminReconciler, identityAdminDispatcher))
-			// Archived workspace purge rides the same client on the
-			// serial retention queue.
-			river.AddWorker(workers, workspacePurgeWorker)
 		}
 	}
 	var riverClient *river.Client[pgx.Tx]
@@ -465,11 +453,6 @@ func NewAppTaskRuntime(
 				workerbilling.PaymentReconciliationQueue:   {MaxWorkers: 1},
 				workerbilling.PaymentCheckoutShutdownQueue: {MaxWorkers: 1},
 				visionbilling.VisionBillingQueue:           {MaxWorkers: 1},
-				// Workspace purge: one serial maintenance worker on the
-				// shared client (same precedent as the queues above).
-				// Serial is deliberate: overlapping purge runs would
-				// contend on the same workspace rows for no gain.
-				riverpolicy.RiverQueueTaskRetention: {MaxWorkers: 1},
 				// #833: signed webhook deliveries ride their own queue with
 				// the shared concurrency config (no new infra); serial
 				// workers match the maintenance-queue precedent and the 1m

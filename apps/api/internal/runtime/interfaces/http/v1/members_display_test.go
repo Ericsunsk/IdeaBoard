@@ -238,7 +238,7 @@ func TestV1MemberListDisplayInMemory(t *testing.T) {
 func TestV1MemberListDisplayPG(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	tstore := tenancypg.NewStore(db)
+	tstore := tenancypg.NewStore(db, nil)
 	dir := newStaticUserDirectory()
 	const owner, member, outsider = 1, 10, 8
 	for _, id := range []int64{owner, member, outsider} {

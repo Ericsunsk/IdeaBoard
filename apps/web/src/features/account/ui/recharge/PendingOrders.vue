@@ -18,19 +18,14 @@
       <Skeleton height="1rem" width="68%" />
     </div>
 
-    <div
+    <LoadErrorPanel
       v-else-if="error"
-      class="rounded-panel border border-destructive/25 bg-card p-4 shadow-sm"
-      role="alert"
-    >
-      <p class="m-0 font-semibold text-destructive">
-        {{ t('account.errors.pendingOrdersLoadFailed') }}
-      </p>
-      <p class="mt-1 mb-0 text-sm text-muted-foreground">{{ errorMessage(error) }}</p>
-      <Button variant="ghost" size="sm" class="mt-2" @click="emit('retry')">{{
-        t('account.reload')
-      }}</Button>
-    </div>
+      :message="t('account.errors.pendingOrdersLoadFailed')"
+      :detail="errorMessage(error)"
+      :retry-label="t('account.reload')"
+      retry-variant="ghost"
+      @retry="emit('retry')"
+    />
 
     <div v-else class="grid gap-2">
       <article
@@ -104,6 +99,7 @@ import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
+import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
 import { formatAccountExpiryDateTime } from '../../session/formatters'
 import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'

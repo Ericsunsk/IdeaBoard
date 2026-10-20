@@ -132,7 +132,7 @@ describe('AccountDialog', () => {
   it('applies the shared overlay chrome through content class', () => {
     renderAccountDialog(true)
 
-    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveClass('shadow-xl')
+    expect(screen.getByRole('dialog', { name: 'Account' })).toHaveClass('shadow-admin-dialog')
   })
 
   it('reuses the shared dialog mask token for the overlay veil (no dialog-specific overlay token)', () => {

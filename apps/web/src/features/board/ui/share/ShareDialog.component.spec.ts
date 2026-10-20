@@ -120,14 +120,23 @@ describe('selected-member Board sharing', () => {
     'pins Creator from Board metadata with catalog cached=%s',
     async (isCached) => {
       const { transport } = setup({ isCached })
-      expect(await screen.findByRole('button', { name: /usr_creator/ })).toBeDisabled()
+      const creatorEl = await screen.findByTitle('usr_creator (Creator)')
+      expect(creatorEl.tagName).toBe('SPAN')
+      expect(creatorEl).toHaveAttribute('aria-label', 'usr_creator, Creator')
+      expect(creatorEl).toHaveAttribute('aria-pressed', 'true')
+      expect((creatorEl as HTMLElement).tabIndex).toBe(-1)
+      expect(screen.queryByRole('button', { name: /usr_creator/ })).not.toBeInTheDocument()
       expect(transport.fetchMeta).toHaveBeenCalledTimes(isCached ? 0 : 1)
     },
   )
 
   test('pins Creator, displays only selection controls and uses one common role', async () => {
     const { user, transport, access } = setup()
-    expect(await screen.findByRole('button', { name: /usr_creator/ })).toBeDisabled()
+    const creatorEl = await screen.findByTitle('usr_creator (Creator)')
+    expect(creatorEl.tagName).toBe('SPAN')
+    expect(creatorEl).toHaveAttribute('aria-label', 'usr_creator, Creator')
+    expect(creatorEl).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: /usr_creator/ })).not.toBeInTheDocument()
     const selected = await screen.findByRole('button', { name: /usr_member/ })
     await waitFor(() => expect(selected).toBeEnabled())
     expect(selected).toHaveAttribute('aria-pressed', 'true')
@@ -268,14 +277,13 @@ describe('selected-member Board sharing', () => {
     })
 
     // Images stay `display:none` until loaded in happy-dom (excluded from
-    // accessible-name computation), so scope by member button and assert the
+    // accessible-name computation), so scope by member title and assert the
     // rendered img attributes directly.
-    const creatorButton = await screen.findByRole('button', { name: /creator@example\.com/ })
-    const creatorImg = within(creatorButton).getByRole('img', { hidden: true })
-    expect(creatorImg).toHaveAttribute(
-      'src',
-      '/api/v1/public/users/usr_creator/avatar?v=2&size=64',
-    )
+    const creatorEl = await screen.findByTitle('creator@example.com (Creator)')
+    expect(creatorEl.tagName).toBe('SPAN')
+    expect(creatorEl).toHaveAttribute('aria-label', 'creator@example.com, Creator')
+    const creatorImg = within(creatorEl as HTMLElement).getByRole('img', { hidden: true })
+    expect(creatorImg).toHaveAttribute('src', '/api/v1/public/users/usr_creator/avatar?v=2&size=64')
     expect(creatorImg).toHaveAttribute('alt', 'creator@example.com')
     const otherButton = screen.getByRole('button', { name: /other@example\.com/ })
     expect(within(otherButton).getByRole('img', { hidden: true })).toHaveAttribute(
@@ -290,7 +298,9 @@ describe('selected-member Board sharing', () => {
 
   test('prefers the roster avatar over the viewer avatar and never leaks it', async () => {
     const store = useUserStore()
-    store.setAuth(makeSessionUser({ public_id: other, avatar: '/api/v1/public/users/usr_other/avatar?v=5' }))
+    store.setAuth(
+      makeSessionUser({ public_id: other, avatar: '/api/v1/public/users/usr_other/avatar?v=5' }),
+    )
     try {
       setup({
         roster: [
@@ -320,7 +330,9 @@ describe('selected-member Board sharing', () => {
 
   test('falls back to the viewer session avatar for the viewer entry', async () => {
     const store = useUserStore()
-    store.setAuth(makeSessionUser({ public_id: member, avatar: '/api/v1/public/users/usr_member/avatar?v=6' }))
+    store.setAuth(
+      makeSessionUser({ public_id: member, avatar: '/api/v1/public/users/usr_member/avatar?v=6' }),
+    )
     try {
       setup({
         roster: [
@@ -335,8 +347,8 @@ describe('selected-member Board sharing', () => {
         'src',
         '/api/v1/public/users/usr_member/avatar?v=6&size=64',
       )
-      const creatorButton = screen.getByRole('button', { name: /creator@example\.com/ })
-      expect(within(creatorButton).queryByRole('img', { hidden: true })).toBeNull()
+      const creatorEl = screen.getByTitle('creator@example.com (Creator)')
+      expect(within(creatorEl as HTMLElement).queryByRole('img', { hidden: true })).toBeNull()
     } finally {
       store.clearAuth()
     }

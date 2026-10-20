@@ -24,13 +24,12 @@ import (
 )
 
 type controlWorkspace struct {
-	ID             string     `json:"id"`
-	Name           string     `json:"name"`
-	OrganizationID *string    `json:"organization_id,omitempty"`
-	IsDefault      bool       `json:"is_default"`
-	ArchivedAt     *time.Time `json:"archived_at,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	OrganizationID *string   `json:"organization_id,omitempty"`
+	IsDefault      bool      `json:"is_default"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 func newControlWorkspace(workspace *tenancy.Workspace) controlWorkspace {
@@ -42,7 +41,6 @@ func newControlWorkspace(workspace *tenancy.Workspace) controlWorkspace {
 	out.Name = workspace.Name
 	out.OrganizationID = workspace.OrganizationID
 	out.IsDefault = workspace.IsDefaultWorkspace()
-	out.ArchivedAt = workspace.ArchivedAt
 	out.CreatedAt = workspace.CreatedAt
 	out.UpdatedAt = workspace.UpdatedAt
 	return out

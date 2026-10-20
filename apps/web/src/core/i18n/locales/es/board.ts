@@ -7,7 +7,6 @@ export default {
   sortLabel: 'Ordenar lienzos',
   sortRecent: 'Reciente',
   sortName: 'Nombre',
-  scopeLabel: 'Ámbito de tableros',
   scopePersonal: 'Tableros personales',
   scopeTeam: 'Tableros del equipo',
   accessPrivate: 'Privado',

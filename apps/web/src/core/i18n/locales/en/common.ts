@@ -71,7 +71,4 @@ export default {
     activeBanner: 'Impersonation preview active',
     exit: 'Exit impersonation',
   },
-  locale: {
-    selectLanguage: 'Select language',
-  },
 } as const

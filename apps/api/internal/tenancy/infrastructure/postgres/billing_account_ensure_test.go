@@ -9,7 +9,7 @@ import (
 // must mint and persist a valid public_id (ba_ CHECK), not just read.
 func TestEnsureBillingAccountForWorkspace(t *testing.T) {
 	db := newTenancyTestDB(t)
-	store := NewStore(db)
+	store := NewStore(db, nil)
 	userID := createTenancyTestUser(t, db)
 	ctx := context.Background()
 

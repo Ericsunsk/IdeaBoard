@@ -6,9 +6,9 @@
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import {
-  archiveWorkspace,
   buildWorkspaceCreateHeaders,
   classifyWorkspaceAccessError,
+  deleteWorkspace,
   fetchAllWorkspaces,
   fetchPrincipal,
   fetchWorkspacePage,
@@ -24,6 +24,14 @@ import {
   WORKSPACE_PAGE_SIZE_MAX,
 } from './workspaceResource'
 
+/**
+ * Delete-confirmation wire shape.
+ * @externalContract Public API DeletedEnvelope: consumed verbatim from the
+ * generated contract (`DELETE /api/v1/workspaces/{id}` renders
+ * `{ data: { deleted: true } }`).
+ */
+type DeletedConfirmation = { data: { deleted: boolean } }
+
 const AGREED_PAGE = {
   data: [
     {
@@ -31,14 +39,12 @@ const AGREED_PAGE = {
       name: 'Alpha',
       organization_id: null,
       is_default: true,
-      archived_at: null,
     },
     {
       public_id: 'ws_b2',
       name: 'Beta',
       organization_id: 'org_c3',
       is_default: false,
-      archived_at: null,
     },
   ],
   meta: { next_cursor: 'cursor2', has_more: true },
@@ -56,14 +62,12 @@ describe('workspace list envelope', () => {
         name: 'Alpha',
         organizationId: null,
         isDefault: true,
-        archivedAt: null,
       },
       {
         publicId: 'ws_b2',
         name: 'Beta',
         organizationId: 'org_c3',
         isDefault: false,
-        archivedAt: null,
       },
     ])
     expect(page).toMatchObject({ nextCursor: 'cursor2', hasMore: true })
@@ -203,7 +207,7 @@ describe('workspace creation', () => {
           body: await request.json(),
         })
         return HttpResponse.json({
-          data: { public_id: 'ws_new1', name: 'New', organization_id: null, archived_at: null },
+          data: { public_id: 'ws_new1', name: 'New', organization_id: null },
         })
       }),
     )
@@ -250,7 +254,6 @@ describe('workspace rename', () => {
             public_id: 'ws_a1',
             name: 'Renamed',
             organization_id: null,
-            archived_at: null,
           },
         })
       }),
@@ -301,33 +304,78 @@ describe('workspace default marker', () => {
       isDefault: false,
     })
   })
+})
 
-  it('archives through POST .../archive and parses the envelope', async () => {
-    const seen: string[] = []
+describe('workspace deletion', () => {
+  it('deletes through DELETE with Idempotency-Key and Request-Id', async () => {
+    const seen: Array<{
+      workspaceId: string
+      idempotencyKey: string | null
+      requestId: string | null
+    }> = []
     useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/archive', ({ params }) => {
-        seen.push(String(params.workspaceId))
-        return HttpResponse.json({
-          data: {
-            public_id: 'ws_a1',
-            name: 'Alpha',
-            organization_id: null,
-            is_default: false,
-            archived_at: '2026-10-18T00:00:00Z',
-          },
+      http.delete('/api/v1/workspaces/:workspaceId', ({ params, request }) => {
+        seen.push({
+          workspaceId: String(params.workspaceId),
+          idempotencyKey: request.headers.get('idempotency-key'),
+          requestId: request.headers.get('request-id'),
         })
+        return HttpResponse.json({ data: { deleted: true } } satisfies DeletedConfirmation)
       }),
     )
 
-    const archived = await archiveWorkspace('ws_a1')
+    await expect(
+      deleteWorkspace('ws_a1', {
+        idempotencyKey: 'workspace-delete:retry-1',
+        requestId: 'req_delete_1',
+      }),
+    ).resolves.toBeUndefined()
 
-    expect(seen).toEqual(['ws_a1'])
-    expect(archived).toMatchObject({ publicId: 'ws_a1', archivedAt: '2026-10-18T00:00:00Z' })
+    expect(seen).toEqual([
+      {
+        workspaceId: 'ws_a1',
+        idempotencyKey: 'workspace-delete:retry-1',
+        requestId: 'req_delete_1',
+      },
+    ])
+  })
+
+  it('mints a fresh workspace-delete idempotency key per attempt', async () => {
+    const seenKeys: Array<string | null> = []
+    useMswHandlers(
+      http.delete('/api/v1/workspaces/:workspaceId', ({ request }) => {
+        seenKeys.push(request.headers.get('idempotency-key'))
+        return HttpResponse.json({ data: { deleted: true } } satisfies DeletedConfirmation)
+      }),
+    )
+
+    await deleteWorkspace('ws_a1')
+    await deleteWorkspace('ws_b2')
+
+    expect(seenKeys).toHaveLength(2)
+    expect(seenKeys[0]).toMatch(/^workspace-delete:/)
+    expect(seenKeys[1]).toMatch(/^workspace-delete:/)
+    expect(seenKeys[0]).not.toBe(seenKeys[1])
+  })
+
+  it('rejects a non-deleted confirmation instead of resolving', async () => {
+    useMswHandlers(
+      http.delete('/api/v1/workspaces/:workspaceId', () =>
+        HttpResponse.json({ data: { deleted: false } } satisfies DeletedConfirmation),
+      ),
+    )
+
+    await expect(deleteWorkspace('ws_a1')).rejects.toThrow()
+  })
+
+  it('validates the workspace id before touching the network', async () => {
+    await expect(deleteWorkspace('123')).rejects.toThrow()
+    await expect(deleteWorkspace('org_c3')).rejects.toThrow()
   })
 
   it('surfaces the server machine code instead of swallowing it', async () => {
     useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/archive', () =>
+      http.delete('/api/v1/workspaces/:workspaceId', () =>
         HttpResponse.json(
           { error: { code: 'workspace_default_protected', message: 'No', request_id: 'r1' } },
           { status: 403 },
@@ -335,7 +383,7 @@ describe('workspace default marker', () => {
       ),
     )
 
-    await expect(archiveWorkspace('ws_d1')).rejects.toMatchObject({
+    await expect(deleteWorkspace('ws_d1')).rejects.toMatchObject({
       code: 'workspace_default_protected',
     })
   })
@@ -375,7 +423,6 @@ describe('workspace URLs', () => {
       workspaceApiUrls.workspaces(),
       workspaceApiUrls.workspaces({ cursor: 'c 1', pageSize: 50 }),
       workspaceApiUrls.workspaceDetail('ws_a1'),
-      workspaceApiUrls.archiveWorkspace('ws_a1'),
       workspaceApiUrls.organizations(),
       workspaceApiUrls.organizationDetail('org_c3'),
       workspaceApiUrls.organizationWorkspaces('org_c3'),

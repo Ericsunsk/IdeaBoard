@@ -2,7 +2,8 @@
 //
 // The selection seam and the rename transport are mocked; the router,
 // query client, and session store are stubbed. Assertions cover the
-// gallery landing (no stale boardId), create-and-switch, rename refresh,
+// gallery landing (no stale boardId), creation preserving canvas scope,
+// rename refresh,
 // and menu-prop mapping.
 import { computed, defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -21,7 +22,7 @@ const queryMocks = vi.hoisted(() => ({ invalidateQueries: vi.fn() }))
 const selectionMocks = vi.hoisted(() => ({ useWorkspaceSelection: vi.fn() }))
 const resourceMocks = vi.hoisted(() => ({
   renameWorkspace: vi.fn(),
-  archiveWorkspace: vi.fn(),
+  deleteWorkspace: vi.fn(),
 }))
 
 vi.mock('vue-router', () => ({
@@ -50,7 +51,7 @@ vi.mock('../selection/workspaceContext', () => ({
 vi.mock('../selection/workspaceResource', () => ({
   WORKSPACE_NAME_MAX_LENGTH: 120,
   renameWorkspace: resourceMocks.renameWorkspace,
-  archiveWorkspace: resourceMocks.archiveWorkspace,
+  deleteWorkspace: resourceMocks.deleteWorkspace,
   workspaceQueryKeys: { list: ['workspaces'] },
 }))
 
@@ -61,7 +62,6 @@ function workspaceSummary(overrides: Partial<WorkspaceSummary> & { publicId: str
     name: overrides.publicId,
     organizationId: null,
     isDefault: false,
-    archivedAt: null,
     ...overrides,
   } as WorkspaceSummary
 }
@@ -107,7 +107,7 @@ describe('useWorkspaceSwitcher', () => {
     routerMocks.replace.mockReset()
     queryMocks.invalidateQueries.mockReset()
     resourceMocks.renameWorkspace.mockReset()
-    resourceMocks.archiveWorkspace.mockReset()
+    resourceMocks.deleteWorkspace.mockReset()
     selectionMocks.useWorkspaceSelection.mockReset()
   })
 
@@ -140,7 +140,7 @@ describe('useWorkspaceSwitcher', () => {
     expect(routerMocks.push).not.toHaveBeenCalled()
   })
 
-  test.each(['select', 'create', 'archive'] as const)(
+  test.each(['select', 'delete'] as const)(
     'waits for the current draft before %s changes workspace scope',
     async (action) => {
       let finishSave!: (isSaved: boolean) => void
@@ -151,19 +151,17 @@ describe('useWorkspaceSwitcher', () => {
       const selection = stubSelection({
         provisionWorkspace: vi.fn().mockResolvedValue(TEAM),
       })
-      resourceMocks.archiveWorkspace.mockResolvedValue(DEFAULT)
+      resourceMocks.deleteWorkspace.mockResolvedValue(undefined)
       const switcher = renderSwitcher({ beforeWorkspaceChange })
       const changing =
         action === 'select'
           ? switcher.switchToGalleryWorkspace(TEAM.publicId)
-          : action === 'create'
-            ? switcher.createAndSwitchWorkspace('Team')
-            : switcher.archiveWorkspaceItem(DEFAULT.publicId)
+          : switcher.deleteWorkspaceItem(DEFAULT.publicId)
 
       expect(beforeWorkspaceChange).toHaveBeenCalledOnce()
       expect(selection.selectWorkspace).not.toHaveBeenCalled()
       expect(selection.provisionWorkspace).not.toHaveBeenCalled()
-      expect(resourceMocks.archiveWorkspace).not.toHaveBeenCalled()
+      expect(resourceMocks.deleteWorkspace).not.toHaveBeenCalled()
       expect(routerMocks.push).not.toHaveBeenCalled()
       finishSave(true)
       await changing
@@ -171,20 +169,18 @@ describe('useWorkspaceSwitcher', () => {
     },
   )
 
-  test.each(['select', 'create', 'archive'] as const)(
+  test.each(['select', 'delete'] as const)(
     'preserves workspace scope when the draft save fails during %s',
     async (action) => {
       const selection = stubSelection()
       const switcher = renderSwitcher({ beforeWorkspaceChange: async () => false })
       if (action === 'select') await switcher.switchToGalleryWorkspace(TEAM.publicId)
-      else if (action === 'create') {
-        await expect(switcher.createAndSwitchWorkspace('Team')).rejects.toThrow('not saved')
-      } else {
-        await expect(switcher.archiveWorkspaceItem(DEFAULT.publicId)).rejects.toThrow('not saved')
+      else {
+        await expect(switcher.deleteWorkspaceItem(DEFAULT.publicId)).rejects.toThrow('not saved')
       }
       expect(selection.selectWorkspace).not.toHaveBeenCalled()
       expect(selection.provisionWorkspace).not.toHaveBeenCalled()
-      expect(resourceMocks.archiveWorkspace).not.toHaveBeenCalled()
+      expect(resourceMocks.deleteWorkspace).not.toHaveBeenCalled()
       expect(routerMocks.push).not.toHaveBeenCalled()
     },
   )
@@ -199,30 +195,37 @@ describe('useWorkspaceSwitcher', () => {
     expect(routerMocks.push).not.toHaveBeenCalled()
   })
 
-  test('creates a workspace, refreshes the list, and lands on the new gallery', async () => {
+  test('creates a workspace and refreshes the list without changing canvas scope', async () => {
     const created = workspaceSummary({ publicId: 'ws_new4', name: 'New space' })
     const selection = stubSelection({
       provisionWorkspace: vi.fn().mockResolvedValue(created),
     })
-    const switcher = renderSwitcher()
+    const beforeWorkspaceChange = vi.fn().mockResolvedValue(false)
+    const originalQuery = { ...routeState.query }
+    const switcher = renderSwitcher({ beforeWorkspaceChange })
 
-    await expect(switcher.createAndSwitchWorkspace('New space')).resolves.toEqual(created)
+    await expect(switcher.createWorkspaceItem('New space')).resolves.toEqual(created)
 
     expect(selection.provisionWorkspace).toHaveBeenCalledWith({ name: 'New space' })
     expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspaces'] })
-    expect(routerMocks.push).toHaveBeenCalledWith({
-      path: USER_BOARDS_PATH,
-      query: { workspace: 'ws_new4' },
-    })
+    expect(beforeWorkspaceChange).not.toHaveBeenCalled()
+    expect(selection.selectWorkspace).not.toHaveBeenCalled()
+    expect(selection.selectedId.value).toBe(DEFAULT.publicId)
+    expect(routeState.query).toEqual(originalQuery)
+    expect(routerMocks.push).not.toHaveBeenCalled()
+    expect(routerMocks.replace).not.toHaveBeenCalled()
   })
 
-  test('does not navigate when creation fails', async () => {
-    stubSelection({ provisionWorkspace: vi.fn().mockRejectedValue(new Error('boom')) })
+  test('does not select when creation fails', async () => {
+    const selection = stubSelection({
+      provisionWorkspace: vi.fn().mockRejectedValue(new Error('boom')),
+    })
     const switcher = renderSwitcher()
 
-    await expect(switcher.createAndSwitchWorkspace('New space')).rejects.toThrow()
+    await expect(switcher.createWorkspaceItem('New space')).rejects.toThrow()
 
     expect(queryMocks.invalidateQueries).not.toHaveBeenCalled()
+    expect(selection.selectWorkspace).not.toHaveBeenCalled()
     expect(routerMocks.push).not.toHaveBeenCalled()
     expect(routerMocks.replace).not.toHaveBeenCalled()
   })
@@ -280,14 +283,23 @@ describe('useWorkspaceSwitcher', () => {
     })
   })
 
-  test('leaves the archived canvas after refresh falls selection back to default', async () => {
-    const archived = workspaceSummary({
-      publicId: 'ws_team2',
-      name: 'Team',
-      organizationId: 'org_c3',
-      archivedAt: '2026-10-18T00:00:00Z',
+  test('creates through menu props without leaving the current route', async () => {
+    const created = workspaceSummary({ publicId: 'ws_new4', name: 'New space' })
+    const selection = stubSelection({
+      provisionWorkspace: vi.fn().mockResolvedValue(created),
     })
-    resourceMocks.archiveWorkspace.mockResolvedValue(archived)
+    const switcher = renderSwitcher()
+
+    await expect(switcher.menuProps.value.onCreate('New space')).resolves.toEqual(created)
+
+    expect(selection.provisionWorkspace).toHaveBeenCalledWith({ name: 'New space' })
+    expect(selection.selectWorkspace).not.toHaveBeenCalled()
+    expect(routerMocks.push).not.toHaveBeenCalled()
+    expect(routerMocks.replace).not.toHaveBeenCalled()
+  })
+
+  test('leaves the deleted canvas after refresh falls selection back to default', async () => {
+    resourceMocks.deleteWorkspace.mockResolvedValue(undefined)
     const items = ref([DEFAULT, TEAM])
     const selectedId = computed(
       () =>
@@ -300,9 +312,9 @@ describe('useWorkspaceSwitcher', () => {
     })
     const switcher = renderSwitcher()
 
-    await expect(switcher.archiveWorkspaceItem('ws_team2')).resolves.toEqual(archived)
+    await expect(switcher.deleteWorkspaceItem('ws_team2')).resolves.toBeUndefined()
 
-    expect(resourceMocks.archiveWorkspace).toHaveBeenCalledWith('ws_team2')
+    expect(resourceMocks.deleteWorkspace).toHaveBeenCalledWith('ws_team2')
     expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspaces'] })
     expect(selectedId.value).toBe(DEFAULT.publicId)
     expect(selection.selectWorkspace).toHaveBeenCalledWith('ws_default1')
@@ -312,16 +324,13 @@ describe('useWorkspaceSwitcher', () => {
     })
   })
 
-  test('stays on the current canvas when archiving another workspace', async () => {
-    resourceMocks.archiveWorkspace.mockResolvedValue({
-      ...TEAM,
-      archivedAt: '2026-10-18T00:00:00Z',
-    })
+  test('stays on the current canvas when deleting another workspace', async () => {
+    resourceMocks.deleteWorkspace.mockResolvedValue(undefined)
     const selection = stubSelection()
     routeState.query = { boardId: 'board_1', workspace: DEFAULT.publicId }
     const switcher = renderSwitcher()
 
-    await switcher.archiveWorkspaceItem(TEAM.publicId)
+    await switcher.deleteWorkspaceItem(TEAM.publicId)
 
     expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspaces'] })
     expect(selection.selectWorkspace).not.toHaveBeenCalled()
@@ -329,15 +338,15 @@ describe('useWorkspaceSwitcher', () => {
     expect(routerMocks.replace).not.toHaveBeenCalled()
   })
 
-  test('propagates the server code when archiving the default row fails', async () => {
+  test('propagates the server code when deleting the default row fails', async () => {
     const failure = Object.assign(new Error('request failed'), {
       code: 'workspace_default_protected',
     })
-    resourceMocks.archiveWorkspace.mockRejectedValue(failure)
+    resourceMocks.deleteWorkspace.mockRejectedValue(failure)
     stubSelection()
     const switcher = renderSwitcher()
 
-    await expect(switcher.archiveWorkspaceItem('ws_default1')).rejects.toMatchObject({
+    await expect(switcher.deleteWorkspaceItem('ws_default1')).rejects.toMatchObject({
       code: 'workspace_default_protected',
     })
     expect(queryMocks.invalidateQueries).not.toHaveBeenCalled()

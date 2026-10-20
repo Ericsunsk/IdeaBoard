@@ -16,7 +16,6 @@ type Querier interface {
 	// archives miss (archived_at IS NULL guard); the caller reads back
 	// the stored row so replays converge instead of 404ing.
 	ArchiveMediaAsset(ctx context.Context, arg ArchiveMediaAssetParams) (MediaAsset, error)
-	ArchiveWorkspace(ctx context.Context, publicID string) (int64, error)
 	ArchiveWorkspaceBoard(ctx context.Context, arg ArchiveWorkspaceBoardParams) (int64, error)
 	// BackfillDailyStatsByCreatedRange freezes one day of terminal workspace
 	// tasks into task_stat_events + task_daily_stats. started_at/ended_at
@@ -230,7 +229,10 @@ type Querier interface {
 	// Workspace tenancy queries (#801). Public references use public_id;
 	// internal_id stays database-internal.
 	//
-	// Default workspace rule (Bug2 root fix): every user owns exactly one live
+	// Deletion is an immediate irreversible hard delete: there is no
+	// archive/restore lifecycle and no workspaces.archived_at column.
+	//
+	// Default workspace rule (Bug2 root fix): every user owns exactly one
 	// Default personal workspace (is_default). Plain personal workspaces created
 	// without an organization are always non-Default and unlimited; only
 	// EnsureDefaultWorkspace mints the Default row.

@@ -143,9 +143,8 @@ vi.mock('../../../workspace/shell/useWorkspaceSwitcher.ts', () => ({
     return {
       menuProps: ref(undefined),
       switchToGalleryWorkspace: vi.fn(),
-      createAndSwitchWorkspace: vi.fn(),
       renameWorkspaceItem: vi.fn(),
-      archiveWorkspaceItem: vi.fn(),
+      deleteWorkspaceItem: vi.fn(),
     }
   },
 }))

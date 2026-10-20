@@ -13,18 +13,17 @@
       <Skeleton height="2.75rem" />
     </div>
 
-    <div
+    <LoadErrorPanel
       v-else-if="!options"
-      class="flex min-h-40 flex-col items-center justify-center text-center"
-    >
-      <p id="recharge-purchase-heading" class="m-0 font-semibold text-destructive">
-        {{ t('account.errors.optionsLoadFailed') }}
-      </p>
-      <p class="mt-1 mb-0 text-sm text-muted-foreground">{{ errorMessage(error) }}</p>
-      <Button variant="ghost" size="sm" class="mt-3" @click="emit('retry')">{{
-        t('account.reload')
-      }}</Button>
-    </div>
+      id="recharge-purchase-heading"
+      class="min-h-40 justify-center"
+      align="center"
+      :message="t('account.errors.optionsLoadFailed')"
+      :detail="errorMessage(error)"
+      :retry-label="t('account.reload')"
+      retry-variant="ghost"
+      @retry="emit('retry')"
+    />
 
     <div
       v-else-if="!options.purchases_available"
@@ -146,6 +145,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import IbFormField from '../../../../core/components/IbFormField.vue'
+import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
 import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'
 import { resolveInteractiveControlState } from '../../../../core/interaction/interactiveControlState'

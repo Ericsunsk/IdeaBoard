@@ -15,8 +15,6 @@ export const shareDialogClasses = {
   sectionTitle: 'm-0 text-sm font-semibold text-foreground',
   loading: 'flex min-h-24 items-center justify-center',
   spinner: 'size-7 text-primary',
-  errorBox:
-    'flex flex-col items-start gap-2 rounded-control border border-destructive/30 bg-destructive/10 p-3 text-sm text-foreground',
   avatarRow: 'flex flex-wrap items-center gap-3 pt-1',
   avatarButton:
     'group relative flex cursor-pointer items-center justify-center rounded-pill p-0.5 outline-none transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:ring-2 focus-visible:ring-ring active:scale-95 disabled:pointer-events-none',

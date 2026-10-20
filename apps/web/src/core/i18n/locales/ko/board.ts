@@ -7,7 +7,6 @@ export default {
   sortLabel: '캔버스 정렬',
   sortRecent: '최근',
   sortName: '이름',
-  scopeLabel: '보드 범위',
   scopePersonal: '개인 보드',
   scopeTeam: '팀 보드',
   accessPrivate: '비공개',

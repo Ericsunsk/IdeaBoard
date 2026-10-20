@@ -19,7 +19,6 @@ export type UserAccountMenuWorkspaceItem = {
   organizationId: string | null
   // The server marker controls the Default badge and protected actions.
   isDefault: boolean
-  archivedAt: string | null
 }
 
 type UserAccountMenuWorkspaceStatus = 'loading' | 'ready' | 'error' | 'empty'
@@ -41,7 +40,7 @@ export type UserAccountMenuWorkspace = {
   onSelect: (workspaceId: string) => void
   onCreate: (name: string) => Promise<UserAccountMenuWorkspaceItem>
   onRename: (workspaceId: string, name: string) => Promise<UserAccountMenuWorkspaceItem>
-  onArchive: (workspaceId: string) => Promise<UserAccountMenuWorkspaceItem>
+  onDelete: (workspaceId: string) => Promise<void>
   onRetry: () => void
 }
 

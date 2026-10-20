@@ -62,3 +62,20 @@ export function resolveMemberAvatar(
   }
   return undefined
 }
+
+/** Minimal roster identity for member initial resolution. */
+export type MemberInitialEntry = {
+  userId: string
+  email?: string | null | undefined
+}
+
+/**
+ * Resolves one member fallback initial: the email first letter first,
+ * then the userId with the `usr_` prefix stripped, else `U`.
+ */
+export function resolveMemberInitial(entry: MemberInitialEntry): string {
+  if (entry.email) {
+    return entry.email.charAt(0).toUpperCase()
+  }
+  return entry.userId.replace(/^usr_/, '').charAt(0).toUpperCase() || 'U'
+}

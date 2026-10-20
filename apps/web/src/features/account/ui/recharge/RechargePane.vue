@@ -44,8 +44,11 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { toRef } from 'vue'
+import { useAppToast } from '../../../../core/composables/useAppToast'
+import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import type { PaymentReturnContext } from '../../core/return'
 import { useRecharge } from '../../session/payments/useRecharge'
+import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'
 import AccountPane from '../shared/AccountPane.vue'
 import ReturnStatus from './ReturnStatus.vue'
 import HistoryTable from './HistoryTable.vue'
@@ -54,6 +57,7 @@ import PurchaseCard from './PurchaseCard.vue'
 
 const props = defineProps<{ isActive: boolean; paymentReturn: PaymentReturnContext | null }>()
 const { t } = useI18n()
+const toast = useAppToast()
 const {
   purchaseOptions,
   optionsPending,
@@ -88,24 +92,49 @@ const {
 async function checkout(ideaQuantity: number) {
   try {
     await createCheckout(ideaQuantity)
-  } catch {
-    // useMutation retains the failure for the visible, retryable form error state.
+  } catch (error) {
+    // Dual: useMutation retains the failure for the visible, retryable form
+    // error state (PurchaseCard inline alert as position anchor); toast
+    // surfaces it transiently for users who miss the inline bar.
+    toast.error(
+      userFacingErrorCopy(
+        error,
+        t('account.errors.checkoutCreateFailed'),
+        ACCOUNT_GUIDANCE_COPY_KEYS,
+      ),
+    )
   }
 }
 
 async function continuePending(publicToken: string) {
   try {
     await continuePendingOrder(publicToken)
-  } catch {
-    // The pending-order card retains a visible error and retry action.
+  } catch (error) {
+    // Dual: the pending-order card retains a visible error and retry action;
+    // toast mirrors it transiently.
+    toast.error(
+      userFacingErrorCopy(
+        error,
+        t('account.errors.continuePaymentFailed'),
+        ACCOUNT_GUIDANCE_COPY_KEYS,
+      ),
+    )
   }
 }
 
 async function abandonPending(publicToken: string) {
   try {
     await abandonPendingOrder(publicToken)
-  } catch {
-    // The pending-order card retains a visible error and retry action.
+  } catch (error) {
+    // Dual: the pending-order card retains a visible error and retry action;
+    // toast mirrors it transiently.
+    toast.error(
+      userFacingErrorCopy(
+        error,
+        t('account.errors.abandonOrderFailed'),
+        ACCOUNT_GUIDANCE_COPY_KEYS,
+      ),
+    )
   }
 }
 </script>

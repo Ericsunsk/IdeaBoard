@@ -1,3 +1,4 @@
-h1:Pnx7kNh+8XTu809/buOoQb6VKfmfUEQ9jZ7EGY2XuxU=
+h1:rZLaWY0bj6THfZiZp2E7mzWCNzVugiYaecpqqJKX+fc=
 20261020000000_baseline.sql h1:Fpqe+04wrz22ibGoHfDHz+s0WBq8GSYDkguIesUcWSU=
 20261020000001_board_y_updates.sql h1:fQb6dWRkE+cm22VIddfEVbXDLML9p7QzkjhCIz8bbxQ=
+20261020000002_drop_workspaces_archived_at.sql h1:yZj35gEPGxSzPy+heq9eudveMrB0P+mPYXd9ywJKh3k=

@@ -12,11 +12,6 @@ export const catalogClasses = {
   pageSubtitle:
     'mt-4 mb-[34px] text-center text-admin-title-sm tracking-normal text-muted-foreground md:text-[19px]',
   toolbar: 'mb-6 grid grid-cols-1 items-center gap-3.5 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]',
-  recoveryState:
-    'mb-4 flex min-h-10 items-center justify-between gap-3 rounded-panel border border-border bg-card px-3 py-2',
-  recoveryText: 'min-w-0 text-admin-body font-semibold text-foreground',
-  recoveryButton:
-    'inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-pill border-0 bg-primary px-3 text-xs font-bold text-primary-foreground hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60',
   createButton:
     'cursor-pointer !h-[42px] !rounded-pill !border-0 !bg-primary !px-5 !text-sm !font-bold !tracking-normal !text-primary-foreground !shadow-none hover:!bg-primary-hover focus-visible:!ring-2 focus-visible:!ring-ring !w-full md:!w-auto',
   searchWrap: 'page-chrome-surface flex h-[42px] min-w-0 items-center gap-2 rounded-pill p-1.5',
@@ -51,21 +46,4 @@ export const catalogClasses = {
   createTitle: 'text-sm font-bold text-foreground',
   createDate: 'mt-[3px] text-xs text-muted-foreground',
   emptyTip: 'mt-[18px] text-admin-body text-muted-foreground',
-  deleteDialogShell: 'p-5',
-  deleteDialogTitle:
-    'm-0 text-admin-heading leading-[1.2] font-bold tracking-normal text-foreground',
-  deleteDialogDescription: 'mt-3 mb-0 text-admin-body leading-6 text-muted-foreground',
-  deleteDialogFooter: 'mt-6 flex justify-end gap-2',
-  deleteCancelButton:
-    'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-pill border-0 bg-transparent px-3.5 text-sm font-bold text-muted-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60',
-  deleteConfirmButton:
-    'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-pill border-0 bg-destructive px-3.5 text-sm font-bold text-destructive-foreground transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-destructive-hover disabled:cursor-not-allowed disabled:opacity-70',
-} as const
-// UiDialog 以 :class/cn() 组合造型：mask 沿用 UiDialog 内置 ibDialogMaskClass。
-export const catalogDeleteDialogContentClass =
-  'overflow-hidden rounded-overlay border border-border bg-popover shadow-[var(--shadow-board-dialog)]'
-
-export const catalogDeleteDialogStyle = {
-  width: '360px',
-  maxWidth: 'calc(100vw - 28px)',
 } as const

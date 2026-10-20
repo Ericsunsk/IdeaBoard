@@ -7,7 +7,6 @@ export default {
   sortLabel: '排序画布',
   sortRecent: '最近',
   sortName: '名称',
-  scopeLabel: '画板范围',
   scopePersonal: '个人画板',
   scopeTeam: '团队画板',
   accessPrivate: '私有',

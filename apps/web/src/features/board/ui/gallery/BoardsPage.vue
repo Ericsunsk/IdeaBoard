@@ -92,30 +92,24 @@
         </Select>
       </section>
 
-      <div
+      <LoadErrorPanel
         v-if="catalogRecoveryBoardId || catalogHydrationFailed"
-        :class="catalogClasses.recoveryState"
-        role="alert"
-      >
-        <span :class="catalogClasses.recoveryText">{{
+        class="mb-4"
+        :message="
           catalogHydrationFailed
             ? t('workspace.catalog.loadFailed')
             : t('workspace.catalog.reloadRequired')
-        }}</span>
-        <Button
-          type="button"
-          :is-disabled="isCatalogReloadPending"
-          :class="catalogClasses.recoveryButton"
-          @click="reloadCatalog"
-          >{{
-            isCatalogReloadPending
-              ? t('workspace.catalog.reloading')
-              : catalogHydrationFailed
-                ? t('common.actions.retry')
-                : t('workspace.catalog.reload')
-          }}</Button
-        >
-      </div>
+        "
+        :retry-label="
+          isCatalogReloadPending
+            ? t('workspace.catalog.reloading')
+            : catalogHydrationFailed
+              ? t('common.actions.retry')
+              : t('workspace.catalog.reload')
+        "
+        :is-retrying="isCatalogReloadPending"
+        @retry="reloadCatalog"
+      />
 
       <section v-if="isBoardsLoading" :class="catalogClasses.loadingState" aria-live="polite">
         <Spinner :class="catalogClasses.loadingSpinner" />
@@ -169,62 +163,21 @@
       </p>
     </main>
 
-    <DialogRoot :open="deleteDialogVisible" @update:open="handleDeleteDialogOpenUpdate">
-      <DialogPortal>
-        <DialogOverlay :class="ibDialogMaskClass" @click="handleDeleteDialogMaskClick" />
-        <DialogContent
-          :class="cn(dialogContentBaseClass, catalogDeleteDialogContentClass)"
-          :style="catalogDeleteDialogStyle"
-          aria-labelledby="board-delete-dialog-title"
-          :aria-busy="deleteDialogAriaBusy"
-          @escape-key-down="handleDeleteDialogEscape"
-          @pointer-down-outside="blockDeleteDialogOutsideDismiss"
-        >
-          <div class="min-h-0 overflow-y-auto">
-            <DialogDescription class="sr-only">
-              {{
-                t('workspace.deleteDialog.description', {
-                  name: pendingDeleteBoard?.name || t('board.untitledCanvas'),
-                })
-              }}
-            </DialogDescription>
-            <div :class="catalogClasses.deleteDialogShell">
-              <h2 id="board-delete-dialog-title" :class="catalogClasses.deleteDialogTitle">
-                {{ t('workspace.deleteDialog.title') }}
-              </h2>
-              <p :class="catalogClasses.deleteDialogDescription">
-                {{
-                  t('workspace.deleteDialog.description', {
-                    name: pendingDeleteBoard?.name || t('board.untitledCanvas'),
-                  })
-                }}
-              </p>
-
-              <div :class="catalogClasses.deleteDialogFooter">
-                <Button
-                  type="button"
-                  :is-disabled="isDeletePending"
-                  :class="catalogClasses.deleteCancelButton"
-                  @click="closeDeleteDialogView"
-                  >{{ t('common.actions.cancel') }}</Button
-                >
-                <Button
-                  type="button"
-                  :is-disabled="isDeletePending"
-                  :class="catalogClasses.deleteConfirmButton"
-                  @click="confirmDelete"
-                  >{{
-                    isDeletePending
-                      ? t('workspace.deleteDialog.deleting')
-                      : t('common.actions.delete')
-                  }}</Button
-                >
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </DialogPortal>
-    </DialogRoot>
+    <!-- 删除二次确认：统一走 UserConfirmDialog intent=danger（参考 LibraryFloatingIsland）。Busy 提交时组件内部锁住 mask/Escape/close-control。 -->
+    <UserConfirmDialog
+      :is-visible="deleteDialogVisible"
+      :title="t('workspace.deleteDialog.title')"
+      :message="
+        t('workspace.deleteDialog.description', {
+          name: pendingDeleteBoard?.name || t('board.untitledCanvas'),
+        })
+      "
+      :confirm-label="t('common.actions.delete')"
+      intent="danger"
+      :is-loading="isDeletePending"
+      @update:is-visible="handleDeleteConfirmVisibleUpdate"
+      @confirm="confirmDelete"
+    />
 
     <ShareDialog :panel="sharePanel" />
   </div>
@@ -235,25 +188,13 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import BoardCard from './BoardCard.vue'
-import { catalogClasses, catalogDeleteDialogContentClass, catalogDeleteDialogStyle } from './skin'
+import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
+import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
+import { catalogClasses } from './skin'
 import { USER_CANVAS_PATH } from '../../../workspace/routePaths'
-import {
-  defineDialogSurfaceIntent,
-  useOverlayInteractionLifecycle,
-} from '../../../../core/composables/useOverlayInteractionLifecycle'
 import { WorkspaceHeader, useWorkspaceSelection } from '../../../workspace'
 import { Group, NavArrowDown, Search, User, Xmark } from '@iconoir/vue'
 import { Button } from '@/components/ui/button'
-import {
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogRoot,
-} from '@/components/ui/dialog'
-import { dialogContentBaseClass } from '@/components/ui/dialog'
-import { cn } from '@/lib/utils'
-import { ibDialogMaskClass } from '../../../../theme/dialogMask'
 import {
   Select,
   SelectContent,
@@ -331,43 +272,12 @@ function onShareBoardIntent(boardId: string) {
   sharePanel.open(board.id, board.name)
 }
 
-const {
-  ariaBusy: deleteDialogAriaBusy,
-  canDismiss: canDismissDeleteDialog,
-  completeClose: completeDeleteDialogClose,
-  handleVisibilityChange: handleDeleteDialogVisibilityChange,
-  requestClose: requestDeleteDialogClose,
-} = useOverlayInteractionLifecycle({
-  isVisible: deleteDialogVisible,
-  busy: isDeletePending,
-  surface: defineDialogSurfaceIntent(),
-  onVisibilityChange: (visible) => {
-    if (!visible) closeDeleteDialog()
-  },
-})
-
-function closeDeleteDialogView() {
-  if (handleDeleteDialogVisibilityChange(false)) handleDeleteDialogAfterHide()
-}
-
-function handleDeleteDialogOpenUpdate(open: boolean) {
-  if (!open) closeDeleteDialogView()
-}
-
-function handleDeleteDialogMaskClick() {
-  if (requestDeleteDialogClose('mask')) handleDeleteDialogAfterHide()
-}
-
-function handleDeleteDialogEscape(event: KeyboardEvent) {
-  if (!canDismissDeleteDialog('escape')) event.preventDefault()
-}
-
-function blockDeleteDialogOutsideDismiss(event: Event) {
-  event.preventDefault()
-}
-
-function handleDeleteDialogAfterHide() {
-  completeDeleteDialogClose()
+// UserConfirmDialog 在 Busy 提交时已锁住全部关闭路径；页面只处理 idle
+// 关闭后的清理（等价于旧 handleDeleteDialogAfterHide 的后半段，focus
+// 恢复由组件内部 lifecycle 负责）。
+function handleDeleteConfirmVisibleUpdate(isVisible: boolean) {
+  if (isVisible || isDeletePending.value) return
+  closeDeleteDialog()
   handleDeleteDialogHidden()
 }
 

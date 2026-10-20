@@ -17,18 +17,12 @@
     </div>
 
     <!-- Error State -->
-    <div
+    <LoadErrorPanel
       v-else-if="section.hasLoadError.value"
-      class="flex flex-col items-start gap-2.5 rounded-panel border border-destructive/30 bg-destructive/10 p-4 text-sm text-foreground"
-      aria-live="polite"
-    >
-      <p class="m-0 text-sm leading-normal text-foreground">
-        {{ t('workspace.switcher.members.loadFailed') }}
-      </p>
-      <Button type="button" size="sm" @click="section.retryRoster()">
-        {{ t('common.actions.retry') }}
-      </Button>
-    </div>
+      :message="t('workspace.switcher.members.loadFailed')"
+      :retry-label="t('common.actions.retry')"
+      @retry="section.retryRoster()"
+    />
 
     <!-- Loaded Content: Invite Bar & Roster List -->
     <template v-else>
@@ -48,7 +42,6 @@
               v-model="section.inviteEmail.value"
               size="sm"
               class="min-w-0 flex-1 h-9 text-xs bg-background"
-              :invalid="section.inviteError.value !== null"
               :disabled="section.isPending('invite')"
               :aria-label="t('workspace.switcher.members.emailLabel')"
               :placeholder="t('workspace.switcher.members.emailPlaceholder')"
@@ -64,6 +57,7 @@
               :is-disabled="section.isPending('invite')"
               @click="section.inviteMember()"
             >
+              <SendMail class="size-4" aria-hidden="true" />
               {{
                 section.isPending('invite')
                   ? t('workspace.switcher.members.inviting')
@@ -71,29 +65,15 @@
               }}
             </Button>
           </div>
-          <p
-            v-if="section.inviteError.value"
-            class="m-0 text-xs leading-normal text-destructive"
-            role="alert"
-          >
-            {{ section.inviteError.value }}
-          </p>
         </div>
       </section>
 
       <!-- Member Roster Card -->
       <section :class="accountCardPanelClass" aria-labelledby="member-roster-title">
         <div class="flex items-center justify-between mb-3">
-          <div class="flex items-center gap-2">
-            <h3 id="member-roster-title" class="m-0 text-admin-body font-semibold text-foreground">
-              {{ t('workspace.switcher.members.title') }}
-            </h3>
-            <span
-              class="rounded-pill bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground font-mono"
-            >
-              {{ section.roster.value.length }}
-            </span>
-          </div>
+          <h3 id="member-roster-title" class="m-0 text-admin-body font-semibold text-foreground">
+            {{ t('workspace.switcher.members.title') }}
+          </h3>
           <span v-if="!section.canManage.value" class="text-xs text-muted-foreground">
             {{ t('workspace.switcher.members.readOnlyNote') }}
           </span>
@@ -118,7 +98,7 @@
                   <AvatarFallback
                     class="bg-primary/10 text-primary font-semibold text-xs border border-primary/20 select-none uppercase"
                   >
-                    {{ memberInitial(entry) }}
+                    {{ resolveMemberInitial(entry) }}
                   </AvatarFallback>
                 </Avatar>
                 <div class="min-w-0 flex-1">
@@ -282,15 +262,17 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { SendMail } from '@iconoir/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { resolveMemberAvatar } from '../../../../core/media/avatarUrl'
+import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
+import { resolveMemberAvatar, resolveMemberInitial } from '../../../../core/media/avatarUrl'
 import { useUserStore } from '../../../auth'
 import { accountCardPanelClass } from '../shared/ui'
 import { memberDisplayName, useWorkspaceMemberSection } from './useWorkspaceMemberSection'
-import type { WorkspaceMemberEntry, WorkspaceMemberRole } from '../../session/accountWorkspace'
+import type { WorkspaceMemberRole } from '../../session/accountWorkspace'
 
 const props = defineProps<{
   workspaceId: string
@@ -301,13 +283,6 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const userStore = useUserStore()
-
-function memberInitial(entry: WorkspaceMemberEntry): string {
-  if (entry.email) {
-    return entry.email.charAt(0).toUpperCase()
-  }
-  return entry.userId.replace(/^usr_/, '').charAt(0).toUpperCase() || 'U'
-}
 
 const section = useWorkspaceMemberSection({
   workspaceId: () => props.workspaceId,

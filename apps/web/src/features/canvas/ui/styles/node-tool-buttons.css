@@ -70,7 +70,7 @@
   border: var(--node-tool-border-width) solid var(--node-tool-button-border);
   background: var(--canvas-node-bg);
   color: var(--canvas-text-control);
-  font-size: 12px;
+  font-size: var(--canvas-font-size-control);
   font-weight: 700;
   line-height: 1;
   outline: none;

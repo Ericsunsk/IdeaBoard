@@ -242,7 +242,7 @@ func TestInternalYDocPostgresRoundTrip(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
 	const owner, viewer = int64(1), int64(3)
-	tenancyStore := tenancypg.NewStore(db)
+	tenancyStore := tenancypg.NewStore(db, nil)
 	ws, err := tenancyStore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "ydoc-pg", OwnerUserID: owner})
 	if err != nil {
 		t.Fatalf("create workspace failed: %v", err)

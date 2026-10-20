@@ -70,12 +70,6 @@ func RiverTimeoutMatrix() []QueueTimeoutPolicy {
 			Notes:   "shutdown sweep; same budget as payment reconciliation",
 		},
 		{
-			Queue:   RiverQueueTaskRetention,
-			Timeout: RiverJobTimeoutTaskRetention,
-			Worker:  "WorkspacePurgeWorker (serial single-worker queue)",
-			Notes:   "serial purge window; matches the historical 15min budget",
-		},
-		{
 			Queue:   RiverQueueVisionBilling,
 			Timeout: RiverJobTimeoutVisionBilling,
 			Worker:  "VisionBillingReconciliationWorker",

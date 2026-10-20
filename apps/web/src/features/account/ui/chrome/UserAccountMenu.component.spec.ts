@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, ref } from 'vue'
 import { i18n } from '../../../../core/i18n'
-import { render, renderWithUser, screen, waitFor } from '../../../../test/render'
+import { render, renderWithUser, screen, waitFor, within } from '../../../../test/render'
 import { expectDomOrder } from '../../../../test/domOrder'
+import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import UserAccountMenu from './UserAccountMenu.vue'
 import type {
   UserAccountMenuItem,
@@ -43,6 +44,7 @@ const DialogContentStub = defineComponent({
 // section controller (read-only empty roster) so no query client or
 // transport is needed here. Member behavior lives in
 // `WorkspaceMemberSection.component.spec.ts` with the real controller.
+vi.mock('../../../../core/composables/useAppToast')
 vi.mock('./useWorkspaceMemberSection', () => ({
   memberDisplayName: (entry: { userId: string }) => entry.userId,
   useWorkspaceMemberSection: () => ({
@@ -56,7 +58,6 @@ vi.mock('./useWorkspaceMemberSection', () => ({
     isPending: () => false,
     inviteEmail: ref(''),
     inviteRole: ref('member'),
-    inviteError: ref(null),
     pickInviteRole: vi.fn(),
     inviteMember: vi.fn(),
     changeMemberRole: vi.fn(),
@@ -90,21 +91,12 @@ function workspaceControls(
         name: 'Personal',
         organizationId: null,
         isDefault: true,
-        archivedAt: null,
       },
       {
         publicId: 'ws_team2',
         name: 'Team',
         organizationId: 'org_c3',
         isDefault: false,
-        archivedAt: null,
-      },
-      {
-        publicId: 'ws_old3',
-        name: 'Old',
-        organizationId: null,
-        isDefault: false,
-        archivedAt: '2026-01-01T00:00:00Z',
       },
     ],
     selectedId: 'ws_personal1',
@@ -112,7 +104,7 @@ function workspaceControls(
     onSelect: vi.fn(),
     onCreate: vi.fn(),
     onRename: vi.fn(),
-    onArchive: vi.fn(),
+    onDelete: vi.fn(),
     onRetry: vi.fn(),
     ...overrides,
   }
@@ -132,8 +124,10 @@ async function openSubmenu(trigger: HTMLElement, firstOptionName: string | RegEx
 }
 
 describe('UserAccountMenu', () => {
+  let toast: AppToastMocks
   beforeEach(() => {
     i18n.global.locale.value = 'en'
+    toast = mockAppToast()
   })
   it('shows the account email above a separator in the user menu', async () => {
     const { user } = renderWithUser(UserAccountMenu, {
@@ -364,6 +358,23 @@ describe('UserAccountMenu', () => {
     expect(screen.getByRole('menuitem', { name: '한국어' })).toBeVisible()
 
     await user.click(zhOption)
+    // The switch loads the zh-CN bundle asynchronously: await its completion
+    // and switch back before the test ends, otherwise the in-flight promise
+    // resolves during a later test (after its sync locale reset) and flips
+    // the menu copy mid-test under parallel load. Selecting a locale closes
+    // the menu, so reopen it first (labels below are the zh-CN copies).
+    await waitFor(() => expect(i18n.global.locale.value).toBe('zh-CN'))
+    await user.click(screen.getByRole('button', { name: '账户菜单' }))
+    const languageTriggerZh = await screen.findByRole('menuitem', { name: '语言' })
+    languageTriggerZh.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        cancelable: true,
+        pointerType: 'mouse',
+      }),
+    )
+    await user.click(await screen.findByRole('menuitem', { name: 'English' }))
+    await waitFor(() => expect(i18n.global.locale.value).toBe('en'))
   })
 
   it('places configured support channels after language and links the QR code safely', async () => {
@@ -481,14 +492,13 @@ describe('UserAccountMenu', () => {
       expectDomOrder([workspaceTrigger, profileItem, appearanceTrigger])
     })
 
-    it('opens unarchived workspaces on hover with the current check and no extra badge', async () => {
+    it('opens workspaces on hover with the current check and no extra badge', async () => {
       await openMenuWithWorkspace(workspaceControls())
 
       const trigger = await screen.findByRole('menuitem', { name: 'Default' })
       const teamOption = await openWorkspaceSubmenu(trigger)
 
       expect(teamOption).toBeVisible()
-      expect(screen.queryByRole('menuitem', { name: 'Old' })).not.toBeInTheDocument()
       // Personal reads as Default in both the trigger row and the submenu
       // option: same shape as theme/language, no badge anywhere.
       const defaults = await screen.findAllByRole('menuitem', { name: 'Default' })
@@ -546,13 +556,12 @@ describe('UserAccountMenu', () => {
       expect(screen.queryByRole('menuitem', { name: 'Team' })).not.toBeInTheDocument()
     })
 
-    it('creates a workspace with a unique default name and keeps settings open', async () => {
+    it('opens the naming dialog with a unique default name and creates on confirm', async () => {
       const created = {
         publicId: 'ws_new4',
         name: 'New workspace',
         organizationId: null,
         isDefault: false,
-        archivedAt: null,
       }
       const workspace = workspaceControls({ onCreate: vi.fn().mockResolvedValue(created) })
       const view = await openSettingsDialog(workspace)
@@ -562,8 +571,96 @@ describe('UserAccountMenu', () => {
 
       await view.user.click(addButton)
 
+      const dialog = await screen.findByRole('dialog', { name: 'New workspace' })
+      expect(dialog).toBeVisible()
+      const nameInput = screen.getByLabelText('Workspace name')
+      expect(nameInput).toHaveValue('New workspace')
+      await waitFor(() => expect(nameInput).toHaveFocus())
+
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
+
       await waitFor(() => expect(workspace.onCreate).toHaveBeenCalledWith('New workspace'))
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'New workspace' })).not.toBeInTheDocument(),
+      )
       expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
+    })
+
+    it('creates with a typed name and focuses the new row with Members', async () => {
+      const created = {
+        publicId: 'ws_new4',
+        name: 'Typed space',
+        organizationId: null,
+        isDefault: false,
+      }
+      const workspace = workspaceControls({ onCreate: vi.fn().mockResolvedValue(created) })
+      const view = await openSettingsDialog(workspace)
+
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      const nameInput = await screen.findByLabelText('Workspace name')
+      await view.user.clear(nameInput)
+      await view.user.type(nameInput, 'Typed space')
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
+
+      await waitFor(() => expect(workspace.onCreate).toHaveBeenCalledWith('Typed space'))
+      await view.rerender({
+        items: profileItems,
+        workspace: { ...workspace, items: [...workspace.items, created] },
+      })
+
+      const newRow = await screen.findByRole('button', { name: 'Typed space' })
+      await waitFor(() => expect(newRow).toHaveAttribute('aria-current', 'page'))
+      expect(await screen.findByRole('heading', { name: 'Typed space' })).toBeVisible()
+      expect(screen.getByRole('heading', { name: 'Members' })).toBeVisible()
+      await waitFor(() => expect(newRow).toHaveFocus())
+      expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
+    })
+
+    it('toasts on an empty name without creating', async () => {
+      const workspace = workspaceControls({ onCreate: vi.fn() })
+      const view = await openSettingsDialog(workspace)
+
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      const nameInput = await screen.findByLabelText('Workspace name')
+      await view.user.clear(nameInput)
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith('Workspace name cannot be empty.'),
+      )
+      expect(workspace.onCreate).not.toHaveBeenCalled()
+      expect(screen.getByRole('dialog', { name: 'New workspace' })).toBeVisible()
+      expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
+    })
+
+    it('cancels the naming dialog without side effects', async () => {
+      const workspace = workspaceControls({ onCreate: vi.fn() })
+      const view = await openSettingsDialog(workspace)
+
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      await screen.findByRole('dialog', { name: 'New workspace' })
+      await view.user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      expect(workspace.onCreate).not.toHaveBeenCalled()
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'New workspace' })).not.toBeInTheDocument(),
+      )
+      expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
+    })
+
+    it('blocks a duplicate name inline without creating', async () => {
+      const workspace = workspaceControls({ onCreate: vi.fn() })
+      const view = await openSettingsDialog(workspace)
+
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      const nameInput = await screen.findByLabelText('Workspace name')
+      await view.user.clear(nameInput)
+      await view.user.type(nameInput, 'Team')
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
+
+      expect(await screen.findByText('A workspace with this name already exists.')).toBeVisible()
+      expect(workspace.onCreate).not.toHaveBeenCalled()
+      expect(screen.getByRole('dialog', { name: 'New workspace' })).toBeVisible()
     })
 
     it('generates an incremented default name when collision occurs', async () => {
@@ -573,14 +670,12 @@ describe('UserAccountMenu', () => {
           name: 'Personal',
           organizationId: null,
           isDefault: true,
-          archivedAt: null,
         },
         {
           publicId: 'ws_item2',
           name: 'New workspace',
           organizationId: 'org_c2',
           isDefault: false,
-          archivedAt: null,
         },
       ]
       const workspace = workspaceControls({
@@ -590,30 +685,40 @@ describe('UserAccountMenu', () => {
           name: 'New workspace 2',
           organizationId: null,
           isDefault: false,
-          archivedAt: null,
         }),
       })
       const view = await openSettingsDialog(workspace)
 
       await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      const nameInput = await screen.findByLabelText('Workspace name')
+      expect(nameInput).toHaveValue('New workspace 2')
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
       await waitFor(() => expect(workspace.onCreate).toHaveBeenCalledWith('New workspace 2'))
     })
 
-    it('keeps settings open with an inline error when creation fails', async () => {
+    it('keeps the naming dialog open with an inline error when creation fails', async () => {
       const workspace = workspaceControls({
         onCreate: vi.fn().mockRejectedValue(new Error('boom')),
       })
       const view = await openSettingsDialog(workspace)
 
       await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      await screen.findByLabelText('Workspace name')
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
 
       expect(
-        await screen.findByText('Could not create the workspace. Please try again.'),
-      ).toBeVisible()
+        await screen.findAllByText('Could not create the workspace. Please try again.'),
+      ).not.toHaveLength(0)
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          'Could not create the workspace. Please try again.',
+        ),
+      )
       expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
+      expect(screen.getByRole('dialog', { name: 'New workspace' })).toBeVisible()
     })
 
-    it('renames in the right panel and keeps the old name with an inline error on failure', async () => {
+    it('renames in the right panel and toasts on failure while keeping the old name', async () => {
       const workspace = workspaceControls({
         onRename: vi.fn().mockRejectedValue(new Error('boom')),
       })
@@ -627,9 +732,16 @@ describe('UserAccountMenu', () => {
       await view.user.keyboard('{Enter}')
 
       await waitFor(() => expect(workspace.onRename).toHaveBeenCalledWith('ws_team2', 'Renamed'))
+      // Server-side rename failures go through toast; inline copy stays for
+      // field-level validation (validateName) only.
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          'Could not rename the workspace. The original name was kept.',
+        ),
+      )
       expect(
-        await screen.findByText('Could not rename the workspace. The original name was kept.'),
-      ).toBeVisible()
+        screen.queryByText('Could not rename the workspace. The original name was kept.'),
+      ).not.toBeInTheDocument()
       expect(screen.getByLabelText('Rename Team')).toHaveValue('Team')
     })
 
@@ -662,12 +774,11 @@ describe('UserAccountMenu', () => {
       expect(await screen.findByText('A workspace with this name already exists.')).toBeVisible()
     })
 
-    it('disables renaming for the Default workspace', async () => {
+    it('hides the rename control for the Default workspace', async () => {
       const workspace = workspaceControls({ onRename: vi.fn() })
       await openSettingsDialog(workspace)
 
-      expect(screen.getByRole('button', { name: 'Rename Default' })).toBeDisabled()
-      expect(screen.getByText('The Default workspace cannot be renamed.')).toBeVisible()
+      expect(screen.queryByRole('button', { name: 'Rename Default' })).toBeNull()
       expect(workspace.onRename).not.toHaveBeenCalled()
     })
 
@@ -677,7 +788,6 @@ describe('UserAccountMenu', () => {
         name: 'Renamed',
         organizationId: 'org_c3',
         isDefault: false,
-        archivedAt: null,
       }
       const workspace = workspaceControls({
         onRename: vi.fn().mockResolvedValue(renamed),
@@ -704,71 +814,156 @@ describe('UserAccountMenu', () => {
       const view = await openSettingsDialog(workspace)
 
       await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      await screen.findByLabelText('Workspace name')
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
 
       expect(
-        await screen.findByText(
+        await screen.findAllByText(
           'Could not create the workspace. Please try again. (workspace_default_conflict)',
         ),
-      ).toBeVisible()
+      ).not.toHaveLength(0)
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          'Could not create the workspace. Please try again. (workspace_default_conflict)',
+        ),
+      )
       expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
     })
 
-    it('disables archiving for the Default workspace', async () => {
+    it('hides the delete section for the Default workspace', async () => {
       const workspace = workspaceControls()
       await openSettingsDialog(workspace)
 
-      const archiveButton = screen.getByRole('button', { name: 'Archive' })
-      expect(archiveButton).toBeDisabled()
-      expect(screen.getByText('The Default workspace cannot be archived.')).toBeVisible()
-      expect(workspace.onArchive).not.toHaveBeenCalled()
+      // Default is never deleted: the whole delete section stays hidden
+      // (mirrors the rename pencil v-if), not a disabled button + note.
+      expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+      expect(screen.queryByText('Delete workspace')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Workspace deletion')).not.toBeInTheDocument()
+      expect(workspace.onDelete).not.toHaveBeenCalled()
     })
 
-    it('archives a plain workspace through a two-step confirm', async () => {
-      const archived = {
-        publicId: 'ws_team2',
-        name: 'Team',
-        organizationId: 'org_c3',
-        isDefault: false,
-        archivedAt: '2026-10-18T00:00:00Z',
-      }
+    it('deletes a plain workspace through UserConfirmDialog with typed confirmation', async () => {
       const workspace = workspaceControls({
-        onArchive: vi.fn().mockResolvedValue(archived),
+        onDelete: vi.fn().mockResolvedValue(undefined),
       })
       const view = await openSettingsDialog(workspace)
 
       await view.user.click(screen.getByRole('button', { name: 'Team' }))
-      const archiveButton = screen.getByRole('button', { name: 'Archive' })
-      expect(archiveButton).toBeEnabled()
-
-      await view.user.click(archiveButton)
+      const deleteButton = screen.getByRole('button', { name: 'Delete' })
+      expect(deleteButton).toBeEnabled()
+      // Non-Default keeps the permanent-delete hint copy.
       expect(
         screen.getByText(
-          'Archive "Team"? It will leave your workspace list and be permanently deleted after 7 days, including boards and files.',
+          'Permanently deletes the workspace immediately, including boards and files; billing records are kept. This cannot be undone.',
         ),
       ).toBeVisible()
 
-      await view.user.click(screen.getByRole('button', { name: 'Confirm archive' }))
-      await waitFor(() => expect(workspace.onArchive).toHaveBeenCalledWith('ws_team2'))
+      await view.user.click(deleteButton)
+      const dialog = await screen.findByRole('dialog', { name: 'Delete workspace' })
+      expect(dialog).toBeVisible()
+      // UserConfirmDialog renders the message twice (sr-only description +
+      // visible body), so assert on the set, not a single node.
+      expect(
+        within(dialog).getAllByText(
+          'Delete "Team" permanently, including its boards and files. This cannot be undone.',
+        ).length,
+      ).toBeGreaterThan(0)
+
+      // Typed confirmation: empty and mismatched names keep the destructive
+      // control disabled.
+      const confirmButton = within(dialog).getByRole('button', { name: 'Delete' })
+      expect(confirmButton).toBeDisabled()
+      const nameInput = within(dialog).getByLabelText('Type "Team" to confirm')
+      await view.user.type(nameInput, 'Tea')
+      expect(confirmButton).toBeDisabled()
+      expect(workspace.onDelete).not.toHaveBeenCalled()
+
+      await view.user.clear(nameInput)
+      await view.user.type(nameInput, 'Team')
+      expect(confirmButton).toBeEnabled()
+
+      await view.user.click(confirmButton)
+      await waitFor(() => expect(workspace.onDelete).toHaveBeenCalledWith('ws_team2'))
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'Delete workspace' })).not.toBeInTheDocument(),
+      )
+      expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
     })
 
-    it('keeps settings open with an inline code when archiving fails', async () => {
+    it('cancels the delete confirm without side effects', async () => {
+      const workspace = workspaceControls({ onDelete: vi.fn() })
+      const view = await openSettingsDialog(workspace)
+
+      await view.user.click(screen.getByRole('button', { name: 'Team' }))
+      await view.user.click(screen.getByRole('button', { name: 'Delete' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Delete workspace' })
+      expect(dialog).toBeVisible()
+
+      await view.user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+      expect(workspace.onDelete).not.toHaveBeenCalled()
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'Delete workspace' })).not.toBeInTheDocument(),
+      )
+      expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
+    })
+
+    it('locks the delete confirm while the commit is busy', async () => {
+      let resolveDelete!: (value: unknown) => void
+      const gate = new Promise((resolve) => {
+        resolveDelete = resolve
+      })
+      const workspace = workspaceControls({ onDelete: vi.fn().mockReturnValue(gate) })
+      const view = await openSettingsDialog(workspace)
+
+      await view.user.click(screen.getByRole('button', { name: 'Team' }))
+      await view.user.click(screen.getByRole('button', { name: 'Delete' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Delete workspace' })
+      await view.user.type(within(dialog).getByLabelText('Type "Team" to confirm'), 'Team')
+      await view.user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+      await waitFor(() => expect(workspace.onDelete).toHaveBeenCalledWith('ws_team2'))
+      // Busy: UserConfirmDialog disables both controls and the parent
+      // ignores dismissals, so the confirm stays open.
+      expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeDisabled()
+      expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled()
+      await view.user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+      expect(screen.getByRole('dialog', { name: 'Delete workspace' })).toBeVisible()
+      expect(workspace.onDelete).toHaveBeenCalledTimes(1)
+
+      resolveDelete(undefined)
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'Delete workspace' })).not.toBeInTheDocument(),
+      )
+    })
+
+    it('keeps settings open with an inline code when deletion fails', async () => {
       const failure = Object.assign(new Error('request failed'), {
         code: 'workspace_default_protected',
       })
       const workspace = workspaceControls({
-        onArchive: vi.fn().mockRejectedValue(failure),
+        onDelete: vi.fn().mockRejectedValue(failure),
       })
       const view = await openSettingsDialog(workspace)
 
       await view.user.click(screen.getByRole('button', { name: 'Team' }))
-      await view.user.click(screen.getByRole('button', { name: 'Archive' }))
-      await view.user.click(screen.getByRole('button', { name: 'Confirm archive' }))
+      await view.user.click(screen.getByRole('button', { name: 'Delete' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Delete workspace' })
+      await view.user.type(within(dialog).getByLabelText('Type "Team" to confirm'), 'Team')
+      await view.user.click(within(dialog).getByRole('button', { name: 'Delete' }))
 
       expect(
         await screen.findByText(
-          'Could not archive the workspace. Please try again. (workspace_default_protected)',
+          'Could not delete the workspace. Please try again. (workspace_default_protected)',
         ),
       ).toBeVisible()
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          'Could not delete the workspace. Please try again. (workspace_default_protected)',
+        ),
+      )
+      // Failure keeps the confirm open for retry or cancel.
+      expect(screen.getByRole('dialog', { name: 'Delete workspace' })).toBeVisible()
       expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
     })
   })

@@ -28,7 +28,7 @@ func TestInternalRealtimeAdmitPostgresSuccess(t *testing.T) {
 
 	const owner, viewer = int64(1), int64(3)
 
-	tenancyStore := tenancypg.NewStore(db)
+	tenancyStore := tenancypg.NewStore(db, nil)
 	ws, err := tenancyStore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
 		Name:        "realtime-pg",
 		OwnerUserID: owner,

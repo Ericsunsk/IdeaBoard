@@ -115,19 +115,16 @@
         </DataTableColumn>
 
         <template #empty>
-          <div
+          <LoadErrorPanel
             v-if="initialError"
-            class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
-            role="alert"
-          >
-            <p class="m-0 font-semibold text-destructive">{{ t('account.rewards.loadFailed') }}</p>
-            <p class="mt-1 mb-0 text-sm text-muted-foreground">
-              {{ errorMessage(initialError) }}
-            </p>
-            <Button variant="ghost" size="sm" class="mt-3" @click="retryInitial()">{{
-              t('account.reload')
-            }}</Button>
-          </div>
+            class="min-h-40 justify-center"
+            align="center"
+            :message="t('account.rewards.loadFailed')"
+            :detail="errorMessage(initialError)"
+            :retry-label="t('account.reload')"
+            retry-variant="ghost"
+            @retry="retryInitial()"
+          />
           <div
             v-else
             class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
@@ -150,16 +147,15 @@
             {{ t('account.rewards.loading') }}
           </p>
 
-          <div
+          <LoadErrorPanel
             v-if="loadMoreError"
-            class="flex items-center justify-center gap-3 border-t border-border px-4 py-3"
-            role="alert"
-          >
-            <span class="text-sm text-destructive">{{ errorMessage(loadMoreError) }}</span>
-            <Button variant="ghost" size="sm" @click="loadMore()">{{
-              t('account.rewards.retryLoad')
-            }}</Button>
-          </div>
+            align="center"
+            :message="errorMessage(loadMoreError)"
+            :retry-label="t('account.rewards.retryLoad')"
+            :is-retrying="isFetchingNextPage"
+            retry-variant="ghost"
+            @retry="loadMore()"
+          />
           <div v-else-if="hasNextPage" class="flex justify-center border-t border-border px-4 py-3">
             <Button
               variant="outline"
@@ -183,6 +179,7 @@ import DataTableColumn from '../../../../core/components/DataTableColumn.vue'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../core/components/DataTableFrame.vue'
+import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
 import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'
 import { ibFormInputClass, ibFormInputErrorClass } from '../../../../theme/formControls'

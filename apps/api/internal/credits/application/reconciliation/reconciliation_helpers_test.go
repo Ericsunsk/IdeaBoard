@@ -76,7 +76,7 @@ func insertReconciliationWorkspaceTask(t testing.TB, db *pgxpool.Pool, taskID st
 	}
 }
 
-// ensureReconciliationWorkspace returns one live personal Workspace and its
+// ensureReconciliationWorkspace returns one personal Workspace and its
 // billing account for userID, creating them on first use. Tasks rows require
 // both foreign keys; the pair is shared by every fixture task of the test.
 
@@ -88,12 +88,12 @@ func ensureReconciliationWorkspace(t testing.TB, db *pgxpool.Pool, userID int64)
 INSERT INTO workspaces (public_id, owner_user_id, name)
 SELECT $1, $2, 'reconciliation fixture'
 WHERE NOT EXISTS (
-  SELECT 1 FROM workspaces WHERE owner_user_id = $2 AND organization_id IS NULL AND archived_at IS NULL
+  SELECT 1 FROM workspaces WHERE owner_user_id = $2 AND organization_id IS NULL
 )`, "ws_reconciliation_"+suffix, userID); err != nil {
 		t.Fatal(err)
 	}
 	var workspaceID int64
-	if err := db.QueryRow(ctx, `SELECT internal_id FROM workspaces WHERE owner_user_id = $1 AND organization_id IS NULL AND archived_at IS NULL`, userID).Scan(&workspaceID); err != nil {
+	if err := db.QueryRow(ctx, `SELECT internal_id FROM workspaces WHERE owner_user_id = $1 AND organization_id IS NULL`, userID).Scan(&workspaceID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, `

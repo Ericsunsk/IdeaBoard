@@ -147,7 +147,7 @@ func NewAppRouter(
 	// registerGlobalMiddleware so every route shares the error envelope.
 	// Plane split: the kernel mounts kernel routes only; v1/control mounts
 	// ride their own packages (no kernel -> plane import, no cycle).
-	tenancyStore := tenancypg.NewStore(repos.db)
+	tenancyStore := tenancypg.NewStore(repos.db, services.storageService)
 	userDirectory := runtimehttp.NewUsersRepositoryDirectory(repos.userRepo)
 	registerHTTPRoutes(router,
 		runtimehttp.Dependencies{
@@ -258,7 +258,7 @@ func NewAppRouter(
 		// settlement seams wired above; billing reads below remain owned
 		// by the billing services.
 		v1.ContractV1BillingDeps{
-			Tenancy:         tenancypg.NewStore(repos.db),
+			Tenancy:         tenancyStore,
 			Users:           runtimehttp.NewUsersRepositoryDirectory(repos.userRepo),
 			BillingAccounts: tenancypg.NewBillingAccountStore(repos.db),
 			Wallets:         services.creditService,
@@ -306,7 +306,7 @@ func NewAppRouter(
 				// workspace bus for cross-instance envelope fanout. No second
 				// NATS connection is opened by this wiring.
 				compositioncontrol.NewControlTaskEventAdapter(taskServices.taskStatusPublisher, taskServices.workspaceEvents, taskServices.workspaceEventBus, taskServices.webhooks)),
-			Tenancy: tenancypg.NewStore(repos.db),
+			Tenancy: tenancyStore,
 			// #941: operator membership removals purge board grants.
 			Boards:             boardStore,
 			UserDirectory:      controlUserDirectory,

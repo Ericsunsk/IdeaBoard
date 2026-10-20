@@ -51,7 +51,7 @@ graph LR
 - Cloudflare DNS/Proxy 暴露 `ideaboard.art` 并提供 WAF / Rate Limiting / Cache Rules。
 - VPS 宿主机 Nginx 反代同域 `/api/*`、`/api/auth/*` 到 Docker Compose 中的 API/Auth。媒体通过 Media Asset、public avatar/logo API 返回图片字节；imgproxy 只接受 API 内部的签名渲染请求。
 - Docker Compose 管理 API（http-only）、API Worker（worker-only）、Auth、PostgreSQL、NATS JetStream 与 `api-uploads` volume。`api` 与 `api-worker` 是同一镜像、同一数据库的双进程（ADR-0021，`API_MODE` 区分），不是微服务。
-- River 任务队列写入 PostgreSQL；JetStream 只承载状态事件、audit 与实时 fanout。全部 River 队列由 `api-worker` 消费（含 drawing/GPU 长耗时、`media_reclamation`、retention/sweep、对账），`api` 只负责 API/SSE 与事务内入队；periodic 调度只跑在 worker 侧。`api-worker` 保持单副本，水平扩展只加 `api`。
+- River 任务队列写入 PostgreSQL；JetStream 只承载状态事件、audit 与实时 fanout。全部 River 队列由 `api-worker` 消费（含 drawing/GPU 长耗时、`media_reclamation`、sweep、对账），`api` 只负责 API/SSE 与事务内入队；periodic 调度只跑在 worker 侧。`api-worker` 保持单副本，水平扩展只加 `api`。
 
 任务 retry 分三层：网关内部重试（单请求最多 5 次，Cloudflare 侧 fallback 链）；网关耗尽后 transient 失败（429/5xx/超时/网络）允许最多 2 次 worker 层重投（reset + River backoff 整任务重投，新 token，以 `tasks.retry_count` 为界，见 ADR-0010）；River `MaxAttempts=25` 是 worker panic、process error、临时基础设施故障的队列层 retry（整任务重投）。Worker timeout（网关 300s/worker 360s/River 17m 嵌套）与 `MaxAttempts` 是代码持有的 typed policy；worker concurrency 通过 `RIVER_WORKER_CONCURRENCY` 配置，默认 5、范围 1–64，重启 API/Worker 后生效。NATS retention 固定为 7 天。Admin 只管理 Egress allowlist（AI 出口唯一是 Cloudflare AI Gateway，图片下载经 safehttp 做 SSRF 防护），按请求读取并在保存后即时生效。
 
@@ -489,11 +489,10 @@ River 重试矩阵是代码持有的 typed policy（事实源 `internal/platform
 | `drawing_default`（`drawing_generate` + settlement-only `drawing_final_failure`） | 25          | panic/process error/基础设施故障的队列层重试；provider transient 在预算内最多 2 次整任务重投（`tasks.retry_count` 为界） |
 | `credit_reconciliation`                                                           | 5           | 对账卡住直接告警，不 churn                                                                                               |
 | `payment_reconciliation` / `payment_checkout_shutdown`                            | 8           | Stripe/DB transient 重试                                                                                                 |
-| `task_retention`                                                                  | 3           | 串行 purge，失败立即暴露                                                                                                 |
 | `vision_billing`                                                                  | 5           | 快照对账                                                                                                                 |
 | `media_reclamation`                                                               | 10          | 存储抖动偏 transient，预算高于其他维护队列                                                                               |
 
-attempt 间隔为 River 默认指数 backoff + jitter。全部 7 个队列的 depth/lag 都有独立 gauge（`ideaboard_river_queue_depth{queue}` / `ideaboard_river_queue_lag_seconds{queue}`，15s 刷新），排障见 [backend-metrics.md](./backend-metrics.md) C 节（按 queue 逐个看，不要只看 `drawing_default`）。
+attempt 间隔为 River 默认指数 backoff + jitter。各队列的 depth/lag 都有独立 gauge（`ideaboard_river_queue_depth{queue}` / `ideaboard_river_queue_lag_seconds{queue}`，15s 刷新；队列清单以 `internal/platform/riverpolicy.RiverRetryMatrix` 为准），排障见 [backend-metrics.md](./backend-metrics.md) C 节（按 queue 逐个看，不要只看 `drawing_default`）。
 
 日志默认脱敏：`internal/platform/applog` 对 credential/token/secret 类 key 直接 `[REDACTED]`，并擦除 value 中 `password=`/`token=` 对与 `scheme://user:password@host` 形态。排障贴日志时仍不要粘贴整段 DSN 或整块 env。
 

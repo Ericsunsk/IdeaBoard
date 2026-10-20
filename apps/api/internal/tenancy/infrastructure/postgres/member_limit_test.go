@@ -11,7 +11,7 @@ import (
 
 func TestWorkspaceMemberLimitConcurrentPostgres(t *testing.T) {
 	db := newTenancyTestDB(t)
-	store := NewStore(db)
+	store := NewStore(db, nil)
 	ctx := context.Background()
 	ownerID := createTenancyTestUser(t, db)
 	workspace, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "member limit", OwnerUserID: ownerID})

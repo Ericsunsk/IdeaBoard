@@ -11,7 +11,9 @@ describe('vite dev proxy', () => {
     const proxy = config.server?.proxy as Record<string, Record<string, unknown>> | undefined
     expect(proxy?.['/realtime']).toMatchObject({
       target: 'http://localhost:6002',
+      // eslint-disable-next-line governance/boolean-prefix -- Vite proxy option name.
       changeOrigin: true,
+      // eslint-disable-next-line governance/boolean-prefix -- Vite proxy option name.
       ws: true,
     })
   })

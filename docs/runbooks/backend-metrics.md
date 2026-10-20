@@ -38,9 +38,9 @@ histogram_quantile(0.95,
 ideaboard_river_queue_depth{queue="drawing_default"}
 ideaboard_river_queue_lag_seconds{queue="drawing_default"}
 # 维护队列逐个看（credit_reconciliation / payment_reconciliation /
-# payment_checkout_shutdown / task_retention / vision_billing / media_reclamation /
+# payment_checkout_shutdown / vision_billing / media_reclamation /
 # task_settlement_sweep）：
-ideaboard_river_queue_depth{queue=~"credit_reconciliation|payment_.*|task_retention|vision_billing|media_reclamation|task_settlement_sweep"}
+ideaboard_river_queue_depth{queue=~"credit_reconciliation|payment_.*|vision_billing|media_reclamation|task_settlement_sweep"}
 
 # 4. 网关失败与 worker 重投速率
 sum by (feature) (rate(ideaboard_gateway_requests_total{outcome="error"}[5m]))
@@ -100,7 +100,6 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 | `drawing_default` | 25 | depth 涨先看 C 节；`attempt` 接近 25 的 job 多为反复 panic/基础设施故障，查 worker 日志而非网关 |
 | `credit_reconciliation` | 5 | 预算小：失败 5 次即进 River `discarded`，直接查对账 Run 而非等自愈 |
 | `payment_reconciliation` / `payment_checkout_shutdown` | 8 | Stripe/DB transient 可自愈；耗尽看 Payments 事故处理 |
-| `task_retention` | 3 | 串行 purge：失败立即暴露，检查保留窗口与锁竞争 |
 | `vision_billing` | 5 | 快照对账失败看 searchcatalog 计费链路 |
 | `media_reclamation` | 10 | 存储抖动自愈空间最大；持续失败看 storage profile 与对象可达性 |
 | `webhook_deliver` | 8 | 单 delivery 8 次耗尽即进 River `discarded`（即 durable DLQ），`discarded` 行即投递终态；attempt 间隔为 30s 起 doubling + jitter（1h cap） |
@@ -120,7 +119,6 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 | `credit_reconciliation` | CreditReconciliationScheduleWorker | 1min | 单次 schedule 写；超时基本可判为 DB 故障 |
 | `payment_reconciliation` | PaymentReconciliationWorker | 4min | Stripe/DB sweep；超时看 Payments 事故处理 |
 | `payment_checkout_shutdown` | PaymentCheckoutShutdownWorker / ScheduleWorker | 4min | 同上 |
-| `task_retention` | WorkspacePurgeWorker | 15min | 串行 purge 窗口；超时看保留窗口与锁竞争 |
 | `vision_billing` | VisionBillingReconciliationWorker | 4min | 低于 5min 调度周期；超时看 searchcatalog 计费链路（超时不会堆积到下个周期） |
 | `media_reclamation` | ReclaimWorker | 2min | 低于 5min claim lease；超时看 storage profile 与对象可达性 |
 | `media_reclamation` | ScheduleWorker | 2min | scan（上限 100）+ 入队扇出；超时看 DB 慢查询 |

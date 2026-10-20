@@ -23,7 +23,6 @@ const BOARD_KEYS = [
   'moreActions',
   'duplicate',
   'edited',
-  'scopeLabel',
   'scopePersonal',
   'scopeTeam',
   'accessPrivate',

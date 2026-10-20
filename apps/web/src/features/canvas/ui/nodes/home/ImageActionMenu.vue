@@ -314,7 +314,7 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   transform: translateX(-50%);
   display: none;
   color: var(--canvas-text-muted);
-  font-size: 10px;
+  font-size: var(--canvas-font-size-micro);
   font-weight: 600;
   line-height: 14px;
   white-space: nowrap;

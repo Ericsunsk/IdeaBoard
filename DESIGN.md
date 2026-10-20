@@ -104,7 +104,7 @@ NATS JetStream 只负责持久领域事件、audit 和 realtime fanout。当前�
 
 ### 4. Worker 是 runtime adapter
 
-workspace task 的执行适配器是 `internal/tasking/interfaces/worker`：它消费 Tasking、Workflow、Prompts 和 Media 的接口，经 `internal/runtime/interfaces/worker/providers` 做 Cloudflare AI Gateway provider calls，并收敛运行时错误。River worker execution 与周期性后台 job（credit reconciliation、payment、retention、vision billing）由 `internal/runtime/interfaces/worker` 的 `river`/`billing`/`retention`/`visionbilling` 子包拥有。
+workspace task 的执行适配器是 `internal/tasking/interfaces/worker`：它消费 Tasking、Workflow、Prompts 和 Media 的接口，经 `internal/runtime/interfaces/worker/providers` 做 Cloudflare AI Gateway provider calls，并收敛运行时错误。River worker execution 与周期性后台 job（credit reconciliation、payment、vision billing）由 `internal/runtime/interfaces/worker` 的 `river`/`billing`/`visionbilling` 子包拥有。
 
 重试分三层，各自有独立事实（`ExecutionAttempt.retry_layer` 与 `gateway_retry_count`）：网关内部重试（同 Model，有界 HTTP policy，归 gateway adapter）、Model fallback（最多一次，只用快照里的 `retry_candidate`，归 worker）、River 整任务重投（transient 失败后按 `MaxProviderRequeues` 整任务 requeue，reset + River backoff + 新 execution token，以 `tasks.retry_count` 为界，归 task lifecycle）。确定性失败（参数非法、额度不足、内容安全拒绝、鉴权失败、not-found、成功但 payload 不可用）直接终态，绝不消耗 fallback 预算；无标记的未知结果同样 fail closed 到终态，见 [ADR-0008](./docs/adr/0008-cloudflare-ai-gateway-sole-egress.md)、[ADR-0010](./docs/adr/0010-gateway-cache-billing-timeout.md) 与 [ADR-0012](./docs/adr/0012-service-model-pool-routing-contract.md)。
 
@@ -350,6 +350,7 @@ UI 实现细节遵循 [apps/web/DESIGN.md](./apps/web/DESIGN.md)。
 - Rewards rollout 只支持 canonical RewardCode schema 的 Fresh Database path。检测到已删除的 Rewards migration version 或 immutable Ledger reference 时 migration 必须 fail closed，禁止兼容性 replay、静默删除或语义 orphan。
 - PostgreSQL backup contains credentials and user/session data; treat `postgres-*.dump[.age|.gpg]` as secret artifacts.
 - DB restore and migration rollback are human-confirmed operations; runtime image rollback does not imply automatic database restore.
+- Workspace deletion is an immediate hard delete with no recovery window: deleting a non-Default workspace removes its boards, tasks, library, media, uploads, memberships and related rows at once (billing records, the credit ledger and user rows are red lines and are retained). A mistaken deletion is unrecoverable; restore is whole-database only and never per-workspace. See [ADR-0023](./docs/adr/0023-workspace-hard-delete.md) and [data-protection](./docs/runbooks/data-protection.md).
 
 Operational procedures live in:
 

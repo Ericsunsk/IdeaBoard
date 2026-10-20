@@ -317,6 +317,7 @@ async function executeRefund(publicOrderNumber: string, ideaQuantity: number) {
     refreshOrders()
   } catch (error) {
     refundError.value = formatAdminDisplayError(error, PAYMENT_ORDERS_MESSAGES.refundFailed)
+    feedback.refundFailed(error)
   } finally {
     refundLoading.value = false
   }

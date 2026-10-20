@@ -33,7 +33,7 @@ export const selectTriggerVariants = cva(
  * varies by size, uses `cva()`.
  */
 export const selectContentVariants =
-  'relative z-50 max-h-96 min-w-32 overflow-hidden rounded-panel border border-border bg-popover text-popover-foreground outline-none overlay-popover-motion'
+  'relative z-popover max-h-96 min-w-32 overflow-hidden rounded-panel border border-border bg-popover text-popover-foreground outline-none overlay-popover-motion'
 
 // Intentional exception: menu items (select + dropdown-menu) use focus:bg-accent
 // with no focus ring — avoids visual churn inside open menus, common practice.

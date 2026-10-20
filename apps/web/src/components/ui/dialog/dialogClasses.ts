@@ -4,4 +4,4 @@
  * p-0 + overflow-hidden：内容区自带 padding（各调用方内部的 p-6 容器）。
  */
 export const dialogContentBaseClass =
-  'fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100dvh-2rem)] translate-x-[-50%] translate-y-[-50%] gap-0 overflow-hidden rounded-overlay border border-border bg-card p-0 shadow-xl overlay-dialog-motion'
+  'fixed top-[50%] left-[50%] z-admin-dialog grid max-h-[calc(100dvh-2rem)] translate-x-[-50%] translate-y-[-50%] gap-0 overflow-hidden rounded-overlay border border-border bg-card p-0 shadow-admin-dialog overlay-dialog-motion'

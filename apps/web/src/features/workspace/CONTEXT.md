@@ -35,6 +35,7 @@ The Workspace Shell is a frontend composition boundary. A tenant Workspace is ow
 - Never duplicate global containers or the global nav bar in business pages.
 - Admin routes remain in the Admin route table; public Search, auth callback, and legal routes retain their explicit access metadata.
 - Never call deep auth-store mutations directly from nav components.
+- Creating a tenant Workspace preserves the current route and selected Workspace; settings focus the new row locally. Explicit navigation owns scope changes and must drop a stale Canvas Board ID.
 
 ## Non-goals
 

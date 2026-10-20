@@ -274,7 +274,7 @@ function startJourney() {
 
   .home-hero-tagline {
     max-width: 300px;
-    font-size: 11px;
+    font-size: var(--text-admin-caption);
   }
 }
 

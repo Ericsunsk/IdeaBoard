@@ -315,6 +315,6 @@ function noopMouse() {}
   border-radius: var(--radius-control);
   background: var(--canvas-node-bg);
   color: var(--canvas-text-muted);
-  font-size: 12px;
+  font-size: var(--canvas-font-size-control);
 }
 </style>

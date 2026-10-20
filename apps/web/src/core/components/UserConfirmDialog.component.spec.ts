@@ -35,7 +35,7 @@ const DialogContentStub = defineComponent({
   `,
 })
 
-function renderConfirmDialog(isLoading = false) {
+function renderConfirmDialog(isLoading = false, extraProps: Record<string, unknown> = {}) {
   const onVisibleUpdate = vi.fn()
   const onConfirm = vi.fn()
   const view = renderWithUser(UserConfirmDialog, {
@@ -48,6 +48,7 @@ function renderConfirmDialog(isLoading = false) {
       isLoading,
       'onUpdate:isVisible': onVisibleUpdate,
       onConfirm,
+      ...extraProps,
     },
     global: {
       stubs: {
@@ -101,5 +102,72 @@ describe('UserConfirmDialog', () => {
     dialog.focus()
     await user.keyboard('{Escape}')
     expect(onVisibleUpdate).not.toHaveBeenCalled()
+  })
+
+  it('disables confirm until the typed text matches the expected name', async () => {
+    const { user, onConfirm } = renderConfirmDialog(false, {
+      expectedConfirmText: 'Team',
+      confirmInputLabel: 'Type "Team" to confirm',
+      confirmInputPlaceholder: 'Workspace name',
+    })
+
+    const confirmButton = screen.getByRole('button', { name: '删除' })
+    const nameInput = screen.getByLabelText('Type "Team" to confirm')
+    expect(nameInput).toHaveAttribute('placeholder', 'Workspace name')
+    expect(confirmButton).toBeDisabled()
+
+    await user.type(nameInput, 'Tea')
+    expect(confirmButton).toBeDisabled()
+
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Team')
+    expect(confirmButton).toBeEnabled()
+
+    await user.click(confirmButton)
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the typed confirm locked while busy and confirms on Enter when matched', async () => {
+    const { user, onConfirm } = renderConfirmDialog(false, {
+      expectedConfirmText: 'Team',
+      confirmInputLabel: 'Type "Team" to confirm',
+    })
+
+    const nameInput = screen.getByLabelText('Type "Team" to confirm')
+    await user.type(nameInput, 'Team')
+    await user.keyboard('{Enter}')
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables the typed input and confirm while the commit is busy', async () => {
+    const { user, onConfirm } = renderConfirmDialog(true, {
+      expectedConfirmText: 'Team',
+      confirmInputLabel: 'Type "Team" to confirm',
+    })
+
+    const nameInput = screen.getByLabelText('Type "Team" to confirm')
+    expect(nameInput).toBeDisabled()
+    expect(screen.getByRole('button', { name: '删除' })).toBeDisabled()
+
+    await user.keyboard('{Enter}')
+    expect(onConfirm).not.toHaveBeenCalled()
+  })
+
+  it('copies the expected name when its chip is clicked', async () => {
+    const { user } = renderConfirmDialog(false, {
+      expectedConfirmText: 'Team',
+      confirmInputLabel: 'Type "Team" to confirm',
+    })
+    // renderWithUser resets the navigator stub, so stub after render.
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    try {
+      expect(screen.getByText('Team')).toBeVisible()
+      await user.click(screen.getByRole('button', { name: 'Copy' }))
+      expect(writeText).toHaveBeenCalledWith('Team')
+      expect(await screen.findByText('Copied')).toBeVisible()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

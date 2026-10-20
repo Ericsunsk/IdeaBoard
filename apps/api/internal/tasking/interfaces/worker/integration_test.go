@@ -65,7 +65,6 @@ CREATE TABLE workspaces (
   is_default BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  archived_at TIMESTAMPTZ NULL,
   CONSTRAINT uq_workspaces_public_id UNIQUE (public_id),
   CONSTRAINT chk_workspaces_public_id CHECK (public_id LIKE 'ws\_%'),
   CONSTRAINT chk_workspaces_owner_xor CHECK (

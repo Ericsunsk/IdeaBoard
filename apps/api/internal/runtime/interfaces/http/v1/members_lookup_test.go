@@ -219,7 +219,7 @@ func TestV1MemberLookupNilProviderFailsClosed(t *testing.T) {
 func TestV1MemberLookupByEmailPG(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	tstore := tenancypg.NewStore(db)
+	tstore := tenancypg.NewStore(db, nil)
 	dir := newStaticUserDirectory()
 	// Numeric ids must exist in the users table (workspace_memberships has
 	// a FK): testdb seeds 1, 3, 8, 10, 11 among others.

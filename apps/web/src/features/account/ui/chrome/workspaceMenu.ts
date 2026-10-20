@@ -1,18 +1,8 @@
 import type { UserAccountMenuWorkspaceItem } from './userAccountMenu.types'
 
-// Shared workspace-row predicates for the avatar dropdown: the hover
+// Shared workspace-row predicate for the avatar dropdown: the hover
 // submenu (in `UserAccountMenu`) and the gear settings dialog show the same
-// visible set, so the filter lives here instead of being duplicated.
-function isVisibleWorkspaceItem(item: UserAccountMenuWorkspaceItem): boolean {
-  return item.archivedAt == null
-}
-
+// rows, so the predicate lives here instead of being duplicated.
 export function isDefaultWorkspaceItem(item: UserAccountMenuWorkspaceItem): boolean {
   return item.isDefault === true
-}
-
-export function visibleWorkspaceItems(
-  items: readonly UserAccountMenuWorkspaceItem[],
-): UserAccountMenuWorkspaceItem[] {
-  return items.filter(isVisibleWorkspaceItem)
 }

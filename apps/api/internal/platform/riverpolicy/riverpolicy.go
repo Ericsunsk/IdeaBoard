@@ -41,8 +41,6 @@ const (
 	RiverQueuePaymentReconciliation = "payment_reconciliation"
 	// RiverQueuePaymentCheckoutShutdown carries checkout session shutdown runs.
 	RiverQueuePaymentCheckoutShutdown = "payment_checkout_shutdown"
-	// RiverQueueTaskRetention carries the serial task retention purges.
-	RiverQueueTaskRetention = "task_retention"
 	// RiverQueueVisionBilling carries vision-search billing reconciliation runs.
 	RiverQueueVisionBilling = "vision_billing"
 	// RiverQueueMediaReclamation carries media storage consistency scans.
@@ -67,7 +65,6 @@ const (
 	RiverMaxAttemptsCreditReconciliation        = 5
 	RiverMaxAttemptsPaymentReconciliation       = 8
 	RiverMaxAttemptsPaymentCheckoutShutdown     = 8
-	RiverMaxAttemptsTaskRetention               = 3
 	RiverMaxAttemptsVisionBilling               = 5
 	RiverMaxAttemptsMediaReclamation            = 10
 	RiverMaxAttemptsWebhookDeliver              = 8
@@ -117,8 +114,6 @@ const (
 	// RiverJobTimeoutPaymentCheckoutShutdown covers one shutdown sweep or a
 	// single shutdown run; same budget as payment reconciliation.
 	RiverJobTimeoutPaymentCheckoutShutdown = 4 * time.Minute
-	// RiverJobTimeoutTaskRetention covers the serial purge window.
-	RiverJobTimeoutTaskRetention = 15 * time.Minute
 	// RiverJobTimeoutVisionBilling covers one snapshot reconciliation batch.
 	// It stays below the 5-minute periodic interval so a stuck run times out
 	// instead of piling up behind the next scheduled run.

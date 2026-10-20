@@ -24,7 +24,7 @@ import (
 
 func TestCreateWorkspaceJoinsAmbientCarrierTx(t *testing.T) {
 	pool := testdb.Open(t)
-	store := NewStore(pool)
+	store := NewStore(pool, nil)
 	ctx := context.Background()
 	const ownerID = 4301
 	if _, err := pool.Exec(ctx, `
@@ -76,7 +76,7 @@ ON CONFLICT (id) DO NOTHING`, ownerID, fmt.Sprintf("carrier-owner-%d", ownerID),
 
 func TestCreateWorkspaceRollsBackWithAmbientCarrier(t *testing.T) {
 	pool := testdb.Open(t)
-	store := NewStore(pool)
+	store := NewStore(pool, nil)
 	ctx := context.Background()
 	const ownerID = 4302
 	if _, err := pool.Exec(ctx, `

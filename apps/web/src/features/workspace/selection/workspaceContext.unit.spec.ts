@@ -9,6 +9,7 @@ import {
   localStorageWorkspacePersist,
   memoryWorkspacePersist,
   resolveWorkspaceSelection,
+  subscribeWorkspaceSelectionChange,
   toWorkspaceSelectionStatus,
   useWorkspaceSelection,
   WORKSPACE_SELECTION_STORAGE_KEY,
@@ -53,7 +54,6 @@ function workspace(overrides: Partial<WorkspaceSummary> & { publicId: string }):
     name: overrides.publicId,
     organizationId: null,
     isDefault: false,
-    archivedAt: null,
     ...overrides,
   }
 }
@@ -231,10 +231,30 @@ describe('concurrent provision idempotency', () => {
     release()
     await expect(first).resolves.toEqual(created)
     await expect(second).resolves.toEqual(created)
-    expect(store.getSelectedId()).toBe('ws_new1')
+    expect(store.getSelectedId()).toBeNull()
 
     await expect(store.provision({ name: 'New' })).resolves.toEqual(created)
     expect(provision).toHaveBeenCalledTimes(2)
+  })
+
+  it('preserves the selected and persisted workspace without emitting a scope change', async () => {
+    const persist = memoryWorkspacePersist(DEFAULT.publicId)
+    const store = createWorkspaceSelectionStore({
+      persist,
+      provision: vi.fn().mockResolvedValue(TEAM),
+    })
+    expect(store.getSelectedId()).toBe(DEFAULT.publicId)
+    const listener = vi.fn()
+    const unsubscribe = subscribeWorkspaceSelectionChange(listener)
+    try {
+      await expect(store.provision({ name: 'Team' })).resolves.toEqual(TEAM)
+
+      expect(store.selectedId.value).toBe(DEFAULT.publicId)
+      expect(persist.readSelectedId()).toBe(DEFAULT.publicId)
+      expect(listener).not.toHaveBeenCalled()
+    } finally {
+      unsubscribe()
+    }
   })
 
   it('keeps different intents on separate flights', async () => {

@@ -7,7 +7,6 @@ export default {
   sortLabel: 'Sort canvases',
   sortRecent: 'Recent',
   sortName: 'Name',
-  scopeLabel: 'Board scope',
   scopePersonal: 'Personal boards',
   scopeTeam: 'Team boards',
   accessPrivate: 'Private',

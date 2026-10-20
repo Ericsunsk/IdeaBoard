@@ -207,7 +207,7 @@
 .canvas-chrome-catalog-recovery-label {
   min-width: 0;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--canvas-font-size-control);
   line-height: 1.2;
   font-weight: 600;
   text-overflow: ellipsis;
@@ -223,7 +223,7 @@
   background: var(--canvas-surface-muted);
   padding: 0 8px;
   color: var(--canvas-text-strong);
-  font-size: 12px;
+  font-size: var(--canvas-font-size-control);
   line-height: 1;
   font-weight: 600;
   transition:

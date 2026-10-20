@@ -280,7 +280,7 @@
   border-radius: 5px;
   background: var(--canvas-tooltip-bg);
   color: var(--canvas-tooltip-text);
-  font-size: 10px;
+  font-size: var(--editing-controls-meta-text-size);
   font-weight: 600;
   line-height: 1;
   text-align: right;

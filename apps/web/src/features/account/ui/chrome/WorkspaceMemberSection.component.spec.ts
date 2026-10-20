@@ -179,28 +179,18 @@ function dialogItems() {
       name: 'Personal',
       organizationId: null,
       isDefault: true,
-      archivedAt: null,
     },
     {
       publicId: 'ws_team2',
       name: 'Team 2',
       organizationId: 'org_c3',
       isDefault: false,
-      archivedAt: null,
     },
     {
       publicId: 'ws_team3',
       name: 'Team 3',
       organizationId: 'org_c3',
       isDefault: false,
-      archivedAt: null,
-    },
-    {
-      publicId: 'ws_old4',
-      name: 'Old',
-      organizationId: null,
-      isDefault: false,
-      archivedAt: '2026-01-01T00:00:00Z',
     },
   ]
 }
@@ -216,7 +206,7 @@ function renderMembersDialog() {
       onRetry: vi.fn(),
       onCreate: vi.fn(),
       onRename: vi.fn(),
-      onArchive: vi.fn(),
+      onDelete: vi.fn(),
     },
     global: {
       stubs: dialogStubs,
@@ -259,9 +249,6 @@ describe('WorkspaceSettingsDialog members', () => {
     expect(screen.getByRole('button', { name: 'Team 2' })).toBeVisible()
     expect(screen.queryByRole('region', { name: 'Members of Team 2' })).not.toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Invite' })).toHaveLength(1)
-
-    // Archived workspaces stay filtered out of the dialog entirely.
-    expect(screen.queryByText('Old')).not.toBeInTheDocument()
   })
 
   test('switches active workspace when clicking a workspace in the sidebar', async () => {
@@ -366,6 +353,17 @@ describe('WorkspaceSettingsDialog members', () => {
     expect(invite.idempotencyKey).toMatch(/^workspace:members\.invite:/)
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Member invited.'))
     expect(await screen.findByText('usr_new')).toBeVisible()
+  })
+
+  test('empty email toasts instead of rendering inline', async () => {
+    const { user } = renderMembersDialog()
+    await screen.findByText('usr_a')
+
+    await user.click(screen.getByRole('button', { name: 'Invite' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Email cannot be empty.'))
+    expect(fakeMembers.calls.filter((call) => call.op === 'lookup')).toHaveLength(0)
+    expect(fakeMembers.calls.filter((call) => call.op === 'invite')).toHaveLength(0)
   })
 
   test('reports the five-person limit and refreshes the roster after a concurrent invite', async () => {

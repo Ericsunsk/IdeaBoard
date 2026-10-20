@@ -117,23 +117,20 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
 
   const inviteEmail = ref('')
   const inviteRole = ref<WorkspaceMemberRole>('member')
-  const inviteError = ref<string | null>(null)
 
   function pickInviteRole(value: unknown): void {
     if (value === 'owner' || value === 'admin' || value === 'member') {
       inviteRole.value = value
-      inviteError.value = null
     }
   }
 
   async function inviteMember(): Promise<void> {
     const email = inviteEmail.value.trim()
     if (!email) {
-      inviteError.value = t('workspace.switcher.members.emailEmpty')
+      toast.error(t('workspace.switcher.members.emailEmpty'))
       return
     }
     if (isPending('invite')) return
-    inviteError.value = null
     await trackPending('invite', async () => {
       let userId: string
       try {
@@ -239,7 +236,6 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
     isPending,
     inviteEmail,
     inviteRole,
-    inviteError,
     pickInviteRole,
     inviteMember,
     changeMemberRole,

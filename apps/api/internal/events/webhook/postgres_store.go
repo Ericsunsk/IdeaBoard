@@ -51,7 +51,7 @@ func (p *PostgresWebhookPersistence) CreateSubscription(ctx context.Context, sub
 	result, err := p.db.Exec(ctx, `
 INSERT INTO event_subscriptions (public_id, workspace_id, endpoint_url, signing_secret, signing_secret_material_kind, signing_secret_key_version, event_types, status, created_at, updated_at)
 SELECT $1, internal_id, $3, $4, $5, $6, $7, 'active', $8, $8
-FROM workspaces WHERE public_id = $2 AND archived_at IS NULL
+FROM workspaces WHERE public_id = $2
 ON CONFLICT (public_id) DO NOTHING`, sub.ID, sub.WorkspaceID, sub.URL,
 		payload, materialKind, keyVersion, sub.EventTypes, sub.CreatedAt.UTC())
 	if err != nil {
@@ -251,7 +251,7 @@ func (p *PostgresWebhookPersistence) EnsureDelivery(ctx context.Context, envelop
 WITH event_row AS (
   INSERT INTO workspace_events (public_id, workspace_id, event_type, event_version, resource_type, resource_id, event_data, occurred_at)
   SELECT $1, internal_id, $2, $3, $4, $5, $6::jsonb, $7
-  FROM workspaces WHERE public_id = $8 AND archived_at IS NULL
+  FROM workspaces WHERE public_id = $8
   ON CONFLICT (public_id) DO UPDATE SET event_data = EXCLUDED.event_data
   RETURNING internal_id
 ), sub_row AS (

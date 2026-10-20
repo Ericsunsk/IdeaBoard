@@ -385,8 +385,8 @@ CREATE INDEX idx_organization_memberships_user ON organization_memberships (user
 -- Workspace tenancy foundation (#801).
 --
 -- A Workspace is owned by a User (personal Workspace, no Organization) or by
--- an Organization. Every user additionally owns exactly one live Default
--- personal workspace (is_default): it is never deleted, archived, or renamed,
+-- an Organization. Every user additionally owns exactly one Default
+-- personal workspace (is_default): it is never deleted or renamed,
 -- and is auto-provisioned when missing. Workspace membership and
 -- Board membership are separate permission layers. Public references must use
 -- public_id; the internal_id bigint stays database-internal per the contract
@@ -399,13 +399,12 @@ CREATE TABLE workspaces (
   owner_user_id BIGINT NULL REFERENCES users(id),
   name TEXT NOT NULL,
   -- Default workspace marker (Bug2 root fix): every user owns exactly one
-  -- live Default personal workspace. Non-Default personal workspaces are
+  -- Default personal workspace. Non-Default personal workspaces are
   -- unlimited; organization workspaces never carry the marker (see
   -- chk_workspaces_default_scope).
   is_default BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  archived_at TIMESTAMPTZ NULL,
   CONSTRAINT uq_workspaces_public_id UNIQUE (public_id),
   -- Kernel prefix pin: mirrors contract.PrefixWorkspace (see also
   -- contract.IsWorkspaceID).
@@ -419,11 +418,11 @@ CREATE TABLE workspaces (
   )
 );
 
--- Default workspace idempotency: at most one live Default workspace per
--- user. Archived Default rows stay out of the way so reprovisioning works.
+-- Default workspace idempotency: at most one Default workspace per user
+-- (deletion is hard, so no residual rows can collide with reprovisioning).
 -- Plain personal workspaces are intentionally unlimited, so the legacy
 -- ux_workspaces_personal_owner cap is gone.
-CREATE UNIQUE INDEX ux_workspaces_default_owner ON workspaces(owner_user_id) WHERE organization_id IS NULL AND is_default AND archived_at IS NULL;
+CREATE UNIQUE INDEX ux_workspaces_default_owner ON workspaces(owner_user_id) WHERE organization_id IS NULL AND is_default;
 
 CREATE TABLE workspace_memberships (
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,

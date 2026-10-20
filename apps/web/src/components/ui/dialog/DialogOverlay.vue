@@ -1,6 +1,6 @@
 <template>
   <DialogOverlay
-    :class="cn('fixed inset-0 z-50 bg-dialog-mask overlay-mask-motion', props.class)"
+    :class="cn('fixed inset-0 z-admin-dialog bg-dialog-mask overlay-mask-motion', props.class)"
     v-bind="cleanProps(props)"
   >
     <slot />

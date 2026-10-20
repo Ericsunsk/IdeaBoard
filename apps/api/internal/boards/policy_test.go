@@ -237,7 +237,7 @@ func TestAccessMatrixCatalogEquivalenceSpotCheck(t *testing.T) {
 func TestAccessMatrixPostgres(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := t.Context()
-	ws, err := tenancypg.NewStore(db).CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
+	ws, err := tenancypg.NewStore(db, nil).CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
 		Name:        "boards-access-matrix-pg",
 		OwnerUserID: matrixCreator,
 	})
@@ -277,12 +277,12 @@ func TestBoardAccessMutationsReturnCommittedSignalRecords(t *testing.T) {
 	if err != nil || len(same.AccessSignals) != 0 {
 		t.Fatalf("no-op signals=%+v err=%v", same, err)
 	}
-	cleaned, err := tenancypg.NewStore(store.db).RemoveWorkspaceMember(ctx, workspace.PublicID, postgresStoreOwner, postgresStoreMember, store)
+	cleaned, err := tenancypg.NewStore(store.db, nil).RemoveWorkspaceMember(ctx, workspace.PublicID, postgresStoreOwner, postgresStoreMember, store)
 	if err != nil || len(cleaned) != 1 || len(cleaned[0].AccessSignals) != 2 {
 		t.Fatalf("departure=%+v err=%v", cleaned, err)
 	}
 	assertStored(cleaned[0].AccessSignals)
-	if _, member, err := tenancypg.NewStore(store.db).GetWorkspaceRole(ctx, workspace.PublicID, postgresStoreMember); err != nil || member {
+	if _, member, err := tenancypg.NewStore(store.db, nil).GetWorkspaceRole(ctx, workspace.PublicID, postgresStoreMember); err != nil || member {
 		t.Fatalf("membership departure did not commit: member=%v err=%v", member, err)
 	}
 }
@@ -425,7 +425,7 @@ func TestMembershipDepartureRollsBackGrantsAndOutbox(t *testing.T) {
 	for _, state := range []string{"live", "archived"} {
 		t.Run(state, func(t *testing.T) {
 			ctx, store, ws := newPostgresWorkspaceBoardFixture(t)
-			tenancyStore := tenancypg.NewStore(store.db)
+			tenancyStore := tenancypg.NewStore(store.db, nil)
 			board := mustCreatePostgresBoard(t, ctx, store, ws, "Departure")
 			user, err := store.q.GetUserByID(ctx, postgresStoreMember)
 			if err != nil {
@@ -517,7 +517,7 @@ func TestMembershipDepartureNotifiesCreatorAndSelectedBoardsIncludingArchived(t 
 		t.Fatal(err)
 	}
 	recipient := tenancy.FormatUserPublicID(uuid.UUID(user.PublicID.Bytes))
-	cleaned, err := tenancypg.NewStore(store.db).RemoveWorkspaceMember(ctx, ws.PublicID, postgresStoreMember, postgresStoreOwner, store)
+	cleaned, err := tenancypg.NewStore(store.db, nil).RemoveWorkspaceMember(ctx, ws.PublicID, postgresStoreMember, postgresStoreOwner, store)
 	if err != nil || len(cleaned) != 3 {
 		t.Fatalf("departure=%+v %v", cleaned, err)
 	}
@@ -721,7 +721,7 @@ func TestCatalogRoleMergeInMemory(t *testing.T) {
 // merged from write_authorization_postgres_test.go.
 func TestWriteAuthorizationPostgres(t *testing.T) {
 	ctx, store, ws := newPostgresWorkspaceBoardFixture(t)
-	if _, err := tenancypg.NewStore(store.db).AddWorkspaceMember(ctx, ws.PublicID, matrixEditor, tenancy.RoleMember); err != nil {
+	if _, err := tenancypg.NewStore(store.db, nil).AddWorkspaceMember(ctx, ws.PublicID, matrixEditor, tenancy.RoleMember); err != nil {
 		t.Fatal(err)
 	}
 	exerciseWriteAuthorization(t, store, ws.PublicID)
@@ -736,7 +736,7 @@ func TestDocumentWriteRechecksAccessAfterBoardLock(t *testing.T) {
 	_, store, ws := newPostgresWorkspaceBoardFixture(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	if _, err := tenancypg.NewStore(store.db).AddWorkspaceMember(ctx, ws.PublicID, matrixEditor, tenancy.RoleMember); err != nil {
+	if _, err := tenancypg.NewStore(store.db, nil).AddWorkspaceMember(ctx, ws.PublicID, matrixEditor, tenancy.RoleMember); err != nil {
 		t.Fatal(err)
 	}
 	id := mustMatrixBoard(t, ctx, store, ws.PublicID, "Concurrent authorization", matrixCreator)

@@ -12,8 +12,8 @@ export { useWorkspaceSwitcher } from './shell/useWorkspaceSwitcher'
 export { default as WorkspaceNavigation } from './shell/components/WorkspaceNavigation.vue'
 export { default as WorkspaceHeader } from './shell/components/WorkspaceHeader.vue'
 export {
-  archiveWorkspace,
   classifyWorkspaceAccessError,
+  deleteWorkspace,
   fetchAllWorkspaces,
   fetchPrincipal,
   fetchWorkspacePage,

@@ -128,20 +128,13 @@
       </div>
 
       <!-- 错误状态提示 -->
-      <div
+      <LoadErrorPanel
         v-if="workspace.errorMessage.value"
-        class="mt-2 flex shrink-0 items-center justify-between gap-3 rounded-panel border border-destructive/40 bg-popover px-3 py-2 text-xs"
-        role="alert"
-      >
-        <span class="font-semibold">{{ workspace.errorMessage.value }}</span>
-        <button
-          type="button"
-          class="shrink-0 rounded-pill bg-primary px-3 py-1.5 font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-          @click="workspace.retry"
-        >
-          {{ t('common.actions.retry') }}
-        </button>
-      </div>
+        class="mt-2 shrink-0"
+        :message="workspace.errorMessage.value"
+        :retry-label="t('common.actions.retry')"
+        @retry="workspace.retry"
+      />
 
       <div
         v-if="saveOperations.length"
@@ -260,6 +253,7 @@ import { createPointerDropTargets } from '../../../core/interaction/pointerDropT
 import { startPointerDrag } from '../../../core/interaction/pointerDrag'
 import type { CanvasLibraryImportDescriptor } from '../core/transfer'
 import UserConfirmDialog from '../../../core/components/UserConfirmDialog.vue'
+import LoadErrorPanel from '../../../core/components/LoadErrorPanel.vue'
 import { useUserConfirmDialog } from '../../../core/composables/useUserConfirmDialog'
 import {
   appOverlayMenuDangerItemClass,

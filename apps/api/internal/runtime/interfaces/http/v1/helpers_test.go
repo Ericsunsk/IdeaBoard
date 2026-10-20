@@ -297,18 +297,35 @@ func TestV1WorkspaceAuthorizationMatrix(t *testing.T) {
 		}
 	})
 
-	t.Run("archive", func(t *testing.T) {
-		archiveTargets := map[int64]int{owner: 200, admin: 200, member: 403, outsider: 404}
-		for userID, want := range archiveTargets {
-			target := v1WorkspaceFixture(t, ctx, store, fmt.Sprintf("archive-%d", userID), owner)
+	t.Run("delete", func(t *testing.T) {
+		deleteTargets := map[int64]int{owner: 200, admin: 200, member: 403, outsider: 404}
+		for userID, want := range deleteTargets {
+			target := v1WorkspaceFixture(t, ctx, store, fmt.Sprintf("delete-%d", userID), owner)
 			store.SeedWorkspaceMember(target.PublicID, admin, tenancy.RoleAdmin)
 			store.SeedWorkspaceMember(target.PublicID, member, tenancy.RoleMember)
 			status, _, payload := doV1(t, engine, v1Call{
-				method: http.MethodPost, path: "/api/v1/workspaces/" + target.PublicID + "/archive", userID: userID,
+				method: http.MethodDelete, path: "/api/v1/workspaces/" + target.PublicID, userID: userID,
+				headers: map[string]string{contract.IdempotencyKeyHeader: fmt.Sprintf("matrix-delete-%d", userID)},
 			})
 			if status != want {
-				t.Fatalf("archive user=%d status = %d, want %d (%v)", userID, status, want, payload)
+				t.Fatalf("delete user=%d status = %d, want %d (%v)", userID, status, want, payload)
 			}
+			if want == 403 && v1ErrorCode(t, payload) != string(contract.CodeWorkspaceForbidden) {
+				t.Fatalf("member delete code = %v, want workspace_forbidden", payload)
+			}
+			if want == 404 && v1ErrorCode(t, payload) != string(contract.CodeWorkspaceNotFound) {
+				t.Fatalf("outsider delete code = %v, want workspace_not_found", payload)
+			}
+		}
+	})
+
+	t.Run("delete requires idempotency key", func(t *testing.T) {
+		target := v1WorkspaceFixture(t, ctx, store, "delete-nokey", owner)
+		status, _, payload := doV1(t, engine, v1Call{
+			method: http.MethodDelete, path: "/api/v1/workspaces/" + target.PublicID, userID: owner,
+		})
+		if status != http.StatusBadRequest || v1ErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
+			t.Fatalf("delete without key = %d %v, want 400 idempotency_key_required", status, payload)
 		}
 	})
 
@@ -690,12 +707,10 @@ func TestV1CreateMultipleNonDefaultWorkspaces(t *testing.T) {
 	}
 }
 
-// TestV1ArchiveDefaultWorkspaceProtected proves the Default workspace
-// cannot be archived (403 workspace_default_protected) while plain rows
-// archive normally. Archived non-Default workspaces are hard-deleted 7
-// days later by the workspace purge, so this guard covers the Default
-// exemption on the archive path.
-func TestV1ArchiveDefaultWorkspaceProtected(t *testing.T) {
+// TestV1DeleteDefaultWorkspaceProtected proves the Default workspace
+// cannot be hard-deleted (403 workspace_default_protected) while plain
+// rows delete immediately and irreversibly.
+func TestV1DeleteDefaultWorkspaceProtected(t *testing.T) {
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
 	engine := newV1TestEngine(store, dir)
@@ -709,15 +724,132 @@ func TestV1ArchiveDefaultWorkspaceProtected(t *testing.T) {
 	if defID == "" {
 		t.Fatal("personal_workspace_id missing after provision")
 	}
-	status, _, archived := doV1(t, engine, v1Call{method: http.MethodPost, path: "/api/v1/workspaces/" + defID + "/archive", userID: userID})
-	if status != http.StatusForbidden || v1ErrorCode(t, archived) != string(contract.CodeWorkspaceDefaultProtected) {
-		t.Fatalf("archive default = %d %v, want 403 workspace_default_protected", status, archived)
+	status, _, deleted := doV1(t, engine, v1Call{method: http.MethodDelete, path: "/api/v1/workspaces/" + defID, userID: userID,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "delete-default-1"}})
+	if status != http.StatusForbidden || v1ErrorCode(t, deleted) != string(contract.CodeWorkspaceDefaultProtected) {
+		t.Fatalf("delete default = %d %v, want 403 workspace_default_protected", status, deleted)
 	}
 
 	plain := v1WorkspaceFixture(t, context.Background(), store, "plain", userID)
-	status, _, _ = doV1(t, engine, v1Call{method: http.MethodPost, path: "/api/v1/workspaces/" + plain.PublicID + "/archive", userID: userID})
+	status, _, _ = doV1(t, engine, v1Call{method: http.MethodDelete, path: "/api/v1/workspaces/" + plain.PublicID, userID: userID,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "delete-plain-1"}})
 	if status != 200 {
-		t.Fatalf("archive plain = %d, want 200", status)
+		t.Fatalf("delete plain = %d, want 200", status)
+	}
+	// Deleted workspaces read as 404 (irreversible).
+	status, _, payload = doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + plain.PublicID, userID: userID})
+	if status != http.StatusNotFound || v1ErrorCode(t, payload) != string(contract.CodeWorkspaceNotFound) {
+		t.Fatalf("get deleted = %d %v, want 404 workspace_not_found", status, payload)
+	}
+}
+
+// TestV1DeleteWorkspaceIdempotency proves key reuse with the same request
+// replays the first result while reuse with a different request renders
+// 409 workspace_idempotency_conflict.
+func TestV1DeleteWorkspaceIdempotency(t *testing.T) {
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	engine := newV1TestEngine(store, dir)
+
+	const userID int64 = 66
+	first := v1WorkspaceFixture(t, context.Background(), store, "idem-a", userID)
+	status, _, _ := doV1(t, engine, v1Call{method: http.MethodDelete, path: "/api/v1/workspaces/" + first.PublicID, userID: userID,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "delete-idem-1"}})
+	if status != 200 {
+		t.Fatalf("first delete = %d, want 200", status)
+	}
+	// The workspace and its membership are physically gone, but the same
+	// authenticated request must still replay the successful response.
+	status, _, replay := doV1(t, engine, v1Call{method: http.MethodDelete, path: "/api/v1/workspaces/" + first.PublicID, userID: userID,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "delete-idem-1"}})
+	if status != http.StatusOK {
+		t.Fatalf("replayed delete = %d %v, want 200", status, replay)
+	}
+	data := v1Data(t, replay).(map[string]any)
+	if data["deleted"] != true || data["id"] != first.PublicID {
+		t.Fatalf("replayed delete data = %v, want original deleted workspace", data)
+	}
+	for _, caller := range []int64{0, userID + 1} {
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodDelete, path: "/api/v1/workspaces/" + first.PublicID, userID: caller,
+			headers: map[string]string{contract.IdempotencyKeyHeader: "delete-idem-1"}})
+		want := http.StatusNotFound
+		if caller == 0 {
+			want = http.StatusUnauthorized
+		}
+		if status != want {
+			t.Fatalf("replay caller=%d = %d %v, want %d", caller, status, payload, want)
+		}
+	}
+	// A new key has no successful deletion to replay.
+	status, _, missing := doV1(t, engine, v1Call{method: http.MethodDelete, path: "/api/v1/workspaces/" + first.PublicID, userID: userID,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "delete-idem-new"}})
+	if status != http.StatusNotFound || v1ErrorCode(t, missing) != string(contract.CodeWorkspaceNotFound) {
+		t.Fatalf("new key on deleted workspace = %d %v, want 404 workspace_not_found", status, missing)
+	}
+	// Same key on a different workspace is a different request hash: 409.
+	second := v1WorkspaceFixture(t, context.Background(), store, "idem-b", userID)
+	status, _, conflict := doV1(t, engine, v1Call{method: http.MethodDelete, path: "/api/v1/workspaces/" + second.PublicID, userID: userID,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "delete-idem-1"}})
+	if status != http.StatusConflict || v1ErrorCode(t, conflict) != string(contract.CodeWorkspaceIdempotencyConflict) {
+		t.Fatalf("conflicting delete = %d %v, want 409 workspace_idempotency_conflict", status, conflict)
+	}
+}
+
+// activeTaskDeleteStore exercises the tenancy conflict at the HTTP boundary;
+// PostgreSQL tests separately cover the transactional task/hold invariant.
+type activeTaskDeleteStore struct {
+	tenancy.Store
+	active bool
+}
+
+func (s *activeTaskDeleteStore) DeleteWorkspace(ctx context.Context, publicID string) error {
+	if s.active {
+		return tenancy.ErrWorkspaceActiveTasks
+	}
+	return s.Store.DeleteWorkspace(ctx, publicID)
+}
+
+func TestV1DeleteWorkspaceActiveTasksConflictDoesNotClaimKey(t *testing.T) {
+	base := tenancy.NewInMemoryStoreForTests()
+	store := &activeTaskDeleteStore{Store: base, active: true}
+	engine := newV1TestEngine(store, newStaticUserDirectory())
+	const owner int64 = 69
+	workspace := v1WorkspaceFixture(t, context.Background(), base, "delete-after-tasks", owner)
+	call := v1Call{method: http.MethodDelete, path: "/api/v1/workspaces/" + workspace.PublicID, userID: owner,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "delete-after-tasks"}}
+	status, _, payload := doV1(t, engine, call)
+	if status != http.StatusConflict || v1ErrorCode(t, payload) != string(contract.CodeWorkspaceActiveTasks) {
+		t.Fatalf("active task delete = %d %v, want 409 workspace_active_tasks", status, payload)
+	}
+	status, _, payload = doV1(t, engine, v1Call{method: http.MethodGet, path: call.path, userID: owner})
+	if status != http.StatusOK {
+		t.Fatalf("workspace after conflict = %d %v, want 200", status, payload)
+	}
+	store.active = false
+	for i := 0; i < 2; i++ {
+		status, _, payload = doV1(t, engine, call)
+		if status != http.StatusOK {
+			t.Fatalf("settled delete attempt %d = %d %v, want 200", i, status, payload)
+		}
+	}
+}
+
+func TestV1DeleteWorkspaceDoesNotCachePermissionFailure(t *testing.T) {
+	store := tenancy.NewInMemoryStoreForTests()
+	engine := newV1TestEngine(store, newStaticUserDirectory())
+	const owner, member int64 = 67, 68
+	workspace := v1WorkspaceFixture(t, context.Background(), store, "delete-after-promotion", owner)
+	store.SeedWorkspaceMember(workspace.PublicID, member, tenancy.RoleMember)
+	call := v1Call{method: http.MethodDelete, path: "/api/v1/workspaces/" + workspace.PublicID, userID: member,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "delete-after-promotion"}}
+	status, _, payload := doV1(t, engine, call)
+	if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeWorkspaceForbidden) {
+		t.Fatalf("member delete = %d %v, want 403 workspace_forbidden", status, payload)
+	}
+	store.SeedWorkspaceMember(workspace.PublicID, member, tenancy.RoleAdmin)
+	status, _, payload = doV1(t, engine, call)
+	if status != http.StatusOK {
+		t.Fatalf("promoted admin delete = %d %v, want 200", status, payload)
 	}
 }
 

@@ -291,7 +291,7 @@ func TestYCompactLifecycleInMemory(t *testing.T) {
 func TestYUpdatePostgresLifecycle(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	tenancyStore := tenancypg.NewStore(db)
+	tenancyStore := tenancypg.NewStore(db, nil)
 	const owner, collaborator = int64(1), int64(3)
 	ws, err := tenancyStore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "ydoc-pg", OwnerUserID: owner})
 	if err != nil {

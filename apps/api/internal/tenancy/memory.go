@@ -3,6 +3,7 @@ package tenancy
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -130,7 +131,7 @@ func (s *InMemoryStore) ListWorkspacesForUser(ctx context.Context, userID int64)
 			continue
 		}
 		w, ok := s.workspaces[publicID]
-		if !ok || w.IsArchived() {
+		if !ok {
 			continue
 		}
 		out = append(out, copyWorkspace(w))
@@ -163,7 +164,7 @@ func (s *InMemoryStore) CreateWorkspace(ctx context.Context, params CreateWorksp
 	}
 	if params.IsDefault && params.OrganizationID == nil {
 		for _, w := range s.workspaces {
-			if w.IsDefaultWorkspace() && !w.IsArchived() && w.OwnerUserID != nil && *w.OwnerUserID == params.OwnerUserID {
+			if w.IsDefaultWorkspace() && w.OwnerUserID != nil && *w.OwnerUserID == params.OwnerUserID {
 				return nil, ErrDefaultWorkspaceConflict
 			}
 		}
@@ -180,7 +181,7 @@ func (s *InMemoryStore) CreateWorkspace(ctx context.Context, params CreateWorksp
 		InternalID:     s.nextInternalIDLocked(),
 		PublicID:       publicID,
 		OrganizationID: params.OrganizationID,
-		Name:           params.Name,
+		Name:           strings.TrimSpace(params.Name),
 		IsDefault:      params.IsDefault && params.OrganizationID == nil,
 		CreatedAt:      now,
 		UpdatedAt:      now,
@@ -218,31 +219,31 @@ func (s *InMemoryStore) UpdateWorkspace(ctx context.Context, publicID, name stri
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	w, ok := s.workspaces[publicID]
-	if !ok || w.IsArchived() {
+	if !ok {
 		return nil, ErrNotFound
 	}
 	if w.IsDefaultWorkspace() {
 		return nil, ErrDefaultWorkspaceProtected
 	}
-	w.Name = name
+	w.Name = strings.TrimSpace(name)
 	w.UpdatedAt = s.clock()
 	return copyWorkspace(w), nil
 }
 
-func (s *InMemoryStore) ArchiveWorkspace(ctx context.Context, publicID string) (*Workspace, error) {
+func (s *InMemoryStore) DeleteWorkspace(ctx context.Context, publicID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	w, ok := s.workspaces[publicID]
-	if !ok || w.IsArchived() {
-		return nil, ErrNotFound
+	if !ok {
+		return ErrNotFound
 	}
 	if w.IsDefaultWorkspace() {
-		return nil, ErrDefaultWorkspaceProtected
+		return ErrDefaultWorkspaceProtected
 	}
-	now := s.clock()
-	w.ArchivedAt = &now
-	w.UpdatedAt = now
-	return copyWorkspace(w), nil
+	delete(s.workspaces, publicID)
+	delete(s.wsMembers, publicID)
+	delete(s.memberSince, publicID)
+	return nil
 }
 
 func (s *InMemoryStore) EnsureDefaultWorkspace(ctx context.Context, userID int64) (*Workspace, error) {
@@ -252,7 +253,7 @@ func (s *InMemoryStore) EnsureDefaultWorkspace(ctx context.Context, userID int64
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, w := range s.workspaces {
-		if w.IsDefaultWorkspace() && !w.IsArchived() && w.OwnerUserID != nil && *w.OwnerUserID == userID {
+		if w.IsDefaultWorkspace() && w.OwnerUserID != nil && *w.OwnerUserID == userID {
 			return copyWorkspace(w), nil
 		}
 	}
@@ -328,7 +329,7 @@ func (s *InMemoryStore) ListWorkspaceMembers(ctx context.Context, workspacePubli
 }
 
 func (s *InMemoryStore) AddWorkspaceMember(ctx context.Context, workspacePublicID string, targetUserID int64, role string) (*WorkspaceMember, error) {
-	role = normalizeRole(role)
+	role = strings.TrimSpace(role)
 	if !IsValidRole(role) {
 		return nil, ErrForbidden
 	}
@@ -349,7 +350,7 @@ func (s *InMemoryStore) AddWorkspaceMember(ctx context.Context, workspacePublicI
 }
 
 func (s *InMemoryStore) UpdateWorkspaceMemberRole(ctx context.Context, workspacePublicID string, actorUserID, targetUserID int64, newRole string) (*WorkspaceMember, error) {
-	newRole = normalizeRole(newRole)
+	newRole = strings.TrimSpace(newRole)
 	if !IsValidRole(newRole) {
 		return nil, ErrForbidden
 	}
@@ -495,7 +496,7 @@ func (s *InMemoryStore) ListOrganizationWorkspaces(ctx context.Context, organiza
 	}
 	var out []*Workspace
 	for _, w := range s.workspaces {
-		if w.OrganizationID != nil && *w.OrganizationID == organizationPublicID && !w.IsArchived() {
+		if w.OrganizationID != nil && *w.OrganizationID == organizationPublicID {
 			out = append(out, copyWorkspace(w))
 		}
 	}
@@ -539,15 +540,6 @@ func (s *InMemoryStore) CreateOrganizationWorkspace(ctx context.Context, organiz
 	s.workspaces[publicID] = w
 	s.grantWorkspaceMemberLocked(publicID, ownerUserID, RoleOwner, now)
 	return copyWorkspace(w), nil
-}
-
-func normalizeRole(role string) string {
-	switch role {
-	case RoleOwner, RoleAdmin, RoleMember:
-		return role
-	default:
-		return role
-	}
 }
 
 // WithWorkspaceMembers keeps the membership snapshot stable throughout a dependent mutation.

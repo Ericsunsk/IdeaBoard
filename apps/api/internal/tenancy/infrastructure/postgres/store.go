@@ -9,6 +9,8 @@ package postgres
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 
@@ -30,11 +32,27 @@ const maxTenancyRows = int32(500)
 // mintAttempts bounds public_id regeneration after a random collision.
 const mintAttempts = 5
 
+// maxRevisionPasses bounds the leaf-first board revision sweep; a healthy
+// chain converges in depth-many passes.
+const maxRevisionPasses = 1000
+
+// objectDeleteAttempts bounds the best-effort post-commit storage cleanup
+// per key.
+const objectDeleteAttempts = 3
+
+// ObjectDeleter is the narrow storage seam hard delete needs. It is
+// satisfied by media storage.Service; the store depends on the shape,
+// never on the media implementation.
+type ObjectDeleter interface {
+	DeleteObjectByKey(ctx context.Context, objectKey string) error
+}
+
 // Store is the postgres tenancy.Store. It must never be replaced by the
 // test-only InMemoryStore in production wiring.
 type Store struct {
-	db *pgxpool.Pool
-	q  *dbsqlc.Queries
+	db      *pgxpool.Pool
+	q       *dbsqlc.Queries
+	objects ObjectDeleter
 }
 
 // Compile-time convergence with the agreed interface.
@@ -46,9 +64,11 @@ type repositoryQueryer struct {
 	q   *dbsqlc.Queries
 }
 
-// NewStore builds a postgres tenancy Store over pool.
-func NewStore(db *pgxpool.Pool) *Store {
-	return &Store{db: db, q: dbsqlc.New(db)}
+// NewStore builds a postgres tenancy Store over pool. objects may be nil
+// in tests that only assert row effects; a nil deleter skips post-commit
+// storage cleanup.
+func NewStore(db *pgxpool.Pool, objects ObjectDeleter) *Store {
+	return &Store{db: db, q: dbsqlc.New(db), objects: objects}
 }
 
 func (s *Store) dbWithContext(ctx context.Context) repositoryQueryer {
@@ -84,7 +104,7 @@ func isPublicIDConflict(err error) bool {
 		strings.Contains(lowered, "uq_organizations_public_id")
 }
 
-// isDefaultConflict reports a duplicate violation of the single-live-Default
+// isDefaultConflict reports a duplicate violation of the single-Default
 // partial unique index (a second Default create for the same owner).
 func isDefaultConflict(err error) bool {
 	if !database.IsDuplicateConstraintError(err) {
@@ -119,7 +139,6 @@ func mapWorkspace(row dbsqlc.Workspace, organizationPublicID *string) *tenancy.W
 		OwnerUserID:    dbutil.Int64Ptr(row.OwnerUserID),
 		Name:           row.Name,
 		IsDefault:      row.IsDefault,
-		ArchivedAt:     dbutil.TimePtr(row.ArchivedAt),
 		CreatedAt:      dbutil.TimeValue(row.CreatedAt),
 		UpdatedAt:      dbutil.TimeValue(row.UpdatedAt),
 	}
@@ -173,8 +192,8 @@ func mapWorkspaceMember(publicID string, row dbsqlc.WorkspaceMembership, externa
 	}
 }
 
-// GetWorkspace resolves a workspace by opaque public id. Archived rows stay
-// visible here (parity with the in-memory Store); lists filter them.
+// GetWorkspace resolves a workspace by opaque public id. Deletion is an
+// immediate hard delete, so missing rows read as 404.
 func (s *Store) GetWorkspace(ctx context.Context, publicID string) (*tenancy.Workspace, error) {
 	row, err := s.dbWithContext(ctx).q.GetWorkspaceByPublicID(ctx, strings.TrimSpace(publicID))
 	if err != nil {
@@ -291,7 +310,7 @@ func (s *Store) CreateWorkspace(ctx context.Context, params tenancy.CreateWorksp
 	return nil, tenancy.ErrConflict
 }
 
-// UpdateWorkspace renames a live workspace; archived or missing rows read
+// UpdateWorkspace renames an existing workspace; missing rows read
 // as not found. The Default workspace is never renamed: attempts fail with
 // tenancy.ErrDefaultWorkspaceProtected. The is_default marker is immutable
 // after creation, so the pre-check below cannot race a flag flip.
@@ -318,27 +337,215 @@ func (s *Store) UpdateWorkspace(ctx context.Context, publicID, name string) (*te
 	return s.GetWorkspace(ctx, publicID)
 }
 
-// ArchiveWorkspace archives a live workspace and returns it with ArchivedAt
-// set; already-archived or missing rows read as not found. The Default
-// workspace is never archived: attempts fail with
-// tenancy.ErrDefaultWorkspaceProtected. The is_default marker is immutable
-// after creation, so the pre-check below cannot race a flag flip.
-func (s *Store) ArchiveWorkspace(ctx context.Context, publicID string) (*tenancy.Workspace, error) {
-	workspace, err := s.GetWorkspace(ctx, publicID)
+// DeleteWorkspace is an immediate irreversible hard delete: it removes
+// the workspace row with its boards and files in one operation. Billing
+// records, the credit ledger, user rows and control audit records are
+// retained (never named in the delete order below). The Default workspace
+// is never deleted (ErrDefaultWorkspaceProtected); unknown ids read as
+// ErrNotFound. Pending/running Tasks block deletion until their canonical
+// lifecycle settles any Credit Hold.
+//
+// Delete order inside one workspace transaction follows the RESTRICT edges
+// so no step blocks on a later one:
+//
+//	execution string-keyed rows -> tasks (cascades task_outputs)
+//	library refs -> library_assets (cascades materializations)
+//	tasks + library assets -> media_assets -> workspace
+//	board_revisions (leaf-first, parent_revision_id is RESTRICT) -> boards
+//
+// Cascade edges (memberships, billing accounts, folders, upload sessions,
+// events, deliveries, documents, media refs, origins, idempotency) are left
+// to their owning FK. Explicit deletes below release RESTRICT blockers or
+// remove rows without foreign keys.
+//
+// Object bytes leave the database first: storage keys are collected inside
+// the transaction, the rows commit, and only then are the objects deleted
+// best-effort with retries outside the transaction. A storage failure never
+// rolls back the committed row delete; it is logged.
+func (s *Store) DeleteWorkspace(ctx context.Context, publicID string) error {
+	if s == nil || s.db == nil {
+		return fmt.Errorf("tenancy: workspace delete: store not configured")
+	}
+	publicID = strings.TrimSpace(publicID)
+	tx, err := s.db.Begin(ctx)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("tenancy: workspace delete: begin: %w", err)
 	}
-	if workspace.IsDefaultWorkspace() {
-		return nil, tenancy.ErrDefaultWorkspaceProtected
+	defer func() { _ = tx.Rollback(ctx) }()
+	var (
+		workspaceID int64
+		isDefault   bool
+	)
+	// The Default marker is immutable but the exemption is re-checked
+	// under row lock so a flag flip cannot race the delete.
+	if err := tx.QueryRow(ctx, `
+SELECT internal_id, is_default
+FROM workspaces WHERE public_id = $1 FOR UPDATE`, publicID).Scan(&workspaceID, &isDefault); err != nil {
+		if database.IsNotFound(err) {
+			return tenancy.ErrNotFound
+		}
+		return err
 	}
-	rows, err := s.dbWithContext(ctx).q.ArchiveWorkspace(ctx, strings.TrimSpace(publicID))
+	if isDefault {
+		return tenancy.ErrDefaultWorkspaceProtected
+	}
+	// Task inserts hold the Workspace FK KEY SHARE lock until submission
+	// commits (including Hold and enqueue). Our FOR UPDATE lock therefore
+	// waits for earlier submissions and prevents later inserts from racing
+	// this check. Never erase the facts canonical settlement still needs.
+	var activeTasks bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (
+  SELECT 1 FROM tasks WHERE workspace_id = $1 AND status IN ('pending', 'running')
+)`, workspaceID).Scan(&activeTasks); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: check active tasks: %w", err)
+	}
+	if activeTasks {
+		return tenancy.ErrWorkspaceActiveTasks
+	}
+	objects, err := collectWorkspaceStorageKeys(ctx, tx, workspaceID)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if rows == 0 {
-		return nil, tenancy.ErrNotFound
+	if err := deleteWorkspaceRows(ctx, tx, workspaceID, publicID); err != nil {
+		return err
 	}
-	return s.GetWorkspace(ctx, publicID)
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: commit: %w", err)
+	}
+	slog.Info("workspace deleted", "workspace_id", publicID)
+	s.cleanupWorkspaceObjects(ctx, objects)
+	return nil
+}
+
+// collectWorkspaceStorageKeys snapshots media asset and upload-session
+// object keys. Pending upload sessions carry NULL keys and are skipped.
+func collectWorkspaceStorageKeys(ctx context.Context, tx pgx.Tx, workspaceID int64) ([]string, error) {
+	rows, err := tx.Query(ctx, `
+SELECT DISTINCT btrim(storage_key)
+FROM (
+  SELECT storage_key FROM media_assets WHERE workspace_id = $1
+  UNION ALL
+  SELECT storage_key FROM upload_sessions WHERE workspace_id = $1
+) objects
+WHERE storage_key IS NOT NULL AND btrim(storage_key) <> ''`, workspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("tenancy: workspace delete: collect storage keys: %w", err)
+	}
+	defer rows.Close()
+	objects, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, fmt.Errorf("tenancy: workspace delete: scan storage keys: %w", err)
+	}
+	return objects, nil
+}
+
+// deleteWorkspaceRows removes every workspace-owned row in RESTRICT-safe
+// order. Red-line tables (credit_*, task_billing_snapshots/settlements,
+// users, payments, rewards, credit_wallets, statistics aggregates,
+// control_audit_records) share no FK into these deletes and are never
+// named here.
+func deleteWorkspaceRows(ctx context.Context, tx pgx.Tx, workspaceID int64, publicID string) error {
+	exec := func(query string, args ...any) error {
+		_, err := tx.Exec(ctx, query, args...)
+		return err
+	}
+	// String-keyed execution rows reference tasks by public_id (no FK);
+	// delete them before the task rows disappear.
+	if err := exec(`DELETE FROM task_execution_attempts WHERE task_id IN (
+  SELECT public_id FROM tasks WHERE workspace_id = $1)`, workspaceID); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: delete execution attempts: %w", err)
+	}
+	if err := exec(`DELETE FROM task_execution_metrics WHERE task_id IN (
+  SELECT public_id FROM tasks WHERE workspace_id = $1)`, workspaceID); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: delete execution metrics: %w", err)
+	}
+	if err := exec(`DELETE FROM task_cancellations WHERE task_id IN (
+  SELECT public_id FROM tasks WHERE workspace_id = $1)`, workspaceID); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: delete cancellations: %w", err)
+	}
+	// library_asset_media_assets carries no FK (orphan risk): clear by
+	// either side before parents disappear.
+	if err := exec(`DELETE FROM library_asset_media_assets WHERE library_asset_id IN (
+  SELECT internal_id FROM library_assets WHERE workspace_id = $1)
+  OR media_asset_id IN (
+  SELECT internal_id FROM media_assets WHERE workspace_id = $1)`, workspaceID); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: delete library asset links: %w", err)
+	}
+	// library_assets -> media_assets and -> folders are RESTRICT: clear
+	// assets before both parents.
+	if err := exec(`DELETE FROM library_assets WHERE workspace_id = $1`, workspaceID); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: delete library assets: %w", err)
+	}
+	// Task deletion cascades outputs before media_assets and releases the
+	// billing_accounts RESTRICT edge before the workspace cascades accounts.
+	if err := exec(`DELETE FROM tasks WHERE workspace_id = $1`, workspaceID); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: delete tasks: %w", err)
+	}
+	// board_revisions.parent_revision_id is RESTRICT on a self edge:
+	// sweep leaves first until the chain drains.
+	if err := deleteWorkspaceBoardRevisionsLeafFirst(ctx, tx, workspaceID); err != nil {
+		return err
+	}
+	// Boards cascade documents, memberships, and media refs.
+	if err := exec(`DELETE FROM boards WHERE workspace_id = $1`, workspaceID); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: delete boards: %w", err)
+	}
+	// media_assets -> upload_sessions is RESTRICT: media first.
+	if err := exec(`DELETE FROM media_assets WHERE workspace_id = $1`, workspaceID); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: delete media assets: %w", err)
+	}
+	// TEXT outbox rows carry no FK; they leave with the workspace.
+	if err := exec(`DELETE FROM task_status_event_outbox WHERE workspace_id = $1`, publicID); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: delete task outbox: %w", err)
+	}
+	if err := exec(`DELETE FROM board_access_event_outbox WHERE workspace_id = $1`, publicID); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: delete board access outbox: %w", err)
+	}
+	if err := exec(`DELETE FROM workspaces WHERE internal_id = $1`, workspaceID); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: delete workspace: %w", err)
+	}
+	return nil
+}
+
+// deleteWorkspaceBoardRevisionsLeafFirst drains board revisions without
+// tripping the parent_revision_id RESTRICT edge: each pass deletes only
+// revisions no surviving row names as parent.
+func deleteWorkspaceBoardRevisionsLeafFirst(ctx context.Context, tx pgx.Tx, workspaceID int64) error {
+	for pass := 0; pass < maxRevisionPasses; pass++ {
+		tag, err := tx.Exec(ctx, `DELETE FROM board_revisions WHERE board_id IN (
+  SELECT internal_id FROM boards WHERE workspace_id = $1)
+  AND internal_id NOT IN (
+  SELECT parent_revision_id FROM board_revisions
+  WHERE parent_revision_id IS NOT NULL AND board_id IN (
+  SELECT internal_id FROM boards WHERE workspace_id = $2))`, workspaceID, workspaceID)
+		if err != nil {
+			return fmt.Errorf("tenancy: workspace delete: delete board revisions: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return nil
+		}
+	}
+	return fmt.Errorf("tenancy: workspace delete: board revision chain did not drain")
+}
+
+// cleanupWorkspaceObjects deletes stored bytes after the rows committed.
+// Best-effort with retries: failures are logged, never returned, so
+// storage trouble cannot roll back (or fail) the delete.
+func (s *Store) cleanupWorkspaceObjects(ctx context.Context, keys []string) {
+	if s == nil || s.objects == nil {
+		return
+	}
+	for _, key := range keys {
+		var err error
+		for attempt := 0; attempt < objectDeleteAttempts; attempt++ {
+			if err = s.objects.DeleteObjectByKey(ctx, key); err == nil {
+				break
+			}
+		}
+		if err != nil {
+			slog.Warn("workspace delete storage delete failed", "storage_key", key, "err", err)
+		}
+	}
 }
 
 // EnsureDefaultWorkspace idempotently provisions the user's Default
@@ -691,7 +898,7 @@ func (s *Store) GetOrganizationRole(ctx context.Context, organizationPublicID st
 	return row.Role, true, nil
 }
 
-// ListOrganizationWorkspaces lists live workspaces owned by an organization.
+// ListOrganizationWorkspaces lists workspaces owned by an organization.
 func (s *Store) ListOrganizationWorkspaces(ctx context.Context, organizationPublicID string) ([]*tenancy.Workspace, error) {
 	organization, err := s.GetOrganization(ctx, organizationPublicID)
 	if err != nil {

@@ -116,7 +116,7 @@ defineProps<{
 
   .user-credit-pill__balance {
     max-width: 8ch;
-    font-size: 12px;
+    font-size: var(--text-admin-meta);
   }
 }
 </style>

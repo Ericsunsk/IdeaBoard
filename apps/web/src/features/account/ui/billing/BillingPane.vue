@@ -68,19 +68,16 @@
       </DataTableColumn>
 
       <template #empty>
-        <div
+        <LoadErrorPanel
           v-if="initialError"
-          class="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"
-          role="alert"
-        >
-          <p class="m-0 font-semibold text-destructive">
-            {{ t('account.billingRecords.loadFailed') }}
-          </p>
-          <p class="mt-1 mb-0 text-sm text-muted-foreground">{{ errorMessage(initialError) }}</p>
-          <Button variant="ghost" size="sm" class="mt-3" @click="retryInitial()">{{
-            t('account.reload')
-          }}</Button>
-        </div>
+          class="min-h-48 justify-center"
+          align="center"
+          :message="t('account.billingRecords.loadFailed')"
+          :detail="errorMessage(initialError)"
+          :retry-label="t('account.reload')"
+          retry-variant="ghost"
+          @retry="retryInitial()"
+        />
         <div
           v-else
           class="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"
@@ -105,16 +102,15 @@
           {{ t('account.billingRecords.loading') }}
         </p>
 
-        <div
+        <LoadErrorPanel
           v-if="loadMoreError"
-          class="flex items-center justify-center gap-3 border-t border-border px-4 py-3"
-          role="alert"
-        >
-          <span class="text-sm text-destructive">{{ errorMessage(loadMoreError) }}</span>
-          <Button variant="ghost" size="sm" @click="loadMore()">{{
-            t('account.billingRecords.retryLoad')
-          }}</Button>
-        </div>
+          align="center"
+          :message="errorMessage(loadMoreError)"
+          :retry-label="t('account.billingRecords.retryLoad')"
+          :is-retrying="isFetchingNextPage"
+          retry-variant="ghost"
+          @retry="loadMore()"
+        />
         <div v-else-if="hasNextPage" class="flex justify-center border-t border-border px-4 py-3">
           <Button
             variant="outline"
@@ -136,6 +132,7 @@ import { Button } from '@/components/ui/button'
 import DataTableColumn from '../../../../core/components/DataTableColumn.vue'
 import { Skeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../core/components/DataTableFrame.vue'
+import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
 import { formatLocaleNumber } from '../../../../core/i18n/formatters'
 import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'

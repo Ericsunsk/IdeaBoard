@@ -70,7 +70,7 @@ services:
     # endpoint). Queue ownership is all-or-nothing per
     # platform/riverpolicy.RiverRetryMatrix: drawing_default (drawing/GPU
     # long-horizon execution + settlement-only convergence),
-    # media_reclamation, task_retention (incl. workspace purge),
+    # media_reclamation,
     # task_settlement_sweep, webhook_deliver, and the
     # credit/payment/vision/identity reconciliation queues all run here;
     # periodic schedules run ONLY here (single scheduler per deployment).

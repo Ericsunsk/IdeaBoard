@@ -11,20 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const archiveWorkspace = `-- name: ArchiveWorkspace :execrows
-UPDATE workspaces
-SET archived_at = now(), updated_at = now()
-WHERE public_id = $1 AND archived_at IS NULL
-`
-
-func (q *Queries) ArchiveWorkspace(ctx context.Context, publicID string) (int64, error) {
-	result, err := q.db.Exec(ctx, archiveWorkspace, publicID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const countWorkspaceMembers = `-- name: CountWorkspaceMembers :one
 SELECT COUNT(*)
 FROM workspace_memberships
@@ -82,7 +68,7 @@ const createWorkspace = `-- name: CreateWorkspace :one
 
 INSERT INTO workspaces (public_id, organization_id, owner_user_id, name, is_default)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
+RETURNING internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at
 `
 
 type CreateWorkspaceParams struct {
@@ -96,7 +82,10 @@ type CreateWorkspaceParams struct {
 // Workspace tenancy queries (#801). Public references use public_id;
 // internal_id stays database-internal.
 //
-// Default workspace rule (Bug2 root fix): every user owns exactly one live
+// Deletion is an immediate irreversible hard delete: there is no
+// archive/restore lifecycle and no workspaces.archived_at column.
+//
+// Default workspace rule (Bug2 root fix): every user owns exactly one
 // Default personal workspace (is_default). Plain personal workspaces created
 // without an organization are always non-Default and unlimited; only
 // EnsureDefaultWorkspace mints the Default row.
@@ -118,7 +107,6 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 		&i.IsDefault,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.ArchivedAt,
 	)
 	return i, err
 }
@@ -163,9 +151,9 @@ func (q *Queries) GetBillingAccountByWorkspaceID(ctx context.Context, workspaceI
 }
 
 const getDefaultWorkspaceByOwner = `-- name: GetDefaultWorkspaceByOwner :one
-SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
+SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at
 FROM workspaces
-WHERE owner_user_id = $1 AND organization_id IS NULL AND is_default AND archived_at IS NULL
+WHERE owner_user_id = $1 AND organization_id IS NULL AND is_default
 LIMIT 1
 `
 
@@ -181,13 +169,12 @@ func (q *Queries) GetDefaultWorkspaceByOwner(ctx context.Context, ownerUserID pg
 		&i.IsDefault,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.ArchivedAt,
 	)
 	return i, err
 }
 
 const getWorkspaceByPublicID = `-- name: GetWorkspaceByPublicID :one
-SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
+SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at
 FROM workspaces
 WHERE public_id = $1
 LIMIT 1
@@ -205,7 +192,6 @@ func (q *Queries) GetWorkspaceByPublicID(ctx context.Context, publicID string) (
 		&i.IsDefault,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.ArchivedAt,
 	)
 	return i, err
 }
@@ -236,7 +222,7 @@ func (q *Queries) GetWorkspaceMembership(ctx context.Context, arg GetWorkspaceMe
 const insertDefaultWorkspaceIgnore = `-- name: InsertDefaultWorkspaceIgnore :execrows
 INSERT INTO workspaces (public_id, owner_user_id, name, is_default)
 VALUES ($1, $2, $3, TRUE)
-ON CONFLICT (owner_user_id) WHERE organization_id IS NULL AND is_default AND archived_at IS NULL DO NOTHING
+ON CONFLICT (owner_user_id) WHERE organization_id IS NULL AND is_default DO NOTHING
 `
 
 type InsertDefaultWorkspaceIgnoreParams struct {
@@ -315,9 +301,9 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMem
 }
 
 const listWorkspacesByOrganizationID = `-- name: ListWorkspacesByOrganizationID :many
-SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
+SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at
 FROM workspaces
-WHERE organization_id = $1 AND archived_at IS NULL
+WHERE organization_id = $1
 ORDER BY internal_id ASC
 LIMIT $2
 `
@@ -345,7 +331,6 @@ func (q *Queries) ListWorkspacesByOrganizationID(ctx context.Context, arg ListWo
 			&i.IsDefault,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.ArchivedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -358,10 +343,10 @@ func (q *Queries) ListWorkspacesByOrganizationID(ctx context.Context, arg ListWo
 }
 
 const listWorkspacesByUserID = `-- name: ListWorkspacesByUserID :many
-SELECT w.internal_id, w.public_id, w.organization_id, w.owner_user_id, w.name, w.is_default, w.created_at, w.updated_at, w.archived_at
+SELECT w.internal_id, w.public_id, w.organization_id, w.owner_user_id, w.name, w.is_default, w.created_at, w.updated_at
 FROM workspaces AS w
 INNER JOIN workspace_memberships AS m ON m.workspace_id = w.internal_id
-WHERE m.user_id = $1 AND w.archived_at IS NULL
+WHERE m.user_id = $1
 ORDER BY w.internal_id ASC
 LIMIT $2
 `
@@ -389,7 +374,6 @@ func (q *Queries) ListWorkspacesByUserID(ctx context.Context, arg ListWorkspaces
 			&i.IsDefault,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.ArchivedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -438,7 +422,7 @@ func (q *Queries) UpdateWorkspaceMemberRole(ctx context.Context, arg UpdateWorks
 const updateWorkspaceName = `-- name: UpdateWorkspaceName :execrows
 UPDATE workspaces
 SET name = $1, updated_at = now()
-WHERE public_id = $2 AND archived_at IS NULL
+WHERE public_id = $2
 `
 
 type UpdateWorkspaceNameParams struct {

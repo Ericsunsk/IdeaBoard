@@ -41,8 +41,8 @@ function notifyWorkspaceSelectionChange(id: string | null) {
 }
 
 /**
- * Subscribes to explicit workspace selection changes (select/clear/
- * provision). Board catalog isolation listens here alongside the auth-scope
+ * Subscribes to explicit workspace selection changes (select/clear).
+ * Board catalog isolation listens here alongside the auth-scope
  * signal so per-scope caches invalidate on either axis.
  */
 export function subscribeWorkspaceSelectionChange(
@@ -189,22 +189,14 @@ export function createWorkspaceSelectionStore(deps?: {
     },
     // Concurrent provisions for the same (name, organization) share one
     // promise and one idempotency key, so double-clicks cannot fork.
+    // Creating a workspace does not change the current navigation scope.
     provision(input: ProvisionWorkspaceInput): Promise<WorkspaceSummary> {
       const key = provisionDedupeKey(input)
       const running = inflight.get(key)
       if (running) return running
-      const task = provision(input)
-        .then((workspace) => {
-          const changed = selectedId.value !== workspace.publicId
-          selectedId.value = workspace.publicId
-          primed = true
-          persist.writeSelectedId(workspace.publicId)
-          if (changed) notifyWorkspaceSelectionChange(workspace.publicId)
-          return workspace
-        })
-        .finally(() => {
-          if (inflight.get(key) === task) inflight.delete(key)
-        })
+      const task = provision(input).finally(() => {
+        if (inflight.get(key) === task) inflight.delete(key)
+      })
       inflight.set(key, task)
       return task
     },

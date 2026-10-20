@@ -57,12 +57,6 @@ func RiverRetryMatrix() []QueueRetryPolicy {
 			Notes:       "checkout session shutdown sweep; same budget as payment reconciliation",
 		},
 		{
-			Queue:       RiverQueueTaskRetention,
-			MaxAttempts: RiverMaxAttemptsTaskRetention,
-			Worker:      "WorkspacePurgeWorker (serial single-worker queue)",
-			Notes:       "purge runs are serial by design; failures must surface immediately, not retry into the next window",
-		},
-		{
 			Queue:       RiverQueueVisionBilling,
 			MaxAttempts: RiverMaxAttemptsVisionBilling,
 			Worker:      "VisionBillingReconciliationWorker",

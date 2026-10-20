@@ -420,7 +420,7 @@ function submitOutpaint(prompt: string) {
   border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--canvas-node-bg) 82%, var(--destructive) 18%);
   color: var(--destructive);
-  font-size: 12px;
+  font-size: var(--canvas-font-size-control);
   font-weight: 600;
   text-align: center;
   pointer-events: auto;

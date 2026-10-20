@@ -401,35 +401,43 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-  /workspaces/{workspace_id}/archive:
-    post:
+    delete:
       tags: [Workspaces]
-      operationId: archiveWorkspace
-      summary: Archive a workspace (owner/admin only)
+      operationId: deleteWorkspace
+      summary: Delete a workspace immediately and irreversibly (owner/admin only)
       description: >-
-        Archives the workspace. No Idempotency-Key is required.
-        The Default workspace is never archived: attempts render 403
-        workspace_default_protected. Archived non-Default workspaces are
-        permanently deleted 7 days after archiving,
-        including boards and files; billing records are retained.
+        Hard-deletes the workspace with its boards and files; there is no
+        recovery window and no restore path. Requires the Idempotency-Key
+        header. Reusing a key with a different request renders 409
+        workspace_idempotency_conflict.
+        The Default workspace is never deleted: attempts render 403
+        workspace_default_protected. Pending or running tasks block deletion with
+        409 workspace_active_tasks until they finish or are cancelled through
+        the task lifecycle. Billing records, the credit ledger, user rows
+        and control audit records are retained.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
-          description: Workspace archived.
+          description: Workspace deleted.
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkspaceEnvelope'
+                $ref: '#/components/schemas/DeletedEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /workspaces/{workspace_id}/members:
     get:
       tags: [WorkspaceMembers]
@@ -3726,18 +3734,13 @@ components:
         is_default:
           type: boolean
           description: >-
-            True for the owner's Default workspace: exactly one live row per
-            user, never deleted, archived, or renamed, auto-provisioned when
+            True for the owner's Default workspace: exactly one row per
+            user, never deleted or renamed, auto-provisioned when
             missing. Organization workspaces always report false.
         created_at:
           type: string
           format: date-time
           description: RFC3339 UTC timestamp.
-        archived_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: RFC3339 UTC timestamp; null unless archived. Archived non-Default workspaces are permanently deleted 7 days after this timestamp.
     Organization:
       type: object
       required: [id, name, created_at]

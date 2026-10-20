@@ -37,7 +37,7 @@ func newPostgresWorkspaceBoardFixture(t *testing.T) (context.Context, *PostgresW
 	t.Helper()
 	db := testdb.Open(t)
 	ctx := context.Background()
-	tenancyStore := tenancypg.NewStore(db)
+	tenancyStore := tenancypg.NewStore(db, nil)
 	ws, err := tenancyStore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
 		Name:        "boards-pg",
 		OwnerUserID: postgresStoreOwner,
@@ -182,7 +182,7 @@ func TestPostgresWorkspaceBoardStoreCrossWorkspaceInvisible(t *testing.T) {
 	boardID := mustCreatePostgresBoard(t, ctx, store, ws, "Private")
 
 	db := store.db
-	tenancyStore := tenancypg.NewStore(db)
+	tenancyStore := tenancypg.NewStore(db, nil)
 	other, err := tenancyStore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
 		Name:        "boards-pg-other",
 		OwnerUserID: postgresStoreOutsider,
@@ -376,7 +376,7 @@ func TestPostgresMemberGrantPurgeParity(t *testing.T) {
 func TestPostgresWorkspaceLeaveRejoinGrantsNothing(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	tenancyStore := tenancypg.NewStore(db)
+	tenancyStore := tenancypg.NewStore(db, nil)
 	ws, err := tenancyStore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
 		Name:        "boards-pg-rejoin",
 		OwnerUserID: postgresStoreOwner,
@@ -457,7 +457,7 @@ func seedPGMediaAsset(t *testing.T, ctx context.Context, pool *pgxpool.Pool, wor
 func TestBoardMediaRefsPostgres(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	ws, err := tenancypg.NewStore(db).CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
+	ws, err := tenancypg.NewStore(db, nil).CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
 		Name:        "boards-media-refs-pg",
 		OwnerUserID: matrixCreator,
 	})
@@ -496,7 +496,7 @@ func newPostgresPreviewFixture(t *testing.T) (context.Context, *pgxpool.Pool, *P
 	t.Helper()
 	db := testdb.Open(t)
 	ctx := context.Background()
-	tenancyStore := tenancypg.NewStore(db)
+	tenancyStore := tenancypg.NewStore(db, nil)
 	ws, err := tenancyStore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
 		Name:        "boards-preview-pg",
 		OwnerUserID: postgresStoreOwner,
@@ -692,7 +692,7 @@ func TestPostgresPreviewCatalogRoleParityAndWorkspaceScope(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	other, err := tenancypg.NewStore(db).CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
+	other, err := tenancypg.NewStore(db, nil).CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
 		Name: "Foreign catalog", OwnerUserID: postgresStoreExtra,
 	})
 	if err != nil {

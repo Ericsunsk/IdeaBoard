@@ -36,8 +36,6 @@ export interface ControlWorkspace {
   name: string
   /** @nullable */
   organization_id?: string | null
-  /** @nullable */
-  archived_at?: string | null
   created_at: string
   updated_at: string
 }

@@ -1623,7 +1623,7 @@ func newV1MediaAccessPGFixture(t *testing.T) *v1MediaAccessPGFixture {
 	t.Helper()
 	db := testdb.Open(t)
 	ctx := context.Background()
-	tstore := tenancypg.NewStore(db)
+	tstore := tenancypg.NewStore(db, nil)
 	dir := newStaticUserDirectory()
 	const owner, member, other = 1, 10, 8
 	for _, id := range []int64{owner, member, other} {

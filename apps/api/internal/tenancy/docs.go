@@ -9,20 +9,19 @@
 // implementation must use the dbWithContext(ctx) pattern.
 //
 // Personal workspace rule (agreed): organization_id IS NULL marks personal
-// scope. Every user additionally owns exactly one live Default personal
-// workspace (is_default): it is never deleted, archived, or renamed,
+// scope. Every user additionally owns exactly one Default personal
+// workspace (is_default): it is never deleted or renamed,
 // and is auto-provisioned when missing (EnsureDefaultWorkspace, concurrent-
 // safe via ux_workspaces_default_owner). Plain personal workspaces are
 // unlimited. Provisioning is idempotent (INSERT ... ON CONFLICT DO NOTHING
 // in postgres) and the in-memory fallback is mutex-guarded so concurrent
 // provision converges to a single Default workspace.
 //
-// Archive is a soft delete (workspaces.archived_at). Non-Default workspaces
-// archived longer ago than the configured window (default 7 days,
-// config.DefaultWorkspacePurgeAfterDays) are hard-deleted with their boards
-// and files by the daily workspace purge
-// (internal/tenancy/application/purge, scheduled with the retention
-// worker); billing records, the credit ledger, and user rows are retained.
+// Deletion is an immediate irreversible hard delete (DeleteWorkspace):
+// the workspace row leaves with its boards and files in one operation.
+// Billing records, the credit ledger, user rows and control audit records
+// are retained. There is no archive/restore lifecycle and no background
+// purge.
 //
 // The in-memory store (memory.go) stays at the top level next to the Store
 // interface as its test-only double; it must never be wired in production.

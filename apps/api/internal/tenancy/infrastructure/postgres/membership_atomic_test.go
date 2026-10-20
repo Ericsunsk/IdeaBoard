@@ -14,7 +14,7 @@ func TestWorkspaceOwnerMutationsKeepOneOwnerPostgres(t *testing.T) {
 	for _, mutation := range []string{"demote", "remove"} {
 		t.Run(mutation, func(t *testing.T) {
 			db := newTenancyTestDB(t)
-			store := NewStore(db)
+			store := NewStore(db, nil)
 			ctx := context.Background()
 			owners := []int64{createTenancyTestUser(t, db), createTenancyTestUser(t, db)}
 			workspace, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "owners", OwnerUserID: owners[0]})
@@ -73,7 +73,7 @@ func TestWorkspaceMemberMutationsRollBackWithAmbientTransaction(t *testing.T) {
 	for _, mutation := range []string{"role", "remove"} {
 		t.Run(mutation, func(t *testing.T) {
 			db := newTenancyTestDB(t)
-			store := NewStore(db)
+			store := NewStore(db, nil)
 			ctx := context.Background()
 			ownerID, memberID := createTenancyTestUser(t, db), createTenancyTestUser(t, db)
 			workspace, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "rollback", OwnerUserID: ownerID})

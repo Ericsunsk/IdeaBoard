@@ -70,7 +70,4 @@ export default {
     activeBanner: 'Vista previa de suplantación activa',
     exit: 'Salir de la suplantación',
   },
-  locale: {
-    selectLanguage: 'Seleccionar idioma',
-  },
 } as const

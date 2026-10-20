@@ -128,8 +128,8 @@ function releaseLeavingAvatar(element: Element) {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: calc(var(--spacing) * 2);
-  height: calc(var(--spacing) * 2);
+  width: var(--primitive-size-10);
+  height: var(--primitive-size-10);
   border: 2px solid var(--color-page-chrome-bg);
   border-radius: var(--radius-pill);
   background: var(--success);

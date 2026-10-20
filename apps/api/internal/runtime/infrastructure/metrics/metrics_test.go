@@ -157,10 +157,10 @@ func TestNewSetReusesAlreadyRegisteredCollectors(t *testing.T) {
 func TestMultiRefresherPublishesEveryQueue(t *testing.T) {
 	set := NewSet(prometheus.NewRegistry())
 	stats := map[string]RiverQueueStats{
-		"drawing_default": func(context.Context) (int64, float64, error) { return 3, 1.5, nil },
-		"task_retention":  func(context.Context) (int64, float64, error) { return 0, 0, nil },
-		"":                func(context.Context) (int64, float64, error) { return 99, 99, nil },
-		"dropped":         nil,
+		"drawing_default":       func(context.Context) (int64, float64, error) { return 3, 1.5, nil },
+		"credit_reconciliation": func(context.Context) (int64, float64, error) { return 0, 0, nil },
+		"":                      func(context.Context) (int64, float64, error) { return 99, 99, nil },
+		"dropped":               nil,
 	}
 	refresher := NewMultiRefresher(set, stats, 0)
 	names := refresher.Queues()
@@ -181,8 +181,8 @@ func TestMultiRefresherPublishesEveryQueue(t *testing.T) {
 	if got := testutil.ToFloat64(set.riverQueueLag.WithLabelValues("drawing_default")); got != 1.5 {
 		t.Fatalf("drawing lag = %v, want 1.5", got)
 	}
-	if got := testutil.ToFloat64(set.riverQueueDepth.WithLabelValues("task_retention")); got != 0 {
-		t.Fatalf("retention depth = %v, want 0", got)
+	if got := testutil.ToFloat64(set.riverQueueDepth.WithLabelValues("credit_reconciliation")); got != 0 {
+		t.Fatalf("credit reconciliation depth = %v, want 0", got)
 	}
 }
 

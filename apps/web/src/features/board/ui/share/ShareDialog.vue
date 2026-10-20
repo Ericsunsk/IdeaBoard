@@ -29,16 +29,12 @@
               <Spinner :class="shareDialogClasses.spinner" />
             </div>
 
-            <div
+            <LoadErrorPanel
               v-else-if="dialog.openError.value"
-              :class="shareDialogClasses.errorBox"
-              aria-live="polite"
-            >
-              <p>{{ t('board.shareDialog.membersUnavailable') }}</p>
-              <Button type="button" size="sm" @click="dialog.retryOpen()">
-                {{ t('board.shareDialog.retry') }}
-              </Button>
-            </div>
+              :message="t('board.shareDialog.membersUnavailable')"
+              :retry-label="t('board.shareDialog.retry')"
+              @retry="dialog.retryOpen()"
+            />
 
             <template v-else-if="dialog.facts.value">
               <template v-if="dialog.canManage.value">
@@ -99,16 +95,12 @@
                   </div>
                 </section>
 
-                <div
+                <LoadErrorPanel
                   v-if="dialog.hasMembersError.value"
-                  :class="shareDialogClasses.errorBox"
-                  aria-live="polite"
-                >
-                  <p>{{ t('board.shareDialog.membersUnavailable') }}</p>
-                  <Button type="button" size="sm" @click="dialog.retryQueries()">
-                    {{ t('board.shareDialog.retry') }}
-                  </Button>
-                </div>
+                  :message="t('board.shareDialog.membersUnavailable')"
+                  :retry-label="t('board.shareDialog.retry')"
+                  @retry="dialog.retryQueries()"
+                />
 
                 <template v-else>
                   <section
@@ -124,69 +116,69 @@
                       role="group"
                       :aria-label="t('board.shareDialog.members')"
                     >
-                      <template v-for="row in dialog.memberRows.value" :key="row.userId">
-                        <button
-                          type="button"
-                          :class="[
-                            shareDialogClasses.avatarButton,
-                            row.isCreator && 'cursor-default',
-                          ]"
-                          :aria-pressed="row.isCreator || row.isSelected ? 'true' : 'false'"
-                          :aria-label="memberAriaLabel(row)"
-                          :title="memberTitle(row)"
-                          :disabled="row.isCreator || !isAccessOn || dialog.isBusy.value"
-                          @mouseenter="hoveredUserId = row.userId"
-                          @mouseleave="hoveredUserId = null"
-                          @focus="hoveredUserId = row.userId"
-                          @blur="hoveredUserId = null"
-                          @click="dialog.toggleMember(row.userId)"
-                        >
-                          <div class="relative flex items-center justify-center">
-                            <Avatar
-                              :class="[
-                                'size-10 transition-[transform,box-shadow,opacity,filter] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]',
-                                row.isCreator || row.isSelected
-                                  ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
-                                  : 'border border-border opacity-40 grayscale hover:opacity-80 hover:grayscale-0',
-                              ]"
-                            >
-                              <AvatarImage
-                                v-if="resolveMemberAvatar(row, userStore.user)"
-                                :src="resolveMemberAvatar(row, userStore.user)!"
-                                :alt="memberDisplayName(row)"
-                              />
-                              <AvatarFallback class="text-xs font-semibold uppercase">
-                                {{ memberInitial(row) }}
-                              </AvatarFallback>
-                            </Avatar>
+                      <component
+                        :is="row.isCreator ? 'span' : 'button'"
+                        v-for="row in dialog.memberRows.value"
+                        :key="row.userId"
+                        :type="row.isCreator ? undefined : 'button'"
+                        :class="[
+                          shareDialogClasses.avatarButton,
+                          row.isCreator && 'cursor-default',
+                        ]"
+                        :aria-pressed="row.isCreator || row.isSelected ? 'true' : 'false'"
+                        :aria-label="memberAriaLabel(row)"
+                        :title="memberTitle(row)"
+                        :disabled="row.isCreator ? undefined : !isAccessOn || dialog.isBusy.value"
+                        @mouseenter="!row.isCreator && (hoveredUserId = row.userId)"
+                        @mouseleave="!row.isCreator && (hoveredUserId = null)"
+                        @focus="!row.isCreator && (hoveredUserId = row.userId)"
+                        @blur="!row.isCreator && (hoveredUserId = null)"
+                        @click="!row.isCreator && dialog.toggleMember(row.userId)"
+                      >
+                        <div class="relative flex items-center justify-center">
+                          <Avatar
+                            :class="[
+                              'size-10 transition-[transform,box-shadow,opacity,filter] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]',
+                              row.isCreator || row.isSelected
+                                ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                                : 'border border-border opacity-40 grayscale hover:opacity-80 hover:grayscale-0',
+                            ]"
+                          >
+                            <AvatarImage
+                              v-if="resolveMemberAvatar(row, userStore.user)"
+                              :src="resolveMemberAvatar(row, userStore.user)!"
+                              :alt="memberDisplayName(row)"
+                            />
+                            <AvatarFallback class="text-xs font-semibold uppercase">
+                              {{ resolveMemberInitial(row) }}
+                            </AvatarFallback>
+                          </Avatar>
 
-                            <span
-                              v-if="row.isCreator"
-                              :class="shareDialogClasses.avatarCreatorBadge"
-                              :title="t('board.shareDialog.creator')"
-                              aria-hidden="true"
-                            >
-                              ★
-                            </span>
+                          <span
+                            v-if="row.isCreator"
+                            :class="shareDialogClasses.avatarCreatorBadge"
+                            :title="t('board.shareDialog.creator')"
+                            aria-hidden="true"
+                          >
+                            ★
+                          </span>
+                          <span
+                            v-else-if="row.isSelected"
+                            :class="shareDialogClasses.avatarGrantedBadge"
+                            aria-hidden="true"
+                          >
+                            <Check class="size-2.5 stroke-[3]" />
+                          </span>
 
-                            <span
-                              v-else-if="row.isSelected"
-                              :class="shareDialogClasses.avatarGrantedBadge"
-                              aria-hidden="true"
-                            >
-                              <Check class="size-2.5 stroke-[3]" />
-                            </span>
-
-                            <span
-                              v-if="dialog.isBusy.value"
-                              class="absolute inset-0 flex items-center justify-center rounded-pill bg-background/60"
-                              aria-hidden="true"
-                            >
-                              <Spinner class="size-4 text-primary" />
-                            </span>
-                          </div>
-                        </button>
-                      </template>
+                          <span
+                            v-if="dialog.isBusy.value"
+                            class="absolute inset-0 flex items-center justify-center rounded-pill bg-background/60"
+                            aria-hidden="true"
+                          >
+                            <Spinner class="size-4 text-primary" />
+                          </span>
+                        </div>
+                      </component>
                     </div>
 
                     <p :class="shareDialogClasses.emptyNote" aria-live="polite">
@@ -240,7 +232,8 @@ import type { ShareMemberRow } from '../../session/share/useShareRoster'
 import { useShareDialog, type ShareDialogDeps } from '../../session/share/useShareDialog'
 import { useUserStore } from '../../../auth'
 import type { SharePanel } from '../../session/share/useSharePanel'
-import { resolveMemberAvatar } from '../../../../core/media/avatarUrl'
+import { resolveMemberAvatar, resolveMemberInitial } from '../../../../core/media/avatarUrl'
+import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
 import { shareDialogClasses, shareDialogContentClass } from './skin'
 
 const props = defineProps<{
@@ -354,13 +347,6 @@ const activeMemberHint = computed(() => {
 
 function memberDisplayName(row: ShareMemberRow): string {
   return row.email || row.userId
-}
-
-function memberInitial(row: ShareMemberRow): string {
-  if (row.email) {
-    return row.email.charAt(0).toUpperCase()
-  }
-  return row.userId.replace(/^usr_/, '').charAt(0).toUpperCase() || 'U'
 }
 
 function memberTitle(row: ShareMemberRow): string {

@@ -275,8 +275,7 @@
         :on-retry="handleWorkspaceDialogRetry"
         :on-create="handleWorkspaceCreate"
         :on-rename="handleWorkspaceRename"
-        :on-archive="handleWorkspaceArchive"
-        :on-select="props.workspace?.onSelect"
+        :on-delete="handleWorkspaceDelete"
         @update:is-open="isWorkspaceSettingsOpen = $event"
       />
     </template>
@@ -317,7 +316,7 @@ import type { SupportChannel } from '../../../../core/composables/useSupportChan
 import SupportChannelQr from './SupportChannelQr.vue'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
 import WorkspaceSettingsDialog from './WorkspaceSettingsDialog.vue'
-import { isDefaultWorkspaceItem, visibleWorkspaceItems } from './workspaceMenu'
+import { isDefaultWorkspaceItem } from './workspaceMenu'
 import type {
   UserAccountMenuItem,
   UserAccountMenuWorkspace,
@@ -422,7 +421,7 @@ const isGuest = computed(() => Boolean(loginItem.value && registerItem.value))
 const WORKSPACE_NAME_MAX_LENGTH_FALLBACK = 120
 
 const isWorkspaceRowVisible = computed(() => !isGuest.value && props.workspace != null)
-const visibleWorkspaces = computed(() => visibleWorkspaceItems(props.workspace?.items ?? []))
+const visibleWorkspaces = computed(() => props.workspace?.items ?? [])
 const isWorkspaceLoading = computed(() => props.workspace?.status === 'loading')
 const workspaceLoadError = computed(() =>
   props.workspace?.status === 'error'
@@ -474,8 +473,8 @@ function requireWorkspace(): UserAccountMenuWorkspace {
 }
 
 async function handleWorkspaceCreate(name: string) {
-  // The header switches to the new workspace gallery on success; the dialog
-  // closes itself, and the dropdown is already closed.
+  // Creation preserves the current route and workspace scope; the settings
+  // dialog stays open and focuses its new row (with Members) locally.
   return requireWorkspace().onCreate(name)
 }
 
@@ -483,8 +482,8 @@ async function handleWorkspaceRename(workspaceId: string, name: string) {
   return requireWorkspace().onRename(workspaceId, name)
 }
 
-async function handleWorkspaceArchive(workspaceId: string) {
-  return requireWorkspace().onArchive(workspaceId)
+async function handleWorkspaceDelete(workspaceId: string) {
+  return requireWorkspace().onDelete(workspaceId)
 }
 
 function keepSupportQrFocus(event: Event) {

@@ -34,6 +34,21 @@
 
 轮换后执行 smoke 检查，确认登录、任务提交、结果回写、上传与媒体读取（v1 media-assets content/derivatives、public avatar/logo route）正常。
 
+## Workspace 删除与误删政策（ADR-0023）
+
+工作区删除是立即硬删，无恢复期：删除确认后，该 workspace 连同 boards、tasks、library、media、uploads、memberships、events/subscriptions 与 outbox 行一次性删除，存储对象在行提交后 best-effort 清理。红线永不删除：`credit_*`、task billing snapshots/settlements、users、payments、rewards、`credit_wallets`、statistics aggregates；billing records 作为对账与法务事实保留。Default workspace 永不删除。
+
+误删=不可恢复：
+
+- 不提供单 workspace 粒度的恢复路径；support/ops 不得承诺找回。
+- 唯一兜底是整库 restore：按 [deployment.md](./deployment.md) 的受控 restore 流程执行（隔离环境校验 checksum → 解密 → `pg_restore --list`/`tar -tzf` → 确认目标库可覆盖 → 恢复 → smoke → 按影响范围密钥轮换），且必须同时评估 uploads backup 与 migration 影响。
+- 整库 restore 是 whole-database 操作，不为单 workspace 执行：它会把全库回滚到 backup 时点，代价远超单个工作区的数据价值；除非整库级灾难，不启动该流程。
+- backup 仍按本手册 secret artifact 要求处理（加密落盘、最小范围访问、事后清理临时副本）。
+
+工单话术（workspace 误删）：
+
+> 经确认，您删除的工作区（含其中 boards、任务、素材与文件）已彻底删除，无法恢复。工作区删除是立即硬删，删除前有二次确认，确认后即不可撤销；我们不提供单个工作区粒度的恢复，整库回滚只用于整库级灾难，不会为单个工作区执行。账单与用量记录不受影响，可在账单/用量页面查看。如需继续使用，请新建工作区重新开始。
+
 ## Outbound Webhook Signing Secret 轮换
 
 `event_subscriptions.signing_secret` 以 `APP_SECRETS_ENCRYPTION_KEY` 信封加密落盘

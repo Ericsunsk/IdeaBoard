@@ -70,7 +70,4 @@ export default {
     activeBanner: '模拟身份预览中',
     exit: '退出模拟身份',
   },
-  locale: {
-    selectLanguage: '选择语言',
-  },
 } as const

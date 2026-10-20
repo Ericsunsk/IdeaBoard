@@ -8,7 +8,7 @@ import type { UserAccountMenuWorkspace } from '../../account/ui/chrome/userAccou
 import { USER_BOARDS_PATH } from '../routePaths'
 import {
   WORKSPACE_NAME_MAX_LENGTH,
-  archiveWorkspace,
+  deleteWorkspace,
   renameWorkspace,
   workspaceQueryKeys,
   type WorkspaceSummary,
@@ -42,8 +42,10 @@ function toMenuStatus(status: WorkspaceSelectionStatus): UserAccountMenuWorkspac
 // Owns the gallery landing after a switch: `selectWorkspace` persists the
 // choice and rewrites the current URL, then this layer routes to
 // `/user/boards` with the new workspace param and no stale `boardId`.
-// Creation provisions (Idempotency-Key deduped in the store) and lands on
-// the new gallery; rename writes through PATCH and only refreshes the list.
+// Creation provisions (Idempotency-Key deduped in the store), refreshes the
+// list without changing workspace scope. The settings dialog owns its local
+// new-row focus, so the current canvas keeps its workspace/board pairing.
+// Rename writes through PATCH and only refreshes the list.
 export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => Promise<boolean> }) {
   const userStore = useUserStore()
   const route = useRoute()
@@ -77,14 +79,9 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     await queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.list })
   }
 
-  async function createAndSwitchWorkspace(name: string): Promise<WorkspaceSummary> {
-    // Provision selects the new workspace in the shared store immediately.
-    if ((await options?.beforeWorkspaceChange?.()) === false) {
-      throw new Error('Workspace change cancelled: current draft was not saved')
-    }
+  async function createWorkspaceItem(name: string): Promise<WorkspaceSummary> {
     const created = await selection.provisionWorkspace({ name })
     await refreshWorkspaceList()
-    landOnGalleryWorkspace(created.publicId)
     return created
   }
 
@@ -104,20 +101,19 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     return updated
   }
 
-  // Reuse the selection seam's fallback after archiving the selected workspace.
-  async function archiveWorkspaceItem(workspaceId: string): Promise<WorkspaceSummary> {
+  // Reuse the selection seam's fallback after deleting the selected workspace.
+  async function deleteWorkspaceItem(workspaceId: string): Promise<void> {
     const isSelectedWorkspace = selection.selectedId.value === workspaceId
     if (isSelectedWorkspace && (await options?.beforeWorkspaceChange?.()) === false) {
       throw new Error('Workspace change cancelled: current draft was not saved')
     }
-    const archived = await archiveWorkspace(workspaceId)
-    // Refresh can already resolve the selection to Default while the URL still names the archived row.
+    await deleteWorkspace(workspaceId)
+    // Refresh can already resolve the selection to Default while the URL still names the deleted row.
     await refreshWorkspaceList()
     if (isSelectedWorkspace) {
       const fallbackId = selection.selectedId.value
       if (fallbackId) landOnGalleryWorkspace(fallbackId)
     }
-    return archived
   }
 
   const menuProps = computed<UserAccountMenuWorkspace>(() => {
@@ -134,9 +130,9 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
       nameMaxLength: WORKSPACE_NAME_MAX_LENGTH,
       currentUserId: userStore.user?.public_id ?? null,
       onSelect: switchToGalleryWorkspace,
-      onCreate: createAndSwitchWorkspace,
+      onCreate: createWorkspaceItem,
       onRename: renameWorkspaceItem,
-      onArchive: archiveWorkspaceItem,
+      onDelete: deleteWorkspaceItem,
       onRetry: () => {
         void selection.refetch()
       },
@@ -146,8 +142,8 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
   return {
     menuProps,
     switchToGalleryWorkspace,
-    createAndSwitchWorkspace,
+    createWorkspaceItem,
     renameWorkspaceItem,
-    archiveWorkspaceItem,
+    deleteWorkspaceItem,
   }
 }

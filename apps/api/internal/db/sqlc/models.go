@@ -1101,7 +1101,6 @@ type Workspace struct {
 	IsDefault      bool               `json:"is_default"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	ArchivedAt     pgtype.Timestamptz `json:"archived_at"`
 }
 
 type WorkspaceEvent struct {

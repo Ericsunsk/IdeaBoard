@@ -30,6 +30,7 @@ import type {
   BadRequestResponse,
   ConflictResponse,
   CreateWorkspaceRequest,
+  DeletedEnvelope,
   ForbiddenResponse,
   ListWorkspacesParams,
   NotFoundResponse,
@@ -449,44 +450,49 @@ export const useUpdateWorkspace = <
 > => {
   return useMutation(getUpdateWorkspaceMutationOptions(options), queryClient)
 }
-export const getArchiveWorkspaceUrl = (workspaceId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/archive`
+export const getDeleteWorkspaceUrl = (workspaceId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}`
 }
 
 /**
- * Archives the workspace. No Idempotency-Key is required. The Default workspace is never archived: attempts render 403 workspace_default_protected. Archived non-Default workspaces are permanently deleted 7 days after archiving, including boards and files; billing records are retained.
- * @summary Archive a workspace (owner/admin only)
+ * Hard-deletes the workspace with its boards and files; there is no recovery window and no restore path. Requires the Idempotency-Key header. Reusing a key with a different request renders 409 workspace_idempotency_conflict. The Default workspace is never deleted: attempts render 403 workspace_default_protected. Billing records, the credit ledger, user rows and control audit records are retained.
+ * @summary Delete a workspace immediately and irreversibly (owner/admin only)
  */
-export const archiveWorkspace = async (
+export const deleteWorkspace = async (
   workspaceId: string,
   options?: Parameters<typeof publicMutator>[1],
-): Promise<WorkspaceEnvelope> => {
-  return publicMutator<WorkspaceEnvelope>(getArchiveWorkspaceUrl(workspaceId), {
+): Promise<DeletedEnvelope> => {
+  return publicMutator<DeletedEnvelope>(getDeleteWorkspaceUrl(workspaceId), {
     ...options,
-    method: 'POST',
+    method: 'DELETE',
   })
 }
 
-export const getArchiveWorkspaceMutationKey = () => ['archiveWorkspace'] as const
+export const getDeleteWorkspaceMutationKey = () => ['deleteWorkspace'] as const
 
-export const getArchiveWorkspaceMutationOptions = <
-  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
+export const getDeleteWorkspaceMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof archiveWorkspace>>,
+    Awaited<ReturnType<typeof deleteWorkspace>>,
     TError,
-    ArchiveWorkspaceMutationVariables,
+    DeleteWorkspaceMutationVariables,
     TContext
   >
   request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof archiveWorkspace>>,
+  Awaited<ReturnType<typeof deleteWorkspace>>,
   TError,
-  ArchiveWorkspaceMutationVariables,
+  DeleteWorkspaceMutationVariables,
   TContext
 > => {
-  const mutationKey = getArchiveWorkspaceMutationKey()
+  const mutationKey = getDeleteWorkspaceMutationKey()
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
       ? options
@@ -494,47 +500,54 @@ export const getArchiveWorkspaceMutationOptions = <
     : { mutation: { mutationKey }, request: undefined }
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof archiveWorkspace>>,
-    ArchiveWorkspaceMutationVariables
+    Awaited<ReturnType<typeof deleteWorkspace>>,
+    DeleteWorkspaceMutationVariables
   > = (props) => {
     const { workspaceId } = props ?? {}
 
-    return archiveWorkspace(workspaceId, requestOptions)
+    return deleteWorkspace(workspaceId, requestOptions)
   }
 
   return { mutationFn, ...mutationOptions }
 }
 
-export type ArchiveWorkspaceMutationResult = NonNullable<
-  Awaited<ReturnType<typeof archiveWorkspace>>
->
+export type DeleteWorkspaceMutationResult = NonNullable<Awaited<ReturnType<typeof deleteWorkspace>>>
 
-export type ArchiveWorkspaceMutationError =
-  UnauthorizedResponse | ForbiddenResponse | NotFoundResponse
-export type ArchiveWorkspaceMutationVariables = { workspaceId: string }
+export type DeleteWorkspaceMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | NotFoundResponse
+  | ConflictResponse
+export type DeleteWorkspaceMutationVariables = { workspaceId: string }
 
 /**
- * @summary Archive a workspace (owner/admin only)
+ * @summary Delete a workspace immediately and irreversibly (owner/admin only)
  */
-export const useArchiveWorkspace = <
-  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
+export const useDeleteWorkspace = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ConflictResponse,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof archiveWorkspace>>,
+      Awaited<ReturnType<typeof deleteWorkspace>>,
       TError,
-      ArchiveWorkspaceMutationVariables,
+      DeleteWorkspaceMutationVariables,
       TContext
     >
     request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
-  Awaited<ReturnType<typeof archiveWorkspace>>,
+  Awaited<ReturnType<typeof deleteWorkspace>>,
   TError,
-  ArchiveWorkspaceMutationVariables,
+  DeleteWorkspaceMutationVariables,
   TContext
 > => {
-  return useMutation(getArchiveWorkspaceMutationOptions(options), queryClient)
+  return useMutation(getDeleteWorkspaceMutationOptions(options), queryClient)
 }

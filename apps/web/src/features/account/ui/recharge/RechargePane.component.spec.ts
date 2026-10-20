@@ -1,6 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
+import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import type { PaymentReturnContext } from '../../core/return'
 import {
   paymentsContextKey,
@@ -19,6 +20,8 @@ vi.mock('../../session/accountWorkspace', async (importOriginal) => ({
     isSelectionSettled: ref(true),
   }),
 }))
+
+vi.mock('../../../../core/composables/useAppToast')
 
 const purchaseOptions = {
   purchases_available: true,
@@ -81,7 +84,12 @@ function renderPane(
 }
 
 describe('RechargePane', () => {
-  beforeEach(() => vi.clearAllMocks())
+  let toast: AppToastMocks
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    toast = mockAppToast()
+  })
 
   it('renders the canonical quick packages with exact two-decimal USD prices', async () => {
     renderPane()
@@ -447,8 +455,41 @@ describe('RechargePane', () => {
     expect(await within(pendingOrder).findByRole('alert')).toHaveTextContent(
       'Network error. Please try again.',
     )
+    // Dual: inline alert stays as position anchor, toast mirrors it transiently.
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Could not continue this payment.'),
+    )
     await user.click(within(pendingOrder).getByRole('button', { name: 'Retry continue payment' }))
     await waitFor(() => expect(continuePendingOrder).toHaveBeenCalledTimes(2))
+  })
+
+  it('mirrors abandon-order failures in a toast while keeping the inline retry', async () => {
+    const abandonPendingOrder = vi.fn().mockRejectedValueOnce(new Error('abandon failed'))
+    const { user } = renderPane({
+      resource: makeResource({
+        abandonPendingOrder,
+        listPendingOrders: vi.fn().mockResolvedValue({
+          items: [
+            {
+              public_token: 'open-order',
+              idea_quantity: 1000,
+              status: 'checkout_open',
+              expires_at: '2026-08-01T01:00:00Z',
+              updated_at: '2026-08-01T00:00:00Z',
+            },
+          ],
+        }),
+      }),
+    })
+
+    const pendingOrder = await screen.findByTestId('pending-payment-order-open-order')
+    await user.click(within(pendingOrder).getByRole('button', { name: 'Abandon order' }))
+    expect(await within(pendingOrder).findByRole('alert')).toHaveTextContent(
+      'Network error. Please try again.',
+    )
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Could not abandon this order.'),
+    )
   })
 
   it('shows the backend-owned processing result after a Checkout return', async () => {
@@ -711,6 +752,10 @@ describe('RechargePane', () => {
     await user.click(await screen.findByRole('button', { name: 'Pay now' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Network error. Please try again.')
+    // Dual: PurchaseCard inline alert stays as position anchor, toast mirrors it.
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Could not open the payment page.'),
+    )
     expect(screen.getByRole('button', { name: 'Pay now' })).toBeEnabled()
     expect(navigate).not.toHaveBeenCalled()
   })

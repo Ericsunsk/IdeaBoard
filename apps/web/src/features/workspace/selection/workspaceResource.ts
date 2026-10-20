@@ -22,8 +22,8 @@
 // domain types exported here.
 
 import {
-  archiveWorkspace as archiveWorkspaceTransport,
   createWorkspace,
+  deleteWorkspace as deleteWorkspaceTransport,
   getListWorkspacesQueryKey,
   listWorkspaces,
   updateWorkspace,
@@ -37,7 +37,10 @@ import {
   opaqueIdPrefix,
   requireContractData,
 } from '../../../api/contractKernel'
-import { workspaceCreationIdempotencyKey } from '../../../api/idempotencyKey'
+import {
+  workspaceCreationIdempotencyKey,
+  workspaceDeletionIdempotencyKey,
+} from '../../../api/idempotencyKey'
 import { normalizePageSize, PAGE_SIZES } from '../../../core/config/pagination'
 import type { AuthFailureMode } from '../../../api/client'
 import { withSignal } from '../../../core/utils/request'
@@ -49,9 +52,8 @@ export type WorkspaceSummary = {
   publicId: string
   name: string
   organizationId: string | null
-  // Default workspaces cannot be deleted, archived, or renamed.
+  // Default workspaces cannot be deleted or renamed.
   isDefault: boolean
-  archivedAt: string | null
   createdAt?: string | undefined
 }
 
@@ -99,14 +101,12 @@ export function parseWorkspaceItem(raw: unknown): WorkspaceSummary {
   // until the backend slice lands (agreed shape always has `name`).
   const name = typeof raw.name === 'string' ? raw.name : ''
   const organizationId = optionalOpaqueId(raw.organization_id, 'org', 'organization')
-  const archivedAt = typeof raw.archived_at === 'string' ? raw.archived_at : null
   const createdAt = typeof raw.created_at === 'string' ? raw.created_at : undefined
   return {
     publicId,
     name,
     organizationId,
     isDefault: raw.is_default === true,
-    archivedAt,
     ...(createdAt === undefined ? {} : { createdAt }),
   }
 }
@@ -305,23 +305,33 @@ export async function renameWorkspace(
   return parseWorkspaceItem(data)
 }
 
-// Explicit POST archive (owner/admin only server-side). No Idempotency-Key:
-// the transition is single-shot and repeat archives converge server-side.
-// The Default workspace renders 403 workspace_default_protected.
-export async function archiveWorkspace(
+// Explicit DELETE (owner/admin only server-side, never the Default row:
+// it renders 403 workspace_default_protected). The backend fails closed
+// without an `Idempotency-Key`, so every attempt mints one unless the
+// caller reuses a key for a retry of the same attempt. Resolves once the
+// server confirms `{ data: { deleted: true } }`; there is no recovery
+// window and no restore path.
+export async function deleteWorkspace(
   workspaceId: string,
-  options?: WorkspaceRequestOptions,
-): Promise<WorkspaceSummary> {
+  options?: WorkspaceRequestOptions & { idempotencyKey?: string | undefined },
+): Promise<void> {
   const targetId = requireOpaqueId(workspaceId, 'ws', 'workspace')
-  const response = await archiveWorkspaceTransport(targetId, toRequestConfig(options))
-  const data = requireContractData<unknown>(response, 'Workspace archive failed')
-  return parseWorkspaceItem(data)
+  const response = await deleteWorkspaceTransport(targetId, {
+    ...withSignal(options?.signal),
+    headers: buildContractRequestHeaders({
+      requestId: asTrimmedString(options?.requestId) ?? newRequestId(),
+      idempotencyKey: asTrimmedString(options?.idempotencyKey) ?? workspaceDeletionIdempotencyKey(),
+    }),
+    ...(options?.authFailure == null ? {} : { authFailure: options.authFailure }),
+  })
+  const data = requireContractData<unknown>(response, 'Workspace deletion failed')
+  if (!isRecord(data) || data.deleted !== true) throw new Error('Workspace deletion failed')
 }
 
 // Canonical agreed-contract URLs, centralized on runtimeUrls. Transport still
 // flows through the generated client above (never direct fetch); these URLs
-// are the reference for deep-link building and for the endpoints the backend
-// slice is adding (detail/archive/organizations are not in the stubs yet).
+// are the reference for deep-link building. Deletes ride `workspaceDetail`
+// (`DELETE` on the workspace path): the old archive sub-path is gone.
 function withCursorQuery(
   base: string,
   params?: { cursor?: string | null | undefined; pageSize?: number | undefined },
@@ -342,8 +352,6 @@ export const workspaceApiUrls = {
   }): string => withCursorQuery(resolveApiUrl('/api/v1/workspaces'), params),
   workspaceDetail: (workspaceId: string): string =>
     resolveApiUrl(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}`),
-  archiveWorkspace: (workspaceId: string): string =>
-    resolveApiUrl(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/archive`),
   organizations: (): string => resolveApiUrl('/api/v1/organizations'),
   organizationDetail: (organizationId: string): string =>
     resolveApiUrl(`/api/v1/organizations/${encodeURIComponent(organizationId)}`),

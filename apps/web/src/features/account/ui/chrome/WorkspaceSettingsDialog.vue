@@ -41,20 +41,21 @@
               :aria-label="t('workspace.switcher.listLabel')"
             >
               <Button
-                v-for="item in visibleItems"
+                v-for="item in workspaceItems"
                 :key="item.publicId"
                 type="button"
                 variant="ghost"
                 :class="accountNavTabClass(item.publicId === activeWorkspaceId)"
                 :aria-current="item.publicId === activeWorkspaceId ? 'page' : undefined"
                 :title="workspaceItemName(item)"
+                :data-workspace-nav="item.publicId"
                 @click="selectWorkspace(item)"
               >
                 <span class="truncate">{{ workspaceItemName(item) }}</span>
               </Button>
 
               <p
-                v-if="visibleItems.length === 0"
+                v-if="workspaceItems.length === 0"
                 class="px-2 py-4 text-xs text-muted-foreground"
                 aria-live="polite"
               >
@@ -69,24 +70,11 @@
                 variant="default"
                 size="sm"
                 class="w-full h-9 justify-center gap-1.5"
-                :is-loading="isCreating"
-                :is-disabled="isCreating"
-                @click="submitCreate"
+                @click="openCreateDialog"
               >
-                <Plus v-if="!isCreating" class="size-3.5" aria-hidden="true" />
-                <span>{{
-                  isCreating
-                    ? t('workspace.switcher.creating')
-                    : t('workspace.switcher.createAction')
-                }}</span>
+                <Plus class="size-3.5" aria-hidden="true" />
+                <span>{{ t('workspace.switcher.createAction') }}</span>
               </Button>
-              <p
-                v-if="createError"
-                class="m-0 text-xs leading-normal text-destructive"
-                role="alert"
-              >
-                {{ createError }}
-              </p>
             </div>
           </aside>
 
@@ -178,17 +166,15 @@
                         {{ workspaceItemName(activeWorkspace) }}
                       </h2>
                       <Button
+                        v-if="!isDefaultWorkspaceItem(activeWorkspace)"
                         type="button"
                         variant="ghost"
                         size="icon"
                         class="size-7 text-muted-foreground hover:text-foreground"
-                        :is-disabled="isDefaultWorkspaceItem(activeWorkspace)"
                         :title="
-                          isDefaultWorkspaceItem(activeWorkspace)
-                            ? t('workspace.switcher.renameDefaultNote')
-                            : t('workspace.switcher.renameAriaLabel', {
-                                name: workspaceItemName(activeWorkspace),
-                              })
+                          t('workspace.switcher.renameAriaLabel', {
+                            name: workspaceItemName(activeWorkspace),
+                          })
                         "
                         :aria-label="
                           t('workspace.switcher.renameAriaLabel', {
@@ -203,12 +189,6 @@
                     <p class="m-0 mt-1 text-xs text-muted-foreground font-mono">
                       ID: {{ activeWorkspace.publicId }}
                     </p>
-                    <p
-                      v-if="isDefaultWorkspaceItem(activeWorkspace)"
-                      class="m-0 mt-0.5 text-xs text-muted-foreground"
-                    >
-                      {{ t('workspace.switcher.renameDefaultNote') }}
-                    </p>
                   </div>
                 </div>
               </header>
@@ -222,9 +202,9 @@
                 :is-expanded="true"
               />
 
-              <!-- Archive row: the Default workspace is never archived, so its
-                button stays disabled with the protected note. -->
+              <!-- Delete row: hidden for the Default workspace (never deleted). -->
               <section
+                v-if="!isDefaultWorkspaceItem(activeWorkspace)"
                 class="flex flex-col gap-2 rounded-control border border-border p-3"
                 :aria-label="t('workspace.switcher.archiveSectionLabel')"
               >
@@ -234,72 +214,27 @@
                       {{ t('workspace.switcher.archiveTitle') }}
                     </p>
                     <p class="m-0 mt-0.5 text-xs text-muted-foreground">
-                      {{
-                        isDefaultWorkspaceItem(activeWorkspace)
-                          ? t('workspace.switcher.archiveDefaultNote')
-                          : t('workspace.switcher.archiveHint')
-                      }}
+                      {{ t('workspace.switcher.archiveHint') }}
                     </p>
                   </div>
                   <Button
-                    v-if="!confirmingArchiveId"
                     type="button"
                     variant="destructive"
                     size="sm"
                     class="h-9 shrink-0"
-                    :is-disabled="isDefaultWorkspaceItem(activeWorkspace) || isArchiving"
-                    :title="
-                      isDefaultWorkspaceItem(activeWorkspace)
-                        ? t('workspace.switcher.archiveDefaultNote')
-                        : undefined
-                    "
+                    :is-disabled="isDeleting"
                     :aria-label="t('workspace.switcher.archiveAction')"
-                    @click="requestArchive(activeWorkspace)"
+                    @click="requestDelete(activeWorkspace)"
                   >
                     {{ t('workspace.switcher.archiveAction') }}
                   </Button>
                 </div>
-                <div
-                  v-if="confirmingArchiveId === activeWorkspace.publicId"
-                  class="flex flex-col gap-2"
-                >
-                  <p class="m-0 text-xs leading-normal text-foreground" role="alert">
-                    {{ t('workspace.switcher.archiveConfirm', { name: activeWorkspace.name }) }}
-                  </p>
-                  <div class="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      class="h-9 shrink-0"
-                      :is-loading="isArchiving"
-                      :is-disabled="isArchiving"
-                      @click="commitArchive(activeWorkspace)"
-                    >
-                      {{
-                        isArchiving
-                          ? t('workspace.switcher.archiving')
-                          : t('workspace.switcher.archiveConfirmAction')
-                      }}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      class="h-9 shrink-0"
-                      :is-disabled="isArchiving"
-                      @click="cancelArchive"
-                    >
-                      {{ t('common.actions.cancel') }}
-                    </Button>
-                  </div>
-                </div>
                 <p
-                  v-if="archiveError"
+                  v-if="deleteError"
                   class="m-0 text-xs leading-normal text-destructive"
                   role="alert"
                 >
-                  {{ archiveError }}
+                  {{ deleteError }}
                 </p>
               </section>
             </div>
@@ -316,6 +251,101 @@
       </DialogContent>
     </DialogPortal>
   </DialogRoot>
+
+  <!-- Create naming dialog (UserConfirmDialog pattern): mask/Escape/cancel
+    dismiss while idle; the confirm commit locks every path while busy. -->
+  <DialogRoot :open="isCreateDialogOpen" @update:open="handleCreateOpenUpdate">
+    <DialogPortal>
+      <DialogOverlay :class="ibDialogMaskClass" @click="handleCreateMaskClick" />
+      <DialogContent
+        class="bg-popover"
+        :style="{ width: 'min(420px, calc(100vw - 32px))' }"
+        :aria-label="t('workspace.switcher.createDialogTitle')"
+        :aria-busy="isCreating || undefined"
+        @escape-key-down="handleCreateEscape"
+        @pointer-down-outside="blockCreateOutsideDismiss"
+      >
+        <div class="min-h-0 overflow-y-auto">
+          <DialogDescription class="sr-only">
+            {{ t('workspace.switcher.createDialogNameLabel') }}
+          </DialogDescription>
+          <div class="p-6">
+            <DialogTitle as="h3" class="m-0 text-lg font-semibold text-foreground">
+              {{ t('workspace.switcher.createDialogTitle') }}
+            </DialogTitle>
+            <div class="mt-5 mb-0 flex flex-col gap-2">
+              <label :for="createInputId" class="text-sm font-medium text-foreground">
+                {{ t('workspace.switcher.createDialogNameLabel') }}
+              </label>
+              <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The create input carries its accessible name via aria-label -->
+              <Input
+                :id="createInputId"
+                ref="createInputRef"
+                v-model="createName"
+                size="sm"
+                class="h-9 text-sm bg-background"
+                :invalid="createNameError !== null"
+                :disabled="isCreating"
+                :aria-label="t('workspace.switcher.createDialogNameLabel')"
+                :maxlength="nameFieldMaxLength"
+                @keydown.enter="submitCreateFromDialog"
+                @keydown.esc.stop.prevent="cancelCreateDialog"
+                @keydown.escape.stop.prevent="cancelCreateDialog"
+              />
+              <p
+                v-if="createNameError"
+                class="m-0 text-xs leading-normal text-destructive"
+                role="alert"
+              >
+                {{ createNameError }}
+              </p>
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                :is-disabled="isCreating"
+                class="rounded-pill px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+                @click="cancelCreateDialog"
+              >
+                {{ t('common.actions.cancel') }}
+              </Button>
+              <Button
+                type="button"
+                :is-loading="isCreating"
+                :is-disabled="isCreating"
+                class="rounded-pill px-4 py-2 text-sm font-semibold disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary-hover"
+                @click="submitCreateFromDialog"
+              >
+                {{
+                  isCreating
+                    ? t('workspace.switcher.creating')
+                    : t('workspace.switcher.createDialogConfirm')
+                }}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
+
+  <!-- 永久删除二次确认：统一走 UserConfirmDialog intent=danger（参考 BoardsPage）。Busy 提交时组件内部锁住 mask/Escape/close-control。输入工作区名匹配后才可确认，防误触。 -->
+  <UserConfirmDialog
+    :is-visible="isDeleteDialogVisible"
+    :title="t('workspace.switcher.archiveTitle')"
+    :message="t('workspace.switcher.archiveConfirm', { name: pendingDeleteName })"
+    :confirm-label="t('workspace.switcher.archiveConfirmAction')"
+    :expected-confirm-text="pendingDeleteName"
+    :confirm-input-label="
+      t('workspace.switcher.archiveConfirmInputLabel', { name: pendingDeleteName })
+    "
+    :confirm-input-placeholder="t('workspace.switcher.archiveConfirmInputPlaceholder')"
+    intent="danger"
+    :is-loading="isDeleting"
+    @update:is-visible="handleDeleteConfirmVisibleUpdate"
+    @confirm="confirmDelete"
+  />
 </template>
 
 <script setup lang="ts">
@@ -335,10 +365,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import { useAppToast } from '../../../../core/composables/useAppToast'
+import {
+  defineDialogSurfaceIntent,
+  useOverlayInteractionLifecycle,
+} from '../../../../core/composables/useOverlayInteractionLifecycle'
 import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import { ibDialogMaskClass } from '../../../../theme/dialogMask'
 import type { UserAccountMenuWorkspaceItem } from './userAccountMenu.types'
-import { isDefaultWorkspaceItem, visibleWorkspaceItems } from './workspaceMenu'
+import { isDefaultWorkspaceItem } from './workspaceMenu'
+import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
 import WorkspaceMemberSection from './WorkspaceMemberSection.vue'
 import {
   accountCloseButtonClass,
@@ -360,8 +396,7 @@ const props = withDefaults(
     onRetry: () => void
     onCreate: (name: string) => Promise<UserAccountMenuWorkspaceItem>
     onRename: (workspaceId: string, name: string) => Promise<UserAccountMenuWorkspaceItem>
-    onArchive: (workspaceId: string) => Promise<UserAccountMenuWorkspaceItem>
-    onSelect?: ((workspaceId: string) => void) | undefined
+    onDelete: (workspaceId: string) => Promise<void>
   }>(),
   {
     selectedId: null,
@@ -369,7 +404,6 @@ const props = withDefaults(
     loadError: null,
     nameMaxLength: 120,
     currentUserId: null,
-    onSelect: undefined,
   },
 )
 
@@ -378,13 +412,14 @@ const emits = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const toast = useAppToast()
 
-const visibleItems = computed(() => visibleWorkspaceItems(props.items))
+const workspaceItems = computed(() => props.items)
 
-const activeWorkspaceId = ref<string>(props.selectedId ?? visibleItems.value[0]?.publicId ?? '')
+const activeWorkspaceId = ref<string>(props.selectedId ?? workspaceItems.value[0]?.publicId ?? '')
 
 watch(
-  [visibleItems, () => props.selectedId],
+  [workspaceItems, () => props.selectedId],
   ([items, selectedId]) => {
     if (items.length === 0) {
       activeWorkspaceId.value = ''
@@ -403,7 +438,7 @@ watch(
 )
 
 const activeWorkspace = computed(() => {
-  return visibleItems.value.find((item) => item.publicId === activeWorkspaceId.value) ?? null
+  return workspaceItems.value.find((item) => item.publicId === activeWorkspaceId.value) ?? null
 })
 
 function workspaceItemName(item: UserAccountMenuWorkspaceItem): string {
@@ -414,8 +449,12 @@ function selectWorkspace(item: UserAccountMenuWorkspaceItem) {
   if (editingId.value && editingId.value !== item.publicId) {
     cancelRename()
   }
-  if (confirmingArchiveId.value && confirmingArchiveId.value !== item.publicId) {
-    cancelArchive()
+  if (
+    pendingDeleteItem.value &&
+    pendingDeleteItem.value.publicId !== item.publicId &&
+    !isDeleting.value
+  ) {
+    closeDeleteDialog()
   }
   activeWorkspaceId.value = item.publicId
 }
@@ -425,7 +464,29 @@ function selectWorkspace(item: UserAccountMenuWorkspaceItem) {
 const nameFieldMaxLength = computed(() => props.nameMaxLength + 1)
 
 const isCreating = ref(false)
-const createError = ref<string | null>(null)
+
+// Create naming dialog (UserConfirmDialog pattern): the Add New button only
+// opens this modal with a unique default name; the confirm commit provisions
+// through `onCreate` (Idempotency-Key deduped upstream) and focuses the new
+// row in the still-open settings dialog. No route navigation happens here.
+const isCreateDialogOpen = ref(false)
+const createName = ref('')
+const createNameError = ref<string | null>(null)
+const createInputId = 'workspace-create-name-input'
+const createInputRef = useTemplateRef('createInputRef')
+
+const { canDismiss: canDismissCreate, requestClose: requestCreateClose } =
+  useOverlayInteractionLifecycle({
+    isVisible: () => isCreateDialogOpen.value,
+    busy: () => isCreating.value,
+    surface: defineDialogSurfaceIntent(),
+    onVisibilityChange: (isVisible) => {
+      if (!isVisible) {
+        isCreateDialogOpen.value = false
+        createNameError.value = null
+      }
+    },
+  })
 
 const editingId = ref<string | null>(null)
 const draftName = ref('')
@@ -436,7 +497,7 @@ const renameInputRef = useTemplateRef('renameInputRef')
 function generateUniqueWorkspaceName(): string {
   const baseName = t('workspace.switcher.defaultNewName')
   const existing = new Set<string>()
-  for (const item of visibleItems.value) {
+  for (const item of workspaceItems.value) {
     existing.add(item.name.trim().toLowerCase())
     if (isDefaultWorkspaceItem(item)) {
       existing.add(t('workspace.switcher.defaultBadge').trim().toLowerCase())
@@ -458,7 +519,7 @@ function validateName(raw: string, currentWorkspaceId?: string | null): string |
   if (next.length > props.nameMaxLength) {
     return t('workspace.switcher.nameTooLong', { max: props.nameMaxLength })
   }
-  const hasDuplicate = visibleItems.value.some((item) => {
+  const hasDuplicate = workspaceItems.value.some((item) => {
     if (currentWorkspaceId && item.publicId === currentWorkspaceId) return false
     const isMatchingRaw = item.name.trim().toLowerCase() === next.toLowerCase()
     const isMatchingDefault =
@@ -472,24 +533,96 @@ function validateName(raw: string, currentWorkspaceId?: string | null): string |
   return null
 }
 
-async function submitCreate() {
+async function submitCreateFromDialog() {
   if (isCreating.value) return
-  const name = generateUniqueWorkspaceName()
+  const trimmed = createName.value.trim()
+  if (!trimmed) {
+    toast.error(t('workspace.switcher.nameEmpty'))
+    return
+  }
+  const violation = validateName(createName.value, null)
+  if (violation) {
+    createNameError.value = violation
+    return
+  }
   isCreating.value = true
-  createError.value = null
+  createNameError.value = null
   try {
-    const created = await props.onCreate(name)
+    const created = await props.onCreate(trimmed)
+    isCreateDialogOpen.value = false
+    createNameError.value = null
     activeWorkspaceId.value = created.publicId
+    pendingCreateFocusId.value = created.publicId
+    focusNewWorkspaceRow(created.publicId)
   } catch (error) {
     const code = userErrorCode(error)?.toLowerCase()
-    createError.value =
+    const message =
       code != null
         ? `${t('workspace.switcher.createFailed')} (${code})`
         : t('workspace.switcher.createFailed')
+    createNameError.value = message
+    toast.error(message)
   } finally {
     isCreating.value = false
   }
 }
+
+function openCreateDialog() {
+  if (isCreating.value) return
+  createName.value = generateUniqueWorkspaceName()
+  createNameError.value = null
+  isCreateDialogOpen.value = true
+  void nextTick(() => {
+    const host = createInputRef.value as unknown as { $el?: unknown } | null
+    const input = (host?.$el ?? host) as HTMLElement | null
+    if (input instanceof HTMLInputElement) {
+      input.focus()
+      input.select()
+    }
+  })
+}
+
+function cancelCreateDialog() {
+  requestCreateClose('close-control')
+}
+
+function handleCreateOpenUpdate(isOpen: boolean) {
+  if (!isOpen) requestCreateClose('close-control')
+}
+
+function handleCreateMaskClick() {
+  requestCreateClose('mask')
+}
+
+function handleCreateEscape(event: KeyboardEvent) {
+  if (!canDismissCreate('escape')) event.preventDefault()
+}
+
+function blockCreateOutsideDismiss(event: Event) {
+  event.preventDefault()
+}
+
+function focusNewWorkspaceRow(workspaceId: string) {
+  void nextTick(() => {
+    const row = document.querySelector(
+      `[data-workspace-nav="${workspaceId}"]`,
+    ) as HTMLElement | null
+    row?.focus()
+  })
+}
+
+// The list refresh lands after the confirm commit resolves: retry the focus
+// once the new row renders so keyboard users land on it with Members shown.
+const pendingCreateFocusId = ref<string | null>(null)
+
+watch(workspaceItems, (items) => {
+  const pending = pendingCreateFocusId.value
+  if (!pending) return
+  if (items.some((item) => item.publicId === pending)) {
+    pendingCreateFocusId.value = null
+    focusNewWorkspaceRow(pending)
+  }
+})
 
 function startRename(item: UserAccountMenuWorkspaceItem) {
   if (isDefaultWorkspaceItem(item)) return
@@ -535,47 +668,58 @@ async function commitRename(item: UserAccountMenuWorkspaceItem) {
     editingId.value = null
   } catch {
     draftName.value = item.name
-    renameError.value = t('workspace.switcher.renameFailed')
+    toast.error(t('workspace.switcher.renameFailed'))
   } finally {
     isRenaming.value = false
   }
 }
 
-const confirmingArchiveId = ref<string | null>(null)
-const isArchiving = ref(false)
-const archiveError = ref<string | null>(null)
+const pendingDeleteItem = ref<UserAccountMenuWorkspaceItem | null>(null)
+const isDeleting = ref(false)
+const deleteError = ref<string | null>(null)
+const isDeleteDialogVisible = computed(() => pendingDeleteItem.value !== null)
+const pendingDeleteName = computed(() => pendingDeleteItem.value?.name ?? '')
 
-function requestArchive(item: UserAccountMenuWorkspaceItem) {
-  if (isDefaultWorkspaceItem(item) || isArchiving.value) return
+function requestDelete(item: UserAccountMenuWorkspaceItem) {
+  if (isDefaultWorkspaceItem(item) || isDeleting.value) return
   activeWorkspaceId.value = item.publicId
-  confirmingArchiveId.value = item.publicId
-  archiveError.value = null
+  pendingDeleteItem.value = { ...item }
+  deleteError.value = null
 }
 
-function cancelArchive() {
-  confirmingArchiveId.value = null
-  archiveError.value = null
+function closeDeleteDialog() {
+  pendingDeleteItem.value = null
+  deleteError.value = null
 }
 
-async function commitArchive(item: UserAccountMenuWorkspaceItem) {
+// UserConfirmDialog 在 Busy 提交时已锁住全部关闭路径；页面只处理 idle
+// 关闭后的清理。
+function handleDeleteConfirmVisibleUpdate(isVisible: boolean) {
+  if (isVisible || isDeleting.value) return
+  closeDeleteDialog()
+}
+
+async function confirmDelete() {
+  const item = pendingDeleteItem.value
+  if (!item || isDeleting.value) return
   if (isDefaultWorkspaceItem(item)) {
-    cancelArchive()
+    closeDeleteDialog()
     return
   }
-  if (confirmingArchiveId.value !== item.publicId || isArchiving.value) return
-  isArchiving.value = true
-  archiveError.value = null
+  isDeleting.value = true
+  deleteError.value = null
   try {
-    await props.onArchive(item.publicId)
-    confirmingArchiveId.value = null
+    await props.onDelete(item.publicId)
+    pendingDeleteItem.value = null
   } catch (error) {
     const code = userErrorCode(error)?.toLowerCase()
-    archiveError.value =
+    deleteError.value =
       code != null
         ? `${t('workspace.switcher.archiveFailed')} (${code})`
         : t('workspace.switcher.archiveFailed')
+    toast.error(deleteError.value)
   } finally {
-    isArchiving.value = false
+    isDeleting.value = false
   }
 }
 </script>

@@ -145,30 +145,17 @@ func TestEnsureDefaultWorkspaceConcurrent(t *testing.T) {
 	}
 }
 
-func TestEnsureDefaultWorkspaceSkipsArchived(t *testing.T) {
+func TestEnsureDefaultWorkspaceDeleteProtected(t *testing.T) {
 	ctx := context.Background()
 	store := NewInMemoryStoreForTests()
 	first, err := store.EnsureDefaultWorkspace(ctx, 7)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.ArchiveWorkspace(ctx, first.PublicID); err == nil {
-		t.Fatal("archiving the Default workspace must be rejected")
+	if err := store.DeleteWorkspace(ctx, first.PublicID); err == nil {
+		t.Fatal("deleting the Default workspace must be rejected")
 	} else if !errors.Is(err, ErrDefaultWorkspaceProtected) {
-		t.Fatalf("archive default err = %v, want ErrDefaultWorkspaceProtected", err)
-	}
-	// An archived non-Default row never satisfies Ensure: the live Default
-	// is still returned.
-	plain, err := store.CreateWorkspace(ctx, CreateWorkspaceParams{Name: "plain", OwnerUserID: 7})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.ArchiveWorkspace(ctx, plain.PublicID); err != nil {
-		t.Fatal(err)
-	}
-	second, err := store.EnsureDefaultWorkspace(ctx, 7)
-	if err != nil || second.PublicID != first.PublicID {
-		t.Fatalf("live Default must be reused: %v, %v", second, err)
+		t.Fatalf("delete default err = %v, want ErrDefaultWorkspaceProtected", err)
 	}
 }
 
@@ -201,7 +188,7 @@ func TestCreateMultipleNonDefaultWorkspaces(t *testing.T) {
 	}
 }
 
-// TestCreateSecondDefaultRejected proves the single-live-Default invariant:
+// TestCreateSecondDefaultRejected proves the single-Default invariant:
 // an explicit second Default create fails instead of forking.
 func TestCreateSecondDefaultRejected(t *testing.T) {
 	ctx := context.Background()
@@ -254,6 +241,47 @@ func TestCreateWorkspaceNameValidation(t *testing.T) {
 	}
 	if err := ValidateName(fmt.Sprintf("%0120d", 0)[:120]); err != nil {
 		t.Fatalf("120-char name must validate: %v", err)
+	}
+}
+
+// TestDeleteWorkspaceHardDelete proves deletion is immediate and
+// irreversible: the Default workspace is protected, plain rows disappear
+// with their memberships, and unknown ids read as not found.
+func TestDeleteWorkspaceHardDelete(t *testing.T) {
+	ctx := context.Background()
+	store := NewInMemoryStoreForTests()
+	def, err := store.EnsureDefaultWorkspace(ctx, 21)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteWorkspace(ctx, def.PublicID); !errors.Is(err, ErrDefaultWorkspaceProtected) {
+		t.Fatalf("delete default err = %v, want ErrDefaultWorkspaceProtected", err)
+	}
+	plain, err := store.CreateWorkspace(ctx, CreateWorkspaceParams{Name: "plain", OwnerUserID: 21})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.GetWorkspaceRole(ctx, plain.PublicID, 21); err != nil {
+		t.Fatalf("role before delete failed: %v", err)
+	}
+	if err := store.DeleteWorkspace(ctx, plain.PublicID); err != nil {
+		t.Fatalf("delete plain failed: %v", err)
+	}
+	if _, err := store.GetWorkspace(ctx, plain.PublicID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("get deleted err = %v, want ErrNotFound", err)
+	}
+	if err := store.DeleteWorkspace(ctx, plain.PublicID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second delete err = %v, want ErrNotFound", err)
+	}
+	if err := store.DeleteWorkspace(ctx, "ws_doesnotexist0001"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("delete unknown err = %v, want ErrNotFound", err)
+	}
+	visible, err := store.ListWorkspacesForUser(ctx, 21)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(visible) != 1 || visible[0].PublicID != def.PublicID {
+		t.Fatalf("visible = %v, want only the Default workspace", visible)
 	}
 }
 

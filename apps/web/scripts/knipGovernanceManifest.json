@@ -13666,10 +13666,10 @@
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#WorkspaceSummary"
         ]
       },
-      "archiveWorkspace": {
+      "deleteWorkspace": {
         "kind": "canonical-public",
         "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#archiveWorkspace"
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#deleteWorkspace"
         ]
       },
       "classifyWorkspaceAccessError": {
@@ -15591,7 +15591,7 @@
       "exports": ["ControlWalletRestrictionRelatedObject"]
     },
     "src/api/generated-query/control/model/controlWorkspace.ts": {
-      "sha256": "5dab1726881c98c7b451f791852de93dc6f666a2625506b100fc2bc7067d8107",
+      "sha256": "aeb69e223a0f44319e4bc88ba97cdad22c1100b5091fbe375e99df2c9b8570d1",
       "exports": ["ControlWorkspace"]
     },
     "src/api/generated-query/control/model/controlWorkspaceEnvelope.ts": {
@@ -17016,7 +17016,7 @@
       "exports": ["VisionQueryId"]
     },
     "src/api/generated-query/public/model/workspace.ts": {
-      "sha256": "23f22bc7ef472d9c568cbb88a19f42c0d8323695f9e5da9ce14a598d20177c67",
+      "sha256": "32454aa236689e70971e1e84d774875426cc67065209ba19a361cc4e1a51347f",
       "exports": ["Workspace"]
     },
     "src/api/generated-query/public/model/workspaceAccess.ts": {
@@ -17704,15 +17704,15 @@
       ]
     },
     "src/api/generated-query/public/workspaces/workspaces.ts": {
-      "sha256": "d43db43626d551a0864333511eb0d34832482abf747f469e00e8c667ae946009",
+      "sha256": "a8615e5ba5e61ab3ade451fb48b3425b97601d3b983ad37f9820a21d2e3e2b6c",
       "exports": [
-        "ArchiveWorkspaceMutationError",
-        "ArchiveWorkspaceMutationResult",
-        "ArchiveWorkspaceMutationVariables",
         "CreateWorkspaceMutationBody",
         "CreateWorkspaceMutationError",
         "CreateWorkspaceMutationResult",
         "CreateWorkspaceMutationVariables",
+        "DeleteWorkspaceMutationError",
+        "DeleteWorkspaceMutationResult",
+        "DeleteWorkspaceMutationVariables",
         "GetWorkspaceQueryError",
         "GetWorkspaceQueryResult",
         "ListWorkspacesQueryError",
@@ -17721,14 +17721,14 @@
         "UpdateWorkspaceMutationError",
         "UpdateWorkspaceMutationResult",
         "UpdateWorkspaceMutationVariables",
-        "archiveWorkspace",
         "createWorkspace",
-        "getArchiveWorkspaceMutationKey",
-        "getArchiveWorkspaceMutationOptions",
-        "getArchiveWorkspaceUrl",
+        "deleteWorkspace",
         "getCreateWorkspaceMutationKey",
         "getCreateWorkspaceMutationOptions",
         "getCreateWorkspaceUrl",
+        "getDeleteWorkspaceMutationKey",
+        "getDeleteWorkspaceMutationOptions",
+        "getDeleteWorkspaceUrl",
         "getGetWorkspaceQueryKey",
         "getGetWorkspaceQueryOptions",
         "getGetWorkspaceUrl",
@@ -17741,8 +17741,8 @@
         "getWorkspace",
         "listWorkspaces",
         "updateWorkspace",
-        "useArchiveWorkspace",
         "useCreateWorkspace",
+        "useDeleteWorkspace",
         "useGetWorkspace",
         "useListWorkspaces",
         "useUpdateWorkspace"

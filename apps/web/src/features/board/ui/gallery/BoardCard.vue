@@ -117,7 +117,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useI18n } from 'vue-i18n'
-import { resolveMemberAvatar } from '../../../../core/media/avatarUrl'
+import { resolveMemberAvatar, resolveMemberInitial } from '../../../../core/media/avatarUrl'
 import { useUserStore } from '../../../auth'
 import type { CatalogEntry } from './contract'
 import type { BoardListSceneEntry } from '../../session/sync/boardQueries'
@@ -165,10 +165,9 @@ const ownerAvatarEntry = computed(() => {
 const ownerAvatarSrc = computed(() =>
   ownerAvatarEntry.value ? resolveMemberAvatar(ownerAvatarEntry.value, userStore.user) : undefined,
 )
-const ownerAvatarInitial = computed(() => {
-  const userId = ownerAvatarEntry.value?.userId ?? ''
-  return userId.replace(/^usr_/, '').charAt(0).toUpperCase() || 'U'
-})
+const ownerAvatarInitial = computed(() =>
+  ownerAvatarEntry.value ? resolveMemberInitial(ownerAvatarEntry.value) : 'U',
+)
 
 // Server access posture as text (never color alone): the card renders the
 // `access_state` fact verbatim and never derives it locally. Boards without

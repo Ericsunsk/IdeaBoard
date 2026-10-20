@@ -16,7 +16,6 @@ vi.mock('../../../../account/ui/chrome/useWorkspaceMemberSection', () => ({
     isPending: () => false,
     inviteEmail: ref(''),
     inviteRole: ref('member'),
-    inviteError: ref(null),
     pickInviteRole: vi.fn(),
     inviteMember: vi.fn(),
     changeMemberRole: vi.fn(),
@@ -655,21 +654,12 @@ describe('CanvasChrome', () => {
             name: 'Personal',
             organizationId: null,
             isDefault: true,
-            archivedAt: null,
           },
           {
             publicId: 'ws_team2',
             name: 'Team',
             organizationId: 'org_c3',
             isDefault: false,
-            archivedAt: null,
-          },
-          {
-            publicId: 'ws_old3',
-            name: 'Old',
-            organizationId: null,
-            isDefault: false,
-            archivedAt: '2026-01-01T00:00:00Z',
           },
         ],
         selectedId: 'ws_default1',
@@ -677,7 +667,7 @@ describe('CanvasChrome', () => {
         onSelect,
         onCreate: vi.fn(),
         onRename: vi.fn(),
-        onArchive: vi.fn(),
+        onDelete: vi.fn(),
         onRetry: vi.fn(),
         ...overrides,
       }
@@ -753,7 +743,6 @@ describe('CanvasChrome', () => {
 
       const teamOption = await screen.findByRole('menuitem', { name: 'Team' })
       expect(teamOption).toBeVisible()
-      expect(screen.queryByRole('menuitem', { name: 'Old' })).not.toBeInTheDocument()
 
       const currentOption = (await screen.findAllByRole('menuitem', { name: 'Default' })).find(
         (entry) => entry.getAttribute('aria-current') === 'true',

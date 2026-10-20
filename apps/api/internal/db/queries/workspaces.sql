@@ -1,7 +1,10 @@
 -- Workspace tenancy queries (#801). Public references use public_id;
 -- internal_id stays database-internal.
 --
--- Default workspace rule (Bug2 root fix): every user owns exactly one live
+-- Deletion is an immediate irreversible hard delete: there is no
+-- archive/restore lifecycle and no workspaces.archived_at column.
+--
+-- Default workspace rule (Bug2 root fix): every user owns exactly one
 -- Default personal workspace (is_default). Plain personal workspaces created
 -- without an organization are always non-Default and unlimited; only
 -- EnsureDefaultWorkspace mints the Default row.
@@ -9,10 +12,10 @@
 -- name: CreateWorkspace :one
 INSERT INTO workspaces (public_id, organization_id, owner_user_id, name, is_default)
 VALUES (sqlc.arg(public_id), sqlc.narg(organization_id), sqlc.narg(owner_user_id), sqlc.arg(name), sqlc.arg(is_default))
-RETURNING internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at;
+RETURNING internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at;
 
 -- name: GetWorkspaceByPublicID :one
-SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
+SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at
 FROM workspaces
 WHERE public_id = sqlc.arg(public_id)
 LIMIT 1;
@@ -29,29 +32,24 @@ FROM workspace_memberships
 WHERE workspace_id = sqlc.arg(workspace_id);
 
 -- name: ListWorkspacesByUserID :many
-SELECT w.internal_id, w.public_id, w.organization_id, w.owner_user_id, w.name, w.is_default, w.created_at, w.updated_at, w.archived_at
+SELECT w.internal_id, w.public_id, w.organization_id, w.owner_user_id, w.name, w.is_default, w.created_at, w.updated_at
 FROM workspaces AS w
 INNER JOIN workspace_memberships AS m ON m.workspace_id = w.internal_id
-WHERE m.user_id = sqlc.arg(user_id) AND w.archived_at IS NULL
+WHERE m.user_id = sqlc.arg(user_id)
 ORDER BY w.internal_id ASC
 LIMIT sqlc.arg(row_limit);
 
 -- name: ListWorkspacesByOrganizationID :many
-SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
+SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at
 FROM workspaces
-WHERE organization_id = sqlc.arg(organization_id) AND archived_at IS NULL
+WHERE organization_id = sqlc.arg(organization_id)
 ORDER BY internal_id ASC
 LIMIT sqlc.arg(row_limit);
 
 -- name: UpdateWorkspaceName :execrows
 UPDATE workspaces
 SET name = sqlc.arg(name), updated_at = now()
-WHERE public_id = sqlc.arg(public_id) AND archived_at IS NULL;
-
--- name: ArchiveWorkspace :execrows
-UPDATE workspaces
-SET archived_at = now(), updated_at = now()
-WHERE public_id = sqlc.arg(public_id) AND archived_at IS NULL;
+WHERE public_id = sqlc.arg(public_id);
 
 -- name: UpsertWorkspaceMembership :exec
 INSERT INTO workspace_memberships (workspace_id, user_id, role)
@@ -96,12 +94,12 @@ WHERE workspace_id = sqlc.arg(workspace_id) AND role = 'owner';
 -- name: InsertDefaultWorkspaceIgnore :execrows
 INSERT INTO workspaces (public_id, owner_user_id, name, is_default)
 VALUES (sqlc.arg(public_id), sqlc.arg(owner_user_id), sqlc.arg(name), TRUE)
-ON CONFLICT (owner_user_id) WHERE organization_id IS NULL AND is_default AND archived_at IS NULL DO NOTHING;
+ON CONFLICT (owner_user_id) WHERE organization_id IS NULL AND is_default DO NOTHING;
 
 -- name: GetDefaultWorkspaceByOwner :one
-SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at, archived_at
+SELECT internal_id, public_id, organization_id, owner_user_id, name, is_default, created_at, updated_at
 FROM workspaces
-WHERE owner_user_id = sqlc.arg(owner_user_id) AND organization_id IS NULL AND is_default AND archived_at IS NULL
+WHERE owner_user_id = sqlc.arg(owner_user_id) AND organization_id IS NULL AND is_default
 LIMIT 1;
 
 -- Billing Account owner stub (#801). Full lifecycle belongs to #804.

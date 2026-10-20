@@ -247,7 +247,7 @@ func openAccessPGEnv(t *testing.T) (*accessPGEnv, context.Context, *pgxpool.Pool
 	t.Helper()
 	db := testdb.Open(t)
 	ctx := context.Background()
-	tenancyStore := tenancypg.NewStore(db)
+	tenancyStore := tenancypg.NewStore(db, nil)
 	ws, err := tenancyStore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
 		Name:        "media-access-pg",
 		OwnerUserID: 1,

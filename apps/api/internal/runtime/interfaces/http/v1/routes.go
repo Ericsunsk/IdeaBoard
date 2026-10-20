@@ -200,7 +200,7 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps runtimehttp.AuthD
 	group.POST("/workspaces", handler.createWorkspace)
 	group.GET("/workspaces/:workspace_id", handler.getWorkspace)
 	group.PATCH("/workspaces/:workspace_id", handler.updateWorkspace)
-	group.POST("/workspaces/:workspace_id/archive", handler.archiveWorkspace)
+	group.DELETE("/workspaces/:workspace_id", handler.deleteWorkspace)
 	group.GET("/workspaces/:workspace_id/members", handler.listWorkspaceMembers)
 	group.POST("/workspaces/:workspace_id/members", handler.addWorkspaceMember)
 	group.GET("/workspaces/:workspace_id/members/lookup", handler.lookupWorkspaceMemberByEmail)
@@ -375,12 +375,11 @@ type v1WorkspaceDTO struct {
 	ID             string  `json:"id"`
 	OrganizationID *string `json:"organization_id"`
 	Name           string  `json:"name"`
-	// IsDefault marks the owner's Default workspace: exactly one live row
-	// per user, never deleted, archived, or renamed, auto-provisioned
+	// IsDefault marks the owner's Default workspace: exactly one row
+	// per user, never deleted or renamed, auto-provisioned
 	// when missing. Organization workspaces always report false.
-	IsDefault  bool    `json:"is_default"`
-	CreatedAt  string  `json:"created_at"`
-	ArchivedAt *string `json:"archived_at,omitempty"`
+	IsDefault bool   `json:"is_default"`
+	CreatedAt string `json:"created_at"`
 }
 
 func toWorkspaceDTO(w *tenancy.Workspace) v1WorkspaceDTO {
@@ -393,10 +392,6 @@ func toWorkspaceDTO(w *tenancy.Workspace) v1WorkspaceDTO {
 	if w.OrganizationID != nil {
 		org := *w.OrganizationID
 		dto.OrganizationID = &org
-	}
-	if w.ArchivedAt != nil {
-		archived := v1FormatTime(*w.ArchivedAt)
-		dto.ArchivedAt = &archived
 	}
 	return dto
 }
@@ -432,7 +427,7 @@ func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	// Default auto-provision hook when the user holds no live Default yet.
+	// Default auto-provision hook when the user holds no Default yet.
 	// Non-Default personal rows do not satisfy it: a user with only plain
 	// rows still gets a fresh Default row here.
 	hasDefault := false
@@ -633,21 +628,69 @@ func (h *contractV1Handler) updateWorkspace(c *gin.Context) {
 	})
 }
 
-func (h *contractV1Handler) archiveWorkspace(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx) {
-		archived, err := h.deps.Store.ArchiveWorkspace(c.Request.Context(), wctx.Workspace.PublicID)
-		if err != nil {
-			if errors.Is(err, tenancy.ErrDefaultWorkspaceProtected) {
-				contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceDefaultProtected), contract.CodeWorkspaceDefaultProtected, runtimehttp.MsgWorkspaceDefaultProtected)
-				c.Abort()
-				return
-			}
-			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
+func (h *contractV1Handler) deleteWorkspace(c *gin.Context) {
+	identityPrincipal, ok := v1RequestPrincipal(c)
+	if !ok || !h.requireStore(c) {
+		return
+	}
+	workspaceID := strings.TrimSpace(c.Param("workspace_id"))
+	if !contract.IsWorkspaceID(workspaceID) {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
+		c.Abort()
+		return
+	}
+	key, ok := requireV1IdempotencyKey(c)
+	if !ok {
+		return
+	}
+	// Unlike other workspace-scoped writes, deletion must resolve the
+	// workspace and authorize only inside the once-fn: successful retries
+	// (including in-flight ones) replay after the workspace is gone.
+	// The authenticated principal + operation scope isolates that replay.
+	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+	hash := contract.HashIdempotencyRequest("workspace:delete", workspaceID)
+	result, fnErr, ok := h.workspaceDo(c, externalUser, identityPrincipal.UserID(), "delete", key, hash, func() (any, error) {
+		workspace, role, visible := h.v1WorkspaceContext(c, identityPrincipal)
+		if workspace == nil || !visible {
+			return nil, tenancy.ErrNotFound
+		}
+		if !v1AllowOwnerOrAdmin(role, visible) {
+			return nil, tenancy.ErrForbidden
+		}
+		if err := h.deps.Store.DeleteWorkspace(c.Request.Context(), workspaceID); err != nil {
+			return nil, err
+		}
+		return &v1DeletedDTO{Deleted: true, ID: workspaceID}, nil
+	})
+	if !ok || c.IsAborted() {
+		return
+	}
+	if fnErr != nil {
+		if errors.Is(fnErr, tenancy.ErrForbidden) {
+			runtimehttp.RequireWorkspaceCapability(c, true, false)
+			return
+		}
+		if errors.Is(fnErr, tenancy.ErrWorkspaceActiveTasks) {
+			contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceActiveTasks), contract.CodeWorkspaceActiveTasks, "工作区仍有进行中的任务，请等待完成或取消后再删除")
 			c.Abort()
 			return
 		}
-		contract.RenderSuccess(c, toWorkspaceDTO(archived))
-	})
+		if errors.Is(fnErr, tenancy.ErrDefaultWorkspaceProtected) {
+			contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceDefaultProtected), contract.CodeWorkspaceDefaultProtected, runtimehttp.MsgWorkspaceDefaultProtected)
+			c.Abort()
+			return
+		}
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
+		c.Abort()
+		return
+	}
+	deleted, ok := result.(*v1DeletedDTO)
+	if !ok || deleted == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
+		c.Abort()
+		return
+	}
+	contract.RenderSuccess(c, *deleted)
 }
 
 // RegisterContractV1RoutesOnEngine mounts the additive v1 group on the

@@ -526,7 +526,7 @@ func TestManualLibraryPublicationMembershipRevocationWinsBeforeInsert(t *testing
 		result <- err
 	}()
 	waitForAcceptanceLock(t, ctx, tx)
-	if _, err := tenancypg.NewStore(env.pool).RemoveWorkspaceMember(dbutil.ContextWithAmbientTx(ctx, tx), env.ws, env.userID, 1, env.boards); err != nil {
+	if _, err := tenancypg.NewStore(env.pool, nil).RemoveWorkspaceMember(dbutil.ContextWithAmbientTx(ctx, tx), env.ws, env.userID, 1, env.boards); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

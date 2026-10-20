@@ -102,7 +102,7 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
   height: 24px;
   min-height: 24px;
   padding: 0 9px;
-  font-size: 10px;
+  font-size: var(--canvas-font-size-micro);
   font-weight: 500;
   letter-spacing: 0;
 }
@@ -113,7 +113,7 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
   border-radius: var(--radius-pill);
   background: var(--node-tool-button-brand);
   color: var(--canvas-text-inverse);
-  font-size: 12px;
+  font-size: var(--canvas-font-size-control);
   font-weight: 600;
   letter-spacing: 0;
   padding: 0 12px;

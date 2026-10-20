@@ -70,7 +70,4 @@ export default {
     activeBanner: '가상 계정 미리보기 활성화',
     exit: '가상 계정 종료',
   },
-  locale: {
-    selectLanguage: '언어 선택',
-  },
 } as const

@@ -24,6 +24,14 @@ export function workspaceCreationIdempotencyKey(): string {
   return createIdempotencyKey('workspace-create')
 }
 
+// Workspace deletion key: caller-generated per delete attempt (the backend
+// `workspace:delete` scope fails closed without an `Idempotency-Key`).
+// Retries of the SAME attempt must reuse the returned value; a new user
+// intent needs a fresh call.
+export function workspaceDeletionIdempotencyKey(): string {
+  return createIdempotencyKey('workspace-delete')
+}
+
 // Workspace board write key (issue #802): per board operation attempt.
 // Retries of the same attempt (e.g. after a 409 revision conflict refresh)
 // must reuse the returned value so the server replays instead of duplicating.
