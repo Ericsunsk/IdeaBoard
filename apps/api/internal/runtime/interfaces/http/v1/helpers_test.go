@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/principal"
@@ -795,23 +796,23 @@ func TestV1DeleteWorkspaceIdempotency(t *testing.T) {
 	}
 }
 
-// activeTaskDeleteStore exercises the tenancy conflict at the HTTP boundary;
+// workspaceDeleteFailureStore exercises tenancy failures at the HTTP boundary;
 // PostgreSQL tests separately cover the transactional task/hold invariant.
-type activeTaskDeleteStore struct {
+type workspaceDeleteFailureStore struct {
 	tenancy.Store
-	active bool
+	deleteErr error
 }
 
-func (s *activeTaskDeleteStore) DeleteWorkspace(ctx context.Context, publicID string) error {
-	if s.active {
-		return tenancy.ErrWorkspaceActiveTasks
+func (s *workspaceDeleteFailureStore) DeleteWorkspace(ctx context.Context, publicID string) error {
+	if s.deleteErr != nil {
+		return s.deleteErr
 	}
 	return s.Store.DeleteWorkspace(ctx, publicID)
 }
 
 func TestV1DeleteWorkspaceActiveTasksConflictDoesNotClaimKey(t *testing.T) {
 	base := tenancy.NewInMemoryStoreForTests()
-	store := &activeTaskDeleteStore{Store: base, active: true}
+	store := &workspaceDeleteFailureStore{Store: base, deleteErr: tenancy.ErrWorkspaceActiveTasks}
 	engine := newV1TestEngine(store, newStaticUserDirectory())
 	const owner int64 = 69
 	workspace := v1WorkspaceFixture(t, context.Background(), base, "delete-after-tasks", owner)
@@ -825,11 +826,35 @@ func TestV1DeleteWorkspaceActiveTasksConflictDoesNotClaimKey(t *testing.T) {
 	if status != http.StatusOK {
 		t.Fatalf("workspace after conflict = %d %v, want 200", status, payload)
 	}
-	store.active = false
+	store.deleteErr = nil
 	for i := 0; i < 2; i++ {
 		status, _, payload = doV1(t, engine, call)
 		if status != http.StatusOK {
 			t.Fatalf("settled delete attempt %d = %d %v, want 200", i, status, payload)
+		}
+	}
+}
+
+func TestV1DeleteWorkspaceDatabaseFailureDoesNotClaimKey(t *testing.T) {
+	base := tenancy.NewInMemoryStoreForTests()
+	store := &workspaceDeleteFailureStore{Store: base, deleteErr: errors.New("database permission denied")}
+	engine := newV1TestEngine(store, newStaticUserDirectory())
+	const owner int64 = 70
+	workspace := v1WorkspaceFixture(t, context.Background(), base, "delete-after-database-recovers", owner)
+	call := v1Call{method: http.MethodDelete, path: "/api/v1/workspaces/" + workspace.PublicID, userID: owner,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "delete-after-database-recovers"}}
+	status, _, payload := doV1(t, engine, call)
+	if status != http.StatusServiceUnavailable || v1ErrorCode(t, payload) != string(contract.CodeServiceUnavailable) {
+		t.Fatalf("database failure delete = %d %v, want 503 service_unavailable", status, payload)
+	}
+	if _, err := base.GetWorkspace(context.Background(), workspace.PublicID); err != nil {
+		t.Fatalf("workspace after database failure: %v", err)
+	}
+	store.deleteErr = nil
+	for attempt := 0; attempt < 2; attempt++ {
+		status, _, payload = doV1(t, engine, call)
+		if status != http.StatusOK {
+			t.Fatalf("recovered delete attempt %d = %d %v, want 200", attempt, status, payload)
 		}
 	}
 }

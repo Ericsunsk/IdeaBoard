@@ -17,6 +17,7 @@ import (
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	"ideaboard/api/internal/media/derivatives/infrastructure/preview"
+	"ideaboard/api/internal/platform/applog"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
@@ -680,7 +681,12 @@ func (h *contractV1Handler) deleteWorkspace(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
+		if errors.Is(fnErr, tenancy.ErrNotFound) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, runtimehttp.MsgListControlBillingAccounts)
+		} else {
+			applog.FromContext(c.Request.Context()).Error("workspace deletion failed", "err", fnErr)
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
+		}
 		c.Abort()
 		return
 	}

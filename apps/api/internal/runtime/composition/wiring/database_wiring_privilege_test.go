@@ -15,6 +15,8 @@ import (
 	"ideaboard/api/internal/platform/database"
 	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
+	"ideaboard/api/internal/tenancy"
+	tenancypostgres "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/testenv"
 
@@ -49,6 +51,26 @@ func TestOpenAppDatabasesStartsWithConfiguredLimitedRole(t *testing.T) {
 	assertControlAuditAppendOnlySmoke(t, databases.DB)
 }
 
+func TestDeleteWorkspaceWithConfiguredLimitedRole(t *testing.T) {
+	fixture := newStartupDatabaseFixture(t)
+	databases, err := OpenAppDatabases(t.Context(), fixture.config)
+	if err != nil {
+		t.Fatalf("OpenAppDatabases() error = %v", err)
+	}
+	defer CloseStartupResources(databases.DB, databases.RiverPool)
+	store := tenancypostgres.NewStore(databases.DB, nil)
+	workspace, err := store.CreateWorkspace(t.Context(), tenancy.CreateWorkspaceParams{Name: "delete freshly created workspace", OwnerUserID: 42})
+	if err != nil {
+		t.Fatalf("create workspace with runtime role: %v", err)
+	}
+	if err := store.DeleteWorkspace(t.Context(), workspace.PublicID); err != nil {
+		t.Fatalf("delete workspace with runtime role: %v", err)
+	}
+	if _, err := store.GetWorkspace(t.Context(), workspace.PublicID); !errors.Is(err, tenancy.ErrNotFound) {
+		t.Fatalf("workspace after deletion = %v, want ErrNotFound", err)
+	}
+}
+
 func assertLibraryMaterializationMappingAccess(t *testing.T, db *pgxpool.Pool) {
 	t.Helper()
 	var allowed bool
@@ -81,6 +103,7 @@ var workspaceRuntimeTableNames = []string{
 	"organizations",
 	"task_billing_settlements",
 	"task_billing_snapshots",
+	"task_status_event_outbox",
 	"upload_sessions",
 	"workspace_events",
 	"workspace_memberships",
@@ -100,6 +123,7 @@ var workspaceRuntimeSequenceNames = []string{
 	"event_subscriptions_internal_id_seq",
 	"library_materializations_internal_id_seq",
 	"organizations_internal_id_seq",
+	"task_status_event_outbox_internal_id_seq",
 	"upload_sessions_internal_id_seq",
 	"workspace_events_internal_id_seq",
 	"workspaces_internal_id_seq",
