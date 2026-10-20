@@ -74,6 +74,39 @@ describe('browser session transition', () => {
     mocks.readStoredSessionUser.mockReturnValue(null)
   })
 
+  it.each(['logout', 'identity switch', 'same-user new session', 'projection refresh'])(
+    'invalidates captured sessions after %s',
+    (change) => {
+      const user = makeSessionUser({ public_id: 'user-1' })
+      const harness = createHarness({ user, isLoaded: true })
+      const isCurrent = harness.transition.captureSession()
+      expect(isCurrent()).toBe(true)
+
+      if (change === 'logout') harness.transition.clearLocal()
+      if (change === 'identity switch') {
+        harness.transition.setAuth(makeSessionUser({ public_id: 'user-2' }))
+      }
+      if (change === 'same-user new session') {
+        harness.transition.clearLocal()
+        harness.transition.setAuth(user)
+      }
+      if (change === 'projection refresh') {
+        harness.loadUser.mockReturnValue(new Promise(() => {}))
+        void harness.transition.fetchUserInfo(true)
+      }
+
+      expect(isCurrent()).toBe(false)
+    },
+  )
+
+  it('never considers an unauthenticated captured session current', () => {
+    const harness = createHarness()
+    const isCurrent = harness.transition.captureSession()
+    expect(isCurrent()).toBe(false)
+    harness.transition.setAuth(makeSessionUser())
+    expect(isCurrent()).toBe(false)
+  })
+
   it('commits a refreshed identity and clears auth-scoped cache only when it changes', async () => {
     const harness = createHarness({
       user: makeSessionUser({ public_id: 'user-1' }),

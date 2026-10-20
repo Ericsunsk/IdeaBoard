@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,7 +15,24 @@ var (
 	ErrUserDeletionAuthUnavailable       = errors.New("user deletion Auth deleter is not configured")
 	ErrUserDeletionStorageUnavailable    = errors.New("user deletion storage cleaner is not configured")
 	ErrInvalidStorageUID                 = errors.New("invalid storage UID")
+	ErrInvalidDisplayName                = errors.New("invalid display name")
 )
+
+// MaxDisplayNameLength mirrors the users.display_name column width
+// (VARCHAR(100)) and its CHECK (length(btrim(display_name)) BETWEEN 1
+// AND 100): validation counts characters, never bytes.
+const MaxDisplayNameLength = 100
+
+// ValidateDisplayName trims surrounding whitespace, rejects empty names,
+// and caps length at the column width. It mirrors the database CHECK so
+// callers fail fast with 422 instead of surfacing a constraint violation.
+func ValidateDisplayName(raw string) error {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || len([]rune(trimmed)) > MaxDisplayNameLength {
+		return ErrInvalidDisplayName
+	}
+	return nil
+}
 
 const (
 	RoleUser  = "user"

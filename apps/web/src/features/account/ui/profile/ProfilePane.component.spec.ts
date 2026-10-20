@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
+import { fireEvent } from '@testing-library/vue'
 import { renderWithUser, screen } from '../../../../test/render'
 import { makeSessionUser } from '../../../../test/factories'
 import type { User } from '../../../../api/sessionUserType'
@@ -7,8 +8,21 @@ import ProfilePane from './ProfilePane.vue'
 
 const mockUser = ref<User>(makeSessionUser({ display_name: 'Ada', role: 'creator', avatar: '' }))
 
+const renameControls = {
+  isEditing: ref(false),
+  isRenaming: ref(false),
+  draftName: ref(''),
+  startRename: vi.fn(),
+  cancelRename: vi.fn(),
+  commitRename: vi.fn(),
+}
+
 vi.mock('../../../auth', () => ({
   useUserStore: () => ({ user: mockUser.value }),
+}))
+
+vi.mock('../../session/profile/useDisplayNameRename', () => ({
+  useDisplayNameRename: () => renameControls,
 }))
 
 vi.mock('../../session/profile/useAvatarUpload', () => ({
@@ -112,5 +126,100 @@ describe('ProfilePane banned badge', () => {
     expect(root).toHaveClass('bg-destructive-soft', 'text-destructive')
     expect(root).not.toHaveClass('bg-destructive')
     expect(container.querySelector('[aria-hidden="true"] span:last-child')).toBeNull()
+  })
+})
+
+describe('ProfilePane display-name rename', () => {
+  it('renders a pencil rename button next to the name', () => {
+    mockUser.value = makeSessionUser({ display_name: 'Ada', role: 'creator', avatar: '' })
+    renameControls.isEditing.value = false
+    renderWithUser(ProfilePane)
+
+    expect(screen.getByText('Ada')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Rename Ada' })).not.toBeNull()
+  })
+
+  it('starts the inline rename from the pencil button', async () => {
+    mockUser.value = makeSessionUser({ display_name: 'Ada', role: 'creator', avatar: '' })
+    renameControls.isEditing.value = false
+    renameControls.startRename.mockClear()
+    const view = renderWithUser(ProfilePane)
+
+    await view.user.click(screen.getByRole('button', { name: 'Rename Ada' }))
+
+    expect(renameControls.startRename).toHaveBeenCalledOnce()
+  })
+
+  it('commits on Enter and cancels on Escape', async () => {
+    mockUser.value = makeSessionUser({ display_name: 'Ada', role: 'creator', avatar: '' })
+    renameControls.isEditing.value = true
+    renameControls.isRenaming.value = false
+    renameControls.draftName.value = 'Ada'
+    renameControls.commitRename.mockClear()
+    renameControls.cancelRename.mockClear()
+    const view = renderWithUser(ProfilePane)
+
+    const input = screen.getByLabelText('Rename Ada')
+    await view.user.clear(input)
+    await view.user.type(input, 'New')
+    await view.user.keyboard('{Enter}')
+    expect(renameControls.commitRename).toHaveBeenCalledOnce()
+
+    await view.user.keyboard('{Escape}')
+    expect(renameControls.cancelRename).toHaveBeenCalledOnce()
+  })
+
+  it('waits for IME composition to finish before submitting the final draft', async () => {
+    mockUser.value = makeSessionUser({ display_name: 'Ada' })
+    renameControls.isEditing.value = true
+    renameControls.isRenaming.value = false
+    renameControls.draftName.value = 'Ada'
+    renameControls.commitRename.mockClear()
+    renderWithUser(ProfilePane)
+    const input = screen.getByLabelText('Rename Ada')
+
+    await fireEvent.compositionStart(input)
+    await fireEvent.input(input, { target: { value: '新名字' } })
+    await fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    expect(renameControls.commitRename).not.toHaveBeenCalled()
+
+    await fireEvent.compositionEnd(input)
+    expect(renameControls.draftName.value).toBe('新名字')
+    await fireEvent.keyDown(input, { key: 'Enter' })
+    expect(renameControls.commitRename).toHaveBeenCalledOnce()
+  })
+
+  it('accepts 100 non-BMP characters without a UTF-16 input ceiling', async () => {
+    mockUser.value = makeSessionUser({ display_name: 'Ada' })
+    renameControls.isEditing.value = true
+    renameControls.isRenaming.value = false
+    renameControls.draftName.value = ''
+    const view = renderWithUser(ProfilePane)
+    const input = screen.getByLabelText('Rename Ada')
+    const name = '😀'.repeat(100)
+
+    await view.user.click(input)
+    await view.user.paste(name)
+
+    expect(input).not.toHaveAttribute('maxlength')
+    expect(input).toHaveValue(name)
+    expect(renameControls.draftName.value).toBe(name)
+  })
+
+  it.each([
+    { key: 'Enter', keyCode: 229 },
+    { key: 'Escape', isComposing: true },
+  ])('ignores composition key events: %j', async (event) => {
+    mockUser.value = makeSessionUser({ display_name: 'Ada' })
+    renameControls.isEditing.value = true
+    renameControls.isRenaming.value = false
+    renameControls.commitRename.mockClear()
+    renameControls.cancelRename.mockClear()
+    renderWithUser(ProfilePane)
+
+    await fireEvent.keyDown(screen.getByLabelText('Rename Ada'), event)
+
+    expect(renameControls.commitRename).not.toHaveBeenCalled()
+    expect(renameControls.cancelRename).not.toHaveBeenCalled()
   })
 })

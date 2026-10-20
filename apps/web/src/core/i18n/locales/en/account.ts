@@ -27,6 +27,9 @@ export default {
   profile: {
     overviewAria: 'Account profile overview',
     changeAvatar: 'Change avatar',
+    renameAriaLabel: 'Rename {name}',
+    displayNameEmpty: 'Display name cannot be empty.',
+    displayNameTooLong: 'Display name must be no more than {max} characters.',
     banned: 'Banned',
     roleAdmin: 'Admin',
     roleCreator: 'Creator',
@@ -208,6 +211,8 @@ export default {
     rewardAlreadyRedeemed: 'This reward was already redeemed. No duplicate Ideas were issued.',
     avatarUpdated: 'Avatar updated.',
     avatarUpdateFailed: 'Could not update your avatar.',
+    displayNameUpdated: 'Display name updated.',
+    displayNameUpdateFailed: 'Could not update your display name.',
     passwordUpdated: 'Password updated. Please sign in again.',
     passwordUpdateFailed: 'Could not update your password.',
   },

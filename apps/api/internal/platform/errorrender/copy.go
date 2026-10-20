@@ -841,6 +841,7 @@ const (
 	MsgTaskStateConflict                              = "任务状态不允许此操作"                  // runtimehttp.MsgTaskStateConflict @ internal/runtime/interfaces/http/errors.go // CodeTaskStateConflict
 	MsgUnauthorized                                   = "未登录"                         // runtimehttp.MsgUnauthorized @ internal/runtime/interfaces/http/errors.go // CodeUnauthorized
 	MsgUpdateBoardAccess                              = "工作区访问级别非法"                   // runtimehttp.MsgUpdateBoardAccess @ internal/runtime/interfaces/http/errors.go // UpdateBoardAccess @ v1/boards.go
+	MsgUpdateUserDisplayName                          = "用户名称非法"                      // runtimehttp.MsgUpdateUserDisplayName @ internal/runtime/interfaces/http/errors.go // UpdateUserDisplayName @ v1/user.go
 	MsgUploadExpired                                  = "上传会话已过期，请重新创建"               // runtimehttp.MsgUploadExpired @ internal/runtime/interfaces/http/errors.go // CodeUploadExpired
 	MsgUploadNotFound                                 = "上传会话不存在"                     // runtimehttp.MsgUploadNotFound @ internal/runtime/interfaces/http/errors.go // CodeUploadNotFound
 	MsgUploadStateConflict                            = "上传会话状态不允许此操作"                // runtimehttp.MsgUploadStateConflict @ internal/runtime/interfaces/http/errors.go // CodeUploadStateConflict

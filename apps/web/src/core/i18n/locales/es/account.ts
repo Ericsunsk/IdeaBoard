@@ -27,6 +27,9 @@ export default {
   profile: {
     overviewAria: 'Resumen del perfil de la cuenta',
     changeAvatar: 'Cambiar avatar',
+    renameAriaLabel: 'Cambiar el nombre de {name}',
+    displayNameEmpty: 'El nombre para mostrar no puede estar vacío.',
+    displayNameTooLong: 'El nombre para mostrar no puede superar los {max} caracteres.',
     banned: 'Bloqueado',
     roleAdmin: 'Administrador',
     roleCreator: 'Creador',
@@ -208,6 +211,8 @@ export default {
     rewardAlreadyRedeemed: 'Esta recompensa ya fue canjeada. No se emitieron Ideas duplicadas.',
     avatarUpdated: 'Avatar actualizado.',
     avatarUpdateFailed: 'No se pudo actualizar el avatar.',
+    displayNameUpdated: 'Nombre para mostrar actualizado.',
+    displayNameUpdateFailed: 'No se pudo actualizar el nombre para mostrar.',
     passwordUpdated: 'Contraseña actualizada. Inicie sesión de nuevo.',
     passwordUpdateFailed: 'No se pudo actualizar la contraseña.',
   },

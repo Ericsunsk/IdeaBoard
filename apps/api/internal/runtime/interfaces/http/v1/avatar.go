@@ -63,7 +63,7 @@ func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	if h.deps.AvatarObjects == nil || h.deps.AvatarProfile == nil {
+	if h.deps.AvatarObjects == nil || h.deps.UserProfile == nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable52)
 		c.Abort()
 		return
@@ -146,7 +146,7 @@ func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
 // (content-addressed key), so replays skip the write; replaced keys are
 // removed best-effort after the row update and never fail the upload.
 func (h *contractV1Handler) storeAvatarOnce(ctx context.Context, userID int64, storageUID, objectKey, filename string, data []byte) (any, error) {
-	previous, err := h.deps.AvatarProfile.GetUserByID(ctx, userID)
+	previous, err := h.deps.UserProfile.GetUserByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (h *contractV1Handler) storeAvatarOnce(ctx context.Context, userID int64, s
 		if storedKey == "" {
 			storedKey = objectKey
 		}
-		if writeErr := h.deps.AvatarProfile.UpdateUserAvatar(ctx, userID, storedKey); writeErr != nil {
+		if writeErr := h.deps.UserProfile.UpdateUserAvatar(ctx, userID, storedKey); writeErr != nil {
 			return nil, writeErr
 		}
 		if previousKey != "" && previousKey != storedKey {
@@ -195,11 +195,11 @@ func (h *contractV1Handler) publicAvatar(c *gin.Context) {
 		runtimehttp.RenderV1BinaryError(c, http.StatusBadRequest)
 		return
 	}
-	if h.deps.AvatarProfile == nil {
+	if h.deps.UserProfile == nil {
 		runtimehttp.RenderV1BinaryError(c, http.StatusServiceUnavailable)
 		return
 	}
-	profile, err := h.deps.AvatarProfile.GetUserByStorageUID(c.Request.Context(), uid)
+	profile, err := h.deps.UserProfile.GetUserByStorageUID(c.Request.Context(), uid)
 	if err != nil {
 		if database.IsNotFound(err) {
 			runtimehttp.RenderV1BinaryError(c, http.StatusNotFound)

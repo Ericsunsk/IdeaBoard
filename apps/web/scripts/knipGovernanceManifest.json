@@ -16238,7 +16238,7 @@
       "exports": ["IfMatchParameter"]
     },
     "src/api/generated-query/public/model/index.ts": {
-      "sha256": "1cab737880321cc27f294cd54d4f27b902e9b4c5330b266073d63b778b4eef96",
+      "sha256": "a3cbfd3e3b34287f141fd2cd50d3f044e2dd467628055c4835c761fef4b2ba8b",
       "exports": [
         "AccessIfMatchParameter",
         "AddWorkspaceMemberRequest",
@@ -16432,6 +16432,8 @@
         "UpdateBoardRequestData",
         "UpdateOrganizationRequest",
         "UpdateOrganizationRequestData",
+        "UpdateUserRequest",
+        "UpdateUserRequestData",
         "UpdateWorkspaceMemberRequest",
         "UpdateWorkspaceMemberRequestData",
         "UpdateWorkspaceRequest",
@@ -17237,7 +17239,7 @@
       ]
     },
     "src/api/generated-query/public/user/user.ts": {
-      "sha256": "64faffdbc28c65ae56c7fdc14f39722cef6ea8ef62f57f0543a4343497225c09",
+      "sha256": "edc865f99ae711f4459052379d02c97fe7ad99adfa0e9b34ad40d422fde2363d",
       "exports": [
         "GetPublicBrandingLogoQueryError",
         "GetPublicBrandingLogoQueryResult",
@@ -17247,6 +17249,10 @@
         "GetSupportChannelsQueryResult",
         "GetUserQueryError",
         "GetUserQueryResult",
+        "UpdateUserMutationBody",
+        "UpdateUserMutationError",
+        "UpdateUserMutationResult",
+        "UpdateUserMutationVariables",
         "UploadAvatarMutationBody",
         "UploadAvatarMutationError",
         "UploadAvatarMutationResult",
@@ -17266,15 +17272,20 @@
         "getPublicBrandingLogo",
         "getPublicUserAvatar",
         "getSupportChannels",
+        "getUpdateUserMutationKey",
+        "getUpdateUserMutationOptions",
+        "getUpdateUserUrl",
         "getUploadAvatarMutationKey",
         "getUploadAvatarMutationOptions",
         "getUploadAvatarUrl",
         "getUser",
+        "updateUser",
         "uploadAvatar",
         "useGetPublicBrandingLogo",
         "useGetPublicUserAvatar",
         "useGetSupportChannels",
         "useGetUser",
+        "useUpdateUser",
         "useUploadAvatar"
       ]
     },
@@ -17735,6 +17746,14 @@
         "useListWorkspaces",
         "useUpdateWorkspace"
       ]
+    },
+    "src/api/generated-query/public/model/updateUserRequest.ts": {
+      "sha256": "bf8d48d5294e9ce35265738607db4af073ffa43a100d4bf0ba3c9836b9da357a",
+      "exports": ["UpdateUserRequest"]
+    },
+    "src/api/generated-query/public/model/updateUserRequestData.ts": {
+      "sha256": "5e947ce285ff6ba2d7aa4cdba1dd51f6ec0149b3d3edc445d91c7d224bfd76e2",
+      "exports": ["UpdateUserRequestData"]
     }
   },
   "files": {

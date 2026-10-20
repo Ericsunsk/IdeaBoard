@@ -329,10 +329,11 @@ func (s *stubUserRepo) UpdateLastLoginMetadata(_ context.Context, _, _, _ string
 func (s *stubUserRepo) List(_ context.Context, _, _ string, _ int16, _ bool, _ int, _ int) ([]*domain.User, identityports.UserListCounts, error) {
 	return nil, identityports.UserListCounts{}, errors.New("not implemented")
 }
-func (s *stubUserRepo) UpdateStatus(_ context.Context, _ int64, _ int16) error      { return nil }
-func (s *stubUserRepo) UpdateRoleByID(_ context.Context, _ int64, _ string) error   { return nil }
-func (s *stubUserRepo) UpdateAvatarByID(_ context.Context, _ int64, _ string) error { return nil }
-func (s *stubUserRepo) EnsureStorageUIDs(_ context.Context) error                   { return nil }
+func (s *stubUserRepo) UpdateStatus(_ context.Context, _ int64, _ int16) error           { return nil }
+func (s *stubUserRepo) UpdateRoleByID(_ context.Context, _ int64, _ string) error        { return nil }
+func (s *stubUserRepo) UpdateAvatarByID(_ context.Context, _ int64, _ string) error      { return nil }
+func (s *stubUserRepo) UpdateDisplayNameByID(_ context.Context, _ int64, _ string) error { return nil }
+func (s *stubUserRepo) EnsureStorageUIDs(_ context.Context) error                        { return nil }
 
 type stubEmailReader struct {
 	identities map[string]authidentity.UserIdentity

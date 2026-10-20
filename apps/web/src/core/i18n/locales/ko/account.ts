@@ -27,6 +27,9 @@ export default {
   profile: {
     overviewAria: '계정 프로필 개요',
     changeAvatar: '아바타 변경',
+    renameAriaLabel: '{name} 이름 바꾸기',
+    displayNameEmpty: '표시 이름은 비워둘 수 없습니다.',
+    displayNameTooLong: '표시 이름은 {max}자를 초과할 수 없습니다.',
     banned: '차단됨',
     roleAdmin: '관리자',
     roleCreator: '크리에이터',
@@ -207,6 +210,8 @@ export default {
     rewardAlreadyRedeemed: '이미 교환된 보상입니다. 중복 Ideas가 지급되지 않았습니다.',
     avatarUpdated: '아바타가 업데이트되었습니다.',
     avatarUpdateFailed: '아바타를 업데이트할 수 없습니다.',
+    displayNameUpdated: '표시 이름이 업데이트되었습니다.',
+    displayNameUpdateFailed: '표시 이름을 업데이트할 수 없습니다.',
     passwordUpdated: '비밀번호가 업데이트되었습니다. 다시 로그인해 주세요.',
     passwordUpdateFailed: '비밀번호를 업데이트할 수 없습니다.',
   },

@@ -269,11 +269,12 @@ describe('WorkspaceSettingsDialog members', () => {
   test('changes a role through PATCH and converges the roster', async () => {
     const { user } = renderMembersDialog()
 
-    const roleGroup = within(await screen.findByLabelText('Role for usr_a'))
-    const adminOption = roleGroup.getByRole('radio', { name: 'Admin' })
-    expect(adminOption).toHaveAttribute('aria-checked', 'false')
+    // Compact dropdown: the closed trigger shows the confirmed value…
+    const trigger = await screen.findByRole('combobox', { name: 'Role for usr_a' })
+    expect(trigger).toHaveTextContent('Member')
 
-    await user.click(adminOption)
+    await user.click(trigger)
+    await user.click(await screen.findByRole('option', { name: 'Admin' }))
 
     await waitFor(() =>
       expect(fakeMembers.calls).toContainEqual(
@@ -281,10 +282,9 @@ describe('WorkspaceSettingsDialog members', () => {
       ),
     )
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Role updated.'))
+    // …and converges to the new value once the roster refetch lands.
     await waitFor(() =>
-      expect(
-        within(screen.getByLabelText('Role for usr_a')).getByRole('radio', { name: 'Admin' }),
-      ).toHaveAttribute('aria-checked', 'true'),
+      expect(screen.getByRole('combobox', { name: 'Role for usr_a' })).toHaveTextContent('Admin'),
     )
   })
 
@@ -292,23 +292,28 @@ describe('WorkspaceSettingsDialog members', () => {
     const { user } = renderMembersDialog()
     fakeMembers.failNext = { op: 'role', code: 'membership_transition_forbidden' }
 
-    const roleGroup = within(await screen.findByLabelText('Role for usr_a'))
-    await user.click(roleGroup.getByRole('radio', { name: 'Owner' }))
+    const trigger = await screen.findByRole('combobox', { name: 'Role for usr_a' })
+    await user.click(trigger)
+    await user.click(await screen.findByRole('option', { name: 'Owner' }))
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith('The last owner cannot be removed or demoted.'),
     )
-    // Controlled buttons: the failed write never moves the confirmed value.
-    expect(
-      within(screen.getByLabelText('Role for usr_a')).getByRole('radio', { name: 'Member' }),
-    ).toHaveAttribute('aria-checked', 'true')
+    // Controlled dropdown: the failed write never moves the confirmed value.
+    expect(screen.getByRole('combobox', { name: 'Role for usr_a' })).toHaveTextContent('Member')
   })
 
   test('requires confirmation before removing, naming the board-grant sweep', async () => {
     const { user } = renderMembersDialog()
     await screen.findByText('usr_a')
 
-    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    // Leave/Remove is an independent text button at the row end, outside the
+    // role dropdown: no segmented pill, no radiogroup.
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Role for usr_a' })).toBeVisible()
+    const removeButton = screen.getByRole('button', { name: 'Remove' })
+
+    await user.click(removeButton)
 
     const note = await screen.findByText(/also removes their board permissions/)
     expect(note).toBeVisible()
@@ -427,7 +432,7 @@ describe('WorkspaceSettingsDialog members', () => {
     expect(team.queryByRole('button', { name: 'Invite' })).not.toBeInTheDocument()
     expect(team.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
     expect(team.queryByRole('button', { name: 'Leave' })).not.toBeInTheDocument()
-    expect(team.queryByLabelText(/Role for /)).not.toBeInTheDocument()
+    expect(team.queryByRole('combobox')).not.toBeInTheDocument()
     // Roles still read as text: owner row plus own member row.
     expect(team.getByText('boss@example.com')).toBeVisible()
     expect(team.getByText('Owner')).toBeVisible()
@@ -439,12 +444,15 @@ describe('WorkspaceSettingsDialog members', () => {
     await user.click(screen.getByRole('button', { name: 'Team 2' }))
     const team = within(sectionByWorkspace('Team 2'))
 
-    // Admin view keeps the invite row and role selects…
+    // Admin view keeps the invite row and role dropdowns…
     expect(await team.findByRole('button', { name: 'Invite' })).toBeVisible()
-    // …but the owner option on member roles stays disabled (the server still guards 403).
-    const roleGroup = within(await team.findByLabelText('Role for boss@example.com'))
-    const ownerOption = roleGroup.getByRole('radio', { name: 'Owner' })
-    expect(ownerOption).toBeDisabled()
+    // …but the owner option is not rendered at all for non-owners (no
+    // disabled placeholder; the server still guards 403).
+    const trigger = await team.findByRole('combobox', { name: 'Role for boss@example.com' })
+    await user.click(trigger)
+    expect(await screen.findByRole('option', { name: 'Member' })).toBeVisible()
+    expect(screen.getByRole('option', { name: 'Admin' })).toBeVisible()
+    expect(screen.queryByRole('option', { name: 'Owner' })).not.toBeInTheDocument()
   })
 
   test('member writes stay isolated per workspace', async () => {

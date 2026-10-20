@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "6a1ae05316667407eecf38c72ce15592b41ef817",
+  "checkpointSha": "cee34313f4c845dc6ba99a7a3a623207f5fd3c35",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -130,6 +130,11 @@
         },
         {
           "from": "src/features/account/session/payments/resource.ts",
+          "to": "src/api/contractKernel.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -294,7 +299,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 40,
+      "fanIn": 41,
       "fanOut": 3,
       "fanOutTargets": [
         "src/core/utils/errorMessages.ts",
@@ -322,7 +327,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 40,
+      "targetFanIn": 41,
       "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -2608,6 +2613,11 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/account/session/profile/resource.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/account/session/rewards/resource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
@@ -2623,8 +2633,8 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 19,
-      "fanOut": 253,
+      "fanIn": 20,
+      "fanOut": 255,
       "fanOutTargets": [
         "src/api/generated-query/public/model/accessIfMatchParameter.ts",
         "src/api/generated-query/public/model/addWorkspaceMemberRequest.ts",
@@ -2818,6 +2828,8 @@
         "src/api/generated-query/public/model/updateBoardRequestData.ts",
         "src/api/generated-query/public/model/updateOrganizationRequest.ts",
         "src/api/generated-query/public/model/updateOrganizationRequestData.ts",
+        "src/api/generated-query/public/model/updateUserRequest.ts",
+        "src/api/generated-query/public/model/updateUserRequestData.ts",
         "src/api/generated-query/public/model/updateWorkspaceMemberRequest.ts",
         "src/api/generated-query/public/model/updateWorkspaceMemberRequestData.ts",
         "src/api/generated-query/public/model/updateWorkspaceRequest.ts",
@@ -3843,6 +3855,16 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/updateUserRequest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/updateUserRequestData.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/updateWorkspaceMemberRequest.ts",
           "kind": "runtime"
         },
@@ -4151,8 +4173,8 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 19,
-      "targetFanOut": 253,
+      "targetFanIn": 20,
+      "targetFanOut": 255,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -4186,12 +4208,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/profile/resource.ts",
+          "to": "src/api/generated-query/public/user/user.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/generated-query/public/user/user.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 5,
+      "fanIn": 6,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -4235,7 +4262,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 5,
+      "targetFanIn": 6,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -4976,6 +5003,21 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/account/session/profile/resource.ts",
+          "to": "src/api/sessionUserType.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/session/profile/useDisplayNameRename.contract.spec.ts",
+          "to": "src/api/sessionUserType.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/session/profile/useProfileFeedback.ts",
+          "to": "src/api/sessionUserType.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/account/ui/profile/ProfilePane.component.spec.ts",
           "to": "src/api/sessionUserType.ts",
           "kind": "type-only"
@@ -5026,7 +5068,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 14,
+      "fanIn": 17,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -5034,7 +5076,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 14,
+      "targetFanIn": 17,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -5234,12 +5276,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/profile/resource.ts",
+          "to": "src/api/userSession.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/auth/session/browserSessionTransition.ts",
           "to": "src/api/userSession.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 2,
+      "fanIn": 3,
       "fanOut": 4,
       "fanOutTargets": [
         "src/api/generated-query/public/user/user.ts",
@@ -5265,7 +5312,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 2,
+      "targetFanIn": 3,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -6006,6 +6053,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/profile/ProfilePane.vue",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/recharge/HistoryTable.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
@@ -6106,7 +6158,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 28,
+      "fanIn": 29,
       "fanOut": 6,
       "fanOutTargets": [
         "node_modules/class-variance-authority/dist/index.js",
@@ -6152,7 +6204,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 28,
+      "targetFanIn": 29,
       "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -6885,6 +6937,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/profile/ProfilePane.vue",
+          "to": "src/components/ui/input/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
@@ -6930,7 +6987,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 13,
+      "fanIn": 14,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -6980,7 +7037,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 13,
+      "targetFanIn": 14,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -7088,6 +7145,11 @@
     "src/components/ui/select/index.ts": {
       "consumerEdges": [
         {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
+          "to": "src/components/ui/select/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/shared/ui/form/AdminSelect.vue",
           "to": "src/components/ui/select/index.ts",
           "kind": "runtime"
@@ -7098,7 +7160,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 2,
+      "fanIn": 3,
       "fanOut": 6,
       "fanOutTargets": [
         "node_modules/class-variance-authority/dist/index.js",
@@ -7309,7 +7371,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 2,
+      "targetFanIn": 3,
       "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -8932,6 +8994,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/profile/useDisplayNameRename.ts",
+          "to": "src/core/composables/useAsyncAction.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/profile/useProfileFeedback.ts",
           "to": "src/core/composables/useAsyncAction.ts",
           "kind": "type-only"
@@ -9002,7 +9069,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 16,
+      "fanIn": 17,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/vue/index.js"],
       "outboundEdges": [
@@ -9016,7 +9083,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 16,
+      "targetFanIn": 17,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -10615,6 +10682,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/profile/resource.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/profile/useProfileFeedback.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -11211,7 +11283,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 140,
+      "fanIn": 141,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
@@ -11281,7 +11353,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 140,
+      "targetFanIn": 141,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -14206,7 +14278,7 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 83,
+      "fanOut": 87,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -14219,11 +14291,13 @@
         "node_modules/vue/index.js",
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/model/index.ts",
+        "src/api/generated-query/public/user/user.ts",
         "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
         "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
         "src/api/idempotencyKey.ts",
         "src/api/sessionUserType.ts",
         "src/api/upload.ts",
+        "src/api/userSession.ts",
         "src/api/workspaceEventStream.ts",
         "src/app/style.css",
         "src/components/ui/avatar/index.ts",
@@ -14232,6 +14306,7 @@
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/input/index.ts",
         "src/components/ui/popover/index.ts",
+        "src/components/ui/select/index.ts",
         "src/components/ui/skeleton/index.ts",
         "src/components/ui/spinner/index.ts",
         "src/core/auth/passwordPolicy.ts",
@@ -14285,6 +14360,7 @@
         "src/test/deferred.ts",
         "src/test/domOrder.ts",
         "src/test/factories/index.ts",
+        "src/test/msw.ts",
         "src/test/render.ts",
         "src/test/toast.ts",
         "src/theme/appOverlayMenu.ts",
@@ -14749,6 +14825,51 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/profile/resource.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/resource.contract.spec.ts",
+          "to": "src/test/msw.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/resource.ts",
+          "to": "src/api/contractKernel.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/resource.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/session/profile/resource.ts",
+          "to": "src/api/generated-query/public/user/user.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/resource.ts",
+          "to": "src/api/sessionUserType.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/session/profile/resource.ts",
+          "to": "src/api/userSession.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/resource.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/resource.ts",
+          "to": "src/core/utils/request.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/profile/useAvatarUpload.contract.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
@@ -14772,6 +14893,41 @@
           "from": "src/features/account/session/profile/useAvatarUpload.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/useDisplayNameRename.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/useDisplayNameRename.contract.spec.ts",
+          "to": "src/api/sessionUserType.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/session/profile/useDisplayNameRename.contract.spec.ts",
+          "to": "src/test/factories/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/useDisplayNameRename.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/useDisplayNameRename.ts",
+          "to": "src/core/composables/useAsyncAction.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/useDisplayNameRename.ts",
+          "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/profile/useProfileFeedback.ts",
+          "to": "src/api/sessionUserType.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/account/session/profile/useProfileFeedback.ts",
@@ -15325,6 +15481,11 @@
         },
         {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
+          "to": "src/components/ui/select/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
           "to": "src/components/ui/spinner/index.ts",
           "kind": "runtime"
         },
@@ -15341,6 +15502,11 @@
         {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
           "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
+          "to": "src/theme/appOverlayMenu.ts",
           "kind": "runtime"
         },
         {
@@ -15645,6 +15811,11 @@
         },
         {
           "from": "src/features/account/ui/profile/ProfilePane.component.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/profile/ProfilePane.component.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
@@ -15686,6 +15857,16 @@
         {
           "from": "src/features/account/ui/profile/ProfilePane.vue",
           "to": "src/components/ui/avatar/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/profile/ProfilePane.vue",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/profile/ProfilePane.vue",
+          "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
         },
         {
@@ -16179,7 +16360,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 83,
+      "targetFanOut": 87,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -22304,6 +22485,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/profile/useDisplayNameRename.ts",
+          "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/security/usePasswordChange.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
@@ -22459,7 +22645,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 36,
+      "fanIn": 37,
       "fanOut": 46,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -23195,7 +23381,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 36,
+      "targetFanIn": 37,
       "targetFanOut": 46,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -44234,6 +44420,11 @@
     "src/test/factories/index.ts": {
       "consumerEdges": [
         {
+          "from": "src/features/account/session/profile/useDisplayNameRename.contract.spec.ts",
+          "to": "src/test/factories/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.component.spec.ts",
           "to": "src/test/factories/index.ts",
           "kind": "runtime"
@@ -44324,7 +44515,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 18,
+      "fanIn": 19,
       "fanOut": 1,
       "fanOutTargets": ["src/api/sessionUserType.ts"],
       "outboundEdges": [
@@ -44338,7 +44529,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 18,
+      "targetFanIn": 19,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -44363,6 +44554,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
+          "to": "src/theme/appOverlayMenu.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/ui/gallery/BoardsPage.vue",
           "to": "src/theme/appOverlayMenu.ts",
           "kind": "runtime"
@@ -44383,7 +44579,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 6,
+      "fanIn": 7,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -44391,7 +44587,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,

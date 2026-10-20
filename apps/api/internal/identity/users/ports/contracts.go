@@ -258,5 +258,6 @@ type UserRepository interface {
 	UpdateStatus(ctx context.Context, id int64, status int16) error
 	UpdateRoleByID(ctx context.Context, id int64, role string) error
 	UpdateAvatarByID(ctx context.Context, id int64, avatar string) error
+	UpdateDisplayNameByID(ctx context.Context, id int64, displayName string) error
 	EnsureStorageUIDs(ctx context.Context) error
 }

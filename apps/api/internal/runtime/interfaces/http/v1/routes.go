@@ -14,7 +14,6 @@ import (
 	eventwebhook "ideaboard/api/internal/events/webhook"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
-	identitydomain "ideaboard/api/internal/identity/users/domain"
 	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	"ideaboard/api/internal/media/derivatives/infrastructure/preview"
 	"ideaboard/api/internal/platform/applog"
@@ -111,9 +110,9 @@ type ContractV1Deps struct {
 	// Nil is reserved for in-memory tests without a durable store.
 	BoardAccessOutbox *eventoutbox.BoardAccessOutboxStore
 	SupportChannels   settings.SupportChannelsSettingProvider
-	// AvatarProfile persists uploads and projects the user record on session reads.
+	// UserProfile persists profile updates and projects the user record on session reads.
 	// Nil omits the read projection and fails avatar uploads closed with 503.
-	AvatarProfile runtimehttp.V1AvatarProfileDirectory
+	UserProfile   runtimehttp.V1UserProfileDirectory
 	MediaPreviews *preview.Service
 	// MemberDisplay resolves workspace-member display facts (Auth-owned
 	// email for invite search plus avatar public URL) for the member
@@ -148,9 +147,9 @@ func requireV1IdempotencyKey(c *gin.Context) (string, bool) {
 	return key, true
 }
 
-// contractV1UserDirectoryNote: runtimehttp.V1UserDirectory, runtimehttp.V1AvatarProfileDirectory,
+// contractV1UserDirectoryNote: runtimehttp.V1UserDirectory, runtimehttp.V1UserProfileDirectory,
 // usersRepositoryDirectory, runtimehttp.NewUsersRepositoryDirectory and
-// runtimehttp.NewV1AvatarProfileDirectory live in the runtimehttp kernel (shared.go)
+// runtimehttp.NewV1UserProfileDirectory live in the runtimehttp kernel (shared.go)
 // so v1 and control share them without a control -> v1 edge.
 
 func (d *ContractV1Deps) normalize() {
@@ -197,6 +196,7 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps runtimehttp.AuthD
 	group.GET("/public/branding/logo", handler.publicBrandingLogo)
 	group.Use(runtimehttp.V1AuthMiddleware(authDeps), runtimehttp.ResolvePrincipal())
 	group.GET("/user", handler.getUser)
+	group.PATCH("/user", handler.updateUser)
 	group.GET("/workspaces", handler.listWorkspaces)
 	group.POST("/workspaces", handler.createWorkspace)
 	group.GET("/workspaces/:workspace_id", handler.getWorkspace)
@@ -339,37 +339,7 @@ func (h *contractV1Handler) getUser(c *gin.Context) {
 	if !ok {
 		return
 	}
-	dto := v1UserDTO{
-		ID:          tenancy.FormatUserPublicID(identityPrincipal.PublicID()),
-		DisplayName: identityPrincipal.DisplayName(),
-		Role:        identityPrincipal.Role().String(),
-		// The principal only exists for active sessions, so the
-		// profile-less fallback (AvatarProfile nil in tests) reports
-		// active rather than the banned zero value.
-		Status: identitydomain.StatusActive,
-	}
-	if h.deps.AvatarProfile != nil {
-		profile, err := h.deps.AvatarProfile.GetUserByID(c.Request.Context(), identityPrincipal.UserID())
-		if err != nil || profile == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable52)
-			c.Abort()
-			return
-		}
-		dto.Avatar = runtimehttp.V1PublicAvatarURLForRow(profile.StorageUID, profile.Avatar)
-		dto.StorageNamespace = strings.TrimSpace(profile.StorageUID)
-		dto.CreatedAt = v1FormatTime(profile.CreatedAt)
-		dto.UpdatedAt = v1FormatTime(profile.UpdatedAt)
-		dto.Status = profile.Status
-	}
-	// Default workspace auto-provision hook: idempotent and
-	// concurrent-safe; a provision failure never fails /user itself.
-	if h.deps.Store != nil {
-		if def, err := h.deps.Store.EnsureDefaultWorkspace(c.Request.Context(), identityPrincipal.UserID()); err == nil && def != nil {
-			id := def.PublicID
-			dto.PersonalWorkspaceID = &id
-		}
-	}
-	contract.RenderSuccess(c, dto)
+	h.renderUser(c, identityPrincipal, identityPrincipal.DisplayName())
 }
 
 type v1WorkspaceDTO struct {

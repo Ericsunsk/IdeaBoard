@@ -170,6 +170,7 @@ const (
 	MsgMembershipTransitionForbidden2  = errorrender.MsgMembershipTransitionForbidden2                 // CodeMembershipTransitionForbidden
 	MsgParseBoardAccessIfMatch         = errorrender.MsgParseBoardAccessIfMatch                        // ParseBoardAccessIfMatch @ v1/boards.go
 	MsgUpdateBoardAccess               = errorrender.MsgUpdateBoardAccess                              // UpdateBoardAccess @ v1/boards.go
+	MsgUpdateUserDisplayName           = errorrender.MsgUpdateUserDisplayName                          // UpdateUserDisplayName @ v1/user.go
 	MsgParseBoardIfMatch               = errorrender.MsgParseBoardIfMatch                              // ParseBoardIfMatch @ v1/boards.go
 	MsgParseBoardIfMatch2              = errorrender.MsgParseBoardIfMatch2                             // ParseBoardIfMatch @ v1/boards.go
 	MsgCreateBoard                     = errorrender.MsgCreateBoard                                    // CreateBoard @ v1/boards.go

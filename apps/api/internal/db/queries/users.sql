@@ -85,6 +85,12 @@ UPDATE users
 SET avatar = sqlc.arg(avatar)
 WHERE id = sqlc.arg(id);
 
+-- name: UpdateUserDisplayName :execrows
+UPDATE users
+SET display_name = sqlc.arg(display_name),
+    updated_at = now()
+WHERE id = sqlc.arg(id);
+
 -- name: UpdateUserStorageUID :execrows
 UPDATE users
 SET storage_uid = sqlc.arg(storage_uid)

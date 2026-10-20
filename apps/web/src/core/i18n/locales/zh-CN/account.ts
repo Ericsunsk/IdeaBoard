@@ -27,6 +27,9 @@ export default {
   profile: {
     overviewAria: '账户个人资料概览',
     changeAvatar: '更改头像',
+    renameAriaLabel: '重命名 {name}',
+    displayNameEmpty: '显示名称不能为空。',
+    displayNameTooLong: '显示名称不能超过 {max} 个字符。',
     banned: '已封禁',
     roleAdmin: '管理员',
     roleCreator: '创作者',
@@ -204,6 +207,8 @@ export default {
     rewardAlreadyRedeemed: '该奖励已被兑换，不可重复领取。',
     avatarUpdated: '头像已更新。',
     avatarUpdateFailed: '更新头像失败。',
+    displayNameUpdated: '显示名称已更新。',
+    displayNameUpdateFailed: '更新显示名称失败。',
     passwordUpdated: '密码已更新，请重新登录。',
     passwordUpdateFailed: '更新密码失败。',
   },

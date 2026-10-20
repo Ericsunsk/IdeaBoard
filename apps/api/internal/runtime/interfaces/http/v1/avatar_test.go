@@ -59,7 +59,7 @@ func TestV1AvatarProfilePersistsAcrossHandlers(t *testing.T) {
 		f.other: {ID: f.other, StorageUID: "AVTR02"},
 	}}
 	deps := ContractV1Deps{Media: f.media, MediaObjects: f.objects, AvatarObjects: f.objects,
-		AvatarUID: NewV1AvatarDirectory(repo), AvatarProfile: runtimehttp.NewV1AvatarProfileDirectory(repo)}
+		AvatarUID: NewV1AvatarDirectory(repo), UserProfile: runtimehttp.NewV1UserProfileDirectory(repo)}
 	engine := newV1MediaTestEngine(f.store, f.dir, deps)
 	call := v1Call{method: "PUT", path: "/api/v1/user/avatar", userID: f.owner,
 		body:    string(v1GapsPNGBytes(512)),
@@ -79,7 +79,7 @@ func TestV1AvatarProfilePersistsAcrossHandlers(t *testing.T) {
 	avatar := v1Data(t, payload).(map[string]any)["avatar_url"]
 	// A fresh handler has no upload replay cache and reads only the user record.
 	engine = newV1MediaTestEngine(f.store, f.dir, ContractV1Deps{
-		AvatarProfile: runtimehttp.NewV1AvatarProfileDirectory(repo),
+		UserProfile: runtimehttp.NewV1UserProfileDirectory(repo),
 	})
 	status, _, payload = doV1(t, engine, v1Call{method: "GET", path: "/api/v1/user", userID: f.owner})
 	if status != http.StatusOK || v1Data(t, payload).(map[string]any)["avatar"] != avatar {
@@ -126,7 +126,7 @@ func TestV1UserProjectsProfileFields(t *testing.T) {
 			Role: "user", Status: identitydomain.StatusBanned, CreatedAt: created, UpdatedAt: updated},
 	}}
 	engine := newV1MediaTestEngine(f.store, f.dir, ContractV1Deps{
-		AvatarProfile: runtimehttp.NewV1AvatarProfileDirectory(repo),
+		UserProfile: runtimehttp.NewV1UserProfileDirectory(repo),
 	})
 	status, _, payload := doV1(t, engine, v1Call{method: "GET", path: "/api/v1/user", userID: f.owner})
 	if status != http.StatusOK {
@@ -185,7 +185,7 @@ func TestV1UserResponseMatchesPublicOpenAPI(t *testing.T) {
 			deps := ContractV1Deps{}
 			if tt.profile != nil {
 				repo := &avatarProfileRepository{users: map[int64]*identitydomain.User{f.owner: tt.profile}}
-				deps.AvatarProfile = runtimehttp.NewV1AvatarProfileDirectory(repo)
+				deps.UserProfile = runtimehttp.NewV1UserProfileDirectory(repo)
 			}
 			engine := newV1MediaTestEngine(f.store, f.dir, deps)
 			status, _, payload := doV1(t, engine, v1Call{method: "GET", path: "/api/v1/user", userID: f.owner})

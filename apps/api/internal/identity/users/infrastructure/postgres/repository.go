@@ -260,6 +260,18 @@ func (r *Repository) UpdateAvatarByID(ctx context.Context, id int64, avatar stri
 	return requireOneUserRow(updated)
 }
 
+// UpdateDisplayNameByID renames the caller's own profile. Callers validate
+// with domain.ValidateDisplayName first; the trim here keeps direct callers
+// safe. The database CHECK (VARCHAR(100), 1..100 characters) stays the
+// final guard.
+func (r *Repository) UpdateDisplayNameByID(ctx context.Context, id int64, displayName string) error {
+	updated, err := r.dbWithContext(ctx).q.UpdateUserDisplayName(ctx, dbsqlc.UpdateUserDisplayNameParams{DisplayName: strings.TrimSpace(displayName), ID: id})
+	if err != nil {
+		return err
+	}
+	return requireOneUserRow(updated)
+}
+
 func (r *Repository) EnsureStorageUIDs(ctx context.Context) error {
 	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
 		rows, err := q.ListUserStorageUIDs(ctx)

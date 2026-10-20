@@ -92,6 +92,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+    patch:
+      tags: [User]
+      operationId: updateUser
+      summary: Rename the current principal profile (self only)
+      description: >-
+        Renames the caller's own profile display_name. The name is
+        trimmed, rejected when empty, and capped at 100 characters
+        (the users.display_name column width). Only the authenticated
+        caller's own row is ever written. No Idempotency-Key is
+        required: renames are naturally idempotent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Profile renamed; updated principal profile.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Profile update unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /user/avatar:
     put:
       tags: [User]
@@ -3800,6 +3841,20 @@ components:
               anyOf:
                 - $ref: '#/components/schemas/OrganizationId'
                 - nullable: true
+    UpdateUserRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [display_name]
+          additionalProperties: false
+          properties:
+            display_name:
+              type: string
+              minLength: 1
+              maxLength: 100
     UpdateWorkspaceRequest:
       type: object
       required: [data]

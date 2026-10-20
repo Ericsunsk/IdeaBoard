@@ -445,6 +445,26 @@ func (q *Queries) UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarPara
 	return result.RowsAffected(), nil
 }
 
+const updateUserDisplayName = `-- name: UpdateUserDisplayName :execrows
+UPDATE users
+SET display_name = $1,
+    updated_at = now()
+WHERE id = $2
+`
+
+type UpdateUserDisplayNameParams struct {
+	DisplayName string `json:"display_name"`
+	ID          int64  `json:"id"`
+}
+
+func (q *Queries) UpdateUserDisplayName(ctx context.Context, arg UpdateUserDisplayNameParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateUserDisplayName, arg.DisplayName, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateUserLastLoginMetadata = `-- name: UpdateUserLastLoginMetadata :execrows
 UPDATE users
 SET last_login_ip = $1,

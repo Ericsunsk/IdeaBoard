@@ -49,20 +49,16 @@ func NewUsersRepositoryDirectory(repo identityports.UserRepository) V1UserDirect
 	return usersRepositoryDirectory{repo: repo}
 }
 
-// V1AvatarProfileDirectory owns the persisted avatar projection, independent of session principals.
-type V1AvatarProfileDirectory interface {
+// V1UserProfileDirectory owns the persisted user profile projection,
+// independent of session principals.
+type V1UserProfileDirectory interface {
 	UpdateUserAvatar(ctx context.Context, userID int64, avatar string) error
-	// GetUserByID projects the stored user row for session reads
-	// (storage namespace, status, timestamps, avatar). It reuses the
-	// existing users.GetByID query; no new query or migration is needed.
+	UpdateDisplayNameByID(ctx context.Context, userID int64, displayName string) error
 	GetUserByID(ctx context.Context, userID int64) (*identitydomain.User, error)
-	// GetUserByStorageUID projects the stored user row for the public
-	// avatar route. It reuses the existing users.GetByStorageUID
-	// query; no new query or migration is needed.
 	GetUserByStorageUID(ctx context.Context, storageUID string) (*identitydomain.User, error)
 }
 
-func NewV1AvatarProfileDirectory(repo identityports.UserRepository) V1AvatarProfileDirectory {
+func NewV1UserProfileDirectory(repo identityports.UserRepository) V1UserProfileDirectory {
 	return usersRepositoryDirectory{repo: repo}
 }
 
@@ -93,6 +89,13 @@ func (d usersRepositoryDirectory) UpdateUserAvatar(ctx context.Context, userID i
 		return tenancy.ErrNotFound
 	}
 	return d.repo.UpdateAvatarByID(ctx, userID, avatar)
+}
+
+func (d usersRepositoryDirectory) UpdateDisplayNameByID(ctx context.Context, userID int64, displayName string) error {
+	if d.repo == nil || userID <= 0 {
+		return tenancy.ErrNotFound
+	}
+	return d.repo.UpdateDisplayNameByID(ctx, userID, displayName)
 }
 
 func (d usersRepositoryDirectory) GetUserByID(ctx context.Context, userID int64) (*identitydomain.User, error) {

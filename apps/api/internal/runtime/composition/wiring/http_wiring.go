@@ -180,7 +180,7 @@ func NewAppRouter(
 			MemberDisplay: v1.NewMemberDisplayService(repos.userRepo, services.authServiceClient),
 			MemberLookup:  v1.NewMemberLookupService(repos.userRepo, services.authServiceClient),
 			AvatarUID:     v1.NewV1AvatarDirectory(repos.userRepo),
-			AvatarProfile: runtimehttp.NewV1AvatarProfileDirectory(repos.userRepo),
+			UserProfile:   runtimehttp.NewV1UserProfileDirectory(repos.userRepo),
 			// Avatar bytes ride the storage abstraction (active
 			// profile): the same seam serves local today and R2 after
 			// the profile cutover.

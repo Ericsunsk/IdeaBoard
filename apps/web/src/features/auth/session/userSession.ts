@@ -10,6 +10,7 @@ export type UserSessionStore = {
   readonly email: string | null
   readonly isAdmin: boolean
   sessionValidatedAt: number
+  captureSession: () => () => boolean
   setAuth: (newUser: User) => void
   setEmail: (email: string) => void
   clearAuth: () => void
@@ -156,6 +157,7 @@ function createUserSessionStore(): UserSessionStore {
     email,
     isAdmin,
     sessionValidatedAt,
+    captureSession: transition.captureSession,
     setAuth: transition.setAuth,
     setEmail,
     clearAuth: transition.clearLocal,

@@ -31,6 +31,7 @@ type SessionTransport = Pick<typeof authTransport, 'hasSession' | 'logout' | 'st
 
 export type BrowserSessionTransition = {
   restoreStoredUser: () => void
+  captureSession: () => () => boolean
   setAuth: (user: User) => void
   clearLocal: () => void
   fetchUserInfo: (
@@ -120,6 +121,13 @@ export function createBrowserSessionTransition(
 
   function isStaleRequest(requestEpoch: number): boolean {
     return requestEpoch !== identityEpoch
+  }
+
+  function captureSession(): () => boolean {
+    const requestEpoch = identityEpoch
+    const publicId = state.getUser()?.public_id
+    return () =>
+      publicId != null && !isStaleRequest(requestEpoch) && state.getUser()?.public_id === publicId
   }
 
   function commitUnlessStale(user: User, requestEpoch: number): User | null {
@@ -215,6 +223,7 @@ export function createBrowserSessionTransition(
 
   return {
     restoreStoredUser,
+    captureSession,
     setAuth: commitUser,
     clearLocal: clearSession,
     fetchUserInfo,

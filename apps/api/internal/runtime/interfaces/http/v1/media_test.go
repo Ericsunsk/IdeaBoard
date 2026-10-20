@@ -799,8 +799,19 @@ func (f *fakeAvatarUID) UpdateUserAvatar(ctx context.Context, userID int64, avat
 	return nil
 }
 
+// UpdateDisplayNameByID keeps fakeAvatarUID satisfying the extended
+// runtimehttp.V1UserProfileDirectory. The avatar surface never
+// renames, so the write is only recorded, never projected.
+func (f *fakeAvatarUID) UpdateDisplayNameByID(_ context.Context, _ int64, _ string) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
+	f.writes++
+	return nil
+}
+
 // GetUserByID keeps fakeAvatarUID satisfying the extended
-// runtimehttp.V1AvatarProfileDirectory (storage/status/timestamps projection).
+// runtimehttp.V1UserProfileDirectory (storage/status/timestamps projection).
 // Unknown users project an empty row; only the avatar-owning user
 // carries the persisted URL.
 func (f *fakeAvatarUID) GetUserByID(ctx context.Context, userID int64) (*domain.User, error) {
@@ -865,8 +876,8 @@ func newV1MediaGapsFixture(t *testing.T, avatarUID V1AvatarUIDDirectory) *v1Medi
 	}
 	store.SeedWorkspaceMember(ws2.PublicID, owner, tenancy.RoleMember)
 	deps := ContractV1Deps{Media: media, MediaObjects: objects, AvatarUID: avatarUID, AvatarObjects: objects, MediaRenderer: imgproxy.NewRenderer(v1TestImgproxyConfig(t), fakeV1StorageProfiler{profile: &storagedomain.StorageProfile{Provider: storagedomain.StorageProviderLocal, Enabled: true}})}
-	if profile, ok := avatarUID.(runtimehttp.V1AvatarProfileDirectory); ok {
-		deps.AvatarProfile = profile
+	if profile, ok := avatarUID.(runtimehttp.V1UserProfileDirectory); ok {
+		deps.UserProfile = profile
 	}
 	engine := newV1MediaTestEngine(store, dir, deps)
 	return &v1MediaGapsFixture{store: store, media: media, objects: objects, dir: dir, engine: engine,
@@ -1910,7 +1921,7 @@ func TestPublicMediaUsesActiveStorageProfile(t *testing.T) {
 			const logoKey = "uploads/site/assets/logo_abcdef1234567890.png"
 			engine := newV1MediaTestEngine(tenancy.NewInMemoryStoreForTests(), newStaticUserDirectory(), ContractV1Deps{
 				MediaRenderer: imgproxy.NewRenderer(v1TestImgproxyConfig(t), tc.profiler),
-				AvatarProfile: &fakeAvatarUID{uid: "AVTR01", avatar: avatarKey},
+				UserProfile:   &fakeAvatarUID{uid: "AVTR01", avatar: avatarKey},
 			})
 			for _, asset := range []struct{ route, key string }{
 				{"/api/v1/public/users/AVTR01/avatar", avatarKey},

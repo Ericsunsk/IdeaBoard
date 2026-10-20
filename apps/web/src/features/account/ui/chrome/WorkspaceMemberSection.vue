@@ -119,94 +119,76 @@
                 </div>
               </div>
 
-              <!-- Right: Role Control + Action (Laid out flat) -->
+              <!-- Right: Role Control + Action -->
               <div class="flex items-center gap-2 shrink-0">
-                <!-- Flat Segmented Group (Member / Admin / Owner / Leave|Remove) -->
-                <div
+                <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The trigger carries its accessible name via :aria-label; the rule cannot see through the Select primitive. -->
+                <Select
                   v-if="section.canManage.value"
-                  class="inline-flex items-center rounded-control bg-muted/60 p-0.5 text-xs border border-border/40"
-                  role="radiogroup"
-                  :aria-label="
-                    t('workspace.switcher.members.roleForMember', {
-                      userId: memberDisplayName(entry),
-                    })
-                  "
+                  :model-value="entry.role"
+                  :disabled="section.isPending(`role:${entry.userId}`)"
+                  @update:model-value="onRoleChange(entry.userId, $event)"
                 >
-                  <button
-                    type="button"
-                    role="radio"
-                    :aria-checked="entry.role === 'member'"
-                    :class="[
-                      'h-7 px-2.5 rounded-control text-xs font-medium transition-[color,background-color,box-shadow] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer select-none',
-                      entry.role === 'member'
-                        ? 'bg-background text-foreground shadow-xs font-semibold'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-background/40',
-                    ]"
-                    :disabled="section.isPending(`role:${entry.userId}`)"
-                    @click="onRoleSelect(entry.userId, 'member')"
-                  >
-                    {{ t('workspace.switcher.members.roleMember') }}
-                  </button>
-                  <button
-                    type="button"
-                    role="radio"
-                    :aria-checked="entry.role === 'admin'"
-                    :class="[
-                      'h-7 px-2.5 rounded-control text-xs font-medium transition-[color,background-color,box-shadow] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer select-none',
-                      entry.role === 'admin'
-                        ? 'bg-background text-foreground shadow-xs font-semibold'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-background/40',
-                    ]"
-                    :disabled="section.isPending(`role:${entry.userId}`)"
-                    @click="onRoleSelect(entry.userId, 'admin')"
-                  >
-                    {{ t('workspace.switcher.members.roleAdmin') }}
-                  </button>
-                  <button
-                    type="button"
-                    role="radio"
-                    :aria-checked="entry.role === 'owner'"
-                    :class="[
-                      'h-7 px-2.5 rounded-control text-xs font-medium transition-[color,background-color,box-shadow] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] select-none',
-                      entry.role === 'owner'
-                        ? 'bg-background text-foreground shadow-xs font-semibold cursor-default'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-background/40 cursor-pointer',
-                      !section.isOwner.value ? 'opacity-40 !cursor-not-allowed' : '',
-                    ]"
-                    :disabled="!section.isOwner.value || section.isPending(`role:${entry.userId}`)"
-                    :title="
-                      !section.isOwner.value
-                        ? t('workspace.switcher.members.noPermission')
-                        : undefined
+                  <SelectTrigger
+                    size="sm"
+                    class="w-auto min-w-24 cursor-pointer gap-1.5"
+                    :aria-label="
+                      t('workspace.switcher.members.roleForMember', {
+                        userId: memberDisplayName(entry),
+                      })
                     "
-                    @click="section.isOwner.value && onRoleSelect(entry.userId, 'owner')"
                   >
-                    {{ t('workspace.switcher.members.roleOwner') }}
-                  </button>
-
-                  <span class="h-3.5 w-px bg-border/60 mx-1" aria-hidden="true" />
-
-                  <!-- Remove/Leave Flat Button -->
-                  <button
-                    v-if="section.confirmingRemoveId.value !== entry.userId"
-                    type="button"
-                    class="h-7 px-2.5 rounded-control text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="section.isPending(`remove:${entry.userId}`)"
-                    @click="section.requestRemove(entry.userId)"
+                    <SelectValue>{{ roleLabel(entry.role) }}</SelectValue>
+                    <SelectIcon>
+                      <NavArrowDown class="size-3.5 shrink-0" aria-hidden="true" />
+                    </SelectIcon>
+                  </SelectTrigger>
+                  <SelectContent
+                    position="popper"
+                    align="end"
+                    :side-offset="appOverlayMenuSideOffset"
                   >
-                    {{
-                      entry.userId === props.currentUserId
-                        ? t('workspace.switcher.members.leaveAction')
-                        : t('workspace.switcher.members.removeAction')
-                    }}
-                  </button>
-                </div>
+                    <SelectViewport>
+                      <SelectItem value="member">
+                        <SelectItemText>{{
+                          t('workspace.switcher.members.roleMember')
+                        }}</SelectItemText>
+                      </SelectItem>
+                      <SelectItem value="admin">
+                        <SelectItemText>{{
+                          t('workspace.switcher.members.roleAdmin')
+                        }}</SelectItemText>
+                      </SelectItem>
+                      <SelectItem v-if="section.isOwner.value" value="owner">
+                        <SelectItemText>{{
+                          t('workspace.switcher.members.roleOwner')
+                        }}</SelectItemText>
+                      </SelectItem>
+                    </SelectViewport>
+                  </SelectContent>
+                </Select>
                 <span
                   v-else
                   class="shrink-0 rounded-pill px-2.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground"
                 >
                   {{ roleLabel(entry.role) }}
                 </span>
+
+                <!-- Independent Leave/Remove text button at the row end -->
+                <button
+                  v-if="
+                    section.canManage.value && section.confirmingRemoveId.value !== entry.userId
+                  "
+                  type="button"
+                  class="h-8 px-2.5 rounded-control text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="section.isPending(`remove:${entry.userId}`)"
+                  @click="section.requestRemove(entry.userId)"
+                >
+                  {{
+                    entry.userId === props.currentUserId
+                      ? t('workspace.switcher.members.leaveAction')
+                      : t('workspace.switcher.members.removeAction')
+                  }}
+                </button>
               </div>
             </div>
 
@@ -262,13 +244,24 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { SendMail } from '@iconoir/vue'
+import { NavArrowDown, SendMail } from '@iconoir/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectIcon,
+  SelectItem,
+  SelectItemText,
+  SelectTrigger,
+  SelectValue,
+  SelectViewport,
+} from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
 import { resolveMemberAvatar, resolveMemberInitial } from '../../../../core/media/avatarUrl'
+import { appOverlayMenuSideOffset } from '../../../../theme/appOverlayMenu'
 import { useUserStore } from '../../../auth'
 import { accountCardPanelClass } from '../shared/ui'
 import { memberDisplayName, useWorkspaceMemberSection } from './useWorkspaceMemberSection'
@@ -301,9 +294,9 @@ function roleLabel(role: WorkspaceMemberRole): string {
   }
 }
 
-async function onRoleSelect(userId: string, role: WorkspaceMemberRole): Promise<void> {
-  const current = section.roster.value.find((entry) => entry.userId === userId)?.role
-  if (current === role) return
-  await section.changeMemberRole(userId, role)
+async function onRoleChange(userId: string, value: unknown): Promise<void> {
+  if (value !== 'member' && value !== 'admin' && value !== 'owner') return
+  if (value === 'owner' && !section.isOwner.value) return
+  await section.changeMemberRole(userId, value)
 }
 </script>

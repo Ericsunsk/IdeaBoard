@@ -52,11 +52,56 @@
         </div>
 
         <div class="min-w-0">
-          <p
-            class="m-0 truncate text-[24px] leading-tight font-bold tracking-normal text-foreground sm:text-[30px]"
-          >
-            {{ userStore.user?.display_name }}
-          </p>
+          <div v-if="isEditingName" class="flex min-w-0 items-center gap-2">
+            <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The rename input carries its accessible name via aria-label -->
+            <Input
+              ref="renameInputRef"
+              v-model="draftName"
+              size="sm"
+              class="h-9 max-w-xs text-sm"
+              :disabled="isRenamingName"
+              :aria-label="renameAriaLabel"
+              @keydown="handleRenameKeydown"
+            />
+            <Button
+              type="button"
+              size="sm"
+              class="h-9 shrink-0"
+              :is-loading="isRenamingName"
+              :is-disabled="isRenamingName"
+              @click="commitRename"
+            >
+              {{ t('common.actions.save') }}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              class="h-9 shrink-0"
+              :is-disabled="isRenamingName"
+              @click="cancelRename"
+            >
+              {{ t('common.actions.cancel') }}
+            </Button>
+          </div>
+          <div v-else class="flex min-w-0 items-center gap-2">
+            <p
+              class="m-0 min-w-0 flex-1 truncate text-[24px] leading-tight font-bold tracking-normal text-foreground sm:text-[30px]"
+            >
+              {{ currentDisplayName }}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              class="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+              :title="renameAriaLabel"
+              :aria-label="renameAriaLabel"
+              @click="handleStartRename"
+            >
+              <EditPencil class="size-3.5" aria-hidden="true" />
+            </Button>
+          </div>
           <div class="mt-3 flex min-w-0 flex-wrap items-center gap-2">
             <StatusBadge v-if="isUserBanned" tone="danger" :dot="false">
               {{ t('account.profile.banned') }}
@@ -95,13 +140,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Camera } from '@iconoir/vue'
+import { Camera, EditPencil } from '@iconoir/vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import StatusBadge, { type AppStatusTone } from '../../../../core/components/StatusBadge.vue'
 import { useUserStore } from '../../../auth'
 import { useAvatarUpload } from '../../session/profile/useAvatarUpload'
+import { useDisplayNameRename } from '../../session/profile/useDisplayNameRename'
 import { formatDottedIsoDate } from '../../../../core/utils/dateTime'
 import { resolveSizedAvatarUrl } from '../../../../core/media/avatarUrl'
 import AccountPane from '../shared/AccountPane.vue'
@@ -115,7 +163,21 @@ type ProfileField = {
 const { t } = useI18n()
 const userStore = useUserStore()
 const { isUploading: isAvatarUploading, handleFileChange: onAvatarFileChange } = useAvatarUpload()
+const {
+  isEditing: isEditingName,
+  isRenaming: isRenamingName,
+  draftName,
+  startRename,
+  cancelRename,
+  commitRename,
+} = useDisplayNameRename()
 const avatarInputRef = ref<HTMLInputElement | null>(null)
+const renameInputRef = useTemplateRef('renameInputRef')
+
+const currentDisplayName = computed(() => userStore.user?.display_name ?? '')
+const renameAriaLabel = computed(() =>
+  t('account.profile.renameAriaLabel', { name: currentDisplayName.value }),
+)
 
 const sizedAvatarUrl = computed(() => resolveSizedAvatarUrl(userStore.user?.avatar, 88))
 const isUserBanned = computed(() => userStore.user?.status === 0)
@@ -149,5 +211,29 @@ const profileFields = computed<ProfileField[]>(() => [
 
 function openAvatarPicker() {
   avatarInputRef.value?.click()
+}
+
+function handleRenameKeydown(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    void commitRename()
+  } else if (event.key === 'Escape' || event.key === 'Esc') {
+    event.preventDefault()
+    event.stopPropagation()
+    cancelRename()
+  }
+}
+
+function handleStartRename() {
+  startRename()
+  void nextTick(() => {
+    const host = renameInputRef.value as unknown as { $el?: unknown } | null
+    const input = (host?.$el ?? host) as HTMLElement | null
+    if (input instanceof HTMLInputElement) {
+      input.focus()
+      input.select()
+    }
+  })
 }
 </script>
