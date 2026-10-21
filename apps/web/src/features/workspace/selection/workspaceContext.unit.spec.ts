@@ -237,6 +237,25 @@ describe('concurrent provision idempotency', () => {
     expect(provision).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps the same workspace name in different organizations on separate flights', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const provision = vi.fn(async () => {
+      await gate
+      return TEAM
+    })
+    const store = createWorkspaceSelectionStore({ persist: memoryWorkspacePersist(), provision })
+    const first = store.provision({ name: 'Design', organizationId: 'org_first' })
+    const second = store.provision({ name: 'Design', organizationId: 'org_second' })
+    expect(provision).toHaveBeenCalledTimes(2)
+    expect(provision).toHaveBeenCalledWith({ name: 'Design', organizationId: 'org_first' })
+    expect(provision).toHaveBeenCalledWith({ name: 'Design', organizationId: 'org_second' })
+    release()
+    await Promise.all([first, second])
+  })
+
   it('preserves the selected and persisted workspace without emitting a scope change', async () => {
     const persist = memoryWorkspacePersist(DEFAULT.publicId)
     const store = createWorkspaceSelectionStore({

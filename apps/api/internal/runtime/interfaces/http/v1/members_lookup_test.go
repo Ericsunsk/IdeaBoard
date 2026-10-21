@@ -232,6 +232,7 @@ func TestV1MemberLookupByEmailPG(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	configureV1WorkspaceDefaultQuota(t, db, ws)
 	if _, err := tstore.AddWorkspaceMember(ctx, ws.PublicID, admin, tenancy.RoleAdmin); err != nil {
 		t.Fatal(err)
 	}

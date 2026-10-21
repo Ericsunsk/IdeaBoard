@@ -154,6 +154,26 @@ func (s *InMemoryStore) CreateWorkspace(ctx context.Context, params CreateWorksp
 	if params.IsDefault && params.OrganizationID != nil {
 		return nil, ErrDefaultWorkspaceConflict
 	}
+	// #944 creation-time guards (parity with postgres): billing opts are
+	// mutually exclusive; Default and org scopes reject explicit billing
+	// choices fail-closed instead of silently picking another pool.
+	if params.BillingAccountPublicID != nil && params.NewBillingAccount {
+		return nil, ErrBillingConflict
+	}
+	if params.IsDefault && (params.BillingAccountPublicID != nil || params.NewBillingAccount) {
+		return nil, ErrBillingConflict
+	}
+	if params.BillingAccountPublicID != nil {
+		if target := strings.TrimSpace(*params.BillingAccountPublicID); !strings.HasPrefix(target, "ba_") || len(target) <= 3 {
+			return nil, ErrBillingNotFound
+		}
+		if params.OrganizationID != nil {
+			return nil, ErrBillingConflict
+		}
+	}
+	if params.NewBillingAccount && params.OrganizationID != nil {
+		return nil, ErrBillingConflict
+	}
 	if params.OrganizationID != nil {
 		if _, ok := s.organizations[*params.OrganizationID]; !ok {
 			return nil, ErrNotFound

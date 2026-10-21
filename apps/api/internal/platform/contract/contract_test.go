@@ -482,6 +482,11 @@ func TestStatusMatrixWorkspaceKernelCodes(t *testing.T) {
 		CodeTaskStateConflict:       http.StatusConflict,
 		CodeTaskInsufficientCredits: http.StatusPaymentRequired,
 
+		CodeWorkspaceBudgetExhausted: http.StatusForbidden,
+		CodeMemberQuotaExhausted:     http.StatusForbidden,
+
+		CodeDefaultMemberQuotaNotConfigured: http.StatusConflict,
+
 		CodeLibraryFolderNotFound:          http.StatusNotFound,
 		CodeLibraryAssetNotFound:           http.StatusNotFound,
 		CodeLibraryMaterializationNotFound: http.StatusNotFound,

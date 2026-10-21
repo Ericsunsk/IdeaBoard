@@ -36,6 +36,11 @@ The Workspace Shell is a frontend composition boundary. A tenant Workspace is ow
 - Admin routes remain in the Admin route table; public Search, auth callback, and legal routes retain their explicit access metadata.
 - Never call deep auth-store mutations directly from nav components.
 - Creating a tenant Workspace preserves the current route and selected Workspace; settings focus the new row locally. Explicit navigation owns scope changes and must drop a stale Canvas Board ID.
+- Workspace creation names its payer explicitly (#944): personal creates default to the current Billing Account with no new wallet, `isNewBillingAccount` mints an isolated account for an independently operated business, org scopes always use the org pool, and the create dialog states the sharing/isolated choice before submit. `provisionWorkspace` carries the billing choice and the dedupe key covers it, so the same name with a different account never replays.
+- Organization setup is explicit in Workspace creation: list all visible Organizations (including those with no Workspace), create the Organization and its funds account as one server transaction, then create its first Workspace as a separate visible step. Workspace creation errors retain the selected Organization for retry; Organization scope never falls back to personal funding.
+- Workspace settings shows the shared consumption budget (#945): usage visible to every member, monthly-limit management gated to billing managers off the billing-account consumption scope (workspace admins cannot raise a pool-granted budget; the backend enforces 403).
+- Workspace settings shows the member cross-workspace quota (#946): self usage visible to every member, per-member limit management gated to billing managers off the same consumption scope (workspace admins cannot raise a pool-granted quota; the backend enforces 403).
+- Workspace settings shows the account default new-member quota (#947): fail closed until a Billing Owner/Admin sets it (invites render 409 and guide to the default; never implicit unlimited), monthly presets plus the five quota words, changes affect only later joins, and invites reuse it atomically (the inviter cannot raise it).
 
 ## Non-goals
 

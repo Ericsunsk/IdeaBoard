@@ -274,6 +274,8 @@
         :current-user-id="props.workspace?.currentUserId ?? null"
         :on-retry="handleWorkspaceDialogRetry"
         :on-create="handleWorkspaceCreate"
+        :on-load-organizations="props.workspace?.onLoadOrganizations"
+        :on-create-organization="props.workspace?.onCreateOrganization"
         :on-rename="handleWorkspaceRename"
         :on-delete="handleWorkspaceDelete"
         @update:is-open="isWorkspaceSettingsOpen = $event"
@@ -320,6 +322,7 @@ import { isDefaultWorkspaceItem } from './workspaceMenu'
 import type {
   UserAccountMenuItem,
   UserAccountMenuWorkspace,
+  UserAccountMenuWorkspaceCreateInput,
   UserAccountMenuWorkspaceItem,
   UserIdeaBalanceControl,
 } from './userAccountMenu.types'
@@ -472,10 +475,10 @@ function requireWorkspace(): UserAccountMenuWorkspace {
   return workspace
 }
 
-async function handleWorkspaceCreate(name: string) {
+async function handleWorkspaceCreate(input: UserAccountMenuWorkspaceCreateInput) {
   // Creation preserves the current route and workspace scope; the settings
   // dialog stays open and focuses its new row (with Members) locally.
-  return requireWorkspace().onCreate(name)
+  return requireWorkspace().onCreate(input)
 }
 
 async function handleWorkspaceRename(workspaceId: string, name: string) {

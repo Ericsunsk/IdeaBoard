@@ -380,6 +380,34 @@ func (f *fakeGapBillingAccounts) LinkWorkspaceToBillingAccount(ctx context.Conte
 	return tenancy.ErrBillingStoreNotConfigured
 }
 
+func (f *fakeGapBillingAccounts) InitiateBillingTransferInvite(ctx context.Context, billingAccountInternalID, fromUserID, toUserID int64, idempotencyKey string) (*tenancy.BillingTransferInvite, error) {
+	return nil, tenancy.ErrBillingStoreNotConfigured
+}
+
+func (f *fakeGapBillingAccounts) GetBillingTransferInvite(ctx context.Context, publicID string) (*tenancy.BillingTransferInvite, error) {
+	return nil, tenancy.ErrBillingNotFound
+}
+
+func (f *fakeGapBillingAccounts) ListBillingTransferInvitesForAccount(ctx context.Context, billingAccountInternalID, actorUserID, beforeID int64, limit int) ([]*tenancy.BillingTransferInvite, error) {
+	return nil, tenancy.ErrBillingStoreNotConfigured
+}
+
+func (f *fakeGapBillingAccounts) AcceptBillingTransferInvite(ctx context.Context, billingAccountInternalID int64, invitePublicID string, recipientUserID int64) (*tenancy.BillingTransferInvite, error) {
+	return nil, tenancy.ErrBillingStoreNotConfigured
+}
+
+func (f *fakeGapBillingAccounts) RejectBillingTransferInvite(ctx context.Context, billingAccountInternalID int64, invitePublicID string, recipientUserID int64) (*tenancy.BillingTransferInvite, error) {
+	return nil, tenancy.ErrBillingStoreNotConfigured
+}
+
+func (f *fakeGapBillingAccounts) CancelBillingTransferInvite(ctx context.Context, billingAccountInternalID int64, invitePublicID string, initiatorUserID int64) (*tenancy.BillingTransferInvite, error) {
+	return nil, tenancy.ErrBillingStoreNotConfigured
+}
+
+func (f *fakeGapBillingAccounts) RemoveBillingAccountMember(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64) error {
+	return tenancy.ErrBillingStoreNotConfigured
+}
+
 func newGapsTestFixture() *gapsTestFixture {
 	fx := &gapsTestFixture{
 		store:    tenancy.NewInMemoryStoreForTests(),

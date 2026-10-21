@@ -110,6 +110,17 @@ type billingAccountStore interface {
 	UpdateBillingAccountMemberRole(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, newRole string) (*tenancy.BillingAccountMember, error)
 	TransferBillingAccountOwnership(ctx context.Context, billingAccountInternalID, currentOwnerID, newOwnerID int64) error
 	LinkWorkspaceToBillingAccount(ctx context.Context, workspaceInternalID, billingAccountInternalID, actorUserID int64) error
+	// Studio handover invitations (#948, invite-style ownership transfer).
+	InitiateBillingTransferInvite(ctx context.Context, billingAccountInternalID, fromUserID, toUserID int64, idempotencyKey string) (*tenancy.BillingTransferInvite, error)
+	GetBillingTransferInvite(ctx context.Context, publicID string) (*tenancy.BillingTransferInvite, error)
+	ListBillingTransferInvitesForAccount(ctx context.Context, billingAccountInternalID, actorUserID, beforeID int64, limit int) ([]*tenancy.BillingTransferInvite, error)
+	AcceptBillingTransferInvite(ctx context.Context, billingAccountInternalID int64, invitePublicID string, recipientUserID int64) (*tenancy.BillingTransferInvite, error)
+	RejectBillingTransferInvite(ctx context.Context, billingAccountInternalID int64, invitePublicID string, recipientUserID int64) (*tenancy.BillingTransferInvite, error)
+	CancelBillingTransferInvite(ctx context.Context, billingAccountInternalID int64, invitePublicID string, initiatorUserID int64) (*tenancy.BillingTransferInvite, error)
+	// RemoveBillingAccountMember detaches one financial manager without
+	// deleting or freezing shared funds (exit path): only the management
+	// row leaves, the Wallet/Ledger/history stay readable.
+	RemoveBillingAccountMember(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64) error
 }
 
 // billingWalletReader composes the Credits-Ledger read side. Only Credits
@@ -200,6 +211,14 @@ type ContractV1BillingDeps struct {
 	PendingOrders   v1PendingOrderService
 	Recharges       v1RechargeHistoryService
 	Rewards         v1RewardsUserService
+	// Budgets persists the Workspace shared consumption budget and
+	// derives live usage (#945). Zero value keeps the budget surface
+	// fail-closed; production fills it in http_wiring.go.
+	Budgets workspaceBudgetStore
+	// Quotas persists the member cross-workspace consumption quotas
+	// and derives live usage (#946). Zero value keeps the quota
+	// surface fail-closed; production fills it in http_wiring.go.
+	Quotas memberQuotaStore
 }
 
 func (d *ContractV1BillingDeps) normalize() {
@@ -222,11 +241,35 @@ func RegisterContractV1BillingRoutesOnEngine(r *gin.Engine, authDeps runtimehttp
 	group.GET("/workspaces/:workspace_id/billing-account/members", handler.listBillingAccountMembers)
 	group.POST("/workspaces/:workspace_id/billing-account/members", handler.addBillingAccountMember)
 	group.PATCH("/workspaces/:workspace_id/billing-account/members/:member_id", handler.updateBillingAccountMember)
+	group.DELETE("/workspaces/:workspace_id/billing-account/members/:member_id", handler.removeBillingAccountMember)
 	group.POST("/workspaces/:workspace_id/billing-account/transfer", handler.transferBillingAccountOwnership)
+	// Studio handover invitations (#948, invite-style ownership transfer).
+	group.POST("/workspaces/:workspace_id/billing-account/transfer-invites", handler.initiateTransferInvite)
+	group.GET("/workspaces/:workspace_id/billing-account/transfer-invites", handler.listTransferInvites)
+	group.GET("/workspaces/:workspace_id/billing-account/transfer-invites/:invite_id", handler.getTransferInvite)
+	group.POST("/workspaces/:workspace_id/billing-account/transfer-invites/:invite_id/accept", handler.acceptTransferInvite)
+	group.POST("/workspaces/:workspace_id/billing-account/transfer-invites/:invite_id/reject", handler.rejectTransferInvite)
+	group.POST("/workspaces/:workspace_id/billing-account/transfer-invites/:invite_id/cancel", handler.cancelTransferInvite)
 	group.GET("/workspaces/:workspace_id/credits/balance", handler.getCreditsBalance)
 	group.GET("/workspaces/:workspace_id/credits/ledger", handler.listCreditsLedger)
 	group.GET("/workspaces/:workspace_id/billing-records", handler.listBillingRecords)
 	group.GET("/workspaces/:workspace_id/usage", handler.getUsage)
+	// Workspace shared consumption budget (#945): any member reads
+	// the cap with live usage; only Billing Owner/Admin writes.
+	group.GET("/workspaces/:workspace_id/budget", handler.getWorkspaceBudget)
+	group.PUT("/workspaces/:workspace_id/budget", handler.setWorkspaceBudget)
+	// Member cross-workspace consumption quotas (#946): Billing
+	// Owner/Admin lists and writes every member's quota; any member
+	// reads their own quota with live usage.
+	group.GET("/workspaces/:workspace_id/member-quotas", handler.listMemberQuotas)
+	group.GET("/workspaces/:workspace_id/member-quotas/self", handler.getMemberQuotaSelf)
+	group.PUT("/workspaces/:workspace_id/member-quotas/:user_id", handler.setMemberQuota)
+	// Account default new-member quota (#947): any member reads the
+	// default; only Billing Owner/Admin writes. Absent renders 409
+	// default_member_quota_not_configured (fail closed, never implicit
+	// unlimited); invites along the same account reuse it atomically.
+	group.GET("/workspaces/:workspace_id/default-member-quota", handler.getDefaultMemberQuota)
+	group.PUT("/workspaces/:workspace_id/default-member-quota", handler.setDefaultMemberQuota)
 	group.POST("/workspaces/:workspace_id/checkout-sessions", handler.createCheckoutSession)
 	group.GET("/workspaces/:workspace_id/checkout-sessions/:session_id", handler.getCheckoutSession)
 	// Gaps batch (#809-close, backend B): purchase options, pending
@@ -369,7 +412,8 @@ func renderBillingAccountError(c *gin.Context, err error) {
 		errors.Is(err, tenancy.ErrBillingLastOwner):
 		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingAccountForbidden, runtimehttp.MsgBillingAccountForbidden)
 	case errors.Is(err, tenancy.ErrBillingConflict),
-		errors.Is(err, tenancy.ErrBillingAmbiguous):
+		errors.Is(err, tenancy.ErrBillingAmbiguous),
+		errors.Is(err, tenancy.ErrWorkspaceMemberLimitReached):
 		contract.RenderError(c, http.StatusConflict, contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
 	case errors.Is(err, tenancy.ErrBillingNotFound):
 		contract.RenderError(c, http.StatusNotFound, contract.CodeBillingAccountNotFound, runtimehttp.MsgBillingAccountNotFound)

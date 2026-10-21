@@ -93,6 +93,7 @@ SELECT has_table_privilege(
 // assertWorkspaceRuntimeTableAccess).
 var workspaceRuntimeTableNames = []string{
 	"billing_accounts",
+	"billing_account_member_quotas",
 	"board_documents",
 	"board_revisions",
 	"event_deliveries",
@@ -105,6 +106,7 @@ var workspaceRuntimeTableNames = []string{
 	"task_billing_snapshots",
 	"task_status_event_outbox",
 	"upload_sessions",
+	"workspace_budgets",
 	"workspace_events",
 	"workspace_memberships",
 	"workspaces",

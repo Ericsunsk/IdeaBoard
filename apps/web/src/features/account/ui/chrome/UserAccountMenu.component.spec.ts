@@ -1,15 +1,44 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, ref } from 'vue'
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import type { RenderOptions } from '@testing-library/vue'
 import { i18n } from '../../../../core/i18n'
-import { render, renderWithUser, screen, waitFor, within } from '../../../../test/render'
+import {
+  render as renderBase,
+  renderWithUser as renderWithUserBase,
+  screen,
+  waitFor,
+  within,
+} from '../../../../test/render'
 import { expectDomOrder } from '../../../../test/domOrder'
 import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import UserAccountMenu from './UserAccountMenu.vue'
+import type { BillingAccountScope } from '../../session/billing-account/resource'
+import { fetchBillingAccount } from '../../session/billing-account/resource'
 import type {
   UserAccountMenuItem,
   UserAccountMenuWorkspace,
   UserIdeaBalanceControl,
 } from './userAccountMenu.types'
+
+// Settings now exercises the real Billing Account context. Other money editors
+// remain stubbed below so these tests focus on menu/create behavior.
+function withQuery<C>(options?: RenderOptions<C>): RenderOptions<C> {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return {
+    ...options,
+    global: {
+      ...options?.global,
+      plugins: [...(options?.global?.plugins ?? []), [VueQueryPlugin, { queryClient }]],
+    },
+  }
+}
+function render<C>(view: C, options?: RenderOptions<C>) {
+  return renderBase(view, withQuery(options))
+}
+function renderWithUser<C>(view: C, options?: RenderOptions<C>) {
+  return renderWithUserBase(view, withQuery(options))
+}
 
 // Reka modal primitives lock body pointer events, which blocks user-event
 // clicks inside the dialog. The AccountDialog harness precedent applies:
@@ -44,7 +73,18 @@ const DialogContentStub = defineComponent({
 // section controller (read-only empty roster) so no query client or
 // transport is needed here. Member behavior lives in
 // `WorkspaceMemberSection.component.spec.ts` with the real controller.
+// The budget section is stubbed for the same reason (read-only empty
+// budget); budget behavior lives in
+// `WorkspaceBudgetSection.component.spec.ts` with the real controller.
+// The member quota section is stubbed likewise (read-only empty quota);
+// quota behavior lives in `MemberQuotaSection.component.spec.ts` with
+// the real controller.
 vi.mock('../../../../core/composables/useAppToast')
+vi.mock('../../session/billing-account/resource', async (load) => ({
+  ...(await load<typeof import('../../session/billing-account/resource')>()),
+  fetchBillingAccount: vi.fn().mockRejectedValue(new Error('no billing account')),
+}))
+vi.mock('./BillingTransferSection.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./useWorkspaceMemberSection', () => ({
   memberDisplayName: (entry: { userId: string }) => entry.userId,
   useWorkspaceMemberSection: () => ({
@@ -65,6 +105,67 @@ vi.mock('./useWorkspaceMemberSection', () => ({
     requestRemove: vi.fn(),
     cancelRemove: vi.fn(),
     confirmRemove: vi.fn(),
+  }),
+}))
+vi.mock('../../session/budget/useWorkspaceBudgetSection', () => ({
+  useWorkspaceBudgetSection: () => ({
+    budget: ref(null),
+    isLoading: ref(false),
+    hasLoadError: ref(false),
+    canManage: ref(false),
+    isExhausted: ref(false),
+    retryBudget: vi.fn(),
+    limitDraft: ref(''),
+    isSaving: ref(false),
+    saveError: ref(null),
+    startEditing: vi.fn(),
+    saveMonthly: vi.fn(),
+    saveUnlimited: vi.fn(),
+  }),
+}))
+vi.mock('../../session/quota/useMemberQuotaSection', () => ({
+  useMemberQuotaSection: () => ({
+    selfQuota: ref(null),
+    isSelfLoading: ref(false),
+    hasSelfError: ref(false),
+    isSelfExhausted: ref(false),
+    retrySelf: vi.fn(),
+    quotas: ref([]),
+    isListLoading: ref(false),
+    hasListError: ref(false),
+    retryList: vi.fn(),
+    canManage: ref(false),
+    memberOptions: ref([]),
+    memberLabel: (userId: string) => userId,
+    cappedPeriods: [],
+    targetUserId: ref(''),
+    targetPeriod: ref('daily'),
+    limitDraft: ref(''),
+    isSaving: ref(false),
+    saveError: ref(null),
+    pickTargetUser: vi.fn(),
+    pickTargetPeriod: vi.fn(),
+    saveQuota: vi.fn(),
+    clearQuota: vi.fn(),
+  }),
+}))
+vi.mock('../../session/quota/useDefaultMemberQuotaSection', () => ({
+  useDefaultMemberQuotaSection: () => ({
+    policy: ref(null),
+    isLoading: ref(false),
+    hasLoadError: ref(false),
+    isNotConfigured: ref(false),
+    retry: vi.fn(),
+    canManage: ref(false),
+    cappedPeriods: [],
+    presets: [],
+    targetPeriod: ref('monthly'),
+    limitDraft: ref(''),
+    isSaving: ref(false),
+    saveError: ref(null),
+    pickTargetPeriod: vi.fn(),
+    pickPreset: vi.fn(),
+    saveDefault: vi.fn(),
   }),
 }))
 
@@ -128,6 +229,12 @@ describe('UserAccountMenu', () => {
   beforeEach(() => {
     i18n.global.locale.value = 'en'
     toast = mockAppToast()
+    vi.mocked(fetchBillingAccount).mockReset().mockResolvedValue({
+      billingAccountId: 'ba_current',
+      workspaceId: 'ws_personal1',
+      isShared: false,
+      consumptionScope: 'account',
+    })
   })
   it('shows the account email above a separator in the user menu', async () => {
     const { user } = renderWithUser(UserAccountMenu, {
@@ -579,7 +686,12 @@ describe('UserAccountMenu', () => {
 
       await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
 
-      await waitFor(() => expect(workspace.onCreate).toHaveBeenCalledWith('New workspace'))
+      await waitFor(() =>
+        expect(workspace.onCreate).toHaveBeenCalledWith({
+          name: 'New workspace',
+          billingAccountId: 'ba_current',
+        }),
+      )
       await waitFor(() =>
         expect(screen.queryByRole('dialog', { name: 'New workspace' })).not.toBeInTheDocument(),
       )
@@ -602,7 +714,12 @@ describe('UserAccountMenu', () => {
       await view.user.type(nameInput, 'Typed space')
       await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
 
-      await waitFor(() => expect(workspace.onCreate).toHaveBeenCalledWith('Typed space'))
+      await waitFor(() =>
+        expect(workspace.onCreate).toHaveBeenCalledWith({
+          name: 'Typed space',
+          billingAccountId: 'ba_current',
+        }),
+      )
       await view.rerender({
         items: profileItems,
         workspace: { ...workspace, items: [...workspace.items, created] },
@@ -693,7 +810,220 @@ describe('UserAccountMenu', () => {
       const nameInput = await screen.findByLabelText('Workspace name')
       expect(nameInput).toHaveValue('New workspace 2')
       await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
-      await waitFor(() => expect(workspace.onCreate).toHaveBeenCalledWith('New workspace 2'))
+      await waitFor(() =>
+        expect(workspace.onCreate).toHaveBeenCalledWith({
+          name: 'New workspace 2',
+          billingAccountId: 'ba_current',
+        }),
+      )
+    })
+
+    it('creates an independent account when the isolation option is picked', async () => {
+      const created = {
+        publicId: 'ws_new9',
+        name: 'Solo biz',
+        organizationId: null,
+        isDefault: false,
+      }
+      const workspace = workspaceControls({ onCreate: vi.fn().mockResolvedValue(created) })
+      const view = await openSettingsDialog(workspace)
+
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      const nameInput = await screen.findByLabelText('Workspace name')
+      await view.user.clear(nameInput)
+      await view.user.type(nameInput, 'Solo biz')
+      await view.user.click(screen.getByRole('radio', { name: /independent account/i }))
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
+
+      await waitFor(() =>
+        expect(workspace.onCreate).toHaveBeenCalledWith({
+          name: 'Solo biz',
+          isNewBillingAccount: true,
+        }),
+      )
+    })
+
+    it('shares the resolved current account id when the read succeeds', async () => {
+      // The settings dialog reads the billing account twice here (budget
+      // management scope plus the create-dialog shared hint), so the read
+      // resolves persistently for this test.
+      vi.mocked(fetchBillingAccount).mockResolvedValue({
+        billingAccountId: 'ba_personal_test9',
+        workspaceId: 'ws_personal1',
+        isShared: true,
+        consumptionScope: 'account',
+      })
+      const created = {
+        publicId: 'ws_new10',
+        name: 'Shared biz',
+        organizationId: null,
+        isDefault: false,
+      }
+      const workspace = workspaceControls({ onCreate: vi.fn().mockResolvedValue(created) })
+      const view = await openSettingsDialog(workspace)
+
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      const nameInput = await screen.findByLabelText('Workspace name')
+      await view.user.clear(nameInput)
+      await view.user.type(nameInput, 'Shared biz')
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
+
+      await waitFor(() =>
+        expect(workspace.onCreate).toHaveBeenCalledWith({
+          name: 'Shared biz',
+          billingAccountId: 'ba_personal_test9',
+        }),
+      )
+    })
+
+    it('blocks unresolved shared funding on an independent current account instead of using Default', async () => {
+      const workspace = workspaceControls({ onCreate: vi.fn() })
+      const view = await openSettingsDialog(workspace)
+      let resolveAccount!: (value: BillingAccountScope) => void
+      vi.mocked(fetchBillingAccount).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveAccount = resolve
+          }),
+      )
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      const create = screen.getByRole('button', { name: 'Create workspace' })
+      expect(create).toBeDisabled()
+      await view.user.click(create)
+      await view.user.keyboard('{Enter}')
+      expect(workspace.onCreate).not.toHaveBeenCalled()
+      resolveAccount({
+        billingAccountId: 'ba_independentB',
+        workspaceId: 'ws_personal1',
+        isShared: false,
+        consumptionScope: 'account',
+      })
+      await waitFor(() => expect(create).toBeEnabled())
+      await view.user.click(create)
+      await waitFor(() =>
+        expect(workspace.onCreate).toHaveBeenCalledWith({
+          name: 'New workspace',
+          billingAccountId: 'ba_independentB',
+        }),
+      )
+    })
+
+    it('blocks shared funding after lookup failure, supports retry and independent creation', async () => {
+      const workspace = workspaceControls({ onCreate: vi.fn() })
+      const view = await openSettingsDialog(workspace)
+      vi.mocked(fetchBillingAccount).mockRejectedValue(new Error('lookup failed'))
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      const create = screen.getByRole('button', { name: 'Create workspace' })
+      expect(create).toBeDisabled()
+      expect(await screen.findByRole('alert')).toBeVisible()
+      await view.user.click(screen.getByRole('button', { name: 'Retry' }))
+      expect(create).toBeDisabled()
+      expect(workspace.onCreate).not.toHaveBeenCalled()
+      await view.user.click(screen.getByRole('radio', { name: /independent account/i }))
+      expect(create).toBeEnabled()
+      await view.user.click(create)
+      await waitFor(() =>
+        expect(workspace.onCreate).toHaveBeenCalledWith({
+          name: 'New workspace',
+          isNewBillingAccount: true,
+        }),
+      )
+    })
+
+    it('ignores a late shared account response after the workspace target changes', async () => {
+      const second = {
+        publicId: 'ws_businessB',
+        name: 'Business B',
+        organizationId: null,
+        isDefault: false,
+      }
+      const workspace = workspaceControls({
+        items: [workspaceControls().items[0]!, second],
+        onCreate: vi.fn(),
+      })
+      const view = await openSettingsDialog(workspace)
+      let finishOld!: (value: BillingAccountScope) => void
+      vi.mocked(fetchBillingAccount).mockImplementation((id) =>
+        id === second.publicId
+          ? Promise.resolve({
+              billingAccountId: 'ba_businessB',
+              workspaceId: id,
+              isShared: false,
+              consumptionScope: 'account',
+            })
+          : new Promise((resolve) => {
+              finishOld = resolve
+            }),
+      )
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      await view.user.click(screen.getByRole('button', { name: 'Business B' }))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Create workspace' })).toBeEnabled(),
+      )
+      finishOld({
+        billingAccountId: 'ba_defaultA',
+        workspaceId: 'ws_personal1',
+        isShared: false,
+        consumptionScope: 'account',
+      })
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
+      await waitFor(() =>
+        expect(workspace.onCreate).toHaveBeenCalledWith({
+          name: 'New workspace',
+          billingAccountId: 'ba_businessB',
+        }),
+      )
+    })
+
+    it('keeps organization creation in organization scope without personal funding overrides', async () => {
+      const workspace = workspaceControls({ selectedId: 'ws_team2', onCreate: vi.fn() })
+      const view = await openSettingsDialog(workspace)
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      expect(screen.queryByRole('radio', { name: /independent account/i })).toBeNull()
+      expect(screen.getByText(/organization org_c3 use its shared account/)).toBeVisible()
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
+      await waitFor(() =>
+        expect(workspace.onCreate).toHaveBeenCalledWith({
+          name: 'New workspace',
+          organizationId: 'org_c3',
+        }),
+      )
+    })
+
+    it('creates an organization account explicitly before its first workspace and retains scope on retry', async () => {
+      const onCreateOrganization = vi.fn().mockResolvedValue({ publicId: 'org_new', name: 'Acme' })
+      const workspace = workspaceControls({
+        onLoadOrganizations: vi.fn().mockResolvedValue([]),
+        onCreateOrganization,
+        onCreate: vi.fn().mockRejectedValueOnce(new Error('workspace failed')).mockResolvedValue({
+          publicId: 'ws_acme',
+          name: 'New workspace',
+          organizationId: 'org_new',
+          isDefault: false,
+        }),
+      })
+      const view = await openSettingsDialog(workspace)
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      await view.user.click(screen.getByRole('button', { name: 'Create organization' }))
+      expect(screen.getByRole('button', { name: 'Create workspace' })).toBeDisabled()
+      await view.user.type(screen.getByLabelText('Organization name'), 'Acme')
+      await view.user.click(screen.getByRole('button', { name: 'Create organization account' }))
+      await waitFor(() => expect(screen.getByLabelText('Workspace scope')).toHaveValue('org_new'))
+      expect(onCreateOrganization).toHaveBeenCalledWith(
+        'Acme',
+        expect.stringContaining('organization-create:'),
+      )
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
+      expect(
+        await screen.findByText('Could not create the workspace. Please try again.'),
+      ).toBeVisible()
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
+      await waitFor(() => expect(workspace.onCreate).toHaveBeenCalledTimes(2))
+      expect(workspace.onCreate).toHaveBeenLastCalledWith({
+        name: 'New workspace',
+        organizationId: 'org_new',
+      })
+      expect(onCreateOrganization).toHaveBeenCalledOnce()
     })
 
     it('keeps the naming dialog open with an inline error when creation fails', async () => {

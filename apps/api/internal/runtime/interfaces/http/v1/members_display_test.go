@@ -248,6 +248,7 @@ func TestV1MemberListDisplayPG(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	configureV1WorkspaceDefaultQuota(t, db, ws)
 	if _, err := tstore.AddWorkspaceMember(ctx, ws.PublicID, member, tenancy.RoleMember); err != nil {
 		t.Fatal(err)
 	}

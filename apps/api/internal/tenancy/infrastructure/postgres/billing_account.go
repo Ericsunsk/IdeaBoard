@@ -27,6 +27,55 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// lockBillingAccountInTx is the common serialization point for financial
+// authority and Workspace scope changes. Acquire it before invitation or
+// Workspace locks, and read permissions only after the lock is held.
+func lockBillingAccountInTx(ctx context.Context, q *dbsqlc.Queries, accountID int64) (dbsqlc.BillingAccount, error) {
+	row, err := q.LockBillingAccount(ctx, accountID)
+	if database.IsNotFound(err) {
+		return row, tenancy.ErrBillingNotFound
+	}
+	return row, err
+}
+
+// checkBillingMemberMutationInTx keeps the account lock, current membership facts,
+// transition policy, and public error classification together. Callers supply
+// their current transaction and perform the authorized write before it ends.
+func checkBillingMemberMutationInTx(ctx context.Context, q *dbsqlc.Queries, accountID, actorUserID, targetUserID int64, newRole string, isRemove bool) error {
+	if _, err := lockBillingAccountInTx(ctx, q, accountID); err != nil {
+		return err
+	}
+	actor, err := q.GetBillingAccountMember(ctx, dbsqlc.GetBillingAccountMemberParams{
+		BillingAccountID: accountID, UserID: actorUserID,
+	})
+	actorRole := ""
+	if err == nil {
+		actorRole = actor.Role
+	} else if !database.IsNotFound(err) {
+		return err
+	}
+	target, err := q.GetBillingAccountMember(ctx, dbsqlc.GetBillingAccountMemberParams{
+		BillingAccountID: accountID, UserID: targetUserID,
+	})
+	if database.IsNotFound(err) {
+		return tenancy.ErrBillingNotFound
+	}
+	if err != nil {
+		return err
+	}
+	owners, err := q.CountBillingAccountOwners(ctx, accountID)
+	if err != nil {
+		return err
+	}
+	if err := tenancy.CheckBillingMemberMutation(actorRole, actorUserID, targetUserID, target.Role, newRole, int(owners), isRemove); err != nil {
+		if errors.Is(err, tenancy.ErrBillingLastOwner) {
+			return err
+		}
+		return tenancy.ErrBillingForbidden
+	}
+	return nil
+}
+
 // Billing owner types for the API projection.
 const (
 	BillingOwnerWorkspace    = "workspace"
@@ -500,11 +549,8 @@ func linkWorkspaceToBillingAccount(ctx context.Context, q *dbsqlc.Queries, pool 
 		return tenancy.ErrForbidden
 	}
 	// Funds side: target must exist and actor must be billing owner/admin.
-	account, err := q.GetBillingAccountByInternalID(ctx, billingAccountInternalID)
+	account, err := lockBillingAccountInTx(ctx, q, billingAccountInternalID)
 	if err != nil {
-		if database.IsNotFound(err) {
-			return tenancy.ErrBillingNotFound
-		}
 		return err
 	}
 	billingRole, err := q.GetBillingAccountMember(ctx, dbsqlc.GetBillingAccountMemberParams{
@@ -608,6 +654,9 @@ func (s *BillingAccountStore) AddBillingAccountMember(ctx context.Context, billi
 	}
 	var added *tenancy.BillingAccountMember
 	err := dbutil.WithTx(ctx, s.db, func(q *dbsqlc.Queries) error {
+		if _, err := lockBillingAccountInTx(ctx, q, billingAccountInternalID); err != nil {
+			return err
+		}
 		actor, err := q.GetBillingAccountMember(ctx, dbsqlc.GetBillingAccountMemberParams{
 			BillingAccountID: billingAccountInternalID, UserID: actorUserID,
 		})
@@ -618,12 +667,6 @@ func (s *BillingAccountStore) AddBillingAccountMember(ctx context.Context, billi
 			return err
 		}
 		if err := tenancy.CheckBillingMemberAdd(actor.Role, role); err != nil {
-			return err
-		}
-		if _, err := q.GetBillingAccountByInternalID(ctx, billingAccountInternalID); err != nil {
-			if database.IsNotFound(err) {
-				return tenancy.ErrBillingNotFound
-			}
 			return err
 		}
 		members, err := q.ListBillingAccountMembers(ctx, dbsqlc.ListBillingAccountMembersParams{
@@ -667,33 +710,8 @@ func (s *BillingAccountStore) UpdateBillingAccountMemberRole(ctx context.Context
 	}
 	var updated *tenancy.BillingAccountMember
 	err := dbutil.WithTx(ctx, s.db, func(q *dbsqlc.Queries) error {
-		actor, err := q.GetBillingAccountMember(ctx, dbsqlc.GetBillingAccountMemberParams{
-			BillingAccountID: billingAccountInternalID, UserID: actorUserID,
-		})
-		actorRole := ""
-		if err == nil {
-			actorRole = actor.Role
-		} else if !database.IsNotFound(err) {
+		if err := checkBillingMemberMutationInTx(ctx, q, billingAccountInternalID, actorUserID, targetUserID, newRole, false); err != nil {
 			return err
-		}
-		target, err := q.GetBillingAccountMember(ctx, dbsqlc.GetBillingAccountMemberParams{
-			BillingAccountID: billingAccountInternalID, UserID: targetUserID,
-		})
-		if err != nil {
-			if database.IsNotFound(err) {
-				return tenancy.ErrBillingNotFound
-			}
-			return err
-		}
-		owners, err := q.CountBillingAccountOwners(ctx, billingAccountInternalID)
-		if err != nil {
-			return err
-		}
-		if err := tenancy.CheckBillingMemberMutation(actorRole, actorUserID, targetUserID, target.Role, newRole, int(owners), false); err != nil {
-			if errors.Is(err, tenancy.ErrBillingLastOwner) {
-				return err
-			}
-			return tenancy.ErrBillingForbidden
 		}
 		row, err := q.UpsertBillingAccountMember(ctx, dbsqlc.UpsertBillingAccountMemberParams{
 			BillingAccountID: billingAccountInternalID, UserID: targetUserID, Role: strings.TrimSpace(newRole),
@@ -721,6 +739,9 @@ func (s *BillingAccountStore) TransferBillingAccountOwnership(ctx context.Contex
 		return tenancy.ErrBillingWorkspaceInvalid
 	}
 	return dbutil.WithTx(ctx, s.db, func(q *dbsqlc.Queries) error {
+		if _, err := lockBillingAccountInTx(ctx, q, billingAccountInternalID); err != nil {
+			return err
+		}
 		current, err := q.GetBillingAccountMember(ctx, dbsqlc.GetBillingAccountMemberParams{
 			BillingAccountID: billingAccountInternalID, UserID: currentOwnerID,
 		})

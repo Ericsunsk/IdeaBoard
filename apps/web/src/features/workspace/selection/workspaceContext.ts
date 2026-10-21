@@ -16,6 +16,7 @@ import {
   fetchWorkspacePage,
   provisionWorkspace,
   workspaceQueryKeys,
+  type ProvisionWorkspaceBillingInput,
   type WorkspaceAccessKind,
   type WorkspaceSummary,
 } from './workspaceResource'
@@ -136,7 +137,7 @@ export function memoryWorkspacePersist(initial: string | null = null): Workspace
 export type ProvisionWorkspaceInput = {
   name: string
   organizationId?: string | undefined
-}
+} & ProvisionWorkspaceBillingInput
 
 export type WorkspaceProvisionFn = (
   input: ProvisionWorkspaceInput,
@@ -164,8 +165,14 @@ export function createWorkspaceSelectionStore(deps?: {
   }
 
   function provisionDedupeKey(input: ProvisionWorkspaceInput): string {
-    const scope = asWorkspaceId(input.organizationId) ?? '-'
-    return `${scope}:${input.name.trim().toLowerCase()}`
+    const scope = input.organizationId?.trim() || '-'
+    const billing =
+      input.isNewBillingAccount === true
+        ? 'new'
+        : typeof input.billingAccountId === 'string' && input.billingAccountId.trim() !== ''
+          ? `ba:${input.billingAccountId.trim()}`
+          : 'default'
+    return `${scope}:${input.name.trim().toLowerCase()}:${billing}`
   }
 
   return {

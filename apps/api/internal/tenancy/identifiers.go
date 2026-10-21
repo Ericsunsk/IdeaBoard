@@ -19,6 +19,10 @@ const (
 	// BillingAccountPrefix aliases the contract kernel so the two can
 	// never drift; billing_accounts.public_id carries ba_ per #804.
 	BillingAccountPrefix = contract.PrefixBillingAccount
+	// BillingTransferInvitePrefix aliases the contract kernel so the two
+	// can never drift; billing_account_transfer_invites.public_id carries
+	// bti_ per #948 (invite-style studio handover).
+	BillingTransferInvitePrefix = contract.PrefixBillingTransferInvite
 )
 
 // FormatUserPublicID renders the external user identifier. The users table
@@ -61,4 +65,10 @@ func NewOrganizationPublicID() (string, error) {
 // workspace-owned billing account (#804).
 func NewBillingAccountPublicID() (string, error) {
 	return contract.MintPublicID(BillingAccountPrefix, 12)
+}
+
+// NewBillingTransferInvitePublicID mints an opaque bti_ public identifier
+// for a studio handover invitation (#948).
+func NewBillingTransferInvitePublicID() (string, error) {
+	return contract.MintPublicID(BillingTransferInvitePrefix, 12)
 }

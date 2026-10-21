@@ -202,6 +202,40 @@
                 :is-expanded="true"
               />
 
+              <BillingTransferSection
+                :key="`transfer-${activeWorkspace.publicId}`"
+                :workspace-id="activeWorkspace.publicId"
+                :current-user-id="props.currentUserId"
+              />
+
+              <!-- Shared consumption budget: usage visible to every member,
+                management gated to billing managers (backend enforces 403). -->
+              <WorkspaceBudgetSection
+                :key="`budget-${activeWorkspace.publicId}`"
+                :workspace-id="activeWorkspace.publicId"
+                :consumption-scope="billingAccount.consumptionScope.value ?? null"
+                :is-expanded="true"
+              />
+
+              <!-- Member cross-workspace quotas: self usage visible to
+                every member, management gated to billing managers
+                (backend enforces 403). -->
+              <MemberQuotaSection
+                :key="`quota-${activeWorkspace.publicId}`"
+                :workspace-id="activeWorkspace.publicId"
+                :consumption-scope="billingAccount.consumptionScope.value ?? null"
+                :is-expanded="true"
+              />
+
+              <!-- Account default new-member quota (#947): fail closed until
+                a Billing Owner/Admin sets it; invites reuse it atomically. -->
+              <DefaultMemberQuotaSection
+                :key="`default-quota-${activeWorkspace.publicId}`"
+                :workspace-id="activeWorkspace.publicId"
+                :consumption-scope="billingAccount.consumptionScope.value ?? null"
+                :is-expanded="true"
+              />
+
               <!-- Delete row: hidden for the Default workspace (never deleted). -->
               <section
                 v-if="!isDefaultWorkspaceItem(activeWorkspace)"
@@ -252,83 +286,19 @@
     </DialogPortal>
   </DialogRoot>
 
-  <!-- Create naming dialog (UserConfirmDialog pattern): mask/Escape/cancel
-    dismiss while idle; the confirm commit locks every path while busy. -->
-  <DialogRoot :open="isCreateDialogOpen" @update:open="handleCreateOpenUpdate">
-    <DialogPortal>
-      <DialogOverlay @click="handleCreateMaskClick" />
-      <DialogContent
-        class="bg-popover"
-        :style="{ width: 'min(420px, calc(100vw - 32px))' }"
-        :aria-label="t('workspace.switcher.createDialogTitle')"
-        :aria-busy="isCreating || undefined"
-        @escape-key-down="handleCreateEscape"
-        @pointer-down-outside="blockCreateOutsideDismiss"
-      >
-        <div class="min-h-0 overflow-y-auto">
-          <DialogDescription class="sr-only">
-            {{ t('workspace.switcher.createDialogNameLabel') }}
-          </DialogDescription>
-          <div class="p-6">
-            <DialogTitle as="h3" class="m-0 text-lg font-semibold text-foreground">
-              {{ t('workspace.switcher.createDialogTitle') }}
-            </DialogTitle>
-            <div class="mt-5 mb-0 flex flex-col gap-2">
-              <label :for="createInputId" class="text-sm font-medium text-foreground">
-                {{ t('workspace.switcher.createDialogNameLabel') }}
-              </label>
-              <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The create input carries its accessible name via aria-label -->
-              <Input
-                :id="createInputId"
-                ref="createInputRef"
-                v-model="createName"
-                size="sm"
-                class="h-9 text-sm bg-background"
-                :invalid="createNameError !== null"
-                :disabled="isCreating"
-                :aria-label="t('workspace.switcher.createDialogNameLabel')"
-                :maxlength="nameFieldMaxLength"
-                @keydown.enter="submitCreateFromDialog"
-                @keydown.esc.stop.prevent="cancelCreateDialog"
-                @keydown.escape.stop.prevent="cancelCreateDialog"
-              />
-              <p
-                v-if="createNameError"
-                class="m-0 text-xs leading-normal text-destructive"
-                role="alert"
-              >
-                {{ createNameError }}
-              </p>
-            </div>
-            <div class="mt-6 flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                :is-disabled="isCreating"
-                class="rounded-pill px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
-                @click="cancelCreateDialog"
-              >
-                {{ t('common.actions.cancel') }}
-              </Button>
-              <Button
-                type="button"
-                :is-loading="isCreating"
-                :is-disabled="isCreating"
-                class="rounded-pill px-4 py-2 text-sm font-semibold disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary-hover"
-                @click="submitCreateFromDialog"
-              >
-                {{
-                  isCreating
-                    ? t('workspace.switcher.creating')
-                    : t('workspace.switcher.createDialogConfirm')
-                }}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </DialogPortal>
-  </DialogRoot>
+  <WorkspaceCreateDialog
+    v-model:is-open="isCreateDialogOpen"
+    :items="workspaceItems"
+    :source-workspace-id="activeWorkspaceId"
+    :default-name="createDefaultName"
+    :name-max-length="props.nameMaxLength"
+    :validate-name="(name) => validateName(name, null)"
+    :on-create="props.onCreate"
+    :on-load-organizations="props.onLoadOrganizations"
+    :on-create-organization="props.onCreateOrganization"
+    @created="handleWorkspaceCreated"
+    @busy="isCreating = $event"
+  />
 
   <!-- 永久删除二次确认：统一走 UserConfirmDialog intent=danger（参考 BoardsPage）。Busy 提交时组件内部锁住 mask/Escape/close-control。输入工作区名匹配后才可确认，防误触。 -->
   <UserConfirmDialog
@@ -366,14 +336,20 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { useAppToast } from '../../../../core/composables/useAppToast'
-import {
-  defineDialogSurfaceIntent,
-  useOverlayInteractionLifecycle,
-} from '../../../../core/composables/useOverlayInteractionLifecycle'
 import { userErrorCode } from '../../../../core/errors/errorCatalog'
-import type { UserAccountMenuWorkspaceItem } from './userAccountMenu.types'
+import type {
+  UserAccountMenuWorkspaceCreateInput,
+  UserAccountMenuOrganizationItem,
+  UserAccountMenuWorkspaceItem,
+} from './userAccountMenu.types'
+import WorkspaceCreateDialog from './WorkspaceCreateDialog.vue'
+import { useBillingAccountContext } from '../../session/billing-account/useBillingAccountContext'
 import { isDefaultWorkspaceItem } from './workspaceMenu'
 import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
+import DefaultMemberQuotaSection from './DefaultMemberQuotaSection.vue'
+import MemberQuotaSection from './MemberQuotaSection.vue'
+import WorkspaceBudgetSection from './WorkspaceBudgetSection.vue'
+import BillingTransferSection from './BillingTransferSection.vue'
 import WorkspaceMemberSection from './WorkspaceMemberSection.vue'
 import {
   accountCloseButtonClass,
@@ -392,8 +368,12 @@ const props = withDefaults(
     loadError?: string | null | undefined
     nameMaxLength?: number | undefined
     currentUserId?: string | null | undefined
+    onLoadOrganizations?: (() => Promise<UserAccountMenuOrganizationItem[]>) | undefined
+    onCreateOrganization?:
+      | ((name: string, idempotencyKey: string) => Promise<UserAccountMenuOrganizationItem>)
+      | undefined
     onRetry: () => void
-    onCreate: (name: string) => Promise<UserAccountMenuWorkspaceItem>
+    onCreate: (input: UserAccountMenuWorkspaceCreateInput) => Promise<UserAccountMenuWorkspaceItem>
     onRename: (workspaceId: string, name: string) => Promise<UserAccountMenuWorkspaceItem>
     onDelete: (workspaceId: string) => Promise<void>
   }>(),
@@ -403,6 +383,8 @@ const props = withDefaults(
     loadError: null,
     nameMaxLength: 120,
     currentUserId: null,
+    onLoadOrganizations: undefined,
+    onCreateOrganization: undefined,
   },
 )
 
@@ -440,6 +422,12 @@ const activeWorkspace = computed(() => {
   return workspaceItems.value.find((item) => item.publicId === activeWorkspaceId.value) ?? null
 })
 
+const billingAccount = useBillingAccountContext({
+  workspaceId: activeWorkspaceId,
+  identity: () => props.currentUserId,
+  isEnabled: () => props.isOpen && activeWorkspaceId.value !== '',
+})
+
 function workspaceItemName(item: UserAccountMenuWorkspaceItem): string {
   return isDefaultWorkspaceItem(item) ? t('workspace.switcher.defaultBadge') : item.name
 }
@@ -464,28 +452,8 @@ const nameFieldMaxLength = computed(() => props.nameMaxLength + 1)
 
 const isCreating = ref(false)
 
-// Create naming dialog (UserConfirmDialog pattern): the Add New button only
-// opens this modal with a unique default name; the confirm commit provisions
-// through `onCreate` (Idempotency-Key deduped upstream) and focuses the new
-// row in the still-open settings dialog. No route navigation happens here.
 const isCreateDialogOpen = ref(false)
-const createName = ref('')
-const createNameError = ref<string | null>(null)
-const createInputId = 'workspace-create-name-input'
-const createInputRef = useTemplateRef('createInputRef')
-
-const { canDismiss: canDismissCreate, requestClose: requestCreateClose } =
-  useOverlayInteractionLifecycle({
-    isVisible: () => isCreateDialogOpen.value,
-    busy: () => isCreating.value,
-    surface: defineDialogSurfaceIntent(),
-    onVisibilityChange: (isVisible) => {
-      if (!isVisible) {
-        isCreateDialogOpen.value = false
-        createNameError.value = null
-      }
-    },
-  })
+const createDefaultName = ref('')
 
 const editingId = ref<string | null>(null)
 const draftName = ref('')
@@ -532,73 +500,16 @@ function validateName(raw: string, currentWorkspaceId?: string | null): string |
   return null
 }
 
-async function submitCreateFromDialog() {
+function openCreateDialog(): void {
   if (isCreating.value) return
-  const trimmed = createName.value.trim()
-  if (!trimmed) {
-    toast.error(t('workspace.switcher.nameEmpty'))
-    return
-  }
-  const violation = validateName(createName.value, null)
-  if (violation) {
-    createNameError.value = violation
-    return
-  }
-  isCreating.value = true
-  createNameError.value = null
-  try {
-    const created = await props.onCreate(trimmed)
-    isCreateDialogOpen.value = false
-    createNameError.value = null
-    activeWorkspaceId.value = created.publicId
-    pendingCreateFocusId.value = created.publicId
-    focusNewWorkspaceRow(created.publicId)
-  } catch (error) {
-    const code = userErrorCode(error)?.toLowerCase()
-    const message =
-      code != null
-        ? `${t('workspace.switcher.createFailed')} (${code})`
-        : t('workspace.switcher.createFailed')
-    createNameError.value = message
-    toast.error(message)
-  } finally {
-    isCreating.value = false
-  }
-}
-
-function openCreateDialog() {
-  if (isCreating.value) return
-  createName.value = generateUniqueWorkspaceName()
-  createNameError.value = null
+  createDefaultName.value = generateUniqueWorkspaceName()
   isCreateDialogOpen.value = true
-  void nextTick(() => {
-    const host = createInputRef.value as unknown as { $el?: unknown } | null
-    const input = (host?.$el ?? host) as HTMLElement | null
-    if (input instanceof HTMLInputElement) {
-      input.focus()
-      input.select()
-    }
-  })
 }
 
-function cancelCreateDialog() {
-  requestCreateClose('close-control')
-}
-
-function handleCreateOpenUpdate(isOpen: boolean) {
-  if (!isOpen) requestCreateClose('close-control')
-}
-
-function handleCreateMaskClick() {
-  requestCreateClose('mask')
-}
-
-function handleCreateEscape(event: KeyboardEvent) {
-  if (!canDismissCreate('escape')) event.preventDefault()
-}
-
-function blockCreateOutsideDismiss(event: Event) {
-  event.preventDefault()
+function handleWorkspaceCreated(created: UserAccountMenuWorkspaceItem): void {
+  activeWorkspaceId.value = created.publicId
+  pendingCreateFocusId.value = created.publicId
+  focusNewWorkspaceRow(created.publicId)
 }
 
 function focusNewWorkspaceRow(workspaceId: string) {

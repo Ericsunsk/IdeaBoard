@@ -9,6 +9,9 @@ var apiOwnedTableNames = []string{
 	"admin_brand_logo_overrides",
 	"billing_accounts",
 	"billing_account_members",
+	"billing_account_member_quotas",
+	"billing_account_default_member_quotas",
+	"billing_account_transfer_invites",
 	"workspace_billing_links",
 	"board_access_event_outbox",
 	"board_documents",
@@ -50,6 +53,7 @@ var apiOwnedTableNames = []string{
 	"upload_sessions",
 	"users",
 	"users_used_uids",
+	"workspace_budgets",
 	"workspace_events",
 	"workspace_memberships",
 	"workspaces",
@@ -57,6 +61,7 @@ var apiOwnedTableNames = []string{
 
 var apiOwnedSequenceNames = []string{
 	"billing_accounts_internal_id_seq",
+	"billing_account_transfer_invites_internal_id_seq",
 	"board_access_event_outbox_internal_id_seq",
 	"board_revisions_internal_id_seq",
 	"board_y_updates_internal_id_seq",

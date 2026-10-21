@@ -28,6 +28,10 @@ import {
   listWorkspaces,
   updateWorkspace,
 } from '../../../api/generated-query/public/workspaces/workspaces'
+import {
+  createOrganization as createOrganizationTransport,
+  listOrganizations,
+} from '../../../api/generated-query/public/organizations/organizations'
 import { getGetUserQueryKey, getUser } from '../../../api/generated-query/public/user/user'
 import type { ListWorkspacesParams } from '../../../api/generated-query/public/model'
 import {
@@ -55,6 +59,9 @@ export type WorkspaceSummary = {
   // Default workspaces cannot be deleted or renamed.
   isDefault: boolean
   createdAt?: string | undefined
+  // Stable funds identity (#944): workspaces sharing one account report the
+  // same ba_ value; omitted for legacy payloads without the field.
+  billingAccountId?: string | undefined
 }
 
 export type PrincipalSummary = {
@@ -93,6 +100,13 @@ function optionalOpaqueId(
   return requireOpaqueId(value, prefix, what)
 }
 
+function optionalBillingAccountId(value: unknown): string | undefined {
+  if (value == null) return undefined
+  if (typeof value !== 'string' || !isOpaqueId(value) || opaqueIdPrefix(value) !== 'ba')
+    throw new Error('Invalid billing account opaque ID')
+  return value
+}
+
 export function parseWorkspaceItem(raw: unknown): WorkspaceSummary {
   if (!isRecord(raw)) throw new Error('Invalid workspace payload')
   // Agreed shape carries `public_id`; the kernel stub only has `id`.
@@ -102,12 +116,14 @@ export function parseWorkspaceItem(raw: unknown): WorkspaceSummary {
   const name = typeof raw.name === 'string' ? raw.name : ''
   const organizationId = optionalOpaqueId(raw.organization_id, 'org', 'organization')
   const createdAt = typeof raw.created_at === 'string' ? raw.created_at : undefined
+  const billingAccountId = optionalBillingAccountId(raw.billing_account_id ?? raw.billingAccountId)
   return {
     publicId,
     name,
     organizationId,
     isDefault: raw.is_default === true,
     ...(createdAt === undefined ? {} : { createdAt }),
+    ...(billingAccountId === undefined ? {} : { billingAccountId }),
   }
 }
 
@@ -247,8 +263,48 @@ export async function fetchPrincipal(options?: WorkspaceRequestOptions): Promise
   return parsePrincipal(response)
 }
 
+export type ProvisionWorkspaceBillingInput = {
+  /** Explicit shared ba_ account to link; omitted defaults to the current account with no new wallet. */
+  billingAccountId?: string | undefined
+  /** Fresh isolated account for an independently operated business. */
+  isNewBillingAccount?: boolean | undefined
+}
+
+function normalizeBillingChoice(input: ProvisionWorkspaceBillingInput): {
+  billingAccountId: string | undefined
+  shouldCreateIsolatedAccount: boolean
+} {
+  const billingAccountId =
+    input.billingAccountId == null
+      ? undefined
+      : (() => {
+          const trimmed = input.billingAccountId.trim()
+          if (!isOpaqueId(trimmed) || opaqueIdPrefix(trimmed) !== 'ba') {
+            throw new Error('Invalid billing account opaque ID')
+          }
+          return trimmed
+        })()
+  const shouldCreateIsolatedAccount = input.isNewBillingAccount === true
+  if (billingAccountId !== undefined && shouldCreateIsolatedAccount) {
+    throw new Error('billing_account_id and new_billing_account are mutually exclusive')
+  }
+  return { billingAccountId, shouldCreateIsolatedAccount }
+}
+
+function assertOrganizationBillingScope(
+  organizationId: string | null,
+  billing: { billingAccountId: string | undefined; shouldCreateIsolatedAccount: boolean },
+): void {
+  if (
+    organizationId != null &&
+    (billing.billingAccountId !== undefined || billing.shouldCreateIsolatedAccount)
+  ) {
+    throw new Error('Organization workspaces always use the organization account')
+  }
+}
+
 export async function provisionWorkspace(
-  input: { name: string; organizationId?: string | undefined },
+  input: { name: string; organizationId?: string | undefined } & ProvisionWorkspaceBillingInput,
   options?: WorkspaceRequestOptions & { idempotencyKey?: string | undefined },
 ): Promise<WorkspaceSummary> {
   const name = typeof input.name === 'string' ? input.name.trim() : ''
@@ -257,11 +313,17 @@ export async function provisionWorkspace(
     throw new Error('Workspace name is too long')
   }
   const organizationId = optionalOpaqueId(input.organizationId, 'org', 'organization')
+  const billing = normalizeBillingChoice(input)
+  assertOrganizationBillingScope(organizationId, billing)
   const response = await createWorkspace(
     {
       data: {
         name,
         ...(organizationId == null ? {} : { organization_id: organizationId }),
+        ...(billing.billingAccountId === undefined
+          ? {}
+          : { billing_account_id: billing.billingAccountId }),
+        ...(billing.shouldCreateIsolatedAccount ? { new_billing_account: true } : {}),
       },
     },
     {
@@ -366,4 +428,54 @@ export const workspaceQueryKeys = {
   all: ['workspaces'] as const,
   list: getListWorkspacesQueryKey(),
   principal: getGetUserQueryKey(),
+}
+
+export type OrganizationSummary = { publicId: string; name: string }
+
+function parseOrganization(raw: unknown): OrganizationSummary {
+  if (!isRecord(raw) || typeof raw.name !== 'string' || !raw.name.trim()) {
+    throw new Error('Invalid organization payload')
+  }
+  return { publicId: requireOpaqueId(raw.id, 'org', 'organization'), name: raw.name }
+}
+
+export async function fetchOrganizations(): Promise<OrganizationSummary[]> {
+  const items: OrganizationSummary[] = []
+  const visited = new Set<string>()
+  let cursor: string | undefined
+  while (true) {
+    const page = await listOrganizations({
+      page_size: WORKSPACE_PAGE_SIZE_MAX,
+      ...(cursor ? { cursor } : {}),
+    })
+    const data = requireContractData<unknown>(page, 'Organization list failed')
+    if (!Array.isArray(data)) throw new Error('Invalid organization list')
+    items.push(...data.map(parseOrganization))
+    if (!page.meta.has_more) return items
+    const next = page.meta.next_cursor
+    if (!next || visited.has(next)) throw new Error('Invalid organization cursor')
+    visited.add(next)
+    cursor = next
+  }
+}
+
+export async function provisionOrganization(
+  name: string,
+  idempotencyKey: string,
+): Promise<OrganizationSummary> {
+  const normalized = name.trim()
+  if (!normalized || normalized.length > WORKSPACE_NAME_MAX_LENGTH)
+    throw new Error('Invalid organization name')
+  const key = asTrimmedString(idempotencyKey)
+  if (!key) throw new Error('Organization creation requires an idempotency key')
+  const response = await createOrganizationTransport(
+    { data: { name: normalized } },
+    {
+      headers: buildContractRequestHeaders({
+        requestId: newRequestId(),
+        idempotencyKey: key,
+      }),
+    },
+  )
+  return parseOrganization(requireContractData<unknown>(response, 'Organization creation failed'))
 }

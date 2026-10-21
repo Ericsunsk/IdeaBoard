@@ -8,6 +8,8 @@ export default {
   service_resolution_unavailable: '该清晰度暂不可用。',
   prompt_unavailable: '该提示词服务当前不可用，请稍后再试。',
   wallet_restricted: '该账户当前受限，无法使用 Ideas。',
+  workspace_budget_exhausted: '当前工作区本期预算已用完。',
+  member_quota_exhausted: '你本周期个人额度已用完。',
   vision_search_not_configured: '视觉搜索暂不可用。',
   vision_search_unavailable: '视觉搜索暂不可用，请稍后重试。',
   vision_search_input_invalid: '请检查搜索内容后重试。',
@@ -32,4 +34,5 @@ export default {
   board_precondition_required: '访问状态已过期，请刷新后重试。',
   board_member_not_found: '看板成员不存在。',
   membership_transition_forbidden: '最后一位管理者不能被移除或降级。',
+  default_member_quota_not_configured: '请先设置新成员默认额度，再邀请成员。',
 } as const

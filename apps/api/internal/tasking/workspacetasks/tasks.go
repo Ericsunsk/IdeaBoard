@@ -12,9 +12,11 @@ import (
 
 	creditsdomain "ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/generation/routing"
+	quotadomain "ideaboard/api/internal/memberquotas"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/workflow"
 	"ideaboard/api/internal/workflow/paramkeys"
+	budgetdomain "ideaboard/api/internal/workspacebudgets"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -123,6 +125,19 @@ var (
 	// (403 billing_wallet_restricted). Alias, not a copy: see
 	// ErrInsufficientCredits for the multi-%w pairing.
 	ErrWalletRestricted = creditsdomain.ErrWalletRestricted
+	// ErrWorkspaceBudgetExhausted reports that a submit would exceed the
+	// Workspace's remaining shared consumption budget for the current
+	// period (403 workspace_budget_exhausted, #945). Alias, not a copy:
+	// the budget seam pairs it via multi-%w and renderTaskError keeps it
+	// distinct from 402 insufficiency and 403 wallet restriction.
+	ErrWorkspaceBudgetExhausted = budgetdomain.ErrBudgetExhausted
+	// ErrMemberQuotaExhausted reports that a submit would exceed the
+	// member's remaining cross-workspace consumption quota for the
+	// current window (403 member_quota_exhausted, #946). Alias, not a
+	// copy: the quota seam pairs it via multi-%w and renderTaskError
+	// keeps it distinct from 402 insufficiency, 403 workspace budget,
+	// and 403 wallet restriction.
+	ErrMemberQuotaExhausted = quotadomain.ErrQuotaExhausted
 	// ErrMediaNotFound wraps an invisible input/output asset.
 	ErrMediaNotFound = errors.New("workspacetasks: media not found")
 	// ErrMediaNotReady wraps a non-ready asset (409 media_not_ready).

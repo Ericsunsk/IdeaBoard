@@ -353,10 +353,21 @@ paths:
       operationId: createWorkspace
       summary: Create a workspace
       description: >-
-        Creates a non-Default workspace. Personal creates without an
-        organization are unlimited; the per-user Default workspace is only
-        ever minted by idempotent auto-provisioning. A second Default create
-        renders 409 workspace_default_conflict.
+        Creates a non-Default workspace with an explicit billing account.
+        Personal creates default to the caller's current (personal) account
+        via an explicit link so no-org business spaces share one balance
+        and no new wallet is minted implicitly; pass new_billing_account
+        true for a fresh isolated account (creator becomes billing owner,
+        balances never merge), or billing_account_id to share an authorized
+        account (caller must be Billing Owner/Admin, 403 otherwise).
+        Organization scopes always use the shared org pool: billing fields
+        with an organization_id render 409 billing_account_conflict, never
+        the creator personal pool. Failures roll back with no half-linked
+        workspace. The per-user Default workspace is only ever minted by
+        idempotent auto-provisioning. A second Default create renders 409
+        workspace_default_conflict. No Idempotency-Key reuse across
+        different billing choices: same key with a different billing
+        selection renders 409 workspace_idempotency_conflict.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -379,6 +390,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -509,7 +522,11 @@ paths:
         keeps the current role, including when the workspace is full.
         Workspaces support at most 5 members including owners; exceeding
         this limit renders 409 workspace_member_limit_reached.
-        Reusing a key with a different request
+        New members require the account default new-member quota to be
+        configured: absent defaults render 409
+        default_member_quota_not_configured (fail closed, never implicit
+        unlimited) and the inviter reuses it atomically (the inviter
+        cannot raise the default here). Reusing a key with a different request
         renders 409 workspace_idempotency_conflict.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
@@ -1397,8 +1414,9 @@ paths:
       operationId: listWorkspaceBillingAccountMembers
       summary: List billing account managers (billing manager only)
       description: >-
-        Financial managers only; workspace standing alone renders 403
-        billing_account_forbidden. No Idempotency-Key: read-only, safe to retry.
+        Financial managers may read account invitations; a Workspace member
+        without financial management sees only invitations addressed to them.
+        No Idempotency-Key: read-only, safe to retry.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       responses:
@@ -1570,6 +1588,76 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+    delete:
+      tags: [WorkspaceBilling]
+      operationId: removeWorkspaceBillingAccountMember
+      summary: Detach a billing manager (billing manager only)
+      description: >-
+        Detaches one financial manager without deleting or freezing shared
+        funds: only the management row leaves, the Wallet, Ledger, and
+        history stay readable. The last Owner cannot be removed. No
+        Idempotency-Key: idempotent detach by value, safe to retry.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: member_id
+          in: path
+          required: true
+          description: Opaque usr_ identity of the billing manager.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Billing manager detached.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [removed]
+                    additionalProperties: false
+                    properties:
+                      removed:
+                        type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Visible-but-forbidden detach (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Last owner cannot be removed (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /workspaces/{workspace_id}/billing-account/transfer:
     post:
       tags: [WorkspaceBilling]
@@ -1626,6 +1714,380 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           description: Conflicting transfer (billing_account_conflict).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/billing-account/transfer-invites:
+    post:
+      tags: [WorkspaceBilling]
+      operationId: initiateWorkspaceBillingTransfer
+      summary: Invite a new billing account owner (billing owner only)
+      description: >-
+        Only the current Billing Owner may initiate; the recipient accepts
+        or rejects, and the initiator may cancel while pending. The Default
+        Workspace never transfers; acceptance grants the recipient Workspace
+        Owner on every non-Default business Workspace associated with the
+        account. Identity, balance, and history stay stable; only management
+        changes. Requires the Idempotency-Key header. At most one pending
+        invite per account.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiateBillingTransferRequest'
+      responses:
+        '201':
+          description: Transfer invitation created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BillingTransferInvite'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Visible-but-forbidden invite (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Conflicting invite (billing_account_conflict).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    get:
+      tags: [WorkspaceBilling]
+      operationId: listWorkspaceBillingTransfers
+      summary: List visible billing handover invitations
+      description: >-
+        Financial managers may read account invitations; a Workspace member
+        without financial management sees only invitations addressed to them.
+        No Idempotency-Key: read-only, safe to retry.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Handover invitation history.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BillingTransferInvite'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Visible-but-forbidden read (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/billing-account/transfer-invites/{invite_id}:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: getWorkspaceBillingTransfer
+      summary: Get a visible billing handover invitation
+      description: >-
+        Financial managers may read account invitations; a Workspace member
+        without financial management may read only invitations addressed to them.
+        Hidden ids converge to billing_account_not_found. No Idempotency-Key: read-only, safe to retry.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: invite_id
+          in: path
+          required: true
+          description: Opaque bti_ handover invitation identifier.
+          schema:
+            type: string
+            pattern: ^bti_[A-Za-z0-9_-]+$
+      responses:
+        '200':
+          description: Handover invitation.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BillingTransferInvite'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Visible-but-forbidden read (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/billing-account/transfer-invites/{invite_id}/accept:
+    post:
+      tags: [WorkspaceBilling]
+      operationId: acceptWorkspaceBillingTransfer
+      summary: Accept a billing handover invitation (recipient only)
+      description: >-
+        Only the recipient may accept a pending invite; acceptance makes the
+        recipient Billing Owner, steps the previous Owner down to Admin, and
+        grants Workspace Owner on every non-Default business Workspace. The
+        Default Workspace never transfers. Requires the Idempotency-Key header.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: invite_id
+          in: path
+          required: true
+          description: Opaque bti_ handover invitation identifier.
+          schema:
+            type: string
+            pattern: ^bti_[A-Za-z0-9_-]+$
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Handover accepted.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BillingTransferInvite'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Visible-but-forbidden accept (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Conflicting accept (billing_account_conflict).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/billing-account/transfer-invites/{invite_id}/reject:
+    post:
+      tags: [WorkspaceBilling]
+      operationId: rejectWorkspaceBillingTransfer
+      summary: Reject a billing handover invitation (recipient only)
+      description: >-
+        Only the recipient may reject a pending invite; membership is
+        unchanged. Requires the Idempotency-Key header.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: invite_id
+          in: path
+          required: true
+          description: Opaque bti_ handover invitation identifier.
+          schema:
+            type: string
+            pattern: ^bti_[A-Za-z0-9_-]+$
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Handover rejected.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BillingTransferInvite'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Visible-but-forbidden reject (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Conflicting reject (billing_account_conflict).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/billing-account/transfer-invites/{invite_id}/cancel:
+    post:
+      tags: [WorkspaceBilling]
+      operationId: cancelWorkspaceBillingTransfer
+      summary: Cancel a billing handover invitation (initiator only)
+      description: >-
+        Only the initiator may cancel a pending invite; membership is
+        unchanged. Requires the Idempotency-Key header.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: invite_id
+          in: path
+          required: true
+          description: Opaque bti_ handover invitation identifier.
+          schema:
+            type: string
+            pattern: ^bti_[A-Za-z0-9_-]+$
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Handover cancelled.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BillingTransferInvite'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Visible-but-forbidden cancel (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Conflicting cancel (billing_account_conflict).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -1829,6 +2291,362 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '503':
           description: Usage service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/budget:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: getWorkspaceBudget
+      summary: Get the workspace shared consumption budget with live usage
+      description: >-
+        Any workspace member reads the cap with live usage and remaining
+        quota for the current period (monthly UTC calendar month, or
+        unlimited when no cap is set). The budget is a cumulative cap on
+        settled plus pending consumption (paid Task generations and Vision
+        Search), not a wallet or reservation: adjusting the limit never
+        clears usage, and a monthly reset starts a new UTC month without
+        deleting history. Block reasons surface on quote/submit as 402
+        task_insufficient_credits (balance shortfall) vs 403
+        workspace_budget_exhausted (cap reached) vs 403
+        billing_wallet_restricted (other funds limits). Hidden workspaces
+        render 404 workspace_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Workspace budget with live usage.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceBudgetEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Budget service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      tags: [WorkspaceBilling]
+      operationId: setWorkspaceBudget
+      summary: Set the workspace shared consumption budget (billing manager only)
+      description: >-
+        Sets the workspace cap to monthly (with limit_credits) or
+        unlimited (no limit_credits). Requires Billing Owner/Admin on the
+        resolved account: workspace-only admins render 403
+        billing_account_forbidden and cannot raise a pool-granted budget.
+        Adjusting the limit never clears usage and never tops up any
+        balance. Invalid input renders 422 validation_failed with
+        details.fields naming period/limit_credits. No Idempotency-Key
+        header is used: the set is naturally idempotent.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetWorkspaceBudgetRequest'
+      responses:
+        '200':
+          description: Workspace budget updated, with live usage.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceBudgetEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Missing financial grant (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Budget service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/member-quotas:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: listMemberQuotas
+      summary: List member cross-workspace quotas with live usage (billing manager only)
+      description: >-
+        Billing Owner/Admin lists every explicitly set quota on the
+        resolved account with live usage and remaining quota for the
+        current window. Other members render 403 billing_account_forbidden
+        and read their own row via the self endpoint. Quotas cap one
+        member's settled plus pending consumption across every workspace
+        sharing the account (paid Task generations and Vision Search),
+        never a sub-wallet: adjusting the limit never clears usage,
+        unused periodic quota never rolls over, and rejoining never
+        re-issues. Hidden workspaces render 404 workspace_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Member quotas with live usage.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberQuotaListEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Missing financial grant (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Quota service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/member-quotas/self:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: getSelfMemberQuota
+      summary: Get the caller's member quota with live usage
+      description: >-
+        Any workspace member reads their own quota with live usage and
+        remaining quota for the current window on the resolved account
+        (daily/weekly/monthly UTC windows, fixed lifetime cap, or
+        unlimited when no cap is set). Absent means unlimited. Block
+        reasons surface on quote/submit as 402 task_insufficient_credits
+        (balance shortfall) vs 403 workspace_budget_exhausted (workspace
+        cap reached) vs 403 member_quota_exhausted (member cap reached)
+        vs 403 billing_wallet_restricted (other funds limits). Hidden
+        workspaces render 404 workspace_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Member quota with live usage.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberQuotaEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Quota service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/member-quotas/{user_id}:
+    put:
+      tags: [WorkspaceBilling]
+      operationId: setMemberQuota
+      summary: Set a member cross-workspace quota (billing manager only)
+      description: >-
+        Sets one member's quota to daily/weekly/monthly/fixed (with
+        limit_credits) or unlimited (no limit_credits). Requires Billing
+        Owner/Admin on the resolved account: workspace-only admins render
+        403 billing_account_forbidden and cannot raise a pool-granted
+        quota. Adjusting the limit never clears usage and never tops up
+        any balance; unused periodic quota never rolls over. Invalid input
+        renders 422 validation_failed with details.fields naming
+        period/limit_credits. No Idempotency-Key header is used: the set
+        is naturally idempotent.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: user_id
+          in: path
+          required: true
+          description: Opaque usr_ identity of the quota member.
+          schema:
+            $ref: '#/components/schemas/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetMemberQuotaRequest'
+      responses:
+        '200':
+          description: Member quota updated, with live usage.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberQuotaEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Missing financial grant (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Quota service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/default-member-quota:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: getDefaultMemberQuota
+      summary: Get the account default new-member quota (members only)
+      description: >-
+        Any workspace member reads the default new-member quota on the
+        resolved account (daily/weekly/monthly UTC windows, fixed lifetime
+        cap, or unlimited). Absent defaults render 409
+        default_member_quota_not_configured (fail closed, never implicit
+        unlimited): a Billing Owner/Admin sets it first via PUT. Hidden
+        workspaces render 404 workspace_not_found.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Default new-member quota.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefaultMemberQuotaEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Default not configured (default_member_quota_not_configured).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Quota service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      tags: [WorkspaceBilling]
+      operationId: setDefaultMemberQuota
+      summary: Set the account default new-member quota (billing manager only)
+      description: >-
+        Sets the account default to daily/weekly/monthly/fixed (with
+        limit_credits) or unlimited (no limit_credits). Requires Billing
+        Owner/Admin on the resolved account: workspace-only admins render
+        403 billing_account_forbidden and cannot raise the pool default.
+        Changing the default only affects later joins; existing per-member
+        rows keep their cap and accrued usage. Invalid input renders 422
+        validation_failed with details.fields naming period/limit_credits.
+        No Idempotency-Key header is used: the set is naturally idempotent.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetDefaultMemberQuotaRequest'
+      responses:
+        '200':
+          description: Default new-member quota updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefaultMemberQuotaEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Missing financial grant (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Quota service unavailable (service_unavailable).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -2420,7 +3238,11 @@ paths:
         (scope task:create): same key+hash replays the first task, key
         reuse with a different request renders 409
         task_idempotency_conflict. Insufficient Ideas render 402
-        task_insufficient_credits. Billing settles against a server-side
+        task_insufficient_credits. A request that would exceed the
+        workspace shared consumption budget renders 403
+        workspace_budget_exhausted; a request that would exceed the
+        member's cross-workspace quota renders 403 member_quota_exhausted.
+        Billing settles against a server-side
         quote for the ai-image:<service> SKU (unpriced or unregistered SKU
         renders billing_pricing_unavailable 422 deterministic, transient
         quote failures billing_quote_unavailable 503,
@@ -2474,7 +3296,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '403':
-          description: Visible-but-forbidden (task_forbidden) or restricted wallet (billing_wallet_restricted).
+          description: Visible-but-forbidden (task_forbidden), restricted wallet (billing_wallet_restricted), exhausted workspace budget (workspace_budget_exhausted), or exhausted member quota (member_quota_exhausted).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -2618,7 +3440,11 @@ paths:
         visible Boards without generate capability 403 task_forbidden, so
         Viewers never read ready), and the resolved account Wallet gates
         funds (402 task_insufficient_credits vs 403
-        billing_wallet_restricted, mirroring the submit Hold). Financial
+        billing_wallet_restricted, mirroring the submit Hold). The
+        workspace shared consumption budget gates the same quote (403
+        workspace_budget_exhausted when the cap is reached), and the
+        member cross-workspace quota gates it too (403
+        member_quota_exhausted when the member cap is reached). Financial
         management alone grants no Board standing. Unpriced or
         unregistered SKU renders billing_pricing_unavailable 422
         deterministic; transient quote failures render
@@ -2658,7 +3484,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '403':
-          description: Visible-but-forbidden (task_forbidden) or restricted wallet (billing_wallet_restricted).
+          description: Visible-but-forbidden (task_forbidden), restricted wallet (billing_wallet_restricted), exhausted workspace budget (workspace_budget_exhausted), or exhausted member quota (member_quota_exhausted).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -4150,6 +4976,13 @@ components:
             True for the owner's Default workspace: exactly one row per
             user, never deleted or renamed, auto-provisioned when
             missing. Organization workspaces always report false.
+        billing_account_id:
+          type: string
+          pattern: ^ba_[A-Za-z0-9_-]+$
+          description: >-
+            Stable funds identity for creation responses; workspaces sharing
+            one account report the same value. Omitted when the billing
+            store is unavailable.
         created_at:
           type: string
           format: date-time
@@ -4213,6 +5046,20 @@ components:
               anyOf:
                 - $ref: '#/components/schemas/OrganizationId'
                 - nullable: true
+            billing_account_id:
+              type: string
+              pattern: ^ba_[A-Za-z0-9_-]+$
+              description: >-
+                Explicit shared account to link (caller must be Billing
+                Owner/Admin). Omitted defaults to the caller's personal
+                account with no new wallet. Mutually exclusive with
+                new_billing_account; rejected with organization scopes.
+            new_billing_account:
+              type: boolean
+              description: >-
+                When true, mints a fresh isolated per-workspace account
+                (creator becomes billing owner). Mutually exclusive with
+                billing_account_id; rejected with organization scopes.
     UpdateUserRequest:
       type: object
       required: [data]
@@ -5088,6 +5935,48 @@ components:
           properties:
             new_owner_user_id:
               type: string
+    InitiateBillingTransferRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [new_owner_user_id]
+          additionalProperties: false
+          properties:
+            new_owner_user_id:
+              type: string
+    BillingTransferInvite:
+      type: object
+      required: [public_id, billing_account_id, from_user_id, to_user_id, status, scope_workspace_ids]
+      additionalProperties: false
+      properties:
+        public_id:
+          type: string
+          pattern: ^bti_[A-Za-z0-9_-]+$
+        billing_account_id:
+          type: string
+          pattern: ^ba_[A-Za-z0-9_-]+$
+        from_user_id:
+          type: string
+        to_user_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, accepted, rejected, cancelled]
+        scope_workspace_ids:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        decided_at:
+          type: string
+          format: date-time
+        decided_by:
+          type: string
     WorkspaceBillingAccountEnvelope:
       type: object
       required: [data]
@@ -5252,6 +6141,190 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/WorkspaceUsage'
+    WorkspaceBudget:
+      type: object
+      required: [workspace_id, billing_account_id, period, used_credits]
+      additionalProperties: false
+      properties:
+        workspace_id:
+          type: string
+          description: Consuming workspace (ws_).
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
+          description: Payer account (ba_) granting this budget; stable across workspace switches and member changes.
+        period:
+          type: string
+          enum: [monthly, unlimited]
+          description: monthly caps per UTC calendar month; unlimited sets no cap (the default).
+        limit_credits:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Monthly cap in integer credits; omitted for unlimited.
+        used_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Settled net captures (linked refunds correct their original period) plus pending holds in the current period, across all members.
+        remaining_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          description: limit_credits minus used_credits clamped at zero; omitted for unlimited.
+        period_start:
+          type: string
+          format: date-time
+          description: Current UTC month start (monthly only).
+        period_end:
+          type: string
+          format: date-time
+          description: Current UTC month end, exclusive (monthly only).
+    WorkspaceBudgetEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceBudget'
+    SetWorkspaceBudgetRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [period]
+          additionalProperties: false
+          properties:
+            period:
+              type: string
+              enum: [monthly, unlimited]
+            limit_credits:
+              type: integer
+              format: int64
+              minimum: 1
+              description: Required for monthly, forbidden for unlimited.
+    MemberQuota:
+      type: object
+      required: [billing_account_id, user_id, period, used_credits]
+      additionalProperties: false
+      properties:
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
+          description: Payer account (ba_) this member consumes; stable across workspace switches and member changes.
+        user_id:
+          type: string
+          description: Opaque usr_ identity of the quota member.
+        period:
+          type: string
+          enum: [daily, weekly, monthly, fixed, unlimited]
+          description: daily/weekly/monthly cap per UTC day, Monday-start week, or calendar month; fixed caps lifetime cumulative spend; unlimited sets no cap (the default).
+        limit_credits:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Capped-period limit in integer credits; omitted for unlimited.
+        used_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Settled net captures (linked refunds correct their original period) plus pending holds in the current window, across every workspace sharing the account.
+        remaining_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          description: limit_credits minus used_credits clamped at zero; omitted for unlimited.
+        period_start:
+          type: string
+          format: date-time
+          description: Current window start, UTC (omitted for fixed/unlimited).
+        period_end:
+          type: string
+          format: date-time
+          description: Current window end, exclusive, UTC (omitted for fixed/unlimited).
+    MemberQuotaEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/MemberQuota'
+    MemberQuotaListEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemberQuota'
+    SetMemberQuotaRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [period]
+          additionalProperties: false
+          properties:
+            period:
+              type: string
+              enum: [daily, weekly, monthly, fixed, unlimited]
+            limit_credits:
+              type: integer
+              format: int64
+              minimum: 1
+              description: Required for capped periods, forbidden for unlimited.
+    DefaultMemberQuota:
+      type: object
+      required: [billing_account_id, workspace_id, period]
+      additionalProperties: false
+      properties:
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
+          description: Payer account (ba_) whose new members reuse this default; stable across workspace switches and member changes.
+        workspace_id:
+          type: string
+          pattern: '^ws_[A-Za-z0-9_-]+$'
+          description: Resolving workspace (consumption location) for this read.
+        period:
+          type: string
+          enum: [daily, weekly, monthly, fixed, unlimited]
+          description: daily/weekly/monthly cap per UTC day, Monday-start week, or calendar month; fixed caps lifetime cumulative spend; unlimited sets no cap.
+        limit_credits:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Capped-period limit in integer credits; omitted for unlimited.
+    DefaultMemberQuotaEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/DefaultMemberQuota'
+    SetDefaultMemberQuotaRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [period]
+          additionalProperties: false
+          properties:
+            period:
+              type: string
+              enum: [daily, weekly, monthly, fixed, unlimited]
+            limit_credits:
+              type: integer
+              format: int64
+              minimum: 1
+              description: Required for capped periods, forbidden for unlimited.
     CreateWorkspaceCheckoutRequest:
       type: object
       required: [data]

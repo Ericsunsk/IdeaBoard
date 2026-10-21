@@ -26,8 +26,8 @@ type SettlementTransactor interface {
 	BeginSettlementTx(ctx context.Context) (pgx.Tx, error)
 }
 
-// TxQuoter mints the price snapshot inside the settlement transaction
-// (repeatable-read snapshot consistency with the Hold that follows).
+// TxQuoter pins the immutable price and authoritative reservation timestamp
+// inside the settlement transaction before the cap checks and Hold.
 // Production adapts the Billing catalog QuoteAtResolutionInTx.
 type TxQuoter interface {
 	QuoteInTx(ctx context.Context, tx pgx.Tx, service, resolution string, quantity int64) (BillingSnapshot, error)
@@ -54,6 +54,29 @@ type TxHolder interface {
 // the caller transaction and fails closed on ambiguity or conflict.
 type TxBillingAccountResolver interface {
 	ResolveBillingAccountInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string) (int64, error)
+}
+
+// TxWorkspaceBudgetChecker enforces the Workspace shared consumption
+// budget inside the settlement transaction (#945). Production implements
+// it on the workspacebudgets Store; tests stub it. The check joins THIS
+// transaction after the Quote (so the quoted amount is known) and before
+// the Hold, locking the budget row and reading the same snapshot. A nil
+// checker means no budget enforcement (unlimited); the member-quota check
+// for #946 runs next at the same boundary.
+type TxWorkspaceBudgetChecker interface {
+	CheckBudgetInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string, amount int64, reservedAt time.Time) error
+}
+
+// TxMemberQuotaChecker enforces the member cross-workspace consumption
+// quota inside the settlement transaction (#946). Production implements
+// it on the memberquotas Store; tests stub it. The check joins THIS
+// transaction after the workspace-budget check (fixed lock order: budget
+// row first, quota row second) and before the Hold, attributing usage to
+// the real operator (Billing Account + User) across every Workspace
+// sharing the account. A nil checker means no quota enforcement
+// (unlimited); both constraints stay independently effective.
+type TxMemberQuotaChecker interface {
+	CheckQuotaInTx(ctx context.Context, tx pgx.Tx, billingAccountID, userID int64, amount int64, reservedAt time.Time) error
 }
 
 // TxEnqueuer carries the River payload inside the settlement transaction.
@@ -350,12 +373,13 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	if err != nil {
 		return nil, true, err
 	}
-	// Budget/member-quota hook (#917 reserves, #945/#946 implement):
-	// future consumption-limit checks join THIS transaction between the
-	// stable account resolution above and the Hold below, reading the
-	// same repeatable-read snapshot. No quota computation runs here; the
-	// Hold stays the sole spending gate, so the boundary is reserved
-	// without claiming unbuilt enforcement.
+	// Budget/member-quota boundary (#945 enforces the shared workspace
+	// cap, #946 the member cross-workspace quota): both checks join THIS
+	// transaction after the Quote (so the quoted amount is known) and
+	// before the Hold below, locking their rows in one fixed order
+	// (budget row first, quota row second) and reading the same snapshot.
+	// A nil checker means unlimited (no enforcement for that boundary);
+	// the two constraints remain independently effective.
 	// Resolve inside the settlement transaction before Quote/Hold so
 	// an empty pool fails before any ledger, task, or queue write (the
 	// rollback below then removes nothing because nothing was written).
@@ -378,6 +402,16 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	}
 	snapshot.SettlementState = "quoted"
 	snapshot.BillingAccountID = billingAccountID
+	if s.budgets != nil && snapshot.TotalCredits > 0 {
+		if err := s.budgets.CheckBudgetInTx(ctx, tx, claim.WorkspaceID, snapshot.TotalCredits, snapshot.QuotedAt); err != nil {
+			return nil, true, err
+		}
+	}
+	if s.quotas != nil && snapshot.TotalCredits > 0 {
+		if err := s.quotas.CheckQuotaInTx(ctx, tx, billingAccountID, input.OwnerUserID, snapshot.TotalCredits, snapshot.QuotedAt); err != nil {
+			return nil, true, err
+		}
+	}
 	var holdTxID string
 	if snapshot.TotalCredits > 0 {
 		// The ledger key is derived from the DURABLE claim scope, never from

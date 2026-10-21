@@ -146,6 +146,40 @@ const (
 	CodeTaskInsufficientCredits      Code = "task_insufficient_credits"
 	CodeServiceResolutionUnavailable Code = "service_resolution_unavailable"
 
+	// Workspace shared consumption budget codes (issue #945).
+	// Wire-stable: do not rename without coordinating the OpenAPI
+	// contract and callers. A request that would exceed the Workspace's
+	// remaining budget renders workspace_budget_exhausted (403),
+	// distinct from balance insufficiency (402
+	// task_insufficient_credits) and other funds restrictions (403
+	// billing_wallet_restricted). Hidden workspaces converge to
+	// workspace_not_found (404) before any budget read, per Baseline 4
+	// anti-enumeration; malformed set input reuses validation_failed
+	// (422) with details.fields naming period/limit_credits.
+	CodeWorkspaceBudgetExhausted Code = "workspace_budget_exhausted"
+
+	// Member cross-workspace consumption quota codes (issue #946).
+	// Wire-stable: do not rename without coordinating the OpenAPI
+	// contract and callers. A request that would exceed the member's
+	// remaining quota renders member_quota_exhausted (403),
+	// distinct from balance insufficiency (402
+	// task_insufficient_credits), the workspace cap (403
+	// workspace_budget_exhausted), and other funds restrictions (403
+	// billing_wallet_restricted). Hidden workspaces converge to
+	// workspace_not_found (404) before any quota read, per Baseline 4
+	// anti-enumeration; malformed set input reuses validation_failed
+	// (422) with details.fields naming period/limit_credits.
+	CodeMemberQuotaExhausted Code = "member_quota_exhausted"
+
+	// Account default new-member quota codes (issue #947).
+	// Wire-stable: do not rename without coordinating the OpenAPI
+	// contract and callers. An invite blocked by a missing default
+	// renders default_member_quota_not_configured (409, fail closed,
+	// never implicit unlimited); the same code renders the default
+	// read when absent so the UI guides a Billing Owner/Admin to set
+	// it first. Malformed set input reuses validation_failed (422).
+	CodeDefaultMemberQuotaNotConfigured Code = "default_member_quota_not_configured"
+
 	// Workspace library codes (issue #806). Wire-stable: do not rename
 	// without coordinating the OpenAPI contract and callers. Library
 	// assets are saved external references (provider URL + source
@@ -401,6 +435,8 @@ func StatusOf(code Code) int {
 		CodeBoardForbidden, CodeBillingWalletRestricted, CodeTaskForbidden, CodeEventForbidden,
 		CodeBoardPermissionDenied, CodeStripePermissionDenied, CodeIdentityForbidden,
 		CodeBillingAccountForbidden,
+		CodeWorkspaceBudgetExhausted,
+		CodeMemberQuotaExhausted,
 		// CodeIdentityUpstreamRejected renders with the upstream 401/403
 		// status kept explicit at the impersonation edge; the registry
 		// pins 403 as the representative denial.
@@ -435,6 +471,7 @@ func StatusOf(code Code) int {
 		CodeBoardNameConflict, CodeBoardIDConflict,
 		CodeIdentityConflict, CodeStripeConfigurationChanged, CodeCheckoutConflict,
 		CodeWalletNotRechargeable, CodeBillingAccountConflict,
+		CodeDefaultMemberQuotaNotConfigured,
 		CodeSearchProviderTestRequired, CodeSearchProviderAPIKeyRequired:
 		return http.StatusConflict
 	case CodeValidationFailed, CodeUploadValidationFailed, CodeMediaValidationFailed,

@@ -1,5 +1,6 @@
-// Package consumptionread owns the PostgreSQL projection of settled-consumption
-// attribution shared by Usage and Billing Records. It reads existing facts only;
+// Package consumptionread owns PostgreSQL consumption projections: settled
+// attribution for Usage/Billing Records and occupied Used Credits for caps.
+// These retain distinct time and pending-consumption semantics. It reads facts only;
 // Ledger, Tasking, and SearchCatalog retain their respective write ownership.
 package consumptionread
 

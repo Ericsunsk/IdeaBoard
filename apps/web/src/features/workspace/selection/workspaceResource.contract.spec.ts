@@ -10,6 +10,8 @@ import {
   classifyWorkspaceAccessError,
   deleteWorkspace,
   fetchAllWorkspaces,
+  fetchOrganizations,
+  provisionOrganization,
   fetchPrincipal,
   fetchWorkspacePage,
   normalizeWorkspaceListParams,
@@ -207,7 +209,12 @@ describe('workspace creation', () => {
           body: await request.json(),
         })
         return HttpResponse.json({
-          data: { public_id: 'ws_new1', name: 'New', organization_id: null },
+          data: {
+            public_id: 'ws_new1',
+            name: 'New',
+            organization_id: null,
+            billing_account_id: 'ba_personal_1',
+          },
         })
       }),
     )
@@ -217,11 +224,42 @@ describe('workspace creation', () => {
       { idempotencyKey: 'workspace-create:retry-1', requestId: 'req_create_1' },
     )
 
-    expect(created).toMatchObject({ publicId: 'ws_new1', name: 'New' })
+    expect(created).toMatchObject({
+      publicId: 'ws_new1',
+      name: 'New',
+      billingAccountId: 'ba_personal_1',
+    })
     expect(seen).toHaveLength(1)
     expect(seen[0]?.idempotencyKey).toBe('workspace-create:retry-1')
     expect(seen[0]?.requestId).toBe('req_create_1')
     expect(seen[0]?.body).toEqual({ data: { name: 'New' } })
+  })
+
+  it('sends an explicit shared account or a fresh independent flag', async () => {
+    const seen: Array<{ body: unknown }> = []
+    useMswHandlers(
+      http.post('/api/v1/workspaces', async ({ request }) => {
+        seen.push({ body: await request.json() })
+        return HttpResponse.json({
+          data: { public_id: 'ws_new2', name: 'Biz', organization_id: null },
+        })
+      }),
+    )
+
+    await provisionWorkspace(
+      { name: 'Biz', billingAccountId: 'ba_personal_1' },
+      { idempotencyKey: 'workspace-create:shared-1' },
+    )
+    await provisionWorkspace(
+      { name: 'Solo', isNewBillingAccount: true },
+      { idempotencyKey: 'workspace-create:new-1' },
+    )
+
+    expect(seen[0]?.body).toEqual({
+      data: { name: 'Biz', billing_account_id: 'ba_personal_1' },
+    })
+    // eslint-disable-next-line governance/boolean-prefix -- Orval wire field mirrors openapi.public.yaml.
+    expect(seen[1]?.body).toEqual({ data: { name: 'Solo', new_billing_account: true } })
   })
 
   it('generates a fresh idempotency key per new intent', () => {
@@ -240,6 +278,42 @@ describe('workspace creation', () => {
       provisionWorkspace({ name: 'x'.repeat(WORKSPACE_NAME_MAX_LENGTH + 1) }),
     ).rejects.toThrow()
     await expect(provisionWorkspace({ name: 'Ok', organizationId: 'nope' })).rejects.toThrow()
+    await expect(provisionWorkspace({ name: 'Ok', billingAccountId: 'nope' })).rejects.toThrow()
+    await expect(
+      provisionWorkspace({
+        name: 'Ok',
+        billingAccountId: 'ba_personal_1',
+        isNewBillingAccount: true,
+      }),
+    ).rejects.toThrow()
+    await expect(
+      provisionWorkspace({
+        name: 'Ok',
+        organizationId: 'org_c3',
+        billingAccountId: 'ba_personal_1',
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('parses the creation-time billing account without breaking legacy payloads', () => {
+    expect(
+      parseWorkspaceItem({
+        public_id: 'ws_b1',
+        name: 'Biz',
+        organization_id: null,
+        billing_account_id: 'ba_personal_1',
+      }),
+    ).toMatchObject({ publicId: 'ws_b1', billingAccountId: 'ba_personal_1' })
+    expect(parseWorkspaceItem({ public_id: 'ws_l1', name: 'Legacy' })).toMatchObject({
+      publicId: 'ws_l1',
+    })
+    expect(() =>
+      parseWorkspaceItem({
+        public_id: 'ws_b2',
+        name: 'Bad',
+        billing_account_id: 'nope',
+      }),
+    ).toThrow()
   })
 })
 
@@ -437,5 +511,61 @@ describe('workspace URLs', () => {
       'cursor=c+1&page_size=50',
     )
     expect(workspaceApiUrls.workspaceDetail('ws a/1')).toContain('ws%20a%2F1')
+  })
+})
+
+describe('organization account setup', () => {
+  it('walks all organizations so an organization without workspaces remains selectable', async () => {
+    useMswHandlers(
+      http.get('/api/v1/organizations', ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('cursor')
+        return HttpResponse.json(
+          cursor === 'next'
+            ? {
+                data: [
+                  { id: 'org_new', name: 'No workspaces yet', created_at: '2026-10-22T00:00:00Z' },
+                ],
+                meta: { has_more: false, next_cursor: null },
+              }
+            : {
+                data: [
+                  { id: 'org_existing', name: 'Existing', created_at: '2026-10-22T00:00:00Z' },
+                ],
+                meta: { has_more: true, next_cursor: 'next' },
+              },
+        )
+      }),
+    )
+    expect(await fetchOrganizations()).toEqual([
+      { publicId: 'org_existing', name: 'Existing' },
+      { publicId: 'org_new', name: 'No workspaces yet' },
+    ])
+  })
+  it('creates an organization with a caller-pinned retry key', async () => {
+    const seenKeys: (string | null)[] = []
+    useMswHandlers(
+      http.post('/api/v1/organizations', async ({ request }) => {
+        seenKeys.push(request.headers.get('Idempotency-Key'))
+        expect(await request.json()).toEqual({ data: { name: 'Acme' } })
+        return HttpResponse.json(
+          { data: { id: 'org_acme', name: 'Acme', created_at: '2026-10-22T00:00:00Z' } },
+          { status: 201 },
+        )
+      }),
+    )
+    expect(await provisionOrganization(' Acme ', 'organization-create:attempt')).toEqual({
+      publicId: 'org_acme',
+      name: 'Acme',
+    })
+    await provisionOrganization('Acme', 'organization-create:attempt')
+    expect(seenKeys).toEqual(['organization-create:attempt', 'organization-create:attempt'])
+  })
+  it('fails closed if organization pagination stops advancing', async () => {
+    useMswHandlers(
+      http.get('/api/v1/organizations', () =>
+        HttpResponse.json({ data: [], meta: { has_more: true, next_cursor: 'same' } }),
+      ),
+    )
+    await expect(fetchOrganizations()).rejects.toThrow('Invalid organization cursor')
   })
 })

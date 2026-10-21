@@ -220,6 +220,9 @@ describe('workspaceMembersResource errors', () => {
     expect(classifyWorkspaceMemberError(codedError('workspace_idempotency_conflict'))).toBe(
       'idempotency-conflict',
     )
+    expect(classifyWorkspaceMemberError(codedError('default_member_quota_not_configured'))).toBe(
+      'missing-default',
+    )
     expect(classifyWorkspaceMemberError(codedError('validation_failed'))).toBe('invalid')
     expect(classifyWorkspaceMemberError(codedError('bad_request'))).toBe('invalid')
     expect(classifyWorkspaceMemberError(codedError('idempotency_key_required'))).toBe('invalid')

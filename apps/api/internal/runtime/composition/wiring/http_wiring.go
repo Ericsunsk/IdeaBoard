@@ -25,6 +25,7 @@ import (
 	"ideaboard/api/internal/media/derivatives/infrastructure/preview"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	"ideaboard/api/internal/media/workspacemedia"
+	"ideaboard/api/internal/memberquotas"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/audit"
@@ -54,6 +55,7 @@ import (
 	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
 	workspacetasks "ideaboard/api/internal/tasking/workspacetasks"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
+	"ideaboard/api/internal/workspacebudgets"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -173,6 +175,11 @@ func NewAppRouter(
 			SupportChannels: services.runtimeSettings,
 			Store:           tenancyStore,
 			Users:           userDirectory,
+			// #944 creation-time account display and authorization: the same
+			// stable billing-account store the billing surface and task
+			// preflights use, so new workspaces link to an authorized
+			// account in one transaction and responses name the payer.
+			BillingAccounts: tenancypg.NewBillingAccountStore(repos.db),
 			// Workspace-member display facts (email + avatar) reuse the Admin
 			// emailReader join (users -> AuthUserIDs -> Auth emails) plus
 			// the avatar projection off the same rows; members without
@@ -234,6 +241,12 @@ func NewAppRouter(
 			// workspace billing reads use, so every surface names one payer.
 			TaskQuoteBillingAccounts: tenancypg.NewBillingAccountStore(repos.db),
 			TaskQuoteWallets:         services.creditService,
+			// #945: the quote/readiness preflight reports the same
+			// Workspace budget cap submit enforces (not-ready early).
+			TaskQuoteBudgets: workspacebudgets.NewStore(repos.db),
+			// #946: the quote/readiness preflight reports the same
+			// member quota submit enforces (not-ready early).
+			TaskQuoteQuotas: memberquotas.NewStore(repos.db),
 			// #848: quote, submit, and readiness share one RoutingResolver
 			// over the catalog pool (ADR-0012 rule 10, single seam).
 			// Submit pins its snapshot atomically via
@@ -243,6 +256,14 @@ func NewAppRouter(
 			TaskRouter:            taskServices.workspaceTaskRouter,
 			TaskSnapshotSaver:     newPoolRoutingSnapshotSaver(),
 			TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
+			// #945: the submit settlement transaction enforces the
+			// Workspace shared consumption budget after Quote and
+			// before Hold (the quote preflight above reports it early).
+			TaskBudgets: workspacebudgets.NewStore(repos.db),
+			// #946: the same transaction enforces the member
+			// cross-workspace quota after the budget check and
+			// before Hold (the quote preflight below reports it early).
+			TaskQuotas: memberquotas.NewStore(repos.db),
 			// #833: the webhook store is shared with the River delivery
 			// worker (built in task_wiring.go where the client exists),
 			// so HTTP views and the worker observe one registry.
@@ -289,6 +310,12 @@ func NewAppRouter(
 			PendingOrders:   services.paymentService,
 			Recharges:       services.paymentService,
 			Rewards:         services.rewardService,
+			// #945: Workspace shared consumption budget (cap + live
+			// usage reads, Billing Owner/Admin writes).
+			Budgets: workspacebudgets.NewStore(repos.db),
+			// #946: member cross-workspace quotas (caps + live
+			// usage reads, Billing Owner/Admin writes, self reads own).
+			Quotas: memberquotas.NewStore(repos.db),
 		},
 		// Control administration shares domain handlers and stores. The guard
 		// enforces authorization, rate limits, idempotency and durable audit.

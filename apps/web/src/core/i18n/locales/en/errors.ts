@@ -13,6 +13,8 @@ export default {
   service_resolution_unavailable: 'This resolution is unavailable right now.',
   prompt_unavailable: 'This prompt is unavailable right now. Please try again later.',
   wallet_restricted: 'Ideas are temporarily unavailable for this account.',
+  workspace_budget_exhausted: 'This workspace has used up its budget for this period.',
+  member_quota_exhausted: 'You have used up your personal quota for this period.',
   vision_search_not_configured: 'Visual Search is unavailable right now.',
   vision_search_unavailable: 'Visual Search is unavailable right now. Please try again later.',
   vision_search_input_invalid: 'Check your search and try again.',
@@ -37,4 +39,5 @@ export default {
   board_precondition_required: 'Access state is outdated. Refresh and try again.',
   board_member_not_found: 'Board member not found.',
   membership_transition_forbidden: 'The last manager cannot be removed or demoted.',
+  default_member_quota_not_configured: 'Set the default quota for new members first, then invite.',
 } as const

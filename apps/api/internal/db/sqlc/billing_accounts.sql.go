@@ -413,6 +413,68 @@ func (q *Queries) ListWorkspacesByBillingAccountID(ctx context.Context, arg List
 	return items, nil
 }
 
+const lockBillingAccount = `-- name: LockBillingAccount :one
+SELECT internal_id, public_id, workspace_id, organization_id, created_at, updated_at
+FROM billing_accounts
+WHERE internal_id = $1
+FOR NO KEY UPDATE
+`
+
+// Serialize financial authority changes and Workspace scope mutations on the
+// stable account before reading roles or taking Workspace/invitation locks.
+func (q *Queries) LockBillingAccount(ctx context.Context, internalID int64) (BillingAccount, error) {
+	row := q.db.QueryRow(ctx, lockBillingAccount, internalID)
+	var i BillingAccount
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.OrganizationID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const lockWorkspaceBillingAccounts = `-- name: LockWorkspaceBillingAccounts :many
+SELECT b.internal_id
+FROM workspaces AS w
+LEFT JOIN workspace_billing_links AS l ON l.workspace_id = w.internal_id
+JOIN billing_accounts AS b ON b.workspace_id = w.internal_id
+  OR b.internal_id = COALESCE(
+    l.billing_account_id,
+    (SELECT a.internal_id FROM billing_accounts AS a WHERE a.organization_id = w.organization_id),
+    (SELECT a.internal_id FROM billing_accounts AS a WHERE a.workspace_id = w.internal_id)
+  )
+WHERE w.public_id = $1
+ORDER BY b.internal_id
+FOR NO KEY UPDATE OF b
+`
+
+// Lock the resolved payer and any account anchored to the Workspace before
+// deletion. Stable ID ordering keeps the account -> Workspace lock order even
+// when an explicitly shared Workspace already has an older anchor account.
+// Resolve without provisioning; an unfunded Workspace returns no rows.
+func (q *Queries) LockWorkspaceBillingAccounts(ctx context.Context, workspacePublicID string) ([]int64, error) {
+	rows, err := q.db.Query(ctx, lockWorkspaceBillingAccounts, workspacePublicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var internal_id int64
+		if err := rows.Scan(&internal_id); err != nil {
+			return nil, err
+		}
+		items = append(items, internal_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertBillingAccountMember = `-- name: UpsertBillingAccountMember :one
 INSERT INTO billing_account_members (billing_account_id, user_id, role)
 VALUES ($1, $2, $3)

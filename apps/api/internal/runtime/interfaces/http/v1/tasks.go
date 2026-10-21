@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/events"
@@ -57,6 +58,24 @@ type taskQuoteBillingAccountReader interface {
 // the preflight closed.
 type taskQuoteWalletReader interface {
 	GetWallet(ctx context.Context, billingAccountID int64) (domain.WalletDetails, error)
+}
+
+// taskQuoteBudgetReader reads the Workspace shared consumption budget for
+// the quote/readiness preflight (#945: the same cap submit enforces,
+// reported early as not-ready). Production wires the workspacebudgets
+// Store; tests stub it. Nil skips the budget gate (unlimited) so existing
+// fixtures stay green.
+type taskQuoteBudgetReader interface {
+	CheckBudgetForQuote(ctx context.Context, workspaceInternalID int64, amount int64, reservedAt time.Time) error
+}
+
+// taskQuoteQuotaReader reads the member cross-workspace consumption quota
+// for the quote/readiness preflight (#946: the same cap submit enforces,
+// reported early as not-ready). Production wires the memberquotas Store;
+// tests stub it. Nil skips the quota gate (unlimited) so existing
+// fixtures stay green.
+type taskQuoteQuotaReader interface {
+	CheckQuotaForQuote(ctx context.Context, billingAccountID, userID int64, amount int64, reservedAt time.Time) error
 }
 
 // Workspace task lifecycle (issue #805). Additive only: legacy
@@ -140,6 +159,8 @@ func (h *contractV1Handler) taskService() *workspacetasks.Service {
 		Resolver: h.deps.TaskRouter, SnapshotSaver: h.deps.TaskSnapshotSaver,
 		Acceptance:      h.taskSubmissionAcceptance(),
 		BillingAccounts: h.deps.TaskBillingAccounts,
+		Budgets:         h.deps.TaskBudgets,
+		Quotas:          h.deps.TaskQuotas,
 	}
 	return workspacetasks.NewService(deps)
 }
@@ -202,6 +223,12 @@ func renderTaskError(c *gin.Context, err error) {
 	case errors.Is(err, workspacetasks.ErrInsufficientCredits):
 		contract.RenderError(c, contract.StatusOf(contract.CodeTaskInsufficientCredits),
 			contract.CodeTaskInsufficientCredits, runtimehttp.MsgValidationFailed2)
+	case errors.Is(err, workspacetasks.ErrWorkspaceBudgetExhausted):
+		contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceBudgetExhausted),
+			contract.CodeWorkspaceBudgetExhausted, runtimehttp.MsgWorkspaceBudgetExhausted)
+	case errors.Is(err, workspacetasks.ErrMemberQuotaExhausted):
+		contract.RenderError(c, contract.StatusOf(contract.CodeMemberQuotaExhausted),
+			contract.CodeMemberQuotaExhausted, runtimehttp.MsgMemberQuotaExhausted)
 	case errors.Is(err, workspacetasks.ErrQuoteUnavailable):
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, runtimehttp.MsgBillingQuoteUnavailable)
 	// An empty eligible pool converges to 422
@@ -871,6 +898,26 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 		if wallet.Available < snapshot.TotalCredits {
 			renderTaskError(c, fmt.Errorf("quote exceeds the resolved account balance: %w", workspacetasks.ErrInsufficientCredits))
 			return
+		}
+		// Workspace shared budget gate (#945: same cap submit enforces,
+		// reported here as not-ready before any Hold). Unlimited (nil
+		// reader or no budget row) passes through; over-cap renders
+		// 403 workspace_budget_exhausted via renderTaskError.
+		if h.deps.TaskQuoteBudgets != nil && snapshot.TotalCredits > 0 {
+			if err := h.deps.TaskQuoteBudgets.CheckBudgetForQuote(c.Request.Context(), workspace.InternalID, snapshot.TotalCredits, snapshot.QuotedAt); err != nil {
+				renderTaskError(c, err)
+				return
+			}
+		}
+		// Member quota gate (#946: same cap submit enforces, reported
+		// here as not-ready before any Hold). Unlimited (nil reader or
+		// no quota row) passes through; over-cap renders 403
+		// member_quota_exhausted via renderTaskError.
+		if h.deps.TaskQuoteQuotas != nil && snapshot.TotalCredits > 0 {
+			if err := h.deps.TaskQuoteQuotas.CheckQuotaForQuote(c.Request.Context(), account.InternalID, identityPrincipal.UserID(), snapshot.TotalCredits, snapshot.QuotedAt); err != nil {
+				renderTaskError(c, err)
+				return
+			}
 		}
 		contract.RenderSuccess(c, v1TaskBillingSnapshotDTO{
 			SKU: snapshot.SKU, DisplayName: snapshot.DisplayName,

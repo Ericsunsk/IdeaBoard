@@ -150,7 +150,18 @@ describe('contract kernel headers', () => {
 
 describe('contract kernel opaque IDs', () => {
   it('validates every documented prefix', () => {
-    for (const prefix of ['usr', 'org', 'ws', 'board', 'task', 'asset', 'upload', 'evt']) {
+    for (const prefix of [
+      'usr',
+      'org',
+      'ws',
+      'board',
+      'task',
+      'asset',
+      'upload',
+      'evt',
+      'ba',
+      'bti',
+    ]) {
       expect(isOpaqueId(`${prefix}_abc123`)).toBe(true)
       expect(opaqueIdPrefix(`${prefix}_abc123`)).toBe(prefix)
     }

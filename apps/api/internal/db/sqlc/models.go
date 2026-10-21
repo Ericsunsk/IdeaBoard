@@ -45,11 +45,45 @@ type BillingAccount struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BillingAccountDefaultMemberQuota struct {
+	BillingAccountID int64              `json:"billing_account_id"`
+	Period           string             `json:"period"`
+	LimitCredits     pgtype.Int8        `json:"limit_credits"`
+	UpdatedByUserID  pgtype.Int8        `json:"updated_by_user_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
 type BillingAccountMember struct {
 	BillingAccountID int64              `json:"billing_account_id"`
 	UserID           int64              `json:"user_id"`
 	Role             string             `json:"role"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
+type BillingAccountMemberQuota struct {
+	BillingAccountID int64              `json:"billing_account_id"`
+	UserID           int64              `json:"user_id"`
+	Period           string             `json:"period"`
+	LimitCredits     pgtype.Int8        `json:"limit_credits"`
+	UpdatedByUserID  pgtype.Int8        `json:"updated_by_user_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type BillingAccountTransferInvite struct {
+	InternalID              int64              `json:"internal_id"`
+	PublicID                string             `json:"public_id"`
+	BillingAccountID        int64              `json:"billing_account_id"`
+	BillingAccountPublicID  string             `json:"billing_account_public_id"`
+	FromUserID              int64              `json:"from_user_id"`
+	ToUserID                int64              `json:"to_user_id"`
+	Status                  string             `json:"status"`
+	IdempotencyKey          string             `json:"idempotency_key"`
+	ScopeWorkspacePublicIds []string           `json:"scope_workspace_public_ids"`
+	CreatedAt               pgtype.Timestamptz `json:"created_at"`
+	DecidedAt               pgtype.Timestamptz `json:"decided_at"`
+	DecidedBy               pgtype.Int8        `json:"decided_by"`
 }
 
 type BillingAdminAction struct {
@@ -1128,6 +1162,15 @@ type WorkspaceBillingLink struct {
 	WorkspaceID      int64              `json:"workspace_id"`
 	BillingAccountID int64              `json:"billing_account_id"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
+type WorkspaceBudget struct {
+	WorkspaceID     int64              `json:"workspace_id"`
+	Period          string             `json:"period"`
+	LimitCredits    pgtype.Int8        `json:"limit_credits"`
+	UpdatedByUserID pgtype.Int8        `json:"updated_by_user_id"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type WorkspaceEvent struct {

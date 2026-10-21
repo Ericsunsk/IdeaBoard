@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, test, vi } from 'vitest'
 import { renderWithUser } from '../../../../test/render'
 import { billingAccountQueryKeys } from './resource'
 import { useBillingAccount } from './useBillingAccount'
+import { useBillingAccountContext } from './useBillingAccountContext'
 
 const fetchAccount = vi.hoisted(() => vi.fn())
 const identity = reactive({ user: { public_id: 'user-1' } })
@@ -94,5 +95,75 @@ describe('billing authorization scope', () => {
     await waitFor(() =>
       expect(screen.getByTestId('scope')).toHaveTextContent('["user-1","member"]'),
     )
+  })
+})
+
+describe('caller-selected Billing Account context', () => {
+  beforeEach(() => {
+    identity.user.public_id = 'user-1'
+    fetchAccount.mockReset()
+  })
+
+  test('keeps a local target independent from global selection and cancels an obsolete same-target generation', async () => {
+    const target = ref('ws_a')
+    let finishOld!: (value: ReturnType<typeof account>) => void
+    fetchAccount.mockImplementation((workspaceId: string) => {
+      if (workspaceId === 'ws_a' && !finishOld) {
+        return new Promise((resolve) => {
+          finishOld = resolve
+        })
+      }
+      return Promise.resolve({
+        ...account(workspaceId === 'ws_a' ? 'member' : 'account'),
+        workspaceId,
+        billingAccountId: `ba_${workspaceId}`,
+      })
+    })
+    const LocalAndGlobal = defineComponent({
+      setup() {
+        return {
+          local: useBillingAccountContext({
+            workspaceId: target,
+            identity: () => identity.user.public_id,
+          }),
+          global: useBillingAccount(),
+        }
+      },
+      template:
+        '<output data-testid="local">{{ local.isReady.value }}:{{ local.readScope.value.workspaceId }}:{{ local.consumptionScope.value }}</output><output data-testid="global">{{ global.readScope.value.workspaceId }}:{{ global.consumptionScope.value }}</output>',
+    })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    renderWithUser(LocalAndGlobal, { global: { plugins: [[VueQueryPlugin, { queryClient }]] } })
+    await waitFor(() => expect(screen.getByTestId('global')).toHaveTextContent('ws_1:account'))
+    expect(screen.getByTestId('local')).toHaveTextContent('false:ws_a:')
+    target.value = 'ws_b'
+    await waitFor(() => expect(screen.getByTestId('local')).toHaveTextContent('true:ws_b:account'))
+    target.value = 'ws_a'
+    await waitFor(() => expect(screen.getByTestId('local')).toHaveTextContent('true:ws_a:member'))
+    finishOld({ ...account('account'), workspaceId: 'ws_a' })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(screen.getByTestId('local')).toHaveTextContent('true:ws_a:member')
+    expect(screen.getByTestId('global')).toHaveTextContent('ws_1:account')
+  })
+
+  test('fails closed on prerequisite error and restores management through the context retry', async () => {
+    fetchAccount
+      .mockRejectedValueOnce(new Error('account unavailable'))
+      .mockResolvedValueOnce(account('account'))
+    const Local = defineComponent({
+      setup: () => useBillingAccountContext({ workspaceId: 'ws_1', identity: 'user-1' }),
+      template:
+        '<output data-testid="permission">{{ isReady }}:{{ consumptionScope }}</output><output role="alert">{{ error?.message }}</output><button @click="retry()">Retry</button>',
+    })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { user } = renderWithUser(Local, {
+      global: { plugins: [[VueQueryPlugin, { queryClient }]] },
+    })
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('account unavailable'))
+    expect(screen.getByTestId('permission')).toHaveTextContent('false:')
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(screen.getByTestId('permission')).toHaveTextContent('true:account'))
+    expect(screen.getByRole('alert')).toBeEmptyDOMElement()
   })
 })

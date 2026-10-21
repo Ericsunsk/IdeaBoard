@@ -35,3 +35,5 @@ export type {
   WorkspaceMemberFailureReason,
   WorkspaceMemberRole,
 } from '../../workspace/selection/workspaceMembersResource'
+
+export { workspaceQueryKeys } from '../../workspace/selection/workspaceResource'

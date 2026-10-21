@@ -148,7 +148,7 @@ function contextualizeContractError(error: unknown, fallback: string): Error {
   return contextualError
 }
 
-// Opaque public IDs: usr_|org_|ws_|board_|task_|asset_|upload_|evt_ + payload.
+// Opaque public IDs: usr_|org_|ws_|board_|task_|asset_|upload_|evt_|ba_|bti_ + payload.
 // Payload alphabet mirrors backend `contract.IsValidPublicID` ([A-Za-z0-9_-]).
 const OPAQUE_ID_RE = opaqueIdPattern([
   'usr',
@@ -159,9 +159,12 @@ const OPAQUE_ID_RE = opaqueIdPattern([
   'asset',
   'upload',
   'evt',
+  'ba',
+  'bti',
 ])
 
-export type OpaqueIdPrefix = 'usr' | 'org' | 'ws' | 'board' | 'task' | 'asset' | 'upload' | 'evt'
+export type OpaqueIdPrefix =
+  'usr' | 'org' | 'ws' | 'board' | 'task' | 'asset' | 'upload' | 'evt' | 'ba' | 'bti'
 
 export function isOpaqueId(value: unknown): boolean {
   return typeof value === 'string' && OPAQUE_ID_RE.test(value)

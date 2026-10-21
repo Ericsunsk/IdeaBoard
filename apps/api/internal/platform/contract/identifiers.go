@@ -45,6 +45,12 @@ const (
 	PrefixRewardCode        = "rwd_"
 	PrefixRewardRedemption  = "rdm_"
 	PrefixReconciliationRun = "rec_"
+	// Billing transfer invite prefix (#948). It matches the
+	// billing_account_transfer_invites public_id CHECK (bti_%), so the
+	// postgres handover path passes minted ids through opaquely.
+	// Invites carry the invitation for studio handover (owner initiate,
+	// recipient accept/reject, initiator cancel) with idempotent replay.
+	PrefixBillingTransferInvite = "bti_"
 )
 
 // knownPrefixes lists every kernel prefix for PrefixOf.
@@ -64,6 +70,7 @@ var knownPrefixes = []string{
 	PrefixRewardCode,
 	PrefixRewardRedemption,
 	PrefixReconciliationRun,
+	PrefixBillingTransferInvite,
 }
 
 // IsValidPublicID reports whether id carries prefix with a non-empty
@@ -133,6 +140,11 @@ func IsRewardRedemptionID(id string) bool { return IsValidPublicID(PrefixRewardR
 // getControlReconciliationRun); the current :run_id stays numeric by
 // formal exception until the public_id column lands.
 func IsReconciliationRunID(id string) bool { return IsValidPublicID(PrefixReconciliationRun, id) }
+
+// IsBillingTransferInviteID reports whether id is a well-formed bti_ identifier.
+func IsBillingTransferInviteID(id string) bool {
+	return IsValidPublicID(PrefixBillingTransferInvite, id)
+}
 
 // MintPublicID mints an opaque public identifier with the given prefix and
 // nbytes of crypto randomness (hex-encoded). It is the single mint behind

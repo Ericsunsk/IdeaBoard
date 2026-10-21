@@ -135,7 +135,7 @@ export const getCreateWorkspaceUrl = () => {
 }
 
 /**
- * Creates a non-Default workspace. Personal creates without an organization are unlimited; the per-user Default workspace is only ever minted by idempotent auto-provisioning. A second Default create renders 409 workspace_default_conflict.
+ * Creates a non-Default workspace with an explicit billing account. Personal creates default to the caller's current (personal) account via an explicit link so no-org business spaces share one balance and no new wallet is minted implicitly; pass new_billing_account true for a fresh isolated account (creator becomes billing owner, balances never merge), or billing_account_id to share an authorized account (caller must be Billing Owner/Admin, 403 otherwise). Organization scopes always use the shared org pool: billing fields with an organization_id render 409 billing_account_conflict, never the creator personal pool. Failures roll back with no half-linked workspace. The per-user Default workspace is only ever minted by idempotent auto-provisioning. A second Default create renders 409 workspace_default_conflict. No Idempotency-Key reuse across different billing choices: same key with a different billing selection renders 409 workspace_idempotency_conflict.
  * @summary Create a workspace
  */
 export const createWorkspace = async (
@@ -175,6 +175,7 @@ export const getCreateWorkspaceMutationOptions = <
   TError =
     | BadRequestResponse
     | UnauthorizedResponse
+    | ForbiddenResponse
     | NotFoundResponse
     | ConflictResponse
     | UnprocessableEntityResponse,
@@ -217,6 +218,7 @@ export type CreateWorkspaceMutationBody = CreateWorkspaceRequest
 export type CreateWorkspaceMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
+  | ForbiddenResponse
   | NotFoundResponse
   | ConflictResponse
   | UnprocessableEntityResponse
@@ -229,6 +231,7 @@ export const useCreateWorkspace = <
   TError =
     | BadRequestResponse
     | UnauthorizedResponse
+    | ForbiddenResponse
     | NotFoundResponse
     | ConflictResponse
     | UnprocessableEntityResponse,

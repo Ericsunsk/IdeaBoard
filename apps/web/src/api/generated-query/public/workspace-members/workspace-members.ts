@@ -132,7 +132,7 @@ export const getAddWorkspaceMemberUrl = (workspaceId: string) => {
 }
 
 /**
- * Requires the Idempotency-Key header. Re-adding an existing member keeps the current role, including when the workspace is full. Workspaces support at most 5 members including owners; exceeding this limit renders 409 workspace_member_limit_reached. Reusing a key with a different request renders 409 workspace_idempotency_conflict.
+ * Requires the Idempotency-Key header. Re-adding an existing member keeps the current role, including when the workspace is full. Workspaces support at most 5 members including owners; exceeding this limit renders 409 workspace_member_limit_reached. New members require the account default new-member quota to be configured: absent defaults render 409 default_member_quota_not_configured (fail closed, never implicit unlimited) and the inviter reuses it atomically (the inviter cannot raise the default here). Reusing a key with a different request renders 409 workspace_idempotency_conflict.
  * @summary Add a workspace member (owner/admin only; owner-only promotion)
  */
 export const addWorkspaceMember = async (

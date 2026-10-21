@@ -92,6 +92,13 @@ var (
 	// ErrBillingLastOwner blocks removing or demoting the last billing
 	// owner (403 with billing_account_forbidden).
 	ErrBillingLastOwner = errors.New("tenancy: last billing owner cannot be removed or demoted")
+	// ErrDefaultQuotaNotConfigured reports an invite blocked by a missing
+	// account default new-member quota policy (#947, fail closed). The
+	// membership write rolls back; handlers render
+	// default_member_quota_not_configured (409) and guide the caller to
+	// have a Billing Owner/Admin set the default first. Absent default
+	// is never an implicit unlimited.
+	ErrDefaultQuotaNotConfigured = errors.New("tenancy: default member quota not configured")
 	// ErrNotUserPublicID reports an identifier without the usr_ prefix.
 	ErrNotUserPublicID = errors.New("tenancy: not a user public id")
 	// ErrMalformedUserPublicID reports a usr_ identifier with bad hex.
@@ -162,12 +169,34 @@ type WorkspaceMember struct {
 // it, and an owner holding a Default rejects a second one with
 // ErrDefaultWorkspaceConflict. Plain POST creation always passes false
 // (non-Default personal workspaces are unlimited).
+// Billing linkage (#944, creation-time explicit account):
+//   - Organization workspaces always use the organization pool; passing
+//     either billing field with an OrganizationID fails closed with
+//     ErrBillingConflict (never silently pick the creator personal pool).
+//   - Personal workspaces default to legacy auto mode (no link, per-workspace
+//     account resolved lazily) when both fields are empty, preserving the
+//     #915 resolution contract for direct Store callers. The Public API
+//     passes an explicit BillingAccountPublicID (shared, caller must be
+//     Billing Owner/Admin) or NewBillingAccount=true (fresh isolated
+//     per-workspace account, creator becomes billing owner) so creation
+//     never auto-creates a wallet implicitly and never leaves a half-linked
+//     workspace on authorization failure (single transaction, fail closed).
+//   - BillingAccountPublicID and NewBillingAccount are mutually exclusive
+//     (both set reports ErrBillingConflict). IsDefault workspaces reject
+//     both (the Default row owns the deterministic personal account).
+//
 // Repository methods take context.Context first.
 type CreateWorkspaceParams struct {
 	Name           string
 	OrganizationID *string
 	OwnerUserID    int64
 	IsDefault      bool
+	// BillingAccountPublicID names an existing ba_ account to share
+	// (explicit workspace_billing_links row, same transaction).
+	BillingAccountPublicID *string
+	// NewBillingAccount mints a fresh isolated per-workspace account
+	// anchored to the new workspace (creator becomes billing owner).
+	NewBillingAccount bool
 }
 
 // Store is the AGREED tenancy persistence interface the DB sibling
@@ -414,5 +443,51 @@ func CheckBillingMemberMutation(actorRole string, actorUserID, targetUserID int6
 		return nil
 	default:
 		return ErrBillingForbidden
+	}
+}
+
+// Billing transfer invite lifecycle (#948, invite-style studio handover).
+//
+// Only a Billing Owner may initiate; the recipient accepts or rejects, and
+// the initiator may cancel while pending. Acceptance hands management to
+// the recipient (new Owner, previous Owner steps down to Admin) and grants
+// the recipient Workspace Owner on every non-Default business Workspace
+// associated with the account; the Default Workspace never transfers.
+// Identity, balance, Ledger, and history stay stable; no funds move to the
+// recipient's other accounts, quotas never reset, and no welcome grant is
+// minted. Row-pinned settlement keeps existing Task/Search/payment/refund
+// attribution on the original account.
+const (
+	BillingTransferPending   = "pending"
+	BillingTransferAccepted  = "accepted"
+	BillingTransferRejected  = "rejected"
+	BillingTransferCancelled = "cancelled"
+)
+
+// BillingTransferInvite is one billing_account_transfer_invites row
+// projected for the API. BillingAccountPublicID is the stable ba_ funds
+// identity snapshot; ScopeWorkspacePublicIDs is the non-Default business
+// Workspace scope granted at acceptance (empty until accepted).
+type BillingTransferInvite struct {
+	InternalID              int64
+	PublicID                string
+	BillingAccountID        int64
+	BillingAccountPublicID  string
+	FromUserID              int64
+	ToUserID                int64
+	Status                  string
+	ScopeWorkspacePublicIDs []string
+	CreatedAt               time.Time
+	DecidedAt               *time.Time
+	DecidedBy               *int64
+}
+
+// IsValidBillingTransferStatus reports whether status is a known invite state.
+func IsValidBillingTransferStatus(status string) bool {
+	switch strings.TrimSpace(status) {
+	case BillingTransferPending, BillingTransferAccepted, BillingTransferRejected, BillingTransferCancelled:
+		return true
+	default:
+		return false
 	}
 }

@@ -225,7 +225,7 @@ func (s *Store) quote(ctx context.Context, querier quoteQuerier, rawSKU string, 
 	var quotedAt pgtype.Timestamptz
 	err = querier.QueryRow(ctx, `
 	SELECT skus.enabled, skus.display_name, prices.price_version_id, prices.version, prices.unit_credits,
-	       statement_timestamp()
+	       date_trunc('milliseconds', statement_timestamp())
 FROM billing_skus skus
 LEFT JOIN billing_current_prices current_prices
   ON current_prices.sku = skus.sku AND current_prices.output_resolution = $2

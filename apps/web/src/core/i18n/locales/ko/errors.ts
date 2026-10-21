@@ -10,6 +10,8 @@ export default {
   service_resolution_unavailable: '현재 이 해상도를 사용할 수 없습니다.',
   prompt_unavailable: '현재 프롬프트를 사용할 수 없습니다. 나중에 다시 시도해 주세요.',
   wallet_restricted: '이 계정에서는 Ideas를 일시적으로 사용할 수 없습니다.',
+  workspace_budget_exhausted: '이 워크스페이스에서는 이번 기간의 예산을 모두 사용했습니다.',
+  member_quota_exhausted: '이번 기간의 개인 할당량을 모두 사용했습니다.',
   vision_search_not_configured: '비전 검색을 현재 사용할 수 없습니다.',
   vision_search_unavailable: '비전 검색을 현재 사용할 수 없습니다. 나중에 다시 시도해 주세요.',
   vision_search_input_invalid: '검색어를 확인한 뒤 다시 시도해 주세요.',
@@ -34,4 +36,5 @@ export default {
   board_precondition_required: '접근 상태가 오래되었습니다. 새로고침 후 다시 시도하세요.',
   board_member_not_found: '보드 멤버를 찾을 수 없습니다.',
   membership_transition_forbidden: '마지막 매니저는 제거하거나 강등할 수 없습니다.',
+  default_member_quota_not_configured: '먼저 신규 멤버 기본 할당량을 설정한 뒤 초대하세요.',
 } as const

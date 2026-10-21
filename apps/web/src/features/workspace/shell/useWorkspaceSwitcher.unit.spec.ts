@@ -52,6 +52,8 @@ vi.mock('../selection/workspaceResource', () => ({
   WORKSPACE_NAME_MAX_LENGTH: 120,
   renameWorkspace: resourceMocks.renameWorkspace,
   deleteWorkspace: resourceMocks.deleteWorkspace,
+  fetchOrganizations: vi.fn(),
+  provisionOrganization: vi.fn(),
   workspaceQueryKeys: { list: ['workspaces'] },
 }))
 
@@ -185,6 +187,17 @@ describe('useWorkspaceSwitcher', () => {
     },
   )
 
+  test('forwards explicit organization scope without a personal billing override', async () => {
+    const selection = stubSelection({ provisionWorkspace: vi.fn().mockResolvedValue(TEAM) })
+    const switcher = renderSwitcher()
+    await switcher.createWorkspaceItem({ name: 'Department', organizationId: 'org_c3' })
+    expect(selection.provisionWorkspace).toHaveBeenCalledWith({
+      name: 'Department',
+      organizationId: 'org_c3',
+    })
+    expect(routerMocks.push).not.toHaveBeenCalled()
+  })
+
   test('preserves workspace scope when the draft flush rejects', async () => {
     const selection = stubSelection()
     const switcher = renderSwitcher({
@@ -204,7 +217,7 @@ describe('useWorkspaceSwitcher', () => {
     const originalQuery = { ...routeState.query }
     const switcher = renderSwitcher({ beforeWorkspaceChange })
 
-    await expect(switcher.createWorkspaceItem('New space')).resolves.toEqual(created)
+    await expect(switcher.createWorkspaceItem({ name: 'New space' })).resolves.toEqual(created)
 
     expect(selection.provisionWorkspace).toHaveBeenCalledWith({ name: 'New space' })
     expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspaces'] })
@@ -222,7 +235,7 @@ describe('useWorkspaceSwitcher', () => {
     })
     const switcher = renderSwitcher()
 
-    await expect(switcher.createWorkspaceItem('New space')).rejects.toThrow()
+    await expect(switcher.createWorkspaceItem({ name: 'New space' })).rejects.toThrow()
 
     expect(queryMocks.invalidateQueries).not.toHaveBeenCalled()
     expect(selection.selectWorkspace).not.toHaveBeenCalled()
@@ -290,7 +303,7 @@ describe('useWorkspaceSwitcher', () => {
     })
     const switcher = renderSwitcher()
 
-    await expect(switcher.menuProps.value.onCreate('New space')).resolves.toEqual(created)
+    await expect(switcher.menuProps.value.onCreate({ name: 'New space' })).resolves.toEqual(created)
 
     expect(selection.provisionWorkspace).toHaveBeenCalledWith({ name: 'New space' })
     expect(selection.selectWorkspace).not.toHaveBeenCalled()

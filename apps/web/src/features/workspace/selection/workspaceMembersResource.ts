@@ -65,6 +65,7 @@ export type WorkspaceMemberFailureReason =
   | 'member-limit'
   | 'idempotency-conflict'
   | 'invalid'
+  | 'missing-default'
   | 'sync-failed'
 
 const WORKSPACE_MEMBER_ROLES: readonly WorkspaceMemberRole[] = ['owner', 'admin', 'member']
@@ -230,6 +231,8 @@ export function classifyWorkspaceMemberError(error: unknown): WorkspaceMemberFai
       return 'member-limit'
     case 'workspace_idempotency_conflict':
       return 'idempotency-conflict'
+    case 'default_member_quota_not_configured':
+      return 'missing-default'
     case 'bad_request':
     case 'validation_failed':
     case 'idempotency_key_required':

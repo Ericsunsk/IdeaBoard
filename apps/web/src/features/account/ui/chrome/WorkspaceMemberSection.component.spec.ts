@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { computed, defineComponent, toValue, type MaybeRefOrGetter } from 'vue'
+import { computed, defineComponent, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import {
   QueryClient,
   VueQueryPlugin,
@@ -15,6 +15,82 @@ import WorkspaceSettingsDialog from './WorkspaceSettingsDialog.vue'
 import type { WorkspaceMemberEntry } from '../../session/accountWorkspace'
 
 vi.mock('../../../../core/composables/useAppToast')
+vi.mock('./BillingTransferSection.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('../../session/billing-account/resource', async (load) => ({
+  ...(await load<typeof import('../../session/billing-account/resource')>()),
+  fetchBillingAccount: vi.fn().mockRejectedValue(new Error('no billing account')),
+}))
+// The budget section rides TanStack Query per workspace row. These
+// member-level specs cover rosters, not budgets: stub the section
+// controller (no budget, read-only) so no query client or transport is
+// needed here. Budget behavior lives in
+// `WorkspaceBudgetSection.component.spec.ts` with the real controller.
+// The member quota section is stubbed likewise (no quota, read-only);
+// quota behavior lives in `MemberQuotaSection.component.spec.ts` with
+// the real controller.
+vi.mock('../../session/budget/useWorkspaceBudgetSection', () => ({
+  useWorkspaceBudgetSection: () => ({
+    budget: ref(null),
+    isLoading: ref(false),
+    hasLoadError: ref(false),
+    canManage: ref(false),
+    isExhausted: ref(false),
+    retryBudget: vi.fn(),
+    limitDraft: ref(''),
+    isSaving: ref(false),
+    saveError: ref(null),
+    startEditing: vi.fn(),
+    saveMonthly: vi.fn(),
+    saveUnlimited: vi.fn(),
+  }),
+}))
+vi.mock('../../session/quota/useMemberQuotaSection', () => ({
+  useMemberQuotaSection: () => ({
+    selfQuota: ref(null),
+    isSelfLoading: ref(false),
+    hasSelfError: ref(false),
+    isSelfExhausted: ref(false),
+    retrySelf: vi.fn(),
+    quotas: ref([]),
+    isListLoading: ref(false),
+    hasListError: ref(false),
+    retryList: vi.fn(),
+    canManage: ref(false),
+    memberOptions: ref([]),
+    memberLabel: (userId: string) => userId,
+    cappedPeriods: [],
+    targetUserId: ref(''),
+    targetPeriod: ref('daily'),
+    limitDraft: ref(''),
+    isSaving: ref(false),
+    saveError: ref(null),
+    pickTargetUser: vi.fn(),
+    pickTargetPeriod: vi.fn(),
+    saveQuota: vi.fn(),
+    clearQuota: vi.fn(),
+  }),
+}))
+// The default quota section is stubbed likewise (no default, read-only);
+// default behavior lives with the real controller in its own specs.
+vi.mock('../../session/quota/useDefaultMemberQuotaSection', () => ({
+  useDefaultMemberQuotaSection: () => ({
+    policy: ref(null),
+    isLoading: ref(false),
+    hasLoadError: ref(false),
+    isNotConfigured: ref(false),
+    retry: vi.fn(),
+    canManage: ref(false),
+    cappedPeriods: [],
+    presets: [],
+    targetPeriod: ref('monthly'),
+    limitDraft: ref(''),
+    isSaving: ref(false),
+    saveError: ref(null),
+    pickTargetPeriod: vi.fn(),
+    pickPreset: vi.fn(),
+    saveDefault: vi.fn(),
+  }),
+}))
 
 // The workspace member transport is faked per workspace: the section
 // controller under test keeps the real query wiring (shared roster key,
@@ -57,6 +133,8 @@ function classifyReason(code: string): string {
       return 'member-limit'
     case 'workspace_idempotency_conflict':
       return 'idempotency-conflict'
+    case 'default_member_quota_not_configured':
+      return 'missing-default'
     case 'bad_request':
     case 'validation_failed':
     case 'idempotency_key_required':

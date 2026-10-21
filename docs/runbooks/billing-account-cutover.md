@@ -1,4 +1,4 @@
-# Billing Account 资金链切换运维手册（#915–#924）
+# Billing Account 资金链切换运维手册（#915–#924；#944–#948 扩展见范围）
 
 本文回答 Billing Account 统一资金模型上线时的三个运维问题：如何停止新资金写入、
 如何验证数据转换、失败后如何恢复与回退。通用 backup/restore、密钥轮换与发布流程见
@@ -9,11 +9,18 @@
 `20261022000000_billing_account_wallets`（Wallet 账户化 + 存量归属回填，
 含评审后破坏性 DDL，`-- destructive: approved`）、
 `20261023000000_vision_workspace_settlement`（Vision 结算三元组）、
-`20261024000000_payment_billing_account`（订单 payer 归属）。
+`20261024000000_payment_billing_account`（订单 payer 归属）、
+`20261027000000_task_billing_workspace_attribution`（Task 结算行内 workspace 归属）、
+`20261028000000_billing_handover_invites`（Studio handover invite 审计事实）、
+`20261029000000_workspace_budgets`（Workspace 共享消费预算，#945）、
+`20261030000000_member_quotas`（成员跨空间消费额度，#946）、
+`20261031000000_default_member_quotas`（账户默认新成员额度，#947）。
 最终结构以 [ADR-0024](../adr/0024-billing-account-resolution.md)～
 [ADR-0031](../adr/0031-admin-explicit-billing-accounts.md)、
-[ADR-0032](../adr/0032-billing-account-integration-gate.md) 与
-[Credits CONTEXT](../apps/api/internal/credits/CONTEXT.md) 为准。
+[ADR-0032](../adr/0032-billing-account-integration-gate.md)、
+[ADR-0033](../adr/0033-workspace-creation-billing-account.md)～
+[ADR-0037](../adr/0037-account-default-member-quota.md) 与
+[Credits CONTEXT](../../apps/api/internal/credits/CONTEXT.md) 为准。
 
 ## 1. 停止新资金写入
 
@@ -73,6 +80,8 @@ WHERE h.status = 'held' AND t.transaction_id IS NULL;
 确定性归属幂等、新账户 0 起、Grant→Hold→Capture 收敛与余额（900/0）、
 同 key 同 hash 重放、同 key 异 hash 冲突、跨账户结算拒绝、零余额争议只记
 unrecovered 不写账、hard-delete 后钱包/投影/Ledger/快照保留可读。
+上述演练只覆盖 #915–#924 的 4 个账务 migration（21–24）；`20261027` 起的
+归属列与 28–31 的交接/预算/额度表不在该次演练内，执行前按当前 baseline 重演。
 演练脚本只跑隔离库，绝不动生产库。
 
 ## 3. 失败恢复

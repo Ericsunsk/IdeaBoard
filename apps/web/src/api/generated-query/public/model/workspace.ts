@@ -24,6 +24,11 @@ export interface Workspace {
   name: string
   /** True for the owner's Default workspace: exactly one row per user, never deleted or renamed, auto-provisioned when missing. Organization workspaces always report false. */
   is_default?: boolean
+  /**
+   * Stable funds identity for creation responses; workspaces sharing one account report the same value. Omitted when the billing store is unavailable.
+   * @pattern ^ba_[A-Za-z0-9_-]+$
+   */
+  billing_account_id?: string
   /** RFC3339 UTC timestamp. */
   created_at: string
 }

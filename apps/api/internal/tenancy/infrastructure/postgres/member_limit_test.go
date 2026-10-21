@@ -18,6 +18,7 @@ func TestWorkspaceMemberLimitConcurrentPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	configureWorkspaceDefaultQuota(t, db, workspace)
 	const candidates = 12
 	userIDs := make([]int64, candidates)
 	for i := range userIDs {

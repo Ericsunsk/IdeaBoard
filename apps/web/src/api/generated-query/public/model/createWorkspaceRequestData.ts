@@ -19,4 +19,11 @@ export type CreateWorkspaceRequestData = {
    */
   name: string
   organization_id?: OrganizationId | unknown
+  /**
+   * Explicit shared account to link (caller must be Billing Owner/Admin). Omitted defaults to the caller's personal account with no new wallet. Mutually exclusive with new_billing_account; rejected with organization scopes.
+   * @pattern ^ba_[A-Za-z0-9_-]+$
+   */
+  billing_account_id?: string
+  /** When true, mints a fresh isolated per-workspace account (creator becomes billing owner). Mutually exclusive with billing_account_id; rejected with organization scopes. */
+  new_billing_account?: boolean
 }

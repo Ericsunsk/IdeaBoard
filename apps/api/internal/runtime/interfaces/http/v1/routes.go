@@ -80,6 +80,19 @@ type ContractV1Deps struct {
 	// workspacetasks.TxBillingAccountResolver (the postgres store does);
 	// in-memory HTTP fixtures inject their test double instead.
 	TaskBillingAccounts workspacetasks.TxBillingAccountResolver
+	// TaskBudgets enforces the Workspace shared consumption budget
+	// inside the submit settlement transaction (#945: after Quote,
+	// before Hold, same snapshot). Production wires the
+	// workspacebudgets Store; in-memory HTTP fixtures inject their
+	// test double instead. Nil means no budget enforcement
+	// (unlimited).
+	TaskBudgets workspacetasks.TxWorkspaceBudgetChecker
+	// TaskQuotas enforces the member cross-workspace consumption quota
+	// inside the submit settlement transaction (#946: after the budget
+	// check, before Hold, same snapshot). Production wires the
+	// memberquotas Store; in-memory HTTP fixtures inject their test
+	// double instead. Nil means no quota enforcement (unlimited).
+	TaskQuotas workspacetasks.TxMemberQuotaChecker
 	// TaskQuoteBillingAccounts resolves the same stable funds identity
 	// for the quote/readiness preflight without a settlement transaction
 	// (#917). Production wires the tenancy billing-account store; tests
@@ -91,6 +104,18 @@ type ContractV1Deps struct {
 	// mirroring the submit Hold). Production wires the Credits service;
 	// tests inject their double. Nil fails the preflight closed.
 	TaskQuoteWallets taskQuoteWalletReader
+	// TaskQuoteBudgets reads the Workspace shared consumption budget
+	// for the quote/readiness preflight (#945: same cap submit
+	// enforces, reported early). Production wires the workspacebudgets
+	// Store; tests inject their double. Nil skips the budget gate
+	// (unlimited).
+	TaskQuoteBudgets taskQuoteBudgetReader
+	// TaskQuoteQuotas reads the member cross-workspace consumption
+	// quota for the quote/readiness preflight (#946: same cap submit
+	// enforces, reported early). Production wires the memberquotas
+	// Store; tests inject their double. Nil skips the quota gate
+	// (unlimited).
+	TaskQuoteQuotas taskQuoteQuotaReader
 	// Media is the workspace-scoped upload-session + media-asset
 	// surface (issue #803, restored in #820). Production wires the
 	// workspace postgres store; tests inject the in-memory implementation.
@@ -149,6 +174,13 @@ type ContractV1Deps struct {
 	// closed with 500 (no fallback default); Load records the missing
 	// key in Config.InvalidEnv so production startup fails fast.
 	RealtimeTicketSecret string
+	// BillingAccounts resolves the stable funds identity for creation-time
+	// account display and authorization (#944). Production wires the
+	// tenancy billing-account store; nil keeps legacy workspace creation
+	// (no explicit linkage) so existing in-memory fixtures stay green.
+	// Explicit billing_account_id/new_billing_account requests with a nil
+	// store fail closed with 503, never silently unlinked.
+	BillingAccounts billingAccountStore
 }
 
 // requireV1IdempotencyKey enforces the shared header-only idempotency contract
@@ -368,6 +400,11 @@ type v1WorkspaceDTO struct {
 	// when missing. Organization workspaces always report false.
 	IsDefault bool   `json:"is_default"`
 	CreatedAt string `json:"created_at"`
+	// BillingAccountID names the stable funds identity (#944) when the
+	// billing store resolved it; omitted for legacy in-memory fixtures
+	// without a billing store. Workspaces sharing one account report the
+	// same ba_ value; independent accounts never share.
+	BillingAccountID *string `json:"billing_account_id,omitempty"`
 }
 
 func toWorkspaceDTO(w *tenancy.Workspace) v1WorkspaceDTO {
@@ -380,6 +417,13 @@ func toWorkspaceDTO(w *tenancy.Workspace) v1WorkspaceDTO {
 	if w.OrganizationID != nil {
 		org := *w.OrganizationID
 		dto.OrganizationID = &org
+	}
+	return dto
+}
+
+func withWorkspaceBillingAccount(dto v1WorkspaceDTO, billingAccountPublicID string) v1WorkspaceDTO {
+	if trimmed := strings.TrimSpace(billingAccountPublicID); contract.IsBillingAccountID(trimmed) {
+		dto.BillingAccountID = &trimmed
 	}
 	return dto
 }
@@ -463,8 +507,10 @@ func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
 
 type v1CreateWorkspaceBody struct {
 	Data struct {
-		Name           string  `json:"name"`
-		OrganizationID *string `json:"organization_id"`
+		Name              string  `json:"name"`
+		OrganizationID    *string `json:"organization_id"`
+		BillingAccountID  *string `json:"billing_account_id"`
+		NewBillingAccount *bool   `json:"new_billing_account"`
 	} `json:"data"`
 }
 
@@ -502,6 +548,38 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 		}
 		orgID = &candidate
 	}
+	// Creation-time billing choice (#944): explicit shared ba_ or a fresh
+	// isolated account. Both set, or either set on an org scope, fails
+	// closed (never silently pick another pool).
+	var billingAccountID *string
+	newBillingAccount := false
+	if body.Data.NewBillingAccount != nil {
+		newBillingAccount = *body.Data.NewBillingAccount
+	}
+	if body.Data.BillingAccountID != nil {
+		candidate := strings.TrimSpace(*body.Data.BillingAccountID)
+		if !contract.IsBillingAccountID(candidate) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeBillingAccountNotFound, runtimehttp.MsgBillingAccountNotFound)
+			c.Abort()
+			return
+		}
+		billingAccountID = &candidate
+	}
+	if billingAccountID != nil && newBillingAccount {
+		contract.RenderError(c, http.StatusConflict, contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
+		c.Abort()
+		return
+	}
+	if orgID != nil && (billingAccountID != nil || newBillingAccount) {
+		contract.RenderError(c, http.StatusConflict, contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
+		c.Abort()
+		return
+	}
+	if (billingAccountID != nil || newBillingAccount) && h.deps.BillingAccounts == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
+		c.Abort()
+		return
+	}
 	ctx := c.Request.Context()
 	// Organization-scoped creation requires org visibility: hidden orgs
 	// (unknown id or caller holds no membership) converge to 404
@@ -519,18 +597,50 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 			}
 		}
 	}
+	// Default shared linkage: personal workspaces without an explicit
+	// choice link to the caller's deterministic personal account (Default
+	// workspace pool), so no-org business spaces share one balance and no
+	// new wallet is minted implicitly. Resolution happens before the
+	// idempotency claim so failures never claim the key.
+	if orgID == nil && billingAccountID == nil && !newBillingAccount && h.deps.BillingAccounts != nil {
+		def, defErr := h.deps.Store.EnsureDefaultWorkspace(ctx, identityPrincipal.UserID())
+		if defErr != nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
+			c.Abort()
+			return
+		}
+		personal, resErr := h.deps.BillingAccounts.EnsureBillingAccountForWorkspace(ctx, def.InternalID, def.PublicID)
+		if resErr != nil {
+			renderBillingAccountError(c, resErr)
+			return
+		}
+		resolved := personal.PublicID
+		billingAccountID = &resolved
+	}
 	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 	orgPart := ""
 	if orgID != nil {
 		orgPart = *orgID
 	}
+	billingPart := ""
+	if newBillingAccount {
+		billingPart = "new-billing-account"
+	} else if billingAccountID != nil {
+		billingPart = *billingAccountID
+	}
 	scope := contract.IdempotencyScope(externalUser, "workspace:create")
-	hash := contract.HashIdempotencyRequest("workspace:create", name, orgPart)
+	hash := contract.HashIdempotencyRequest("workspace:create", name, orgPart, billingPart)
 	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
 		// Plain POST creation (no organization) always mints a non-Default
 		// personal workspace; such rows are unlimited. Only
 		// EnsureDefaultWorkspace mints the Default row.
 		params := tenancy.CreateWorkspaceParams{Name: name, OrganizationID: orgID, OwnerUserID: identityPrincipal.UserID()}
+		if billingAccountID != nil {
+			params.BillingAccountPublicID = billingAccountID
+		}
+		if newBillingAccount {
+			params.NewBillingAccount = true
+		}
 		if orgID != nil {
 			return h.deps.Store.CreateOrganizationWorkspace(ctx, *orgID, identityPrincipal.UserID(), name)
 		}
@@ -552,6 +662,21 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 			c.Abort()
 			return
 		}
+		if errors.Is(doErr, tenancy.ErrBillingForbidden) {
+			contract.RenderError(c, http.StatusForbidden, contract.CodeBillingAccountForbidden, runtimehttp.MsgBillingAccountForbidden)
+			c.Abort()
+			return
+		}
+		if errors.Is(doErr, tenancy.ErrBillingNotFound) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeBillingAccountNotFound, runtimehttp.MsgBillingAccountNotFound)
+			c.Abort()
+			return
+		}
+		if errors.Is(doErr, tenancy.ErrBillingConflict) || errors.Is(doErr, tenancy.ErrBillingAmbiguous) {
+			contract.RenderError(c, http.StatusConflict, contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
+			c.Abort()
+			return
+		}
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
 		c.Abort()
 		return
@@ -562,7 +687,13 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	contract.RenderCreated(c, toWorkspaceDTO(created))
+	dto := toWorkspaceDTO(created)
+	if h.deps.BillingAccounts != nil {
+		if account, resErr := h.deps.BillingAccounts.EnsureBillingAccountForWorkspace(ctx, created.InternalID, created.PublicID); resErr == nil {
+			dto = withWorkspaceBillingAccount(dto, account.PublicID)
+		}
+	}
+	contract.RenderCreated(c, dto)
 }
 
 func (h *contractV1Handler) orgRoleForCreate(ctx context.Context, orgID string, userID int64) (*tenancy.Organization, string, error) {
@@ -660,6 +791,11 @@ func (h *contractV1Handler) deleteWorkspace(c *gin.Context) {
 		}
 		if errors.Is(fnErr, tenancy.ErrWorkspaceActiveTasks) {
 			contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceActiveTasks), contract.CodeWorkspaceActiveTasks, "工作区仍有进行中的任务，请等待完成或取消后再删除")
+			c.Abort()
+			return
+		}
+		if errors.Is(fnErr, tenancy.ErrBillingConflict) || errors.Is(fnErr, tenancy.ErrBillingAmbiguous) {
+			contract.RenderError(c, contract.StatusOf(contract.CodeBillingAccountConflict), contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
 			c.Abort()
 			return
 		}

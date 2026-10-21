@@ -38,12 +38,14 @@ import (
 var billingTestNow = time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
 
 type fakeBillingAccounts struct {
-	mu       sync.Mutex
-	accounts map[int64]tenancypg.BillingAccount
-	byPublic map[string]int64
-	roles    map[int64]map[int64]string
-	deny     map[int64]bool
-	calls    int
+	mu        sync.Mutex
+	accounts  map[int64]tenancypg.BillingAccount
+	byPublic  map[string]int64
+	roles     map[int64]map[int64]string
+	deny      map[int64]bool
+	calls     int
+	invites   map[string]*tenancy.BillingTransferInvite
+	inviteSeq int64
 }
 
 func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error) {
@@ -238,6 +240,162 @@ func (f *fakeBillingAccounts) LinkWorkspaceToBillingAccount(ctx context.Context,
 	}
 	target.Shared = true
 	f.accounts[workspaceInternalID] = target
+	return nil
+}
+
+func (f *fakeBillingAccounts) billingRoleLocked(billingAccountInternalID, userID int64) (string, bool) {
+	if f.deny != nil && f.deny[userID] {
+		return "", false
+	}
+	if byUser, ok := f.roles[billingAccountInternalID]; ok {
+		if role, ok := byUser[userID]; ok {
+			return role, true
+		}
+		return "", false
+	}
+	return tenancy.BillingRoleOwner, true
+}
+
+func (f *fakeBillingAccounts) InitiateBillingTransferInvite(ctx context.Context, billingAccountInternalID, fromUserID, toUserID int64, idempotencyKey string) (*tenancy.BillingTransferInvite, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if fromUserID == toUserID || fromUserID <= 0 || toUserID <= 0 || billingAccountInternalID <= 0 {
+		return nil, tenancy.ErrBillingWorkspaceInvalid
+	}
+	role, ok := f.billingRoleLocked(billingAccountInternalID, fromUserID)
+	if !ok || !tenancy.IsBillingOwner(role) {
+		return nil, tenancy.ErrBillingForbidden
+	}
+	if f.invites == nil {
+		f.invites = make(map[string]*tenancy.BillingTransferInvite)
+	}
+	for _, existing := range f.invites {
+		if existing.BillingAccountID != billingAccountInternalID {
+			continue
+		}
+		if existing.Status == tenancy.BillingTransferPending {
+			return nil, tenancy.ErrBillingConflict
+		}
+	}
+	f.inviteSeq++
+	publicID := "bti_test_" + string(rune('a'+f.inviteSeq%26)) + string(rune('0'+f.inviteSeq%10)) + "00000001"
+	invited := &tenancy.BillingTransferInvite{
+		InternalID: f.inviteSeq, PublicID: publicID,
+		BillingAccountID: billingAccountInternalID,
+		FromUserID:       fromUserID, ToUserID: toUserID,
+		Status: tenancy.BillingTransferPending,
+	}
+	f.invites[publicID] = invited
+	return invited, nil
+}
+
+func (f *fakeBillingAccounts) GetBillingTransferInvite(ctx context.Context, publicID string) (*tenancy.BillingTransferInvite, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if invited, ok := f.invites[publicID]; ok {
+		return invited, nil
+	}
+	return nil, tenancy.ErrBillingNotFound
+}
+
+func (f *fakeBillingAccounts) ListBillingTransferInvitesForAccount(ctx context.Context, billingAccountInternalID, actorUserID, beforeID int64, limit int) ([]*tenancy.BillingTransferInvite, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	role, ok := f.billingRoleLocked(billingAccountInternalID, actorUserID)
+	manager := ok && tenancy.IsBillingManager(role)
+	var out []*tenancy.BillingTransferInvite
+	for _, invited := range f.invites {
+		if invited.BillingAccountID == billingAccountInternalID && (manager || invited.ToUserID == actorUserID) {
+			out = append(out, invited)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeBillingAccounts) AcceptBillingTransferInvite(ctx context.Context, billingAccountInternalID int64, invitePublicID string, recipientUserID int64) (*tenancy.BillingTransferInvite, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	invited, ok := f.invites[invitePublicID]
+	if !ok || invited.BillingAccountID != billingAccountInternalID {
+		return nil, tenancy.ErrBillingNotFound
+	}
+	if invited.Status != tenancy.BillingTransferPending {
+		return nil, tenancy.ErrBillingConflict
+	}
+	if invited.ToUserID != recipientUserID {
+		return nil, tenancy.ErrBillingForbidden
+	}
+	fromRole, ok := f.billingRoleLocked(invited.BillingAccountID, invited.FromUserID)
+	if !ok || !tenancy.IsBillingOwner(fromRole) {
+		return nil, tenancy.ErrBillingConflict
+	}
+	if f.roles == nil {
+		f.roles = make(map[int64]map[int64]string)
+	}
+	if f.roles[invited.BillingAccountID] == nil {
+		f.roles[invited.BillingAccountID] = make(map[int64]string)
+	}
+	f.roles[invited.BillingAccountID][invited.ToUserID] = tenancy.BillingRoleOwner
+	f.roles[invited.BillingAccountID][invited.FromUserID] = tenancy.BillingRoleAdmin
+	invited.Status = tenancy.BillingTransferAccepted
+	return invited, nil
+}
+
+func (f *fakeBillingAccounts) RejectBillingTransferInvite(ctx context.Context, billingAccountInternalID int64, invitePublicID string, recipientUserID int64) (*tenancy.BillingTransferInvite, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	invited, ok := f.invites[invitePublicID]
+	if !ok || invited.BillingAccountID != billingAccountInternalID {
+		return nil, tenancy.ErrBillingNotFound
+	}
+	if invited.Status != tenancy.BillingTransferPending {
+		return nil, tenancy.ErrBillingConflict
+	}
+	if invited.ToUserID != recipientUserID {
+		return nil, tenancy.ErrBillingForbidden
+	}
+	invited.Status = tenancy.BillingTransferRejected
+	return invited, nil
+}
+
+func (f *fakeBillingAccounts) CancelBillingTransferInvite(ctx context.Context, billingAccountInternalID int64, invitePublicID string, initiatorUserID int64) (*tenancy.BillingTransferInvite, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	invited, ok := f.invites[invitePublicID]
+	if !ok || invited.BillingAccountID != billingAccountInternalID {
+		return nil, tenancy.ErrBillingNotFound
+	}
+	if invited.Status != tenancy.BillingTransferPending {
+		return nil, tenancy.ErrBillingConflict
+	}
+	if invited.FromUserID != initiatorUserID {
+		return nil, tenancy.ErrBillingForbidden
+	}
+	invited.Status = tenancy.BillingTransferCancelled
+	return invited, nil
+}
+
+func (f *fakeBillingAccounts) RemoveBillingAccountMember(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	actorRole, _ := f.billingRoleLocked(billingAccountInternalID, actorUserID)
+	targetRole, ok := f.billingRoleLocked(billingAccountInternalID, targetUserID)
+	if !ok {
+		return tenancy.ErrBillingNotFound
+	}
+	owners := 0
+	for _, r := range f.roles[billingAccountInternalID] {
+		if r == tenancy.BillingRoleOwner {
+			owners++
+		}
+	}
+	if owners == 0 {
+		owners = 1
+	}
+	if err := tenancy.CheckBillingMemberMutation(actorRole, actorUserID, targetUserID, targetRole, "", owners, true); err != nil {
+		return err
+	}
+	delete(f.roles[billingAccountInternalID], targetUserID)
 	return nil
 }
 

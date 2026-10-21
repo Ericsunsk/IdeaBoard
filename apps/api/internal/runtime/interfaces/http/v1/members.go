@@ -90,6 +90,8 @@ func renderMemberTransitionError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, tenancy.ErrWorkspaceMemberLimitReached):
 		contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceMemberLimitReached, "Workspace supports up to 5 members, including owners")
+	case errors.Is(err, tenancy.ErrDefaultQuotaNotConfigured):
+		contract.RenderError(c, http.StatusConflict, contract.CodeDefaultMemberQuotaNotConfigured, runtimehttp.MsgDefaultMemberQuotaNotConfigured)
 	case errors.Is(err, tenancy.ErrLastOwner):
 		contract.RenderError(c, contract.StatusOf(contract.CodeMembershipTransitionForbidden),
 			contract.CodeMembershipTransitionForbidden, runtimehttp.MsgMembershipTransitionForbidden2)

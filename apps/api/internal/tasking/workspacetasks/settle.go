@@ -51,8 +51,18 @@ type Service struct {
 	// without it.
 	submissionClaims TxSubmissionClaimStore
 	billingAccounts  TxBillingAccountResolver
-	events           []TaskEvent
-	now              func() time.Time
+	// budgets enforces the Workspace shared consumption budget inside
+	// the settlement transaction (#945: after Quote, before Hold, same
+	// snapshot). Nil means no budget enforcement (unlimited); the
+	// member-quota seam for #946 stays a separate boundary.
+	budgets TxWorkspaceBudgetChecker
+	// quotas enforces the member cross-workspace consumption quota inside
+	// the settlement transaction (#946: after the budget check, before
+	// Hold, same snapshot). Nil means no quota enforcement (unlimited).
+	// The two constraints stay independently effective: both must pass.
+	quotas TxMemberQuotaChecker
+	events []TaskEvent
+	now    func() time.Time
 }
 
 // ServiceDeps wires the settlement seams. TaskRead and TaskLifecycle are
@@ -90,6 +100,15 @@ type ServiceDeps struct {
 	// store that cannot resolve fails closed (no seam ->
 	// ErrSettlementUnavailable) rather than spending an owner wallet.
 	BillingAccounts TxBillingAccountResolver
+	// Budgets enforces the Workspace shared consumption budget inside
+	// the settlement transaction (#945: after Quote, before Hold, same
+	// snapshot). Nil means no budget enforcement (unlimited).
+	Budgets TxWorkspaceBudgetChecker
+	// Quotas enforces the member cross-workspace consumption quota
+	// inside the settlement transaction (#946: after the budget check,
+	// before Hold, same snapshot). Nil means no quota enforcement
+	// (unlimited). Both constraints stay independently effective.
+	Quotas TxMemberQuotaChecker
 }
 
 // SubmissionAuthorizer accepts current membership, Board capability and all input
@@ -107,7 +126,7 @@ func NewService(deps ServiceDeps) *Service {
 		queue: deps.Queue, assets: deps.Assets,
 		resolver: deps.Resolver, saveSnapshot: deps.SnapshotSaver, now: time.Now,
 		submissionClaims: deps.SubmissionClaims, acceptance: deps.Acceptance,
-		billingAccounts: deps.BillingAccounts,
+		billingAccounts: deps.BillingAccounts, budgets: deps.Budgets, quotas: deps.Quotas,
 	}
 }
 

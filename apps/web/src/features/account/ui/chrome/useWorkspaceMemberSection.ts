@@ -54,6 +54,8 @@ function memberFailureCopyKey(
       return 'workspace.switcher.members.memberLimitReached'
     case 'idempotency-conflict':
       return 'workspace.switcher.members.conflict'
+    case 'missing-default':
+      return 'workspace.switcher.members.defaultMissing'
     case 'invalid':
       return 'workspace.switcher.members.invalidRequest'
     default:

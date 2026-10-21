@@ -21,6 +21,7 @@ func TestWorkspaceOwnerMutationsKeepOneOwnerPostgres(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			configureWorkspaceDefaultQuota(t, db, workspace)
 			if _, err := store.AddWorkspaceMember(ctx, workspace.PublicID, owners[1], tenancy.RoleOwner); err != nil {
 				t.Fatal(err)
 			}
@@ -80,6 +81,7 @@ func TestWorkspaceMemberMutationsRollBackWithAmbientTransaction(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			configureWorkspaceDefaultQuota(t, db, workspace)
 			if _, err := store.AddWorkspaceMember(ctx, workspace.PublicID, memberID, tenancy.RoleMember); err != nil {
 				t.Fatal(err)
 			}

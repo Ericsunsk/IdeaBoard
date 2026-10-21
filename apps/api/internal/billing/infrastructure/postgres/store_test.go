@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"ideaboard/api/internal/billing"
@@ -578,5 +579,36 @@ func assertOperationBlocked(t *testing.T, done <-chan error) {
 	case err := <-done:
 		t.Fatalf("operation completed before competing transaction released its lock: %v", err)
 	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+// Supply a deterministic DB statement clock just before midnight. The quote
+// must already have the millisecond precision of the durable reservation facts;
+// PostgreSQL rounding must never move a checked reservation into the next day.
+type quoteBoundaryClock struct{ quoteQuerier }
+
+func (q quoteBoundaryClock) QueryRow(ctx context.Context, query string, args ...any) pgx.Row {
+	query = strings.ReplaceAll(query, "statement_timestamp()", "'2025-01-31 23:59:59.9996+00'::timestamptz")
+	return q.quoteQuerier.QueryRow(ctx, query, args...)
+}
+
+func TestQuoteTimestampKeepsPersistedPeriodAtMillisecondBoundary(t *testing.T) {
+	pool := testdb.Open(t)
+	store := NewStore(pool)
+	definition := testBillableDefinition("ai-image:inpaint", "Inpaint")
+	if _, err := store.PublishPrice(t.Context(), PublishPriceInput{Definition: definition, UnitCredits: 25, ActorID: 7}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.quote(t.Context(), quoteBoundaryClock{pool}, string(definition.SKU), OutputResolution1K, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := time.Date(2025, 1, 31, 23, 59, 59, 999000000, time.UTC)
+	var persisted time.Time
+	if err := pool.QueryRow(t.Context(), `SELECT $1::timestamptz(3)`, got.QuotedAt).Scan(&persisted); err != nil {
+		t.Fatal(err)
+	}
+	if !got.QuotedAt.Equal(want) || !persisted.Equal(want) {
+		t.Fatalf("quote=%s persisted=%s, want %s", got.QuotedAt, persisted, want)
 	}
 }

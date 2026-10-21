@@ -24,6 +24,11 @@ export function workspaceCreationIdempotencyKey(): string {
   return createIdempotencyKey('workspace-create')
 }
 
+// Organization creation atomically provisions its own financial account.
+export function organizationCreationIdempotencyKey(): string {
+  return createIdempotencyKey('organization-create')
+}
+
 // Workspace deletion key: caller-generated per delete attempt (the backend
 // `workspace:delete` scope fails closed without an `Idempotency-Key`).
 // Retries of the SAME attempt must reuse the returned value; a new user
@@ -113,6 +118,16 @@ export function workspaceTaskIdempotencyKey(operation: 'create' | 'cancel'): str
 // fresh call. Role changes are idempotent by value and carry no key.
 export function workspaceMemberIdempotencyKey(operation: 'invite' | 'remove'): string {
   return createIdempotencyKey(`workspace:members.${operation}`)
+}
+
+// Workspace billing handover key per operation (#948,
+// `billing.account.transfer-invite|accept|reject|cancel` backend scopes
+// bound to operator + workspace). Retries of the SAME attempt must reuse
+// the returned value; a new handover intent needs a fresh call.
+export function workspaceBillingTransferIdempotencyKey(
+  operation: 'invite' | 'accept' | 'reject' | 'cancel',
+): string {
+  return createIdempotencyKey(`billing:transfer-${operation}`)
 }
 
 // Control Plane user administration key per operation (issue #808,

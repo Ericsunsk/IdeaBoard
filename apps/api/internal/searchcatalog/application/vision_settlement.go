@@ -15,8 +15,9 @@
 // transaction. Capture, Release, and background reconciliation converge on
 // the STORED payer; they never re-resolve from the live Owner or
 // membership, so handovers and departures mid-flight cannot move the
-// money. Future consumption limits (945/946) join this same transaction
-// at the marked boundary; no limit math lives here.
+// money. The Workspace shared budget (#945) and the member
+// cross-workspace quota (#946) join this same transaction after Quote
+// and before Hold; both stay independently effective.
 package application
 
 import (
@@ -121,6 +122,23 @@ func (s *VisionBillingService) reserve(ctx context.Context, workspacePublicID st
 	if err != nil {
 		return visionReservation{}, ErrVisionPricingUnavailable
 	}
+	// Workspace shared budget gate (#945): after Quote, before Hold, in
+	// this same reservation transaction. The ledger Hold that follows is
+	// the reservation; terminal Capture/Release needs no re-check and
+	// in-flight operations converge on their submit-time period facts.
+	// A nil checker means unlimited. The member quota gate (#946) runs
+	// next at the same boundary, in the same fixed lock order as Task
+	// submit (budget row first, quota row second).
+	if s.budgets != nil && quote.TotalCredits > 0 {
+		if err := s.budgets.CheckBudgetByInternalIDInTx(ctx, tx, identity.WorkspaceInternalID, quote.TotalCredits, quote.QuotedAt); err != nil {
+			return visionReservation{}, err
+		}
+	}
+	if s.quotas != nil && quote.TotalCredits > 0 {
+		if err := s.quotas.CheckQuotaInTx(ctx, tx, identity.BillingAccountID, userID, quote.TotalCredits, quote.QuotedAt); err != nil {
+			return visionReservation{}, err
+		}
+	}
 	operationID := uuid.NewString()
 	hold, err := s.credits.InTx(tx).Hold(ctx, ports.HoldCommand{
 		BillingAccountID: identity.BillingAccountID, Amount: amount,
@@ -137,8 +155,8 @@ func (s *VisionBillingService) reserve(ctx context.Context, workspacePublicID st
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO ai_search_operations
-		(operation_id, user_id, workspace_id, billing_account_id, idempotency_key, request_hash, sku, price_version_id, unit_credits, hold_transaction_id, status)
-		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')`, operationID, userID, identity.WorkspaceInternalID, identity.BillingAccountID, key, requestHash, visionSearchSKU, quote.PriceVersionID, quote.TotalCredits, hold.TransactionID); err != nil {
+		(operation_id, user_id, workspace_id, billing_account_id, idempotency_key, request_hash, sku, price_version_id, unit_credits, hold_transaction_id, status, created_at)
+		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11)`, operationID, userID, identity.WorkspaceInternalID, identity.BillingAccountID, key, requestHash, visionSearchSKU, quote.PriceVersionID, quote.TotalCredits, hold.TransactionID, quote.QuotedAt); err != nil {
 		if database.IsDuplicateConstraintError(err) {
 			return visionReservation{}, ErrVisionIdempotencyConflict
 		}

@@ -4,11 +4,16 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { useUserStore } from '../../auth'
 import { i18n } from '../../../core/i18n'
 import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
-import type { UserAccountMenuWorkspace } from '../../account/ui/chrome/userAccountMenu.types'
+import type {
+  UserAccountMenuWorkspace,
+  UserAccountMenuWorkspaceCreateInput,
+} from '../../account/ui/chrome/userAccountMenu.types'
 import { USER_BOARDS_PATH } from '../routePaths'
 import {
   WORKSPACE_NAME_MAX_LENGTH,
   deleteWorkspace,
+  fetchOrganizations,
+  provisionOrganization,
   renameWorkspace,
   workspaceQueryKeys,
   type WorkspaceSummary,
@@ -79,8 +84,15 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     await queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.list })
   }
 
-  async function createWorkspaceItem(name: string): Promise<WorkspaceSummary> {
-    const created = await selection.provisionWorkspace({ name })
+  async function createWorkspaceItem(
+    input: UserAccountMenuWorkspaceCreateInput,
+  ): Promise<WorkspaceSummary> {
+    const created = await selection.provisionWorkspace({
+      name: input.name,
+      ...(input.organizationId === undefined ? {} : { organizationId: input.organizationId }),
+      ...(input.billingAccountId === undefined ? {} : { billingAccountId: input.billingAccountId }),
+      ...(input.isNewBillingAccount === true ? { isNewBillingAccount: true } : {}),
+    })
     await refreshWorkspaceList()
     return created
   }
@@ -129,6 +141,8 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
       ),
       nameMaxLength: WORKSPACE_NAME_MAX_LENGTH,
       currentUserId: userStore.user?.public_id ?? null,
+      onLoadOrganizations: fetchOrganizations,
+      onCreateOrganization: provisionOrganization,
       onSelect: switchToGalleryWorkspace,
       onCreate: createWorkspaceItem,
       onRename: renameWorkspaceItem,

@@ -43,7 +43,7 @@ Billing is the platform-level product identity and Credit pricing context. Users
 - Every publish locks the SKU row and, inside one typed PostgreSQL command, materializes the Catalog item (if needed), allocates a monotonic version per SKU and Output Resolution, inserts the prices, moves the corresponding current pointers, and writes append-only audit.
 - Items published for the first time or still without a current price auto-enable; Disabled items with a current price stay Disabled across repricing.
 - Feature availability is owned solely by the Billing Catalog SKU enabled state; Feature Prompts carry no enabled/published state. Enable/disable commands record actor, target, old/new, outcome and time automatically.
-- Quote reads SKU, current pointer and Price Version in one MVCC statement and never mixes concurrent versions.
+- Quote reads SKU, current pointer and Price Version in one MVCC statement and never mixes concurrent versions. Its authoritative DB timestamp is truncated to milliseconds before cap checks, matching durable Task/Vision attribution precision without rounding into another UTC period.
 - quantity must be a positive `int64`; `unit_credits × quantity` beyond `9_000_000_000_000_000` fails closed.
 - Explicit 0 Credits is a free price; missing SKU, disabled SKU, or no current price fails closed.
 - Billing never selects Models; changing a Service Model Pool cannot change its prices.

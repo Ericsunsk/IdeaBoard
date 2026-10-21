@@ -23,6 +23,24 @@ export type UserAccountMenuWorkspaceItem = {
 
 type UserAccountMenuWorkspaceStatus = 'loading' | 'ready' | 'error' | 'empty'
 
+export type UserAccountMenuWorkspaceCreateInput = { name: string } & (
+  | {
+      /** Organization creates always use the organization pool. */
+      organizationId: string
+      billingAccountId?: never
+      isNewBillingAccount?: never
+    }
+  | {
+      organizationId?: undefined
+      /** Explicit shared ba_ account, resolved before creation is enabled. */
+      billingAccountId?: string | undefined
+      /** Fresh isolated account for an independently operated business. */
+      isNewBillingAccount?: boolean | undefined
+    }
+)
+
+export type UserAccountMenuOrganizationItem = { publicId: string; name: string }
+
 export type UserAccountMenuWorkspace = {
   items: UserAccountMenuWorkspaceItem[]
   selectedId: string | null
@@ -37,8 +55,11 @@ export type UserAccountMenuWorkspace = {
    * unresolved: member sections render read-only.
    */
   currentUserId?: string | null | undefined
+  onLoadOrganizations?: (() => Promise<UserAccountMenuOrganizationItem[]>) | undefined
+  onCreateOrganization?:
+    ((name: string, idempotencyKey: string) => Promise<UserAccountMenuOrganizationItem>) | undefined
   onSelect: (workspaceId: string) => void
-  onCreate: (name: string) => Promise<UserAccountMenuWorkspaceItem>
+  onCreate: (input: UserAccountMenuWorkspaceCreateInput) => Promise<UserAccountMenuWorkspaceItem>
   onRename: (workspaceId: string, name: string) => Promise<UserAccountMenuWorkspaceItem>
   onDelete: (workspaceId: string) => Promise<void>
   onRetry: () => void

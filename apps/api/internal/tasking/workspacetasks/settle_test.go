@@ -1627,3 +1627,50 @@ func TestSettlementStagesOnlyAfterACommittedTransaction(t *testing.T) {
 	assertSingleStagedStatus(t, service, env, created.ID, workspacetasks.StatusCompleted)
 	assertStagedEventIsCommitted(t, env, created.ID, workspacetasks.StatusCompleted)
 }
+
+// A submission carries the quote's timestamp through both cap checks and the
+// durable Task fact, even if either check runs across a calendar boundary.
+type reservationTimeQuoter struct {
+	*atomicQuoter
+	at time.Time
+}
+
+func (q reservationTimeQuoter) QuoteInTx(ctx context.Context, tx pgx.Tx, service, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
+	snapshot, err := q.atomicQuoter.QuoteInTx(ctx, tx, service, resolution, quantity)
+	snapshot.QuotedAt = q.at
+	return snapshot, err
+}
+
+type reservationTimeChecks struct {
+	budgetAt time.Time
+	quotaAt  time.Time
+}
+
+func (c *reservationTimeChecks) CheckBudgetInTx(_ context.Context, _ pgx.Tx, _ string, _ int64, reservedAt time.Time) error {
+	c.budgetAt = reservedAt
+	return nil
+}
+
+func (c *reservationTimeChecks) CheckQuotaInTx(_ context.Context, _ pgx.Tx, _, _ int64, _ int64, reservedAt time.Time) error {
+	c.quotaAt = reservedAt
+	return nil
+}
+
+func TestSubmitPersistsTheReservationPeriodCheckedByBothCaps(t *testing.T) {
+	env := openAtomicEnv(t, 20)
+	reservedAt := time.Date(2025, 1, 31, 23, 59, 59, 999000000, time.UTC)
+	checks := &reservationTimeChecks{}
+	deps := env.serviceDeps
+	deps.Quoter = reservationTimeQuoter{atomicQuoter: deps.Quoter.(*atomicQuoter), at: reservedAt}
+	deps.Budgets = checks
+	deps.Quotas = checks
+	env.service = workspacetasks.NewService(deps)
+	task := env.createPaidTask(t, 1)
+	var persisted time.Time
+	if err := env.pool.QueryRow(context.Background(), `SELECT quoted_at FROM task_billing_snapshots WHERE task_id=$1`, task.ID).Scan(&persisted); err != nil {
+		t.Fatal(err)
+	}
+	if !checks.budgetAt.Equal(reservedAt) || !checks.quotaAt.Equal(reservedAt) || !persisted.Equal(reservedAt) {
+		t.Fatalf("reservation=%s budget=%s quota=%s persisted=%s", reservedAt, checks.budgetAt, checks.quotaAt, persisted)
+	}
+}

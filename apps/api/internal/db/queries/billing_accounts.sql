@@ -27,6 +27,14 @@ FROM billing_accounts
 WHERE internal_id = sqlc.arg(internal_id)
 LIMIT 1;
 
+-- name: LockBillingAccount :one
+-- Serialize financial authority changes and Workspace scope mutations on the
+-- stable account before reading roles or taking Workspace/invitation locks.
+SELECT internal_id, public_id, workspace_id, organization_id, created_at, updated_at
+FROM billing_accounts
+WHERE internal_id = sqlc.arg(internal_id)
+FOR NO KEY UPDATE;
+
 -- name: ListBillingAccountsForAdmin :many
 SELECT b.internal_id, b.public_id, b.workspace_id, b.organization_id, b.created_at, b.updated_at,
        w.public_id AS workspace_public_id, o.public_id AS organization_public_id
@@ -111,3 +119,21 @@ SELECT organization_id, user_id, role, created_at
 FROM organization_memberships
 WHERE organization_id = sqlc.arg(organization_id) AND role = 'owner'
 ORDER BY user_id ASC;
+
+-- name: LockWorkspaceBillingAccounts :many
+-- Lock the resolved payer and any account anchored to the Workspace before
+-- deletion. Stable ID ordering keeps the account -> Workspace lock order even
+-- when an explicitly shared Workspace already has an older anchor account.
+-- Resolve without provisioning; an unfunded Workspace returns no rows.
+SELECT b.internal_id
+FROM workspaces AS w
+LEFT JOIN workspace_billing_links AS l ON l.workspace_id = w.internal_id
+JOIN billing_accounts AS b ON b.workspace_id = w.internal_id
+  OR b.internal_id = COALESCE(
+    l.billing_account_id,
+    (SELECT a.internal_id FROM billing_accounts AS a WHERE a.organization_id = w.organization_id),
+    (SELECT a.internal_id FROM billing_accounts AS a WHERE a.workspace_id = w.internal_id)
+  )
+WHERE w.public_id = sqlc.arg(workspace_public_id)
+ORDER BY b.internal_id
+FOR NO KEY UPDATE OF b;
