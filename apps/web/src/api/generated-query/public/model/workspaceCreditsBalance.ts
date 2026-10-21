@@ -14,6 +14,11 @@ import type { WorkspaceCreditsBalanceStatus } from './workspaceCreditsBalanceSta
 import type { WorkspaceId } from './workspaceId'
 
 export interface WorkspaceCreditsBalance {
+  /**
+   * Stable funds identity holding the unified balance; shared workspaces report the same account.
+   * @pattern ^ba_[A-Za-z0-9_-]+$
+   */
+  billing_account_id: string
   workspace_id: WorkspaceId
   /**
    * Integer minor units.

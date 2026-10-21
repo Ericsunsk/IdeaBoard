@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
@@ -13,12 +14,14 @@ import (
 	tasksdomain "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
+	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/workflow/paramkeys"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -82,6 +85,51 @@ func (f *fakeTaskQuoter) QuoteInTx(ctx context.Context, _ pgx.Tx, kind, resoluti
 	return f.Quote(ctx, kind, resolution, quantity)
 }
 
+// v1FakeBillingAccounts serves the stable funds-identity seam from a fixed
+// fixture account for in-memory settlement tests.
+type v1FakeBillingAccounts struct{}
+
+func (v1FakeBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string) (int64, error) {
+	return 7001, nil
+}
+
+// EnsureBillingAccountForWorkspace serves the quote-preflight resolution
+// from the same fixed fixture account submit holds (#917: one payer for
+// quote, readiness, and submit in these fixtures).
+func (v1FakeBillingAccounts) EnsureBillingAccountForWorkspace(_ context.Context, _ int64, _ string) (tenancypg.BillingAccount, error) {
+	return tenancypg.BillingAccount{InternalID: 7001, PublicID: "ba_quote0000001", OwnerType: tenancypg.BillingOwnerWorkspace}, nil
+}
+
+// v1FakeQuoteWallets serves the quote-preflight funds gate from a
+// configurable fixture balance. Tests mutate available/restrictions/err
+// to prove the 402-vs-403 split; the default funds every fixture quote.
+type v1FakeQuoteWallets struct {
+	mu           sync.Mutex
+	available    int64
+	reserved     int64
+	restrictions []string
+	err          error
+}
+
+func newV1FakeQuoteWallets() *v1FakeQuoteWallets {
+	return &v1FakeQuoteWallets{available: 1000000}
+}
+
+func (f *v1FakeQuoteWallets) GetWallet(_ context.Context, _ int64) (domain.WalletDetails, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return domain.WalletDetails{}, f.err
+	}
+	details := domain.WalletDetails{Status: domain.WalletStatusActive}
+	details.Available = f.available
+	details.Reserved = f.reserved
+	for _, restrictionType := range f.restrictions {
+		details.ActiveRestrictions = append(details.ActiveRestrictions, domain.WalletRestriction{Type: restrictionType})
+	}
+	return details, nil
+}
+
 type fakeTaskHolder struct {
 	holds    map[string]int64
 	captured map[string]int64
@@ -93,7 +141,7 @@ func newFakeTaskHolder() *fakeTaskHolder {
 	return &fakeTaskHolder{holds: map[string]int64{}, captured: map[string]int64{}, released: map[string]int64{}}
 }
 
-func (f *fakeTaskHolder) Hold(ctx context.Context, userID int64, amount int64, key, taskID string) (string, error) {
+func (f *fakeTaskHolder) Hold(ctx context.Context, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
 	if f.holdErr != nil {
 		return "", f.holdErr
 	}
@@ -102,12 +150,12 @@ func (f *fakeTaskHolder) Hold(ctx context.Context, userID int64, amount int64, k
 	return holdID, nil
 }
 
-func (f *fakeTaskHolder) Capture(ctx context.Context, holdID string, amount int64, taskID string) error {
+func (f *fakeTaskHolder) Capture(ctx context.Context, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) error {
 	f.captured[holdID] = amount
 	return nil
 }
 
-func (f *fakeTaskHolder) Release(ctx context.Context, holdID string, amount int64, taskID string) error {
+func (f *fakeTaskHolder) Release(ctx context.Context, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) error {
 	f.released[holdID] = amount
 	return nil
 }
@@ -115,8 +163,8 @@ func (f *fakeTaskHolder) Release(ctx context.Context, holdID string, amount int6
 // HoldInTx serves the settlement-transaction seam from the same maps and
 // registers its rollback undo, so a rejected submit strands no hold.
 // CaptureInTx/ReleaseInTx delegate to the same call recording.
-func (f *fakeTaskHolder) HoldInTx(ctx context.Context, tx pgx.Tx, userID int64, amount int64, key, taskID string) (string, error) {
-	holdID, err := f.Hold(ctx, userID, amount, key, taskID)
+func (f *fakeTaskHolder) HoldInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
+	holdID, err := f.Hold(ctx, billingAccountID, actorUserID, amount, key, taskID)
 	if err != nil {
 		return "", err
 	}
@@ -128,15 +176,15 @@ func (f *fakeTaskHolder) HoldInTx(ctx context.Context, tx pgx.Tx, userID int64, 
 	return holdID, nil
 }
 
-func (f *fakeTaskHolder) CaptureInTx(ctx context.Context, _ pgx.Tx, _ int64, holdID string, amount int64, taskID string) (string, error) {
-	if err := f.Capture(ctx, holdID, amount, taskID); err != nil {
+func (f *fakeTaskHolder) CaptureInTx(ctx context.Context, _ pgx.Tx, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) (string, error) {
+	if err := f.Capture(ctx, billingAccountID, actorUserID, holdID, amount, taskID); err != nil {
 		return "", err
 	}
 	return "", nil
 }
 
-func (f *fakeTaskHolder) ReleaseInTx(ctx context.Context, _ pgx.Tx, _ int64, holdID string, amount int64, taskID string) (string, error) {
-	if err := f.Release(ctx, holdID, amount, taskID); err != nil {
+func (f *fakeTaskHolder) ReleaseInTx(ctx context.Context, _ pgx.Tx, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) (string, error) {
+	if err := f.Release(ctx, billingAccountID, actorUserID, holdID, amount, taskID); err != nil {
 		return "", err
 	}
 	return "", nil
@@ -197,6 +245,7 @@ type v1TaskFixture struct {
 	holder  *fakeTaskHolder
 	queue   *fakeTaskQueue
 	assets  *fakeTaskAssets
+	wallets *v1FakeQuoteWallets
 	saved   map[string]routing.RoutingSnapshot
 }
 
@@ -211,6 +260,7 @@ func newV1TaskFixture(t *testing.T, pools ...map[string]routing.Pool) *v1TaskFix
 	holder := newFakeTaskHolder()
 	queue := &fakeTaskQueue{}
 	assets := &fakeTaskAssets{assets: map[string]*workspacetasks.AssetInfo{}}
+	wallets := newV1FakeQuoteWallets()
 	saved := make(map[string]routing.RoutingSnapshot)
 	router := gin.New()
 	router.Use(runtimehttp.ContractRequestIDMiddleware())
@@ -251,9 +301,14 @@ func newV1TaskFixture(t *testing.T, pools ...map[string]routing.Pool) *v1TaskFix
 		Store: store, Users: dir,
 		Tasks: txTasks, TaskLifecycle: txTasks,
 		TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets,
-		TaskRouter:        resolver,
-		TaskSnapshotSaver: v1TxSnapshotSaver(saved),
-		TaskAcceptance:    &v1TxSubmissionAcceptance{assets: assets},
+		TaskRouter:          resolver,
+		TaskSnapshotSaver:   v1TxSnapshotSaver(saved),
+		TaskBillingAccounts: v1FakeBillingAccounts{},
+		// #917: the preflight resolves the same fixture account submit
+		// holds and gates the same fixture funds.
+		TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
+		TaskQuoteWallets:         wallets,
+		TaskAcceptance:           &v1TxSubmissionAcceptance{assets: assets},
 	})
 	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "tasks", OwnerUserID: 1})
 	if err != nil {
@@ -264,7 +319,7 @@ func newV1TaskFixture(t *testing.T, pools ...map[string]routing.Pool) *v1TaskFix
 	for _, id := range []int64{1, 2, 3, 9} {
 		dir.ensure(id)
 	}
-	return &v1TaskFixture{engine: router, store: store, dir: dir, ws: ws, tasks: tasks, txTasks: txTasks, quoter: quoter, holder: holder, queue: queue, assets: assets, saved: saved}
+	return &v1TaskFixture{engine: router, store: store, dir: dir, ws: ws, tasks: tasks, txTasks: txTasks, quoter: quoter, holder: holder, queue: queue, assets: assets, wallets: wallets, saved: saved}
 }
 
 func v1CreateTaskBodyJSON(kind string) string {
@@ -772,6 +827,7 @@ func newV1PromptMaskFixture(t *testing.T) *v1PromptMaskFixture {
 	holder := newFakeTaskHolder()
 	queue := &fakeTaskQueue{}
 	assets := &fakeTaskAssets{assets: map[string]*workspacetasks.AssetInfo{}}
+	wallets := newV1FakeQuoteWallets()
 	saved := make(map[string]routing.RoutingSnapshot)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -801,10 +857,13 @@ func newV1PromptMaskFixture(t *testing.T) *v1PromptMaskFixture {
 		Store: store, Users: dir,
 		Tasks: txTasks, TaskLifecycle: txTasks,
 		TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets,
-		TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
-		TaskRouter:            allowTestPoolResolver(),
-		TaskSnapshotSaver:     v1TxSnapshotSaver(saved),
-		TaskAcceptance:        &v1TxSubmissionAcceptance{assets: assets},
+		TaskCanonicalCompiler:    taskservice.CompileWorkspaceParams,
+		TaskRouter:               allowTestPoolResolver(),
+		TaskSnapshotSaver:        v1TxSnapshotSaver(saved),
+		TaskBillingAccounts:      v1FakeBillingAccounts{},
+		TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
+		TaskQuoteWallets:         wallets,
+		TaskAcceptance:           &v1TxSubmissionAcceptance{assets: assets},
 	})
 	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "prompt-mask", OwnerUserID: 1})
 	if err != nil {
@@ -989,7 +1048,12 @@ func newV1TaskRoutingFixture(t *testing.T, pools map[string]routing.Pool) *v1Rou
 			saved[taskID] = snap
 			return nil
 		},
-		TaskAcceptance: &v1TxSubmissionAcceptance{assets: base.assets},
+		TaskAcceptance:      &v1TxSubmissionAcceptance{assets: base.assets},
+		TaskBillingAccounts: v1FakeBillingAccounts{},
+		// #917: the preflight resolves the same fixture account submit
+		// holds and gates the same fixture funds.
+		TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
+		TaskQuoteWallets:         base.wallets,
 	})
 	base.engine = router
 	return &v1RoutingFixture{v1TaskFixture: base, pools: pools, saved: saved}

@@ -8,6 +8,7 @@ import (
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	"ideaboard/api/internal/payments/application/credentials"
 	paymentdispute "ideaboard/api/internal/payments/application/dispute"
+	"ideaboard/api/internal/payments/application/hints"
 	paymentorder "ideaboard/api/internal/payments/application/order"
 	paymentrefund "ideaboard/api/internal/payments/application/refund"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
@@ -85,7 +86,7 @@ func newTestFixtures(t *testing.T, event paymentports.StripeWebhookEvent, verify
 	}
 	service, err := webhook.NewService(webhook.Dependencies{
 		Inbox: fx.inbox, Convergence: fx.convergence,
-		Events:   events,
+		Hints:    hints.NewPublisher(events, fx.convergence),
 		Verifier: fx.verifier, CheckoutStore: fx.convergence, Checkout: fx.checkout,
 		Refund: refundService, Dispute: disputeService,
 		CheckoutGateway: fx.checkoutGw, DisputeGateway: fx.disputeGw,
@@ -238,6 +239,8 @@ type fakeConvergence struct {
 	order           paymentsdomain.PaymentOrder
 	external        paymentsdomain.PaymentRefund
 	refundConverged bool
+	hintManagers    []int64
+	payer           int64
 }
 
 func (f *fakeConvergence) GetPaymentRefundByStripeID(context.Context, string) (paymentsdomain.PaymentRefund, error) {
@@ -249,7 +252,7 @@ func (f *fakeConvergence) GetPaymentRefundByStripeID(context.Context, string) (p
 
 func (f *fakeConvergence) CreateExternalPaymentRefund(_ context.Context, provider paymentports.StripeRefund, _ time.Time) (paymentsdomain.PaymentRefund, error) {
 	f.external = paymentsdomain.PaymentRefund{
-		ID: "refund_1", UserID: 7, StripeRefundID: provider.ID,
+		ID: "refund_1", UserID: 7, PaymentOrderID: "order_1", StripeRefundID: provider.ID,
 		StripeChargeID: provider.ChargeID, AmountMinor: provider.AmountMinor, Currency: provider.Currency,
 	}
 	return f.external, nil
@@ -260,7 +263,7 @@ func (f *fakeConvergence) RecordPaymentRefundAnomaly(context.Context, paymentpor
 }
 
 func (f *fakeConvergence) ConvergePaymentDispute(_ context.Context, dispute paymentports.StripeDispute, _ time.Time) (paymentsdomain.PaymentDispute, bool, error) {
-	return paymentsdomain.PaymentDispute{StripeDisputeID: dispute.ID}, true, nil
+	return paymentsdomain.PaymentDispute{StripeDisputeID: dispute.ID, UserID: 7, PaymentOrderID: "order_1"}, true, nil
 }
 
 func (f *fakeConvergence) GetPaymentOrderByCheckoutSession(context.Context, string, string) (paymentsdomain.PaymentOrder, error) {
@@ -314,4 +317,27 @@ func (f *fakeConvergence) MarkPaymentRefundProviderResult(_ context.Context, _ s
 
 func (f *fakeConvergence) MarkPaymentRefundSucceeded(_ context.Context, _ string, _ time.Time) (paymentsdomain.PaymentRefund, error) {
 	return paymentsdomain.PaymentRefund{}, nil
+}
+
+func (f *fakeConvergence) GetPaymentOrderPayerAccount(_ context.Context, _ string) (int64, error) {
+	if f.payer > 0 {
+		return f.payer, nil
+	}
+	return 0, errFakeNotFound
+}
+
+func (f *fakeConvergence) WithBillingAccountCheckoutLock(ctx context.Context, _ int64, fn func(context.Context) error) error {
+	return fn(ctx)
+}
+
+func (f *fakeConvergence) ListAccountActivePaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error) {
+	return nil, nil
+}
+
+func (f *fakeConvergence) GetPaymentOrderByID(context.Context, string) (paymentsdomain.PaymentOrder, error) {
+	return f.order, nil
+}
+
+func (f *fakeConvergence) ListBillingAccountManagerIDs(context.Context, int64) ([]int64, error) {
+	return f.hintManagers, nil
 }

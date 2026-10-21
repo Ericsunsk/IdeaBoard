@@ -23,16 +23,17 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 	seedRechargeableWallet(t, pool, 42)
 	repo := newTestPaymentStores(pool)
 	now := time.Now().UTC()
-	order := createBoundPaymentOrder(t, repo)
+	order := createBoundPaymentOrder(t, repo, paymentBillingAccount(t, pool, 42))
 	configuration := activeTestStripeConfiguration(t, repo)
 	paidFacts := paidCheckoutFacts(order)
 	paidFacts.PaidAt = now.Add(-2 * time.Hour)
 	if _, err := repo.ConvergePaidPaymentOrder(t.Context(), paidFacts, now.Add(-time.Hour)); err != nil {
 		t.Fatalf("ConvergePaidPaymentOrder() error = %v", err)
 	}
+	payer := paymentBillingAccount(t, pool, 42)
 	cancelledInput := paymentsdomain.CreatePaymentOrderIntentInput{
 		ID: "0198cd29-f457-7e4b-b95e-6cfde41b8333", PublicOrderNumber: "IBP-20260801-ABC123DEF457",
-		PublicToken: "0198cd29-f457-7e4b-b95e-6cfde41b8444", UserID: 42,
+		PublicToken: "0198cd29-f457-7e4b-b95e-6cfde41b8444", UserID: 42, BillingAccountID: payer,
 		ClientIdempotencyKey: "payment-history-cancelled", RequestHash: "941d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
 		StripeCredentialID: configuration.CredentialID, StripeAccountID: "acct_payment", StripeProductID: "prod_idea", IdeaQuantity: 1000,
 		TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
@@ -49,12 +50,12 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := repo.MarkPaymentOrderCancelled(t.Context(), 42, cancelled.ID); err != nil {
+	if _, _, err := repo.MarkPaymentOrderCancelled(t.Context(), payer, cancelled.ID); err != nil {
 		t.Fatal(err)
 	}
 
 	service := newCompleteTestCheckoutService(t, repo, payments.NewPaymentRuntime(nil, func() time.Time { return now.Add(2 * time.Hour) }), testStripeGateway{}, testCheckoutGateway{}, creditService, testShutdownEnqueuer{})
-	page, err := service.ListRecharges(t.Context(), 42, "", 20)
+	page, err := service.ListRecharges(t.Context(), payer, "", 20)
 	if err != nil {
 		t.Fatalf("ListRecharges() error = %v", err)
 	}
@@ -73,7 +74,7 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 		t.Fatalf("next cursor = %q, want empty", page.NextCursor)
 	}
 
-	otherPage, err := service.ListRecharges(t.Context(), 99, "", 20)
+	otherPage, err := service.ListRecharges(t.Context(), paymentBillingAccount(t, pool, 99), "", 20)
 	if err != nil {
 		t.Fatalf("cross-user ListRecharges() error = %v", err)
 	}
@@ -81,7 +82,7 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 		t.Fatalf("cross-user items = %+v", otherPage.Items)
 	}
 	expiredService := newCompleteTestCheckoutService(t, repo, payments.NewPaymentRuntime(nil, func() time.Time { return now.AddDate(1, 0, 0).Add(24 * time.Hour) }), testStripeGateway{}, testCheckoutGateway{}, creditService, testShutdownEnqueuer{})
-	expiredPage, err := expiredService.ListRecharges(t.Context(), 42, "", 20)
+	expiredPage, err := expiredService.ListRecharges(t.Context(), payer, "", 20)
 	if err != nil {
 		t.Fatalf("ListRecharges() after history window error = %v", err)
 	}
@@ -113,7 +114,7 @@ func TestListRechargesShowsPartialAndFullRefundState(t *testing.T) {
 	if _, err := repo.MarkPaymentRefundSucceeded(t.Context(), first.ID, now); err != nil {
 		t.Fatal(err)
 	}
-	partial, err := service.ListRecharges(t.Context(), 42, "", 20)
+	partial, err := service.ListRecharges(t.Context(), paymentBillingAccount(t, db, 42), "", 20)
 	if err != nil || len(partial.Items) != 1 || partial.Items[0].Status != "credited" || partial.Items[0].RefundedAmountMinor != 200 {
 		t.Fatalf("partial recharge history=%+v error=%v", partial, err)
 	}
@@ -128,7 +129,7 @@ func TestListRechargesShowsPartialAndFullRefundState(t *testing.T) {
 	if _, err := repo.MarkPaymentRefundSucceeded(t.Context(), second.ID, now); err != nil {
 		t.Fatal(err)
 	}
-	full, err := service.ListRecharges(t.Context(), 42, "", 20)
+	full, err := service.ListRecharges(t.Context(), paymentBillingAccount(t, db, 42), "", 20)
 	if err != nil || len(full.Items) != 1 || full.Items[0].Status != "refunded" || full.Items[0].RefundedAmountMinor != 500 {
 		t.Fatalf("full recharge history=%+v error=%v", full, err)
 	}

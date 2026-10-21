@@ -80,8 +80,12 @@ func newDeferredVisionService(t *testing.T, stub *deferredCatalogStub) *VisionBi
 	catalog := billingapplication.NewBillableItemCatalog(registry, stub)
 	// Credits/vision are unused on the deferred reserve path (no Hold);
 	// they only need to be non-nil for constructor checks in Extract.
-	// Reserve itself only needs pool + catalog.
-	return NewVisionBillingService(pool, catalog, &credits.Service{}, &VisionSearchService{})
+	// Reserve itself only needs pool + catalog + the workspace settlement
+	// identity (static fake: no tenancy lookup).
+	return NewVisionBillingServiceWithResolver(pool, catalog, &credits.Service{}, &VisionSearchService{}, staticVisionAccounts{
+		workspaceInternalID: 7001,
+		billingAccountID:    8001,
+	})
 }
 
 func TestVisionBillingReserveDefersOnUnpriced(t *testing.T) {
@@ -103,7 +107,7 @@ func TestVisionBillingReserveDefersOnUnpriced(t *testing.T) {
 				got = append(got, struct{ sku, reason, operationID string }{sku, reason, operationID})
 			}
 			defer func() { visionBillingDeferredObserve = prev }()
-			reserved, err := svc.reserve(context.Background(), 1, "deferred-key-"+tc.reason, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+			reserved, err := svc.reserve(context.Background(), "ws_deferred0001", 1, "deferred-key-"+tc.reason, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 			if err != nil {
 				t.Fatalf("reserve err = %v, want deferred free (no error)", err)
 			}

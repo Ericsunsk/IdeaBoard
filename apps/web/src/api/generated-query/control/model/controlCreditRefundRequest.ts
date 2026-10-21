@@ -30,9 +30,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Linked Refund only; exactly one of user_id or billing_account_id is required, and the charge must sit on the addressed account.
+ */
 export interface ControlCreditRefundRequest {
   /** @pattern ^usr_[A-Za-z0-9_-]+$ */
-  user_id: string
+  user_id?: string
+  /** @pattern ^ba_[A-Za-z0-9_-]+$ */
+  billing_account_id?: string
   /** @minimum 1 */
   amount_credits: number
   business_reference_id: string

@@ -46,12 +46,21 @@ package v1
 //
 // AuthZ: every route resolves the explicit workspace context with the
 // kernel visibility rule (malformed/unknown/non-member workspaces are
-// invisible: 404 workspace_not_found, never 403; anon is 401). Any
-// workspace member may read/act; payments + rewards facts stay
-// caller-scoped (principal UserID) with the workspace as the authZ scope
-// only, matching the checkout-session precedent. Wallet-balance reads
-// keep the owner projection in v1/billing.go; order/recharge/
-// redemption facts do NOT (they are per-user top-up/redemption facts).
+// invisible: 404 workspace_not_found, never 403; anon is 401). Top-up
+// facts belong to the payer Billing Account (#919): purchase options,
+// pending orders (list/continue/abandon), recharge history, and return
+// status require Billing Owner/Admin on the workspace's stable account.
+// Workspace Owner/Admin standing alone (space-only admin) renders
+// billing_account_forbidden and observes no financial facts.
+//
+// Cursor dialects: recharges reuse the legacy opaque NextCursor directly
+// in meta (service-owned); redemption history maps BeforeID through the
+// kernel opaque cursor (v1BillingRedemptionCursor). List endpoints expose
+// only cursor + page_size (Baseline 5.5). Pending orders are bounded
+// (max 3 unpaid per payer account, service-enforced) and intentionally unpaginated.
+//
+// Rewards redeem/history stay caller-scoped (principal UserID, #919 out of
+// scope); only the top-up surface below moved to the payer account.
 //
 // Cursor dialects: recharges reuse the legacy opaque NextCursor directly
 // in meta (service-owned); redemption history maps BeforeID through the
@@ -76,6 +85,7 @@ import (
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/tenancy"
+	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/gin-gonic/gin"
@@ -98,24 +108,26 @@ import (
 
 // v1PurchaseOptionsService is the caller-owned read over the Payments
 // purchase-eligibility projection (static quantities + terms versions +
-// wallet gate). No ledger writes.
+// wallet gate) for one payer Billing Account. No ledger writes.
 type v1PurchaseOptionsService interface {
-	GetPurchaseOptions(ctx context.Context, userID int64) (paymentcontracts.PurchaseOptions, error)
+	GetPurchaseOptions(ctx context.Context, billingAccountID int64) (paymentcontracts.PurchaseOptions, error)
 }
 
 // v1PendingOrderService composes the Payments order-intent seam:
 // list/continue/abandon converge provider state inside Payments; the
-// handler adds workspace authZ + header-key idempotency only.
+// handler adds workspace authZ (Billing Owner/Admin on the payer account)
+// + header-key idempotency only.
 type v1PendingOrderService interface {
-	ListPendingOrders(ctx context.Context, userID int64) (paymentcontracts.PendingPaymentOrderList, error)
-	ContinuePendingOrder(ctx context.Context, userID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error)
-	AbandonPendingOrder(ctx context.Context, userID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error)
+	ListPendingOrders(ctx context.Context, billingAccountID int64) (paymentcontracts.PendingPaymentOrderList, error)
+	ContinuePendingOrder(ctx context.Context, billingAccountID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error)
+	AbandonPendingOrder(ctx context.Context, billingAccountID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error)
 }
 
 // v1RechargeHistoryService composes the Payments settled-facts read model
-// (credited + refunded + user-abandoned, latest 12 months). Read-only.
+// (credited + refunded + user-abandoned, latest 12 months) for one payer
+// Billing Account. Read-only.
 type v1RechargeHistoryService interface {
-	ListRecharges(ctx context.Context, userID int64, cursor string, limit int) (paymentcontracts.RechargeHistoryPage, error)
+	ListRecharges(ctx context.Context, billingAccountID int64, cursor string, limit int) (paymentcontracts.RechargeHistoryPage, error)
 }
 
 // v1RewardsUserService composes the Rewards user seam: Redeem settles
@@ -143,12 +155,20 @@ func registerContractV1BillingGapsRoutes(group *gin.RouterGroup, handler *contra
 func (h *contractV1BillingHandler) getPurchaseOptions(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
 		p := wctx.Principal
+		workspace := wctx.Workspace
 		if h.deps.PurchaseOptions == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable43)
 			c.Abort()
 			return
 		}
-		options, err := h.deps.PurchaseOptions.GetPurchaseOptions(c.Request.Context(), p.UserID())
+		// The recharge page names its explicit target account (#919):
+		// options address the workspace's stable payer account and require
+		// Billing Owner/Admin. Space-only admins observe no financial facts.
+		account, ok := h.requireBillingManager(c, workspace, p.UserID())
+		if !ok {
+			return
+		}
+		options, err := h.deps.PurchaseOptions.GetPurchaseOptions(c.Request.Context(), account.InternalID)
 		if err != nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable43)
 			c.Abort()
@@ -157,39 +177,54 @@ func (h *contractV1BillingHandler) getPurchaseOptions(c *gin.Context) {
 		if options.QuickIdeaQuantities == nil {
 			options.QuickIdeaQuantities = []int64{}
 		}
-		contract.RenderSuccess(c, options)
+		contract.RenderSuccess(c, v1PurchaseOptionsDTO{BillingAccountID: account.PublicID, PurchaseOptions: options})
 	})
 }
 
-type v1PendingOrderDTO struct {
-	PublicToken  string `json:"public_token"`
-	IdeaQuantity int64  `json:"idea_quantity"`
-	CheckoutURL  string `json:"checkout_url,omitempty"`
-	Status       string `json:"status"`
-	ExpiresAt    string `json:"expires_at"`
-	UpdatedAt    string `json:"updated_at"`
+// v1PurchaseOptionsDTO makes the recharge target account explicit (#919):
+// the embedded Payments options stay the eligibility projection, while
+// billing_account_id names the payer account the checkout will charge.
+type v1PurchaseOptionsDTO struct {
+	BillingAccountID string `json:"billing_account_id"`
+	paymentcontracts.PurchaseOptions
 }
 
-func toV1PendingOrderDTO(order paymentcontracts.PendingPaymentOrder) v1PendingOrderDTO {
+type v1PendingOrderDTO struct {
+	PublicToken      string `json:"public_token"`
+	BillingAccountID string `json:"billing_account_id"`
+	IdeaQuantity     int64  `json:"idea_quantity"`
+	CheckoutURL      string `json:"checkout_url,omitempty"`
+	Status           string `json:"status"`
+	ExpiresAt        string `json:"expires_at"`
+	UpdatedAt        string `json:"updated_at"`
+}
+
+func toV1PendingOrderDTO(billingAccountPublicID string, order paymentcontracts.PendingPaymentOrder) v1PendingOrderDTO {
 	return v1PendingOrderDTO{
-		PublicToken:  order.PublicToken,
-		IdeaQuantity: order.IdeaQuantity,
-		CheckoutURL:  order.CheckoutURL,
-		Status:       order.Status,
-		ExpiresAt:    order.ExpiresAt.UTC().Format(time.RFC3339),
-		UpdatedAt:    order.UpdatedAt.UTC().Format(time.RFC3339),
+		PublicToken:      order.PublicToken,
+		BillingAccountID: billingAccountPublicID,
+		IdeaQuantity:     order.IdeaQuantity,
+		CheckoutURL:      order.CheckoutURL,
+		Status:           order.Status,
+		ExpiresAt:        order.ExpiresAt.UTC().Format(time.RFC3339),
+		UpdatedAt:        order.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
 func (h *contractV1BillingHandler) listPendingOrders(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
 		p := wctx.Principal
+		workspace := wctx.Workspace
 		if h.deps.PendingOrders == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable43)
 			c.Abort()
 			return
 		}
-		orders, err := h.deps.PendingOrders.ListPendingOrders(c.Request.Context(), p.UserID())
+		account, ok := h.requireBillingManager(c, workspace, p.UserID())
+		if !ok {
+			return
+		}
+		orders, err := h.deps.PendingOrders.ListPendingOrders(c.Request.Context(), account.InternalID)
 		if err != nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable43)
 			c.Abort()
@@ -197,7 +232,7 @@ func (h *contractV1BillingHandler) listPendingOrders(c *gin.Context) {
 		}
 		items := make([]v1PendingOrderDTO, 0, len(orders.Items))
 		for _, order := range orders.Items {
-			items = append(items, toV1PendingOrderDTO(order))
+			items = append(items, toV1PendingOrderDTO(account.PublicID, order))
 		}
 		contract.RenderSuccess(c, map[string]any{"items": items})
 	})
@@ -254,60 +289,31 @@ func renderPendingOrderError(c *gin.Context, err error, action string) {
 }
 
 func (h *contractV1BillingHandler) continuePendingOrder(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
-		p := wctx.Principal
-		workspace := wctx.Workspace
-		if h.deps.PendingOrders == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable43)
-			c.Abort()
-			return
-		}
-		orderID, ok := v1PendingOrderToken(c)
-		if !ok {
-			return
-		}
-		if !requireEmptyV1BillingActionBody(c) {
-			return
-		}
-		key, err := contract.IdempotencyKeyFromHeader(c)
-		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, runtimehttp.MsgIdempotencyKeyRequired2)
-			c.Abort()
-			return
-		}
-		ctx := c.Request.Context()
-		externalUser := tenancy.FormatUserPublicID(p.PublicID())
-		scope := contract.IdempotencyScope(externalUser, "billing.pending.continue")
-		hash := contract.HashIdempotencyRequest("billing.pending.continue", workspace.PublicID, orderID)
-		result, _, doErr := h.deps.Idempotency.Do(ctx, scope, p.UserID(), key, hash, func() (any, error) {
-			return h.deps.PendingOrders.ContinuePendingOrder(ctx, p.UserID(), orderID)
-		})
-		if doErr != nil {
-			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeBillingCheckoutConflict, runtimehttp.MsgWorkspaceIdempotencyConflict)
-				c.Abort()
-				return
-			}
-			renderPendingOrderError(c, doErr, runtimehttp.MsgContinuePendingOrder)
-			return
-		}
-		order, ok := result.(paymentcontracts.PendingPaymentOrder)
-		if !ok {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable43)
-			c.Abort()
-			return
-		}
-		contract.RenderSuccess(c, toV1PendingOrderDTO(order))
+	h.pendingOrderAction(c, "continue", func(ctx context.Context, accountID int64, orderID string) (paymentcontracts.PendingPaymentOrder, error) {
+		return h.deps.PendingOrders.ContinuePendingOrder(ctx, accountID, orderID)
 	})
 }
 
 func (h *contractV1BillingHandler) abandonPendingOrder(c *gin.Context) {
+	h.pendingOrderAction(c, "abandon", func(ctx context.Context, accountID int64, orderID string) (paymentcontracts.PendingPaymentOrder, error) {
+		return h.deps.PendingOrders.AbandonPendingOrder(ctx, accountID, orderID)
+	})
+}
+
+// pendingOrderAction runs the empty-body continue/abandon intents against
+// the persisted payer account (#919): only its Billing Owner/Admin may
+// act, and the token never becomes an ownership oracle.
+func (h *contractV1BillingHandler) pendingOrderAction(c *gin.Context, action string, run func(ctx context.Context, accountID int64, orderID string) (paymentcontracts.PendingPaymentOrder, error)) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
 		p := wctx.Principal
 		workspace := wctx.Workspace
 		if h.deps.PendingOrders == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable43)
 			c.Abort()
+			return
+		}
+		account, ok := h.requireBillingManager(c, workspace, p.UserID())
+		if !ok {
 			return
 		}
 		orderID, ok := v1PendingOrderToken(c)
@@ -325,10 +331,10 @@ func (h *contractV1BillingHandler) abandonPendingOrder(c *gin.Context) {
 		}
 		ctx := c.Request.Context()
 		externalUser := tenancy.FormatUserPublicID(p.PublicID())
-		scope := contract.IdempotencyScope(externalUser, "billing.pending.abandon")
-		hash := contract.HashIdempotencyRequest("billing.pending.abandon", workspace.PublicID, orderID)
+		scope := contract.IdempotencyScope(externalUser, "billing.pending."+action)
+		hash := contract.HashIdempotencyRequest("billing.pending."+action, workspace.PublicID, orderID)
 		result, _, doErr := h.deps.Idempotency.Do(ctx, scope, p.UserID(), key, hash, func() (any, error) {
-			return h.deps.PendingOrders.AbandonPendingOrder(ctx, p.UserID(), orderID)
+			return run(ctx, account.InternalID, orderID)
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
@@ -336,7 +342,11 @@ func (h *contractV1BillingHandler) abandonPendingOrder(c *gin.Context) {
 				c.Abort()
 				return
 			}
-			renderPendingOrderError(c, doErr, runtimehttp.MsgAbandonPendingOrder)
+			if action == "abandon" {
+				renderPendingOrderError(c, doErr, runtimehttp.MsgAbandonPendingOrder)
+			} else {
+				renderPendingOrderError(c, doErr, runtimehttp.MsgContinuePendingOrder)
+			}
 			return
 		}
 		order, ok := result.(paymentcontracts.PendingPaymentOrder)
@@ -345,12 +355,13 @@ func (h *contractV1BillingHandler) abandonPendingOrder(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		contract.RenderSuccess(c, toV1PendingOrderDTO(order))
+		contract.RenderSuccess(c, toV1PendingOrderDTO(account.PublicID, order))
 	})
 }
 
 type v1RechargeHistoryItemDTO struct {
 	OccurredAt           string `json:"occurred_at"`
+	BillingAccountID     string `json:"billing_account_id"`
 	IdeaQuantity         int64  `json:"idea_quantity"`
 	PaidAmountMinor      int64  `json:"paid_amount_minor,omitempty"`
 	PaidCurrency         string `json:"paid_currency,omitempty"`
@@ -363,9 +374,14 @@ type v1RechargeHistoryItemDTO struct {
 func (h *contractV1BillingHandler) listRecharges(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
 		p := wctx.Principal
+		workspace := wctx.Workspace
 		if h.deps.Recharges == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable43)
 			c.Abort()
+			return
+		}
+		account, ok := h.requireBillingManager(c, workspace, p.UserID())
+		if !ok {
 			return
 		}
 		pageSize, ok := v1PageSize(c)
@@ -373,7 +389,7 @@ func (h *contractV1BillingHandler) listRecharges(c *gin.Context) {
 			return
 		}
 		cursor := strings.TrimSpace(c.Query(contract.CursorParam))
-		page, err := h.deps.Recharges.ListRecharges(c.Request.Context(), p.UserID(), cursor, pageSize)
+		page, err := h.deps.Recharges.ListRecharges(c.Request.Context(), account.InternalID, cursor, pageSize)
 		if err != nil {
 			switch {
 			case errors.Is(err, paymentcontracts.ErrRechargeHistoryCursor):
@@ -390,6 +406,7 @@ func (h *contractV1BillingHandler) listRecharges(c *gin.Context) {
 		for _, item := range page.Items {
 			items = append(items, v1RechargeHistoryItemDTO{
 				OccurredAt:           item.OccurredAt.UTC().Format(time.RFC3339),
+				BillingAccountID:     account.PublicID,
 				IdeaQuantity:         item.IdeaQuantity,
 				PaidAmountMinor:      item.PaidAmountMinor,
 				PaidCurrency:         item.PaidCurrency,
@@ -601,7 +618,11 @@ type v1RedeemRewardResultDTO struct {
 	HistoryItem      v1RewardRedemptionHistoryItemDTO `json:"history_item"`
 	CreditedAmount   int64                            `json:"credited_amount"`
 	AvailableBalance int64                            `json:"available_balance"`
-	Replayed         bool                             `json:"replayed,omitempty"`
+	// BillingAccountID is the stable ba_ funds identity that received the
+	// Grant: the caller's initial personal account. The requesting
+	// workspace is authZ scope only and never changes the beneficiary.
+	BillingAccountID string `json:"billing_account_id"`
+	Replayed         bool   `json:"replayed,omitempty"`
 }
 
 func toV1RewardHistoryItemDTO(item ports.RedemptionHistoryItem) v1RewardRedemptionHistoryItemDTO {
@@ -617,10 +638,19 @@ func toV1RewardHistoryItemDTO(item ports.RedemptionHistoryItem) v1RewardRedempti
 // transaction) with durable per-user replay; the kernel IdempotencyStore
 // adds header-key replay for transport retries. Code plaintext never
 // leaves the request hash.
+//
+// Beneficiary rule (#921): the Grant settles into the caller's
+// deterministic initial personal Billing Account, never into the
+// requesting workspace's account, so switching workspaces (including
+// organization workspaces) neither duplicates nor redirects the benefit.
+// The transport idempotency hash therefore covers only the operation and
+// the code: the same key + same code replays the first redemption even
+// across workspaces, while a different code still conflicts. The response
+// carries the beneficiary billing_account_id (ba_) with the beneficiary
+// available_balance; organization funds are never implicitly touched.
 func (h *contractV1BillingHandler) redeemReward(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
 		p := wctx.Principal
-		workspace := wctx.Workspace
 		if h.deps.Rewards == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable45)
 			c.Abort()
@@ -647,7 +677,7 @@ func (h *contractV1BillingHandler) redeemReward(c *gin.Context) {
 		ctx := c.Request.Context()
 		externalUser := tenancy.FormatUserPublicID(p.PublicID())
 		scope := contract.IdempotencyScope(externalUser, "rewards.redeem")
-		hash := contract.HashIdempotencyRequest("rewards.redeem", workspace.PublicID, code)
+		hash := contract.HashIdempotencyRequest("rewards.redeem", code)
 		result, replayed, doErr := h.deps.Idempotency.Do(ctx, scope, p.UserID(), key, hash, func() (any, error) {
 			return h.deps.Rewards.Redeem(ctx, ports.RedeemCommand{UserID: p.UserID(), Code: code})
 		})
@@ -674,6 +704,10 @@ func (h *contractV1BillingHandler) redeemReward(c *gin.Context) {
 		}
 		redeemed.Redemption.UserPublicID = p.PublicID()
 		redeemed.Redemption.DisplayName = p.DisplayName()
+		beneficiary, beneficiaryOK := h.rewardBeneficiaryAccount(c, redeemed.BillingAccountID)
+		if !beneficiaryOK {
+			return
+		}
 		redemption := redeemed.Redemption
 		dto := v1RedeemRewardResultDTO{
 			Redemption: v1RewardRedemptionDTO{
@@ -686,10 +720,30 @@ func (h *contractV1BillingHandler) redeemReward(c *gin.Context) {
 			HistoryItem:      toV1RewardHistoryItemDTO(redeemed.HistoryItem),
 			CreditedAmount:   redeemed.CreditedAmount,
 			AvailableBalance: redeemed.AvailableBalance,
+			BillingAccountID: beneficiary.PublicID,
 			Replayed:         replayed || redeemed.Replayed,
 		}
 		contract.RenderCreated(c, dto)
 	})
+}
+
+// rewardBeneficiaryAccount maps the internal beneficiary account recorded
+// by the Rewards service to its stable ba_ funds identity. Unknown or
+// unmapped accounts fail closed: the edge never names a workspace account
+// as the beneficiary and never omits the field.
+func (h *contractV1BillingHandler) rewardBeneficiaryAccount(c *gin.Context, billingAccountInternalID int64) (tenancypg.BillingAccount, bool) {
+	if h.deps.BillingAccounts == nil || billingAccountInternalID <= 0 {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable45)
+		c.Abort()
+		return tenancypg.BillingAccount{}, false
+	}
+	account, err := h.deps.BillingAccounts.GetBillingAccountByInternalID(c.Request.Context(), billingAccountInternalID)
+	if err != nil || strings.TrimSpace(account.PublicID) == "" {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable45)
+		c.Abort()
+		return tenancypg.BillingAccount{}, false
+	}
+	return account, true
 }
 
 type v1RewardRedemptionCursor struct {
@@ -777,7 +831,7 @@ func (h *contractV1BillingHandler) listRewardRedemptions(c *gin.Context) {
 //	RedeemWorkspaceRewardRequest: {data: {code: {type: string, minLength: 1}}}
 //	WorkspaceRewardRedemption: {id: int64, reward_code_id: int64, user_public_id: {format: uuid}, display_name, credit_amount: int64, credit_transaction_id, available_balance_after: int64, redeemed_at: date-time}
 //	WorkspaceRewardRedemptionHistoryItem: {id: int64, reward_code_display_name, credited_amount: int64, masked_code_hint, redeemed_at: date-time}
-//	RedeemWorkspaceRewardResult: {redemption: WorkspaceRewardRedemption, history_item: WorkspaceRewardRedemptionHistoryItem, credited_amount: int64, available_balance: int64, replayed?: boolean}
+//	RedeemWorkspaceRewardResult: {redemption: WorkspaceRewardRedemption, history_item: WorkspaceRewardRedemptionHistoryItem, credited_amount: int64, available_balance: int64, billing_account_id: {pattern: ^ba_} (beneficiary initial personal account; the requesting workspace is authZ scope only), replayed?: boolean}
 //
 // Error codes frozen: reward_code_unavailable (422), reward_wallet_locked
 // (409), reward_redeem_conflict (409); reused kernel + #804 codes:

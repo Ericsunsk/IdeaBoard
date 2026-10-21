@@ -37,6 +37,7 @@ type ConvergenceStore interface {
 	MarkPaymentRefundProviderResult(context.Context, string, string, string, time.Time) (paymentsdomain.PaymentRefund, error)
 	MarkPaymentRefundSucceeded(context.Context, string, time.Time) (paymentsdomain.PaymentRefund, error)
 	GetPaymentRefundByStripeID(context.Context, string) (paymentsdomain.PaymentRefund, error)
+	GetPaymentOrderPayerAccount(context.Context, string) (int64, error)
 }
 
 type CheckoutRecovery interface {
@@ -65,7 +66,7 @@ type Service struct {
 	orderLifecycle   *paymentorder.PaymentOrderLifecycle
 	credentialAccess func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, string, error)
 	orderAccess      func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, string, error)
-	publish          func(int64, paymentports.PaymentEventStatus)
+	hints            paymentports.PaymentHintPublisher
 	now              func() time.Time
 }
 
@@ -81,7 +82,7 @@ type Dependencies struct {
 	OrderLifecycle   *paymentorder.PaymentOrderLifecycle
 	CredentialAccess func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, string, error)
 	OrderAccess      func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, string, error)
-	Publish          func(int64, paymentports.PaymentEventStatus)
+	Hints            paymentports.PaymentHintPublisher
 	Now              func() time.Time
 }
 
@@ -89,7 +90,7 @@ func New(deps Dependencies) (*Service, error) {
 	if deps.Configuration == nil || deps.Convergence == nil || deps.CheckoutRecovery == nil || deps.CheckoutStore == nil || deps.CheckoutGateway == nil || deps.RefundGateway == nil || deps.DisputeGateway == nil || deps.OrderLifecycle == nil || deps.CredentialAccess == nil || deps.OrderAccess == nil || deps.Now == nil {
 		return nil, fmt.Errorf("reconciliation service requires complete dependencies")
 	}
-	return &Service{configuration: deps.Configuration, convergence: deps.Convergence, checkoutRecovery: deps.CheckoutRecovery, checkoutStore: deps.CheckoutStore, checkoutGateway: deps.CheckoutGateway, refundGateway: deps.RefundGateway, disputeGateway: deps.DisputeGateway, disputeExpiry: deps.DisputeExpiry, orderLifecycle: deps.OrderLifecycle, credentialAccess: deps.CredentialAccess, orderAccess: deps.OrderAccess, publish: deps.Publish, now: deps.Now}, nil
+	return &Service{configuration: deps.Configuration, convergence: deps.Convergence, checkoutRecovery: deps.CheckoutRecovery, checkoutStore: deps.CheckoutStore, checkoutGateway: deps.CheckoutGateway, refundGateway: deps.RefundGateway, disputeGateway: deps.DisputeGateway, disputeExpiry: deps.DisputeExpiry, orderLifecycle: deps.OrderLifecycle, credentialAccess: deps.CredentialAccess, orderAccess: deps.OrderAccess, hints: deps.Hints, now: deps.Now}, nil
 }
 
 func (s *Service) ListAnomalies(ctx context.Context, limit int32) ([]Anomaly, error) {

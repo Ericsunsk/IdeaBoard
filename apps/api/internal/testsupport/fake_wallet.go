@@ -17,6 +17,10 @@ func (FakeMissingWalletReader) GetWallet(context.Context, int64) (creditsdomain.
 	return creditsdomain.WalletDetails{}, creditsdomain.ErrWalletNotFound
 }
 
+func (FakeMissingWalletReader) ResolvePersonalAccount(context.Context, int64) (int64, error) {
+	return 0, creditsdomain.ErrWalletNotFound
+}
+
 func (FakeMissingWalletReader) ListLedger(context.Context, creditsdomain.ListLedgerInput) (creditsdomain.LedgerPage, error) {
 	return creditsdomain.LedgerPage{}, creditsdomain.ErrWalletNotFound
 }

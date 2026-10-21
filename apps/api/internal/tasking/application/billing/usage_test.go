@@ -2,12 +2,14 @@ package billing
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/billing"
 	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
+	creditsdomain "ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/workflow"
 
@@ -29,7 +31,11 @@ func TestTaskBillingUsageUsesUserCreatedIndexWithNormalPlanner(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := NewUsageStore(pool)
-	count, activeDays, err := store.GetTaskUsage(ctx, 81, location)
+	explainAccountID, err := resolveUsageTestAccount(t, ctx, pool, 81)
+	if err != nil {
+		t.Fatal(err)
+	}
+	count, activeDays, err := store.GetTaskUsage(ctx, explainAccountID, creditsdomain.UsageFilter{}, location)
 	if err != nil {
 		t.Fatalf("GetTaskUsage() error = %v", err)
 	}
@@ -42,7 +48,7 @@ EXPLAIN (ANALYZE, COSTS OFF, TIMING OFF, SUMMARY OFF)
 SELECT COUNT(*)::bigint,
        COUNT(DISTINCT (created_at AT TIME ZONE $2)::date)::bigint
 FROM task_billing_snapshots
-WHERE user_id = $1`, 81, location.String())
+WHERE billing_account_id = $1`, explainAccountID, location.String())
 	if err != nil {
 		t.Fatalf("explain task billing usage: %v", err)
 	}
@@ -59,7 +65,7 @@ WHERE user_id = $1`, 81, location.String())
 	if err := rows.Err(); err != nil {
 		t.Fatalf("read task billing plan: %v", err)
 	}
-	if !strings.Contains(plan.String(), "idx_task_billing_snapshots_user_created") {
+	if !strings.Contains(plan.String(), "idx_task_billing_snapshots_account_created") {
 		t.Fatalf("normal planner did not use Task Billing usage index:\n%s", plan.String())
 	}
 }
@@ -78,7 +84,11 @@ func TestTaskUsageAggregationUsesShanghaiDayBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	count, activeDays, err := NewUsageStore(pool).GetTaskUsage(ctx, userID, location)
+	usageAccountID, err := resolveUsageTestAccount(t, ctx, pool, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	count, activeDays, err := NewUsageStore(pool).GetTaskUsage(ctx, usageAccountID, creditsdomain.UsageFilter{}, location)
 	if err != nil {
 		t.Fatalf("GetTaskUsage() error = %v", err)
 	}
@@ -97,18 +107,23 @@ func seedTaskBillingUsageBoundarySnapshots(
 	sku billing.SKU,
 ) {
 	t.Helper()
+	boundaryAccountID, err := resolveUsageTestAccount(t, ctx, pool, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	beforeTaskID := prefix + "_before"
 	afterTaskID := prefix + "_after"
 	beforeBoundary := time.Date(2026, time.July, 12, 15, 59, 59, 0, time.UTC)
 	afterBoundary := time.Date(2026, time.July, 12, 16, 0, 0, 0, time.UTC)
 	if _, err := pool.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, service, sku, display_name, price_version_id, price_version,
+  task_id, user_id, billing_account_id, service, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, created_at
 )
 SELECT
   fixture.task_id,
   $1,
+  $8,
   $2,
   price.sku,
   price.display_name,
@@ -131,7 +146,7 @@ CROSS JOIN (
   VALUES ($4::varchar, $5::timestamptz), ($6::varchar, $7::timestamptz)
 ) AS fixture(task_id, created_at)`,
 		userID, request.Service, string(sku),
-		beforeTaskID, beforeBoundary, afterTaskID, afterBoundary,
+		beforeTaskID, beforeBoundary, afterTaskID, afterBoundary, boundaryAccountID,
 	); err != nil {
 		t.Fatalf("seed task snapshots around Shanghai day boundary: %v", err)
 	}
@@ -176,14 +191,19 @@ func seedTaskBillingUsageSnapshots(
 	sku billing.SKU,
 ) {
 	t.Helper()
+	seriesAccountID, err := resolveUsageTestAccount(t, ctx, pool, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := pool.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, service, sku, display_name, price_version_id, price_version,
+  task_id, user_id, billing_account_id, service, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, created_at
 )
 SELECT
   $3 || '_' || series,
   $1,
+  $6,
   $4,
   price.sku,
   price.display_name,
@@ -203,7 +223,7 @@ FROM (
   LIMIT 1
 ) AS price
 CROSS JOIN generate_series(1, $2::integer) AS series`,
-		userID, count, prefix, request.Service, string(sku)); err != nil {
+		userID, count, prefix, request.Service, string(sku), seriesAccountID); err != nil {
 		t.Fatalf("seed task billing snapshots: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `
@@ -212,4 +232,23 @@ SELECT $1 || '_' || series, 'free', clock_timestamp()
 FROM generate_series(1, $2::integer) AS series`, prefix, count); err != nil {
 		t.Fatalf("seed task billing settlements: %v", err)
 	}
+}
+
+func resolveUsageTestAccount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID int64) (int64, error) {
+	t.Helper()
+	storageUID := fmt.Sprintf("U%05d", userID)
+	if _, err := pool.Exec(ctx, `
+INSERT INTO users (id, display_name, storage_uid, role, status)
+VALUES ($1, 'usage-billing-user', $2, 'user', 1)
+ON CONFLICT (id) DO NOTHING`, userID, storageUID); err != nil {
+		return 0, err
+	}
+	var accountID int64
+	if err := pool.QueryRow(ctx, `SELECT ensure_personal_billing_account_for_user($1)`, userID).Scan(&accountID); err != nil {
+		return 0, err
+	}
+	if accountID <= 0 {
+		t.Fatalf("personal billing account %d not resolved", userID)
+	}
+	return accountID, nil
 }

@@ -44,12 +44,13 @@ describe('billingResource', () => {
       `/v1/workspaces/${WORKSPACE_ID}/billing-records?cursor=cursor-prev&page_size=20`,
       expect.objectContaining({ method: 'GET', signal: controller.signal }),
     )
-    expect(billingRecordsQueryKeys.list(WORKSPACE_ID)).toEqual([
-      'workspace',
-      'billing',
-      'records',
-      WORKSPACE_ID,
-    ])
+    const scope = {
+      workspaceId: WORKSPACE_ID,
+      billingAccountId: 'ba_1',
+      identity: 'user-1',
+      consumptionScope: 'account' as const,
+    }
+    expect(billingRecordsQueryKeys.list(scope)).toEqual(['workspace', 'billing', 'records', scope])
   })
 
   it('omits the next cursor when the page is exhausted', async () => {

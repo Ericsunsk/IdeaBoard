@@ -47,7 +47,7 @@ func newReconciliationService(
 
 func createReconciliationTaskFixture(t *testing.T, db *pgxpool.Pool, service *credits.Service, taskID, status, errorMessage string, userID, priceID, priceVersion int64) string {
 	t.Helper()
-	hold, err := service.Hold(t.Context(), ports.HoldCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("hold:"+taskID, taskID)})
+	hold, err := service.Hold(t.Context(), ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, db, userID), Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("hold:"+taskID, taskID)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,11 +112,12 @@ WHERE NOT EXISTS (SELECT 1 FROM billing_accounts WHERE workspace_id = $2)`, "ba_
 func insertReconciliationTaskBillingSnapshot(t testing.TB, db *pgxpool.Pool, taskID string, userID, priceID, priceVersion int64, holdTransactionID string) {
 	t.Helper()
 	result, err := db.Exec(t.Context(), `
-INSERT INTO task_billing_snapshots(task_id,user_id,service,sku,display_name,price_version_id,price_version,unit_credits,quantity,total_credits,quoted_at,hold_transaction_id)
-SELECT $1, $2, 'test', prices.sku, skus.display_name, prices.price_version_id, prices.version,
+INSERT INTO task_billing_snapshots(task_id,user_id,billing_account_id,service,sku,display_name,price_version_id,price_version,unit_credits,quantity,total_credits,quoted_at,hold_transaction_id)
+SELECT $1, $2, transactions.billing_account_id, 'test', prices.sku, skus.display_name, prices.price_version_id, prices.version,
        prices.unit_credits, 1, prices.unit_credits, clock_timestamp(), $5
 FROM billing_price_versions prices
 JOIN billing_skus skus ON skus.sku = prices.sku
+JOIN credit_transactions transactions ON transactions.transaction_id = $5
 WHERE prices.price_version_id = $3 AND prices.version = $4`, taskID, userID, priceID, priceVersion, holdTransactionID)
 	if err != nil {
 		t.Fatal(err)

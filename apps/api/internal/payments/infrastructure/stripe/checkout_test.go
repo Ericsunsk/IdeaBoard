@@ -52,7 +52,7 @@ func TestCheckoutAdapterCreatesCustomerWithoutEmailAndCreatesFixedCheckoutSessio
 
 	adapter := newCheckoutTestAdapter(server.URL)
 	customer, err := adapter.CreateCustomer(context.Background(), paymentports.CreateCheckoutCustomerInput{
-		APIKey: "sk_test_not_a_real_secret", UserID: 42, IdempotencyKey: "ideaboard-customer-42",
+		APIKey: "sk_test_not_a_real_secret", BillingAccountID: 42, IdempotencyKey: "ideaboard-customer-42",
 	})
 	if err != nil {
 		t.Fatalf("create customer: %v", err)
@@ -63,10 +63,10 @@ func TestCheckoutAdapterCreatesCustomerWithoutEmailAndCreatesFixedCheckoutSessio
 	if customerForm.Get("email") != "" {
 		t.Fatalf("first persistent customer must not receive email, got %q", customerForm.Get("email"))
 	}
-	if customerForm.Get("metadata[ideaboard_user_id]") != "42" {
-		t.Fatalf("customer user metadata = %q", customerForm.Get("metadata[ideaboard_user_id]"))
+	if customerForm.Get("metadata[ideaboard_billing_account_id]") != "42" {
+		t.Fatalf("customer account metadata = %q", customerForm.Get("metadata[ideaboard_billing_account_id]"))
 	}
-	if customerForm.Get("description") != "IdeaBoard user 42" {
+	if customerForm.Get("description") != "IdeaBoard billing account 42" {
 		t.Fatalf("customer description = %q", customerForm.Get("description"))
 	}
 

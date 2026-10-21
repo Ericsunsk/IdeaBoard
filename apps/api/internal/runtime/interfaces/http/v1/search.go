@@ -559,7 +559,7 @@ func (h *contractV1Handler) runVisionQuery(c *gin.Context, workspace *tenancy.Wo
 		}, nil
 	}
 	holdKey := "search-vision:" + operationID + ":hold"
-	holdID, holdErr := h.deps.Search.Settler.Hold(ctx, identityPrincipal.UserID(), amount, holdKey, "search vision query")
+	holdID, holdErr := h.deps.Search.Settler.Hold(ctx, workspace.PublicID, identityPrincipal.UserID(), amount, holdKey, "search vision query")
 	if holdErr != nil {
 		if errors.Is(holdErr, errV1BillingRestricted) {
 			return nil, errV1BillingRestricted
@@ -570,7 +570,7 @@ func (h *contractV1Handler) runVisionQuery(c *gin.Context, workspace *tenancy.Wo
 		WorkspacePublicID: workspace.PublicID, UserText: input.UserText, References: references,
 	})
 	if extractErr != nil {
-		_ = h.deps.Search.Settler.Release(ctx, identityPrincipal.UserID(), holdID, amount, "search-vision:"+operationID+":release")
+		_ = h.deps.Search.Settler.Release(ctx, workspace.PublicID, identityPrincipal.UserID(), holdID, amount, "search-vision:"+operationID+":release")
 		if errors.Is(extractErr, errV1VisionNotConfigured) {
 			return nil, errV1VisionNotConfigured
 		}
@@ -578,11 +578,11 @@ func (h *contractV1Handler) runVisionQuery(c *gin.Context, workspace *tenancy.Wo
 	}
 	normalized, normalizeErr := searchcatalog.NormalizeV1SearchQuery(extracted)
 	if normalizeErr != nil {
-		_ = h.deps.Search.Settler.Release(ctx, identityPrincipal.UserID(), holdID, amount, "search-vision:"+operationID+":release")
+		_ = h.deps.Search.Settler.Release(ctx, workspace.PublicID, identityPrincipal.UserID(), holdID, amount, "search-vision:"+operationID+":release")
 		return nil, errV1VisionProviderError
 	}
-	if captureErr := h.deps.Search.Settler.Capture(ctx, identityPrincipal.UserID(), holdID, amount, "search-vision:"+operationID+":capture"); captureErr != nil {
-		_ = h.deps.Search.Settler.Release(ctx, identityPrincipal.UserID(), holdID, amount, "search-vision:"+operationID+":release")
+	if captureErr := h.deps.Search.Settler.Capture(ctx, workspace.PublicID, identityPrincipal.UserID(), holdID, amount, "search-vision:"+operationID+":capture"); captureErr != nil {
+		_ = h.deps.Search.Settler.Release(ctx, workspace.PublicID, identityPrincipal.UserID(), holdID, amount, "search-vision:"+operationID+":release")
 		return nil, captureErr
 	}
 	return v1VisionQueryDTO{

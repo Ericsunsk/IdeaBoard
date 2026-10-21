@@ -2,7 +2,6 @@ package tests
 
 import (
 	"ideaboard/api/internal/credits/domain"
-	"ideaboard/api/internal/credits/ports"
 	payments "ideaboard/api/internal/payments"
 
 	"context"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/credits"
+	creditsports "ideaboard/api/internal/credits/ports"
 	paymentcheckout "ideaboard/api/internal/payments/application/checkout"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
@@ -42,7 +42,7 @@ func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *te
 	service := newConfiguredPurchaseServiceWithClock(t, pool, configurationGateway, checkoutGateway, credits.NewService(pool), func() time.Time { return now })
 	requestedAt := now
 	command := paymentsdomain.CreateCheckoutCommand{
-		UserID: 42, ClientIdempotencyKey: "purchase-checkout-request-1", IdeaQuantity: 501,
+		BillingAccountID: paymentBillingAccount(t, pool, 42), UserID: 42, ClientIdempotencyKey: "purchase-checkout-request-1", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards",
 	}
@@ -94,7 +94,7 @@ func TestCreateCheckoutCreatesCustomerPerStripeMode(t *testing.T) {
 	service := newConfiguredPurchaseService(t, pool, configurationGateway, checkoutGateway, credits.NewService(pool))
 
 	first := paymentsdomain.CreateCheckoutCommand{
-		UserID: 42, ClientIdempotencyKey: "purchase-customer-test-generation", IdeaQuantity: 501,
+		BillingAccountID: paymentBillingAccount(t, pool, 42), UserID: 42, ClientIdempotencyKey: "purchase-customer-test-generation", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards",
 	}
@@ -134,7 +134,7 @@ func TestCreateCheckoutReusesCustomerAfterKeyRotationWithinStripeMode(t *testing
 	service := newConfiguredPurchaseService(t, pool, configurationGateway, checkoutGateway, credits.NewService(pool))
 
 	first := paymentsdomain.CreateCheckoutCommand{
-		UserID: 42, ClientIdempotencyKey: "purchase-customer-mode-key-a", IdeaQuantity: 501,
+		BillingAccountID: paymentBillingAccount(t, pool, 42), UserID: 42, ClientIdempotencyKey: "purchase-customer-mode-key-a", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards",
 	}
@@ -167,7 +167,7 @@ func TestCreateCheckoutReplaysImmutableSecondPrecisionExpiryAfterProviderTimeout
 	now := time.Now().UTC().Truncate(time.Second).Add(987654321)
 	service := newConfiguredPurchaseServiceWithClock(t, pool, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool), func() time.Time { return now })
 	command := paymentsdomain.CreateCheckoutCommand{
-		UserID: 42, ClientIdempotencyKey: "purchase-checkout-timeout-recovery", IdeaQuantity: 501,
+		BillingAccountID: paymentBillingAccount(t, pool, 42), UserID: 42, ClientIdempotencyKey: "purchase-checkout-timeout-recovery", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards",
 	}
@@ -231,7 +231,7 @@ func TestCreateCheckoutConvergesPaidSessionRecoveredFromCreatingOrder(t *testing
 	}
 	service := newConfiguredPurchaseService(t, pool, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool))
 	command := paymentsdomain.CreateCheckoutCommand{
-		UserID: 42, ClientIdempotencyKey: "purchase-checkout-recovered-paid", IdeaQuantity: 501,
+		BillingAccountID: paymentBillingAccount(t, pool, 42), UserID: 42, ClientIdempotencyKey: "purchase-checkout-recovered-paid", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards",
 	}
@@ -242,8 +242,8 @@ func TestCreateCheckoutConvergesPaidSessionRecoveredFromCreatingOrder(t *testing
 	if _, err := service.CreateCheckout(t.Context(), command); !errors.Is(err, paymentcontracts.ErrPaymentAlreadyCompleted) {
 		t.Fatalf("recovered paid Checkout error = %v, want ErrPaymentAlreadyCompleted", err)
 	}
-	assertPurchaseOrderStatusByKey(t, pool, command.UserID, command.ClientIdempotencyKey, paymentsdomain.PaymentOrderCredited)
-	wallet, err := credits.NewService(pool).GetWallet(t.Context(), command.UserID)
+	assertPurchaseOrderStatusByKey(t, pool, command.BillingAccountID, command.ClientIdempotencyKey, paymentsdomain.PaymentOrderCredited)
+	wallet, err := paymentWallet(t, credits.NewService(pool), command.UserID)
 	if err != nil || wallet.Available != 502 {
 		t.Fatalf("Wallet after recovered paid Checkout = %+v, %v", wallet, err)
 	}
@@ -273,7 +273,7 @@ func TestCreateCheckoutExpiresRecoveredCreatingSessionBeforeNewAttempt(t *testin
 	}
 	service := newConfiguredPurchaseService(t, pool, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool))
 	command := paymentsdomain.CreateCheckoutCommand{
-		UserID: 42, ClientIdempotencyKey: "purchase-checkout-recovered-expired", IdeaQuantity: 501,
+		BillingAccountID: paymentBillingAccount(t, pool, 42), UserID: 42, ClientIdempotencyKey: "purchase-checkout-recovered-expired", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards",
 	}
@@ -284,7 +284,7 @@ func TestCreateCheckoutExpiresRecoveredCreatingSessionBeforeNewAttempt(t *testin
 	if _, err := service.CreateCheckout(t.Context(), command); !errors.Is(err, paymentcontracts.ErrCheckoutSessionExpired) {
 		t.Fatalf("recovered expired Checkout error = %v, want ErrCheckoutSessionExpired", err)
 	}
-	assertPurchaseOrderStatusByKey(t, pool, command.UserID, command.ClientIdempotencyKey, paymentsdomain.PaymentOrderExpired)
+	assertPurchaseOrderStatusByKey(t, pool, command.BillingAccountID, command.ClientIdempotencyKey, paymentsdomain.PaymentOrderExpired)
 
 	retry := command
 	retry.ClientIdempotencyKey = "purchase-checkout-after-recovered-expired"
@@ -309,7 +309,7 @@ func TestCreateCheckoutReleasesOrderAfterDefinitiveProviderRejection(t *testing.
 		credits.NewService(pool),
 	)
 	command := paymentsdomain.CreateCheckoutCommand{
-		UserID: 42, ClientIdempotencyKey: "purchase-checkout-rejected", IdeaQuantity: 501,
+		BillingAccountID: paymentBillingAccount(t, pool, 42), UserID: 42, ClientIdempotencyKey: "purchase-checkout-rejected", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards",
 	}
@@ -351,7 +351,7 @@ func TestActiveOrderQueryCreditsOnlyAValidatedPaidStripeSession(t *testing.T) {
 	checkoutGateway := &fakeCheckoutGateway{}
 	service := newConfiguredPurchaseService(t, pool, configurationGateway, checkoutGateway, creditService)
 	checkout, err := service.CreateCheckout(t.Context(), paymentsdomain.CreateCheckoutCommand{
-		UserID: 42, ClientIdempotencyKey: "purchase-query-request-1", IdeaQuantity: 501,
+		BillingAccountID: paymentBillingAccount(t, pool, 42), UserID: 42, ClientIdempotencyKey: "purchase-query-request-1", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards",
 	})
@@ -359,19 +359,19 @@ func TestActiveOrderQueryCreditsOnlyAValidatedPaidStripeSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkoutGateway.paid = true
-	status, err := service.GetPaymentOrderReturnStatus(t.Context(), 42, checkout.PublicToken)
+	status, err := service.GetPaymentOrderReturnStatus(t.Context(), paymentBillingAccount(t, pool, 42), checkout.PublicToken)
 	if err != nil {
 		t.Fatalf("GetPaymentOrderReturnStatus() error = %v", err)
 	}
 	if status.Status != "credited" || status.IdeaQuantity != 501 {
 		t.Fatalf("return status = %+v", status)
 	}
-	wallet, err := creditService.GetWallet(t.Context(), 42)
+	wallet, err := paymentWallet(t, creditService, 42)
 	if err != nil || wallet.Available != 502 {
 		t.Fatalf("Wallet = %+v, %v", wallet, err)
 	}
 
-	if _, err := service.GetPaymentOrderReturnStatus(t.Context(), 99, checkout.PublicToken); !errors.Is(err, paymentcontracts.ErrPaymentOrderNotFound) {
+	if _, err := service.GetPaymentOrderReturnStatus(t.Context(), paymentBillingAccount(t, pool, 99), checkout.PublicToken); !errors.Is(err, paymentcontracts.ErrPaymentOrderNotFound) {
 		t.Fatalf("cross-user token error = %v", err)
 	}
 }
@@ -398,7 +398,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 		t.Fatal(err)
 	}
 	checkout, err := service.CreateCheckout(t.Context(), paymentsdomain.CreateCheckoutCommand{
-		UserID: 42, ClientIdempotencyKey: "signed-webhook-checkout", IdeaQuantity: 501,
+		BillingAccountID: paymentBillingAccount(t, pool, 42), UserID: 42, ClientIdempotencyKey: "signed-webhook-checkout", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards",
 	})
@@ -422,7 +422,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 	default:
 		t.Fatal("processing user event was not published")
 	}
-	wallet, err := creditService.GetWallet(t.Context(), 42)
+	wallet, err := paymentWallet(t, creditService, 42)
 	if err != nil || wallet.Available != 1 {
 		t.Fatalf("unpaid completed webhook changed Wallet = %+v, %v", wallet, err)
 	}
@@ -443,7 +443,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 	default:
 		t.Fatal("credited user event was not published")
 	}
-	wallet, err = creditService.GetWallet(t.Context(), 42)
+	wallet, err = paymentWallet(t, creditService, 42)
 	if err != nil || wallet.Available != 502 {
 		t.Fatalf("Wallet = %+v, %v", wallet, err)
 	}
@@ -470,7 +470,7 @@ func TestStripeKeyChangePreservesUnsettledOrderCredential(t *testing.T) {
 	checkoutGateway := &fakeCheckoutGateway{}
 	service := newConfiguredPurchaseService(t, pool, configurationGateway, checkoutGateway, creditService)
 	if _, err := service.CreateCheckout(t.Context(), paymentsdomain.CreateCheckoutCommand{
-		UserID: 42, ClientIdempotencyKey: "account-switch-open-order", IdeaQuantity: 501,
+		BillingAccountID: paymentBillingAccount(t, pool, 42), UserID: 42, ClientIdempotencyKey: "account-switch-open-order", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards",
 	}); err != nil {
@@ -489,7 +489,7 @@ func TestStripeKeyChangePreservesUnsettledOrderCredential(t *testing.T) {
 	if err != nil || stored.AccountID != "acct_replacement" {
 		t.Fatalf("Stripe configuration did not rotate: %+v, %v", stored, err)
 	}
-	orders, err := newTestPaymentStores(pool).ListActivePaymentOrders(t.Context(), 42)
+	orders, err := newTestPaymentStores(pool).ListAccountActivePaymentOrders(t.Context(), paymentBillingAccount(t, pool, 42))
 	if err != nil || len(orders) != 1 {
 		t.Fatalf("active orders = %+v, %v", orders, err)
 	}
@@ -517,7 +517,7 @@ func TestStripeKeyChangeDoesNotWaitForProviderIO(t *testing.T) {
 	checkoutDone := make(chan error, 1)
 	go func() {
 		_, err := service.CreateCheckout(t.Context(), paymentsdomain.CreateCheckoutCommand{
-			UserID: 42, ClientIdempotencyKey: "account-switch-race-checkout", IdeaQuantity: 501,
+			BillingAccountID: paymentBillingAccount(t, pool, 42), UserID: 42, ClientIdempotencyKey: "account-switch-race-checkout", IdeaQuantity: 501,
 			TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 			ReturnBaseURL: "https://app.example.com/user/boards",
 		})
@@ -607,10 +607,10 @@ func (f *fakeCheckoutGateway) CreateCheckoutSession(_ context.Context, input pay
 	return f.createdSession, nil
 }
 
-func assertPurchaseOrderStatusByKey(t *testing.T, db *pgxpool.Pool, userID int64, idempotencyKey string, want paymentsdomain.PaymentOrderStatus) {
+func assertPurchaseOrderStatusByKey(t *testing.T, db *pgxpool.Pool, billingAccountID int64, idempotencyKey string, want paymentsdomain.PaymentOrderStatus) {
 	t.Helper()
 	var status paymentsdomain.PaymentOrderStatus
-	if err := db.QueryRow(t.Context(), `SELECT status FROM payment_orders WHERE user_id = $1 AND client_idempotency_key = $2`, userID, idempotencyKey).Scan(&status); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT status FROM payment_orders WHERE billing_account_id = $1 AND client_idempotency_key = $2`, billingAccountID, idempotencyKey).Scan(&status); err != nil {
 		t.Fatal(err)
 	}
 	if status != want {
@@ -673,7 +673,7 @@ func newConfiguredPurchaseService(
 	db *pgxpool.Pool,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
-	wallets ports.WalletReader,
+	wallets creditsports.WalletReader,
 ) *payments.Service {
 	return newConfiguredPurchaseServiceWithClock(t, db, configurationGateway, checkoutGateway, wallets, func() time.Time {
 		return time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
@@ -685,7 +685,7 @@ func newConfiguredPurchaseServiceWithClock(
 	db *pgxpool.Pool,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
-	wallets ports.WalletReader,
+	wallets creditsports.WalletReader,
 	now func() time.Time,
 ) *payments.Service {
 	t.Helper()
@@ -707,8 +707,8 @@ func seedRechargeableWallet(t *testing.T, pool *pgxpool.Pool, userID int64) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = credits.NewService(pool).Grant(t.Context(), ports.GrantCommand{
-		UserID: userID, Amount: amount,
+	_, err = credits.NewService(pool).Grant(t.Context(), creditsports.GrantCommand{
+		BillingAccountID: paymentAccount(t, credits.NewService(pool), userID), Amount: amount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "payment-wallet-seed-" + strconv.FormatInt(userID, 10),
 			Actor:          domain.Actor{Type: domain.ActorAdmin, ID: "42"},

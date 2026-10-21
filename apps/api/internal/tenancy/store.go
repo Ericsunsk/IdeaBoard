@@ -16,7 +16,21 @@ const (
 	RoleMember = "member"
 )
 
+// Billing Account financial roles (#915). Financial management (recharge,
+// bills, member quotas, workspace budgets) is separate from Workspace
+// content membership. Owner and Admin both manage recharge/bills/quotas;
+// only Owner transfers ownership. Financial management never grants Board
+// content access.
+const (
+	BillingRoleOwner = "owner"
+	BillingRoleAdmin = "admin"
+)
+
 const MaxWorkspaceMembers = 5
+
+// MaxBillingAccountMembers bounds explicit financial managers per account.
+// One User may manage many independent accounts; this cap is per account.
+const MaxBillingAccountMembers = 10
 
 var (
 	// ErrNotFound reports an invisible or missing resource. Handlers render
@@ -58,6 +72,26 @@ var (
 	// ErrBillingWorkspaceInvalid reports billing account provisioning
 	// with an invalid workspace.
 	ErrBillingWorkspaceInvalid = errors.New("tenancy: billing account workspace is invalid")
+	// ErrBillingNotFound reports a missing billing account. Handlers render
+	// it as 404 billing_account_not_found after the workspace visibility
+	// gate (hidden workspaces still converge to workspace_not_found first,
+	// per Baseline 4 anti-enumeration).
+	ErrBillingNotFound = errors.New("tenancy: billing account not found")
+	// ErrBillingForbidden reports a visible-but-forbidden financial action
+	// (403 billing_account_forbidden): the caller holds Workspace standing
+	// but no Billing Account Owner/Admin grant.
+	ErrBillingForbidden = errors.New("tenancy: billing account forbidden")
+	// ErrBillingConflict reports an ambiguous resolution or a conflicting
+	// ownership association (409 billing_account_conflict). Callers fail
+	// closed instead of silently picking another wallet.
+	ErrBillingConflict = errors.New("tenancy: billing account conflict")
+	// ErrBillingAmbiguous reports multiple candidate accounts with no
+	// explicit link (409 billing_account_conflict). Same wire mapping as
+	// ErrBillingConflict; kept distinct for fail-closed diagnosis.
+	ErrBillingAmbiguous = errors.New("tenancy: billing account ambiguous")
+	// ErrBillingLastOwner blocks removing or demoting the last billing
+	// owner (403 with billing_account_forbidden).
+	ErrBillingLastOwner = errors.New("tenancy: last billing owner cannot be removed or demoted")
 	// ErrNotUserPublicID reports an identifier without the usr_ prefix.
 	ErrNotUserPublicID = errors.New("tenancy: not a user public id")
 	// ErrMalformedUserPublicID reports a usr_ identifier with bad hex.
@@ -279,5 +313,106 @@ func CheckMemberMutation(actorRole string, actorUserID, targetUserID int64, targ
 		return nil
 	default:
 		return ErrForbidden
+	}
+}
+
+// BillingAccountMember is one billing_account_members row.
+type BillingAccountMember struct {
+	BillingAccountID int64
+	UserID           int64
+	Role             string
+	CreatedAt        time.Time
+}
+
+// IsValidBillingRole reports whether role is a known billing manager role.
+func IsValidBillingRole(role string) bool {
+	switch strings.TrimSpace(role) {
+	case BillingRoleOwner, BillingRoleAdmin:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsBillingManager reports whether a billing role may manage recharge,
+// bills, member quotas, and workspace budgets (Owner/Admin both).
+func IsBillingManager(role string) bool {
+	return IsValidBillingRole(strings.TrimSpace(role))
+}
+
+// IsBillingOwner reports whether a billing role may transfer ownership.
+func IsBillingOwner(role string) bool {
+	return strings.TrimSpace(role) == BillingRoleOwner
+}
+
+// CheckBillingMemberAdd enforces server-side rules for granting a billing
+// manager: actor must be owner|admin, and only owners may grant owner.
+// Workspace Owner/Admin standing alone never grants this (fail closed).
+func CheckBillingMemberAdd(actorBillingRole, newRole string) error {
+	switch strings.TrimSpace(actorBillingRole) {
+	case BillingRoleOwner:
+		return nil
+	case BillingRoleAdmin:
+		if strings.TrimSpace(newRole) == BillingRoleOwner {
+			return ErrBillingForbidden
+		}
+		return nil
+	default:
+		return ErrBillingForbidden
+	}
+}
+
+// CheckBillingMemberMutation enforces billing role transitions and the
+// handover invariant: the last owner cannot be removed or demoted, only
+// owners transfer ownership, and management is never lifetime-bound to the
+// provisioning identity (any owner may hand over to another manager).
+func CheckBillingMemberMutation(actorRole string, actorUserID, targetUserID int64, targetCurrentRole, newRole string, ownerCount int, isRemove bool) error {
+	actorRole = strings.TrimSpace(actorRole)
+	targetCurrentRole = strings.TrimSpace(targetCurrentRole)
+	newRole = strings.TrimSpace(newRole)
+	isSelf := actorUserID == targetUserID
+
+	if isRemove {
+		if targetCurrentRole == BillingRoleOwner && ownerCount <= 1 {
+			return ErrBillingLastOwner
+		}
+		if isSelf {
+			return nil
+		}
+		switch actorRole {
+		case BillingRoleOwner:
+			return nil
+		case BillingRoleAdmin:
+			if targetCurrentRole == BillingRoleOwner {
+				return ErrBillingForbidden
+			}
+			return nil
+		default:
+			return ErrBillingForbidden
+		}
+	}
+
+	if !IsValidBillingRole(newRole) {
+		return ErrBillingForbidden
+	}
+	if newRole == targetCurrentRole {
+		return nil
+	}
+	if targetCurrentRole == BillingRoleOwner && ownerCount <= 1 {
+		return ErrBillingLastOwner
+	}
+	if newRole == BillingRoleOwner && actorRole != BillingRoleOwner {
+		return ErrBillingForbidden
+	}
+	switch actorRole {
+	case BillingRoleOwner:
+		return nil
+	case BillingRoleAdmin:
+		if targetCurrentRole == BillingRoleOwner || newRole == BillingRoleOwner {
+			return ErrBillingForbidden
+		}
+		return nil
+	default:
+		return ErrBillingForbidden
 	}
 }

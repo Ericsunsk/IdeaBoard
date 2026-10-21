@@ -50,13 +50,18 @@ type Record struct {
 	Kind                  Kind      `json:"kind"`
 	Title                 string    `json:"title"`
 	CreditDelta           int64     `json:"credit_delta"`
-	AvailableCreditsAfter int64     `json:"available_credits_after"`
+	AvailableCreditsAfter *int64    `json:"available_credits_after,omitempty"`
 }
 
+// ListInput carries the server-authorized consumption scope. Zero WorkspaceID
+// and ActorUserID permit full account billing; scoped reads include Captures only.
+// Caller authorization must choose these fields, never client query parameters.
 type ListInput struct {
-	UserID         int64
-	BeforeSequence int64
-	Limit          int
+	BillingAccountID int64
+	WorkspaceID      int64
+	ActorUserID      int64
+	BeforeSequence   int64
+	Limit            int
 }
 
 type Page struct {

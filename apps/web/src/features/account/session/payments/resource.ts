@@ -73,6 +73,7 @@ export type PaymentLegalDocument = {
 
 /** @externalContract Workspace purchase options response. */
 export type PaymentPurchaseOptions = {
+  billing_account_id: string
   purchases_available: boolean
   unavailable_reason?: string
   restriction_type?: string
@@ -99,6 +100,7 @@ type PendingPaymentOrderStatus =
 
 export type PendingPaymentOrder = {
   public_token: string
+  billing_account_id: string
   idea_quantity: number
   checkout_url?: string
   status: PendingPaymentOrderStatus
@@ -112,6 +114,7 @@ export type PendingPaymentOrderList = {
 
 export type RechargeHistoryItem = {
   occurred_at: string
+  billing_account_id: string
   idea_quantity: number
   paid_amount_minor?: number
   paid_currency?: string
@@ -129,6 +132,7 @@ export type PaymentOrderStatus = PaymentOrderReturnStatusStatus
 
 export type PaymentEvent = {
   public_token?: string
+  billing_account_id?: string
   status: PaymentOrderStatus | 'refund_updated' | 'dispute_updated'
 }
 
@@ -285,6 +289,7 @@ function requireCheckoutSession(session: WorkspaceCheckoutSession): PaymentCheck
 
 function toPurchaseOptions(options: WorkspacePurchaseOptions): PaymentPurchaseOptions {
   const result: PaymentPurchaseOptions = {
+    billing_account_id: options.billing_account_id,
     purchases_available: options.purchases_available,
     quick_idea_quantities: [...options.quick_idea_quantities],
     min_idea_quantity: options.min_idea_quantity,
@@ -304,6 +309,7 @@ function toPurchaseOptions(options: WorkspacePurchaseOptions): PaymentPurchaseOp
 function toPendingOrder(order: WorkspacePendingOrder): PendingPaymentOrder {
   const result: PendingPaymentOrder = {
     public_token: order.public_token,
+    billing_account_id: order.billing_account_id,
     idea_quantity: order.idea_quantity,
     status: order.status,
     expires_at: order.expires_at,
@@ -316,6 +322,7 @@ function toPendingOrder(order: WorkspacePendingOrder): PendingPaymentOrder {
 function toRechargeItem(item: WorkspaceRechargeHistoryItem): RechargeHistoryItem {
   const result: RechargeHistoryItem = {
     occurred_at: item.occurred_at,
+    billing_account_id: item.billing_account_id,
     idea_quantity: item.idea_quantity,
     status: item.status,
   }
@@ -376,7 +383,11 @@ export function parsePaymentEvent(raw: string): PaymentEvent | null {
   try {
     const value: unknown = JSON.parse(raw)
     if (!value || typeof value !== 'object') return null
-    const candidate = value as { public_token?: unknown; status?: unknown }
+    const candidate = value as {
+      public_token?: unknown
+      billing_account_id?: unknown
+      status?: unknown
+    }
     if (
       candidate.status !== 'processing' &&
       candidate.status !== 'credited' &&
@@ -389,9 +400,16 @@ export function parsePaymentEvent(raw: string): PaymentEvent | null {
     if (candidate.public_token !== undefined && typeof candidate.public_token !== 'string') {
       return null
     }
+    if (
+      candidate.billing_account_id !== undefined &&
+      typeof candidate.billing_account_id !== 'string'
+    ) {
+      return null
+    }
     return {
       status: candidate.status,
       ...(candidate.public_token ? { public_token: candidate.public_token } : {}),
+      ...(candidate.billing_account_id ? { billing_account_id: candidate.billing_account_id } : {}),
     }
   } catch {
     return null

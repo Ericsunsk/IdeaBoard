@@ -56,18 +56,18 @@ RETURNING id`, scheduledFor).Scan(&activeRunID); err != nil {
 	}
 
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   94,
-		Amount:   testhelpers.MustCreditAmount(t, 10),
-		Metadata: testhelpers.TestMetadata("health:grant:94", "health-grant-94"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94),
+		Amount:           testhelpers.MustCreditAmount(t, 10),
+		Metadata:         testhelpers.TestMetadata("health:grant:94", "health-grant-94"),
 	}); err != nil {
 		t.Fatal(err)
 	}
 	var warningFindingID int64
 	if err := pool.QueryRow(ctx, `
 INSERT INTO credit_reconciliation_findings (
-  fingerprint, finding_type, severity, risk, wallet_user_id, subject_type, subject_id,
+  fingerprint, finding_type, severity, risk, wallet_user_id, billing_account_id, subject_type, subject_id,
   first_seen_run_id, last_seen_run_id
-) VALUES ($1, 'stale_hold', 'warning', 'low', 94, 'credit_hold', 'hold-94', $2, $2)
+) VALUES ($1, 'stale_hold', 'warning', 'low', 94, (SELECT ensure_personal_billing_account_for_user(94)), 'credit_hold', 'hold-94', $2, $2)
 RETURNING id`, strings.Repeat("a", 64), runID).Scan(&warningFindingID); err != nil {
 		t.Fatal(err)
 	}
@@ -78,30 +78,30 @@ RETURNING id`, strings.Repeat("a", 64), runID).Scan(&warningFindingID); err != n
 	}
 
 	if _, err := service.RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID:        94,
-		Type:          "ledger_integrity",
-		Source:        "reconciliation",
-		RelatedObject: domain.BusinessReference{Type: "finding", ID: strconv.FormatInt(warningFindingID, 10)},
-		Reason:        "health integration exact restriction",
-		Actor:         domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94),
+		Type:             "ledger_integrity",
+		Source:           "reconciliation",
+		RelatedObject:    domain.BusinessReference{Type: "finding", ID: strconv.FormatInt(warningFindingID, 10)},
+		Reason:           "health integration exact restriction",
+		Actor:            domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   95,
-		Amount:   testhelpers.MustCreditAmount(t, 10),
-		Metadata: testhelpers.TestMetadata("health:grant:95", "health-grant-95"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 95),
+		Amount:           testhelpers.MustCreditAmount(t, 10),
+		Metadata:         testhelpers.TestMetadata("health:grant:95", "health-grant-95"),
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID:        95,
-		Type:          "manual_review",
-		Source:        "admin",
-		RelatedObject: domain.BusinessReference{Type: "case", ID: "unrelated"},
-		Reason:        "unrelated restriction must not affect ledger health count",
-		Actor:         domain.Actor{Type: domain.ActorAdmin, ID: "1"},
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 95),
+		Type:             "manual_review",
+		Source:           "admin",
+		RelatedObject:    domain.BusinessReference{Type: "case", ID: "unrelated"},
+		Reason:           "unrelated restriction must not affect ledger health count",
+		Actor:            domain.Actor{Type: domain.ActorAdmin, ID: "1"},
 	}); err != nil {
 		t.Fatal(err)
 	}

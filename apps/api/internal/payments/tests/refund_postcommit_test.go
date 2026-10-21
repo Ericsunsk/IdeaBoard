@@ -8,6 +8,7 @@ import (
 	"ideaboard/api/internal/db/dbutil"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentcredentials "ideaboard/api/internal/payments/application/credentials"
+	"ideaboard/api/internal/payments/application/hints"
 	paymentrefund "ideaboard/api/internal/payments/application/refund"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
@@ -45,14 +46,14 @@ func TestPaymentRefundPublishDefersToPostCommit(t *testing.T) {
 		gateway := &refundGatewayFake{
 			createResponse: paymentports.StripeRefund{ID: stripeID, Status: "succeeded"},
 		}
-		svc, err := paymentrefund.NewService(repo, gateway, events, func() time.Time { return now }, resolver)
+		svc, err := paymentrefund.NewService(repo, gateway, hints.NewPublisher(events, repo), func() time.Time { return now }, resolver)
 		if err != nil {
 			t.Fatalf("refund service: %v", err)
 		}
 		return svc
 	}
 
-	// Without a registry the legacy synchronous behavior stays:
+	// Without an ambient transaction, committed phases publish synchronously:
 	// reservation + settlement publish immediately.
 	syncEvents := &countingRefundPublisher{}
 	syncSvc := newService(syncEvents, "re_postcommit_sync")
@@ -69,7 +70,12 @@ func TestPaymentRefundPublishDefersToPostCommit(t *testing.T) {
 
 	deferredEvents := &countingRefundPublisher{}
 	deferredSvc := newService(deferredEvents, "re_postcommit_deferred")
-	carrier := dbutil.ContextWithAmbientPostCommit(t.Context())
+	guardTx, err := db.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer guardTx.Rollback(t.Context())
+	carrier := dbutil.ContextWithAmbientPostCommit(dbutil.ContextWithAmbientTx(t.Context(), guardTx))
 	deferredRefund, err := deferredSvc.CreatePaymentRefund(carrier, paymentcontracts.CreatePaymentRefundCommand{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 50,
 		IdempotencyKey: "refund-postcommit-deferred",
@@ -85,13 +91,20 @@ func TestPaymentRefundPublishDefersToPostCommit(t *testing.T) {
 	if got := deferredEvents.total(); got != 0 {
 		t.Fatalf("deferred publishes before commit = %d, want 0 (nothing may publish before guard commit)", got)
 	}
+	// A new manager joins after staging but before the guard commits.
+	// Both phases must resolve the current audience outside the closed tx.
+	ensurePaymentsTestUser(t, db, 43)
+	grantBillingAccountManager(t, db, order.BillingAccountID, 43, "admin")
+	if err := guardTx.Commit(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	dbutil.RunAmbientPostCommit(carrier)
-	if got := deferredEvents.total(); got != 2 {
-		t.Fatalf("deferred publishes after commit = %d, want 2", got)
+	if got := deferredEvents.total(); got != 4 {
+		t.Fatalf("deferred publishes after commit = %d, want 4 (two current managers per phase)", got)
 	}
 	// Running hooks twice never double-publishes.
 	dbutil.RunAmbientPostCommit(carrier)
-	if got := deferredEvents.total(); got != 2 {
-		t.Fatalf("publishes after second run = %d, want still 2 (exactly-once)", got)
+	if got := deferredEvents.total(); got != 4 {
+		t.Fatalf("publishes after second run = %d, want still 4 (exactly-once)", got)
 	}
 }

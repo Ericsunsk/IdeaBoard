@@ -75,6 +75,7 @@ export const CREDIT_HEALTH_MESSAGES = {
   queueDrawerFirstSeen: '首次发现',
   queueDrawerResolvedAt: '解决时间',
   queueDrawerWallet: '关联 Wallet',
+  queueDrawerBillingAccount: '资金账户',
   queueDrawerDetails: '完整 Details',
   queueDrawerNoDetails: '无附加 details',
 } as const

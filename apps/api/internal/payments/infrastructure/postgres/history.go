@@ -17,7 +17,7 @@ import (
 
 func (r *Repository) ListPaymentRechargeHistory(
 	ctx context.Context,
-	userID int64,
+	billingAccountID int64,
 	cutoff time.Time,
 	cursor *paymentreadmodel.RechargeHistoryCursor,
 	limit int,
@@ -25,7 +25,7 @@ func (r *Repository) ListPaymentRechargeHistory(
 	if r == nil || r.db == nil {
 		return nil, fmt.Errorf("payments repository: database unavailable")
 	}
-	params := dbsqlc.ListPaymentRechargeHistoryParams{UserID: userID, CutoffAt: dbutil.TimestamptzFromTime(cutoff), PageLimit: int32(limit)}
+	params := dbsqlc.ListAccountRechargeHistoryParams{BillingAccountID: billingAccountID, CutoffAt: dbutil.TimestamptzFromTime(cutoff), PageLimit: int32(limit)}
 	if cursor != nil {
 		occurredAt, err := time.Parse(time.RFC3339Nano, cursor.OccurredAt)
 		if err != nil {
@@ -39,7 +39,7 @@ func (r *Repository) ListPaymentRechargeHistory(
 		params.CursorPaidAt = pgtype.Timestamptz{Time: occurredAt, Valid: true}
 		params.CursorID = pgtype.UUID{Bytes: id, Valid: true}
 	}
-	rows, err := r.DBWithContext(ctx).Queries().ListPaymentRechargeHistory(ctx, params)
+	rows, err := r.DBWithContext(ctx).Queries().ListAccountRechargeHistory(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("list payment recharge history: %w", err)
 	}
@@ -50,7 +50,7 @@ func (r *Repository) ListPaymentRechargeHistory(
 	return records, nil
 }
 
-func decodeRechargeHistoryRecord(row dbsqlc.ListPaymentRechargeHistoryRow) paymentreadmodel.RechargeHistoryRecord {
+func decodeRechargeHistoryRecord(row dbsqlc.ListAccountRechargeHistoryRow) paymentreadmodel.RechargeHistoryRecord {
 	return paymentreadmodel.RechargeHistoryRecord{
 		OrderID:              uuid.UUID(row.ID.Bytes),
 		OccurredAt:           dbutil.TimeValue(row.OccurredAt),

@@ -8,6 +8,8 @@ import UsagePane from './UsagePane.vue'
 const usageState = await vi.hoisted(async () => {
   const { ref } = await import('vue')
   return {
+    billingAccountId: ref<string | undefined>(),
+    isShared: ref(false),
     usage: ref<{
       timezone: 'Asia/Shanghai'
       lifetime: {
@@ -281,6 +283,43 @@ describe('UsagePane', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Please try again later.')
     await user.click(screen.getByRole('button', { name: 'Reload' }))
     expect(usageState.retry).toHaveBeenCalledOnce()
+  })
+
+  it('names the shared account behind the usage snapshot', () => {
+    usageState.usage.value = {
+      timezone: 'Asia/Shanghai',
+      lifetime: {
+        total_credits: 99,
+        peak_daily_credits: 42,
+        average_daily_credits: 3.3,
+        task_count: 5,
+        active_days: 4,
+      },
+      trend: buildZeroTrend(),
+    }
+    usageState.billingAccountId.value = 'ba_1'
+    usageState.isShared.value = true
+    usageState.isInitialPending.value = false
+    usageState.error.value = null
+
+    renderUsagePane()
+
+    expect(screen.getByRole('status')).toHaveTextContent('ba_1')
+
+    usageState.billingAccountId.value = undefined
+    usageState.isShared.value = false
+  })
+
+  it('renders the restricted title for billing_account_forbidden', () => {
+    usageState.usage.value = undefined
+    usageState.isInitialPending.value = false
+    const forbidden = new Error('forbidden') as Error & { code: string }
+    forbidden.code = 'billing_account_forbidden'
+    usageState.error.value = forbidden
+
+    renderUsagePane()
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Access restricted')
   })
 
   it('renders a native segmented range switcher in the chart card header', async () => {

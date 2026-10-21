@@ -24,20 +24,25 @@ var creditInternalFunctionSignatures = []string{
 	"apply_credit_posting_balances()",
 	"validate_credit_transaction_balance()",
 	"guard_credit_posting_transaction_scope()",
+	"ensure_credit_wallet_projection_on_user_insert()",
+	"provision_billing_account_wallet_on_account_insert()",
 }
 
-const creditCommandFunctionSignature = "execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
-const creditPurchaseFunctionSignature = "execute_credit_purchase_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
-const creditPurchaseRefundHoldFunctionSignature = "execute_credit_purchase_refund_hold_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
-const creditPurchaseRefundFunctionSignature = "execute_credit_purchase_refund_v1(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
-const creditPaymentDisputeDebitFunctionSignature = "execute_credit_payment_dispute_debit_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
-const creditPaymentDisputeRestoreFunctionSignature = "execute_credit_payment_dispute_restore_v1(BIGINT, TEXT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+const creditCommandFunctionSignature = "execute_credit_command_v3(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+const creditPurchaseFunctionSignature = "execute_credit_purchase_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+const creditPurchaseRefundHoldFunctionSignature = "execute_credit_purchase_refund_hold_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+const creditPurchaseRefundFunctionSignature = "execute_credit_purchase_refund_v2(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+const creditPaymentDisputeDebitFunctionSignature = "execute_credit_payment_dispute_debit_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+const creditPaymentDisputeRestoreFunctionSignature = "execute_credit_payment_dispute_restore_v2(BIGINT, TEXT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
 
 var creditLifecycleFunctionSignatures = []string{
 	"bind_credit_welcome_identity_key(TEXT)",
-	"provision_credit_wallet(BIGINT)",
-	"set_credit_wallet_status(BIGINT, TEXT)",
+	"provision_billing_account_wallet(BIGINT)",
+	"set_billing_account_wallet_status(BIGINT, TEXT)",
+	"freeze_sole_owned_billing_wallets(BIGINT, BOOLEAN)",
+	"remove_shared_billing_memberships_for_user(BIGINT)",
 	"claim_credit_welcome(TEXT, BIGINT)",
+	"ensure_personal_billing_account_for_user(BIGINT)",
 }
 
 var creditRestrictionFunctionSignatures = []string{

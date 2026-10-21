@@ -55,12 +55,16 @@ import type {
   ControlCreditWalletEnvelope,
   ControlNotFoundResponse,
   ControlObjectEnvelope,
+  ControlReleaseWalletRestrictionRequest,
+  ControlRestrictWalletRequest,
   ControlRewardCodeCreateRequest,
   ControlRewardCodeEnabledRequest,
   ControlRewardCodeSearchRequest,
   ControlRewardCodeUpdateRequest,
+  ControlWalletRestrictionResultEnvelope,
   ForbiddenResponse,
   IdempotencyConflictResponse,
+  ListControlBillingAccountLedgerParams,
   ListControlCreditLedgerParams,
   ListControlReconciliationFindingsParams,
   ListControlReconciliationRunsParams,
@@ -79,6 +83,7 @@ export const getCreateControlCreditGrantUrl = () => {
 }
 
 /**
+ * Targets exactly one explicit Billing Account: user_id addresses the target user's deterministic initial personal account, while billing_account_id names a shared/organization account directly (exactly one of the two is required). The Ledger Actor is always the platform-Admin operator. Requires Idempotency-Key: yes (header).
  * @summary Grant credits via credits.Commands
  */
 export const createControlCreditGrant = async (
@@ -205,6 +210,7 @@ export const getCreateControlCreditDeductionUrl = () => {
 }
 
 /**
+ * Targets exactly one explicit Billing Account: user_id addresses the target user's deterministic initial personal account, while billing_account_id names a shared/organization account directly (exactly one of the two is required). The Ledger Actor is always the platform-Admin operator. Requires Idempotency-Key: yes (header).
  * @summary Deduct credits via credits.Commands
  */
 export const createControlCreditDeduction = async (
@@ -332,6 +338,7 @@ export const getCreateControlCreditRefundUrl = () => {
 }
 
 /**
+ * Linked Refund only: charge_transaction_id must name a Capture on the addressed Billing Account (cross-account charges fail closed, no new refund policy). Targets exactly one explicit Billing Account (user_id or billing_account_id, exactly one required). Requires Idempotency-Key: yes (header).
  * @summary Refund a charge via credits.Commands
  */
 export const createControlCreditRefund = async (
@@ -458,6 +465,7 @@ export const getCreateControlCreditCorrectionUrl = () => {
 }
 
 /**
+ * Linked Correction only: original_transaction_id must name a transaction on the addressed Billing Account (cross-account references fail closed). Targets exactly one explicit Billing Account (user_id or billing_account_id, exactly one required). Requires Idempotency-Key: yes (header).
  * @summary Correct a prior transaction via credits.Commands
  */
 export const createControlCreditCorrection = async (
@@ -587,7 +595,7 @@ export const getGetControlCreditWalletUrl = (userId: string) => {
 }
 
 /**
- * @summary Read a user credit wallet
+ * @summary Read a user's personal billing account wallet
  */
 export const getControlCreditWallet = async (
   userId: string,
@@ -637,7 +645,7 @@ export type GetControlCreditWalletQueryError =
   BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse
 
 /**
- * @summary Read a user credit wallet
+ * @summary Read a user's personal billing account wallet
  */
 
 export function useGetControlCreditWallet<
@@ -684,7 +692,8 @@ export const getListControlCreditLedgerUrl = (
 }
 
 /**
- * @summary List wallet ledger transactions
+ * Reads the Ledger of the target user's deterministic initial personal Billing Account. For shared/organization accounts use the ba_-addressed ledger read. Requires Idempotency-Key: no (read).
+ * @summary List personal billing account ledger transactions
  */
 export const listControlCreditLedger = async (
   userId: string,
@@ -740,7 +749,7 @@ export type ListControlCreditLedgerQueryError =
   BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse
 
 /**
- * @summary List wallet ledger transactions
+ * @summary List personal billing account ledger transactions
  */
 
 export function useListControlCreditLedger<
@@ -768,6 +777,471 @@ export function useListControlCreditLedger<
   return query
 }
 
+export const getGetControlBillingAccountWalletUrl = (billingAccountId: string) => {
+  return `/credits/accounts/${encodeURIComponent(String(billingAccountId))}`
+}
+
+/**
+ * Reads the Wallet of one explicitly addressed Billing Account (personal, shared or organization) with its reason-coded active restrictions. No single-user linkage is synthesized. Requires Idempotency-Key: no (read).
+ * @summary Read one billing account wallet for platform administration
+ */
+export const getControlBillingAccountWallet = async (
+  billingAccountId: string,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlCreditWalletEnvelope> => {
+  return controlMutator<ControlCreditWalletEnvelope>(
+    getGetControlBillingAccountWalletUrl(billingAccountId),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getGetControlBillingAccountWalletQueryKey = (
+  billingAccountId: MaybeRefOrGetter<string>,
+) => {
+  return ['credits', 'accounts', billingAccountId] as const
+}
+
+export const getGetControlBillingAccountWalletQueryOptions = <
+  TData = Awaited<ReturnType<typeof getControlBillingAccountWallet>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  billingAccountId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlBillingAccountWallet>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetControlBillingAccountWalletQueryKey(billingAccountId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getControlBillingAccountWallet>>> = ({
+    signal,
+  }) => getControlBillingAccountWallet(toValue(billingAccountId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () => toValue(billingAccountId) !== null && toValue(billingAccountId) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getControlBillingAccountWallet>>, TError, TData>
+}
+
+export type GetControlBillingAccountWalletQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getControlBillingAccountWallet>>
+>
+export type GetControlBillingAccountWalletQueryError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse
+
+/**
+ * @summary Read one billing account wallet for platform administration
+ */
+
+export function useGetControlBillingAccountWallet<
+  TData = Awaited<ReturnType<typeof getControlBillingAccountWallet>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  billingAccountId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlBillingAccountWallet>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetControlBillingAccountWalletQueryOptions(billingAccountId, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListControlBillingAccountLedgerUrl = (
+  billingAccountId: string,
+  params?: ListControlBillingAccountLedgerParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/credits/accounts/${encodeURIComponent(String(billingAccountId))}/ledger?${stringifiedParams}`
+    : `/credits/accounts/${encodeURIComponent(String(billingAccountId))}/ledger`
+}
+
+/**
+ * Pages the Ledger of one explicitly addressed Billing Account with Hold/Capture references. Requires Idempotency-Key: no (read).
+ * @summary List billing account ledger transactions
+ */
+export const listControlBillingAccountLedger = async (
+  billingAccountId: string,
+  params?: ListControlBillingAccountLedgerParams,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<PaginatedControlLedger> => {
+  return controlMutator<PaginatedControlLedger>(
+    getListControlBillingAccountLedgerUrl(billingAccountId, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getListControlBillingAccountLedgerQueryKey = (
+  billingAccountId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<ListControlBillingAccountLedgerParams>,
+) => {
+  return ['credits', 'accounts', billingAccountId, 'ledger', ...(params ? [params] : [])] as const
+}
+
+export const getListControlBillingAccountLedgerQueryOptions = <
+  TData = Awaited<ReturnType<typeof listControlBillingAccountLedger>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  billingAccountId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<ListControlBillingAccountLedgerParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listControlBillingAccountLedger>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListControlBillingAccountLedgerQueryKey(billingAccountId, params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listControlBillingAccountLedger>>> = ({
+    signal,
+  }) =>
+    listControlBillingAccountLedger(toValue(billingAccountId), toValue(params), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () => toValue(billingAccountId) !== null && toValue(billingAccountId) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listControlBillingAccountLedger>>, TError, TData>
+}
+
+export type ListControlBillingAccountLedgerQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listControlBillingAccountLedger>>
+>
+export type ListControlBillingAccountLedgerQueryError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse
+
+/**
+ * @summary List billing account ledger transactions
+ */
+
+export function useListControlBillingAccountLedger<
+  TData = Awaited<ReturnType<typeof listControlBillingAccountLedger>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  billingAccountId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<ListControlBillingAccountLedgerParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listControlBillingAccountLedger>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListControlBillingAccountLedgerQueryOptions(
+    billingAccountId,
+    params,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getRestrictControlWalletUrl = () => {
+  return `/credits/wallet-restrictions`
+}
+
+/**
+ * Creates one reason-coded spending limit on the explicitly addressed Billing Account through the typed WalletRestrictionCommands seam (the same seam Reconciliation uses for automatic isolation). Only the addressed account is affected, never sibling accounts. Requires Idempotency-Key: yes (header).
+ * @summary Restrict a billing account wallet via credits.Commands seam
+ */
+export const restrictControlWallet = async (
+  controlRestrictWalletRequest: ControlRestrictWalletRequest,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlWalletRestrictionResultEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<ControlWalletRestrictionResultEnvelope>(getRestrictControlWalletUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(controlRestrictWalletRequest),
+  })
+}
+
+export const getRestrictControlWalletMutationKey = () => ['restrictControlWallet'] as const
+
+export const getRestrictControlWalletMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | IdempotencyConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restrictControlWallet>>,
+    TError,
+    RestrictControlWalletMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restrictControlWallet>>,
+  TError,
+  RestrictControlWalletMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestrictControlWalletMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restrictControlWallet>>,
+    RestrictControlWalletMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return restrictControlWallet(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type RestrictControlWalletMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restrictControlWallet>>
+>
+export type RestrictControlWalletMutationBody = ControlRestrictWalletRequest
+export type RestrictControlWalletMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | ControlNotFoundResponse
+  | IdempotencyConflictResponse
+export type RestrictControlWalletMutationVariables = { data: ControlRestrictWalletRequest }
+
+/**
+ * @summary Restrict a billing account wallet via credits.Commands seam
+ */
+export const useRestrictControlWallet = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | IdempotencyConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restrictControlWallet>>,
+      TError,
+      RestrictControlWalletMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof restrictControlWallet>>,
+  TError,
+  RestrictControlWalletMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestrictControlWalletMutationOptions(options), queryClient)
+}
+export const getReleaseControlWalletRestrictionUrl = (restrictionId: string) => {
+  return `/credits/wallet-restrictions/${encodeURIComponent(String(restrictionId))}/release`
+}
+
+/**
+ * Releases exactly the addressed restriction_id, keeping its history. Sibling restrictions on the same account and restrictions on other accounts are untouched. Requires Idempotency-Key: yes (header).
+ * @summary Release one wallet restriction precisely
+ */
+export const releaseControlWalletRestriction = async (
+  restrictionId: string,
+  controlReleaseWalletRestrictionRequest: ControlReleaseWalletRestrictionRequest,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlWalletRestrictionResultEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<ControlWalletRestrictionResultEnvelope>(
+    getReleaseControlWalletRestrictionUrl(restrictionId),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(controlReleaseWalletRestrictionRequest),
+    },
+  )
+}
+
+export const getReleaseControlWalletRestrictionMutationKey = () =>
+  ['releaseControlWalletRestriction'] as const
+
+export const getReleaseControlWalletRestrictionMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | IdempotencyConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof releaseControlWalletRestriction>>,
+    TError,
+    ReleaseControlWalletRestrictionMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof releaseControlWalletRestriction>>,
+  TError,
+  ReleaseControlWalletRestrictionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getReleaseControlWalletRestrictionMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof releaseControlWalletRestriction>>,
+    ReleaseControlWalletRestrictionMutationVariables
+  > = (props) => {
+    const { restrictionId, data } = props ?? {}
+
+    return releaseControlWalletRestriction(restrictionId, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type ReleaseControlWalletRestrictionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof releaseControlWalletRestriction>>
+>
+export type ReleaseControlWalletRestrictionMutationBody = ControlReleaseWalletRestrictionRequest
+export type ReleaseControlWalletRestrictionMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | ControlNotFoundResponse
+  | IdempotencyConflictResponse
+export type ReleaseControlWalletRestrictionMutationVariables = {
+  restrictionId: string
+  data: ControlReleaseWalletRestrictionRequest
+}
+
+/**
+ * @summary Release one wallet restriction precisely
+ */
+export const useReleaseControlWalletRestriction = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | IdempotencyConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof releaseControlWalletRestriction>>,
+      TError,
+      ReleaseControlWalletRestrictionMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof releaseControlWalletRestriction>>,
+  TError,
+  ReleaseControlWalletRestrictionMutationVariables,
+  TContext
+> => {
+  return useMutation(getReleaseControlWalletRestrictionMutationOptions(options), queryClient)
+}
 export const getGetControlCreditHealthUrl = () => {
   return `/credits/health`
 }

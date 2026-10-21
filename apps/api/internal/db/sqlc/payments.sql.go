@@ -19,7 +19,7 @@ SET status = 'checkout_open',
     checkout_url = $4,
     expires_at = $5
 WHERE id = $1 AND status = 'creating'
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 type BindPaymentOrderCheckoutParams struct {
@@ -44,6 +44,7 @@ func (q *Queries) BindPaymentOrderCheckout(ctx context.Context, arg BindPaymentO
 		&i.PublicOrderNumber,
 		&i.PublicToken,
 		&i.UserID,
+		&i.BillingAccountID,
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
@@ -103,7 +104,7 @@ WITH candidates AS (
       claimed_until = EXCLUDED.claimed_until
   RETURNING payment_order_id, claim_token, claim_generation
 )
-SELECT orders.id, orders.public_order_number, orders.public_token, orders.user_id, orders.client_idempotency_key, orders.request_hash, orders.status, orders.stripe_credential_id, orders.stripe_account_id, orders.stripe_customer_id, orders.stripe_product_id, orders.stripe_checkout_session_id, orders.stripe_payment_intent_id, orders.stripe_charge_id, orders.idea_quantity, orders.base_currency, orders.base_amount_minor, orders.paid_subtotal_minor, orders.paid_tax_minor, orders.paid_total_minor, orders.paid_currency, orders.terms_version, orders.refund_policy_version, orders.return_base_url, orders.checkout_url, orders.receipt_url, orders.credit_transaction_id, orders.expires_at, orders.paid_at, orders.credited_at, orders.created_at, orders.updated_at, claimed.claim_token, claimed.claim_generation
+SELECT orders.id, orders.public_order_number, orders.public_token, orders.user_id, orders.billing_account_id, orders.client_idempotency_key, orders.request_hash, orders.status, orders.stripe_credential_id, orders.stripe_account_id, orders.stripe_customer_id, orders.stripe_product_id, orders.stripe_checkout_session_id, orders.stripe_payment_intent_id, orders.stripe_charge_id, orders.idea_quantity, orders.base_currency, orders.base_amount_minor, orders.paid_subtotal_minor, orders.paid_tax_minor, orders.paid_total_minor, orders.paid_currency, orders.terms_version, orders.refund_policy_version, orders.return_base_url, orders.checkout_url, orders.receipt_url, orders.credit_transaction_id, orders.expires_at, orders.paid_at, orders.credited_at, orders.created_at, orders.updated_at, claimed.claim_token, claimed.claim_generation
 FROM claimed
 JOIN payment_orders AS orders ON orders.id = claimed.payment_order_id
 ORDER BY orders.id
@@ -143,6 +144,7 @@ func (q *Queries) ClaimDuePaymentOrderReconciliations(ctx context.Context, arg C
 			&i.PaymentOrder.PublicOrderNumber,
 			&i.PaymentOrder.PublicToken,
 			&i.PaymentOrder.UserID,
+			&i.PaymentOrder.BillingAccountID,
 			&i.PaymentOrder.ClientIdempotencyKey,
 			&i.PaymentOrder.RequestHash,
 			&i.PaymentOrder.Status,
@@ -312,6 +314,7 @@ const getAdminPaymentOrder = `-- name: GetAdminPaymentOrder :one
 SELECT orders.id,
        orders.public_order_number,
        orders.user_id,
+       orders.billing_account_id,
        users.public_id AS user_public_id,
        users.display_name,
        orders.status,
@@ -352,6 +355,7 @@ type GetAdminPaymentOrderRow struct {
 	ID                      pgtype.UUID        `json:"id"`
 	PublicOrderNumber       string             `json:"public_order_number"`
 	UserID                  int64              `json:"user_id"`
+	BillingAccountID        pgtype.Int8        `json:"billing_account_id"`
 	UserPublicID            pgtype.UUID        `json:"user_public_id"`
 	DisplayName             string             `json:"display_name"`
 	Status                  string             `json:"status"`
@@ -390,6 +394,7 @@ func (q *Queries) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 		&i.ID,
 		&i.PublicOrderNumber,
 		&i.UserID,
+		&i.BillingAccountID,
 		&i.UserPublicID,
 		&i.DisplayName,
 		&i.Status,
@@ -443,25 +448,28 @@ func (q *Queries) GetPaymentCheckoutShutdown(ctx context.Context, id pgtype.UUID
 	return i, err
 }
 
-const getPaymentCustomer = `-- name: GetPaymentCustomer :one
-SELECT user_id, stripe_account_id, stripe_mode, stripe_customer_id, created_at, updated_at
+const getPaymentCustomerByAccount = `-- name: GetPaymentCustomerByAccount :one
+SELECT user_id, billing_account_id, stripe_account_id, stripe_mode, stripe_customer_id, created_at, updated_at
 FROM payment_customers
-WHERE user_id = $1
+WHERE billing_account_id = $1
   AND stripe_account_id = $2
   AND stripe_mode = $3
 `
 
-type GetPaymentCustomerParams struct {
-	UserID          int64  `json:"user_id"`
-	StripeAccountID string `json:"stripe_account_id"`
-	StripeMode      string `json:"stripe_mode"`
+type GetPaymentCustomerByAccountParams struct {
+	BillingAccountID int64  `json:"billing_account_id"`
+	StripeAccountID  string `json:"stripe_account_id"`
+	StripeMode       string `json:"stripe_mode"`
 }
 
-func (q *Queries) GetPaymentCustomer(ctx context.Context, arg GetPaymentCustomerParams) (PaymentCustomer, error) {
-	row := q.db.QueryRow(ctx, getPaymentCustomer, arg.UserID, arg.StripeAccountID, arg.StripeMode)
+// Account Stripe Customer (#919): reused per payer Billing Account, never
+// per operator, so test/live stay isolated and key rotation never duplicates.
+func (q *Queries) GetPaymentCustomerByAccount(ctx context.Context, arg GetPaymentCustomerByAccountParams) (PaymentCustomer, error) {
+	row := q.db.QueryRow(ctx, getPaymentCustomerByAccount, arg.BillingAccountID, arg.StripeAccountID, arg.StripeMode)
 	var i PaymentCustomer
 	err := row.Scan(
 		&i.UserID,
+		&i.BillingAccountID,
 		&i.StripeAccountID,
 		&i.StripeMode,
 		&i.StripeCustomerID,
@@ -471,8 +479,119 @@ func (q *Queries) GetPaymentCustomer(ctx context.Context, arg GetPaymentCustomer
 	return i, err
 }
 
+const getPaymentOrderByAccountIdempotency = `-- name: GetPaymentOrderByAccountIdempotency :one
+SELECT id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+FROM payment_orders
+WHERE billing_account_id = $1 AND client_idempotency_key = $2
+`
+
+type GetPaymentOrderByAccountIdempotencyParams struct {
+	BillingAccountID     pgtype.Int8 `json:"billing_account_id"`
+	ClientIdempotencyKey string      `json:"client_idempotency_key"`
+}
+
+// Account idempotency scope (#919): the durable replay scope is the payer
+// Billing Account, never the operator. Same key + same hash replays, same
+// key + different hash conflicts; cross-account key reuse never replays.
+func (q *Queries) GetPaymentOrderByAccountIdempotency(ctx context.Context, arg GetPaymentOrderByAccountIdempotencyParams) (PaymentOrder, error) {
+	row := q.db.QueryRow(ctx, getPaymentOrderByAccountIdempotency, arg.BillingAccountID, arg.ClientIdempotencyKey)
+	var i PaymentOrder
+	err := row.Scan(
+		&i.ID,
+		&i.PublicOrderNumber,
+		&i.PublicToken,
+		&i.UserID,
+		&i.BillingAccountID,
+		&i.ClientIdempotencyKey,
+		&i.RequestHash,
+		&i.Status,
+		&i.StripeCredentialID,
+		&i.StripeAccountID,
+		&i.StripeCustomerID,
+		&i.StripeProductID,
+		&i.StripeCheckoutSessionID,
+		&i.StripePaymentIntentID,
+		&i.StripeChargeID,
+		&i.IdeaQuantity,
+		&i.BaseCurrency,
+		&i.BaseAmountMinor,
+		&i.PaidSubtotalMinor,
+		&i.PaidTaxMinor,
+		&i.PaidTotalMinor,
+		&i.PaidCurrency,
+		&i.TermsVersion,
+		&i.RefundPolicyVersion,
+		&i.ReturnBaseUrl,
+		&i.CheckoutUrl,
+		&i.ReceiptUrl,
+		&i.CreditTransactionID,
+		&i.ExpiresAt,
+		&i.PaidAt,
+		&i.CreditedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPaymentOrderByAccountToken = `-- name: GetPaymentOrderByAccountToken :one
+SELECT id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+FROM payment_orders
+WHERE public_token = $1 AND billing_account_id = $2
+`
+
+type GetPaymentOrderByAccountTokenParams struct {
+	PublicToken      pgtype.UUID `json:"public_token"`
+	BillingAccountID pgtype.Int8 `json:"billing_account_id"`
+}
+
+// Account order reads (#919): continue/abandon/Return address the persisted
+// payer account. Callers authorize Billing Owner/Admin first and converge
+// unknown tokens to not-found (anti-enumeration); the token alone is never
+// an ownership oracle.
+func (q *Queries) GetPaymentOrderByAccountToken(ctx context.Context, arg GetPaymentOrderByAccountTokenParams) (PaymentOrder, error) {
+	row := q.db.QueryRow(ctx, getPaymentOrderByAccountToken, arg.PublicToken, arg.BillingAccountID)
+	var i PaymentOrder
+	err := row.Scan(
+		&i.ID,
+		&i.PublicOrderNumber,
+		&i.PublicToken,
+		&i.UserID,
+		&i.BillingAccountID,
+		&i.ClientIdempotencyKey,
+		&i.RequestHash,
+		&i.Status,
+		&i.StripeCredentialID,
+		&i.StripeAccountID,
+		&i.StripeCustomerID,
+		&i.StripeProductID,
+		&i.StripeCheckoutSessionID,
+		&i.StripePaymentIntentID,
+		&i.StripeChargeID,
+		&i.IdeaQuantity,
+		&i.BaseCurrency,
+		&i.BaseAmountMinor,
+		&i.PaidSubtotalMinor,
+		&i.PaidTaxMinor,
+		&i.PaidTotalMinor,
+		&i.PaidCurrency,
+		&i.TermsVersion,
+		&i.RefundPolicyVersion,
+		&i.ReturnBaseUrl,
+		&i.CheckoutUrl,
+		&i.ReceiptUrl,
+		&i.CreditTransactionID,
+		&i.ExpiresAt,
+		&i.PaidAt,
+		&i.CreditedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getPaymentOrderByCheckoutSession = `-- name: GetPaymentOrderByCheckoutSession :one
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2
 `
@@ -493,6 +612,7 @@ func (q *Queries) GetPaymentOrderByCheckoutSession(ctx context.Context, arg GetP
 		&i.PublicOrderNumber,
 		&i.PublicToken,
 		&i.UserID,
+		&i.BillingAccountID,
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
@@ -526,7 +646,7 @@ func (q *Queries) GetPaymentOrderByCheckoutSession(ctx context.Context, arg GetP
 }
 
 const getPaymentOrderByIDForUpdate = `-- name: GetPaymentOrderByIDForUpdate :one
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE id = $1
 FOR UPDATE
@@ -545,108 +665,7 @@ func (q *Queries) GetPaymentOrderByIDForUpdate(ctx context.Context, id pgtype.UU
 		&i.PublicOrderNumber,
 		&i.PublicToken,
 		&i.UserID,
-		&i.ClientIdempotencyKey,
-		&i.RequestHash,
-		&i.Status,
-		&i.StripeCredentialID,
-		&i.StripeAccountID,
-		&i.StripeCustomerID,
-		&i.StripeProductID,
-		&i.StripeCheckoutSessionID,
-		&i.StripePaymentIntentID,
-		&i.StripeChargeID,
-		&i.IdeaQuantity,
-		&i.BaseCurrency,
-		&i.BaseAmountMinor,
-		&i.PaidSubtotalMinor,
-		&i.PaidTaxMinor,
-		&i.PaidTotalMinor,
-		&i.PaidCurrency,
-		&i.TermsVersion,
-		&i.RefundPolicyVersion,
-		&i.ReturnBaseUrl,
-		&i.CheckoutUrl,
-		&i.ReceiptUrl,
-		&i.CreditTransactionID,
-		&i.ExpiresAt,
-		&i.PaidAt,
-		&i.CreditedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getPaymentOrderByIdempotency = `-- name: GetPaymentOrderByIdempotency :one
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
-FROM payment_orders
-WHERE user_id = $1 AND client_idempotency_key = $2
-`
-
-type GetPaymentOrderByIdempotencyParams struct {
-	UserID               int64  `json:"user_id"`
-	ClientIdempotencyKey string `json:"client_idempotency_key"`
-}
-
-func (q *Queries) GetPaymentOrderByIdempotency(ctx context.Context, arg GetPaymentOrderByIdempotencyParams) (PaymentOrder, error) {
-	row := q.db.QueryRow(ctx, getPaymentOrderByIdempotency, arg.UserID, arg.ClientIdempotencyKey)
-	var i PaymentOrder
-	err := row.Scan(
-		&i.ID,
-		&i.PublicOrderNumber,
-		&i.PublicToken,
-		&i.UserID,
-		&i.ClientIdempotencyKey,
-		&i.RequestHash,
-		&i.Status,
-		&i.StripeCredentialID,
-		&i.StripeAccountID,
-		&i.StripeCustomerID,
-		&i.StripeProductID,
-		&i.StripeCheckoutSessionID,
-		&i.StripePaymentIntentID,
-		&i.StripeChargeID,
-		&i.IdeaQuantity,
-		&i.BaseCurrency,
-		&i.BaseAmountMinor,
-		&i.PaidSubtotalMinor,
-		&i.PaidTaxMinor,
-		&i.PaidTotalMinor,
-		&i.PaidCurrency,
-		&i.TermsVersion,
-		&i.RefundPolicyVersion,
-		&i.ReturnBaseUrl,
-		&i.CheckoutUrl,
-		&i.ReceiptUrl,
-		&i.CreditTransactionID,
-		&i.ExpiresAt,
-		&i.PaidAt,
-		&i.CreditedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getPaymentOrderByPublicToken = `-- name: GetPaymentOrderByPublicToken :one
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
-FROM payment_orders
-WHERE public_token = $1 AND user_id = $2
-`
-
-type GetPaymentOrderByPublicTokenParams struct {
-	PublicToken pgtype.UUID `json:"public_token"`
-	UserID      int64       `json:"user_id"`
-}
-
-func (q *Queries) GetPaymentOrderByPublicToken(ctx context.Context, arg GetPaymentOrderByPublicTokenParams) (PaymentOrder, error) {
-	row := q.db.QueryRow(ctx, getPaymentOrderByPublicToken, arg.PublicToken, arg.UserID)
-	var i PaymentOrder
-	err := row.Scan(
-		&i.ID,
-		&i.PublicOrderNumber,
-		&i.PublicToken,
-		&i.UserID,
+		&i.BillingAccountID,
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
@@ -878,6 +897,7 @@ INSERT INTO payment_orders (
   public_order_number,
   public_token,
   user_id,
+  billing_account_id,
   client_idempotency_key,
   request_hash,
   status,
@@ -891,12 +911,12 @@ INSERT INTO payment_orders (
   return_base_url,
   expires_at
 )
-SELECT $1, $2, $3, $4, $5, $6, 'creating', $7, $8, $9, $10, $10, $11, $12, $13, $14
+SELECT $1, $2, $3, $4, $5, $6, $7, 'creating', $8, $9, $10, $11, $11, $12, $13, $14, $15
 FROM payment_stripe_configurations configuration
 WHERE configuration.singleton_id = 1
-  AND configuration.active_credential_id = $7
+  AND configuration.active_credential_id = $8
   AND configuration.purchases_enabled
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 type InsertPaymentOrderIntentParams struct {
@@ -904,6 +924,7 @@ type InsertPaymentOrderIntentParams struct {
 	PublicOrderNumber    string             `json:"public_order_number"`
 	PublicToken          pgtype.UUID        `json:"public_token"`
 	UserID               int64              `json:"user_id"`
+	BillingAccountID     pgtype.Int8        `json:"billing_account_id"`
 	ClientIdempotencyKey string             `json:"client_idempotency_key"`
 	RequestHash          string             `json:"request_hash"`
 	StripeCredentialID   pgtype.UUID        `json:"stripe_credential_id"`
@@ -922,6 +943,7 @@ func (q *Queries) InsertPaymentOrderIntent(ctx context.Context, arg InsertPaymen
 		arg.PublicOrderNumber,
 		arg.PublicToken,
 		arg.UserID,
+		arg.BillingAccountID,
 		arg.ClientIdempotencyKey,
 		arg.RequestHash,
 		arg.StripeCredentialID,
@@ -939,6 +961,7 @@ func (q *Queries) InsertPaymentOrderIntent(ctx context.Context, arg InsertPaymen
 		&i.PublicOrderNumber,
 		&i.PublicToken,
 		&i.UserID,
+		&i.BillingAccountID,
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
@@ -1094,6 +1117,225 @@ func (q *Queries) InsertPaymentWebhookEvent(ctx context.Context, arg InsertPayme
 	return result.RowsAffected(), nil
 }
 
+const listAccountActivePaymentOrders = `-- name: ListAccountActivePaymentOrders :many
+SELECT id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+FROM payment_orders
+WHERE billing_account_id = $1
+  AND status IN ('creating', 'checkout_open', 'async_payment_pending')
+ORDER BY created_at, id
+`
+
+// Account unpaid-slot accounting (#919): Checkout create/continue serialize
+// per payer account under the account advisory lock.
+func (q *Queries) ListAccountActivePaymentOrders(ctx context.Context, billingAccountID pgtype.Int8) ([]PaymentOrder, error) {
+	rows, err := q.db.Query(ctx, listAccountActivePaymentOrders, billingAccountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PaymentOrder
+	for rows.Next() {
+		var i PaymentOrder
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicOrderNumber,
+			&i.PublicToken,
+			&i.UserID,
+			&i.BillingAccountID,
+			&i.ClientIdempotencyKey,
+			&i.RequestHash,
+			&i.Status,
+			&i.StripeCredentialID,
+			&i.StripeAccountID,
+			&i.StripeCustomerID,
+			&i.StripeProductID,
+			&i.StripeCheckoutSessionID,
+			&i.StripePaymentIntentID,
+			&i.StripeChargeID,
+			&i.IdeaQuantity,
+			&i.BaseCurrency,
+			&i.BaseAmountMinor,
+			&i.PaidSubtotalMinor,
+			&i.PaidTaxMinor,
+			&i.PaidTotalMinor,
+			&i.PaidCurrency,
+			&i.TermsVersion,
+			&i.RefundPolicyVersion,
+			&i.ReturnBaseUrl,
+			&i.CheckoutUrl,
+			&i.ReceiptUrl,
+			&i.CreditTransactionID,
+			&i.ExpiresAt,
+			&i.PaidAt,
+			&i.CreditedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAccountPendingPaymentOrders = `-- name: ListAccountPendingPaymentOrders :many
+SELECT id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+FROM payment_orders
+WHERE billing_account_id = $1
+  AND status IN ('checkout_open', 'async_payment_pending', 'paid_pending_credit')
+ORDER BY created_at DESC, id DESC
+`
+
+// Account pending orders (#919): every Billing Owner/Admin of the payer
+// account manages these, not just the creating operator.
+func (q *Queries) ListAccountPendingPaymentOrders(ctx context.Context, billingAccountID pgtype.Int8) ([]PaymentOrder, error) {
+	rows, err := q.db.Query(ctx, listAccountPendingPaymentOrders, billingAccountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PaymentOrder
+	for rows.Next() {
+		var i PaymentOrder
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicOrderNumber,
+			&i.PublicToken,
+			&i.UserID,
+			&i.BillingAccountID,
+			&i.ClientIdempotencyKey,
+			&i.RequestHash,
+			&i.Status,
+			&i.StripeCredentialID,
+			&i.StripeAccountID,
+			&i.StripeCustomerID,
+			&i.StripeProductID,
+			&i.StripeCheckoutSessionID,
+			&i.StripePaymentIntentID,
+			&i.StripeChargeID,
+			&i.IdeaQuantity,
+			&i.BaseCurrency,
+			&i.BaseAmountMinor,
+			&i.PaidSubtotalMinor,
+			&i.PaidTaxMinor,
+			&i.PaidTotalMinor,
+			&i.PaidCurrency,
+			&i.TermsVersion,
+			&i.RefundPolicyVersion,
+			&i.ReturnBaseUrl,
+			&i.CheckoutUrl,
+			&i.ReceiptUrl,
+			&i.CreditTransactionID,
+			&i.ExpiresAt,
+			&i.PaidAt,
+			&i.CreditedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAccountRechargeHistory = `-- name: ListAccountRechargeHistory :many
+SELECT orders.id,
+       COALESCE(orders.paid_at, orders.updated_at) AS occurred_at,
+       orders.idea_quantity,
+       orders.status,
+       orders.paid_total_minor,
+       orders.paid_currency,
+       orders.receipt_url,
+       COALESCE(refunds.idea_quantity, 0)::BIGINT AS refunded_idea_quantity,
+       COALESCE(refunds.amount_minor, 0)::BIGINT AS refunded_amount_minor
+FROM payment_orders orders
+LEFT JOIN LATERAL (
+  SELECT SUM(payment_refunds.idea_quantity)::BIGINT AS idea_quantity,
+         SUM(payment_refunds.amount_minor)::BIGINT AS amount_minor
+  FROM payment_refunds
+  WHERE payment_refunds.payment_order_id = orders.id
+    AND payment_refunds.status = 'succeeded'
+) refunds ON TRUE
+WHERE orders.billing_account_id = $1::BIGINT
+  AND orders.status IN ('credited', 'cancelled')
+  AND COALESCE(orders.paid_at, orders.updated_at) >= $2::TIMESTAMPTZ
+  AND (
+    NOT $3::BOOLEAN
+    OR (COALESCE(orders.paid_at, orders.updated_at), orders.id) < ($4::TIMESTAMPTZ, $5::UUID)
+  )
+ORDER BY COALESCE(orders.paid_at, orders.updated_at) DESC, orders.id DESC
+LIMIT $6::INTEGER
+`
+
+type ListAccountRechargeHistoryParams struct {
+	BillingAccountID int64              `json:"billing_account_id"`
+	CutoffAt         pgtype.Timestamptz `json:"cutoff_at"`
+	CursorSet        bool               `json:"cursor_set"`
+	CursorPaidAt     pgtype.Timestamptz `json:"cursor_paid_at"`
+	CursorID         pgtype.UUID        `json:"cursor_id"`
+	PageLimit        int32              `json:"page_limit"`
+}
+
+type ListAccountRechargeHistoryRow struct {
+	ID                   pgtype.UUID        `json:"id"`
+	OccurredAt           pgtype.Timestamptz `json:"occurred_at"`
+	IdeaQuantity         int64              `json:"idea_quantity"`
+	Status               string             `json:"status"`
+	PaidTotalMinor       pgtype.Int8        `json:"paid_total_minor"`
+	PaidCurrency         string             `json:"paid_currency"`
+	ReceiptUrl           string             `json:"receipt_url"`
+	RefundedIdeaQuantity int64              `json:"refunded_idea_quantity"`
+	RefundedAmountMinor  int64              `json:"refunded_amount_minor"`
+}
+
+// Account recharge history (#919): credited, refunded-overlay, and
+// user-abandoned facts of one payer Billing Account for its authorized
+// managers. Same 12-month window and opaque-cursor paging as the
+// operator read it replaces; no payer PII or provider secrets.
+func (q *Queries) ListAccountRechargeHistory(ctx context.Context, arg ListAccountRechargeHistoryParams) ([]ListAccountRechargeHistoryRow, error) {
+	rows, err := q.db.Query(ctx, listAccountRechargeHistory,
+		arg.BillingAccountID,
+		arg.CutoffAt,
+		arg.CursorSet,
+		arg.CursorPaidAt,
+		arg.CursorID,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAccountRechargeHistoryRow
+	for rows.Next() {
+		var i ListAccountRechargeHistoryRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OccurredAt,
+			&i.IdeaQuantity,
+			&i.Status,
+			&i.PaidTotalMinor,
+			&i.PaidCurrency,
+			&i.ReceiptUrl,
+			&i.RefundedIdeaQuantity,
+			&i.RefundedAmountMinor,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listActivePaymentCheckoutShutdowns = `-- name: ListActivePaymentCheckoutShutdowns :many
 SELECT id, stripe_credential_id, stripe_account_id, cutoff_at, created_at, completed_at
 FROM payment_checkout_shutdowns
@@ -1129,7 +1371,7 @@ func (q *Queries) ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]Pay
 }
 
 const listActivePaymentOrders = `-- name: ListActivePaymentOrders :many
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE user_id = $1
   AND status IN ('creating', 'checkout_open', 'async_payment_pending')
@@ -1150,6 +1392,7 @@ func (q *Queries) ListActivePaymentOrders(ctx context.Context, userID int64) ([]
 			&i.PublicOrderNumber,
 			&i.PublicToken,
 			&i.UserID,
+			&i.BillingAccountID,
 			&i.ClientIdempotencyKey,
 			&i.RequestHash,
 			&i.Status,
@@ -1361,8 +1604,40 @@ func (q *Queries) ListAdminPaymentOrders(ctx context.Context, arg ListAdminPayme
 	return items, nil
 }
 
+const listBillingAccountManagerIDs = `-- name: ListBillingAccountManagerIDs :many
+SELECT user_id
+FROM billing_account_members
+WHERE billing_account_id = $1
+ORDER BY user_id
+`
+
+// Server-internal SSE fanout audience (#919): the current financial
+// managers of one Billing Account. No auth gate here; callers fan out
+// post-commit hints only to these users, so exited members and
+// non-managers never observe another account's settlement. Financial
+// management grants no content access; this list never leaves the server.
+func (q *Queries) ListBillingAccountManagerIDs(ctx context.Context, billingAccountID int64) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listBillingAccountManagerIDs, billingAccountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var user_id int64
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPaymentOrdersForCheckoutShutdown = `-- name: ListPaymentOrdersForCheckoutShutdown :many
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE stripe_account_id = $1
   AND stripe_credential_id = $2
@@ -1398,6 +1673,7 @@ func (q *Queries) ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg 
 			&i.PublicOrderNumber,
 			&i.PublicToken,
 			&i.UserID,
+			&i.BillingAccountID,
 			&i.ClientIdempotencyKey,
 			&i.RequestHash,
 			&i.Status,
@@ -1426,93 +1702,6 @@ func (q *Queries) ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg 
 			&i.CreditedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listPaymentRechargeHistory = `-- name: ListPaymentRechargeHistory :many
-SELECT orders.id,
-       COALESCE(orders.paid_at, orders.updated_at) AS occurred_at,
-       orders.idea_quantity,
-       orders.status,
-       orders.paid_total_minor,
-       orders.paid_currency,
-       orders.receipt_url,
-       COALESCE(refunds.idea_quantity, 0)::BIGINT AS refunded_idea_quantity,
-       COALESCE(refunds.amount_minor, 0)::BIGINT AS refunded_amount_minor
-FROM payment_orders orders
-LEFT JOIN LATERAL (
-  SELECT SUM(payment_refunds.idea_quantity)::BIGINT AS idea_quantity,
-         SUM(payment_refunds.amount_minor)::BIGINT AS amount_minor
-  FROM payment_refunds
-  WHERE payment_refunds.payment_order_id = orders.id
-    AND payment_refunds.status = 'succeeded'
-) refunds ON TRUE
-WHERE orders.user_id = $1::BIGINT
-  AND orders.status IN ('credited', 'cancelled')
-  AND COALESCE(orders.paid_at, orders.updated_at) >= $2::TIMESTAMPTZ
-  AND (
-    NOT $3::BOOLEAN
-    OR (COALESCE(orders.paid_at, orders.updated_at), orders.id) < ($4::TIMESTAMPTZ, $5::UUID)
-  )
-ORDER BY COALESCE(orders.paid_at, orders.updated_at) DESC, orders.id DESC
-LIMIT $6::INTEGER
-`
-
-type ListPaymentRechargeHistoryParams struct {
-	UserID       int64              `json:"user_id"`
-	CutoffAt     pgtype.Timestamptz `json:"cutoff_at"`
-	CursorSet    bool               `json:"cursor_set"`
-	CursorPaidAt pgtype.Timestamptz `json:"cursor_paid_at"`
-	CursorID     pgtype.UUID        `json:"cursor_id"`
-	PageLimit    int32              `json:"page_limit"`
-}
-
-type ListPaymentRechargeHistoryRow struct {
-	ID                   pgtype.UUID        `json:"id"`
-	OccurredAt           pgtype.Timestamptz `json:"occurred_at"`
-	IdeaQuantity         int64              `json:"idea_quantity"`
-	Status               string             `json:"status"`
-	PaidTotalMinor       pgtype.Int8        `json:"paid_total_minor"`
-	PaidCurrency         string             `json:"paid_currency"`
-	ReceiptUrl           string             `json:"receipt_url"`
-	RefundedIdeaQuantity int64              `json:"refunded_idea_quantity"`
-	RefundedAmountMinor  int64              `json:"refunded_amount_minor"`
-}
-
-func (q *Queries) ListPaymentRechargeHistory(ctx context.Context, arg ListPaymentRechargeHistoryParams) ([]ListPaymentRechargeHistoryRow, error) {
-	rows, err := q.db.Query(ctx, listPaymentRechargeHistory,
-		arg.UserID,
-		arg.CutoffAt,
-		arg.CursorSet,
-		arg.CursorPaidAt,
-		arg.CursorID,
-		arg.PageLimit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListPaymentRechargeHistoryRow
-	for rows.Next() {
-		var i ListPaymentRechargeHistoryRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.OccurredAt,
-			&i.IdeaQuantity,
-			&i.Status,
-			&i.PaidTotalMinor,
-			&i.PaidCurrency,
-			&i.ReceiptUrl,
-			&i.RefundedIdeaQuantity,
-			&i.RefundedAmountMinor,
 		); err != nil {
 			return nil, err
 		}
@@ -1623,7 +1812,7 @@ func (q *Queries) ListPaymentStripeCredentials(ctx context.Context) ([]PaymentSt
 }
 
 const listUnsettledPaymentOrders = `-- name: ListUnsettledPaymentOrders :many
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE status IN ('creating', 'checkout_open', 'async_payment_pending', 'paid_pending_credit')
 ORDER BY created_at, id
@@ -1644,67 +1833,7 @@ func (q *Queries) ListUnsettledPaymentOrders(ctx context.Context) ([]PaymentOrde
 			&i.PublicOrderNumber,
 			&i.PublicToken,
 			&i.UserID,
-			&i.ClientIdempotencyKey,
-			&i.RequestHash,
-			&i.Status,
-			&i.StripeCredentialID,
-			&i.StripeAccountID,
-			&i.StripeCustomerID,
-			&i.StripeProductID,
-			&i.StripeCheckoutSessionID,
-			&i.StripePaymentIntentID,
-			&i.StripeChargeID,
-			&i.IdeaQuantity,
-			&i.BaseCurrency,
-			&i.BaseAmountMinor,
-			&i.PaidSubtotalMinor,
-			&i.PaidTaxMinor,
-			&i.PaidTotalMinor,
-			&i.PaidCurrency,
-			&i.TermsVersion,
-			&i.RefundPolicyVersion,
-			&i.ReturnBaseUrl,
-			&i.CheckoutUrl,
-			&i.ReceiptUrl,
-			&i.CreditTransactionID,
-			&i.ExpiresAt,
-			&i.PaidAt,
-			&i.CreditedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listUserPendingPaymentOrders = `-- name: ListUserPendingPaymentOrders :many
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
-FROM payment_orders
-WHERE user_id = $1
-  AND status IN ('checkout_open', 'async_payment_pending', 'paid_pending_credit')
-ORDER BY created_at DESC, id DESC
-`
-
-func (q *Queries) ListUserPendingPaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error) {
-	rows, err := q.db.Query(ctx, listUserPendingPaymentOrders, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []PaymentOrder
-	for rows.Next() {
-		var i PaymentOrder
-		if err := rows.Scan(
-			&i.ID,
-			&i.PublicOrderNumber,
-			&i.PublicToken,
-			&i.UserID,
+			&i.BillingAccountID,
 			&i.ClientIdempotencyKey,
 			&i.RequestHash,
 			&i.Status,
@@ -1749,7 +1878,7 @@ UPDATE payment_orders
 SET status = 'async_payment_pending',
     checkout_url = ''
 WHERE id = $1 AND status = 'checkout_open'
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 func (q *Queries) MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UUID) (PaymentOrder, error) {
@@ -1760,6 +1889,7 @@ func (q *Queries) MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UU
 		&i.PublicOrderNumber,
 		&i.PublicToken,
 		&i.UserID,
+		&i.BillingAccountID,
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
@@ -1792,27 +1922,30 @@ func (q *Queries) MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UU
 	return i, err
 }
 
-const markPaymentOrderCancelled = `-- name: MarkPaymentOrderCancelled :one
+const markPaymentOrderCancelledByAccount = `-- name: MarkPaymentOrderCancelledByAccount :one
 UPDATE payment_orders
 SET status = 'cancelled',
     checkout_url = ''
-WHERE id = $1 AND user_id = $2 AND status = 'checkout_open'
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+WHERE id = $1 AND billing_account_id = $2 AND status = 'checkout_open'
+RETURNING id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
-type MarkPaymentOrderCancelledParams struct {
-	ID     pgtype.UUID `json:"id"`
-	UserID int64       `json:"user_id"`
+type MarkPaymentOrderCancelledByAccountParams struct {
+	ID               pgtype.UUID `json:"id"`
+	BillingAccountID pgtype.Int8 `json:"billing_account_id"`
 }
 
-func (q *Queries) MarkPaymentOrderCancelled(ctx context.Context, arg MarkPaymentOrderCancelledParams) (PaymentOrder, error) {
-	row := q.db.QueryRow(ctx, markPaymentOrderCancelled, arg.ID, arg.UserID)
+// Account abandon (#919): any Billing Owner/Admin of the persisted payer
+// account may abandon its open Checkout.
+func (q *Queries) MarkPaymentOrderCancelledByAccount(ctx context.Context, arg MarkPaymentOrderCancelledByAccountParams) (PaymentOrder, error) {
+	row := q.db.QueryRow(ctx, markPaymentOrderCancelledByAccount, arg.ID, arg.BillingAccountID)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
 		&i.PublicOrderNumber,
 		&i.PublicToken,
 		&i.UserID,
+		&i.BillingAccountID,
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
@@ -1851,7 +1984,7 @@ SET status = 'credited',
     credit_transaction_id = $2,
     credited_at = $3
 WHERE id = $1 AND status = 'paid_pending_credit'
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 type MarkPaymentOrderCreditedParams struct {
@@ -1868,6 +2001,7 @@ func (q *Queries) MarkPaymentOrderCredited(ctx context.Context, arg MarkPaymentO
 		&i.PublicOrderNumber,
 		&i.PublicToken,
 		&i.UserID,
+		&i.BillingAccountID,
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
@@ -1905,7 +2039,7 @@ UPDATE payment_orders
 SET status = 'expired',
     checkout_url = ''
 WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 func (q *Queries) MarkPaymentOrderExpired(ctx context.Context, id pgtype.UUID) (PaymentOrder, error) {
@@ -1916,6 +2050,7 @@ func (q *Queries) MarkPaymentOrderExpired(ctx context.Context, id pgtype.UUID) (
 		&i.PublicOrderNumber,
 		&i.PublicToken,
 		&i.UserID,
+		&i.BillingAccountID,
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
@@ -1953,7 +2088,7 @@ UPDATE payment_orders
 SET status = 'payment_failed',
     checkout_url = ''
 WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 func (q *Queries) MarkPaymentOrderFailed(ctx context.Context, id pgtype.UUID) (PaymentOrder, error) {
@@ -1964,6 +2099,7 @@ func (q *Queries) MarkPaymentOrderFailed(ctx context.Context, id pgtype.UUID) (P
 		&i.PublicOrderNumber,
 		&i.PublicToken,
 		&i.UserID,
+		&i.BillingAccountID,
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
@@ -2041,7 +2177,7 @@ SET status = 'paid_pending_credit',
     paid_at = $12
 WHERE id = $1
   AND status IN ('creating', 'checkout_open', 'async_payment_pending', 'cancelled', 'expired', 'payment_failed')
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 type RecordPaymentOrderPaidParams struct {
@@ -2080,6 +2216,7 @@ func (q *Queries) RecordPaymentOrderPaid(ctx context.Context, arg RecordPaymentO
 		&i.PublicOrderNumber,
 		&i.PublicToken,
 		&i.UserID,
+		&i.BillingAccountID,
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
@@ -2169,24 +2306,27 @@ func (q *Queries) ReplacePaymentStripeConfiguration(ctx context.Context, arg Rep
 	return i, err
 }
 
-const upsertPaymentCustomer = `-- name: UpsertPaymentCustomer :one
-INSERT INTO payment_customers (user_id, stripe_account_id, stripe_mode, stripe_customer_id)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (user_id, stripe_account_id, stripe_mode) DO UPDATE
-SET stripe_customer_id = EXCLUDED.stripe_customer_id
-RETURNING user_id, stripe_account_id, stripe_mode, stripe_customer_id, created_at, updated_at
+const upsertPaymentCustomerByAccount = `-- name: UpsertPaymentCustomerByAccount :one
+INSERT INTO payment_customers (user_id, billing_account_id, stripe_account_id, stripe_mode, stripe_customer_id)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (billing_account_id, stripe_account_id, stripe_mode) DO UPDATE
+SET stripe_customer_id = EXCLUDED.stripe_customer_id,
+    user_id = EXCLUDED.user_id
+RETURNING user_id, billing_account_id, stripe_account_id, stripe_mode, stripe_customer_id, created_at, updated_at
 `
 
-type UpsertPaymentCustomerParams struct {
+type UpsertPaymentCustomerByAccountParams struct {
 	UserID           int64  `json:"user_id"`
+	BillingAccountID int64  `json:"billing_account_id"`
 	StripeAccountID  string `json:"stripe_account_id"`
 	StripeMode       string `json:"stripe_mode"`
 	StripeCustomerID string `json:"stripe_customer_id"`
 }
 
-func (q *Queries) UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCustomerParams) (PaymentCustomer, error) {
-	row := q.db.QueryRow(ctx, upsertPaymentCustomer,
+func (q *Queries) UpsertPaymentCustomerByAccount(ctx context.Context, arg UpsertPaymentCustomerByAccountParams) (PaymentCustomer, error) {
+	row := q.db.QueryRow(ctx, upsertPaymentCustomerByAccount,
 		arg.UserID,
+		arg.BillingAccountID,
 		arg.StripeAccountID,
 		arg.StripeMode,
 		arg.StripeCustomerID,
@@ -2194,6 +2334,7 @@ func (q *Queries) UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCu
 	var i PaymentCustomer
 	err := row.Scan(
 		&i.UserID,
+		&i.BillingAccountID,
 		&i.StripeAccountID,
 		&i.StripeMode,
 		&i.StripeCustomerID,

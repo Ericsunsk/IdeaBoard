@@ -86,15 +86,16 @@ func TestTransactionLockOrdering(t *testing.T) {
 	billing := readOrderFile(t, filepath.Join("..", "billing", "infrastructure", "postgres", "store.go"))
 	baselineFile, baseline := baselineMigration(t)
 
-	t.Run("settlement submit walks claim quote hold task snapshot billing enqueue", func(t *testing.T) {
+	t.Run("settlement submit walks authorize claim quote hold task snapshot billing enqueue", func(t *testing.T) {
 		body := sliceBetween(t, "settle_tx.go", settle,
 			"func (s *Service) createInTx", "func (s *Service) replayClaimedSubmission")
 		assertCallOrder(t, "settle_tx.go:createInTx", body, []string{
-			"txClaims.ClaimSubmissionInTx(ctx, tx, claim)",
 			"s.acceptance.AuthorizeSubmission(ctx, tx, input)",
+			"txClaims.ClaimSubmissionInTx(ctx, tx, claim)",
+			"txAccounts.ResolveBillingAccountInTx(ctx, tx, claim.WorkspaceID)",
 			"s.resolver.ResolveInTx(ctx, tx, kind, resolution)",
 			"txQuoter.QuoteInTx(ctx, tx, kind, resolution, quantity)",
-			"txHolder.HoldInTx(ctx, tx, input.OwnerUserID",
+			"txHolder.HoldInTx(ctx, tx, billingAccountID, input.OwnerUserID",
 			"txStore.CreateTaskInTx(ctx, tx, task)",
 			"s.saveSnapshot(ctx, tx, created.ID, routingSnap)",
 			"facts.CreateBillingFactsInTx(ctx, tx, created)",
@@ -107,15 +108,15 @@ func TestTransactionLockOrdering(t *testing.T) {
 			"func (s *Service) completeInTx", "func (s *Service) failInTx")
 		assertCallOrder(t, "settle_tx.go:completeInTx", complete, []string{
 			"txStore.CompleteTaskInTx(ctx, tx, workspaceID, taskID, outputs)",
-			"txHolder.CaptureInTx(ctx, tx, completed.OwnerUserID",
-			"txHolder.ReleaseInTx(ctx, tx, completed.OwnerUserID",
+			"txHolder.CaptureInTx(ctx, tx, completed.BillingAccountID, completed.OwnerUserID",
+			"txHolder.ReleaseInTx(ctx, tx, completed.BillingAccountID, completed.OwnerUserID",
 			"facts.SetBillingSettlementInTx(ctx, tx, taskID,",
 		})
 		failed := sliceBetween(t, "settle_tx.go", settle,
 			"func (s *Service) failInTx", "func (s *Service) cancelInTx")
 		assertCallOrder(t, "settle_tx.go:failInTx", failed, []string{
 			"txStore.FailTaskInTx(ctx, tx, workspaceID, taskID, errorMsg)",
-			"txHolder.ReleaseInTx(ctx, tx, failed.OwnerUserID",
+			"txHolder.ReleaseInTx(ctx, tx, failed.BillingAccountID, failed.OwnerUserID",
 			"facts.SetBillingSettlementInTx(ctx, tx, taskID,",
 		})
 	})
@@ -164,6 +165,17 @@ func TestTransactionLockOrdering(t *testing.T) {
 		assertCallOrder(t, baselineFile+":execute_credit_command_v2", body, []string{
 			"pg_advisory_xact_lock(hashtextextended(p_idempotency_key",
 			"FROM credit_wallets WHERE user_id = p_user_id FOR UPDATE",
+			"ORDER BY accounts.id FOR UPDATE",
+		})
+	})
+
+	t.Run("billing account commands keep the same lock order on the account wallet", func(t *testing.T) {
+		fragment := readOrderFile(t, filepath.Join("..", "db", "schema", "fragments", "credits.sql"))
+		body := sliceBetween(t, "fragments/credits.sql", fragment,
+			"CREATE FUNCTION execute_credit_command_v3(", "$$ LANGUAGE plpgsql")
+		assertCallOrder(t, "fragments/credits.sql:execute_credit_command_v3", body, []string{
+			"pg_advisory_xact_lock(hashtextextended(p_idempotency_key",
+			"FROM credit_wallets wallets WHERE wallets.billing_account_id = p_billing_account_id FOR UPDATE",
 			"ORDER BY accounts.id FOR UPDATE",
 		})
 	})

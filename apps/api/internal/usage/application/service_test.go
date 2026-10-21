@@ -42,7 +42,7 @@ func TestServiceGetCurrentUsesShanghaiCaptureDaysAndLogicalTasks(t *testing.T) {
 		ServiceOptions{Now: func() time.Time { return now }},
 	)
 
-	result, err := service.GetCurrent(context.Background(), 42, usagedomain.Range30Days)
+	result, err := service.GetCurrent(context.Background(), 42, domain.UsageFilter{}, usagedomain.Range30Days)
 	if err != nil {
 		t.Fatalf("GetCurrent() error = %v", err)
 	}
@@ -95,7 +95,7 @@ func TestServiceGetCurrentBuildsEverySupportedShanghaiRangeIncludingToday(t *tes
 				ServiceOptions{Now: func() time.Time { return now }},
 			)
 
-			result, err := service.GetCurrent(context.Background(), 42, tt.usageRange)
+			result, err := service.GetCurrent(context.Background(), 42, domain.UsageFilter{}, tt.usageRange)
 			if err != nil {
 				t.Fatalf("GetCurrent() error = %v", err)
 			}
@@ -117,7 +117,7 @@ func TestServiceGetCurrentRejectsUnsafeCaptureBeforeReadingTasks(t *testing.T) {
 		ServiceOptions{},
 	)
 
-	_, err := service.GetCurrent(context.Background(), 42, usagedomain.Range30Days)
+	_, err := service.GetCurrent(context.Background(), 42, domain.UsageFilter{}, usagedomain.Range30Days)
 	if !errors.Is(err, usageports.ErrUnsafeNumber) {
 		t.Fatalf("GetCurrent() error = %v, want usageports.ErrUnsafeNumber", err)
 	}
@@ -150,7 +150,7 @@ func TestServiceGetCurrentRejectsUnsafeDailyCapture(t *testing.T) {
 		ServiceOptions{Now: func() time.Time { return time.Date(2026, time.July, 13, 0, 0, 0, 0, time.UTC) }},
 	)
 
-	_, err := service.GetCurrent(context.Background(), 42, usagedomain.Range30Days)
+	_, err := service.GetCurrent(context.Background(), 42, domain.UsageFilter{}, usagedomain.Range30Days)
 	if !errors.Is(err, usageports.ErrUnsafeNumber) {
 		t.Fatalf("GetCurrent() error = %v, want usageports.ErrUnsafeNumber", err)
 	}
@@ -170,7 +170,7 @@ func TestServiceGetCurrentAcceptsMaximumSafeInteger(t *testing.T) {
 		&taskUsageReaderStub{taskCount: MaxSafeInteger, activeDays: MaxSafeInteger},
 		ServiceOptions{Now: func() time.Time { return time.Date(2026, time.July, 13, 8, 0, 0, 0, location) }},
 	)
-	result, err := service.GetCurrent(context.Background(), 42, usagedomain.Range30Days)
+	result, err := service.GetCurrent(context.Background(), 42, domain.UsageFilter{}, usagedomain.Range30Days)
 	if err != nil {
 		t.Fatalf("GetCurrent() error = %v", err)
 	}
@@ -186,7 +186,7 @@ func TestServiceGetCurrentReturnsZeroesWithoutCapturesOrTasks(t *testing.T) {
 		ServiceOptions{Now: func() time.Time { return time.Date(2026, time.July, 13, 8, 0, 0, 0, time.UTC) }},
 	)
 
-	result, err := service.GetCurrent(context.Background(), 42, usagedomain.Range30Days)
+	result, err := service.GetCurrent(context.Background(), 42, domain.UsageFilter{}, usagedomain.Range30Days)
 	if err != nil {
 		t.Fatalf("GetCurrent() error = %v", err)
 	}
@@ -206,11 +206,11 @@ type captureUsageReaderStub struct {
 	err              error
 }
 
-func (s captureUsageReaderStub) GetCaptureUsage(context.Context, int64, *time.Location) (int64, int64, time.Time, error) {
+func (s captureUsageReaderStub) GetCaptureUsage(context.Context, int64, domain.UsageFilter, *time.Location) (int64, int64, time.Time, error) {
 	return s.totalCredits, s.peakDailyCredits, s.firstCaptureDay, s.err
 }
 
-func (s captureUsageReaderStub) GetDailyCaptureUsage(context.Context, int64, *time.Location, time.Time, time.Time) (map[string]int64, error) {
+func (s captureUsageReaderStub) GetDailyCaptureUsage(context.Context, int64, domain.UsageFilter, *time.Location, time.Time, time.Time) (map[string]int64, error) {
 	return s.dailyCredits, s.err
 }
 
@@ -221,7 +221,7 @@ type taskUsageReaderStub struct {
 	calls      int
 }
 
-func (s *taskUsageReaderStub) GetTaskUsage(context.Context, int64, *time.Location) (int64, int64, error) {
+func (s *taskUsageReaderStub) GetTaskUsage(context.Context, int64, domain.UsageFilter, *time.Location) (int64, int64, error) {
 	s.calls++
 	return s.taskCount, s.activeDays, s.err
 }
@@ -237,7 +237,7 @@ func TestServiceGetCurrentReportsDurableLogicalTasks(t *testing.T) {
 	latestCapture := captureUsageCredits(t, ctx, creditService, userID, 100, "usage-capture-2")
 	_ = captureUsageCredits(t, ctx, creditService, 902, 10, "usage-other-user-capture")
 	if _, err := creditService.Refund(ctx, ports.RefundCommand{
-		UserID:              userID,
+		BillingAccountID:    usageAccountOf(t, ctx, creditService, userID),
 		ChargeTransactionID: firstCapture.TransactionID,
 		Amount:              mustUsageCreditAmount(t, 20),
 		Metadata:            usageCreditMetadata("usage-refund"),
@@ -262,7 +262,7 @@ func TestServiceGetCurrentReportsDurableLogicalTasks(t *testing.T) {
 	}
 	service := newUsageService()
 
-	beforeDelete, err := service.GetCurrent(ctx, userID, usagedomain.Range30Days)
+	beforeDelete, err := service.GetCurrent(ctx, usageAccountOf(t, ctx, creditService, userID), domain.UsageFilter{}, usagedomain.Range30Days)
 	if err != nil {
 		t.Fatalf("GetCurrent() error = %v", err)
 	}
@@ -297,25 +297,35 @@ VALUES ($1, $2, $3, 'user', 1)`, userID, fmt.Sprintf("usage-user-%d", userID), s
 	}
 }
 
+func usageAccountOf(t *testing.T, ctx context.Context, service *credits.Service, userID int64) int64 {
+	t.Helper()
+	accountID, err := service.ResolvePersonalAccount(ctx, userID)
+	if err != nil {
+		t.Fatalf("resolve personal account %d: %v", userID, err)
+	}
+	return accountID
+}
+
 func captureUsageCredits(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, key string) ports.CommandResult {
 	t.Helper()
+	accountID := usageAccountOf(t, ctx, service, userID)
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   userID,
-		Amount:   mustUsageCreditAmount(t, amount),
-		Metadata: usageCreditMetadata("usage-grant-" + key),
+		BillingAccountID: accountID,
+		Amount:           mustUsageCreditAmount(t, amount),
+		Metadata:         usageCreditMetadata("usage-grant-" + key),
 	}); err != nil {
 		t.Fatalf("grant user %d: %v", userID, err)
 	}
 	hold, err := service.Hold(ctx, ports.HoldCommand{
-		UserID:   userID,
-		Amount:   mustUsageCreditAmount(t, amount),
-		Metadata: usageCreditMetadata("usage-hold-" + key),
+		BillingAccountID: accountID,
+		Amount:           mustUsageCreditAmount(t, amount),
+		Metadata:         usageCreditMetadata("usage-hold-" + key),
 	})
 	if err != nil {
 		t.Fatalf("hold user %d: %v", userID, err)
 	}
 	capture, err := service.Capture(ctx, ports.CaptureCommand{
-		UserID:            userID,
+		BillingAccountID:  accountID,
 		HoldTransactionID: hold.TransactionID,
 		Amount:            mustUsageCreditAmount(t, amount),
 		Metadata:          usageCreditMetadata("usage-capture-" + key),
@@ -358,12 +368,16 @@ func seedDurableUsageSnapshots(
 	taskIDs []string,
 ) {
 	t.Helper()
+	var snapshotAccountID int64
+	if err := pool.QueryRow(ctx, `SELECT ensure_personal_billing_account_for_user($1)`, userID).Scan(&snapshotAccountID); err != nil {
+		t.Fatalf("resolve snapshot billing account: %v", err)
+	}
 	for _, taskID := range taskIDs {
 		tx, err := pool.Begin(ctx)
 		if err != nil {
 			t.Fatalf("begin task billing fixture: %v", err)
 		}
-		if _, err := billingWriter.HoldAndPersist(ctx, tx, taskbilling.HoldCommand{TaskID: taskID, UserID: userID, Billing: request}); err != nil {
+		if _, err := billingWriter.HoldAndPersist(ctx, tx, taskbilling.HoldCommand{TaskID: taskID, BillingAccountID: snapshotAccountID, ActorUserID: userID, Billing: request}); err != nil {
 			_ = tx.Rollback(ctx)
 			t.Fatalf("persist task billing snapshot %s: %v", taskID, err)
 		}

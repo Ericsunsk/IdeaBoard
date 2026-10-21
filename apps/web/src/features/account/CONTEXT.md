@@ -16,10 +16,21 @@ It does NOT own the server-side ledger, the Stripe gateway itself, or pricing po
 ## Public Seams
 
 - `core/index.ts` pure quantity normalization (`normalizeIdeaQuantity`, `MIN_IDEA_QUANTITY`), payment-return query parsing, account-tab keys/resolution, and chart/quantity types.
-- `session/index.ts` unified export for `credits`, `payments`, `rewards`, `usage`, `billing` transport resources, orchestration hooks, and runtime chart/date/currency formatting.
-- `session` use-case hooks: `useRecharge`, `useCreditWallet`, `useCreditsSync`, `useRewardRedemption`, `useUsage`, `useAvatarUpload`, `accountOverlay`.
+- `session/index.ts` unified export for `credits`, `payments`, `rewards`, `usage`, `billing`, `billingAccount` transport resources, orchestration hooks, and runtime chart/date/currency formatting.
+- `session` use-case hooks: `useRecharge`, `useCreditWallet`, `useCreditsSync`, `useRewardRedemption`, `useUsage`, `useBillingAccount`, `useAvatarUpload`, `accountOverlay`.
 - `ui/index.ts` view layer: `RechargePane`, `UsagePane`, `RewardsPane`, `SecurityPane`, `BillingPane`, and `AccountDialogHost`.
 - `accountOverlay.open(tab?)` the only entry to open the account dialog.
+
+## Billing Account Scope (issue #922)
+
+- Funds identity is the stable Billing Account (`ba_`): every Workspace sharing one account reports the same balance, with or without an Organization; independent accounts never share cache entries.
+- `useBillingAccount` owns Workspace selection, account resolution and read readiness. It supplies immutable identity-aware contexts to query keys: `walletScope` for balance and `readScope` (including server-derived consumption visibility) for Usage/Billing Records. Dependent queries never assemble or re-resolve this context themselves.
+- The same module owns prerequisite-error precedence, prerequisite-first retry, and matching retained consumption results against the current authorized context. Disabled reads and failed resolution hide cached financial data; query-key snapshots pin the requested identity and Workspace even when responses arrive late.
+- Account resolution failures propagate to balance, billing, and usage error states; retry reloads the failing prerequisite before the dependent read. Successful usage ranges may be retained only within the same Workspace and Billing Account.
+- Raw Ledger and recharge orders require Billing Owner/Admin. Billing Records and Usage share server-derived consumption scopes: financial managers see the account, Workspace Owner/Admin sees the current Workspace, and ordinary members see their own consumption across the account. Scoped Billing Records exclude non-consumption entries and historical account balances. The balance projection remains available to Workspace members for consumption UI.
+- Query functions read scope from the query key, never from the closure, so cross-account switches and late responses cannot mix data; balance responses naming a different payer fail closed.
+- Settlement attributes the real operator and the consuming Workspace and never rewrites history; there is no owner-wallet projection or fallback.
+- `invalidateUserMoney` refreshes credits + billing records + usage together; reward history stays at the redemption site.
 
 ## Invariants
 

@@ -276,10 +276,17 @@ func (s *Store) CreateWorkspace(ctx context.Context, params tenancy.CreateWorksp
 			return nil, err
 		}
 		err = s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
+			// Organization workspaces carry no owner_user_id per
+			// chk_workspaces_owner_xor (org owns the workspace); the
+			// creator still gains an owner membership row below.
+			ownerCol := nullInt64(params.OwnerUserID)
+			if orgInternal.Valid {
+				ownerCol = pgtype.Int8{}
+			}
 			row, insertErr := q.CreateWorkspace(ctx, dbsqlc.CreateWorkspaceParams{
 				PublicID:       publicID,
 				OrganizationID: orgInternal,
-				OwnerUserID:    nullInt64(params.OwnerUserID),
+				OwnerUserID:    ownerCol,
 				Name:           strings.TrimSpace(params.Name),
 				IsDefault:      params.IsDefault && !orgInternal.Valid,
 			})

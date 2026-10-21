@@ -62,7 +62,7 @@ func (s *Service) PrepareRequest(ctx context.Context, command paymentsdomain.Cre
 	if !configuration.PurchasesEnabled || !configuration.ChargesEnabled || configuration.StripeProductID == "" || configuration.PaymentMethodConfigurationID == "" {
 		return Request{}, paymentsdomain.ErrPurchasesUnavailable
 	}
-	if err := s.requireWallet(ctx, command.UserID); err != nil {
+	if err := s.requireWallet(ctx, command.BillingAccountID); err != nil {
 		return Request{}, err
 	}
 	configuration, apiKey, err := s.resolver.ForCredentialID(ctx, configuration.CredentialID)
@@ -76,8 +76,11 @@ func (s *Service) PrepareRequest(ctx context.Context, command paymentsdomain.Cre
 	return Request{Quote: quote, RequestHash: hash, Configuration: configuration, APIKey: apiKey, ReturnBaseURL: base, Now: s.now().UTC()}, nil
 }
 
-func (s *Service) requireWallet(ctx context.Context, userID int64) error {
-	wallet, err := s.wallets.GetWallet(ctx, userID)
+func (s *Service) requireWallet(ctx context.Context, billingAccountID int64) error {
+	if billingAccountID <= 0 {
+		return paymentsdomain.ErrWalletNotRechargeable
+	}
+	wallet, err := s.wallets.GetWallet(ctx, billingAccountID)
 	if err != nil {
 		if errors.Is(err, domain.ErrWalletNotFound) {
 			return paymentsdomain.ErrWalletNotRechargeable
@@ -91,7 +94,7 @@ func (s *Service) requireWallet(ctx context.Context, userID int64) error {
 }
 
 func (s *Service) ResolveOrder(ctx context.Context, command paymentsdomain.CreateCheckoutCommand, request Request, resolve func(context.Context, paymentsdomain.PaymentOrder) (paymentsdomain.PaymentOrder, error)) (OrderResolution, error) {
-	active, err := s.RefreshActivePaymentOrders(ctx, command.UserID, request.Now, resolve)
+	active, err := s.RefreshActivePaymentOrders(ctx, command.BillingAccountID, request.Now, resolve)
 	if err != nil {
 		return OrderResolution{}, err
 	}
@@ -131,7 +134,7 @@ func (s *Service) ResolveOrder(ctx context.Context, command paymentsdomain.Creat
 	if err != nil {
 		return OrderResolution{}, err
 	}
-	order, reused, err := s.store.CreatePaymentOrderIntent(ctx, paymentsdomain.CreatePaymentOrderIntentInput{ID: id.String(), PublicOrderNumber: number, PublicToken: uuid.NewString(), UserID: command.UserID, ClientIdempotencyKey: strings.TrimSpace(command.ClientIdempotencyKey), RequestHash: request.RequestHash, StripeCredentialID: request.Configuration.CredentialID, StripeAccountID: request.Configuration.AccountID, StripeProductID: request.Configuration.StripeProductID, IdeaQuantity: request.Quote.IdeaQuantity, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion, ReturnBaseURL: request.ReturnBaseURL, ExpiresAt: request.Now.Truncate(time.Second).Add(SessionLifetime + TransportMargin)})
+	order, reused, err := s.store.CreatePaymentOrderIntent(ctx, paymentsdomain.CreatePaymentOrderIntentInput{ID: id.String(), PublicOrderNumber: number, PublicToken: uuid.NewString(), UserID: command.UserID, BillingAccountID: command.BillingAccountID, ClientIdempotencyKey: strings.TrimSpace(command.ClientIdempotencyKey), RequestHash: request.RequestHash, StripeCredentialID: request.Configuration.CredentialID, StripeAccountID: request.Configuration.AccountID, StripeProductID: request.Configuration.StripeProductID, IdeaQuantity: request.Quote.IdeaQuantity, TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion, ReturnBaseURL: request.ReturnBaseURL, ExpiresAt: request.Now.Truncate(time.Second).Add(SessionLifetime + TransportMargin)})
 	if err != nil {
 		return OrderResolution{}, err
 	}
@@ -139,15 +142,15 @@ func (s *Service) ResolveOrder(ctx context.Context, command paymentsdomain.Creat
 }
 
 type Store interface {
-	WithUserCheckoutLock(context.Context, int64, func(context.Context) error) error
+	WithBillingAccountCheckoutLock(context.Context, int64, func(context.Context) error) error
 	CreatePaymentOrderIntent(context.Context, paymentsdomain.CreatePaymentOrderIntentInput) (paymentsdomain.PaymentOrder, bool, error)
-	GetPaymentCustomer(context.Context, int64, string, paymentports.StripeMode) (PaymentCustomer, error)
+	GetPaymentCustomerByAccount(context.Context, int64, string, paymentports.StripeMode) (PaymentCustomer, error)
 	UpsertPaymentCustomer(context.Context, PaymentCustomer) (PaymentCustomer, error)
 	BindPaymentOrderCheckout(context.Context, paymentsdomain.BindPaymentOrderCheckoutInput) (paymentsdomain.PaymentOrder, error)
 	GetPaymentOrderByID(context.Context, string) (paymentsdomain.PaymentOrder, error)
-	GetPaymentOrderByPublicToken(context.Context, int64, string) (paymentsdomain.PaymentOrder, error)
-	ListActivePaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error)
-	ListUserPendingPaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error)
+	GetPaymentOrderByAccountToken(context.Context, int64, string) (paymentsdomain.PaymentOrder, error)
+	ListAccountActivePaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error)
+	ListAccountPendingPaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error)
 }
 
 type Service struct {
@@ -170,8 +173,8 @@ func NewService(configuration ConfigurationStore, store Store, gateway paymentpo
 	return &Service{configuration: configuration, resolver: resolver, store: store, gateway: gateway, wallets: wallets, lifecycle: lifecycle, now: now}, nil
 }
 
-func (s *Service) RefreshActivePaymentOrders(ctx context.Context, userID int64, now time.Time, resolve func(context.Context, paymentsdomain.PaymentOrder) (paymentsdomain.PaymentOrder, error)) ([]paymentsdomain.PaymentOrder, error) {
-	orders, err := s.store.ListActivePaymentOrders(ctx, userID)
+func (s *Service) RefreshActivePaymentOrders(ctx context.Context, billingAccountID int64, now time.Time, resolve func(context.Context, paymentsdomain.PaymentOrder) (paymentsdomain.PaymentOrder, error)) ([]paymentsdomain.PaymentOrder, error) {
+	orders, err := s.store.ListAccountActivePaymentOrders(ctx, billingAccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -208,21 +211,21 @@ func (s *Service) EnsureCustomer(ctx context.Context, configuration paymentconfi
 	if configuration.AccountID != order.StripeAccountID || configuration.Mode == "" {
 		return PaymentCustomer{}, paymentsdomain.ErrPurchasesUnavailable
 	}
-	stored, err := s.store.GetPaymentCustomer(ctx, order.UserID, order.StripeAccountID, configuration.Mode)
+	stored, err := s.store.GetPaymentCustomerByAccount(ctx, order.BillingAccountID, order.StripeAccountID, configuration.Mode)
 	if err == nil && stored.StripeCustomerID != "" {
 		return stored, nil
 	}
 	if err != nil && !database.IsNotFound(err) {
 		return PaymentCustomer{}, fmt.Errorf("get payment customer: %w", err)
 	}
-	created, err := s.gateway.CreateCustomer(ctx, paymentports.CreateCheckoutCustomerInput{APIKey: apiKey, UserID: order.UserID, IdempotencyKey: "ideaboard-customer-" + order.StripeAccountID + "-" + string(configuration.Mode) + "-" + strconv.FormatInt(order.UserID, 10)})
+	created, err := s.gateway.CreateCustomer(ctx, paymentports.CreateCheckoutCustomerInput{APIKey: apiKey, BillingAccountID: order.BillingAccountID, IdempotencyKey: "ideaboard-customer-" + order.StripeAccountID + "-" + string(configuration.Mode) + "-" + strconv.FormatInt(order.BillingAccountID, 10)})
 	if err != nil {
 		return PaymentCustomer{}, err
 	}
 	if strings.TrimSpace(created.ID) == "" {
 		return PaymentCustomer{}, paymentsdomain.ErrPurchasesUnavailable
 	}
-	return s.store.UpsertPaymentCustomer(ctx, PaymentCustomer{UserID: order.UserID, StripeAccountID: order.StripeAccountID, StripeMode: configuration.Mode, StripeCustomerID: created.ID})
+	return s.store.UpsertPaymentCustomer(ctx, PaymentCustomer{UserID: order.UserID, BillingAccountID: order.BillingAccountID, StripeAccountID: order.StripeAccountID, StripeMode: configuration.Mode, StripeCustomerID: created.ID})
 }
 
 func (s *Service) CreateSessionForOrder(ctx context.Context, configuration paymentconfiguration.StoredStripeConfiguration, apiKey string, order paymentsdomain.PaymentOrder) (paymentsdomain.PaymentOrder, error) {
@@ -332,7 +335,7 @@ func (s *Service) shutdownAPIKey(ctx context.Context, shutdown paymentconfigurat
 }
 
 func (s *Service) processCheckoutShutdownOrder(ctx context.Context, shutdown paymentconfiguration.PaymentCheckoutShutdown, apiKey string, order paymentsdomain.PaymentOrder) error {
-	return s.store.WithUserCheckoutLock(ctx, order.UserID, func(c context.Context) error {
+	return s.store.WithBillingAccountCheckoutLock(ctx, order.BillingAccountID, func(c context.Context) error {
 		current, err := s.store.GetPaymentOrderByID(c, order.ID)
 		if database.IsNotFound(err) {
 			return nil

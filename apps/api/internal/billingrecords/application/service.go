@@ -22,7 +22,7 @@ func (s *Service) List(ctx context.Context, input billingrecordsports.ListInput)
 	if s == nil || s.repository == nil {
 		return billingrecordsports.Page{}, billingrecordsports.ErrRepositoryNotConfigured
 	}
-	if input.UserID <= 0 || input.BeforeSequence < 0 {
+	if input.BillingAccountID <= 0 || input.BeforeSequence < 0 || input.WorkspaceID < 0 || input.ActorUserID < 0 {
 		return billingrecordsports.Page{}, billingrecordsports.ErrInvalidListInput
 	}
 	limit := input.Limit
@@ -33,7 +33,7 @@ func (s *Service) List(ctx context.Context, input billingrecordsports.ListInput)
 		return billingrecordsports.Page{}, billingrecordsports.ErrInvalidPageLimit
 	}
 
-	ledgerRecords, err := s.repository.List(ctx, input.UserID, input.BeforeSequence, limit+1)
+	ledgerRecords, err := s.repository.List(ctx, input, limit+1)
 	if err != nil {
 		return billingrecordsports.Page{}, err
 	}
@@ -46,6 +46,9 @@ func (s *Service) List(ctx context.Context, input billingrecordsports.ListInput)
 		record, err := recordFromLedger(ledgerRecord)
 		if err != nil {
 			return billingrecordsports.Page{}, err
+		}
+		if input.WorkspaceID != 0 || input.ActorUserID != 0 {
+			record.AvailableCreditsAfter = nil
 		}
 		page.Records = append(page.Records, record)
 	}
@@ -66,7 +69,7 @@ func recordFromLedger(raw ledgerRecord) (billingrecordsports.Record, error) {
 		Kind:                  kind,
 		Title:                 title,
 		CreditDelta:           delta,
-		AvailableCreditsAfter: raw.availableAfter,
+		AvailableCreditsAfter: &raw.availableAfter,
 	}, nil
 }
 

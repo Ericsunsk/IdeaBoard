@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	creditsdomain "ideaboard/api/internal/credits/domain"
 	usagedomain "ideaboard/api/internal/usage/domain"
 )
 
@@ -115,7 +116,7 @@ func TestServiceCacheSupportsConcurrentReadersWithoutSharingTrendSlices(t *testi
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			result, err := service.GetCurrent(context.Background(), 41, usagedomain.Range1Year)
+			result, err := service.GetCurrent(context.Background(), 41, creditsdomain.UsageFilter{}, usagedomain.Range1Year)
 			if err != nil {
 				errorsCh <- err
 				return
@@ -142,7 +143,7 @@ func TestServiceCacheSupportsConcurrentReadersWithoutSharingTrendSlices(t *testi
 
 func getUsageForTest(t *testing.T, service *Service, userID int64, usageRange usagedomain.Range) Usage {
 	t.Helper()
-	result, err := service.GetCurrent(context.Background(), userID, usageRange)
+	result, err := service.GetCurrent(context.Background(), userID, creditsdomain.UsageFilter{}, usageRange)
 	if err != nil {
 		t.Fatalf("GetCurrent(%d, %s) error = %v", userID, usageRange, err)
 	}
@@ -179,13 +180,13 @@ func newCountingCaptureReader() *countingCaptureReader {
 	return &countingCaptureReader{dailyCalls: make(map[string]int)}
 }
 
-func (r *countingCaptureReader) GetCaptureUsage(context.Context, int64, *time.Location) (int64, int64, time.Time, error) {
+func (r *countingCaptureReader) GetCaptureUsage(context.Context, int64, creditsdomain.UsageFilter, *time.Location) (int64, int64, time.Time, error) {
 	return 0, 0, time.Time{}, nil
 }
 
 func (r *countingCaptureReader) GetDailyCaptureUsage(
 	_ context.Context,
-	userID int64,
+	userID int64, filter creditsdomain.UsageFilter,
 	_ *time.Location,
 	start time.Time,
 	endExclusive time.Time,
@@ -237,7 +238,7 @@ func TestServiceCacheCollapsesConcurrentColdLoads(t *testing.T) {
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			if _, err := service.GetCurrent(context.Background(), 7, usagedomain.Range30Days); err != nil {
+			if _, err := service.GetCurrent(context.Background(), 7, creditsdomain.UsageFilter{}, usagedomain.Range30Days); err != nil {
 				errorsCh <- err
 			}
 		}()
@@ -261,7 +262,7 @@ func TestServiceSingleflightLoaderOutlivesLeaderCancellation(t *testing.T) {
 	loaderFinished := make(chan error, 1)
 	leaderFinished := make(chan error, 1)
 	waiterFinished := make(chan error, 1)
-	key := cacheKey{userID: 7, usageRange: usagedomain.Range30Days}
+	key := cacheKey{billingAccountID: 7, usageRange: usagedomain.Range30Days}
 	var startedOnce sync.Once
 	var loadCalls atomic.Int32
 	load := func(loadCtx context.Context) (Usage, error) {
@@ -317,7 +318,7 @@ type pilingCaptureReader struct {
 
 func (r *pilingCaptureReader) GetDailyCaptureUsage(
 	ctx context.Context,
-	userID int64,
+	userID int64, filter creditsdomain.UsageFilter,
 	location *time.Location,
 	start time.Time,
 	endExclusive time.Time,
@@ -325,5 +326,48 @@ func (r *pilingCaptureReader) GetDailyCaptureUsage(
 	if r.started.Add(1) == 1 {
 		time.Sleep(150 * time.Millisecond)
 	}
-	return r.countingCaptureReader.GetDailyCaptureUsage(ctx, userID, location, start, endExclusive)
+	return r.countingCaptureReader.GetDailyCaptureUsage(ctx, userID, filter, location, start, endExclusive)
+}
+
+// Financial authority may differ for the same account, so both the cache and
+// singleflight key must include the authorized member/workspace filter.
+func TestServiceUsageCacheSeparatesAuthorizedScopes(t *testing.T) {
+	reader := &scopedUsageReader{loads: make(map[creditsdomain.UsageFilter]int)}
+	service := NewService(reader, reader, ServiceOptions{})
+	for _, filter := range []creditsdomain.UsageFilter{{}, {WorkspaceID: 11}, {WorkspaceID: 12}, {ActorUserID: 11}, {ActorUserID: 12}} {
+		for range 2 {
+			result, err := service.GetCurrent(context.Background(), 42, filter, usagedomain.Range7Days)
+			if err != nil {
+				t.Fatal(err)
+			}
+			expected := int64(100) + filter.WorkspaceID*10 + filter.ActorUserID
+			if result.Lifetime.TotalCredits != expected || result.Lifetime.TaskCount != expected {
+				t.Fatalf("filter %+v got credits/tasks %d/%d, want %d", filter, result.Lifetime.TotalCredits, result.Lifetime.TaskCount, expected)
+			}
+		}
+	}
+	if len(reader.loads) != 5 {
+		t.Fatalf("loaded %d scopes, want 5", len(reader.loads))
+	}
+	for filter, count := range reader.loads {
+		if count != 1 {
+			t.Fatalf("scope %+v loaded %d times", filter, count)
+		}
+	}
+}
+
+type scopedUsageReader struct {
+	loads map[creditsdomain.UsageFilter]int
+}
+
+func (r *scopedUsageReader) GetCaptureUsage(_ context.Context, _ int64, filter creditsdomain.UsageFilter, _ *time.Location) (int64, int64, time.Time, error) {
+	r.loads[filter]++
+	value := int64(100) + filter.WorkspaceID*10 + filter.ActorUserID
+	return value, value, time.Time{}, nil
+}
+func (r *scopedUsageReader) GetDailyCaptureUsage(_ context.Context, _ int64, _ creditsdomain.UsageFilter, _ *time.Location, _, _ time.Time) (map[string]int64, error) {
+	return nil, nil
+}
+func (r *scopedUsageReader) GetTaskUsage(_ context.Context, _ int64, filter creditsdomain.UsageFilter, _ *time.Location) (int64, int64, error) {
+	return int64(100) + filter.WorkspaceID*10 + filter.ActorUserID, 1, nil
 }

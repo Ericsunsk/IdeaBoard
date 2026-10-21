@@ -117,6 +117,13 @@ func (s *txTestStore) TransitionForRetryInTx(ctx context.Context, _ pgx.Tx, work
 	return s.TransitionForRetry(ctx, workspaceID, taskID, newToken)
 }
 
+// ResolveBillingAccountInTx serves the stable funds identity seam from a
+// fixed fixture account: fake settlement spends the fixture account, never
+// an owner wallet.
+func (s *txTestStore) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string) (int64, error) {
+	return 9101, nil
+}
+
 func (s *txTestStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim SubmissionClaim) (*SubmissionClaim, bool, error) {
 	key := claimScopeKey(claim.WorkspaceID, claim.Operation, claim.IdempotencyKey)
 	s.mu.Lock()
@@ -160,9 +167,9 @@ type txTestHolder struct {
 	inTxHolds int
 }
 
-func (h *txTestHolder) HoldInTx(ctx context.Context, tx pgx.Tx, userID int64, amount int64, key, taskID string) (string, error) {
+func (h *txTestHolder) HoldInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
 	h.inTxHolds++
-	holdID, err := h.Hold(ctx, userID, amount, key, taskID)
+	holdID, err := h.Hold(ctx, billingAccountID, actorUserID, amount, key, taskID)
 	if err != nil {
 		return "", err
 	}
@@ -174,12 +181,12 @@ func (h *txTestHolder) HoldInTx(ctx context.Context, tx pgx.Tx, userID int64, am
 	return holdID, nil
 }
 
-func (h *txTestHolder) CaptureInTx(_ context.Context, _ pgx.Tx, _ int64, holdID string, amount int64, _ string) (string, error) {
+func (h *txTestHolder) CaptureInTx(_ context.Context, _ pgx.Tx, _ int64, _ int64, holdID string, amount int64, _ string) (string, error) {
 	h.captured[holdID] = amount
 	return "", nil
 }
 
-func (h *txTestHolder) ReleaseInTx(_ context.Context, _ pgx.Tx, _ int64, holdID string, amount int64, _ string) (string, error) {
+func (h *txTestHolder) ReleaseInTx(_ context.Context, _ pgx.Tx, _ int64, _ int64, holdID string, amount int64, _ string) (string, error) {
 	h.released[holdID] = amount
 	return "", nil
 }

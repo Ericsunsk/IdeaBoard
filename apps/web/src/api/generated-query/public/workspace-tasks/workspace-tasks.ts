@@ -586,7 +586,7 @@ export const getQuoteWorkspaceTaskUrl = (workspaceId: string) => {
 }
 
 /**
- * Returns an immutable price snapshot with no persistence (separate from the authoritative create). No Idempotency-Key is required. Unpriced or unregistered SKU renders billing_pricing_unavailable 422 deterministic; transient quote failures render billing_quote_unavailable 503. Missing Service Model Pool routing renders service_resolution_unavailable 422. An omitted resolution is normalized to the Service policy canonical value; only 1k, 2k, and 4k are accepted.
+ * Returns an immutable price snapshot with no persistence (separate from the authoritative create). No Idempotency-Key is required: pure read, safe to retry. The preflight resolves the same stable Billing Account submit would hold (no owner-wallet fallback) and applies the same consumption eligibility: an optional data.board_id binds the preflight to its Board (Board identity + generate capability checked before any quote; invisible Boards render 404 board_not_found, archived Boards 409 board_archived, visible Boards without generate capability 403 task_forbidden, so Viewers never read ready), and the resolved account Wallet gates funds (402 task_insufficient_credits vs 403 billing_wallet_restricted, mirroring the submit Hold). Financial management alone grants no Board standing. Unpriced or unregistered SKU renders billing_pricing_unavailable 422 deterministic; transient quote failures render billing_quote_unavailable 503. Missing Service Model Pool routing renders service_resolution_unavailable 422. An omitted resolution is normalized to the Service policy canonical value; only 1k, 2k, and 4k are accepted.
  * @summary Preflight price quote for a task (members only, no persistence)
  */
 export const quoteWorkspaceTask = async (
@@ -627,9 +627,10 @@ export const getQuoteWorkspaceTaskMutationOptions = <
   TError =
     | BadRequestResponse
     | UnauthorizedResponse
+    | ErrorEnvelope
     | NotFoundResponse
-    | UnprocessableEntityResponse
-    | ErrorEnvelope,
+    | ConflictResponse
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -671,9 +672,10 @@ export type QuoteWorkspaceTaskMutationBody = QuoteWorkspaceTaskRequest
 export type QuoteWorkspaceTaskMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
-  | NotFoundResponse
-  | UnprocessableEntityResponse
   | ErrorEnvelope
+  | NotFoundResponse
+  | ConflictResponse
+  | UnprocessableEntityResponse
 export type QuoteWorkspaceTaskMutationVariables = {
   workspaceId: string
   data: QuoteWorkspaceTaskRequest
@@ -686,9 +688,10 @@ export const useQuoteWorkspaceTask = <
   TError =
     | BadRequestResponse
     | UnauthorizedResponse
+    | ErrorEnvelope
     | NotFoundResponse
-    | UnprocessableEntityResponse
-    | ErrorEnvelope,
+    | ConflictResponse
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {

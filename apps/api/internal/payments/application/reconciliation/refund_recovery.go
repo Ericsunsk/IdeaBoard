@@ -54,8 +54,9 @@ func (s *Service) reconcileDuePaymentRefunds(ctx context.Context, now time.Time)
 		// The durable refund fact is committed before this post-commit hint.
 		// Re-emitting during a later recovery pass lets connected clients
 		// refresh after a process crash dropped the original in-memory event.
-		if s.publish != nil {
-			s.publish(refund.UserID, paymentports.PaymentEventRefundUpdated)
+		if s.hints != nil {
+			accountID, _ := s.convergence.GetPaymentOrderPayerAccount(ctx, refund.PaymentOrderID)
+			s.hints.Publish(ctx, refund.UserID, paymentports.PaymentEvent{BillingAccountID: accountID, Status: paymentports.PaymentEventRefundUpdated})
 		}
 	}
 	return retryErr

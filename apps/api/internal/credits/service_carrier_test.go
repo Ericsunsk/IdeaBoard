@@ -65,9 +65,9 @@ func TestGrantJoinsAmbientCarrierTx(t *testing.T) {
 
 	tx, carrier := beginCarrier(t, ctx, pool)
 	result, err := service.Grant(carrier, ports.GrantCommand{
-		UserID:   4201,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: testhelpers.TestMetadata("carrier-grant-commit", "carrier-grant-commit"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 4201),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         testhelpers.TestMetadata("carrier-grant-commit", "carrier-grant-commit"),
 	})
 	if err != nil {
 		_ = tx.Rollback(ctx)
@@ -88,7 +88,7 @@ func TestGrantJoinsAmbientCarrierTx(t *testing.T) {
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatalf("commit carrier tx: %v", err)
 	}
-	wallet, err := service.GetWallet(ctx, 4201)
+	wallet, err := service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, 4201))
 	if err != nil {
 		t.Fatalf("GetWallet() after carrier commit error = %v", err)
 	}
@@ -105,9 +105,9 @@ func TestGrantRollsBackWithAmbientCarrier(t *testing.T) {
 
 	tx, carrier := beginCarrier(t, ctx, pool)
 	result, err := service.Grant(carrier, ports.GrantCommand{
-		UserID:   4202,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: testhelpers.TestMetadata("carrier-grant-rollback", "carrier-grant-rollback"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 4202),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         testhelpers.TestMetadata("carrier-grant-rollback", "carrier-grant-rollback"),
 	})
 	if err != nil {
 		_ = tx.Rollback(ctx)
@@ -123,7 +123,7 @@ func TestGrantRollsBackWithAmbientCarrier(t *testing.T) {
 		t.Fatalf("ledger rows after carrier rollback = %d, want 0", got)
 	}
 	// No grant survived the rollback: the wallet holds nothing.
-	wallet, err := service.GetWallet(ctx, 4202)
+	wallet, err := service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, 4202))
 	if err != nil {
 		t.Fatalf("GetWallet() after carrier rollback error = %v", err)
 	}
@@ -140,21 +140,21 @@ func TestRestrictWalletJoinsAmbientCarrierTx(t *testing.T) {
 	const userID = 4203
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: testhelpers.TestMetadata("carrier-restrict:grant", "carrier-restrict-grant"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         testhelpers.TestMetadata("carrier-restrict:grant", "carrier-restrict-grant"),
 	}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
 
 	tx, carrier := beginCarrier(t, ctx, pool)
 	change, err := service.RestrictWallet(carrier, ports.RestrictWalletCommand{
-		UserID:        userID,
-		Type:          "ledger_integrity",
-		Source:        "reconciliation",
-		RelatedObject: domain.BusinessReference{Type: "finding", ID: "carrier-finding-a"},
-		Reason:        "projection mismatch",
-		Actor:         domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Type:             "ledger_integrity",
+		Source:           "reconciliation",
+		RelatedObject:    domain.BusinessReference{Type: "finding", ID: "carrier-finding-a"},
+		Reason:           "projection mismatch",
+		Actor:            domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
 	})
 	if err != nil {
 		_ = tx.Rollback(ctx)
@@ -175,7 +175,7 @@ func TestRestrictWalletJoinsAmbientCarrierTx(t *testing.T) {
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatalf("commit carrier tx: %v", err)
 	}
-	wallet, err := service.GetWallet(ctx, userID)
+	wallet, err := service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, userID))
 	if err != nil {
 		t.Fatalf("GetWallet() after carrier commit error = %v", err)
 	}
@@ -191,19 +191,19 @@ func TestReleaseWalletRestrictionRollsBackWithAmbientCarrier(t *testing.T) {
 	const userID = 4204
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: testhelpers.TestMetadata("carrier-release:grant", "carrier-release-grant"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         testhelpers.TestMetadata("carrier-release:grant", "carrier-release-grant"),
 	}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
 	change, err := service.RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID:        userID,
-		Type:          "ledger_integrity",
-		Source:        "reconciliation",
-		RelatedObject: domain.BusinessReference{Type: "finding", ID: "carrier-finding-b"},
-		Reason:        "projection mismatch",
-		Actor:         domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Type:             "ledger_integrity",
+		Source:           "reconciliation",
+		RelatedObject:    domain.BusinessReference{Type: "finding", ID: "carrier-finding-b"},
+		Reason:           "projection mismatch",
+		Actor:            domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
 	})
 	if err != nil {
 		t.Fatalf("RestrictWallet() error = %v", err)
@@ -223,7 +223,7 @@ func TestReleaseWalletRestrictionRollsBackWithAmbientCarrier(t *testing.T) {
 	}
 	// The release rolled back with the carrier: the wallet is still
 	// restricted afterwards.
-	wallet, err := service.GetWallet(ctx, userID)
+	wallet, err := service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, userID))
 	if err != nil {
 		t.Fatalf("GetWallet() after carrier rollback error = %v", err)
 	}

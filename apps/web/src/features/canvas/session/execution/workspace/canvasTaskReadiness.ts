@@ -6,6 +6,13 @@
 // `available_credits`/`reserved_credits` map to 0 and sufficiency is
 // inferred from the absence of 402. There is no v1 matrix endpoint;
 // matrix fans out to one quote per request. No SSE, no cancel, no Vue.
+//
+// #917: quote enforces the same stable account and consumption
+// eligibility as submit (Board generate gate via the bound board_id,
+// 402 insufficient vs 403 restricted). Readiness keeps them distinct:
+// shortfall throws the insufficient-credits preflight (top-up call to
+// action), restriction and Board denials read not-ready with their
+// codes.
 
 import type { ApiClientError } from '../../../../../api/client'
 import { quoteWorkspaceTask } from '../../../../../api/workspaceTaskTransport'
@@ -71,6 +78,23 @@ export async function fetchCanvasWorkspaceTaskReadiness(
     const apiError = error as ApiClientError
     const code = apiError?.code
     if (code === 'task_insufficient_credits') throw insufficientCreditsPreflightError()
+    // Funds restricted vs balance shortfall stay distinct (#917): a
+    // restricted Wallet is not-ready (no top-up call to action), while a
+    // shortfall throws the insufficient-credits preflight above.
+    if (code === 'billing_wallet_restricted') {
+      return toNotReady(input.service, readinessErrorCopy('wallet_restricted'), 'wallet_restricted')
+    }
+    // Board generate gate mirrors submit (#917): Viewers read not-ready
+    // instead of throwing, archived/invisible Boards keep their codes.
+    if (code === 'task_forbidden') {
+      return toNotReady(input.service, readinessErrorCopy('task_forbidden'), 'task_forbidden')
+    }
+    if (code === 'board_archived') {
+      return toNotReady(input.service, readinessErrorCopy('board_archived'), 'board_archived')
+    }
+    if (code === 'board_not_found') {
+      return toNotReady(input.service, readinessErrorCopy('board_not_found'), 'board_not_found')
+    }
     if (code === 'service_resolution_unavailable') {
       return toNotReady(input.service, readinessErrorCopy(code), code)
     }

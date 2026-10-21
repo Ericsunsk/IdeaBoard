@@ -86,21 +86,34 @@
           </template>
         </AdminColumn>
 
-        <AdminColumn :header="t('admin.common.actions')" style="width: 80px">
+        <AdminColumn :header="t('admin.common.actions')" style="width: 140px">
           <template #body="{ data }">
-            <AdminButton
-              v-if="isRefundableCharge(data)"
-              :label="t('admin.wallet.refund')"
-              size="sm"
-              variant="ghost"
-              class="text-destructive hover:text-destructive/80"
-              :disabled="commandPending"
-              :aria-label="t('admin.wallet.refundAria', { id: data.transaction_id })"
-              @click="emit('openRefund', data)"
-            />
-            <span v-else class="text-admin-caption text-muted-foreground">{{
-              ADMIN_IDENTITY_EMPTY
-            }}</span>
+            <div class="flex items-center gap-1">
+              <AdminButton
+                v-if="isRefundableCharge(data)"
+                :label="t('admin.wallet.refund')"
+                size="sm"
+                variant="ghost"
+                class="text-destructive hover:text-destructive/80"
+                :disabled="commandPending"
+                :aria-label="t('admin.wallet.refundAria', { id: data.transaction_id })"
+                @click="emit('openRefund', data)"
+              />
+              <AdminButton
+                v-if="isCorrectableTransaction(data)"
+                :label="t('admin.wallet.correct')"
+                size="sm"
+                variant="ghost"
+                :disabled="commandPending"
+                :aria-label="t('admin.wallet.correctAria', { id: data.transaction_id })"
+                @click="emit('openCorrection', data)"
+              />
+              <span
+                v-if="!isRefundableCharge(data) && !isCorrectableTransaction(data)"
+                class="text-admin-caption text-muted-foreground"
+                >{{ ADMIN_IDENTITY_EMPTY }}</span
+              >
+            </div>
           </template>
         </AdminColumn>
       </AdminTable>
@@ -137,7 +150,10 @@ import {
 } from '../../../core/shared/format'
 import { formatIdeaAmount } from '../../../../../../core/i18n/userIdeaCurrency'
 import type { AdminCreditLedgerTransaction } from '../../../session/wallets/resource'
-import { isRefundableCharge } from '../../../core/wallets/creditCommandContract'
+import {
+  isCorrectableTransaction,
+  isRefundableCharge,
+} from '../../../core/wallets/creditCommandContract'
 
 defineProps<{
   transactions: AdminCreditLedgerTransaction[]
@@ -148,6 +164,7 @@ defineProps<{
 
 const emit = defineEmits<{
   openRefund: [transaction: AdminCreditLedgerTransaction]
+  openCorrection: [transaction: AdminCreditLedgerTransaction]
   loadMore: []
 }>()
 

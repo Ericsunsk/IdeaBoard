@@ -78,6 +78,8 @@ export default {
     codeLabel: '교환 코드를 입력하세요',
     codePlaceholder: '교환 코드를 입력하세요',
     redeem: '교환',
+    beneficiaryNote:
+      '보상은 개인 계정으로 지급됩니다. 현재 워크스페이스는 수령인을 변경하지 않습니다.',
     historyTitle: '교환 내역',
     tableAria: '교환 내역 테이블',
     emptyTitle: '아직 교환 내역이 없습니다',
@@ -105,6 +107,11 @@ export default {
     retryLoad: '다시 불러오기',
     loadMore: '더 불러오기',
     unknownTime: '알 수 없는 시간',
+    sharedAccount:
+      '공유 잔액 계정 {account}: 이 계정의 모든 워크스페이스에 동일한 잔액이 표시됩니다.',
+    forbiddenTitle: '접근 제한됨',
+    forbiddenDescription:
+      '현재 역할로는 이 기록을 볼 수 없습니다. 워크스페이스 또는 결제 관리자에게 문의하세요.',
     kinds: {
       usage: '사용량',
       reward: '보상',
@@ -135,6 +142,10 @@ export default {
     rangeWeek: '주',
     rangeMonth: '월',
     rangeYear: '년',
+    sharedAccount: '공유 계정 {account}의 사용량입니다.',
+    forbiddenTitle: '접근 제한됨',
+    forbiddenDescription:
+      '현재 역할로는 이 사용량을 볼 수 없습니다. 워크스페이스 또는 결제 관리자에게 문의하세요.',
     genericError: '나중에 다시 시도해 주세요.',
   },
   topUp: {
@@ -146,6 +157,7 @@ export default {
     reasonRestricted: '이 계정은 현재 충전할 수 없습니다.',
     reasonDefault: '충전 서비스를 아직 사용할 수 없습니다. 나중에 다시 시도해 주세요.',
     chooseQuantity: '금액을 선택하세요',
+    targetAccount: '충전 대상 계정 {account}',
     packagesAria: '빠른 충전 패키지',
     customQuantity: '사용자 지정 금액',
     payNow: '지금 결제',
@@ -242,7 +254,7 @@ export default {
     quantityIntegerRange: '{min}에서 {max} 사이의 정수를 입력하세요.',
     quantityBelowMin: '최소 충전량은 {min} Ideas입니다.',
     quantityAboveMax: '최대 충전량은 {max} Ideas입니다.',
+    billingAccountLoadFailed: '결제 계정을 불러올 수 없습니다.',
     workspaceRequired: '결제 정보를 보려면 워크스페이스를 선택하세요.',
-    featureUnavailable: '이 기능을 현재 사용할 수 없습니다.',
   },
 } as const

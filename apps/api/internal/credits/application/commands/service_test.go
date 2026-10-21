@@ -24,8 +24,8 @@ func TestAdminCanGrantCreditsAndReadWalletLedger(t *testing.T) {
 	ctx := context.Background()
 
 	result, err := service.Grant(ctx, ports.GrantCommand{
-		UserID: 42,
-		Amount: testhelpers.MustCreditAmount(t, 100),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "admin-grant:test-user-42:welcome",
 			Actor:          domain.Actor{Type: domain.ActorAdmin, ID: "7"},
@@ -46,7 +46,7 @@ func TestAdminCanGrantCreditsAndReadWalletLedger(t *testing.T) {
 		t.Fatalf("Grant() wallet = %+v, want available=100 reserved=0", result.Wallet)
 	}
 
-	wallet, err := service.GetWallet(ctx, 42)
+	wallet, err := service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, 42))
 	if err != nil {
 		t.Fatalf("GetWallet() error = %v", err)
 	}
@@ -54,7 +54,7 @@ func TestAdminCanGrantCreditsAndReadWalletLedger(t *testing.T) {
 		t.Fatalf("wallet = %+v, want available=100 reserved=0", wallet)
 	}
 
-	page, err := service.ListLedger(ctx, domain.ListLedgerInput{UserID: 42, Limit: 20})
+	page, err := service.ListLedger(ctx, domain.ListLedgerInput{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Limit: 20})
 	if err != nil {
 		t.Fatalf("ListLedger() error = %v", err)
 	}
@@ -90,9 +90,9 @@ func TestCreditCommandIdempotencyReturnsOriginalResultAndRejectsHashConflict(t *
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	command := ports.GrantCommand{
-		UserID:   42,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: testhelpers.TestMetadata("credit-command:idempotent", "idempotent-grant"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         testhelpers.TestMetadata("credit-command:idempotent", "idempotent-grant"),
 	}
 
 	first, err := service.Grant(ctx, command)
@@ -100,9 +100,9 @@ func TestCreditCommandIdempotencyReturnsOriginalResultAndRejectsHashConflict(t *
 		t.Fatalf("first Grant() error = %v", err)
 	}
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   42,
-		Amount:   testhelpers.MustCreditAmount(t, 25),
-		Metadata: testhelpers.TestMetadata("credit-command:second", "second-grant"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42),
+		Amount:           testhelpers.MustCreditAmount(t, 25),
+		Metadata:         testhelpers.TestMetadata("credit-command:second", "second-grant"),
 	}); err != nil {
 		t.Fatalf("second independent Grant() error = %v", err)
 	}
@@ -124,9 +124,9 @@ func TestCreditCommandIdempotencyReturnsOriginalResultAndRejectsHashConflict(t *
 		t.Fatalf("conflicting Grant() error = %v, want domain.ErrIdempotencyConflict", err)
 	}
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   88,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: command.Metadata,
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 88),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         command.Metadata,
 	}); !errors.Is(err, domain.ErrIdempotencyConflict) {
 		t.Fatalf("cross-wallet conflicting Grant() error = %v, want domain.ErrIdempotencyConflict", err)
 	}
@@ -139,16 +139,16 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	userID := int64(88)
 
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: testhelpers.TestMetadata("lifecycle:grant", "lifecycle-grant"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         testhelpers.TestMetadata("lifecycle:grant", "lifecycle-grant"),
 	}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
 	hold, err := service.Hold(ctx, ports.HoldCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 80),
-		Metadata: testhelpers.TestMetadata("lifecycle:hold:capture", "lifecycle-hold-capture"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 80),
+		Metadata:         testhelpers.TestMetadata("lifecycle:hold:capture", "lifecycle-hold-capture"),
 	})
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
@@ -157,7 +157,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 		t.Fatalf("hold wallet = %+v", hold.Wallet)
 	}
 	capture, err := service.Capture(ctx, ports.CaptureCommand{
-		UserID:            userID,
+		BillingAccountID:  testhelpers.MustBillingAccount(t, pool, userID),
 		HoldTransactionID: hold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 80),
 		Metadata:          testhelpers.TestMetadata("lifecycle:capture", "lifecycle-capture"),
@@ -169,7 +169,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 		t.Fatalf("capture result = %+v", capture)
 	}
 	if _, err := service.Release(ctx, ports.ReleaseCommand{
-		UserID:            userID,
+		BillingAccountID:  testhelpers.MustBillingAccount(t, pool, userID),
 		HoldTransactionID: hold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 1),
 		Metadata:          testhelpers.TestMetadata("lifecycle:release-settled", "lifecycle-release-settled"),
@@ -177,7 +177,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 		t.Fatalf("Release(settled hold) error = %v, want domain.ErrHoldSettled", err)
 	}
 	refund, err := service.Refund(ctx, ports.RefundCommand{
-		UserID:              userID,
+		BillingAccountID:    testhelpers.MustBillingAccount(t, pool, userID),
 		ChargeTransactionID: capture.TransactionID,
 		Amount:              testhelpers.MustCreditAmount(t, 30),
 		Metadata:            testhelpers.TestMetadata("lifecycle:refund", "lifecycle-refund"),
@@ -189,7 +189,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 		t.Fatalf("refund wallet = %+v", refund.Wallet)
 	}
 	if _, err := service.Refund(ctx, ports.RefundCommand{
-		UserID:              userID,
+		BillingAccountID:    testhelpers.MustBillingAccount(t, pool, userID),
 		ChargeTransactionID: capture.TransactionID,
 		Amount:              testhelpers.MustCreditAmount(t, 51),
 		Metadata:            testhelpers.TestMetadata("lifecycle:refund-too-large", "lifecycle-refund-too-large"),
@@ -198,15 +198,15 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	}
 
 	releasedHold, err := service.Hold(ctx, ports.HoldCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 10),
-		Metadata: testhelpers.TestMetadata("lifecycle:hold:release", "lifecycle-hold-release"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 10),
+		Metadata:         testhelpers.TestMetadata("lifecycle:hold:release", "lifecycle-hold-release"),
 	})
 	if err != nil {
 		t.Fatalf("second Hold() error = %v", err)
 	}
 	release, err := service.Release(ctx, ports.ReleaseCommand{
-		UserID:            userID,
+		BillingAccountID:  testhelpers.MustBillingAccount(t, pool, userID),
 		HoldTransactionID: releasedHold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 10),
 		Metadata:          testhelpers.TestMetadata("lifecycle:release", "lifecycle-release"),
@@ -218,14 +218,14 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 		t.Fatalf("release wallet = %+v", release.Wallet)
 	}
 	if _, err := service.Hold(ctx, ports.HoldCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 51),
-		Metadata: testhelpers.TestMetadata("lifecycle:insufficient", "lifecycle-insufficient"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 51),
+		Metadata:         testhelpers.TestMetadata("lifecycle:insufficient", "lifecycle-insufficient"),
 	}); !errors.Is(err, domain.ErrInsufficientCredits) {
 		t.Fatalf("Hold(insufficient) error = %v, want domain.ErrInsufficientCredits", err)
 	}
 
-	page, err := service.ListLedger(ctx, domain.ListLedgerInput{UserID: userID, Limit: 20})
+	page, err := service.ListLedger(ctx, domain.ListLedgerInput{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Limit: 20})
 	if err != nil {
 		t.Fatalf("ListLedger() error = %v", err)
 	}
@@ -241,21 +241,21 @@ func TestCreditHoldSupportsOneCaptureAndOneReleaseWithStableTotals(t *testing.T)
 	const userID int64 = 889
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
 
-	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 4), Metadata: testhelpers.TestMetadata("partial:grant", "partial-grant")}); err != nil {
+	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 4), Metadata: testhelpers.TestMetadata("partial:grant", "partial-grant")}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	hold, err := service.Hold(ctx, ports.HoldCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 4), Metadata: testhelpers.TestMetadata("partial:hold", "partial-hold")})
+	hold, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 4), Metadata: testhelpers.TestMetadata("partial:hold", "partial-hold")})
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	capture, err := service.Capture(ctx, ports.CaptureCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata("partial:capture", "partial-capture")})
+	capture, err := service.Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata("partial:capture", "partial-capture")})
 	if err != nil {
 		t.Fatalf("partial Capture() error = %v", err)
 	}
 	if capture.Amount != 2 || capture.Wallet.Reserved != 2 {
 		t.Fatalf("partial capture = %+v", capture)
 	}
-	release, err := service.Release(ctx, ports.ReleaseCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata("partial:release", "partial-release")})
+	release, err := service.Release(ctx, ports.ReleaseCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata("partial:release", "partial-release")})
 	if err != nil {
 		t.Fatalf("partial Release() error = %v", err)
 	}
@@ -278,9 +278,9 @@ func TestConcurrentHoldsCannotOverspendOneWallet(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(90)
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: testhelpers.TestMetadata("concurrent-holds:grant", "concurrent-holds-grant"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         testhelpers.TestMetadata("concurrent-holds:grant", "concurrent-holds-grant"),
 	}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
@@ -294,8 +294,8 @@ func TestConcurrentHoldsCannotOverspendOneWallet(t *testing.T) {
 		go func() {
 			defer wait.Done()
 			_, err := service.Hold(ctx, ports.HoldCommand{
-				UserID: userID,
-				Amount: testhelpers.MustCreditAmount(t, 10),
+				BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+				Amount:           testhelpers.MustCreditAmount(t, 10),
 				Metadata: testhelpers.TestMetadata(
 					fmt.Sprintf("concurrent-holds:hold:%d", attempt),
 					fmt.Sprintf("concurrent-holds-%d", attempt),
@@ -322,7 +322,7 @@ func TestConcurrentHoldsCannotOverspendOneWallet(t *testing.T) {
 	if succeeded != 10 || insufficient != 10 {
 		t.Fatalf("holds succeeded=%d insufficient=%d, want 10/10", succeeded, insufficient)
 	}
-	wallet, err := service.GetWallet(ctx, userID)
+	wallet, err := service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, userID))
 	if err != nil {
 		t.Fatalf("GetWallet() error = %v", err)
 	}
@@ -342,9 +342,9 @@ func TestDifferentWalletsDoNotShareASystemAccountLock(t *testing.T) {
 	defer func() { _ = tx.Rollback(ctx) }()
 	commands := service.InTx(tx)
 	if _, err := commands.Grant(ctx, ports.GrantCommand{
-		UserID:   91,
-		Amount:   testhelpers.MustCreditAmount(t, 10),
-		Metadata: testhelpers.TestMetadata("parallel-wallets:first", "parallel-wallets-first"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 91),
+		Amount:           testhelpers.MustCreditAmount(t, 10),
+		Metadata:         testhelpers.TestMetadata("parallel-wallets:first", "parallel-wallets-first"),
 	}); err != nil {
 		t.Fatalf("transactional Grant(first wallet) error = %v", err)
 	}
@@ -352,9 +352,9 @@ func TestDifferentWalletsDoNotShareASystemAccountLock(t *testing.T) {
 	result := make(chan error, 1)
 	go func() {
 		_, err := service.Grant(ctx, ports.GrantCommand{
-			UserID:   92,
-			Amount:   testhelpers.MustCreditAmount(t, 10),
-			Metadata: testhelpers.TestMetadata("parallel-wallets:second", "parallel-wallets-second"),
+			BillingAccountID: testhelpers.MustBillingAccount(t, pool, 92),
+			Amount:           testhelpers.MustCreditAmount(t, 10),
+			Metadata:         testhelpers.TestMetadata("parallel-wallets:second", "parallel-wallets-second"),
 		})
 		result <- err
 	}()
@@ -374,9 +374,9 @@ func TestPostgresEnforcesBalancedImmutableLedgerAndProjectionWrites(t *testing.T
 	ctx := context.Background()
 	userID := int64(93)
 	grant, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: testhelpers.TestMetadata("ledger-invariants:grant", "ledger-invariants-grant"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         testhelpers.TestMetadata("ledger-invariants:grant", "ledger-invariants-grant"),
 	})
 	if err != nil {
 		t.Fatalf("Grant() error = %v", err)
@@ -386,22 +386,24 @@ func TestPostgresEnforcesBalancedImmutableLedgerAndProjectionWrites(t *testing.T
 	if err != nil {
 		t.Fatalf("Begin(unbalanced) error = %v", err)
 	}
+	defer func() { _ = unbalancedTx.Rollback(ctx) }()
+	accountID := testhelpers.MustBillingAccount(t, pool, userID)
 	var availableAccountID int64
 	if err := unbalancedTx.QueryRow(ctx, `
 SELECT id FROM credit_accounts
-WHERE wallet_user_id = $1 AND account_role = 'user_available'`, userID).Scan(&availableAccountID); err != nil {
+WHERE billing_account_id = $1 AND account_role = 'user_available'`, accountID).Scan(&availableAccountID); err != nil {
 		t.Fatalf("load available account error = %v", err)
 	}
 	if _, err := unbalancedTx.Exec(ctx, `
 INSERT INTO credit_transactions (
-  transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
+  transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
   actor_type, actor_id, source, reason, business_reference_type,
   business_reference_id, command_amount, posting_count,
   available_balance_after, reserved_balance_after
 )
 VALUES ('ctx_unbalanced', $1, 'correction', 'ledger-invariants:unbalanced', repeat('0', 64),
         'system', 'test', 'integration_test', 'unbalanced transaction', 'test',
-        'unbalanced', 1, 2, 101, 0)`, userID); err != nil {
+        'unbalanced', 1, 2, 101, 0)`, accountID); err != nil {
 		t.Fatalf("insert unbalanced transaction error = %v", err)
 	}
 	if _, err := unbalancedTx.Exec(ctx, `
@@ -412,7 +414,7 @@ VALUES ('ctx_unbalanced', $1, 1)`, availableAccountID); err != nil {
 	if err := unbalancedTx.Commit(ctx); err == nil {
 		t.Fatal("unbalanced credit transaction committed")
 	}
-	wallet, err := service.GetWallet(ctx, userID)
+	wallet, err := service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, userID))
 	if err != nil {
 		t.Fatalf("GetWallet(after rejected transaction) error = %v", err)
 	}
@@ -429,24 +431,24 @@ VALUES ('ctx_unbalanced', $1, 1)`, availableAccountID); err != nil {
 	var sinkAccountID int64
 	if err := balancedTx.QueryRow(ctx, `
 SELECT id FROM credit_accounts
-WHERE wallet_user_id IS NULL AND shard_key = $1 AND account_role = 'system_issuance'`, testhelpers.WalletSystemShard(userID)).Scan(&issuanceAccountID); err != nil {
+WHERE wallet_user_id IS NULL AND billing_account_id IS NULL AND shard_key = $1 AND account_role = 'system_issuance'`, testhelpers.WalletSystemShard(accountID)).Scan(&issuanceAccountID); err != nil {
 		t.Fatalf("load issuance account error = %v", err)
 	}
 	if err := balancedTx.QueryRow(ctx, `
 SELECT id FROM credit_accounts
-WHERE wallet_user_id IS NULL AND shard_key = $1 AND account_role = 'system_sink'`, testhelpers.WalletSystemShard(userID)).Scan(&sinkAccountID); err != nil {
+WHERE wallet_user_id IS NULL AND billing_account_id IS NULL AND shard_key = $1 AND account_role = 'system_sink'`, testhelpers.WalletSystemShard(accountID)).Scan(&sinkAccountID); err != nil {
 		t.Fatalf("load sink account error = %v", err)
 	}
 	if _, err := balancedTx.Exec(ctx, `
 INSERT INTO credit_transactions (
-  transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
+  transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
   actor_type, actor_id, source, reason, business_reference_type,
   business_reference_id, command_amount, posting_count,
   available_balance_after, reserved_balance_after
 )
 VALUES ('ctx_three_postings', $1, 'correction', 'ledger-invariants:three-postings', repeat('1', 64),
         'system', 'test', 'integration_test', 'three posting correction', 'test',
-        'three-postings', 10, 3, 107, 0)`, userID); err != nil {
+        'three-postings', 10, 3, 107, 0)`, accountID); err != nil {
 		t.Fatalf("insert three-posting transaction error = %v", err)
 	}
 	if _, err := balancedTx.Exec(ctx, `
@@ -476,7 +478,7 @@ VALUES ($1, $2, 1)`, grant.TransactionID, sinkAccountID); err == nil {
 		t.Fatal("posting was appended after its ledger transaction committed")
 	}
 
-	page, err := service.ListLedger(ctx, domain.ListLedgerInput{UserID: userID, Limit: 20})
+	page, err := service.ListLedger(ctx, domain.ListLedgerInput{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Limit: 20})
 	if err != nil {
 		t.Fatalf("ListLedger() error = %v", err)
 	}

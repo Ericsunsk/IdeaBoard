@@ -78,6 +78,8 @@ export default {
     codeLabel: 'Enter redemption code',
     codePlaceholder: 'Enter redemption code',
     redeem: 'Redeem',
+    beneficiaryNote:
+      'Rewards credit to your personal account. The current workspace does not change the beneficiary.',
     historyTitle: 'Redemption history',
     tableAria: 'Redemption history table',
     emptyTitle: 'No redemptions yet',
@@ -105,6 +107,11 @@ export default {
     retryLoad: 'Retry load',
     loadMore: 'Load more',
     unknownTime: 'Unknown time',
+    sharedAccount:
+      'Shared balance account {account}: every workspace on this account shows the same balance.',
+    forbiddenTitle: 'Access restricted',
+    forbiddenDescription:
+      'Your current role cannot view these records. Contact a workspace or billing admin.',
     kinds: {
       usage: 'Usage',
       reward: 'Reward',
@@ -135,6 +142,10 @@ export default {
     rangeWeek: 'Week',
     rangeMonth: 'Month',
     rangeYear: 'Year',
+    sharedAccount: 'Usage of shared account {account}.',
+    forbiddenTitle: 'Access restricted',
+    forbiddenDescription:
+      'Your current role cannot view this usage. Contact a workspace or billing admin.',
     genericError: 'Please try again later.',
   },
   topUp: {
@@ -146,6 +157,7 @@ export default {
     reasonRestricted: 'This account cannot top up right now.',
     reasonDefault: 'The top-up service is not ready yet. Please try again later.',
     chooseQuantity: 'Choose an amount',
+    targetAccount: 'Top-up target account {account}',
     packagesAria: 'Quick top-up packages',
     customQuantity: 'Custom amount',
     payNow: 'Pay now',
@@ -243,7 +255,7 @@ export default {
     quantityIntegerRange: 'Enter a whole number between {min} and {max}.',
     quantityBelowMin: 'Minimum top-up is {min} Ideas.',
     quantityAboveMax: 'Maximum top-up is {max} Ideas.',
+    billingAccountLoadFailed: 'Could not load the billing account.',
     workspaceRequired: 'Select a workspace to view billing information.',
-    featureUnavailable: 'This feature is currently unavailable.',
   },
 } as const

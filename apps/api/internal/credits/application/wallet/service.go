@@ -22,14 +22,17 @@ type Service struct {
 }
 
 type Backend struct {
-	MapDatabaseError func(error) error
-	ProvisionWallet  func(context.Context, pgx.Tx, int64) error
-	BindIdentityKey  func(context.Context, pgx.Tx, string) error
-	SetWalletFrozen  func(context.Context, pgx.Tx, int64, bool) error
-	ClaimWelcome     func(context.Context, pgx.Tx, string, int64) (bool, error)
-	ExecuteGrant     func(context.Context, pgx.Tx, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
-	RestrictWallet   func(context.Context, pgx.Tx, ports.RestrictWalletCommand) (ports.WalletRestrictionChange, error)
-	ReleaseWallet    func(context.Context, pgx.Tx, ports.ReleaseWalletRestrictionCommand) (ports.WalletRestrictionChange, error)
+	MapDatabaseError              func(error) error
+	ResolvePersonalAccount        func(context.Context, pgx.Tx, int64) (int64, error)
+	ProvisionAccountWallet        func(context.Context, pgx.Tx, int64) error
+	BindIdentityKey               func(context.Context, pgx.Tx, string) error
+	SetAccountWalletFrozen        func(context.Context, pgx.Tx, int64, bool) error
+	SetSoleOwnedWalletsFrozen     func(context.Context, pgx.Tx, int64, bool) error
+	RemoveSharedBillingMembership func(context.Context, pgx.Tx, int64) error
+	ClaimWelcome                  func(context.Context, pgx.Tx, string, int64) (bool, error)
+	ExecuteGrant                  func(context.Context, pgx.Tx, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
+	RestrictWallet                func(context.Context, pgx.Tx, ports.RestrictWalletCommand) (ports.WalletRestrictionChange, error)
+	ReleaseWallet                 func(context.Context, pgx.Tx, ports.ReleaseWalletRestrictionCommand) (ports.WalletRestrictionChange, error)
 }
 
 func NewService(pool *pgxpool.Pool, backend Backend) (*Service, error) {
@@ -43,8 +46,9 @@ func NewService(pool *pgxpool.Pool, backend Backend) (*Service, error) {
 }
 
 func backendComplete(backend Backend) bool {
-	return backend.MapDatabaseError != nil && backend.ProvisionWallet != nil && backend.BindIdentityKey != nil &&
-		backend.SetWalletFrozen != nil && backend.ClaimWelcome != nil && backend.ExecuteGrant != nil &&
+	return backend.MapDatabaseError != nil && backend.ResolvePersonalAccount != nil && backend.ProvisionAccountWallet != nil &&
+		backend.BindIdentityKey != nil && backend.SetAccountWalletFrozen != nil && backend.SetSoleOwnedWalletsFrozen != nil &&
+		backend.RemoveSharedBillingMembership != nil && backend.ClaimWelcome != nil && backend.ExecuteGrant != nil &&
 		backend.RestrictWallet != nil && backend.ReleaseWallet != nil
 }
 
@@ -79,14 +83,31 @@ func (s *Service) ReleaseWalletRestriction(
 	})
 }
 
-func (c *transactionLifecycle) ProvisionWallet(ctx context.Context, userID int64) error {
+func (c *transactionLifecycle) ResolvePersonalAccount(ctx context.Context, userID int64) (int64, error) {
 	if c == nil || c.tx == nil || userID <= 0 {
+		return 0, domain.ErrInvalidCommand
+	}
+	if !backendComplete(c.backend) {
+		return 0, fmt.Errorf("credits wallet: persistence backend not configured")
+	}
+	accountID, err := c.backend.ResolvePersonalAccount(ctx, c.tx, userID)
+	if err != nil {
+		return 0, c.backend.MapDatabaseError(err)
+	}
+	if accountID <= 0 {
+		return 0, domain.ErrWalletNotFound
+	}
+	return accountID, nil
+}
+
+func (c *transactionLifecycle) ProvisionAccountWallet(ctx context.Context, billingAccountID int64) error {
+	if c == nil || c.tx == nil || billingAccountID <= 0 {
 		return domain.ErrInvalidCommand
 	}
 	if !backendComplete(c.backend) {
 		return fmt.Errorf("credits wallet: persistence backend not configured")
 	}
-	if err := c.backend.ProvisionWallet(ctx, c.tx, userID); err != nil {
+	if err := c.backend.ProvisionAccountWallet(ctx, c.tx, billingAccountID); err != nil {
 		return c.backend.MapDatabaseError(err)
 	}
 	return nil
@@ -106,14 +127,40 @@ func (c *transactionLifecycle) BindWelcomeIdentityKey(ctx context.Context, keyFi
 	return nil
 }
 
-func (c *transactionLifecycle) SetWalletFrozen(ctx context.Context, userID int64, frozen bool) error {
+func (c *transactionLifecycle) SetAccountWalletFrozen(ctx context.Context, billingAccountID int64, frozen bool) error {
+	if c == nil || c.tx == nil || billingAccountID <= 0 {
+		return domain.ErrInvalidCommand
+	}
+	if !backendComplete(c.backend) {
+		return fmt.Errorf("credits wallet: persistence backend not configured")
+	}
+	if err := c.backend.SetAccountWalletFrozen(ctx, c.tx, billingAccountID, frozen); err != nil {
+		return c.backend.MapDatabaseError(err)
+	}
+	return nil
+}
+
+func (c *transactionLifecycle) SetSoleOwnedWalletsFrozen(ctx context.Context, userID int64, frozen bool) error {
 	if c == nil || c.tx == nil || userID <= 0 {
 		return domain.ErrInvalidCommand
 	}
 	if !backendComplete(c.backend) {
 		return fmt.Errorf("credits wallet: persistence backend not configured")
 	}
-	if err := c.backend.SetWalletFrozen(ctx, c.tx, userID, frozen); err != nil {
+	if err := c.backend.SetSoleOwnedWalletsFrozen(ctx, c.tx, userID, frozen); err != nil {
+		return c.backend.MapDatabaseError(err)
+	}
+	return nil
+}
+
+func (c *transactionLifecycle) RemoveSharedBillingMemberships(ctx context.Context, userID int64) error {
+	if c == nil || c.tx == nil || userID <= 0 {
+		return domain.ErrInvalidCommand
+	}
+	if !backendComplete(c.backend) {
+		return fmt.Errorf("credits wallet: persistence backend not configured")
+	}
+	if err := c.backend.RemoveSharedBillingMembership(ctx, c.tx, userID); err != nil {
 		return c.backend.MapDatabaseError(err)
 	}
 	return nil
@@ -122,17 +169,18 @@ func (c *transactionLifecycle) SetWalletFrozen(ctx context.Context, userID int64
 func (c *transactionLifecycle) ClaimWelcomeGrant(
 	ctx context.Context,
 	identityFingerprint string,
+	userID int64,
 	command ports.GrantCommand,
 ) (ports.CommandResult, bool, error) {
 	identityFingerprint = strings.TrimSpace(identityFingerprint)
-	if c == nil || c.tx == nil || len(identityFingerprint) != 64 || command.UserID <= 0 {
+	if c == nil || c.tx == nil || len(identityFingerprint) != 64 || userID <= 0 || command.BillingAccountID <= 0 {
 		return ports.CommandResult{}, false, domain.ErrInvalidCommand
 	}
 	if !backendComplete(c.backend) {
 		return ports.CommandResult{}, false, fmt.Errorf("credits wallet: persistence backend not configured")
 	}
 	var claimed bool
-	claimed, err := c.backend.ClaimWelcome(ctx, c.tx, identityFingerprint, command.UserID)
+	claimed, err := c.backend.ClaimWelcome(ctx, c.tx, identityFingerprint, userID)
 	if err != nil {
 		return ports.CommandResult{}, false, c.backend.MapDatabaseError(err)
 	}
@@ -151,11 +199,11 @@ func (c *transactionLifecycle) grantInTx(ctx context.Context, command ports.Gran
 	if err != nil {
 		return ports.CommandResult{}, err
 	}
-	return c.backend.ExecuteGrant(ctx, c.tx, command.UserID, command.Amount.Int64(), metadata)
+	return c.backend.ExecuteGrant(ctx, c.tx, command.BillingAccountID, command.Amount.Int64(), metadata)
 }
 
 func normalizeGrantForWelcome(command ports.GrantCommand) (domain.CommandMetadata, error) {
-	if command.UserID <= 0 || command.Amount <= 0 || command.Amount.Int64() > domain.MaxCreditAmount {
+	if command.BillingAccountID <= 0 || command.Amount <= 0 || command.Amount.Int64() > domain.MaxCreditAmount {
 		return domain.CommandMetadata{}, domain.ErrInvalidCommand
 	}
 	return commands.NormalizeMetadata(command.Metadata)
@@ -262,7 +310,7 @@ func normalizeRestrictWalletCommand(command ports.RestrictWalletCommand) (ports.
 	if command.Actor.Type == domain.ActorAdmin {
 		command.Reason = ""
 	}
-	if command.UserID <= 0 || command.Type == "" || len(command.Type) > 64 ||
+	if command.BillingAccountID <= 0 || command.Type == "" || len(command.Type) > 64 ||
 		command.Source == "" || len(command.Source) > 64 ||
 		command.RelatedObject.Type == "" || len(command.RelatedObject.Type) > 64 ||
 		command.RelatedObject.ID == "" || len(command.RelatedObject.ID) > 160 ||

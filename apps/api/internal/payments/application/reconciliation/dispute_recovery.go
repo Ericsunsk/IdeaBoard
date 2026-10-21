@@ -43,8 +43,9 @@ func (s *Service) reconcileDuePaymentDisputes(ctx context.Context, now time.Time
 		// The dispute fact and dependent checkout expiry are durable before
 		// this hint. Re-emitting on a later due pass repairs a dropped
 		// in-memory notification without changing the ledger fact.
-		if (changed || updated.UserID > 0) && s.publish != nil {
-			s.publish(updated.UserID, paymentports.PaymentEventDisputeUpdated)
+		if (changed || updated.UserID > 0) && s.hints != nil {
+			accountID, _ := s.convergence.GetPaymentOrderPayerAccount(ctx, updated.PaymentOrderID)
+			s.hints.Publish(ctx, updated.UserID, paymentports.PaymentEvent{BillingAccountID: accountID, Status: paymentports.PaymentEventDisputeUpdated})
 		}
 	}
 	return retryErr

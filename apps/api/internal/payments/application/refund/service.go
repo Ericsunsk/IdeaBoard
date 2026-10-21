@@ -22,24 +22,25 @@ type Store interface {
 	GetPaymentRefundByStripeID(context.Context, string) (domain.PaymentRefund, error)
 	CreateExternalPaymentRefund(context.Context, ports.StripeRefund, time.Time) (domain.PaymentRefund, error)
 	RecordPaymentRefundAnomaly(context.Context, ports.StripeRefund, string, time.Time) (int64, error)
+	GetPaymentOrderPayerAccount(context.Context, string) (int64, error)
 }
 
 type Service struct {
 	store    Store
 	resolver *credentials.Resolver
 	gateway  ports.RefundGateway
-	events   ports.PaymentEventPublisher
+	hints    ports.PaymentHintPublisher
 	now      func() time.Time
 }
 
-func NewService(store Store, gateway ports.RefundGateway, events ports.PaymentEventPublisher, now func() time.Time, resolver *credentials.Resolver) (*Service, error) {
+func NewService(store Store, gateway ports.RefundGateway, hints ports.PaymentHintPublisher, now func() time.Time, resolver *credentials.Resolver) (*Service, error) {
 	if store == nil || resolver == nil || gateway == nil {
 		return nil, fmt.Errorf("refund service requires store, credential resolver, and gateway")
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{store: store, resolver: resolver, gateway: gateway, events: events, now: now}, nil
+	return &Service{store: store, resolver: resolver, gateway: gateway, hints: hints, now: now}, nil
 }
 
 func (s *Service) CreatePaymentRefund(ctx context.Context, command contracts.CreatePaymentRefundCommand) (domain.PaymentRefund, error) {
@@ -58,7 +59,7 @@ func (s *Service) CreatePaymentRefund(ctx context.Context, command contracts.Cre
 	if err != nil {
 		return domain.PaymentRefund{}, err
 	}
-	s.publish(ctx, refund.UserID)
+	s.publishRefund(ctx, refund)
 	if refund.StripeRefundID != "" {
 		return refund, nil
 	}
@@ -72,7 +73,7 @@ func (s *Service) CreatePaymentRefund(ctx context.Context, command contracts.Cre
 		if markErr != nil {
 			return domain.PaymentRefund{}, errors.Join(err, markErr)
 		}
-		s.publish(ctx, failed.UserID)
+		s.publishRefund(ctx, failed)
 		return failed, err
 	}
 	if strings.TrimSpace(providerRefund.ID) == "" {
@@ -109,13 +110,13 @@ func (s *Service) Converge(ctx context.Context, refund domain.PaymentRefund, pro
 	case ports.StripeRefundSucceeded:
 		settled, settleErr := s.store.MarkPaymentRefundSucceeded(ctx, updated.ID, s.now().UTC())
 		if settleErr == nil && updated.Status == domain.PaymentRefundPending {
-			s.publish(ctx, settled.UserID)
+			s.publishRefund(ctx, settled)
 		}
 		return settled, settleErr
 	case ports.StripeRefundFailed, ports.StripeRefundCanceled:
 		failed, failErr := s.store.MarkPaymentRefundFailed(ctx, updated.ID, "Stripe refund failed", s.now().UTC())
 		if failErr == nil && updated.Status == domain.PaymentRefundPending {
-			s.publish(ctx, failed.UserID)
+			s.publishRefund(ctx, failed)
 		}
 		return failed, failErr
 	default:
@@ -143,11 +144,21 @@ func (s *Service) RefundAPIKeyForOrder(ctx context.Context, orderID string) (str
 	return apiKey, nil
 }
 
-func (s *Service) publish(ctx context.Context, userID int64) {
-	if s == nil || s.events == nil {
+// publishRefund builds a hint from the order's persisted payer and defers
+// delivery until the guard commits. Recipient policy belongs to the publisher.
+func (s *Service) publishRefund(ctx context.Context, refund domain.PaymentRefund) {
+	if s == nil || s.hints == nil {
 		return
 	}
+	accountID, err := s.store.GetPaymentOrderPayerAccount(ctx, refund.PaymentOrderID)
 	event := ports.PaymentEvent{Status: ports.PaymentEventRefundUpdated}
+	fallbackUserID := refund.UserID
+	if err == nil && accountID > 0 {
+		event.BillingAccountID = accountID
+	} else if fallbackUserID <= 0 {
+		// No durable payer yet (or lookup failed): keep operator fallback.
+		return
+	}
 	// #889 post-commit announcements (task cancel parity): on the
 	// guard-owned transaction the flip has not committed yet (the
 	// reservation/settlement use their own transactions, but the guard
@@ -157,12 +168,15 @@ func (s *Service) publish(ctx context.Context, userID int64) {
 	// announces nothing; the retry re-publishes on its own commit.
 	// Without a registry (owned settlement, River recovery, unwired
 	// callers) keep the synchronous publish.
-	if dbutil.DeferAmbientPostCommit(ctx, func(hookCtx context.Context) {
-		s.events.Publish(userID, event)
-	}) {
+	publish := func(hookCtx context.Context) {
+		// The guard transaction may already be closed. Audience reads must
+		// observe committed membership through a fresh database connection.
+		s.hints.Publish(dbutil.ContextWithAmbientTx(hookCtx, nil), fallbackUserID, event)
+	}
+	if dbutil.DeferAmbientPostCommit(ctx, publish) {
 		return
 	}
-	s.events.Publish(userID, event)
+	publish(ctx)
 }
 
 func (s *Service) refundAPIKey(ctx context.Context, orderNumber string) (string, error) {

@@ -48,23 +48,27 @@ type ReconciliationRun struct {
 }
 
 type ReconciliationFinding struct {
-	ID                int64                       `json:"id"`
-	Fingerprint       string                      `json:"fingerprint"`
-	FindingType       ReconciliationFindingType   `json:"finding_type"`
-	Severity          ReconciliationSeverity      `json:"severity"`
-	Risk              ReconciliationRisk          `json:"risk"`
-	WalletUserID      *int64                      `json:"-"`
-	WalletPublicID    *uuid.UUID                  `json:"wallet_public_id,omitempty"`
-	WalletDisplayName string                      `json:"wallet_display_name,omitempty"`
-	SubjectType       string                      `json:"subject_type"`
-	SubjectID         string                      `json:"subject_id"`
-	Details           map[string]any              `json:"details"`
-	Status            ReconciliationFindingStatus `json:"status"`
-	Isolated          bool                        `json:"isolated"`
-	OccurrenceCount   int64                       `json:"occurrence_count"`
-	FirstSeenAt       time.Time                   `json:"first_seen_at"`
-	LastSeenAt        time.Time                   `json:"last_seen_at"`
-	ResolvedAt        *time.Time                  `json:"resolved_at,omitempty"`
+	ID               int64                     `json:"id"`
+	Fingerprint      string                    `json:"fingerprint"`
+	FindingType      ReconciliationFindingType `json:"finding_type"`
+	Severity         ReconciliationSeverity    `json:"severity"`
+	Risk             ReconciliationRisk        `json:"risk"`
+	BillingAccountID *int64                    `json:"-"`
+	// BillingAccountPublicID is the stable ba_ funds identity this Finding
+	// isolates (#923). It is the Admin repair scope: auto-restriction and
+	// release act only on this account, never on sibling accounts.
+	BillingAccountPublicID string                      `json:"billing_account_id,omitempty"`
+	WalletPublicID         *uuid.UUID                  `json:"wallet_public_id,omitempty"`
+	WalletDisplayName      string                      `json:"wallet_display_name,omitempty"`
+	SubjectType            string                      `json:"subject_type"`
+	SubjectID              string                      `json:"subject_id"`
+	Details                map[string]any              `json:"details"`
+	Status                 ReconciliationFindingStatus `json:"status"`
+	Isolated               bool                        `json:"isolated"`
+	OccurrenceCount        int64                       `json:"occurrence_count"`
+	FirstSeenAt            time.Time                   `json:"first_seen_at"`
+	LastSeenAt             time.Time                   `json:"last_seen_at"`
+	ResolvedAt             *time.Time                  `json:"resolved_at,omitempty"`
 }
 
 type ReconciliationRunStatus string

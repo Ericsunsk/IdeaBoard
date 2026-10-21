@@ -14,7 +14,7 @@ const (
 )
 
 // allowedWalletTransitions mirrors the durable guards in
-// set_credit_wallet_status
+// set_billing_account_wallet_status
 // (internal/db/schema/fragments/credits.sql): wallets move freely
 // between active and frozen (freeze on restriction/anomaly, unfreeze
 // on release). The type only documents the allowed transitions at
@@ -52,14 +52,14 @@ type WalletDetails struct {
 
 // merged from internal/credits/domain/restriction.go (structural consolidation; symbols unchanged).
 type WalletRestriction struct {
-	RestrictionID string            `json:"restriction_id"`
-	UserID        int64             `json:"-"`
-	PublicID      uuid.UUID         `json:"public_id"`
-	DisplayName   string            `json:"display_name"`
-	Type          string            `json:"type"`
-	Source        string            `json:"source"`
-	RelatedObject BusinessReference `json:"related_object"`
-	Reason        string            `json:"reason"`
-	CreatedBy     Actor             `json:"created_by"`
-	CreatedAt     time.Time         `json:"created_at"`
+	RestrictionID    string            `json:"restriction_id"`
+	BillingAccountID int64             `json:"-"`
+	PublicID         uuid.UUID         `json:"public_id"`
+	DisplayName      string            `json:"display_name"`
+	Type             string            `json:"type"`
+	Source           string            `json:"source"`
+	RelatedObject    BusinessReference `json:"related_object"`
+	Reason           string            `json:"reason"`
+	CreatedBy        Actor             `json:"created_by"`
+	CreatedAt        time.Time         `json:"created_at"`
 }

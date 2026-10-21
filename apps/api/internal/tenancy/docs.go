@@ -1,5 +1,24 @@
 // Package tenancy owns the Workspace, Organization, and membership
-// lifecycle (issue #801).
+// lifecycle (issue #801) plus stable Billing Account resolution and
+// financial management (issue #915).
+//
+// The durable schema (organizations, workspaces,
+// organization_memberships, workspace_memberships, billing_accounts,
+// billing_account_members, workspace_billing_links) is created by a sibling
+// stream; this package programs to the AGREED interface via the Store
+// interface below so handlers and tests do not block on it. Repository
+// methods take context.Context first and the future postgres
+// implementation must use the dbWithContext(ctx) pattern.
+//
+// Billing Account model (#915): the stable funds identity holds the unified
+// balance; many Workspaces may share one account (org pool or explicit
+// no-org studio link), independent accounts stay isolated. Resolution joins
+// the caller transaction and fails closed on missing, ambiguous, or
+// conflicting ownership; joining a Workspace never merges personal funds.
+// Financial Owner/Admin manages recharge, bills, quotas, and budgets;
+// Workspace Owner/Admin standing alone grants no financial management, and
+// financial management grants no Board content access. Ownership is
+// transferable, never lifetime-bound.
 //
 // The durable schema (organizations, workspaces,
 // organization_memberships, workspace_memberships) is created by a sibling

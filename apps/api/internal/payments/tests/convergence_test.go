@@ -20,8 +20,9 @@ func TestPaidPaymentOrderAndPurchaseCreditConvergeAtomicallyOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	account42 := paymentAccount(t, creditService, 42)
 	if _, err := creditService.Grant(t.Context(), ports.GrantCommand{
-		UserID: 42, Amount: seedAmount,
+		BillingAccountID: account42, Amount: seedAmount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "payment-convergence-seed", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "42"},
 			Source: "admin_console", Reason: "seed payment convergence Wallet",
@@ -32,7 +33,7 @@ func TestPaidPaymentOrderAndPurchaseCreditConvergeAtomicallyOnce(t *testing.T) {
 	}
 
 	repo := newTestPaymentStores(pool)
-	order := createBoundPaymentOrder(t, repo)
+	order := createBoundPaymentOrder(t, repo, paymentBillingAccount(t, pool, 42))
 	facts := paidCheckoutFacts(order)
 	creditedAt := time.Date(2026, 8, 1, 12, 10, 0, 0, time.UTC)
 
@@ -87,8 +88,9 @@ func TestPaidPaymentOrderFactConflictRollsBackWithoutCredit(t *testing.T) {
 	db := testdb.Open(t)
 	creditService := credits.NewService(db)
 	seedAmount, _ := domain.NewCreditAmount(1)
+	account42 := paymentAccount(t, creditService, 42)
 	if _, err := creditService.Grant(t.Context(), ports.GrantCommand{
-		UserID: 42, Amount: seedAmount,
+		BillingAccountID: account42, Amount: seedAmount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "payment-conflict-seed", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "42"},
 			Source: "admin_console", Reason: "seed payment convergence Wallet",
@@ -98,7 +100,7 @@ func TestPaidPaymentOrderFactConflictRollsBackWithoutCredit(t *testing.T) {
 		t.Fatal(err)
 	}
 	repo := newTestPaymentStores(db)
-	order := createBoundPaymentOrder(t, repo)
+	order := createBoundPaymentOrder(t, repo, paymentBillingAccount(t, db, 42))
 	facts := paidCheckoutFacts(order)
 	facts.RequestHash = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 
@@ -121,12 +123,12 @@ func TestPaidPaymentOrderFactConflictRollsBackWithoutCredit(t *testing.T) {
 	}
 }
 
-func createBoundPaymentOrder(t *testing.T, repo *testPaymentStores) paymentsdomain.PaymentOrder {
+func createBoundPaymentOrder(t *testing.T, repo *testPaymentStores, billingAccountID int64) paymentsdomain.PaymentOrder {
 	t.Helper()
 	configuration := publishTestStripeConfiguration(t, repo, "acct_payment", "prod_idea")
 	input := paymentsdomain.CreatePaymentOrderIntentInput{
 		ID: "0198cd29-f457-7e4b-b95e-6cfde41b8111", PublicOrderNumber: "IBP-20260801-ABC123DEF456",
-		PublicToken: "0198cd29-f457-7e4b-b95e-6cfde41b8222", UserID: 42,
+		PublicToken: "0198cd29-f457-7e4b-b95e-6cfde41b8222", UserID: 42, BillingAccountID: billingAccountID,
 		ClientIdempotencyKey: "payment-convergence-checkout", RequestHash: "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
 		StripeCredentialID: configuration.CredentialID, StripeAccountID: "acct_payment", StripeProductID: "prod_idea", IdeaQuantity: 501,
 		TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,

@@ -109,6 +109,7 @@ type Querier interface {
 	// transaction (see InsertWorkspaceTaskOutput).
 	CompleteWorkspaceTask(ctx context.Context, arg CompleteWorkspaceTaskParams) (Task, error)
 	CountAdminPaymentOrders(ctx context.Context, arg CountAdminPaymentOrdersParams) (int64, error)
+	CountBillingAccountOwners(ctx context.Context, billingAccountID int64) (int64, error)
 	CountBoardYUpdates(ctx context.Context, arg CountBoardYUpdatesParams) (int64, error)
 	// Counts honor the user/keyword filters but never the status filter, so
 	// the status pills keep their global breakdown while a status is active.
@@ -250,6 +251,7 @@ type Querier interface {
 	// Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 	CreateWorkspaceTask(ctx context.Context, arg CreateWorkspaceTaskParams) (Task, error)
 	DeleteAdminBrandLogoOverride(ctx context.Context, arg DeleteAdminBrandLogoOverrideParams) (int64, error)
+	DeleteBillingAccountMember(ctx context.Context, arg DeleteBillingAccountMemberParams) (int64, error)
 	// DeleteBoardDocumentMediaRefs clears every accepted document reference
 	// for one board in the calling workspace (#936). ReplaceDocument calls it
 	// before re-inserting the accepted set, so removed references stop
@@ -287,7 +289,21 @@ type Querier interface {
 	GetActiveLibraryMaterializationByAsset(ctx context.Context, arg GetActiveLibraryMaterializationByAssetParams) (GetActiveLibraryMaterializationByAssetRow, error)
 	GetActiveStorageProfileSecretVersion(ctx context.Context, arg GetActiveStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	GetAdminPaymentOrder(ctx context.Context, orderNumber string) (GetAdminPaymentOrderRow, error)
+	GetBillingAccountByInternalID(ctx context.Context, internalID int64) (BillingAccount, error)
+	// Billing Account resolution and membership queries (#915). Public references
+	// use public_id (ba_); internal_id stays database-internal.
+	//
+	// Resolution is explicit and fail-closed: one Workspace resolves to exactly
+	// one Billing Account via (1) explicit workspace_billing_links, else (2) the
+	// Organization account for org workspaces, else (3) the per-workspace
+	// account. Missing, ambiguous, or conflicting ownership fails closed in the
+	// caller (no silent fallback to another wallet). All queries are typed and
+	// join the caller-owned transaction via the passed Queries (no ambient pool
+	// use here), so Task settlement keeps Quote/Hold/Task/River atomic.
+	GetBillingAccountByOrganizationID(ctx context.Context, organizationID pgtype.Int8) (BillingAccount, error)
+	GetBillingAccountByPublicID(ctx context.Context, publicID string) (BillingAccount, error)
 	GetBillingAccountByWorkspaceID(ctx context.Context, workspaceID pgtype.Int8) (BillingAccount, error)
+	GetBillingAccountMember(ctx context.Context, arg GetBillingAccountMemberParams) (BillingAccountMember, error)
 	// Global presence-ticket lookup: board public ids are globally unique
 	// (uq_boards_public_id), so the realtime admit path resolves the owning
 	// workspace from the ticket bid alone without a wid query param.
@@ -324,7 +340,18 @@ type Querier interface {
 	GetOrganizationByPublicID(ctx context.Context, publicID string) (Organization, error)
 	GetOrganizationMembership(ctx context.Context, arg GetOrganizationMembershipParams) (OrganizationMembership, error)
 	GetPaymentCheckoutShutdown(ctx context.Context, id pgtype.UUID) (PaymentCheckoutShutdown, error)
-	GetPaymentCustomer(ctx context.Context, arg GetPaymentCustomerParams) (PaymentCustomer, error)
+	// Account Stripe Customer (#919): reused per payer Billing Account, never
+	// per operator, so test/live stay isolated and key rotation never duplicates.
+	GetPaymentCustomerByAccount(ctx context.Context, arg GetPaymentCustomerByAccountParams) (PaymentCustomer, error)
+	// Account idempotency scope (#919): the durable replay scope is the payer
+	// Billing Account, never the operator. Same key + same hash replays, same
+	// key + different hash conflicts; cross-account key reuse never replays.
+	GetPaymentOrderByAccountIdempotency(ctx context.Context, arg GetPaymentOrderByAccountIdempotencyParams) (PaymentOrder, error)
+	// Account order reads (#919): continue/abandon/Return address the persisted
+	// payer account. Callers authorize Billing Owner/Admin first and converge
+	// unknown tokens to not-found (anti-enumeration); the token alone is never
+	// an ownership oracle.
+	GetPaymentOrderByAccountToken(ctx context.Context, arg GetPaymentOrderByAccountTokenParams) (PaymentOrder, error)
 	// Unified Checkout-session lookup (merged from ...ForUpdate + plain): the
 	// non-lock version is kept. The only caller is the webhook read path
 	// (dispatch, outside a write tx), which needs no row lock.
@@ -335,8 +362,6 @@ type Querier interface {
 	// explicit tx release the lock immediately, so they behave like the plain
 	// read they replaced.
 	GetPaymentOrderByIDForUpdate(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
-	GetPaymentOrderByIdempotency(ctx context.Context, arg GetPaymentOrderByIdempotencyParams) (PaymentOrder, error)
-	GetPaymentOrderByPublicToken(ctx context.Context, arg GetPaymentOrderByPublicTokenParams) (PaymentOrder, error)
 	GetPaymentStripeConfiguration(ctx context.Context) (PaymentStripeConfiguration, error)
 	GetPaymentStripeCredential(ctx context.Context, id pgtype.UUID) (PaymentStripeCredential, error)
 	GetPaymentStripeCredentialForOrder(ctx context.Context, id pgtype.UUID) (PaymentStripeCredential, error)
@@ -353,15 +378,18 @@ type Querier interface {
 	GetUserByPublicID(ctx context.Context, publicID pgtype.UUID) (User, error)
 	GetUserByStorageUID(ctx context.Context, storageUid string) (User, error)
 	GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error)
+	GetWorkspaceBillingLink(ctx context.Context, workspaceID int64) (WorkspaceBillingLink, error)
 	GetWorkspaceBoard(ctx context.Context, arg GetWorkspaceBoardParams) (GetWorkspaceBoardRow, error)
 	GetWorkspaceBoardAccess(ctx context.Context, arg GetWorkspaceBoardAccessParams) (GetWorkspaceBoardAccessRow, error)
 	GetWorkspaceBoardMembership(ctx context.Context, arg GetWorkspaceBoardMembershipParams) (int64, error)
+	GetWorkspaceByInternalID(ctx context.Context, internalID int64) (Workspace, error)
 	GetWorkspaceByPublicID(ctx context.Context, publicID string) (Workspace, error)
 	// GetWorkspaceMediaAssetID resolves a workspace-scoped media asset public
 	// id for output association. Minimal lookup only; the full media surface
 	// belongs to #820.
 	GetWorkspaceMediaAssetID(ctx context.Context, arg GetWorkspaceMediaAssetIDParams) (int64, error)
 	GetWorkspaceMembership(ctx context.Context, arg GetWorkspaceMembershipParams) (WorkspaceMembership, error)
+	GetWorkspaceMembershipByIDs(ctx context.Context, arg GetWorkspaceMembershipByIDsParams) (WorkspaceMembership, error)
 	GetWorkspaceTaskByPublicID(ctx context.Context, arg GetWorkspaceTaskByPublicIDParams) (Task, error)
 	HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error)
 	InsertBoardDocument(ctx context.Context, arg InsertBoardDocumentParams) error
@@ -393,12 +421,32 @@ type Querier interface {
 	// InsertWorkspaceTaskOutput accepts the output reference and its immutable
 	// Media origin from the persisted Task in the same statement.
 	InsertWorkspaceTaskOutput(ctx context.Context, arg InsertWorkspaceTaskOutputParams) (InsertWorkspaceTaskOutputRow, error)
+	// Account unpaid-slot accounting (#919): Checkout create/continue serialize
+	// per payer account under the account advisory lock.
+	ListAccountActivePaymentOrders(ctx context.Context, billingAccountID pgtype.Int8) ([]PaymentOrder, error)
+	// Account pending orders (#919): every Billing Owner/Admin of the payer
+	// account manages these, not just the creating operator.
+	ListAccountPendingPaymentOrders(ctx context.Context, billingAccountID pgtype.Int8) ([]PaymentOrder, error)
+	// Account recharge history (#919): credited, refunded-overlay, and
+	// user-abandoned facts of one payer Billing Account for its authorized
+	// managers. Same 12-month window and opaque-cursor paging as the
+	// operator read it replaces; no payer PII or provider secrets.
+	ListAccountRechargeHistory(ctx context.Context, arg ListAccountRechargeHistoryParams) ([]ListAccountRechargeHistoryRow, error)
 	ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]PaymentCheckoutShutdown, error)
 	ListActivePaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error)
 	ListAdminBrandLogoOverrides(ctx context.Context) ([]AdminBrandLogoOverride, error)
 	ListAdminPaymentOrderWebhookEvents(ctx context.Context, arg ListAdminPaymentOrderWebhookEventsParams) ([]ListAdminPaymentOrderWebhookEventsRow, error)
 	ListAdminPaymentOrders(ctx context.Context, arg ListAdminPaymentOrdersParams) ([]ListAdminPaymentOrdersRow, error)
 	ListBackfilledDatesByRange(ctx context.Context, arg ListBackfilledDatesByRangeParams) ([]pgtype.Date, error)
+	// Server-internal SSE fanout audience (#919): the current financial
+	// managers of one Billing Account. No auth gate here; callers fan out
+	// post-commit hints only to these users, so exited members and
+	// non-managers never observe another account's settlement. Financial
+	// management grants no content access; this list never leaves the server.
+	ListBillingAccountManagerIDs(ctx context.Context, billingAccountID int64) ([]int64, error)
+	ListBillingAccountMembers(ctx context.Context, arg ListBillingAccountMembersParams) ([]BillingAccountMember, error)
+	ListBillingAccountsForAdmin(ctx context.Context, arg ListBillingAccountsForAdminParams) ([]ListBillingAccountsForAdminRow, error)
+	ListBillingAccountsForUser(ctx context.Context, arg ListBillingAccountsForUserParams) ([]BillingAccount, error)
 	ListBoardRevisions(ctx context.Context, arg ListBoardRevisionsParams) ([]ListBoardRevisionsRow, error)
 	ListBoardYUpdates(ctx context.Context, arg ListBoardYUpdatesParams) ([]ListBoardYUpdatesRow, error)
 	// ListBoardsReferencingMediaAsset lists the workspace-scoped board public
@@ -426,9 +474,9 @@ type Querier interface {
 	// plus recent execution attempts. Attempt buckets stay empty until the
 	// worker records attempts; pending buckets are live immediately.
 	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
+	ListOrganizationOwners(ctx context.Context, organizationID int64) ([]OrganizationMembership, error)
 	ListOrganizationsByUserID(ctx context.Context, arg ListOrganizationsByUserIDParams) ([]Organization, error)
 	ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg ListPaymentOrdersForCheckoutShutdownParams) ([]PaymentOrder, error)
-	ListPaymentRechargeHistory(ctx context.Context, arg ListPaymentRechargeHistoryParams) ([]ListPaymentRechargeHistoryRow, error)
 	ListPaymentReconciliationAnomalies(ctx context.Context, rowLimit int32) ([]ListPaymentReconciliationAnomaliesRow, error)
 	ListPaymentStripeCredentials(ctx context.Context) ([]PaymentStripeCredential, error)
 	ListServiceModelPoolEntries(ctx context.Context, service string) ([]ServiceModelPoolEntry, error)
@@ -492,7 +540,6 @@ type Querier interface {
 	// projected alongside the asset row.
 	ListTaskMediaAssets(ctx context.Context, arg ListTaskMediaAssetsParams) ([]ListTaskMediaAssetsRow, error)
 	ListUnsettledPaymentOrders(ctx context.Context) ([]PaymentOrder, error)
-	ListUserPendingPaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error)
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	// Limit authorized identifiers before joining scene bodies. The count row
@@ -509,6 +556,7 @@ type Querier interface {
 	// (internal task ids resolved from the same page).
 	ListWorkspaceTaskOutputsByTaskIDs(ctx context.Context, taskIds []int64) ([]TaskOutput, error)
 	ListWorkspaceTasks(ctx context.Context, arg ListWorkspaceTasksParams) ([]Task, error)
+	ListWorkspacesByBillingAccountID(ctx context.Context, arg ListWorkspacesByBillingAccountIDParams) ([]Workspace, error)
 	ListWorkspacesByOrganizationID(ctx context.Context, arg ListWorkspacesByOrganizationIDParams) ([]Workspace, error)
 	ListWorkspacesByUserID(ctx context.Context, arg ListWorkspacesByUserIDParams) ([]Workspace, error)
 	LockAIGatewayCatalogWrite(ctx context.Context) error
@@ -551,7 +599,9 @@ type Querier interface {
 	LockWorkspaceMemberBoards(ctx context.Context, arg LockWorkspaceMemberBoardsParams) ([]LockWorkspaceMemberBoardsRow, error)
 	LockWorkspaceMemberships(ctx context.Context, publicID string) (int64, error)
 	MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
-	MarkPaymentOrderCancelled(ctx context.Context, arg MarkPaymentOrderCancelledParams) (PaymentOrder, error)
+	// Account abandon (#919): any Billing Owner/Admin of the persisted payer
+	// account may abandon its open Checkout.
+	MarkPaymentOrderCancelledByAccount(ctx context.Context, arg MarkPaymentOrderCancelledByAccountParams) (PaymentOrder, error)
 	MarkPaymentOrderCredited(ctx context.Context, arg MarkPaymentOrderCreditedParams) (PaymentOrder, error)
 	MarkPaymentOrderExpired(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
 	MarkPaymentOrderFailed(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
@@ -627,6 +677,7 @@ type Querier interface {
 	UpdateWorkspaceMemberRole(ctx context.Context, arg UpdateWorkspaceMemberRoleParams) (int64, error)
 	UpdateWorkspaceName(ctx context.Context, arg UpdateWorkspaceNameParams) (int64, error)
 	UpsertAdminBrandLogoOverride(ctx context.Context, arg UpsertAdminBrandLogoOverrideParams) (AdminBrandLogoOverride, error)
+	UpsertBillingAccountMember(ctx context.Context, arg UpsertBillingAccountMemberParams) (BillingAccountMember, error)
 	// UpsertBoardDocumentMediaRef records one accepted board -> media asset
 	// reference (#936: document source). Reconciled in the SAME transaction as
 	// the document accept: the board and the asset must both resolve inside
@@ -635,7 +686,7 @@ type Querier interface {
 	UpsertBoardDocumentMediaRef(ctx context.Context, arg UpsertBoardDocumentMediaRefParams) error
 	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)
 	UpsertOrganizationMembership(ctx context.Context, arg UpsertOrganizationMembershipParams) error
-	UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCustomerParams) (PaymentCustomer, error)
+	UpsertPaymentCustomerByAccount(ctx context.Context, arg UpsertPaymentCustomerByAccountParams) (PaymentCustomer, error)
 	UpsertServiceModelPoolVersion(ctx context.Context, arg UpsertServiceModelPoolVersionParams) (int64, error)
 	// #809 hard cut: the locator-immutability guard used to consult
 	// media_assets.storage_profile_id, which no longer exists in the
@@ -643,6 +694,7 @@ type Querier interface {
 	// trigger was removed with it). Only same-locator updates may proceed.
 	UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) (int64, error)
 	UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error
+	UpsertWorkspaceBillingLink(ctx context.Context, arg UpsertWorkspaceBillingLinkParams) (WorkspaceBillingLink, error)
 	UpsertWorkspaceMembership(ctx context.Context, arg UpsertWorkspaceMembershipParams) error
 }
 

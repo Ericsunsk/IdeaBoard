@@ -32,6 +32,9 @@
             >{{ t('account.rewards.redeem') }}</Button
           >
         </div>
+        <p class="m-0 text-xs text-muted-foreground" role="note">
+          {{ t('account.rewards.beneficiaryNote') }}
+        </p>
         <p
           v-if="redeemFailed"
           id="account-reward-code-error"

@@ -93,8 +93,11 @@ func (d *ContractControlDeps) registerControlWorkspaceRoutes(control *gin.Router
 
 func (d *ContractControlDeps) registerControlBillingRoutes(control *gin.RouterGroup) {
 	skuTarget := controlTargetParam("sku", "billing_sku")
+	billingAccountTarget := controlTargetParam("billing_account_id", "billing_account")
 	control.GET("/billing/accounts", d.guard(ControlCapabilityBilling,
 		controlRoute{Operation: "billing.get_account", Route: "GET /billing/accounts"}, d.listControlBillingAccounts))
+	control.GET("/billing/accounts/:billing_account_id", d.guard(ControlCapabilityBilling,
+		controlRoute{Operation: "billing.get_account_detail", Route: "GET /billing/accounts/{billing_account_id}", Target: billingAccountTarget}, d.getControlBillingAccount))
 	control.GET("/billing/catalog", d.guard(ControlCapabilityBilling,
 		controlRoute{Operation: "billing.list_catalog", Route: "GET /billing/catalog"}, d.listControlBillingCatalog))
 	control.POST("/billing/catalog/:sku/prices", d.guard(ControlCapabilityBilling,
@@ -111,6 +114,8 @@ func (d *ContractControlDeps) registerControlBillingRoutes(control *gin.RouterGr
 
 func (d *ContractControlDeps) registerControlCreditRoutes(control *gin.RouterGroup) {
 	walletTarget := controlTargetParam("user_id", "user")
+	accountTarget := controlTargetParam("billing_account_id", "billing_account")
+	restrictionTarget := controlTargetParam("restriction_id", "wallet_restriction")
 	control.POST("/credits/grants", d.guard(ControlCapabilityCredits,
 		controlRoute{Operation: "credits.grant", Route: "POST /credits/grants", Mutation: true, Target: controlCreditBodyUserTarget}, d.grantControlCredits))
 	control.POST("/credits/deductions", d.guard(ControlCapabilityCredits,
@@ -123,6 +128,14 @@ func (d *ContractControlDeps) registerControlCreditRoutes(control *gin.RouterGro
 		controlRoute{Operation: "credits.get_wallet", Route: "GET /credits/wallets/{user_id}", Target: walletTarget}, d.getControlCreditWallet))
 	control.GET("/credits/wallets/:user_id/ledger", d.guard(ControlCapabilityCredits,
 		controlRoute{Operation: "credits.list_ledger", Route: "GET /credits/wallets/{user_id}/ledger", Target: walletTarget}, d.listControlCreditLedger))
+	control.GET("/credits/accounts/:billing_account_id", d.guard(ControlCapabilityCredits,
+		controlRoute{Operation: "credits.get_account_wallet", Route: "GET /credits/accounts/{billing_account_id}", Target: accountTarget}, d.getControlBillingAccountWallet))
+	control.GET("/credits/accounts/:billing_account_id/ledger", d.guard(ControlCapabilityCredits,
+		controlRoute{Operation: "credits.list_account_ledger", Route: "GET /credits/accounts/{billing_account_id}/ledger", Target: accountTarget}, d.listControlBillingAccountLedger))
+	control.POST("/credits/wallet-restrictions", d.guard(ControlCapabilityCredits,
+		controlRoute{Operation: "credits.restrict_wallet", Route: "POST /credits/wallet-restrictions", Mutation: true, Target: controlRestrictionBodyAccountTarget}, d.restrictControlWallet))
+	control.POST("/credits/wallet-restrictions/:restriction_id/release", d.guard(ControlCapabilityCredits,
+		controlRoute{Operation: "credits.release_wallet_restriction", Route: "POST /credits/wallet-restrictions/{restriction_id}/release", Mutation: true, Target: restrictionTarget}, d.releaseControlWalletRestriction))
 	control.GET("/credits/health", d.guard(ControlCapabilityCredits,
 		controlRoute{Operation: "credits.get_health", Route: "GET /credits/health"}, d.getControlCreditHealth))
 	control.POST("/credits/reconciliation/runs", d.guard(ControlCapabilityCredits,
@@ -136,8 +149,9 @@ func (d *ContractControlDeps) registerControlCreditRoutes(control *gin.RouterGro
 }
 
 // controlCreditBodyUserTarget extracts the audit target from the credit
-// mutation body (user_id is usr_-shaped; unparseable means no target,
-// the handler still fails closed with 400).
+// mutation body: the explicit ba_ funds identity when account-addressed,
+// else the usr_-shaped user. Unparseable means no target, the handler
+// still fails closed with 400.
 func controlCreditBodyUserTarget(c *gin.Context, body []byte) (string, string) {
 	if len(body) == 0 {
 		return "", ""
@@ -146,11 +160,31 @@ func controlCreditBodyUserTarget(c *gin.Context, body []byte) (string, string) {
 	if err := contract.DecodeStrict(body, &payload); err != nil {
 		return "", ""
 	}
+	if raw, _ := payload["billing_account_id"].(string); strings.TrimSpace(raw) != "" {
+		return "billing_account", strings.TrimSpace(raw)
+	}
 	raw, _ := payload["user_id"].(string)
 	if raw == "" {
 		return "", ""
 	}
 	return "user", raw
+}
+
+// controlRestrictionBodyAccountTarget extracts the audit target from the
+// wallet-restriction creation body (the explicit ba_ funds identity).
+func controlRestrictionBodyAccountTarget(c *gin.Context, body []byte) (string, string) {
+	if len(body) == 0 {
+		return "", ""
+	}
+	var payload map[string]any
+	if err := contract.DecodeStrict(body, &payload); err != nil {
+		return "", ""
+	}
+	raw, _ := payload["billing_account_id"].(string)
+	if strings.TrimSpace(raw) == "" {
+		return "", ""
+	}
+	return "billing_account", strings.TrimSpace(raw)
 }
 
 func (d *ContractControlDeps) registerControlPaymentRoutes(control *gin.RouterGroup) {

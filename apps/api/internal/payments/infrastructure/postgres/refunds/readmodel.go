@@ -41,17 +41,22 @@ func (s *Store) loadPendingRefundOrder(ctx context.Context, tx pgx.Tx, orderNumb
 	var paidSubtotal, paidTotal pgtype.Int8
 	var paidCurrency pgtype.Text
 	var paidAt pgtype.Timestamptz
+	var billingAccountID pgtype.Int8
 	if err := tx.QueryRow(ctx, `
-SELECT id::text, public_order_number, user_id, status, stripe_charge_id, idea_quantity,
+SELECT id::text, public_order_number, user_id, billing_account_id, status, stripe_charge_id, idea_quantity,
        paid_subtotal_minor, paid_total_minor, paid_currency, paid_at
 FROM payment_orders WHERE public_order_number = $1 FOR UPDATE`, orderNumber).Scan(
-		&order.ID, &order.PublicOrderNumber, &order.UserID, &order.Status, &order.StripeChargeID,
+		&order.ID, &order.PublicOrderNumber, &order.UserID, &billingAccountID, &order.Status, &order.StripeChargeID,
 		&order.IdeaQuantity, &paidSubtotal, &paidTotal, &paidCurrency, &paidAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return paymentsdomain.PaymentOrder{}, pgtype.Int8{}, pgtype.Int8{}, pgtype.Text{}, pgtype.Timestamptz{}, paymentcontracts.ErrAdminPaymentOrderNotFound
 		}
 		return paymentsdomain.PaymentOrder{}, pgtype.Int8{}, pgtype.Int8{}, pgtype.Text{}, pgtype.Timestamptz{}, fmt.Errorf("read payment order for refund: %w", err)
+	}
+	order.BillingAccountID = 0
+	if billingAccountID.Valid {
+		order.BillingAccountID = billingAccountID.Int64
 	}
 	return order, paidSubtotal, paidTotal, paidCurrency, paidAt, nil
 }

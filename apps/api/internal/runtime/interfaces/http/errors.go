@@ -37,6 +37,9 @@ const (
 	MsgIdempotencyConflict2            = errorrender.MsgIdempotencyConflict2                           // CodeIdempotencyConflict
 	MsgControlNotFound2                = errorrender.MsgControlNotFound2                               // CodeControlNotFound
 	MsgBillingWalletRestricted         = errorrender.MsgBillingWalletRestricted                        // CodeBillingWalletRestricted
+	MsgBillingAccountForbidden         = errorrender.MsgBillingAccountForbidden                        // CodeBillingAccountForbidden
+	MsgBillingAccountConflict          = errorrender.MsgBillingAccountConflict                         // CodeBillingAccountConflict
+	MsgBillingAccountNotFound          = errorrender.MsgBillingAccountNotFound                         // CodeBillingAccountNotFound
 	MsgValidationFailed2               = errorrender.MsgValidationFailed2                              // CodeValidationFailed
 	MsgControlNotFound3                = errorrender.MsgControlNotFound3                               // CodeControlNotFound
 	MsgValidationFailed3               = errorrender.MsgValidationFailed3                              // CodeValidationFailed
@@ -97,6 +100,8 @@ const (
 	MsgServiceUnavailable26            = errorrender.MsgServiceUnavailable26                           // CodeServiceUnavailable
 	MsgServiceUnavailable27            = errorrender.MsgServiceUnavailable27                           // CodeServiceUnavailable
 	MsgControlNotFound8                = errorrender.MsgControlNotFound8                               // CodeControlNotFound
+	MsgControlNotFound9                = errorrender.MsgControlNotFound9                               // CodeControlNotFound
+	MsgControlNotFound10               = errorrender.MsgControlNotFound10                              // CodeControlNotFound
 	MsgConflict4                       = errorrender.MsgConflict4                                      // CodeConflict
 	MsgServiceUnavailable28            = errorrender.MsgServiceUnavailable28                           // CodeServiceUnavailable
 	MsgServiceUnavailable29            = errorrender.MsgServiceUnavailable29                           // CodeServiceUnavailable
@@ -226,4 +231,7 @@ const (
 	MsgReadyHandler                    = errorrender.MsgReadyHandler                                   // ReadyHandler @ routes.go
 	MsgPublicBrandingSettingsHandler   = errorrender.MsgPublicBrandingSettingsHandler                  // PublicBrandingSettingsHandler @ routes.go
 	MsgBadRequest35                    = errorrender.MsgBadRequest35                                   // CodeBadRequest
+	MsgBadRequest36                    = errorrender.MsgBadRequest36                                   // CodeBadRequest
+	MsgBadRequest37                    = errorrender.MsgBadRequest37                                   // CodeBadRequest
+	MsgBadRequest38                    = errorrender.MsgBadRequest38                                   // CodeBadRequest
 )

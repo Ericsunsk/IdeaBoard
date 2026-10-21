@@ -36,10 +36,11 @@ describe('Wallet Subcomponents', () => {
       props: {
         activeTab: 'grant',
         refundSource: null,
+        correctionSource: null,
         amountCredits: 100,
 
         showErrors: false,
-        validation: { amountError: '', valid: true },
+        validation: { amountError: '', targetError: '', valid: true },
         commandPending: false,
         onCancel,
         onSubmit,
@@ -63,10 +64,11 @@ describe('Wallet Subcomponents', () => {
       props: {
         activeTab: tab,
         refundSource: null,
+        correctionSource: null,
         amountCredits: null,
 
         showErrors: false,
-        validation: { amountError: '', valid: true },
+        validation: { amountError: '', targetError: '', valid: true },
         commandPending: false,
       },
     })

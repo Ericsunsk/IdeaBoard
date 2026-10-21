@@ -29,11 +29,28 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { ControlBillingOwnerScopeParameter } from './controlBillingOwnerScopeParameter'
+import type { CursorParameter } from './cursorParameter'
+import type { PageSizeParameter } from './pageSizeParameter'
 
 export type ListControlBillingAccountsParams = {
   /**
-   * Workspace public id (ws_...) owning the account.
+   * Workspace public id (ws_...) owning the account. Omit to list all accounts.
    * @pattern ^ws_[A-Za-z0-9_-]+$
    */
-  workspace_id: string
+  workspace_id?: string
+  /**
+   * Filter the Admin account list by ownership (all, organization, workspace). Default all.
+   */
+  owner_scope?: ControlBillingOwnerScopeParameter
+  /**
+   * Opaque cursor token bound to operator, filters and sort order.
+   * @maxLength 512
+   */
+  cursor?: CursorParameter
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  page_size?: PageSizeParameter
 }

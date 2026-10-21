@@ -97,7 +97,7 @@ func (s *Service) ProvisionIdentity(ctx context.Context, identity ports.Verified
 		if granted {
 			return &ports.ProvisionResult{User: *user, Wallet: grant, WelcomeGranted: true}, nil
 		}
-		return s.provisionResultWithoutGrant(ctx, user)
+		return s.provisionResultWithoutGrant(ctx, ambient, user)
 	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -121,9 +121,14 @@ func (s *Service) ProvisionIdentity(ctx context.Context, identity ports.Verified
 	}
 	wallet := grant
 	if !granted {
-		result, err := s.provisionResultWithoutGrant(ctx, user)
+		readTx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("begin provisioned wallet read: %w", err)
+		}
+		result, readErr := s.provisionResultWithoutGrant(ctx, readTx, user)
+		_ = readTx.Rollback(ctx)
+		if readErr != nil {
+			return nil, readErr
 		}
 		return result, nil
 	}
@@ -132,13 +137,19 @@ func (s *Service) ProvisionIdentity(ctx context.Context, identity ports.Verified
 
 // provisionResultWithoutGrant reads the already-settled wallet for a
 // replayed provisioning (the welcome fingerprint was claimed before, so
-// no new grant was minted). The read runs on the pool outside any
-// transaction, exactly as before: under a borrowed guard transaction the
-// wallet row pre-exists in every reachable replay shape (a fresh wallet
-// plus an already-claimed fingerprint would require a fingerprint
-// collision), so the pool read observes it.
-func (s *Service) provisionResultWithoutGrant(ctx context.Context, user *domain.User) (*ports.ProvisionResult, error) {
-	walletDetails, err := s.credits.GetWallet(ctx, user.ID)
+// no new grant was minted). Account resolution joins the given transaction
+// (owned or borrowed); the wallet read runs on the pool against committed
+// state. Under a borrowed guard transaction the wallet row pre-exists in
+// every reachable replay shape (a fresh wallet plus an already-claimed
+// fingerprint would require a fingerprint collision), so the pool read
+// observes it.
+func (s *Service) provisionResultWithoutGrant(ctx context.Context, tx pgx.Tx, user *domain.User) (*ports.ProvisionResult, error) {
+	lifecycle := s.credits.LifecycleInTx(tx)
+	personalAccountID, err := lifecycle.ResolvePersonalAccount(ctx, user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("resolve personal Billing Account: %w", err)
+	}
+	walletDetails, err := s.credits.GetWallet(ctx, personalAccountID)
 	if err != nil {
 		return nil, fmt.Errorf("read provisioned Credit Wallet: %w", err)
 	}
@@ -166,11 +177,16 @@ func (s *Service) provisionIdentityTx(ctx context.Context, tx pgx.Tx, identity p
 	if err := lifecycle.BindWelcomeIdentityKey(ctx, s.welcomeKeyFingerprint); err != nil {
 		return nil, zeroWallet, false, fmt.Errorf("verify permanently bound Welcome identity key: %w", err)
 	}
-	if err := lifecycle.ProvisionWallet(ctx, user.ID); err != nil {
-		return nil, zeroWallet, false, fmt.Errorf("provision Credit Wallet: %w", err)
+	personalAccountID, err := lifecycle.ResolvePersonalAccount(ctx, user.ID)
+	if err != nil {
+		return nil, zeroWallet, false, fmt.Errorf("resolve personal Billing Account: %w", err)
 	}
-	grant, granted, err := lifecycle.ClaimWelcomeGrant(ctx, fingerprint, ports.WelcomeGrantCommand{
+	if err := lifecycle.ProvisionAccountWallet(ctx, personalAccountID); err != nil {
+		return nil, zeroWallet, false, fmt.Errorf("provision Billing Account Wallet: %w", err)
+	}
+	grant, granted, err := lifecycle.ClaimWelcomeGrant(ctx, fingerprint, user.ID, ports.WelcomeGrantCommand{
 		UserID:                user.ID,
+		BillingAccountID:      personalAccountID,
 		Amount:                welcomeGrantCredits,
 		IdempotencyKey:        "welcome:" + fingerprint,
 		ActorType:             "system",
@@ -183,8 +199,8 @@ func (s *Service) provisionIdentityTx(ctx context.Context, tx pgx.Tx, identity p
 	if err != nil {
 		return nil, zeroWallet, false, fmt.Errorf("claim Welcome Grant: %w", err)
 	}
-	if err := lifecycle.SetWalletFrozen(ctx, user.ID, user.Status != 1); err != nil {
-		return nil, zeroWallet, false, fmt.Errorf("align Credit Wallet status: %w", err)
+	if err := lifecycle.SetAccountWalletFrozen(ctx, personalAccountID, user.Status != 1); err != nil {
+		return nil, zeroWallet, false, fmt.Errorf("align Billing Account Wallet status: %w", err)
 	}
 	return user, grant.Wallet, granted, nil
 }

@@ -18,6 +18,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// GetPaymentOrderPayerAccount reads the immutable payer shared by refund and
+// dispute hints. Current operators and memberships never determine this fact.
+func (r *Repository) GetPaymentOrderPayerAccount(ctx context.Context, orderID string) (int64, error) {
+	if !r.Available() || orderID == "" {
+		return 0, fmt.Errorf("payments repository: invalid order payer query")
+	}
+	var billingAccountID pgtype.Int8
+	if err := r.DBWithContext(ctx).Executor().QueryRow(ctx, `SELECT billing_account_id FROM payment_orders WHERE id = $1::uuid`, orderID).Scan(&billingAccountID); err != nil {
+		return 0, err
+	}
+	if !billingAccountID.Valid || billingAccountID.Int64 <= 0 {
+		return 0, fmt.Errorf("payment order without payer Billing Account")
+	}
+	return billingAccountID.Int64, nil
+}
+
 func (r *Repository) GetStripeConfiguration(ctx context.Context) (paymentconfiguration.StoredStripeConfiguration, error) {
 	if r == nil || r.db == nil {
 		return paymentconfiguration.StoredStripeConfiguration{}, fmt.Errorf("payments repository: database unavailable")
@@ -120,23 +136,24 @@ func (r *Repository) ListPaymentOrdersForCheckoutShutdown(ctx context.Context, s
 	return items, nil
 }
 
-func (r *Repository) GetPaymentCustomer(ctx context.Context, userID int64, accountID string, mode paymentports.StripeMode) (paymentcheckout.PaymentCustomer, error) {
+func (r *Repository) GetPaymentCustomerByAccount(ctx context.Context, billingAccountID int64, accountID string, mode paymentports.StripeMode) (paymentcheckout.PaymentCustomer, error) {
 	if r == nil || r.db == nil {
 		return paymentcheckout.PaymentCustomer{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	row, err := r.DBWithContext(ctx).Queries().GetPaymentCustomer(ctx, dbsqlc.GetPaymentCustomerParams{
-		UserID: userID, StripeAccountID: accountID, StripeMode: string(mode),
+	row, err := r.DBWithContext(ctx).Queries().GetPaymentCustomerByAccount(ctx, dbsqlc.GetPaymentCustomerByAccountParams{
+		BillingAccountID: billingAccountID, StripeAccountID: accountID, StripeMode: string(mode),
 	})
 	if err != nil {
 		return paymentcheckout.PaymentCustomer{}, err
 	}
 	return paymentcheckout.PaymentCustomer{
-		UserID: row.UserID, StripeAccountID: row.StripeAccountID, StripeMode: paymentports.StripeMode(row.StripeMode), StripeCustomerID: row.StripeCustomerID,
+		UserID: row.UserID, BillingAccountID: row.BillingAccountID,
+		StripeAccountID: row.StripeAccountID, StripeMode: paymentports.StripeMode(row.StripeMode), StripeCustomerID: row.StripeCustomerID,
 		CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt),
 	}, nil
 }
 
-func (r *Repository) GetPaymentOrderByPublicToken(ctx context.Context, userID int64, token string) (paymentsdomain.PaymentOrder, error) {
+func (r *Repository) GetPaymentOrderByAccountToken(ctx context.Context, billingAccountID int64, token string) (paymentsdomain.PaymentOrder, error) {
 	if r == nil || r.db == nil {
 		return paymentsdomain.PaymentOrder{}, fmt.Errorf("payments repository: database unavailable")
 	}
@@ -144,8 +161,8 @@ func (r *Repository) GetPaymentOrderByPublicToken(ctx context.Context, userID in
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, database.ErrNotFound
 	}
-	row, err := r.DBWithContext(ctx).Queries().GetPaymentOrderByPublicToken(ctx, dbsqlc.GetPaymentOrderByPublicTokenParams{
-		PublicToken: pgUUIDToPgType(publicToken), UserID: userID,
+	row, err := r.DBWithContext(ctx).Queries().GetPaymentOrderByAccountToken(ctx, dbsqlc.GetPaymentOrderByAccountTokenParams{
+		PublicToken: pgUUIDToPgType(publicToken), BillingAccountID: pgtype.Int8{Int64: billingAccountID, Valid: true},
 	})
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, err
@@ -194,13 +211,28 @@ func (r *Repository) ListActivePaymentOrders(ctx context.Context, userID int64) 
 	return orders, nil
 }
 
-func (r *Repository) ListUserPendingPaymentOrders(ctx context.Context, userID int64) ([]paymentsdomain.PaymentOrder, error) {
-	if r == nil || r.db == nil || userID <= 0 {
-		return nil, fmt.Errorf("payments repository: invalid pending order query")
+func (r *Repository) ListAccountActivePaymentOrders(ctx context.Context, billingAccountID int64) ([]paymentsdomain.PaymentOrder, error) {
+	if r == nil || r.db == nil || billingAccountID <= 0 {
+		return nil, fmt.Errorf("payments repository: invalid account active order query")
 	}
-	rows, err := r.DBWithContext(ctx).Queries().ListUserPendingPaymentOrders(ctx, userID)
+	rows, err := r.DBWithContext(ctx).Queries().ListAccountActivePaymentOrders(ctx, pgtype.Int8{Int64: billingAccountID, Valid: true})
 	if err != nil {
-		return nil, fmt.Errorf("list user pending payment orders: %w", err)
+		return nil, fmt.Errorf("list account active payment orders: %w", err)
+	}
+	orders := make([]paymentsdomain.PaymentOrder, 0, len(rows))
+	for _, row := range rows {
+		orders = append(orders, PaymentOrder(row))
+	}
+	return orders, nil
+}
+
+func (r *Repository) ListAccountPendingPaymentOrders(ctx context.Context, billingAccountID int64) ([]paymentsdomain.PaymentOrder, error) {
+	if r == nil || r.db == nil || billingAccountID <= 0 {
+		return nil, fmt.Errorf("payments repository: invalid account pending order query")
+	}
+	rows, err := r.DBWithContext(ctx).Queries().ListAccountPendingPaymentOrders(ctx, pgtype.Int8{Int64: billingAccountID, Valid: true})
+	if err != nil {
+		return nil, fmt.Errorf("list account pending payment orders: %w", err)
 	}
 	orders := make([]paymentsdomain.PaymentOrder, 0, len(rows))
 	for _, row := range rows {

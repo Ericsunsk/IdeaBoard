@@ -74,6 +74,23 @@ type ContractV1Deps struct {
 	// TaskSnapshotSaver pins the Resolve snapshot. Production wiring must
 	// provide it; atomic settlement fails closed when it is absent.
 	TaskSnapshotSaver WorkspaceTaskSnapshotSaver
+	// TaskBillingAccounts resolves the stable funds identity inside the
+	// settlement transaction (#915 resolution, #916 funds identity). Nil
+	// falls back to TaskLifecycle when it implements
+	// workspacetasks.TxBillingAccountResolver (the postgres store does);
+	// in-memory HTTP fixtures inject their test double instead.
+	TaskBillingAccounts workspacetasks.TxBillingAccountResolver
+	// TaskQuoteBillingAccounts resolves the same stable funds identity
+	// for the quote/readiness preflight without a settlement transaction
+	// (#917). Production wires the tenancy billing-account store; tests
+	// inject their double. Nil fails the preflight closed (503), never
+	// an owner-wallet fallback.
+	TaskQuoteBillingAccounts taskQuoteBillingAccountReader
+	// TaskQuoteWallets reads the resolved account Wallet for the
+	// preflight funds gate (#917: 402 insufficient vs 403 restricted,
+	// mirroring the submit Hold). Production wires the Credits service;
+	// tests inject their double. Nil fails the preflight closed.
+	TaskQuoteWallets taskQuoteWalletReader
 	// Media is the workspace-scoped upload-session + media-asset
 	// surface (issue #803, restored in #820). Production wires the
 	// workspace postgres store; tests inject the in-memory implementation.

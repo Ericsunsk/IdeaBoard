@@ -26,7 +26,7 @@ func TestNewPurchaseQuoteUsesExactIntegerUSDMinorUnits(t *testing.T) {
 
 func TestCheckoutRequestFingerprintIsCanonicalAndTermsAreCurrent(t *testing.T) {
 	command := paymentsdomain.CreateCheckoutCommand{
-		UserID: 42, ClientIdempotencyKey: "checkout-request-1", IdeaQuantity: 501,
+		BillingAccountID: 7, UserID: 42, ClientIdempotencyKey: "checkout-request-1", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: paymentsdomain.CurrentTermsVersion,
 		RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
 	}
@@ -42,6 +42,26 @@ func TestCheckoutRequestFingerprintIsCanonicalAndTermsAreCurrent(t *testing.T) {
 	if first != second || len(first) != 64 {
 		t.Fatalf("fingerprints first=%q second=%q", first, second)
 	}
+	// The idempotency scope is the payer account (#919): the operator is
+	// attribution, not scope, so changing only the operator replays while
+	// changing the account conflicts.
+	command.UserID = 43
+	replayed, err := paymentsdomain.CheckoutRequestFingerprint(command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replayed != first {
+		t.Fatal("operator change must not move the account idempotency scope")
+	}
+	command.BillingAccountID = 8
+	moved, err := paymentsdomain.CheckoutRequestFingerprint(command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moved == first {
+		t.Fatal("account change preserved canonical fingerprint")
+	}
+	command.BillingAccountID = 7
 	command.IdeaQuantity++
 	third, err := paymentsdomain.CheckoutRequestFingerprint(command)
 	if err != nil {
@@ -60,5 +80,10 @@ func TestCheckoutRequestFingerprintIsCanonicalAndTermsAreCurrent(t *testing.T) {
 	command.TermsAccepted = false
 	if _, err := paymentsdomain.CheckoutRequestFingerprint(command); !errors.Is(err, paymentsdomain.ErrTermsAcceptanceRequired) {
 		t.Fatalf("missing acceptance error = %v", err)
+	}
+	command.TermsAccepted = true
+	command.BillingAccountID = 0
+	if _, err := paymentsdomain.CheckoutRequestFingerprint(command); !errors.Is(err, paymentsdomain.ErrCheckoutIdempotencyKey) {
+		t.Fatalf("missing account error = %v", err)
 	}
 }

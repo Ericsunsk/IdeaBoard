@@ -227,6 +227,13 @@ func NewAppRouter(
 			TaskHolder: taskServices.workspaceTaskHolder,
 			TaskQueue:  taskServices.workspaceTaskQueue,
 			TaskAssets: taskServices.workspaceTaskAssets,
+			// #917: the quote/readiness preflight resolves the same stable
+			// Billing Account submit holds (no owner-wallet fallback) and
+			// gates the same Wallet funds (402 insufficient vs 403
+			// restricted). The store below is the same tenancy seam the
+			// workspace billing reads use, so every surface names one payer.
+			TaskQuoteBillingAccounts: tenancypg.NewBillingAccountStore(repos.db),
+			TaskQuoteWallets:         services.creditService,
 			// #848: quote, submit, and readiness share one RoutingResolver
 			// over the catalog pool (ADR-0012 rule 10, single seam).
 			// Submit pins its snapshot atomically via
@@ -294,6 +301,7 @@ func NewAppRouter(
 			Credits:        services.creditService,
 			CreditUsers:    creditUserResolver,
 			CreditReads:    services.creditService,
+			Restrictions:   services.creditService,
 			Reconciliation: services.creditService,
 			Tasks: control.NewWorkspaceControlTasks(services.dbPool, taskServices.workspaceTaskStore, taskServices.workspaceTaskHolder, creditUserResolver,
 				// Admin-cancel announcements (admin cancel dead-channel fix).

@@ -579,7 +579,13 @@ paths:
     get:
       tags: [ControlBilling]
       operationId: listControlBillingAccounts
-      summary: Resolve the implicit billing account for a workspace
+      summary: Locate billing accounts for platform administration
+      description: >-
+        With workspace_id, resolves the implicit billing account for that
+        workspace (single-item page). Without it, pages all stable Billing
+        Accounts newest-first (Admin locate/audit for personal, shared and
+        organization accounts) with the opaque cursor/page_size dialect and
+        an optional owner_scope filter. Requires Idempotency-Key: no (read).
       x-capability: control:billing
       x-audit:
         operator: true
@@ -588,14 +594,17 @@ paths:
       parameters:
         - name: workspace_id
           in: query
-          required: true
-          description: Workspace public id (ws_...) owning the account.
+          required: false
+          description: Workspace public id (ws_...) owning the account. Omit to list all accounts.
           schema:
             type: string
             pattern: '^ws_[A-Za-z0-9_-]+$'
+        - $ref: '#/components/parameters/ControlBillingOwnerScope'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
       responses:
         '200':
-          description: Billing account for the workspace.
+          description: Billing account page (single resolve or Admin list).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -609,6 +618,42 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /billing/accounts/{billing_account_id}:
+    get:
+      tags: [ControlBilling]
+      operationId: getControlBillingAccount
+      summary: Read one billing account for platform administration
+      description: >-
+        Reads one stable Billing Account by its ba_ id with ownership
+        linkage, explicitly linked workspaces, financial managers (usr_
+        identities) and the wallet summary. Customer-side Billing
+        Owner/Admin standing never implies this platform-Admin read.
+        Requires Idempotency-Key: no (read).
+      x-capability: control:billing
+      x-audit:
+        operator: true
+        target: billing_account
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlBillingAccountId'
+      responses:
+        '200':
+          description: Billing account detail.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlBillingAccountDetailEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
   /billing/catalog:
     get:
       tags: [ControlBilling]
@@ -813,6 +858,12 @@ paths:
       tags: [ControlCredits]
       operationId: createControlCreditGrant
       summary: Grant credits via credits.Commands
+      description: >-
+        Targets exactly one explicit Billing Account: user_id addresses the
+        target user's deterministic initial personal account, while
+        billing_account_id names a shared/organization account directly
+        (exactly one of the two is required). The Ledger Actor is always
+        the platform-Admin operator. Requires Idempotency-Key: yes (header).
       x-capability: control:credits
       x-audit:
         operator: true
@@ -853,6 +904,12 @@ paths:
       tags: [ControlCredits]
       operationId: createControlCreditDeduction
       summary: Deduct credits via credits.Commands
+      description: >-
+        Targets exactly one explicit Billing Account: user_id addresses the
+        target user's deterministic initial personal account, while
+        billing_account_id names a shared/organization account directly
+        (exactly one of the two is required). The Ledger Actor is always
+        the platform-Admin operator. Requires Idempotency-Key: yes (header).
       x-capability: control:credits
       x-audit:
         operator: true
@@ -893,6 +950,12 @@ paths:
       tags: [ControlCredits]
       operationId: createControlCreditRefund
       summary: Refund a charge via credits.Commands
+      description: >-
+        Linked Refund only: charge_transaction_id must name a Capture on the
+        addressed Billing Account (cross-account charges fail closed, no new
+        refund policy). Targets exactly one explicit Billing Account
+        (user_id or billing_account_id, exactly one required). Requires
+        Idempotency-Key: yes (header).
       x-capability: control:credits
       x-audit:
         operator: true
@@ -933,6 +996,12 @@ paths:
       tags: [ControlCredits]
       operationId: createControlCreditCorrection
       summary: Correct a prior transaction via credits.Commands
+      description: >-
+        Linked Correction only: original_transaction_id must name a
+        transaction on the addressed Billing Account (cross-account
+        references fail closed). Targets exactly one explicit Billing
+        Account (user_id or billing_account_id, exactly one required).
+        Requires Idempotency-Key: yes (header).
       x-capability: control:credits
       x-audit:
         operator: true
@@ -972,7 +1041,7 @@ paths:
     get:
       tags: [ControlCredits]
       operationId: getControlCreditWallet
-      summary: Read a user credit wallet
+      summary: Read a user's personal billing account wallet
       x-capability: control:credits
       x-audit:
         operator: true
@@ -1002,7 +1071,11 @@ paths:
     get:
       tags: [ControlCredits]
       operationId: listControlCreditLedger
-      summary: List wallet ledger transactions
+      summary: List personal billing account ledger transactions
+      description: >-
+        Reads the Ledger of the target user's deterministic initial
+        personal Billing Account. For shared/organization accounts use the
+        ba_-addressed ledger read. Requires Idempotency-Key: no (read).
       x-capability: control:credits
       x-audit:
         operator: true
@@ -1030,6 +1103,163 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/ControlNotFound'
+  /credits/accounts/{billing_account_id}:
+    get:
+      tags: [ControlCredits]
+      operationId: getControlBillingAccountWallet
+      summary: Read one billing account wallet for platform administration
+      description: >-
+        Reads the Wallet of one explicitly addressed Billing Account
+        (personal, shared or organization) with its reason-coded active
+        restrictions. No single-user linkage is synthesized. Requires
+        Idempotency-Key: no (read).
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: billing_account
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlBillingAccountId'
+      responses:
+        '200':
+          description: Account wallet detail.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlCreditWalletEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+  /credits/accounts/{billing_account_id}/ledger:
+    get:
+      tags: [ControlCredits]
+      operationId: listControlBillingAccountLedger
+      summary: List billing account ledger transactions
+      description: >-
+        Pages the Ledger of one explicitly addressed Billing Account with
+        Hold/Capture references. Requires Idempotency-Key: no (read).
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: billing_account
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlBillingAccountId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Ledger page.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedControlLedger'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+  /credits/wallet-restrictions:
+    post:
+      tags: [ControlCredits]
+      operationId: restrictControlWallet
+      summary: Restrict a billing account wallet via credits.Commands seam
+      description: >-
+        Creates one reason-coded spending limit on the explicitly addressed
+        Billing Account through the typed WalletRestrictionCommands seam
+        (the same seam Reconciliation uses for automatic isolation). Only
+        the addressed account is affected, never sibling accounts.
+        Requires Idempotency-Key: yes (header).
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: billing_account
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlRestrictWalletRequest'
+      responses:
+        '200':
+          description: Restriction applied.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlWalletRestrictionResultEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /credits/wallet-restrictions/{restriction_id}/release:
+    post:
+      tags: [ControlCredits]
+      operationId: releaseControlWalletRestriction
+      summary: Release one wallet restriction precisely
+      description: >-
+        Releases exactly the addressed restriction_id, keeping its history.
+        Sibling restrictions on the same account and restrictions on other
+        accounts are untouched. Requires Idempotency-Key: yes (header).
+      x-capability: control:credits
+      x-audit:
+        operator: true
+        target: wallet_restriction
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlRestrictionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlReleaseWalletRestrictionRequest'
+      responses:
+        '200':
+          description: Restriction released.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlWalletRestrictionResultEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
   /credits/health:
     get:
       tags: [ControlCredits]
@@ -3444,6 +3674,31 @@ components:
       schema:
         type: string
         pattern: '^usr_[A-Za-z0-9_-]+$'
+    ControlBillingAccountId:
+      name: billing_account_id
+      in: path
+      required: true
+      description: Stable Billing Account public id (ba_...), the funds identity holding the unified balance.
+      schema:
+        type: string
+        pattern: '^ba_[A-Za-z0-9_-]+$'
+    ControlRestrictionId:
+      name: restriction_id
+      in: path
+      required: true
+      description: Wallet restriction id (UUID).
+      schema:
+        type: string
+        format: uuid
+    ControlBillingOwnerScope:
+      name: owner_scope
+      in: query
+      required: false
+      description: Filter the Admin account list by ownership (all, organization, workspace). Default all.
+      schema:
+        type: string
+        enum: [all, organization, workspace]
+        default: all
     ControlTaskId:
       name: task_id
       in: path
@@ -3847,21 +4102,32 @@ components:
           format: date-time
     ControlBillingAccount:
       type: object
-      required: [workspace_id, created_at, updated_at]
+      required: [billing_account_id, owner_type, created_at, updated_at]
       additionalProperties: false
       properties:
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
+          description: Stable funds identity holding the unified balance.
+        owner_type:
+          type: string
+          enum: [workspace, organization]
+          description: workspace covers per-workspace and studio-shared links; organization is the shared org pool.
         workspace_id:
           type: string
-          description: Workspace public id owning the implicit billing account.
+          description: Resolving or owning Workspace public id, when the account is workspace-scoped.
+        organization_id:
+          type: string
+          description: Owning Organization public id, when the account is the shared org pool.
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
-    ControlCreditWallet:
+    ControlBillingAccountMember:
       type: object
-      required: [user_id, display_name, available_credits, reserved_credits, status, active_restrictions]
+      required: [user_id, display_name, role]
       additionalProperties: false
       properties:
         user_id:
@@ -3869,6 +4135,136 @@ components:
           pattern: '^usr_[A-Za-z0-9_-]+$'
         display_name:
           type: string
+        role:
+          type: string
+          enum: [owner, admin]
+    ControlLinkedWorkspace:
+      type: object
+      required: [workspace_id, name]
+      additionalProperties: false
+      properties:
+        workspace_id:
+          type: string
+          pattern: '^ws_[A-Za-z0-9_-]+$'
+        name:
+          type: string
+    ControlBillingAccountWalletSummary:
+      type: object
+      required: [available_credits, reserved_credits, status]
+      additionalProperties: false
+      properties:
+        available_credits:
+          type: integer
+        reserved_credits:
+          type: integer
+        status:
+          type: string
+          enum: [active, frozen]
+    ControlBillingAccountDetail:
+      type: object
+      required: [billing_account_id, owner_type, linked_workspaces, members, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
+        owner_type:
+          type: string
+          enum: [workspace, organization]
+        workspace_id:
+          type: string
+          description: Owning Workspace public id, when the account is workspace-scoped.
+        organization_id:
+          type: string
+          description: Owning Organization public id, when the account is the shared org pool.
+        linked_workspaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlLinkedWorkspace'
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlBillingAccountMember'
+        wallet:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/ControlBillingAccountWalletSummary'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ControlBillingAccountDetailEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ControlBillingAccountDetail'
+    ControlRestrictWalletRequest:
+      type: object
+      required: [billing_account_id, type, source, related_object_type, related_object_id]
+      additionalProperties: false
+      properties:
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
+        type:
+          type: string
+        source:
+          type: string
+        related_object_type:
+          type: string
+        related_object_id:
+          type: string
+        reason:
+          type: string
+    ControlReleaseWalletRestrictionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+    ControlWalletRestrictionResult:
+      type: object
+      required: [restriction_id, replayed]
+      additionalProperties: false
+      properties:
+        restriction_id:
+          type: string
+        replayed:
+          type: boolean
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
+    ControlWalletRestrictionResultEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ControlWalletRestrictionResult'
+    ControlCreditWallet:
+      type: object
+      required: [available_credits, reserved_credits, status, active_restrictions]
+      additionalProperties: false
+      properties:
+        user_id:
+          type: string
+          pattern: '^usr_[A-Za-z0-9_-]+$'
+          description: Present only on user-addressed reads; account-addressed reads carry no single-user linkage.
+        display_name:
+          type: string
+          description: Present only on user-addressed reads.
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
+          description: Stable funds identity holding the balance (#916). The wallet belongs to this Billing Account; user_id names the requested target only.
+        owner_type:
+          type: string
+          enum: [workspace, organization]
+          description: Ownership of the addressed Billing Account.
         available_credits:
           type: integer
         reserved_credits:
@@ -3882,7 +4278,7 @@ components:
             $ref: '#/components/schemas/ControlWalletRestriction'
     ControlWalletRestriction:
       type: object
-      required: [restriction_id, user_id, type, source, created_at]
+      required: [restriction_id, type, source, created_at]
       additionalProperties: false
       properties:
         restriction_id:
@@ -3890,8 +4286,14 @@ components:
         user_id:
           type: string
           pattern: '^usr_[A-Za-z0-9_-]+$'
+          description: Present only on user-addressed reads.
         display_name:
           type: string
+          description: Present only on user-addressed reads.
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
+          description: The restricted Billing Account.
         type:
           type: string
         source:
@@ -4277,12 +4679,16 @@ components:
                 $ref: '#/components/schemas/ControlModelPoolEntry'
     ControlCreditCommandRequest:
       type: object
-      required: [user_id, amount_credits, business_reference_id]
+      required: [amount_credits, business_reference_id]
       additionalProperties: false
+      description: Exactly one of user_id (target user's personal account) or billing_account_id (explicit shared/organization account) is required.
       properties:
         user_id:
           type: string
           pattern: '^usr_[A-Za-z0-9_-]+$'
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
         amount_credits:
           type: integer
           minimum: 1
@@ -4290,12 +4696,16 @@ components:
           type: string
     ControlCreditRefundRequest:
       type: object
-      required: [user_id, amount_credits, business_reference_id, charge_transaction_id]
+      required: [amount_credits, business_reference_id, charge_transaction_id]
       additionalProperties: false
+      description: Linked Refund only; exactly one of user_id or billing_account_id is required, and the charge must sit on the addressed account.
       properties:
         user_id:
           type: string
           pattern: '^usr_[A-Za-z0-9_-]+$'
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
         amount_credits:
           type: integer
           minimum: 1
@@ -4305,12 +4715,16 @@ components:
           type: string
     ControlCreditCorrectionRequest:
       type: object
-      required: [user_id, amount_credits, business_reference_id, original_transaction_id]
+      required: [amount_credits, business_reference_id, original_transaction_id]
       additionalProperties: false
+      description: Linked Correction only; exactly one of user_id or billing_account_id is required, and the original must sit on the addressed account.
       properties:
         user_id:
           type: string
           pattern: '^usr_[A-Za-z0-9_-]+$'
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
         amount_credits:
           type: integer
           minimum: 1

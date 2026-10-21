@@ -38,6 +38,7 @@ describe('rewardsResource', () => {
         },
         credited_amount: 80,
         available_balance: 1080,
+        billing_account_id: 'ba_beneficiary_7011',
         replayed: false,
       },
     })
@@ -45,6 +46,7 @@ describe('rewardsResource', () => {
     await expect(redeemRewardCode(WORKSPACE_ID, '  IDEA2026  ')).resolves.toMatchObject({
       credited_amount: 80,
       available_balance: 1080,
+      billing_account_id: 'ba_beneficiary_7011',
       replayed: false,
       history_item: { reward_code_display_name: '夏日灵感奖励' },
     })

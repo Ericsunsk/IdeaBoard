@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	creditsdomain "ideaboard/api/internal/credits/domain"
 	usagedomain "ideaboard/api/internal/usage/domain"
 )
 
@@ -15,14 +16,15 @@ const (
 )
 
 type cacheKey struct {
-	userID     int64
-	usageRange usagedomain.Range
+	billingAccountID int64
+	filter           creditsdomain.UsageFilter
+	usageRange       usagedomain.Range
 }
 
 // String renders the singleflight de-duplication key. cacheKey itself stays
 // a comparable struct for the map index; singleflight requires a string.
 func (k cacheKey) String() string {
-	return fmt.Sprintf("%d/%s", k.userID, k.usageRange)
+	return fmt.Sprintf("%d/%d/%d/%s", k.billingAccountID, k.filter.WorkspaceID, k.filter.ActorUserID, k.usageRange)
 }
 
 type cacheEntry struct {

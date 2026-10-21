@@ -98,7 +98,7 @@ River + PostgreSQL 负责：
 - 任务状态、取消标记和运行态事实源
 - 队列监控的聚合来源
 
-全部 canonical AI Image Workflow 都使用 Idea 计费；纯本地裁剪、调色、图层和蒙版绘制不进入 Task Billing。用户展示名使用 `Idea/Ideas`，内部 domain unit、代码、API 与 schema 继续使用 `Credit/credits`。Submit 必须在同一 PostgreSQL transaction 中完成 server-side Quote snapshot、`RoutingSnapshot` 固化、Credit Hold、Task insert 与 River enqueue；成功终态与 Capture 原子提交，失败、取消或最终 timeout 与 Release 原子提交。Task status event 只能在该 transaction commit 后发布。
+全部 canonical AI Image Workflow 都使用 Idea 计费；纯本地裁剪、调色、图层和蒙版绘制不进入 Task Billing。用户展示名使用 `Idea/Ideas`，内部 domain unit、代码、API 与 schema 继续使用 `Credit/credits`。Submit 必须在同一 PostgreSQL transaction 中完成 server-side Quote snapshot、`RoutingSnapshot` 固化、Credit Hold、Task insert 与 River enqueue，且 Hold 的付款账户是该 Workspace 的稳定 Billing Account（#915 解析加入该事务，实际提交 User 记为操作人）；成功终态与 Capture 原子提交，失败、取消或最终 timeout 与 Release 原子提交（终态读 Task 行内账户收敛，不因成员/角色/Owner 变化改写）。Task status event 只能在该 transaction commit 后发布（借用 guard 事务时经 post-commit hook）。Quote/readiness 预检执行同一账户与同一消费资格判定（Board 编辑权限门控，余额不足 402 vs 资金限制 403）。
 
 NATS JetStream 只负责持久领域事件、audit 和 realtime fanout。当前核心事件是 `task.status_changed`，由 API 实例 bridge 到本地 SSE hub。禁止把 NATS JetStream 恢复成任务执行队列，也不保留 Redis/Asynq/Dragonfly/Garnet 等生产兼容路径。
 
@@ -191,7 +191,7 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | Platform                                                      | `internal/platform`, `internal/db`, `internal/events` | config、system settings、database、response helpers、safe HTTP、event bus、sqlc                                                                   |
 | Tasking                                                       | `internal/tasking`                                    | task model、submission、queueing、runtime state、task billing、statistics                                                                         |
 | Identity                                                      | `internal/identity`                                   | auth middleware/client、user persistence、user/admin management                                                                                   |
-| Tenancy                                                       | `internal/tenancy`                                    | Workspace、Organization、membership 生命周期与 role 约束、workspace billing account 绑定；不拥有账务写入                                          |
+| Tenancy                                                       | `internal/tenancy`                                    | Workspace、Organization、membership 生命周期与 role 约束、Billing Account 稳定解析（多 Workspace 共享、显式关联、fail closed）与财务 Owner/Admin 权限；不拥有账务写入                                          |
 | [AI Gateway](./apps/api/internal/aigateway/CONTEXT.md)        | `internal/aigateway`                                  | 唯一 AI 出口的配置面：gateway connection、model catalog、Vision mapping、route preview 与探测；不拥有 Wallet、Ledger、价格或 Service Model Pool   |
 | Boards                                                        | `internal/boards`                                     | board ownership、access checks、board management API                                                                                              |
 | Media                                                         | `internal/media`                                      | storage、assets、derivatives、media refs、image format validation                                                                                 |
@@ -201,9 +201,10 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | Generation                                                    | `internal/generation`                                 | Service Model Pool 的 `routing`（纯领域：eligibility、确定性选型、retry candidate、`RoutingSnapshot`）与 `catalog`（pool 持久化、快照 save/load） |
 | Billing                                                       | `internal/billing`                                    | 全局 immutable SKU identity、versioned Credit pricing、server-side Quote snapshot                                                                 |
 | Billing Records                                               | `internal/billingrecords`                             | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing snapshot，不拥有账务写入                                           |
-| Credits                                                       | `internal/credits`                                    | 平台 Credit Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Credit Commands                                                 |
+| Credits                                                       | `internal/credits`                                    | Billing Account 归属的统一 Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Credit Commands；资金 identity 归账户、操作人归 Actor（ADR-0025） |
 | Rewards                                                       | `internal/rewards`                                    | RewardCode、Redemption、用户 history 与 Credits Grant 编排                                                                                        |
-| [Payments](./apps/api/internal/payments/CONTEXT.md)           | `internal/payments`                                   | Stripe 配置、签名 Webhook Inbox 与支付生命周期；Idea 余额和 Ledger 写入仍由 Credits 独占                                                          |
+| [Payments](./apps/api/internal/payments/CONTEXT.md)           | `internal/payments`                                   | Stripe 配置、签名 Webhook Inbox 与支付生命周期（订单持久化付款账户＋实际操作人，Billing Owner/Admin 管理授权账户订单）；Idea 余额和 Ledger 写入仍由 Credits 独占 |
+| Consumption Read                                             | `internal/consumptionread`                            | 只读 Ledger 归属 projection；统一 immutable Task snapshot / Vision operation 的消费 Workspace 过滤与展示名，不复制资金事实、不接管写入                |
 | Usage                                                         | `internal/usage`                                      | 用户侧用量 Read Model；组合 Credits Capture 与 durable Task Billing snapshot，返回 Lifetime 摘要与每日 Capture Trend，不拥有账务或任务写入        |
 
 Dependency direction:

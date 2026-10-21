@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const disputeReconciliationInterval = time.Hour
@@ -87,6 +88,9 @@ func (s *Store) loadEligibleDisputeOrder(ctx context.Context, tx pgx.Tx, provide
 		}
 		return postgres.PaymentOrderFacts{}, err
 	}
+	if order.BillingAccountID <= 0 {
+		return postgres.PaymentOrderFacts{}, paymentcontracts.ErrDisputeOrderNotEligible
+	}
 	if order.Status != paymentsdomain.PaymentOrderCredited || order.PaidTotal <= 0 || order.IdeaQuantity <= 0 || !strings.EqualFold(order.PaidCurrency, provider.Currency) {
 		return postgres.PaymentOrderFacts{}, paymentcontracts.ErrDisputeOrderNotEligible
 	}
@@ -100,7 +104,7 @@ func createPaymentDisputeInTx(ctx context.Context, tx pgx.Tx, order postgres.Pay
 	}
 	dispute := newPaymentDispute(order, provider, desiredStatus, target, now)
 	if desiredStatus != paymentsdomain.PaymentDisputeWon {
-		if err := applyNewPaymentDisputeRecovery(ctx, tx, &dispute); err != nil {
+		if err := applyNewPaymentDisputeRecovery(ctx, tx, &dispute, order.BillingAccountID); err != nil {
 			return paymentsdomain.PaymentDispute{}, false, err
 		}
 	}
@@ -169,10 +173,15 @@ INSERT INTO payment_disputes (
 	return nil
 }
 
-func applyNewPaymentDisputeRecovery(ctx context.Context, tx pgx.Tx, dispute *paymentsdomain.PaymentDispute) error {
+func applyNewPaymentDisputeRecovery(ctx context.Context, tx pgx.Tx, dispute *paymentsdomain.PaymentDispute, billingAccountID int64) error {
+	// #920: debit/restriction converge on the order's fixed payer account.
+	if billingAccountID <= 0 {
+		return fmt.Errorf("dispute order without payer Billing Account")
+	}
+	accountID := billingAccountID
 	restrictions := credits.RestrictionsInTx(tx)
 	change, err := restrictions.RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID: dispute.UserID, Type: "payment_dispute", Source: "stripe_dispute",
+		BillingAccountID: accountID, Type: "payment_dispute", Source: "stripe_dispute",
 		RelatedObject: domain.BusinessReference{Type: "payment_dispute", ID: dispute.ID},
 		Reason:        "Stripe Dispute " + dispute.StripeDisputeID,
 		Actor:         domain.Actor{Type: domain.ActorService, ID: "payments"},
@@ -193,7 +202,7 @@ func applyNewPaymentDisputeRecovery(ctx context.Context, tx pgx.Tx, dispute *pay
 		return err
 	}
 	result, err := commands.PaymentDisputeDebit(ctx, ports.PaymentDisputeDebitCommand{
-		UserID: dispute.UserID, RequestedAmount: amount,
+		BillingAccountID: accountID, RequestedAmount: amount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "dispute-debit-" + dispute.ID,
 			Actor:          domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_dispute",
@@ -264,8 +273,14 @@ func recoverWonPaymentDispute(ctx context.Context, tx pgx.Tx, dispute *paymentsd
 		if err != nil {
 			return err
 		}
+		// #920: restore exactly this dispute's debit on the order's fixed
+		// payer account; member exits never move the obligation.
+		accountID, err := loadDisputeOrderBillingAccount(ctx, tx, dispute.PaymentOrderID)
+		if err != nil {
+			return err
+		}
 		restored, err := commands.PaymentDisputeRestore(ctx, ports.PaymentDisputeRestoreCommand{
-			UserID: dispute.UserID, OriginalTransactionID: dispute.DebitTransactionID, Amount: amount,
+			BillingAccountID: accountID, OriginalTransactionID: dispute.DebitTransactionID, Amount: amount,
 			Metadata: domain.CommandMetadata{
 				IdempotencyKey: "dispute-restore-" + dispute.ID,
 				Actor:          domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_dispute",
@@ -299,6 +314,20 @@ FROM payment_disputes WHERE stripe_dispute_id = $1 FOR UPDATE`, stripeDisputeID)
 		return paymentsdomain.PaymentDispute{}, err
 	}
 	return dispute, nil
+}
+
+// loadDisputeOrderBillingAccount resolves the fixed payer account for won
+// restoration (#920). The dispute row keeps the operator as UserID; funds
+// converge on the order row.
+func loadDisputeOrderBillingAccount(ctx context.Context, tx pgx.Tx, orderID string) (int64, error) {
+	var billingAccountID pgtype.Int8
+	if err := tx.QueryRow(ctx, `SELECT billing_account_id FROM payment_orders WHERE id = $1::uuid`, orderID).Scan(&billingAccountID); err != nil {
+		return 0, fmt.Errorf("read dispute order payer: %w", err)
+	}
+	if !billingAccountID.Valid || billingAccountID.Int64 <= 0 {
+		return 0, fmt.Errorf("dispute order without payer Billing Account")
+	}
+	return billingAccountID.Int64, nil
 }
 
 func (s *Store) GetPaymentDisputeByStripeID(ctx context.Context, stripeDisputeID string) (paymentsdomain.PaymentDispute, error) {

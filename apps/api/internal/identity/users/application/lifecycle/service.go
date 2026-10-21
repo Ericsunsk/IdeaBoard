@@ -83,8 +83,11 @@ func (s *Service) setUserStatusTx(ctx context.Context, tx pgx.Tx, userID int64, 
 	if result.RowsAffected() != 1 {
 		return database.ErrNotFound
 	}
-	if err := s.credits.LifecycleInTx(tx).SetWalletFrozen(ctx, userID, status == domain.StatusBanned); err != nil {
-		return fmt.Errorf("update Credit Wallet status: %w", err)
+	// Ban/unban touches only solely-owned non-organization account wallets;
+	// shared and organization funds never freeze because one member was
+	// deactivated (#916). Existing Holds still converge via Capture/Release.
+	if err := s.credits.LifecycleInTx(tx).SetSoleOwnedWalletsFrozen(ctx, userID, status == domain.StatusBanned); err != nil {
+		return fmt.Errorf("update Billing Account Wallet status: %w", err)
 	}
 	return nil
 }
@@ -197,8 +200,8 @@ func beginUserDeletionTx(ctx context.Context, credits ports.CreditWalletLifecycl
 	if _, err := tx.Exec(ctx, `UPDATE users SET status = 0, updated_at = now() WHERE id = $1`, userID); err != nil {
 		return nil, fmt.Errorf("freeze user during deletion: %w", err)
 	}
-	if err := credits.LifecycleInTx(tx).SetWalletFrozen(ctx, userID, true); err != nil {
-		return nil, fmt.Errorf("freeze Credit Wallet during deletion: %w", err)
+	if err := credits.LifecycleInTx(tx).SetSoleOwnedWalletsFrozen(ctx, userID, true); err != nil {
+		return nil, fmt.Errorf("freeze Billing Account Wallets during deletion: %w", err)
 	}
 	return progress, nil
 }
@@ -338,8 +341,11 @@ func tombstoneUserTx(ctx context.Context, credits ports.CreditWalletLifecycleSer
 	if err := anonymizeTombstoneUser(ctx, tx, userID, tombstoneStorageUID); err != nil {
 		return "", err
 	}
-	if err := credits.LifecycleInTx(tx).SetWalletFrozen(ctx, userID, true); err != nil {
-		return "", fmt.Errorf("freeze Credit Wallet: %w", err)
+	if err := credits.LifecycleInTx(tx).SetSoleOwnedWalletsFrozen(ctx, userID, true); err != nil {
+		return "", fmt.Errorf("freeze Billing Account Wallets: %w", err)
+	}
+	if err := credits.LifecycleInTx(tx).RemoveSharedBillingMemberships(ctx, userID); err != nil {
+		return "", fmt.Errorf("detach shared Billing Account memberships: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `
 UPDATE user_deletion_requests

@@ -14,9 +14,11 @@ type CheckoutGateway interface {
 }
 
 type CreateCheckoutCustomerInput struct {
-	APIKey         string
-	UserID         int64
-	IdempotencyKey string
+	APIKey string
+	// Payer funds identity: the Billing Account the Stripe Customer is
+	// reused for. The operator never scopes the customer.
+	BillingAccountID int64
+	IdempotencyKey   string
 }
 
 type CheckoutCustomer struct{ ID string }

@@ -23,7 +23,7 @@ func mustUUID(t *testing.T, s string) uuid.UUID {
 func TestDecodeRechargeHistoryRecordKeepsNullablePaidFacts(t *testing.T) {
 	id := mustUUID(t, "0198cd29-f457-7e4b-b95e-6cfde41b8333")
 	occurred := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
-	row := dbsqlc.ListPaymentRechargeHistoryRow{
+	row := dbsqlc.ListAccountRechargeHistoryRow{
 		ID: idTimestampUUID(id), OccurredAt: dbutil.TimestamptzFromTime(occurred),
 		IdeaQuantity: 501, Status: "credited",
 		PaidTotalMinor: pgtype.Int8{Int64: 502, Valid: true}, PaidCurrency: "USD",
@@ -40,7 +40,7 @@ func TestDecodeRechargeHistoryRecordKeepsNullablePaidFacts(t *testing.T) {
 		t.Fatalf("currency = %q, want lowercased", record.PaidCurrency)
 	}
 
-	cancelled := dbsqlc.ListPaymentRechargeHistoryRow{
+	cancelled := dbsqlc.ListAccountRechargeHistoryRow{
 		ID: idTimestampUUID(id), OccurredAt: dbutil.TimestamptzFromTime(occurred),
 		IdeaQuantity: 100, Status: "cancelled",
 		PaidTotalMinor: pgtype.Int8{Valid: false}, PaidCurrency: "",

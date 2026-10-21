@@ -7,13 +7,14 @@ import (
 
 	billingrecordsdomain "ideaboard/api/internal/billingrecords/domain"
 	billingrecordsports "ideaboard/api/internal/billingrecords/ports"
+	"ideaboard/api/internal/consumptionread"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const listRecordsSQL = `
+var listRecordsSQL = `
 SELECT transactions.id,
        transactions.transaction_id,
        transactions.command_type,
@@ -21,24 +22,21 @@ SELECT transactions.id,
        transactions.actor_type,
        transactions.source,
        transactions.business_reference_type,
-       transactions.available_balance_after,
+       CASE WHEN $4::bigint = 0 AND $5::bigint = 0 THEN transactions.available_balance_after ELSE 0 END,
        transactions.created_at,
-       snapshots.display_name,
+       transactions.consumption_display_name,
        original.command_type
-FROM credit_transactions transactions
-LEFT JOIN task_billing_snapshots snapshots
-  ON transactions.command_type = 'capture'
- AND transactions.business_reference_type = 'task'
- AND snapshots.task_id = transactions.business_reference_id
- AND snapshots.user_id = transactions.wallet_user_id
+FROM ` + consumptionread.Transactions(5) + ` AS transactions
 LEFT JOIN credit_transactions original
   ON transactions.command_type = 'correction'
  AND original.transaction_id = transactions.related_transaction_id
- AND original.wallet_user_id = transactions.wallet_user_id
-WHERE transactions.wallet_user_id = $1
+ AND original.billing_account_id = transactions.billing_account_id
+WHERE transactions.billing_account_id = $1
   AND ($2::BIGINT <= 0 OR transactions.id < $2)
   AND transactions.command_type IN ('grant', 'deduction', 'capture', 'correction')
   AND transactions.command_amount > 0
+  AND (($4::bigint = 0 AND $5::bigint = 0) OR transactions.command_type = 'capture')
+  AND ($4::bigint = 0 OR (transactions.actor_type = 'user' AND transactions.actor_id = $4::text))
   AND (
     transactions.command_type <> 'correction'
     OR original.command_type IN ('grant', 'deduction')
@@ -81,11 +79,11 @@ func (q repositoryQueryer) Query(query string, args ...any) (pgx.Rows, error) {
 	return q.pool.Query(q.ctx, query, args...)
 }
 
-func (r *Repository) List(ctx context.Context, userID, beforeSequence int64, fetchLimit int) ([]ledgerRecord, error) {
+func (r *Repository) List(ctx context.Context, input billingrecordsports.ListInput, fetchLimit int) ([]ledgerRecord, error) {
 	if r == nil || r.pool == nil {
 		return nil, billingrecordsports.ErrPoolNotConfigured
 	}
-	rows, err := r.dbWithContext(ctx).Query(listRecordsSQL, userID, beforeSequence, fetchLimit)
+	rows, err := r.dbWithContext(ctx).Query(listRecordsSQL, input.BillingAccountID, input.BeforeSequence, fetchLimit, input.ActorUserID, input.WorkspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("billing records repository: list records: %w", err)
 	}

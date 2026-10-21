@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/generation/routing"
@@ -37,13 +38,22 @@ type TxQuoter interface {
 // delegate to the transaction-scoped Commands (credits.Service.InTx) and
 // perform no ledger SQL of their own.
 //
-// Unlike Holder, the userID is explicit: terminal settlement reads it from
-// the flipped task row, so Capture/Release never depend on the
-// process-local hold map (which a restart would lose).
+// Unlike Holder, both ids are explicit: terminal settlement reads the funds
+// account and the operator from the flipped task row, so Capture/Release
+// never depend on the process-local hold map (which a restart would lose)
+// and never fall back to an owner wallet.
 type TxHolder interface {
-	HoldInTx(ctx context.Context, tx pgx.Tx, userID int64, amount int64, idempotencyKey, taskID string) (string, error)
-	CaptureInTx(ctx context.Context, tx pgx.Tx, userID int64, holdTransactionID string, amount int64, taskID string) (string, error)
-	ReleaseInTx(ctx context.Context, tx pgx.Tx, userID int64, holdTransactionID string, amount int64, taskID string) (string, error)
+	HoldInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, amount int64, idempotencyKey, taskID string) (string, error)
+	CaptureInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) (string, error)
+	ReleaseInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) (string, error)
+}
+
+// TxBillingAccountResolver resolves the stable funds identity inside the
+// settlement transaction (#915 resolution, #916 funds identity). Production
+// implements it on the postgres task Store; tests stub it. Resolution joins
+// the caller transaction and fails closed on ambiguity or conflict.
+type TxBillingAccountResolver interface {
+	ResolveBillingAccountInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string) (int64, error)
 }
 
 // TxEnqueuer carries the River payload inside the settlement transaction.
@@ -88,29 +98,29 @@ func (s *Service) billingFacts() TxBillingFacts {
 	return facts
 }
 
-func (s *Service) settlementSeams() (SettlementTransactor, TxQuoter, TxHolder, TxTaskLifecycleStore, TxEnqueuer, TxSubmissionClaimStore, bool) {
+func (s *Service) settlementSeams() (SettlementTransactor, TxQuoter, TxHolder, TxTaskLifecycleStore, TxEnqueuer, TxSubmissionClaimStore, TxBillingAccountResolver, bool) {
 	if s == nil || s.taskLifecycle == nil {
-		return nil, nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, nil, false
 	}
 	transactor, ok := s.taskLifecycle.(SettlementTransactor)
 	if !ok {
-		return nil, nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, nil, false
 	}
 	txQuoter, ok := s.quoter.(TxQuoter)
 	if !ok {
-		return nil, nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, nil, false
 	}
 	txHolder, ok := s.holder.(TxHolder)
 	if !ok {
-		return nil, nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, nil, false
 	}
 	txStore, ok := s.taskLifecycle.(TxTaskLifecycleStore)
 	if !ok {
-		return nil, nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, nil, false
 	}
 	txQueue, ok := s.queue.(TxEnqueuer)
 	if !ok {
-		return nil, nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, nil, false
 	}
 	// The durable submit claim is discovered from the same lifecycle store
 	// that owns the settlement transaction, for the same reason every other
@@ -120,9 +130,17 @@ func (s *Service) settlementSeams() (SettlementTransactor, TxQuoter, TxHolder, T
 	// settling an unfenced submit.
 	txClaims := s.claimStore(txStore)
 	if txClaims == nil {
-		return nil, nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, nil, false
 	}
-	return transactor, txQuoter, txHolder, txStore, txQueue, txClaims, true
+	txAccounts := s.billingAccounts
+	if txAccounts == nil {
+		var ok bool
+		txAccounts, ok = txStore.(TxBillingAccountResolver)
+		if !ok {
+			return nil, nil, nil, nil, nil, nil, nil, false
+		}
+	}
+	return transactor, txQuoter, txHolder, txStore, txQueue, txClaims, txAccounts, true
 }
 
 // claimStore resolves the durable submit claim store: the explicit
@@ -207,6 +225,27 @@ func commitSettlementTx(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
 
+// stageSettlementEvent stages one status event after its settlement unit is
+// durable (#917: events publish only after commit). An owned transaction
+// commits here, so the event stages synchronously for the caller to flush.
+// A borrowed guard transaction commits later at the guard, so the stage is
+// registered as a post-commit hook instead: it runs only after the guard's
+// commit, timestamped then, and never on rollback. Without a registry (raw
+// carriers outside the guard) the legacy synchronous stage is kept so the
+// caller can flush after the commit it owns.
+func (s *Service) stageSettlementEvent(ctx context.Context, owned bool, taskID, workspaceID string, status Status, executionToken string, occurredAt time.Time) {
+	if owned {
+		s.stageWithTokenAt(taskID, workspaceID, status, executionToken, occurredAt)
+		return
+	}
+	stage := func(context.Context) {
+		s.stageWithTokenAt(taskID, workspaceID, status, executionToken, occurredAt)
+	}
+	if !dbutil.DeferAmbientPostCommit(ctx, stage) {
+		s.stageWithTokenAt(taskID, workspaceID, status, executionToken, occurredAt)
+	}
+}
+
 // captureSplit derives the per-output unit billing capped at the held
 // total, with the remainder released. Both legs run in the same tx.
 func captureSplit(completed *WorkspaceTask, outputCount int) (capture, release int64) {
@@ -230,18 +269,25 @@ func (s *Service) holderSettles(holdID string, total int64) bool {
 	return s.holder != nil && strings.TrimSpace(holdID) != "" && total > 0
 }
 
-// createInTx settles Claim -> Quote -> Hold -> Insert -> Enqueue in ONE
-// PostgreSQL transaction. Any failure rolls the whole transaction back: no
-// task row without its Hold, no Hold without its task, no River job without
-// task facts, and no durable idempotency claim without all of them.
+// createInTx settles Authorize -> Claim -> Quote -> Hold -> Insert ->
+// Enqueue in ONE PostgreSQL transaction. Any failure rolls the whole
+// transaction back: no task row without its Hold, no Hold without its
+// task, no River job without task facts, and no durable idempotency claim
+// without all of them.
 //
-// The claim is written FIRST, before Quote and before the Hold. That
-// ordering is the fix: a retried submit now collides on the claim's unique
-// constraint and returns the original task, so it never reaches the ledger,
-// the task table, or River. It reports handled=false for test-only service
-// fixtures that do not expose PostgreSQL transaction seams.
+// Lock order is load-bearing (#917): the submission gate runs FIRST
+// because it takes the workspace row FOR UPDATE, serializing
+// same-workspace settlements at entry. The claim INSERT that follows
+// takes FOR KEY SHARE on the same row through its workspace FK; taking
+// it before the membership lock deadlocked concurrent distinct-key
+// submits (both held KEY SHARE, both wanted the FOR UPDATE upgrade,
+// SQLSTATE 40P01). The claim still precedes Quote and the Hold, so a
+// retried submit collides on the claim's unique constraint and returns
+// the original task without ever reaching the ledger, the task table, or
+// River. It reports handled=false for test-only service fixtures that do
+// not expose PostgreSQL transaction seams.
 func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resolution string, quantity int64, taskID, token string, claim SubmissionClaim) (*WorkspaceTask, bool, error) {
-	transactor, txQuoter, txHolder, txStore, txQueue, txClaims, ok := s.settlementSeams()
+	transactor, txQuoter, txHolder, txStore, txQueue, txClaims, txAccounts, ok := s.settlementSeams()
 	if !ok {
 		return nil, false, nil
 	}
@@ -258,6 +304,18 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 			rollbackSettlementTx(ctx, tx)
 		}
 	}()
+	// The submission gate runs before the claim (see the lock-order note
+	// above): it pins current membership, the Board binding, and input
+	// authorization on the settlement transaction before any Quote or
+	// Hold. A rejection here writes nothing, so no claim is left behind
+	// to fence its key.
+	if s.acceptance == nil {
+		return nil, true, ErrSettlementUnavailable
+	}
+	binding, err := s.acceptance.AuthorizeSubmission(ctx, tx, input)
+	if err != nil {
+		return nil, true, err
+	}
 	// Claim the client key inside the settlement transaction. This is the
 	// concurrency fence: a concurrent submit of the same key blocks on the
 	// unique constraint until this transaction commits or rolls back, then
@@ -284,13 +342,20 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 		// task.created for this exact task.
 		return replayed, true, nil
 	}
-	if s.acceptance == nil {
-		return nil, true, ErrSettlementUnavailable
-	}
-	binding, err := s.acceptance.AuthorizeSubmission(ctx, tx, input)
+	// Stable funds identity first (#915 resolution joins this transaction,
+	// #916 spends it): the Hold below and every terminal settlement use
+	// this account with the submitter as operator. Ambiguity or conflict
+	// fails closed before any ledger, task, or queue write.
+	billingAccountID, err := txAccounts.ResolveBillingAccountInTx(ctx, tx, claim.WorkspaceID)
 	if err != nil {
 		return nil, true, err
 	}
+	// Budget/member-quota hook (#917 reserves, #945/#946 implement):
+	// future consumption-limit checks join THIS transaction between the
+	// stable account resolution above and the Hold below, reading the
+	// same repeatable-read snapshot. No quota computation runs here; the
+	// Hold stays the sole spending gate, so the boundary is reserved
+	// without claiming unbuilt enforcement.
 	// Resolve inside the settlement transaction before Quote/Hold so
 	// an empty pool fails before any ledger, task, or queue write (the
 	// rollback below then removes nothing because nothing was written).
@@ -312,13 +377,14 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 		return nil, true, err
 	}
 	snapshot.SettlementState = "quoted"
+	snapshot.BillingAccountID = billingAccountID
 	var holdTxID string
 	if snapshot.TotalCredits > 0 {
 		// The ledger key is derived from the DURABLE claim scope, never from
 		// the freshly minted task id. A retried submit therefore asks the
 		// ledger for the same key, so the ledger's own replay path fences a
 		// duplicate hold even if the claim were somehow bypassed.
-		holdTxID, err = txHolder.HoldInTx(ctx, tx, input.OwnerUserID, snapshot.TotalCredits,
+		holdTxID, err = txHolder.HoldInTx(ctx, tx, billingAccountID, input.OwnerUserID, snapshot.TotalCredits,
 			TaskSubmitHoldKey(claim.WorkspaceID, claim.IdempotencyKey), taskID)
 		if err != nil {
 			return nil, true, err
@@ -358,7 +424,7 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 		}
 		committed = true
 	}
-	s.stageWithTokenAt(created.ID, created.WorkspaceID, StatusPending, created.ExecutionToken, created.UpdatedAt)
+	s.stageSettlementEvent(ctx, owned, created.ID, created.WorkspaceID, StatusPending, created.ExecutionToken, created.UpdatedAt)
 	return created, true, nil
 }
 
@@ -426,14 +492,14 @@ func (s *Service) completeInTx(ctx context.Context, workspaceID, taskID string, 
 		var captureTxID, releaseTxID string
 		if capture > 0 {
 			var captureErr error
-			captureTxID, captureErr = txHolder.CaptureInTx(ctx, tx, completed.OwnerUserID, completed.BillingSnapshot.HoldTransactionID, capture, taskID)
+			captureTxID, captureErr = txHolder.CaptureInTx(ctx, tx, completed.BillingAccountID, completed.OwnerUserID, completed.BillingSnapshot.HoldTransactionID, capture, taskID)
 			if captureErr != nil {
 				return nil, true, fmt.Errorf("workspacetasks: capture on complete: %w", captureErr)
 			}
 		}
 		if release > 0 {
 			var releaseErr error
-			releaseTxID, releaseErr = txHolder.ReleaseInTx(ctx, tx, completed.OwnerUserID, completed.BillingSnapshot.HoldTransactionID, release, taskID)
+			releaseTxID, releaseErr = txHolder.ReleaseInTx(ctx, tx, completed.BillingAccountID, completed.OwnerUserID, completed.BillingSnapshot.HoldTransactionID, release, taskID)
 			if releaseErr != nil {
 				return nil, true, fmt.Errorf("workspacetasks: release remainder on complete: %w", releaseErr)
 			}
@@ -455,7 +521,7 @@ func (s *Service) completeInTx(ctx context.Context, workspaceID, taskID string, 
 		}
 		committed = true
 	}
-	s.stageWithTokenAt(taskID, workspaceID, StatusCompleted, completed.ExecutionToken, completed.UpdatedAt)
+	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusCompleted, completed.ExecutionToken, completed.UpdatedAt)
 	return completed, true, nil
 }
 
@@ -480,7 +546,7 @@ func (s *Service) failInTx(ctx context.Context, workspaceID, taskID, errorMsg st
 		return nil, true, err
 	}
 	if s.holderSettles(failed.BillingSnapshot.HoldTransactionID, failed.BillingSnapshot.TotalCredits) {
-		releaseTxID, releaseErr := txHolder.ReleaseInTx(ctx, tx, failed.OwnerUserID, failed.BillingSnapshot.HoldTransactionID, failed.BillingSnapshot.TotalCredits, taskID)
+		releaseTxID, releaseErr := txHolder.ReleaseInTx(ctx, tx, failed.BillingAccountID, failed.OwnerUserID, failed.BillingSnapshot.HoldTransactionID, failed.BillingSnapshot.TotalCredits, taskID)
 		if releaseErr != nil {
 			return nil, true, fmt.Errorf("workspacetasks: release on fail: %w", releaseErr)
 		}
@@ -497,7 +563,7 @@ func (s *Service) failInTx(ctx context.Context, workspaceID, taskID, errorMsg st
 		}
 		committed = true
 	}
-	s.stageWithTokenAt(taskID, workspaceID, StatusFailed, failed.ExecutionToken, failed.UpdatedAt)
+	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusFailed, failed.ExecutionToken, failed.UpdatedAt)
 	return failed, true, nil
 }
 
@@ -526,7 +592,7 @@ func (s *Service) cancelInTx(ctx context.Context, workspaceID, taskID string, ac
 		return flipped, true, true, nil
 	}
 	if s.holderSettles(flipped.BillingSnapshot.HoldTransactionID, flipped.BillingSnapshot.TotalCredits) {
-		releaseTxID, releaseErr := txHolder.ReleaseInTx(ctx, tx, flipped.OwnerUserID, flipped.BillingSnapshot.HoldTransactionID, flipped.BillingSnapshot.TotalCredits, taskID)
+		releaseTxID, releaseErr := txHolder.ReleaseInTx(ctx, tx, flipped.BillingAccountID, flipped.OwnerUserID, flipped.BillingSnapshot.HoldTransactionID, flipped.BillingSnapshot.TotalCredits, taskID)
 		if releaseErr != nil {
 			return nil, false, true, fmt.Errorf("workspacetasks: release on cancel: %w", releaseErr)
 		}
@@ -546,18 +612,10 @@ func (s *Service) cancelInTx(ctx context.Context, workspaceID, taskID string, ac
 		return flipped, false, true, nil
 	}
 	// Borrowed (ambient) transaction (#889): the guard commits later
-	// together with the audit row, so staging now would let a caller
-	// publish a transition the guard can still roll back. Register the
-	// stage as a post-commit hook instead: it runs only after the
-	// guard's commit, timestamped then. Without a registry (raw carriers
-	// outside the guard) keep the legacy synchronous stage so the caller
-	// can flush after the commit it owns.
-	stage := func(context.Context) {
-		s.stageWithTokenAt(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken, flipped.UpdatedAt)
-	}
-	if !dbutil.DeferAmbientPostCommit(ctx, stage) {
-		s.stageWithTokenAt(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken, flipped.UpdatedAt)
-	}
+	// together with the audit row, so the stage defers through the same
+	// post-commit hook every other settlement uses (see
+	// stageSettlementEvent).
+	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusCancelled, flipped.ExecutionToken, flipped.UpdatedAt)
 	return flipped, false, true, nil
 }
 

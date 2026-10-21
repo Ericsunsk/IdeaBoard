@@ -17,6 +17,7 @@ import (
 	"ideaboard/api/internal/testdb"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotencyKey(t *testing.T) {
@@ -27,7 +28,7 @@ func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotenc
 	// This is a timeout recovery: a local deadline elapsed before the original
 	// provider response could be bound. Stripe idempotency, not that deadline,
 	// decides whether a Session exists.
-	order := createReconciliationIntent(t, repo, 42, 501, now.Add(time.Hour))
+	order := createReconciliationIntent(t, db, repo, 42, 501, now.Add(time.Hour))
 
 	now = now.Add(3 * time.Minute)
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
@@ -63,7 +64,7 @@ func TestPaymentReconciliationPreservesCreatingOrderWhenPurchasePolicyIsUnavaila
 	repo := newTestPaymentStores(db)
 	configuration := activeTestStripeConfiguration(t, repo)
 	now = now.Add(3 * time.Minute)
-	order := createReconciliationIntent(t, repo, 42, 504, now.Add(time.Hour))
+	order := createReconciliationIntent(t, db, repo, 42, 504, now.Add(time.Hour))
 
 	outcome, err := service.ReconcilePaymentOrderClaim(
 		t.Context(),
@@ -88,13 +89,13 @@ func TestPaymentReconciliationRetriesPaidPendingCreditWithoutSecondStripeFact(t 
 	now := time.Now().UTC()
 	checkout := newLifecycleCheckoutGateway()
 	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
-	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "reconciliation-paid-pending", 700))
+	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(t, db, 42, "reconciliation-paid-pending", 700))
 	if err != nil {
 		t.Fatal(err)
 	}
 	checkout.setPaid(true)
 	removeFailure := injectLifecyclePurchaseCreditFailure(t, db)
-	if _, err := service.GetPaymentOrderReturnStatus(t.Context(), 42, created.PublicToken); err == nil {
+	if _, err := service.GetPaymentOrderReturnStatus(t.Context(), paymentBillingAccount(t, db, 42), created.PublicToken); err == nil {
 		t.Fatal("expected initial Ledger failure")
 	}
 	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderPaidPendingCredit)
@@ -129,7 +130,7 @@ func TestPaymentReconciliationRecoversLostWebhookPaidSessionExactlyOnce(t *testi
 	now := time.Now().UTC()
 	checkout := newLifecycleCheckoutGateway()
 	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
-	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "reconciliation-lost-webhook", 701))
+	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(t, db, 42, "reconciliation-lost-webhook", 701))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +155,7 @@ func TestPaymentReconciliationClaimsAtMostOneHundredAndFencesStaleWorkers(t *tes
 	publishTestStripeConfiguration(t, repo, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
 	now := time.Now().UTC()
 	for index := int64(0); index < 101; index++ {
-		createReconciliationIntent(t, repo, 42, 500+index, now.Add(time.Hour))
+		createReconciliationIntent(t, db, repo, 42, 500+index, now.Add(time.Hour))
 	}
 	now = now.Add(3 * time.Minute)
 	first, err := repo.ClaimDuePaymentOrderReconciliations(t.Context(), now)
@@ -201,7 +202,7 @@ func TestPaymentReconciliationConcurrentWorkersClaimEachOrderOnce(t *testing.T) 
 	publishTestStripeConfiguration(t, repo, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
 	now := time.Now().UTC()
 	for index := int64(0); index < 12; index++ {
-		createReconciliationIntent(t, repo, 42, 800+index, now.Add(time.Hour))
+		createReconciliationIntent(t, db, repo, 42, 800+index, now.Add(time.Hour))
 	}
 	now = now.Add(3 * time.Minute)
 	claimsByWorker := make(chan []paymentreconciliation.Claim, 2)
@@ -235,7 +236,7 @@ func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 	checkout := reconciliationDeterministicFailureGateway{}
 	db, service, wallets, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	repo := newTestPaymentStores(db)
-	order := createReconciliationIntent(t, repo, 42, 503, now.Add(time.Hour))
+	order := createReconciliationIntent(t, db, repo, 42, 503, now.Add(time.Hour))
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("deterministic provider failure must not cause River retry: %v", err)
 	}
@@ -278,11 +279,11 @@ func TestPaymentReconciliationFailureSummaryNeverPersistsUnknownProviderBody(t *
 	}
 }
 
-func createReconciliationIntent(t *testing.T, repo *testPaymentStores, userID, quantity int64, expiresAt time.Time) paymentsdomain.PaymentOrder {
-	return createReconciliationIntentForStripeAccount(t, repo, userID, quantity, expiresAt, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
+func createReconciliationIntent(t *testing.T, db *pgxpool.Pool, repo *testPaymentStores, userID, quantity int64, expiresAt time.Time) paymentsdomain.PaymentOrder {
+	return createReconciliationIntentForStripeAccount(t, db, repo, userID, quantity, expiresAt, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
 }
 
-func createReconciliationIntentForStripeAccount(t *testing.T, repo *testPaymentStores, userID, quantity int64, expiresAt time.Time, accountID, productID string) paymentsdomain.PaymentOrder {
+func createReconciliationIntentForStripeAccount(t *testing.T, db *pgxpool.Pool, repo *testPaymentStores, userID, quantity int64, expiresAt time.Time, accountID, productID string) paymentsdomain.PaymentOrder {
 	t.Helper()
 	configuration := activeTestStripeConfiguration(t, repo)
 	if configuration.AccountID != accountID || configuration.StripeProductID != productID {
@@ -291,7 +292,7 @@ func createReconciliationIntentForStripeAccount(t *testing.T, repo *testPaymentS
 	id := uuid.New()
 	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), paymentsdomain.CreatePaymentOrderIntentInput{
 		ID: id.String(), PublicOrderNumber: fmt.Sprintf("IBP-20260801-%012d", quantity), PublicToken: uuid.NewString(),
-		UserID: userID, ClientIdempotencyKey: fmt.Sprintf("reconciliation-order-%d-%s", quantity, id.String()[:8]),
+		UserID: userID, BillingAccountID: paymentBillingAccount(t, db, userID), ClientIdempotencyKey: fmt.Sprintf("reconciliation-order-%d-%s", quantity, id.String()[:8]),
 		RequestHash:        "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
 		StripeCredentialID: configuration.CredentialID, StripeAccountID: accountID, StripeProductID: productID, IdeaQuantity: quantity,
 		TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,

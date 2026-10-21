@@ -532,9 +532,19 @@ func testBillableDefinition(sku SKU, displayName string) BillableItemDefinition 
 
 const freeBillingSnapshotInsertSQL = `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, service, sku, display_name, price_version_id,
+  task_id, user_id, billing_account_id, service, sku, display_name, price_version_id,
   price_version, unit_credits, quantity, total_credits, quoted_at
-) VALUES ($1, 1, 'test-feature', $2, $3, $4, $5, $6, 1, 0, clock_timestamp())`
+) VALUES ($1, 1, (SELECT ensure_personal_billing_account_for_user(1)), 'test-feature', $2, $3, $4, $5, $6, 1, 0, clock_timestamp())`
+
+func ensureBillingSnapshotUser(t *testing.T, db billingSnapshotExecer) {
+	t.Helper()
+	if _, err := db.Exec(t.Context(), `
+INSERT INTO users (id, display_name, storage_uid, role, status)
+VALUES (1, 'billing-snapshot-user', 'BILL01', 'user', 1)
+ON CONFLICT (id) DO NOTHING`); err != nil {
+		t.Fatalf("seed billing snapshot user: %v", err)
+	}
+}
 
 func publishDeleteCandidate(t *testing.T, service *Store, sku SKU) PriceInfo {
 	t.Helper()
@@ -555,6 +565,7 @@ type billingSnapshotExecer interface {
 
 func insertFreeBillingSnapshot(t *testing.T, db billingSnapshotExecer, taskID string, sku SKU, displayName string, price PriceInfo) {
 	t.Helper()
+	ensureBillingSnapshotUser(t, db)
 	if _, err := db.Exec(t.Context(), freeBillingSnapshotInsertSQL,
 		taskID, sku, displayName, price.PriceVersionID, price.Version, price.UnitCredits); err != nil {
 		t.Fatalf("insert free Billing Snapshot: %v", err)

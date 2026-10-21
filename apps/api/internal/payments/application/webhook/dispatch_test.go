@@ -2,6 +2,7 @@ package webhook_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -88,6 +89,32 @@ func TestDispatchConvergesDisputeThroughCanonicalRetrieve(t *testing.T) {
 	}
 	if published != 1 {
 		t.Fatalf("dispute user events = %d, want 1", published)
+	}
+}
+
+func TestDispatchHintsReachOnlyCurrentPayerManagers(t *testing.T) {
+	for _, eventType := range []string{"refund.updated", "charge.dispute.created"} {
+		t.Run(eventType, func(t *testing.T) {
+			var recipients []int64
+			fx := newTestFixtures(t, paymentports.StripeWebhookEvent{
+				ID: "evt_managers", Type: eventType, ObjectID: "provider_1", ChargeID: "ch_1", CreatedAt: time.Now(),
+			}, nil, countingPublisher{fn: func(userID int64, event paymentports.PaymentEvent) {
+				recipients = append(recipients, userID)
+				if event.BillingAccountID != 101 {
+					t.Fatalf("hint payer = %d, want persisted account 101", event.BillingAccountID)
+				}
+			}})
+			fx.convergence.payer = 101
+			fx.convergence.hintManagers = []int64{8, 9}
+			fx.refundGw.refund = paymentports.StripeRefund{ID: "provider_1", ChargeID: "ch_1", AmountMinor: 100, Currency: "usd", Status: "succeeded"}
+			fx.disputeGw.dispute = paymentports.StripeDispute{ID: "provider_1", ChargeID: "ch_1"}
+			if _, err := fx.service.ReceiveStripeWebhook(t.Context(), []byte("{}"), "sig"); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(recipients, []int64{8, 9}) {
+				t.Fatalf("recipients = %v, want current managers without operator 7", recipients)
+			}
+		})
 	}
 }
 

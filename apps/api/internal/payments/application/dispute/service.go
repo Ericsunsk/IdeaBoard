@@ -12,8 +12,9 @@ import (
 )
 
 type CheckoutStore interface {
-	WithUserCheckoutLock(context.Context, int64, func(context.Context) error) error
-	ListActivePaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error)
+	WithBillingAccountCheckoutLock(context.Context, int64, func(context.Context) error) error
+	ListAccountActivePaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error)
+	GetPaymentOrderByID(context.Context, string) (paymentsdomain.PaymentOrder, error)
 }
 
 type Service struct {
@@ -40,40 +41,62 @@ func NewService(deps Dependencies) (*Service, error) {
 // ExpireDisputeCheckoutSessions closes active Checkout sessions after a dispute
 // restriction is durably committed. The operation is idempotent and safe for
 // webhook and reconciliation retries.
+//
+// #920: expiry targets the dispute order's fixed payer account, never the
+// operator's personal scope, so member exits and management changes never
+// move the obligation. Stripe I/O runs inside the account advisory lock with
+// short transactions only, never holding a local transaction.
 func (s *Service) ExpireDisputeCheckoutSessions(ctx context.Context, dispute paymentsdomain.PaymentDispute) error {
 	if s == nil || (dispute.Status != paymentsdomain.PaymentDisputeOpen && dispute.Status != paymentsdomain.PaymentDisputeLost) {
 		return nil
 	}
-	return s.checkoutStore.WithUserCheckoutLock(ctx, dispute.UserID, func(locked context.Context) error {
-		orders, err := s.checkoutStore.ListActivePaymentOrders(locked, dispute.UserID)
+	order, err := s.checkoutStore.GetPaymentOrderByID(ctx, dispute.PaymentOrderID)
+	if err != nil {
+		return fmt.Errorf("resolve dispute payer: %w", err)
+	}
+	if order.BillingAccountID <= 0 {
+		return fmt.Errorf("resolve dispute payer: invalid Billing Account")
+	}
+	return s.expireAccountCheckoutSessions(ctx, order.BillingAccountID)
+}
+
+// expireAccountCheckoutSessions expires the payer account's active checkouts
+// under the per-account advisory lock (#919).
+func (s *Service) expireAccountCheckoutSessions(ctx context.Context, billingAccountID int64) error {
+	return s.checkoutStore.WithBillingAccountCheckoutLock(ctx, billingAccountID, func(locked context.Context) error {
+		orders, err := s.checkoutStore.ListAccountActivePaymentOrders(locked, billingAccountID)
 		if err != nil {
 			return err
 		}
-		for _, order := range orders {
-			switch order.Status {
-			case paymentsdomain.PaymentOrderCreating:
-				if _, err := s.orderLifecycle.ExpireOrder(locked, order); err != nil {
-					return err
-				}
-			case paymentsdomain.PaymentOrderCheckoutOpen:
-				_, apiKey, err := s.credentialAccess(locked, order.StripeCredentialID)
-				if err != nil {
-					return err
-				}
-				expiration, err := s.checkoutGateway.ExpireCheckoutSession(locked, paymentports.ExpireCheckoutSessionInput{APIKey: apiKey, SessionID: order.StripeCheckoutSessionID})
-				if err != nil {
-					return err
-				}
-				if _, err := s.orderLifecycle.ConvergeCheckoutExpiration(locked, order, expiration); err != nil {
-					return err
-				}
-			case paymentsdomain.PaymentOrderAsyncPaymentPending:
-				// Provider payment submission already happened; normal checkout
-				// convergence owns this terminal outcome.
-			default:
-				return database.ErrNotFound
-			}
-		}
-		return nil
+		return s.expireListedCheckoutSessions(locked, orders)
 	})
+}
+
+func (s *Service) expireListedCheckoutSessions(locked context.Context, orders []paymentsdomain.PaymentOrder) error {
+	for _, order := range orders {
+		switch order.Status {
+		case paymentsdomain.PaymentOrderCreating:
+			if _, err := s.orderLifecycle.ExpireOrder(locked, order); err != nil {
+				return err
+			}
+		case paymentsdomain.PaymentOrderCheckoutOpen:
+			_, apiKey, err := s.credentialAccess(locked, order.StripeCredentialID)
+			if err != nil {
+				return err
+			}
+			expiration, err := s.checkoutGateway.ExpireCheckoutSession(locked, paymentports.ExpireCheckoutSessionInput{APIKey: apiKey, SessionID: order.StripeCheckoutSessionID})
+			if err != nil {
+				return err
+			}
+			if _, err := s.orderLifecycle.ConvergeCheckoutExpiration(locked, order, expiration); err != nil {
+				return err
+			}
+		case paymentsdomain.PaymentOrderAsyncPaymentPending:
+			// Provider payment submission already happened; normal checkout
+			// convergence owns this terminal outcome.
+		default:
+			return database.ErrNotFound
+		}
+	}
+	return nil
 }

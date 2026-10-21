@@ -26,7 +26,7 @@ func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := creditService.Deduct(t.Context(), ports.DeductionCommand{
-		UserID: 42, Amount: spendAmount,
+		BillingAccountID: paymentAccount(t, creditService, 42), Amount: spendAmount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "dispute-preexisting-spend", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "42"},
 			Source: "admin", Reason: "test preexisting spend",
@@ -49,7 +49,7 @@ func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 		dispute.RestrictionID == "" || dispute.DebitTransactionID == "" {
 		t.Fatalf("open Dispute = %+v", dispute)
 	}
-	wallet, err := creditService.GetWallet(t.Context(), 42)
+	wallet, err := paymentWallet(t, creditService, 42)
 	if err != nil || wallet.Available != 0 || len(wallet.ActiveRestrictions) != 1 {
 		t.Fatalf("restricted Wallet=%+v err=%v", wallet, err)
 	}
@@ -68,7 +68,7 @@ func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 	if err != nil || !changed || won.Status != paymentsdomain.PaymentDisputeWon || won.RestoreTransactionID == "" {
 		t.Fatalf("late-win Dispute=%+v changed=%v err=%v", won, changed, err)
 	}
-	wallet, err = creditService.GetWallet(t.Context(), 42)
+	wallet, err = paymentWallet(t, creditService, 42)
 	if err != nil || wallet.Available != 50 || len(wallet.ActiveRestrictions) != 0 {
 		t.Fatalf("restored Wallet=%+v err=%v", wallet, err)
 	}
@@ -86,7 +86,7 @@ func TestPaymentDisputeFullDebitRetainsRestrictionAfterLoss(t *testing.T) {
 	if err != nil || !changed || dispute.TargetIdeaQuantity != 500 || dispute.DebitedIdeaQuantity != 500 || dispute.UnrecoveredCredits != 0 {
 		t.Fatalf("full lost Dispute=%+v changed=%v err=%v", dispute, changed, err)
 	}
-	wallet, err := credits.NewService(pool).GetWallet(t.Context(), 42)
+	wallet, err := paymentWallet(t, credits.NewService(pool), 42)
 	if err != nil || wallet.Available != 0 || len(wallet.ActiveRestrictions) != 1 {
 		t.Fatalf("full lost Wallet=%+v err=%v", wallet, err)
 	}
@@ -110,7 +110,7 @@ func TestWonDisputeDiscoveredAfterCloseDoesNotCreateTransientRecovery(t *testing
 		dispute.RestrictionID != "" || dispute.DebitTransactionID != "" {
 		t.Fatalf("close-first Dispute = %+v", dispute)
 	}
-	wallet, err := credits.NewService(pool).GetWallet(t.Context(), 42)
+	wallet, err := paymentWallet(t, credits.NewService(pool), 42)
 	if err != nil || wallet.Available != 500 || len(wallet.ActiveRestrictions) != 0 {
 		t.Fatalf("unchanged Wallet=%+v err=%v", wallet, err)
 	}
@@ -142,7 +142,7 @@ func TestPaymentDisputeAndLaterRefundShareTheOrderIdeaCap(t *testing.T) {
 	if err != nil || refund.IdeaQuantity != 300 {
 		t.Fatalf("remaining refund=%+v err=%v", refund, err)
 	}
-	wallet, err := credits.NewService(pool).GetWallet(t.Context(), 42)
+	wallet, err := paymentWallet(t, credits.NewService(pool), 42)
 	if err != nil || wallet.Available != 0 || wallet.Reserved != 300 {
 		t.Fatalf("Wallet after shared cap=%+v err=%v", wallet, err)
 	}
@@ -168,7 +168,7 @@ func TestPaymentRefundAndLaterDisputeShareTheOrderIdeaCap(t *testing.T) {
 	if err != nil || !changed || dispute.TargetIdeaQuantity != 200 || dispute.DebitedIdeaQuantity != 200 {
 		t.Fatalf("capped Dispute=%+v changed=%v err=%v", dispute, changed, err)
 	}
-	wallet, err := credits.NewService(pool).GetWallet(t.Context(), 42)
+	wallet, err := paymentWallet(t, credits.NewService(pool), 42)
 	if err != nil || wallet.Available != 0 || wallet.Reserved != 300 {
 		t.Fatalf("Wallet after refund-first cap=%+v err=%v", wallet, err)
 	}
@@ -194,7 +194,7 @@ func TestPaymentDisputeSerializesWithConcurrentConsumption(t *testing.T) {
 	go func() {
 		<-start
 		_, holdErr := creditService.Hold(t.Context(), ports.HoldCommand{
-			UserID: 42, Amount: holdAmount,
+			BillingAccountID: paymentAccount(t, creditService, 42), Amount: holdAmount,
 			Metadata: domain.CommandMetadata{
 				IdempotencyKey: "dispute-concurrent-hold", Actor: domain.Actor{Type: domain.ActorUser, ID: "42"},
 				Source: "task_submission", Reason: "concurrent task consumption",
@@ -224,7 +224,7 @@ func TestPaymentDisputeSerializesWithConcurrentConsumption(t *testing.T) {
 	if holdErr != nil && !errors.Is(holdErr, domain.ErrWalletRestricted) {
 		t.Fatalf("concurrent Hold error=%v", holdErr)
 	}
-	wallet, err := creditService.GetWallet(t.Context(), 42)
+	wallet, err := paymentWallet(t, creditService, 42)
 	if err != nil || wallet.Available < 0 || len(wallet.ActiveRestrictions) != 1 {
 		t.Fatalf("concurrent Wallet=%+v err=%v", wallet, err)
 	}

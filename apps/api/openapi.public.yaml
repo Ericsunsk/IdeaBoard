@@ -1294,11 +1294,14 @@ paths:
     get:
       tags: [WorkspaceBilling]
       operationId: getWorkspaceBillingAccount
-      summary: Get the implicit per-workspace billing account (members only)
+      summary: Get the stable workspace billing account (members only)
       description: >-
-        The account is implicit per workspace (no billing-account id in
-        URLs) and provisioned idempotently on first read. Hidden
-        workspaces converge to 404 workspace_not_found.
+        The account is stable (ba_ funds identity) and never derives from
+        the current Workspace Owner wallet. Many Workspaces may share one
+        account (organization pool or explicit no-org studio link);
+        independent accounts stay isolated. The response carries
+        billing_account_id, workspace_id (consumption location), and
+        owner_type. Hidden workspaces converge to 404 workspace_not_found.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       responses:
@@ -1324,14 +1327,331 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/billing-account/link:
+    post:
+      tags: [WorkspaceBilling]
+      operationId: linkWorkspaceBillingAccount
+      summary: Link a workspace to a shared billing account (workspace owner/admin + billing manager only)
+      description: >-
+        Creates the explicit stable association for no-org studio sharing.
+        Requires Workspace Owner/Admin on the workspace AND Billing
+        Owner/Admin on the target account; space-only admins render 403
+        billing_account_forbidden. Conflicting ownership or a payer switch
+        renders 409 billing_account_conflict (fail closed). Requires the
+        Idempotency-Key header.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkWorkspaceBillingAccountRequest'
+      responses:
+        '200':
+          description: Linked billing account.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceBillingAccountEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Visible-but-forbidden financial action (billing_account_forbidden) or space-only admin (workspace_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Conflicting ownership or payer switch (billing_account_conflict).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/billing-account/members:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: listWorkspaceBillingAccountMembers
+      summary: List billing account managers (billing manager only)
+      description: >-
+        Financial managers only; workspace standing alone renders 403
+        billing_account_forbidden. No Idempotency-Key: read-only, safe to retry.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Billing account managers.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BillingAccountMember'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Visible-but-forbidden financial read (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      tags: [WorkspaceBilling]
+      operationId: addWorkspaceBillingAccountMember
+      summary: Grant a billing account manager (billing manager only)
+      description: >-
+        Only Billing Owner may grant Owner; Admin may grant Admin.
+        Joining an account grants no Workspace or Board access. Requires
+        the Idempotency-Key header.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddBillingAccountMemberRequest'
+      responses:
+        '201':
+          description: Granted billing manager.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BillingAccountMember'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Visible-but-forbidden financial grant (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Conflicting grant (billing_account_conflict).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/billing-account/members/{member_id}:
+    patch:
+      tags: [WorkspaceBilling]
+      operationId: updateWorkspaceBillingAccountMember
+      summary: Change a billing manager role (billing manager only)
+      description: >-
+        Only Owners transfer ownership; the last Owner cannot be demoted.
+        No Idempotency-Key: idempotent role write, safe to retry.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: member_id
+          in: path
+          required: true
+          description: Opaque usr_ identity of the billing manager.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBillingAccountMemberRequest'
+      responses:
+        '200':
+          description: Updated billing manager.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BillingAccountMember'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Visible-but-forbidden role change (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/billing-account/transfer:
+    post:
+      tags: [WorkspaceBilling]
+      operationId: transferWorkspaceBillingAccount
+      summary: Transfer billing account ownership (billing owner only)
+      description: >-
+        Only the current Owner may transfer; the previous Owner steps down
+        to Admin so the account never loses its last Owner. Identity,
+        balance, and history stay stable; only management changes. Requires
+        the Idempotency-Key header.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferBillingAccountRequest'
+      responses:
+        '200':
+          description: Ownership transferred.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [transferred]
+                    additionalProperties: false
+                    properties:
+                      transferred:
+                        type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Visible-but-forbidden transfer (billing_account_forbidden).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Conflicting transfer (billing_account_conflict).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Billing service unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /workspaces/{workspace_id}/credits/balance:
     get:
       tags: [WorkspaceBilling]
       operationId: getWorkspaceCreditsBalance
       summary: Get workspace credits balance (members only)
       description: >-
-        Transitional projection: the credits ledger stays user-scoped, so
-        workspace reads project the workspace owner's wallet. All money
+        Stable shared balance of the workspace's Billing Account (ba_ funds
+        identity): every workspace sharing one account reports the same
+        available and reserved Ideas, with or without an Organization;
+        independent accounts stay isolated. All money
         is integer minor units. Frozen or restricted wallets render 403
         billing_wallet_restricted; missing wallets render 404 with the
         same code (no provisioning state leak).
@@ -1373,8 +1693,10 @@ paths:
     get:
       tags: [WorkspaceBilling]
       operationId: listWorkspaceCreditsLedger
-      summary: List immutable credits ledger entries (members only)
+      summary: List immutable credits ledger entries (Billing Owner/Admin)
       description: >-
+        Requires Billing Owner/Admin on the resolved account; Workspace membership
+        alone renders 403 billing_account_forbidden.
         Ledger entries are immutable INSERT-only facts served newest-first
         over an opaque before-sequence cursor. Restricted wallets render
         403 billing_wallet_restricted.
@@ -1420,10 +1742,16 @@ paths:
     get:
       tags: [WorkspaceBilling]
       operationId: listWorkspaceBillingRecords
-      summary: List caller-owned billing records (members only)
+      summary: List billing and consumption records within the authorized scope
       description: >-
+        Billing Owner/Admin sees account records; Workspace Owner/Admin sees only
+        consumption in the current workspace; other members see only their own
+        consumption within the account. Scoped consumption omits account balance
+        history and non-consumption records. Authorization filters apply before pagination.
         Read model over settled ledger facts plus immutable task billing
-        snapshots; no ledger writes happen here. Cursor pagination over
+        snapshots of the workspace's stable Billing Account; no ledger writes happen here.
+        Settlement attributes the real operator and the consuming workspace and never
+        rewrites history on member exit or owner change. Cursor pagination over
         the opaque before-sequence cursor. Invalid list input renders
         400 bad_request; store-side failures render 503
         service_unavailable.
@@ -1460,9 +1788,13 @@ paths:
     get:
       tags: [WorkspaceBilling]
       operationId: getWorkspaceUsage
-      summary: Get current workspace usage snapshot (members only)
+      summary: Get usage snapshot of the workspace account (Billing Owner/Admin)
       description: >-
-        Read-only composition of settled captures plus task snapshots.
+        Requires Billing Owner/Admin on the resolved account; Workspace membership
+        alone renders 403 billing_account_forbidden.
+        Read-only composition of settled captures plus task snapshots of the
+        workspace's stable Billing Account, attributed to the real operator and
+        the consuming workspace.
         Unknown range values render 422 validation_failed. Service-side
         invalid input renders 4xx (bad user 400 bad_request, bad range
         422 validation_failed); store-side failures render 503
@@ -1508,15 +1840,17 @@ paths:
     post:
       tags: [WorkspaceBilling]
       operationId: createWorkspaceCheckoutSession
-      summary: Create a recharge checkout session (members only)
+      summary: Create a recharge checkout session (billing manager only)
       description: >-
         Pricing is server-side only: the request carries the Idea quantity
         plus terms acceptance, never prices or amounts (unknown fields
         such as client-supplied prices are strictly rejected with 400).
         Quantity bounds are 500..500000 Ideas; terms must be accepted at
-        the current versions. Requires the Idempotency-Key header: same
-        key+hash replays the first session, a different request renders
-        409 billing_checkout_conflict. Restricted wallets render 403
+        the current versions. Requires Billing Owner/Admin: workspace-only
+        admins render 403 billing_account_forbidden and cannot top up.
+        Requires the Idempotency-Key header: same key+hash replays the
+        first session, a different request renders 409
+        billing_checkout_conflict. Restricted wallets render 403
         billing_wallet_restricted. Webhook settlement (POST
         /api/webhooks/stripe) is unchanged and settles only through the
         Payments to credits transaction.
@@ -1544,7 +1878,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Wallet restricted and not rechargeable (billing_wallet_restricted).
+          description: Wallet restricted and not rechargeable (billing_wallet_restricted) or missing financial grant (billing_account_forbidden).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -1929,16 +2263,23 @@ paths:
     post:
       tags: [WorkspaceRewards]
       operationId: redeemWorkspaceReward
-      summary: Redeem a reward code into the caller wallet (members only, 201)
+      summary: Redeem a reward code into the caller personal account (members only, 201)
       description: >-
         Redeems one reward code through the Rewards seam, which Grants
         through credits.Commands inside its own transaction (durable
         per-user replay); the kernel IdempotencyStore adds header-key
         replay for transport retries. Code plaintext never leaves the
-        request hash. Unknown, expired, exhausted, or disabled codes
-        converge to 422 reward_code_unavailable (no oracle); frozen
-        wallets render 409 reward_wallet_locked; key reuse with a
-        different request renders 409 reward_redeem_conflict.
+        request hash. The Grant settles into the caller's deterministic
+        initial personal Billing Account, never into the requesting
+        workspace's account: the workspace is the authZ scope only and
+        switching workspaces (including organization workspaces) neither
+        duplicates nor redirects the benefit, and organization funds are
+        never implicitly touched. The response names the beneficiary
+        billing_account_id (ba_) with its available_balance. Unknown,
+        expired, exhausted, or disabled codes converge to 422
+        reward_code_unavailable (no oracle); frozen wallets render 409
+        reward_wallet_locked; key reuse with a different request renders
+        409 reward_redeem_conflict.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -2267,9 +2608,20 @@ paths:
       summary: Preflight price quote for a task (members only, no persistence)
       description: >-
         Returns an immutable price snapshot with no persistence (separate
-        from the authoritative create). No Idempotency-Key is required.
-        Unpriced or unregistered SKU renders billing_pricing_unavailable
-        422 deterministic; transient quote failures render
+        from the authoritative create). No Idempotency-Key is required:
+        pure read, safe to retry. The preflight resolves the same stable
+        Billing Account submit would hold (no owner-wallet fallback) and
+        applies the same consumption eligibility: an optional
+        data.board_id binds the preflight to its Board (Board identity +
+        generate capability checked before any quote; invisible Boards
+        render 404 board_not_found, archived Boards 409 board_archived,
+        visible Boards without generate capability 403 task_forbidden, so
+        Viewers never read ready), and the resolved account Wallet gates
+        funds (402 task_insufficient_credits vs 403
+        billing_wallet_restricted, mirroring the submit Hold). Financial
+        management alone grants no Board standing. Unpriced or
+        unregistered SKU renders billing_pricing_unavailable 422
+        deterministic; transient quote failures render
         billing_quote_unavailable 503. Missing Service Model Pool routing
         renders service_resolution_unavailable 422. An omitted resolution
         is normalized to the Service policy canonical value; only 1k, 2k,
@@ -2296,8 +2648,28 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '402':
+          description: Insufficient Ideas on the resolved account (task_insufficient_credits).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Visible-but-forbidden (task_forbidden) or restricted wallet (billing_wallet_restricted).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '503':
@@ -4620,14 +4992,26 @@ components:
           $ref: '#/components/schemas/AvatarUploadResult'
     WorkspaceBillingAccount:
       type: object
-      required: [workspace_id, owner_type]
+      required: [billing_account_id, workspace_id, owner_type, consumption_scope]
       additionalProperties: false
       properties:
+        billing_account_id:
+          type: string
+          pattern: ^ba_[A-Za-z0-9_-]+$
+          description: Stable funds identity; never derives from the current Workspace Owner wallet.
         workspace_id:
           $ref: '#/components/schemas/WorkspaceId'
         owner_type:
           type: string
-          enum: [workspace]
+          enum: [workspace, organization]
+          description: workspace covers per-workspace and studio-shared links; organization is the shared org pool.
+        consumption_scope:
+          type: string
+          enum: [account, workspace, member]
+          description: Server-resolved consumption visibility for the authenticated principal.
+        shared:
+          type: boolean
+          description: True when many Workspaces share one account; omitted when false.
         created_at:
           type: string
           format: date-time
@@ -4636,6 +5020,74 @@ components:
           type: string
           format: date-time
           description: Omitted when empty.
+    BillingAccountMember:
+      type: object
+      required: [user_id, role]
+      additionalProperties: false
+      properties:
+        user_id:
+          type: string
+          description: Opaque usr_ identity of the financial manager.
+        role:
+          type: string
+          enum: [owner, admin]
+        created_at:
+          type: string
+          format: date-time
+          description: Omitted when empty.
+    LinkWorkspaceBillingAccountRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [billing_account_id]
+          additionalProperties: false
+          properties:
+            billing_account_id:
+              type: string
+              pattern: ^ba_[A-Za-z0-9_-]+$
+    AddBillingAccountMemberRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [user_id, role]
+          additionalProperties: false
+          properties:
+            user_id:
+              type: string
+            role:
+              type: string
+              enum: [owner, admin]
+    UpdateBillingAccountMemberRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [role]
+          additionalProperties: false
+          properties:
+            role:
+              type: string
+              enum: [owner, admin]
+    TransferBillingAccountRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [new_owner_user_id]
+          additionalProperties: false
+          properties:
+            new_owner_user_id:
+              type: string
     WorkspaceBillingAccountEnvelope:
       type: object
       required: [data]
@@ -4645,9 +5097,13 @@ components:
           $ref: '#/components/schemas/WorkspaceBillingAccount'
     WorkspaceCreditsBalance:
       type: object
-      required: [workspace_id, available_credits, reserved_credits, status]
+      required: [billing_account_id, workspace_id, available_credits, reserved_credits, status]
       additionalProperties: false
       properties:
+        billing_account_id:
+          type: string
+          pattern: ^ba_[A-Za-z0-9_-]+$
+          description: Stable funds identity holding the unified balance; shared workspaces report the same account.
         workspace_id:
           $ref: '#/components/schemas/WorkspaceId'
         available_credits:
@@ -4711,7 +5167,7 @@ components:
           $ref: '#/components/schemas/PaginationMeta'
     BillingRecord:
       type: object
-      required: [record_id, occurred_at, kind, title, credit_delta, available_credits_after]
+      required: [record_id, occurred_at, kind, title, credit_delta]
       additionalProperties: false
       properties:
         record_id:
@@ -4731,6 +5187,7 @@ components:
         available_credits_after:
           type: integer
           format: int64
+          description: Account balance history, present only for Billing Owner/Admin.
     PaginatedBillingRecords:
       type: object
       required: [data, meta]
@@ -4822,12 +5279,15 @@ components:
               description: Defaults to the current refund policy version when omitted.
     WorkspaceCheckoutSession:
       type: object
-      required: [session_id]
+      required: [session_id, billing_account_id]
       additionalProperties: false
       properties:
         session_id:
           type: string
           description: Opaque checkout session identifier.
+        billing_account_id:
+          type: string
+          description: Payer account (ba_) this session charges; stable across workspace switches and member changes.
         status:
           type: string
           description: Session status (present on read).
@@ -4855,9 +5315,12 @@ components:
           $ref: '#/components/schemas/WorkspaceCheckoutSession'
     WorkspacePurchaseOptions:
       type: object
-      required: [purchases_available, quick_idea_quantities, min_idea_quantity, max_idea_quantity, ideas_per_usd, terms, refund_policy]
+      required: [billing_account_id, purchases_available, quick_idea_quantities, min_idea_quantity, max_idea_quantity, ideas_per_usd, terms, refund_policy]
       additionalProperties: false
       properties:
+        billing_account_id:
+          type: string
+          description: Explicit recharge target account (ba_); the checkout will charge this payer account.
         purchases_available:
           type: boolean
         unavailable_reason:
@@ -4909,13 +5372,16 @@ components:
           $ref: '#/components/schemas/WorkspacePurchaseOptions'
     WorkspacePendingOrder:
       type: object
-      required: [public_token, idea_quantity, status, expires_at, updated_at]
+      required: [public_token, billing_account_id, idea_quantity, status, expires_at, updated_at]
       additionalProperties: false
       properties:
         public_token:
           type: string
           format: uuid
           description: Opaque pending order token (same value as the legacy public_token).
+        billing_account_id:
+          type: string
+          description: Payer account (ba_) owning this order; every manager of the account manages it.
         idea_quantity:
           type: integer
           format: int64
@@ -4957,12 +5423,15 @@ components:
           $ref: '#/components/schemas/WorkspacePendingOrder'
     WorkspaceRechargeHistoryItem:
       type: object
-      required: [occurred_at, idea_quantity, status]
+      required: [occurred_at, billing_account_id, idea_quantity, status]
       additionalProperties: false
       properties:
         occurred_at:
           type: string
           format: date-time
+        billing_account_id:
+          type: string
+          description: Payer account (ba_) this history fact belongs to.
         idea_quantity:
           type: integer
           format: int64
@@ -5126,7 +5595,7 @@ components:
           format: date-time
     RedeemWorkspaceRewardResult:
       type: object
-      required: [redemption, history_item, credited_amount, available_balance]
+      required: [redemption, history_item, credited_amount, available_balance, billing_account_id]
       additionalProperties: false
       properties:
         redemption:
@@ -5141,6 +5610,14 @@ components:
           type: integer
           format: int64
           description: Integer minor units.
+        billing_account_id:
+          type: string
+          pattern: '^ba_[A-Za-z0-9_-]+$'
+          description: >-
+            Stable funds identity that received the Grant: the caller's
+            deterministic initial personal Billing Account. The requesting
+            workspace is the authZ scope only and never changes the
+            beneficiary.
         replayed:
           type: boolean
           description: True when an idempotent replay returned the first redemption.
@@ -5439,6 +5916,15 @@ components:
             resolution:
               type: string
               description: Output resolution; omitted input is normalized to the Service policy canonical value.
+            board_id:
+              $ref: '#/components/schemas/BoardId'
+              description: >-
+                Optional Canvas Board binding (board_...). The preflight
+                enforces the same generate-capability gate as submit
+                (invisible Boards 404 board_not_found, archived 409
+                board_archived, visible without generate 403
+                task_forbidden); omitted stays a workspace-level price
+                preflight with no Board attribution.
     CancelWorkspaceTaskRequest:
       type: object
       additionalProperties: false

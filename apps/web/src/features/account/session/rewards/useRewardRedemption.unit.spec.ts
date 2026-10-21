@@ -18,6 +18,7 @@ const redeemed = {
   },
   credited_amount: 80,
   available_balance: 180,
+  billing_account_id: 'ba_beneficiary_7001',
   replayed: false,
   history_item: {
     id: 41,

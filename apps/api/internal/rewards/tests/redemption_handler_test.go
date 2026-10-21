@@ -56,7 +56,7 @@ func TestRewardRedeemPreservesCommittedOutcomeWithoutPostCommitIdentityProjectio
 		created.RewardCode.ID, 3).Scan(&redemptionCount, &grantCount); err != nil {
 		t.Fatalf("count committed Redemption and Credit Grant facts: %v", err)
 	}
-	wallet, err := creditService.GetWallet(t.Context(), 3)
+	wallet, err := rewardWallet(t, creditService, 3)
 	if err != nil {
 		t.Fatalf("GetWallet() error = %v", err)
 	}

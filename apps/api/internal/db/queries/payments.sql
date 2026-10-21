@@ -153,10 +153,13 @@ WHERE stripe_event_id = $1
     OR (processing_result = 'processing' AND processed_at < clock_timestamp() - INTERVAL '5 minutes')
   );
 
--- name: GetPaymentOrderByIdempotency :one
+-- name: GetPaymentOrderByAccountIdempotency :one
+-- Account idempotency scope (#919): the durable replay scope is the payer
+-- Billing Account, never the operator. Same key + same hash replays, same
+-- key + different hash conflicts; cross-account key reuse never replays.
 SELECT *
 FROM payment_orders
-WHERE user_id = $1 AND client_idempotency_key = $2;
+WHERE billing_account_id = $1 AND client_idempotency_key = $2;
 
 -- name: GetPaymentOrderByIDForUpdate :one
 -- Unified ID lookup (merged from GetPaymentOrderByID + GetPaymentOrderByIDForUpdate):
@@ -176,6 +179,15 @@ WHERE user_id = $1
   AND status IN ('creating', 'checkout_open', 'async_payment_pending')
 ORDER BY created_at, id;
 
+-- name: ListAccountActivePaymentOrders :many
+-- Account unpaid-slot accounting (#919): Checkout create/continue serialize
+-- per payer account under the account advisory lock.
+SELECT *
+FROM payment_orders
+WHERE billing_account_id = $1
+  AND status IN ('creating', 'checkout_open', 'async_payment_pending')
+ORDER BY created_at, id;
+
 -- name: ListPaymentOrdersForCheckoutShutdown :many
 SELECT *
 FROM payment_orders
@@ -186,10 +198,12 @@ WHERE stripe_account_id = $1
 ORDER BY created_at, id
 LIMIT $4;
 
--- name: ListUserPendingPaymentOrders :many
+-- name: ListAccountPendingPaymentOrders :many
+-- Account pending orders (#919): every Billing Owner/Admin of the payer
+-- account manages these, not just the creating operator.
 SELECT *
 FROM payment_orders
-WHERE user_id = $1
+WHERE billing_account_id = $1
   AND status IN ('checkout_open', 'async_payment_pending', 'paid_pending_credit')
 ORDER BY created_at DESC, id DESC;
 
@@ -199,6 +213,7 @@ INSERT INTO payment_orders (
   public_order_number,
   public_token,
   user_id,
+  billing_account_id,
   client_idempotency_key,
   request_hash,
   status,
@@ -212,25 +227,28 @@ INSERT INTO payment_orders (
   return_base_url,
   expires_at
 )
-SELECT $1, $2, $3, $4, $5, $6, 'creating', $7, $8, $9, $10, $10, $11, $12, $13, $14
+SELECT $1, $2, $3, $4, $5, $6, $7, 'creating', $8, $9, $10, $11, $11, $12, $13, $14, $15
 FROM payment_stripe_configurations configuration
 WHERE configuration.singleton_id = 1
-  AND configuration.active_credential_id = $7
+  AND configuration.active_credential_id = $8
   AND configuration.purchases_enabled
 RETURNING *;
 
--- name: GetPaymentCustomer :one
+-- name: GetPaymentCustomerByAccount :one
+-- Account Stripe Customer (#919): reused per payer Billing Account, never
+-- per operator, so test/live stay isolated and key rotation never duplicates.
 SELECT *
 FROM payment_customers
-WHERE user_id = $1
+WHERE billing_account_id = $1
   AND stripe_account_id = $2
   AND stripe_mode = $3;
 
--- name: UpsertPaymentCustomer :one
-INSERT INTO payment_customers (user_id, stripe_account_id, stripe_mode, stripe_customer_id)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (user_id, stripe_account_id, stripe_mode) DO UPDATE
-SET stripe_customer_id = EXCLUDED.stripe_customer_id
+-- name: UpsertPaymentCustomerByAccount :one
+INSERT INTO payment_customers (user_id, billing_account_id, stripe_account_id, stripe_mode, stripe_customer_id)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (billing_account_id, stripe_account_id, stripe_mode) DO UPDATE
+SET stripe_customer_id = EXCLUDED.stripe_customer_id,
+    user_id = EXCLUDED.user_id
 RETURNING *;
 
 -- name: BindPaymentOrderCheckout :one
@@ -265,11 +283,13 @@ SET status = 'payment_failed',
 WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')
 RETURNING *;
 
--- name: MarkPaymentOrderCancelled :one
+-- name: MarkPaymentOrderCancelledByAccount :one
+-- Account abandon (#919): any Billing Owner/Admin of the persisted payer
+-- account may abandon its open Checkout.
 UPDATE payment_orders
 SET status = 'cancelled',
     checkout_url = ''
-WHERE id = $1 AND user_id = $2 AND status = 'checkout_open'
+WHERE id = $1 AND billing_account_id = $2 AND status = 'checkout_open'
 RETURNING *;
 
 -- name: MarkPaymentOrderExpired :one
@@ -401,6 +421,7 @@ LIMIT sqlc.arg(page_limit)::INTEGER;
 SELECT orders.id,
        orders.public_order_number,
        orders.user_id,
+       orders.billing_account_id,
        users.public_id AS user_public_id,
        users.display_name,
        orders.status,
@@ -477,12 +498,20 @@ SET status = 'credited',
 WHERE id = $1 AND status = 'paid_pending_credit'
 RETURNING *;
 
--- name: GetPaymentOrderByPublicToken :one
+-- name: GetPaymentOrderByAccountToken :one
+-- Account order reads (#919): continue/abandon/Return address the persisted
+-- payer account. Callers authorize Billing Owner/Admin first and converge
+-- unknown tokens to not-found (anti-enumeration); the token alone is never
+-- an ownership oracle.
 SELECT *
 FROM payment_orders
-WHERE public_token = $1 AND user_id = $2;
+WHERE public_token = $1 AND billing_account_id = $2;
 
--- name: ListPaymentRechargeHistory :many
+-- name: ListAccountRechargeHistory :many
+-- Account recharge history (#919): credited, refunded-overlay, and
+-- user-abandoned facts of one payer Billing Account for its authorized
+-- managers. Same 12-month window and opaque-cursor paging as the
+-- operator read it replaces; no payer PII or provider secrets.
 SELECT orders.id,
        COALESCE(orders.paid_at, orders.updated_at) AS occurred_at,
        orders.idea_quantity,
@@ -500,7 +529,7 @@ LEFT JOIN LATERAL (
   WHERE payment_refunds.payment_order_id = orders.id
     AND payment_refunds.status = 'succeeded'
 ) refunds ON TRUE
-WHERE orders.user_id = sqlc.arg(user_id)::BIGINT
+WHERE orders.billing_account_id = sqlc.arg(billing_account_id)::BIGINT
   AND orders.status IN ('credited', 'cancelled')
   AND COALESCE(orders.paid_at, orders.updated_at) >= sqlc.arg(cutoff_at)::TIMESTAMPTZ
   AND (
@@ -509,6 +538,17 @@ WHERE orders.user_id = sqlc.arg(user_id)::BIGINT
   )
 ORDER BY COALESCE(orders.paid_at, orders.updated_at) DESC, orders.id DESC
 LIMIT sqlc.arg(page_limit)::INTEGER;
+
+-- name: ListBillingAccountManagerIDs :many
+-- Server-internal SSE fanout audience (#919): the current financial
+-- managers of one Billing Account. No auth gate here; callers fan out
+-- post-commit hints only to these users, so exited members and
+-- non-managers never observe another account's settlement. Financial
+-- management grants no content access; this list never leaves the server.
+SELECT user_id
+FROM billing_account_members
+WHERE billing_account_id = $1
+ORDER BY user_id;
 
 -- name: MarkPaymentWebhookEventProcessed :execrows
 UPDATE payment_webhook_events

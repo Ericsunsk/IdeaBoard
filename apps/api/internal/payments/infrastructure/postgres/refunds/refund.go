@@ -103,6 +103,13 @@ func (s *Store) createExternalRefundFact(ctx context.Context, tx pgx.Tx, order p
 	if qty > order.IdeaQuantity-already {
 		qty = order.IdeaQuantity - already
 	}
+	// #920: Dashboard refunds reserve on the order's fixed payer account.
+	// Member exits and management changes never move the obligation; a
+	// missing payer fails closed instead of falling back to the operator.
+	if order.BillingAccountID <= 0 {
+		return paymentsdomain.PaymentRefund{}, fmt.Errorf("refund order without payer Billing Account")
+	}
+	accountID := order.BillingAccountID
 	hold, err := credits.CommandsInTx(tx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
@@ -118,7 +125,7 @@ func (s *Store) createExternalRefundFact(ctx context.Context, tx pgx.Tx, order p
 	// recovery, while frozen/tombstone lifecycles stay rejected by the
 	// routine gate. Insufficient Ideas surface as ErrInsufficientCredits
 	// so dispatch records a durable anomaly for manual recovery.
-	holdResult, err := hold.PurchaseRefundHold(ctx, ports.PurchaseRefundHoldCommand{UserID: order.UserID, Amount: creditAmount, Metadata: domain.CommandMetadata{
+	holdResult, err := hold.PurchaseRefundHold(ctx, ports.PurchaseRefundHoldCommand{BillingAccountID: accountID, Amount: creditAmount, Metadata: domain.CommandMetadata{
 		IdempotencyKey: "refund-hold-" + refundID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: "Stripe Dashboard refund", BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refundID},
 	}})
 	if err != nil {
@@ -223,6 +230,12 @@ func commitPendingRefundReplay(ctx context.Context, tx pgx.Tx, owned bool, exist
 
 func (s *Store) persistPendingRefund(ctx context.Context, tx pgx.Tx, order paymentsdomain.PaymentOrder, currency string, input paymentrefund.CreatePendingPaymentRefundInput, amountMinor int64) (paymentsdomain.PaymentRefund, error) {
 	refundID := uuid.NewString()
+	// #920: Admin refunds reserve on the order's fixed payer account, never
+	// the operator's personal account.
+	if order.BillingAccountID <= 0 {
+		return paymentsdomain.PaymentRefund{}, fmt.Errorf("refund order without payer Billing Account")
+	}
+	accountID := order.BillingAccountID
 	commands, err := credits.CommandsInTx(tx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
@@ -231,7 +244,7 @@ func (s *Store) persistPendingRefund(ctx context.Context, tx pgx.Tx, order payme
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, paymentcontracts.ErrRefundAmountInvalid
 	}
-	hold, err := commands.PurchaseRefundHold(ctx, ports.PurchaseRefundHoldCommand{UserID: order.UserID, Amount: creditAmount, Metadata: domain.CommandMetadata{
+	hold, err := commands.PurchaseRefundHold(ctx, ports.PurchaseRefundHoldCommand{BillingAccountID: accountID, Amount: creditAmount, Metadata: domain.CommandMetadata{
 		IdempotencyKey: "refund-hold-" + refundID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: "Stripe refund hold",
 		BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refundID},
 	}})
@@ -283,6 +296,12 @@ func (s *Store) MarkPaymentRefundFailed(ctx context.Context, refundID, summary s
 	if refund.Status == paymentsdomain.PaymentRefundSucceeded {
 		return paymentsdomain.PaymentRefund{}, paymentcontracts.ErrRefundOrderNotEligible
 	}
+	// #920: release on the order's fixed payer account. The refund row keeps
+	// the operator as UserID; funds never follow the operator.
+	accountID, err := loadRefundOrderBillingAccount(ctx, tx, refund.PaymentOrderID)
+	if err != nil {
+		return paymentsdomain.PaymentRefund{}, err
+	}
 	commands, err := credits.CommandsInTx(tx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
@@ -291,7 +310,7 @@ func (s *Store) MarkPaymentRefundFailed(ctx context.Context, refundID, summary s
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if _, err := commands.Release(ctx, ports.ReleaseCommand{UserID: refund.UserID, HoldTransactionID: refund.CreditHoldTransactionID, Amount: creditAmount, Metadata: domain.CommandMetadata{IdempotencyKey: "refund-release-" + refund.ID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe refund failed", BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refund.ID}}}); err != nil && !errors.Is(err, domain.ErrHoldSettled) {
+	if _, err := commands.Release(ctx, ports.ReleaseCommand{BillingAccountID: accountID, HoldTransactionID: refund.CreditHoldTransactionID, Amount: creditAmount, Metadata: domain.CommandMetadata{IdempotencyKey: "refund-release-" + refund.ID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe refund failed", BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refund.ID}}}); err != nil && !errors.Is(err, domain.ErrHoldSettled) {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	if err := scanPaymentRefund(tx.QueryRow(ctx, `UPDATE payment_refunds SET status = 'failed', error_summary = $2, failed_at = $3, updated_at = $3 WHERE id = $1::uuid RETURNING id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at`, refundID, postgres.BoundedText(summary, 500), now), &refund); err != nil {
@@ -324,12 +343,17 @@ func (s *Store) MarkPaymentRefundSucceeded(ctx context.Context, refundID string,
 	if refund.Status == paymentsdomain.PaymentRefundFailed {
 		return paymentsdomain.PaymentRefund{}, paymentcontracts.ErrRefundOrderNotEligible
 	}
+	// #920: settle on the order's fixed payer account.
+	accountID, err := loadRefundOrderBillingAccount(ctx, tx, refund.PaymentOrderID)
+	if err != nil {
+		return paymentsdomain.PaymentRefund{}, err
+	}
 	commands, err := credits.CommandsInTx(tx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	creditResult, err := commands.PurchaseRefund(ctx, ports.PurchaseRefundCommand{
-		UserID: refund.UserID, HoldTransactionID: refund.CreditHoldTransactionID,
+		BillingAccountID: accountID, HoldTransactionID: refund.CreditHoldTransactionID,
 		Metadata: domain.CommandMetadata{IdempotencyKey: "purchase-refund-" + refund.ID,
 			Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe refund succeeded",
 			BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refund.ID}},
@@ -351,6 +375,9 @@ func (s *Store) MarkPaymentRefundSucceeded(ctx context.Context, refundID string,
 
 // merged from internal/payments/infrastructure/postgres/refunds/helpers.go (structural consolidation; symbols unchanged).
 func validateExternalRefund(order postgres.PaymentOrderFacts, provider paymentports.StripeRefund) error {
+	if order.BillingAccountID <= 0 {
+		return paymentcontracts.ErrRefundOrderNotEligible
+	}
 	if order.Status != paymentsdomain.PaymentOrderCredited || order.PaidSubtotal <= 0 || order.PaidTotal <= 0 || order.IdeaQuantity <= 0 {
 		return paymentcontracts.ErrRefundOrderNotEligible
 	}
@@ -361,6 +388,9 @@ func validateExternalRefund(order postgres.PaymentOrderFacts, provider paymentpo
 }
 
 func validatePendingRefundEligibility(order paymentsdomain.PaymentOrder, paidSubtotal, paidTotal pgtype.Int8, paidAt pgtype.Timestamptz, now time.Time) error {
+	if order.BillingAccountID <= 0 {
+		return paymentcontracts.ErrRefundOrderNotEligible
+	}
 	if order.Status != paymentsdomain.PaymentOrderCredited || order.StripeChargeID == "" || order.IdeaQuantity <= 0 || !paidSubtotal.Valid || paidSubtotal.Int64 <= 0 || !paidTotal.Valid || paidTotal.Int64 <= 0 || !paidAt.Valid {
 		return paymentcontracts.ErrRefundOrderNotEligible
 	}
@@ -368,6 +398,21 @@ func validatePendingRefundEligibility(order paymentsdomain.PaymentOrder, paidSub
 		return paymentcontracts.ErrRefundExpired
 	}
 	return nil
+}
+
+// loadRefundOrderBillingAccount resolves the fixed payer account for
+// post-reservation settlement (#920). The refund row keeps the operator as
+// UserID; funds converge on the order row, so member exits and management
+// changes never move the obligation. A missing payer fails closed.
+func loadRefundOrderBillingAccount(ctx context.Context, tx pgx.Tx, orderID string) (int64, error) {
+	var billingAccountID pgtype.Int8
+	if err := tx.QueryRow(ctx, `SELECT billing_account_id FROM payment_orders WHERE id = $1::uuid`, orderID).Scan(&billingAccountID); err != nil {
+		return 0, fmt.Errorf("read refund order payer: %w", err)
+	}
+	if !billingAccountID.Valid || billingAccountID.Int64 <= 0 {
+		return 0, fmt.Errorf("refund order without payer Billing Account")
+	}
+	return billingAccountID.Int64, nil
 }
 
 func scanPaymentRefund(row interface{ Scan(...any) error }, refund *paymentsdomain.PaymentRefund) error {

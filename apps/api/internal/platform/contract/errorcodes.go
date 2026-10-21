@@ -123,6 +123,13 @@ const (
 	CodeBillingSessionNotFound    Code = "billing_session_not_found"
 	CodeBillingQuoteUnavailable   Code = "billing_quote_unavailable"
 	CodeBillingPricingUnavailable Code = "billing_pricing_unavailable"
+	// Billing Account ownership codes (issue #915). Wire-stable: visible
+	// workspaces with no financial grant render billing_account_forbidden
+	// (403); ambiguous resolution or conflicting ownership links render
+	// billing_account_conflict (409, fail closed, no silent wallet pick).
+	CodeBillingAccountForbidden Code = "billing_account_forbidden"
+	CodeBillingAccountConflict  Code = "billing_account_conflict"
+	CodeBillingAccountNotFound  Code = "billing_account_not_found"
 
 	// Workspace task lifecycle codes (issue #805). Wire-stable: do not
 	// rename without coordinating the OpenAPI contract and callers.
@@ -393,6 +400,7 @@ func StatusOf(code Code) int {
 		CodeWorkspaceDefaultProtected,
 		CodeBoardForbidden, CodeBillingWalletRestricted, CodeTaskForbidden, CodeEventForbidden,
 		CodeBoardPermissionDenied, CodeStripePermissionDenied, CodeIdentityForbidden,
+		CodeBillingAccountForbidden,
 		// CodeIdentityUpstreamRejected renders with the upstream 401/403
 		// status kept explicit at the impersonation edge; the registry
 		// pins 403 as the representative denial.
@@ -401,6 +409,7 @@ func StatusOf(code Code) int {
 	case CodeNotFound, CodeWorkspaceNotFound, CodeOrganizationNotFound, CodeWorkspaceMemberNotFound,
 		CodeBoardNotFound, CodeBoardMemberNotFound,
 		CodeUploadNotFound, CodeMediaNotFound, CodeBillingSessionNotFound,
+		CodeBillingAccountNotFound,
 		CodeLibraryFolderNotFound, CodeLibraryAssetNotFound, CodeLibraryMaterializationNotFound,
 		CodeTaskNotFound, CodeEventNotFound, CodeEventSubscriptionNotFound, CodeControlNotFound,
 		CodeBillingSKUNotFound,
@@ -425,7 +434,7 @@ func StatusOf(code Code) int {
 		CodeCreditIdempotencyConflict,
 		CodeBoardNameConflict, CodeBoardIDConflict,
 		CodeIdentityConflict, CodeStripeConfigurationChanged, CodeCheckoutConflict,
-		CodeWalletNotRechargeable,
+		CodeWalletNotRechargeable, CodeBillingAccountConflict,
 		CodeSearchProviderTestRequired, CodeSearchProviderAPIKeyRequired:
 		return http.StatusConflict
 	case CodeValidationFailed, CodeUploadValidationFailed, CodeMediaValidationFailed,

@@ -21,7 +21,7 @@ func TestDisablePurchasesFastPathExpiresExistingCheckout(t *testing.T) {
 	checkoutGateway := &fakeCheckoutGateway{}
 	service := newConfiguredPurchaseService(t, pool, configurationGateway, checkoutGateway, creditService)
 
-	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "checkout-shutdown-open", 501))
+	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(t, pool, 42, "checkout-shutdown-open", 501))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestDisablePurchasesFastPathExpiresExistingCheckout(t *testing.T) {
 	if len(configurationGateway.calls) != prepareCalls {
 		t.Fatalf("disable called Stripe PrepareConfiguration %d times", len(configurationGateway.calls)-prepareCalls)
 	}
-	if _, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "checkout-shutdown-rejected", 502)); !errors.Is(err, paymentsdomain.ErrPurchasesUnavailable) {
+	if _, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(t, pool, 42, "checkout-shutdown-rejected", 502)); !errors.Is(err, paymentsdomain.ErrPurchasesUnavailable) {
 		t.Fatalf("CreateCheckout after disable error = %v, want paymentsdomain.ErrPurchasesUnavailable", err)
 	}
 
@@ -67,7 +67,7 @@ func TestDisabledReconciliationDoesNotCreateCheckout(t *testing.T) {
 	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, creditService)
 	repo := newTestPaymentStores(db)
 	now := time.Now().UTC()
-	order := createReconciliationIntentForStripeAccount(t, repo, 42, 501, now.Add(time.Hour), "acct_shutdown_reconciliation", "prod_shutdown_reconciliation")
+	order := createReconciliationIntentForStripeAccount(t, db, repo, 42, 501, now.Add(time.Hour), "acct_shutdown_reconciliation", "prod_shutdown_reconciliation")
 	if _, err := service.ConfigureStripe(t.Context(), paymentcontracts.ConfigureStripeCommand{
 		ActorID: 42, PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001", PurchasesEnabled: false,
 	}); err != nil {

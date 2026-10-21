@@ -7,6 +7,7 @@ describe('PurchaseCard', () => {
     renderWithUser(PurchaseCard, {
       props: {
         options: {
+          billing_account_id: 'ba_test_target',
           purchases_available: false,
           unavailable_reason: 'wallet_restricted',
           restriction_type: 'payment_dispute',
@@ -26,5 +27,28 @@ describe('PurchaseCard', () => {
 
     expect(screen.getByText('Top-up unavailable')).toBeVisible()
     expect(screen.getByText(/card dispute is in progress/i)).toBeVisible()
+  })
+
+  it('names the explicit payer account on the recharge surface', () => {
+    renderWithUser(PurchaseCard, {
+      props: {
+        options: {
+          billing_account_id: 'ba_test_target',
+          purchases_available: true,
+          quick_idea_quantities: [500, 1000],
+          min_idea_quantity: 500,
+          max_idea_quantity: 500000,
+          ideas_per_usd: 100,
+          terms: { version: 'v1', url: '/terms' },
+          refund_policy: { version: 'v1', url: '/refund-policy' },
+        },
+        pending: false,
+        error: null,
+        checkoutPending: false,
+        checkoutError: null,
+      },
+    })
+
+    expect(screen.getByText(/ba_test_target/)).toBeVisible()
   })
 })

@@ -14,6 +14,8 @@ import type { WorkspacePurchaseOptionsRefundPolicy } from './workspacePurchaseOp
 import type { WorkspacePurchaseOptionsTerms } from './workspacePurchaseOptionsTerms'
 
 export interface WorkspacePurchaseOptions {
+  /** Explicit recharge target account (ba_); the checkout will charge this payer account. */
+  billing_account_id: string
   purchases_available: boolean
   /** Omitted when purchases are available. */
   unavailable_reason?: string

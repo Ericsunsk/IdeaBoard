@@ -30,9 +30,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Exactly one of user_id (target user's personal account) or billing_account_id (explicit shared/organization account) is required.
+ */
 export interface ControlCreditCommandRequest {
   /** @pattern ^usr_[A-Za-z0-9_-]+$ */
-  user_id: string
+  user_id?: string
+  /** @pattern ^ba_[A-Za-z0-9_-]+$ */
+  billing_account_id?: string
   /** @minimum 1 */
   amount_credits: number
   business_reference_id: string

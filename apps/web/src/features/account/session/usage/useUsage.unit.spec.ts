@@ -1,12 +1,17 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { screen, waitFor } from '@testing-library/vue'
-import { defineComponent, ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, reactive, ref } from 'vue'
+import { beforeEach, describe, expect, it, test, vi } from 'vitest'
 import { renderWithUser } from '../../../../test/render'
+import { billingAccountQueryKeys } from '../billing-account/resource'
 import type { AccountUsage, UsageRange } from './resource'
 import { useUsage } from './useUsage'
 
 const fetchUsageMock = vi.hoisted(() => vi.fn())
+const workspaceId = ref('ws_1')
+const fetchAccountMock = vi.hoisted(() => vi.fn())
+const identity = reactive({ user: { public_id: 'user-1' } })
+vi.mock('../../../auth', () => ({ useUserStore: () => identity }))
 
 vi.mock('./resource', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./resource')>()
@@ -16,9 +21,14 @@ vi.mock('./resource', async (importOriginal) => {
 vi.mock('../accountWorkspace', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../accountWorkspace')>()),
   useAccountWorkspace: () => ({
-    workspaceId: ref('ws_1'),
+    workspaceId,
     isSelectionSettled: ref(true),
   }),
+}))
+
+vi.mock('../billing-account/resource', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../billing-account/resource')>()),
+  fetchBillingAccount: fetchAccountMock,
 }))
 
 const UsageHost = defineComponent({
@@ -41,6 +51,37 @@ const UsageHost = defineComponent({
 describe('useUsage', () => {
   beforeEach(() => {
     fetchUsageMock.mockReset()
+    workspaceId.value = 'ws_1'
+    identity.user.public_id = 'user-1'
+    fetchAccountMock.mockReset().mockImplementation(async () => buildAccount())
+  })
+
+  it('surfaces account resolution failures and retries the prerequisite before usage', async () => {
+    fetchAccountMock
+      .mockRejectedValueOnce(new Error('account unavailable'))
+      .mockResolvedValueOnce(buildAccount())
+    fetchUsageMock.mockResolvedValue(buildUsage('30d', 30))
+    const { user } = renderUsageHost()
+    await waitFor(() => expect(screen.getByTestId('request-state')).toHaveTextContent('error'))
+    expect(fetchUsageMock).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: '重试' }))
+    await waitFor(() => expect(screen.getByTestId('last-credit')).toHaveTextContent('30'))
+    expect(fetchAccountMock).toHaveBeenCalledTimes(2)
+  })
+
+  test('hides cached usage after authorization revalidation fails and retries resolution first', async () => {
+    fetchUsageMock.mockResolvedValue(buildUsage('30d', 30))
+    const { queryClient, user } = renderUsageHost()
+    await waitFor(() => expect(screen.getByTestId('last-credit')).toHaveTextContent('30'))
+    fetchAccountMock.mockRejectedValueOnce(new Error('permission lookup failed'))
+    await queryClient.invalidateQueries({ queryKey: billingAccountQueryKeys.all })
+    await waitFor(() => expect(screen.getByTestId('request-state')).toHaveTextContent('error'))
+    expect(screen.getByTestId('last-credit')).toBeEmptyDOMElement()
+    expect(fetchUsageMock).toHaveBeenCalledOnce()
+
+    await user.click(screen.getByRole('button', { name: '重试' }))
+    await waitFor(() => expect(screen.getByTestId('last-credit')).toHaveTextContent('30'))
+    expect(fetchAccountMock).toHaveBeenCalledTimes(3)
   })
 
   it('keeps the last successful range when a switch fails and retries only the selected range', async () => {
@@ -98,6 +139,32 @@ describe('useUsage', () => {
     expect(screen.getByTestId('last-credit')).toHaveTextContent('365')
   })
 
+  it('hides the previous account while the new account loads and fails', async () => {
+    const second = deferred<AccountUsage>()
+    fetchUsageMock.mockResolvedValueOnce(buildUsage('30d', 30)).mockReturnValueOnce(second.promise)
+    renderUsageHost()
+    await waitFor(() => expect(screen.getByTestId('last-credit')).toHaveTextContent('30'))
+    workspaceId.value = 'ws_2'
+    await waitFor(() => expect(screen.getByTestId('last-credit')).toBeEmptyDOMElement())
+    expect(screen.getByTestId('display-range')).toBeEmptyDOMElement()
+    await waitFor(() => expect(fetchUsageMock).toHaveBeenCalledTimes(2))
+    second.reject(new Error('second account unavailable'))
+    await waitFor(() => expect(screen.getByTestId('request-state')).toHaveTextContent('error'))
+    expect(screen.getByTestId('last-credit')).toBeEmptyDOMElement()
+    expect(screen.getByTestId('display-range')).toBeEmptyDOMElement()
+  })
+
+  it('clears retained usage when the same account changes authorization scope', async () => {
+    fetchUsageMock.mockResolvedValueOnce(buildUsage('30d', 100))
+    const { queryClient } = renderUsageHost()
+    await waitFor(() => expect(screen.getByTestId('last-credit')).toHaveTextContent('100'))
+    fetchUsageMock.mockRejectedValueOnce(new Error('scope refresh failed'))
+    fetchAccountMock.mockResolvedValueOnce(buildAccount('member'))
+    await queryClient.invalidateQueries({ queryKey: billingAccountQueryKeys.all })
+    await waitFor(() => expect(fetchUsageMock).toHaveBeenCalledTimes(2))
+    expect(screen.getByTestId('last-credit')).toHaveTextContent(/^$/)
+  })
+
   it('uses a 30 second stale window and refetches stale data when the window regains focus', async () => {
     const initial = buildUsage('30d', 30)
     fetchUsageMock.mockResolvedValue(initial)
@@ -105,7 +172,18 @@ describe('useUsage', () => {
 
     await waitFor(() => expect(fetchUsageMock).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.getByTestId('request-state')).toHaveTextContent('ready'))
-    const queryKey = ['workspace', 'usage', 'current', 'ws_1', '30d'] as const
+    const queryKey = [
+      'workspace',
+      'usage',
+      'current',
+      {
+        workspaceId: 'ws_1',
+        billingAccountId: 'ba_1',
+        identity: 'user-1',
+        consumptionScope: 'account',
+      },
+      '30d',
+    ] as const
     const query = queryClient.getQueryCache().find({ queryKey })
     expect(query?.options).toMatchObject({
       staleTime: 30_000,
@@ -162,4 +240,13 @@ function deferred<T>() {
     reject = rejectPromise
   })
   return { promise, resolve, reject }
+}
+
+function buildAccount(consumptionScope: 'account' | 'member' = 'account') {
+  return {
+    billingAccountId: workspaceId.value === 'ws_1' ? 'ba_1' : 'ba_2',
+    workspaceId: workspaceId.value,
+    isShared: false,
+    consumptionScope,
+  }
 }

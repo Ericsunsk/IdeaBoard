@@ -17,8 +17,19 @@ It does not own the Credits Ledger or Identity data; all ledger effects go throu
 - `AdminCommands` offers Create, Update, SetEnabled, and Delete: Create uses a client idempotency key; Update saves rules and optionally rotates the bearer Code in one transaction; SetEnabled is set-state; Delete accepts only zero-Redemption aggregates.
 - `AdminReads.SearchRewardCodes` searches via no-store POST body with fuzzy name search, full-Code HMAC lookup, effective-status filter, filtered total, and keyset pages, and results carry no plaintext or full digest.
 - `AdminReads.ListAdminRedemptions` pages successful Redemption summaries by RewardCode scope with a keyset; `GetAdminRedemption` returns the Credits Transaction ID and masked Code hint only within the same RewardCode scope.
-- `UserCommands.Redeem` synchronously redeems a RewardCode and returns the Redemption, credited amount, available balance, and replay marker.
+- `UserCommands.Redeem` synchronously redeems a RewardCode and returns the Redemption, credited amount, beneficiary Billing Account, available balance, and replay marker.
 - `UserReads.ListRedemptions` returns the current user's successful Redemption history by ID cursor with only RewardCode display name, credited amount, masked Code hint, and redeem time.
+
+Beneficiary rule (#921): eligibility stays per User (each user redeems each
+RewardCode at most once), while the Grant beneficiary is always the
+caller's deterministic initial personal Billing Account resolved through
+`credits.ResolvePersonalAccountInTx` inside the redemption transaction.
+The requesting workspace (personal or organization) is authZ scope only
+and never changes the beneficiary; the v1 edge names the beneficiary
+`billing_account_id` (ba_) with its available balance, and the transport
+idempotency hash covers only operation + code so the same key + same code
+replays across workspaces instead of conflicting or double-granting.
+Organization funds are never implicitly touched by personal redemptions.
 
 Implementation note: hash normalization, HMAC candidates, row locking, persistence, and Credits transaction orchestration stay inside the module implementation.
 
@@ -35,7 +46,7 @@ Implementation note: hash normalization, HMAC candidates, row locking, persisten
 - Update and SetEnabled never double-Journal the same target state; a zero-Redemption RewardCode may hard-delete, and the Journal nullable FK uses `ON DELETE SET NULL` while permanently keeping the immutable target ID and safe target snapshot.
 - Code plaintext or reversible ciphertext never enters the database, Admin lists, URLs, Journal, or logs; only key version, HMAC-SHA256 digest, and a four-character hint are stored.
 - Admin search accepts POST bodies only; a query normalizable to a full Code generates only current and previous HMAC candidates and is never sent to PostgreSQL as a name parameter, and name, effective status, filtered total, and keyset page must come from one read snapshot.
-- Rewards owns the caller transaction and writes the Credits Ledger only via `credits.Service.InTx(tx).Grant`; capacity, Grant, and Redemption commit or roll back together.
+- Rewards owns the caller transaction and writes the Credits Ledger only via `credits.Service.InTx(tx).Grant`; capacity, Grant, and Redemption commit or roll back together. The Grant addresses the caller's initial personal Billing Account resolved in-transaction (#921); workspace context never redirects it.
 - The Runtime role executing `reserve_reward_code_redemption_v1` is a restricted capability that still consumes one eligible RewardCode cap entry; expiry is judged by database time only, and the Grant plus Redemption insert stay orchestrated by the application transaction.
 - Credit Grants always use source `reward_redemption`, a fixed redemption-reward reason literal, and the Redemption ID business reference.
 - An authenticated Admin may reverse a Grant's accounting effect via Credits Correction; the Correction is a new Ledger fact that deletes no Redemption and restores no RewardCode capacity.

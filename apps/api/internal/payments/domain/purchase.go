@@ -41,6 +41,10 @@ type PurchaseQuote struct {
 }
 
 type CreateCheckoutCommand struct {
+	// Payer funds identity: the Billing Account that owns the unified
+	// balance and scopes idempotency, unpaid slots, and settlement.
+	BillingAccountID int64
+	// Operator attribution: the real User performing the checkout.
 	UserID               int64
 	ClientIdempotencyKey string
 	IdeaQuantity         int64
@@ -62,7 +66,7 @@ func NewPurchaseQuote(ideaQuantity int64) (PurchaseQuote, error) {
 }
 
 func CheckoutRequestFingerprint(command CreateCheckoutCommand) (string, error) {
-	if command.UserID <= 0 {
+	if command.BillingAccountID <= 0 || command.UserID <= 0 {
 		return "", ErrCheckoutIdempotencyKey
 	}
 	idempotencyKey := strings.TrimSpace(command.ClientIdempotencyKey)
@@ -78,14 +82,14 @@ func CheckoutRequestFingerprint(command CreateCheckoutCommand) (string, error) {
 		return "", ErrTermsAcceptanceRequired
 	}
 	payload, err := json.Marshal(struct {
-		UserID              int64  `json:"user_id"`
+		BillingAccountID    int64  `json:"billing_account_id"`
 		IdeaQuantity        int64  `json:"idea_quantity"`
 		BaseCurrency        string `json:"base_currency"`
 		BaseAmountMinor     int64  `json:"base_amount_minor"`
 		TermsVersion        string `json:"terms_version"`
 		RefundPolicyVersion string `json:"refund_policy_version"`
 	}{
-		UserID: command.UserID, IdeaQuantity: quote.IdeaQuantity,
+		BillingAccountID: command.BillingAccountID, IdeaQuantity: quote.IdeaQuantity,
 		BaseCurrency: quote.BaseCurrency, BaseAmountMinor: quote.BaseAmountMinor,
 		TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
 	})

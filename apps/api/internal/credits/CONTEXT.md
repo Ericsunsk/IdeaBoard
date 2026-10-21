@@ -24,9 +24,11 @@ product identity, versioned pricing, and Quotes belong to the `billing` context.
 | Term                      | Meaning                                                                                                                                               |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Credit                    | Indivisible integer currency unit; floating point is forbidden                                                                                        |
-| Credit Wallet             | Account boundary of a single user inside the Credits context                                                                                          |
-| Wallet Restriction        | Reason-coded spending limit, independent of Wallet lifecycle status; traced by type, source, and related object, releasable independently per source  |
-| Credit Account            | Double-entry posting landing point; each Wallet has available/reserved, System accounts shard by Wallet                                               |
+| Credit Wallet             | Account boundary of exactly one Billing Account inside the Credits context (#916). The Wallet holds the account's unified balance; many Workspaces may spend one Wallet through the stable Tenancy resolution, while the Command Actor records the real operator |
+| Billing Account Funds Identity | The stable `billing_accounts.internal_id` (`ba_` on the wire) that owns a Wallet. Workspace records the consumption location, User records the actual operator; financial Owner/Admin never implies Board content access |
+| Initial Personal Account  | The deterministic per-user account (that user's Default personal workspace account, provisioned on demand) that every pre-916 personal balance, history row, and open Hold is attributed to. Personal funds never inject into an organization; new organization/shared accounts start at zero |
+| Wallet Restriction        | Reason-coded spending limit on one account Wallet, independent of Wallet lifecycle status; traced by type, source, and related object, releasable independently per source  |
+| Credit Account            | Double-entry posting landing point; each Wallet has available/reserved, System accounts shard by Billing Account                                     |
 | Ledger Transaction        | One immutable accounting fact with at least two Postings under the same asset                                                                         |
 | Posting                   | Signed delta on one Credit Account; the sum within one Transaction must be 0                                                                          |
 | Balance Projection        | O(1) cache of `credit_accounts.balance`, updated only by the Posting trigger, never an independent fact source                                        |
@@ -47,24 +49,42 @@ A Refund reverses a Capture; a Purchase Refund settles an external-payment refun
 
 - `Commands`: sole application write entrypoint for Grant, Deduct, Hold,
   Capture, Release, Refund, Purchase, PurchaseRefundHold, PurchaseRefund,
-  PaymentDisputeDebit, and PaymentDisputeRestore.
+  PaymentDisputeDebit, and PaymentDisputeRestore. Every Command addresses
+  one Billing Account (`BillingAccountID`, the Wallet identity) with the
+  real operator on `Metadata.Actor` (user/service/admin/system); funds
+  identity and operator are never conflated. Workspace-scoped spenders
+  (Tasks, Vision Search) resolve the account through the Tenancy stable resolution inside the
+  caller transaction (fail closed); scopeless spenders (Rewards, Payments,
+  Welcome, Admin) resolve the deterministic initial personal
+  account. There is no user-wallet fallback and no dual settlement.
   External-payment commands use independent typed `SECURITY DEFINER` routines;
-  all other commands go through `execute_credit_command_v2`.
-- `Service.InTx(pgx.Tx)` / `CommandsInTx(pgx.Tx)`: caller-owned transaction
-  adapters over the same `Commands` contract.
+  all other commands go through `execute_credit_command_v3`.
+- `Service.InTx(pgx.Tx)` / `CommandsInTx(pgx.Tx)` / `ResolvePersonalAccountInTx(pgx.Tx)`: caller-owned transaction
+  adapters over the same account contract.
   Task/River submission and task terminal convergence both use pgx;
   there is no `database/sql` Credit Command path.
   Callers own commit/rollback; the Tasking Task Store holds no
   application-lifetime Credits/Billing dependency.
-- `WalletReader`: Wallet balance plus keyset-paginated Ledger queries.
+- `WalletReader`: account-keyed Wallet balance plus keyset-paginated Ledger queries.
 - `WalletRestrictionCommands`: idempotent create and precise release of
-  Restrictions through a transaction-capable typed seam.
+  account Restrictions through a transaction-capable typed seam.
   Other contexts must not write the Restriction table directly.
-- `Service.GetCaptureUsage`: read-only per-user aggregation of settled Captures
+- `WalletLifecycle`: account lifecycle (`ProvisionAccountWallet`,
+  `SetAccountWalletFrozen`), deterministic personal-account resolution,
+  sole-owned freeze for ban/delete isolation
+  (`SetSoleOwnedWalletsFrozen`, `RemoveSharedBillingMemberships`), and the
+  Welcome claim (identity-deduped per user, granted to the personal account).
+- `Service.GetCaptureUsage`: read-only Billing Account aggregation of settled Captures, narrowed by the
+  authorized consumption Workspace and/or real initiating member
   at typed locations, composed into caller-owned Usage interfaces.
-  Returns no Refunds; grants no Ledger write.
+  Returns no Refunds; grants no Ledger write. The PostgreSQL adapter consumes
+  `internal/consumptionread` for the shared settled-consumption attribution
+  projection instead of knowing Task/Vision origin storage.
 - User-side Billing Records: independent caller-owned Read Model over settled
-  Ledger facts plus the immutable Task Billing Snapshot.
+  Ledger facts plus the immutable Task Billing Snapshot. Account managers see
+  account billing; Workspace managers see local consumption; other members see
+  their own account consumption. SQL authorization filtering precedes keyset
+  pagination; scoped reads omit historical account balances and non-consumption entries.
   Reuses no Admin Ledger DTO; exposes no Hold/Release/Refund;
   grants no Ledger write.
 - `Reconciliation`: runs on an independent River queue.
@@ -75,6 +95,18 @@ A Refund reverses a Capture; a Purchase Refund settles an external-payment refun
   No set-balance; no Ledger history update/delete.
   Ledger reads return the Hold/Capture reference explicitly, so Admins never
   infer settlement state from bare association IDs.
+- Admin explicit-account operations (#923): the Control Plane addresses one
+  stable Billing Account per call. `user_id` targets the user's
+  deterministic initial personal account; `billing_account_id` names any
+  shared/organization account directly (exactly one of the two, fail
+  closed). Account wallet/Ledger reads, fund commands, and manual
+  restrict/release all carry the ba_ funds identity with the platform-Admin
+  operator as Actor; no single-user linkage is synthesized for shared
+  accounts. Reconciliation Findings expose the same `billing_account_id`
+  as the repair scope: automatic restriction/release affects only that
+  account plus its own cause. Customer-side Billing Owner/Admin standing
+  manages recharge/bills/quotas on its own accounts only and is never
+  equivalent to the platform-Admin operator.
 
 ## Invariants
 
@@ -86,14 +118,32 @@ A Refund reverses a Capture; a Purchase Refund settles an external-payment refun
   and zero sum at commit.
 - Ledger Transactions and Postings forbid UPDATE/DELETE;
   errors are fixed only by appending reversal/correction transactions.
+  Pre-916 history rows keep their amounts and postings untouched; only the
+  additive `billing_account_id` attribution column is backfilled, mapping
+  each personal balance/history/Hold 1:1 to its owner's initial personal
+  account (no copy, no merge, no organization injection).
 - Posting statements update projections in stable `account_id` order;
   Commands lock accounts in the same order before writing.
+- Wallet/advisory/idempotency/actor/source/reference gates are unchanged,
+  evaluated on the Billing Account: same key + same hash replays, same key
+  + different hash conflicts, and a foreign account cannot settle another
+  account's Hold or Charge.
 - The API runtime role holds only SELECT on Credit tables:
   no direct Ledger/projection DML, no execution of internal trigger functions;
-  only the migration owner holds schema.
-- System Issuance, Revenue, and Sink accounts shard by `wallet:<user_id>`
-  and keep role/metadata, avoiding one global system row
-  serializing all Wallets.
+  only the migration owner holds schema. Runtime EXECUTE covers exactly the
+  v3/v2 account routines plus lifecycle/restriction/reconciliation seams;
+  the superseded user-keyed routines are dropped.
+- System Issuance, Revenue, and Sink accounts shard by
+  `billing-account:<billing_account_id>` and keep role/metadata,
+  avoiding one global system row serializing all Wallets. Legacy
+  `wallet:<user_id>` shards stay untouched as history.
+- Scope deletion never deletes money facts: workspace hard delete removes
+  the scope (boards, tasks, links, members, the `billing_accounts` row)
+  while Wallet, projection, Ledger, snapshot, and operation rows are
+  retained under their `billing_account_id` attribution (same precedent as
+  `task_billing_snapshots.task_id`, which carries no task FK). Command
+  functions re-verify wallet existence per call, so no dangling FK can be
+  traversed.
 - Each Command takes an idempotency-key advisory transaction lock first,
   then compares the server-side canonical SHA-256 request hash.
   Same key + same hash replays the original result;
@@ -122,6 +172,12 @@ A Refund reverses a Capture; a Purchase Refund settles an external-payment refun
   existing Holds must still converge via Capture/Release;
   authenticated-Admin linked Refund/Correction remains available for repair;
   the Wallet starts no new spending.
+- Ban and deletion freeze only solely-owned non-organization account
+  Wallets; organization and other users' funds never freeze because one
+  member was deactivated. Deletion additionally detaches the user from
+  accounts that keep other managers while the tombstone row is retained.
+  Pre-existing Holds and Purchase/Refund/Dispute obligations still converge
+  on frozen Wallets through the typed settlement paths.
 - Wallet lifecycle status and active Restrictions are orthogonal.
   Grant, Deduction, and Hold require active lifecycle plus zero active
   Restrictions; the Payments-typed PurchaseRefundHold is not spending and may
@@ -131,7 +187,7 @@ A Refund reverses a Capture; a Purchase Refund settles an external-payment refun
   Idempotency replay returns the original result before the current gate.
 - Restriction create/release locks the Wallet row first to linearize
   with the Credit Command gate;
-  only one active row per `(Wallet, type, source, related object)`;
+  only one active row per `(Billing Account, type, source, related object)`;
   release keeps history and never clears other sources' Restrictions.
 - Auth public registration uses canonical Email, username, and Password;
   after Email verification succeeds, the `canonical_email` verified identity
@@ -187,9 +243,9 @@ A Refund reverses a Capture; a Purchase Refund settles an external-payment refun
 - Run-Finding links keep only internal historical snapshots and audit
   associations; the Admin Finding read contract exposes only the global
   open/resolved queue, with no Run-scoped dual-track query.
-- Identity atomically provisions the Wallet and freezes/restores lifecycle
+- Identity atomically provisions the personal Billing Account Wallet and freezes/restores lifecycle
   status through the typed Wallet lifecycle seam, and idempotently issues
-  the `100 Ideas` Welcome Grant keyed by a trusted
+  the `100 Ideas` Welcome Grant (identity-deduped per user, credited to the personal account) keyed by a trusted
   canonical-registration-identity HMAC claim;
   Ban/Unban/delete never creates or clears standalone Restrictions,
   and claim identity plaintext never enters the Credits schema.
@@ -197,8 +253,9 @@ A Refund reverses a Capture; a Purchase Refund settles an external-payment refun
   via a typed `SECURITY DEFINER` command on first use;
   on config drift, startup/provisioning fails closed so the same identity
   cannot mint a new claim.
-- Business-user deletion first freezes the Wallet and records a durable
-  deletion phase in the local transaction, then idempotently deletes Auth,
+- Business-user deletion first freezes solely-owned non-organization
+  account Wallets, detaches shared Billing Account memberships, and records
+  a durable deletion phase in the local transaction, then idempotently deletes Auth,
   cleans Storage, and writes the user tombstone in order;
   failed requests retry to convergence from the persisted phase.
   The user tombstone primary key, Tasks, Wallets, Ledger, and Welcome claims

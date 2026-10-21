@@ -223,7 +223,13 @@ type RedeemResult struct {
 	HistoryItem      RedemptionHistoryItem `json:"history_item"`
 	CreditedAmount   int64                 `json:"credited_amount"`
 	AvailableBalance int64                 `json:"available_balance"`
-	Replayed         bool                  `json:"replayed"`
+	// BillingAccountID is the internal beneficiary Billing Account that
+	// received the Grant: the caller's deterministic initial personal
+	// account (#916/#921). The HTTP edge maps it to the ba_ public ID so
+	// the UI can name the actual credited account; the requesting
+	// workspace is authZ scope only and never changes the beneficiary.
+	BillingAccountID int64 `json:"billing_account_id"`
+	Replayed         bool  `json:"replayed"`
 }
 
 type RedemptionHistoryItem struct {

@@ -8,6 +8,7 @@ import (
 
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	"ideaboard/api/internal/payments/application/hints"
 	paymentorder "ideaboard/api/internal/payments/application/order"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
@@ -47,8 +48,8 @@ func newRecoveryFixtures(t *testing.T) *recoveryFixtures {
 		OrderAccess: func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, string, error) {
 			return fx.credential, "sk_test", nil
 		},
-		Publish: func(_ int64, status paymentports.PaymentEventStatus) { fx.published = append(fx.published, status) },
-		Now:     func() time.Time { return time.Now().UTC() },
+		Hints: hints.NewPublisher(recoveryPublisher{func(event paymentports.PaymentEvent) { fx.published = append(fx.published, event.Status) }}, nil),
+		Now:   func() time.Time { return time.Now().UTC() },
 	})
 	if err != nil {
 		t.Fatalf("reconciliation service: %v", err)
@@ -198,6 +199,10 @@ func (fakeRecoveryStore) WithUserCheckoutLock(ctx context.Context, _ int64, fn f
 	return fn(ctx)
 }
 
+func (fakeRecoveryStore) GetPaymentOrderPayerAccount(context.Context, string) (int64, error) {
+	return 0, nil
+}
+
 func (fakeRecoveryStore) ListActivePaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error) {
 	return nil, nil
 }
@@ -255,3 +260,9 @@ type fakeRecoveryDisputeExpiry struct{}
 func (fakeRecoveryDisputeExpiry) ExpireDisputeCheckoutSessions(context.Context, paymentsdomain.PaymentDispute) error {
 	return nil
 }
+
+type recoveryPublisher struct {
+	publish func(paymentports.PaymentEvent)
+}
+
+func (p recoveryPublisher) Publish(_ int64, event paymentports.PaymentEvent) { p.publish(event) }

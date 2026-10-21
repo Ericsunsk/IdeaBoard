@@ -146,14 +146,18 @@ func TestDeletionFullSagaSurvivesGuardRollback(t *testing.T) {
 		t.Fatalf("tombstone display=%q auth=%v status=%d storage=%q", displayName, authUserID, status, tombstoneStorageUID)
 	}
 	// Historical Wallet stays readable but frozen: no new spending.
-	wallet, err := creditService.GetWallet(ctx, provisioned.User.ID)
+	tombstoneAccountID, err := creditService.ResolvePersonalAccount(ctx, provisioned.User.ID)
+	if err != nil {
+		t.Fatalf("resolve tombstone account: %v", err)
+	}
+	wallet, err := creditService.GetWallet(ctx, tombstoneAccountID)
 	if err != nil {
 		t.Fatalf("GetWallet(tombstone) error = %v", err)
 	}
 	if wallet.Status != domain.WalletStatusFrozen {
 		t.Fatalf("tombstone wallet status = %q, want frozen", wallet.Status)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(provisioned.User.ID, "durable-full:frozen")); !errors.Is(err, domain.ErrWalletFrozen) {
+	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, provisioned.User.ID, "durable-full:frozen")); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Hold(tombstone wallet) error = %v, want ErrWalletFrozen", err)
 	}
 	// Idempotent retry after the guard failure does not touch externals again.

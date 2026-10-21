@@ -14,6 +14,8 @@
 export interface WorkspaceCheckoutSession {
   /** Opaque checkout session identifier. */
   session_id: string
+  /** Payer account (ba_) this session charges; stable across workspace switches and member changes. */
+  billing_account_id: string
   /** Session status (present on read). */
   status?: string
   /** @minimum 0 */

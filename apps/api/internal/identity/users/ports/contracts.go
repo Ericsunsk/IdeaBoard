@@ -72,11 +72,11 @@ type ProvisionResult struct {
 // WalletBalance is the Identity read model needed after provisioning.
 // Credits owns the full wallet projection and translates it at the adapter boundary.
 type WalletBalance struct {
-	UserID      int64     `json:"-"`
-	PublicID    uuid.UUID `json:"public_id"`
-	DisplayName string    `json:"display_name"`
-	Available   int64     `json:"available_credits"`
-	Reserved    int64     `json:"reserved_credits"`
+	BillingAccountID int64     `json:"-"`
+	PublicID         uuid.UUID `json:"public_id"`
+	DisplayName      string    `json:"display_name"`
+	Available        int64     `json:"available_credits"`
+	Reserved         int64     `json:"reserved_credits"`
 }
 
 type WalletDetails struct {
@@ -165,6 +165,7 @@ type UserUploadCleaner interface {
 
 type WelcomeGrantCommand struct {
 	UserID                int64
+	BillingAccountID      int64
 	Amount                int64
 	IdempotencyKey        string
 	ActorType             string
@@ -181,9 +182,12 @@ type WelcomeGrantResult struct {
 
 type WalletLifecycle interface {
 	BindWelcomeIdentityKey(context.Context, string) error
-	ProvisionWallet(context.Context, int64) error
-	SetWalletFrozen(context.Context, int64, bool) error
-	ClaimWelcomeGrant(context.Context, string, WelcomeGrantCommand) (WelcomeGrantResult, bool, error)
+	ResolvePersonalAccount(context.Context, int64) (int64, error)
+	ProvisionAccountWallet(context.Context, int64) error
+	SetAccountWalletFrozen(context.Context, int64, bool) error
+	SetSoleOwnedWalletsFrozen(context.Context, int64, bool) error
+	RemoveSharedBillingMemberships(context.Context, int64) error
+	ClaimWelcomeGrant(context.Context, string, int64, WelcomeGrantCommand) (WelcomeGrantResult, bool, error)
 }
 
 type CreditWalletLifecycleService interface {

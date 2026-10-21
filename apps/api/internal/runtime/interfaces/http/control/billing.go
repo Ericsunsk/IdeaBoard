@@ -8,48 +8,12 @@ import (
 	"errors"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"net/http"
-	"strings"
-	"time"
 
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/platform/contract"
 
 	"github.com/gin-gonic/gin"
 )
-
-type controlBillingAccount struct {
-	WorkspaceID string    `json:"workspace_id"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-func (d *ContractControlDeps) listControlBillingAccounts(c *gin.Context, _ controlContext) {
-	if d == nil || d.Tenancy == nil || d.BillingAccounts == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable)
-		return
-	}
-	workspaceID := strings.TrimSpace(c.Query("workspace_id"))
-	if !contract.IsWorkspaceID(workspaceID) {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest3)
-		return
-	}
-	workspace, err := d.Tenancy.GetWorkspace(c.Request.Context(), workspaceID)
-	if err != nil {
-		writeControlTenancyError(c, err, runtimehttp.MsgListControlBillingAccounts)
-		return
-	}
-	account, err := d.BillingAccounts.EnsureBillingAccountForWorkspace(c.Request.Context(), workspace.InternalID, workspace.PublicID)
-	if err != nil {
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable2)
-		return
-	}
-	items := []controlBillingAccount{{
-		WorkspaceID: account.WorkspacePublicID,
-		CreatedAt:   account.CreatedAt,
-		UpdatedAt:   account.UpdatedAt,
-	}}
-	contract.RenderPaginated(c, items, contract.NewPageMeta("", false))
-}
 
 func writeControlBillingError(c *gin.Context, err error) {
 	switch {

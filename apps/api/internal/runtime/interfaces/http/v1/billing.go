@@ -92,16 +92,31 @@ func renderBillingPricingUnavailable(c *gin.Context, err error) bool {
 	return true
 }
 
-// billingAccountStore provisions the implicit per-workspace billing account.
+// billingAccountStore provisions and resolves stable billing accounts.
 // Production uses tenancypg.BillingAccountStore; tests stub this interface.
+// Resolution joins the caller transaction inside the store; handlers only
+// pass workspace scope plus the authenticated principal.
 type billingAccountStore interface {
 	EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error)
+	GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancypg.BillingAccount, error)
+	// GetBillingAccountByInternalID resolves the stable ba_ funds identity
+	// for a beneficiary account (#921): reward redemption credits the
+	// caller's initial personal account, and the edge maps it to ba_ so
+	// the UI can name the actual credited account.
+	GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancypg.BillingAccount, error)
+	GetBillingAccountRole(ctx context.Context, billingAccountInternalID, userID int64) (string, bool, error)
+	ListBillingAccountMembers(ctx context.Context, billingAccountInternalID, actorUserID int64) ([]tenancy.BillingAccountMember, error)
+	AddBillingAccountMember(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, role string) (*tenancy.BillingAccountMember, error)
+	UpdateBillingAccountMemberRole(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, newRole string) (*tenancy.BillingAccountMember, error)
+	TransferBillingAccountOwnership(ctx context.Context, billingAccountInternalID, currentOwnerID, newOwnerID int64) error
+	LinkWorkspaceToBillingAccount(ctx context.Context, workspaceInternalID, billingAccountInternalID, actorUserID int64) error
 }
 
 // billingWalletReader composes the Credits-Ledger read side. Only Credits
-// owns ledger writes; this interface exposes reads.
+// owns ledger writes; this interface exposes reads. Reads are keyed by the
+// stable Billing Account (#916), never by a user wallet.
 type billingWalletReader interface {
-	GetWallet(ctx context.Context, userID int64) (domain.WalletDetails, error)
+	GetWallet(ctx context.Context, billingAccountID int64) (domain.WalletDetails, error)
 	ListLedger(ctx context.Context, input domain.ListLedgerInput) (domain.LedgerPage, error)
 }
 
@@ -113,7 +128,7 @@ type billingRecordsLister interface {
 
 // billingUsageReader composes settled Captures + task snapshots. Read-only.
 type billingUsageReader interface {
-	GetCurrent(ctx context.Context, userID int64, usageRange usagedomain.Range) (usageapplication.Usage, error)
+	GetCurrent(ctx context.Context, billingAccountID int64, filter domain.UsageFilter, usageRange usagedomain.Range) (usageapplication.Usage, error)
 }
 
 // billingQuoter mints immutable server-side price snapshots. No client
@@ -122,14 +137,16 @@ type billingQuoter interface {
 	QuoteAtResolution(ctx context.Context, rawSKU string, resolution billing.OutputResolution, quantity int64) (billing.Quote, error)
 }
 
-// workspaceCheckoutService owns checkout sessions bound to the workspace
-// billing account. Production adapts the existing internal/payments
+// workspaceCheckoutService owns checkout sessions bound to the payer
+// Billing Account. Production adapts the existing internal/payments
 // checkout seam (namespaced idempotency key, server-side PurchaseQuote);
 // webhook settlement stays inside Payments and settles ONLY through
-// credits.Commands transactionally.
+// credits.Commands transactionally. BillingAccountID is the payer account
+// resolved from the workspace (#919); operatorUserID is the real operator
+// recorded on the order independently.
 type workspaceCheckoutService interface {
-	CreateWorkspaceCheckout(ctx context.Context, userID int64, workspacePublicID, clientKey string, input workspaceCheckoutInput) (workspaceCheckoutResult, error)
-	GetWorkspaceCheckout(ctx context.Context, userID int64, workspacePublicID, sessionID string) (workspaceCheckoutStatus, error)
+	CreateWorkspaceCheckout(ctx context.Context, billingAccountID, operatorUserID int64, workspacePublicID, clientKey string, input workspaceCheckoutInput) (workspaceCheckoutResult, error)
+	GetWorkspaceCheckout(ctx context.Context, billingAccountID int64, sessionID string) (workspaceCheckoutStatus, error)
 }
 
 type workspaceCheckoutInput struct {
@@ -201,6 +218,11 @@ func RegisterContractV1BillingRoutesOnEngine(r *gin.Engine, authDeps runtimehttp
 	group.Use(runtimehttp.PublicContractChain()...)
 	group.Use(runtimehttp.V1AuthMiddleware(authDeps), runtimehttp.ResolvePrincipal())
 	group.GET("/workspaces/:workspace_id/billing-account", handler.getBillingAccount)
+	group.POST("/workspaces/:workspace_id/billing-account/link", handler.linkBillingAccount)
+	group.GET("/workspaces/:workspace_id/billing-account/members", handler.listBillingAccountMembers)
+	group.POST("/workspaces/:workspace_id/billing-account/members", handler.addBillingAccountMember)
+	group.PATCH("/workspaces/:workspace_id/billing-account/members/:member_id", handler.updateBillingAccountMember)
+	group.POST("/workspaces/:workspace_id/billing-account/transfer", handler.transferBillingAccountOwnership)
 	group.GET("/workspaces/:workspace_id/credits/balance", handler.getCreditsBalance)
 	group.GET("/workspaces/:workspace_id/credits/ledger", handler.listCreditsLedger)
 	group.GET("/workspaces/:workspace_id/billing-records", handler.listBillingRecords)
@@ -254,26 +276,50 @@ func (h *contractV1BillingHandler) billingWorkspaceContext(c *gin.Context, p pri
 	return workspace, role, true
 }
 
-// billingWalletUser resolves which user wallet backs workspace reads.
-//
-// Transitional projection (#804): the Credits ledger stays user-scoped, so
-// workspace reads project the workspace owner's wallet (personal and
-// org workspaces always record an owner). When the owner is unknown the
-// caller's own wallet is used. Workspace-scoped ledger wrappers (hold/
-// capture/release keyed by billing account) are #805/#808 follow-ups; no
-// second ledger is introduced here.
-func billingWalletUser(workspace *tenancy.Workspace, callerUserID int64) int64 {
-	if workspace != nil && workspace.OwnerUserID != nil && *workspace.OwnerUserID > 0 {
-		return *workspace.OwnerUserID
+// billingAccountForWorkspace resolves the stable funds identity backing
+// workspace reads (#915 resolution, #916 funds identity). There is no
+// owner-wallet fallback: every read addresses the resolved Billing Account,
+// so sharing a Workspace never exposes another wallet.
+func (h *contractV1BillingHandler) billingAccountForWorkspace(c *gin.Context, workspace *tenancy.Workspace) (tenancypg.BillingAccount, bool) {
+	if h.deps.BillingAccounts == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable41)
+		c.Abort()
+		return tenancypg.BillingAccount{}, false
 	}
-	return callerUserID
+	account, err := h.deps.BillingAccounts.EnsureBillingAccountForWorkspace(
+		c.Request.Context(), workspace.InternalID, workspace.PublicID)
+	if err != nil {
+		renderBillingAccountError(c, err)
+		return tenancypg.BillingAccount{}, false
+	}
+	return account, true
+}
+
+// consumptionReadScope is shared by summary and itemized reads. Workspace
+// membership does not confer account-wide financial visibility.
+func (h *contractV1BillingHandler) consumptionReadScope(c *gin.Context, wctx v1WorkspaceCtx, account tenancypg.BillingAccount) (domain.UsageFilter, string, bool) {
+	role, member, err := h.deps.BillingAccounts.GetBillingAccountRole(c.Request.Context(), account.InternalID, wctx.Principal.UserID())
+	if err != nil {
+		renderBillingAccountError(c, err)
+		return domain.UsageFilter{}, "", false
+	}
+	if member && (role == tenancy.BillingRoleOwner || role == tenancy.BillingRoleAdmin) {
+		return domain.UsageFilter{}, "account", true
+	}
+	if wctx.Role == tenancy.RoleOwner || wctx.Role == tenancy.RoleAdmin {
+		return domain.UsageFilter{WorkspaceID: wctx.Workspace.InternalID}, "workspace", true
+	}
+	return domain.UsageFilter{ActorUserID: wctx.Principal.UserID()}, "member", true
 }
 
 type v1BillingAccountDTO struct {
-	WorkspaceID string `json:"workspace_id"`
-	OwnerType   string `json:"owner_type"`
-	CreatedAt   string `json:"created_at,omitempty"`
-	UpdatedAt   string `json:"updated_at,omitempty"`
+	ConsumptionScope string `json:"consumption_scope"`
+	BillingAccountID string `json:"billing_account_id"`
+	WorkspaceID      string `json:"workspace_id"`
+	OwnerType        string `json:"owner_type"`
+	Shared           bool   `json:"shared,omitempty"`
+	CreatedAt        string `json:"created_at,omitempty"`
+	UpdatedAt        string `json:"updated_at,omitempty"`
 }
 
 func (h *contractV1BillingHandler) getBillingAccount(c *gin.Context) {
@@ -284,14 +330,23 @@ func (h *contractV1BillingHandler) getBillingAccount(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		account, err := h.deps.BillingAccounts.EnsureBillingAccountForWorkspace(
-			c.Request.Context(), workspace.InternalID, workspace.PublicID)
-		if err != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-			c.Abort()
+		account, resolved := h.billingAccountForWorkspace(c, workspace)
+		if !resolved {
 			return
 		}
-		dto := v1BillingAccountDTO{WorkspaceID: workspace.PublicID, OwnerType: "workspace"}
+		_, scope, ok := h.consumptionReadScope(c, wctx, account)
+		if !ok {
+			return
+		}
+		dto := v1BillingAccountDTO{
+			ConsumptionScope: scope,
+			BillingAccountID: account.PublicID,
+			WorkspaceID:      workspace.PublicID,
+			OwnerType:        account.OwnerType,
+		}
+		if account.Shared {
+			dto.Shared = true
+		}
 		if !account.CreatedAt.IsZero() {
 			dto.CreatedAt = account.CreatedAt.UTC().Format(time.RFC3339)
 		}
@@ -302,7 +357,58 @@ func (h *contractV1BillingHandler) getBillingAccount(c *gin.Context) {
 	})
 }
 
+// renderBillingAccountError maps stable-resolution outcomes onto the wire:
+// hidden workspaces already converged to workspace_not_found before this;
+// visible-but-forbidden financial actions render billing_account_forbidden
+// (403), ambiguous or conflicting ownership renders billing_account_conflict
+// (409), unknown ba_ targets render billing_account_not_found (404), and
+// provisioning failures stay 503 service_unavailable (transient).
+func renderBillingAccountError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, tenancy.ErrBillingForbidden),
+		errors.Is(err, tenancy.ErrBillingLastOwner):
+		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingAccountForbidden, runtimehttp.MsgBillingAccountForbidden)
+	case errors.Is(err, tenancy.ErrBillingConflict),
+		errors.Is(err, tenancy.ErrBillingAmbiguous):
+		contract.RenderError(c, http.StatusConflict, contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
+	case errors.Is(err, tenancy.ErrBillingNotFound):
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBillingAccountNotFound, runtimehttp.MsgBillingAccountNotFound)
+	case errors.Is(err, tenancy.ErrForbidden):
+		contract.RenderError(c, http.StatusForbidden, contract.CodeWorkspaceForbidden, runtimehttp.MsgForbidden)
+	default:
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
+	}
+	c.Abort()
+}
+
+// requireBillingManager resolves the stable account for a workspace and
+// reports whether the caller holds Billing Owner/Admin. Workspace
+// Owner/Admin standing alone never grants financial management.
+func (h *contractV1BillingHandler) requireBillingManager(c *gin.Context, workspace *tenancy.Workspace, userID int64) (tenancypg.BillingAccount, bool) {
+	if h.deps.BillingAccounts == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
+		c.Abort()
+		return tenancypg.BillingAccount{}, false
+	}
+	account, resolved := h.billingAccountForWorkspace(c, workspace)
+	if !resolved {
+		return tenancypg.BillingAccount{}, false
+	}
+	role, ok, err := h.deps.BillingAccounts.GetBillingAccountRole(c.Request.Context(), account.InternalID, userID)
+	if err != nil {
+		renderBillingAccountError(c, err)
+		return tenancypg.BillingAccount{}, false
+	}
+	if !ok || !tenancy.IsBillingManager(role) {
+		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingAccountForbidden, runtimehttp.MsgBillingAccountForbidden)
+		c.Abort()
+		return tenancypg.BillingAccount{}, false
+	}
+	return account, true
+}
+
 type v1BillingCreditsBalanceDTO struct {
+	BillingAccountID   string   `json:"billing_account_id"`
 	WorkspaceID        string   `json:"workspace_id"`
 	AvailableCredits   int64    `json:"available_credits"`
 	ReservedCredits    int64    `json:"reserved_credits"`
@@ -310,7 +416,7 @@ type v1BillingCreditsBalanceDTO struct {
 	ActiveRestrictions []string `json:"active_restrictions,omitempty"`
 }
 
-func billingToBalanceDTO(workspacePublicID string, wallet domain.WalletDetails) v1BillingCreditsBalanceDTO {
+func billingToBalanceDTO(billingAccountPublicID, workspacePublicID string, wallet domain.WalletDetails) v1BillingCreditsBalanceDTO {
 	restrictions := make([]string, 0, len(wallet.ActiveRestrictions))
 	for _, restriction := range wallet.ActiveRestrictions {
 		if restriction.Type != "" {
@@ -318,6 +424,7 @@ func billingToBalanceDTO(workspacePublicID string, wallet domain.WalletDetails) 
 		}
 	}
 	dto := v1BillingCreditsBalanceDTO{
+		BillingAccountID: billingAccountPublicID,
 		WorkspaceID:      workspacePublicID,
 		AvailableCredits: wallet.Available,
 		ReservedCredits:  wallet.Reserved,
@@ -357,7 +464,7 @@ func renderV1UsageError(c *gin.Context, err error) {
 	case errors.Is(err, usagedomain.ErrInvalidRange):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
 			runtimehttp.MsgRenderV1UsageError, contract.FieldErrors{Fields: map[string]string{"range": "invalid"}})
-	case errors.Is(err, usageports.ErrInvalidUserID):
+	case errors.Is(err, usageports.ErrInvalidBillingAccountID):
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest33)
 	default:
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable40)
@@ -383,19 +490,22 @@ func billingRenderWalletGate(c *gin.Context, err error) {
 
 func (h *contractV1BillingHandler) getCreditsBalance(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
-		p := wctx.Principal
 		workspace := wctx.Workspace
 		if h.deps.Wallets == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable41)
 			c.Abort()
 			return
 		}
-		wallet, err := h.deps.Wallets.GetWallet(c.Request.Context(), billingWalletUser(workspace, p.UserID()))
+		account, ok := h.billingAccountForWorkspace(c, workspace)
+		if !ok {
+			return
+		}
+		wallet, err := h.deps.Wallets.GetWallet(c.Request.Context(), account.InternalID)
 		if err != nil {
 			billingRenderWalletGate(c, err)
 			return
 		}
-		contract.RenderSuccess(c, billingToBalanceDTO(workspace.PublicID, wallet))
+		contract.RenderSuccess(c, billingToBalanceDTO(account.PublicID, workspace.PublicID, wallet))
 	})
 }
 
@@ -425,7 +535,6 @@ func billingToLedgerEntryDTO(tx domain.LedgerTransaction) v1BillingLedgerEntryDT
 
 func (h *contractV1BillingHandler) listCreditsLedger(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
-		p := wctx.Principal
 		workspace := wctx.Workspace
 		if h.deps.Wallets == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable42)
@@ -446,10 +555,14 @@ func (h *contractV1BillingHandler) listCreditsLedger(c *gin.Context) {
 			}
 			beforeSequence = cursor.BeforeSequence
 		}
+		account, ok := h.requireBillingManager(c, workspace, wctx.Principal.UserID())
+		if !ok {
+			return
+		}
 		page, err := h.deps.Wallets.ListLedger(c.Request.Context(), domain.ListLedgerInput{
-			UserID:         billingWalletUser(workspace, p.UserID()),
-			BeforeSequence: beforeSequence,
-			Limit:          pageSize,
+			BillingAccountID: account.InternalID,
+			BeforeSequence:   beforeSequence,
+			Limit:            pageSize,
 		})
 		if err != nil {
 			if errors.Is(err, domain.ErrWalletRestricted) || errors.Is(err, domain.ErrWalletFrozen) {
@@ -484,12 +597,11 @@ type v1BillingRecordDTO struct {
 	Kind                  string `json:"kind"`
 	Title                 string `json:"title"`
 	CreditDelta           int64  `json:"credit_delta"`
-	AvailableCreditsAfter int64  `json:"available_credits_after"`
+	AvailableCreditsAfter *int64 `json:"available_credits_after,omitempty"`
 }
 
 func (h *contractV1BillingHandler) listBillingRecords(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
-		p := wctx.Principal
 		workspace := wctx.Workspace
 		if h.deps.Records == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
@@ -510,10 +622,20 @@ func (h *contractV1BillingHandler) listBillingRecords(c *gin.Context) {
 			}
 			beforeSequence = cursor.BeforeSequence
 		}
+		account, ok := h.billingAccountForWorkspace(c, workspace)
+		if !ok {
+			return
+		}
+		filter, _, ok := h.consumptionReadScope(c, wctx, account)
+		if !ok {
+			return
+		}
 		page, err := h.deps.Records.List(c.Request.Context(), billingrecordsports.ListInput{
-			UserID:         billingWalletUser(workspace, p.UserID()),
-			BeforeSequence: beforeSequence,
-			Limit:          pageSize,
+			BillingAccountID: account.InternalID,
+			WorkspaceID:      filter.WorkspaceID,
+			ActorUserID:      filter.ActorUserID,
+			BeforeSequence:   beforeSequence,
+			Limit:            pageSize,
 		})
 		if err != nil {
 			renderV1BillingRecordsError(c, err)
@@ -546,7 +668,6 @@ func (h *contractV1BillingHandler) listBillingRecords(c *gin.Context) {
 
 func (h *contractV1BillingHandler) getUsage(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
-		p := wctx.Principal
 		workspace := wctx.Workspace
 		if h.deps.Usage == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable40)
@@ -560,7 +681,15 @@ func (h *contractV1BillingHandler) getUsage(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		snapshot, err := h.deps.Usage.GetCurrent(c.Request.Context(), billingWalletUser(workspace, p.UserID()), usageRange)
+		account, ok := h.billingAccountForWorkspace(c, workspace)
+		if !ok {
+			return
+		}
+		filter, _, ok := h.consumptionReadScope(c, wctx, account)
+		if !ok {
+			return
+		}
+		snapshot, err := h.deps.Usage.GetCurrent(c.Request.Context(), account.InternalID, filter, usageRange)
 		if err != nil {
 			renderV1UsageError(c, err)
 			return
@@ -579,12 +708,13 @@ type v1CreateCheckoutBody struct {
 }
 
 type v1CheckoutSessionDTO struct {
-	SessionID    string `json:"session_id"`
-	Status       string `json:"status,omitempty"`
-	IdeaQuantity int64  `json:"idea_quantity,omitempty"`
-	CheckoutURL  string `json:"checkout_url,omitempty"`
-	ExpiresAt    string `json:"expires_at,omitempty"`
-	Reused       bool   `json:"reused,omitempty"`
+	SessionID        string `json:"session_id"`
+	BillingAccountID string `json:"billing_account_id"`
+	Status           string `json:"status,omitempty"`
+	IdeaQuantity     int64  `json:"idea_quantity,omitempty"`
+	CheckoutURL      string `json:"checkout_url,omitempty"`
+	ExpiresAt        string `json:"expires_at,omitempty"`
+	Reused           bool   `json:"reused,omitempty"`
 }
 
 func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
@@ -594,6 +724,13 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 		if h.deps.Checkout == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable43)
 			c.Abort()
+			return
+		}
+		// Financial management (#915): recharge requires Billing
+		// Owner/Admin. Workspace Owner/Admin standing alone (space-only
+		// admin) renders billing_account_forbidden and cannot top up.
+		account, ok := h.requireBillingManager(c, workspace, p.UserID())
+		if !ok {
 			return
 		}
 		key, err := contract.IdempotencyKeyFromHeader(c)
@@ -638,11 +775,11 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 		}
 		ctx := c.Request.Context()
 		externalUser := tenancy.FormatUserPublicID(p.PublicID())
-		scope := contract.IdempotencyScope(externalUser, "billing.checkout.create")
+		scope := contract.IdempotencyScope(externalUser, "billing.checkout.create:"+account.PublicID)
 		hash := contract.HashIdempotencyRequest("billing.checkout.create", workspace.PublicID,
 			strings.TrimSpace(billingFormatInt64(quantity)), termsVersion, refundVersion)
 		result, _, doErr := h.deps.Idempotency.Do(ctx, scope, p.UserID(), key, hash, func() (any, error) {
-			return h.deps.Checkout.CreateWorkspaceCheckout(ctx, p.UserID(), workspace.PublicID, key, workspaceCheckoutInput{
+			return h.deps.Checkout.CreateWorkspaceCheckout(ctx, account.InternalID, p.UserID(), workspace.PublicID, key, workspaceCheckoutInput{
 				IdeaQuantity:        quantity,
 				TermsAccepted:       true,
 				TermsVersion:        termsVersion,
@@ -681,7 +818,7 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		dto := v1CheckoutSessionDTO{SessionID: created.SessionID, IdeaQuantity: quantity, Reused: created.Reused}
+		dto := v1CheckoutSessionDTO{SessionID: created.SessionID, BillingAccountID: account.PublicID, IdeaQuantity: quantity, Reused: created.Reused}
 		if created.CheckoutURL != "" {
 			dto.CheckoutURL = created.CheckoutURL
 		}
@@ -701,13 +838,21 @@ func (h *contractV1BillingHandler) getCheckoutSession(c *gin.Context) {
 			c.Abort()
 			return
 		}
+		// Return-status reads address the persisted payer account (#919):
+		// only its Billing Owner/Admin may observe the order. The browser
+		// back-jump is never a payment fact; the server re-reads the
+		// Stripe Checkout Session inside the service.
+		account, ok := h.requireBillingManager(c, workspace, p.UserID())
+		if !ok {
+			return
+		}
 		sessionID := strings.TrimSpace(c.Param("session_id"))
 		if sessionID == "" {
 			contract.RenderError(c, http.StatusNotFound, contract.CodeBillingSessionNotFound, runtimehttp.MsgBillingSessionNotFound)
 			c.Abort()
 			return
 		}
-		status, err := h.deps.Checkout.GetWorkspaceCheckout(c.Request.Context(), p.UserID(), workspace.PublicID, sessionID)
+		status, err := h.deps.Checkout.GetWorkspaceCheckout(c.Request.Context(), account.InternalID, sessionID)
 		if err != nil {
 			if errors.Is(err, errBillingSessionNotFound) {
 				contract.RenderError(c, http.StatusNotFound, contract.CodeBillingSessionNotFound, runtimehttp.MsgBillingSessionNotFound)
@@ -717,7 +862,7 @@ func (h *contractV1BillingHandler) getCheckoutSession(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		dto := v1CheckoutSessionDTO{SessionID: status.SessionID, Status: status.Status, IdeaQuantity: status.IdeaQuantity}
+		dto := v1CheckoutSessionDTO{SessionID: status.SessionID, BillingAccountID: account.PublicID, Status: status.Status, IdeaQuantity: status.IdeaQuantity}
 		if status.CheckoutURL != "" {
 			dto.CheckoutURL = status.CheckoutURL
 		}
@@ -772,13 +917,14 @@ func NewPaymentsCheckoutAdapter(creator paymentcontracts.UserCheckoutService, re
 	return &PaymentsCheckoutAdapter{creator: creator, returnBaseURL: returnBaseURL}
 }
 
-func (a *PaymentsCheckoutAdapter) CreateWorkspaceCheckout(ctx context.Context, userID int64, workspacePublicID, clientKey string, input workspaceCheckoutInput) (workspaceCheckoutResult, error) {
+func (a *PaymentsCheckoutAdapter) CreateWorkspaceCheckout(ctx context.Context, billingAccountID, operatorUserID int64, workspacePublicID, clientKey string, input workspaceCheckoutInput) (workspaceCheckoutResult, error) {
 	if a == nil || a.creator == nil {
 		return workspaceCheckoutResult{}, paymentsdomain.ErrPurchasesUnavailable
 	}
 	namespaced := workspacePublicID + ":" + strings.TrimSpace(clientKey)
 	result, err := a.creator.CreateCheckout(ctx, paymentsdomain.CreateCheckoutCommand{
-		UserID:               userID,
+		BillingAccountID:     billingAccountID,
+		UserID:               operatorUserID,
 		ClientIdempotencyKey: namespaced,
 		IdeaQuantity:         input.IdeaQuantity,
 		TermsAccepted:        input.TermsAccepted,
@@ -797,11 +943,11 @@ func (a *PaymentsCheckoutAdapter) CreateWorkspaceCheckout(ctx context.Context, u
 	}, nil
 }
 
-func (a *PaymentsCheckoutAdapter) GetWorkspaceCheckout(ctx context.Context, userID int64, _ string, sessionID string) (workspaceCheckoutStatus, error) {
+func (a *PaymentsCheckoutAdapter) GetWorkspaceCheckout(ctx context.Context, billingAccountID int64, sessionID string) (workspaceCheckoutStatus, error) {
 	if a == nil || a.creator == nil {
 		return workspaceCheckoutStatus{}, paymentsdomain.ErrPurchasesUnavailable
 	}
-	status, err := a.creator.GetPaymentOrderReturnStatus(ctx, userID, sessionID)
+	status, err := a.creator.GetPaymentOrderReturnStatus(ctx, billingAccountID, sessionID)
 	if err != nil {
 		if errors.Is(err, paymentcontracts.ErrPaymentOrderNotFound) {
 			return workspaceCheckoutStatus{}, errBillingSessionNotFound
@@ -839,7 +985,7 @@ func (a *PaymentsCheckoutAdapter) GetWorkspaceCheckout(ctx context.Context, user
 // Schemas (all money integer minor units; snapshots immutable):
 //
 //	WorkspaceBillingAccount: {workspace_id: WorkspaceId, owner_type: {const: workspace}, created_at?, updated_at?}
-//	WorkspaceCreditsBalance: {workspace_id, available_credits: int64>=0, reserved_credits: int64>=0, status: {enum: [active, frozen]}, active_restrictions?: string[]}
+//	WorkspaceCreditsBalance: {billing_account_id: {pattern: ^ba_} (stable funds identity shared across workspaces), workspace_id, available_credits: int64>=0, reserved_credits: int64>=0, status: {enum: [active, frozen]}, active_restrictions?: string[]}
 //	CreditsLedgerEntry: {transaction_id: string, command_type: string, amount_credits: int64, available_credits_after: int64, reserved_credits_after: int64, created_at: date-time}
 //	BillingRecord: {record_id, occurred_at: date-time, kind: {enum: [ai_usage, usage, reward, system_grant, system_adjustment, top_up]}, title, credit_delta: int64, available_credits_after: int64}
 //	WorkspaceUsage: {timezone: {const: Asia/Shanghai}, lifetime: {total_credits, peak_daily_credits, average_daily_credits, task_count, active_days}, trend: [{date, credits}]}

@@ -108,10 +108,15 @@ func newPhase4Fixture(t *testing.T) *phase4Fixture {
 		// Production-shaped asset gate: the real adapter over the
 		// media store, so task input/output verification runs the
 		// same ready/archived/invisible mapping as production.
-		TaskAssets:        &workspacemedia.TaskAssetAdapter{Store: media},
-		TaskRouter:        allowTestPoolResolver(),
-		TaskSnapshotSaver: v1TxSnapshotSaver(saved),
-		TaskAcceptance:    &v1TxSubmissionAcceptance{assets: &workspacemedia.TaskAssetAdapter{Store: media}},
+		TaskAssets:          &workspacemedia.TaskAssetAdapter{Store: media},
+		TaskRouter:          allowTestPoolResolver(),
+		TaskSnapshotSaver:   v1TxSnapshotSaver(saved),
+		TaskBillingAccounts: v1FakeBillingAccounts{},
+		// #917: the preflight resolves the same fixture account submit
+		// holds and gates the same fixture funds.
+		TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
+		TaskQuoteWallets:         newV1FakeQuoteWallets(),
+		TaskAcceptance:           &v1TxSubmissionAcceptance{assets: &workspacemedia.TaskAssetAdapter{Store: media}},
 	})
 	return &phase4Fixture{engine: router, store: store, dir: dir, ws: ws, tasks: tasks, media: media, lib: lib, queue: queue}
 }

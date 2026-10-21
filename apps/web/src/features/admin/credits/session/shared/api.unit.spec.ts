@@ -4,8 +4,13 @@ const controlMocks = vi.hoisted(() => ({
   createControlCreditGrant: vi.fn(),
   createControlCreditDeduction: vi.fn(),
   createControlCreditRefund: vi.fn(),
+  createControlCreditCorrection: vi.fn(),
   getControlCreditWallet: vi.fn(),
+  getControlBillingAccountWallet: vi.fn(),
   listControlCreditLedger: vi.fn(),
+  listControlBillingAccountLedger: vi.fn(),
+  restrictControlWallet: vi.fn(),
+  releaseControlWalletRestriction: vi.fn(),
   getControlCreditHealth: vi.fn(),
   startControlReconciliation: vi.fn(),
   listControlReconciliationRuns: vi.fn(),
@@ -13,11 +18,22 @@ const controlMocks = vi.hoisted(() => ({
   listControlReconciliationFindings: vi.fn(),
 }))
 
+const billingMocks = vi.hoisted(() => ({
+  listControlBillingAccounts: vi.fn(),
+  getControlBillingAccount: vi.fn(),
+}))
+
 vi.mock(
   '../../../../../api/generated-query/control/control-credits/control-credits',
   () => controlMocks,
 )
 
+vi.mock(
+  '../../../../../api/generated-query/control/control-billing/control-billing',
+  () => billingMocks,
+)
+
+import type { ControlWalletRestrictionResult } from '../../../../../api/generated-query/control/model/controlWalletRestrictionResult'
 import { adminCreditsBillingApi } from './api'
 
 describe('credits billing API adapter', () => {
@@ -57,6 +73,55 @@ describe('credits billing API adapter', () => {
     controlMocks.createControlCreditGrant.mockResolvedValue(result('grant'))
     controlMocks.createControlCreditDeduction.mockResolvedValue(result('deduction'))
     controlMocks.createControlCreditRefund.mockResolvedValue(result('refund'))
+    controlMocks.createControlCreditCorrection.mockResolvedValue(result('correction'))
+    controlMocks.getControlBillingAccountWallet.mockResolvedValue({
+      data: {
+        billing_account_id: 'ba_orgpool00000000000000000000000001',
+        owner_type: 'organization',
+        status: 'active',
+        available_credits: 5000,
+        reserved_credits: 10,
+        active_restrictions: [],
+      },
+    })
+    controlMocks.listControlBillingAccountLedger.mockResolvedValue({
+      data: [],
+      meta: { next_cursor: null, has_more: false },
+    })
+    controlMocks.restrictControlWallet.mockResolvedValue({
+      data: {
+        restriction_id: '00000000-0000-4000-8000-000000000001',
+        replayed: false,
+      } satisfies ControlWalletRestrictionResult,
+    })
+    controlMocks.releaseControlWalletRestriction.mockResolvedValue({
+      data: {
+        restriction_id: '00000000-0000-4000-8000-000000000001',
+        replayed: false,
+      } satisfies ControlWalletRestrictionResult,
+    })
+    billingMocks.listControlBillingAccounts.mockResolvedValue({
+      data: [
+        {
+          billing_account_id: 'ba_orgpool00000000000000000000000001',
+          owner_type: 'organization',
+          created_at: '2026-09-23T00:00:00Z',
+          updated_at: '2026-09-23T00:00:00Z',
+        },
+      ],
+      meta: { next_cursor: null, has_more: false },
+    })
+    billingMocks.getControlBillingAccount.mockResolvedValue({
+      data: {
+        billing_account_id: 'ba_orgpool00000000000000000000000001',
+        owner_type: 'organization',
+        linked_workspaces: [],
+        members: [],
+        wallet: { available_credits: 5000, reserved_credits: 10, status: 'active' },
+        created_at: '2026-09-23T00:00:00Z',
+        updated_at: '2026-09-23T00:00:00Z',
+      },
+    })
 
     const run = { id: 7, status: 'completed' }
     const runs = { runs: [run] }
@@ -134,6 +199,77 @@ describe('credits billing API adapter', () => {
     expect(controlMocks.createControlCreditGrant.mock.calls[0]?.[0]).not.toHaveProperty(
       'idempotency_key',
     )
+  })
+
+  it('addresses explicit billing accounts without user linkage', async () => {
+    const accountId = 'ba_orgpool00000000000000000000000001'
+    const wallet = await adminCreditsBillingApi.getAccountWallet(accountId)
+    expect(wallet).toMatchObject({
+      billing_account_id: accountId,
+      owner_type: 'organization',
+      available_credits: 5000,
+    })
+    expect(wallet.public_id).toBe(accountId)
+    expect(controlMocks.getControlBillingAccountWallet).toHaveBeenCalledWith(accountId, undefined)
+
+    const ledger = await adminCreditsBillingApi.listAccountLedger(accountId, { page_size: 25 })
+    expect(ledger).toEqual({ transactions: [], nextCursor: undefined, hasMore: false })
+
+    const correction = await adminCreditsBillingApi.correct(
+      {
+        billing_account_id: accountId,
+        amount_credits: 5,
+        business_reference_id: 'control-ui:correction:op-1',
+        original_transaction_id: 'ctxn-1',
+      },
+      { idempotencyKey: 'control-ui:correction:op-1' },
+    )
+    expect(correction.transaction_id).toBe('transaction-1')
+    const correctionHeaders = controlMocks.createControlCreditCorrection.mock.calls[0]?.[1]
+      ?.headers as Record<string, string>
+    expect(correctionHeaders['Idempotency-Key']).toBe('control-ui:correction:op-1')
+  })
+
+  it('creates and releases wallet restrictions on the explicit account', async () => {
+    const accountId = 'ba_orgpool00000000000000000000000001'
+    const created = await adminCreditsBillingApi.restrictWallet(
+      {
+        billing_account_id: accountId,
+        type: 'spending',
+        source: 'control_review',
+        related_object_type: 'finding',
+        related_object_id: '42',
+      },
+      { idempotencyKey: 'control-ui:restrict:op-1' },
+    )
+    expect(created.restriction_id).toBe('00000000-0000-4000-8000-000000000001')
+
+    const released = await adminCreditsBillingApi.releaseWalletRestriction(
+      '00000000-0000-4000-8000-000000000001',
+      {},
+      { idempotencyKey: 'control-ui:release:op-1' },
+    )
+    expect(released.restriction_id).toBe('00000000-0000-4000-8000-000000000001')
+    expect(controlMocks.releaseControlWalletRestriction).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000001',
+      {},
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'Idempotency-Key': 'control-ui:release:op-1' }),
+      }),
+    )
+  })
+
+  it('lists and reads billing accounts for admin audit', async () => {
+    const page = await adminCreditsBillingApi.listBillingAccounts({ owner_scope: 'organization' })
+    expect(page.accounts).toHaveLength(1)
+    expect(page.accounts[0]?.billing_account_id).toBe('ba_orgpool00000000000000000000000001')
+    expect(page.hasMore).toBe(false)
+
+    const detail = await adminCreditsBillingApi.getBillingAccount(
+      'ba_orgpool00000000000000000000000001',
+    )
+    expect(detail.owner_type).toBe('organization')
+    expect(detail.wallet?.available_credits).toBe(5000)
   })
 
   it('reads reconciliation and health through the control adapter', async () => {

@@ -5,6 +5,7 @@ import { notifyUserCreditsInvalidation } from '../../../../core/query/userCredit
 import { useCreditsSync } from './useCreditsSync'
 import { billingRecordsQueryKeys } from '../billing/resource'
 import { creditsQueryKeys } from '../credits/resource'
+import { usageQueryKeys } from '../usage/resource'
 
 describe('useCreditsSync', () => {
   it('shares one settlement listener per QueryClient and releases it with the scope', () => {
@@ -30,11 +31,12 @@ describe('useCreditsSync', () => {
       status: 'completed',
     })
 
-    expect(invalidateQueries).toHaveBeenCalledTimes(2)
+    expect(invalidateQueries).toHaveBeenCalledTimes(3)
     expect(invalidateQueries).toHaveBeenNthCalledWith(1, { queryKey: creditsQueryKeys.all })
     expect(invalidateQueries).toHaveBeenNthCalledWith(2, {
       queryKey: billingRecordsQueryKeys.all,
     })
+    expect(invalidateQueries).toHaveBeenNthCalledWith(3, { queryKey: usageQueryKeys.all })
 
     app.unmount()
     notifyUserCreditsInvalidation({
@@ -42,7 +44,7 @@ describe('useCreditsSync', () => {
       taskId: 'task-8',
       status: 'failed',
     })
-    expect(invalidateQueries).toHaveBeenCalledTimes(2)
+    expect(invalidateQueries).toHaveBeenCalledTimes(3)
 
     queryClient.clear()
     host.remove()

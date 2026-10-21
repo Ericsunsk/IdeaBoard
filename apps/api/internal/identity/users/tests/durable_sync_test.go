@@ -65,7 +65,12 @@ func (f *durableSyncFixture) seedUser(t *testing.T, display, authID, storageUID,
 	if err != nil {
 		t.Fatalf("begin wallet transaction: %v", err)
 	}
-	if err := creditService.LifecycleInTx(tx).ProvisionWallet(ctx, user.ID); err != nil {
+	personalAccountID, err := creditService.LifecycleInTx(tx).ResolvePersonalAccount(ctx, user.ID)
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("resolve personal account: %v", err)
+	}
+	if err := creditService.LifecycleInTx(tx).ProvisionAccountWallet(ctx, personalAccountID); err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("provision wallet: %v", err)
 	}
@@ -94,7 +99,12 @@ func durableIntentCount(t *testing.T, pool *pgxpool.Pool, userID int64, status s
 
 func durableWalletStatus(t *testing.T, pool *pgxpool.Pool, userID int64) creditsdomain.WalletStatus {
 	t.Helper()
-	wallet, err := credits.NewService(pool).GetWallet(context.Background(), userID)
+	service := credits.NewService(pool)
+	accountID, err := service.ResolvePersonalAccount(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("resolve personal account: %v", err)
+	}
+	wallet, err := service.GetWallet(context.Background(), accountID)
 	if err != nil {
 		t.Fatalf("read wallet: %v", err)
 	}

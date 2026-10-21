@@ -54,6 +54,7 @@ type AdminPaymentOrderRecord struct {
 type AdminPaymentOrderDetailFacts struct {
 	PublicOrderNumber       string
 	InternalUserID          int64
+	BillingAccountID        int64
 	UserPublicID            uuid.UUID
 	DisplayName             string
 	Status                  string
@@ -101,7 +102,8 @@ type AdminPaymentWebhookEventRecord struct {
 // internal key is never serialized by the HTTP adapter.
 type AdminPaymentOrderDetailRecord struct {
 	paymentcontracts.AdminPaymentOrderDetail
-	InternalUserID int64
+	InternalUserID   int64
+	BillingAccountID int64
 }
 
 // AdminPaymentOrderSummaryFromRecord builds the safe Admin list summary from
@@ -162,5 +164,5 @@ func AdminPaymentOrderDetailFromFacts(facts AdminPaymentOrderDetailFacts) AdminP
 		},
 		Refunds:  []paymentcontracts.AdminPaymentRefundSummary{},
 		Disputes: []paymentcontracts.AdminPaymentDisputeSummary{},
-	}, InternalUserID: facts.InternalUserID}
+	}, InternalUserID: facts.InternalUserID, BillingAccountID: facts.BillingAccountID}
 }

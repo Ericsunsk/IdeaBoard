@@ -21,20 +21,20 @@ func TestWalletRestrictionsAreConcurrentIdempotentAndIndependentlyReleased(t *te
 	ctx := context.Background()
 	userID := int64(91)
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: testhelpers.TestMetadata("wallet-restrictions:grant", "wallet-restrictions-grant"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         testhelpers.TestMetadata("wallet-restrictions:grant", "wallet-restrictions-grant"),
 	}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
 
 	command := ports.RestrictWalletCommand{
-		UserID:        userID,
-		Type:          "ledger_integrity",
-		Source:        "reconciliation",
-		RelatedObject: domain.BusinessReference{Type: "finding", ID: "finding-91-a"},
-		Reason:        "projection mismatch",
-		Actor:         domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Type:             "ledger_integrity",
+		Source:           "reconciliation",
+		RelatedObject:    domain.BusinessReference{Type: "finding", ID: "finding-91-a"},
+		Reason:           "projection mismatch",
+		Actor:            domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
 	}
 	const attempts = 16
 	results := make(chan ports.WalletRestrictionChange, attempts)
@@ -79,11 +79,11 @@ func TestWalletRestrictionsAreConcurrentIdempotentAndIndependentlyReleased(t *te
 	}
 
 	independent, err := service.RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID:        userID,
-		Type:          "risk_control",
-		Source:        "identity_risk",
-		RelatedObject: domain.BusinessReference{Type: "review", ID: "review-91"},
-		Actor:         domain.Actor{Type: domain.ActorAdmin, ID: "7"},
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Type:             "risk_control",
+		Source:           "identity_risk",
+		RelatedObject:    domain.BusinessReference{Type: "review", ID: "review-91"},
+		Actor:            domain.Actor{Type: domain.ActorAdmin, ID: "7"},
 	})
 	if err != nil {
 		t.Fatalf("RestrictWallet(independent) error = %v", err)
@@ -96,7 +96,7 @@ func TestWalletRestrictionsAreConcurrentIdempotentAndIndependentlyReleased(t *te
 		t.Fatalf("independent restriction = %+v, first ID=%s", independent, restrictionID)
 	}
 
-	wallet, err := service.GetWallet(ctx, userID)
+	wallet, err := service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, userID))
 	if err != nil {
 		t.Fatalf("GetWallet(restricted) error = %v", err)
 	}
@@ -144,7 +144,7 @@ func TestWalletRestrictionsAreConcurrentIdempotentAndIndependentlyReleased(t *te
 		t.Fatalf("release results=%d released=%d, want %d/1", releaseResultCount, releasedCount, attempts)
 	}
 
-	wallet, err = service.GetWallet(ctx, userID)
+	wallet, err = service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, userID))
 	if err != nil {
 		t.Fatalf("GetWallet(after one release) error = %v", err)
 	}
@@ -152,9 +152,9 @@ func TestWalletRestrictionsAreConcurrentIdempotentAndIndependentlyReleased(t *te
 		t.Fatalf("active restrictions after one release = %+v", wallet.ActiveRestrictions)
 	}
 	if _, err := service.Hold(ctx, ports.HoldCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 1),
-		Metadata: testhelpers.TestMetadata("wallet-restrictions:still-blocked", "wallet-restrictions-still-blocked"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 1),
+		Metadata:         testhelpers.TestMetadata("wallet-restrictions:still-blocked", "wallet-restrictions-still-blocked"),
 	}); !errors.Is(err, domain.ErrWalletRestricted) {
 		t.Fatalf("Hold(with independent restriction) error = %v, want domain.ErrWalletRestricted", err)
 	}
@@ -166,9 +166,9 @@ func TestWalletRestrictionsAreConcurrentIdempotentAndIndependentlyReleased(t *te
 		t.Fatalf("ReleaseWalletRestriction(independent) error = %v", err)
 	}
 	if _, err := service.Hold(ctx, ports.HoldCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 1),
-		Metadata: testhelpers.TestMetadata("wallet-restrictions:unblocked", "wallet-restrictions-unblocked"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 1),
+		Metadata:         testhelpers.TestMetadata("wallet-restrictions:unblocked", "wallet-restrictions-unblocked"),
 	}); err != nil {
 		t.Fatalf("Hold(after all releases) error = %v", err)
 	}
@@ -181,10 +181,11 @@ func TestWalletRestrictionsAreConcurrentIdempotentAndIndependentlyReleased(t *te
 		t.Fatalf("reopened restriction = %+v, previous ID=%s", reopened, restrictionID)
 	}
 	var totalRows, releasedRows int
+	accountID := testhelpers.MustBillingAccount(t, pool, userID)
 	if err := pool.QueryRow(ctx, `
 SELECT count(*), count(*) FILTER (WHERE released_at IS NOT NULL)
 FROM credit_wallet_restrictions
-WHERE wallet_user_id = $1`, userID).Scan(&totalRows, &releasedRows); err != nil {
+WHERE billing_account_id = $1`, accountID).Scan(&totalRows, &releasedRows); err != nil {
 		t.Fatalf("read restriction history error = %v", err)
 	}
 	if totalRows != 3 || releasedRows != 2 {
@@ -198,37 +199,37 @@ func TestWalletRestrictionBlocksNewExposureButAllowsConvergenceAndRepair(t *test
 	ctx := context.Background()
 	userID := int64(92)
 	grantCommand := ports.GrantCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: testhelpers.TestMetadata("wallet-restriction-gate:grant", "wallet-restriction-gate-grant"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         testhelpers.TestMetadata("wallet-restriction-gate:grant", "wallet-restriction-gate-grant"),
 	}
 	grant, err := service.Grant(ctx, grantCommand)
 	if err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
 	captureHold, err := service.Hold(ctx, ports.HoldCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 20),
-		Metadata: testhelpers.TestMetadata("wallet-restriction-gate:capture-hold", "wallet-restriction-gate-capture-hold"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 20),
+		Metadata:         testhelpers.TestMetadata("wallet-restriction-gate:capture-hold", "wallet-restriction-gate-capture-hold"),
 	})
 	if err != nil {
 		t.Fatalf("Hold(capture) error = %v", err)
 	}
 	releaseHold, err := service.Hold(ctx, ports.HoldCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 10),
-		Metadata: testhelpers.TestMetadata("wallet-restriction-gate:release-hold", "wallet-restriction-gate-release-hold"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 10),
+		Metadata:         testhelpers.TestMetadata("wallet-restriction-gate:release-hold", "wallet-restriction-gate-release-hold"),
 	})
 	if err != nil {
 		t.Fatalf("Hold(release) error = %v", err)
 	}
 	if _, err := service.RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID:        userID,
-		Type:          "ledger_integrity",
-		Source:        "reconciliation",
-		RelatedObject: domain.BusinessReference{Type: "finding", ID: "finding-92"},
-		Reason:        "ledger mismatch",
-		Actor:         domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Type:             "ledger_integrity",
+		Source:           "reconciliation",
+		RelatedObject:    domain.BusinessReference{Type: "finding", ID: "finding-92"},
+		Reason:           "ledger mismatch",
+		Actor:            domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
 	}); err != nil {
 		t.Fatalf("RestrictWallet() error = %v", err)
 	}
@@ -244,21 +245,21 @@ func TestWalletRestrictionBlocksNewExposureButAllowsConvergenceAndRepair(t *test
 		{
 			name: "grant",
 			run: func() error {
-				_, err := service.Grant(ctx, ports.GrantCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("wallet-restriction-gate:new-grant", "wallet-restriction-gate-new-grant")})
+				_, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("wallet-restriction-gate:new-grant", "wallet-restriction-gate-new-grant")})
 				return err
 			},
 		},
 		{
 			name: "deduction",
 			run: func() error {
-				_, err := service.Deduct(ctx, ports.DeductionCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("wallet-restriction-gate:deduction", "wallet-restriction-gate-deduction")})
+				_, err := service.Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("wallet-restriction-gate:deduction", "wallet-restriction-gate-deduction")})
 				return err
 			},
 		},
 		{
 			name: "hold",
 			run: func() error {
-				_, err := service.Hold(ctx, ports.HoldCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("wallet-restriction-gate:new-hold", "wallet-restriction-gate-new-hold")})
+				_, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("wallet-restriction-gate:new-hold", "wallet-restriction-gate-new-hold")})
 				return err
 			},
 		},
@@ -275,16 +276,23 @@ func TestWalletRestrictionBlocksNewExposureButAllowsConvergenceAndRepair(t *test
 	if err != nil {
 		t.Fatalf("Begin(freeze) error = %v", err)
 	}
-	if err := service.LifecycleInTx(tx).SetWalletFrozen(ctx, userID, true); err != nil {
-		_ = tx.Rollback(ctx)
-		t.Fatalf("SetWalletFrozen() error = %v", err)
+	{
+		accountID, resolveErr := service.LifecycleInTx(tx).ResolvePersonalAccount(ctx, userID)
+		if resolveErr != nil {
+			_ = tx.Rollback(ctx)
+			t.Fatalf("ResolvePersonalAccount() error = %v", resolveErr)
+		}
+		if err := service.LifecycleInTx(tx).SetAccountWalletFrozen(ctx, accountID, true); err != nil {
+			_ = tx.Rollback(ctx)
+			t.Fatalf("SetAccountWalletFrozen() error = %v", err)
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatalf("commit freeze error = %v", err)
 	}
 
 	capture, err := service.Capture(ctx, ports.CaptureCommand{
-		UserID:            userID,
+		BillingAccountID:  testhelpers.MustBillingAccount(t, pool, userID),
 		HoldTransactionID: captureHold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 20),
 		Metadata:          testhelpers.TestMetadata("wallet-restriction-gate:capture", "wallet-restriction-gate-capture"),
@@ -293,7 +301,7 @@ func TestWalletRestrictionBlocksNewExposureButAllowsConvergenceAndRepair(t *test
 		t.Fatalf("Capture(restricted frozen Wallet) error = %v", err)
 	}
 	if _, err := service.Release(ctx, ports.ReleaseCommand{
-		UserID:            userID,
+		BillingAccountID:  testhelpers.MustBillingAccount(t, pool, userID),
 		HoldTransactionID: releaseHold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 10),
 		Metadata:          testhelpers.TestMetadata("wallet-restriction-gate:release", "wallet-restriction-gate-release"),
@@ -301,7 +309,7 @@ func TestWalletRestrictionBlocksNewExposureButAllowsConvergenceAndRepair(t *test
 		t.Fatalf("Release(restricted frozen Wallet) error = %v", err)
 	}
 	if _, err := service.Refund(ctx, ports.RefundCommand{
-		UserID:              userID,
+		BillingAccountID:    testhelpers.MustBillingAccount(t, pool, userID),
 		ChargeTransactionID: capture.TransactionID,
 		Amount:              testhelpers.MustCreditAmount(t, 5),
 		Metadata:            testhelpers.TestMetadata("wallet-restriction-gate:refund", "wallet-restriction-gate-refund"),
@@ -309,7 +317,7 @@ func TestWalletRestrictionBlocksNewExposureButAllowsConvergenceAndRepair(t *test
 		t.Fatalf("Refund(restricted frozen Wallet) error = %v", err)
 	}
 	if _, err := service.Correct(ctx, ports.CorrectionCommand{
-		UserID:                userID,
+		BillingAccountID:      testhelpers.MustBillingAccount(t, pool, userID),
 		OriginalTransactionID: grant.TransactionID,
 		Amount:                testhelpers.MustCreditAmount(t, 5),
 		Metadata:              testhelpers.TestMetadata("wallet-restriction-gate:correction", "wallet-restriction-gate-correction"),
@@ -317,7 +325,7 @@ func TestWalletRestrictionBlocksNewExposureButAllowsConvergenceAndRepair(t *test
 		t.Fatalf("Correct(restricted frozen Wallet) error = %v", err)
 	}
 
-	wallet, err := service.GetWallet(ctx, userID)
+	wallet, err := service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, userID))
 	if err != nil {
 		t.Fatalf("GetWallet() error = %v", err)
 	}
@@ -343,19 +351,19 @@ func TestWalletRestrictionDatabaseConstraintsRejectUserActorsAndInvalidReleaseTi
 	ctx := context.Background()
 	userID := int64(93)
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 10),
-		Metadata: testhelpers.TestMetadata("wallet-restriction-constraints:grant", "wallet-restriction-constraints-grant"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Amount:           testhelpers.MustCreditAmount(t, 10),
+		Metadata:         testhelpers.TestMetadata("wallet-restriction-constraints:grant", "wallet-restriction-constraints-grant"),
 	}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
 	if _, err := service.RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID:        userID,
-		Type:          "ledger_integrity",
-		Source:        "reconciliation",
-		RelatedObject: domain.BusinessReference{Type: "finding", ID: "invalid-user-actor"},
-		Reason:        "must reject user actor",
-		Actor:         domain.Actor{Type: domain.ActorUser, ID: "93"},
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Type:             "ledger_integrity",
+		Source:           "reconciliation",
+		RelatedObject:    domain.BusinessReference{Type: "finding", ID: "invalid-user-actor"},
+		Reason:           "must reject user actor",
+		Actor:            domain.Actor{Type: domain.ActorUser, ID: "93"},
 	}); !errors.Is(err, domain.ErrInvalidCommand) {
 		t.Fatalf("RestrictWallet(user actor) error = %v, want domain.ErrInvalidCommand", err)
 	}
@@ -369,12 +377,12 @@ INSERT INTO credit_wallet_restrictions (
 	}
 
 	created, err := service.RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID:        userID,
-		Type:          "ledger_integrity",
-		Source:        "reconciliation",
-		RelatedObject: domain.BusinessReference{Type: "finding", ID: "release-timeline"},
-		Reason:        "verify release timeline constraint",
-		Actor:         domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
+		Type:             "ledger_integrity",
+		Source:           "reconciliation",
+		RelatedObject:    domain.BusinessReference{Type: "finding", ID: "release-timeline"},
+		Reason:           "verify release timeline constraint",
+		Actor:            domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
 	})
 	if err != nil {
 		t.Fatalf("RestrictWallet() error = %v", err)

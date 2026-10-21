@@ -30,6 +30,7 @@ type ConvergenceStore interface {
 	CreateExternalPaymentRefund(context.Context, paymentports.StripeRefund, time.Time) (paymentsdomain.PaymentRefund, error)
 	RecordPaymentRefundAnomaly(context.Context, paymentports.StripeRefund, string, time.Time) (int64, error)
 	ConvergePaymentDispute(context.Context, paymentports.StripeDispute, time.Time) (paymentsdomain.PaymentDispute, bool, error)
+	GetPaymentOrderPayerAccount(context.Context, string) (int64, error)
 }
 
 // WebhookProcessingResult is the closed inbox processing_result
@@ -63,7 +64,7 @@ type Dependencies struct {
 	DisputeGateway     paymentports.DisputeGateway
 	CredentialAccess   CredentialAccess
 	WebhookCredentials WebhookCredentialAccess
-	Events             paymentports.PaymentEventPublisher
+	Hints              paymentports.PaymentHintPublisher
 	Now                func() time.Time
 }
 
@@ -79,7 +80,7 @@ type Service struct {
 	disputeGateway     paymentports.DisputeGateway
 	credentialAccess   CredentialAccess
 	webhookCredentials WebhookCredentialAccess
-	events             paymentports.PaymentEventPublisher
+	hints              paymentports.PaymentHintPublisher
 	now                func() time.Time
 }
 
@@ -94,5 +95,5 @@ func NewService(deps Dependencies) (*Service, error) {
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
-	return &Service{inbox: deps.Inbox, convergence: deps.Convergence, verifier: deps.Verifier, checkoutStore: deps.CheckoutStore, checkout: deps.Checkout, refund: deps.Refund, dispute: deps.Dispute, checkoutGateway: deps.CheckoutGateway, disputeGateway: deps.DisputeGateway, credentialAccess: deps.CredentialAccess, webhookCredentials: deps.WebhookCredentials, events: deps.Events, now: deps.Now}, nil
+	return &Service{inbox: deps.Inbox, convergence: deps.Convergence, verifier: deps.Verifier, checkoutStore: deps.CheckoutStore, checkout: deps.Checkout, refund: deps.Refund, dispute: deps.Dispute, checkoutGateway: deps.CheckoutGateway, disputeGateway: deps.DisputeGateway, credentialAccess: deps.CredentialAccess, webhookCredentials: deps.WebhookCredentials, hints: deps.Hints, now: deps.Now}, nil
 }

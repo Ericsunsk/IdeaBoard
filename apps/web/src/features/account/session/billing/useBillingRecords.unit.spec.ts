@@ -1,13 +1,18 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { screen, waitFor } from '@testing-library/vue'
-import { defineComponent, ref } from 'vue'
+import { defineComponent, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { notifyUserCreditsInvalidation } from '../../../../core/query/userCreditsInvalidation'
 import { renderWithUser } from '../../../../test/render'
-import type { BillingRecordPageData } from './resource'
+import { billingAccountQueryKeys } from '../billing-account/resource'
+import type { BillingRecordPage } from './resource'
 import { useBillingRecords } from './useBillingRecords'
 
 const fetchBillingRecordsMock = vi.hoisted(() => vi.fn())
+const workspaceId = ref('ws_1')
+const fetchAccountMock = vi.hoisted(() => vi.fn())
+const identity = reactive({ user: { public_id: 'user-1' } })
+vi.mock('../../../auth', () => ({ useUserStore: () => identity }))
 
 vi.mock('./resource', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./resource')>()
@@ -17,9 +22,14 @@ vi.mock('./resource', async (importOriginal) => {
 vi.mock('../accountWorkspace', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../accountWorkspace')>()),
   useAccountWorkspace: () => ({
-    workspaceId: ref('ws_1'),
+    workspaceId,
     isSelectionSettled: ref(true),
   }),
+}))
+
+vi.mock('../billing-account/resource', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../billing-account/resource')>()),
+  fetchBillingAccount: fetchAccountMock,
 }))
 
 const BillingHost = defineComponent({
@@ -28,13 +38,69 @@ const BillingHost = defineComponent({
   },
   template: `
     <button type="button" @click="loadMore()">加载更多</button>
+    <button type="button" @click="retryInitial()">重试</button>
+    <output data-testid="error">{{ initialError?.message || '' }}</output>
+    <output data-testid="pending">{{ isInitialPending }}</output>
     <output data-testid="record-titles">{{ records.map((record) => record.title).join(',') }}</output>
     <output data-testid="has-more">{{ hasNextPage }}</output>
   `,
 })
 
 describe('useBillingRecords', () => {
-  beforeEach(() => fetchBillingRecordsMock.mockReset())
+  beforeEach(() => {
+    fetchBillingRecordsMock.mockReset()
+    workspaceId.value = 'ws_1'
+    identity.user.public_id = 'user-1'
+    fetchAccountMock.mockReset().mockImplementation(async () => buildAccount())
+  })
+
+  it('surfaces account resolution failures and retries the prerequisite before loading records', async () => {
+    fetchAccountMock
+      .mockRejectedValueOnce(new Error('account unavailable'))
+      .mockResolvedValueOnce(buildAccount())
+    fetchBillingRecordsMock.mockResolvedValue({ records: [], next_cursor: undefined })
+    const { user } = renderBillingHost()
+    await waitFor(() =>
+      expect(screen.getByTestId('error')).toHaveTextContent('account unavailable'),
+    )
+    expect(screen.getByTestId('pending')).toHaveTextContent('false')
+    expect(fetchBillingRecordsMock).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: '重试' }))
+    await waitFor(() => expect(fetchBillingRecordsMock).toHaveBeenCalledOnce())
+    expect(fetchAccountMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('drops privileged pages and late responses when authorization changes', async () => {
+    let resolvePrivileged!: (value: BillingRecordPage) => void
+    fetchBillingRecordsMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePrivileged = resolve
+        }),
+    )
+    const { queryClient } = renderBillingHost()
+    await waitFor(() => expect(fetchBillingRecordsMock).toHaveBeenCalledOnce())
+    fetchBillingRecordsMock.mockResolvedValueOnce(buildPage('自身消费'))
+    fetchAccountMock.mockResolvedValueOnce(buildAccount('member'))
+    await queryClient.invalidateQueries({ queryKey: billingAccountQueryKeys.all })
+    await waitFor(() => expect(screen.getByTestId('record-titles')).toHaveTextContent('自身消费'))
+    resolvePrivileged(buildPage('全账户充值'))
+    await Promise.resolve()
+    expect(screen.getByTestId('record-titles')).not.toHaveTextContent('全账户充值')
+  })
+
+  it('does not reuse cached account pages for another identity on the same account', async () => {
+    fetchBillingRecordsMock.mockResolvedValueOnce(buildPage('管理员充值'))
+    renderBillingHost()
+    await waitFor(() => expect(screen.getByTestId('record-titles')).toHaveTextContent('管理员充值'))
+    fetchBillingRecordsMock.mockRejectedValueOnce(new Error('member records unavailable'))
+    fetchAccountMock.mockResolvedValueOnce(buildAccount('member'))
+    identity.user.public_id = 'user-2'
+    await waitFor(() =>
+      expect(screen.getByTestId('error')).toHaveTextContent('member records unavailable'),
+    )
+    expect(screen.getByTestId('record-titles')).toHaveTextContent(/^$/)
+  })
 
   it('loads 20-record cursor pages and appends the next page', async () => {
     fetchBillingRecordsMock
@@ -84,12 +150,13 @@ function renderBillingHost() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { gcTime: Number.POSITIVE_INFINITY, retry: false } },
   })
-  return renderWithUser(BillingHost, {
+  const result = renderWithUser(BillingHost, {
     global: { plugins: [[VueQueryPlugin, { queryClient }]] },
   })
+  return { ...result, queryClient }
 }
 
-function buildPage(title: string, nextCursor?: string): BillingRecordPageData {
+function buildPage(title: string, nextCursor?: string): BillingRecordPage {
   return {
     records: [
       {
@@ -102,5 +169,14 @@ function buildPage(title: string, nextCursor?: string): BillingRecordPageData {
       },
     ],
     ...(nextCursor ? { next_cursor: nextCursor } : {}),
+  }
+}
+
+function buildAccount(consumptionScope: 'account' | 'member' = 'account') {
+  return {
+    billingAccountId: workspaceId.value === 'ws_1' ? 'ba_1' : 'ba_2',
+    workspaceId: workspaceId.value,
+    isShared: false,
+    consumptionScope,
   }
 }

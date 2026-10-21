@@ -63,6 +63,22 @@ func (r *Repository) WithUserCheckoutLock(ctx context.Context, userID int64, run
 	return WithAdvisoryLock(ctx, r.db, lockKey, userCheckoutLifecycleLockSeed, run)
 }
 
+// accountCheckoutLifecycleLockSeed separates the payer-account Checkout
+// critical section from the retained per-operator dispute lock (#919).
+const accountCheckoutLifecycleLockSeed int64 = 412456873631731954
+
+// WithBillingAccountCheckoutLock serializes Checkout create, continue, and
+// abandon per payer Billing Account (#919). Like the user lock, it never
+// holds a database transaction across Stripe network calls: callers converge
+// provider state inside the lock with short transactions only.
+func (r *Repository) WithBillingAccountCheckoutLock(ctx context.Context, billingAccountID int64, run func(context.Context) error) (resultErr error) {
+	if r == nil || r.db == nil || billingAccountID <= 0 || run == nil {
+		return fmt.Errorf("payments repository: invalid Billing Account Checkout lock")
+	}
+	lockKey := fmt.Sprintf("payment-account-checkout:%d", billingAccountID)
+	return WithAdvisoryLock(ctx, r.db, lockKey, accountCheckoutLifecycleLockSeed, run)
+}
+
 func (db ContextDB) Queries() *dbsqlc.Queries {
 	return dbsqlc.New(db.executor)
 }
@@ -216,6 +232,17 @@ func (db ContextDB) WithReadSnapshot(run func(*dbsqlc.Queries) error) (resultErr
 	return nil
 }
 
+// ListBillingAccountManagerIDs resolves the server-internal SSE fanout
+// audience (#919): the current financial managers of one payer account.
+// No auth gate here; the lifecycle fans post-commit hints only to these
+// users, so exited members and non-managers never observe the settlement.
+func (r *Repository) ListBillingAccountManagerIDs(ctx context.Context, billingAccountID int64) ([]int64, error) {
+	if r == nil || r.db == nil || billingAccountID <= 0 {
+		return nil, fmt.Errorf("payments repository: invalid Billing Account audience query")
+	}
+	return r.DBWithContext(ctx).Queries().ListBillingAccountManagerIDs(ctx, billingAccountID)
+}
+
 func (r *Repository) ConvergePaidPaymentOrder(ctx context.Context, facts paymentsdomain.PaidCheckoutFacts, creditedAt time.Time) (paymentsdomain.PaymentConvergenceResult, error) {
 	if r == nil || r.db == nil {
 		return paymentsdomain.PaymentConvergenceResult{}, fmt.Errorf("payments repository: database unavailable")
@@ -316,12 +343,19 @@ func creditLockedPaidOrderInTx(ctx context.Context, q *dbsqlc.Queries, tx pgx.Tx
 	if err != nil {
 		return paymentsdomain.PaymentConvergenceResult{}, fmt.Errorf("build purchase credit amount: %w", err)
 	}
+	// Settlement converges on the order's persisted payer account (#919):
+	// workspace switches, member exits, and management changes never move
+	// the obligation. There is no per-operator fallback; a missing payer
+	// fails closed for replay/reconciliation instead of crediting elsewhere.
+	if order.BillingAccountID <= 0 {
+		return paymentsdomain.PaymentConvergenceResult{}, fmt.Errorf("credit paid payment order without payer Billing Account")
+	}
 	commands, err := credits.CommandsInTx(tx)
 	if err != nil {
 		return paymentsdomain.PaymentConvergenceResult{}, err
 	}
 	creditResult, err := commands.Purchase(ctx, ports.PurchaseCommand{
-		UserID: order.UserID, Amount: amount,
+		BillingAccountID: order.BillingAccountID, Amount: amount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "payment-purchase:" + order.ID,
 			Actor:          domain.Actor{Type: domain.ActorService, ID: "payments"},

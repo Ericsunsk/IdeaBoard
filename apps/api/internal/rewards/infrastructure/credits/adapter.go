@@ -20,7 +20,11 @@ type Adapter struct{ service *credits.Service }
 func New(service *credits.Service) *Adapter { return &Adapter{service: service} }
 
 func (a *Adapter) ReadWallet(ctx context.Context, userID int64) (redemptions.WalletSnapshot, error) {
-	wallet, err := a.service.GetWallet(ctx, userID)
+	accountID, err := a.service.ResolvePersonalAccount(ctx, userID)
+	if err != nil {
+		return redemptions.WalletSnapshot{}, err
+	}
+	wallet, err := a.service.GetWallet(ctx, accountID)
 	if err != nil {
 		switch {
 		case errors.Is(err, creditsdomain.ErrWalletNotFound):
@@ -31,7 +35,7 @@ func (a *Adapter) ReadWallet(ctx context.Context, userID int64) (redemptions.Wal
 			return redemptions.WalletSnapshot{}, err
 		}
 	}
-	return redemptions.WalletSnapshot{Available: wallet.Available}, nil
+	return redemptions.WalletSnapshot{Available: wallet.Available, BillingAccountID: accountID}, nil
 }
 
 func (a *Adapter) Grant(ctx context.Context, tx pgx.Tx, request redemptions.CreditGrantRequest) (redemptions.CreditGrantResult, error) {
@@ -39,9 +43,17 @@ func (a *Adapter) Grant(ctx context.Context, tx pgx.Tx, request redemptions.Cred
 	if err != nil {
 		return redemptions.CreditGrantResult{}, err
 	}
+	resolver, err := credits.ResolvePersonalAccountInTx(ctx, tx)
+	if err != nil {
+		return redemptions.CreditGrantResult{}, err
+	}
+	accountID, err := resolver.ResolvePersonalAccount(ctx, request.UserID)
+	if err != nil {
+		return redemptions.CreditGrantResult{}, err
+	}
 	result, err := a.service.InTx(tx).Grant(ctx, creditsports.GrantCommand{
-		UserID: request.UserID,
-		Amount: amount,
+		BillingAccountID: accountID,
+		Amount:           amount,
 		Metadata: creditsdomain.CommandMetadata{
 			IdempotencyKey:    request.IdempotencyKey,
 			Actor:             creditsdomain.Actor{Type: creditsdomain.ActorType(request.ActorType), ID: request.ActorID},
@@ -56,7 +68,7 @@ func (a *Adapter) Grant(ctx context.Context, tx pgx.Tx, request redemptions.Cred
 		}
 		return redemptions.CreditGrantResult{}, err
 	}
-	return redemptions.CreditGrantResult{TransactionID: result.TransactionID, AvailableBalance: result.Wallet.Available}, nil
+	return redemptions.CreditGrantResult{TransactionID: result.TransactionID, AvailableBalance: result.Wallet.Available, BillingAccountID: accountID}, nil
 }
 
 var _ redemptions.CreditGateway = (*Adapter)(nil)

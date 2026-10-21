@@ -24,8 +24,8 @@ RETURNING id::text`).Scan(&credentialID); err != nil {
 
 	orderID := "33333333-3333-4333-8333-333333333333"
 	if _, err := db.Exec(ctx, `
-INSERT INTO payment_orders (id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_product_id, idea_quantity, base_currency, base_amount_minor, terms_version, refund_policy_version, return_base_url, expires_at)
-VALUES ($1::uuid, 'IBP-20240101-BALANCES0001', gen_random_uuid(), 42, 'test-balances-01', $2, 'cancelled', $3::uuid, 'acct_balances', 'prod_balances', 500, 'usd', 500, 'v1', 'v1', 'https://example.com/', now() + interval '1 hour')`,
+INSERT INTO payment_orders (id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_product_id, idea_quantity, base_currency, base_amount_minor, terms_version, refund_policy_version, return_base_url, expires_at)
+VALUES ($1::uuid, 'IBP-20240101-BALANCES0001', gen_random_uuid(), 42, ensure_personal_billing_account_for_user(42), 'test-balances-01', $2, 'cancelled', $3::uuid, 'acct_balances', 'prod_balances', 500, 'usd', 500, 'v1', 'v1', 'https://example.com/', now() + interval '1 hour')`,
 		orderID, strings.Repeat("c", 64), credentialID); err != nil {
 		t.Fatalf("seed payment order: %v", err)
 	}

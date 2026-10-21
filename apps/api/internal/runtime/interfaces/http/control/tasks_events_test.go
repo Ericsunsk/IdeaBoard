@@ -84,27 +84,27 @@ func (h *controlTxHolder) releaseFailure() error {
 
 // Hold/Capture/Release must never run: the production store exposes the
 // PostgreSQL settlement seams, so cancel settles inside one transaction.
-func (h *controlTxHolder) Hold(context.Context, int64, int64, string, string) (string, error) {
+func (h *controlTxHolder) Hold(context.Context, int64, int64, int64, string, string) (string, error) {
 	return "", errors.New("controlTxHolder.Hold must not run on the single-tx path")
 }
 
-func (h *controlTxHolder) Capture(context.Context, string, int64, string) error {
+func (h *controlTxHolder) Capture(context.Context, int64, int64, string, int64, string) error {
 	return errors.New("controlTxHolder.Capture must not run on the single-tx path")
 }
 
-func (h *controlTxHolder) Release(context.Context, string, int64, string) error {
+func (h *controlTxHolder) Release(context.Context, int64, int64, string, int64, string) error {
 	return errors.New("controlTxHolder.Release must not run on the single-tx path")
 }
 
-func (h *controlTxHolder) HoldInTx(context.Context, pgx.Tx, int64, int64, string, string) (string, error) {
+func (h *controlTxHolder) HoldInTx(context.Context, pgx.Tx, int64, int64, int64, string, string) (string, error) {
 	return "", errors.New("controlTxHolder.HoldInTx must not run on cancel")
 }
 
-func (h *controlTxHolder) CaptureInTx(context.Context, pgx.Tx, int64, string, int64, string) (string, error) {
+func (h *controlTxHolder) CaptureInTx(context.Context, pgx.Tx, int64, int64, string, int64, string) (string, error) {
 	return "", errors.New("controlTxHolder.CaptureInTx must not run on cancel")
 }
 
-func (h *controlTxHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, userID int64, holdID string, amount int64, taskID string) (string, error) {
+func (h *controlTxHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) (string, error) {
 	if err := h.releaseFailure(); err != nil {
 		return "", err
 	}
@@ -113,10 +113,10 @@ func (h *controlTxHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, userID int
 		return "", err
 	}
 	result, err := h.credits.InTx(tx).Release(ctx, creditsports.ReleaseCommand{
-		UserID: userID, HoldTransactionID: holdID, Amount: creditAmount,
+		BillingAccountID: billingAccountID, HoldTransactionID: holdID, Amount: creditAmount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey:    "control-cancel-release:" + taskID,
-			Actor:             domain.Actor{Type: domain.ActorUser, ID: fmt.Sprint(userID)},
+			Actor:             domain.Actor{Type: domain.ActorUser, ID: fmt.Sprint(actorUserID)},
 			Source:            "task_submission",
 			Reason:            "control admin cancel release",
 			BusinessReference: domain.BusinessReference{Type: "task", ID: taskID},
@@ -187,7 +187,7 @@ func (e *controlCancelEnv) creditServiceFor(t *testing.T) *credits.Service {
 	if err != nil {
 		t.Fatalf("begin wallet tx: %v", err)
 	}
-	if err := service.LifecycleInTx(tx).ProvisionWallet(ctx, e.userID); err != nil {
+	if err := service.LifecycleInTx(tx).ProvisionAccountWallet(ctx, e.billingID); err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("provision wallet: %v", err)
 	}
@@ -197,7 +197,7 @@ func (e *controlCancelEnv) creditServiceFor(t *testing.T) *credits.Service {
 		t.Fatalf("grant amount: %v", err)
 	}
 	if _, err := service.InTx(tx).Grant(ctx, creditsports.GrantCommand{
-		UserID: e.userID, Amount: grant,
+		BillingAccountID: e.billingID, Amount: grant,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "control-cancel-grant-" + randomControlHex(t, 6),
 			Actor:          domain.Actor{Type: domain.ActorSystem, ID: "test"},
@@ -225,7 +225,7 @@ func (e *controlCancelEnv) holdForTask(t *testing.T, service *credits.Service, t
 		t.Fatalf("hold amount: %v", err)
 	}
 	result, err := service.Hold(ctx, creditsports.HoldCommand{
-		UserID: e.userID, Amount: hold,
+		BillingAccountID: e.billingID, Amount: hold,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "control-cancel-hold-" + randomControlHex(t, 6),
 			Actor:          domain.Actor{Type: domain.ActorUser, ID: fmt.Sprint(e.userID)},
@@ -264,9 +264,9 @@ VALUES ($1, (SELECT internal_id FROM workspaces WHERE public_id = $5), $2, $3, '
 	// Without the settlement row the Release leg rolls back with "not found",
 	// which would make every leg here fail for the wrong reason.
 	if _, err := e.pool.Exec(context.Background(), `
-INSERT INTO task_billing_snapshots (task_id, user_id, service, sku, display_name, price_version_id, price_version, output_resolution, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id)
-VALUES ($1, $2, 'render', 'ai-image:render', 'Render', $4, $5, '1k', 100, 1, 100, now(), $3)`,
-		taskID, e.userID, holdID, e.priceVersionID, e.priceVersion); err != nil {
+INSERT INTO task_billing_snapshots (task_id, user_id, billing_account_id, service, sku, display_name, price_version_id, price_version, output_resolution, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id)
+VALUES ($1, $2, $6, 'render', 'ai-image:render', 'Render', $4, $5, '1k', 100, 1, 100, now(), $3)`,
+		taskID, e.userID, holdID, e.priceVersionID, e.priceVersion, e.billingID); err != nil {
 		t.Fatalf("seed paid control billing snapshot %s: %v", taskID, err)
 	}
 	if _, err := e.pool.Exec(context.Background(), `

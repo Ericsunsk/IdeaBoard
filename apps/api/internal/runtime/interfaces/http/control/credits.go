@@ -34,8 +34,10 @@ type controlCreditResult struct {
 }
 
 type controlCreditWallet struct {
-	UserID             string                     `json:"user_id"`
-	DisplayName        string                     `json:"display_name"`
+	UserID             string                     `json:"user_id,omitempty"`
+	DisplayName        string                     `json:"display_name,omitempty"`
+	BillingAccountID   string                     `json:"billing_account_id,omitempty"`
+	OwnerType          string                     `json:"owner_type,omitempty"`
 	AvailableCredits   int64                      `json:"available_credits"`
 	ReservedCredits    int64                      `json:"reserved_credits"`
 	Status             string                     `json:"status"`
@@ -43,18 +45,19 @@ type controlCreditWallet struct {
 }
 
 type controlWalletRestriction struct {
-	RestrictionID string                          `json:"restriction_id"`
-	UserID        string                          `json:"user_id"`
-	DisplayName   string                          `json:"display_name"`
-	Type          string                          `json:"type"`
-	Source        string                          `json:"source"`
-	RelatedObject creditsdomain.BusinessReference `json:"related_object"`
-	Reason        string                          `json:"reason"`
-	CreatedBy     creditsdomain.Actor             `json:"created_by"`
-	CreatedAt     time.Time                       `json:"created_at"`
+	RestrictionID    string                          `json:"restriction_id"`
+	UserID           string                          `json:"user_id,omitempty"`
+	DisplayName      string                          `json:"display_name,omitempty"`
+	BillingAccountID string                          `json:"billing_account_id,omitempty"`
+	Type             string                          `json:"type"`
+	Source           string                          `json:"source"`
+	RelatedObject    creditsdomain.BusinessReference `json:"related_object"`
+	Reason           string                          `json:"reason"`
+	CreatedBy        creditsdomain.Actor             `json:"created_by"`
+	CreatedAt        time.Time                       `json:"created_at"`
 }
 
-func newControlCreditResult(result creditsports.CommandResult, userID uuid.UUID, displayName string) controlCreditResult {
+func newControlCreditResult(result creditsports.CommandResult, userID uuid.UUID, displayName, billingAccountPublicID string) controlCreditResult {
 	return controlCreditResult{
 		TransactionID: result.TransactionID,
 		CommandType:   string(result.CommandType),
@@ -64,11 +67,47 @@ func newControlCreditResult(result creditsports.CommandResult, userID uuid.UUID,
 		Wallet: controlCreditWallet{
 			UserID:             tenancy.FormatUserPublicID(userID),
 			DisplayName:        displayName,
+			BillingAccountID:   billingAccountPublicID,
 			AvailableCredits:   result.Wallet.Available,
 			ReservedCredits:    result.Wallet.Reserved,
 			ActiveRestrictions: []controlWalletRestriction{},
 		},
 	}
+}
+
+// newControlCreditAccountResult projects a fund command on an explicitly
+// addressed Billing Account (#923): funds identity is the ba_ account and
+// the operator stays on the Ledger Actor; no single-user linkage is
+// synthesized for shared/organization accounts.
+func newControlCreditAccountResult(result creditsports.CommandResult, target *controlCreditTarget) controlCreditResult {
+	return controlCreditResult{
+		TransactionID: result.TransactionID,
+		CommandType:   string(result.CommandType),
+		AmountCredits: result.Amount,
+		Replayed:      result.Replayed,
+		CreatedAt:     result.CreatedAt,
+		Wallet: controlCreditWallet{
+			BillingAccountID:   target.billingAccountPublicID,
+			OwnerType:          target.ownerType,
+			AvailableCredits:   result.Wallet.Available,
+			ReservedCredits:    result.Wallet.Reserved,
+			ActiveRestrictions: []controlWalletRestriction{},
+		},
+	}
+}
+
+// controlBillingAccountIdentity resolves the ba_ display id plus the owner
+// type for an account wallet. Unknown accounts render empty (fail-closed
+// reads already gated the operation); the numeric key never crosses.
+func (d *ContractControlDeps) controlBillingAccountIdentity(c *gin.Context, billingAccountInternalID int64) (publicID, ownerType string) {
+	if d == nil || d.BillingAccounts == nil || billingAccountInternalID <= 0 {
+		return "", ""
+	}
+	account, err := d.BillingAccounts.GetBillingAccountByInternalID(c.Request.Context(), billingAccountInternalID)
+	if err != nil {
+		return "", ""
+	}
+	return account.PublicID, account.OwnerType
 }
 
 // writeControlCreditError maps credit domain failures to contract codes.
@@ -101,7 +140,12 @@ func writeControlCreditError(c *gin.Context, err error) {
 }
 
 type controlCreditAmountRequest struct {
-	UserID              string `json:"user_id"`
+	// UserID addresses the target user's deterministic initial personal
+	// Billing Account (#916). Exactly one of UserID / BillingAccountID is
+	// required: the ba_ form addresses an explicit shared/organization
+	// account with no single-user linkage synthesized.
+	UserID              string `json:"user_id,omitempty"`
+	BillingAccountID    string `json:"billing_account_id,omitempty"`
 	AmountCredits       int64  `json:"amount_credits"`
 	BusinessReferenceID string `json:"business_reference_id"`
 }
@@ -110,6 +154,111 @@ type controlCreditLinkRequest struct {
 	controlCreditAmountRequest
 	ChargeTransactionID   string `json:"charge_transaction_id"`
 	OriginalTransactionID string `json:"original_transaction_id"`
+}
+
+// controlCreditTarget is the resolved fund-operation target: one explicit
+// Billing Account plus the optional personal-account user linkage. Funds
+// identity and operator are never conflated: the Ledger Actor is always
+// the platform-Admin operator (see controlCreditMetadata).
+type controlCreditTarget struct {
+	billingAccountID       int64
+	billingAccountPublicID string
+	ownerType              string
+	userPublicID           uuid.UUID
+	displayName            string
+	hasUser                bool
+}
+
+// resolveControlCreditTarget maps the XOR-addressed request body to one
+// explicit Billing Account. Missing/ambiguous addressing fails closed with
+// 400; unknown users or accounts surface as 404 from the seams.
+func (d *ContractControlDeps) resolveControlCreditTarget(c *gin.Context, rawUserID, rawBillingAccountID string) (*controlCreditTarget, bool) {
+	rawUserID = strings.TrimSpace(rawUserID)
+	rawBillingAccountID = strings.TrimSpace(rawBillingAccountID)
+	if (rawUserID == "") == (rawBillingAccountID == "") {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest37)
+		return nil, false
+	}
+	if rawBillingAccountID != "" {
+		publicID, ok := parseControlBillingAccountID(c, rawBillingAccountID)
+		if !ok {
+			return nil, false
+		}
+		if d == nil || d.BillingAccounts == nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable8)
+			return nil, false
+		}
+		account, err := d.BillingAccounts.GetBillingAccountByPublicID(c.Request.Context(), publicID)
+		if err != nil {
+			writeControlBillingAccountError(c, err)
+			return nil, false
+		}
+		return &controlCreditTarget{
+			billingAccountID:       account.InternalID,
+			billingAccountPublicID: account.PublicID,
+			ownerType:              account.OwnerType,
+		}, true
+	}
+	userID, resolvedPublicID, resolvedDisplayName, resolved := d.resolveControlCreditUser(c, rawUserID)
+	if !resolved {
+		return nil, false
+	}
+	if d == nil || d.Credits == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable8)
+		return nil, false
+	}
+	accountID, err := d.Credits.ResolvePersonalAccount(c.Request.Context(), userID)
+	if err != nil {
+		writeControlCreditError(c, err)
+		return nil, false
+	}
+	publicID, ownerType := d.controlBillingAccountIdentity(c, accountID)
+	return &controlCreditTarget{
+		billingAccountID:       accountID,
+		billingAccountPublicID: publicID,
+		ownerType:              ownerType,
+		userPublicID:           resolvedPublicID,
+		displayName:            resolvedDisplayName,
+		hasUser:                true,
+	}, true
+}
+
+// prepareControlCreditCommand decodes and validates the shared credit
+// mutation body (header-only idempotency key; body carries no key). The
+// target is exactly one explicit Billing Account: usr_-addressed requests
+// resolve the target user's deterministic initial personal account (#916),
+// ba_-addressed requests name the funds identity directly. Fund operations
+// address the account with the admin operator as Actor, never a user wallet.
+func (d *ContractControlDeps) prepareControlCreditCommand(c *gin.Context) (target *controlCreditTarget, amount creditsdomain.CreditAmount, chargeID, originalID, businessRefID string, ok bool) {
+	var req controlCreditLinkRequest
+	if err := contract.BindStrictJSON(c, &req); err != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest4)
+		return nil, 0, "", "", "", false
+	}
+	resolved, resolvedOK := d.resolveControlCreditTarget(c, req.UserID, req.BillingAccountID)
+	if !resolvedOK {
+		return nil, 0, "", "", "", false
+	}
+	parsed, err := creditsdomain.NewCreditAmount(req.AmountCredits)
+	if err != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest10)
+		return nil, 0, "", "", "", false
+	}
+	return resolved,
+		parsed,
+		strings.TrimSpace(req.ChargeTransactionID), strings.TrimSpace(req.OriginalTransactionID),
+		strings.TrimSpace(req.BusinessReferenceID), true
+}
+
+// renderControlCreditResult projects a fund command result: user-addressed
+// calls keep the usr_ identity linkage, account-addressed calls project the
+// ba_ funds identity with no synthesized user.
+func renderControlCreditResult(c *gin.Context, result creditsports.CommandResult, target *controlCreditTarget) {
+	if target.hasUser {
+		contract.RenderSuccess(c, newControlCreditResult(result, target.userPublicID, target.displayName, target.billingAccountPublicID))
+		return
+	}
+	contract.RenderSuccess(c, newControlCreditAccountResult(result, target))
 }
 
 // resolveControlCreditUser maps a usr_ user_id to the internal identity
@@ -147,46 +296,24 @@ func controlCreditMetadata(ctx controlContext, source, businessReferenceID strin
 	}
 }
 
-// prepareControlCreditCommand decodes and validates the shared credit
-// mutation body (header-only idempotency key; body carries no key).
-func (d *ContractControlDeps) prepareControlCreditCommand(c *gin.Context) (userID int64, publicID uuid.UUID, displayName string, amount creditsdomain.CreditAmount, chargeID, originalID, businessRefID string, ok bool) {
-	var req controlCreditLinkRequest
-	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest4)
-		return 0, uuid.Nil, "", 0, "", "", "", false
-	}
-	userID, publicID, displayName, ok = d.resolveControlCreditUser(c, req.UserID)
-	if !ok {
-		return 0, uuid.Nil, "", 0, "", "", "", false
-	}
-	parsed, err := creditsdomain.NewCreditAmount(req.AmountCredits)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest10)
-		return 0, uuid.Nil, "", 0, "", "", "", false
-	}
-	return userID, publicID, displayName, parsed,
-		strings.TrimSpace(req.ChargeTransactionID), strings.TrimSpace(req.OriginalTransactionID),
-		strings.TrimSpace(req.BusinessReferenceID), true
-}
-
 func (d *ContractControlDeps) grantControlCredits(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Credits == nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable8)
 		return
 	}
-	userID, publicID, displayName, amount, _, _, businessRefID, ok := d.prepareControlCreditCommand(c)
+	target, amount, _, _, businessRefID, ok := d.prepareControlCreditCommand(c)
 	if !ok {
 		return
 	}
 	result, err := d.Credits.Grant(c.Request.Context(), creditsports.GrantCommand{
-		UserID: userID, Amount: amount,
+		BillingAccountID: target.billingAccountID, Amount: amount,
 		Metadata: controlCreditMetadata(ctx, "control_grant", businessRefID),
 	})
 	if err != nil {
 		writeControlCreditError(c, err)
 		return
 	}
-	contract.RenderSuccess(c, newControlCreditResult(result, publicID, displayName))
+	renderControlCreditResult(c, result, target)
 }
 
 func (d *ContractControlDeps) deductControlCredits(c *gin.Context, ctx controlContext) {
@@ -194,19 +321,19 @@ func (d *ContractControlDeps) deductControlCredits(c *gin.Context, ctx controlCo
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable8)
 		return
 	}
-	userID, publicID, displayName, amount, _, _, businessRefID, ok := d.prepareControlCreditCommand(c)
+	target, amount, _, _, businessRefID, ok := d.prepareControlCreditCommand(c)
 	if !ok {
 		return
 	}
 	result, err := d.Credits.Deduct(c.Request.Context(), creditsports.DeductionCommand{
-		UserID: userID, Amount: amount,
+		BillingAccountID: target.billingAccountID, Amount: amount,
 		Metadata: controlCreditMetadata(ctx, "control_deduction", businessRefID),
 	})
 	if err != nil {
 		writeControlCreditError(c, err)
 		return
 	}
-	contract.RenderSuccess(c, newControlCreditResult(result, publicID, displayName))
+	renderControlCreditResult(c, result, target)
 }
 
 func (d *ContractControlDeps) refundControlCredits(c *gin.Context, ctx controlContext) {
@@ -214,7 +341,7 @@ func (d *ContractControlDeps) refundControlCredits(c *gin.Context, ctx controlCo
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable8)
 		return
 	}
-	userID, publicID, displayName, amount, chargeID, _, businessRefID, ok := d.prepareControlCreditCommand(c)
+	target, amount, chargeID, _, businessRefID, ok := d.prepareControlCreditCommand(c)
 	if !ok {
 		return
 	}
@@ -223,14 +350,14 @@ func (d *ContractControlDeps) refundControlCredits(c *gin.Context, ctx controlCo
 		return
 	}
 	result, err := d.Credits.Refund(c.Request.Context(), creditsports.RefundCommand{
-		UserID: userID, ChargeTransactionID: chargeID, Amount: amount,
+		BillingAccountID: target.billingAccountID, ChargeTransactionID: chargeID, Amount: amount,
 		Metadata: controlCreditMetadata(ctx, "control_refund", businessRefID),
 	})
 	if err != nil {
 		writeControlCreditError(c, err)
 		return
 	}
-	contract.RenderSuccess(c, newControlCreditResult(result, publicID, displayName))
+	renderControlCreditResult(c, result, target)
 }
 
 func (d *ContractControlDeps) correctControlCredits(c *gin.Context, ctx controlContext) {
@@ -238,7 +365,7 @@ func (d *ContractControlDeps) correctControlCredits(c *gin.Context, ctx controlC
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable8)
 		return
 	}
-	userID, publicID, displayName, amount, _, originalID, businessRefID, ok := d.prepareControlCreditCommand(c)
+	target, amount, _, originalID, businessRefID, ok := d.prepareControlCreditCommand(c)
 	if !ok {
 		return
 	}
@@ -247,14 +374,14 @@ func (d *ContractControlDeps) correctControlCredits(c *gin.Context, ctx controlC
 		return
 	}
 	result, err := d.Credits.Correct(c.Request.Context(), creditsports.CorrectionCommand{
-		UserID: userID, OriginalTransactionID: originalID, Amount: amount,
+		BillingAccountID: target.billingAccountID, OriginalTransactionID: originalID, Amount: amount,
 		Metadata: controlCreditMetadata(ctx, "control_correction", businessRefID),
 	})
 	if err != nil {
 		writeControlCreditError(c, err)
 		return
 	}
-	contract.RenderSuccess(c, newControlCreditResult(result, publicID, displayName))
+	renderControlCreditResult(c, result, target)
 }
 
 func (d *ContractControlDeps) getControlCreditWallet(c *gin.Context, _ controlContext) {
@@ -262,22 +389,30 @@ func (d *ContractControlDeps) getControlCreditWallet(c *gin.Context, _ controlCo
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable8)
 		return
 	}
-	userID, _, _, ok := d.resolveControlCreditUser(c, c.Param("user_id"))
+	userID, targetPublicID, targetDisplayName, ok := d.resolveControlCreditUser(c, c.Param("user_id"))
 	if !ok {
 		return
 	}
-	wallet, err := d.CreditReads.GetWallet(c.Request.Context(), userID)
+	accountID, err := d.CreditReads.ResolvePersonalAccount(c.Request.Context(), userID)
 	if err != nil {
 		writeControlCreditError(c, err)
 		return
 	}
-	contract.RenderSuccess(c, newControlCreditWalletView(c, d, wallet))
+	wallet, err := d.CreditReads.GetWallet(c.Request.Context(), accountID)
+	if err != nil {
+		writeControlCreditError(c, err)
+		return
+	}
+	contract.RenderSuccess(c, newControlCreditWalletView(c, d, wallet, targetPublicID, targetDisplayName))
 }
 
-func newControlCreditWalletView(c *gin.Context, d *ContractControlDeps, wallet creditsdomain.WalletDetails) controlCreditWallet {
+func newControlCreditWalletView(c *gin.Context, d *ContractControlDeps, wallet creditsdomain.WalletDetails, targetPublicID uuid.UUID, targetDisplayName string) controlCreditWallet {
+	publicID, ownerType := d.controlBillingAccountIdentity(c, wallet.BillingAccountID)
 	view := controlCreditWallet{
-		UserID:             tenancy.FormatUserPublicID(wallet.PublicID),
-		DisplayName:        wallet.DisplayName,
+		UserID:             tenancy.FormatUserPublicID(targetPublicID),
+		DisplayName:        targetDisplayName,
+		BillingAccountID:   publicID,
+		OwnerType:          ownerType,
 		AvailableCredits:   wallet.Available,
 		ReservedCredits:    wallet.Reserved,
 		Status:             string(wallet.Status),
@@ -285,23 +420,44 @@ func newControlCreditWalletView(c *gin.Context, d *ContractControlDeps, wallet c
 	}
 	for _, restriction := range wallet.ActiveRestrictions {
 		view.ActiveRestrictions = append(view.ActiveRestrictions, controlWalletRestriction{
-			RestrictionID: restriction.RestrictionID,
-			UserID:        tenancy.FormatUserPublicID(restriction.PublicID),
-			DisplayName:   restriction.DisplayName,
-			Type:          restriction.Type,
-			Source:        restriction.Source,
-			RelatedObject: restriction.RelatedObject,
-			Reason:        restriction.Reason,
-			CreatedBy:     restriction.CreatedBy,
-			CreatedAt:     restriction.CreatedAt,
+			RestrictionID:    restriction.RestrictionID,
+			UserID:           tenancy.FormatUserPublicID(targetPublicID),
+			DisplayName:      targetDisplayName,
+			BillingAccountID: publicID,
+			Type:             restriction.Type,
+			Source:           restriction.Source,
+			RelatedObject:    restriction.RelatedObject,
+			Reason:           restriction.Reason,
+			CreatedBy:        restriction.CreatedBy,
+			CreatedAt:        restriction.CreatedAt,
 		})
 	}
-	if d == nil || d.CreditUsers == nil || wallet.UserID <= 0 {
-		return view
+	return view
+}
+
+// newControlBillingAccountWalletView projects an explicitly addressed
+// account wallet (#923): funds identity is the ba_ account with its owner
+// type; no single-user linkage is attached.
+func newControlBillingAccountWalletView(c *gin.Context, d *ContractControlDeps, wallet creditsdomain.WalletDetails, publicID, ownerType string) controlCreditWallet {
+	view := controlCreditWallet{
+		BillingAccountID:   publicID,
+		OwnerType:          ownerType,
+		AvailableCredits:   wallet.Available,
+		ReservedCredits:    wallet.Reserved,
+		Status:             string(wallet.Status),
+		ActiveRestrictions: make([]controlWalletRestriction, 0, len(wallet.ActiveRestrictions)),
 	}
-	if identity, err := d.CreditUsers.ResolveID(c.Request.Context(), wallet.UserID); err == nil && identity.ID > 0 {
-		view.UserID = tenancy.FormatUserPublicID(identity.PublicID)
-		view.DisplayName = identity.DisplayName
+	for _, restriction := range wallet.ActiveRestrictions {
+		view.ActiveRestrictions = append(view.ActiveRestrictions, controlWalletRestriction{
+			RestrictionID:    restriction.RestrictionID,
+			BillingAccountID: publicID,
+			Type:             restriction.Type,
+			Source:           restriction.Source,
+			RelatedObject:    restriction.RelatedObject,
+			Reason:           restriction.Reason,
+			CreatedBy:        restriction.CreatedBy,
+			CreatedAt:        restriction.CreatedAt,
+		})
 	}
 	return view
 }
@@ -320,6 +476,59 @@ func (d *ContractControlDeps) listControlCreditLedger(c *gin.Context, _ controlC
 	if !ok {
 		return
 	}
+	accountID, err := d.CreditReads.ResolvePersonalAccount(c.Request.Context(), userID)
+	if err != nil {
+		writeControlCreditError(c, err)
+		return
+	}
+	d.listControlLedgerForAccount(c, accountID)
+}
+
+// getControlBillingAccountWallet reads one explicitly addressed account
+// wallet by its ba_ id (#923). It is the Admin repair/audit read for
+// shared and organization accounts that no single usr_ names.
+func (d *ContractControlDeps) getControlBillingAccountWallet(c *gin.Context, _ controlContext) {
+	if d == nil || d.CreditReads == nil || d.BillingAccounts == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable8)
+		return
+	}
+	publicID, ok := parseControlBillingAccountID(c, c.Param("billing_account_id"))
+	if !ok {
+		return
+	}
+	account, err := d.BillingAccounts.GetBillingAccountByPublicID(c.Request.Context(), publicID)
+	if err != nil {
+		writeControlBillingAccountError(c, err)
+		return
+	}
+	wallet, err := d.CreditReads.GetWallet(c.Request.Context(), account.InternalID)
+	if err != nil {
+		writeControlCreditError(c, err)
+		return
+	}
+	contract.RenderSuccess(c, newControlBillingAccountWalletView(c, d, wallet, account.PublicID, account.OwnerType))
+}
+
+// listControlBillingAccountLedger pages the Ledger of one explicitly
+// addressed account by its ba_ id (#923).
+func (d *ContractControlDeps) listControlBillingAccountLedger(c *gin.Context, _ controlContext) {
+	if d == nil || d.CreditReads == nil || d.BillingAccounts == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable8)
+		return
+	}
+	publicID, ok := parseControlBillingAccountID(c, c.Param("billing_account_id"))
+	if !ok {
+		return
+	}
+	account, err := d.BillingAccounts.GetBillingAccountByPublicID(c.Request.Context(), publicID)
+	if err != nil {
+		writeControlBillingAccountError(c, err)
+		return
+	}
+	d.listControlLedgerForAccount(c, account.InternalID)
+}
+
+func (d *ContractControlDeps) listControlLedgerForAccount(c *gin.Context, accountID int64) {
 	cursor, ok := parseControlPageCursor(c, func(cursor *controlLedgerCursor) bool { return cursor.Before > 0 })
 	if !ok {
 		return
@@ -333,9 +542,9 @@ func (d *ContractControlDeps) listControlCreditLedger(c *gin.Context, _ controlC
 		return
 	}
 	page, err := d.CreditReads.ListLedger(c.Request.Context(), creditsdomain.ListLedgerInput{
-		UserID:         userID,
-		BeforeSequence: before,
-		Limit:          limit,
+		BillingAccountID: accountID,
+		BeforeSequence:   before,
+		Limit:            limit,
 	})
 	if err != nil {
 		writeControlCreditError(c, err)

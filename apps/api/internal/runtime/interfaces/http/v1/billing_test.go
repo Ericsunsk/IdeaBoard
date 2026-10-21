@@ -40,6 +40,9 @@ var billingTestNow = time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
 type fakeBillingAccounts struct {
 	mu       sync.Mutex
 	accounts map[int64]tenancypg.BillingAccount
+	byPublic map[string]int64
+	roles    map[int64]map[int64]string
+	deny     map[int64]bool
 	calls    int
 }
 
@@ -51,6 +54,9 @@ func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Conte
 		return existing, nil
 	}
 	account := tenancypg.BillingAccount{
+		InternalID:          workspaceInternalID,
+		PublicID:            "ba_test_" + workspacePublicID,
+		OwnerType:           tenancypg.BillingOwnerWorkspace,
 		WorkspaceInternalID: workspaceInternalID,
 		WorkspacePublicID:   workspacePublicID,
 		CreatedAt:           billingTestNow,
@@ -59,8 +65,180 @@ func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Conte
 	if f.accounts == nil {
 		f.accounts = make(map[int64]tenancypg.BillingAccount)
 	}
+	if f.byPublic == nil {
+		f.byPublic = make(map[string]int64)
+	}
 	f.accounts[workspaceInternalID] = account
+	f.byPublic[account.PublicID] = workspaceInternalID
 	return account, nil
+}
+
+func (f *fakeBillingAccounts) GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancypg.BillingAccount, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.byPublic != nil {
+		if internalID, ok := f.byPublic[publicID]; ok {
+			if account, ok := f.accounts[internalID]; ok {
+				return account, nil
+			}
+		}
+	}
+	for _, account := range f.accounts {
+		if account.PublicID == publicID {
+			return account, nil
+		}
+	}
+	return tenancypg.BillingAccount{}, tenancy.ErrBillingNotFound
+}
+
+func (f *fakeBillingAccounts) GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancypg.BillingAccount, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if account, ok := f.accounts[billingAccountInternalID]; ok {
+		return account, nil
+	}
+	return tenancypg.BillingAccount{}, tenancy.ErrBillingNotFound
+}
+
+func (f *fakeBillingAccounts) GetBillingAccountRole(ctx context.Context, billingAccountInternalID, userID int64) (string, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.deny != nil && f.deny[userID] {
+		return "", false, nil
+	}
+	if f.roles != nil {
+		if byUser, ok := f.roles[billingAccountInternalID]; ok {
+			if role, ok := byUser[userID]; ok {
+				return role, true, nil
+			}
+			return "", false, nil
+		}
+	}
+	return tenancy.BillingRoleOwner, true, nil
+}
+
+func (f *fakeBillingAccounts) ListBillingAccountMembers(ctx context.Context, billingAccountInternalID, actorUserID int64) ([]tenancy.BillingAccountMember, error) {
+	role, ok, err := f.GetBillingAccountRole(ctx, billingAccountInternalID, actorUserID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok || !tenancy.IsBillingManager(role) {
+		return nil, tenancy.ErrBillingForbidden
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []tenancy.BillingAccountMember
+	if byUser, ok := f.roles[billingAccountInternalID]; ok {
+		for userID, r := range byUser {
+			out = append(out, tenancy.BillingAccountMember{BillingAccountID: billingAccountInternalID, UserID: userID, Role: r})
+		}
+	} else {
+		out = append(out, tenancy.BillingAccountMember{BillingAccountID: billingAccountInternalID, UserID: actorUserID, Role: tenancy.BillingRoleOwner})
+	}
+	return out, nil
+}
+
+func (f *fakeBillingAccounts) AddBillingAccountMember(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, role string) (*tenancy.BillingAccountMember, error) {
+	actorRole, ok, err := f.GetBillingAccountRole(ctx, billingAccountInternalID, actorUserID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, tenancy.ErrBillingForbidden
+	}
+	if err := tenancy.CheckBillingMemberAdd(actorRole, role); err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.roles == nil {
+		f.roles = make(map[int64]map[int64]string)
+	}
+	if f.roles[billingAccountInternalID] == nil {
+		f.roles[billingAccountInternalID] = make(map[int64]string)
+		// The permissive default owner materializes on first write so
+		// later role lookups for the granting owner keep succeeding.
+		f.roles[billingAccountInternalID][actorUserID] = actorRole
+	}
+	f.roles[billingAccountInternalID][targetUserID] = role
+	return &tenancy.BillingAccountMember{BillingAccountID: billingAccountInternalID, UserID: targetUserID, Role: role}, nil
+}
+
+func (f *fakeBillingAccounts) UpdateBillingAccountMemberRole(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, newRole string) (*tenancy.BillingAccountMember, error) {
+	actorRole, _, err := f.GetBillingAccountRole(ctx, billingAccountInternalID, actorUserID)
+	if err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	byUser := f.roles[billingAccountInternalID]
+	current := ""
+	if byUser != nil {
+		current = byUser[targetUserID]
+	}
+	owners := 0
+	for _, r := range byUser {
+		if r == tenancy.BillingRoleOwner {
+			owners++
+		}
+	}
+	if owners == 0 {
+		owners = 1
+		if current == "" {
+			current = tenancy.BillingRoleAdmin
+		}
+	}
+	if err := tenancy.CheckBillingMemberMutation(actorRole, actorUserID, targetUserID, current, newRole, owners, false); err != nil {
+		return nil, err
+	}
+	if f.roles == nil {
+		f.roles = make(map[int64]map[int64]string)
+	}
+	if f.roles[billingAccountInternalID] == nil {
+		f.roles[billingAccountInternalID] = make(map[int64]string)
+	}
+	f.roles[billingAccountInternalID][targetUserID] = newRole
+	return &tenancy.BillingAccountMember{BillingAccountID: billingAccountInternalID, UserID: targetUserID, Role: newRole}, nil
+}
+
+func (f *fakeBillingAccounts) TransferBillingAccountOwnership(ctx context.Context, billingAccountInternalID, currentOwnerID, newOwnerID int64) error {
+	role, ok, err := f.GetBillingAccountRole(ctx, billingAccountInternalID, currentOwnerID)
+	if err != nil {
+		return err
+	}
+	if !ok || !tenancy.IsBillingOwner(role) {
+		return tenancy.ErrBillingForbidden
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.roles == nil {
+		f.roles = make(map[int64]map[int64]string)
+	}
+	if f.roles[billingAccountInternalID] == nil {
+		f.roles[billingAccountInternalID] = make(map[int64]string)
+	}
+	f.roles[billingAccountInternalID][newOwnerID] = tenancy.BillingRoleOwner
+	f.roles[billingAccountInternalID][currentOwnerID] = tenancy.BillingRoleAdmin
+	return nil
+}
+
+func (f *fakeBillingAccounts) LinkWorkspaceToBillingAccount(ctx context.Context, workspaceInternalID, billingAccountInternalID, actorUserID int64) error {
+	role, ok, err := f.GetBillingAccountRole(ctx, billingAccountInternalID, actorUserID)
+	if err != nil {
+		return err
+	}
+	if !ok || !tenancy.IsBillingManager(role) {
+		return tenancy.ErrBillingForbidden
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	target, ok := f.accounts[billingAccountInternalID]
+	if !ok {
+		return tenancy.ErrBillingNotFound
+	}
+	target.Shared = true
+	f.accounts[workspaceInternalID] = target
+	return nil
 }
 
 type fakeBillingWallets struct {
@@ -70,13 +248,13 @@ type fakeBillingWallets struct {
 	getErr  map[int64]error
 }
 
-func (f *fakeBillingWallets) GetWallet(ctx context.Context, userID int64) (domain.WalletDetails, error) {
+func (f *fakeBillingWallets) GetWallet(ctx context.Context, billingAccountID int64) (domain.WalletDetails, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if err, ok := f.getErr[userID]; ok {
+	if err, ok := f.getErr[billingAccountID]; ok {
 		return domain.WalletDetails{}, err
 	}
-	wallet, ok := f.wallets[userID]
+	wallet, ok := f.wallets[billingAccountID]
 	if !ok {
 		return domain.WalletDetails{}, domain.ErrWalletNotFound
 	}
@@ -88,11 +266,11 @@ func (f *fakeBillingWallets) GetWallet(ctx context.Context, userID int64) (domai
 func (f *fakeBillingWallets) ListLedger(ctx context.Context, input domain.ListLedgerInput) (domain.LedgerPage, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if err, ok := f.getErr[input.UserID]; ok {
+	if err, ok := f.getErr[input.BillingAccountID]; ok {
 		return domain.LedgerPage{}, err
 	}
 	var filtered []domain.LedgerTransaction
-	for _, tx := range f.ledgers[input.UserID] {
+	for _, tx := range f.ledgers[input.BillingAccountID] {
 		if input.BeforeSequence <= 0 || tx.SequenceID < input.BeforeSequence {
 			filtered = append(filtered, tx)
 		}
@@ -113,9 +291,10 @@ func (f *fakeBillingWallets) ListLedger(ctx context.Context, input domain.ListLe
 }
 
 type fakeBillingRecords struct {
-	mu      sync.Mutex
-	records map[int64][]billingrecordsports.Record
-	err     error
+	mu        sync.Mutex
+	records   map[int64][]billingrecordsports.Record
+	lastInput billingrecordsports.ListInput
+	err       error
 }
 
 func (f *fakeBillingRecords) List(ctx context.Context, input billingrecordsports.ListInput) (billingrecordsports.Page, error) {
@@ -124,7 +303,8 @@ func (f *fakeBillingRecords) List(ctx context.Context, input billingrecordsports
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	all := f.records[input.UserID]
+	f.lastInput = input
+	all := f.records[input.BillingAccountID]
 	limit := input.Limit
 	if limit <= 0 {
 		limit = 20
@@ -140,11 +320,15 @@ func (f *fakeBillingRecords) List(ctx context.Context, input billingrecordsports
 }
 
 type fakeBillingUsage struct {
-	snapshot usageapplication.Usage
-	err      error
+	snapshot      usageapplication.Usage
+	lastFilter    domain.UsageFilter
+	lastAccountID int64
+	err           error
 }
 
-func (f *fakeBillingUsage) GetCurrent(ctx context.Context, userID int64, usageRange usagedomain.Range) (usageapplication.Usage, error) {
+func (f *fakeBillingUsage) GetCurrent(ctx context.Context, userID int64, filter domain.UsageFilter, usageRange usagedomain.Range) (usageapplication.Usage, error) {
+	f.lastFilter = filter
+	f.lastAccountID = userID
 	if f.err != nil {
 		return usageapplication.Usage{}, f.err
 	}
@@ -177,15 +361,17 @@ func (fakeBillingQuoter) QuoteAtResolution(ctx context.Context, rawSKU string, r
 type fakeWorkspaceCheckout struct {
 	mu       sync.Mutex
 	sessions map[string]workspaceCheckoutStatus
-	create   func(ctx context.Context, userID int64, workspacePublicID, clientKey string, input workspaceCheckoutInput) (workspaceCheckoutResult, error)
+	lastBill int64
+	create   func(ctx context.Context, billingAccountID, userID int64, workspacePublicID, clientKey string, input workspaceCheckoutInput) (workspaceCheckoutResult, error)
 }
 
-func (f *fakeWorkspaceCheckout) CreateWorkspaceCheckout(ctx context.Context, userID int64, workspacePublicID, clientKey string, input workspaceCheckoutInput) (workspaceCheckoutResult, error) {
+func (f *fakeWorkspaceCheckout) CreateWorkspaceCheckout(ctx context.Context, billingAccountID, userID int64, workspacePublicID, clientKey string, input workspaceCheckoutInput) (workspaceCheckoutResult, error) {
 	if f.create != nil {
-		return f.create(ctx, userID, workspacePublicID, clientKey, input)
+		return f.create(ctx, billingAccountID, userID, workspacePublicID, clientKey, input)
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.lastBill = billingAccountID
 	if f.sessions == nil {
 		f.sessions = make(map[string]workspaceCheckoutStatus)
 	}
@@ -204,9 +390,10 @@ func (f *fakeWorkspaceCheckout) CreateWorkspaceCheckout(ctx context.Context, use
 	return workspaceCheckoutResult{SessionID: status.SessionID, CheckoutURL: status.CheckoutURL, ExpiresAt: status.ExpiresAt}, nil
 }
 
-func (f *fakeWorkspaceCheckout) GetWorkspaceCheckout(ctx context.Context, userID int64, workspacePublicID, sessionID string) (workspaceCheckoutStatus, error) {
+func (f *fakeWorkspaceCheckout) GetWorkspaceCheckout(ctx context.Context, billingAccountID int64, sessionID string) (workspaceCheckoutStatus, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.lastBill = billingAccountID
 	if status, ok := f.sessions[sessionID]; ok {
 		return status, nil
 	}
@@ -262,11 +449,22 @@ func (fx *billingTestFixture) engine() *gin.Engine {
 	return engine
 }
 
-func (fx *billingTestFixture) seedWallet(userID int64, available, reserved int64) {
-	fx.wallets.wallets[userID] = domain.WalletDetails{
-		WalletBalance: domain.WalletBalance{Available: available, Reserved: reserved},
+func (fx *billingTestFixture) seedWallet(billingAccountID int64, available, reserved int64) {
+	fx.wallets.wallets[billingAccountID] = domain.WalletDetails{
+		WalletBalance: domain.WalletBalance{BillingAccountID: billingAccountID, Available: available, Reserved: reserved},
 		Status:        domain.WalletStatusActive,
 	}
+}
+
+// mustAccount resolves the stable funds identity for a fixture workspace:
+// reads seed the account wallet, never a user wallet (#916).
+func (fx *billingTestFixture) mustAccount(t *testing.T, ctx context.Context, ws *tenancy.Workspace) int64 {
+	t.Helper()
+	account, err := fx.accounts.EnsureBillingAccountForWorkspace(ctx, ws.InternalID, ws.PublicID)
+	if err != nil {
+		t.Fatalf("resolve fixture billing account: %v", err)
+	}
+	return account.InternalID
 }
 
 func billingCheckoutBody(quantity int64) string {
@@ -335,7 +533,7 @@ func TestV1BillingRestrictedWalletDenied(t *testing.T) {
 	ctx := context.Background()
 	fx := newBillingTestFixture()
 	ws := v1WorkspaceFixture(t, ctx, fx.store, "billing", 11)
-	fx.wallets.getErr[11] = domain.ErrWalletRestricted
+	fx.wallets.getErr[fx.mustAccount(t, ctx, ws)] = domain.ErrWalletRestricted
 	engine := fx.engine()
 
 	status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/credits/balance", userID: 11})
@@ -352,9 +550,10 @@ func TestV1BillingBalanceAndLedgerCursor(t *testing.T) {
 	ctx := context.Background()
 	fx := newBillingTestFixture()
 	ws := v1WorkspaceFixture(t, ctx, fx.store, "billing", 11)
-	fx.seedWallet(11, 980, 20)
+	accountID := fx.mustAccount(t, ctx, ws)
+	fx.seedWallet(accountID, 980, 20)
 	for i := int64(1); i <= 3; i++ {
-		fx.wallets.ledgers[11] = append(fx.wallets.ledgers[11], domain.LedgerTransaction{
+		fx.wallets.ledgers[accountID] = append(fx.wallets.ledgers[accountID], domain.LedgerTransaction{
 			SequenceID: i, TransactionID: fmt.Sprintf("tx-%d", i),
 			CommandType: domain.CommandCapture, Amount: 20,
 			AvailableBalanceAfter: 1000 - 20*i, ReservedBalanceAfter: 20,
@@ -404,10 +603,60 @@ func TestV1BillingBalanceAndLedgerCursor(t *testing.T) {
 	}
 }
 
+// TestV1BillingSharedBalanceSameAccount pins issue #922 rule 1 at the
+// read edge: two Workspaces sharing one Billing Account report the same
+// payer account and the same balance, while an independent account stays
+// isolated. The balance names its workspace (consumption location) plus
+// the stable payer account; it never derives from the Workspace Owner.
+func TestV1BillingSharedBalanceSameAccount(t *testing.T) {
+	ctx := context.Background()
+	fx := newBillingTestFixture()
+	wsA := v1WorkspaceFixture(t, ctx, fx.store, "billing-shared-a", 11)
+	wsB := v1WorkspaceFixture(t, ctx, fx.store, "billing-shared-b", 11)
+	accountA := fx.mustAccount(t, ctx, wsA)
+	fx.seedWallet(accountA, 980, 20)
+	if err := fx.accounts.LinkWorkspaceToBillingAccount(ctx, wsB.InternalID, accountA, 11); err != nil {
+		t.Fatalf("link shared account: %v", err)
+	}
+	engine := fx.engine()
+
+	readBalance := func(wsID string) map[string]any {
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + wsID + "/credits/balance", userID: 11})
+		if status != http.StatusOK {
+			t.Fatalf("balance %s status = %d (%v)", wsID, status, payload)
+		}
+		return v1Data(t, payload).(map[string]any)
+	}
+	first := readBalance(wsA.PublicID)
+	second := readBalance(wsB.PublicID)
+	if first["billing_account_id"] == "" || first["billing_account_id"] != second["billing_account_id"] {
+		t.Fatalf("shared balance accounts = %v vs %v, want one stable payer", first["billing_account_id"], second["billing_account_id"])
+	}
+	if first["available_credits"] != float64(980) || second["available_credits"] != float64(980) {
+		t.Fatalf("shared balances = %v vs %v, want 980/980", first["available_credits"], second["available_credits"])
+	}
+	if first["workspace_id"] != wsA.PublicID || second["workspace_id"] != wsB.PublicID {
+		t.Fatalf("balance workspace scope = %v vs %v, want per-workspace consumption location", first["workspace_id"], second["workspace_id"])
+	}
+
+	// An independent workspace keeps its own isolated account and balance.
+	wsC := v1WorkspaceFixture(t, ctx, fx.store, "billing-shared-c", 11)
+	accountC := fx.mustAccount(t, ctx, wsC)
+	fx.seedWallet(accountC, 10, 0)
+	third := readBalance(wsC.PublicID)
+	if third["billing_account_id"] == first["billing_account_id"] {
+		t.Fatalf("independent balance account = %v, want isolation from %v", third["billing_account_id"], first["billing_account_id"])
+	}
+	if third["available_credits"] != float64(10) {
+		t.Fatalf("independent balance = %v, want 10", third["available_credits"])
+	}
+}
+
 func TestV1BillingCheckoutIdempotency(t *testing.T) {
 	ctx := context.Background()
 	fx := newBillingTestFixture()
 	ws := v1WorkspaceFixture(t, ctx, fx.store, "billing", 11)
+	accountID := fx.mustAccount(t, ctx, ws)
 	engine := fx.engine()
 	path := "/api/v1/workspaces/" + ws.PublicID + "/checkout-sessions"
 
@@ -428,6 +677,12 @@ func TestV1BillingCheckoutIdempotency(t *testing.T) {
 	sessionID, _ := v1Data(t, first).(map[string]any)["session_id"].(string)
 	if sessionID == "" {
 		t.Fatalf("checkout must return an opaque session_id: %v", first)
+	}
+	if v1Data(t, first).(map[string]any)["billing_account_id"] != "ba_test_"+ws.PublicID {
+		t.Fatalf("checkout must name its explicit target account: %v", first)
+	}
+	if fx.checkout.lastBill != accountID {
+		t.Fatalf("checkout payer = %d, want stable account %d", fx.checkout.lastBill, accountID)
 	}
 
 	status, replayed := call(billingCheckoutBody(1000), "checkout-key-1")
@@ -480,16 +735,52 @@ func TestV1BillingCheckoutSessionGet(t *testing.T) {
 	if status != http.StatusNotFound || v1ErrorCode(t, missing) != string(contract.CodeBillingSessionNotFound) {
 		t.Fatalf("missing session = %d %v, want 404 billing_session_not_found", status, missing)
 	}
+	if v1Data(t, got).(map[string]any)["billing_account_id"] != "ba_test_"+ws.PublicID {
+		t.Fatalf("session must name its payer account: %v", got)
+	}
+}
+
+// TestV1BillingFinanceRequiresBillingGrant pins the #919 financial
+// boundary on the checkout surface: a workspace admin without a Billing
+// Owner/Admin grant observes no session facts and cannot top up. The
+// purchase-options/pending/recharges matrix lives in billing_gaps_test.go,
+// where those seams are wired.
+func TestV1BillingFinanceRequiresBillingGrant(t *testing.T) {
+	ctx := context.Background()
+	fx := newBillingTestFixture()
+	ws := v1WorkspaceFixture(t, ctx, fx.store, "billing", 11)
+	if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, 12, tenancy.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	fx.accounts.deny = map[int64]bool{12: true}
+	engine := fx.engine()
+	base := "/api/v1/workspaces/" + ws.PublicID
+
+	status, _, created := doV1(t, engine, v1Call{method: http.MethodPost, path: base + "/checkout-sessions", body: billingCheckoutBody(1000), userID: 11, headers: map[string]string{contract.IdempotencyKeyHeader: "grant-key-1"}})
+	if status != http.StatusCreated {
+		t.Fatalf("manager checkout = %d (%v)", status, created)
+	}
+	sessionID := v1Data(t, created).(map[string]any)["session_id"].(string)
+
+	status, _, forbiddenGet := doV1(t, engine, v1Call{method: http.MethodGet, path: base + "/checkout-sessions/" + sessionID, userID: 12})
+	if status != http.StatusForbidden || v1ErrorCode(t, forbiddenGet) != string(contract.CodeBillingAccountForbidden) {
+		t.Fatalf("space-only admin session read = %d %v, want 403 billing_account_forbidden", status, forbiddenGet)
+	}
+	status, _, forbiddenCreate := doV1(t, engine, v1Call{method: http.MethodPost, path: base + "/checkout-sessions", body: billingCheckoutBody(1000), userID: 12, headers: map[string]string{contract.IdempotencyKeyHeader: "grant-key-4"}})
+	if status != http.StatusForbidden || v1ErrorCode(t, forbiddenCreate) != string(contract.CodeBillingAccountForbidden) {
+		t.Fatalf("space-only admin checkout = %d %v, want 403 billing_account_forbidden", status, forbiddenCreate)
+	}
 }
 
 func TestV1BillingRecordsAndUsage(t *testing.T) {
 	ctx := context.Background()
 	fx := newBillingTestFixture()
 	ws := v1WorkspaceFixture(t, ctx, fx.store, "billing", 11)
-	fx.seedWallet(11, 980, 0)
-	fx.records.records[11] = []billingrecordsports.Record{{
+	accountID := fx.mustAccount(t, ctx, ws)
+	fx.seedWallet(accountID, 980, 0)
+	fx.records.records[accountID] = []billingrecordsports.Record{{
 		RecordID: "record-1", OccurredAt: billingTestNow, Kind: billingrecordsports.KindTopUp,
-		Title: "Idea 充值", CreditDelta: 1000, AvailableCreditsAfter: 1980,
+		Title: "Idea 充值", CreditDelta: 1000, AvailableCreditsAfter: func() *int64 { n := int64(1980); return &n }(),
 	}}
 	engine := fx.engine()
 
@@ -527,7 +818,7 @@ func TestV1BillingUsageAndRecordsInvalidInput(t *testing.T) {
 	t.Run("usage invalid user id is 400", func(t *testing.T) {
 		fx := newBillingTestFixture()
 		ws := v1WorkspaceFixture(t, ctx, fx.store, "billing", 11)
-		fx.usage.err = usageports.ErrInvalidUserID
+		fx.usage.err = usageports.ErrInvalidBillingAccountID
 		engine := fx.engine()
 		status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/usage", userID: 11})
 		if status != http.StatusBadRequest || v1ErrorCode(t, payload) != string(contract.CodeBadRequest) {
@@ -629,4 +920,91 @@ func TestV1BillingQuoteToSettlementStub(t *testing.T) {
 		t.Fatalf("settlement = %d %v, want single balanced Purchase appending 1000", after, postings)
 	}
 	var _ = paymentcontracts.CheckoutResult{}
+}
+
+// Full-account financial reads require a separate Billing grant. Workspace
+// membership, including Workspace Owner/Admin, never grants that scope.
+func TestV1BillingAccountReadsRequireFinancialGrant(t *testing.T) {
+	ctx := context.Background()
+	fx := newBillingTestFixture()
+	ws := v1WorkspaceFixture(t, ctx, fx.store, "financial-reads", 11)
+	accountID := fx.mustAccount(t, ctx, ws)
+	fx.seedWallet(accountID, 980, 0)
+	fx.accounts.deny = map[int64]bool{11: true, 12: true, 13: true}
+	for _, member := range []struct {
+		userID int64
+		role   string
+	}{{11, tenancy.RoleOwner}, {12, tenancy.RoleAdmin}, {13, tenancy.RoleMember}} {
+		if member.userID != 11 {
+			if _, err := fx.store.AddWorkspaceMember(ctx, ws.PublicID, member.userID, member.role); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, suffix := range []string{"/credits/ledger"} {
+			status, _, payload := doV1(t, fx.engine(), v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + suffix, userID: member.userID})
+			if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeBillingAccountForbidden) {
+				t.Fatalf("%s %s = %d %v", member.role, suffix, status, payload)
+			}
+		}
+		status, _, payload := doV1(t, fx.engine(), v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/usage", userID: member.userID})
+		if status != http.StatusOK {
+			t.Fatalf("%s scoped usage = %d %v", member.role, status, payload)
+		}
+		expected := domain.UsageFilter{WorkspaceID: ws.InternalID}
+		if member.role == tenancy.RoleMember {
+			expected = domain.UsageFilter{ActorUserID: member.userID}
+		}
+		status, _, payload = doV1(t, fx.engine(), v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/billing-records", userID: member.userID})
+		if status != http.StatusOK || (fx.records.lastInput.WorkspaceID != expected.WorkspaceID || fx.records.lastInput.ActorUserID != expected.ActorUserID) || fx.records.lastInput.BillingAccountID != accountID {
+			t.Fatalf("%s scoped records = %d %v input=%+v, want %+v", member.role, status, payload, fx.records.lastInput, expected)
+		}
+		status, _, payload = doV1(t, fx.engine(), v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/billing-account", userID: member.userID})
+		expectedScope := "workspace"
+		if member.role == tenancy.RoleMember {
+			expectedScope = "member"
+		}
+		if status != http.StatusOK || v1Data(t, payload).(map[string]any)["consumption_scope"] != expectedScope {
+			t.Fatalf("%s billing-account scope=%d %v", member.role, status, payload)
+		}
+		if fx.usage.lastFilter != expected || fx.usage.lastAccountID != accountID {
+			t.Fatalf("%s usage filter/account = %+v/%d, want %+v/%d", member.role, fx.usage.lastFilter, fx.usage.lastAccountID, expected, accountID)
+		}
+	}
+
+	// A Billing Admin with only ordinary Workspace membership can read the
+	// account, proving this is a financial-role gate rather than a space rank.
+	delete(fx.accounts.deny, 13)
+	fx.accounts.roles = map[int64]map[int64]string{accountID: {13: tenancy.BillingRoleAdmin}}
+	for _, suffix := range []string{"/credits/ledger", "/billing-records", "/usage"} {
+		status, _, payload := doV1(t, fx.engine(), v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + suffix, userID: 13})
+		if status != http.StatusOK {
+			t.Fatalf("Billing Admin %s = %d %v", suffix, status, payload)
+		}
+	}
+	if fx.records.lastInput.WorkspaceID != 0 || fx.records.lastInput.ActorUserID != 0 {
+		t.Fatalf("financial admin records scoped unexpectedly: %+v", fx.records.lastInput)
+	}
+	if fx.usage.lastFilter != (domain.UsageFilter{}) {
+		t.Fatalf("financial admin scoped unexpectedly: %+v", fx.usage.lastFilter)
+	}
+
+}
+
+func TestV1BillingCheckoutKeysDoNotConflictAcrossAccounts(t *testing.T) {
+	fx := newBillingTestFixture()
+	first := v1WorkspaceFixture(t, t.Context(), fx.store, "first-account", 11)
+	second := v1WorkspaceFixture(t, t.Context(), fx.store, "second-account", 11)
+	engine := fx.engine()
+	var previousSession string
+	for _, workspace := range []*tenancy.Workspace{first, second} {
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodPost, path: "/api/v1/workspaces/" + workspace.PublicID + "/checkout-sessions", body: billingCheckoutBody(1000), userID: 11, headers: map[string]string{contract.IdempotencyKeyHeader: "same-account-manager-key"}})
+		if status != http.StatusCreated {
+			t.Fatalf("independent checkout = %d %v", status, payload)
+		}
+		session := v1Data(t, payload).(map[string]any)["session_id"].(string)
+		if session == previousSession {
+			t.Fatal("another account's session was replayed")
+		}
+		previousSession = session
+	}
 }

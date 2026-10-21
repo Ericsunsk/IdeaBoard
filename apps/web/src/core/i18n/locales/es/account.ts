@@ -78,6 +78,8 @@ export default {
     codeLabel: 'Introduce el código de canje',
     codePlaceholder: 'Introduce el código de canje',
     redeem: 'Canjear',
+    beneficiaryNote:
+      'Las recompensas se abonan a tu cuenta personal. El espacio de trabajo actual no cambia el beneficiario.',
     historyTitle: 'Historial de canjes',
     tableAria: 'Tabla de historial de canjes',
     emptyTitle: 'Aún no hay canjes',
@@ -105,6 +107,11 @@ export default {
     retryLoad: 'Reintentar',
     loadMore: 'Cargar más',
     unknownTime: 'Hora desconocida',
+    sharedAccount:
+      'Cuenta de saldo compartido {account}: todos los espacios de trabajo de esta cuenta muestran el mismo saldo.',
+    forbiddenTitle: 'Acceso restringido',
+    forbiddenDescription:
+      'Tu rol actual no puede ver estos registros. Contacta con un administrador del espacio o de facturación.',
     kinds: {
       usage: 'Uso',
       reward: 'Recompensa',
@@ -135,6 +142,10 @@ export default {
     rangeWeek: 'Semana',
     rangeMonth: 'Mes',
     rangeYear: 'Año',
+    sharedAccount: 'Uso de la cuenta compartida {account}.',
+    forbiddenTitle: 'Acceso restringido',
+    forbiddenDescription:
+      'Tu rol actual no puede ver este uso. Contacta con un administrador del espacio o de facturación.',
     genericError: 'Inténtelo de nuevo más tarde.',
   },
   topUp: {
@@ -146,6 +157,7 @@ export default {
     reasonRestricted: 'Esta cuenta no puede recargar en este momento.',
     reasonDefault: 'El servicio de recarga aún no está listo. Inténtelo de nuevo más tarde.',
     chooseQuantity: 'Elija un importe',
+    targetAccount: 'Cuenta de destino de la recarga {account}',
     packagesAria: 'Paquetes de recarga rápida',
     customQuantity: 'Importe personalizado',
     payNow: 'Pagar ahora',
@@ -243,7 +255,7 @@ export default {
     quantityIntegerRange: 'Introduce un número entero entre {min} y {max}.',
     quantityBelowMin: 'La recarga mínima es de {min} Ideas.',
     quantityAboveMax: 'La recarga máxima es de {max} Ideas.',
+    billingAccountLoadFailed: 'No se pudo cargar la cuenta de facturación.',
     workspaceRequired: 'Seleccione un espacio de trabajo para ver la información de facturación.',
-    featureUnavailable: 'Esta función no está disponible actualmente.',
   },
 } as const

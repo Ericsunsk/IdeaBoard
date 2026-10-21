@@ -14,11 +14,13 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 	db := testdb.Open(t)
 	repo := newTestPaymentStores(db)
 	configuration := publishTestStripeConfiguration(t, repo, "acct_order", "prod_idea")
+	payer := paymentBillingAccount(t, db, 42)
 	input := paymentsdomain.CreatePaymentOrderIntentInput{
 		ID:                   "0198cd29-f457-7e4b-b95e-6cfde41b7111",
 		PublicOrderNumber:    "IBP-20260801-ABC123DEF456",
 		PublicToken:          "0198cd29-f457-7e4b-b95e-6cfde41b7222",
 		UserID:               42,
+		BillingAccountID:     payer,
 		ClientIdempotencyKey: "checkout-request-1",
 		RequestHash:          "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
 		StripeCredentialID:   configuration.CredentialID,
@@ -38,12 +40,15 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 	if reused || first.Status != paymentsdomain.PaymentOrderCreating || first.PublicToken != input.PublicToken {
 		t.Fatalf("first order=%+v reused=%t", first, reused)
 	}
+	if first.BillingAccountID != payer || first.UserID != 42 {
+		t.Fatalf("order attribution account=%d user=%d, want %d/42", first.BillingAccountID, first.UserID, payer)
+	}
 
 	replayed, reused, err := repo.CreatePaymentOrderIntent(t.Context(), paymentsdomain.CreatePaymentOrderIntentInput{
 		ID:                "0198cd29-f457-7e4b-b95e-6cfde41b7333",
 		PublicOrderNumber: "IBP-20260801-XYZ123DEF456",
 		PublicToken:       "0198cd29-f457-7e4b-b95e-6cfde41b7444",
-		UserID:            input.UserID, ClientIdempotencyKey: input.ClientIdempotencyKey,
+		UserID:            input.UserID, BillingAccountID: input.BillingAccountID, ClientIdempotencyKey: input.ClientIdempotencyKey,
 		RequestHash: input.RequestHash, StripeCredentialID: input.StripeCredentialID, StripeAccountID: input.StripeAccountID,
 		StripeProductID: input.StripeProductID, IdeaQuantity: input.IdeaQuantity,
 		TermsVersion:        input.TermsVersion,
@@ -59,8 +64,17 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 		t.Fatalf("conflict error=%v, want paymentsdomain.ErrCheckoutIdempotencyConflict", err)
 	}
 
+	// Cross-account key reuse never replays another account's order: same
+	// key + same hash under a different payer fails closed.
+	ensurePaymentsTestUser(t, db, 43)
+	foreign := input
+	foreign.BillingAccountID = paymentBillingAccount(t, db, 43)
+	if _, _, err := repo.CreatePaymentOrderIntent(t.Context(), foreign); !errors.Is(err, paymentsdomain.ErrCheckoutIdempotencyConflict) {
+		t.Fatalf("cross-account reuse error=%v, want paymentsdomain.ErrCheckoutIdempotencyConflict", err)
+	}
+
 	var count int
-	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = 42`).Scan(&count); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE billing_account_id = $1`, payer).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != 1 {
@@ -69,9 +83,11 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 }
 
 func TestCreatePaymentOrderIntentRejectsInvalidStripeCredentialID(t *testing.T) {
-	repo := newTestPaymentStores(testdb.Open(t))
+	db := testdb.Open(t)
+	repo := newTestPaymentStores(db)
 	_, _, err := repo.CreatePaymentOrderIntent(t.Context(), paymentsdomain.CreatePaymentOrderIntentInput{
 		ID: "0198cd29-f457-7e4b-b95e-6cfde41b7111", PublicToken: "0198cd29-f457-7e4b-b95e-6cfde41b7222",
+		UserID: 42, BillingAccountID: paymentBillingAccount(t, db, 42),
 	})
 	if err == nil || !strings.Contains(err.Error(), "parse Stripe credential ID") {
 		t.Fatalf("CreatePaymentOrderIntent() error = %v, want invalid Stripe credential ID", err)

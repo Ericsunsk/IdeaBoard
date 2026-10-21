@@ -19,5 +19,6 @@ export interface BillingRecord {
   title: string
   /** Integer minor units (signed). */
   credit_delta: number
-  available_credits_after: number
+  /** Account balance history, present only for Billing Owner/Admin. */
+  available_credits_after?: number
 }

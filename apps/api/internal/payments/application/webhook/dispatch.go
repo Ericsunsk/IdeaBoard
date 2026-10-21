@@ -106,8 +106,8 @@ func (s *Service) processDispute(ctx context.Context, event paymentports.StripeW
 	if err := s.dispute.ExpireDisputeCheckoutSessions(ctx, dispute); err != nil {
 		return err
 	}
-	if changed && s.events != nil {
-		s.events.Publish(dispute.UserID, paymentports.PaymentEvent{Status: paymentports.PaymentEventDisputeUpdated})
+	if changed {
+		s.publishDispute(ctx, dispute)
 	}
 	return nil
 }
@@ -156,8 +156,10 @@ func (s *Service) processExternalRefund(ctx context.Context, refundID, credentia
 	if _, createErr := s.convergence.CreateExternalPaymentRefund(ctx, providerRefund, s.now().UTC()); createErr != nil {
 		if errors.Is(createErr, domain.ErrInsufficientCredits) || errors.Is(createErr, paymentcontracts.ErrRefundAmountExceeds) {
 			userID, anomalyErr := s.convergence.RecordPaymentRefundAnomaly(ctx, providerRefund, "Stripe Dashboard refund requires manual balance recovery", s.now().UTC())
-			if anomalyErr == nil && s.events != nil {
-				s.events.Publish(userID, paymentports.PaymentEvent{Status: paymentports.PaymentEventRefundUpdated})
+			if anomalyErr == nil {
+				// The anomaly carries no refund row; fan out to the payer
+				// account when resolvable, else the operator fallback.
+				s.publishRefundForOrder(ctx, "", userID)
 			}
 			return anomalyErr
 		}
@@ -172,10 +174,43 @@ func (s *Service) processExternalRefund(ctx context.Context, refundID, credentia
 	}
 	providerRefund.Status = strings.ToLower(strings.TrimSpace(providerRefund.Status))
 	_, err = s.refund.Converge(ctx, refund, providerRefund)
-	if err == nil && s.events != nil {
-		s.events.Publish(refund.UserID, paymentports.PaymentEvent{Status: paymentports.PaymentEventRefundUpdated})
+	// Converge already fanned out account-aware; re-emitting here repairs a
+	// dropped in-memory hint without changing the ledger fact.
+	if err == nil {
+		s.publishRefundForOrder(ctx, refund.PaymentOrderID, refund.UserID)
 	}
 	return err
+}
+
+// publishDispute fans one dispute hint to the payer account's managers.
+func (s *Service) publishDispute(ctx context.Context, dispute paymentsdomain.PaymentDispute) {
+	if s == nil || s.hints == nil {
+		return
+	}
+	event := paymentports.PaymentEvent{Status: paymentports.PaymentEventDisputeUpdated}
+	fallback := dispute.UserID
+	if s.convergence != nil && dispute.PaymentOrderID != "" {
+		if accountID, err := s.convergence.GetPaymentOrderPayerAccount(ctx, dispute.PaymentOrderID); err == nil && accountID > 0 {
+			event.BillingAccountID = accountID
+		}
+	}
+	s.hints.Publish(ctx, fallback, event)
+}
+
+// publishRefundForOrder fans one refund hint to the payer account's managers.
+// orderID may be empty (anomaly path): then only the operator fallback is used
+// unless the caller already resolved the account.
+func (s *Service) publishRefundForOrder(ctx context.Context, orderID string, fallbackUserID int64) {
+	if s == nil || s.hints == nil {
+		return
+	}
+	event := paymentports.PaymentEvent{Status: paymentports.PaymentEventRefundUpdated}
+	if s.convergence != nil && orderID != "" {
+		if accountID, err := s.convergence.GetPaymentOrderPayerAccount(ctx, orderID); err == nil && accountID > 0 {
+			event.BillingAccountID = accountID
+		}
+	}
+	s.hints.Publish(ctx, fallbackUserID, event)
 }
 
 // operationError maps provider transport failures to the stable checkout

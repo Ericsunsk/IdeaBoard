@@ -16,8 +16,8 @@ type Service struct {
 }
 
 type Backend struct {
-	GetCaptureUsage      func(context.Context, *pgxpool.Pool, int64, *time.Location) (int64, int64, time.Time, error)
-	GetDailyCaptureUsage func(context.Context, *pgxpool.Pool, int64, *time.Location, time.Time, time.Time) (map[string]int64, error)
+	GetCaptureUsage      func(context.Context, *pgxpool.Pool, int64, domain.UsageFilter, *time.Location) (int64, int64, time.Time, error)
+	GetDailyCaptureUsage func(context.Context, *pgxpool.Pool, int64, domain.UsageFilter, *time.Location, time.Time, time.Time) (map[string]int64, error)
 }
 
 func NewService(pool *pgxpool.Pool, backend Backend) (*Service, error) {
@@ -32,21 +32,23 @@ func NewService(pool *pgxpool.Pool, backend Backend) (*Service, error) {
 
 func (s *Service) GetCaptureUsage(
 	ctx context.Context,
-	userID int64,
+	billingAccountID int64,
+	filter domain.UsageFilter,
 	location *time.Location,
 ) (totalCredits int64, peakDailyCredits int64, firstCaptureDay time.Time, err error) {
 	if s == nil || s.pool == nil {
 		return 0, 0, time.Time{}, fmt.Errorf("credits service: database pool not configured")
 	}
-	if userID <= 0 {
+	if billingAccountID <= 0 || !filter.Valid() {
 		return 0, 0, time.Time{}, domain.ErrInvalidCommand
 	}
-	return s.backend.GetCaptureUsage(ctx, s.pool, userID, location)
+	return s.backend.GetCaptureUsage(ctx, s.pool, billingAccountID, filter, location)
 }
 
 func (s *Service) GetDailyCaptureUsage(
 	ctx context.Context,
-	userID int64,
+	billingAccountID int64,
+	filter domain.UsageFilter,
 	location *time.Location,
 	start time.Time,
 	endExclusive time.Time,
@@ -54,5 +56,5 @@ func (s *Service) GetDailyCaptureUsage(
 	if s == nil || s.pool == nil {
 		return nil, fmt.Errorf("credits service: database pool not configured")
 	}
-	return s.backend.GetDailyCaptureUsage(ctx, s.pool, userID, location, start, endExclusive)
+	return s.backend.GetDailyCaptureUsage(ctx, s.pool, billingAccountID, filter, location, start, endExclusive)
 }

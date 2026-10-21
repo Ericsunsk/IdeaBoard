@@ -21,8 +21,12 @@
       class="rounded-panel border border-destructive/25 bg-card p-5"
       role="alert"
     >
-      <p class="m-0 font-semibold text-destructive">{{ t('account.errors.usageLoadFailed') }}</p>
-      <p class="mt-1 mb-0 text-sm text-muted-foreground">{{ errorMessage(error) }}</p>
+      <p class="m-0 font-semibold text-destructive">
+        {{ isForbidden ? t('account.usage.forbiddenTitle') : t('account.errors.usageLoadFailed') }}
+      </p>
+      <p class="mt-1 mb-0 text-sm text-muted-foreground">
+        {{ isForbidden ? t('account.usage.forbiddenDescription') : errorMessage(error) }}
+      </p>
       <Button
         type="button"
         variant="ghost"
@@ -34,6 +38,9 @@
     </section>
 
     <template v-else-if="usage">
+      <p v-if="billingAccountId" class="mb-3 text-xs text-muted-foreground" role="status">
+        {{ t('account.usage.sharedAccount', { account: billingAccountId }) }}
+      </p>
       <section :class="summaryPanelClass" :aria-label="t('account.usage.summaryAria')">
         <div :class="summaryGridClass">
           <article
@@ -140,7 +147,7 @@ import { Button } from '@/components/ui/button'
 import RangedLineChartCard from '../../../../core/components/RangedLineChartCard.vue'
 import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
 import { formatLocaleNumber } from '../../../../core/i18n/formatters'
-import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
+import { userErrorCode, userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'
 import { useUsage } from '../../session/usage/useUsage'
 import { DEFAULT_USAGE_RANGE, type UsageRange } from '../../session/usage/resource'
@@ -154,10 +161,9 @@ import AccountPane from '../shared/AccountPane.vue'
 const props = defineProps<{ active: boolean }>()
 const { t, locale } = useI18n()
 const selectedRange = ref<UsageRange>(DEFAULT_USAGE_RANGE)
-const { usage, displayRange, isInitialPending, isSwitching, error, retry } = useUsage(
-  selectedRange,
-  () => props.active,
-)
+const { billingAccountId, usage, displayRange, isInitialPending, isSwitching, error, retry } =
+  useUsage(selectedRange, () => props.active)
+const isForbidden = computed(() => userErrorCode(error.value) === 'billing_account_forbidden')
 const summaryPanelClass = 'overflow-hidden rounded-panel border border-border bg-card shadow-raised'
 const summaryGridClass = 'grid grid-cols-2 sm:grid-cols-5'
 const summaryCellClass = 'min-h-[100px] min-w-0 p-4 sm:min-h-[108px] sm:p-5'

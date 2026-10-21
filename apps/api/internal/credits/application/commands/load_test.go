@@ -38,10 +38,11 @@ func TestCreditMillionTransactionDataset(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 	userID := int64(95)
+	accountID := testhelpers.MustBillingAccount(t, pool, userID)
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   userID,
-		Amount:   testhelpers.MustCreditAmount(t, 1),
-		Metadata: testhelpers.TestMetadata("load:bootstrap", "load-bootstrap"),
+		BillingAccountID: accountID,
+		Amount:           testhelpers.MustCreditAmount(t, 1),
+		Metadata:         testhelpers.TestMetadata("load:bootstrap", "load-bootstrap"),
 	}); err != nil {
 		t.Fatalf("bootstrap Grant() error = %v", err)
 	}
@@ -50,12 +51,12 @@ func TestCreditMillionTransactionDataset(t *testing.T) {
 	var issuanceAccountID int64
 	if err := pool.QueryRow(ctx, `
 SELECT id FROM credit_accounts
-WHERE wallet_user_id = $1 AND account_role = 'user_available'`, userID).Scan(&availableAccountID); err != nil {
+WHERE billing_account_id = $1 AND account_role = 'user_available'`, accountID).Scan(&availableAccountID); err != nil {
 		t.Fatalf("load available account error = %v", err)
 	}
 	if err := pool.QueryRow(ctx, `
 SELECT id FROM credit_accounts
-WHERE wallet_user_id IS NULL AND shard_key = $1 AND account_role = 'system_issuance'`, testhelpers.WalletSystemShard(userID)).Scan(&issuanceAccountID); err != nil {
+WHERE wallet_user_id IS NULL AND billing_account_id IS NULL AND shard_key = $1 AND account_role = 'system_issuance'`, testhelpers.WalletSystemShard(accountID)).Scan(&issuanceAccountID); err != nil {
 		t.Fatalf("load issuance account error = %v", err)
 	}
 
@@ -67,7 +68,7 @@ ALTER TABLE credit_postings DISABLE TRIGGER guard_credit_posting_transaction_sco
 	}
 	if _, err := pool.Exec(ctx, `
 INSERT INTO credit_transactions (
-  transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
+  transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
   actor_type, actor_id, source, reason, business_reference_type,
   business_reference_id, command_amount, posting_count,
   available_balance_after, reserved_balance_after, created_at
@@ -89,7 +90,7 @@ SELECT
   series + 1,
   0,
   now() - (($2 - series)::TEXT || ' microseconds')::INTERVAL
-FROM generate_series(1, $2::BIGINT) AS series`, userID, transactionCount); err != nil {
+FROM generate_series(1, $2::BIGINT) AS series`, accountID, transactionCount); err != nil {
 		t.Fatalf("seed credit transactions error = %v", err)
 	}
 	if _, err := pool.Exec(ctx, `
@@ -159,7 +160,7 @@ FROM (
 	runtime.ReadMemStats(&memoryAfter)
 
 	walletStarted := time.Now()
-	wallet, err := service.GetWallet(ctx, userID)
+	wallet, err := service.GetWallet(ctx, accountID)
 	if err != nil {
 		t.Fatalf("GetWallet() error = %v", err)
 	}
@@ -168,7 +169,7 @@ FROM (
 		t.Fatalf("wallet available = %d, want %d", wallet.Available, transactionCount+1)
 	}
 	ledgerStarted := time.Now()
-	page, err := service.ListLedger(ctx, domain.ListLedgerInput{UserID: userID, Limit: 50})
+	page, err := service.ListLedger(ctx, domain.ListLedgerInput{BillingAccountID: accountID, Limit: 50})
 	if err != nil {
 		t.Fatalf("ListLedger() error = %v", err)
 	}
@@ -178,10 +179,10 @@ FROM (
 	}
 
 	contentionStarted := time.Now()
-	runCreditLoadContention(t, ctx, service, userID)
+	runCreditLoadContention(t, ctx, service, accountID)
 	contentionDuration := time.Since(contentionStarted)
 	parallelStarted := time.Now()
-	runCreditLoadParallelWallets(t, ctx, service, pool)
+	runCreditLoadParallelWallets(t, ctx, service, pool, testhelpers.MustBillingAccount(t, pool, 99), testhelpers.MustBillingAccount(t, pool, 101))
 	parallelDuration := time.Since(parallelStarted)
 	throughputDuration, throughputRate := runCreditMultiWalletThroughput(t, ctx, service, pool)
 	if throughputRate < 232 {
@@ -231,7 +232,7 @@ func creditLoadTransactionCount(t *testing.T) int {
 	return count
 }
 
-func runCreditLoadContention(t *testing.T, ctx context.Context, service *credits.Service, userID int64) {
+func runCreditLoadContention(t *testing.T, ctx context.Context, service *credits.Service, accountID int64) {
 	t.Helper()
 	const workers = 32
 	var wait sync.WaitGroup
@@ -243,8 +244,8 @@ func runCreditLoadContention(t *testing.T, ctx context.Context, service *credits
 		go func() {
 			defer wait.Done()
 			_, err := service.Hold(ctx, ports.HoldCommand{
-				UserID: userID,
-				Amount: amount,
+				BillingAccountID: accountID,
+				Amount:           amount,
 				Metadata: testhelpers.TestMetadata(
 					fmt.Sprintf("load:contention:%d", worker),
 					fmt.Sprintf("load-contention-%d", worker),
@@ -262,7 +263,7 @@ func runCreditLoadContention(t *testing.T, ctx context.Context, service *credits
 	}
 }
 
-func runCreditLoadParallelWallets(t *testing.T, ctx context.Context, service *credits.Service, pool creditPoolBeginner) {
+func runCreditLoadParallelWallets(t *testing.T, ctx context.Context, service *credits.Service, pool creditPoolBeginner, account99, account101 int64) {
 	t.Helper()
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -270,18 +271,18 @@ func runCreditLoadParallelWallets(t *testing.T, ctx context.Context, service *cr
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := service.InTx(tx).Grant(ctx, ports.GrantCommand{
-		UserID:   99,
-		Amount:   testhelpers.MustCreditAmount(t, 1),
-		Metadata: testhelpers.TestMetadata("load:parallel:first", "load-parallel-first"),
+		BillingAccountID: account99,
+		Amount:           testhelpers.MustCreditAmount(t, 1),
+		Metadata:         testhelpers.TestMetadata("load:parallel:first", "load-parallel-first"),
 	}); err != nil {
 		t.Fatalf("parallel first Grant() error = %v", err)
 	}
 	finished := make(chan error, 1)
 	go func() {
 		_, err := service.Grant(ctx, ports.GrantCommand{
-			UserID:   101,
-			Amount:   testhelpers.MustCreditAmount(t, 1),
-			Metadata: testhelpers.TestMetadata("load:parallel:second", "load-parallel-second"),
+			BillingAccountID: account101,
+			Amount:           testhelpers.MustCreditAmount(t, 1),
+			Metadata:         testhelpers.TestMetadata("load:parallel:second", "load-parallel-second"),
 		})
 		finished <- err
 	}()
@@ -307,7 +308,11 @@ FROM generate_series(1, $1::BIGINT) series ON CONFLICT (id) DO NOTHING`, command
 		t.Fatalf("seed throughput users error = %v", err)
 	}
 	for userID := int64(10001); userID <= 10000+commandCount; userID++ {
-		if _, err := service.Grant(ctx, ports.GrantCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata(
+		throughputAccountID, resolveErr := service.ResolvePersonalAccount(ctx, userID)
+		if resolveErr != nil {
+			t.Fatalf("resolve throughput account %d error = %v", userID, resolveErr)
+		}
+		if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: throughputAccountID, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata(
 			fmt.Sprintf("load:throughput:grant:%d", userID), fmt.Sprintf("load-throughput-grant-%d", userID),
 		)}); err != nil {
 			t.Fatalf("seed throughput wallet %d error = %v", userID, err)
@@ -327,7 +332,12 @@ FROM generate_series(1, $1::BIGINT) series ON CONFLICT (id) DO NOTHING`, command
 					return
 				}
 				userID := int64(10001) + index
-				_, err := service.Hold(ctx, ports.HoldCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata(
+				throughputAccountID, resolveErr := service.ResolvePersonalAccount(ctx, userID)
+				if resolveErr != nil {
+					errorsCh <- resolveErr
+					return
+				}
+				_, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: throughputAccountID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata(
 					fmt.Sprintf("load:throughput:hold:%d", userID), fmt.Sprintf("load-throughput-hold-%d", userID),
 				)})
 				if err != nil {

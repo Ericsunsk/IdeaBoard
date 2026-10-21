@@ -74,10 +74,13 @@ func CanOrderTransition(from, to PaymentOrderStatus) bool {
 }
 
 type PaymentOrder struct {
-	ID                      string
-	PublicOrderNumber       string
-	PublicToken             string
+	ID                string
+	PublicOrderNumber string
+	PublicToken       string
+	// Operator attribution: the real User who created the checkout.
+	// Funds identity is BillingAccountID; the two are never conflated.
 	UserID                  int64
+	BillingAccountID        int64
 	ClientIdempotencyKey    string
 	RequestHash             string
 	Status                  PaymentOrderStatus
@@ -109,10 +112,15 @@ type PaymentOrder struct {
 }
 
 type CreatePaymentOrderIntentInput struct {
-	ID                   string
-	PublicOrderNumber    string
-	PublicToken          string
-	UserID               int64
+	ID                string
+	PublicOrderNumber string
+	PublicToken       string
+	// Operator attribution: the real User who created the checkout.
+	UserID int64
+	// Payer funds identity: the Billing Account that owns the unified
+	// balance. Idempotency, unpaid-slot accounting, and settlement all
+	// scope to this account, never to the operator.
+	BillingAccountID     int64
 	ClientIdempotencyKey string
 	RequestHash          string
 	StripeCredentialID   string

@@ -34,6 +34,11 @@ var (
 	ErrVisionIdempotencyConflict    = errors.New("vision search idempotency key conflicts with a different request")
 	ErrVisionPricingUnavailable     = errors.New("vision search pricing is unavailable")
 	ErrVisionSettlement             = errors.New("vision search credit settlement is uncertain")
+	// ErrVisionWorkspaceNotFound reports a hidden workspace or a caller
+	// without membership. Handlers render it as workspace_not_found (never
+	// a billing status), per anti-enumeration: outsiders learn nothing
+	// about the payer.
+	ErrVisionWorkspaceNotFound = errors.New("vision search workspace is not visible")
 )
 
 type VisionBillingResult struct {
@@ -110,22 +115,38 @@ func (e *VisionBillingPending) Error() string {
 }
 
 type VisionBillingService struct {
-	pool    *pgxpool.Pool
-	catalog *billingapplication.BillableItemCatalog
-	credits *credits.Service
-	vision  *VisionSearchService
+	pool     *pgxpool.Pool
+	catalog  *billingapplication.BillableItemCatalog
+	credits  *credits.Service
+	vision   *VisionSearchService
+	accounts VisionBillingAccountResolver
 }
 
 func NewVisionBillingService(pool *pgxpool.Pool, catalog *billingapplication.BillableItemCatalog, creditService *credits.Service, vision *VisionSearchService) *VisionBillingService {
-	return &VisionBillingService{pool: pool, catalog: catalog, credits: creditService, vision: vision}
+	return &VisionBillingService{pool: pool, catalog: catalog, credits: creditService, vision: vision, accounts: visionBillingAccountResolver{}}
 }
 
-func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempotencyKey string, input searchdomain.VisionInput) (VisionBillingResult, error) {
+// NewVisionBillingServiceWithResolver is the seam tests use to inject a
+// fake settlement identity; production uses NewVisionBillingService.
+func NewVisionBillingServiceWithResolver(pool *pgxpool.Pool, catalog *billingapplication.BillableItemCatalog, creditService *credits.Service, vision *VisionSearchService, resolver VisionBillingAccountResolver) *VisionBillingService {
+	return &VisionBillingService{pool: pool, catalog: catalog, credits: creditService, vision: vision, accounts: resolver}
+}
+
+// Extract bills one vision call to the consuming Workspace's stable
+// Billing Account (#918): the submitter stays the real initiator (Actor
+// on every Command), the Workspace is the consumption location, and the
+// resolved account is the only payer. There is no personal-wallet
+// fallback on this path.
+func (s *VisionBillingService) Extract(ctx context.Context, workspacePublicID string, userID int64, idempotencyKey string, input searchdomain.VisionInput) (VisionBillingResult, error) {
 	if s == nil || s.pool == nil || s.catalog == nil || s.credits == nil || s.vision == nil {
 		return VisionBillingResult{}, searchdomain.ErrVisionUnavailable
 	}
 	if userID <= 0 {
 		return VisionBillingResult{}, searchdomain.ErrVisionInput
+	}
+	workspacePublicID = strings.TrimSpace(workspacePublicID)
+	if workspacePublicID == "" {
+		return VisionBillingResult{}, ErrVisionWorkspaceNotFound
 	}
 	idempotencyKey = strings.TrimSpace(idempotencyKey)
 	if idempotencyKey == "" || len(idempotencyKey) > visionBillingKeyMaxLength {
@@ -134,8 +155,11 @@ func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempo
 	if err := validateVisionInput(input); err != nil {
 		return VisionBillingResult{}, err
 	}
-	requestHash := hashVisionInput(input)
-	reserved, err := s.reserve(ctx, userID, idempotencyKey, requestHash)
+	// The request hash binds the resource scope (workspace + submitter +
+	// normalized input bytes) so a key reused across workspaces, operators,
+	// or bodies conflicts instead of replaying another scope's operation.
+	requestHash := hashVisionRequest(workspacePublicID, userID, input)
+	reserved, err := s.reserve(ctx, workspacePublicID, userID, idempotencyKey, requestHash)
 	if err != nil {
 		return VisionBillingResult{}, err
 	}
@@ -159,7 +183,7 @@ func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempo
 			return VisionBillingResult{OperationID: reserved.result.OperationID, Status: string(VisionOperationReconciliationPending)}, &VisionBillingPending{OperationID: reserved.result.OperationID}
 		}
 		code, message, status := visionFailureDetails(providerErr)
-		if err := s.release(context.WithoutCancel(ctx), reserved.result.OperationID, userID, code, message); err != nil {
+		if err := s.release(context.WithoutCancel(ctx), reserved.result.OperationID, workspacePublicID, userID, code, message); err != nil {
 			_ = s.markReconciliationPending(context.WithoutCancel(ctx), reserved.result.OperationID)
 			return VisionBillingResult{OperationID: reserved.result.OperationID, Status: string(VisionOperationReconciliationPending)}, fmt.Errorf("%w: release: %w", ErrVisionSettlement, err)
 		}
@@ -170,7 +194,7 @@ func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempo
 		// Deferred free path skips ledger capture: amount 0 free-marker.
 		return VisionBillingResult{VisionExtraction: extraction, OperationID: reserved.result.OperationID, Status: string(VisionOperationSucceeded)}, nil
 	}
-	if err := s.capture(context.WithoutCancel(ctx), reserved.result.OperationID, userID, extraction.Query); err != nil {
+	if err := s.capture(context.WithoutCancel(ctx), reserved.result.OperationID, workspacePublicID, userID, extraction.Query); err != nil {
 		_ = s.markReconciliationPending(context.WithoutCancel(ctx), reserved.result.OperationID)
 		return VisionBillingResult{OperationID: reserved.result.OperationID, Status: string(VisionOperationReconciliationPending)}, fmt.Errorf("%w: capture: %w", ErrVisionSettlement, err)
 	}
@@ -208,6 +232,21 @@ func hashVisionInput(input searchdomain.VisionInput) string {
 		hash.Write([]byte{0})
 		hash.Write(image.Data)
 	}
+	return hex.EncodeToString(hash.Sum(nil))
+}
+
+// hashVisionRequest binds the idempotency hash to the resource scope
+// (consuming workspace + submitter) in addition to the normalized input
+// bytes. The same client key reused across workspaces, operators, or
+// bodies therefore hashes differently and conflicts instead of replaying
+// another scope's operation.
+func hashVisionRequest(workspacePublicID string, userID int64, input searchdomain.VisionInput) string {
+	hash := sha256.New()
+	hash.Write([]byte(strings.TrimSpace(workspacePublicID)))
+	hash.Write([]byte{0})
+	fmt.Fprintf(hash, "%d", userID)
+	hash.Write([]byte{0})
+	hash.Write([]byte(hashVisionInput(input)))
 	return hex.EncodeToString(hash.Sum(nil))
 }
 

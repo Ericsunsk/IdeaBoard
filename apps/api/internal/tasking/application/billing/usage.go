@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	creditsdomain "ideaboard/api/internal/credits/domain"
 )
 
 // UsageStore reads immutable Task Billing submission snapshots. Snapshot rows
@@ -34,20 +35,23 @@ func (q contextQueryer) QueryRow(query string, args ...any) pgx.Row {
 
 func (s *UsageStore) GetTaskUsage(
 	ctx context.Context,
-	userID int64,
+	billingAccountID int64,
+	filter creditsdomain.UsageFilter,
 	location *time.Location,
 ) (taskCount int64, activeDays int64, err error) {
 	if s == nil || s.db == nil {
 		return 0, 0, fmt.Errorf("task billing usage store: database unavailable")
 	}
-	if userID <= 0 || location == nil {
+	if billingAccountID <= 0 || !filter.Valid() || location == nil {
 		return 0, 0, fmt.Errorf("task billing usage store: invalid query")
 	}
 	err = s.dbWithContext(ctx).QueryRow(`
 SELECT COUNT(*)::bigint,
        COUNT(DISTINCT (created_at AT TIME ZONE $2)::date)::bigint
 FROM task_billing_snapshots
-WHERE user_id = $1`, userID, location.String()).Scan(&taskCount, &activeDays)
+WHERE billing_account_id = $1
+  AND ($3::bigint = 0 OR workspace_id = $3)
+  AND ($4::bigint = 0 OR user_id = $4)`, billingAccountID, location.String(), filter.WorkspaceID, filter.ActorUserID).Scan(&taskCount, &activeDays)
 	if err != nil {
 		return 0, 0, fmt.Errorf("task billing usage store: aggregate snapshots: %w", err)
 	}

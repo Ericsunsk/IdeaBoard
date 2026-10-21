@@ -458,18 +458,171 @@ CREATE TABLE billing_accounts (
 -- 1:1 relationship: each workspace has exactly one billing account
 CREATE UNIQUE INDEX ux_billing_accounts_workspace ON billing_accounts (workspace_id) WHERE workspace_id IS NOT NULL;
 CREATE UNIQUE INDEX ux_billing_accounts_organization ON billing_accounts (organization_id) WHERE organization_id IS NOT NULL;
+
+-- Billing Account membership (#915). Financial management is separate from
+-- Workspace content membership: a Billing Account has Owner/Admin managers,
+-- while consumption stays gated by Workspace membership + Board capability.
+-- One User may manage many independent accounts; balances never merge across
+-- accounts. Ownership is transferable and never lifetime-bound to the
+-- provisioning login identity.
+CREATE TABLE billing_account_members (
+  billing_account_id BIGINT NOT NULL REFERENCES billing_accounts(internal_id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- Role pin: mirrors tenancy.BillingRoleOwner/BillingRoleAdmin; keep the
+  -- spellings identical to the tenancy kernel.
+  role TEXT NOT NULL CHECK (role IN ('owner','admin')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (billing_account_id, user_id)
+);
+
+CREATE INDEX idx_billing_account_members_user ON billing_account_members (user_id, billing_account_id);
+
+-- Explicit Workspace to Billing Account association (#915). One Workspace
+-- resolves to exactly one Billing Account; many Workspaces may share one
+-- account (organization workspaces share the organization account, no-org
+-- studio spaces may explicitly link to the same studio account).
+-- Independent accounts stay isolated: no row here means no sharing.
+-- The link is explicit and stable: creating a new business space never
+-- auto-creates a wallet, and joining a Workspace never merges personal funds.
+CREATE TABLE workspace_billing_links (
+  workspace_id BIGINT PRIMARY KEY REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  billing_account_id BIGINT NOT NULL REFERENCES billing_accounts(internal_id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_workspace_billing_links_account ON workspace_billing_links (billing_account_id, workspace_id);
+
+-- Every Billing Account owns exactly one Credit Wallet (#916): provisioning
+-- follows account creation, never the current Workspace Owner's personal
+-- wallet. The function lives in the Credits fragment; the trigger stays with
+-- the account tables it fires on.
+CREATE FUNCTION provision_billing_account_wallet_on_account_insert() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_catalog', 'pg_temp'
+    AS $$
+BEGIN
+  PERFORM provision_billing_account_wallet(NEW.internal_id);
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER provision_billing_account_wallet_after_account_insert
+AFTER INSERT ON billing_accounts
+FOR EACH ROW
+EXECUTE FUNCTION provision_billing_account_wallet_on_account_insert();
+
+REVOKE ALL ON FUNCTION provision_billing_account_wallet_on_account_insert() FROM PUBLIC;
+
+-- ensure_personal_billing_account_for_user returns the deterministic initial
+-- personal Billing Account for one user (#916): the per-workspace account of
+-- the user's Default personal workspace, provisioning the Default workspace,
+-- its owner membership, the billing account, and the billing owner grant on
+-- demand. Every pre-916 personal balance, history row, and open Hold is
+-- attributed to exactly this account by the migration; joining a Workspace
+-- or Organization never merges funds here. Organization accounts are never
+-- returned: personal money is never injected into an organization.
+-- SQL-minted ws_/ba_ suffixes are hex and satisfy the kernel alphabet.
+CREATE FUNCTION ensure_personal_billing_account_for_user(p_user_id BIGINT)
+RETURNS BIGINT
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'pg_catalog', 'pg_temp'
+AS $$
+DECLARE
+  v_workspace_id BIGINT;
+  v_billing_account_id BIGINT;
+BEGIN
+  IF p_user_id <= 0 OR NOT EXISTS (SELECT 1 FROM users WHERE id = p_user_id) THEN
+    RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid personal billing account owner';
+  END IF;
+
+  SELECT internal_id INTO v_workspace_id
+  FROM workspaces
+  WHERE owner_user_id = p_user_id AND organization_id IS NULL AND is_default
+  LIMIT 1;
+  IF NOT FOUND THEN
+    FOR _ IN 1..8 LOOP
+      BEGIN
+        INSERT INTO workspaces (public_id, owner_user_id, name, is_default)
+        VALUES ('ws_' || substr(md5(gen_random_uuid()::TEXT), 1, 12), p_user_id, 'My Workspace', TRUE)
+        RETURNING workspaces.internal_id INTO v_workspace_id;
+        EXIT;
+      EXCEPTION WHEN unique_violation THEN
+        SELECT internal_id INTO v_workspace_id
+        FROM workspaces
+        WHERE owner_user_id = p_user_id AND organization_id IS NULL AND is_default
+        LIMIT 1;
+        IF FOUND THEN
+          EXIT;
+        END IF;
+      END;
+    END LOOP;
+    IF v_workspace_id IS NULL THEN
+      RAISE EXCEPTION 'personal default workspace could not be provisioned';
+    END IF;
+  END IF;
+
+  INSERT INTO workspace_memberships (workspace_id, user_id, role)
+  VALUES (v_workspace_id, p_user_id, 'owner')
+  ON CONFLICT (workspace_id, user_id) DO NOTHING;
+
+  SELECT internal_id INTO v_billing_account_id
+  FROM billing_accounts
+  WHERE workspace_id = v_workspace_id
+  LIMIT 1;
+  IF NOT FOUND THEN
+    FOR _ IN 1..8 LOOP
+      BEGIN
+        INSERT INTO billing_accounts (public_id, workspace_id, organization_id)
+        VALUES ('ba_' || substr(md5(gen_random_uuid()::TEXT), 1, 12), v_workspace_id, NULL)
+        RETURNING billing_accounts.internal_id INTO v_billing_account_id;
+        EXIT;
+      EXCEPTION WHEN unique_violation THEN
+        SELECT internal_id INTO v_billing_account_id
+        FROM billing_accounts
+        WHERE workspace_id = v_workspace_id
+        LIMIT 1;
+        IF FOUND THEN
+          EXIT;
+        END IF;
+      END;
+    END LOOP;
+    IF v_billing_account_id IS NULL THEN
+      RAISE EXCEPTION 'personal billing account could not be provisioned';
+    END IF;
+  END IF;
+
+  INSERT INTO billing_account_members (billing_account_id, user_id, role)
+  VALUES (v_billing_account_id, p_user_id, 'owner')
+  ON CONFLICT (billing_account_id, user_id) DO NOTHING;
+
+  RETURN v_billing_account_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION ensure_personal_billing_account_for_user(BIGINT) FROM PUBLIC;
+-- Credit Wallet boundary (#916): one Wallet belongs to exactly one Billing
+-- Account. billing_account_id is the wallet identity; user_id stays only as
+-- provisioning-owner provenance (nullable: organization/shared wallets have
+-- no single user) and sustains the pre-916 ledger history references.
 CREATE TABLE credit_wallets (
-  user_id BIGINT PRIMARY KEY,
+  billing_account_id BIGINT PRIMARY KEY,
+  user_id BIGINT,
   status VARCHAR(20) NOT NULL DEFAULT 'active',
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  -- No FK to billing_accounts: the Wallet row outlives its account scope
+  -- (workspace hard delete removes the scope, never money facts). Command
+  -- functions enforce wallet existence with SELECT ... FOR UPDATE + IB002.
   CONSTRAINT fk_credit_wallets_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
   CONSTRAINT ck_credit_wallets_status CHECK (status IN ('active', 'frozen'))
 );
 
+CREATE INDEX idx_credit_wallets_user_id ON credit_wallets (user_id) WHERE user_id IS NOT NULL;
+
 CREATE TABLE credit_wallet_restrictions (
   restriction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  wallet_user_id BIGINT NOT NULL,
+  billing_account_id BIGINT,
+  wallet_user_id BIGINT,
   restriction_type VARCHAR(64) NOT NULL,
   source VARCHAR(64) NOT NULL,
   related_object_type VARCHAR(64) NOT NULL,
@@ -482,8 +635,11 @@ CREATE TABLE credit_wallet_restrictions (
   released_by_actor_type VARCHAR(24),
   released_by_actor_id VARCHAR(128),
   release_reason TEXT,
+  CONSTRAINT ck_credit_wallet_restrictions_billing_account CHECK (billing_account_id IS NOT NULL),
+  CONSTRAINT fk_credit_wallet_restrictions_billing_account_id
+    FOREIGN KEY (billing_account_id) REFERENCES credit_wallets(billing_account_id) ON DELETE RESTRICT,
   CONSTRAINT fk_credit_wallet_restrictions_wallet_user_id
-    FOREIGN KEY (wallet_user_id) REFERENCES credit_wallets(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (wallet_user_id) REFERENCES users(id) ON DELETE RESTRICT,
   CONSTRAINT ck_credit_wallet_restrictions_type
     CHECK (btrim(restriction_type) <> ''),
   CONSTRAINT ck_credit_wallet_restrictions_source
@@ -513,7 +669,7 @@ CREATE TABLE credit_wallet_restrictions (
 
 CREATE UNIQUE INDEX uq_credit_wallet_restrictions_active_source
   ON credit_wallet_restrictions (
-    wallet_user_id,
+    billing_account_id,
     restriction_type,
     source,
     related_object_type,
@@ -522,11 +678,12 @@ CREATE UNIQUE INDEX uq_credit_wallet_restrictions_active_source
   WHERE released_at IS NULL;
 
 CREATE INDEX idx_credit_wallet_restrictions_wallet_active
-  ON credit_wallet_restrictions (wallet_user_id, created_at DESC, restriction_id)
+  ON credit_wallet_restrictions (billing_account_id, created_at DESC, restriction_id)
   WHERE released_at IS NULL;
 
 CREATE TABLE credit_accounts (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  billing_account_id BIGINT,
   wallet_user_id BIGINT,
   asset_code VARCHAR(32) NOT NULL DEFAULT 'credits',
   account_role VARCHAR(32) NOT NULL,
@@ -535,13 +692,14 @@ CREATE TABLE credit_accounts (
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   CONSTRAINT uq_credit_accounts_id_asset UNIQUE (id, asset_code),
-  CONSTRAINT fk_credit_accounts_wallet_user_id FOREIGN KEY (wallet_user_id) REFERENCES credit_wallets(user_id) ON DELETE RESTRICT,
+  CONSTRAINT fk_credit_accounts_billing_account_id FOREIGN KEY (billing_account_id) REFERENCES credit_wallets(billing_account_id) ON DELETE RESTRICT,
   CONSTRAINT ck_credit_accounts_asset CHECK (asset_code = 'credits'),
   CONSTRAINT ck_credit_accounts_role CHECK (account_role IN ('user_available', 'user_reserved', 'system_issuance', 'system_revenue', 'system_sink')),
   CONSTRAINT ck_credit_accounts_owner CHECK (
-    (wallet_user_id IS NOT NULL AND account_role IN ('user_available', 'user_reserved') AND shard_key = '')
+    (account_role IN ('user_available', 'user_reserved') AND shard_key = ''
+      AND (wallet_user_id IS NOT NULL OR billing_account_id IS NOT NULL))
     OR
-    (wallet_user_id IS NULL AND account_role IN ('system_issuance', 'system_revenue', 'system_sink') AND btrim(shard_key) <> '')
+    (billing_account_id IS NULL AND wallet_user_id IS NULL AND account_role IN ('system_issuance', 'system_revenue', 'system_sink') AND btrim(shard_key) <> '')
   ),
   CONSTRAINT ck_credit_accounts_user_balance_non_negative CHECK (
     account_role NOT IN ('user_available', 'user_reserved') OR balance >= 0
@@ -550,13 +708,15 @@ CREATE TABLE credit_accounts (
 );
 
 CREATE UNIQUE INDEX uq_credit_accounts_user_role ON credit_accounts (wallet_user_id, asset_code, account_role) WHERE wallet_user_id IS NOT NULL;
-CREATE UNIQUE INDEX uq_credit_accounts_system_shard_role ON credit_accounts (asset_code, account_role, shard_key) WHERE wallet_user_id IS NULL;
+CREATE UNIQUE INDEX uq_credit_accounts_billing_role ON credit_accounts (billing_account_id, asset_code, account_role) WHERE billing_account_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_credit_accounts_system_shard_role ON credit_accounts (asset_code, account_role, shard_key) WHERE wallet_user_id IS NULL AND billing_account_id IS NULL;
 CREATE INDEX idx_credit_accounts_system_role ON credit_accounts (account_role, shard_key) WHERE wallet_user_id IS NULL;
 
 CREATE TABLE credit_transactions (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   transaction_id VARCHAR(64) NOT NULL,
-  wallet_user_id BIGINT NOT NULL,
+  billing_account_id BIGINT,
+  wallet_user_id BIGINT,
   command_type VARCHAR(24) NOT NULL,
   asset_code VARCHAR(32) NOT NULL DEFAULT 'credits',
   idempotency_key VARCHAR(160) NOT NULL,
@@ -575,7 +735,7 @@ CREATE TABLE credit_transactions (
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   CONSTRAINT uq_credit_transactions_transaction_id UNIQUE (transaction_id),
   CONSTRAINT uq_credit_transactions_idempotency_key UNIQUE (idempotency_key),
-  CONSTRAINT fk_credit_transactions_wallet_user_id FOREIGN KEY (wallet_user_id) REFERENCES credit_wallets(user_id) ON DELETE RESTRICT,
+  CONSTRAINT ck_credit_transactions_billing_account CHECK (billing_account_id IS NOT NULL),
   CONSTRAINT fk_credit_transactions_related_transaction_id FOREIGN KEY (related_transaction_id) REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
   CONSTRAINT ck_credit_transactions_command_type CHECK (command_type IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction', 'purchase_credit', 'purchase_refund', 'payment_dispute_debit', 'payment_dispute_restore')),
   CONSTRAINT ck_credit_transactions_asset CHECK (asset_code = 'credits'),
@@ -589,11 +749,12 @@ CREATE TABLE credit_transactions (
   CONSTRAINT ck_credit_transactions_balances_non_negative CHECK (available_balance_after >= 0 AND reserved_balance_after >= 0)
 );
 
-CREATE INDEX idx_credit_transactions_wallet_id_desc ON credit_transactions (wallet_user_id, id DESC);
+CREATE INDEX idx_credit_transactions_wallet_id_desc ON credit_transactions (billing_account_id, id DESC);
+CREATE INDEX idx_credit_transactions_legacy_wallet_id_desc ON credit_transactions (wallet_user_id, id DESC) WHERE wallet_user_id IS NOT NULL;
 CREATE INDEX idx_credit_transactions_business_reference ON credit_transactions (business_reference_type, business_reference_id, id DESC);
 CREATE INDEX idx_credit_transactions_related ON credit_transactions (related_transaction_id) WHERE related_transaction_id IS NOT NULL;
 CREATE INDEX idx_credit_transactions_capture_user_created
-  ON credit_transactions (wallet_user_id, created_at)
+  ON credit_transactions (billing_account_id, created_at)
   INCLUDE (command_amount)
   WHERE command_type = 'capture';
 
@@ -616,7 +777,8 @@ CREATE INDEX idx_credit_postings_transaction_id ON credit_postings (transaction_
 
 CREATE TABLE credit_holds (
   hold_transaction_id VARCHAR(64) PRIMARY KEY,
-  wallet_user_id BIGINT NOT NULL,
+  billing_account_id BIGINT,
+  wallet_user_id BIGINT,
   amount BIGINT NOT NULL,
   captured_amount BIGINT NOT NULL DEFAULT 0,
   released_amount BIGINT NOT NULL DEFAULT 0,
@@ -625,8 +787,8 @@ CREATE TABLE credit_holds (
   release_transaction_id VARCHAR(64),
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   settled_at TIMESTAMPTZ(3),
+  CONSTRAINT ck_credit_holds_billing_account CHECK (billing_account_id IS NOT NULL),
   CONSTRAINT fk_credit_holds_hold_transaction_id FOREIGN KEY (hold_transaction_id) REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
-  CONSTRAINT fk_credit_holds_wallet_user_id FOREIGN KEY (wallet_user_id) REFERENCES credit_wallets(user_id) ON DELETE RESTRICT,
   CONSTRAINT fk_credit_holds_capture_transaction_id FOREIGN KEY (capture_transaction_id) REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
   CONSTRAINT fk_credit_holds_release_transaction_id FOREIGN KEY (release_transaction_id) REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
   CONSTRAINT uq_credit_holds_capture_transaction_id UNIQUE (capture_transaction_id),
@@ -651,17 +813,18 @@ CREATE TABLE credit_holds (
   )
 );
 
-CREATE INDEX idx_credit_holds_wallet_status ON credit_holds (wallet_user_id, status, created_at DESC);
+CREATE INDEX idx_credit_holds_wallet_status ON credit_holds (billing_account_id, status, created_at DESC);
 
 CREATE TABLE credit_charges (
   capture_transaction_id VARCHAR(64) PRIMARY KEY,
-  wallet_user_id BIGINT NOT NULL,
+  billing_account_id BIGINT,
+  wallet_user_id BIGINT,
   amount BIGINT NOT NULL,
   refunded_amount BIGINT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT ck_credit_charges_billing_account CHECK (billing_account_id IS NOT NULL),
   CONSTRAINT fk_credit_charges_capture_transaction_id FOREIGN KEY (capture_transaction_id) REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
-  CONSTRAINT fk_credit_charges_wallet_user_id FOREIGN KEY (wallet_user_id) REFERENCES credit_wallets(user_id) ON DELETE RESTRICT,
   CONSTRAINT ck_credit_charges_amount_positive CHECK (amount > 0),
   CONSTRAINT ck_credit_charges_refunded_range CHECK (refunded_amount BETWEEN 0 AND amount)
 );
@@ -718,7 +881,11 @@ CREATE TABLE credit_reconciliation_findings (
   finding_type VARCHAR(64) NOT NULL,
   severity VARCHAR(16) NOT NULL,
   risk VARCHAR(16) NOT NULL,
-  wallet_user_id BIGINT REFERENCES credit_wallets(user_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+  wallet_user_id BIGINT,
+  billing_account_id BIGINT,
+  CONSTRAINT fk_credit_reconciliation_findings_wallet_user_id FOREIGN KEY (wallet_user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+  -- No FK to billing_accounts: findings outlive scopes (ownership
+  -- lost/changed downgrades instead of blocking scope deletion).
   subject_type VARCHAR(32) NOT NULL,
   subject_id VARCHAR(160) NOT NULL,
   details JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(details) = 'object'),
@@ -741,7 +908,7 @@ CREATE TABLE credit_reconciliation_findings (
 CREATE INDEX idx_credit_reconciliation_findings_list
   ON credit_reconciliation_findings (status, id DESC);
 CREATE INDEX idx_credit_reconciliation_findings_wallet
-  ON credit_reconciliation_findings (wallet_user_id, id DESC) WHERE wallet_user_id IS NOT NULL;
+  ON credit_reconciliation_findings (billing_account_id, id DESC) WHERE billing_account_id IS NOT NULL;
 
 CREATE TABLE credit_reconciliation_run_findings (
   run_id BIGINT NOT NULL REFERENCES credit_reconciliation_runs(id) ON DELETE RESTRICT,
@@ -759,7 +926,7 @@ CREATE TABLE credit_reconciliation_run_findings (
 );
 
 CREATE FUNCTION create_credit_wallet_restriction(
-  p_user_id BIGINT,
+  p_billing_account_id BIGINT,
   p_restriction_type TEXT,
   p_source TEXT,
   p_related_object_type TEXT,
@@ -784,7 +951,7 @@ BEGIN
     p_reason := '';
   END IF;
 
-  IF p_user_id <= 0
+  IF p_billing_account_id <= 0
      OR p_restriction_type = '' OR length(p_restriction_type) > 64
      OR p_source = '' OR length(p_source) > 64
      OR p_related_object_type = '' OR length(p_related_object_type) > 64
@@ -795,13 +962,13 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit wallet restriction';
   END IF;
 
-  PERFORM 1 FROM credit_wallets wallets WHERE wallets.user_id = p_user_id FOR UPDATE;
+  PERFORM 1 FROM credit_wallets wallets WHERE wallets.billing_account_id = p_billing_account_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
   END IF;
 
   INSERT INTO credit_wallet_restrictions (
-    wallet_user_id,
+    billing_account_id,
     restriction_type,
     source,
     related_object_type,
@@ -811,7 +978,7 @@ BEGIN
     created_by_actor_id
   )
   VALUES (
-    p_user_id,
+    p_billing_account_id,
     p_restriction_type,
     p_source,
     p_related_object_type,
@@ -821,7 +988,7 @@ BEGIN
     p_actor_id
   )
   ON CONFLICT (
-    wallet_user_id,
+    billing_account_id,
     restriction_type,
     source,
     related_object_type,
@@ -836,7 +1003,7 @@ BEGIN
   END IF;
   SELECT restrictions.restriction_id INTO v_restriction_id
   FROM credit_wallet_restrictions restrictions
-  WHERE restrictions.wallet_user_id = p_user_id
+  WHERE restrictions.billing_account_id = p_billing_account_id
     AND restrictions.restriction_type = p_restriction_type
     AND restrictions.source = p_source
     AND restrictions.related_object_type = p_related_object_type
@@ -857,7 +1024,7 @@ RETURNS TABLE (restriction_id TEXT, replayed BOOLEAN)
 AS $$
 DECLARE
   v_restriction_id UUID;
-  v_wallet_user_id BIGINT;
+  v_wallet_billing_account_id BIGINT;
   v_replayed BOOLEAN;
 BEGIN
   p_restriction_id := btrim(p_restriction_id);
@@ -876,14 +1043,14 @@ BEGIN
   END IF;
 
   v_restriction_id := p_restriction_id::UUID;
-  SELECT restrictions.wallet_user_id INTO v_wallet_user_id
+  SELECT restrictions.billing_account_id INTO v_wallet_billing_account_id
   FROM credit_wallet_restrictions restrictions
   WHERE restrictions.restriction_id = v_restriction_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB012', MESSAGE = 'credit wallet restriction not found';
   END IF;
 
-  PERFORM 1 FROM credit_wallets wallets WHERE wallets.user_id = v_wallet_user_id FOR UPDATE;
+  PERFORM 1 FROM credit_wallets wallets WHERE wallets.billing_account_id = v_wallet_billing_account_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
   END IF;
@@ -901,14 +1068,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
 
-CREATE FUNCTION execute_credit_command_v2(
-  p_command_type TEXT, p_user_id BIGINT, p_amount BIGINT, p_related_transaction_id TEXT,
+CREATE FUNCTION execute_credit_command_v3(
+  p_command_type TEXT, p_billing_account_id BIGINT, p_amount BIGINT, p_related_transaction_id TEXT,
   p_idempotency_key TEXT, p_actor_type TEXT, p_actor_id TEXT, p_source TEXT, p_reason TEXT,
   p_business_reference_type TEXT, p_business_reference_id TEXT
 )
 RETURNS TABLE (
   transaction_id VARCHAR(64), command_type VARCHAR(24), command_amount BIGINT,
-  wallet_user_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
+  billing_account_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
   replayed BOOLEAN, created_at TIMESTAMPTZ(3)
 )
 AS $$
@@ -934,7 +1101,7 @@ BEGIN
     p_reason := '';
   END IF;
   p_business_reference_id := btrim(p_business_reference_id);
-  IF p_user_id <= 0 OR p_command_type NOT IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction')
+  IF p_billing_account_id <= 0 OR p_command_type NOT IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction')
      OR p_idempotency_key = '' OR length(p_idempotency_key) > 160 OR p_actor_type NOT IN ('admin', 'system', 'service', 'user')
      OR p_actor_id = '' OR length(p_actor_id) > 128 OR p_source = '' OR length(p_source) > 64 OR (p_actor_type <> 'admin' AND p_reason = '')
      OR p_business_reference_type = '' OR length(p_business_reference_type) > 64
@@ -945,7 +1112,7 @@ BEGIN
      OR (p_command_type IN ('refund', 'correction') AND (p_related_transaction_id = '' OR length(p_related_transaction_id) > 64)) THEN
     RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit command';
   END IF;
-  v_payload := jsonb_build_object('command_type', p_command_type, 'user_id', p_user_id, 'amount', p_amount,
+  v_payload := jsonb_build_object('command_type', p_command_type, 'billing_account_id', p_billing_account_id, 'amount', p_amount,
     'related_transaction_id', p_related_transaction_id, 'actor', jsonb_build_object('type', p_actor_type, 'id', p_actor_id),
     'source', p_source, 'reason', p_reason, 'business_reference', jsonb_build_object('type', p_business_reference_type, 'id', p_business_reference_id));
   v_hash := encode(sha256(convert_to(v_payload::TEXT, 'UTF8')), 'hex');
@@ -953,25 +1120,25 @@ BEGIN
   SELECT request_hash INTO v_existing_hash FROM credit_transactions WHERE idempotency_key = p_idempotency_key;
   IF FOUND THEN
     IF v_existing_hash <> v_hash THEN RAISE EXCEPTION USING ERRCODE = 'IB001', MESSAGE = 'credit idempotency conflict'; END IF;
-    RETURN QUERY SELECT existing.transaction_id, existing.command_type, existing.command_amount, existing.wallet_user_id,
+    RETURN QUERY SELECT existing.transaction_id, existing.command_type, existing.command_amount, existing.billing_account_id,
       existing.available_balance_after, existing.reserved_balance_after, TRUE, existing.created_at
       FROM credit_transactions existing WHERE existing.idempotency_key = p_idempotency_key;
     RETURN;
   END IF;
-  v_shard_key := 'wallet:' || p_user_id::TEXT;
+  v_shard_key := 'billing-account:' || p_billing_account_id::TEXT;
   IF p_command_type = 'grant' THEN
-    INSERT INTO credit_wallets (user_id) VALUES (p_user_id) ON CONFLICT DO NOTHING;
-    INSERT INTO credit_accounts (wallet_user_id, account_role) VALUES (p_user_id, 'user_available'), (p_user_id, 'user_reserved') ON CONFLICT DO NOTHING;
+    INSERT INTO credit_wallets (billing_account_id) VALUES (p_billing_account_id) ON CONFLICT DO NOTHING;
+    INSERT INTO credit_accounts (billing_account_id, account_role) VALUES (p_billing_account_id, 'user_available'), (p_billing_account_id, 'user_reserved') ON CONFLICT DO NOTHING;
     INSERT INTO credit_accounts (account_role, shard_key, metadata) VALUES
-      ('system_issuance', v_shard_key, jsonb_build_object('scope', 'wallet', 'wallet_user_id', p_user_id)),
-      ('system_revenue', v_shard_key, jsonb_build_object('scope', 'wallet', 'wallet_user_id', p_user_id)),
-      ('system_sink', v_shard_key, jsonb_build_object('scope', 'wallet', 'wallet_user_id', p_user_id)) ON CONFLICT DO NOTHING;
+      ('system_issuance', v_shard_key, jsonb_build_object('scope', 'billing_account', 'billing_account_id', p_billing_account_id)),
+      ('system_revenue', v_shard_key, jsonb_build_object('scope', 'billing_account', 'billing_account_id', p_billing_account_id)),
+      ('system_sink', v_shard_key, jsonb_build_object('scope', 'billing_account', 'billing_account_id', p_billing_account_id)) ON CONFLICT DO NOTHING;
   END IF;
   IF p_command_type IN ('capture', 'release') THEN
     SELECT amount, status, captured_amount, released_amount, capture_transaction_id, release_transaction_id
       INTO v_hold_amount, v_hold_status, v_captured_amount, v_released_amount, v_capture_transaction_id, v_release_transaction_id
       FROM credit_holds holds
-      WHERE holds.hold_transaction_id = p_related_transaction_id AND holds.wallet_user_id = p_user_id FOR UPDATE;
+      WHERE holds.hold_transaction_id = p_related_transaction_id AND holds.billing_account_id = p_billing_account_id FOR UPDATE;
     IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = 'IB005', MESSAGE = 'credit hold not found'; END IF;
     IF v_hold_status <> 'held' THEN RAISE EXCEPTION USING ERRCODE = 'IB006', MESSAGE = 'credit hold already settled'; END IF;
     IF (p_command_type = 'capture' AND v_capture_transaction_id IS NOT NULL)
@@ -983,13 +1150,13 @@ BEGIN
     END IF;
   ELSIF p_command_type = 'refund' THEN
     SELECT amount, refunded_amount INTO v_charge_amount, v_refunded_amount FROM credit_charges charges
-      WHERE charges.capture_transaction_id = p_related_transaction_id AND charges.wallet_user_id = p_user_id FOR UPDATE;
+      WHERE charges.capture_transaction_id = p_related_transaction_id AND charges.billing_account_id = p_billing_account_id FOR UPDATE;
     IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = 'IB007', MESSAGE = 'credit charge not found'; END IF;
     IF p_amount > v_charge_amount - v_refunded_amount THEN RAISE EXCEPTION USING ERRCODE = 'IB008', MESSAGE = 'credit refund exceeds remaining charge'; END IF;
   ELSIF p_command_type = 'correction' THEN
     SELECT original_transaction.command_type, original_transaction.command_amount, original_transaction.actor_type, original_transaction.source, original_transaction.posting_count, COALESCE(original_transaction.related_transaction_id, '') INTO v_original_command_type, v_original_amount, v_original_actor_type, v_original_source, v_original_posting_count, v_original_related_transaction_id
     FROM credit_transactions original_transaction
-    WHERE original_transaction.transaction_id = p_related_transaction_id AND original_transaction.wallet_user_id = p_user_id
+    WHERE original_transaction.transaction_id = p_related_transaction_id AND original_transaction.billing_account_id = p_billing_account_id
     FOR UPDATE;
     IF NOT FOUND OR v_original_command_type NOT IN ('grant', 'deduction', 'refund') OR (v_original_actor_type <> 'admin' AND NOT (v_original_command_type = 'grant' AND v_original_source = 'reward_redemption')) THEN
       RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit correction';
@@ -1009,13 +1176,13 @@ BEGIN
     END IF;
     IF v_original_command_type = 'refund' THEN
       SELECT refunded_amount INTO v_refunded_amount FROM credit_charges charge
-      WHERE charge.capture_transaction_id = v_original_related_transaction_id AND charge.wallet_user_id = p_user_id FOR UPDATE;
+      WHERE charge.capture_transaction_id = v_original_related_transaction_id AND charge.billing_account_id = p_billing_account_id FOR UPDATE;
       IF NOT FOUND OR p_amount > v_refunded_amount THEN
         RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid refund correction';
       END IF;
     END IF;
   END IF;
-  SELECT status INTO v_wallet_status FROM credit_wallets WHERE user_id = p_user_id FOR UPDATE;
+  SELECT status INTO v_wallet_status FROM credit_wallets wallets WHERE wallets.billing_account_id = p_billing_account_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found'; END IF;
   IF v_wallet_status <> 'active'
      AND p_command_type NOT IN ('capture', 'release')
@@ -1025,19 +1192,19 @@ BEGIN
   IF p_command_type IN ('grant', 'deduction', 'hold')
      AND EXISTS (
        SELECT 1 FROM credit_wallet_restrictions restrictions
-       WHERE restrictions.wallet_user_id = p_user_id AND restrictions.released_at IS NULL
+       WHERE restrictions.billing_account_id = p_billing_account_id AND restrictions.released_at IS NULL
      ) THEN
     RAISE EXCEPTION USING ERRCODE = 'IB011', MESSAGE = 'credit wallet restricted';
   END IF;
-  PERFORM id FROM credit_accounts accounts WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role IN ('system_issuance', 'system_revenue', 'system_sink')) ORDER BY accounts.id FOR UPDATE;
+  PERFORM id FROM credit_accounts accounts WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role IN ('system_issuance', 'system_revenue', 'system_sink')) ORDER BY accounts.id FOR UPDATE;
   SELECT MAX(id) FILTER (WHERE account_role = 'user_available'), MAX(id) FILTER (WHERE account_role = 'user_reserved'),
     MAX(id) FILTER (WHERE account_role = 'system_issuance'), MAX(id) FILTER (WHERE account_role = 'system_revenue'),
     MAX(id) FILTER (WHERE account_role = 'system_sink'), MAX(balance) FILTER (WHERE account_role = 'user_available'),
     MAX(balance) FILTER (WHERE account_role = 'user_reserved') INTO v_available_id, v_reserved_id, v_issuance_id, v_revenue_id,
     v_sink_id, v_available_balance, v_reserved_balance FROM credit_accounts accounts WHERE
-    (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved')) OR
-    (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role IN ('system_issuance', 'system_revenue', 'system_sink'));
+    (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved')) OR
+    (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role IN ('system_issuance', 'system_revenue', 'system_sink'));
   IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_issuance_id IS NULL OR v_revenue_id IS NULL OR v_sink_id IS NULL THEN
     RAISE EXCEPTION 'credit wallet account set is incomplete';
   END IF;
@@ -1057,13 +1224,13 @@ BEGIN
   IF v_to_id = v_reserved_id THEN v_reserved_after := v_reserved_after + v_amount; END IF;
   IF v_available_after < 0 OR v_reserved_after < 0 THEN RAISE EXCEPTION USING ERRCODE = 'IB004', MESSAGE = 'insufficient credits'; END IF;
   v_transaction_id := 'ctx_' || substr(encode(sha256(convert_to(clock_timestamp()::TEXT || random()::TEXT || p_idempotency_key, 'UTF8')), 'hex'), 1, 32);
-  INSERT INTO credit_transactions (transaction_id, wallet_user_id, command_type, idempotency_key, request_hash, actor_type, actor_id,
+  INSERT INTO credit_transactions (transaction_id, billing_account_id, command_type, idempotency_key, request_hash, actor_type, actor_id,
     source, reason, business_reference_type, business_reference_id, related_transaction_id, command_amount, posting_count, available_balance_after, reserved_balance_after)
-    VALUES (v_transaction_id, p_user_id, p_command_type, p_idempotency_key, v_hash, p_actor_type, p_actor_id, p_source, p_reason,
+    VALUES (v_transaction_id, p_billing_account_id, p_command_type, p_idempotency_key, v_hash, p_actor_type, p_actor_id, p_source, p_reason,
     p_business_reference_type, p_business_reference_id, NULLIF(p_related_transaction_id, ''), v_amount, 2, v_available_after, v_reserved_after);
   INSERT INTO credit_postings (transaction_id, account_id, amount) VALUES (v_transaction_id, v_from_id, -v_amount), (v_transaction_id, v_to_id, v_amount);
   IF p_command_type = 'hold' THEN
-    INSERT INTO credit_holds (hold_transaction_id, wallet_user_id, amount) VALUES (v_transaction_id, p_user_id, v_amount);
+    INSERT INTO credit_holds (hold_transaction_id, billing_account_id, amount) VALUES (v_transaction_id, p_billing_account_id, v_amount);
   ELSIF p_command_type IN ('capture', 'release') THEN
     IF p_command_type = 'capture' THEN
       v_captured_amount := v_captured_amount + v_amount;
@@ -1085,13 +1252,13 @@ BEGIN
         release_transaction_id = v_release_transaction_id,
         settled_at = CASE WHEN v_terminal_status = 'held' THEN NULL ELSE now() END
     WHERE hold_transaction_id = p_related_transaction_id;
-    IF p_command_type = 'capture' THEN INSERT INTO credit_charges (capture_transaction_id, wallet_user_id, amount) VALUES (v_transaction_id, p_user_id, v_amount); END IF;
+    IF p_command_type = 'capture' THEN INSERT INTO credit_charges (capture_transaction_id, billing_account_id, amount) VALUES (v_transaction_id, p_billing_account_id, v_amount); END IF;
   ELSIF p_command_type = 'refund' THEN
     UPDATE credit_charges SET refunded_amount = refunded_amount + v_amount, updated_at = now() WHERE capture_transaction_id = p_related_transaction_id;
   ELSIF p_command_type = 'correction' AND v_original_command_type = 'refund' THEN
     UPDATE credit_charges SET refunded_amount = refunded_amount - v_amount, updated_at = now() WHERE capture_transaction_id = v_original_related_transaction_id;
   END IF;
-  RETURN QUERY SELECT created.transaction_id, created.command_type, created.command_amount, created.wallet_user_id, created.available_balance_after,
+  RETURN QUERY SELECT created.transaction_id, created.command_type, created.command_amount, created.billing_account_id, created.available_balance_after,
     created.reserved_balance_after, FALSE, created.created_at FROM credit_transactions created WHERE created.transaction_id = v_transaction_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
@@ -1101,13 +1268,13 @@ DECLARE trusted_schema TEXT := current_schema();
 BEGIN
   EXECUTE format('ALTER FUNCTION %I.create_credit_wallet_restriction(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp', trusted_schema, trusted_schema);
   EXECUTE format('ALTER FUNCTION %I.release_credit_wallet_restriction(TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp', trusted_schema, trusted_schema);
-  EXECUTE format('ALTER FUNCTION %I.execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp', trusted_schema, trusted_schema);
+  EXECUTE format('ALTER FUNCTION %I.execute_credit_command_v3(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp', trusted_schema, trusted_schema);
 END;
 $$;
 
 REVOKE ALL ON FUNCTION create_credit_wallet_restriction(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION release_credit_wallet_restriction(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION execute_credit_command_v3(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 
 CREATE FUNCTION start_credit_reconciliation(
   p_trigger_type TEXT,
@@ -1228,12 +1395,12 @@ BEGIN
   IF NOT FOUND THEN RETURN; END IF;
 
   CREATE TEMP TABLE reconciliation_scan (
-    finding_type TEXT, severity TEXT, risk TEXT, wallet_user_id BIGINT,
+    finding_type TEXT, severity TEXT, risk TEXT, billing_account_id BIGINT,
     subject_type TEXT, subject_id TEXT, details JSONB
   ) ON COMMIT DROP;
 
   INSERT INTO reconciliation_scan
-  SELECT 'ledger_postings_invalid', 'critical', 'high', transactions.wallet_user_id,
+  SELECT 'ledger_postings_invalid', 'critical', 'high', transactions.billing_account_id,
     'transaction', transactions.transaction_id,
     jsonb_build_object('declared_posting_count', transactions.posting_count, 'actual_posting_count', COUNT(postings.id),
       'asset_count', COUNT(DISTINCT postings.asset_code), 'posting_sum', COALESCE(SUM(postings.amount), 0),
@@ -1242,7 +1409,7 @@ BEGIN
       'command_amount', transactions.command_amount)
   FROM credit_transactions transactions
   LEFT JOIN credit_postings postings ON postings.transaction_id = transactions.transaction_id
-  GROUP BY transactions.transaction_id, transactions.wallet_user_id, transactions.posting_count, transactions.command_amount
+  GROUP BY transactions.transaction_id, transactions.billing_account_id, transactions.posting_count, transactions.command_amount
   HAVING COUNT(postings.id) < 2 OR COUNT(postings.id) <> transactions.posting_count
       OR COUNT(DISTINCT postings.asset_code) <> 1
       OR BOOL_OR(postings.asset_code IS DISTINCT FROM transactions.asset_code)
@@ -1251,7 +1418,7 @@ BEGIN
       OR COALESCE(SUM(postings.amount) FILTER (WHERE postings.amount > 0), 0) <> transactions.command_amount;
 
   INSERT INTO reconciliation_scan
-  SELECT 'command_shape_invalid', 'critical', 'high', transactions.wallet_user_id, 'transaction', transactions.transaction_id,
+  SELECT 'command_shape_invalid', 'critical', 'high', transactions.billing_account_id, 'transaction', transactions.transaction_id,
     jsonb_build_object('command_type', transactions.command_type, 'actor_type', transactions.actor_type,
       'related_transaction_id', transactions.related_transaction_id, 'command_amount', transactions.command_amount)
   FROM credit_transactions transactions
@@ -1280,23 +1447,23 @@ BEGIN
     OR transactions.command_amount <= 0;
 
   INSERT INTO reconciliation_scan
-  SELECT 'wallet_projection_mismatch', 'critical', 'high', accounts.wallet_user_id,
+  SELECT 'wallet_projection_mismatch', 'critical', 'high', accounts.billing_account_id,
     'account', accounts.id::TEXT,
     jsonb_build_object('account_role', accounts.account_role, 'projected_balance', accounts.balance,
       'ledger_balance', COALESCE(SUM(postings.amount), 0))
   FROM credit_accounts accounts
   LEFT JOIN credit_postings postings ON postings.account_id = accounts.id
-  WHERE accounts.wallet_user_id IS NOT NULL
-  GROUP BY accounts.id, accounts.wallet_user_id, accounts.account_role, accounts.balance
+  WHERE accounts.billing_account_id IS NOT NULL
+  GROUP BY accounts.id, accounts.billing_account_id, accounts.account_role, accounts.balance
   HAVING accounts.balance <> COALESCE(SUM(postings.amount), 0);
 
   INSERT INTO reconciliation_scan
-  SELECT 'stale_hold', 'warning', 'low', holds.wallet_user_id, 'hold', holds.hold_transaction_id,
+  SELECT 'stale_hold', 'warning', 'low', holds.billing_account_id, 'hold', holds.hold_transaction_id,
     jsonb_build_object('created_at', holds.created_at, 'age_seconds', EXTRACT(EPOCH FROM clock_timestamp() - holds.created_at)::BIGINT)
   FROM credit_holds holds WHERE holds.status = 'held' AND holds.created_at < clock_timestamp() - v_stale_after;
 
   INSERT INTO reconciliation_scan
-  SELECT 'task_hold_missing_billing_snapshot', 'critical', 'high', transactions.wallet_user_id,
+  SELECT 'task_hold_missing_billing_snapshot', 'critical', 'high', transactions.billing_account_id,
     'hold', transactions.transaction_id,
     jsonb_build_object('task_id', transactions.business_reference_id, 'billing_snapshot_exists', FALSE)
   FROM credit_transactions transactions
@@ -1305,17 +1472,17 @@ BEGIN
     AND snapshots.task_id IS NULL;
 
   INSERT INTO reconciliation_scan
-  SELECT 'task_trace_missing', 'warning', 'low', snapshots.user_id,
+  SELECT 'task_trace_missing', 'warning', 'low', snapshots.billing_account_id,
     'task', snapshots.task_id,
     jsonb_build_object('hold_transaction_id', snapshots.hold_transaction_id, 'settlement_state', settlements.state)
   FROM task_billing_snapshots snapshots
   JOIN credit_transactions transactions ON transactions.transaction_id = snapshots.hold_transaction_id
     AND transactions.command_type = 'hold' AND transactions.command_amount = snapshots.total_credits
-    AND transactions.wallet_user_id = snapshots.user_id
+    AND transactions.billing_account_id = snapshots.billing_account_id
     AND transactions.business_reference_type = 'task' AND transactions.business_reference_id = snapshots.task_id
   JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
   JOIN credit_holds holds ON holds.hold_transaction_id = snapshots.hold_transaction_id
-    AND holds.wallet_user_id = snapshots.user_id AND holds.amount = snapshots.total_credits
+    AND holds.billing_account_id = snapshots.billing_account_id AND holds.amount = snapshots.total_credits
     AND holds.status = settlements.state
   LEFT JOIN tasks ON tasks.public_id = snapshots.task_id
   WHERE snapshots.total_credits > 0 AND tasks.public_id IS NULL
@@ -1324,7 +1491,7 @@ BEGIN
       SELECT 1 FROM credit_transactions terminal
       WHERE terminal.transaction_id IN (settlements.capture_transaction_id, settlements.release_transaction_id)
         AND terminal.command_amount > 0
-        AND terminal.wallet_user_id = snapshots.user_id
+        AND terminal.billing_account_id = snapshots.billing_account_id
         AND terminal.related_transaction_id = snapshots.hold_transaction_id
         AND terminal.business_reference_type = 'task' AND terminal.business_reference_id = snapshots.task_id
     ))
@@ -1348,13 +1515,13 @@ BEGIN
     );
 
   INSERT INTO reconciliation_scan
-  SELECT 'task_billing_fact_missing', 'critical', 'high', snapshots.user_id, 'task', snapshots.task_id,
+  SELECT 'task_billing_fact_missing', 'critical', 'high', snapshots.billing_account_id, 'task', snapshots.task_id,
     jsonb_build_object('hold_transaction_id', snapshots.hold_transaction_id, 'hold_exists', holds.hold_transaction_id IS NOT NULL,
       'settlement_exists', settlements.task_id IS NOT NULL, 'hold_command', hold_transactions.command_type,
       'hold_command_amount', hold_transactions.command_amount, 'expected_amount', snapshots.total_credits,
-      'hold_wallet_matches', hold_transactions.wallet_user_id = snapshots.user_id,
+      'hold_wallet_matches', hold_transactions.billing_account_id = snapshots.billing_account_id,
       'hold_reference_matches', hold_transactions.business_reference_type = 'task' AND hold_transactions.business_reference_id = snapshots.task_id,
-      'hold_projection_matches', holds.wallet_user_id = snapshots.user_id AND holds.amount = snapshots.total_credits,
+      'hold_projection_matches', holds.billing_account_id = snapshots.billing_account_id AND holds.amount = snapshots.total_credits,
       'settlement_state', settlements.state, 'capture_command', capture_tx.command_type,
       'release_command', release_tx.command_type)
   FROM task_billing_snapshots snapshots
@@ -1367,10 +1534,10 @@ BEGIN
     holds.hold_transaction_id IS NULL OR settlements.task_id IS NULL
     OR hold_transactions.command_type IS DISTINCT FROM 'hold'
     OR hold_transactions.command_amount IS DISTINCT FROM snapshots.total_credits
-    OR hold_transactions.wallet_user_id IS DISTINCT FROM snapshots.user_id
+    OR hold_transactions.billing_account_id IS DISTINCT FROM snapshots.billing_account_id
     OR hold_transactions.business_reference_type IS DISTINCT FROM 'task'
     OR hold_transactions.business_reference_id IS DISTINCT FROM snapshots.task_id
-    OR holds.wallet_user_id IS DISTINCT FROM snapshots.user_id
+    OR holds.billing_account_id IS DISTINCT FROM snapshots.billing_account_id
     OR holds.amount IS DISTINCT FROM snapshots.total_credits
     OR settlements.state NOT IN ('held', 'captured', 'released')
     OR holds.status IS DISTINCT FROM settlements.state
@@ -1385,7 +1552,7 @@ BEGIN
       WHEN tasks.status IN ('pending', 'running') THEN 'active_task_not_held'
       WHEN tasks.status IN ('completed', 'failed', 'cancelled') THEN 'terminal_task_settlement_mismatch'
     END,
-    'critical', 'high', snapshots.user_id, 'task', tasks.public_id,
+    'critical', 'high', snapshots.billing_account_id, 'task', tasks.public_id,
       jsonb_build_object('task_status', tasks.status, 'settlement_state', settlements.state,
       'capture_transaction_id', settlements.capture_transaction_id, 'release_transaction_id', settlements.release_transaction_id)
   FROM task_billing_snapshots snapshots
@@ -1407,7 +1574,7 @@ BEGIN
     )));
 
   INSERT INTO reconciliation_scan
-  SELECT 'task_terminal_transaction_count', 'critical', 'high', snapshots.user_id, 'task', tasks.public_id,
+  SELECT 'task_terminal_transaction_count', 'critical', 'high', snapshots.billing_account_id, 'task', tasks.public_id,
     jsonb_build_object('task_status', tasks.status, 'expected_count',
       (CASE WHEN settlements.captured_credits > 0 THEN 1 ELSE 0 END) +
       (CASE WHEN settlements.released_credits > 0 THEN 1 ELSE 0 END),
@@ -1417,10 +1584,10 @@ BEGIN
   JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
   LEFT JOIN credit_transactions terminals ON terminals.related_transaction_id = snapshots.hold_transaction_id
     AND terminals.command_type IN ('capture', 'release')
-    AND terminals.wallet_user_id = snapshots.user_id
+    AND terminals.billing_account_id = snapshots.billing_account_id
     AND terminals.business_reference_type = 'task' AND terminals.business_reference_id = tasks.public_id
   WHERE snapshots.total_credits > 0 AND tasks.status IN ('completed', 'failed', 'cancelled')
-  GROUP BY snapshots.user_id, tasks.public_id, tasks.status, settlements.captured_credits, settlements.released_credits
+  GROUP BY snapshots.billing_account_id, tasks.public_id, tasks.status, settlements.captured_credits, settlements.released_credits
   HAVING COUNT(terminals.transaction_id) <>
     (CASE WHEN settlements.captured_credits > 0 THEN 1 ELSE 0 END) +
     (CASE WHEN settlements.released_credits > 0 THEN 1 ELSE 0 END);
@@ -1430,14 +1597,14 @@ BEGIN
     SELECT idempotency_key, COUNT(*) AS transaction_count, COUNT(DISTINCT request_hash) AS request_hash_count
     FROM credit_transactions GROUP BY idempotency_key HAVING COUNT(DISTINCT request_hash) > 1
   )
-  SELECT 'idempotency_request_hash_conflict', 'critical', 'high', transactions.wallet_user_id,
+  SELECT 'idempotency_request_hash_conflict', 'critical', 'high', transactions.billing_account_id,
     'idempotency_key', conflicts.idempotency_key,
     jsonb_build_object('transaction_count', conflicts.transaction_count, 'request_hash_count', conflicts.request_hash_count)
   FROM conflicts JOIN credit_transactions transactions USING (idempotency_key)
-  GROUP BY conflicts.idempotency_key, conflicts.transaction_count, conflicts.request_hash_count, transactions.wallet_user_id;
+  GROUP BY conflicts.idempotency_key, conflicts.transaction_count, conflicts.request_hash_count, transactions.billing_account_id;
 
   INSERT INTO reconciliation_scan
-  SELECT 'task_settlement_reference_invalid', 'critical', 'high', snapshots.user_id, 'task', snapshots.task_id,
+  SELECT 'task_settlement_reference_invalid', 'critical', 'high', snapshots.billing_account_id, 'task', snapshots.task_id,
     jsonb_build_object('settlement_state', settlements.state, 'capture_transaction_id', settlements.capture_transaction_id,
       'release_transaction_id', settlements.release_transaction_id)
   FROM task_billing_snapshots snapshots
@@ -1450,7 +1617,7 @@ BEGIN
     OR (settlements.capture_transaction_id IS NOT NULL AND (
       capture_tx.command_type IS DISTINCT FROM 'capture'
       OR capture_tx.command_amount IS DISTINCT FROM settlements.captured_credits
-      OR capture_tx.wallet_user_id IS DISTINCT FROM snapshots.user_id
+      OR capture_tx.billing_account_id IS DISTINCT FROM snapshots.billing_account_id
       OR capture_tx.related_transaction_id IS DISTINCT FROM snapshots.hold_transaction_id
       OR capture_tx.business_reference_type IS DISTINCT FROM 'task'
       OR capture_tx.business_reference_id IS DISTINCT FROM snapshots.task_id
@@ -1458,7 +1625,7 @@ BEGIN
     OR (settlements.release_transaction_id IS NOT NULL AND (
       release_tx.command_type IS DISTINCT FROM 'release'
       OR release_tx.command_amount IS DISTINCT FROM settlements.released_credits
-      OR release_tx.wallet_user_id IS DISTINCT FROM snapshots.user_id
+      OR release_tx.billing_account_id IS DISTINCT FROM snapshots.billing_account_id
       OR release_tx.related_transaction_id IS DISTINCT FROM snapshots.hold_transaction_id
       OR release_tx.business_reference_type IS DISTINCT FROM 'task'
       OR release_tx.business_reference_id IS DISTINCT FROM snapshots.task_id
@@ -1466,26 +1633,26 @@ BEGIN
   );
 
   INSERT INTO reconciliation_scan
-  SELECT 'duplicate_business_reference', 'error', 'high', wallet_user_id, 'business_reference',
+  SELECT 'duplicate_business_reference', 'error', 'high', billing_account_id, 'business_reference',
     business_reference_type || ':' || business_reference_id || ':' || command_type,
     jsonb_build_object('command_type', command_type, 'transaction_count', COUNT(*))
   FROM credit_transactions
-  GROUP BY wallet_user_id, business_reference_type, business_reference_id, command_type HAVING COUNT(*) > 1;
+  GROUP BY billing_account_id, business_reference_type, business_reference_id, command_type HAVING COUNT(*) > 1;
 
   INSERT INTO reconciliation_scan
-  SELECT 'correction_amount_exceeds_original', 'critical', 'high', original.wallet_user_id,
+  SELECT 'correction_amount_exceeds_original', 'critical', 'high', original.billing_account_id,
     'transaction', original.transaction_id,
     jsonb_build_object('original_command_type', original.command_type, 'original_amount', original.command_amount,
       'corrected_amount', SUM(corrections.command_amount))
   FROM credit_transactions original
   JOIN credit_transactions corrections ON corrections.command_type = 'correction'
     AND corrections.related_transaction_id = original.transaction_id
-  GROUP BY original.transaction_id, original.wallet_user_id, original.command_type, original.command_amount, original.actor_type
+  GROUP BY original.transaction_id, original.billing_account_id, original.command_type, original.command_amount, original.actor_type
   HAVING original.command_type NOT IN ('grant', 'deduction', 'refund')
     OR original.actor_type <> 'admin' OR SUM(corrections.command_amount) > original.command_amount;
 
   INSERT INTO reconciliation_scan
-  SELECT 'refund_amount_invalid', 'critical', 'high', charges.wallet_user_id, 'charge', charges.capture_transaction_id,
+  SELECT 'refund_amount_invalid', 'critical', 'high', charges.billing_account_id, 'charge', charges.capture_transaction_id,
     jsonb_build_object('charge_amount', charges.amount, 'projected_refunded_amount', charges.refunded_amount,
       'ledger_refunded_amount', COALESCE(refunds.amount, 0) - COALESCE(corrections.amount, 0))
   FROM credit_charges charges
@@ -1504,28 +1671,28 @@ BEGIN
     OR charges.refunded_amount <> COALESCE(refunds.amount, 0) - COALESCE(corrections.amount, 0);
 
   INSERT INTO reconciliation_scan
-  SELECT 'illegal_reference_chain', 'critical', 'high', transactions.wallet_user_id, 'transaction', transactions.transaction_id,
+  SELECT 'illegal_reference_chain', 'critical', 'high', transactions.billing_account_id, 'transaction', transactions.transaction_id,
     jsonb_build_object('command_type', transactions.command_type, 'related_transaction_id', transactions.related_transaction_id,
-      'related_command_type', related.command_type, 'related_wallet_user_id', related.wallet_user_id)
+      'related_command_type', related.command_type, 'related_billing_account_id', related.billing_account_id)
   FROM credit_transactions transactions
   LEFT JOIN credit_transactions related ON related.transaction_id = transactions.related_transaction_id
   WHERE (transactions.command_type IN ('grant', 'deduction', 'hold', 'purchase_credit', 'payment_dispute_debit') AND transactions.related_transaction_id IS NOT NULL)
     OR (transactions.command_type IN ('capture', 'release') AND
-      (related.transaction_id IS NULL OR related.command_type <> 'hold' OR related.wallet_user_id <> transactions.wallet_user_id))
+      (related.transaction_id IS NULL OR related.command_type <> 'hold' OR related.billing_account_id <> transactions.billing_account_id))
     OR (transactions.command_type = 'refund' AND
-      (related.transaction_id IS NULL OR related.command_type <> 'capture' OR related.wallet_user_id <> transactions.wallet_user_id))
+      (related.transaction_id IS NULL OR related.command_type <> 'capture' OR related.billing_account_id <> transactions.billing_account_id))
     OR (transactions.command_type = 'purchase_refund' AND
-      (related.transaction_id IS NULL OR related.command_type <> 'hold' OR related.wallet_user_id <> transactions.wallet_user_id))
+      (related.transaction_id IS NULL OR related.command_type <> 'hold' OR related.billing_account_id <> transactions.billing_account_id))
     OR (transactions.command_type = 'payment_dispute_restore' AND
-      (related.transaction_id IS NULL OR related.command_type <> 'payment_dispute_debit' OR related.wallet_user_id <> transactions.wallet_user_id
+      (related.transaction_id IS NULL OR related.command_type <> 'payment_dispute_debit' OR related.billing_account_id <> transactions.billing_account_id
        OR related.business_reference_type <> transactions.business_reference_type
        OR related.business_reference_id <> transactions.business_reference_id))
     OR (transactions.command_type = 'correction' AND
       (related.transaction_id IS NULL OR related.command_type NOT IN ('grant', 'deduction', 'refund')
-       OR related.actor_type <> 'admin' OR related.wallet_user_id <> transactions.wallet_user_id));
+       OR related.actor_type <> 'admin' OR related.billing_account_id <> transactions.billing_account_id));
 
   INSERT INTO reconciliation_scan
-  SELECT 'payment_dispute_restore_exceeds_debit', 'critical', 'high', debit.wallet_user_id,
+  SELECT 'payment_dispute_restore_exceeds_debit', 'critical', 'high', debit.billing_account_id,
     'transaction', debit.transaction_id,
     jsonb_build_object('debited_amount', debit.command_amount, 'restored_amount', COALESCE(restores.amount, 0))
   FROM credit_transactions debit
@@ -1539,14 +1706,14 @@ BEGIN
     AND COALESCE(restores.amount, 0) > debit.command_amount;
 
   INSERT INTO reconciliation_scan
-  SELECT 'hold_state_invalid', 'critical', 'high', holds.wallet_user_id, 'hold', holds.hold_transaction_id,
+  SELECT 'hold_state_invalid', 'critical', 'high', holds.billing_account_id, 'hold', holds.hold_transaction_id,
     jsonb_build_object('hold_status', holds.status, 'hold_amount', holds.amount, 'hold_command', hold_tx.command_type,
       'capture_command', capture_tx.command_type, 'release_command', release_tx.command_type)
   FROM credit_holds holds
   LEFT JOIN credit_transactions hold_tx ON hold_tx.transaction_id = holds.hold_transaction_id
   LEFT JOIN credit_transactions capture_tx ON capture_tx.transaction_id = holds.capture_transaction_id
   LEFT JOIN credit_transactions release_tx ON release_tx.transaction_id = holds.release_transaction_id
-  WHERE hold_tx.command_type IS DISTINCT FROM 'hold' OR hold_tx.wallet_user_id IS DISTINCT FROM holds.wallet_user_id
+  WHERE hold_tx.command_type IS DISTINCT FROM 'hold' OR hold_tx.billing_account_id IS DISTINCT FROM holds.billing_account_id
     OR hold_tx.command_amount IS DISTINCT FROM holds.amount
     OR (holds.status = 'held' AND (
       holds.captured_amount + holds.released_amount >= holds.amount
@@ -1558,12 +1725,12 @@ BEGIN
       OR holds.settled_at IS NULL
       OR capture_tx.command_type NOT IN ('capture', 'purchase_refund')
       OR capture_tx.command_amount IS DISTINCT FROM holds.captured_amount
-      OR capture_tx.wallet_user_id IS DISTINCT FROM holds.wallet_user_id
+      OR capture_tx.billing_account_id IS DISTINCT FROM holds.billing_account_id
       OR capture_tx.related_transaction_id IS DISTINCT FROM holds.hold_transaction_id
       OR (holds.released_amount > 0 AND (
         release_tx.command_type IS DISTINCT FROM 'release'
         OR release_tx.command_amount IS DISTINCT FROM holds.released_amount
-        OR release_tx.wallet_user_id IS DISTINCT FROM holds.wallet_user_id
+        OR release_tx.billing_account_id IS DISTINCT FROM holds.billing_account_id
         OR release_tx.related_transaction_id IS DISTINCT FROM holds.hold_transaction_id
       ))
     ))
@@ -1573,40 +1740,40 @@ BEGIN
       OR holds.settled_at IS NULL
       OR release_tx.command_type IS DISTINCT FROM 'release'
       OR release_tx.command_amount IS DISTINCT FROM holds.released_amount
-      OR release_tx.wallet_user_id IS DISTINCT FROM holds.wallet_user_id
+      OR release_tx.billing_account_id IS DISTINCT FROM holds.billing_account_id
       OR release_tx.related_transaction_id IS DISTINCT FROM holds.hold_transaction_id
     ));
 
   INSERT INTO reconciliation_scan
-  SELECT 'hold_terminal_transaction_count', 'critical', 'high', holds.wallet_user_id, 'hold', holds.hold_transaction_id,
+  SELECT 'hold_terminal_transaction_count', 'critical', 'high', holds.billing_account_id, 'hold', holds.hold_transaction_id,
     jsonb_build_object('hold_status', holds.status, 'settlement_transaction_count', COUNT(terminals.transaction_id))
   FROM credit_holds holds
   LEFT JOIN credit_transactions terminals ON terminals.related_transaction_id = holds.hold_transaction_id
     AND terminals.command_type IN ('capture', 'release', 'purchase_refund')
-  GROUP BY holds.hold_transaction_id, holds.wallet_user_id, holds.status, holds.captured_amount, holds.released_amount
+  GROUP BY holds.hold_transaction_id, holds.billing_account_id, holds.status, holds.captured_amount, holds.released_amount
   HAVING COUNT(terminals.transaction_id) <>
     (CASE WHEN holds.captured_amount > 0 THEN 1 ELSE 0 END) +
     (CASE WHEN holds.released_amount > 0 THEN 1 ELSE 0 END);
 
   INSERT INTO reconciliation_scan
-  SELECT 'charge_state_invalid', 'critical', 'high', charges.wallet_user_id, 'charge', charges.capture_transaction_id,
+  SELECT 'charge_state_invalid', 'critical', 'high', charges.billing_account_id, 'charge', charges.capture_transaction_id,
     jsonb_build_object('charge_amount', charges.amount, 'capture_command', capture.command_type, 'capture_amount', capture.command_amount)
   FROM credit_charges charges
   LEFT JOIN credit_transactions capture ON capture.transaction_id = charges.capture_transaction_id
-  WHERE capture.command_type IS DISTINCT FROM 'capture' OR capture.wallet_user_id IS DISTINCT FROM charges.wallet_user_id
+  WHERE capture.command_type IS DISTINCT FROM 'capture' OR capture.billing_account_id IS DISTINCT FROM charges.billing_account_id
     OR capture.command_amount IS DISTINCT FROM charges.amount;
 
   WITH normalized AS (
-    SELECT scan.*, encode(sha256(convert_to(concat_ws(E'\x1f', finding_type, COALESCE(wallet_user_id::TEXT, ''), subject_type, subject_id), 'UTF8')), 'hex') AS fingerprint
+    SELECT scan.*, encode(sha256(convert_to(concat_ws(E'\x1f', finding_type, COALESCE(billing_account_id::TEXT, ''), subject_type, subject_id), 'UTF8')), 'hex') AS fingerprint
     FROM reconciliation_scan scan WHERE finding_type IS NOT NULL
   ), upserted AS (
     INSERT INTO credit_reconciliation_findings (
-      fingerprint, finding_type, severity, risk, wallet_user_id, subject_type, subject_id, details,
+      fingerprint, finding_type, severity, risk, billing_account_id, subject_type, subject_id, details,
       first_seen_run_id, last_seen_run_id
-    ) SELECT fingerprint, finding_type, severity, risk, wallet_user_id, subject_type, subject_id, details, p_run_id, p_run_id
+    ) SELECT fingerprint, finding_type, severity, risk, billing_account_id, subject_type, subject_id, details, p_run_id, p_run_id
       FROM normalized
     ON CONFLICT (fingerprint) DO UPDATE SET
-      severity = EXCLUDED.severity, risk = EXCLUDED.risk, wallet_user_id = EXCLUDED.wallet_user_id,
+      severity = EXCLUDED.severity, risk = EXCLUDED.risk, billing_account_id = EXCLUDED.billing_account_id,
       details = EXCLUDED.details, status = 'open', isolated = FALSE, last_seen_run_id = p_run_id,
       last_seen_at = clock_timestamp(), occurrence_count = credit_reconciliation_findings.occurrence_count + 1,
       resolved_at = NULL
@@ -1620,7 +1787,7 @@ BEGIN
 
   FOR v_finding IN
     SELECT restrictions.restriction_id::TEXT AS restriction_id,
-           restrictions.wallet_user_id,
+           restrictions.billing_account_id,
            findings.id AS finding_id
     FROM credit_wallet_restrictions restrictions
     JOIN credit_reconciliation_findings findings
@@ -1632,11 +1799,11 @@ BEGIN
       AND (
         findings.status <> 'open'
         OR findings.risk <> 'high'
-        OR findings.wallet_user_id IS NULL
-        OR findings.wallet_user_id <> restrictions.wallet_user_id
+        OR findings.billing_account_id IS NULL
+        OR findings.billing_account_id <> restrictions.billing_account_id
         OR findings.last_seen_run_id <> p_run_id
       )
-    ORDER BY restrictions.wallet_user_id, findings.id
+    ORDER BY restrictions.billing_account_id, findings.id
   LOOP
     PERFORM release_credit_wallet_restriction(
       v_finding.restriction_id,
@@ -1647,17 +1814,17 @@ BEGIN
   END LOOP;
 
   FOR v_finding IN
-    SELECT findings.id, findings.wallet_user_id, findings.finding_type
+    SELECT findings.id, findings.billing_account_id, findings.finding_type
     FROM credit_reconciliation_findings findings
     WHERE findings.last_seen_run_id = p_run_id
       AND findings.status = 'open'
       AND findings.risk = 'high'
-      AND findings.wallet_user_id IS NOT NULL
-    ORDER BY findings.wallet_user_id, findings.id
+      AND findings.billing_account_id IS NOT NULL
+    ORDER BY findings.billing_account_id, findings.id
   LOOP
     SELECT restriction_id INTO v_restriction_id
     FROM create_credit_wallet_restriction(
-      v_finding.wallet_user_id,
+      v_finding.billing_account_id,
       'ledger_integrity',
       'reconciliation',
       'finding',
@@ -1672,7 +1839,7 @@ BEGIN
   SET isolated = EXISTS (
     SELECT 1
     FROM credit_wallet_restrictions restrictions
-    WHERE restrictions.wallet_user_id = findings.wallet_user_id
+    WHERE restrictions.billing_account_id = findings.billing_account_id
       AND restrictions.restriction_type = 'ledger_integrity'
       AND restrictions.source = 'reconciliation'
       AND restrictions.related_object_type = 'finding'
@@ -1696,7 +1863,7 @@ BEGIN
   UPDATE credit_reconciliation_runs runs SET status = 'completed', completed_at = clock_timestamp(),
     finding_count = (SELECT COUNT(*) FROM credit_reconciliation_run_findings WHERE run_id = p_run_id),
     critical_count = (SELECT COUNT(*) FROM credit_reconciliation_findings WHERE last_seen_run_id = p_run_id AND severity = 'critical'),
-    isolated_wallet_count = (SELECT COUNT(DISTINCT wallet_user_id) FROM credit_reconciliation_findings
+    isolated_wallet_count = (SELECT COUNT(DISTINCT billing_account_id) FROM credit_reconciliation_findings
       WHERE last_seen_run_id = p_run_id AND isolated)
   WHERE runs.id = p_run_id;
 END;
@@ -1728,7 +1895,8 @@ BEGIN
      AND pg_trigger_depth() < 2 THEN
     RAISE EXCEPTION 'credit account balances are ledger projections and cannot be overwritten directly';
   END IF;
-  IF NEW.wallet_user_id IS DISTINCT FROM OLD.wallet_user_id
+  IF NEW.billing_account_id IS DISTINCT FROM OLD.billing_account_id
+     OR NEW.wallet_user_id IS DISTINCT FROM OLD.wallet_user_id
      OR NEW.asset_code IS DISTINCT FROM OLD.asset_code
      OR NEW.account_role IS DISTINCT FROM OLD.account_role
      OR NEW.shard_key IS DISTINCT FROM OLD.shard_key THEN
@@ -1897,51 +2065,107 @@ END;
 $_$;
 
 --
--- Name: provision_credit_wallet(bigint); Type: FUNCTION; Schema: public; Owner: -
+-- Name: provision_billing_account_wallet(bigint); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION provision_credit_wallet(p_user_id bigint) RETURNS void
+CREATE FUNCTION provision_billing_account_wallet(p_billing_account_id bigint) RETURNS void
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public', 'pg_catalog', 'pg_temp'
     AS $$
 DECLARE
   v_shard_key VARCHAR(128);
 BEGIN
-  IF p_user_id <= 0 OR NOT EXISTS (SELECT 1 FROM users WHERE id = p_user_id) THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit wallet owner';
+  IF p_billing_account_id <= 0 OR NOT EXISTS (SELECT 1 FROM billing_accounts WHERE internal_id = p_billing_account_id) THEN
+    RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid billing account wallet owner';
   END IF;
 
-  v_shard_key := 'wallet:' || p_user_id::TEXT;
-  INSERT INTO credit_wallets (user_id) VALUES (p_user_id) ON CONFLICT DO NOTHING;
-  INSERT INTO credit_accounts (wallet_user_id, account_role)
-  VALUES (p_user_id, 'user_available'), (p_user_id, 'user_reserved')
+  v_shard_key := 'billing-account:' || p_billing_account_id::TEXT;
+  INSERT INTO credit_wallets (billing_account_id) VALUES (p_billing_account_id) ON CONFLICT DO NOTHING;
+  INSERT INTO credit_accounts (billing_account_id, account_role)
+  VALUES (p_billing_account_id, 'user_available'), (p_billing_account_id, 'user_reserved')
   ON CONFLICT DO NOTHING;
   INSERT INTO credit_accounts (account_role, shard_key, metadata)
   VALUES
-    ('system_issuance', v_shard_key, jsonb_build_object('scope', 'wallet', 'wallet_user_id', p_user_id)),
-    ('system_revenue', v_shard_key, jsonb_build_object('scope', 'wallet', 'wallet_user_id', p_user_id)),
-    ('system_sink', v_shard_key, jsonb_build_object('scope', 'wallet', 'wallet_user_id', p_user_id))
+    ('system_issuance', v_shard_key, jsonb_build_object('scope', 'billing_account', 'billing_account_id', p_billing_account_id)),
+    ('system_revenue', v_shard_key, jsonb_build_object('scope', 'billing_account', 'billing_account_id', p_billing_account_id)),
+    ('system_sink', v_shard_key, jsonb_build_object('scope', 'billing_account', 'billing_account_id', p_billing_account_id))
   ON CONFLICT DO NOTHING;
 END;
 $$;
 
 --
--- Name: set_credit_wallet_status(bigint, text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: set_billing_account_wallet_status(bigint, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION set_credit_wallet_status(p_user_id bigint, p_status text) RETURNS void
+CREATE FUNCTION set_billing_account_wallet_status(p_billing_account_id bigint, p_status text) RETURNS void
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public', 'pg_catalog', 'pg_temp'
     AS $$
 BEGIN
   p_status := btrim(p_status);
-  IF p_user_id <= 0 OR p_status NOT IN ('active', 'frozen') THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit wallet status command';
+  IF p_billing_account_id <= 0 OR p_status NOT IN ('active', 'frozen') THEN
+    RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid billing account wallet status command';
   END IF;
-  UPDATE credit_wallets SET status = p_status, updated_at = now() WHERE user_id = p_user_id;
+  UPDATE credit_wallets SET status = p_status, updated_at = now() WHERE billing_account_id = p_billing_account_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
   END IF;
+END;
+$$;
+
+-- freeze_sole_owned_billing_wallets freezes only the wallets whose Billing
+-- Account is exclusively managed by p_user_id (single owner, no other
+-- manager) and is NOT organization-owned. Freezing or deleting a user must
+-- never freeze organization or other users' funds (#916): shared/org wallets
+-- stay active so existing payment obligations and Holds keep converging.
+CREATE FUNCTION freeze_sole_owned_billing_wallets(p_user_id bigint, p_frozen boolean) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_catalog', 'pg_temp'
+    AS $$
+DECLARE
+  v_status TEXT := CASE WHEN p_frozen THEN 'frozen' ELSE 'active' END;
+BEGIN
+  IF p_user_id <= 0 THEN
+    RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid billing wallet freeze command';
+  END IF;
+  UPDATE credit_wallets wallets
+  SET status = v_status, updated_at = now()
+  FROM billing_accounts accounts
+  WHERE wallets.billing_account_id = accounts.internal_id
+    AND accounts.organization_id IS NULL
+    AND EXISTS (
+      SELECT 1 FROM billing_account_members managers
+      WHERE managers.billing_account_id = accounts.internal_id
+        AND managers.user_id = p_user_id AND managers.role = 'owner'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM billing_account_members others
+      WHERE others.billing_account_id = accounts.internal_id
+        AND others.user_id <> p_user_id
+    );
+END;
+$$;
+
+-- remove_shared_billing_memberships_for_user detaches a deleted user from
+-- every Billing Account that keeps at least one other manager, so the
+-- tombstone holds no financial management. Sole-owned non-org accounts keep
+-- their (frozen) membership row: the tombstone user row is retained and the
+-- funds stay attributable instead of orphaned.
+CREATE FUNCTION remove_shared_billing_memberships_for_user(p_user_id bigint) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_catalog', 'pg_temp'
+    AS $$
+BEGIN
+  IF p_user_id <= 0 THEN
+    RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid billing membership cleanup command';
+  END IF;
+  DELETE FROM billing_account_members departed
+  WHERE departed.user_id = p_user_id
+    AND EXISTS (
+      SELECT 1 FROM billing_account_members others
+      WHERE others.billing_account_id = departed.billing_account_id
+        AND others.user_id <> p_user_id
+    );
 END;
 $$;
 
@@ -1950,7 +2174,7 @@ CREATE FUNCTION ensure_credit_wallet_projection_on_user_insert() RETURNS trigger
     SET search_path TO 'public', 'pg_catalog', 'pg_temp'
     AS $$
 BEGIN
-  PERFORM provision_credit_wallet(NEW.id);
+  PERFORM provision_billing_account_wallet(ensure_personal_billing_account_for_user(NEW.id));
   RETURN NEW;
 END;
 $$;
@@ -2927,6 +3151,8 @@ CREATE INDEX idx_event_delivery_attempts_delivery
 CREATE TABLE ai_search_operations (
   operation_id UUID PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  workspace_id BIGINT,
+  billing_account_id BIGINT,
   idempotency_key VARCHAR(160) NOT NULL,
   request_hash CHAR(64) NOT NULL,
   sku VARCHAR(128) NOT NULL,
@@ -2940,6 +3166,7 @@ CREATE TABLE ai_search_operations (
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   settled_at TIMESTAMPTZ(3),
+  CONSTRAINT ck_ai_search_operations_billing_account CHECK (billing_account_id IS NOT NULL),
   CONSTRAINT uq_ai_search_operations_user_key UNIQUE (user_id, idempotency_key),
   CONSTRAINT ck_ai_search_operations_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),
   CONSTRAINT ck_ai_search_operations_status CHECK (status IN ('pending', 'succeeded', 'failed', 'reconciliation_pending')),
@@ -2953,6 +3180,13 @@ CREATE TABLE ai_search_operations (
 CREATE INDEX idx_ai_search_operations_pending
   ON ai_search_operations (status, created_at)
   WHERE status IN ('pending', 'reconciliation_pending');
+
+CREATE INDEX idx_ai_search_operations_workspace
+  ON ai_search_operations (workspace_id, created_at DESC);
+
+CREATE UNIQUE INDEX uq_ai_search_operations_workspace_key
+  ON ai_search_operations (workspace_id, idempotency_key)
+  WHERE workspace_id IS NOT NULL;
 CREATE TABLE task_daily_stats (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   stat_date DATE NOT NULL,
@@ -3688,14 +3922,15 @@ DECLARE
   snapshot_unit BIGINT;
   snapshot_quantity BIGINT;
   snapshot_user BIGINT;
+  snapshot_account BIGINT;
   snapshot_hold TEXT;
   valid_terminal BOOLEAN;
 BEGIN
   IF TG_OP = 'DELETE' THEN
     RAISE EXCEPTION USING ERRCODE = 'IB202', MESSAGE = 'task billing settlements cannot be deleted';
   END IF;
-  SELECT total_credits, unit_credits, quantity, user_id, hold_transaction_id
-  INTO snapshot_total, snapshot_unit, snapshot_quantity, snapshot_user, snapshot_hold
+  SELECT total_credits, unit_credits, quantity, user_id, billing_account_id, hold_transaction_id
+  INTO snapshot_total, snapshot_unit, snapshot_quantity, snapshot_user, snapshot_account, snapshot_hold
   FROM task_billing_snapshots
   WHERE task_id = NEW.task_id;
   IF NOT FOUND THEN
@@ -3726,7 +3961,7 @@ BEGIN
       WHERE transactions.transaction_id = NEW.capture_transaction_id
         AND transactions.command_type = 'capture'
         AND transactions.command_amount = NEW.captured_credits
-        AND transactions.wallet_user_id = snapshot_user
+        AND transactions.billing_account_id = snapshot_account
         AND transactions.related_transaction_id = snapshot_hold
         AND transactions.business_reference_type = 'task'
         AND transactions.business_reference_id = NEW.task_id
@@ -3736,7 +3971,7 @@ BEGIN
       WHERE transactions.transaction_id = NEW.release_transaction_id
         AND transactions.command_type = 'release'
         AND transactions.command_amount = NEW.released_credits
-        AND transactions.wallet_user_id = snapshot_user
+        AND transactions.billing_account_id = snapshot_account
         AND transactions.related_transaction_id = snapshot_hold
         AND transactions.business_reference_type = 'task'
         AND transactions.business_reference_id = NEW.task_id
@@ -3998,7 +4233,7 @@ BEGIN
     FROM credit_transactions transactions
     WHERE transactions.transaction_id = NEW.hold_transaction_id
       AND transactions.command_type = 'hold'
-      AND transactions.wallet_user_id = NEW.user_id
+      AND transactions.billing_account_id = NEW.billing_account_id
       AND transactions.command_amount = NEW.total_credits
       AND transactions.business_reference_type = 'task'
       AND transactions.business_reference_id = NEW.task_id
@@ -4132,6 +4367,8 @@ CREATE TABLE task_billing_settlements (
 CREATE TABLE task_billing_snapshots (
     task_id character varying(64) NOT NULL,
     user_id bigint NOT NULL,
+    workspace_id bigint,
+    billing_account_id bigint,
     service character varying(64) NOT NULL,
     sku character varying(128) NOT NULL,
     price_version_id bigint NOT NULL,
@@ -4152,7 +4389,9 @@ CREATE TABLE task_billing_snapshots (
     CONSTRAINT task_billing_snapshots_quantity_check CHECK ((quantity > 0)),
     CONSTRAINT task_billing_snapshots_total_credits_check CHECK (((total_credits >= 0) AND (total_credits <= '9000000000000000'::bigint))),
     CONSTRAINT task_billing_snapshots_unit_credits_check CHECK (((unit_credits >= 0) AND (unit_credits <= '9000000000000000'::bigint))),
-    CONSTRAINT task_billing_snapshots_user_id_check CHECK ((user_id > 0))
+    CONSTRAINT task_billing_snapshots_workspace_id_check CHECK ((workspace_id > 0)),
+    CONSTRAINT task_billing_snapshots_user_id_check CHECK ((user_id > 0)),
+    CONSTRAINT task_billing_snapshots_billing_account_check CHECK ((billing_account_id IS NOT NULL AND billing_account_id > 0))
 );
 
 --
@@ -4239,6 +4478,9 @@ CREATE INDEX billing_current_prices_price_version_idx ON billing_current_prices 
 --
 
 CREATE INDEX idx_task_billing_snapshots_user_created ON task_billing_snapshots USING btree (user_id, created_at);
+
+CREATE INDEX idx_task_billing_snapshots_account_created ON task_billing_snapshots USING btree (billing_account_id, created_at);
+CREATE INDEX idx_task_billing_snapshots_account_workspace_created ON task_billing_snapshots USING btree (billing_account_id, workspace_id, created_at);
 
 --
 -- Name: billing_admin_actions billing_admin_actions_append_only; Type: TRIGGER; Schema: public; Owner: -
@@ -4553,12 +4795,20 @@ ALTER TABLE credit_transactions
 
 CREATE TABLE payment_customers (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  -- Payer funds identity (#919): the Billing Account that owns the unified
+  -- balance. user_id stays as the operator that first ensured the customer;
+  -- Stripe Customers are reused per (billing_account_id, stripe_account_id,
+  -- stripe_mode) so test/live stay isolated and key rotation never duplicates.
+  -- Plain BIGINT with no FK: the row is a payment fact and is retained when
+  -- the scope is hard-deleted (same precedent as task_billing_snapshots).
+  billing_account_id BIGINT,
   stripe_account_id TEXT NOT NULL,
   stripe_mode TEXT NOT NULL,
   stripe_customer_id TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT payment_customers_pkey PRIMARY KEY (user_id, stripe_account_id, stripe_mode),
+  CONSTRAINT payment_customers_pkey PRIMARY KEY (billing_account_id, stripe_account_id, stripe_mode),
+  CONSTRAINT ck_payment_customer_billing_account CHECK (billing_account_id IS NOT NULL),
   CONSTRAINT ck_payment_customer_account_id CHECK (char_length(stripe_account_id) BETWEEN 1 AND 255),
   CONSTRAINT ck_payment_customer_mode CHECK (stripe_mode IN ('test', 'live')),
   CONSTRAINT uq_payment_customer_namespace UNIQUE (stripe_account_id, stripe_mode, stripe_customer_id),
@@ -4569,7 +4819,16 @@ CREATE TABLE payment_orders (
   id UUID PRIMARY KEY,
   public_order_number TEXT NOT NULL UNIQUE,
   public_token UUID NOT NULL UNIQUE,
+  -- Operator attribution (#919): the real User who created the checkout.
+  -- Funds identity is billing_account_id below; the two are never conflated.
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  -- Payer funds identity (#919): the Billing Account holding the unified
+  -- balance. Checkout, continue/abandon, Return, Webhook, and background
+  -- recovery all converge on this persisted account; workspace switches,
+  -- member exits, and management changes never move the obligation.
+  -- Plain BIGINT with no FK: the order is a money fact and is retained when
+  -- the scope is hard-deleted (same precedent as task_billing_snapshots).
+  billing_account_id BIGINT,
   client_idempotency_key TEXT NOT NULL,
   request_hash TEXT NOT NULL,
   status TEXT NOT NULL,
@@ -4598,7 +4857,11 @@ CREATE TABLE payment_orders (
   credited_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT uq_payment_order_idempotency UNIQUE (user_id, client_idempotency_key),
+  -- Idempotency scope is the payer account (#919): same key + same hash
+  -- replays, same key + different hash conflicts. Independent accounts
+  -- may use the same client key, even with the same operator.
+  CONSTRAINT uq_payment_order_billing_idempotency UNIQUE (billing_account_id, client_idempotency_key),
+  CONSTRAINT ck_payment_order_billing_account CHECK (billing_account_id IS NOT NULL),
   CONSTRAINT uq_payment_order_checkout_session UNIQUE (stripe_account_id, stripe_checkout_session_id),
   CONSTRAINT ck_payment_order_public_number CHECK (public_order_number ~ '^IBP-[0-9]{8}-[A-Z0-9]{12}$'),
   CONSTRAINT ck_payment_order_idempotency CHECK (char_length(client_idempotency_key) BETWEEN 8 AND 160),
@@ -4659,6 +4922,11 @@ CREATE TABLE payment_orders (
 CREATE INDEX idx_payment_orders_user_history
   ON payment_orders (user_id, created_at DESC, id DESC);
 
+-- Account-scoped order reads (#919): pending lists, recharge history, and
+-- unpaid-slot accounting all address the payer account, never the operator.
+CREATE INDEX idx_payment_orders_billing_history
+  ON payment_orders (billing_account_id, created_at DESC, id DESC);
+
 CREATE INDEX idx_payment_orders_admin_history
   ON payment_orders (created_at DESC, id DESC);
 
@@ -4669,8 +4937,10 @@ CREATE INDEX idx_payment_orders_open
   ON payment_orders (status, expires_at)
   WHERE status IN ('creating', 'checkout_open', 'async_payment_pending');
 
-CREATE UNIQUE INDEX uq_payment_orders_user_active_quantity
-  ON payment_orders (user_id, idea_quantity)
+-- Unpaid-slot accounting is per payer account (#919): one account holds at
+-- most one unpaid active Checkout per Idea quantity.
+CREATE UNIQUE INDEX uq_payment_orders_billing_active_quantity
+  ON payment_orders (billing_account_id, idea_quantity)
   WHERE status IN ('creating', 'checkout_open', 'async_payment_pending');
 
 CREATE UNIQUE INDEX uq_payment_orders_stripe_charge
@@ -4688,6 +4958,7 @@ BEGIN
      OR OLD.public_order_number <> NEW.public_order_number
      OR OLD.public_token <> NEW.public_token
      OR OLD.user_id <> NEW.user_id
+     OR OLD.billing_account_id IS DISTINCT FROM NEW.billing_account_id
      OR OLD.client_idempotency_key <> NEW.client_idempotency_key
      OR OLD.request_hash <> NEW.request_hash
      OR OLD.stripe_account_id <> NEW.stripe_account_id
@@ -4763,7 +5034,7 @@ BEGIN
     FROM credit_transactions transaction_fact
     WHERE transaction_fact.transaction_id = NEW.credit_transaction_id
       AND transaction_fact.command_type = 'purchase_credit'
-      AND transaction_fact.wallet_user_id = NEW.user_id
+      AND transaction_fact.billing_account_id = NEW.billing_account_id
       AND transaction_fact.command_amount = NEW.idea_quantity
       AND transaction_fact.actor_type = 'service'
       AND transaction_fact.actor_id = 'payments'
@@ -4920,8 +5191,8 @@ CREATE TRIGGER initialize_payment_order_reconciliation
 AFTER INSERT ON payment_orders
 FOR EACH ROW EXECUTE FUNCTION initialize_payment_order_reconciliation();
 
-CREATE FUNCTION execute_credit_purchase_v1(
-  p_user_id BIGINT,
+CREATE FUNCTION execute_credit_purchase_v2(
+  p_billing_account_id BIGINT,
   p_amount BIGINT,
   p_idempotency_key TEXT,
   p_actor_type TEXT,
@@ -4933,7 +5204,7 @@ CREATE FUNCTION execute_credit_purchase_v1(
 )
 RETURNS TABLE (
   transaction_id VARCHAR(64), command_type VARCHAR(24), command_amount BIGINT,
-  wallet_user_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
+  billing_account_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
   replayed BOOLEAN, created_at TIMESTAMPTZ(3)
 )
 AS $$
@@ -4956,7 +5227,7 @@ BEGIN
   p_reason := btrim(p_reason);
   p_business_reference_type := btrim(p_business_reference_type);
   p_business_reference_id := btrim(p_business_reference_id);
-  IF p_user_id <= 0 OR p_amount <= 0 OR p_amount > 9000000000000000
+  IF p_billing_account_id <= 0 OR p_amount <= 0 OR p_amount > 9000000000000000
      OR p_idempotency_key = '' OR length(p_idempotency_key) > 160
      OR p_actor_type <> 'service' OR p_actor_id <> 'payments'
      OR p_source <> 'stripe_purchase' OR p_reason = ''
@@ -4965,7 +5236,7 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit purchase command';
   END IF;
   v_payload := jsonb_build_object(
-    'command_type', 'purchase_credit', 'user_id', p_user_id, 'amount', p_amount,
+    'command_type', 'purchase_credit', 'billing_account_id', p_billing_account_id, 'amount', p_amount,
     'related_transaction_id', '',
     'actor', jsonb_build_object('type', p_actor_type, 'id', p_actor_id),
     'source', p_source, 'reason', p_reason,
@@ -4982,21 +5253,21 @@ BEGIN
     END IF;
     RETURN QUERY
     SELECT existing.transaction_id, existing.command_type, existing.command_amount,
-      existing.wallet_user_id, existing.available_balance_after, existing.reserved_balance_after,
+      existing.billing_account_id, existing.available_balance_after, existing.reserved_balance_after,
       TRUE, existing.created_at
     FROM credit_transactions existing
     WHERE existing.idempotency_key = p_idempotency_key;
     RETURN;
   END IF;
-  PERFORM 1 FROM credit_wallets wallets WHERE wallets.user_id = p_user_id FOR UPDATE;
+  PERFORM 1 FROM credit_wallets wallets WHERE wallets.billing_account_id = p_billing_account_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
   END IF;
-  v_shard_key := 'wallet:' || p_user_id::TEXT;
+  v_shard_key := 'billing-account:' || p_billing_account_id::TEXT;
   PERFORM accounts.id
   FROM credit_accounts accounts
-  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_issuance')
+  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_issuance')
   ORDER BY accounts.id FOR UPDATE;
   SELECT
     MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_available'),
@@ -5006,8 +5277,8 @@ BEGIN
     MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
   INTO v_available_id, v_reserved_id, v_issuance_id, v_available_balance, v_reserved_balance
   FROM credit_accounts accounts
-  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_issuance');
+  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_issuance');
   IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_issuance_id IS NULL THEN
     RAISE EXCEPTION 'credit wallet account set is incomplete';
   END IF;
@@ -5015,11 +5286,11 @@ BEGIN
     clock_timestamp()::TEXT || random()::TEXT || p_idempotency_key, 'UTF8'
   )), 'hex'), 1, 32);
   INSERT INTO credit_transactions (
-    transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
+    transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
     actor_type, actor_id, source, reason, business_reference_type, business_reference_id,
     command_amount, posting_count, available_balance_after, reserved_balance_after
   ) VALUES (
-    v_transaction_id, p_user_id, 'purchase_credit', p_idempotency_key, v_hash,
+    v_transaction_id, p_billing_account_id, 'purchase_credit', p_idempotency_key, v_hash,
     p_actor_type, p_actor_id, p_source, p_reason, p_business_reference_type, p_business_reference_id,
     p_amount, 2, v_available_balance + p_amount, v_reserved_balance
   );
@@ -5027,7 +5298,7 @@ BEGIN
   VALUES (v_transaction_id, v_issuance_id, -p_amount), (v_transaction_id, v_available_id, p_amount);
   RETURN QUERY
   SELECT created.transaction_id, created.command_type, created.command_amount,
-    created.wallet_user_id, created.available_balance_after, created.reserved_balance_after,
+    created.billing_account_id, created.available_balance_after, created.reserved_balance_after,
     FALSE, created.created_at
   FROM credit_transactions created
   WHERE created.transaction_id = v_transaction_id;
@@ -5038,17 +5309,17 @@ DO $$
 DECLARE trusted_schema TEXT := current_schema();
 BEGIN
   EXECUTE format(
-    'ALTER FUNCTION %I.execute_credit_purchase_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
+    'ALTER FUNCTION %I.execute_credit_purchase_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
     trusted_schema,
     trusted_schema
   );
 END;
 $$;
 
-REVOKE ALL ON FUNCTION execute_credit_purchase_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION execute_credit_purchase_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 
-CREATE FUNCTION execute_credit_purchase_refund_hold_v1(
-  p_user_id BIGINT,
+CREATE FUNCTION execute_credit_purchase_refund_hold_v2(
+  p_billing_account_id BIGINT,
   p_amount BIGINT,
   p_idempotency_key TEXT,
   p_actor_type TEXT,
@@ -5060,7 +5331,7 @@ CREATE FUNCTION execute_credit_purchase_refund_hold_v1(
 )
 RETURNS TABLE (
   transaction_id VARCHAR(64), command_type VARCHAR(24), command_amount BIGINT,
-  wallet_user_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
+  billing_account_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
   replayed BOOLEAN, created_at TIMESTAMPTZ(3)
 )
 AS $$
@@ -5082,7 +5353,7 @@ BEGIN
   p_reason := btrim(p_reason);
   p_business_reference_type := btrim(p_business_reference_type);
   p_business_reference_id := btrim(p_business_reference_id);
-  IF p_user_id <= 0 OR p_amount <= 0 OR p_amount > 9000000000000000
+  IF p_billing_account_id <= 0 OR p_amount <= 0 OR p_amount > 9000000000000000
      OR p_idempotency_key = '' OR length(p_idempotency_key) > 160
      OR p_actor_type <> 'service' OR p_actor_id <> 'payments'
      OR p_source <> 'stripe_refund_hold' OR p_reason = ''
@@ -5092,7 +5363,7 @@ BEGIN
   END IF;
 
   v_payload := jsonb_build_object(
-    'command_type', 'hold', 'user_id', p_user_id, 'amount', p_amount,
+    'command_type', 'hold', 'billing_account_id', p_billing_account_id, 'amount', p_amount,
     'related_transaction_id', '',
     'actor', jsonb_build_object('type', p_actor_type, 'id', p_actor_id),
     'source', p_source, 'reason', p_reason,
@@ -5108,7 +5379,7 @@ BEGIN
       RAISE EXCEPTION USING ERRCODE = 'IB001', MESSAGE = 'credit idempotency conflict';
     END IF;
     RETURN QUERY SELECT existing.transaction_id, existing.command_type, existing.command_amount,
-      existing.wallet_user_id, existing.available_balance_after, existing.reserved_balance_after,
+      existing.billing_account_id, existing.available_balance_after, existing.reserved_balance_after,
       TRUE, existing.created_at
     FROM credit_transactions existing
     WHERE existing.idempotency_key = p_idempotency_key;
@@ -5117,7 +5388,7 @@ BEGIN
 
   SELECT wallets.status INTO v_wallet_status
   FROM credit_wallets wallets
-  WHERE wallets.user_id = p_user_id
+  WHERE wallets.billing_account_id = p_billing_account_id
   FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
@@ -5128,7 +5399,7 @@ BEGIN
 
   PERFORM accounts.id
   FROM credit_accounts accounts
-  WHERE accounts.wallet_user_id = p_user_id
+  WHERE accounts.billing_account_id = p_billing_account_id
     AND accounts.account_role IN ('user_available', 'user_reserved')
   ORDER BY accounts.id
   FOR UPDATE;
@@ -5138,7 +5409,7 @@ BEGIN
          MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
   INTO v_available_id, v_reserved_id, v_available_balance, v_reserved_balance
   FROM credit_accounts accounts
-  WHERE accounts.wallet_user_id = p_user_id
+  WHERE accounts.billing_account_id = p_billing_account_id
     AND accounts.account_role IN ('user_available', 'user_reserved');
   IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_available_balance < p_amount THEN
     RAISE EXCEPTION USING ERRCODE = 'IB004', MESSAGE = 'insufficient credits';
@@ -5148,21 +5419,21 @@ BEGIN
     clock_timestamp()::TEXT || random()::TEXT || p_idempotency_key, 'UTF8'
   )), 'hex'), 1, 32);
   INSERT INTO credit_transactions (
-    transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
+    transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
     actor_type, actor_id, source, reason, business_reference_type, business_reference_id,
     command_amount, posting_count, available_balance_after, reserved_balance_after
   ) VALUES (
-    v_transaction_id, p_user_id, 'hold', p_idempotency_key, v_hash,
+    v_transaction_id, p_billing_account_id, 'hold', p_idempotency_key, v_hash,
     p_actor_type, p_actor_id, p_source, p_reason, p_business_reference_type, p_business_reference_id,
     p_amount, 2, v_available_balance - p_amount, v_reserved_balance + p_amount
   );
   INSERT INTO credit_postings (transaction_id, account_id, amount)
   VALUES (v_transaction_id, v_available_id, -p_amount), (v_transaction_id, v_reserved_id, p_amount);
-  INSERT INTO credit_holds (hold_transaction_id, wallet_user_id, amount)
-  VALUES (v_transaction_id, p_user_id, p_amount);
+  INSERT INTO credit_holds (hold_transaction_id, billing_account_id, amount)
+  VALUES (v_transaction_id, p_billing_account_id, p_amount);
 
   RETURN QUERY SELECT created.transaction_id, created.command_type, created.command_amount,
-    created.wallet_user_id, created.available_balance_after, created.reserved_balance_after,
+    created.billing_account_id, created.available_balance_after, created.reserved_balance_after,
     FALSE, created.created_at
   FROM credit_transactions created
   WHERE created.transaction_id = v_transaction_id;
@@ -5173,22 +5444,22 @@ DO $$
 DECLARE trusted_schema TEXT := current_schema();
 BEGIN
   EXECUTE format(
-    'ALTER FUNCTION %I.execute_credit_purchase_refund_hold_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
+    'ALTER FUNCTION %I.execute_credit_purchase_refund_hold_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
     trusted_schema, trusted_schema
   );
 END;
 $$;
 
-REVOKE ALL ON FUNCTION execute_credit_purchase_refund_hold_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION execute_credit_purchase_refund_hold_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 
-CREATE FUNCTION execute_credit_purchase_refund_v1(
-  p_user_id BIGINT, p_hold_transaction_id TEXT, p_idempotency_key TEXT,
+CREATE FUNCTION execute_credit_purchase_refund_v2(
+  p_billing_account_id BIGINT, p_hold_transaction_id TEXT, p_idempotency_key TEXT,
   p_actor_type TEXT, p_actor_id TEXT, p_source TEXT, p_reason TEXT,
   p_business_reference_type TEXT, p_business_reference_id TEXT
 )
 RETURNS TABLE (
   transaction_id VARCHAR(64), command_type VARCHAR(24), command_amount BIGINT,
-  wallet_user_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
+  billing_account_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
   replayed BOOLEAN, created_at TIMESTAMPTZ(3)
 )
 AS $$
@@ -5201,7 +5472,7 @@ BEGIN
   p_actor_type := btrim(p_actor_type); p_actor_id := btrim(p_actor_id); p_source := btrim(p_source);
   p_reason := btrim(p_reason); p_business_reference_type := btrim(p_business_reference_type);
   p_business_reference_id := btrim(p_business_reference_id);
-  IF p_user_id <= 0 OR p_hold_transaction_id = '' OR length(p_hold_transaction_id) > 64
+  IF p_billing_account_id <= 0 OR p_hold_transaction_id = '' OR length(p_hold_transaction_id) > 64
      OR p_idempotency_key = '' OR length(p_idempotency_key) > 160
      OR p_actor_type <> 'service' OR p_actor_id <> 'payments' OR p_source <> 'stripe_refund'
      OR p_reason = '' OR p_business_reference_type <> 'payment_refund'
@@ -5209,7 +5480,7 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit purchase refund command';
   END IF;
   v_payload := jsonb_build_object(
-    'command_type', 'purchase_refund', 'user_id', p_user_id,
+    'command_type', 'purchase_refund', 'billing_account_id', p_billing_account_id,
     'related_transaction_id', p_hold_transaction_id,
     'actor', jsonb_build_object('type', p_actor_type, 'id', p_actor_id),
     'source', p_source, 'reason', p_reason,
@@ -5221,20 +5492,20 @@ BEGIN
   IF FOUND THEN
     IF v_existing_hash <> v_hash THEN RAISE EXCEPTION USING ERRCODE = 'IB001', MESSAGE = 'credit idempotency conflict'; END IF;
     RETURN QUERY SELECT existing.transaction_id, existing.command_type, existing.command_amount,
-      existing.wallet_user_id, existing.available_balance_after, existing.reserved_balance_after, TRUE, existing.created_at
+      existing.billing_account_id, existing.available_balance_after, existing.reserved_balance_after, TRUE, existing.created_at
     FROM credit_transactions existing WHERE existing.idempotency_key = p_idempotency_key;
     RETURN;
   END IF;
   SELECT holds.amount, holds.status INTO v_amount, v_hold_status FROM credit_holds holds
-  WHERE holds.hold_transaction_id = p_hold_transaction_id AND holds.wallet_user_id = p_user_id FOR UPDATE;
+  WHERE holds.hold_transaction_id = p_hold_transaction_id AND holds.billing_account_id = p_billing_account_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = 'IB005', MESSAGE = 'credit hold not found'; END IF;
   IF v_hold_status <> 'held' THEN RAISE EXCEPTION USING ERRCODE = 'IB006', MESSAGE = 'credit hold already settled'; END IF;
-  PERFORM 1 FROM credit_wallets wallets WHERE wallets.user_id = p_user_id FOR UPDATE;
+  PERFORM 1 FROM credit_wallets wallets WHERE wallets.billing_account_id = p_billing_account_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found'; END IF;
-  v_shard_key := 'wallet:' || p_user_id::TEXT;
+  v_shard_key := 'billing-account:' || p_billing_account_id::TEXT;
   PERFORM accounts.id FROM credit_accounts accounts
-  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_issuance')
+  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_issuance')
   ORDER BY accounts.id FOR UPDATE;
   SELECT MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_available'),
          MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_reserved'),
@@ -5243,8 +5514,8 @@ BEGIN
          MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
   INTO v_available_id, v_reserved_id, v_issuance_id, v_available_balance, v_reserved_balance
   FROM credit_accounts accounts
-  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_issuance');
+  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_issuance');
   IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_issuance_id IS NULL OR v_reserved_balance < v_amount THEN
     RAISE EXCEPTION USING ERRCODE = 'IB004', MESSAGE = 'insufficient credits';
   END IF;
@@ -5252,11 +5523,11 @@ BEGIN
     clock_timestamp()::TEXT || random()::TEXT || p_idempotency_key, 'UTF8'
   )), 'hex'), 1, 32);
   INSERT INTO credit_transactions (
-    transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
+    transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
     actor_type, actor_id, source, reason, business_reference_type, business_reference_id,
     related_transaction_id, command_amount, posting_count, available_balance_after, reserved_balance_after
   ) VALUES (
-    v_transaction_id, p_user_id, 'purchase_refund', p_idempotency_key, v_hash,
+    v_transaction_id, p_billing_account_id, 'purchase_refund', p_idempotency_key, v_hash,
     p_actor_type, p_actor_id, p_source, p_reason, p_business_reference_type, p_business_reference_id,
     p_hold_transaction_id, v_amount, 2, v_available_balance, v_reserved_balance - v_amount
   );
@@ -5269,7 +5540,7 @@ BEGIN
       settled_at = now()
   WHERE hold_transaction_id = p_hold_transaction_id;
   RETURN QUERY SELECT created.transaction_id, created.command_type, created.command_amount,
-    created.wallet_user_id, created.available_balance_after, created.reserved_balance_after, FALSE, created.created_at
+    created.billing_account_id, created.available_balance_after, created.reserved_balance_after, FALSE, created.created_at
   FROM credit_transactions created WHERE created.transaction_id = v_transaction_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
@@ -5278,13 +5549,13 @@ DO $$
 DECLARE trusted_schema TEXT := current_schema();
 BEGIN
   EXECUTE format(
-    'ALTER FUNCTION %I.execute_credit_purchase_refund_v1(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
+    'ALTER FUNCTION %I.execute_credit_purchase_refund_v2(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
     trusted_schema, trusted_schema
   );
 END;
 $$;
 
-REVOKE ALL ON FUNCTION execute_credit_purchase_refund_v1(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION execute_credit_purchase_refund_v2(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 -- Control Plane audit records. Every high-risk operation records operator,
 -- target, capability, outcome, and timestamp. Capability enforcement
 -- happens at middleware; this append-only table is the audit trail.
@@ -5387,7 +5658,9 @@ ALTER TABLE credit_transactions
 -- transaction because the Wallet had no available Ideas to recover.
 CREATE TABLE payment_dispute_debit_requests (
   id UUID PRIMARY KEY,
-  wallet_user_id BIGINT NOT NULL REFERENCES credit_wallets(user_id) ON DELETE RESTRICT,
+  billing_account_id BIGINT,
+  wallet_user_id BIGINT,
+  CONSTRAINT fk_payment_dispute_debit_requests_wallet_user_id FOREIGN KEY (wallet_user_id) REFERENCES users(id) ON DELETE RESTRICT,
   idempotency_key TEXT NOT NULL UNIQUE,
   request_hash CHAR(64) NOT NULL,
   requested_amount BIGINT NOT NULL,
@@ -5398,6 +5671,7 @@ CREATE TABLE payment_dispute_debit_requests (
   business_reference_type TEXT NOT NULL,
   business_reference_id TEXT NOT NULL,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT ck_payment_dispute_debit_request_billing_account CHECK (billing_account_id IS NOT NULL),
   CONSTRAINT ck_payment_dispute_debit_request_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),
   CONSTRAINT ck_payment_dispute_debit_request_amounts CHECK (
     requested_amount > 0 AND debited_amount BETWEEN 0 AND requested_amount
@@ -5413,11 +5687,11 @@ CREATE TABLE payment_dispute_debit_requests (
 );
 
 CREATE INDEX idx_payment_dispute_debit_requests_wallet
-  ON payment_dispute_debit_requests (wallet_user_id, created_at DESC, id DESC);
+  ON payment_dispute_debit_requests (billing_account_id, created_at DESC, id DESC);
 
 -- statement:begin
-CREATE FUNCTION execute_credit_payment_dispute_debit_v1(
-  p_user_id BIGINT,
+CREATE FUNCTION execute_credit_payment_dispute_debit_v2(
+  p_billing_account_id BIGINT,
   p_requested_amount BIGINT,
   p_idempotency_key TEXT,
   p_actor_type TEXT,
@@ -5429,7 +5703,7 @@ CREATE FUNCTION execute_credit_payment_dispute_debit_v1(
 )
 RETURNS TABLE (
   transaction_id VARCHAR(64), command_type VARCHAR(24), command_amount BIGINT,
-  wallet_user_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
+  billing_account_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
   replayed BOOLEAN, created_at TIMESTAMPTZ(3), requested_amount BIGINT, unrecovered_amount BIGINT
 )
 AS $$
@@ -5454,7 +5728,7 @@ BEGIN
   p_reason := btrim(p_reason);
   p_business_reference_type := btrim(p_business_reference_type);
   p_business_reference_id := btrim(p_business_reference_id);
-  IF p_user_id <= 0 OR p_requested_amount <= 0 OR p_requested_amount > 9000000000000000
+  IF p_billing_account_id <= 0 OR p_requested_amount <= 0 OR p_requested_amount > 9000000000000000
      OR p_idempotency_key = '' OR length(p_idempotency_key) > 160
      OR p_actor_type <> 'service' OR p_actor_id <> 'payments'
      OR p_source <> 'stripe_dispute' OR p_reason = ''
@@ -5464,7 +5738,7 @@ BEGIN
   END IF;
 
   v_payload := jsonb_build_object(
-    'command_type', 'payment_dispute_debit', 'user_id', p_user_id, 'requested_amount', p_requested_amount,
+    'command_type', 'payment_dispute_debit', 'billing_account_id', p_billing_account_id, 'requested_amount', p_requested_amount,
     'actor', jsonb_build_object('type', p_actor_type, 'id', p_actor_id),
     'source', p_source, 'reason', p_reason,
     'business_reference', jsonb_build_object('type', p_business_reference_type, 'id', p_business_reference_id)
@@ -5481,7 +5755,7 @@ BEGIN
     END IF;
     RETURN QUERY
     SELECT COALESCE(request.credit_transaction_id, ''), 'payment_dispute_debit'::VARCHAR(24), request.debited_amount,
-      request.wallet_user_id, request.available_balance_after, request.reserved_balance_after, TRUE, request.created_at,
+      request.billing_account_id, request.available_balance_after, request.reserved_balance_after, TRUE, request.created_at,
       request.requested_amount, request.requested_amount - request.debited_amount
     FROM payment_dispute_debit_requests request
     WHERE request.idempotency_key = p_idempotency_key;
@@ -5491,14 +5765,14 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'IB001', MESSAGE = 'credit idempotency conflict';
   END IF;
 
-  PERFORM 1 FROM credit_wallets WHERE user_id = p_user_id FOR UPDATE;
+  PERFORM 1 FROM credit_wallets wallets WHERE wallets.billing_account_id = p_billing_account_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
   END IF;
-  v_shard_key := 'wallet:' || p_user_id::TEXT;
+  v_shard_key := 'billing-account:' || p_billing_account_id::TEXT;
   PERFORM accounts.id FROM credit_accounts accounts
-  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink')
+  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink')
   ORDER BY accounts.id FOR UPDATE;
   SELECT MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_available'),
          MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_reserved'),
@@ -5507,8 +5781,8 @@ BEGIN
          MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
   INTO v_available_id, v_reserved_id, v_sink_id, v_available_balance, v_reserved_balance
   FROM credit_accounts accounts
-  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink');
+  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink');
   IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_sink_id IS NULL THEN
     RAISE EXCEPTION 'credit wallet account set is incomplete';
   END IF;
@@ -5516,16 +5790,16 @@ BEGIN
 
   IF v_debited_amount = 0 THEN
     INSERT INTO payment_dispute_debit_requests (
-      id, wallet_user_id, idempotency_key, request_hash, requested_amount, debited_amount,
+      id, billing_account_id, wallet_user_id, idempotency_key, request_hash, requested_amount, debited_amount,
       available_balance_after, reserved_balance_after,
       business_reference_type, business_reference_id
     ) VALUES (
-      gen_random_uuid(), p_user_id, p_idempotency_key, v_hash, p_requested_amount, 0,
+      gen_random_uuid(), p_billing_account_id, NULL, p_idempotency_key, v_hash, p_requested_amount, 0,
       v_available_balance, v_reserved_balance,
       p_business_reference_type, p_business_reference_id
     ) RETURNING payment_dispute_debit_requests.created_at INTO v_created_at;
     RETURN QUERY SELECT ''::VARCHAR(64), 'payment_dispute_debit'::VARCHAR(24), 0::BIGINT,
-      p_user_id, v_available_balance, v_reserved_balance, FALSE, v_created_at, p_requested_amount, p_requested_amount;
+      p_billing_account_id, v_available_balance, v_reserved_balance, FALSE, v_created_at, p_requested_amount, p_requested_amount;
     RETURN;
   END IF;
 
@@ -5533,35 +5807,35 @@ BEGIN
     clock_timestamp()::TEXT || random()::TEXT || p_idempotency_key, 'UTF8'
   )), 'hex'), 1, 32);
   INSERT INTO credit_transactions (
-    transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
+    transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
     actor_type, actor_id, source, reason, business_reference_type, business_reference_id,
     command_amount, posting_count, available_balance_after, reserved_balance_after
   ) VALUES (
-    v_transaction_id, p_user_id, 'payment_dispute_debit', p_idempotency_key, v_hash,
+    v_transaction_id, p_billing_account_id, 'payment_dispute_debit', p_idempotency_key, v_hash,
     p_actor_type, p_actor_id, p_source, p_reason, p_business_reference_type, p_business_reference_id,
     v_debited_amount, 2, v_available_balance - v_debited_amount, v_reserved_balance
   );
   INSERT INTO credit_postings (transaction_id, account_id, amount)
   VALUES (v_transaction_id, v_available_id, -v_debited_amount), (v_transaction_id, v_sink_id, v_debited_amount);
   INSERT INTO payment_dispute_debit_requests (
-      id, wallet_user_id, idempotency_key, request_hash, requested_amount, debited_amount,
+      id, billing_account_id, wallet_user_id, idempotency_key, request_hash, requested_amount, debited_amount,
       available_balance_after, reserved_balance_after,
       credit_transaction_id, business_reference_type, business_reference_id
     ) VALUES (
-      gen_random_uuid(), p_user_id, p_idempotency_key, v_hash, p_requested_amount, v_debited_amount,
+      gen_random_uuid(), p_billing_account_id, NULL, p_idempotency_key, v_hash, p_requested_amount, v_debited_amount,
       v_available_balance - v_debited_amount, v_reserved_balance,
       v_transaction_id, p_business_reference_type, p_business_reference_id
   ) RETURNING payment_dispute_debit_requests.created_at INTO v_created_at;
   RETURN QUERY SELECT v_transaction_id, 'payment_dispute_debit'::VARCHAR(24), v_debited_amount,
-    p_user_id, v_available_balance - v_debited_amount, v_reserved_balance, FALSE, v_created_at,
+    p_billing_account_id, v_available_balance - v_debited_amount, v_reserved_balance, FALSE, v_created_at,
     p_requested_amount, p_requested_amount - v_debited_amount;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
 -- statement:end
 
 -- statement:begin
-CREATE FUNCTION execute_credit_payment_dispute_restore_v1(
-  p_user_id BIGINT,
+CREATE FUNCTION execute_credit_payment_dispute_restore_v2(
+  p_billing_account_id BIGINT,
   p_original_transaction_id TEXT,
   p_amount BIGINT,
   p_idempotency_key TEXT,
@@ -5574,7 +5848,7 @@ CREATE FUNCTION execute_credit_payment_dispute_restore_v1(
 )
 RETURNS TABLE (
   transaction_id VARCHAR(64), command_type VARCHAR(24), command_amount BIGINT,
-  wallet_user_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
+  billing_account_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
   replayed BOOLEAN, created_at TIMESTAMPTZ(3)
 )
 AS $$
@@ -5600,7 +5874,7 @@ BEGIN
   p_reason := btrim(p_reason);
   p_business_reference_type := btrim(p_business_reference_type);
   p_business_reference_id := btrim(p_business_reference_id);
-  IF p_user_id <= 0 OR p_original_transaction_id = '' OR length(p_original_transaction_id) > 64
+  IF p_billing_account_id <= 0 OR p_original_transaction_id = '' OR length(p_original_transaction_id) > 64
      OR p_amount <= 0 OR p_amount > 9000000000000000
      OR p_idempotency_key = '' OR length(p_idempotency_key) > 160
      OR p_actor_type <> 'service' OR p_actor_id <> 'payments'
@@ -5611,7 +5885,7 @@ BEGIN
   END IF;
 
   v_payload := jsonb_build_object(
-    'command_type', 'payment_dispute_restore', 'user_id', p_user_id, 'amount', p_amount,
+    'command_type', 'payment_dispute_restore', 'billing_account_id', p_billing_account_id, 'amount', p_amount,
     'related_transaction_id', p_original_transaction_id,
     'actor', jsonb_build_object('type', p_actor_type, 'id', p_actor_id),
     'source', p_source, 'reason', p_reason,
@@ -5625,7 +5899,7 @@ BEGIN
       RAISE EXCEPTION USING ERRCODE = 'IB001', MESSAGE = 'credit idempotency conflict';
     END IF;
     RETURN QUERY SELECT existing.transaction_id, existing.command_type, existing.command_amount,
-      existing.wallet_user_id, existing.available_balance_after, existing.reserved_balance_after,
+      existing.billing_account_id, existing.available_balance_after, existing.reserved_balance_after,
       TRUE, existing.created_at
     FROM credit_transactions existing WHERE existing.idempotency_key = p_idempotency_key;
     RETURN;
@@ -5636,7 +5910,7 @@ BEGIN
 
   SELECT original.command_amount INTO v_original_amount
   FROM credit_transactions original
-  WHERE original.transaction_id = p_original_transaction_id AND original.wallet_user_id = p_user_id
+  WHERE original.transaction_id = p_original_transaction_id AND original.billing_account_id = p_billing_account_id
     AND original.command_type = 'payment_dispute_debit' AND original.actor_type = 'service' AND original.actor_id = 'payments'
     AND original.source = 'stripe_dispute' AND original.business_reference_type = p_business_reference_type
     AND original.business_reference_id = p_business_reference_id
@@ -5651,14 +5925,14 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'payment dispute restore exceeds debited amount';
   END IF;
 
-  PERFORM 1 FROM credit_wallets WHERE user_id = p_user_id FOR UPDATE;
+  PERFORM 1 FROM credit_wallets wallets WHERE wallets.billing_account_id = p_billing_account_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
   END IF;
-  v_shard_key := 'wallet:' || p_user_id::TEXT;
+  v_shard_key := 'billing-account:' || p_billing_account_id::TEXT;
   PERFORM accounts.id FROM credit_accounts accounts
-  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink')
+  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink')
   ORDER BY accounts.id FOR UPDATE;
   SELECT MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_available'),
          MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_reserved'),
@@ -5667,8 +5941,8 @@ BEGIN
          MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
   INTO v_available_id, v_reserved_id, v_sink_id, v_available_balance, v_reserved_balance
   FROM credit_accounts accounts
-  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink');
+  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink');
   IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_sink_id IS NULL THEN
     RAISE EXCEPTION 'credit wallet account set is incomplete';
   END IF;
@@ -5676,18 +5950,18 @@ BEGIN
     clock_timestamp()::TEXT || random()::TEXT || p_idempotency_key, 'UTF8'
   )), 'hex'), 1, 32);
   INSERT INTO credit_transactions (
-    transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
+    transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
     actor_type, actor_id, source, reason, business_reference_type, business_reference_id,
     related_transaction_id, command_amount, posting_count, available_balance_after, reserved_balance_after
   ) VALUES (
-    v_transaction_id, p_user_id, 'payment_dispute_restore', p_idempotency_key, v_hash,
+    v_transaction_id, p_billing_account_id, 'payment_dispute_restore', p_idempotency_key, v_hash,
     p_actor_type, p_actor_id, p_source, p_reason, p_business_reference_type, p_business_reference_id,
     p_original_transaction_id, p_amount, 2, v_available_balance + p_amount, v_reserved_balance
   );
   INSERT INTO credit_postings (transaction_id, account_id, amount)
   VALUES (v_transaction_id, v_sink_id, -p_amount), (v_transaction_id, v_available_id, p_amount);
   RETURN QUERY SELECT created.transaction_id, created.command_type, created.command_amount,
-    created.wallet_user_id, created.available_balance_after, created.reserved_balance_after,
+    created.billing_account_id, created.available_balance_after, created.reserved_balance_after,
     FALSE, created.created_at
   FROM credit_transactions created WHERE created.transaction_id = v_transaction_id;
 END;
@@ -5699,19 +5973,19 @@ DO $$
 DECLARE trusted_schema TEXT := current_schema();
 BEGIN
   EXECUTE format(
-    'ALTER FUNCTION %I.execute_credit_payment_dispute_debit_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
+    'ALTER FUNCTION %I.execute_credit_payment_dispute_debit_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
     trusted_schema, trusted_schema
   );
   EXECUTE format(
-    'ALTER FUNCTION %I.execute_credit_payment_dispute_restore_v1(BIGINT, TEXT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
+    'ALTER FUNCTION %I.execute_credit_payment_dispute_restore_v2(BIGINT, TEXT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
     trusted_schema, trusted_schema
   );
 END;
 $$;
 -- statement:end
 
-REVOKE ALL ON FUNCTION execute_credit_payment_dispute_debit_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION execute_credit_payment_dispute_restore_v1(BIGINT, TEXT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION execute_credit_payment_dispute_debit_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION execute_credit_payment_dispute_restore_v2(BIGINT, TEXT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 
 CREATE TABLE payment_disputes (
   id UUID PRIMARY KEY,

@@ -23,6 +23,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { AdminSubNavigationLayout } from '../../shared'
 import {
   ADMIN_CREDIT_HEALTH_PATH,
+  ADMIN_CREDIT_ACCOUNTS_PATH,
   ADMIN_CREDIT_PRICING_PATH,
   ADMIN_PAYMENT_ORDERS_PATH,
   ADMIN_REWARD_CODES_PATH,
@@ -34,6 +35,7 @@ import { CREDITS_BILLING_LAYOUT_MESSAGES } from './messages'
 
 type NavigationPath =
   | typeof ADMIN_CREDIT_PRICING_PATH
+  | typeof ADMIN_CREDIT_ACCOUNTS_PATH
   | typeof ADMIN_CREDIT_HEALTH_PATH
   | typeof ADMIN_REWARD_CODES_PATH
   | typeof ADMIN_PAYMENT_ORDERS_PATH
@@ -43,6 +45,11 @@ const navigationItems: Array<{ key: string; path: NavigationPath; label: string 
     key: 'pricing',
     path: ADMIN_CREDIT_PRICING_PATH,
     label: CREDITS_BILLING_LAYOUT_MESSAGES.navPricing,
+  },
+  {
+    key: 'accounts',
+    path: ADMIN_CREDIT_ACCOUNTS_PATH,
+    label: CREDITS_BILLING_LAYOUT_MESSAGES.navAccounts,
   },
   {
     key: 'health',

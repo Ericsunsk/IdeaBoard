@@ -20,6 +20,7 @@ import (
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	taskapp "ideaboard/api/internal/tasking/application/task"
 	tasksdomain "ideaboard/api/internal/tasking/domain"
+	"ideaboard/api/internal/tenancy"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testsupport"
 	"net/http"
@@ -302,20 +303,20 @@ func (f *fakeImpersonator) ImpersonateUser(_ context.Context, _ string, _ string
 // fakeControlCredits counts commands, captures metadata, and can force
 // domain failures for error-mapping tests.
 type fakeControlCredits struct {
-	mu         sync.Mutex
-	calls      int
-	lastMeta   domain.CommandMetadata
-	lastKind   string
-	lastUserID int64
-	fail       error
+	mu                   sync.Mutex
+	calls                int
+	lastMeta             domain.CommandMetadata
+	lastKind             string
+	lastBillingAccountID int64
+	fail                 error
 }
 
-func (f *fakeControlCredits) result(userID int64, kind string, amount domain.CreditAmount, meta domain.CommandMetadata) (creditsports.CommandResult, error) {
+func (f *fakeControlCredits) result(billingAccountID int64, kind string, amount domain.CreditAmount, meta domain.CommandMetadata) (creditsports.CommandResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls++
 	f.lastKind = kind
-	f.lastUserID = userID
+	f.lastBillingAccountID = billingAccountID
 	f.lastMeta = meta
 	if f.fail != nil {
 		return creditsports.CommandResult{}, f.fail
@@ -324,25 +325,34 @@ func (f *fakeControlCredits) result(userID int64, kind string, amount domain.Cre
 		TransactionID: "ctxn_test_" + kind,
 		CommandType:   domain.CommandGrant,
 		Amount:        amount.Int64(),
-		Wallet:        domain.WalletBalance{UserID: userID, Available: 100, Reserved: 0},
+		Wallet:        domain.WalletBalance{BillingAccountID: billingAccountID, Available: 100, Reserved: 0},
 		CreatedAt:     time.Now().UTC(),
 	}, nil
 }
 
 func (f *fakeControlCredits) Grant(_ context.Context, c creditsports.GrantCommand) (creditsports.CommandResult, error) {
-	return f.result(c.UserID, "grant", c.Amount, c.Metadata)
+	return f.result(c.BillingAccountID, "grant", c.Amount, c.Metadata)
 }
 
 func (f *fakeControlCredits) Deduct(_ context.Context, c creditsports.DeductionCommand) (creditsports.CommandResult, error) {
-	return f.result(c.UserID, "deduct", c.Amount, c.Metadata)
+	return f.result(c.BillingAccountID, "deduct", c.Amount, c.Metadata)
 }
 
 func (f *fakeControlCredits) Correct(_ context.Context, c creditsports.CorrectionCommand) (creditsports.CommandResult, error) {
-	return f.result(c.UserID, "correct", c.Amount, c.Metadata)
+	return f.result(c.BillingAccountID, "correct", c.Amount, c.Metadata)
 }
 
 func (f *fakeControlCredits) Refund(_ context.Context, c creditsports.RefundCommand) (creditsports.CommandResult, error) {
-	return f.result(c.UserID, "refund", c.Amount, c.Metadata)
+	return f.result(c.BillingAccountID, "refund", c.Amount, c.Metadata)
+}
+
+func (f *fakeControlCredits) ResolvePersonalAccount(_ context.Context, userID int64) (int64, error) {
+	// Deterministic fixture mapping: tests address user 7's wallet facts
+	// through account 7007 without a database.
+	if userID <= 0 {
+		return 0, domain.ErrInvalidCommand
+	}
+	return 7000 + userID, nil
 }
 
 type fakeControlCreditDirectory struct{}
@@ -371,11 +381,17 @@ func (fakeControlCreditDirectory) ResolveID(_ context.Context, id int64) (credit
 
 type fakeControlCreditReads struct{}
 
-func (fakeControlCreditReads) GetWallet(_ context.Context, userID int64) (domain.WalletDetails, error) {
+func (fakeControlCreditReads) GetWallet(_ context.Context, billingAccountID int64) (domain.WalletDetails, error) {
 	return domain.WalletDetails{WalletBalance: domain.WalletBalance{
-		UserID: userID, PublicID: testUUIDForUser(userID),
-		DisplayName: fmt.Sprintf("user-%d", userID), Available: 100, Reserved: 5,
+		BillingAccountID: billingAccountID, Available: 100, Reserved: 5,
 	}}, nil
+}
+
+func (fakeControlCreditReads) ResolvePersonalAccount(_ context.Context, userID int64) (int64, error) {
+	if userID <= 0 {
+		return 0, domain.ErrInvalidCommand
+	}
+	return 7000 + userID, nil
 }
 
 func (fakeControlCreditReads) ListLedger(_ context.Context, input domain.ListLedgerInput) (domain.LedgerPage, error) {
@@ -508,6 +524,73 @@ func (fakeControlBillingAccounts) EnsureBillingAccountForWorkspace(_ context.Con
 		WorkspaceInternalID: workspaceInternalID, WorkspacePublicID: workspacePublicID,
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	}, nil
+}
+
+func (fakeControlBillingAccounts) GetBillingAccountByInternalID(_ context.Context, billingAccountInternalID int64) (tenancypg.BillingAccount, error) {
+	return tenancypg.BillingAccount{
+		InternalID: billingAccountInternalID, PublicID: "ba_testfixture",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}, nil
+}
+
+func (fakeControlBillingAccounts) GetBillingAccountByPublicID(_ context.Context, publicID string) (tenancypg.BillingAccount, error) {
+	return tenancypg.BillingAccount{
+		InternalID: 7001, PublicID: publicID,
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}, nil
+}
+
+func (fakeControlBillingAccounts) GetAdminBillingAccountByPublicID(_ context.Context, publicID string) (tenancypg.AdminBillingAccount, error) {
+	return tenancypg.AdminBillingAccount{
+		InternalID: 7001, PublicID: publicID, OwnerType: tenancypg.BillingOwnerWorkspace,
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}, nil
+}
+
+func (fakeControlBillingAccounts) ListBillingAccountsForAdmin(_ context.Context, _ int64, _ string, _ int) ([]tenancypg.AdminBillingAccount, error) {
+	return []tenancypg.AdminBillingAccount{}, nil
+}
+
+func (fakeControlBillingAccounts) ListBillingAccountMembersForAdmin(_ context.Context, _ int64) ([]tenancy.BillingAccountMember, error) {
+	return []tenancy.BillingAccountMember{}, nil
+}
+
+func (fakeControlBillingAccounts) ListExplicitlyLinkedWorkspaces(_ context.Context, _ int64) ([]tenancy.Workspace, error) {
+	return []tenancy.Workspace{}, nil
+}
+
+// fakeControlRestrictions captures Admin restriction commands for
+// contract tests. The typed Credits seam stays the only Ledger-adjacent
+// writer; this fake only records calls.
+type fakeControlRestrictions struct {
+	mu            sync.Mutex
+	restrictCalls int
+	releaseCalls  int
+	lastRestrict  creditsports.RestrictWalletCommand
+	lastRelease   creditsports.ReleaseWalletRestrictionCommand
+	fail          error
+}
+
+func (f *fakeControlRestrictions) RestrictWallet(_ context.Context, command creditsports.RestrictWalletCommand) (creditsports.WalletRestrictionChange, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.restrictCalls++
+	f.lastRestrict = command
+	if f.fail != nil {
+		return creditsports.WalletRestrictionChange{}, f.fail
+	}
+	return creditsports.WalletRestrictionChange{RestrictionID: "00000000-0000-4000-8000-000000000001"}, nil
+}
+
+func (f *fakeControlRestrictions) ReleaseWalletRestriction(_ context.Context, command creditsports.ReleaseWalletRestrictionCommand) (creditsports.WalletRestrictionChange, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.releaseCalls++
+	f.lastRelease = command
+	if f.fail != nil {
+		return creditsports.WalletRestrictionChange{}, f.fail
+	}
+	return creditsports.WalletRestrictionChange{RestrictionID: command.RestrictionID}, nil
 }
 
 // ---- merged from helpers_extra_test.go ----

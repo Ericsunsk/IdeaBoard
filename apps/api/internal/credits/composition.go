@@ -14,6 +14,7 @@ import (
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/infrastructure/postgres"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/db/dbutil"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,6 +22,7 @@ import (
 
 type Service struct {
 	initErr        error
+	pool           *pgxpool.Pool
 	commandBackend commands.Backend
 	walletBackend  appwallet.Backend
 	commands       *commands.Service
@@ -51,8 +53,11 @@ func postgresBackends() postgresBackendsSet {
 			ExecuteCreditPaymentDisputeRestore: postgres.ExecuteCreditPaymentDisputeRestore,
 		},
 		wallet: appwallet.Backend{
-			MapDatabaseError: postgres.MapCreditDatabaseError, ProvisionWallet: postgres.ProvisionWallet, BindIdentityKey: postgres.BindIdentityKey,
-			SetWalletFrozen: postgres.SetWalletFrozen, ClaimWelcome: postgres.ClaimWelcome, ExecuteGrant: postgres.ExecuteGrant,
+			MapDatabaseError: postgres.MapCreditDatabaseError, ResolvePersonalAccount: postgres.ResolvePersonalAccount,
+			ProvisionAccountWallet: postgres.ProvisionAccountWallet, BindIdentityKey: postgres.BindIdentityKey,
+			SetAccountWalletFrozen: postgres.SetAccountWalletFrozen, SetSoleOwnedWalletsFrozen: postgres.SetSoleOwnedWalletsFrozen,
+			RemoveSharedBillingMembership: postgres.RemoveSharedBillingMembership,
+			ClaimWelcome:                  postgres.ClaimWelcome, ExecuteGrant: postgres.ExecuteGrant,
 			RestrictWallet: postgres.RestrictWallet, ReleaseWallet: postgres.ReleaseWallet,
 		},
 		readmodel: readmodel.Backend{GetAvailableBalances: postgres.GetAvailableBalances, GetWallet: postgres.GetWallet, ListLedger: postgres.ListLedger},
@@ -172,6 +177,7 @@ func buildService(pool *pgxpool.Pool, dispatcher ports.ReconciliationRunDispatch
 		return nil, err
 	}
 	return &Service{
+		pool:           pool,
 		commandBackend: backend.commands,
 		walletBackend:  backend.wallet,
 		commands:       commandsSvc,
@@ -222,6 +228,44 @@ func CommandsInTx(tx pgx.Tx) (ports.Commands, error) {
 		return nil, fmt.Errorf("credits: transaction is nil")
 	}
 	return commands.NewTransactionCommands(tx, defaultPostgresBackends.commands), nil
+}
+
+// ResolvePersonalAccountInTx ensures and returns the deterministic initial
+// personal Billing Account for one user inside the caller's transaction
+// (#916). Ledger-writing callers without a workspace scope (Rewards,
+// Payments, Welcome, Admin) resolve the payer/operator through this seam
+// so every Command carries a Billing Account with the real Actor.
+// Workspace-scoped spenders (Tasks, Vision Search) resolve the consuming
+// Workspace's stable account instead; this seam is never their fallback.
+func ResolvePersonalAccountInTx(ctx context.Context, tx pgx.Tx) (PersonalAccountResolver, error) {
+	if tx == nil {
+		return nil, fmt.Errorf("credits: transaction is nil")
+	}
+	return personalAccountResolver{tx: tx}, nil
+}
+
+// PersonalAccountResolver resolves initial personal accounts on a borrowed
+// transaction.
+type PersonalAccountResolver interface {
+	ResolvePersonalAccount(ctx context.Context, userID int64) (int64, error)
+}
+
+type personalAccountResolver struct {
+	tx pgx.Tx
+}
+
+func (r personalAccountResolver) ResolvePersonalAccount(ctx context.Context, userID int64) (int64, error) {
+	if userID <= 0 {
+		return 0, fmt.Errorf("credits: invalid user for personal account resolution")
+	}
+	var accountID int64
+	if err := r.tx.QueryRow(ctx, `SELECT ensure_personal_billing_account_for_user($1)`, userID).Scan(&accountID); err != nil {
+		return 0, err
+	}
+	if accountID <= 0 {
+		return 0, fmt.Errorf("credits: personal billing account not resolved")
+	}
+	return accountID, nil
 }
 
 // LifecycleInTx lets Identity compose Wallet changes with user writes.
@@ -360,21 +404,57 @@ func (s *Service) ReleaseWalletRestriction(
 
 func (s *Service) GetAvailableBalances(
 	ctx context.Context,
-	userIDs []int64,
+	billingAccountIDs []int64,
 ) (map[int64]int64, error) {
 	service, err := s.requireReadModel()
 	if err != nil {
 		return nil, err
 	}
-	return service.GetAvailableBalances(ctx, userIDs)
+	return service.GetAvailableBalances(ctx, billingAccountIDs)
 }
 
-func (s *Service) GetWallet(ctx context.Context, userID int64) (domain.WalletDetails, error) {
+func (s *Service) GetWallet(ctx context.Context, billingAccountID int64) (domain.WalletDetails, error) {
 	service, err := s.requireReadModel()
 	if err != nil {
 		return domain.WalletDetails{}, err
 	}
-	return service.GetWallet(ctx, userID)
+	return service.GetWallet(ctx, billingAccountID)
+}
+
+// ResolvePersonalAccount ensures and returns the deterministic initial
+// personal Billing Account for one user on the pool (#916). Transactional
+// callers use ResolvePersonalAccountInTx instead.
+func (s *Service) ResolvePersonalAccount(ctx context.Context, userID int64) (int64, error) {
+	if err := s.serviceError(); err != nil {
+		return 0, err
+	}
+	if s == nil || s.pool == nil {
+		return 0, errServiceUnavailable
+	}
+	if userID <= 0 {
+		return 0, domain.ErrInvalidCommand
+	}
+	// Join the ambient guard transaction when staged (control audit
+	// atomicity): the ensure is idempotent, and the caller-owned commit
+	// still owns visibility. Without a carrier the pool path runs.
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		var accountID int64
+		if err := ambient.QueryRow(ctx, `SELECT ensure_personal_billing_account_for_user($1)`, userID).Scan(&accountID); err != nil {
+			return 0, err
+		}
+		if accountID <= 0 {
+			return 0, domain.ErrWalletNotFound
+		}
+		return accountID, nil
+	}
+	var accountID int64
+	if err := s.pool.QueryRow(ctx, `SELECT ensure_personal_billing_account_for_user($1)`, userID).Scan(&accountID); err != nil {
+		return 0, err
+	}
+	if accountID <= 0 {
+		return 0, domain.ErrWalletNotFound
+	}
+	return accountID, nil
 }
 
 func (s *Service) ListLedger(ctx context.Context, input domain.ListLedgerInput) (domain.LedgerPage, error) {
@@ -387,19 +467,21 @@ func (s *Service) ListLedger(ctx context.Context, input domain.ListLedgerInput) 
 
 func (s *Service) GetCaptureUsage(
 	ctx context.Context,
-	userID int64,
+	billingAccountID int64,
+	filter domain.UsageFilter,
 	location *time.Location,
 ) (totalCredits int64, peakDailyCredits int64, firstCaptureDay time.Time, err error) {
 	service, err := s.requireUsage()
 	if err != nil {
 		return 0, 0, time.Time{}, err
 	}
-	return service.GetCaptureUsage(ctx, userID, location)
+	return service.GetCaptureUsage(ctx, billingAccountID, filter, location)
 }
 
 func (s *Service) GetDailyCaptureUsage(
 	ctx context.Context,
-	userID int64,
+	billingAccountID int64,
+	filter domain.UsageFilter,
 	location *time.Location,
 	start time.Time,
 	endExclusive time.Time,
@@ -408,7 +490,7 @@ func (s *Service) GetDailyCaptureUsage(
 	if err != nil {
 		return nil, err
 	}
-	return service.GetDailyCaptureUsage(ctx, userID, location, start, endExclusive)
+	return service.GetDailyCaptureUsage(ctx, billingAccountID, filter, location, start, endExclusive)
 }
 
 func (s *Service) GetCreditHealth(ctx context.Context) (health.CreditHealth, error) {

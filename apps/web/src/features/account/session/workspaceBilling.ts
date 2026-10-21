@@ -10,10 +10,7 @@ import { i18n } from '../../../core/i18n'
 // existing workspace selection store (personal workspace default). There is
 // no hidden inference: a null selection fails closed with a guidance error
 // (`workspace_selection_required`) instead of guessing a workspace.
-// Surfaces with no v1 equivalent (rewards, purchase options, pending
-// orders, recharge history) fail closed with `workspace_billing_unavailable`.
 export const WORKSPACE_SELECTION_REQUIRED_CODE = 'workspace_selection_required'
-const WORKSPACE_BILLING_UNAVAILABLE_CODE = 'workspace_billing_unavailable'
 
 export type WorkspaceBillingGuidanceError = Error & { code: string }
 
@@ -39,7 +36,6 @@ export function requireAccountWorkspaceId(workspaceId: string | null | undefined
  */
 export const ACCOUNT_GUIDANCE_COPY_KEYS: Readonly<Record<string, string>> = {
   workspace_selection_required: 'account.errors.workspaceRequired',
-  workspace_billing_unavailable: 'account.errors.featureUnavailable',
 }
 
 export async function resolveWorkspaceBillingData<T>(
@@ -49,7 +45,7 @@ export async function resolveWorkspaceBillingData<T>(
   try {
     return requireContractData<T>(await request, fallback)
   } catch (error) {
-    throw contextualizeWorkspaceBillingError(error, fallback)
+    throw asWorkspaceBillingError(error, fallback)
   }
 }
 
@@ -65,11 +61,6 @@ export function readContractListBody<T>(body: unknown, fallback: string): T {
   return body as T
 }
 
-function contextualizeWorkspaceBillingError(error: unknown, fallback: string): Error {
-  if (isGuidanceError(error)) return error
-  return asWorkspaceBillingError(error, fallback)
-}
-
 export function asWorkspaceBillingError(error: unknown, fallback: string): Error {
   const message = formatDisplayErrorMessage(error, fallback)
   if (error instanceof Error && error.message === message) return error
@@ -83,13 +74,4 @@ export function asWorkspaceBillingError(error: unknown, fallback: string): Error
     contextual.status = source.status
   }
   return contextual
-}
-
-function isGuidanceError(error: unknown): error is WorkspaceBillingGuidanceError {
-  return (
-    error instanceof Error &&
-    'code' in error &&
-    (error.code === WORKSPACE_SELECTION_REQUIRED_CODE ||
-      error.code === WORKSPACE_BILLING_UNAVAILABLE_CODE)
-  )
 }

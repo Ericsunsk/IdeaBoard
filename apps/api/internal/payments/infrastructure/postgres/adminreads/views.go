@@ -33,9 +33,14 @@ func decodeAdminPaymentOrderRecord(row dbsqlc.ListAdminPaymentOrdersRow) payment
 }
 
 func decodeAdminPaymentOrderDetailFacts(row dbsqlc.GetAdminPaymentOrderRow) paymentreadmodel.AdminPaymentOrderDetailFacts {
+	billingAccountID := int64(0)
+	if row.BillingAccountID.Valid {
+		billingAccountID = row.BillingAccountID.Int64
+	}
 	return paymentreadmodel.AdminPaymentOrderDetailFacts{
 		PublicOrderNumber: row.PublicOrderNumber, InternalUserID: row.UserID,
-		UserPublicID: uuid.UUID(row.UserPublicID.Bytes), DisplayName: row.DisplayName,
+		BillingAccountID: billingAccountID,
+		UserPublicID:     uuid.UUID(row.UserPublicID.Bytes), DisplayName: row.DisplayName,
 		Status: row.Status, IdeaQuantity: row.IdeaQuantity,
 		BaseCurrency: strings.ToLower(row.BaseCurrency), BaseAmountMinor: row.BaseAmountMinor,
 		PaidSubtotalMinor: dbutil.Int64Ptr(row.PaidSubtotalMinor),

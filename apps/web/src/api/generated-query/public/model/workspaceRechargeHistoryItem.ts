@@ -14,6 +14,8 @@ import type { WorkspaceRechargeHistoryItemStatus } from './workspaceRechargeHist
 
 export interface WorkspaceRechargeHistoryItem {
   occurred_at: string
+  /** Payer account (ba_) this history fact belongs to. */
+  billing_account_id: string
   idea_quantity: number
   /** Integer minor units; omitted when empty. */
   paid_amount_minor?: number

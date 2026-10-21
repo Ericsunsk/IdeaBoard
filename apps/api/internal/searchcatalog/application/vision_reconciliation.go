@@ -70,7 +70,8 @@ func (s *VisionBillingService) reconcileOne(ctx context.Context, operationID str
 	var userID int64
 	var holdID string
 	var amount int64
-	if err := tx.QueryRow(ctx, `SELECT user_id, hold_transaction_id, unit_credits FROM ai_search_operations WHERE operation_id = $1::uuid AND status IN ('pending', 'reconciliation_pending') FOR UPDATE`, operationID).Scan(&userID, &holdID, &amount); err != nil {
+	var accountID int64
+	if err := tx.QueryRow(ctx, `SELECT user_id, hold_transaction_id, unit_credits, billing_account_id FROM ai_search_operations WHERE operation_id = $1::uuid AND status IN ('pending', 'reconciliation_pending') FOR UPDATE`, operationID).Scan(&userID, &holdID, &amount, &accountID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -81,7 +82,7 @@ func (s *VisionBillingService) reconcileOne(ctx context.Context, operationID str
 		return err
 	}
 	if _, err := s.credits.InTx(tx).Release(ctx, ports.ReleaseCommand{
-		UserID: userID, HoldTransactionID: holdID, Amount: creditAmount,
+		BillingAccountID: accountID, HoldTransactionID: holdID, Amount: creditAmount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "ai-search:" + operationID + ":reconcile-release",
 			Actor:          domain.Actor{Type: domain.ActorSystem, ID: "vision-reconciliation"},

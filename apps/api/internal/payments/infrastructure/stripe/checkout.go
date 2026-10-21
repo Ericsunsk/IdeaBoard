@@ -32,8 +32,8 @@ func (a *Adapter) CreateCustomer(ctx context.Context, input paymentports.CreateC
 	}
 
 	params := &stripe.CustomerCreateParams{
-		Description: stripe.String(fmt.Sprintf("IdeaBoard user %d", input.UserID)),
-		Metadata:    map[string]string{"ideaboard_user_id": strconv.FormatInt(input.UserID, 10)},
+		Description: stripe.String(fmt.Sprintf("IdeaBoard billing account %d", input.BillingAccountID)),
+		Metadata:    map[string]string{"ideaboard_billing_account_id": strconv.FormatInt(input.BillingAccountID, 10)},
 	}
 	params.SetIdempotencyKey(input.IdempotencyKey)
 	startedAt := time.Now()

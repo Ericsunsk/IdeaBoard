@@ -150,6 +150,20 @@ CREATE TABLE billing_accounts (
   )
 );
 
+CREATE TABLE workspace_billing_links (
+  workspace_id BIGINT PRIMARY KEY REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  billing_account_id BIGINT NOT NULL REFERENCES billing_accounts(internal_id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE billing_account_members (
+  billing_account_id BIGINT NOT NULL REFERENCES billing_accounts(internal_id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('owner','admin')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (billing_account_id, user_id)
+);
+
 CREATE TABLE tasks (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
@@ -779,7 +793,7 @@ func newIntegrationHolder() *integrationHolder {
 	return &integrationHolder{holds: map[string]int64{}, released: map[string]int64{}}
 }
 
-func (h *integrationHolder) Hold(ctx context.Context, userID int64, amount int64, key, taskID string) (string, error) {
+func (h *integrationHolder) Hold(ctx context.Context, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	holdID := "hold_" + taskID
@@ -787,11 +801,11 @@ func (h *integrationHolder) Hold(ctx context.Context, userID int64, amount int64
 	return holdID, nil
 }
 
-func (h *integrationHolder) Capture(ctx context.Context, holdID string, amount int64, taskID string) error {
+func (h *integrationHolder) Capture(ctx context.Context, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) error {
 	return nil
 }
 
-func (h *integrationHolder) Release(ctx context.Context, holdID string, amount int64, taskID string) error {
+func (h *integrationHolder) Release(ctx context.Context, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.released[holdID] = amount
@@ -803,8 +817,8 @@ func (h *integrationHolder) Release(ctx context.Context, holdID string, amount i
 // registers its rollback undo: a rolled-back submit strands no fake hold.
 // (Production holds ride the credits transaction itself; see
 // workspacetasks/settle_test.go.)
-func (h *integrationHolder) HoldInTx(ctx context.Context, tx pgx.Tx, userID int64, amount int64, key, taskID string) (string, error) {
-	holdID, err := h.Hold(ctx, userID, amount, key, taskID)
+func (h *integrationHolder) HoldInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
+	holdID, err := h.Hold(ctx, billingAccountID, actorUserID, amount, key, taskID)
 	if err != nil {
 		return "", err
 	}
@@ -818,15 +832,15 @@ func (h *integrationHolder) HoldInTx(ctx context.Context, tx pgx.Tx, userID int6
 	return holdID, nil
 }
 
-func (h *integrationHolder) CaptureInTx(ctx context.Context, _ pgx.Tx, _ int64, holdID string, amount int64, taskID string) (string, error) {
-	if err := h.Capture(ctx, holdID, amount, taskID); err != nil {
+func (h *integrationHolder) CaptureInTx(ctx context.Context, _ pgx.Tx, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) (string, error) {
+	if err := h.Capture(ctx, billingAccountID, actorUserID, holdID, amount, taskID); err != nil {
 		return "", err
 	}
 	return "", nil
 }
 
-func (h *integrationHolder) ReleaseInTx(ctx context.Context, _ pgx.Tx, _ int64, holdID string, amount int64, taskID string) (string, error) {
-	if err := h.Release(ctx, holdID, amount, taskID); err != nil {
+func (h *integrationHolder) ReleaseInTx(ctx context.Context, _ pgx.Tx, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) (string, error) {
+	if err := h.Release(ctx, billingAccountID, actorUserID, holdID, amount, taskID); err != nil {
 		return "", err
 	}
 	return "", nil
@@ -966,10 +980,10 @@ func TestWorkspaceTaskAdaptersFailClosed(t *testing.T) {
 		t.Fatalf("nil quoter = %v, want quote unavailable", err)
 	}
 	var holder *taskadapters.WorkspaceTaskHolder
-	if _, err := holder.Hold(ctx, 1, 10, "k", "task_x"); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if _, err := holder.Hold(ctx, 1, 7, 10, "k", "task_x"); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil holder Hold = %v, want quote unavailable", err)
 	}
-	if err := holder.Release(ctx, "hold_x", 10, "task_x"); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if err := holder.Release(ctx, 1, 7, "hold_x", 10, "task_x"); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil holder Release = %v, want quote unavailable", err)
 	}
 	var queue *taskadapters.WorkspaceTaskEnqueuer

@@ -3920,12 +3920,6 @@
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/features/account/index.ts#BillingRecord"]
       },
-      "BillingRecordItem": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/account/index.ts#BillingRecordItem"
-        ]
-      },
       "BillingRecordKind": {
         "kind": "canonical-public",
         "evidence": [
@@ -3936,12 +3930,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/account/index.ts#BillingRecordPage"
-        ]
-      },
-      "BillingRecordPageData": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/account/index.ts#BillingRecordPageData"
         ]
       },
       "ComingSoonPane": {
@@ -4640,10 +4628,6 @@
         "kind": "canonical-origin",
         "evidence": ["src/features/account/index.ts#BillingRecord"]
       },
-      "BillingRecordItem": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/account/index.ts#BillingRecordItem"]
-      },
       "BillingRecordKind": {
         "kind": "canonical-origin",
         "evidence": ["src/features/account/index.ts#BillingRecordKind"]
@@ -4651,10 +4635,6 @@
       "BillingRecordPage": {
         "kind": "canonical-origin",
         "evidence": ["src/features/account/index.ts#BillingRecordPage"]
-      },
-      "BillingRecordPageData": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/account/index.ts#BillingRecordPageData"]
       },
       "ListUserBillingRecordsParams": {
         "kind": "canonical-origin",
@@ -14350,11 +14330,13 @@
   },
   "generated": {
     "src/api/generated-query/control/control-billing/control-billing.ts": {
-      "sha256": "91f0659042e1ee64855695e31c72ec9fe86e571df187777802a7747a3cb64ff7",
+      "sha256": "316722367218928be9771a7f292304800ae4bccef468faaf3c2c60f9c5804b35",
       "exports": [
         "DeleteControlCatalogItemMutationError",
         "DeleteControlCatalogItemMutationResult",
         "DeleteControlCatalogItemMutationVariables",
+        "GetControlBillingAccountQueryError",
+        "GetControlBillingAccountQueryResult",
         "GetControlCatalogModelPoolQueryError",
         "GetControlCatalogModelPoolQueryResult",
         "ListControlBillingAccountsQueryError",
@@ -14374,10 +14356,14 @@
         "SetControlCatalogAvailabilityMutationResult",
         "SetControlCatalogAvailabilityMutationVariables",
         "deleteControlCatalogItem",
+        "getControlBillingAccount",
         "getControlCatalogModelPool",
         "getDeleteControlCatalogItemMutationKey",
         "getDeleteControlCatalogItemMutationOptions",
         "getDeleteControlCatalogItemUrl",
+        "getGetControlBillingAccountQueryKey",
+        "getGetControlBillingAccountQueryOptions",
+        "getGetControlBillingAccountUrl",
         "getGetControlCatalogModelPoolQueryKey",
         "getGetControlCatalogModelPoolQueryOptions",
         "getGetControlCatalogModelPoolUrl",
@@ -14402,6 +14388,7 @@
         "replaceControlCatalogModelPool",
         "setControlCatalogAvailability",
         "useDeleteControlCatalogItem",
+        "useGetControlBillingAccount",
         "useGetControlCatalogModelPool",
         "useListControlBillingAccounts",
         "useListControlBillingCatalog",
@@ -14411,7 +14398,7 @@
       ]
     },
     "src/api/generated-query/control/control-credits/control-credits.ts": {
-      "sha256": "1de057578cce37d665ec0d89e34fff2840f1d280a11e658009a41bd53f18b809",
+      "sha256": "39353a348e934434c4f190bef06324bfa67f0b24956c4e1d0091397f555b64af",
       "exports": [
         "CreateControlCreditCorrectionMutationBody",
         "CreateControlCreditCorrectionMutationError",
@@ -14436,6 +14423,8 @@
         "DeleteControlRewardCodeMutationError",
         "DeleteControlRewardCodeMutationResult",
         "DeleteControlRewardCodeMutationVariables",
+        "GetControlBillingAccountWalletQueryError",
+        "GetControlBillingAccountWalletQueryResult",
         "GetControlCreditHealthQueryError",
         "GetControlCreditHealthQueryResult",
         "GetControlCreditWalletQueryError",
@@ -14444,6 +14433,8 @@
         "GetControlReconciliationRunQueryResult",
         "GetControlRewardRedemptionQueryError",
         "GetControlRewardRedemptionQueryResult",
+        "ListControlBillingAccountLedgerQueryError",
+        "ListControlBillingAccountLedgerQueryResult",
         "ListControlCreditLedgerQueryError",
         "ListControlCreditLedgerQueryResult",
         "ListControlReconciliationFindingsQueryError",
@@ -14452,6 +14443,14 @@
         "ListControlReconciliationRunsQueryResult",
         "ListControlRewardRedemptionsQueryError",
         "ListControlRewardRedemptionsQueryResult",
+        "ReleaseControlWalletRestrictionMutationBody",
+        "ReleaseControlWalletRestrictionMutationError",
+        "ReleaseControlWalletRestrictionMutationResult",
+        "ReleaseControlWalletRestrictionMutationVariables",
+        "RestrictControlWalletMutationBody",
+        "RestrictControlWalletMutationError",
+        "RestrictControlWalletMutationResult",
+        "RestrictControlWalletMutationVariables",
         "SearchControlRewardCodesMutationBody",
         "SearchControlRewardCodesMutationError",
         "SearchControlRewardCodesMutationResult",
@@ -14472,6 +14471,7 @@
         "createControlCreditRefund",
         "createControlRewardCode",
         "deleteControlRewardCode",
+        "getControlBillingAccountWallet",
         "getControlCreditHealth",
         "getControlCreditWallet",
         "getControlReconciliationRun",
@@ -14494,6 +14494,9 @@
         "getDeleteControlRewardCodeMutationKey",
         "getDeleteControlRewardCodeMutationOptions",
         "getDeleteControlRewardCodeUrl",
+        "getGetControlBillingAccountWalletQueryKey",
+        "getGetControlBillingAccountWalletQueryOptions",
+        "getGetControlBillingAccountWalletUrl",
         "getGetControlCreditHealthQueryKey",
         "getGetControlCreditHealthQueryOptions",
         "getGetControlCreditHealthUrl",
@@ -14506,6 +14509,9 @@
         "getGetControlRewardRedemptionQueryKey",
         "getGetControlRewardRedemptionQueryOptions",
         "getGetControlRewardRedemptionUrl",
+        "getListControlBillingAccountLedgerQueryKey",
+        "getListControlBillingAccountLedgerQueryOptions",
+        "getListControlBillingAccountLedgerUrl",
         "getListControlCreditLedgerQueryKey",
         "getListControlCreditLedgerQueryOptions",
         "getListControlCreditLedgerUrl",
@@ -14518,6 +14524,12 @@
         "getListControlRewardRedemptionsQueryKey",
         "getListControlRewardRedemptionsQueryOptions",
         "getListControlRewardRedemptionsUrl",
+        "getReleaseControlWalletRestrictionMutationKey",
+        "getReleaseControlWalletRestrictionMutationOptions",
+        "getReleaseControlWalletRestrictionUrl",
+        "getRestrictControlWalletMutationKey",
+        "getRestrictControlWalletMutationOptions",
+        "getRestrictControlWalletUrl",
         "getSearchControlRewardCodesMutationKey",
         "getSearchControlRewardCodesMutationOptions",
         "getSearchControlRewardCodesUrl",
@@ -14530,10 +14542,13 @@
         "getUpdateControlRewardCodeMutationKey",
         "getUpdateControlRewardCodeMutationOptions",
         "getUpdateControlRewardCodeUrl",
+        "listControlBillingAccountLedger",
         "listControlCreditLedger",
         "listControlReconciliationFindings",
         "listControlReconciliationRuns",
         "listControlRewardRedemptions",
+        "releaseControlWalletRestriction",
+        "restrictControlWallet",
         "searchControlRewardCodes",
         "setControlRewardCodeEnabled",
         "startControlReconciliation",
@@ -14544,14 +14559,18 @@
         "useCreateControlCreditRefund",
         "useCreateControlRewardCode",
         "useDeleteControlRewardCode",
+        "useGetControlBillingAccountWallet",
         "useGetControlCreditHealth",
         "useGetControlCreditWallet",
         "useGetControlReconciliationRun",
         "useGetControlRewardRedemption",
+        "useListControlBillingAccountLedger",
         "useListControlCreditLedger",
         "useListControlReconciliationFindings",
         "useListControlReconciliationRuns",
         "useListControlRewardRedemptions",
+        "useReleaseControlWalletRestriction",
+        "useRestrictControlWallet",
         "useSearchControlRewardCodes",
         "useSetControlRewardCodeEnabled",
         "useStartControlReconciliation",
@@ -15231,7 +15250,7 @@
       "exports": ["ControlBeforeIdParameter"]
     },
     "src/api/generated-query/control/model/controlBillingAccount.ts": {
-      "sha256": "f43b7c171f2d3bd2b7abfba72929a8eee4e6e390828a1e5c9c667a61ad5016dd",
+      "sha256": "3033e1b31962d6842fc4c79492447a4fe417dc5866203e79b476c8c61b689beb",
       "exports": ["ControlBillingAccount"]
     },
     "src/api/generated-query/control/model/controlBrandingLogoUpload.ts": {
@@ -15241,6 +15260,42 @@
     "src/api/generated-query/control/model/controlBrandingLogoUploadEnvelope.ts": {
       "sha256": "92f06868726a7aa202449a0e5a07c9a97c765cec35606c47c2e4e10a4f638bd7",
       "exports": ["ControlBrandingLogoUploadEnvelope"]
+    },
+    "src/api/generated-query/control/model/controlBillingAccountDetail.ts": {
+      "sha256": "6afa2ebc3956ec7d0d0c606bd0828be6e67d93f6d34b5369e4a12ecc2dc850c1",
+      "exports": ["ControlBillingAccountDetail"]
+    },
+    "src/api/generated-query/control/model/controlBillingAccountDetailEnvelope.ts": {
+      "sha256": "5bfd3b5f2b9ec2d45b96ffb0c5dd1e167d8e59c592abb072c65e495f5b71bb1c",
+      "exports": ["ControlBillingAccountDetailEnvelope"]
+    },
+    "src/api/generated-query/control/model/controlBillingAccountDetailOwnerType.ts": {
+      "sha256": "c0d66a40cb1179e95d7871e4fa6cbc021e15d316557bc8050fdaa816ec097834",
+      "exports": ["ControlBillingAccountDetailOwnerType"]
+    },
+    "src/api/generated-query/control/model/controlBillingAccountMember.ts": {
+      "sha256": "2ceeec6d622307c19d724aa414c4f00747313629533b59b9067d66c676c3cd29",
+      "exports": ["ControlBillingAccountMember"]
+    },
+    "src/api/generated-query/control/model/controlBillingAccountMemberRole.ts": {
+      "sha256": "6d8b78b2518ec25da3f5d03a9c998dcbc49c6c7dd5858743e794de1464113141",
+      "exports": ["ControlBillingAccountMemberRole"]
+    },
+    "src/api/generated-query/control/model/controlBillingAccountOwnerType.ts": {
+      "sha256": "c0c67ce85a70f528fba85e82c5622c9a68d5616e36eedce85c1b2c8ccacc9420",
+      "exports": ["ControlBillingAccountOwnerType"]
+    },
+    "src/api/generated-query/control/model/controlBillingAccountWalletSummary.ts": {
+      "sha256": "ae1df671d20372a9dc9701a03a9d2ef47dad4da8c6ccbdaa4a8e115525bb26ed",
+      "exports": ["ControlBillingAccountWalletSummary"]
+    },
+    "src/api/generated-query/control/model/controlBillingAccountWalletSummaryStatus.ts": {
+      "sha256": "428a6bbdee6ecb7169748c1bddd8ddff2429db5e046d28f644f2d0fc8e912ea9",
+      "exports": ["ControlBillingAccountWalletSummaryStatus"]
+    },
+    "src/api/generated-query/control/model/controlBillingOwnerScopeParameter.ts": {
+      "sha256": "17747e46fa97247a221b3cdab5128b40f93f07780d3981b56998d9f8a440ad36",
+      "exports": ["ControlBillingOwnerScopeParameter"]
     },
     "src/api/generated-query/control/model/controlBrandLogoOverride.ts": {
       "sha256": "6549b8b122a6240844d2ef153624605c740832df867719e92542b610ac469e09",
@@ -15271,15 +15326,15 @@
       "exports": ["ControlCreatedRewardCode"]
     },
     "src/api/generated-query/control/model/controlCreditCommandRequest.ts": {
-      "sha256": "977c697e6f89715f950f66d3eaa30760664909c801fcfd7ae86821f0c189568f",
+      "sha256": "9f49747250cb696166217772f011e6008e39c12aadb0319b6bda241c3a948587",
       "exports": ["ControlCreditCommandRequest"]
     },
     "src/api/generated-query/control/model/controlCreditCorrectionRequest.ts": {
-      "sha256": "60de5322bd6a72f975648ab8739343282e73ed1b7cbf72f7f40e15bc22c333f0",
+      "sha256": "633382d8a69ef997cdb1e8025108973a5319b445cd7545a87869dd52e66778ae",
       "exports": ["ControlCreditCorrectionRequest"]
     },
     "src/api/generated-query/control/model/controlCreditRefundRequest.ts": {
-      "sha256": "5289284309a581e3636eb64653767b489d94ad5ec347ddf058257b879a92f7c1",
+      "sha256": "5c37b4aaedbc149faeb7adb12e46a442e5110dee1348e6ffd7b700870b95c592",
       "exports": ["ControlCreditRefundRequest"]
     },
     "src/api/generated-query/control/model/controlCreditResult.ts": {
@@ -15291,12 +15346,16 @@
       "exports": ["ControlCreditResultEnvelope"]
     },
     "src/api/generated-query/control/model/controlCreditWallet.ts": {
-      "sha256": "8f84564569d148f864276abf417d37b2b4f0dda7dd9503abc81d6c85fdff54c2",
+      "sha256": "bfd5880f46fabd57a7c12e73f26267e0222e7faf1028f7d4d06fe29c020378cc",
       "exports": ["ControlCreditWallet"]
     },
     "src/api/generated-query/control/model/controlCreditWalletEnvelope.ts": {
       "sha256": "6c2f5df72789af5b536b36d9a450e78c8f1f58527ad73c0c671c3df96c9a799d",
       "exports": ["ControlCreditWalletEnvelope"]
+    },
+    "src/api/generated-query/control/model/controlCreditWalletOwnerType.ts": {
+      "sha256": "32fbd2bb8d5e087d742dd7c3b3e3547bca4533229e0143bec70a982a05f18980",
+      "exports": ["ControlCreditWalletOwnerType"]
     },
     "src/api/generated-query/control/model/controlCreditWalletStatus.ts": {
       "sha256": "9e98f7ed9652747ce92abe28be0caf3727603dad5cfd8bb18cf21c9ee04a4d97",
@@ -15341,6 +15400,10 @@
     "src/api/generated-query/control/model/controlLimitParameter.ts": {
       "sha256": "f1b5184a28be04cc98857e695efaa47c656c8cc597b9c7358a0b3005d4ade1e8",
       "exports": ["ControlLimitParameter"]
+    },
+    "src/api/generated-query/control/model/controlLinkedWorkspace.ts": {
+      "sha256": "9d46ae9ec40c2f57e1201422b93a9b520f4c49d45ceb856ef32b0961e0d497b6",
+      "exports": ["ControlLinkedWorkspace"]
     },
     "src/api/generated-query/control/model/controlMailConfig.ts": {
       "sha256": "c7f6ade7c73bae0ccc4b51042d74238ddbc857a2eba8bebda30327e36564052c",
@@ -15426,6 +15489,10 @@
       "sha256": "24d4ea68987de37a3fd94037e5027925248910ce75da57a2364de2f3cfbb80e7",
       "exports": ["ControlPublishPricesRequestPrices"]
     },
+    "src/api/generated-query/control/model/controlReleaseWalletRestrictionRequest.ts": {
+      "sha256": "b1829b368b523e48f4b41bcb6904e9bb1e1b2069febd36980905c17ed8dbf47c",
+      "exports": ["ControlReleaseWalletRestrictionRequest"]
+    },
     "src/api/generated-query/control/model/controlReplaceModelPoolEnvelope.ts": {
       "sha256": "ea556590b8622cc38d78299564e0e35092494a35edb2fb3ecb847132ceeb17a8",
       "exports": ["ControlReplaceModelPoolEnvelope"]
@@ -15437,6 +15504,10 @@
     "src/api/generated-query/control/model/controlReplaceModelPoolRequest.ts": {
       "sha256": "6f2b50d8712855b95b59d9f1cd97b36892d3677413aaf4e4236a21f301bcb6e6",
       "exports": ["ControlReplaceModelPoolRequest"]
+    },
+    "src/api/generated-query/control/model/controlRestrictWalletRequest.ts": {
+      "sha256": "ddda55f94f31d64e09daff3014338034716851dba52cabab466a850e03f691da",
+      "exports": ["ControlRestrictWalletRequest"]
     },
     "src/api/generated-query/control/model/controlRewardCode.ts": {
       "sha256": "e844529c88ca67ac14bec3ebbca8d59aa05e577d5b9ceb851a2d7f9409bd5db6",
@@ -15567,7 +15638,7 @@
       "exports": ["ControlUserRole"]
     },
     "src/api/generated-query/control/model/controlWalletRestriction.ts": {
-      "sha256": "d247860a1fba78c271607976f48715bff2f218fb60c4d3f8ff7d2eb271733fae",
+      "sha256": "ef16993002e0e4f02bb602a2257d750ad0a596347f4d98bc4253746eefcdee75",
       "exports": ["ControlWalletRestriction"]
     },
     "src/api/generated-query/control/model/controlWalletRestrictionCreatedBy.ts": {
@@ -15577,6 +15648,14 @@
     "src/api/generated-query/control/model/controlWalletRestrictionRelatedObject.ts": {
       "sha256": "c0605a0fef383478b171602372ddc0ed58329fab0ef1f39973a165e2f63e46ef",
       "exports": ["ControlWalletRestrictionRelatedObject"]
+    },
+    "src/api/generated-query/control/model/controlWalletRestrictionResult.ts": {
+      "sha256": "3b53ed9e2a1b5ac30d659ffeb4497142a05547c970c72dee5e3ef47c5f9d24aa",
+      "exports": ["ControlWalletRestrictionResult"]
+    },
+    "src/api/generated-query/control/model/controlWalletRestrictionResultEnvelope.ts": {
+      "sha256": "4c0d2d38330cbf3f4d57685474d2ae946d39088c2c2c66d0059d85fcbea60d34",
+      "exports": ["ControlWalletRestrictionResultEnvelope"]
     },
     "src/api/generated-query/control/model/controlWorkspace.ts": {
       "sha256": "aeb69e223a0f44319e4bc88ba97cdad22c1100b5091fbe375e99df2c9b8570d1",
@@ -15651,11 +15730,15 @@
       "exports": ["IdempotencyKeyParameter"]
     },
     "src/api/generated-query/control/model/index.ts": {
-      "sha256": "b21a9782628a4f9d7059431809e550f8020fc9110313187cdbd66eeb40b5bd64",
+      "sha256": "2e6ae240273a99abcfca4663cf70cb710eac2583b00f547d49d547bde4caf196",
       "exports": []
     },
+    "src/api/generated-query/control/model/listControlBillingAccountLedgerParams.ts": {
+      "sha256": "e32d9573beae28e50de1a6c724276e1af8ad8eaa135ca43547e79fd978f6cd38",
+      "exports": ["ListControlBillingAccountLedgerParams"]
+    },
     "src/api/generated-query/control/model/listControlBillingAccountsParams.ts": {
-      "sha256": "27eec608403cbc8c3305cf7043ab1d1d8d18ce04be5c9c446379f9ce65549593",
+      "sha256": "9ce4f5447161275b343ee8cb0e22162eb07fc6b5c585a8d50c41b97dcf9ceb0f",
       "exports": ["ListControlBillingAccountsParams"]
     },
     "src/api/generated-query/control/model/listControlCreditLedgerParams.ts": {
@@ -15917,6 +16000,22 @@
       "sha256": "49dc1a36bfbb52d04e445a27bcd8c075e0ab64e5741cffaa2584d5449ce57bb0",
       "exports": ["AccessIfMatchParameter"]
     },
+    "src/api/generated-query/public/model/addBillingAccountMemberRequest.ts": {
+      "sha256": "2f7c5327fe8bd7b7cd3e640df2716b3d23862ae52ca481a218038c82b1e98920",
+      "exports": ["AddBillingAccountMemberRequest"]
+    },
+    "src/api/generated-query/public/model/addBillingAccountMemberRequestData.ts": {
+      "sha256": "81efcf8f4f0cd8ccbf1028f92e79112948ef260dac53bb36e1a7578c528f2a15",
+      "exports": ["AddBillingAccountMemberRequestData"]
+    },
+    "src/api/generated-query/public/model/addBillingAccountMemberRequestDataRole.ts": {
+      "sha256": "989a465737eab4034b91beb41cc6d7543e84188b08963bc175bf6968d20eeb0b",
+      "exports": ["AddBillingAccountMemberRequestDataRole"]
+    },
+    "src/api/generated-query/public/model/addWorkspaceBillingAccountMember201.ts": {
+      "sha256": "63ef7c43a9299506d808160ed9fd78ad3f8b927c73974cac2f3d056c2fe009fd",
+      "exports": ["AddWorkspaceBillingAccountMember201"]
+    },
     "src/api/generated-query/public/model/addWorkspaceMemberRequest.ts": {
       "sha256": "e0717ad9fae4b35739a739670494d709f3a25d8b9b774336de8aeff958821afc",
       "exports": ["AddWorkspaceMemberRequest"]
@@ -15952,6 +16051,14 @@
     "src/api/generated-query/public/model/batchGetMediaAssetsResultEnvelope.ts": {
       "sha256": "4a01de56deb010ff773e906f1cddc11cba3b57f5c08c9b3c20d797d610ba89f6",
       "exports": ["BatchGetMediaAssetsResultEnvelope"]
+    },
+    "src/api/generated-query/public/model/billingAccountMember.ts": {
+      "sha256": "d826f78ed874a758dc80a727445a8cec1cdb4f007b37eef644edb3c014931cc3",
+      "exports": ["BillingAccountMember"]
+    },
+    "src/api/generated-query/public/model/billingAccountMemberRole.ts": {
+      "sha256": "ed799343e9f3d9e8c056dcb4dd0a03d257cb52104488ed1ca11e99f045bf9741",
+      "exports": ["BillingAccountMemberRole"]
     },
     "src/api/generated-query/public/model/billingRecord.ts": {
       "sha256": "5d245f0666a551d08cefc546af6d112fd4c0afcc9f0f59c4c93c612295aa3d51",
@@ -16238,264 +16345,8 @@
       "exports": ["IfMatchParameter"]
     },
     "src/api/generated-query/public/model/index.ts": {
-      "sha256": "a3cbfd3e3b34287f141fd2cd50d3f044e2dd467628055c4835c761fef4b2ba8b",
-      "exports": [
-        "AccessIfMatchParameter",
-        "AddWorkspaceMemberRequest",
-        "AddWorkspaceMemberRequestData",
-        "AvatarUploadResult",
-        "AvatarUploadResultEnvelope",
-        "BadRequestResponse",
-        "BatchGetMediaAssetsRequest",
-        "BatchGetMediaAssetsRequestData",
-        "BatchGetMediaAssetsResult",
-        "BatchGetMediaAssetsResultEnvelope",
-        "BillingRecord",
-        "BillingRecordKind",
-        "Board",
-        "BoardAccess",
-        "BoardAccessEnvelope",
-        "BoardAccessState",
-        "BoardCapabilities",
-        "BoardDocument",
-        "BoardDocumentDocument",
-        "BoardDocumentEnvelope",
-        "BoardDocumentPreviewScene",
-        "BoardEnvelope",
-        "BoardId",
-        "BoardPreviewScene",
-        "BoardRelationship",
-        "BoardRevision",
-        "BoardRevisionDetail",
-        "BoardRevisionDetailEnvelope",
-        "BoardRevisionDetailSnapshot",
-        "CancelWorkspaceTaskRequest",
-        "CancelWorkspaceTaskRequestData",
-        "CompleteUploadEnvelope",
-        "CompleteUploadRequest",
-        "CompleteUploadRequestData",
-        "CompleteUploadRequestDataMediaKind",
-        "CompleteUploadResult",
-        "ConflictResponse",
-        "CreateBoardRequest",
-        "CreateBoardRequestData",
-        "CreateLibraryFolderRequest",
-        "CreateLibraryFolderRequestData",
-        "CreateOrganizationRequest",
-        "CreateOrganizationRequestData",
-        "CreateOrganizationWorkspaceRequest",
-        "CreateOrganizationWorkspaceRequestData",
-        "CreateUploadRequest",
-        "CreateUploadRequestData",
-        "CreateUploadRequestDataMediaKind",
-        "CreateWorkspaceBillingQuoteRequest",
-        "CreateWorkspaceBillingQuoteRequestData",
-        "CreateWorkspaceBillingQuoteRequestDataOutputResolution",
-        "CreateWorkspaceCheckoutRequest",
-        "CreateWorkspaceCheckoutRequestData",
-        "CreateWorkspaceRequest",
-        "CreateWorkspaceRequestData",
-        "CreateWorkspaceTaskRequest",
-        "CreateWorkspaceTaskRequestData",
-        "CreateWorkspaceTaskRequestDataInputs",
-        "CreateWorkspaceTaskRequestDataParams",
-        "CreateWorkspaceVisionQueryRequest",
-        "CreateWorkspaceVisionQueryRequestData",
-        "CreditsLedgerEntry",
-        "CreditsLedgerEntryCommandType",
-        "CursorParameter",
-        "DeletedEnvelope",
-        "DeletedEnvelopeData",
-        "DerivativeWorkspaceLibraryAssetParams",
-        "ErrorEnvelope",
-        "ErrorEnvelopeError",
-        "ErrorEnvelopeErrorDetails",
-        "EventId",
-        "ExternalLibraryAsset",
-        "ExternalLibraryAssetSource",
-        "ForbiddenResponse",
-        "GetPublicBrandingLogoParams",
-        "GetPublicUserAvatarParams",
-        "GetPublicUserAvatarSize",
-        "GetWorkspaceUsageParams",
-        "GetWorkspaceUsageRange",
-        "IdempotencyKeyParameter",
-        "IfMatchParameter",
-        "LibraryAsset",
-        "LibraryAssetEnvelope",
-        "LibraryAssetId",
-        "LibraryAssetProvider",
-        "LibraryFolder",
-        "LibraryFolderEnvelope",
-        "LibraryFolderId",
-        "ListBoardRevisionsParams",
-        "ListBoardsParams",
-        "ListOrganizationsParams",
-        "ListWorkspaceBillingRecordsParams",
-        "ListWorkspaceCreditsLedgerParams",
-        "ListWorkspaceLibraryAssetsParams",
-        "ListWorkspaceLibraryFoldersParams",
-        "ListWorkspaceMediaAssetsParams",
-        "ListWorkspaceRechargesParams",
-        "ListWorkspaceRewardRedemptionsParams",
-        "ListWorkspaceTasksParams",
-        "ListWorkspacesParams",
-        "LookupWorkspaceMemberByEmailParams",
-        "MediaAsset",
-        "MediaAssetDerivatives",
-        "MediaAssetEnvelope",
-        "MediaAssetId",
-        "MediaAssetMediaKind",
-        "MediaAssetStatus",
-        "MediaDerivative",
-        "MediaDerivativeStatus",
-        "MediaDisplay",
-        "MediaDisplayVariant",
-        "MediaDisplayVariantMaxSide",
-        "MediaDisplayVariantTier",
-        "MediaLibraryAsset",
-        "MediaLibraryAssetSource",
-        "MemberLookupEmailParameter",
-        "MembershipRole",
-        "MoveLibraryAssetRequest",
-        "MoveLibraryAssetRequestData",
-        "NotFoundResponse",
-        "Organization",
-        "OrganizationEnvelope",
-        "OrganizationId",
-        "PageSizeParameter",
-        "PaginatedBillingRecords",
-        "PaginatedBoardRevisions",
-        "PaginatedBoards",
-        "PaginatedCreditsLedger",
-        "PaginatedLibraryAssets",
-        "PaginatedLibraryFolders",
-        "PaginatedMediaAssets",
-        "PaginatedOrganizations",
-        "PaginatedWorkspaceRecharges",
-        "PaginatedWorkspaceRewardRedemptions",
-        "PaginatedWorkspaceSearchResults",
-        "PaginatedWorkspaceTasks",
-        "PaginatedWorkspaces",
-        "PaginationMeta",
-        "PreconditionFailedResponse",
-        "PreconditionRequiredResponse",
-        "QuoteWorkspaceTaskRequest",
-        "QuoteWorkspaceTaskRequestData",
-        "RealtimeTicket",
-        "RealtimeTicketEnvelope",
-        "RedeemWorkspaceRewardRequest",
-        "RedeemWorkspaceRewardRequestData",
-        "RedeemWorkspaceRewardResult",
-        "RedeemWorkspaceRewardResultEnvelope",
-        "RenameLibraryFolderRequest",
-        "RenameLibraryFolderRequestData",
-        "ReplaceBoardDocumentRequest",
-        "ReplaceBoardDocumentRequestData",
-        "ReplaceBoardDocumentRequestDataPayload",
-        "RequestIdParameter",
-        "ResolveLibraryAssetItem",
-        "ResolveLibraryAssetResult",
-        "ResolveLibraryAssetResultStatus",
-        "ResolveLibraryAssetsEnvelope",
-        "ResolveLibraryAssetsRequest",
-        "ResolveLibraryAssetsRequestData",
-        "ResolveLibraryAssetsResult",
-        "SaveExternalLibraryAssetData",
-        "SaveExternalLibraryAssetDataSource",
-        "SaveLibraryAssetRequest",
-        "SaveMediaLibraryAssetData",
-        "SaveMediaLibraryAssetDataSource",
-        "SearchWorkspaceParams",
-        "SearchWorkspaceProviderItem",
-        "Service",
-        "SuccessEnvelope",
-        "SuccessEnvelopeData",
-        "SuccessEnvelopeMeta",
-        "SupportChannel",
-        "SupportChannelKind",
-        "SupportChannelsSetting",
-        "SupportChannelsSettingEnvelope",
-        "TaskBillingSnapshot",
-        "TaskBillingSnapshotEnvelope",
-        "TaskEnvelope",
-        "TaskId",
-        "TaskOutputKind",
-        "TaskOutputRef",
-        "TaskSettlementState",
-        "TaskStatus",
-        "UnauthorizedResponse",
-        "UnprocessableEntityResponse",
-        "UpdateBoardAccessRequest",
-        "UpdateBoardAccessRequestData",
-        "UpdateBoardRequest",
-        "UpdateBoardRequestData",
-        "UpdateOrganizationRequest",
-        "UpdateOrganizationRequestData",
-        "UpdateUserRequest",
-        "UpdateUserRequestData",
-        "UpdateWorkspaceMemberRequest",
-        "UpdateWorkspaceMemberRequestData",
-        "UpdateWorkspaceRequest",
-        "UpdateWorkspaceRequestData",
-        "UploadId",
-        "UploadSession",
-        "UploadSessionEnvelope",
-        "UploadSessionMediaKind",
-        "UploadSessionStatus",
-        "UploadTarget",
-        "UploadTargetKind",
-        "User",
-        "UserEnvelope",
-        "UserId",
-        "UserRole",
-        "VisionQueryId",
-        "Workspace",
-        "WorkspaceAccess",
-        "WorkspaceBillingAccount",
-        "WorkspaceBillingAccountEnvelope",
-        "WorkspaceBillingAccountOwnerType",
-        "WorkspaceBillingQuote",
-        "WorkspaceBillingQuoteEnvelope",
-        "WorkspaceCheckoutSession",
-        "WorkspaceCheckoutSessionEnvelope",
-        "WorkspaceCreditsBalance",
-        "WorkspaceCreditsBalanceEnvelope",
-        "WorkspaceCreditsBalanceStatus",
-        "WorkspaceEnvelope",
-        "WorkspaceId",
-        "WorkspaceList",
-        "WorkspaceMember",
-        "WorkspaceMemberEnvelope",
-        "WorkspaceMemberList",
-        "WorkspaceMemberLookup",
-        "WorkspaceMemberLookupEnvelope",
-        "WorkspacePendingOrder",
-        "WorkspacePendingOrderEnvelope",
-        "WorkspacePendingOrderList",
-        "WorkspacePendingOrderListEnvelope",
-        "WorkspacePendingOrderStatus",
-        "WorkspacePurchaseOptions",
-        "WorkspacePurchaseOptionsEnvelope",
-        "WorkspacePurchaseOptionsRefundPolicy",
-        "WorkspacePurchaseOptionsTerms",
-        "WorkspaceRechargeHistoryItem",
-        "WorkspaceRechargeHistoryItemStatus",
-        "WorkspaceRewardRedemption",
-        "WorkspaceRewardRedemptionHistoryItem",
-        "WorkspaceSearchResult",
-        "WorkspaceTask",
-        "WorkspaceTaskOutputs",
-        "WorkspaceTaskOutputsEnvelope",
-        "WorkspaceUsage",
-        "WorkspaceUsageEnvelope",
-        "WorkspaceUsageLifetime",
-        "WorkspaceUsageTimezone",
-        "WorkspaceUsageTrendItem",
-        "WorkspaceVisionQuery",
-        "WorkspaceVisionQueryEnvelope",
-        "WorkspaceVisionQueryStatus"
-      ]
+      "sha256": "e11812e9438ac6a0a5c94cbe7c65fc3ddc4ca31ac3063d1b9f0be9534842fe6c",
+      "exports": []
     },
     "src/api/generated-query/public/model/libraryAsset.ts": {
       "sha256": "774a22db6f55a89dc10b3e823a992ae0c3ca375f1afdc137046f69f7e836c095",
@@ -16525,6 +16376,14 @@
       "sha256": "9894ae0e8af49f35ae3079146d1fad03e5a94e3a3c0371ecccd39255fe8f9652",
       "exports": ["LibraryFolderId"]
     },
+    "src/api/generated-query/public/model/linkWorkspaceBillingAccountRequest.ts": {
+      "sha256": "6872bb074094afea39e2526b6c5628afc874b8e5934f30e434dcd9cf503d84ca",
+      "exports": ["LinkWorkspaceBillingAccountRequest"]
+    },
+    "src/api/generated-query/public/model/linkWorkspaceBillingAccountRequestData.ts": {
+      "sha256": "4122afeed48ebc6e631f75f27b054c7fc8e881ab157de9be327b4d1e8cb6e3fc",
+      "exports": ["LinkWorkspaceBillingAccountRequestData"]
+    },
     "src/api/generated-query/public/model/listBoardRevisionsParams.ts": {
       "sha256": "b6a4a65fc0c84fedfad6b12f4feb82d09517aa04a63f6517d1102bdb224f628d",
       "exports": ["ListBoardRevisionsParams"]
@@ -16536,6 +16395,10 @@
     "src/api/generated-query/public/model/listOrganizationsParams.ts": {
       "sha256": "a6b253ddec513a78e9b2395744fdd01470ce830d9827bf35007cced6fddff48f",
       "exports": ["ListOrganizationsParams"]
+    },
+    "src/api/generated-query/public/model/listWorkspaceBillingAccountMembers200.ts": {
+      "sha256": "f4ce56f9de8810cf9194f658026c06158a2668b1f9fe43b8e228c84e299f2491",
+      "exports": ["ListWorkspaceBillingAccountMembers200"]
     },
     "src/api/generated-query/public/model/listWorkspaceBillingRecordsParams.ts": {
       "sha256": "241ae6ed4e339120beef1c7dc15e2d0a01e04a0e638210c9913e1c37a772629f",
@@ -16738,7 +16601,7 @@
       "exports": ["QuoteWorkspaceTaskRequest"]
     },
     "src/api/generated-query/public/model/quoteWorkspaceTaskRequestData.ts": {
-      "sha256": "d085af612c602ebf24e4acea6b1fcd7be9e349f07cf48f9af7dfe5e6f4391992",
+      "sha256": "c29fb2e6e56795d60aa11281138326949b8049bb94228bf7c5ec14cb8109fa04",
       "exports": ["QuoteWorkspaceTaskRequestData"]
     },
     "src/api/generated-query/public/model/realtimeTicket.ts": {
@@ -16758,7 +16621,7 @@
       "exports": ["RedeemWorkspaceRewardRequestData"]
     },
     "src/api/generated-query/public/model/redeemWorkspaceRewardResult.ts": {
-      "sha256": "0643419ecb62d92c005fc6c59c3f21a265f1c0056634cdeafaf1b22de89e90d9",
+      "sha256": "45a6ec908e5d47a524b88fa14faf88ee6c3c6a80706eed06c175233525f6c609",
       "exports": ["RedeemWorkspaceRewardResult"]
     },
     "src/api/generated-query/public/model/redeemWorkspaceRewardResultEnvelope.ts": {
@@ -16909,6 +16772,22 @@
       "sha256": "a675cfeda832c718adb2378feb8f30a40f7f20e5e251a69711b708b3e3848994",
       "exports": ["TaskStatus"]
     },
+    "src/api/generated-query/public/model/transferBillingAccountRequest.ts": {
+      "sha256": "9a42a426375e460449cd99cc2d81526b431ddc624113954d5d6b235a13c8e8e2",
+      "exports": ["TransferBillingAccountRequest"]
+    },
+    "src/api/generated-query/public/model/transferBillingAccountRequestData.ts": {
+      "sha256": "7ad6aef6997ec2c724dcf08d356f56fbced79877e6db535105979a9cc3976a33",
+      "exports": ["TransferBillingAccountRequestData"]
+    },
+    "src/api/generated-query/public/model/transferWorkspaceBillingAccount200.ts": {
+      "sha256": "7cdd9fa9dbcd66d6221b382bf154de03902054db64659ffddbdb28b719d7409f",
+      "exports": ["TransferWorkspaceBillingAccount200"]
+    },
+    "src/api/generated-query/public/model/transferWorkspaceBillingAccount200Data.ts": {
+      "sha256": "757f983cf5b8172899246d3510a3fdd2dfafcc0b8a46c6fbefc9d06d31fe2eea",
+      "exports": ["TransferWorkspaceBillingAccount200Data"]
+    },
     "src/api/generated-query/public/model/unauthorizedResponse.ts": {
       "sha256": "18e308649b1ccb1cf18dadf57ceb4578334d5a6f3e60774809ceb78fe13d2596",
       "exports": ["UnauthorizedResponse"]
@@ -16916,6 +16795,18 @@
     "src/api/generated-query/public/model/unprocessableEntityResponse.ts": {
       "sha256": "f8e5afde2a5706d4c4945a9e686a6de7052a6c064e9f8ea362aa2e42fcbffe7a",
       "exports": ["UnprocessableEntityResponse"]
+    },
+    "src/api/generated-query/public/model/updateBillingAccountMemberRequest.ts": {
+      "sha256": "83bc5d4dfcd605e54f6b5400f11426691e89ad95868502c5d7e03019fa773209",
+      "exports": ["UpdateBillingAccountMemberRequest"]
+    },
+    "src/api/generated-query/public/model/updateBillingAccountMemberRequestData.ts": {
+      "sha256": "982ef0023bcd8b3a7c2f7a8b34bcd08a9b68f80781f6d10474981eb1fbf5d990",
+      "exports": ["UpdateBillingAccountMemberRequestData"]
+    },
+    "src/api/generated-query/public/model/updateBillingAccountMemberRequestDataRole.ts": {
+      "sha256": "22e172d96ad08ccd0de74b305a18c7fa90f4ef8d6c7018e120de09e2dcbe1f9e",
+      "exports": ["UpdateBillingAccountMemberRequestDataRole"]
     },
     "src/api/generated-query/public/model/updateBoardAccessRequest.ts": {
       "sha256": "c23fd3832075beac7e5c15a13a00cb3fced925e4764aa22131080c5e7f43b0f9",
@@ -16940,6 +16831,10 @@
     "src/api/generated-query/public/model/updateOrganizationRequestData.ts": {
       "sha256": "ebce66b3e7ec7ec2db5a0046798d6e484a6e9a9423523624f370f0d3bee55e07",
       "exports": ["UpdateOrganizationRequestData"]
+    },
+    "src/api/generated-query/public/model/updateWorkspaceBillingAccountMember200.ts": {
+      "sha256": "0233f98817f03242d6f22edd6565098ff5a06ee5f5c21191796e989d40040bcc",
+      "exports": ["UpdateWorkspaceBillingAccountMember200"]
     },
     "src/api/generated-query/public/model/updateWorkspaceMemberRequest.ts": {
       "sha256": "843d2e1cfe694bc5909865e61ecd2112306c10ae19141d54b8a40a9a3f3c43db",
@@ -17014,7 +16909,7 @@
       "exports": ["WorkspaceAccess"]
     },
     "src/api/generated-query/public/model/workspaceBillingAccount.ts": {
-      "sha256": "71f1de4827230c3555b5b8a01c361bcd098253b6442c7abf6c88254c4449e9a5",
+      "sha256": "b3b4b34b555fb4cb462bf0764728fcc2172a51ad4ea8a52871949a548dfed81f",
       "exports": ["WorkspaceBillingAccount"]
     },
     "src/api/generated-query/public/model/workspaceBillingAccountEnvelope.ts": {
@@ -17022,7 +16917,7 @@
       "exports": ["WorkspaceBillingAccountEnvelope"]
     },
     "src/api/generated-query/public/model/workspaceBillingAccountOwnerType.ts": {
-      "sha256": "19290fbaac019adbfb18c39ba80652ba784fc260821b683c49221f7a30fef2fd",
+      "sha256": "ba5cd3bbf551011051fe92863297f60a0716ee2fc42d87f2911e66ca20f1da9d",
       "exports": ["WorkspaceBillingAccountOwnerType"]
     },
     "src/api/generated-query/public/model/workspaceBillingQuote.ts": {
@@ -17034,7 +16929,7 @@
       "exports": ["WorkspaceBillingQuoteEnvelope"]
     },
     "src/api/generated-query/public/model/workspaceCheckoutSession.ts": {
-      "sha256": "48f0b81b1e9f789b8f90d344d921bf88118fdb0722da69f2d1421f6efd5bafcd",
+      "sha256": "ad1d8560a35c3c5ba976809ba2763c799c62b0eaf2e482595f233dcfcccdde29",
       "exports": ["WorkspaceCheckoutSession"]
     },
     "src/api/generated-query/public/model/workspaceCheckoutSessionEnvelope.ts": {
@@ -17042,7 +16937,7 @@
       "exports": ["WorkspaceCheckoutSessionEnvelope"]
     },
     "src/api/generated-query/public/model/workspaceCreditsBalance.ts": {
-      "sha256": "78702ff25ba373d1812965359465b715d062036c71310d4ae16bf9472bea7d53",
+      "sha256": "7e9f49f34eeb1f33954413cb1ad9ba25ecab30f32efc4d8662f3fbc143990ee2",
       "exports": ["WorkspaceCreditsBalance"]
     },
     "src/api/generated-query/public/model/workspaceCreditsBalanceEnvelope.ts": {
@@ -17086,7 +16981,7 @@
       "exports": ["WorkspaceMemberLookupEnvelope"]
     },
     "src/api/generated-query/public/model/workspacePendingOrder.ts": {
-      "sha256": "730b28b308f01da655a2480ca33f98f64818bb74f8ddbc2cd4282733498a65b6",
+      "sha256": "3bce5b8d3633f86f9b5add0686d4f8045a279c46d9a5116d20f48322ceef4d28",
       "exports": ["WorkspacePendingOrder"]
     },
     "src/api/generated-query/public/model/workspacePendingOrderEnvelope.ts": {
@@ -17106,7 +17001,7 @@
       "exports": ["WorkspacePendingOrderStatus"]
     },
     "src/api/generated-query/public/model/workspacePurchaseOptions.ts": {
-      "sha256": "687a32e019bc4fb337bd410348784a02cc2e333a8e3b2e9ca1a65fa9ca6a9cce",
+      "sha256": "2ca766dea453f20c48cbea277db02d0b1f94c371694cb132569d87dad2395eca",
       "exports": ["WorkspacePurchaseOptions"]
     },
     "src/api/generated-query/public/model/workspacePurchaseOptionsEnvelope.ts": {
@@ -17122,7 +17017,7 @@
       "exports": ["WorkspacePurchaseOptionsTerms"]
     },
     "src/api/generated-query/public/model/workspaceRechargeHistoryItem.ts": {
-      "sha256": "d6422d3759ab11cf93e06e88e4b955ddfc703d98716147db39c0dbdcfa0b83b3",
+      "sha256": "18306aad6af3c1e40540f6f64f34ddbce684362f4e607afde5b545a421c3ef6a",
       "exports": ["WorkspaceRechargeHistoryItem"]
     },
     "src/api/generated-query/public/model/workspaceRechargeHistoryItemStatus.ts": {
@@ -17290,11 +17185,15 @@
       ]
     },
     "src/api/generated-query/public/workspace-billing/workspace-billing.ts": {
-      "sha256": "221f8834d95b6216474f5f200e85e843d6a3ba7eb4136195b9fadffc695167e2",
+      "sha256": "ff6357e69fb88c104a115328203e806929b07731040c724ff98e8b692e96ac80",
       "exports": [
         "AbandonWorkspacePendingOrderMutationError",
         "AbandonWorkspacePendingOrderMutationResult",
         "AbandonWorkspacePendingOrderMutationVariables",
+        "AddWorkspaceBillingAccountMemberMutationBody",
+        "AddWorkspaceBillingAccountMemberMutationError",
+        "AddWorkspaceBillingAccountMemberMutationResult",
+        "AddWorkspaceBillingAccountMemberMutationVariables",
         "ContinueWorkspacePendingOrderMutationError",
         "ContinueWorkspacePendingOrderMutationResult",
         "ContinueWorkspacePendingOrderMutationVariables",
@@ -17316,6 +17215,12 @@
         "GetWorkspacePurchaseOptionsQueryResult",
         "GetWorkspaceUsageQueryError",
         "GetWorkspaceUsageQueryResult",
+        "LinkWorkspaceBillingAccountMutationBody",
+        "LinkWorkspaceBillingAccountMutationError",
+        "LinkWorkspaceBillingAccountMutationResult",
+        "LinkWorkspaceBillingAccountMutationVariables",
+        "ListWorkspaceBillingAccountMembersQueryError",
+        "ListWorkspaceBillingAccountMembersQueryResult",
         "ListWorkspaceBillingRecordsQueryError",
         "ListWorkspaceBillingRecordsQueryResult",
         "ListWorkspaceCreditsLedgerQueryError",
@@ -17324,13 +17229,25 @@
         "ListWorkspacePendingOrdersQueryResult",
         "ListWorkspaceRechargesQueryError",
         "ListWorkspaceRechargesQueryResult",
+        "TransferWorkspaceBillingAccountMutationBody",
+        "TransferWorkspaceBillingAccountMutationError",
+        "TransferWorkspaceBillingAccountMutationResult",
+        "TransferWorkspaceBillingAccountMutationVariables",
+        "UpdateWorkspaceBillingAccountMemberMutationBody",
+        "UpdateWorkspaceBillingAccountMemberMutationError",
+        "UpdateWorkspaceBillingAccountMemberMutationResult",
+        "UpdateWorkspaceBillingAccountMemberMutationVariables",
         "abandonWorkspacePendingOrder",
+        "addWorkspaceBillingAccountMember",
         "continueWorkspacePendingOrder",
         "createWorkspaceBillingQuote",
         "createWorkspaceCheckoutSession",
         "getAbandonWorkspacePendingOrderMutationKey",
         "getAbandonWorkspacePendingOrderMutationOptions",
         "getAbandonWorkspacePendingOrderUrl",
+        "getAddWorkspaceBillingAccountMemberMutationKey",
+        "getAddWorkspaceBillingAccountMemberMutationOptions",
+        "getAddWorkspaceBillingAccountMemberUrl",
         "getContinueWorkspacePendingOrderMutationKey",
         "getContinueWorkspacePendingOrderMutationOptions",
         "getContinueWorkspacePendingOrderUrl",
@@ -17355,6 +17272,12 @@
         "getGetWorkspaceUsageQueryKey",
         "getGetWorkspaceUsageQueryOptions",
         "getGetWorkspaceUsageUrl",
+        "getLinkWorkspaceBillingAccountMutationKey",
+        "getLinkWorkspaceBillingAccountMutationOptions",
+        "getLinkWorkspaceBillingAccountUrl",
+        "getListWorkspaceBillingAccountMembersQueryKey",
+        "getListWorkspaceBillingAccountMembersQueryOptions",
+        "getListWorkspaceBillingAccountMembersUrl",
         "getListWorkspaceBillingRecordsQueryKey",
         "getListWorkspaceBillingRecordsQueryOptions",
         "getListWorkspaceBillingRecordsUrl",
@@ -17367,16 +17290,27 @@
         "getListWorkspaceRechargesQueryKey",
         "getListWorkspaceRechargesQueryOptions",
         "getListWorkspaceRechargesUrl",
+        "getTransferWorkspaceBillingAccountMutationKey",
+        "getTransferWorkspaceBillingAccountMutationOptions",
+        "getTransferWorkspaceBillingAccountUrl",
+        "getUpdateWorkspaceBillingAccountMemberMutationKey",
+        "getUpdateWorkspaceBillingAccountMemberMutationOptions",
+        "getUpdateWorkspaceBillingAccountMemberUrl",
         "getWorkspaceBillingAccount",
         "getWorkspaceCheckoutSession",
         "getWorkspaceCreditsBalance",
         "getWorkspacePurchaseOptions",
         "getWorkspaceUsage",
+        "linkWorkspaceBillingAccount",
+        "listWorkspaceBillingAccountMembers",
         "listWorkspaceBillingRecords",
         "listWorkspaceCreditsLedger",
         "listWorkspacePendingOrders",
         "listWorkspaceRecharges",
+        "transferWorkspaceBillingAccount",
+        "updateWorkspaceBillingAccountMember",
         "useAbandonWorkspacePendingOrder",
+        "useAddWorkspaceBillingAccountMember",
         "useContinueWorkspacePendingOrder",
         "useCreateWorkspaceBillingQuote",
         "useCreateWorkspaceCheckoutSession",
@@ -17385,10 +17319,14 @@
         "useGetWorkspaceCreditsBalance",
         "useGetWorkspacePurchaseOptions",
         "useGetWorkspaceUsage",
+        "useLinkWorkspaceBillingAccount",
+        "useListWorkspaceBillingAccountMembers",
         "useListWorkspaceBillingRecords",
         "useListWorkspaceCreditsLedger",
         "useListWorkspacePendingOrders",
-        "useListWorkspaceRecharges"
+        "useListWorkspaceRecharges",
+        "useTransferWorkspaceBillingAccount",
+        "useUpdateWorkspaceBillingAccountMember"
       ]
     },
     "src/api/generated-query/public/workspace-library/workspace-library.ts": {
@@ -17608,7 +17546,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts": {
-      "sha256": "e1b1c6fa32fb24e6418b1ba9ed36063a94f4998ee82035fa15aa18d13d29ce40",
+      "sha256": "0ddfa0e683c47d3b40090e9a05e4ec760910fe6b6ad0bb80bbc3a3d08ec3c78a",
       "exports": [
         "ListWorkspaceRewardRedemptionsQueryError",
         "ListWorkspaceRewardRedemptionsQueryResult",
@@ -17650,7 +17588,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-tasks/workspace-tasks.ts": {
-      "sha256": "a13e64851988b2964a3880f407414633849044077785aaab16b4efc19ff66222",
+      "sha256": "b04443113540bdf9fd5689bcd1933eda0c5293a98f90552b02546861ef4fb499",
       "exports": [
         "CancelWorkspaceTaskMutationBody",
         "CancelWorkspaceTaskMutationError",

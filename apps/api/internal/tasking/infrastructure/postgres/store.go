@@ -76,6 +76,9 @@ var _ workspacetasks.TxTaskLifecycleStore = (*Store)(nil)
 // Compile-time convergence with the durable submit idempotency claim seam.
 var _ workspacetasks.TxSubmissionClaimStore = (*Store)(nil)
 
+// Compile-time convergence with the stable funds-identity seam.
+var _ workspacetasks.TxBillingAccountResolver = (*Store)(nil)
+
 // workflowInputEnvelope is the tasks.workflow_input JSONB shape. Billing
 // snapshots are quote-time facts (the credits ledger owns settlement
 // truth); execution_token is the durable retry-fencing token; cancel
@@ -182,13 +185,14 @@ func mapTaskRow(workspacePublicID string, row dbsqlc.Task, outputs []workspaceta
 		completed = dbutil.TimePtr(row.CancelledAt)
 	}
 	task := &workspacetasks.WorkspaceTask{
-		ID:              row.PublicID,
-		WorkspaceID:     strings.TrimSpace(workspacePublicID),
-		OwnerUserID:     row.SubmitterUserID,
-		Service:         row.Service,
-		MediaAssetIDs:   append([]string(nil), envelope.MediaAssetIDs...),
-		Params:          envelope.Params,
-		CanonicalParams: envelope.CanonicalParams,
+		ID:               row.PublicID,
+		WorkspaceID:      strings.TrimSpace(workspacePublicID),
+		OwnerUserID:      row.SubmitterUserID,
+		BillingAccountID: row.BillingAccountID,
+		Service:          row.Service,
+		MediaAssetIDs:    append([]string(nil), envelope.MediaAssetIDs...),
+		Params:           envelope.Params,
+		CanonicalParams:  envelope.CanonicalParams,
 		// The pinned submit-time snapshot rides the row untouched: the
 		// worker parses and Verify()s it, every other reader ignores it.
 		RoutingSnapshot:    append([]byte(nil), row.RoutingSnapshot...),
@@ -234,6 +238,22 @@ func resolveBillingAccount(ctx context.Context, q *dbsqlc.Queries, workspaceInte
 		return 0, err
 	}
 	return created.InternalID, nil
+}
+
+// ResolveBillingAccountInTx resolves the stable funds identity inside the
+// caller's settlement transaction (#915 resolution, #916 funds identity).
+// It satisfies workspacetasks.TxBillingAccountResolver so submit-time Holds
+// spend the resolved account instead of an owner wallet.
+func (s *Store) ResolveBillingAccountInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string) (int64, error) {
+	if tx == nil {
+		return 0, fmt.Errorf("tasking postgres: settlement transaction is nil")
+	}
+	q := s.q.WithTx(tx)
+	workspaceInternalID, err := resolveWorkspace(ctx, q, workspacePublicID)
+	if err != nil {
+		return 0, err
+	}
+	return resolveBillingAccount(ctx, q, workspaceInternalID)
 }
 
 // loadOutputs reads ordered output refs for one task row.
@@ -329,15 +349,19 @@ func (s *Store) CreateBillingFactsInTx(ctx context.Context, tx pgx.Tx, task *wor
 		return fmt.Errorf("tasking postgres: billing facts require transaction and task")
 	}
 	snapshot := task.BillingSnapshot
+	snapshotAccountID := snapshot.BillingAccountID
+	if snapshotAccountID <= 0 {
+		snapshotAccountID = task.BillingAccountID
+	}
 	if _, err := tx.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, service, sku, display_name, price_version_id, price_version,
+  task_id, user_id, billing_account_id, workspace_id, service, sku, display_name, price_version_id, price_version,
   output_resolution, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-		task.ID, task.OwnerUserID, task.Service, snapshot.SKU, snapshot.DisplayName,
+) VALUES ($1,$2,$3,(SELECT internal_id FROM workspaces WHERE public_id = $15),$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+		task.ID, task.OwnerUserID, snapshotAccountID, task.Service, snapshot.SKU, snapshot.DisplayName,
 		snapshot.PriceVersionID, snapshot.PriceVersion, snapshot.OutputResolution,
 		snapshot.UnitCredits, snapshot.Quantity, snapshot.TotalCredits, snapshot.QuotedAt,
-		nilIfEmpty(snapshot.HoldTransactionID)); err != nil {
+		nilIfEmpty(snapshot.HoldTransactionID), task.WorkspaceID); err != nil {
 		return fmt.Errorf("insert task billing snapshot: %w", err)
 	}
 	if snapshot.SettlementState != "held" && snapshot.SettlementState != "free" {
@@ -469,9 +493,16 @@ func createTaskWithQueries(ctx context.Context, q *dbsqlc.Queries, task *workspa
 	if err != nil {
 		return nil, err
 	}
-	billingAccountID, err := resolveBillingAccount(ctx, q, workspaceInternalID)
-	if err != nil {
-		return nil, err
+	// The submit path resolves the stable account before the Hold and pins
+	// it on the task; re-resolution here would risk spending a different
+	// account than the Hold. Fall back to resolution only for callers that
+	// did not settle through createInTx.
+	billingAccountID := stored.BillingAccountID
+	if billingAccountID <= 0 {
+		billingAccountID, err = resolveBillingAccount(ctx, q, workspaceInternalID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	row, err := q.CreateWorkspaceTask(ctx, dbsqlc.CreateWorkspaceTaskParams{
 		PublicID:         taskID,

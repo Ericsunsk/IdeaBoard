@@ -65,7 +65,7 @@ func (allowAllPoolStore) ListPoolInTx(_ context.Context, _ pgx.Tx, service strin
 	return allowAllPoolStore{}.ListPool(context.Background(), service)
 }
 
-func (f *fakeHolder) Hold(ctx context.Context, userID int64, amount int64, key, taskID string) (string, error) {
+func (f *fakeHolder) Hold(ctx context.Context, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
 	if f.holdErr != nil {
 		return "", f.holdErr
 	}
@@ -77,12 +77,12 @@ func (f *fakeHolder) Hold(ctx context.Context, userID int64, amount int64, key, 
 	return holdID, nil
 }
 
-func (f *fakeHolder) Capture(ctx context.Context, holdID string, amount int64, taskID string) error {
+func (f *fakeHolder) Capture(ctx context.Context, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) error {
 	f.captured[holdID] = amount
 	return nil
 }
 
-func (f *fakeHolder) Release(ctx context.Context, holdID string, amount int64, taskID string) error {
+func (f *fakeHolder) Release(ctx context.Context, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) error {
 	f.released[holdID] = amount
 	return nil
 }
@@ -90,19 +90,19 @@ func (f *fakeHolder) Release(ctx context.Context, holdID string, amount int64, t
 // HoldInTx/CaptureInTx/ReleaseInTx serve the settlement-transaction seams
 // from the same ledger maps. Rollback fidelity lives in the txTestHolder
 // wrapper (settle_tx_fake_test.go), which regulators of atomicity use.
-func (f *fakeHolder) HoldInTx(ctx context.Context, _ pgx.Tx, userID int64, amount int64, key, taskID string) (string, error) {
-	return f.Hold(ctx, userID, amount, key, taskID)
+func (f *fakeHolder) HoldInTx(ctx context.Context, _ pgx.Tx, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
+	return f.Hold(ctx, billingAccountID, actorUserID, amount, key, taskID)
 }
 
-func (f *fakeHolder) CaptureInTx(ctx context.Context, _ pgx.Tx, _ int64, holdID string, amount int64, taskID string) (string, error) {
-	if err := f.Capture(ctx, holdID, amount, taskID); err != nil {
+func (f *fakeHolder) CaptureInTx(ctx context.Context, _ pgx.Tx, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) (string, error) {
+	if err := f.Capture(ctx, billingAccountID, actorUserID, holdID, amount, taskID); err != nil {
 		return "", err
 	}
 	return "", nil
 }
 
-func (f *fakeHolder) ReleaseInTx(ctx context.Context, _ pgx.Tx, _ int64, holdID string, amount int64, taskID string) (string, error) {
-	if err := f.Release(ctx, holdID, amount, taskID); err != nil {
+func (f *fakeHolder) ReleaseInTx(ctx context.Context, _ pgx.Tx, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) (string, error) {
+	if err := f.Release(ctx, billingAccountID, actorUserID, holdID, amount, taskID); err != nil {
 		return "", err
 	}
 	return "", nil

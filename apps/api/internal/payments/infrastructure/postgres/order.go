@@ -12,6 +12,7 @@ import (
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
+	"ideaboard/api/internal/platform/database"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -21,17 +22,20 @@ import (
 // PaymentOrderFacts carries the order identity and paid facts shared by the
 // refunds and disputes subpackages when they resolve an order by its Stripe
 // charge ID. It lives on the order aggregate (root) because both subpackages
-// load it the same way.
+// load it the same way. BillingAccountID is the fixed payer funds identity
+// (#920): refund/dispute settlement converges on this row-inline account,
+// never re-deriving from the operator.
 type PaymentOrderFacts struct {
-	ID           string
-	PublicNumber string
-	UserID       int64
-	Status       paymentsdomain.PaymentOrderStatus
-	IdeaQuantity int64
-	PaidSubtotal int64
-	PaidTotal    int64
-	PaidCurrency string
-	PaidAt       time.Time
+	ID               string
+	PublicNumber     string
+	UserID           int64
+	BillingAccountID int64
+	Status           paymentsdomain.PaymentOrderStatus
+	IdeaQuantity     int64
+	PaidSubtotal     int64
+	PaidTotal        int64
+	PaidCurrency     string
+	PaidAt           time.Time
 }
 
 // LoadPaymentOrderFactsForCharge locks the order behind a Stripe charge so
@@ -39,12 +43,14 @@ type PaymentOrderFacts struct {
 func LoadPaymentOrderFactsForCharge(ctx context.Context, q Queryer, chargeID string) (PaymentOrderFacts, error) {
 	var order PaymentOrderFacts
 	var paidAt pgtype.Timestamptz
-	err := q.QueryRow(ctx, `SELECT id::text, public_order_number, user_id, status, idea_quantity, paid_subtotal_minor, paid_total_minor, paid_currency, paid_at FROM payment_orders WHERE stripe_charge_id = $1 FOR UPDATE`, chargeID).Scan(
-		&order.ID, &order.PublicNumber, &order.UserID, &order.Status, &order.IdeaQuantity, &order.PaidSubtotal, &order.PaidTotal, &order.PaidCurrency, &paidAt,
+	var billingAccountID pgtype.Int8
+	err := q.QueryRow(ctx, `SELECT id::text, public_order_number, user_id, billing_account_id, status, idea_quantity, paid_subtotal_minor, paid_total_minor, paid_currency, paid_at FROM payment_orders WHERE stripe_charge_id = $1 FOR UPDATE`, chargeID).Scan(
+		&order.ID, &order.PublicNumber, &order.UserID, &billingAccountID, &order.Status, &order.IdeaQuantity, &order.PaidSubtotal, &order.PaidTotal, &order.PaidCurrency, &paidAt,
 	)
 	if err != nil {
 		return PaymentOrderFacts{}, err
 	}
+	order.BillingAccountID = pgBillingAccountID(billingAccountID)
 	if paidAt.Valid {
 		order.PaidAt = paidAt.Time
 	}
@@ -52,10 +58,16 @@ func LoadPaymentOrderFactsForCharge(ctx context.Context, q Queryer, chargeID str
 }
 
 // CreatePaymentOrderIntent persists an idempotent checkout intent while
-// serializing concurrent requests for the same user/client key.
+// serializing concurrent requests for the same payer account/client key.
+// The durable replay scope is the payer Billing Account (#919): same key +
+// same hash replays, same key + different hash conflicts, and cross-account
+// key reuse never replays another account's order.
 func (r *Repository) CreatePaymentOrderIntent(ctx context.Context, input paymentsdomain.CreatePaymentOrderIntentInput) (paymentsdomain.PaymentOrder, bool, error) {
 	if r == nil || r.db == nil {
 		return paymentsdomain.PaymentOrder{}, false, fmt.Errorf("payments repository: database unavailable")
+	}
+	if input.BillingAccountID <= 0 || input.UserID <= 0 {
+		return paymentsdomain.PaymentOrder{}, false, paymentsdomain.ErrCheckoutIdempotencyKey
 	}
 	id, err := uuid.Parse(input.ID)
 	if err != nil {
@@ -72,12 +84,12 @@ func (r *Repository) CreatePaymentOrderIntent(ctx context.Context, input payment
 	var order paymentsdomain.PaymentOrder
 	var reused bool
 	err = r.DBWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx pgx.Tx) error {
-		lockKey := fmt.Sprintf("%d:%s", input.UserID, input.ClientIdempotencyKey)
+		lockKey := fmt.Sprintf("%d:%s", input.BillingAccountID, input.ClientIdempotencyKey)
 		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 8188403870220423781))`, lockKey); err != nil {
 			return fmt.Errorf("lock payment order idempotency: %w", err)
 		}
-		existing, err := q.GetPaymentOrderByIdempotency(ctx, dbsqlc.GetPaymentOrderByIdempotencyParams{
-			UserID: input.UserID, ClientIdempotencyKey: input.ClientIdempotencyKey,
+		existing, err := q.GetPaymentOrderByAccountIdempotency(ctx, dbsqlc.GetPaymentOrderByAccountIdempotencyParams{
+			BillingAccountID: pgtype.Int8{Int64: input.BillingAccountID, Valid: true}, ClientIdempotencyKey: input.ClientIdempotencyKey,
 		})
 		if err == nil {
 			if existing.RequestHash != input.RequestHash {
@@ -91,7 +103,8 @@ func (r *Repository) CreatePaymentOrderIntent(ctx context.Context, input payment
 		}
 		created, err := q.InsertPaymentOrderIntent(ctx, dbsqlc.InsertPaymentOrderIntentParams{
 			ID: pgUUIDToPgType(id), PublicOrderNumber: input.PublicOrderNumber, PublicToken: pgUUIDToPgType(publicToken),
-			UserID: input.UserID, ClientIdempotencyKey: input.ClientIdempotencyKey, RequestHash: input.RequestHash,
+			UserID: input.UserID, BillingAccountID: pgtype.Int8{Int64: input.BillingAccountID, Valid: true},
+			ClientIdempotencyKey: input.ClientIdempotencyKey, RequestHash: input.RequestHash,
 			StripeCredentialID: pgUUIDToPgType(stripeCredentialID), StripeAccountID: input.StripeAccountID, StripeProductID: input.StripeProductID,
 			IdeaQuantity: input.IdeaQuantity, TermsVersion: input.TermsVersion,
 			RefundPolicyVersion: input.RefundPolicyVersion, ReturnBaseUrl: input.ReturnBaseURL, ExpiresAt: dbutil.TimestamptzFromTime(input.ExpiresAt),
@@ -99,6 +112,11 @@ func (r *Repository) CreatePaymentOrderIntent(ctx context.Context, input payment
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return paymentsdomain.ErrPurchasesUnavailable
+			}
+			if database.IsDuplicateConstraintError(err) {
+				// A uniqueness race must not replay an unrelated order.
+				// Durable replay is resolved above within the payer scope.
+				return paymentsdomain.ErrCheckoutIdempotencyConflict
 			}
 			return fmt.Errorf("insert payment order intent: %w", err)
 		}
@@ -112,15 +130,20 @@ func (r *Repository) UpsertPaymentCustomer(ctx context.Context, customer payment
 	if r == nil || r.db == nil {
 		return paymentcheckout.PaymentCustomer{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	row, err := r.DBWithContext(ctx).Queries().UpsertPaymentCustomer(ctx, dbsqlc.UpsertPaymentCustomerParams{
-		UserID: customer.UserID, StripeAccountID: customer.StripeAccountID,
-		StripeMode: string(customer.StripeMode), StripeCustomerID: customer.StripeCustomerID,
+	if customer.BillingAccountID <= 0 {
+		return paymentcheckout.PaymentCustomer{}, fmt.Errorf("payments repository: invalid payer Billing Account")
+	}
+	row, err := r.DBWithContext(ctx).Queries().UpsertPaymentCustomerByAccount(ctx, dbsqlc.UpsertPaymentCustomerByAccountParams{
+		UserID: customer.UserID, BillingAccountID: customer.BillingAccountID,
+		StripeAccountID: customer.StripeAccountID,
+		StripeMode:      string(customer.StripeMode), StripeCustomerID: customer.StripeCustomerID,
 	})
 	if err != nil {
 		return paymentcheckout.PaymentCustomer{}, fmt.Errorf("upsert payment customer: %w", err)
 	}
 	return paymentcheckout.PaymentCustomer{
-		UserID: row.UserID, StripeAccountID: row.StripeAccountID, StripeMode: paymentports.StripeMode(row.StripeMode), StripeCustomerID: row.StripeCustomerID,
+		UserID: row.UserID, BillingAccountID: row.BillingAccountID,
+		StripeAccountID: row.StripeAccountID, StripeMode: paymentports.StripeMode(row.StripeMode), StripeCustomerID: row.StripeCustomerID,
 		CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt),
 	}, nil
 }
@@ -211,13 +234,13 @@ func (r *Repository) MarkPaymentOrderExpired(ctx context.Context, orderID string
 	return PaymentOrder(existing), false, nil
 }
 
-func (r *Repository) MarkPaymentOrderCancelled(ctx context.Context, userID int64, orderID string) (paymentsdomain.PaymentOrder, bool, error) {
+func (r *Repository) MarkPaymentOrderCancelled(ctx context.Context, billingAccountID int64, orderID string) (paymentsdomain.PaymentOrder, bool, error) {
 	id, err := uuid.Parse(orderID)
 	if err != nil {
 		return paymentsdomain.PaymentOrder{}, false, paymentcontracts.ErrPaymentOrderNotFound
 	}
 	queries := r.DBWithContext(ctx).Queries()
-	row, err := queries.MarkPaymentOrderCancelled(ctx, dbsqlc.MarkPaymentOrderCancelledParams{ID: pgUUIDToPgType(id), UserID: userID})
+	row, err := queries.MarkPaymentOrderCancelledByAccount(ctx, dbsqlc.MarkPaymentOrderCancelledByAccountParams{ID: pgUUIDToPgType(id), BillingAccountID: pgtype.Int8{Int64: billingAccountID, Valid: true}})
 	if err == nil {
 		return PaymentOrder(row), true, nil
 	}
@@ -225,7 +248,7 @@ func (r *Repository) MarkPaymentOrderCancelled(ctx context.Context, userID int64
 		return paymentsdomain.PaymentOrder{}, false, fmt.Errorf("mark payment order cancelled: %w", err)
 	}
 	existing, err := queries.GetPaymentOrderByIDForUpdate(ctx, pgUUIDToPgType(id))
-	if err != nil || existing.UserID != userID {
+	if err != nil || pgBillingAccountID(existing.BillingAccountID) != billingAccountID {
 		return paymentsdomain.PaymentOrder{}, false, paymentcontracts.ErrPaymentOrderNotFound
 	}
 	return PaymentOrder(existing), false, nil

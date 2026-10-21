@@ -1,0 +1,107 @@
+// Vision workspace settlement identity (#918).
+//
+// A Vision Search call bills the consuming Workspace's stable Billing
+// Account (#915 resolution: explicit workspace_billing_links, else the
+// Organization pool, else the per-workspace account; fail closed), never
+// the operator's personal wallet. The operation row persists the
+// settlement triple: submitter (user_id, the real initiator, also the
+// Actor on every Command), consumption location (workspace_id), and payer
+// (billing_account_id). Hold/Capture/Release and background reconciliation
+// converge on the stored payer; they never re-resolve from the live Owner
+// or membership, so an owner handover or member departure mid-flight
+// cannot move the money.
+//
+// Future consumption limits (945/946 budgets/quotas) join this same
+// settlement transaction: the resolver runs inside the caller's tx before
+// Quote/Hold, so a limit check added here would fence the Hold atomically
+// with the operation insert. This file implements no limit math, only the
+// boundary.
+
+package application
+
+import (
+	"context"
+	"strings"
+
+	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/contract"
+	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// VisionSettlementIdentity is the resolved settlement triple for one
+// vision call inside the caller's transaction.
+type VisionSettlementIdentity struct {
+	// WorkspaceInternalID is the consumption location (workspaces.internal_id).
+	WorkspaceInternalID int64
+	// BillingAccountID is the stable payer (billing_accounts.internal_id).
+	BillingAccountID int64
+}
+
+// VisionBillingAccountResolver resolves the settlement triple inside the
+// caller's transaction and fails closed on ambiguity or conflict. The
+// production implementation below owns the #915 chain; tests inject a
+// fake. Resolution never falls back to a personal wallet: scopeless
+// callers do not exist on this path (every vision call names its
+// consuming workspace).
+type VisionBillingAccountResolver interface {
+	ResolveVisionSettlementInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string, actorUserID int64) (VisionSettlementIdentity, error)
+	// ResolveWorkspaceInternalID maps a ws_ public id to its internal id
+	// without any membership gate. Capture/Release use it only to verify
+	// the stored resource scope; post-Hold membership changes never gate
+	// settlement.
+	ResolveWorkspaceInternalID(ctx context.Context, tx pgx.Tx, workspacePublicID string) (int64, error)
+}
+
+// visionBillingAccountResolver is the production #915 chain over the
+// caller's transaction: workspace visibility + membership gate, then the
+// stable account resolution. Hidden workspaces and non-members converge
+// to ErrVisionWorkspaceNotFound (never a distinct billing status), per
+// anti-enumeration; billing ambiguity/conflict propagates fail-closed.
+type visionBillingAccountResolver struct{}
+
+func (visionBillingAccountResolver) ResolveVisionSettlementInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string, actorUserID int64) (VisionSettlementIdentity, error) {
+	workspacePublicID = strings.TrimSpace(workspacePublicID)
+	if tx == nil || actorUserID <= 0 || !contract.IsWorkspaceID(workspacePublicID) {
+		return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
+	}
+	queries := dbsqlc.New(tx)
+	workspace, err := queries.GetWorkspaceByPublicID(ctx, workspacePublicID)
+	if err != nil {
+		return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
+	}
+	if _, err := queries.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
+		WorkspaceID: workspace.InternalID, UserID: actorUserID,
+	}); err != nil {
+		return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
+	}
+	account, err := tenancypg.EnsureBillingAccountForWorkspaceWithQueries(ctx, queries, workspace.InternalID)
+	if err != nil {
+		return VisionSettlementIdentity{}, err
+	}
+	if account.InternalID <= 0 {
+		return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
+	}
+	return VisionSettlementIdentity{
+		WorkspaceInternalID: workspace.InternalID,
+		BillingAccountID:    account.InternalID,
+	}, nil
+}
+
+// ResolveWorkspaceInternalID maps a ws_ public id to its internal id
+// without any membership gate (capture/release scope verification only).
+func (visionBillingAccountResolver) ResolveWorkspaceInternalID(ctx context.Context, tx pgx.Tx, workspacePublicID string) (int64, error) {
+	workspacePublicID = strings.TrimSpace(workspacePublicID)
+	if tx == nil || !contract.IsWorkspaceID(workspacePublicID) {
+		return 0, ErrVisionWorkspaceNotFound
+	}
+	workspace, err := dbsqlc.New(tx).GetWorkspaceByPublicID(ctx, workspacePublicID)
+	if err != nil {
+		return 0, ErrVisionWorkspaceNotFound
+	}
+	if workspace.InternalID <= 0 {
+		return 0, ErrVisionWorkspaceNotFound
+	}
+	return workspace.InternalID, nil
+}

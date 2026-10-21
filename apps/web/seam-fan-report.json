@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "cee34313f4c845dc6ba99a7a3a623207f5fd3c35",
+  "checkpointSha": "eaaa646ecac33aa276f6c94b214a243aeb99ee1f",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -355,9 +355,14 @@
           "from": "src/features/admin/credits/session/pricing/modelPoolResource.ts",
           "to": "src/api/generated-query/control/control-billing/control-billing.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/shared/api.ts",
+          "to": "src/api/generated-query/control/control-billing/control-billing.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 3,
+      "fanIn": 4,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -401,7 +406,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 3,
+      "targetFanIn": 4,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -1181,7 +1186,7 @@
         }
       ],
       "fanIn": 18,
-      "fanOut": 157,
+      "fanOut": 173,
       "fanOutTargets": [
         "src/api/generated-query/control/model/auditRecord.ts",
         "src/api/generated-query/control/model/auditRecordOperator.ts",
@@ -1199,6 +1204,15 @@
         "src/api/generated-query/control/model/controlBanRequest.ts",
         "src/api/generated-query/control/model/controlBeforeIdParameter.ts",
         "src/api/generated-query/control/model/controlBillingAccount.ts",
+        "src/api/generated-query/control/model/controlBillingAccountDetail.ts",
+        "src/api/generated-query/control/model/controlBillingAccountDetailEnvelope.ts",
+        "src/api/generated-query/control/model/controlBillingAccountDetailOwnerType.ts",
+        "src/api/generated-query/control/model/controlBillingAccountMember.ts",
+        "src/api/generated-query/control/model/controlBillingAccountMemberRole.ts",
+        "src/api/generated-query/control/model/controlBillingAccountOwnerType.ts",
+        "src/api/generated-query/control/model/controlBillingAccountWalletSummary.ts",
+        "src/api/generated-query/control/model/controlBillingAccountWalletSummaryStatus.ts",
+        "src/api/generated-query/control/model/controlBillingOwnerScopeParameter.ts",
         "src/api/generated-query/control/model/controlBrandLogoOverride.ts",
         "src/api/generated-query/control/model/controlBrandLogoOverrideList.ts",
         "src/api/generated-query/control/model/controlBrandLogoOverrideScope.ts",
@@ -1215,6 +1229,7 @@
         "src/api/generated-query/control/model/controlCreditResultEnvelope.ts",
         "src/api/generated-query/control/model/controlCreditWallet.ts",
         "src/api/generated-query/control/model/controlCreditWalletEnvelope.ts",
+        "src/api/generated-query/control/model/controlCreditWalletOwnerType.ts",
         "src/api/generated-query/control/model/controlCreditWalletStatus.ts",
         "src/api/generated-query/control/model/controlDeletedRewardCode.ts",
         "src/api/generated-query/control/model/controlErrorEnvelope.ts",
@@ -1226,6 +1241,7 @@
         "src/api/generated-query/control/model/controlLedgerTransactionBusinessReference.ts",
         "src/api/generated-query/control/model/controlLedgerTransactionCharge.ts",
         "src/api/generated-query/control/model/controlLimitParameter.ts",
+        "src/api/generated-query/control/model/controlLinkedWorkspace.ts",
         "src/api/generated-query/control/model/controlMailConfig.ts",
         "src/api/generated-query/control/model/controlMailConfigEnvelope.ts",
         "src/api/generated-query/control/model/controlMailConfigReadiness.ts",
@@ -1247,9 +1263,11 @@
         "src/api/generated-query/control/model/controlPaymentRefundRequest.ts",
         "src/api/generated-query/control/model/controlPublishPricesRequest.ts",
         "src/api/generated-query/control/model/controlPublishPricesRequestPrices.ts",
+        "src/api/generated-query/control/model/controlReleaseWalletRestrictionRequest.ts",
         "src/api/generated-query/control/model/controlReplaceModelPoolEnvelope.ts",
         "src/api/generated-query/control/model/controlReplaceModelPoolEnvelopeData.ts",
         "src/api/generated-query/control/model/controlReplaceModelPoolRequest.ts",
+        "src/api/generated-query/control/model/controlRestrictWalletRequest.ts",
         "src/api/generated-query/control/model/controlRewardCode.ts",
         "src/api/generated-query/control/model/controlRewardCodeCreateRequest.ts",
         "src/api/generated-query/control/model/controlRewardCodeEnabledRequest.ts",
@@ -1285,6 +1303,8 @@
         "src/api/generated-query/control/model/controlWalletRestriction.ts",
         "src/api/generated-query/control/model/controlWalletRestrictionCreatedBy.ts",
         "src/api/generated-query/control/model/controlWalletRestrictionRelatedObject.ts",
+        "src/api/generated-query/control/model/controlWalletRestrictionResult.ts",
+        "src/api/generated-query/control/model/controlWalletRestrictionResultEnvelope.ts",
         "src/api/generated-query/control/model/controlWorkspace.ts",
         "src/api/generated-query/control/model/controlWorkspaceEnvelope.ts",
         "src/api/generated-query/control/model/controlWorkspaceMember.ts",
@@ -1303,6 +1323,7 @@
         "src/api/generated-query/control/model/getControlStatisticsParams.ts",
         "src/api/generated-query/control/model/idempotencyConflictResponse.ts",
         "src/api/generated-query/control/model/idempotencyKeyParameter.ts",
+        "src/api/generated-query/control/model/listControlBillingAccountLedgerParams.ts",
         "src/api/generated-query/control/model/listControlBillingAccountsParams.ts",
         "src/api/generated-query/control/model/listControlCreditLedgerParams.ts",
         "src/api/generated-query/control/model/listControlPaymentOrdersParams.ts",
@@ -1424,6 +1445,51 @@
         },
         {
           "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlBillingAccountDetail.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlBillingAccountDetailEnvelope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlBillingAccountDetailOwnerType.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlBillingAccountMember.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlBillingAccountMemberRole.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlBillingAccountOwnerType.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlBillingAccountWalletSummary.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlBillingAccountWalletSummaryStatus.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlBillingOwnerScopeParameter.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
           "to": "src/api/generated-query/control/model/controlBrandLogoOverride.ts",
           "kind": "runtime"
         },
@@ -1504,6 +1570,11 @@
         },
         {
           "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlCreditWalletOwnerType.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
           "to": "src/api/generated-query/control/model/controlCreditWalletStatus.ts",
           "kind": "runtime"
         },
@@ -1555,6 +1626,11 @@
         {
           "from": "src/api/generated-query/control/model/index.ts",
           "to": "src/api/generated-query/control/model/controlLimitParameter.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlLinkedWorkspace.ts",
           "kind": "runtime"
         },
         {
@@ -1664,6 +1740,11 @@
         },
         {
           "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlReleaseWalletRestrictionRequest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
           "to": "src/api/generated-query/control/model/controlReplaceModelPoolEnvelope.ts",
           "kind": "runtime"
         },
@@ -1675,6 +1756,11 @@
         {
           "from": "src/api/generated-query/control/model/index.ts",
           "to": "src/api/generated-query/control/model/controlReplaceModelPoolRequest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlRestrictWalletRequest.ts",
           "kind": "runtime"
         },
         {
@@ -1854,6 +1940,16 @@
         },
         {
           "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlWalletRestrictionResult.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/controlWalletRestrictionResultEnvelope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
           "to": "src/api/generated-query/control/model/controlWorkspace.ts",
           "kind": "runtime"
         },
@@ -1940,6 +2036,11 @@
         {
           "from": "src/api/generated-query/control/model/index.ts",
           "to": "src/api/generated-query/control/model/idempotencyKeyParameter.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/control/model/index.ts",
+          "to": "src/api/generated-query/control/model/listControlBillingAccountLedgerParams.ts",
           "kind": "runtime"
         },
         {
@@ -2133,7 +2234,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 18,
-      "targetFanOut": 157,
+      "targetFanOut": 173,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -2598,6 +2699,16 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/account/session/billing-account/resource.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/session/billing-account/resource.unit.spec.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/account/session/billing/resource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
@@ -2633,10 +2744,14 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 20,
-      "fanOut": 255,
+      "fanIn": 22,
+      "fanOut": 273,
       "fanOutTargets": [
         "src/api/generated-query/public/model/accessIfMatchParameter.ts",
+        "src/api/generated-query/public/model/addBillingAccountMemberRequest.ts",
+        "src/api/generated-query/public/model/addBillingAccountMemberRequestData.ts",
+        "src/api/generated-query/public/model/addBillingAccountMemberRequestDataRole.ts",
+        "src/api/generated-query/public/model/addWorkspaceBillingAccountMember201.ts",
         "src/api/generated-query/public/model/addWorkspaceMemberRequest.ts",
         "src/api/generated-query/public/model/addWorkspaceMemberRequestData.ts",
         "src/api/generated-query/public/model/avatarUploadResult.ts",
@@ -2646,6 +2761,8 @@
         "src/api/generated-query/public/model/batchGetMediaAssetsRequestData.ts",
         "src/api/generated-query/public/model/batchGetMediaAssetsResult.ts",
         "src/api/generated-query/public/model/batchGetMediaAssetsResultEnvelope.ts",
+        "src/api/generated-query/public/model/billingAccountMember.ts",
+        "src/api/generated-query/public/model/billingAccountMemberRole.ts",
         "src/api/generated-query/public/model/billingRecord.ts",
         "src/api/generated-query/public/model/billingRecordKind.ts",
         "src/api/generated-query/public/model/board.ts",
@@ -2724,9 +2841,12 @@
         "src/api/generated-query/public/model/libraryFolder.ts",
         "src/api/generated-query/public/model/libraryFolderEnvelope.ts",
         "src/api/generated-query/public/model/libraryFolderId.ts",
+        "src/api/generated-query/public/model/linkWorkspaceBillingAccountRequest.ts",
+        "src/api/generated-query/public/model/linkWorkspaceBillingAccountRequestData.ts",
         "src/api/generated-query/public/model/listBoardRevisionsParams.ts",
         "src/api/generated-query/public/model/listBoardsParams.ts",
         "src/api/generated-query/public/model/listOrganizationsParams.ts",
+        "src/api/generated-query/public/model/listWorkspaceBillingAccountMembers200.ts",
         "src/api/generated-query/public/model/listWorkspaceBillingRecordsParams.ts",
         "src/api/generated-query/public/model/listWorkspaceCreditsLedgerParams.ts",
         "src/api/generated-query/public/model/listWorkspaceLibraryAssetsParams.ts",
@@ -2820,8 +2940,15 @@
         "src/api/generated-query/public/model/taskOutputRef.ts",
         "src/api/generated-query/public/model/taskSettlementState.ts",
         "src/api/generated-query/public/model/taskStatus.ts",
+        "src/api/generated-query/public/model/transferBillingAccountRequest.ts",
+        "src/api/generated-query/public/model/transferBillingAccountRequestData.ts",
+        "src/api/generated-query/public/model/transferWorkspaceBillingAccount200.ts",
+        "src/api/generated-query/public/model/transferWorkspaceBillingAccount200Data.ts",
         "src/api/generated-query/public/model/unauthorizedResponse.ts",
         "src/api/generated-query/public/model/unprocessableEntityResponse.ts",
+        "src/api/generated-query/public/model/updateBillingAccountMemberRequest.ts",
+        "src/api/generated-query/public/model/updateBillingAccountMemberRequestData.ts",
+        "src/api/generated-query/public/model/updateBillingAccountMemberRequestDataRole.ts",
         "src/api/generated-query/public/model/updateBoardAccessRequest.ts",
         "src/api/generated-query/public/model/updateBoardAccessRequestData.ts",
         "src/api/generated-query/public/model/updateBoardRequest.ts",
@@ -2830,6 +2957,7 @@
         "src/api/generated-query/public/model/updateOrganizationRequestData.ts",
         "src/api/generated-query/public/model/updateUserRequest.ts",
         "src/api/generated-query/public/model/updateUserRequestData.ts",
+        "src/api/generated-query/public/model/updateWorkspaceBillingAccountMember200.ts",
         "src/api/generated-query/public/model/updateWorkspaceMemberRequest.ts",
         "src/api/generated-query/public/model/updateWorkspaceMemberRequestData.ts",
         "src/api/generated-query/public/model/updateWorkspaceRequest.ts",
@@ -2849,6 +2977,7 @@
         "src/api/generated-query/public/model/workspace.ts",
         "src/api/generated-query/public/model/workspaceAccess.ts",
         "src/api/generated-query/public/model/workspaceBillingAccount.ts",
+        "src/api/generated-query/public/model/workspaceBillingAccountConsumptionScope.ts",
         "src/api/generated-query/public/model/workspaceBillingAccountEnvelope.ts",
         "src/api/generated-query/public/model/workspaceBillingAccountOwnerType.ts",
         "src/api/generated-query/public/model/workspaceBillingQuote.ts",
@@ -2900,6 +3029,26 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/addBillingAccountMemberRequest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/addBillingAccountMemberRequestData.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/addBillingAccountMemberRequestDataRole.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/addWorkspaceBillingAccountMember201.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/addWorkspaceMemberRequest.ts",
           "kind": "runtime"
         },
@@ -2941,6 +3090,16 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/batchGetMediaAssetsResultEnvelope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/billingAccountMember.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/billingAccountMemberRole.ts",
           "kind": "runtime"
         },
         {
@@ -3335,6 +3494,16 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/linkWorkspaceBillingAccountRequest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/linkWorkspaceBillingAccountRequestData.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/listBoardRevisionsParams.ts",
           "kind": "runtime"
         },
@@ -3346,6 +3515,11 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/listOrganizationsParams.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/listWorkspaceBillingAccountMembers200.ts",
           "kind": "runtime"
         },
         {
@@ -3815,12 +3989,47 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/transferBillingAccountRequest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/transferBillingAccountRequestData.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/transferWorkspaceBillingAccount200.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/transferWorkspaceBillingAccount200Data.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/unauthorizedResponse.ts",
           "kind": "runtime"
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/unprocessableEntityResponse.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/updateBillingAccountMemberRequest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/updateBillingAccountMemberRequestData.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/updateBillingAccountMemberRequestDataRole.ts",
           "kind": "runtime"
         },
         {
@@ -3861,6 +4070,11 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/updateUserRequestData.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/updateWorkspaceBillingAccountMember200.ts",
           "kind": "runtime"
         },
         {
@@ -3956,6 +4170,11 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/workspaceBillingAccount.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/workspaceBillingAccountConsumptionScope.ts",
           "kind": "runtime"
         },
         {
@@ -4173,8 +4392,8 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 20,
-      "targetFanOut": 255,
+      "targetFanIn": 22,
+      "targetFanOut": 273,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -4282,6 +4501,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/billing-account/resource.ts",
+          "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/billing/resource.ts",
           "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
@@ -4307,7 +4531,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 6,
+      "fanIn": 7,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -4351,7 +4575,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -5101,6 +5325,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/credits/session/accounts/resource.ts",
+          "to": "src/api/stripUndefined.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/session/health/findingQueueResource.ts",
           "to": "src/api/stripUndefined.ts",
           "kind": "runtime"
@@ -5146,7 +5375,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 11,
+      "fanIn": 12,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -5154,7 +5383,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 11,
+      "targetFanIn": 12,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -7836,6 +8065,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/credits/ui/accounts/AdminBillingAccountsPage.vue",
+          "to": "src/core/components/ActionButton.vue",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/ui/health/AdminCreditFindingQueue.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
@@ -7902,6 +8136,11 @@
         },
         {
           "from": "src/features/admin/credits/ui/wallets/components/WalletOverviewCard.vue",
+          "to": "src/core/components/ActionButton.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/wallets/components/WalletRestrictionPanel.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
         },
@@ -7986,7 +8225,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 31,
+      "fanIn": 33,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/clsx/dist/clsx.js",
@@ -8020,7 +8259,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 31,
+      "targetFanIn": 33,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -9541,6 +9780,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/credits/session/accounts/resource.ts",
+          "to": "src/core/config/pagination.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/session/health/findingQueueResource.ts",
           "to": "src/core/config/pagination.ts",
           "kind": "runtime"
@@ -9591,7 +9835,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 15,
+      "fanIn": 16,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -9599,7 +9843,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 15,
+      "targetFanIn": 16,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -10637,6 +10881,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/billing-account/resource.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/billing/resource.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -10648,11 +10897,6 @@
         },
         {
           "from": "src/features/account/session/credits/resource.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/credits/useCreditWallet.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -10747,6 +10991,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/credits/ui/accounts/AdminBillingAccountsPage.component.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -10758,6 +11007,11 @@
         },
         {
           "from": "src/features/admin/credits/ui/wallets/AdminUserWalletDialog.component.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/wallets/components/WalletRestrictionPanel.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -11283,7 +11537,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 141,
+      "fanIn": 143,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
@@ -11353,7 +11607,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 141,
+      "targetFanIn": 143,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -11812,6 +12066,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/credits/ui/accounts/AdminBillingAccountsPage.component.spec.ts",
+          "to": "src/core/i18n/userLocale.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/ui/rewards/AdminRewardCodesPage.component.spec.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
@@ -11823,6 +12082,11 @@
         },
         {
           "from": "src/features/admin/credits/ui/wallets/AdminUserWalletDialog.component.spec.ts",
+          "to": "src/core/i18n/userLocale.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/wallets/components/WalletRestrictionPanel.component.spec.ts",
           "to": "src/core/i18n/userLocale.ts",
           "kind": "runtime"
         },
@@ -11852,7 +12116,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 17,
+      "fanIn": 19,
       "fanOut": 6,
       "fanOutTargets": [
         "src/core/composables/useAppToast.ts",
@@ -11898,7 +12162,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 17,
+      "targetFanIn": 19,
       "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -12909,6 +13173,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/billing-account/useBillingAccount.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/billing/useBillingRecords.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
@@ -12930,6 +13199,11 @@
         },
         {
           "from": "src/features/account/session/usage/useUsage.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/accounts/resource.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -12999,7 +13273,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 20,
+      "fanIn": 22,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -13007,7 +13281,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 20,
+      "targetFanIn": 22,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13111,6 +13385,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/credits/session/wallets/resource.unit.spec.ts",
+          "to": "src/core/query/userCreditsInvalidation.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskWaiting.ts",
           "to": "src/core/query/userCreditsInvalidation.ts",
           "kind": "runtime"
@@ -13121,7 +13400,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 6,
+      "fanIn": 7,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -13129,7 +13408,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13761,6 +14040,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/credits/ui/wallets/AdminUserWalletDialog.vue",
+          "to": "src/core/utils/ids.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/board/session/catalog/boards.ts",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
@@ -13801,7 +14085,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 12,
+      "fanIn": 13,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -13809,7 +14093,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 12,
+      "targetFanIn": 13,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -14400,6 +14684,76 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/account/session/billing-account/resource.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/session/billing-account/resource.ts",
+          "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/billing-account/resource.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/billing-account/resource.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/billing-account/resource.unit.spec.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/session/billing-account/useBillingAccount.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/billing-account/useBillingAccount.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/billing-account/useBillingAccount.ts",
+          "to": "src/core/query/queryDefaults.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/billing-account/useBillingAccount.ts",
+          "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/billing-account/useBillingAccount.unit.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/billing-account/useBillingAccount.unit.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/billing-account/useBillingAccount.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/billing-account/useBillingAccount.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/billing-account/useBillingAccount.unit.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/billing/resource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
@@ -14556,12 +14910,17 @@
         },
         {
           "from": "src/features/account/session/credits/useCreditWallet.ts",
-          "to": "src/core/i18n/index.ts",
+          "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/session/credits/useCreditWallet.ts",
-          "to": "src/core/query/queryDefaults.ts",
+          "from": "src/features/account/session/credits/useCreditWallet.unit.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/credits/useCreditWallet.unit.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
           "kind": "runtime"
         },
         {
@@ -14572,6 +14931,11 @@
         {
           "from": "src/features/account/session/credits/useCreditWallet.unit.spec.ts",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/credits/useCreditWallet.unit.spec.ts",
+          "to": "src/test/render.ts",
           "kind": "runtime"
         },
         {
@@ -17508,6 +17872,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/credits/ui/accounts/AdminBillingAccountsPage.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/ui/health/AdminCreditFindingQueue.vue",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -17634,6 +18003,11 @@
         },
         {
           "from": "src/features/admin/credits/ui/wallets/components/WalletOverviewCard.vue",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/ui/wallets/components/WalletRestrictionPanel.vue",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
         },
@@ -18093,7 +18467,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 121,
+      "fanIn": 123,
       "fanOut": 53,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -19381,7 +19755,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 121,
+      "targetFanIn": 123,
       "targetFanOut": 53,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -22480,6 +22854,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/billing-account/useBillingAccount.ts",
+          "to": "src/features/auth/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/profile/useAvatarUpload.ts",
           "to": "src/features/auth/index.ts",
           "kind": "runtime"
@@ -22645,7 +23024,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 37,
+      "fanIn": 38,
       "fanOut": 46,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -23381,7 +23760,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 37,
+      "targetFanIn": 38,
       "targetFanOut": 46,
       "advisories": {
         "fanInTargetMismatch": false,

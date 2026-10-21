@@ -44,6 +44,10 @@ export type RewardRedeemResult = {
   history_item: RewardRedemptionHistoryItem
   credited_amount: number
   available_balance: number
+  // Beneficiary stable funds identity (ba_): the caller's initial
+  // personal Billing Account. The requesting workspace is authZ scope
+  // only and never changes the beneficiary (#921).
+  billing_account_id: string
   replayed: boolean
 }
 
@@ -79,6 +83,7 @@ export async function redeemRewardCode(
     history_item: result.history_item,
     credited_amount: result.credited_amount,
     available_balance: result.available_balance,
+    billing_account_id: result.billing_account_id,
     replayed: result.replayed === true,
   }
 }

@@ -28,6 +28,7 @@ import (
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/tenancy"
+	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,18 +39,18 @@ const (
 )
 
 type fakeGapPurchaseOptions struct {
-	mu      sync.Mutex
-	options paymentcontracts.PurchaseOptions
-	err     error
-	calls   int
-	lastUID int64
+	mu          sync.Mutex
+	options     paymentcontracts.PurchaseOptions
+	err         error
+	calls       int
+	lastAccount int64
 }
 
-func (f *fakeGapPurchaseOptions) GetPurchaseOptions(ctx context.Context, userID int64) (paymentcontracts.PurchaseOptions, error) {
+func (f *fakeGapPurchaseOptions) GetPurchaseOptions(ctx context.Context, billingAccountID int64) (paymentcontracts.PurchaseOptions, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls++
-	f.lastUID = userID
+	f.lastAccount = billingAccountID
 	if f.err != nil {
 		return paymentcontracts.PurchaseOptions{}, f.err
 	}
@@ -88,7 +89,7 @@ type fakeGapPendingOrders struct {
 	abandonKeys  int
 }
 
-func (f *fakeGapPendingOrders) ListPendingOrders(ctx context.Context, userID int64) (paymentcontracts.PendingPaymentOrderList, error) {
+func (f *fakeGapPendingOrders) ListPendingOrders(ctx context.Context, billingAccountID int64) (paymentcontracts.PendingPaymentOrderList, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	list := paymentcontracts.PendingPaymentOrderList{Items: []paymentcontracts.PendingPaymentOrder{}}
@@ -99,7 +100,7 @@ func (f *fakeGapPendingOrders) ListPendingOrders(ctx context.Context, userID int
 	return list, nil
 }
 
-func (f *fakeGapPendingOrders) ContinuePendingOrder(ctx context.Context, userID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {
+func (f *fakeGapPendingOrders) ContinuePendingOrder(ctx context.Context, billingAccountID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.continueErr != nil {
@@ -113,7 +114,7 @@ func (f *fakeGapPendingOrders) ContinuePendingOrder(ctx context.Context, userID 
 	return order, nil
 }
 
-func (f *fakeGapPendingOrders) AbandonPendingOrder(ctx context.Context, userID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {
+func (f *fakeGapPendingOrders) AbandonPendingOrder(ctx context.Context, billingAccountID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.abandonErr != nil {
@@ -136,7 +137,7 @@ type fakeGapRecharges struct {
 	err   error
 }
 
-func (f *fakeGapRecharges) ListRecharges(ctx context.Context, userID int64, cursor string, limit int) (paymentcontracts.RechargeHistoryPage, error) {
+func (f *fakeGapRecharges) ListRecharges(ctx context.Context, billingAccountID int64, cursor string, limit int) (paymentcontracts.RechargeHistoryPage, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.err != nil {
@@ -249,6 +250,9 @@ func (f *fakeGapRewards) Redeem(ctx context.Context, cmd ports.RedeemCommand) (p
 		HistoryItem:      ports.RedemptionHistoryItem{ID: redemption.ID, RewardCodeDisplayName: redemption.RewardCodeDisplayName, CreditedAmount: redemption.CreditAmount, MaskedCodeHint: redemption.MaskedCodeHint, RedeemedAt: redemption.RedeemedAt},
 		CreditedAmount:   redemption.CreditAmount,
 		AvailableBalance: redemption.AvailableBalanceAfter,
+		// Beneficiary is the caller's deterministic initial personal
+		// account (#921); the requesting workspace never changes it.
+		BillingAccountID: 7000 + cmd.UserID,
 	}
 	if f.redeemed == nil {
 		f.redeemed = make(map[string]ports.RedeemResult)
@@ -289,7 +293,91 @@ type gapsTestFixture struct {
 	recharge *fakeGapRecharges
 	quoter   *fakeGapQuoter
 	rewards  *fakeGapRewards
+	accounts *fakeGapBillingAccounts
 	deps     ContractV1BillingDeps
+}
+
+// fakeGapBillingAccounts maps beneficiary internal accounts to stable
+// ba_ identities for the rewards beneficiary assertions (#921). Any
+// internal ID resolves deterministically; unknown shapes are never
+// fabricated beyond the ba_ pattern.
+type fakeGapBillingAccounts struct {
+	mu       sync.Mutex
+	accounts map[int64]tenancypg.BillingAccount
+	roles    map[int64]map[int64]string
+	deny     map[int64]bool
+}
+
+func (f *fakeGapBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if existing, ok := f.accounts[workspaceInternalID]; ok {
+		return existing, nil
+	}
+	account := tenancypg.BillingAccount{
+		InternalID:          workspaceInternalID,
+		PublicID:            "ba_gaps_" + workspacePublicID,
+		OwnerType:           tenancypg.BillingOwnerWorkspace,
+		WorkspaceInternalID: workspaceInternalID,
+		WorkspacePublicID:   workspacePublicID,
+	}
+	if f.accounts == nil {
+		f.accounts = make(map[int64]tenancypg.BillingAccount)
+	}
+	f.accounts[workspaceInternalID] = account
+	return account, nil
+}
+
+func (f *fakeGapBillingAccounts) GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancypg.BillingAccount, error) {
+	return tenancypg.BillingAccount{}, tenancy.ErrBillingNotFound
+}
+
+func (f *fakeGapBillingAccounts) GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancypg.BillingAccount, error) {
+	if billingAccountInternalID <= 0 {
+		return tenancypg.BillingAccount{}, tenancy.ErrBillingNotFound
+	}
+	return tenancypg.BillingAccount{
+		InternalID: billingAccountInternalID,
+		PublicID:   fmt.Sprintf("ba_beneficiary_%d", billingAccountInternalID),
+		OwnerType:  tenancypg.BillingOwnerWorkspace,
+	}, nil
+}
+
+func (f *fakeGapBillingAccounts) GetBillingAccountRole(ctx context.Context, billingAccountInternalID, userID int64) (string, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.deny != nil && f.deny[userID] {
+		return "", false, nil
+	}
+	if f.roles != nil {
+		if byUser, ok := f.roles[billingAccountInternalID]; ok {
+			if role, ok := byUser[userID]; ok {
+				return role, true, nil
+			}
+			return "", false, nil
+		}
+	}
+	return tenancy.BillingRoleOwner, true, nil
+}
+
+func (f *fakeGapBillingAccounts) ListBillingAccountMembers(ctx context.Context, billingAccountInternalID, actorUserID int64) ([]tenancy.BillingAccountMember, error) {
+	return nil, tenancy.ErrBillingStoreNotConfigured
+}
+
+func (f *fakeGapBillingAccounts) AddBillingAccountMember(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, role string) (*tenancy.BillingAccountMember, error) {
+	return nil, tenancy.ErrBillingStoreNotConfigured
+}
+
+func (f *fakeGapBillingAccounts) UpdateBillingAccountMemberRole(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, newRole string) (*tenancy.BillingAccountMember, error) {
+	return nil, tenancy.ErrBillingStoreNotConfigured
+}
+
+func (f *fakeGapBillingAccounts) TransferBillingAccountOwnership(ctx context.Context, billingAccountInternalID, currentOwnerID, newOwnerID int64) error {
+	return tenancy.ErrBillingStoreNotConfigured
+}
+
+func (f *fakeGapBillingAccounts) LinkWorkspaceToBillingAccount(ctx context.Context, workspaceInternalID, billingAccountInternalID, actorUserID int64) error {
+	return tenancy.ErrBillingStoreNotConfigured
 }
 
 func newGapsTestFixture() *gapsTestFixture {
@@ -301,11 +389,13 @@ func newGapsTestFixture() *gapsTestFixture {
 		recharge: &fakeGapRecharges{},
 		quoter:   &fakeGapQuoter{},
 		rewards:  &fakeGapRewards{},
+		accounts: &fakeGapBillingAccounts{},
 	}
 	fx.deps = ContractV1BillingDeps{
 		Tenancy: fx.store, Users: fx.dir,
 		PurchaseOptions: fx.purchase, PendingOrders: fx.pending,
 		Recharges: fx.recharge, Quoter: fx.quoter, Rewards: fx.rewards,
+		BillingAccounts: fx.accounts,
 	}
 	return fx
 }
@@ -322,9 +412,26 @@ func gapsWorkspace(t *testing.T, fx *gapsTestFixture) string {
 	return ws.PublicID
 }
 
+// gapsAccount resolves the stable payer account a gaps test workspace
+// reads through (#919): the same Ensure seam the handlers use.
+func gapsAccount(t *testing.T, fx *gapsTestFixture, wsID string) tenancypg.BillingAccount {
+	t.Helper()
+	ctx := context.Background()
+	ws, err := fx.store.GetWorkspace(ctx, wsID)
+	if err != nil {
+		t.Fatalf("gaps workspace: %v", err)
+	}
+	account, err := fx.accounts.EnsureBillingAccountForWorkspace(ctx, ws.InternalID, wsID)
+	if err != nil {
+		t.Fatalf("gaps billing account: %v", err)
+	}
+	return account
+}
+
 func TestV1GapsPurchaseOptions(t *testing.T) {
 	fx := newGapsTestFixture()
 	wsID := gapsWorkspace(t, fx)
+	account := gapsAccount(t, fx, wsID)
 	engine := fx.engine()
 
 	status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + wsID + "/purchase-options", userID: 11})
@@ -335,20 +442,36 @@ func TestV1GapsPurchaseOptions(t *testing.T) {
 	if data["purchases_available"] != true || data["min_idea_quantity"] != float64(500) || data["ideas_per_usd"] != float64(100) {
 		t.Fatalf("purchase options = %v, want server-side quote facts", data)
 	}
-	if fx.purchase.lastUID != 11 {
-		t.Fatalf("purchase options user = %d, want caller 11 (not owner projection)", fx.purchase.lastUID)
+	if data["billing_account_id"] != account.PublicID {
+		t.Fatalf("purchase options = %v, want explicit target account %s", data, account.PublicID)
+	}
+	if fx.purchase.lastAccount != account.InternalID {
+		t.Fatalf("purchase options account = %d, want payer %d (not operator projection)", fx.purchase.lastAccount, account.InternalID)
 	}
 
-	// Member (non-owner) reads with their own facts; outsiders 404.
+	// Space-only member (workspace member, no Billing grant) cannot borrow
+	// workspace standing to read financial facts (#919).
 	if _, err := fx.store.AddWorkspaceMember(context.Background(), wsID, 12, tenancy.RoleMember); err != nil {
 		t.Fatal(err)
 	}
+	fx.accounts.deny = map[int64]bool{12: true}
+	status, _, forbidden := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + wsID + "/purchase-options", userID: 12})
+	if status != http.StatusForbidden || v1ErrorCode(t, forbidden) != string(contract.CodeBillingAccountForbidden) {
+		t.Fatalf("member purchase-options = %d %v, want 403 billing_account_forbidden", status, forbidden)
+	}
+
+	// Granted Billing Admin on the same account manages its facts.
+	delete(fx.accounts.deny, 12)
+	fx.accounts.roles = map[int64]map[int64]string{account.InternalID: {12: tenancy.BillingRoleAdmin}}
 	status, _, member := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + wsID + "/purchase-options", userID: 12})
 	if status != http.StatusOK {
-		t.Fatalf("member purchase-options status = %d (%v)", status, member)
+		t.Fatalf("manager purchase-options status = %d (%v)", status, member)
 	}
-	if fx.purchase.lastUID != 12 {
-		t.Fatalf("member purchase options user = %d, want caller 12", fx.purchase.lastUID)
+	if v1Data(t, member).(map[string]any)["billing_account_id"] != account.PublicID {
+		t.Fatalf("manager purchase options = %v, want same target account", member)
+	}
+	if fx.purchase.lastAccount != account.InternalID {
+		t.Fatalf("manager purchase options account = %d, want payer %d", fx.purchase.lastAccount, account.InternalID)
 	}
 	status, _, hidden := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + wsID + "/purchase-options", userID: 99})
 	if status != http.StatusNotFound || v1ErrorCode(t, hidden) != string(contract.CodeWorkspaceNotFound) {
@@ -363,6 +486,7 @@ func TestV1GapsPurchaseOptions(t *testing.T) {
 func TestV1GapsPendingOrdersList(t *testing.T) {
 	fx := newGapsTestFixture()
 	wsID := gapsWorkspace(t, fx)
+	account := gapsAccount(t, fx, wsID)
 	fx.pending.orders[gapOrderTokenA] = gapPendingOrder(gapOrderTokenA, 1000, string(paymentsdomain.PaymentOrderCheckoutOpen))
 	fx.pending.orders[gapOrderTokenB] = gapPendingOrder(gapOrderTokenB, 2000, string(paymentsdomain.PaymentOrderAsyncPaymentPending))
 	engine := fx.engine()
@@ -379,9 +503,22 @@ func TestV1GapsPendingOrdersList(t *testing.T) {
 	if first["public_token"] != gapOrderTokenA || first["checkout_url"] == "" {
 		t.Fatalf("open order must carry checkout_url: %v", first)
 	}
+	if first["billing_account_id"] != account.PublicID {
+		t.Fatalf("pending order = %v, want payer account %s", first, account.PublicID)
+	}
 	second := items[1].(map[string]any)
 	if _, hasURL := second["checkout_url"]; hasURL {
 		t.Fatalf("non-open order must omit checkout_url: %v", second)
+	}
+
+	// Space-only member observes no financial facts.
+	if _, err := fx.store.AddWorkspaceMember(context.Background(), wsID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	fx.accounts.deny = map[int64]bool{12: true}
+	status, _, forbidden := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + wsID + "/pending-orders", userID: 12})
+	if status != http.StatusForbidden || v1ErrorCode(t, forbidden) != string(contract.CodeBillingAccountForbidden) {
+		t.Fatalf("member pending = %d %v, want 403 billing_account_forbidden", status, forbidden)
 	}
 
 	status, _, hidden := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + wsID + "/pending-orders", userID: 99})
@@ -464,6 +601,16 @@ func TestV1GapsPendingContinue(t *testing.T) {
 	if status != http.StatusNotFound || v1ErrorCode(t, hidden) != string(contract.CodeWorkspaceNotFound) {
 		t.Fatalf("outsider continue = %d %v, want 404 workspace_not_found", status, hidden)
 	}
+
+	// Space-only member cannot continue another scope's order.
+	if _, err := fx.store.AddWorkspaceMember(context.Background(), wsID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	fx.accounts.deny = map[int64]bool{12: true}
+	status, _, forbidden := doV1(t, engine, gapsContinueCall(base, gapOrderTokenA, "continue-key-7", "", 12))
+	if status != http.StatusForbidden || v1ErrorCode(t, forbidden) != string(contract.CodeBillingAccountForbidden) {
+		t.Fatalf("member continue = %d %v, want 403 billing_account_forbidden", status, forbidden)
+	}
 }
 
 func TestV1GapsPendingAbandon(t *testing.T) {
@@ -498,11 +645,30 @@ func TestV1GapsPendingAbandon(t *testing.T) {
 	if status != http.StatusNotFound || v1ErrorCode(t, unknown) != string(contract.CodeBillingSessionNotFound) {
 		t.Fatalf("unknown abandon = %d %v, want 404 billing_session_not_found", status, unknown)
 	}
+
+	// Space-only member cannot abandon the account's order.
+	if _, err := fx.store.AddWorkspaceMember(context.Background(), wsID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	fx.accounts.deny = map[int64]bool{12: true}
+	memberCall := func(orderID, key string) (int, map[string]any) {
+		headers := map[string]string{contract.IdempotencyKeyHeader: key}
+		status, _, payload := doV1(t, engine, v1Call{
+			method: http.MethodPost, path: "/api/v1/workspaces/" + wsID + "/pending-orders/" + orderID + "/abandon",
+			userID: 12, headers: headers,
+		})
+		return status, payload
+	}
+	status, forbidden := memberCall(gapOrderTokenA, "abandon-key-3")
+	if status != http.StatusForbidden || v1ErrorCode(t, forbidden) != string(contract.CodeBillingAccountForbidden) {
+		t.Fatalf("member abandon = %d %v, want 403 billing_account_forbidden", status, forbidden)
+	}
 }
 
 func TestV1GapsRecharges(t *testing.T) {
 	fx := newGapsTestFixture()
 	wsID := gapsWorkspace(t, fx)
+	account := gapsAccount(t, fx, wsID)
 	fx.recharge.items = []paymentcontracts.RechargeHistoryItem{
 		gapRechargeItem(1000, string(paymentsdomain.PaymentOrderCredited)),
 		gapRechargeItem(2000, "refunded"),
@@ -530,6 +696,9 @@ func TestV1GapsRecharges(t *testing.T) {
 	if entry["receipt_url"] == "" || entry["occurred_at"] == "" || entry["idea_quantity"] != float64(1000) {
 		t.Fatalf("recharge entry = %v, want receipt + occurred_at + quantity", entry)
 	}
+	if entry["billing_account_id"] != account.PublicID {
+		t.Fatalf("recharge entry = %v, want payer account %s", entry, account.PublicID)
+	}
 
 	status, _, second := doV1(t, engine, v1Call{method: http.MethodGet, path: base + "?cursor=" + next, userID: 11})
 	if status != http.StatusOK {
@@ -553,6 +722,16 @@ func TestV1GapsRecharges(t *testing.T) {
 	status, _, hidden := doV1(t, engine, v1Call{method: http.MethodGet, path: base, userID: 99})
 	if status != http.StatusNotFound || v1ErrorCode(t, hidden) != string(contract.CodeWorkspaceNotFound) {
 		t.Fatalf("outsider = %d %v, want 404 workspace_not_found", status, hidden)
+	}
+
+	// Space-only member observes no recharge history.
+	if _, err := fx.store.AddWorkspaceMember(context.Background(), wsID, 12, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	fx.accounts.deny = map[int64]bool{12: true}
+	status, _, forbidden := doV1(t, engine, v1Call{method: http.MethodGet, path: base, userID: 12})
+	if status != http.StatusForbidden || v1ErrorCode(t, forbidden) != string(contract.CodeBillingAccountForbidden) {
+		t.Fatalf("member recharges = %d %v, want 403 billing_account_forbidden", status, forbidden)
 	}
 }
 
@@ -813,6 +992,11 @@ func TestV1GapsRewardRedeem(t *testing.T) {
 	}
 	if data["credited_amount"] != float64(80) || data["available_balance"] != float64(1080) {
 		t.Fatalf("redeem result = %v, want amounts", data)
+	}
+	// Beneficiary is the caller's initial personal account (#921): the
+	// edge names the stable ba_ funds identity, never the workspace.
+	if data["billing_account_id"] != "ba_beneficiary_7011" {
+		t.Fatalf("redeem beneficiary = %v, want ba_beneficiary_7011", data)
 	}
 	if replayed, _ := data["replayed"].(bool); replayed {
 		t.Fatalf("first redeem must not be marked replayed: %v", data)

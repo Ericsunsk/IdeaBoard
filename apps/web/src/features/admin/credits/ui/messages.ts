@@ -5,6 +5,7 @@
 
 export const CREDITS_BILLING_LAYOUT_MESSAGES = {
   navPricing: '功能定价',
+  navAccounts: '资金账户',
   navHealth: '账本健康',
   navRewards: '兑换码',
   navPayments: '支付订单',

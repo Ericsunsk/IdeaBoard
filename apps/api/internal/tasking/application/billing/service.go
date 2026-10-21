@@ -55,13 +55,16 @@ type Request struct {
 	Quantity         int64
 }
 
-// HoldCommand bundles one task wallet hold with the validated billing request
-// it settles. It replaces the unnamed (taskID, userID, request) parameter
-// group previously threaded across the submission seam.
+// HoldCommand bundles one task account hold with the validated billing request
+// it settles. BillingAccountID is the stable funds identity (#916); ActorUserID
+// is the real operator recorded on the Command. It replaces the unnamed
+// (taskID, userID, request) parameter group previously threaded across the
+// submission seam.
 type HoldCommand struct {
-	TaskID  string
-	UserID  int64
-	Billing Request
+	TaskID           string
+	BillingAccountID int64
+	ActorUserID      int64
+	Billing          Request
 }
 
 type Readiness struct {
@@ -73,7 +76,8 @@ type Readiness struct {
 
 type Snapshot struct {
 	TaskID            string
-	UserID            int64
+	BillingAccountID  int64
+	SubmitterUserID   int64
 	Service           string
 	SKU               billing.SKU
 	DisplayName       string
@@ -137,8 +141,8 @@ func validateRequest(request Request) (billing.SKU, error) {
 	return sku, nil
 }
 
-func (s *Service) Readiness(ctx context.Context, userID int64, request Request) (Readiness, error) {
-	if s == nil || s.quoter == nil || s.credits == nil || userID <= 0 {
+func (s *Service) Readiness(ctx context.Context, billingAccountID int64, request Request) (Readiness, error) {
+	if s == nil || s.quoter == nil || s.credits == nil || billingAccountID <= 0 {
 		return Readiness{}, fmt.Errorf("task billing service unavailable")
 	}
 	sku, err := validateRequest(request)
@@ -149,7 +153,7 @@ func (s *Service) Readiness(ctx context.Context, userID int64, request Request) 
 	if err != nil {
 		return Readiness{}, fmt.Errorf("%w: %w", ErrPricingUnavailable, err)
 	}
-	wallet, err := s.credits.GetWallet(ctx, userID)
+	wallet, err := s.credits.GetWallet(ctx, billingAccountID)
 	if err != nil {
 		return Readiness{}, err
 	}
@@ -163,8 +167,8 @@ func (s *Service) Readiness(ctx context.Context, userID int64, request Request) 
 }
 
 func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, command HoldCommand) (Snapshot, error) {
-	taskID, userID, request := command.TaskID, command.UserID, command.Billing
-	if s == nil || s.quoter == nil || s.credits == nil || tx == nil || strings.TrimSpace(taskID) == "" || userID <= 0 {
+	taskID, billingAccountID, actorUserID, request := command.TaskID, command.BillingAccountID, command.ActorUserID, command.Billing
+	if s == nil || s.quoter == nil || s.credits == nil || tx == nil || strings.TrimSpace(taskID) == "" || billingAccountID <= 0 || actorUserID <= 0 {
 		return Snapshot{}, fmt.Errorf("task billing service unavailable")
 	}
 	sku, err := validateRequest(request)
@@ -177,7 +181,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, command HoldCom
 	}
 
 	snapshot := Snapshot{
-		TaskID: taskID, UserID: userID, Service: request.Service,
+		TaskID: taskID, BillingAccountID: billingAccountID, SubmitterUserID: actorUserID, Service: request.Service,
 		SKU: quote.SKU, DisplayName: quote.DisplayName, PriceVersionID: quote.PriceVersionID, PriceVersion: quote.PriceVersion,
 		OutputResolution: quote.OutputResolution,
 		UnitCredits:      quote.UnitCredits, Quantity: quote.Quantity, TotalCredits: quote.TotalCredits, QuotedAt: quote.QuotedAt,
@@ -191,9 +195,9 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, command HoldCom
 			return Snapshot{}, amountErr
 		}
 		hold, holdErr := s.credits.InTx(tx).Hold(ctx, ports.HoldCommand{
-			UserID:   userID,
-			Amount:   amount,
-			Metadata: taskCommandMetadata("task-hold:"+taskID, domain.ActorUser, fmt.Sprint(userID), "task_submission", errorrender.MsgHoldAndPersist, taskID),
+			BillingAccountID: billingAccountID,
+			Amount:           amount,
+			Metadata:         taskCommandMetadata("task-hold:"+taskID, domain.ActorUser, fmt.Sprint(actorUserID), "task_submission", errorrender.MsgHoldAndPersist, taskID),
 		})
 		if errors.Is(holdErr, domain.ErrInsufficientCredits) {
 			return Snapshot{}, ErrInsufficientCredits
@@ -212,10 +216,10 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, command HoldCom
 
 	if _, err := tx.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, service, sku, display_name, price_version_id, price_version,
+  task_id, user_id, billing_account_id, workspace_id, service, sku, display_name, price_version_id, price_version,
   output_resolution, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-		snapshot.TaskID, snapshot.UserID, snapshot.Service, snapshot.SKU,
+) VALUES ($1::text, $2, $3, (SELECT workspace_id FROM tasks WHERE public_id = $1), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+		snapshot.TaskID, snapshot.SubmitterUserID, snapshot.BillingAccountID, snapshot.Service, snapshot.SKU,
 		snapshot.DisplayName, snapshot.PriceVersionID, snapshot.PriceVersion, snapshot.OutputResolution, snapshot.UnitCredits, snapshot.Quantity,
 		snapshot.TotalCredits, snapshot.QuotedAt, holdTransactionID,
 	); err != nil {

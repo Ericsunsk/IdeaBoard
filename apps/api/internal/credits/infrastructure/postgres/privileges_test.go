@@ -72,9 +72,9 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 		t.Fatalf("SET ROLE(command) error = %v", err)
 	}
 	result, err := service.InTx(tx).Grant(ctx, ports.GrantCommand{
-		UserID:   42,
-		Amount:   testhelpers.MustCreditAmount(t, 25),
-		Metadata: testhelpers.TestMetadata("runtime-role:grant", "runtime-role-grant"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42),
+		Amount:           testhelpers.MustCreditAmount(t, 25),
+		Metadata:         testhelpers.TestMetadata("runtime-role:grant", "runtime-role-grant"),
 	})
 	if err != nil {
 		_ = tx.Rollback(ctx)
@@ -84,12 +84,12 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 		t.Fatalf("runtime role Grant() result = %+v", result)
 	}
 	restriction, err := credits.RestrictionsInTx(tx).RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID:        42,
-		Type:          "runtime_test",
-		Source:        "privilege_test",
-		RelatedObject: domain.BusinessReference{Type: "test", ID: "runtime-role"},
-		Reason:        "verify restricted write capability",
-		Actor:         domain.Actor{Type: domain.ActorService, ID: "runtime-test"},
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42),
+		Type:             "runtime_test",
+		Source:           "privilege_test",
+		RelatedObject:    domain.BusinessReference{Type: "test", ID: "runtime-role"},
+		Reason:           "verify restricted write capability",
+		Actor:            domain.Actor{Type: domain.ActorService, ID: "runtime-test"},
 	})
 	if err != nil {
 		_ = tx.Rollback(ctx)
@@ -104,7 +104,7 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 		t.Fatalf("runtime role ReleaseWalletRestriction() error = %v", err)
 	}
 	purchase, err := service.InTx(tx).Purchase(ctx, ports.PurchaseCommand{
-		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 5),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Amount: testhelpers.MustCreditAmount(t, 5),
 		Metadata: testhelpers.PurchaseMetadata("runtime-role:purchase", "runtime-role-payment-order"),
 	})
 	if err != nil {
@@ -125,12 +125,13 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 	if _, err := denialTx.Exec(ctx, `SET LOCAL ROLE `+roleSQL); err != nil {
 		t.Fatalf("SET ROLE(deduction denial) error = %v", err)
 	}
+	denialAccountID := testhelpers.MustBillingAccount(t, pool, 42)
 	var ignored string
 	err = denialTx.QueryRow(ctx, `
-SELECT transaction_id FROM execute_credit_command_v2(
-  'deduction', 42, 1, '', 'runtime-role:non-admin-deduction', 'service', 'runtime',
+SELECT transaction_id FROM execute_credit_command_v3(
+  'deduction', $1, 1, '', 'runtime-role:non-admin-deduction', 'service', 'runtime',
   'runtime_test', 'must be rejected', 'test', 'runtime-role-non-admin-deduction'
-)`).Scan(&ignored)
+)`, denialAccountID).Scan(&ignored)
 	if err == nil || !strings.Contains(err.Error(), "invalid credit command") {
 		t.Fatalf("runtime direct non-admin deduction error = %v, want invalid credit command", err)
 	}
@@ -191,12 +192,12 @@ SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
        has_table_privilege($1, '"user"', 'INSERT'),
        has_function_privilege(
          $1,
-         'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)',
+         'execute_credit_command_v3(text,bigint,bigint,text,text,text,text,text,text,text,text)',
          'EXECUTE'
 	       ),
 	   has_function_privilege(
 	     $1,
-	     'execute_credit_purchase_v1(bigint,bigint,text,text,text,text,text,text,text)',
+	     'execute_credit_purchase_v2(bigint,bigint,text,text,text,text,text,text,text)',
 	     'EXECUTE'
 	       ),
        has_function_privilege(
@@ -238,7 +239,7 @@ SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
 	if err := pool.QueryRow(ctx, `
 SELECT prosecdef, COALESCE(array_to_string(proconfig, ','), ''), current_schema()
 FROM pg_proc
-WHERE oid = 'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)'::regprocedure`,
+WHERE oid = 'execute_credit_command_v3(text,bigint,bigint,text,text,text,text,text,text,text,text)'::regprocedure`,
 	).Scan(&securityDefiner, &functionConfig, &trustedSchema); err != nil {
 		t.Fatalf("read command function security config error = %v", err)
 	}
@@ -248,7 +249,7 @@ WHERE oid = 'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,te
 	if err := pool.QueryRow(ctx, `
 SELECT prosecdef, COALESCE(array_to_string(proconfig, ','), '')
 FROM pg_proc
-WHERE oid = 'execute_credit_purchase_v1(bigint,bigint,text,text,text,text,text,text,text)'::regprocedure`,
+WHERE oid = 'execute_credit_purchase_v2(bigint,bigint,text,text,text,text,text,text,text)'::regprocedure`,
 	).Scan(&securityDefiner, &functionConfig); err != nil {
 		t.Fatalf("read purchase function security config error = %v", err)
 	}
@@ -329,9 +330,9 @@ func assertTemporaryCreditTablesCannotShadowLedger(
 		}
 	}
 	result, err := credits.NewService(pool).InTx(tx).Grant(ctx, ports.GrantCommand{
-		UserID:   42,
-		Amount:   testhelpers.MustCreditAmount(t, 7),
-		Metadata: testhelpers.TestMetadata("runtime-role:temp-shadow", "runtime-role-temp-shadow"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42),
+		Amount:           testhelpers.MustCreditAmount(t, 7),
+		Metadata:         testhelpers.TestMetadata("runtime-role:temp-shadow", "runtime-role-temp-shadow"),
 	})
 	if err != nil {
 		t.Fatalf("Grant() under temp shadow attack error = %v", err)
@@ -340,12 +341,12 @@ func assertTemporaryCreditTablesCannotShadowLedger(
 		t.Fatalf("Grant() under temp shadow attack result = %+v", result)
 	}
 	restriction, err := credits.RestrictionsInTx(tx).RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID:        42,
-		Type:          "temp_shadow",
-		Source:        "privilege_test",
-		RelatedObject: domain.BusinessReference{Type: "test", ID: "temp-shadow"},
-		Reason:        "verify trusted restriction table",
-		Actor:         domain.Actor{Type: domain.ActorService, ID: "runtime-test"},
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42),
+		Type:             "temp_shadow",
+		Source:           "privilege_test",
+		RelatedObject:    domain.BusinessReference{Type: "test", ID: "temp-shadow"},
+		Reason:           "verify trusted restriction table",
+		Actor:            domain.Actor{Type: domain.ActorService, ID: "runtime-test"},
 	})
 	if err != nil {
 		t.Fatalf("RestrictWallet() under temp shadow attack error = %v", err)

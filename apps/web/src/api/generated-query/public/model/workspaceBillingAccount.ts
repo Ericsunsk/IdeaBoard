@@ -10,12 +10,23 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { WorkspaceBillingAccountConsumptionScope } from './workspaceBillingAccountConsumptionScope'
 import type { WorkspaceBillingAccountOwnerType } from './workspaceBillingAccountOwnerType'
 import type { WorkspaceId } from './workspaceId'
 
 export interface WorkspaceBillingAccount {
+  /**
+   * Stable funds identity; never derives from the current Workspace Owner wallet.
+   * @pattern ^ba_[A-Za-z0-9_-]+$
+   */
+  billing_account_id: string
   workspace_id: WorkspaceId
+  /** workspace covers per-workspace and studio-shared links; organization is the shared org pool. */
   owner_type: WorkspaceBillingAccountOwnerType
+  /** Server-resolved consumption visibility for the authenticated principal. */
+  consumption_scope: WorkspaceBillingAccountConsumptionScope
+  /** True when many Workspaces share one account; omitted when false. */
+  shared?: boolean
   /** Omitted when empty. */
   created_at?: string
   /** Omitted when empty. */

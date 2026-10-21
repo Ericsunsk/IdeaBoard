@@ -15,7 +15,7 @@ import (
 func PaymentOrder(row dbsqlc.PaymentOrder) paymentsdomain.PaymentOrder {
 	return paymentsdomain.PaymentOrder{
 		ID: pgUUIDString(row.ID), PublicOrderNumber: row.PublicOrderNumber, PublicToken: pgUUIDString(row.PublicToken),
-		UserID: row.UserID, ClientIdempotencyKey: row.ClientIdempotencyKey, RequestHash: row.RequestHash,
+		UserID: row.UserID, BillingAccountID: pgBillingAccountID(row.BillingAccountID), ClientIdempotencyKey: row.ClientIdempotencyKey, RequestHash: row.RequestHash,
 		Status: paymentsdomain.PaymentOrderStatus(row.Status), StripeCredentialID: pgUUIDString(row.StripeCredentialID), StripeAccountID: row.StripeAccountID,
 		StripeCustomerID: row.StripeCustomerID, StripeProductID: row.StripeProductID,
 		StripeCheckoutSessionID: PgTextString(row.StripeCheckoutSessionID),
@@ -47,4 +47,14 @@ func PgTextString(value pgtype.Text) string {
 		return ""
 	}
 	return value.String
+}
+
+// pgBillingAccountID projects the payer Billing Account attribution. The
+// column is CHECK-enforced NOT NULL; an invalid value decodes to 0 so
+// callers fail closed on the missing payer instead of misattributing funds.
+func pgBillingAccountID(value pgtype.Int8) int64 {
+	if !value.Valid {
+		return 0
+	}
+	return value.Int64
 }

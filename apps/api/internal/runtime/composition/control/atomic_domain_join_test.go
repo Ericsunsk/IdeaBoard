@@ -79,10 +79,15 @@ func TestControlGuardDomainAuditShareOneTransaction(t *testing.T) {
 	}
 	// The guarded handler runs inside txCtx: the domain write joins the
 	// guard transaction through the carrier (no BeginTx of its own).
+	joinAccountID, err := creditService.ResolvePersonalAccount(txCtx, walletUserID)
+	if err != nil {
+		scope.Rollback(txCtx)
+		t.Fatalf("ResolvePersonalAccount() error = %v", err)
+	}
 	result, err := creditService.Grant(txCtx, ports.GrantCommand{
-		UserID:   walletUserID,
-		Amount:   testhelpers.MustCreditAmount(t, 50),
-		Metadata: testhelpers.TestMetadata("control-join-grant", "control-join-grant"),
+		BillingAccountID: joinAccountID,
+		Amount:           testhelpers.MustCreditAmount(t, 50),
+		Metadata:         testhelpers.TestMetadata("control-join-grant", "control-join-grant"),
 	})
 	if err != nil {
 		scope.Rollback(txCtx)
@@ -152,10 +157,15 @@ func TestControlGuardRollbackRemovesDomainAndAudit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("scope Begin: %v", err)
 	}
+	joinAccountID, err := creditService.ResolvePersonalAccount(txCtx, walletUserID)
+	if err != nil {
+		scope.Rollback(txCtx)
+		t.Fatalf("ResolvePersonalAccount() error = %v", err)
+	}
 	result, err := creditService.Grant(txCtx, ports.GrantCommand{
-		UserID:   walletUserID,
-		Amount:   testhelpers.MustCreditAmount(t, 50),
-		Metadata: testhelpers.TestMetadata("control-join-rollback", "control-join-rollback"),
+		BillingAccountID: joinAccountID,
+		Amount:           testhelpers.MustCreditAmount(t, 50),
+		Metadata:         testhelpers.TestMetadata("control-join-rollback", "control-join-rollback"),
 	})
 	if err != nil {
 		scope.Rollback(txCtx)

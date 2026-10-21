@@ -17,27 +17,27 @@ type CommandResult struct {
 }
 
 type GrantCommand struct {
-	UserID   int64
-	Amount   domain.CreditAmount
-	Metadata domain.CommandMetadata
+	BillingAccountID int64
+	Amount           domain.CreditAmount
+	Metadata         domain.CommandMetadata
 }
 
 // PurchaseCommand credits a paid external order. Only the Payments service
 // may issue it, and callers should compose it into the Payment Order transaction.
 type PurchaseCommand struct {
-	UserID   int64
-	Amount   domain.CreditAmount
-	Metadata domain.CommandMetadata
+	BillingAccountID int64
+	Amount           domain.CreditAmount
+	Metadata         domain.CommandMetadata
 }
 
 type PurchaseRefundHoldCommand struct {
-	UserID   int64
-	Amount   domain.CreditAmount
-	Metadata domain.CommandMetadata
+	BillingAccountID int64
+	Amount           domain.CreditAmount
+	Metadata         domain.CommandMetadata
 }
 
 type PurchaseRefundCommand struct {
-	UserID            int64
+	BillingAccountID  int64
 	HoldTransactionID string
 	Metadata          domain.CommandMetadata
 }
@@ -47,9 +47,9 @@ type PurchaseRefundCommand struct {
 // balance and returns the unrecovered remainder without creating a negative
 // projection.
 type PaymentDisputeDebitCommand struct {
-	UserID          int64
-	RequestedAmount domain.CreditAmount
-	Metadata        domain.CommandMetadata
+	BillingAccountID int64
+	RequestedAmount  domain.CreditAmount
+	Metadata         domain.CommandMetadata
 }
 
 type PaymentDisputeDebitResult struct {
@@ -59,7 +59,7 @@ type PaymentDisputeDebitResult struct {
 }
 
 type PaymentDisputeRestoreCommand struct {
-	UserID                int64
+	BillingAccountID      int64
 	OriginalTransactionID string
 	Amount                domain.CreditAmount
 	Metadata              domain.CommandMetadata
@@ -68,42 +68,42 @@ type PaymentDisputeRestoreCommand struct {
 // DeductionCommand records a discretionary administrative debit. It can only
 // consume available credits and always creates a new immutable transaction.
 type DeductionCommand struct {
-	UserID   int64
-	Amount   domain.CreditAmount
-	Metadata domain.CommandMetadata
+	BillingAccountID int64
+	Amount           domain.CreditAmount
+	Metadata         domain.CommandMetadata
 }
 
 // CorrectionCommand partially or fully reverses one prior administrative
 // Grant, Deduction, or Refund. Capture corrections remain linked Refunds.
 type CorrectionCommand struct {
-	UserID                int64
+	BillingAccountID      int64
 	OriginalTransactionID string
 	Amount                domain.CreditAmount
 	Metadata              domain.CommandMetadata
 }
 
 type HoldCommand struct {
-	UserID   int64
-	Amount   domain.CreditAmount
-	Metadata domain.CommandMetadata
+	BillingAccountID int64
+	Amount           domain.CreditAmount
+	Metadata         domain.CommandMetadata
 }
 
 type CaptureCommand struct {
-	UserID            int64
+	BillingAccountID  int64
 	HoldTransactionID string
 	Amount            domain.CreditAmount
 	Metadata          domain.CommandMetadata
 }
 
 type ReleaseCommand struct {
-	UserID            int64
+	BillingAccountID  int64
 	HoldTransactionID string
 	Amount            domain.CreditAmount
 	Metadata          domain.CommandMetadata
 }
 
 type RefundCommand struct {
-	UserID              int64
+	BillingAccountID    int64
 	ChargeTransactionID string
 	Amount              domain.CreditAmount
 	Metadata            domain.CommandMetadata

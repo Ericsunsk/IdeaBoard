@@ -24,13 +24,13 @@ const (
 	paymentOrderReturnFailed     = "failed"
 )
 
-// ListPendingOrders returns the user's unsettled checkout intents.
-func (s *Service) ListPendingOrders(ctx context.Context, userID int64) (paymentcontracts.PendingPaymentOrderList, error) {
+// ListPendingOrders returns the payer account's unsettled checkout intents.
+func (s *Service) ListPendingOrders(ctx context.Context, billingAccountID int64) (paymentcontracts.PendingPaymentOrderList, error) {
 	result := paymentcontracts.PendingPaymentOrderList{Items: make([]paymentcontracts.PendingPaymentOrder, 0)}
-	if s == nil || s.store == nil || userID <= 0 {
+	if s == nil || s.store == nil || billingAccountID <= 0 {
 		return result, paymentcontracts.ErrPaymentOrderNotFound
 	}
-	orders, err := s.store.ListUserPendingPaymentOrders(ctx, userID)
+	orders, err := s.store.ListAccountPendingPaymentOrders(ctx, billingAccountID)
 	if err != nil {
 		return result, err
 	}
@@ -40,22 +40,22 @@ func (s *Service) ListPendingOrders(ctx context.Context, userID int64) (paymentc
 	return result, nil
 }
 
-func (s *Service) ContinuePendingOrder(ctx context.Context, userID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {
-	if s == nil || s.configuration == nil || s.store == nil || userID <= 0 {
+func (s *Service) ContinuePendingOrder(ctx context.Context, billingAccountID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {
+	if s == nil || s.configuration == nil || s.store == nil || billingAccountID <= 0 {
 		return paymentcontracts.PendingPaymentOrder{}, paymentcontracts.ErrPaymentOrderNotFound
 	}
 	var result paymentcontracts.PendingPaymentOrder
-	err := s.store.WithUserCheckoutLock(ctx, userID, func(locked context.Context) error {
+	err := s.store.WithBillingAccountCheckoutLock(ctx, billingAccountID, func(locked context.Context) error {
 		var err error
-		result, err = s.continuePendingOrderLocked(locked, userID, publicToken)
+		result, err = s.continuePendingOrderLocked(locked, billingAccountID, publicToken)
 		return err
 	})
 	return result, err
 }
 
-func (s *Service) continuePendingOrderLocked(ctx context.Context, userID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {
+func (s *Service) continuePendingOrderLocked(ctx context.Context, billingAccountID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {
 	var result paymentcontracts.PendingPaymentOrder
-	order, err := s.store.GetPaymentOrderByPublicToken(ctx, userID, publicToken)
+	order, err := s.store.GetPaymentOrderByAccountToken(ctx, billingAccountID, publicToken)
 	if database.IsNotFound(err) {
 		return result, paymentcontracts.ErrPaymentOrderNotFound
 	}
@@ -78,7 +78,7 @@ func (s *Service) continuePendingOrderLocked(ctx context.Context, userID int64, 
 	if err != nil || configuration.AccountID != order.StripeAccountID {
 		return result, paymentsdomain.ErrPurchasesUnavailable
 	}
-	if err := s.requireWallet(ctx, userID); err != nil {
+	if err := s.requireWallet(ctx, billingAccountID); err != nil {
 		return result, err
 	}
 	session, err := s.gateway.RetrieveCheckoutSession(ctx, ports.RetrieveCheckoutSessionInput{APIKey: apiKey, SessionID: order.StripeCheckoutSessionID})
@@ -99,13 +99,13 @@ func (s *Service) continuePendingOrderLocked(ctx context.Context, userID int64, 
 	return result, nil
 }
 
-func (s *Service) AbandonPendingOrder(ctx context.Context, userID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {
-	if s == nil || s.configuration == nil || s.store == nil || userID <= 0 {
+func (s *Service) AbandonPendingOrder(ctx context.Context, billingAccountID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {
+	if s == nil || s.configuration == nil || s.store == nil || billingAccountID <= 0 {
 		return paymentcontracts.PendingPaymentOrder{}, paymentcontracts.ErrPaymentOrderNotFound
 	}
 	var result paymentcontracts.PendingPaymentOrder
-	err := s.store.WithUserCheckoutLock(ctx, userID, func(locked context.Context) error {
-		order, err := s.store.GetPaymentOrderByPublicToken(locked, userID, publicToken)
+	err := s.store.WithBillingAccountCheckoutLock(ctx, billingAccountID, func(locked context.Context) error {
+		order, err := s.store.GetPaymentOrderByAccountToken(locked, billingAccountID, publicToken)
 		if database.IsNotFound(err) {
 			return paymentcontracts.ErrPaymentOrderNotFound
 		}
@@ -142,14 +142,14 @@ func pendingPaymentOrder(order paymentsdomain.PaymentOrder) paymentcontracts.Pen
 	return paymentcontracts.PendingPaymentOrder{PublicToken: order.PublicToken, IdeaQuantity: order.IdeaQuantity, CheckoutURL: checkoutURL, Status: string(order.Status), ExpiresAt: order.ExpiresAt, UpdatedAt: order.UpdatedAt}
 }
 
-func (s *Service) GetPurchaseOptions(ctx context.Context, userID int64) (paymentcontracts.PurchaseOptions, error) {
+func (s *Service) GetPurchaseOptions(ctx context.Context, billingAccountID int64) (paymentcontracts.PurchaseOptions, error) {
 	options := paymentcontracts.PurchaseOptions{
 		QuickIdeaQuantities: append([]int64(nil), paymentsdomain.QuickPurchaseIdeaQuantities[:]...),
 		MinIdeaQuantity:     paymentsdomain.MinimumPurchaseIdeas, MaxIdeaQuantity: paymentsdomain.MaximumPurchaseIdeas, IdeasPerUSD: paymentsdomain.IdeasPerUSD,
 		Terms:        paymentcontracts.PaymentLegalDocument{Version: paymentsdomain.CurrentTermsVersion, URL: "/terms"},
 		RefundPolicy: paymentcontracts.PaymentLegalDocument{Version: paymentsdomain.CurrentRefundPolicyVersion, URL: "/refund-policy"},
 	}
-	if s == nil || s.configuration == nil || s.wallets == nil || userID <= 0 {
+	if s == nil || s.configuration == nil || s.wallets == nil || billingAccountID <= 0 {
 		options.UnavailableReason = "payments_not_configured"
 		return options, nil
 	}
@@ -165,7 +165,7 @@ func (s *Service) GetPurchaseOptions(ctx context.Context, userID int64) (payment
 		options.UnavailableReason = "purchases_disabled"
 		return options, nil
 	}
-	wallet, err := s.wallets.GetWallet(ctx, userID)
+	wallet, err := s.wallets.GetWallet(ctx, billingAccountID)
 	if err != nil {
 		if errors.Is(err, domain.ErrWalletNotFound) {
 			options.UnavailableReason = "wallet_restricted"
@@ -192,7 +192,7 @@ func (s *Service) CreateCheckout(ctx context.Context, command paymentsdomain.Cre
 		return paymentcontracts.CheckoutResult{}, paymentsdomain.ErrPurchasesUnavailable
 	}
 	var result paymentcontracts.CheckoutResult
-	err := s.store.WithUserCheckoutLock(ctx, command.UserID, func(locked context.Context) error {
+	err := s.store.WithBillingAccountCheckoutLock(ctx, command.BillingAccountID, func(locked context.Context) error {
 		request, err := s.PrepareRequest(locked, command)
 		if err != nil {
 			return err
@@ -251,13 +251,13 @@ func checkoutResult(order paymentsdomain.PaymentOrder, reused bool) paymentcontr
 	return paymentcontracts.CheckoutResult{CheckoutURL: order.CheckoutURL, PublicToken: order.PublicToken, ExpiresAt: order.ExpiresAt, Reused: reused}
 }
 
-func (s *Service) GetPaymentOrderReturnStatus(ctx context.Context, userID int64, publicToken string) (paymentcontracts.PaymentOrderReturnStatus, error) {
+func (s *Service) GetPaymentOrderReturnStatus(ctx context.Context, billingAccountID int64, publicToken string) (paymentcontracts.PaymentOrderReturnStatus, error) {
 	if s == nil || s.configuration == nil || s.store == nil {
 		return paymentcontracts.PaymentOrderReturnStatus{}, paymentcontracts.ErrPaymentOrderNotFound
 	}
 	var result paymentcontracts.PaymentOrderReturnStatus
-	err := s.store.WithUserCheckoutLock(ctx, userID, func(locked context.Context) error {
-		order, err := s.store.GetPaymentOrderByPublicToken(locked, userID, publicToken)
+	err := s.store.WithBillingAccountCheckoutLock(ctx, billingAccountID, func(locked context.Context) error {
+		order, err := s.store.GetPaymentOrderByAccountToken(locked, billingAccountID, publicToken)
 		if database.IsNotFound(err) {
 			return paymentcontracts.ErrPaymentOrderNotFound
 		}

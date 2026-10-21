@@ -11,9 +11,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * workspace covers per-workspace and studio-shared links; organization is the shared org pool.
+ */
 export type WorkspaceBillingAccountOwnerType =
   (typeof WorkspaceBillingAccountOwnerType)[keyof typeof WorkspaceBillingAccountOwnerType]
 
 export const WorkspaceBillingAccountOwnerType = {
   workspace: 'workspace',
+  organization: 'organization',
 } as const

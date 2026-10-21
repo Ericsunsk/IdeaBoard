@@ -177,7 +177,12 @@ func IsValidationError(err error) bool {
 // BillingSnapshot is the immutable price fact persisted with a task.
 // Money is integer minor units (credits) throughout; snapshots are
 // INSERT-only in the durable implementation.
+//
+// BillingAccountID is the funds identity (#916): the stable Billing Account
+// whose Wallet was held. It never derives from the current Workspace Owner;
+// the submitter rides OwnerUserID as the real operator (Actor).
 type BillingSnapshot struct {
+	BillingAccountID  int64     `json:"billing_account_id"`
 	SKU               string    `json:"sku"`
 	DisplayName       string    `json:"display_name"`
 	PriceVersionID    int64     `json:"price_version_id"`
@@ -223,14 +228,18 @@ const (
 // consumes only this field. Readers must treat any stored value as
 // absent; the snapshot is the sole routing fact.
 type WorkspaceTask struct {
-	ID              string         `json:"id"`
-	WorkspaceID     string         `json:"workspace_id"`
-	OwnerUserID     int64          `json:"owner_user_id"`
-	Service         string         `json:"service"`
-	MediaAssetIDs   []string       `json:"media_asset_ids,omitempty"`
-	Params          map[string]any `json:"params,omitempty"`
-	CanonicalParams string         `json:"canonical_params,omitempty"`
-	ResolvedModel   string         `json:"resolved_model,omitempty"`
+	ID          string `json:"id"`
+	WorkspaceID string `json:"workspace_id"`
+	OwnerUserID int64  `json:"owner_user_id"`
+	// BillingAccountID is the stable funds identity resolved at submit
+	// (#916): terminal Capture/Release converge on this account with
+	// OwnerUserID as the operator Actor. Internal only, never on the wire.
+	BillingAccountID int64          `json:"-"`
+	Service          string         `json:"service"`
+	MediaAssetIDs    []string       `json:"media_asset_ids,omitempty"`
+	Params           map[string]any `json:"params,omitempty"`
+	CanonicalParams  string         `json:"canonical_params,omitempty"`
+	ResolvedModel    string         `json:"resolved_model,omitempty"`
 	// RoutingSnapshot carries the immutable submit-time RoutingSnapshot
 	// JSONB pinned on the task row (#848, ADR-0012 rule 9): the exact
 	// routing.RoutingSnapshot JSON shape, raw so readers that do not
@@ -306,10 +315,15 @@ type Quoter interface {
 
 // Holder reserves Ideas via Credits Commands (never direct ledger
 // writes). Production adapts credits.Commands; tests stub it.
+//
+// billingAccountID is the funds identity (#916, resolved via the #915
+// stable resolution); actorUserID is the real operator recorded on the
+// Command. The two are never conflated: sharing a Workspace never spends
+// the operator's personal funds.
 type Holder interface {
-	Hold(ctx context.Context, userID int64, amount int64, idempotencyKey, taskID string) (string, error)
-	Capture(ctx context.Context, holdTransactionID string, amount int64, taskID string) error
-	Release(ctx context.Context, holdTransactionID string, amount int64, taskID string) error
+	Hold(ctx context.Context, billingAccountID, actorUserID int64, amount int64, idempotencyKey, taskID string) (string, error)
+	Capture(ctx context.Context, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) error
+	Release(ctx context.Context, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) error
 }
 
 // Enqueuer carries the River payload. Production adapts the River queue;

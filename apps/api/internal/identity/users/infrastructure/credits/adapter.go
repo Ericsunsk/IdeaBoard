@@ -24,17 +24,17 @@ func (a *Adapter) LifecycleInTx(tx pgx.Tx) usersports.WalletLifecycle {
 	return &lifecycleAdapter{lifecycle: a.service.LifecycleInTx(tx)}
 }
 
-func (a *Adapter) GetWallet(ctx context.Context, userID int64) (usersports.WalletDetails, error) {
-	wallet, err := a.service.GetWallet(ctx, userID)
+func (a *Adapter) GetWallet(ctx context.Context, billingAccountID int64) (usersports.WalletDetails, error) {
+	wallet, err := a.service.GetWallet(ctx, billingAccountID)
 	if err != nil {
 		return usersports.WalletDetails{}, err
 	}
 	return usersports.WalletDetails{WalletBalance: usersports.WalletBalance{
-		UserID:      wallet.UserID,
-		PublicID:    wallet.PublicID,
-		DisplayName: wallet.DisplayName,
-		Available:   wallet.Available,
-		Reserved:    wallet.Reserved,
+		BillingAccountID: wallet.BillingAccountID,
+		PublicID:         wallet.PublicID,
+		DisplayName:      wallet.DisplayName,
+		Available:        wallet.Available,
+		Reserved:         wallet.Reserved,
 	}}, nil
 }
 
@@ -46,26 +46,39 @@ func (a *lifecycleAdapter) BindWelcomeIdentityKey(ctx context.Context, fingerpri
 	return a.lifecycle.BindWelcomeIdentityKey(ctx, fingerprint)
 }
 
-func (a *lifecycleAdapter) ProvisionWallet(ctx context.Context, userID int64) error {
-	return a.lifecycle.ProvisionWallet(ctx, userID)
+func (a *lifecycleAdapter) ResolvePersonalAccount(ctx context.Context, userID int64) (int64, error) {
+	return a.lifecycle.ResolvePersonalAccount(ctx, userID)
 }
 
-func (a *lifecycleAdapter) SetWalletFrozen(ctx context.Context, userID int64, frozen bool) error {
-	return a.lifecycle.SetWalletFrozen(ctx, userID, frozen)
+func (a *lifecycleAdapter) ProvisionAccountWallet(ctx context.Context, billingAccountID int64) error {
+	return a.lifecycle.ProvisionAccountWallet(ctx, billingAccountID)
+}
+
+func (a *lifecycleAdapter) SetAccountWalletFrozen(ctx context.Context, billingAccountID int64, frozen bool) error {
+	return a.lifecycle.SetAccountWalletFrozen(ctx, billingAccountID, frozen)
+}
+
+func (a *lifecycleAdapter) SetSoleOwnedWalletsFrozen(ctx context.Context, userID int64, frozen bool) error {
+	return a.lifecycle.SetSoleOwnedWalletsFrozen(ctx, userID, frozen)
+}
+
+func (a *lifecycleAdapter) RemoveSharedBillingMemberships(ctx context.Context, userID int64) error {
+	return a.lifecycle.RemoveSharedBillingMemberships(ctx, userID)
 }
 
 func (a *lifecycleAdapter) ClaimWelcomeGrant(
 	ctx context.Context,
 	fingerprint string,
+	userID int64,
 	command usersports.WelcomeGrantCommand,
 ) (usersports.WelcomeGrantResult, bool, error) {
 	amount, err := creditsdomain.NewCreditAmount(command.Amount)
 	if err != nil {
 		return usersports.WelcomeGrantResult{}, false, err
 	}
-	result, granted, err := a.lifecycle.ClaimWelcomeGrant(ctx, fingerprint, creditsports.GrantCommand{
-		UserID: command.UserID,
-		Amount: amount,
+	result, granted, err := a.lifecycle.ClaimWelcomeGrant(ctx, fingerprint, command.UserID, creditsports.GrantCommand{
+		BillingAccountID: command.BillingAccountID,
+		Amount:           amount,
 		Metadata: creditsdomain.CommandMetadata{
 			IdempotencyKey:    command.IdempotencyKey,
 			Actor:             creditsdomain.Actor{Type: creditsdomain.ActorType(command.ActorType), ID: command.ActorID},
@@ -78,11 +91,11 @@ func (a *lifecycleAdapter) ClaimWelcomeGrant(
 		return usersports.WelcomeGrantResult{}, false, err
 	}
 	return usersports.WelcomeGrantResult{Wallet: usersports.WalletBalance{
-		UserID:      result.Wallet.UserID,
-		PublicID:    result.Wallet.PublicID,
-		DisplayName: result.Wallet.DisplayName,
-		Available:   result.Wallet.Available,
-		Reserved:    result.Wallet.Reserved,
+		BillingAccountID: result.Wallet.BillingAccountID,
+		PublicID:         result.Wallet.PublicID,
+		DisplayName:      result.Wallet.DisplayName,
+		Available:        result.Wallet.Available,
+		Reserved:         result.Wallet.Reserved,
 	}}, granted, nil
 }
 

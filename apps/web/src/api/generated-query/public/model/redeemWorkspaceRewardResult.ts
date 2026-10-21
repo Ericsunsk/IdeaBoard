@@ -20,6 +20,11 @@ export interface RedeemWorkspaceRewardResult {
   credited_amount: number
   /** Integer minor units. */
   available_balance: number
+  /**
+   * Stable funds identity that received the Grant: the caller's deterministic initial personal Billing Account. The requesting workspace is the authZ scope only and never changes the beneficiary.
+   * @pattern ^ba_[A-Za-z0-9_-]+$
+   */
+  billing_account_id: string
   /** True when an idempotent replay returned the first redemption. */
   replayed?: boolean
 }

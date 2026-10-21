@@ -39,21 +39,21 @@ func TestReadModelReturnsCommittedWalletAndBalances(t *testing.T) {
 	ctx := t.Context()
 
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   94,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: testhelpers.TestMetadata("readmodel:grant:94", "readmodel-grant-94"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         testhelpers.TestMetadata("readmodel:grant:94", "readmodel-grant-94"),
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   95,
-		Amount:   testhelpers.MustCreditAmount(t, 40),
-		Metadata: testhelpers.TestMetadata("readmodel:grant:95", "readmodel-grant-95"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 95),
+		Amount:           testhelpers.MustCreditAmount(t, 40),
+		Metadata:         testhelpers.TestMetadata("readmodel:grant:95", "readmodel-grant-95"),
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	wallet, err := service.GetWallet(ctx, 94)
+	wallet, err := service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, 94))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,12 +64,14 @@ func TestReadModelReturnsCommittedWalletAndBalances(t *testing.T) {
 		t.Fatalf("GetWallet() restrictions = %+v, want empty", wallet.ActiveRestrictions)
 	}
 
-	balances, err := service.GetAvailableBalances(ctx, []int64{94, 95})
+	account94 := testhelpers.MustBillingAccount(t, pool, 94)
+	account95 := testhelpers.MustBillingAccount(t, pool, 95)
+	balances, err := service.GetAvailableBalances(ctx, []int64{account94, account95})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if balances[94] != 100 || balances[95] != 40 {
-		t.Fatalf("GetAvailableBalances() = %v, want map[94:100 95:40]", balances)
+	if balances[account94] != 100 || balances[account95] != 40 {
+		t.Fatalf("GetAvailableBalances() = %v, want per-account 100/40", balances)
 	}
 
 	empty, err := service.GetAvailableBalances(ctx, nil)
@@ -84,22 +86,22 @@ func TestReadModelListsLedgerNewestFirstWithKeysetPagination(t *testing.T) {
 	ctx := t.Context()
 
 	if _, err := service.Grant(ctx, ports.GrantCommand{
-		UserID:   94,
-		Amount:   testhelpers.MustCreditAmount(t, 100),
-		Metadata: testhelpers.TestMetadata("readmodel:ledger:grant", "readmodel-ledger-grant"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94),
+		Amount:           testhelpers.MustCreditAmount(t, 100),
+		Metadata:         testhelpers.TestMetadata("readmodel:ledger:grant", "readmodel-ledger-grant"),
 	}); err != nil {
 		t.Fatal(err)
 	}
 	hold, err := service.Hold(ctx, ports.HoldCommand{
-		UserID:   94,
-		Amount:   testhelpers.MustCreditAmount(t, 30),
-		Metadata: testhelpers.TestMetadata("readmodel:ledger:hold", "readmodel-ledger-hold"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94),
+		Amount:           testhelpers.MustCreditAmount(t, 30),
+		Metadata:         testhelpers.TestMetadata("readmodel:ledger:hold", "readmodel-ledger-hold"),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.Release(ctx, ports.ReleaseCommand{
-		UserID:            94,
+		BillingAccountID:  testhelpers.MustBillingAccount(t, pool, 94),
 		HoldTransactionID: hold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 30),
 		Metadata:          testhelpers.TestMetadata("readmodel:ledger:release", "readmodel-ledger-release"),
@@ -107,7 +109,7 @@ func TestReadModelListsLedgerNewestFirstWithKeysetPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	first, err := service.ListLedger(ctx, domain.ListLedgerInput{UserID: 94, Limit: 2})
+	first, err := service.ListLedger(ctx, domain.ListLedgerInput{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94), Limit: 2})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +128,7 @@ func TestReadModelListsLedgerNewestFirstWithKeysetPagination(t *testing.T) {
 		t.Fatalf("release transaction missing hold reference: %+v", first.Transactions[0])
 	}
 
-	second, err := service.ListLedger(ctx, domain.ListLedgerInput{UserID: 94, BeforeSequence: first.NextBeforeSequence, Limit: 10})
+	second, err := service.ListLedger(ctx, domain.ListLedgerInput{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94), BeforeSequence: first.NextBeforeSequence, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +136,7 @@ func TestReadModelListsLedgerNewestFirstWithKeysetPagination(t *testing.T) {
 		t.Fatalf("second page = %+v, want final transaction without cursor", second)
 	}
 
-	empty, err := service.ListLedger(ctx, domain.ListLedgerInput{UserID: 96})
+	empty, err := service.ListLedger(ctx, domain.ListLedgerInput{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 96)})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, within } from '../../../../test/render'
-import type { BillingRecordItem } from '../../session/billing/resource'
+import type { BillingRecord } from '../../session/billing/resource'
 import BillingPane from './BillingPane.vue'
 
 const useBillingRecordsMock = vi.hoisted(() => vi.fn())
@@ -10,7 +10,7 @@ vi.mock('../../session/billing/useBillingRecords', () => ({
   useBillingRecords: useBillingRecordsMock,
 }))
 
-function makeRecord(overrides: Partial<BillingRecordItem> = {}): BillingRecordItem {
+function makeRecord(overrides: Partial<BillingRecord> = {}): BillingRecord {
   return {
     record_id: 'record-1',
     occurred_at: '2026-07-14T09:08:07',
@@ -24,7 +24,10 @@ function makeRecord(overrides: Partial<BillingRecordItem> = {}): BillingRecordIt
 
 function makeBillingState(overrides: Record<string, unknown> = {}) {
   return {
-    records: ref<BillingRecordItem[]>([]),
+    billingAccountId: ref<string | undefined>(undefined),
+    isShared: ref(false),
+    consumptionScope: ref('account'),
+    records: ref<BillingRecord[]>([]),
     isInitialPending: ref(false),
     initialError: ref<unknown>(null),
     loadMoreError: ref<unknown>(null),
@@ -181,5 +184,55 @@ describe('BillingPane', () => {
     await user.click(loadMoreButton)
 
     expect(loadMore).toHaveBeenCalledOnce()
+  })
+
+  it('names the shared balance account behind the records', () => {
+    useBillingRecordsMock.mockReturnValue(
+      makeBillingState({
+        billingAccountId: ref('ba_1'),
+        isShared: ref(true),
+        records: ref([makeRecord()]),
+      }),
+    )
+
+    renderPane()
+
+    expect(screen.getByRole('status')).toHaveTextContent('ba_1')
+  })
+
+  it('renders the restricted state for billing_account_forbidden instead of a retryable load error', async () => {
+    const retryInitial = vi.fn().mockResolvedValue(undefined)
+    const forbidden = new Error('forbidden') as Error & { code: string }
+    forbidden.code = 'billing_account_forbidden'
+    useBillingRecordsMock.mockReturnValue(
+      makeBillingState({ initialError: ref(forbidden), retryInitial }),
+    )
+
+    const { user } = renderPane()
+
+    expect(screen.getByText('Access restricted')).toBeVisible()
+    expect(
+      screen.getByText(
+        'Your current role cannot view these records. Contact a workspace or billing admin.',
+      ),
+    ).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Reload' }))
+    expect(retryInitial).toHaveBeenCalledOnce()
+  })
+})
+
+describe('scoped consumption records', () => {
+  it('renders member consumption without exposing an account balance column', () => {
+    const { available_credits_after: _balance, ...record } = makeRecord()
+    useBillingRecordsMock.mockReturnValue(
+      makeBillingState({
+        consumptionScope: ref('member'),
+        records: ref([record]),
+      }),
+    )
+    renderPane()
+    expect(screen.getByText('局部重绘')).toBeVisible()
+    expect(screen.queryByRole('columnheader', { name: /余额/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('980')).not.toBeInTheDocument()
   })
 })

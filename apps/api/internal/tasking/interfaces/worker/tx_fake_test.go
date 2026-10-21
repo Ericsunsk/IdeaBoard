@@ -267,6 +267,15 @@ func workerNoopSnapshotSaver(context.Context, pgx.Tx, string, routing.RoutingSna
 	return nil
 }
 
+// workerTestBillingAccounts serves the stable funds-identity seam from a
+// fixed fixture account: in-memory settlement spends the fixture account,
+// never an owner wallet.
+type workerTestBillingAccounts struct{}
+
+func (workerTestBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ pgx.Tx, _ string) (int64, error) {
+	return 7001, nil
+}
+
 // newTxWorkerService wires one in-memory settlement through createInTx for
 // the database-free worker loop tests.
 func newTxWorkerService(txStore *txWorkerStore, holder *workerTestHolder, queue *workerTestQueue, assets workspacetasks.AssetReader, boards workspacetasks.BoardAuthorizer) *workspacetasks.Service {
@@ -274,7 +283,8 @@ func newTxWorkerService(txStore *txWorkerStore, holder *workerTestHolder, queue 
 		TaskRead: txStore, TaskLifecycle: txStore,
 		Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
 		Assets: assets, Resolver: allowTestPoolResolver(),
-		SnapshotSaver: workerNoopSnapshotSaver,
-		Acceptance:    &workerTestAcceptance{boards: boards, assets: assets},
+		SnapshotSaver:   workerNoopSnapshotSaver,
+		Acceptance:      &workerTestAcceptance{boards: boards, assets: assets},
+		BillingAccounts: workerTestBillingAccounts{},
 	})
 }

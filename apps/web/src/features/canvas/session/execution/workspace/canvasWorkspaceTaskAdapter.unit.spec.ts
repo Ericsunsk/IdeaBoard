@@ -485,6 +485,24 @@ describe('quote mapping', () => {
     ).toEqual({ service: 'generation', quantity: 3, resolution: '1k' })
   })
 
+  it('binds board_id onto quote inputs for the shared generate gate (#917)', () => {
+    expect(
+      toWorkspaceQuoteInput({
+        prompt: '',
+        service: 'generation',
+        board_id: 'board_abc123',
+        params: { output_count: 1, output_resolution: '1k' },
+      }),
+    ).toEqual({ service: 'generation', quantity: 1, resolution: '1k', board_id: 'board_abc123' })
+    expect(
+      toWorkspaceQuoteInput({
+        prompt: '',
+        service: 'generation',
+        params: { output_count: 1, output_resolution: '1k' },
+      }),
+    ).toEqual({ service: 'generation', quantity: 1, resolution: '1k' })
+  })
+
   it('maps a snapshot to readiness with inferred sufficiency', () => {
     expect(
       toSubmitTaskReadiness(
@@ -770,6 +788,34 @@ describe('canvas workspace task transport', () => {
     await expect(
       fetchCanvasWorkspaceTaskReadiness({ prompt: '', service: 'generation' }),
     ).resolves.toMatchObject({ ready: false, service: 'generation' } satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >)
+  })
+
+  it('keeps restricted funds and Board denials not-ready with their codes (#917)', async () => {
+    mocks.quoteWorkspaceTask.mockRejectedValueOnce(
+      Object.assign(new Error('restricted'), { status: 403, code: 'billing_wallet_restricted' }),
+    )
+    await expect(
+      fetchCanvasWorkspaceTaskReadiness({ prompt: '', service: 'generation' }),
+    ).resolves.toMatchObject({
+      ready: false,
+      service: 'generation',
+      error_code: 'wallet_restricted',
+    } satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >)
+
+    mocks.quoteWorkspaceTask.mockRejectedValueOnce(
+      Object.assign(new Error('viewer'), { status: 403, code: 'task_forbidden' }),
+    )
+    await expect(
+      fetchCanvasWorkspaceTaskReadiness({ prompt: '', service: 'generation' }),
+    ).resolves.toMatchObject({
+      ready: false,
+      service: 'generation',
+      error_code: 'task_forbidden',
+    } satisfies Partial<
       import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
     >)
   })

@@ -46,8 +46,8 @@ export const getRedeemWorkspaceRewardUrl = (workspaceId: string) => {
 }
 
 /**
- * Redeems one reward code through the Rewards seam, which Grants through credits.Commands inside its own transaction (durable per-user replay); the kernel IdempotencyStore adds header-key replay for transport retries. Code plaintext never leaves the request hash. Unknown, expired, exhausted, or disabled codes converge to 422 reward_code_unavailable (no oracle); frozen wallets render 409 reward_wallet_locked; key reuse with a different request renders 409 reward_redeem_conflict.
- * @summary Redeem a reward code into the caller wallet (members only, 201)
+ * Redeems one reward code through the Rewards seam, which Grants through credits.Commands inside its own transaction (durable per-user replay); the kernel IdempotencyStore adds header-key replay for transport retries. Code plaintext never leaves the request hash. The Grant settles into the caller's deterministic initial personal Billing Account, never into the requesting workspace's account: the workspace is the authZ scope only and switching workspaces (including organization workspaces) neither duplicates nor redirects the benefit, and organization funds are never implicitly touched. The response names the beneficiary billing_account_id (ba_) with its available_balance. Unknown, expired, exhausted, or disabled codes converge to 422 reward_code_unavailable (no oracle); frozen wallets render 409 reward_wallet_locked; key reuse with a different request renders 409 reward_redeem_conflict.
+ * @summary Redeem a reward code into the caller personal account (members only, 201)
  */
 export const redeemWorkspaceReward = async (
   workspaceId: string,
@@ -134,7 +134,7 @@ export type RedeemWorkspaceRewardMutationVariables = {
 }
 
 /**
- * @summary Redeem a reward code into the caller wallet (members only, 201)
+ * @summary Redeem a reward code into the caller personal account (members only, 201)
  */
 export const useRedeemWorkspaceReward = <
   TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,

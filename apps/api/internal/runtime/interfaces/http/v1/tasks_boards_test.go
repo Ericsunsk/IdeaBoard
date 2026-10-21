@@ -76,9 +76,14 @@ func newV1BoardTaskFixture(t *testing.T) *v1BoardTaskFixture {
 		Store: fx.store, Users: fx.dir, Boards: boardStore,
 		Tasks: fx.txTasks, TaskLifecycle: fx.txTasks,
 		TaskQuoter: fx.quoter, TaskHolder: fx.holder, TaskQueue: fx.queue, TaskAssets: fx.assets,
-		TaskRouter:        allowTestPoolResolver(),
-		TaskSnapshotSaver: v1TxSnapshotSaver(fx.saved),
-		TaskAcceptance:    &v1TxSubmissionAcceptance{boards: &boardtaskaccess.Authorizer{Store: boardStore}, assets: fx.assets},
+		TaskRouter:          allowTestPoolResolver(),
+		TaskSnapshotSaver:   v1TxSnapshotSaver(fx.saved),
+		TaskBillingAccounts: v1FakeBillingAccounts{},
+		// #917: the preflight resolves the same fixture account submit
+		// holds and gates the same fixture funds.
+		TaskQuoteBillingAccounts: v1FakeBillingAccounts{},
+		TaskQuoteWallets:         fx.wallets,
+		TaskAcceptance:           &v1TxSubmissionAcceptance{boards: &boardtaskaccess.Authorizer{Store: boardStore}, assets: fx.assets},
 	})
 	fx.engine = router
 	boardID, err := boards.NewV1BoardPublicID()

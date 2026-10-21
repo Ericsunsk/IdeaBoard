@@ -1,13 +1,16 @@
 package v1
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
@@ -17,6 +20,7 @@ import (
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
+	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/workflow"
 	"ideaboard/api/internal/workflow/paramkeys"
 
@@ -37,6 +41,23 @@ type (
 	// (catalog.SaveRoutingSnapshot in production, capture fakes in tests).
 	WorkspaceTaskSnapshotSaver = workspacetasks.RoutingSnapshotSaver
 )
+
+// taskQuoteBillingAccountReader resolves the stable funds identity for the
+// quote/readiness preflight without a settlement transaction (#917: Quote,
+// readiness, and submit spend the same account). Production adapts the
+// tenancy billing-account store (the same Ensure seam the workspace
+// billing reads use); tests stub it. Nil fails the preflight closed.
+type taskQuoteBillingAccountReader interface {
+	EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error)
+}
+
+// taskQuoteWalletReader reads the account Wallet for the preflight funds
+// gate (#917: insufficient vs restricted surfaces here exactly as on
+// submit). Production wires the Credits service; tests stub it. Nil fails
+// the preflight closed.
+type taskQuoteWalletReader interface {
+	GetWallet(ctx context.Context, billingAccountID int64) (domain.WalletDetails, error)
+}
 
 // Workspace task lifecycle (issue #805). Additive only: legacy
 // /api/user task routes were removed in #809.
@@ -117,7 +138,8 @@ func (h *contractV1Handler) taskService() *workspacetasks.Service {
 		Quoter:      h.deps.TaskQuoter,
 		Holder:      h.deps.TaskHolder, Queue: h.deps.TaskQueue, Assets: h.deps.TaskAssets,
 		Resolver: h.deps.TaskRouter, SnapshotSaver: h.deps.TaskSnapshotSaver,
-		Acceptance: h.taskSubmissionAcceptance(),
+		Acceptance:      h.taskSubmissionAcceptance(),
+		BillingAccounts: h.deps.TaskBillingAccounts,
 	}
 	return workspacetasks.NewService(deps)
 }
@@ -730,13 +752,34 @@ type v1QuoteTaskBody struct {
 		Service    string  `json:"service"`
 		Quantity   *int64  `json:"quantity"`
 		Resolution *string `json:"resolution"`
+		// BoardID optionally binds a Canvas readiness preflight to its
+		// Board (#917): the same generate-capability gate submit enforces
+		// applies here, so Viewers never read ready for a Board they
+		// cannot generate on. Omitted stays a workspace-level price
+		// preflight with no Board attribution.
+		BoardID string `json:"board_id,omitempty"`
 	} `json:"data"`
 }
 
 // quoteWorkspaceTask is the preflight seam: it returns an immutable price
-// snapshot with no persistence (separate from authoritative create).
+// snapshot with no persistence (separate from authoritative create). It
+// spends no Credits, but it resolves the SAME stable Billing Account
+// submit would hold (#917) and applies the same consumption eligibility:
+// workspace membership (404 task_not_found when hidden), the Board
+// generate gate when data.board_id is present (404 board_not_found, 409
+// board_archived, 403 task_forbidden), the shared pool availability
+// decision (422 service_resolution_unavailable), and the Wallet funds
+// gate (402 task_insufficient_credits vs 403 billing_wallet_restricted,
+// mirroring the submit Hold mapping, including the frozen passthrough).
+// Financial management alone grants no Board standing: a caller without
+// Board generate capability fails here exactly as on submit. The snapshot
+// stays price-only (no balances ride it); callers refresh the accurate
+// account balance through the workspace billing reads, which resolve the
+// same stable account.
 func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 	withV1WorkspaceBody(h, c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx, body v1QuoteTaskBody) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
 		quantity := int64(1)
 		if body.Data.Quantity != nil {
 			quantity = *body.Data.Quantity
@@ -745,12 +788,88 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 		if body.Data.Resolution != nil && strings.TrimSpace(*body.Data.Resolution) != "" {
 			resolution = strings.TrimSpace(*body.Data.Resolution)
 		}
+		// Board generate gate first (same BoardPolicy submit decision as
+		// the settlement transaction): Viewers never read ready.
+		boardID := strings.TrimSpace(body.Data.BoardID)
+		if boardID != "" {
+			if err := workspacetasks.ValidateBoardID(boardID); err != nil {
+				renderTaskError(c, err)
+				return
+			}
+			workspaceRole, ok := h.taskWorkspaceRoleString(c.Request.Context(), workspace, identityPrincipal.UserID())
+			if !ok {
+				contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, runtimehttp.MsgControlNotFound8)
+				c.Abort()
+				return
+			}
+			authorizer := h.taskBoardsAuthorizer()
+			if authorizer == nil {
+				renderTaskError(c, errors.New("tasks: board authorizer unavailable"))
+				return
+			}
+			access, err := authorizer.ResolveBoardAccess(c.Request.Context(), workspace.PublicID, boardID, identityPrincipal.UserID(), workspaceRole)
+			if err != nil {
+				renderTaskError(c, err)
+				return
+			}
+			var facts workspacetasks.BoardTaskFacts
+			if access != nil {
+				facts = workspacetasks.BoardTaskFacts{
+					CanRead: access.CanRead, CanGenerate: access.CanGenerate,
+					CanWrite: access.CanWrite, Archived: access.Archived,
+				}
+			}
+			switch workspacetasks.BoardPolicy.Check(facts, workspacetasks.BoardOpSubmit) {
+			case workspacetasks.BoardDecisionAllow:
+			case workspacetasks.BoardDecisionArchived:
+				renderTaskError(c, workspacetasks.ErrBoardArchived)
+				return
+			case workspacetasks.BoardDecisionForbidden:
+				renderTaskError(c, workspacetasks.ErrForbidden)
+				return
+			default:
+				renderTaskError(c, workspacetasks.ErrBoardNotFound)
+				return
+			}
+		}
+		// Same stable payer submit would hold: no owner-wallet fallback.
+		if h.deps.TaskQuoteBillingAccounts == nil || h.deps.TaskQuoteWallets == nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable25)
+			c.Abort()
+			return
+		}
+		account, err := h.deps.TaskQuoteBillingAccounts.EnsureBillingAccountForWorkspace(c.Request.Context(), workspace.InternalID, workspace.PublicID)
+		if err != nil {
+			renderBillingAccountError(c, err)
+			return
+		}
 		service := h.taskService()
 		snapshot, err := service.Quote(c.Request.Context(), workspacetasks.QuoteParams{
 			Service: strings.TrimSpace(body.Data.Service), Quantity: quantity, Resolution: resolution,
 		})
 		if err != nil {
 			renderTaskError(c, err)
+			return
+		}
+		// Funds gate on the resolved account (submit Hold parity):
+		// active restrictions deny first, then sufficiency. Frozen and
+		// missing wallets pass through exactly as the submit Hold maps
+		// them (no second mapping to drift).
+		wallet, err := h.deps.TaskQuoteWallets.GetWallet(c.Request.Context(), account.InternalID)
+		if err != nil {
+			if errors.Is(err, domain.ErrWalletRestricted) {
+				renderTaskError(c, workspacetasks.ErrWalletRestricted)
+				return
+			}
+			renderTaskError(c, err)
+			return
+		}
+		if len(wallet.ActiveRestrictions) > 0 {
+			renderTaskError(c, workspacetasks.ErrWalletRestricted)
+			return
+		}
+		if wallet.Available < snapshot.TotalCredits {
+			renderTaskError(c, fmt.Errorf("quote exceeds the resolved account balance: %w", workspacetasks.ErrInsufficientCredits))
 			return
 		}
 		contract.RenderSuccess(c, v1TaskBillingSnapshotDTO{
@@ -780,7 +899,15 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 //	/workspaces/{workspace_id}/tasks/{task_id}/outputs:
 //	  get: {operationId: listWorkspaceTaskOutputs, parameters: [WorkspaceId, TaskId]}
 //	/workspaces/{workspace_id}/task-quotes:
-//	  post: {operationId: quoteWorkspaceTask, parameters: [WorkspaceId]}
+//	  post: {operationId: quoteWorkspaceTask, parameters: [WorkspaceId]
+//	         (no Idempotency-Key: pure read, safe to retry)}
+//
+// QuoteWorkspaceTaskRequest carries the same stable payer and consumption
+// eligibility submit enforces (#917): an optional data.board_id binds the
+// preflight to its Board (invisible 404 board_not_found, archived 409
+// board_archived, no generate capability 403 task_forbidden); the Wallet
+// funds gate renders 402 task_insufficient_credits vs 403
+// billing_wallet_restricted exactly as the submit Hold maps them.
 //
 // Schemas:
 //
@@ -812,7 +939,7 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 //	  validation_failed on details.fields.resolution; an absent top level
 //	  carries the params value through, and an absent pair applies the
 //	  omitted resolutions are normalized to the Service policy's canonical 1k/2k/4k value.
-//	QuoteWorkspaceTaskRequest: {data: {service: string, quantity?: int64>=1, resolution?: string}}
+//	QuoteWorkspaceTaskRequest: {data: {service: string, quantity?: int64>=1, resolution?: string, board_id?: BoardId (optional Canvas binding; the preflight enforces the same generate gate as submit)}}
 //
 // Prompt/mask spec notes for the merger (v1 task creation gap batch):
 //   - data.prompt is new; the idempotency hash covers it (same key +
@@ -830,7 +957,8 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 //     resolver (no params/Extra URL plumbing).
 //
 // Error codes frozen: task_not_found (404 hidden), task_forbidden (403),
-// task_state_conflict (409), task_insufficient_credits (402),
+// task_state_conflict (409), task_insufficient_credits (402, submit Hold
+// and quote preflight alike),
 // task_idempotency_conflict (409, kernel); reused kernel codes
 // workspace_not_found/workspace_forbidden/pagination_cursor_invalid/bad_request/
 // validation_failed/idempotency_key_required/service_unavailable plus

@@ -15,6 +15,8 @@ import type { WorkspacePendingOrderStatus } from './workspacePendingOrderStatus'
 export interface WorkspacePendingOrder {
   /** Opaque pending order token (same value as the legacy public_token). */
   public_token: string
+  /** Payer account (ba_) owning this order; every manager of the account manages it. */
+  billing_account_id: string
   idea_quantity: number
   /** Omitted unless checkout is open. */
   checkout_url?: string

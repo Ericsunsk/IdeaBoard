@@ -1,37 +1,44 @@
-import { computed, toValue, type MaybeRefOrGetter } from 'vue'
+import { computed, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { fetchCreditWallet, creditsQueryKeys } from './resource'
-import { i18n } from '../../../../core/i18n'
-import { useAccountWorkspace } from '../accountWorkspace'
+import { useBillingAccount } from '../billing-account/useBillingAccount'
 import { useCreditsSync } from './useCreditsSync'
 import { accountScoped } from '../../../../core/query/queryDefaults'
 
 export type CreditWalletState =
   | { status: 'loading' }
-  | { status: 'ready'; availableCredits: number }
+  | { status: 'ready'; availableCredits: number; billingAccountId: string; isShared: boolean }
   | { status: 'error'; error: Error }
 
 export function useCreditWallet(enabled: MaybeRefOrGetter<boolean> = true) {
   useCreditsSync()
-  const { workspaceId, isSelectionSettled } = useAccountWorkspace({ enabled })
+  const billing = useBillingAccount(enabled)
   const query = useQuery({
-    queryKey: computed(() => creditsQueryKeys.wallet(workspaceId.value ?? '')),
-    queryFn: ({ signal }) => fetchCreditWallet(workspaceId.value ?? '', signal),
-    enabled: () => toValue(enabled) && isSelectionSettled.value,
+    queryKey: computed(() => creditsQueryKeys.wallet(billing.walletScope.value)),
+    queryFn: ({ queryKey, signal }) =>
+      fetchCreditWallet(queryKey[3].workspaceId, signal, queryKey[3].billingAccountId),
+    enabled: billing.isReady,
     ...accountScoped(),
   })
+  const readError = billing.readError(query.error)
   const state = computed<CreditWalletState>(() => {
-    if (query.isError.value) {
+    const error = readError.value
+    if (error) {
       return {
         status: 'error',
-        error: query.error.value ?? new Error(i18n.global.t('account.errors.walletLoadFailed')),
+        error,
       }
     }
-    const availableCredits = query.data.value?.available_credits
-    if (query.isPending.value || availableCredits == null) {
+    const data = query.data.value
+    if (!billing.isReady.value || query.isPending.value || data == null) {
       return { status: 'loading' }
     }
-    return { status: 'ready', availableCredits }
+    return {
+      status: 'ready',
+      availableCredits: data.available_credits,
+      billingAccountId: data.billing_account_id,
+      isShared: billing.isShared.value,
+    }
   })
 
   return { state }

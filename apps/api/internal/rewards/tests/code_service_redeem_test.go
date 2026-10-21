@@ -380,7 +380,11 @@ func (service failingGrantCreditService) Grant(context.Context, pgx.Tx, redempti
 }
 
 func (service failingGrantCreditService) ReadWallet(ctx context.Context, userID int64) (redemptions.WalletSnapshot, error) {
-	wallet, err := service.reader.GetWallet(ctx, userID)
+	accountID, err := service.reader.ResolvePersonalAccount(ctx, userID)
+	if err != nil {
+		return redemptions.WalletSnapshot{}, err
+	}
+	wallet, err := service.reader.GetWallet(ctx, accountID)
 	if err != nil {
 		return redemptions.WalletSnapshot{}, err
 	}

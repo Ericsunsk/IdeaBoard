@@ -78,7 +78,7 @@ func newWorkerTestHolder() *workerTestHolder {
 	return &workerTestHolder{holds: map[string]int64{}, captures: map[string]int64{}, releases: map[string]int64{}}
 }
 
-func (h *workerTestHolder) Hold(ctx context.Context, userID int64, amount int64, key, taskID string) (string, error) {
+func (h *workerTestHolder) Hold(ctx context.Context, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	holdID := "hold_" + taskID
@@ -86,14 +86,14 @@ func (h *workerTestHolder) Hold(ctx context.Context, userID int64, amount int64,
 	return holdID, nil
 }
 
-func (h *workerTestHolder) Capture(ctx context.Context, holdID string, amount int64, taskID string) error {
+func (h *workerTestHolder) Capture(ctx context.Context, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.captures[holdID] += amount
 	return nil
 }
 
-func (h *workerTestHolder) Release(ctx context.Context, holdID string, amount int64, taskID string) error {
+func (h *workerTestHolder) Release(ctx context.Context, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.releases[holdID] += amount
@@ -104,8 +104,8 @@ func (h *workerTestHolder) Release(ctx context.Context, holdID string, amount in
 // HoldInTx serves the settlement-transaction seam from the same maps and
 // registers its rollback undo, so a rejected submit strands no hold.
 // CaptureInTx/ReleaseInTx delegate to the same call recording.
-func (h *workerTestHolder) HoldInTx(ctx context.Context, tx pgx.Tx, userID int64, amount int64, key, taskID string) (string, error) {
-	holdID, err := h.Hold(ctx, userID, amount, key, taskID)
+func (h *workerTestHolder) HoldInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
+	holdID, err := h.Hold(ctx, billingAccountID, actorUserID, amount, key, taskID)
 	if err != nil {
 		return "", err
 	}
@@ -119,15 +119,15 @@ func (h *workerTestHolder) HoldInTx(ctx context.Context, tx pgx.Tx, userID int64
 	return holdID, nil
 }
 
-func (h *workerTestHolder) CaptureInTx(ctx context.Context, _ pgx.Tx, _ int64, holdID string, amount int64, taskID string) (string, error) {
-	if err := h.Capture(ctx, holdID, amount, taskID); err != nil {
+func (h *workerTestHolder) CaptureInTx(ctx context.Context, _ pgx.Tx, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) (string, error) {
+	if err := h.Capture(ctx, billingAccountID, actorUserID, holdID, amount, taskID); err != nil {
 		return "", err
 	}
 	return "", nil
 }
 
-func (h *workerTestHolder) ReleaseInTx(ctx context.Context, _ pgx.Tx, _ int64, holdID string, amount int64, taskID string) (string, error) {
-	if err := h.Release(ctx, holdID, amount, taskID); err != nil {
+func (h *workerTestHolder) ReleaseInTx(ctx context.Context, _ pgx.Tx, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) (string, error) {
+	if err := h.Release(ctx, billingAccountID, actorUserID, holdID, amount, taskID); err != nil {
 		return "", err
 	}
 	return "", nil

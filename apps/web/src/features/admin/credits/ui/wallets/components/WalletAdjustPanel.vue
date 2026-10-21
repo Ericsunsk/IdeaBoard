@@ -14,7 +14,9 @@
               ? t('admin.wallet.grantTitle')
               : activeTab === 'deduction'
                 ? t('admin.wallet.deductTitle')
-                : t('admin.wallet.refundTitle')
+                : activeTab === 'refund'
+                  ? t('admin.wallet.refundTitle')
+                  : t('admin.wallet.correctTitle')
           }}
         </h3>
       </div>
@@ -24,7 +26,9 @@
             ? t('admin.wallet.grantHint')
             : activeTab === 'deduction'
               ? t('admin.wallet.deductHint')
-              : t('admin.wallet.refundHint')
+              : activeTab === 'refund'
+                ? t('admin.wallet.refundHint')
+                : t('admin.wallet.correctHint')
         }}
       </span>
     </div>
@@ -37,6 +41,18 @@
         t('admin.wallet.originalChargeNotice', {
           id: refundSource.transaction_id,
           amount: formatIdeaAmount(refundSource.charge?.remaining_refundable_credits ?? 0),
+        })
+      }}</span>
+    </div>
+
+    <div
+      v-if="activeTab === 'correction' && correctionSource"
+      class="flex items-center gap-2 rounded-panel border border-primary-line bg-primary-faint px-3.5 py-2.5 text-xs text-primary font-mono"
+    >
+      <span>{{
+        t('admin.wallet.originalTransactionNotice', {
+          id: correctionSource.transaction_id,
+          amount: formatIdeaAmount(correctionSource.amount_credits),
         })
       }}</span>
     </div>
@@ -100,8 +116,9 @@ import type { AdminCreditLedgerTransaction } from '../../../session/wallets/reso
 import type { CreditCommandValidation } from '../../../core/wallets/creditCommandContract'
 
 defineProps<{
-  activeTab: 'grant' | 'deduction' | 'refund'
+  activeTab: 'grant' | 'deduction' | 'refund' | 'correction'
   refundSource: AdminCreditLedgerTransaction | null
+  correctionSource: AdminCreditLedgerTransaction | null
   amountCredits: number | null
   showErrors: boolean
   validation: CreditCommandValidation

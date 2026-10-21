@@ -117,8 +117,14 @@
         >
           <template #body="{ data }">
             <div class="flex min-w-0 flex-col gap-1">
-              <span v-if="data.wallet_public_id" class="text-xs font-semibold text-foreground">
-                Wallet · {{ data.wallet_display_name || data.wallet_public_id }}
+              <span
+                v-if="data.billing_account_id || data.wallet_public_id"
+                class="text-xs font-semibold text-foreground"
+              >
+                {{
+                  data.billing_account_id ??
+                  `Wallet · ${data.wallet_display_name || data.wallet_public_id}`
+                }}
               </span>
               <AdminMono
                 class="max-w-72 truncate text-xs text-muted-foreground"
@@ -261,13 +267,15 @@
         </div>
       </section>
 
-      <section v-if="selectedFinding.wallet_public_id">
+      <section v-if="selectedFinding.billing_account_id || selectedFinding.wallet_public_id">
         <div class="text-admin-caption font-bold text-muted-foreground">
-          {{ CREDIT_HEALTH_MESSAGES.queueDrawerWallet }}
+          {{ CREDIT_HEALTH_MESSAGES.queueDrawerBillingAccount }}
         </div>
-        <div class="mt-2 text-admin-body font-admin-emphasis text-foreground">
-          Wallet ·
-          {{ selectedFinding.wallet_display_name || selectedFinding.wallet_public_id }}
+        <div class="mt-2 font-mono text-admin-body font-admin-emphasis text-foreground">
+          {{
+            selectedFinding.billing_account_id ??
+            `Wallet · ${selectedFinding.wallet_display_name || selectedFinding.wallet_public_id}`
+          }}
         </div>
       </section>
 

@@ -91,6 +91,7 @@ describe('paymentsResource checkout', () => {
   it('reads purchase options through the v1 public plane', async () => {
     transport.request.mockResolvedValue({
       data: {
+        billing_account_id: 'ba_target_1',
         purchases_available: true,
         quick_idea_quantities: [100, 500],
         min_idea_quantity: 100,
@@ -102,6 +103,7 @@ describe('paymentsResource checkout', () => {
     })
 
     await expect(paymentsResource.getPurchaseOptions(WORKSPACE_ID)).resolves.toMatchObject({
+      billing_account_id: 'ba_target_1',
       purchases_available: true,
       min_idea_quantity: 100,
       terms: { version: 'v2026-01' },
@@ -118,6 +120,7 @@ describe('paymentsResource checkout', () => {
         items: [
           {
             public_token: 'tok-1',
+            billing_account_id: 'ba_target_1',
             idea_quantity: 500,
             checkout_url: 'https://pay.example/c',
             status: 'checkout_open',
@@ -129,7 +132,9 @@ describe('paymentsResource checkout', () => {
     })
 
     await expect(paymentsResource.listPendingOrders(WORKSPACE_ID)).resolves.toMatchObject({
-      items: [{ public_token: 'tok-1', status: 'checkout_open' }],
+      items: [
+        { public_token: 'tok-1', billing_account_id: 'ba_target_1', status: 'checkout_open' },
+      ],
     })
     expect(transport.request).toHaveBeenCalledWith(
       `/v1/workspaces/${WORKSPACE_ID}/pending-orders`,
@@ -213,6 +218,13 @@ describe('paymentsResource payment events', () => {
       public_token: 'token',
       status: 'credited',
     })
+    expect(
+      parsePaymentEvent('{"public_token":"token","billing_account_id":"ba_1","status":"credited"}'),
+    ).toEqual({
+      public_token: 'token',
+      billing_account_id: 'ba_1',
+      status: 'credited',
+    })
     expect(parsePaymentEvent('{"status":"refund_updated"}')).toEqual({
       status: 'refund_updated',
     })
@@ -221,6 +233,7 @@ describe('paymentsResource payment events', () => {
     })
     expect(parsePaymentEvent('{"status":"unknown"}')).toBeNull()
     expect(parsePaymentEvent('{"public_token":42,"status":"failed"}')).toBeNull()
+    expect(parsePaymentEvent('{"billing_account_id":7,"status":"credited"}')).toBeNull()
     expect(parsePaymentEvent('not-json')).toBeNull()
   })
 

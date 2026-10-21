@@ -1,50 +1,85 @@
 // Vision settlement owns the durable money movements behind one vision
-// search: idempotent reservation (advisory lock + request-hash replay +
-// Catalog quote + Credits Hold + operation row in one transaction), success
-// capture, failure release, and the mark for reconciliation when settlement
-// is uncertain.
+// search: idempotent reservation (settlement-triple resolution +
+// advisory lock + request-hash replay + Catalog quote + Credits Hold +
+// operation row in one transaction), success capture, failure release,
+// and the mark for reconciliation when settlement is uncertain.
 //
 // Settlement never calls the vision provider; the executor (vision.go /
 // vision_provider.go) owns provider I/O. Every Credits write funnels through
 // the typed credits.Commands seam via InTx; this package never touches the
 // Ledger or balance projections directly.
+//
+// Settlement identity (#918): every operation persists the triple
+// (submitter user_id, consumption workspace_id, payer billing_account_id)
+// resolved through the stable #915 chain inside the reservation
+// transaction. Capture, Release, and background reconciliation converge on
+// the STORED payer; they never re-resolve from the live Owner or
+// membership, so handovers and departures mid-flight cannot move the
+// money. Future consumption limits (945/946) join this same transaction
+// at the marked boundary; no limit math lives here.
 package application
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/platform/database"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
-// reserve replays an existing operation by (user, idempotency key) or locks,
-// quotes, holds, and inserts a new pending row atomically. Unpriced catalog
-// states degrade to the deferred free-marker path (no ledger row, no hold)
-// with distinct sku_not_found / pricing_unavailable / unpriced_zero reasons.
-func (s *VisionBillingService) reserve(ctx context.Context, userID int64, key, requestHash string) (visionReservation, error) {
+// reserve replays an existing operation by (submitter, idempotency key) or
+// locks, resolves the settlement triple, quotes, holds, and inserts a new
+// pending row atomically. Unpriced catalog states degrade to the deferred
+// free-marker path (no ledger row, no hold) with distinct sku_not_found /
+// pricing_unavailable / unpriced_zero reasons.
+//
+// The replay binds account + resource scope: an existing row whose stored
+// workspace, payer, or request hash differs from this call conflicts
+// instead of replaying, so a key cannot be replayed across workspaces,
+// accounts, operators, or bodies. Insert races (including the legacy
+// user-key and the new workspace-key uniques) converge to the same
+// conflict.
+func (s *VisionBillingService) reserve(ctx context.Context, workspacePublicID string, userID int64, key, requestHash string) (visionReservation, error) {
+	workspacePublicID = strings.TrimSpace(workspacePublicID)
+	if workspacePublicID == "" || userID <= 0 {
+		return visionReservation{}, ErrVisionWorkspaceNotFound
+	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return visionReservation{}, fmt.Errorf("begin vision billing transaction: %w", err)
 	}
 	defer tx.Rollback(context.Background())
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, fmt.Sprintf("%d:%s", userID, key)); err != nil {
+	// Settlement-triple resolution joins this transaction (membership gate
+	// + stable #915 account). Hidden workspaces and non-members fail here
+	// with workspace_not_found before any catalog or ledger read, so no
+	// payer fact leaks to outsiders. Future 945/946 limit checks join at
+	// this same boundary, before Quote/Hold.
+	identity, err := s.visionAccounts().ResolveVisionSettlementInTx(ctx, tx, workspacePublicID, userID)
+	if err != nil {
+		return visionReservation{}, err
+	}
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, fmt.Sprintf("vision:%d:%d:%s", identity.WorkspaceInternalID, identity.BillingAccountID, key)); err != nil {
 		return visionReservation{}, fmt.Errorf("lock vision operation: %w", err)
 	}
 	var existing VisionBillingResult
 	var existingHash, status, errorCode, errorMessage string
+	var existingWorkspaceID, existingAccountID int64
 	err = tx.QueryRow(ctx, `
-		SELECT operation_id::text, request_hash, status, query, error_code, error_message
+		SELECT operation_id::text, request_hash, status, query, error_code, error_message, workspace_id, billing_account_id
 		FROM ai_search_operations
 		WHERE user_id = $1 AND idempotency_key = $2
-		FOR UPDATE`, userID, key).Scan(&existing.OperationID, &existingHash, &status, &existing.Query, &errorCode, &errorMessage)
+		FOR UPDATE`, userID, key).Scan(&existing.OperationID, &existingHash, &status, &existing.Query, &errorCode, &errorMessage, &existingWorkspaceID, &existingAccountID)
 	if err == nil {
-		if existingHash != requestHash {
+		// Legacy personal rows carry NULL workspace: they never belong to
+		// a workspace scope, so they conflict here instead of replaying.
+		if existingHash != requestHash || existingWorkspaceID != identity.WorkspaceInternalID || existingAccountID != identity.BillingAccountID {
 			return visionReservation{}, ErrVisionIdempotencyConflict
 		}
 		existing.Status = status
@@ -88,7 +123,7 @@ func (s *VisionBillingService) reserve(ctx context.Context, userID int64, key, r
 	}
 	operationID := uuid.NewString()
 	hold, err := s.credits.InTx(tx).Hold(ctx, ports.HoldCommand{
-		UserID: userID, Amount: amount,
+		BillingAccountID: identity.BillingAccountID, Amount: amount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey:    "ai-search:" + operationID + ":hold",
 			Actor:             domain.Actor{Type: domain.ActorUser, ID: fmt.Sprintf("%d", userID)},
@@ -102,19 +137,28 @@ func (s *VisionBillingService) reserve(ctx context.Context, userID int64, key, r
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO ai_search_operations
-		(operation_id, user_id, idempotency_key, request_hash, sku, price_version_id, unit_credits, hold_transaction_id, status)
-		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, 'pending')`, operationID, userID, key, requestHash, visionSearchSKU, quote.PriceVersionID, quote.TotalCredits, hold.TransactionID); err != nil {
+		(operation_id, user_id, workspace_id, billing_account_id, idempotency_key, request_hash, sku, price_version_id, unit_credits, hold_transaction_id, status)
+		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')`, operationID, userID, identity.WorkspaceInternalID, identity.BillingAccountID, key, requestHash, visionSearchSKU, quote.PriceVersionID, quote.TotalCredits, hold.TransactionID); err != nil {
+		if database.IsDuplicateConstraintError(err) {
+			return visionReservation{}, ErrVisionIdempotencyConflict
+		}
 		return visionReservation{}, fmt.Errorf("insert vision operation: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
+		if database.IsDuplicateConstraintError(err) {
+			return visionReservation{}, ErrVisionIdempotencyConflict
+		}
 		return visionReservation{}, fmt.Errorf("commit vision billing reservation: %w", err)
 	}
 	return visionReservation{result: VisionBillingResult{OperationID: operationID, Status: string(VisionOperationPending)}, execute: true}, nil
 }
 
 // capture settles a succeeded extraction: Credits Capture plus the durable
-// succeeded marker commit atomically.
-func (s *VisionBillingService) capture(ctx context.Context, operationID string, userID int64, query string) error {
+// succeeded marker commit atomically. The payer is the STORED account; the
+// caller's workspace scope is verified against the stored row (no
+// membership re-gate, no account re-resolution), so post-Hold handovers
+// cannot divert the capture.
+func (s *VisionBillingService) capture(ctx context.Context, operationID, workspacePublicID string, userID int64, query string) error {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
@@ -122,15 +166,19 @@ func (s *VisionBillingService) capture(ctx context.Context, operationID string, 
 	defer tx.Rollback(context.Background())
 	var holdID string
 	var amount int64
-	if err := tx.QueryRow(ctx, `SELECT hold_transaction_id, unit_credits FROM ai_search_operations WHERE operation_id = $1::uuid AND user_id = $2 AND status = 'pending' FOR UPDATE`, operationID, userID).Scan(&holdID, &amount); err != nil {
+	var accountID, workspaceID, submitter int64
+	if err := tx.QueryRow(ctx, `SELECT hold_transaction_id, unit_credits, billing_account_id, workspace_id, user_id FROM ai_search_operations WHERE operation_id = $1::uuid AND status = 'pending' FOR UPDATE`, operationID).Scan(&holdID, &amount, &accountID, &workspaceID, &submitter); err != nil {
 		return err
+	}
+	if submitter != userID || !s.verifyVisionWorkspace(ctx, tx, workspacePublicID, workspaceID) {
+		return ErrVisionIdempotencyConflict
 	}
 	creditAmount, err := domain.NewCreditAmount(amount)
 	if err != nil {
 		return err
 	}
 	if _, err := s.credits.InTx(tx).Capture(ctx, ports.CaptureCommand{
-		UserID: userID, HoldTransactionID: holdID, Amount: creditAmount,
+		BillingAccountID: accountID, HoldTransactionID: holdID, Amount: creditAmount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "ai-search:" + operationID + ":capture",
 			Actor:          domain.Actor{Type: domain.ActorUser, ID: fmt.Sprintf("%d", userID)},
@@ -147,8 +195,9 @@ func (s *VisionBillingService) capture(ctx context.Context, operationID string, 
 }
 
 // release settles a deterministically failed extraction: Credits Release
-// plus the durable failed marker commit atomically.
-func (s *VisionBillingService) release(ctx context.Context, operationID string, userID int64, code, message string) error {
+// plus the durable failed marker commit atomically. Same stored-payer
+// rule as capture.
+func (s *VisionBillingService) release(ctx context.Context, operationID, workspacePublicID string, userID int64, code, message string) error {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
@@ -156,15 +205,19 @@ func (s *VisionBillingService) release(ctx context.Context, operationID string, 
 	defer tx.Rollback(context.Background())
 	var holdID string
 	var amount int64
-	if err := tx.QueryRow(ctx, `SELECT hold_transaction_id, unit_credits FROM ai_search_operations WHERE operation_id = $1::uuid AND user_id = $2 AND status = 'pending' FOR UPDATE`, operationID, userID).Scan(&holdID, &amount); err != nil {
+	var accountID, workspaceID, submitter int64
+	if err := tx.QueryRow(ctx, `SELECT hold_transaction_id, unit_credits, billing_account_id, workspace_id, user_id FROM ai_search_operations WHERE operation_id = $1::uuid AND status = 'pending' FOR UPDATE`, operationID).Scan(&holdID, &amount, &accountID, &workspaceID, &submitter); err != nil {
 		return err
+	}
+	if submitter != userID || !s.verifyVisionWorkspace(ctx, tx, workspacePublicID, workspaceID) {
+		return ErrVisionIdempotencyConflict
 	}
 	creditAmount, err := domain.NewCreditAmount(amount)
 	if err != nil {
 		return err
 	}
 	if _, err := s.credits.InTx(tx).Release(ctx, ports.ReleaseCommand{
-		UserID: userID, HoldTransactionID: holdID, Amount: creditAmount,
+		BillingAccountID: accountID, HoldTransactionID: holdID, Amount: creditAmount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "ai-search:" + operationID + ":release",
 			Actor:          domain.Actor{Type: domain.ActorUser, ID: fmt.Sprintf("%d", userID)},
@@ -178,6 +231,32 @@ func (s *VisionBillingService) release(ctx context.Context, operationID string, 
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+// verifyVisionWorkspace binds the settlement to its resource scope without
+// re-gating membership: the stored workspace must still resolve to the
+// caller's workspace. A workspace deleted mid-flight (hard delete keeps
+// the money fact) fails closed into reconciliation, which converges on
+// the stored payer without any workspace gate.
+func (s *VisionBillingService) verifyVisionWorkspace(ctx context.Context, tx pgx.Tx, workspacePublicID string, storedWorkspaceID int64) bool {
+	if storedWorkspaceID <= 0 || strings.TrimSpace(workspacePublicID) == "" {
+		return false
+	}
+	internalID, err := s.visionAccounts().ResolveWorkspaceInternalID(ctx, tx, strings.TrimSpace(workspacePublicID))
+	if err != nil {
+		return false
+	}
+	return internalID == storedWorkspaceID
+}
+
+// visionAccounts returns the injected resolver, defaulting to the
+// production #915 chain when unset (constructor always sets it; the
+// fallback only guards zero-valued test fixtures).
+func (s *VisionBillingService) visionAccounts() VisionBillingAccountResolver {
+	if s != nil && s.accounts != nil {
+		return s.accounts
+	}
+	return visionBillingAccountResolver{}
 }
 
 // markReconciliationPending parks an operation whose settlement outcome is

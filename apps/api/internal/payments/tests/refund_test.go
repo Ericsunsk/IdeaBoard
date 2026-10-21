@@ -20,6 +20,7 @@ import (
 	"ideaboard/api/internal/db/dbutil"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentcredentials "ideaboard/api/internal/payments/application/credentials"
+	"ideaboard/api/internal/payments/application/hints"
 	paymentrefund "ideaboard/api/internal/payments/application/refund"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
@@ -87,7 +88,7 @@ func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T
 	if refund.AmountMinor != 200 || refund.Currency != "usd" || refund.Status != paymentsdomain.PaymentRefundPending {
 		t.Fatalf("refund = %+v", refund)
 	}
-	wallet, err := credits.NewService(pool).GetWallet(t.Context(), 42)
+	wallet, err := paymentWallet(t, credits.NewService(pool), 42)
 	if err != nil || wallet.Available != 300 || wallet.Reserved != 200 {
 		t.Fatalf("reserved Wallet=%+v error=%v", wallet, err)
 	}
@@ -114,7 +115,7 @@ func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T
 	if err != nil || failed.Status != paymentsdomain.PaymentRefundFailed {
 		t.Fatalf("MarkPaymentRefundFailed() refund=%+v error=%v", failed, err)
 	}
-	wallet, err = credits.NewService(pool).GetWallet(t.Context(), 42)
+	wallet, err = paymentWallet(t, credits.NewService(pool), 42)
 	if err != nil || wallet.Available != 500 || wallet.Reserved != 0 {
 		t.Fatalf("released Wallet=%+v error=%v", wallet, err)
 	}
@@ -129,7 +130,7 @@ func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T
 	if err != nil || succeeded.Status != paymentsdomain.PaymentRefundSucceeded || succeeded.CreditTransactionID == "" {
 		t.Fatalf("MarkPaymentRefundSucceeded() refund=%+v error=%v", succeeded, err)
 	}
-	wallet, err = credits.NewService(pool).GetWallet(t.Context(), 42)
+	wallet, err = paymentWallet(t, credits.NewService(pool), 42)
 	if err != nil || wallet.Available != 300 || wallet.Reserved != 0 {
 		t.Fatalf("settled Wallet=%+v error=%v", wallet, err)
 	}
@@ -219,7 +220,8 @@ func TestPaymentRefundServiceChainCommitsBeforeStripeUnderAmbientControlTx(t *te
 			return nil
 		},
 	}
-	service, err := paymentrefund.NewService(repo, gateway, nil, func() time.Time { return now }, resolver)
+	events := &countingRefundPublisher{}
+	service, err := paymentrefund.NewService(repo, gateway, hints.NewPublisher(events, repo), func() time.Time { return now }, resolver)
 	if err != nil {
 		t.Fatalf("refund service: %v", err)
 	}
@@ -230,7 +232,7 @@ func TestPaymentRefundServiceChainCommitsBeforeStripeUnderAmbientControlTx(t *te
 	if err != nil {
 		t.Fatalf("begin control transaction: %v", err)
 	}
-	carrierCtx := dbutil.ContextWithAmbientTx(t.Context(), carrier)
+	carrierCtx := dbutil.ContextWithAmbientPostCommit(dbutil.ContextWithAmbientTx(t.Context(), carrier))
 	command := paymentcontracts.CreatePaymentRefundCommand{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 100,
 		IdempotencyKey: "refund-service-chain",
@@ -260,6 +262,9 @@ func TestPaymentRefundServiceChainCommitsBeforeStripeUnderAmbientControlTx(t *te
 	if err := carrier.Rollback(t.Context()); err != nil {
 		t.Fatalf("rollback control transaction: %v", err)
 	}
+	if got := events.total(); got != 0 {
+		t.Fatalf("rollback published %d hints, want 0", got)
+	}
 	settled, err := repo.GetPaymentRefundByID(t.Context(), first.ID)
 	if err != nil || settled.Status != paymentsdomain.PaymentRefundSucceeded {
 		t.Fatalf("settled refund after control rollback=%+v error=%v", settled, err)
@@ -283,7 +288,7 @@ func TestExternalDashboardRefundUsesTypedHoldUnderRestriction(t *testing.T) {
 	// A spending restriction blocks the generic spending Hold but must not
 	// block legitimate Dashboard refund recovery via PurchaseRefundHold.
 	if _, err := credits.NewService(db).RestrictWallet(t.Context(), ports.RestrictWalletCommand{
-		UserID: 42, Type: "payment_dispute", Source: "stripe_dispute",
+		BillingAccountID: paymentAccount(t, credits.NewService(db), 42), Type: "payment_dispute", Source: "stripe_dispute",
 		RelatedObject: domain.BusinessReference{Type: "payment_dispute", ID: "dispute-897"},
 		Reason:        "open payment dispute", Actor: domain.Actor{Type: domain.ActorService, ID: "payments"},
 	}); err != nil {
@@ -311,7 +316,7 @@ func TestExternalDashboardRefundUsesTypedHoldUnderRestriction(t *testing.T) {
 	if err != nil || settled.Status != paymentsdomain.PaymentRefundSucceeded {
 		t.Fatalf("MarkPaymentRefundSucceeded() refund=%+v error=%v", settled, err)
 	}
-	wallet, err := credits.NewService(db).GetWallet(t.Context(), 42)
+	wallet, err := paymentWallet(t, credits.NewService(db), 42)
 	if err != nil || wallet.Reserved != 0 {
 		t.Fatalf("settled wallet=%+v error=%v", wallet, err)
 	}
@@ -327,7 +332,7 @@ func TestExternalDashboardRefundInsufficientIdeasSurfacesRecoverableError(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := credits.NewService(pool).Deduct(t.Context(), ports.DeductionCommand{UserID: 42, Amount: spendAmount, Metadata: domain.CommandMetadata{
+	if _, err := credits.NewService(pool).Deduct(t.Context(), ports.DeductionCommand{BillingAccountID: paymentAccount(t, credits.NewService(pool), 42), Amount: spendAmount, Metadata: domain.CommandMetadata{
 		IdempotencyKey: "refund-external-shortage-spend", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "42"}, Source: "admin", Reason: "consume Ideas", BusinessReference: domain.BusinessReference{Type: "test", ID: "shortage"},
 	}}); err != nil {
 		t.Fatalf("spend Ideas: %v", err)
@@ -346,7 +351,7 @@ func TestExternalDashboardRefundBlockedOnFrozenWallet(t *testing.T) {
 	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	createCreditedRefundOrder(t, db, repo, now.Add(-time.Hour))
-	if _, err := db.Exec(t.Context(), `SELECT set_credit_wallet_status(42, 'frozen')`); err != nil {
+	if _, err := db.Exec(t.Context(), `SELECT set_billing_account_wallet_status(ensure_personal_billing_account_for_user(42), 'frozen')`); err != nil {
 		t.Fatalf("freeze wallet: %v", err)
 	}
 	if _, err := repo.CreateExternalPaymentRefund(t.Context(), paymentports.StripeRefund{ID: "re_dash_frozen", ChargeID: "ch_refund", AmountMinor: 100, Currency: "usd", Status: "succeeded"}, now); !errors.Is(err, domain.ErrWalletFrozen) {
@@ -439,7 +444,7 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 	if err != nil || settled.Status != paymentsdomain.PaymentRefundSucceeded {
 		t.Fatalf("settled refund=%+v error=%v", settled, err)
 	}
-	wallet, err := credits.NewService(pool).GetWallet(t.Context(), 42)
+	wallet, err := paymentWallet(t, credits.NewService(pool), 42)
 	if err != nil || wallet.Available != 400 || wallet.Reserved != 0 {
 		t.Fatalf("settled wallet=%+v error=%v", wallet, err)
 	}
@@ -478,7 +483,7 @@ func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) 
 	if succeeded != 1 || rejected != 1 {
 		t.Fatalf("concurrent refunds succeeded=%d rejected=%d", succeeded, rejected)
 	}
-	wallet, err := credits.NewService(pool).GetWallet(t.Context(), 42)
+	wallet, err := paymentWallet(t, credits.NewService(pool), 42)
 	if err != nil || wallet.Available != 200 || wallet.Reserved != 300 {
 		t.Fatalf("concurrent refund wallet=%+v error=%v", wallet, err)
 	}
@@ -487,10 +492,10 @@ func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) 
 func createCreditedRefundOrder(t *testing.T, db *pgxpool.Pool, repo *testPaymentStores, paidAt time.Time) paymentsdomain.PaymentOrder {
 	t.Helper()
 	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
-	if _, err := db.Exec(t.Context(), `SELECT provision_credit_wallet(42)`); err != nil {
+	if _, err := db.Exec(t.Context(), `SELECT ensure_personal_billing_account_for_user(42)`); err != nil {
 		t.Fatal(err)
 	}
-	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260804-REFUND000001", 500)
+	order := createAdminPaymentOrder(t, db, repo, 42, "IBP-20260804-REFUND000001", 500)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), paymentsdomain.BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: "cus_refund", StripeSessionID: "cs_refund",
 		CheckoutURL: "https://checkout.stripe.example/refund", ExpiresAt: order.ExpiresAt,

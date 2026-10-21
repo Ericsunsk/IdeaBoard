@@ -29,10 +29,20 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { ControlBillingAccountOwnerType } from './controlBillingAccountOwnerType'
 
 export interface ControlBillingAccount {
-  /** Workspace public id owning the implicit billing account. */
-  workspace_id: string
+  /**
+   * Stable funds identity holding the unified balance.
+   * @pattern ^ba_[A-Za-z0-9_-]+$
+   */
+  billing_account_id: string
+  /** workspace covers per-workspace and studio-shared links; organization is the shared org pool. */
+  owner_type: ControlBillingAccountOwnerType
+  /** Resolving or owning Workspace public id, when the account is workspace-scoped. */
+  workspace_id?: string
+  /** Owning Organization public id, when the account is the shared org pool. */
+  organization_id?: string
   created_at: string
   updated_at: string
 }

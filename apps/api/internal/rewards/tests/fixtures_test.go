@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"ideaboard/api/internal/credits"
+	creditsdomain "ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/rewards"
 	rewardscredits "ideaboard/api/internal/rewards/infrastructure/credits"
 	"ideaboard/api/internal/rewards/infrastructure/postgres"
@@ -50,8 +51,12 @@ func provisionRewardWallet(t *testing.T, pool *pgxpool.Pool, creditService *cred
 		t.Fatalf("begin wallet transaction: %v", err)
 	}
 	defer func() { _ = tx.Rollback(t.Context()) }()
-	if err := creditService.LifecycleInTx(tx).ProvisionWallet(t.Context(), userID); err != nil {
-		t.Fatalf("ProvisionWallet() error = %v", err)
+	personalAccountID, err := creditService.LifecycleInTx(tx).ResolvePersonalAccount(t.Context(), userID)
+	if err != nil {
+		t.Fatalf("ResolvePersonalAccount() error = %v", err)
+	}
+	if err := creditService.LifecycleInTx(tx).ProvisionAccountWallet(t.Context(), personalAccountID); err != nil {
+		t.Fatalf("ProvisionAccountWallet() error = %v", err)
 	}
 	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatalf("commit wallet: %v", err)
@@ -66,4 +71,15 @@ func lockRewardCodeID(ctx context.Context, tx pgx.Tx, rewardCodeID int64) error 
 // renamed by resource: reward-code service test helpers).
 func rewardCodeString(value string) *string {
 	return &value
+}
+
+// rewardWallet reads the deterministic initial personal Billing Account
+// wallet for one redeemer (#916).
+func rewardWallet(t *testing.T, service *credits.Service, userID int64) (creditsdomain.WalletDetails, error) {
+	t.Helper()
+	accountID, err := service.ResolvePersonalAccount(t.Context(), userID)
+	if err != nil {
+		return creditsdomain.WalletDetails{}, err
+	}
+	return service.GetWallet(t.Context(), accountID)
 }

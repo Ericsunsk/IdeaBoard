@@ -95,7 +95,7 @@ const (
 )
 
 // allowedHoldTransitions mirrors the durable guards in
-// execute_credit_command_v2
+// execute_credit_command_v3
 // (internal/db/schema/fragments/credits.sql): a hold opens held;
 // partial capture/release settlements keep it held (amounts accumulate
 // until captured + released == amount); full settlement flips it to
@@ -141,9 +141,9 @@ type ChargeReference struct {
 }
 
 type ListLedgerInput struct {
-	UserID         int64
-	BeforeSequence int64
-	Limit          int
+	BillingAccountID int64
+	BeforeSequence   int64
+	Limit            int
 }
 
 type LedgerPage struct {
@@ -151,11 +151,13 @@ type LedgerPage struct {
 	NextBeforeSequence int64               `json:"next_before_sequence,omitempty"`
 }
 
-// WalletBalance.UserID is an internal wallet FK and must never cross the HTTP boundary.
+// WalletBalance.BillingAccountID is an internal Billing Account FK and must
+// never cross the HTTP boundary (#916: the Wallet belongs to exactly one
+// Billing Account; the Actor on each Command carries the real operator).
 type WalletBalance struct {
-	UserID      int64     `json:"-"`
-	PublicID    uuid.UUID `json:"public_id"`
-	DisplayName string    `json:"display_name"`
-	Available   int64     `json:"available_credits"`
-	Reserved    int64     `json:"reserved_credits"`
+	BillingAccountID int64     `json:"-"`
+	PublicID         uuid.UUID `json:"public_id"`
+	DisplayName      string    `json:"display_name"`
+	Available        int64     `json:"available_credits"`
+	Reserved         int64     `json:"reserved_credits"`
 }

@@ -19,6 +19,8 @@ const sessionEmail = ref<string | null>(null)
 const walletState = ref<CreditWalletState>({
   status: 'ready',
   availableCredits: 1280,
+  billingAccountId: 'ba_1',
+  isShared: false,
 })
 
 vi.mock('../../auth/session/transport', () => ({
@@ -96,7 +98,12 @@ describe('useWorkspaceAccountControls', () => {
     })
     sessionEmail.value = null
     vi.mocked(authTransport.getSessionUser).mockReset().mockResolvedValue(null)
-    walletState.value = { status: 'ready', availableCredits: 1280 }
+    walletState.value = {
+      status: 'ready',
+      availableCredits: 1280,
+      billingAccountId: 'ba_1',
+      isShared: false,
+    }
   })
 
   it('exposes typed balance, avatar and session email without a credits menu item', () => {

@@ -84,6 +84,18 @@ describe('RewardsPane', () => {
     expect(screen.getByText('No redemptions yet')).toBeVisible()
   })
 
+  it('names the personal beneficiary account next to the redeem control', () => {
+    renderRewardsPane()
+
+    // #921: the requesting workspace never changes the beneficiary; the
+    // pane states the actual credited account next to the control.
+    expect(
+      screen.getByText(
+        'Rewards credit to your personal account. The current workspace does not change the beneficiary.',
+      ),
+    ).toBeVisible()
+  })
+
   it('keeps the user-shell primary action visual contract', () => {
     renderRewardsPane()
 

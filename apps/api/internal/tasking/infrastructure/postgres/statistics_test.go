@@ -56,7 +56,7 @@ VALUES ($1,$2,$3,$4,'render','{}',$5,2,0,'','', $6,$7,$8,$9)`,
 			t.Fatalf("seed task %s failed: %v", publicID, err)
 		}
 	}
-	if _, err := db.Exec(ctx, `INSERT INTO credit_wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`, userID); err != nil {
+	if _, err := db.Exec(ctx, `INSERT INTO credit_wallets (billing_account_id) VALUES ($1) ON CONFLICT DO NOTHING`, billingAccountID); err != nil {
 		t.Fatalf("seed credit wallet failed: %v", err)
 	}
 	var issuanceAccountID, sinkAccountID int64
@@ -94,9 +94,9 @@ ON CONFLICT DO NOTHING RETURNING id`, seed.role, seed.shard).Scan(seed.dest); er
 			}
 		}()
 		if _, err := tx.Exec(ctx, `
-INSERT INTO credit_transactions (transaction_id, wallet_user_id, command_type, idempotency_key, request_hash, actor_type, actor_id, source, reason, business_reference_type, business_reference_id, command_amount, posting_count, available_balance_after, reserved_balance_after, created_at)
+INSERT INTO credit_transactions (transaction_id, billing_account_id, command_type, idempotency_key, request_hash, actor_type, actor_id, source, reason, business_reference_type, business_reference_id, command_amount, posting_count, available_balance_after, reserved_balance_after, created_at)
 VALUES ($1,$2,$3,$4,$5,'system','test','test','test seed',$6,$7,$8,2,1000,0,$9)`,
-			txnID, userID, commandType, key, strings.Repeat("ab", 32), businessRefType, businessRefID, amount, created); err != nil {
+			txnID, billingAccountID, commandType, key, strings.Repeat("ab", 32), businessRefType, businessRefID, amount, created); err != nil {
 			t.Fatalf("seed credit txn %s failed: %v", key, err)
 		}
 		if _, err := tx.Exec(ctx, `
@@ -138,9 +138,9 @@ VALUES ('test:render', '1k', 2, 0, $1) RETURNING price_version_id`, userID).Scan
 			hold = holdID
 		}
 		if _, err := db.Exec(ctx, `
-INSERT INTO task_billing_snapshots (task_id, user_id, service, sku, display_name, price_version_id, price_version, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id)
-VALUES ($1,$2,'render','test:render','Render',$3,$4,$5,$6,$7,$8,$9)`,
-			taskID, userID, priceVersionID, priceVersion, unitCredits, quantity, total, quotedAt, hold); err != nil {
+INSERT INTO task_billing_snapshots (task_id, user_id, billing_account_id, service, sku, display_name, price_version_id, price_version, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id)
+VALUES ($1,$2,$3,'render','test:render','Render',$4,$5,$6,$7,$8,$9,$10)`,
+			taskID, userID, billingAccountID, priceVersionID, priceVersion, unitCredits, quantity, total, quotedAt, hold); err != nil {
 			t.Fatalf("seed snapshot %s failed: %v", taskID, err)
 		}
 	}

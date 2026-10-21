@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"ideaboard/api/internal/consumptionread"
 	"ideaboard/api/internal/credits/domain"
 
 	"github.com/jackc/pgx/v5"
@@ -16,53 +17,53 @@ import (
 func GetAvailableBalances(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	userIDs []int64,
+	billingAccountIDs []int64,
 ) (map[int64]int64, error) {
 	if pool == nil {
 		return nil, fmt.Errorf("credits service: database pool not configured")
 	}
-	if len(userIDs) == 0 {
+	if len(billingAccountIDs) == 0 {
 		return map[int64]int64{}, nil
 	}
-	for _, userID := range userIDs {
-		if userID <= 0 {
+	for _, billingAccountID := range billingAccountIDs {
+		if billingAccountID <= 0 {
 			return nil, domain.ErrInvalidCommand
 		}
 	}
 
 	rows, err := pool.Query(ctx, `
-SELECT requested.user_id,
-       wallets.user_id IS NOT NULL AS wallet_exists,
-       available.id IS NOT NULL AS available_exists,
-       reserved.id IS NOT NULL AS reserved_exists,
-       COALESCE(available.balance, 0)
-FROM unnest($1::bigint[]) AS requested(user_id)
-LEFT JOIN credit_wallets wallets ON wallets.user_id = requested.user_id
+SELECT requested.billing_account_id,
+        wallets.billing_account_id IS NOT NULL AS wallet_exists,
+        available.id IS NOT NULL AS available_exists,
+        reserved.id IS NOT NULL AS reserved_exists,
+        COALESCE(available.balance, 0)
+FROM unnest($1::bigint[]) AS requested(billing_account_id)
+LEFT JOIN credit_wallets wallets ON wallets.billing_account_id = requested.billing_account_id
 LEFT JOIN credit_accounts available
-  ON available.wallet_user_id = requested.user_id
+  ON available.billing_account_id = requested.billing_account_id
  AND available.asset_code = 'credits'
  AND available.account_role = 'user_available'
 LEFT JOIN credit_accounts reserved
-  ON reserved.wallet_user_id = requested.user_id
+  ON reserved.billing_account_id = requested.billing_account_id
  AND reserved.asset_code = 'credits'
  AND reserved.account_role = 'user_reserved'
-ORDER BY requested.user_id`, userIDs)
+ORDER BY requested.billing_account_id`, billingAccountIDs)
 	if err != nil {
 		return nil, fmt.Errorf("credits service: read available balances: %w", err)
 	}
 	defer rows.Close()
 
-	balances := make(map[int64]int64, len(userIDs))
+	balances := make(map[int64]int64, len(billingAccountIDs))
 	for rows.Next() {
 		var (
-			userID          int64
-			walletExists    bool
-			availableExists bool
-			reservedExists  bool
-			available       int64
+			billingAccountID int64
+			walletExists     bool
+			availableExists  bool
+			reservedExists   bool
+			available        int64
 		)
 		if err := rows.Scan(
-			&userID,
+			&billingAccountID,
 			&walletExists,
 			&availableExists,
 			&reservedExists,
@@ -74,13 +75,13 @@ ORDER BY requested.user_id`, userIDs)
 			return nil, fmt.Errorf(
 				"%w for user %d (wallet=%t available=%t reserved=%t)",
 				domain.ErrWalletBalanceIntegrity,
-				userID,
+				billingAccountID,
 				walletExists,
 				availableExists,
 				reservedExists,
 			)
 		}
-		balances[userID] = available
+		balances[billingAccountID] = available
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("credits service: iterate available balances: %w", err)
@@ -88,28 +89,28 @@ ORDER BY requested.user_id`, userIDs)
 	return balances, nil
 }
 
-func GetWallet(ctx context.Context, pool *pgxpool.Pool, userID int64) (domain.WalletDetails, error) {
+func GetWallet(ctx context.Context, pool *pgxpool.Pool, billingAccountID int64) (domain.WalletDetails, error) {
 	if pool == nil {
 		return domain.WalletDetails{}, fmt.Errorf("credits service: database pool not configured")
 	}
-	if userID <= 0 {
+	if billingAccountID <= 0 {
 		return domain.WalletDetails{}, domain.ErrInvalidCommand
 	}
 	wallet := domain.WalletDetails{
-		WalletBalance:      domain.WalletBalance{UserID: userID},
+		WalletBalance:      domain.WalletBalance{BillingAccountID: billingAccountID},
 		ActiveRestrictions: make([]domain.WalletRestriction, 0),
 	}
 	var activeRestrictionsJSON []byte
 	err := pool.QueryRow(ctx, `
 	WITH wallet_balance AS (
-	  SELECT wallets.user_id,
+	  SELECT wallets.billing_account_id,
 	         wallets.status,
 	         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_available') AS available_credits,
 	         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved') AS reserved_credits
 	  FROM credit_wallets wallets
-	  JOIN credit_accounts accounts ON accounts.wallet_user_id = wallets.user_id
-	  WHERE wallets.user_id = $1
-	  GROUP BY wallets.user_id, wallets.status
+	  JOIN credit_accounts accounts ON accounts.billing_account_id = wallets.billing_account_id
+	  WHERE wallets.billing_account_id = $1
+	  GROUP BY wallets.billing_account_id, wallets.status
 	  HAVING COUNT(*) FILTER (WHERE accounts.account_role IN ('user_available', 'user_reserved')) = 2
 	)
 	SELECT wallet_balance.status,
@@ -119,7 +120,7 @@ func GetWallet(ctx context.Context, pool *pgxpool.Pool, userID int64) (domain.Wa
 	         SELECT jsonb_agg(
 	           jsonb_build_object(
 	             'restriction_id', restrictions.restriction_id,
-	             'user_id', restrictions.wallet_user_id,
+	             'billing_account_id', restrictions.billing_account_id,
 	             'type', restrictions.restriction_type,
 	             'source', restrictions.source,
 	             'related_object', jsonb_build_object(
@@ -135,10 +136,10 @@ func GetWallet(ctx context.Context, pool *pgxpool.Pool, userID int64) (domain.Wa
 	           ) ORDER BY restrictions.created_at, restrictions.restriction_id
 	         )
 	         FROM credit_wallet_restrictions restrictions
-	         WHERE restrictions.wallet_user_id = wallet_balance.user_id
+	         WHERE restrictions.billing_account_id = wallet_balance.billing_account_id
 	           AND restrictions.released_at IS NULL
 	       ), '[]'::jsonb)
-	FROM wallet_balance`, userID).Scan(
+	FROM wallet_balance`, billingAccountID).Scan(
 		&wallet.Status,
 		&wallet.Available,
 		&wallet.Reserved,
@@ -153,6 +154,9 @@ func GetWallet(ctx context.Context, pool *pgxpool.Pool, userID int64) (domain.Wa
 	if err := json.Unmarshal(activeRestrictionsJSON, &wallet.ActiveRestrictions); err != nil {
 		return domain.WalletDetails{}, fmt.Errorf("credits service: decode active Wallet restrictions: %w", err)
 	}
+	for index := range wallet.ActiveRestrictions {
+		wallet.ActiveRestrictions[index].BillingAccountID = wallet.BillingAccountID
+	}
 	return wallet, nil
 }
 
@@ -160,7 +164,7 @@ func ListLedger(ctx context.Context, pool *pgxpool.Pool, input domain.ListLedger
 	if pool == nil {
 		return domain.LedgerPage{}, fmt.Errorf("credits service: database pool not configured")
 	}
-	if input.UserID <= 0 {
+	if input.BillingAccountID <= 0 {
 		return domain.LedgerPage{}, domain.ErrInvalidCommand
 	}
 	limit := input.Limit
@@ -186,10 +190,10 @@ SELECT id,
        reserved_balance_after,
        created_at
 FROM credit_transactions
-WHERE wallet_user_id = $1
+WHERE billing_account_id = $1
   AND ($2::BIGINT <= 0 OR id < $2)
 ORDER BY id DESC
-LIMIT $3`, input.UserID, input.BeforeSequence, limit+1)
+LIMIT $3`, input.BillingAccountID, input.BeforeSequence, limit+1)
 	if err != nil {
 		return domain.LedgerPage{}, fmt.Errorf("credits service: list ledger: %w", err)
 	}
@@ -432,13 +436,14 @@ ORDER BY posting.transaction_id, posting.id`, transactionIDs)
 func GetCaptureUsage(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	userID int64,
+	billingAccountID int64,
+	filter domain.UsageFilter,
 	location *time.Location,
 ) (totalCredits int64, peakDailyCredits int64, firstCaptureDay time.Time, err error) {
 	if pool == nil {
 		return 0, 0, time.Time{}, fmt.Errorf("credits service: database pool not configured")
 	}
-	if userID <= 0 {
+	if billingAccountID <= 0 || !filter.Valid() {
 		return 0, 0, time.Time{}, domain.ErrInvalidCommand
 	}
 	if location == nil {
@@ -450,15 +455,16 @@ func GetCaptureUsage(
 WITH daily_captures AS (
   SELECT (created_at AT TIME ZONE $2)::date AS capture_day,
          SUM(command_amount)::numeric AS amount
-  FROM credit_transactions
-  WHERE wallet_user_id = $1
+  FROM `+consumptionread.Transactions(4)+` AS captures
+  WHERE billing_account_id = $1
     AND command_type = 'capture'
+    AND ($3::bigint = 0 OR (actor_type = 'user' AND actor_id = $3::text))
   GROUP BY (created_at AT TIME ZONE $2)::date
 )
 SELECT COALESCE(SUM(amount), 0)::bigint,
        COALESCE(MAX(amount), 0)::bigint,
        COALESCE(MIN(capture_day)::text, '')
-FROM daily_captures`, userID, location.String()).Scan(
+FROM daily_captures`, billingAccountID, location.String(), filter.ActorUserID, filter.WorkspaceID).Scan(
 		&totalCredits,
 		&peakDailyCredits,
 		&rawFirstCaptureDay,
@@ -479,7 +485,8 @@ FROM daily_captures`, userID, location.String()).Scan(
 func GetDailyCaptureUsage(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	userID int64,
+	billingAccountID int64,
+	filter domain.UsageFilter,
 	location *time.Location,
 	start time.Time,
 	endExclusive time.Time,
@@ -487,7 +494,7 @@ func GetDailyCaptureUsage(
 	if pool == nil {
 		return nil, fmt.Errorf("credits service: database pool not configured")
 	}
-	if userID <= 0 {
+	if billingAccountID <= 0 || !filter.Valid() {
 		return nil, domain.ErrInvalidCommand
 	}
 	if location == nil || !endExclusive.After(start) {
@@ -497,13 +504,14 @@ func GetDailyCaptureUsage(
 	rows, err := pool.Query(ctx, `
 SELECT ((created_at AT TIME ZONE $2)::date)::text AS capture_day,
        SUM(command_amount)::bigint AS amount
-FROM credit_transactions
-WHERE wallet_user_id = $1
+FROM `+consumptionread.Transactions(6)+` AS captures
+WHERE billing_account_id = $1
   AND command_type = 'capture'
+  AND ($5::bigint = 0 OR (actor_type = 'user' AND actor_id = $5::text))
   AND created_at >= $3
   AND created_at < $4
 GROUP BY (created_at AT TIME ZONE $2)::date
-ORDER BY capture_day`, userID, location.String(), start, endExclusive)
+ORDER BY capture_day`, billingAccountID, location.String(), start, endExclusive, filter.ActorUserID, filter.WorkspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("credits service: query daily capture usage: %w", err)
 	}

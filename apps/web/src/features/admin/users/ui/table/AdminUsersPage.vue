@@ -251,8 +251,8 @@
 
   <AdminUserWalletDialog
     v-if="walletDialogUser"
-    v-model:visible="walletDialogVisible"
-    :user="walletDialogUser"
+    v-model:is-visible="walletDialogVisible"
+    :target="{ ...walletDialogUser, kind: 'user', id: walletDialogUser.publicId }"
     @refresh-users="loadUsers"
   />
 </template>

@@ -86,7 +86,14 @@ describe('Admin Reward Code routes', () => {
       path: '',
       redirect: '/admin/credits/pricing',
     })
-    expect(childPaths).toEqual(['', 'pricing', 'health', 'reward-codes', 'payment-orders'])
+    expect(childPaths).toEqual([
+      '',
+      'pricing',
+      'accounts',
+      'health',
+      'reward-codes',
+      'payment-orders',
+    ])
     expect(childPaths).not.toContain('wallets')
     expect(creditsRoute?.children?.some((route) => route.name === 'AdminCreditWallets')).toBe(false)
     expect(rewardCodeRoute).toMatchObject({
@@ -95,6 +102,19 @@ describe('Admin Reward Code routes', () => {
     })
     expect(rewardCodeRoute?.component).toEqual(expect.any(Function))
     expect(rewardCodeRoute?.redirect).toBeUndefined()
+  })
+
+  it('publishes the funding account route under Credits operations', () => {
+    const creditsRoute = adminRoutes[0]?.children?.find((route) => route.path === 'credits')
+    const accountsRoute = creditsRoute?.children?.find((route) => route.path === 'accounts')
+
+    expect(accountsRoute).toMatchObject({
+      path: 'accounts',
+      name: 'AdminBillingAccounts',
+    })
+    expect(accountsRoute?.meta?.title).toBe('资金账户')
+    expect(accountsRoute?.component).toEqual(expect.any(Function))
+    expect(accountsRoute?.redirect).toBeUndefined()
   })
 })
 

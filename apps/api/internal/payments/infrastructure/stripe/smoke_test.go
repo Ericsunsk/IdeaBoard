@@ -44,7 +44,7 @@ func TestStripeTestModeSmoke(t *testing.T) {
 	const paymentOrderID = "1db90f9a-c836-4ef7-b449-6f58457d8f79"
 	const requestHash = "c8ea3f9d5e50ee5151ff8535c87822384f1ea2d3fb092b6795d223244e0f9068"
 	customer, err := adapter.CreateCustomer(t.Context(), paymentports.CreateCheckoutCustomerInput{
-		APIKey: apiKey, UserID: 9_000_000_001, IdempotencyKey: "ideaboard-stripe-smoke-customer-v1",
+		APIKey: apiKey, BillingAccountID: 9_000_000_001, IdempotencyKey: "ideaboard-stripe-smoke-customer-v1",
 	})
 	if err != nil {
 		t.Fatalf("create Stripe Test Mode customer: %v", err)

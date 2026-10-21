@@ -2,7 +2,6 @@ import type { RouteRecordRaw } from 'vue-router'
 import { adminNavigationRouteDefs, ADMIN_DEFAULT_PATH } from './navigationMeta'
 import type { AdminNavigationKey } from './navigationMeta'
 import { ADMIN_CREDIT_PRICING_PATH, ADMIN_ROOT_PATH } from '../routePaths'
-
 const adminPageComponents = {
   users: () => import('../users/ui/table/AdminUsersPage.vue'),
   credits: () => import('../credits/ui/AdminCreditsBillingLayout.vue'),
@@ -42,6 +41,15 @@ export const adminRoutes: RouteRecordRaw[] = [
             name: 'AdminCreditPricing',
             component: () => import('../credits/ui/pricing/AdminBillingPricingPage.vue'),
             meta: { requiresAuth: true, title: '功能定价' },
+          },
+          {
+            path: 'accounts',
+            name: 'AdminBillingAccounts',
+            component: () => import('../credits/ui/accounts/AdminBillingAccountsPage.vue'),
+            // requiresAuth rides the merged parent meta plus the admin path
+            // gate (router/index.ts); siblings redeclare it, new literals
+            // stay out per the boolean-prefix ratchet.
+            meta: { title: '资金账户' },
           },
           {
             path: 'health',

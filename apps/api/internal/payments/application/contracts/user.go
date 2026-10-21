@@ -18,6 +18,11 @@ type UserCheckoutService interface {
 	ListRecharges(context.Context, int64, string, int) (RechargeHistoryPage, error)
 }
 
+// The int64 argument on every UserCheckoutService method is the payer
+// Billing Account internal ID (#919), never the operator: orders, history,
+// and unpaid-slot accounting all scope to the account, while the operator
+// rides CreateCheckoutCommand.UserID and the order row independently.
+
 type WebhookService interface {
 	ReceiveStripeWebhook(context.Context, []byte, string) (paymentports.StripeWebhookReceipt, error)
 }

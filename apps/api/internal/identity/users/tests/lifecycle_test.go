@@ -25,10 +25,15 @@ func newLifecycleService(pool *pgxpool.Pool, creditService *credits.Service, key
 	return NewLifecycleService(pool, identitycreditsadapter.New(creditService), key)
 }
 
-func lifecycleHold(userID int64, key string) ports.HoldCommand {
+func lifecycleHold(t *testing.T, creditService *credits.Service, userID int64, key string) ports.HoldCommand {
+	t.Helper()
+	accountID, err := creditService.ResolvePersonalAccount(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("resolve lifecycle hold account: %v", err)
+	}
 	return ports.HoldCommand{
-		UserID: userID,
-		Amount: domain.CreditAmount(1),
+		BillingAccountID: accountID,
+		Amount:           domain.CreditAmount(1),
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey:    key,
 			Actor:             domain.Actor{Type: domain.ActorUser, ID: "lifecycle-test"},
@@ -79,7 +84,7 @@ func TestProvisionIdentityCreatesUserWalletAndWelcomeGrantAtomically(t *testing.
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM credit_welcome_claims`).Scan(&claimCount); err != nil {
 		t.Fatalf("count welcome claims: %v", err)
 	}
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM credit_transactions WHERE wallet_user_id = $1`, first.User.ID).Scan(&transactionCount); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM credit_transactions WHERE billing_account_id = ensure_personal_billing_account_for_user($1)`, first.User.ID).Scan(&transactionCount); err != nil {
 		t.Fatalf("count credit transactions: %v", err)
 	}
 	if claimCount != 1 || transactionCount != 1 {
@@ -221,13 +226,17 @@ func TestSetUserStatusFreezesAndRestoresWalletAtomically(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProvisionIdentity() error = %v", err)
 	}
+	accountID, err := creditService.ResolvePersonalAccount(ctx, result.User.ID)
+	if err != nil {
+		t.Fatalf("ResolvePersonalAccount() error = %v", err)
+	}
 	restriction, err := creditService.RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID:        result.User.ID,
-		Type:          "ledger_integrity",
-		Source:        "reconciliation",
-		RelatedObject: domain.BusinessReference{Type: "finding", ID: "identity-status-finding"},
-		Reason:        "verify Identity lifecycle isolation",
-		Actor:         domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
+		BillingAccountID: accountID,
+		Type:             "ledger_integrity",
+		Source:           "reconciliation",
+		RelatedObject:    domain.BusinessReference{Type: "finding", ID: "identity-status-finding"},
+		Reason:           "verify Identity lifecycle isolation",
+		Actor:            domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
 	})
 	if err != nil {
 		t.Fatalf("RestrictWallet() error = %v", err)
@@ -236,14 +245,14 @@ func TestSetUserStatusFreezesAndRestoresWalletAtomically(t *testing.T) {
 	if err := service.SetUserStatus(ctx, result.User.ID, 0); err != nil {
 		t.Fatalf("SetUserStatus(banned) error = %v", err)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(result.User.ID, "status:frozen")); !errors.Is(err, domain.ErrWalletFrozen) {
+	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, result.User.ID, "status:frozen")); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Hold(frozen wallet) error = %v, want ErrWalletFrozen", err)
 	}
 	var userStatus int16
 	var walletStatus string
 	if err := pool.QueryRow(ctx, `
 SELECT users.status, credit_wallets.status
-FROM users JOIN credit_wallets ON credit_wallets.user_id = users.id
+FROM users JOIN credit_wallets ON credit_wallets.billing_account_id = ensure_personal_billing_account_for_user(users.id)
 WHERE users.id = $1`, result.User.ID).Scan(&userStatus, &walletStatus); err != nil {
 		t.Fatalf("read statuses: %v", err)
 	}
@@ -254,14 +263,14 @@ WHERE users.id = $1`, result.User.ID).Scan(&userStatus, &walletStatus); err != n
 	if err := service.SetUserStatus(ctx, result.User.ID, 1); err != nil {
 		t.Fatalf("SetUserStatus(active) error = %v", err)
 	}
-	wallet, err := creditService.GetWallet(ctx, result.User.ID)
+	wallet, err := creditService.GetWallet(ctx, accountID)
 	if err != nil {
 		t.Fatalf("GetWallet(restored lifecycle) error = %v", err)
 	}
 	if wallet.Status != domain.WalletStatusActive || len(wallet.ActiveRestrictions) != 1 || wallet.ActiveRestrictions[0].RestrictionID != restriction.RestrictionID {
 		t.Fatalf("restored lifecycle cleared independent restriction: %+v", wallet)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(result.User.ID, "status:active-restricted")); !errors.Is(err, domain.ErrWalletRestricted) {
+	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, result.User.ID, "status:active-restricted")); !errors.Is(err, domain.ErrWalletRestricted) {
 		t.Fatalf("Hold(restored but restricted Wallet) error = %v, want ErrWalletRestricted", err)
 	}
 	if _, err := creditService.ReleaseWalletRestriction(ctx, ports.ReleaseWalletRestrictionCommand{
@@ -271,7 +280,7 @@ WHERE users.id = $1`, result.User.ID).Scan(&userStatus, &walletStatus); err != n
 	}); err != nil {
 		t.Fatalf("ReleaseWalletRestriction() error = %v", err)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(result.User.ID, "status:active")); err != nil {
+	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, result.User.ID, "status:active")); err != nil {
 		t.Fatalf("Hold(after explicit restriction release) error = %v", err)
 	}
 }
@@ -299,13 +308,17 @@ func TestTombstoneUserPreservesAccountingAndPreventsWelcomeReclaim(t *testing.T)
 	if err != nil {
 		t.Fatalf("ProvisionIdentity(first) error = %v", err)
 	}
+	firstAccountID, err := creditService.ResolvePersonalAccount(ctx, first.User.ID)
+	if err != nil {
+		t.Fatalf("ResolvePersonalAccount() error = %v", err)
+	}
 	restriction, err := creditService.RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID:        first.User.ID,
-		Type:          "ledger_integrity",
-		Source:        "reconciliation",
-		RelatedObject: domain.BusinessReference{Type: "finding", ID: "deletion-finding"},
-		Reason:        "verify deletion preserves restrictions",
-		Actor:         domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
+		BillingAccountID: firstAccountID,
+		Type:             "ledger_integrity",
+		Source:           "reconciliation",
+		RelatedObject:    domain.BusinessReference{Type: "finding", ID: "deletion-finding"},
+		Reason:           "verify deletion preserves restrictions",
+		Actor:            domain.Actor{Type: domain.ActorSystem, ID: "reconciliation"},
 	})
 	if err != nil {
 		t.Fatalf("RestrictWallet(deletion) error = %v", err)
@@ -319,7 +332,7 @@ func TestTombstoneUserPreservesAccountingAndPreventsWelcomeReclaim(t *testing.T)
 	var status int16
 	if err := pool.QueryRow(ctx, `
 SELECT users.display_name, users.auth_user_id, users.avatar, users.status, credit_wallets.status
-FROM users JOIN credit_wallets ON credit_wallets.user_id = users.id WHERE users.id = $1`, first.User.ID).Scan(
+FROM users JOIN credit_wallets ON credit_wallets.billing_account_id = ensure_personal_billing_account_for_user(users.id) WHERE users.id = $1`, first.User.ID).Scan(
 		&displayName, &authUserID, &avatar, &status, &walletStatus,
 	); err != nil {
 		t.Fatalf("read tombstone: %v", err)
@@ -327,7 +340,7 @@ FROM users JOIN credit_wallets ON credit_wallets.user_id = users.id WHERE users.
 	if displayName != "已注销用户" || authUserID != nil || avatar != "" || status != 0 || walletStatus != "frozen" {
 		t.Fatalf("tombstone display_name=%q auth=%v avatar=%q status=%d wallet=%q", displayName, authUserID, avatar, status, walletStatus)
 	}
-	tombstoneWallet, err := creditService.GetWallet(ctx, first.User.ID)
+	tombstoneWallet, err := creditService.GetWallet(ctx, firstAccountID)
 	if err != nil {
 		t.Fatalf("GetWallet(tombstone) error = %v", err)
 	}
@@ -348,10 +361,10 @@ FROM users JOIN credit_wallets ON credit_wallets.user_id = users.id WHERE users.
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM credit_welcome_claims`).Scan(&claimCount); err != nil {
 		t.Fatalf("count claims: %v", err)
 	}
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM credit_transactions WHERE wallet_user_id = $1`, first.User.ID).Scan(&firstLedgerCount); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM credit_transactions WHERE billing_account_id = ensure_personal_billing_account_for_user($1)`, first.User.ID).Scan(&firstLedgerCount); err != nil {
 		t.Fatalf("count first ledger: %v", err)
 	}
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM credit_transactions WHERE wallet_user_id = $1`, second.User.ID).Scan(&secondLedgerCount); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM credit_transactions WHERE billing_account_id = ensure_personal_billing_account_for_user($1)`, second.User.ID).Scan(&secondLedgerCount); err != nil {
 		t.Fatalf("count second ledger: %v", err)
 	}
 	if claimCount != 1 || firstLedgerCount != 1 || secondLedgerCount != 0 {
@@ -391,11 +404,15 @@ func TestDirectUserRepositoryInsertProvisionsCreditWalletProjection(t *testing.T
 		t.Fatalf("create user: %v", err)
 	}
 
-	balances, err := credits.NewService(pool).GetAvailableBalances(ctx, []int64{user.ID})
+	provisionedAccountID, err := credits.NewService(pool).ResolvePersonalAccount(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("resolve provisioned account: %v", err)
+	}
+	balances, err := credits.NewService(pool).GetAvailableBalances(ctx, []int64{provisionedAccountID})
 	if err != nil {
 		t.Fatalf("read provisioned wallet balance: %v", err)
 	}
-	if got := balances[user.ID]; got != 0 {
+	if got := balances[provisionedAccountID]; got != 0 {
 		t.Fatalf("available balance = %d, want 0", got)
 	}
 }
@@ -422,7 +439,7 @@ RETURNING id`, authUserID).Scan(&userID); err != nil {
 	if len(results) != 1 || !results[0].WelcomeGranted || results[0].Wallet.Available != 100 {
 		t.Fatalf("initializer results = %+v", results)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(userID, "initializer:banned")); !errors.Is(err, domain.ErrWalletFrozen) {
+	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, userID, "initializer:banned")); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Hold(initialized banned wallet) error = %v, want ErrWalletFrozen", err)
 	}
 }
@@ -476,7 +493,7 @@ func TestAdminProvisionCreatesAndRepairsLifecycleAtomically(t *testing.T) {
 	if _, err := pool.Exec(ctx, `UPDATE users SET role = 'user', status = 0 WHERE id = $1`, created.User.ID); err != nil {
 		t.Fatalf("drift local admin: %v", err)
 	}
-	if _, err := pool.Exec(ctx, `SELECT set_credit_wallet_status($1, 'frozen')`, created.User.ID); err != nil {
+	if _, err := pool.Exec(ctx, `SELECT set_billing_account_wallet_status(ensure_personal_billing_account_for_user($1), 'frozen')`, created.User.ID); err != nil {
 		t.Fatalf("freeze drifted admin wallet: %v", err)
 	}
 	repaired, err := service.ProvisionIdentity(ctx, identity)
@@ -487,7 +504,7 @@ func TestAdminProvisionCreatesAndRepairsLifecycleAtomically(t *testing.T) {
 		t.Fatalf("repaired admin = %+v, created = %+v", repaired, created)
 	}
 	var walletStatus string
-	if err := pool.QueryRow(ctx, `SELECT status FROM credit_wallets WHERE user_id = $1`, created.User.ID).Scan(&walletStatus); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT status FROM credit_wallets WHERE billing_account_id = ensure_personal_billing_account_for_user($1)`, created.User.ID).Scan(&walletStatus); err != nil {
 		t.Fatalf("read repaired wallet status: %v", err)
 	}
 	if walletStatus != "active" {
@@ -744,13 +761,13 @@ VALUES (
 
 	if _, err := pool.Exec(ctx, `
 INSERT INTO payment_orders (
-  id, public_order_number, public_token, user_id, client_idempotency_key, request_hash,
+  id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash,
   status, stripe_credential_id, stripe_account_id, stripe_product_id, idea_quantity, base_amount_minor, terms_version,
   refund_policy_version, return_base_url, expires_at
 )
 VALUES (
   '0198cd29-f457-7e4b-b95e-6cfde41b9555', 'IBP-20260805-GUARD1234567',
-  '0198cd29-f457-7e4b-b95e-6cfde41b9666', $1, 'delete-payment-guard',
+  '0198cd29-f457-7e4b-b95e-6cfde41b9666', $1, ensure_personal_billing_account_for_user($1), 'delete-payment-guard',
   '841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f',
   'creating', '0198cd29-f457-7e4b-b95e-6cfde41b9777', 'acct_delete_guard', 'prod_delete_guard', 501, 501, 'v1', 'v1',
   'https://app.example.com', now() + interval '30 minutes'
@@ -772,7 +789,7 @@ VALUES (
 	var walletStatus string
 	if err := pool.QueryRow(ctx, `
 SELECT users.status, credit_wallets.status
-FROM users JOIN credit_wallets ON credit_wallets.user_id = users.id
+FROM users JOIN credit_wallets ON credit_wallets.billing_account_id = ensure_personal_billing_account_for_user(users.id)
 WHERE users.id = $1`, provisioned.User.ID).Scan(&userStatus, &walletStatus); err != nil {
 		t.Fatalf("read payment-guard state: %v", err)
 	}
@@ -862,7 +879,7 @@ func TestProvisionConcurrentWithBanOrDeleteNeverLeavesInactiveUserWithActiveWall
 			var walletStatus string
 			if err := pool.QueryRow(ctx, `
 SELECT users.status, credit_wallets.status
-FROM users JOIN credit_wallets ON credit_wallets.user_id = users.id
+FROM users JOIN credit_wallets ON credit_wallets.billing_account_id = ensure_personal_billing_account_for_user(users.id)
 WHERE users.id = $1`, created.User.ID).Scan(&userStatus, &walletStatus); err != nil {
 				t.Fatalf("read final status: %v", err)
 			}
@@ -884,7 +901,7 @@ func assertDeletionState(t *testing.T, pool interface {
 SELECT request.phase, users.status, wallet.status
 FROM user_deletion_requests request
 JOIN users ON users.id = request.user_id
-JOIN credit_wallets wallet ON wallet.user_id = request.user_id
+JOIN credit_wallets wallet ON wallet.billing_account_id = ensure_personal_billing_account_for_user(request.user_id)
 WHERE request.user_id = $1`, userID).Scan(&phase, &userStatus, &walletStatus); err != nil {
 		t.Fatalf("read deletion state: %v", err)
 	}

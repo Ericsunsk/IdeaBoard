@@ -9,8 +9,11 @@ import (
 // PaymentCustomer is the Stripe customer identity used by Checkout. It is
 // owned by the Checkout application boundary rather than the root composition
 // package, while persistence adapters remain free to map it to SQL rows.
+// The customer is scoped to the payer Billing Account (#919); UserID stays
+// only as the operator that last ensured it.
 type PaymentCustomer struct {
 	UserID           int64
+	BillingAccountID int64
 	StripeAccountID  string
 	StripeMode       paymentports.StripeMode
 	StripeCustomerID string

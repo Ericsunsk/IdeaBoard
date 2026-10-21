@@ -1,11 +1,15 @@
 import { getWorkspaceUsage } from '../../../../api/generated-query/public/workspace-billing/workspace-billing'
 import type { WorkspaceUsage } from '../../../../api/generated-query/public/model'
+import type { BillingConsumptionReadScope } from '../billing-account/readScope'
 import { i18n } from '../../../../core/i18n'
 import { requireAccountWorkspaceId, resolveWorkspaceBillingData } from '../workspaceBilling'
 
-// User usage boundary (W2 transports). Reads go through the Public Data
-// Plane (`GET /api/v1/workspaces/{id}/usage?range=`) with local view types;
-// the deleted `GET /api/user/usage` route is gone.
+// User usage boundary (v1 public plane).
+//
+// Reads go through `GET /api/v1/workspaces/{id}/usage?range=`, scoped to
+// the Workspace's stable Billing Account and attributed to the real
+// operator and the consuming Workspace. There is no owner-wallet
+// projection and no fallback.
 export const UsageRange = {
   '7d': '7d',
   '30d': '30d',
@@ -37,8 +41,8 @@ export const DEFAULT_USAGE_RANGE: UsageRange = '30d'
 
 export const usageQueryKeys = {
   all: ['workspace', 'usage'] as const,
-  current: (workspaceId: string, range: UsageRange) =>
-    ['workspace', 'usage', 'current', workspaceId, range] as const,
+  current: (scope: BillingConsumptionReadScope, range: UsageRange) =>
+    ['workspace', 'usage', 'current', scope, range] as const,
 }
 
 export async function fetchUsage(

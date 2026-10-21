@@ -48,6 +48,9 @@
             >$1.00 USD = 100 Ideas</span
           >
         </div>
+        <p class="mt-1 mb-0 text-admin-meta text-muted-foreground">
+          {{ t('account.topUp.targetAccount', { account: options.billing_account_id }) }}
+        </p>
         <div
           class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5"
           :aria-label="t('account.topUp.packagesAria')"

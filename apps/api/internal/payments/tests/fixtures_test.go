@@ -1,7 +1,9 @@
 package tests
 
 import (
-	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/credits"
+	creditsdomain "ideaboard/api/internal/credits/domain"
+	creditsports "ideaboard/api/internal/credits/ports"
 	payments "ideaboard/api/internal/payments"
 
 	"context"
@@ -10,6 +12,7 @@ import (
 	"ideaboard/api/internal/payments/infrastructure/postgres/adminreads"
 	"ideaboard/api/internal/payments/infrastructure/postgres/disputes"
 	"ideaboard/api/internal/payments/infrastructure/postgres/refunds"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -66,7 +69,7 @@ func newCompleteTestPaymentsService(
 	runtime *payments.PaymentRuntime,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
-	wallets ports.WalletReader,
+	wallets creditsports.WalletReader,
 	verifier paymentports.StripeWebhookVerifier,
 	refundGateway paymentports.RefundGateway,
 	disputeGateway paymentports.DisputeGateway,
@@ -91,7 +94,7 @@ func newCompleteTestCheckoutService(
 	runtime *payments.PaymentRuntime,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
-	wallets ports.WalletReader,
+	wallets creditsports.WalletReader,
 	shutdownEnqueuer paymentconfiguration.ShutdownEnqueuer,
 ) *payments.Service {
 	t.Helper()
@@ -140,11 +143,12 @@ func activeTestStripeConfiguration(t *testing.T, repo *testPaymentStores) paymen
 	return configuration
 }
 
-func createAdminPaymentOrder(t *testing.T, repo *testPaymentStores, userID int64, publicOrderNumber string, quantity int64) paymentsdomain.PaymentOrder {
+func createAdminPaymentOrder(t *testing.T, db *pgxpool.Pool, repo *testPaymentStores, userID int64, publicOrderNumber string, quantity int64) paymentsdomain.PaymentOrder {
 	t.Helper()
 	configuration := activeTestStripeConfiguration(t, repo)
 	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), paymentsdomain.CreatePaymentOrderIntentInput{
 		ID: uuid.NewString(), PublicOrderNumber: publicOrderNumber, PublicToken: uuid.NewString(), UserID: userID,
+		BillingAccountID:     paymentBillingAccount(t, db, userID),
 		ClientIdempotencyKey: "admin-read-" + strings.ToLower(publicOrderNumber[len(publicOrderNumber)-12:]),
 		RequestHash:          "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
 		StripeCredentialID:   configuration.CredentialID,
@@ -236,4 +240,63 @@ func decodePaymentUserEvent(t *testing.T, event platformevents.UserEvent) Paymen
 		t.Fatalf("decode payment user event: %v", err)
 	}
 	return paymentEvent
+}
+
+// paymentWallet reads the deterministic initial personal Billing Account
+// wallet for one payer (#916): every payment outcome credits that account,
+// never a user wallet.
+func paymentWallet(t *testing.T, service *credits.Service, userID int64) (creditsdomain.WalletDetails, error) {
+	t.Helper()
+	accountID, err := service.ResolvePersonalAccount(t.Context(), userID)
+	if err != nil {
+		return creditsdomain.WalletDetails{}, err
+	}
+	return service.GetWallet(t.Context(), accountID)
+}
+
+// paymentAccount resolves the payer's account for command construction.
+func paymentAccount(t *testing.T, service *credits.Service, userID int64) int64 {
+	t.Helper()
+	accountID, err := service.ResolvePersonalAccount(t.Context(), userID)
+	if err != nil {
+		t.Fatalf("resolve payer billing account %d: %v", userID, err)
+	}
+	return accountID
+}
+
+// paymentBillingAccount provisions the payer's deterministic initial
+// personal Billing Account (#919) through the same database function the
+// migration backfill uses. Every pre-existing order attribution test starts
+// from this account; sharing and management tests grant from here.
+func paymentBillingAccount(t *testing.T, pool *pgxpool.Pool, userID int64) int64 {
+	t.Helper()
+	var accountID int64
+	if err := pool.QueryRow(t.Context(), `SELECT ensure_personal_billing_account_for_user($1)`, userID).Scan(&accountID); err != nil {
+		t.Fatalf("ensure payer billing account %d: %v", userID, err)
+	}
+	return accountID
+}
+
+// grantBillingAccountManager adds a financial manager to one Billing Account
+// (#919). Financial management never grants content access; this only wires
+// the funds side for multi-operator order tests.
+func grantBillingAccountManager(t *testing.T, pool *pgxpool.Pool, billingAccountID, userID int64, role string) {
+	t.Helper()
+	if _, err := pool.Exec(t.Context(), `INSERT INTO billing_account_members (billing_account_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (billing_account_id, user_id) DO UPDATE SET role = EXCLUDED.role`, billingAccountID, userID, role); err != nil {
+		t.Fatalf("grant billing manager %d on %d: %v", userID, billingAccountID, err)
+	}
+}
+
+// ensurePaymentsTestUser provisions one business user row for operator or
+// manager identities beyond the testdb fixture set (#919): the personal
+// Billing Account function fails closed for unknown owners.
+func ensurePaymentsTestUser(t *testing.T, pool *pgxpool.Pool, userID int64) {
+	t.Helper()
+	uid := "T" + strings.Repeat("0", 5-len(strconv.FormatInt(userID, 10))) + strconv.FormatInt(userID, 10)
+	if _, err := pool.Exec(t.Context(), `INSERT INTO users (id, display_name, storage_uid, role, status) VALUES ($1, $2, $3, 'user', 1) ON CONFLICT (id) DO NOTHING`, userID, "test-fixture-user", uid); err != nil {
+		t.Fatalf("seed payments test user %d: %v", userID, err)
+	}
+	if _, err := pool.Exec(t.Context(), `INSERT INTO users_used_uids (storage_uid) VALUES ($1) ON CONFLICT (storage_uid) DO NOTHING`, uid); err != nil {
+		t.Fatalf("seed payments test user uid %d: %v", userID, err)
+	}
 }

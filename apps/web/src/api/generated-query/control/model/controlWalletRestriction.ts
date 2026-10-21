@@ -34,9 +34,18 @@ import type { ControlWalletRestrictionRelatedObject } from './controlWalletRestr
 
 export interface ControlWalletRestriction {
   restriction_id: string
-  /** @pattern ^usr_[A-Za-z0-9_-]+$ */
-  user_id: string
+  /**
+   * Present only on user-addressed reads.
+   * @pattern ^usr_[A-Za-z0-9_-]+$
+   */
+  user_id?: string
+  /** Present only on user-addressed reads. */
   display_name?: string
+  /**
+   * The restricted Billing Account.
+   * @pattern ^ba_[A-Za-z0-9_-]+$
+   */
+  billing_account_id?: string
   type: string
   source: string
   related_object?: ControlWalletRestrictionRelatedObject

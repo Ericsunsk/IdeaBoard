@@ -188,11 +188,14 @@ func ListGlobalReconciliationFindings(ctx context.Context, pool *pgxpool.Pool, s
 		return ports.ReconciliationFindingPage{}, domain.ErrInvalidCommand
 	}
 	rows, err := pool.Query(ctx, `
-SELECT id, fingerprint, finding_type, severity, risk, wallet_user_id, subject_type, subject_id, details, status,
-       isolated, occurrence_count, first_seen_at, last_seen_at, resolved_at
-FROM credit_reconciliation_findings
-WHERE status = $1 AND ($2::BIGINT = 0 OR id < $2)
-ORDER BY id DESC LIMIT $3`, string(status), input.BeforeID, limit+1)
+SELECT f.id, f.fingerprint, f.finding_type, f.severity, f.risk, f.billing_account_id,
+       COALESCE(b.public_id, '') AS billing_account_public_id,
+       f.subject_type, f.subject_id, f.details, f.status,
+       f.isolated, f.occurrence_count, f.first_seen_at, f.last_seen_at, f.resolved_at
+FROM credit_reconciliation_findings AS f
+LEFT JOIN billing_accounts AS b ON b.internal_id = f.billing_account_id
+WHERE f.status = $1 AND ($2::BIGINT = 0 OR f.id < $2)
+ORDER BY f.id DESC LIMIT $3`, string(status), input.BeforeID, limit+1)
 	if err != nil {
 		return ports.ReconciliationFindingPage{}, fmt.Errorf("credits reconciliation: list global findings: %w", err)
 	}
@@ -211,7 +214,7 @@ func ScanReconciliationFindingPage(rows reconciliationFindingRows, limit int) (p
 	for rows.Next() {
 		var finding ports.ReconciliationFinding
 		if err := rows.Scan(&finding.ID, &finding.Fingerprint, &finding.FindingType, &finding.Severity, &finding.Risk,
-			&finding.WalletUserID, &finding.SubjectType, &finding.SubjectID, &finding.Details, &finding.Status,
+			&finding.BillingAccountID, &finding.BillingAccountPublicID, &finding.SubjectType, &finding.SubjectID, &finding.Details, &finding.Status,
 			&finding.Isolated, &finding.OccurrenceCount, &finding.FirstSeenAt, &finding.LastSeenAt, &finding.ResolvedAt); err != nil {
 			return ports.ReconciliationFindingPage{}, fmt.Errorf("credits reconciliation: scan finding: %w", err)
 		}

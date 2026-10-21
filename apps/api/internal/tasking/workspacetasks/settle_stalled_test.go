@@ -32,6 +32,7 @@ import (
 	"ideaboard/api/internal/credits/ports"
 	"ideaboard/api/internal/platform/riverpolicy"
 	"ideaboard/api/internal/tasking/workspacetasks"
+	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 )
 
 // ageTaskPastStallThreshold rewinds tasks.updated_at — the LIVENESS clock the
@@ -238,7 +239,7 @@ func TestStalledSweepIsIdempotent(t *testing.T) {
 	if first.Converged != 1 {
 		t.Fatalf("first sweep = %+v, want converged=1", first)
 	}
-	ledgerAfterFirst := env.ledgerCount(t, `wallet_user_id = $1`, env.userID)
+	ledgerAfterFirst := env.ledgerCount(t, `billing_account_id = $1`, env.accountID)
 	// grant + hold + release = 3; a second Release would make it 4.
 	if ledgerAfterFirst != 3 {
 		t.Fatalf("ledger rows after first sweep = %d, want 3", ledgerAfterFirst)
@@ -251,8 +252,8 @@ func TestStalledSweepIsIdempotent(t *testing.T) {
 	if second.Converged != 0 || len(second.Failures) != 0 {
 		t.Fatalf("second sweep = %+v, want no convergence and no failures", second)
 	}
-	if env.ledgerCount(t, `wallet_user_id = $1`, env.userID) != ledgerAfterFirst {
-		t.Fatalf("second sweep wrote ledger rows: %d, want %d", env.ledgerCount(t, `wallet_user_id = $1`, env.userID), ledgerAfterFirst)
+	if env.ledgerCount(t, `billing_account_id = $1`, env.accountID) != ledgerAfterFirst {
+		t.Fatalf("second sweep wrote ledger rows: %d, want %d", env.ledgerCount(t, `billing_account_id = $1`, env.accountID), ledgerAfterFirst)
 	}
 	if env.ledgerCount(t, `idempotency_key = $1`, "task-release:"+stalled.ID) != 1 {
 		t.Fatal("second sweep wrote a duplicate Release")
@@ -287,11 +288,19 @@ func (e *atomicEnv) seedSecondWorkspaceWithFundedOwner(t *testing.T) (workspaceI
 		workspaceID, userID); err != nil {
 		t.Fatalf("seed second workspace membership: %v", err)
 	}
+	var secondWorkspaceInternalID int64
+	if err := e.pool.QueryRow(ctx, `SELECT internal_id FROM workspaces WHERE public_id = $1`, workspaceID).Scan(&secondWorkspaceInternalID); err != nil {
+		t.Fatalf("resolve second workspace: %v", err)
+	}
+	secondAccount, err := tenancypg.NewBillingAccountStore(e.pool).EnsureBillingAccountForWorkspace(ctx, secondWorkspaceInternalID, workspaceID)
+	if err != nil {
+		t.Fatalf("resolve second billing account: %v", err)
+	}
 	tx, err := e.pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := e.credits.LifecycleInTx(tx).ProvisionWallet(ctx, userID); err != nil {
+	if err := e.credits.LifecycleInTx(tx).ProvisionAccountWallet(ctx, secondAccount.InternalID); err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("provision second wallet: %v", err)
 	}
@@ -300,7 +309,7 @@ func (e *atomicEnv) seedSecondWorkspaceWithFundedOwner(t *testing.T) (workspaceI
 		_ = tx.Rollback(ctx)
 		t.Fatal(err)
 	}
-	if _, err := e.credits.InTx(tx).Grant(ctx, ports.GrantCommand{UserID: userID, Amount: grant, Metadata: domain.CommandMetadata{
+	if _, err := e.credits.InTx(tx).Grant(ctx, ports.GrantCommand{BillingAccountID: secondAccount.InternalID, Amount: grant, Metadata: domain.CommandMetadata{
 		IdempotencyKey: "stalled-other-seed-" + randomAtomicHex(t, 4),
 		Actor:          domain.Actor{Type: domain.ActorSystem, ID: "test"},
 		Source:         "test", Reason: "stalled sweep seed",
@@ -363,7 +372,15 @@ func TestStalledSweepNeverSettlesAcrossWorkspaces(t *testing.T) {
 	if env.ledgerCount(t, `idempotency_key = $1`, "task-release:"+other.ID) != 0 {
 		t.Fatal("cross-workspace sweep released a hold")
 	}
-	otherWallet, err := env.credits.GetWallet(context.Background(), otherUser)
+	var otherWorkspaceInternalID int64
+	if err := env.pool.QueryRow(context.Background(), `SELECT internal_id FROM workspaces WHERE public_id = $1`, otherWS).Scan(&otherWorkspaceInternalID); err != nil {
+		t.Fatalf("resolve second workspace: %v", err)
+	}
+	secondAccountID, err := tenancypg.NewBillingAccountStore(env.pool).EnsureBillingAccountForWorkspace(context.Background(), otherWorkspaceInternalID, otherWS)
+	if err != nil {
+		t.Fatalf("resolve second billing account: %v", err)
+	}
+	otherWallet, err := env.credits.GetWallet(context.Background(), secondAccountID.InternalID)
 	if err != nil {
 		t.Fatalf("read second wallet: %v", err)
 	}

@@ -50,6 +50,7 @@ type Service struct {
 	// ServiceDeps.SubmissionClaims: production settlement fails closed
 	// without it.
 	submissionClaims TxSubmissionClaimStore
+	billingAccounts  TxBillingAccountResolver
 	events           []TaskEvent
 	now              func() time.Time
 }
@@ -82,6 +83,13 @@ type ServiceDeps struct {
 	// of degrading into an unfenced create.
 	SubmissionClaims TxSubmissionClaimStore
 	Acceptance       SubmissionAuthorizer
+	// BillingAccounts resolves the stable funds identity inside the
+	// settlement transaction (#915 resolution, #916 funds identity). When
+	// nil, production falls back to the taskLifecycle store when it
+	// implements TxBillingAccountResolver (the postgres Store does); a
+	// store that cannot resolve fails closed (no seam ->
+	// ErrSettlementUnavailable) rather than spending an owner wallet.
+	BillingAccounts TxBillingAccountResolver
 }
 
 // SubmissionAuthorizer accepts current membership, Board capability and all input
@@ -99,6 +107,7 @@ func NewService(deps ServiceDeps) *Service {
 		queue: deps.Queue, assets: deps.Assets,
 		resolver: deps.Resolver, saveSnapshot: deps.SnapshotSaver, now: time.Now,
 		submissionClaims: deps.SubmissionClaims, acceptance: deps.Acceptance,
+		billingAccounts: deps.BillingAccounts,
 	}
 }
 
@@ -295,7 +304,8 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 func pendingTaskWithBinding(input CreateInput, kind, taskID, token string, binding TaskBoardBinding, snapshot BillingSnapshot) *WorkspaceTask {
 	return &WorkspaceTask{
 		ID: taskID, WorkspaceID: strings.TrimSpace(input.WorkspaceID), OwnerUserID: input.OwnerUserID,
-		Service: kind, MediaAssetIDs: append([]string(nil), input.MediaAssetIDs...),
+		BillingAccountID: snapshot.BillingAccountID,
+		Service:          kind, MediaAssetIDs: append([]string(nil), input.MediaAssetIDs...),
 		Params: cloneParams(input.Params), CanonicalParams: input.CanonicalParams,
 		BoardID: binding.BoardID, BoardAccessVersion: binding.AccessVersion,
 		Status:     StatusPending,

@@ -36,18 +36,25 @@ type StripeWebhookInboxStore interface {
 
 type PaymentCheckoutStore interface {
 	WithUserCheckoutLock(context.Context, int64, func(context.Context) error) error
+	WithBillingAccountCheckoutLock(context.Context, int64, func(context.Context) error) error
 	CreatePaymentOrderIntent(context.Context, paymentsdomain.CreatePaymentOrderIntentInput) (paymentsdomain.PaymentOrder, bool, error)
-	GetPaymentCustomer(context.Context, int64, string, paymentports.StripeMode) (paymentcheckout.PaymentCustomer, error)
+	GetPaymentCustomerByAccount(context.Context, int64, string, paymentports.StripeMode) (paymentcheckout.PaymentCustomer, error)
 	UpsertPaymentCustomer(context.Context, paymentcheckout.PaymentCustomer) (paymentcheckout.PaymentCustomer, error)
 	BindPaymentOrderCheckout(context.Context, paymentsdomain.BindPaymentOrderCheckoutInput) (paymentsdomain.PaymentOrder, error)
-	GetPaymentOrderByPublicToken(context.Context, int64, string) (paymentsdomain.PaymentOrder, error)
+	GetPaymentOrderByAccountToken(context.Context, int64, string) (paymentsdomain.PaymentOrder, error)
 	GetPaymentOrderByID(context.Context, string) (paymentsdomain.PaymentOrder, error)
 	GetPaymentOrderByCheckoutSession(context.Context, string, string) (paymentsdomain.PaymentOrder, error)
 	ListActivePaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error)
-	ListUserPendingPaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error)
+	ListAccountActivePaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error)
+	ListAccountPendingPaymentOrders(context.Context, int64) ([]paymentsdomain.PaymentOrder, error)
 	ListUnsettledPaymentOrders(context.Context) ([]paymentsdomain.PaymentOrder, error)
 	paymentreadmodel.CheckoutStore
 }
+
+// The int64 account argument on the ByAccount variants is the payer Billing
+// Account internal ID (#919). The operator-scoped methods stay for the
+// dispute path, which expires open checkouts behind the disputed operator;
+// checkout, return, and history use only the ByAccount variants.
 
 type PaymentOrderConvergenceStore interface {
 	MarkPaymentOrderAsyncPending(context.Context, string) (paymentsdomain.PaymentOrder, error)
@@ -63,6 +70,7 @@ type PaymentConvergenceStore interface {
 	ConvergePaymentDispute(context.Context, paymentports.StripeDispute, time.Time) (paymentsdomain.PaymentDispute, bool, error)
 	ListDuePaymentDisputes(context.Context, time.Time, int) ([]paymentsdomain.PaymentDispute, error)
 	ListPaymentDisputesForOrder(context.Context, string) ([]paymentsdomain.PaymentDispute, error)
+	GetPaymentOrderPayerAccount(context.Context, string) (int64, error)
 	ClaimDuePaymentOrderReconciliations(context.Context, time.Time) ([]paymentreconciliation.Claim, error)
 	CompletePaymentOrderReconciliationClaim(context.Context, paymentreconciliation.Claim, paymentreconciliation.Outcome) (bool, error)
 	ListPaymentReconciliationAnomalies(context.Context, int32) ([]paymentreconciliation.Anomaly, error)

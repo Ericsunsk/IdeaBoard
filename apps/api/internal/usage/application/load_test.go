@@ -11,6 +11,7 @@ import (
 
 	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
 	"ideaboard/api/internal/credits"
+	creditsdomain "ideaboard/api/internal/credits/domain"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/testenv"
@@ -85,7 +86,7 @@ func TestUsageMillionTransactionDataset(t *testing.T) {
 	)
 	results := make(map[usagedomain.Range]usageLoadLatency)
 	for _, usageRange := range []usagedomain.Range{usagedomain.Range7Days, usagedomain.Range30Days, usagedomain.Range1Year} {
-		loaded, err := service.loadCurrent(ctx, usageLoadTargetUserID, usageRange)
+		loaded, err := service.loadCurrent(ctx, usageLoadTargetUserID, creditsdomain.UsageFilter{}, usageRange)
 		if err != nil {
 			t.Fatalf("warm uncached %s usage: %v", usageRange, err)
 		}
@@ -96,7 +97,7 @@ func TestUsageMillionTransactionDataset(t *testing.T) {
 		durations := make([]time.Duration, 0, usageLoadSamples)
 		for sample := 0; sample < usageLoadSamples; sample++ {
 			started := time.Now()
-			loaded, err := service.loadCurrent(ctx, usageLoadTargetUserID, usageRange)
+			loaded, err := service.loadCurrent(ctx, usageLoadTargetUserID, creditsdomain.UsageFilter{}, usageRange)
 			durations = append(durations, time.Since(started))
 			if err != nil {
 				t.Fatalf("uncached %s usage sample %d: %v", usageRange, sample, err)

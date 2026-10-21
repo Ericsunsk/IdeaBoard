@@ -35,10 +35,30 @@ An Execution Plan belongs to Canvas and may produce multiple Tasks. A Routing Sn
 ## Invariants
 
 - Task insert, billing hold, media reference claim, and River enqueue commit in
-  one PostgreSQL transaction.
+  one PostgreSQL transaction against the Workspace's stable Billing Account
+  (#915 resolution joins the transaction, #916 spends it); the submitter
+  rides as the operator Actor, never as the funds identity. Inside the
+  transaction the submission gate (workspace row lock) precedes the durable
+  idempotency claim: the claim's workspace FK takes `FOR KEY SHARE`, so
+  locking first is the only deadlock-free entry order for concurrent
+  submits.
+- Quote, readiness, and submit spend the same stable account with the same
+  consumption eligibility: workspace membership, the Board generate gate for
+  Board-bound preflights (editors and owners generate, viewers never do;
+  financial management alone grants no Board standing), the shared pool
+  availability decision, and the Wallet funds gate (402 insufficient vs 403
+  restricted, mirroring the submit Hold). Terminal Capture/Release converge
+  on the submit-time row facts, so member departure, role/billing-owner
+  changes, and payer-link changes never rewrite a Task's attribution; retry
+  mints a fresh execution token with no second Hold.
 - PostgreSQL and River are the task facts and queue source; NATS is event-only.
 - Terminal success captures Credits; failure, cancellation, and timeout release
-  the hold atomically with the task transition.
+  the hold atomically with the task transition. Events stage only after the
+  settlement unit is durable: synchronously for owned transactions, via a
+  post-commit hook for guard-borrowed ones, never on rollback.
+- Budget and member-quota checks (945/946) join the settlement transaction
+  between stable-account resolution and the Hold; no quota computation runs
+  in this boundary yet.
 - Submission validates current Workspace membership, Board generation capability,
   and canonical Media read permission for every input and mask within the same
   transaction as Quote, Hold, Task insert, and queue insertion.

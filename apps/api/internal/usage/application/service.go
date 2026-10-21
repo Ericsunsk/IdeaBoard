@@ -9,6 +9,7 @@ import (
 	"time"
 
 	billingrecordsports "ideaboard/api/internal/billingrecords/ports"
+	creditsdomain "ideaboard/api/internal/credits/domain"
 	usagedomain "ideaboard/api/internal/usage/domain"
 	usageports "ideaboard/api/internal/usage/ports"
 
@@ -28,12 +29,12 @@ const MaxSafeInteger int64 = billingrecordsports.MaxSafeInteger
 const sharedUsageLoadTimeout = 30 * time.Second
 
 type CaptureUsageReader interface {
-	GetCaptureUsage(context.Context, int64, *time.Location) (int64, int64, time.Time, error)
-	GetDailyCaptureUsage(context.Context, int64, *time.Location, time.Time, time.Time) (map[string]int64, error)
+	GetCaptureUsage(context.Context, int64, creditsdomain.UsageFilter, *time.Location) (int64, int64, time.Time, error)
+	GetDailyCaptureUsage(context.Context, int64, creditsdomain.UsageFilter, *time.Location, time.Time, time.Time) (map[string]int64, error)
 }
 
 type LogicalTaskUsageReader interface {
-	GetTaskUsage(context.Context, int64, *time.Location) (int64, int64, error)
+	GetTaskUsage(context.Context, int64, creditsdomain.UsageFilter, *time.Location) (int64, int64, error)
 }
 
 type LifetimeSummary struct {
@@ -89,22 +90,22 @@ func NewService(
 	}
 }
 
-func (s *Service) GetCurrent(ctx context.Context, userID int64, usageRange usagedomain.Range) (Usage, error) {
+func (s *Service) GetCurrent(ctx context.Context, billingAccountID int64, filter creditsdomain.UsageFilter, usageRange usagedomain.Range) (Usage, error) {
 	if s == nil || s.captures == nil || s.tasks == nil {
 		return Usage{}, usageports.ErrReadersNotConfigured
 	}
-	if userID <= 0 {
-		return Usage{}, usageports.ErrInvalidUserID
+	if billingAccountID <= 0 || !filter.Valid() {
+		return Usage{}, usageports.ErrInvalidBillingAccountID
 	}
 	if !usageRange.Valid() {
 		return Usage{}, fmt.Errorf("usage service: %w: %q", usagedomain.ErrInvalidRange, usageRange)
 	}
-	key := cacheKey{userID: userID, usageRange: usageRange}
+	key := cacheKey{billingAccountID: billingAccountID, filter: filter, usageRange: usageRange}
 	if cached, ok := s.cache.Get(key); ok {
 		return cached, nil
 	}
 	loaded, err := s.loadSingleflight(ctx, key, func(sharedCtx context.Context) (Usage, error) {
-		return s.loadCurrent(sharedCtx, userID, usageRange)
+		return s.loadCurrent(sharedCtx, billingAccountID, filter, usageRange)
 	})
 	if err != nil {
 		return Usage{}, err
@@ -148,12 +149,12 @@ func (s *Service) loadSingleflight(
 	}
 }
 
-func (s *Service) loadCurrent(ctx context.Context, userID int64, usageRange usagedomain.Range) (Usage, error) {
+func (s *Service) loadCurrent(ctx context.Context, billingAccountID int64, filter creditsdomain.UsageFilter, usageRange usagedomain.Range) (Usage, error) {
 	location, err := time.LoadLocation(ShanghaiTimezone)
 	if err != nil {
 		return Usage{}, fmt.Errorf("%w: %w", usageports.ErrLoadTimezone, err)
 	}
-	totalCredits, peakDailyCredits, firstCaptureDay, err := s.captures.GetCaptureUsage(ctx, userID, location)
+	totalCredits, peakDailyCredits, firstCaptureDay, err := s.captures.GetCaptureUsage(ctx, billingAccountID, filter, location)
 	if err != nil {
 		return Usage{}, fmt.Errorf("%w: %w", usageports.ErrReadSettledCaptures, err)
 	}
@@ -163,7 +164,7 @@ func (s *Service) loadCurrent(ctx context.Context, userID int64, usageRange usag
 	if err := validateSafeInteger("peak daily credits", peakDailyCredits); err != nil {
 		return Usage{}, err
 	}
-	taskCount, activeDays, err := s.tasks.GetTaskUsage(ctx, userID, location)
+	taskCount, activeDays, err := s.tasks.GetTaskUsage(ctx, billingAccountID, filter, location)
 	if err != nil {
 		return Usage{}, fmt.Errorf("%w: %w", usageports.ErrReadLogicalTasks, err)
 	}
@@ -197,7 +198,8 @@ func (s *Service) loadCurrent(ctx context.Context, userID int64, usageRange usag
 	trendStart := today.AddDate(0, 0, -(trendDays - 1))
 	dailyCredits, err := s.captures.GetDailyCaptureUsage(
 		ctx,
-		userID,
+		billingAccountID,
+		filter,
 		location,
 		trendStart,
 		today.AddDate(0, 0, 1),

@@ -29,13 +29,25 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { ControlCreditWalletOwnerType } from './controlCreditWalletOwnerType'
 import type { ControlCreditWalletStatus } from './controlCreditWalletStatus'
 import type { ControlWalletRestriction } from './controlWalletRestriction'
 
 export interface ControlCreditWallet {
-  /** @pattern ^usr_[A-Za-z0-9_-]+$ */
-  user_id: string
-  display_name: string
+  /**
+   * Present only on user-addressed reads; account-addressed reads carry no single-user linkage.
+   * @pattern ^usr_[A-Za-z0-9_-]+$
+   */
+  user_id?: string
+  /** Present only on user-addressed reads. */
+  display_name?: string
+  /**
+   * Stable funds identity holding the balance (#916). The wallet belongs to this Billing Account; user_id names the requested target only.
+   * @pattern ^ba_[A-Za-z0-9_-]+$
+   */
+  billing_account_id?: string
+  /** Ownership of the addressed Billing Account. */
+  owner_type?: ControlCreditWalletOwnerType
   available_credits: number
   reserved_credits: number
   status: ControlCreditWalletStatus

@@ -146,7 +146,12 @@ export async function listWorkspaceTaskOutputs(
 
 export async function quoteWorkspaceTask(
   workspaceId: string,
-  input: { service: string; quantity?: number | undefined; resolution?: string | undefined },
+  input: {
+    service: string
+    quantity?: number | undefined
+    resolution?: string | undefined
+    board_id?: string | undefined
+  },
   options?: WorkspaceTasksRequestOptions,
 ): Promise<WorkspaceTaskBillingSnapshot> {
   const data: QuoteWorkspaceTaskRequest['data'] = {
@@ -154,6 +159,7 @@ export async function quoteWorkspaceTask(
   }
   if (input.quantity != null) data.quantity = input.quantity
   if (input.resolution != null) data.resolution = input.resolution
+  if (input.board_id != null) data.board_id = input.board_id
   const envelope = await quoteWorkspaceTaskTransport(
     assertWorkspaceTaskWorkspaceId(workspaceId),
     { data },

@@ -26,6 +26,7 @@ import (
 	"ideaboard/api/internal/media/workspacemedia"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"ideaboard/api/internal/tasking/workspacetasks"
+	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
 	"reflect"
 	"strings"
@@ -174,7 +175,7 @@ func (h *atomicHolder) releaseFailure() error {
 	return h.failRelease
 }
 
-func (h *atomicHolder) Hold(ctx context.Context, userID int64, amount int64, key, taskID string) (string, error) {
+func (h *atomicHolder) Hold(ctx context.Context, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
 	if err := h.holdFailure(); err != nil {
 		return "", err
 	}
@@ -182,22 +183,22 @@ func (h *atomicHolder) Hold(ctx context.Context, userID int64, amount int64, key
 	if err != nil {
 		return "", err
 	}
-	result, err := h.credits.Hold(ctx, ports.HoldCommand{UserID: userID, Amount: creditAmount, Metadata: atomicMetadata(key, taskID, userID)})
+	result, err := h.credits.Hold(ctx, ports.HoldCommand{BillingAccountID: billingAccountID, Amount: creditAmount, Metadata: atomicMetadata(key, taskID, actorUserID)})
 	if err != nil {
 		return "", err
 	}
 	return result.TransactionID, nil
 }
 
-func (h *atomicHolder) Capture(ctx context.Context, holdID string, amount int64, taskID string) error {
+func (h *atomicHolder) Capture(ctx context.Context, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) error {
 	return errors.New("atomicHolder.Capture must not run on the single-tx path")
 }
 
-func (h *atomicHolder) Release(ctx context.Context, holdID string, amount int64, taskID string) error {
+func (h *atomicHolder) Release(ctx context.Context, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) error {
 	return errors.New("atomicHolder.Release must not run on the single-tx path")
 }
 
-func (h *atomicHolder) HoldInTx(ctx context.Context, tx pgx.Tx, userID int64, amount int64, key, taskID string) (string, error) {
+func (h *atomicHolder) HoldInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
 	if err := h.holdFailure(); err != nil {
 		return "", err
 	}
@@ -205,14 +206,14 @@ func (h *atomicHolder) HoldInTx(ctx context.Context, tx pgx.Tx, userID int64, am
 	if err != nil {
 		return "", err
 	}
-	result, err := h.credits.InTx(tx).Hold(ctx, ports.HoldCommand{UserID: userID, Amount: creditAmount, Metadata: atomicMetadata(key, taskID, userID)})
+	result, err := h.credits.InTx(tx).Hold(ctx, ports.HoldCommand{BillingAccountID: billingAccountID, Amount: creditAmount, Metadata: atomicMetadata(key, taskID, actorUserID)})
 	if err != nil {
 		return "", err
 	}
 	return result.TransactionID, nil
 }
 
-func (h *atomicHolder) CaptureInTx(ctx context.Context, tx pgx.Tx, userID int64, holdID string, amount int64, taskID string) (string, error) {
+func (h *atomicHolder) CaptureInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) (string, error) {
 	if err := h.captureFailure(); err != nil {
 		return "", err
 	}
@@ -221,8 +222,8 @@ func (h *atomicHolder) CaptureInTx(ctx context.Context, tx pgx.Tx, userID int64,
 		return "", err
 	}
 	result, err := h.credits.InTx(tx).Capture(ctx, ports.CaptureCommand{
-		UserID: userID, HoldTransactionID: holdID, Amount: creditAmount,
-		Metadata: atomicMetadata("task-capture:"+taskID, taskID, userID),
+		BillingAccountID: billingAccountID, HoldTransactionID: holdID, Amount: creditAmount,
+		Metadata: atomicMetadata("task-capture:"+taskID, taskID, actorUserID),
 	})
 	if err != nil {
 		return "", err
@@ -230,7 +231,7 @@ func (h *atomicHolder) CaptureInTx(ctx context.Context, tx pgx.Tx, userID int64,
 	return result.TransactionID, nil
 }
 
-func (h *atomicHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, userID int64, holdID string, amount int64, taskID string) (string, error) {
+func (h *atomicHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) (string, error) {
 	if err := h.releaseFailure(); err != nil {
 		return "", err
 	}
@@ -239,8 +240,8 @@ func (h *atomicHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, userID int64,
 		return "", err
 	}
 	result, err := h.credits.InTx(tx).Release(ctx, ports.ReleaseCommand{
-		UserID: userID, HoldTransactionID: holdID, Amount: creditAmount,
-		Metadata: atomicMetadata("task-release:"+taskID, taskID, userID),
+		BillingAccountID: billingAccountID, HoldTransactionID: holdID, Amount: creditAmount,
+		Metadata: atomicMetadata("task-release:"+taskID, taskID, actorUserID),
 	})
 	if err != nil {
 		return "", err
@@ -299,6 +300,7 @@ type atomicEnv struct {
 	serviceDeps workspacetasks.ServiceDeps
 	ws          string
 	userID      int64
+	accountID   int64
 	unitCost    int64
 }
 
@@ -334,11 +336,22 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 	acceptance := &workspacemedia.TaskSubmissionAuthorizer{Boards: boardStore, TaskBoards: &boardtaskaccess.Authorizer{Store: boardStore}}
 
 	creditService := credits.NewService(pool)
+	// Seed funds on the task workspace's stable billing account (#916):
+	// submission Holds spend the resolved account, never an owner wallet.
+	var workspaceInternalID int64
+	if err := pool.QueryRow(ctx, `SELECT internal_id FROM workspaces WHERE public_id = $1`, ws).Scan(&workspaceInternalID); err != nil {
+		t.Fatalf("resolve atomic settle workspace: %v", err)
+	}
+	workspaceAccount, err := tenancypg.NewBillingAccountStore(pool).EnsureBillingAccountForWorkspace(ctx, workspaceInternalID, ws)
+	if err != nil {
+		t.Fatalf("resolve atomic settle billing account: %v", err)
+	}
+	accountID := workspaceAccount.InternalID
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := creditService.LifecycleInTx(tx).ProvisionWallet(ctx, userID); err != nil {
+	if err := creditService.LifecycleInTx(tx).ProvisionAccountWallet(ctx, accountID); err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("provision atomic settle wallet: %v", err)
 	}
@@ -347,7 +360,7 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 		_ = tx.Rollback(ctx)
 		t.Fatal(err)
 	}
-	if _, err := creditService.InTx(tx).Grant(ctx, ports.GrantCommand{UserID: userID, Amount: grantAmount, Metadata: domain.CommandMetadata{
+	if _, err := creditService.InTx(tx).Grant(ctx, ports.GrantCommand{BillingAccountID: accountID, Amount: grantAmount, Metadata: domain.CommandMetadata{
 		IdempotencyKey: "atomic-settle-seed-" + randomAtomicHex(t, 4),
 		Actor:          domain.Actor{Type: domain.ActorSystem, ID: "test"},
 		Source:         "test", Reason: "atomic settlement seed",
@@ -387,12 +400,12 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 		Acceptance: acceptance, TaskRead: store, TaskLifecycle: store, TaskBilling: store, Quoter: &atomicQuoter{catalog: billingCatalog}, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(), SnapshotSaver: snapshotSaver,
 	}
 	service := workspacetasks.NewService(deps)
-	return &atomicEnv{pool: pool, store: store, credits: creditService, holder: holder, queue: queue, service: service, serviceDeps: deps, ws: ws, userID: userID, unitCost: unitCost}
+	return &atomicEnv{pool: pool, store: store, credits: creditService, holder: holder, queue: queue, service: service, serviceDeps: deps, ws: ws, userID: userID, accountID: accountID, unitCost: unitCost}
 }
 
 func (e *atomicEnv) wallet(t *testing.T) (available, reserved int64) {
 	t.Helper()
-	details, err := e.credits.GetWallet(context.Background(), e.userID)
+	details, err := e.credits.GetWallet(context.Background(), e.accountID)
 	if err != nil {
 		t.Fatalf("read atomic settle wallet: %v", err)
 	}
@@ -503,7 +516,7 @@ func TestAtomicCreateRollsBackOnEnqueueFailure(t *testing.T) {
 	if count != 0 {
 		t.Fatalf("tasks = %d, want 0 (insert rolled back)", count)
 	}
-	if env.ledgerCount(t, `wallet_user_id = $1 AND command_type = 'hold'`, env.userID) != 0 {
+	if env.ledgerCount(t, `billing_account_id = $1 AND command_type = 'hold'`, env.accountID) != 0 {
 		t.Fatal("hold ledger row leaked after rolled-back Create")
 	}
 	if available, reserved := env.wallet(t); available != 1000 || reserved != 0 {
@@ -731,7 +744,7 @@ func TestAtomicFreeTaskSettlesWithoutLedger(t *testing.T) {
 	if completed.Status != workspacetasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", completed.Status)
 	}
-	if count := env.ledgerCount(t, `wallet_user_id = $1`, env.userID); count != 1 {
+	if count := env.ledgerCount(t, `billing_account_id = $1`, env.accountID); count != 1 {
 		t.Fatalf("ledger rows = %d, want only the seed grant (no hold/capture/release)", count)
 	}
 	if available, reserved := env.wallet(t); available != 1000 || reserved != 0 {
@@ -850,7 +863,7 @@ func TestAtomicRoutingUnavailableReservesNothing(t *testing.T) {
 	if count != 0 {
 		t.Fatalf("tasks = %d, want 0", count)
 	}
-	if env.ledgerCount(t, `wallet_user_id = $1 AND command_type = 'hold'`, env.userID) != 0 {
+	if env.ledgerCount(t, `billing_account_id = $1 AND command_type = 'hold'`, env.accountID) != 0 {
 		t.Fatal("hold ledger row leaked after unavailable Create")
 	}
 	if available, reserved := env.wallet(t); available != 1000 || reserved != 0 {
@@ -1005,27 +1018,27 @@ func (f *carrierSettleStore) GetTaskInTx(_ context.Context, _ pgx.Tx, workspaceI
 // called in this proof.
 type carrierSettleHolder struct{}
 
-func (carrierSettleHolder) Hold(_ context.Context, _ int64, _ int64, _, _ string) (string, error) {
+func (carrierSettleHolder) Hold(_ context.Context, _ int64, _ int64, _ int64, _, _ string) (string, error) {
 	return "", nil
 }
 
-func (carrierSettleHolder) Capture(_ context.Context, _ string, _ int64, _ string) error {
+func (carrierSettleHolder) Capture(_ context.Context, _ int64, _ int64, _ string, _ int64, _ string) error {
 	return nil
 }
 
-func (carrierSettleHolder) Release(_ context.Context, _ string, _ int64, _ string) error {
+func (carrierSettleHolder) Release(_ context.Context, _ int64, _ int64, _ string, _ int64, _ string) error {
 	return nil
 }
 
-func (carrierSettleHolder) HoldInTx(_ context.Context, _ pgx.Tx, _ int64, _ int64, _, _ string) (string, error) {
+func (carrierSettleHolder) HoldInTx(_ context.Context, _ pgx.Tx, _ int64, _ int64, _ int64, _, _ string) (string, error) {
 	return "", nil
 }
 
-func (carrierSettleHolder) CaptureInTx(_ context.Context, _ pgx.Tx, _ int64, _ string, _ int64, _ string) (string, error) {
+func (carrierSettleHolder) CaptureInTx(_ context.Context, _ pgx.Tx, _ int64, _ int64, _ string, _ int64, _ string) (string, error) {
 	return "", nil
 }
 
-func (carrierSettleHolder) ReleaseInTx(_ context.Context, _ pgx.Tx, _ int64, _ string, _ int64, _ string) (string, error) {
+func (carrierSettleHolder) ReleaseInTx(_ context.Context, _ pgx.Tx, _ int64, _ int64, _ string, _ int64, _ string) (string, error) {
 	return "", nil
 }
 

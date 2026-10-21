@@ -406,7 +406,11 @@ func TestDeleteWorkspaceRejectsActiveTasksWithoutChangingGraph(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer func() { _ = tx.Rollback(ctx) }()
-			if err := service.LifecycleInTx(tx).ProvisionWallet(ctx, userID); err != nil {
+			deleteGuardAccountID, err := service.LifecycleInTx(tx).ResolvePersonalAccount(ctx, userID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := service.LifecycleInTx(tx).ProvisionAccountWallet(ctx, deleteGuardAccountID); err != nil {
 				t.Fatal(err)
 			}
 			metadata := func(key string) creditdomain.CommandMetadata {
@@ -421,10 +425,10 @@ func TestDeleteWorkspaceRejectsActiveTasksWithoutChangingGraph(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := service.InTx(tx).Grant(ctx, creditports.GrantCommand{UserID: userID, Amount: amount, Metadata: metadata("delete-guard-grant")}); err != nil {
+			if _, err := service.InTx(tx).Grant(ctx, creditports.GrantCommand{BillingAccountID: deleteGuardAccountID, Amount: amount, Metadata: metadata("delete-guard-grant")}); err != nil {
 				t.Fatal(err)
 			}
-			hold, err := service.InTx(tx).Hold(ctx, creditports.HoldCommand{UserID: userID, Amount: amount, Metadata: metadata("delete-guard-hold")})
+			hold, err := service.InTx(tx).Hold(ctx, creditports.HoldCommand{BillingAccountID: deleteGuardAccountID, Amount: amount, Metadata: metadata("delete-guard-hold")})
 			if err != nil {
 				t.Fatal(err)
 			}

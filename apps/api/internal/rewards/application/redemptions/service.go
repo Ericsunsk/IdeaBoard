@@ -35,9 +35,17 @@ type CreditGrantRequest struct {
 type CreditGrantResult struct {
 	TransactionID    string
 	AvailableBalance int64
+	// BillingAccountID is the beneficiary Billing Account the Grant
+	// settled into (the caller's initial personal account).
+	BillingAccountID int64
 }
 
-type WalletSnapshot struct{ Available int64 }
+type WalletSnapshot struct {
+	Available int64
+	// BillingAccountID is the beneficiary Billing Account the snapshot
+	// was read from (the caller's initial personal account).
+	BillingAccountID int64
+}
 
 // Service is the user-facing redemption service.
 type Service struct {
@@ -179,7 +187,7 @@ func (s *Service) redeemRewardCode(
 			return RedeemResult{}, true, fmt.Errorf("commit reward Code redemption: %w", err)
 		}
 	}
-	return canonicalRedeemResult(redemption, grant.AvailableBalance, false), true, nil
+	return canonicalRedeemResult(redemption, grant.AvailableBalance, grant.BillingAccountID, false), true, nil
 }
 
 func (s *Service) loadRewardCode(ctx context.Context, tx pgx.Tx, rewardCodeID int64) (RewardCode, error) {
@@ -233,7 +241,7 @@ func (s *Service) finishRewardRedemptionReplay(ctx context.Context, tx pgx.Tx, u
 	if err != nil {
 		return RedeemResult{}, true, fmt.Errorf("read reward Code replay Wallet: %w", err)
 	}
-	return canonicalRedeemResult(redemption, wallet.Available, true), true, nil
+	return canonicalRedeemResult(redemption, wallet.Available, wallet.BillingAccountID, true), true, nil
 }
 
 func (s *Service) grantRewardCodeCredits(ctx context.Context, tx pgx.Tx, userID int64, rewardCode RewardCode) (int64, CreditGrantResult, error) {
@@ -283,7 +291,7 @@ RETURNING id, reward_code_id, user_id, reward_code_display_name, masked_code_hin
 	return redemption, nil
 }
 
-func canonicalRedeemResult(redemption Redemption, balance int64, replayed bool) RedeemResult {
+func canonicalRedeemResult(redemption Redemption, balance, billingAccountID int64, replayed bool) RedeemResult {
 	return RedeemResult{
 		Redemption: redemption,
 		HistoryItem: RedemptionHistoryItem{
@@ -295,6 +303,7 @@ func canonicalRedeemResult(redemption Redemption, balance int64, replayed bool) 
 		},
 		CreditedAmount:   redemption.CreditAmount,
 		AvailableBalance: balance,
+		BillingAccountID: billingAccountID,
 		Replayed:         replayed,
 	}
 }

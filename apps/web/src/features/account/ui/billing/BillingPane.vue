@@ -1,5 +1,8 @@
 <template>
   <AccountPane :title="t('account.tabs.billingTransactions')">
+    <p v-if="billingAccountId" class="mb-3 text-xs text-muted-foreground" role="status">
+      {{ t('account.billingRecords.sharedAccount', { account: billingAccountId }) }}
+    </p>
     <DataTableFrame
       :value="tableRows"
       data-key="record_id"
@@ -55,6 +58,7 @@
       </DataTableColumn>
 
       <DataTableColumn
+        v-if="consumptionScope === 'account'"
         field="available_credits_after"
         :header="t('account.billingRecords.columnBalanceAfter')"
         :style="{ width: '140px' }"
@@ -62,14 +66,33 @@
         <template #body="{ data }">
           <Skeleton v-if="isSkeletonRow(data)" width="5rem" />
           <span v-else class="font-mono font-semibold text-muted-foreground">
-            {{ formatLocaleNumber(data.available_credits_after) }}
+            {{
+              data.available_credits_after == null
+                ? '—'
+                : formatLocaleNumber(data.available_credits_after)
+            }}
           </span>
         </template>
       </DataTableColumn>
 
       <template #empty>
+        <div
+          v-if="isForbidden"
+          class="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"
+          role="status"
+        >
+          <span class="font-semibold text-foreground">{{
+            t('account.billingRecords.forbiddenTitle')
+          }}</span>
+          <span class="mt-1 text-sm text-muted-foreground">{{
+            t('account.billingRecords.forbiddenDescription')
+          }}</span>
+          <Button variant="ghost" size="sm" class="mt-3" @click="retryInitial()">{{
+            t('account.reload')
+          }}</Button>
+        </div>
         <LoadErrorPanel
-          v-if="initialError"
+          v-else-if="initialError"
           class="min-h-48 justify-center"
           align="center"
           :message="t('account.billingRecords.loadFailed')"
@@ -134,10 +157,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../core/components/DataTableFrame.vue'
 import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
 import { formatLocaleNumber } from '../../../../core/i18n/formatters'
-import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
+import { userErrorCode, userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'
 import { formatAccountLocalDateTime } from '../../session/formatters'
-import type { BillingRecordItem } from '../../session/billing/resource'
+import type { BillingRecord } from '../../session/billing/resource'
 import { useBillingRecords } from '../../session/billing/useBillingRecords'
 import AccountPane from '../shared/AccountPane.vue'
 import { accountDataTableFrameClass } from '../shared/ui'
@@ -146,11 +169,13 @@ type BillingSkeletonRow = {
   record_id: string
   isSkeleton: true
 }
-type BillingTableRow = BillingRecordItem | BillingSkeletonRow
+type BillingTableRow = BillingRecord | BillingSkeletonRow
 
 const props = defineProps<{ active: boolean }>()
 const { t } = useI18n()
 const {
+  billingAccountId,
+  consumptionScope,
   records,
   isInitialPending,
   initialError,
@@ -160,6 +185,9 @@ const {
   retryInitial,
   loadMore,
 } = useBillingRecords(() => props.active)
+const isForbidden = computed(
+  () => userErrorCode(initialError.value) === 'billing_account_forbidden',
+)
 const skeletonRows: BillingSkeletonRow[] = Array.from({ length: 5 }, (_, index) => ({
   record_id: `billing-skeleton-${index}`,
   isSkeleton: true,
@@ -176,7 +204,7 @@ function formatSignedAmount(value: number): string {
   return formatLocaleNumber(value)
 }
 
-function amountTone(record: BillingRecordItem): string {
+function amountTone(record: BillingRecord): string {
   if (record.credit_delta > 0) return 'text-success'
   if (record.kind === 'system_adjustment' && record.credit_delta < 0) {
     return 'text-destructive'
@@ -185,7 +213,7 @@ function amountTone(record: BillingRecordItem): string {
 }
 
 // Backend titles are Chinese protocol data; User copy resolves from the stable kind enum instead.
-const BILLING_KIND_COPY_KEY_MAP: Partial<Record<BillingRecordItem['kind'], string>> = {
+const BILLING_KIND_COPY_KEY_MAP: Partial<Record<BillingRecord['kind'], string>> = {
   usage: 'account.billingRecords.kinds.usage',
   reward: 'account.billingRecords.kinds.reward',
   top_up: 'account.billingRecords.kinds.topUp',
@@ -193,7 +221,7 @@ const BILLING_KIND_COPY_KEY_MAP: Partial<Record<BillingRecordItem['kind'], strin
   system_adjustment: 'account.billingRecords.kinds.systemAdjustment',
 }
 
-function recordDescription(record: BillingRecordItem): string {
+function recordDescription(record: BillingRecord): string {
   const key = BILLING_KIND_COPY_KEY_MAP[record.kind]
   // ai_usage keeps the pricing-config display name (e.g. the SKU label shown before purchase).
   if (!key) return record.title

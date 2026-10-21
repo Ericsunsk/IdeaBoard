@@ -80,10 +80,18 @@ import (
 // this seam performs none. Production adapts *credits.Service;
 // tests inject fakes. The library surface no longer settles (permanent
 // free tier); the search surface still does.
+//
+// Settlement identity (#918): funds always come from the consuming
+// Workspace's stable Billing Account with the caller as operator; there
+// is no personal-wallet fallback. Callers pass the consuming workspace
+// so the adapter resolves the payer inside the settlement transaction
+// (explicit link -> organization pool -> per-workspace account, fail
+// closed). Future consumption limits (945/946) join that same
+// transaction; no limit math lives here.
 type V1CreditSettler interface {
-	Hold(ctx context.Context, userID int64, amountCredits int64, idempotencyKey, reason string) (string, error)
-	Capture(ctx context.Context, userID int64, holdID string, amountCredits int64, idempotencyKey string) error
-	Release(ctx context.Context, userID int64, holdID string, amountCredits int64, idempotencyKey string) error
+	Hold(ctx context.Context, workspacePublicID string, actorUserID int64, amountCredits int64, idempotencyKey, reason string) (string, error)
+	Capture(ctx context.Context, workspacePublicID string, actorUserID int64, holdID string, amountCredits int64, idempotencyKey string) error
+	Release(ctx context.Context, workspacePublicID string, actorUserID int64, holdID string, amountCredits int64, idempotencyKey string) error
 }
 
 // V1BillingQuoter mints server-side price snapshots for metered

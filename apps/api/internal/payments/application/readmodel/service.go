@@ -26,6 +26,9 @@ type CheckoutStore interface {
 	GetAdminPaymentOrder(context.Context, string) (AdminPaymentOrderDetailFacts, []AdminPaymentWebhookEventRecord, error)
 }
 
+// ListPaymentRechargeHistory scopes to one payer Billing Account (#919);
+// the int64 is the account internal ID, never the operator.
+
 type ConvergenceStore interface {
 	ListPaymentRefundsForOrder(context.Context, string) ([]paymentsdomain.PaymentRefund, error)
 	ListPaymentDisputesForOrder(context.Context, string) ([]paymentsdomain.PaymentDispute, error)
@@ -145,7 +148,13 @@ func (s *Service) setRefundableIdeaQuantity(ctx context.Context, detail *AdminPa
 	if remaining <= 0 {
 		return nil
 	}
-	wallet, err := s.wallets.GetWallet(ctx, detail.InternalUserID)
+	// #920: refundable reads the order's fixed payer account, never the
+	// operator's personal account. A missing payer leaves the field unset
+	// rather than attributing another account's balance.
+	if detail.BillingAccountID <= 0 {
+		return nil
+	}
+	wallet, err := s.wallets.GetWallet(ctx, detail.BillingAccountID)
 	if err != nil && !errors.Is(err, domain.ErrWalletNotFound) {
 		return err
 	}
@@ -155,8 +164,8 @@ func (s *Service) setRefundableIdeaQuantity(ctx context.Context, detail *AdminPa
 	return nil
 }
 
-func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string, limit int) (paymentcontracts.RechargeHistoryPage, error) {
-	if s == nil || s.checkoutStore == nil || userID <= 0 {
+func (s *Service) ListRecharges(ctx context.Context, billingAccountID int64, cursor string, limit int) (paymentcontracts.RechargeHistoryPage, error) {
+	if s == nil || s.checkoutStore == nil || billingAccountID <= 0 {
 		return paymentcontracts.RechargeHistoryPage{}, paymentcontracts.ErrPaymentOrderNotFound
 	}
 	if limit == 0 {
@@ -169,7 +178,7 @@ func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string
 	if err != nil {
 		return paymentcontracts.RechargeHistoryPage{}, err
 	}
-	rows, err := s.checkoutStore.ListPaymentRechargeHistory(ctx, userID, s.now().UTC().AddDate(0, -12, 0), parsedCursor, limit+1)
+	rows, err := s.checkoutStore.ListPaymentRechargeHistory(ctx, billingAccountID, s.now().UTC().AddDate(0, -12, 0), parsedCursor, limit+1)
 	if err != nil {
 		return paymentcontracts.RechargeHistoryPage{}, fmt.Errorf("list recharge history: %w", err)
 	}

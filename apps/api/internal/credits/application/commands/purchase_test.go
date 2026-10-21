@@ -19,7 +19,7 @@ func TestPurchaseCreditsUsesCallerTransactionAndCanonicalIdempotency(t *testing.
 	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	if _, err := service.Grant(t.Context(), ports.GrantCommand{
-		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 10),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Amount: testhelpers.MustCreditAmount(t, 10),
 		Metadata: testhelpers.TestMetadata("purchase:seed", "purchase-seed"),
 	}); err != nil {
 		t.Fatalf("seed Wallet: %v", err)
@@ -34,7 +34,7 @@ func TestPurchaseCreditsUsesCallerTransactionAndCanonicalIdempotency(t *testing.
 		t.Fatal(err)
 	}
 	first, err := commands.Purchase(t.Context(), ports.PurchaseCommand{
-		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 500), Metadata: testhelpers.PurchaseMetadata("payment-purchase:order-1", "order-1"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Amount: testhelpers.MustCreditAmount(t, 500), Metadata: testhelpers.PurchaseMetadata("payment-purchase:order-1", "order-1"),
 	})
 	if err != nil {
 		_ = tx.Rollback(t.Context())
@@ -58,7 +58,7 @@ func TestPurchaseCreditsUsesCallerTransactionAndCanonicalIdempotency(t *testing.
 		t.Fatal(err)
 	}
 	replayed, err := replayCommands.Purchase(t.Context(), ports.PurchaseCommand{
-		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 500), Metadata: testhelpers.PurchaseMetadata("payment-purchase:order-1", "order-1"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Amount: testhelpers.MustCreditAmount(t, 500), Metadata: testhelpers.PurchaseMetadata("payment-purchase:order-1", "order-1"),
 	})
 	if err != nil {
 		_ = replayTx.Rollback(t.Context())
@@ -82,7 +82,7 @@ func TestPurchaseCreditsUsesCallerTransactionAndCanonicalIdempotency(t *testing.
 		t.Fatal(err)
 	}
 	_, err = conflictCommands.Purchase(t.Context(), ports.PurchaseCommand{
-		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 501), Metadata: testhelpers.PurchaseMetadata("payment-purchase:order-1", "order-1"),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Amount: testhelpers.MustCreditAmount(t, 501), Metadata: testhelpers.PurchaseMetadata("payment-purchase:order-1", "order-1"),
 	})
 	if !errors.Is(err, domain.ErrIdempotencyConflict) {
 		t.Fatalf("conflicting Purchase() error = %v, want domain.ErrIdempotencyConflict", err)
@@ -93,7 +93,7 @@ func TestPurchaseCreditsRequiresStripePaymentServiceMetadata(t *testing.T) {
 	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	if _, err := service.Grant(t.Context(), ports.GrantCommand{
-		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 1),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Amount: testhelpers.MustCreditAmount(t, 1),
 		Metadata: testhelpers.TestMetadata("purchase:validation-seed", "purchase-validation-seed"),
 	}); err != nil {
 		t.Fatal(err)
@@ -102,7 +102,7 @@ func TestPurchaseCreditsRequiresStripePaymentServiceMetadata(t *testing.T) {
 	invalid := testhelpers.PurchaseMetadata("payment-purchase:invalid", "order-invalid")
 	invalid.Actor = domain.Actor{Type: domain.ActorAdmin, ID: "7"}
 	if _, err := service.Purchase(t.Context(), ports.PurchaseCommand{
-		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 500), Metadata: invalid,
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Amount: testhelpers.MustCreditAmount(t, 500), Metadata: invalid,
 	}); !errors.Is(err, domain.ErrInvalidCommand) {
 		t.Fatalf("Purchase() error = %v, want domain.ErrInvalidCommand", err)
 	}
@@ -112,13 +112,13 @@ func TestPurchaseCreditsConvergesAfterWalletBecomesRestrictedAndFrozen(t *testin
 	pool := testdb.Open(t)
 	service := credits.NewService(pool)
 	if _, err := service.Grant(t.Context(), ports.GrantCommand{
-		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 1),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Amount: testhelpers.MustCreditAmount(t, 1),
 		Metadata: testhelpers.TestMetadata("purchase:convergence-seed", "purchase-convergence-seed"),
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.RestrictWallet(t.Context(), ports.RestrictWalletCommand{
-		UserID: 42, Type: "payment_test", Source: "integration_test",
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Type: "payment_test", Source: "integration_test",
 		RelatedObject: domain.BusinessReference{Type: "payment_order", ID: "order-convergence"},
 		Reason:        "verify paid order convergence",
 		Actor:         domain.Actor{Type: domain.ActorService, ID: "payments"},
@@ -130,7 +130,7 @@ func TestPurchaseCreditsConvergesAfterWalletBecomesRestrictedAndFrozen(t *testin
 	}
 
 	result, err := service.Purchase(t.Context(), ports.PurchaseCommand{
-		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 500),
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Amount: testhelpers.MustCreditAmount(t, 500),
 		Metadata: testhelpers.PurchaseMetadata("payment-purchase:order-convergence", "order-convergence"),
 	})
 	if err != nil {
@@ -144,23 +144,23 @@ func TestPurchaseCreditsConvergesAfterWalletBecomesRestrictedAndFrozen(t *testin
 func TestPurchaseRefundSettlesReservedIdeasToIssuanceIdempotently(t *testing.T) {
 	pool := testdb.Open(t)
 	service := credits.NewService(pool)
-	if _, err := service.Grant(t.Context(), ports.GrantCommand{UserID: 42, Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("purchase-refund:seed", "purchase-refund-seed")}); err != nil {
+	if _, err := service.Grant(t.Context(), ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("purchase-refund:seed", "purchase-refund-seed")}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.RestrictWallet(t.Context(), ports.RestrictWalletCommand{
-		UserID: 42, Type: "payment_dispute", Source: "stripe_dispute",
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Type: "payment_dispute", Source: "stripe_dispute",
 		RelatedObject: domain.BusinessReference{Type: "payment_dispute", ID: "dispute-1"},
 		Reason:        "open payment Dispute", Actor: domain.Actor{Type: domain.ActorService, ID: "payments"},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	hold, err := service.PurchaseRefundHold(t.Context(), ports.PurchaseRefundHoldCommand{UserID: 42, Amount: testhelpers.MustCreditAmount(t, 40), Metadata: domain.CommandMetadata{
+	hold, err := service.PurchaseRefundHold(t.Context(), ports.PurchaseRefundHoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Amount: testhelpers.MustCreditAmount(t, 40), Metadata: domain.CommandMetadata{
 		IdempotencyKey: "purchase-refund:hold", Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: "reserve unused Ideas", BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: "refund-1"},
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	command := ports.PurchaseRefundCommand{UserID: 42, HoldTransactionID: hold.TransactionID, Metadata: domain.CommandMetadata{
+	command := ports.PurchaseRefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), HoldTransactionID: hold.TransactionID, Metadata: domain.CommandMetadata{
 		IdempotencyKey: "purchase-refund:settle", Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe refund succeeded", BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: "refund-1"},
 	}}
 	result, err := service.PurchaseRefund(t.Context(), command)

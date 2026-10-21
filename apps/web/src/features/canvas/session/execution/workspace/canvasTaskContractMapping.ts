@@ -358,15 +358,21 @@ export function toWorkspaceQuoteInput(request: CanvasTaskRequestData): {
   service: Service
   quantity?: number | undefined
   resolution?: string | undefined
+  board_id?: string | undefined
 } {
   // Quotes are price-only: prompt/media never ride a quote, so readiness
   // preflight never throws unmappable for them (submit does, fail-closed).
+  // The Board binding rides along (#917): quote enforces the same
+  // generate gate as submit against the same stable account, so Viewers
+  // never read ready for a Board they cannot generate on.
   const service = assertService(request.service)
   const quantity = toWorkspaceQuantity(request.params)
   const resolution = toWorkspaceResolution(request.params)
+  const boardId = toWorkspaceBoardId(request.board_id)
   return {
     service,
     ...(quantity == null ? {} : { quantity }),
     ...(resolution == null ? {} : { resolution }),
+    ...(boardId == null ? {} : { board_id: boardId }),
   }
 }

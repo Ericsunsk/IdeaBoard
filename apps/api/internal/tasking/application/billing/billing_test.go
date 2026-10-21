@@ -33,11 +33,15 @@ func TestAIImageReadinessReturnsQuoteAndWalletAvailability(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback(t.Context())
-	if err := creditService.LifecycleInTx(tx).ProvisionWallet(t.Context(), 1); err != nil {
+	personalAccountID, err := creditService.LifecycleInTx(tx).ResolvePersonalAccount(t.Context(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := creditService.LifecycleInTx(tx).ProvisionAccountWallet(t.Context(), personalAccountID); err != nil {
 		t.Fatal(err)
 	}
 	amount, _ := domain.NewCreditAmount(20)
-	if _, err := creditService.InTx(tx).Grant(t.Context(), ports.GrantCommand{UserID: 1, Amount: amount, Metadata: domain.CommandMetadata{
+	if _, err := creditService.InTx(tx).Grant(t.Context(), ports.GrantCommand{BillingAccountID: personalAccountID, Amount: amount, Metadata: domain.CommandMetadata{
 		IdempotencyKey: "readiness-grant", Actor: domain.Actor{Type: domain.ActorSystem, ID: "test"}, Source: "test", Reason: "readiness", BusinessReference: domain.BusinessReference{Type: "test", ID: "readiness"},
 	}}); err != nil {
 		t.Fatal(err)
@@ -46,7 +50,7 @@ func TestAIImageReadinessReturnsQuoteAndWalletAvailability(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	readiness, err := service.Readiness(t.Context(), 1, request)
+	readiness, err := service.Readiness(t.Context(), personalAccountID, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,14 +116,18 @@ func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
 					t.Fatal(err)
 				}
 				defer tx.Rollback(t.Context())
-				if err := creditService.LifecycleInTx(tx).ProvisionWallet(t.Context(), 1); err != nil {
+				matrixAccountID, err := creditService.LifecycleInTx(tx).ResolvePersonalAccount(t.Context(), 1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := creditService.LifecycleInTx(tx).ProvisionAccountWallet(t.Context(), matrixAccountID); err != nil {
 					t.Fatal(err)
 				}
 				amount, err := domain.NewCreditAmount(20)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err := creditService.InTx(tx).Grant(t.Context(), ports.GrantCommand{UserID: 1, Amount: amount, Metadata: domain.CommandMetadata{
+				if _, err := creditService.InTx(tx).Grant(t.Context(), ports.GrantCommand{BillingAccountID: matrixAccountID, Amount: amount, Metadata: domain.CommandMetadata{
 					IdempotencyKey: "readiness-matrix:" + feature + ":" + scenario.name,
 					Actor:          domain.Actor{Type: domain.ActorSystem, ID: "test"}, Source: "test", Reason: "readiness matrix",
 					BusinessReference: domain.BusinessReference{Type: "test", ID: feature + ":" + scenario.name},
@@ -130,7 +138,7 @@ func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				readiness, err := service.Readiness(t.Context(), 1, request)
+				readiness, err := service.Readiness(t.Context(), matrixAccountID, request)
 				if scenario.wantErr != nil {
 					if !errors.Is(err, scenario.wantErr) {
 						t.Fatalf("error=%v, want %v", err, scenario.wantErr)
@@ -198,7 +206,11 @@ func TestHoldAndPersistFailsClosedForUnavailableFeatureStates(t *testing.T) {
 			}
 			defer tx.Rollback(t.Context())
 			service := NewService(catalog, creditService)
-			if _, err := service.HoldAndPersist(t.Context(), tx, HoldCommand{TaskID: "unavailable-" + scenario.name, UserID: 1, Billing: request}); !errors.Is(err, ErrPricingUnavailable) {
+			unavailableAccountID, err := creditService.ResolvePersonalAccount(t.Context(), 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := service.HoldAndPersist(t.Context(), tx, HoldCommand{TaskID: "unavailable-" + scenario.name, BillingAccountID: unavailableAccountID, ActorUserID: 1, Billing: request}); !errors.Is(err, ErrPricingUnavailable) {
 				t.Fatalf("HoldAndPersist error=%v, want ErrPricingUnavailable", err)
 			}
 			var count int
@@ -226,10 +238,14 @@ func TestDatabaseRejectsTaskBillingFactMutationAndIllegalSettlement(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := creditService.LifecycleInTx(tx).ProvisionWallet(t.Context(), 1); err != nil {
+	factsAccountID, err := creditService.ResolvePersonalAccount(t.Context(), 1)
+	if err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := service.HoldAndPersist(t.Context(), tx, HoldCommand{TaskID: "immutable-billing-task", UserID: 1, Billing: request})
+	if err := creditService.LifecycleInTx(tx).ProvisionAccountWallet(t.Context(), factsAccountID); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := service.HoldAndPersist(t.Context(), tx, HoldCommand{TaskID: "immutable-billing-task", BillingAccountID: factsAccountID, ActorUserID: 1, Billing: request})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,10 +268,10 @@ SELECT display_name FROM task_billing_snapshots WHERE task_id = 'immutable-billi
 	}
 	if _, err := pool.Exec(t.Context(), `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, service, sku, display_name, price_version_id, price_version,
+  task_id, user_id, billing_account_id, service, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at
 )
-SELECT 'invalid-initial-settlement', 1, service, sku, display_name, price_version_id, price_version,
+SELECT 'invalid-initial-settlement', 1, billing_account_id, service, sku, display_name, price_version_id, price_version,
        unit_credits, quantity, total_credits, quoted_at
 FROM task_billing_snapshots WHERE task_id = 'immutable-billing-task'`); err != nil {
 		t.Fatal(err)

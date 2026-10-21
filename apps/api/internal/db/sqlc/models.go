@@ -19,6 +19,8 @@ type AdminBrandLogoOverride struct {
 type AiSearchOperation struct {
 	OperationID       pgtype.UUID        `json:"operation_id"`
 	UserID            int64              `json:"user_id"`
+	WorkspaceID       pgtype.Int8        `json:"workspace_id"`
+	BillingAccountID  pgtype.Int8        `json:"billing_account_id"`
 	IdempotencyKey    string             `json:"idempotency_key"`
 	RequestHash       string             `json:"request_hash"`
 	Sku               string             `json:"sku"`
@@ -41,6 +43,13 @@ type BillingAccount struct {
 	OrganizationID pgtype.Int8        `json:"organization_id"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type BillingAccountMember struct {
+	BillingAccountID int64              `json:"billing_account_id"`
+	UserID           int64              `json:"user_id"`
+	Role             string             `json:"role"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
 type BillingAdminAction struct {
@@ -188,19 +197,21 @@ type ControlIdempotencyRecord struct {
 }
 
 type CreditAccount struct {
-	ID           int64              `json:"id"`
-	WalletUserID pgtype.Int8        `json:"wallet_user_id"`
-	AssetCode    string             `json:"asset_code"`
-	AccountRole  string             `json:"account_role"`
-	ShardKey     string             `json:"shard_key"`
-	Balance      int64              `json:"balance"`
-	Metadata     []byte             `json:"metadata"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	ID               int64              `json:"id"`
+	BillingAccountID pgtype.Int8        `json:"billing_account_id"`
+	WalletUserID     pgtype.Int8        `json:"wallet_user_id"`
+	AssetCode        string             `json:"asset_code"`
+	AccountRole      string             `json:"account_role"`
+	ShardKey         string             `json:"shard_key"`
+	Balance          int64              `json:"balance"`
+	Metadata         []byte             `json:"metadata"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
 type CreditCharge struct {
 	CaptureTransactionID string             `json:"capture_transaction_id"`
-	WalletUserID         int64              `json:"wallet_user_id"`
+	BillingAccountID     pgtype.Int8        `json:"billing_account_id"`
+	WalletUserID         pgtype.Int8        `json:"wallet_user_id"`
 	Amount               int64              `json:"amount"`
 	RefundedAmount       int64              `json:"refunded_amount"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
@@ -209,7 +220,8 @@ type CreditCharge struct {
 
 type CreditHold struct {
 	HoldTransactionID    string             `json:"hold_transaction_id"`
-	WalletUserID         int64              `json:"wallet_user_id"`
+	BillingAccountID     pgtype.Int8        `json:"billing_account_id"`
+	WalletUserID         pgtype.Int8        `json:"wallet_user_id"`
 	Amount               int64              `json:"amount"`
 	CapturedAmount       int64              `json:"captured_amount"`
 	ReleasedAmount       int64              `json:"released_amount"`
@@ -230,23 +242,24 @@ type CreditPosting struct {
 }
 
 type CreditReconciliationFinding struct {
-	ID              int64              `json:"id"`
-	Fingerprint     string             `json:"fingerprint"`
-	FindingType     string             `json:"finding_type"`
-	Severity        string             `json:"severity"`
-	Risk            string             `json:"risk"`
-	WalletUserID    pgtype.Int8        `json:"wallet_user_id"`
-	SubjectType     string             `json:"subject_type"`
-	SubjectID       string             `json:"subject_id"`
-	Details         []byte             `json:"details"`
-	Status          string             `json:"status"`
-	Isolated        bool               `json:"isolated"`
-	FirstSeenRunID  int64              `json:"first_seen_run_id"`
-	LastSeenRunID   int64              `json:"last_seen_run_id"`
-	OccurrenceCount int64              `json:"occurrence_count"`
-	FirstSeenAt     pgtype.Timestamptz `json:"first_seen_at"`
-	LastSeenAt      pgtype.Timestamptz `json:"last_seen_at"`
-	ResolvedAt      pgtype.Timestamptz `json:"resolved_at"`
+	ID               int64              `json:"id"`
+	Fingerprint      string             `json:"fingerprint"`
+	FindingType      string             `json:"finding_type"`
+	Severity         string             `json:"severity"`
+	Risk             string             `json:"risk"`
+	WalletUserID     pgtype.Int8        `json:"wallet_user_id"`
+	BillingAccountID pgtype.Int8        `json:"billing_account_id"`
+	SubjectType      string             `json:"subject_type"`
+	SubjectID        string             `json:"subject_id"`
+	Details          []byte             `json:"details"`
+	Status           string             `json:"status"`
+	Isolated         bool               `json:"isolated"`
+	FirstSeenRunID   int64              `json:"first_seen_run_id"`
+	LastSeenRunID    int64              `json:"last_seen_run_id"`
+	OccurrenceCount  int64              `json:"occurrence_count"`
+	FirstSeenAt      pgtype.Timestamptz `json:"first_seen_at"`
+	LastSeenAt       pgtype.Timestamptz `json:"last_seen_at"`
+	ResolvedAt       pgtype.Timestamptz `json:"resolved_at"`
 }
 
 type CreditReconciliationRun struct {
@@ -283,7 +296,8 @@ type CreditReconciliationRunFinding struct {
 type CreditTransaction struct {
 	ID                    int64              `json:"id"`
 	TransactionID         string             `json:"transaction_id"`
-	WalletUserID          int64              `json:"wallet_user_id"`
+	BillingAccountID      pgtype.Int8        `json:"billing_account_id"`
+	WalletUserID          pgtype.Int8        `json:"wallet_user_id"`
 	CommandType           string             `json:"command_type"`
 	AssetCode             string             `json:"asset_code"`
 	IdempotencyKey        string             `json:"idempotency_key"`
@@ -303,15 +317,17 @@ type CreditTransaction struct {
 }
 
 type CreditWallet struct {
-	UserID    int64              `json:"user_id"`
-	Status    string             `json:"status"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	BillingAccountID int64              `json:"billing_account_id"`
+	UserID           pgtype.Int8        `json:"user_id"`
+	Status           string             `json:"status"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
 type CreditWalletRestriction struct {
 	RestrictionID       pgtype.UUID        `json:"restriction_id"`
-	WalletUserID        int64              `json:"wallet_user_id"`
+	BillingAccountID    pgtype.Int8        `json:"billing_account_id"`
+	WalletUserID        pgtype.Int8        `json:"wallet_user_id"`
 	RestrictionType     string             `json:"restriction_type"`
 	Source              string             `json:"source"`
 	RelatedObjectType   string             `json:"related_object_type"`
@@ -570,6 +586,7 @@ type PaymentCheckoutShutdown struct {
 
 type PaymentCustomer struct {
 	UserID           int64              `json:"user_id"`
+	BillingAccountID int64              `json:"billing_account_id"`
 	StripeAccountID  string             `json:"stripe_account_id"`
 	StripeMode       string             `json:"stripe_mode"`
 	StripeCustomerID string             `json:"stripe_customer_id"`
@@ -603,7 +620,8 @@ type PaymentDispute struct {
 
 type PaymentDisputeDebitRequest struct {
 	ID                    pgtype.UUID        `json:"id"`
-	WalletUserID          int64              `json:"wallet_user_id"`
+	BillingAccountID      pgtype.Int8        `json:"billing_account_id"`
+	WalletUserID          pgtype.Int8        `json:"wallet_user_id"`
 	IdempotencyKey        string             `json:"idempotency_key"`
 	RequestHash           string             `json:"request_hash"`
 	RequestedAmount       int64              `json:"requested_amount"`
@@ -621,6 +639,7 @@ type PaymentOrder struct {
 	PublicOrderNumber       string             `json:"public_order_number"`
 	PublicToken             pgtype.UUID        `json:"public_token"`
 	UserID                  int64              `json:"user_id"`
+	BillingAccountID        pgtype.Int8        `json:"billing_account_id"`
 	ClientIdempotencyKey    string             `json:"client_idempotency_key"`
 	RequestHash             string             `json:"request_hash"`
 	Status                  string             `json:"status"`
@@ -884,6 +903,8 @@ type TaskBillingSettlement struct {
 type TaskBillingSnapshot struct {
 	TaskID            string             `json:"task_id"`
 	UserID            int64              `json:"user_id"`
+	WorkspaceID       pgtype.Int8        `json:"workspace_id"`
+	BillingAccountID  pgtype.Int8        `json:"billing_account_id"`
 	Service           string             `json:"service"`
 	Sku               string             `json:"sku"`
 	PriceVersionID    int64              `json:"price_version_id"`
@@ -1101,6 +1122,12 @@ type Workspace struct {
 	IsDefault      bool               `json:"is_default"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type WorkspaceBillingLink struct {
+	WorkspaceID      int64              `json:"workspace_id"`
+	BillingAccountID int64              `json:"billing_account_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
 type WorkspaceEvent struct {

@@ -10,6 +10,7 @@ import (
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	"ideaboard/api/internal/payments/application/credentials"
 	paymentdispute "ideaboard/api/internal/payments/application/dispute"
+	"ideaboard/api/internal/payments/application/hints"
 	paymentorder "ideaboard/api/internal/payments/application/order"
 	paymentreadmodel "ideaboard/api/internal/payments/application/readmodel"
 	paymentreconciliation "ideaboard/api/internal/payments/application/reconciliation"
@@ -44,6 +45,11 @@ type PaymentOrderTransitions struct {
 	runtime        *PaymentRuntime
 }
 
+// NewPaymentOrderTransitions wires the shared order lifecycle. When the
+// convergence store also resolves the SSE fanout audience (the Postgres
+// repository does via ListBillingAccountManagerIDs), hints fan out to the
+// persisted payer account's current managers (#919); otherwise only the
+// creating operator is notified.
 func NewPaymentOrderTransitions(store paymentpersistence.PaymentOrderConvergenceStore, runtime *PaymentRuntime) (*PaymentOrderTransitions, error) {
 	if store == nil {
 		return nil, fmt.Errorf("payment order transitions require convergence store")
@@ -51,8 +57,10 @@ func NewPaymentOrderTransitions(store paymentpersistence.PaymentOrderConvergence
 	if runtime == nil {
 		return nil, fmt.Errorf("payment order transitions require runtime")
 	}
+	audience, _ := store.(hints.BillingAccountAudience)
+	lifecycle := paymentorder.NewLifecycle(store, hints.NewPublisher(runtime.events, audience), runtime.now)
 	return &PaymentOrderTransitions{
-		orderLifecycle: paymentorder.NewLifecycle(store, runtime.events, runtime.now),
+		orderLifecycle: lifecycle,
 		runtime:        runtime,
 	}, nil
 }
@@ -109,7 +117,9 @@ func NewService(deps ServiceDependencies) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	refundService, err := paymentrefund.NewService(deps.Convergence, deps.RefundGateway, deps.Transitions.runtime.events, deps.Transitions.runtime.now, resolver)
+	audience, _ := deps.Convergence.(hints.BillingAccountAudience)
+	hintPublisher := hints.NewPublisher(deps.Transitions.runtime.events, audience)
+	refundService, err := paymentrefund.NewService(deps.Convergence, deps.RefundGateway, hintPublisher, deps.Transitions.runtime.now, resolver)
 	if err != nil {
 		return nil, err
 	}
@@ -127,9 +137,7 @@ func NewService(deps ServiceDependencies) (*Service, error) {
 		DisputeGateway: deps.DisputeGateway, DisputeExpiry: disputeService, OrderLifecycle: deps.Transitions.orderLifecycle,
 		CredentialAccess: resolver.ForCredentialID,
 		OrderAccess:      resolver.ForOrder,
-		Publish: func(userID int64, status paymentports.PaymentEventStatus) {
-			deps.Transitions.runtime.events.Publish(userID, paymentports.PaymentEvent{Status: status})
-		}, Now: deps.Transitions.runtime.now,
+		Hints:            hintPublisher, Now: deps.Transitions.runtime.now,
 	})
 	if err != nil {
 		return nil, err
@@ -140,7 +148,7 @@ func NewService(deps ServiceDependencies) (*Service, error) {
 		Refund: refundService, Dispute: disputeService, CheckoutGateway: deps.CheckoutGateway, DisputeGateway: deps.DisputeGateway,
 		CredentialAccess:   resolver.ForCredentialID,
 		WebhookCredentials: resolver.ListWebhookCredentials,
-		Events:             deps.Transitions.runtime.events, Now: deps.Transitions.runtime.now,
+		Hints:              hintPublisher, Now: deps.Transitions.runtime.now,
 	})
 	if err != nil {
 		return nil, err

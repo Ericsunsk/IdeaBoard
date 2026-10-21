@@ -39,11 +39,17 @@ describe('usageResource', () => {
       `/v1/workspaces/${WORKSPACE_ID}/usage?range=7d`,
       expect.objectContaining({ method: 'GET', signal: controller.signal }),
     )
-    expect(usageQueryKeys.current(WORKSPACE_ID, '7d')).toEqual([
+    const scope = {
+      workspaceId: WORKSPACE_ID,
+      billingAccountId: 'ba_1',
+      identity: 'user-1',
+      consumptionScope: 'account' as const,
+    }
+    expect(usageQueryKeys.current(scope, '7d')).toEqual([
       'workspace',
       'usage',
       'current',
-      WORKSPACE_ID,
+      scope,
       '7d',
     ])
   })

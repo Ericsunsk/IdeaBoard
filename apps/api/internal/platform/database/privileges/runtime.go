@@ -8,6 +8,8 @@ package privileges
 var apiOwnedTableNames = []string{
 	"admin_brand_logo_overrides",
 	"billing_accounts",
+	"billing_account_members",
+	"workspace_billing_links",
 	"board_access_event_outbox",
 	"board_documents",
 	"board_document_media_refs",

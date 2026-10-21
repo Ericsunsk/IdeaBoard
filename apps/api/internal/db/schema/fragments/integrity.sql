@@ -28,7 +28,9 @@ ALTER TABLE credit_transactions
 -- transaction because the Wallet had no available Ideas to recover.
 CREATE TABLE payment_dispute_debit_requests (
   id UUID PRIMARY KEY,
-  wallet_user_id BIGINT NOT NULL REFERENCES credit_wallets(user_id) ON DELETE RESTRICT,
+  billing_account_id BIGINT,
+  wallet_user_id BIGINT,
+  CONSTRAINT fk_payment_dispute_debit_requests_wallet_user_id FOREIGN KEY (wallet_user_id) REFERENCES users(id) ON DELETE RESTRICT,
   idempotency_key TEXT NOT NULL UNIQUE,
   request_hash CHAR(64) NOT NULL,
   requested_amount BIGINT NOT NULL,
@@ -39,6 +41,7 @@ CREATE TABLE payment_dispute_debit_requests (
   business_reference_type TEXT NOT NULL,
   business_reference_id TEXT NOT NULL,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT ck_payment_dispute_debit_request_billing_account CHECK (billing_account_id IS NOT NULL),
   CONSTRAINT ck_payment_dispute_debit_request_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),
   CONSTRAINT ck_payment_dispute_debit_request_amounts CHECK (
     requested_amount > 0 AND debited_amount BETWEEN 0 AND requested_amount
@@ -54,11 +57,11 @@ CREATE TABLE payment_dispute_debit_requests (
 );
 
 CREATE INDEX idx_payment_dispute_debit_requests_wallet
-  ON payment_dispute_debit_requests (wallet_user_id, created_at DESC, id DESC);
+  ON payment_dispute_debit_requests (billing_account_id, created_at DESC, id DESC);
 
 -- statement:begin
-CREATE FUNCTION execute_credit_payment_dispute_debit_v1(
-  p_user_id BIGINT,
+CREATE FUNCTION execute_credit_payment_dispute_debit_v2(
+  p_billing_account_id BIGINT,
   p_requested_amount BIGINT,
   p_idempotency_key TEXT,
   p_actor_type TEXT,
@@ -70,7 +73,7 @@ CREATE FUNCTION execute_credit_payment_dispute_debit_v1(
 )
 RETURNS TABLE (
   transaction_id VARCHAR(64), command_type VARCHAR(24), command_amount BIGINT,
-  wallet_user_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
+  billing_account_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
   replayed BOOLEAN, created_at TIMESTAMPTZ(3), requested_amount BIGINT, unrecovered_amount BIGINT
 )
 AS $$
@@ -95,7 +98,7 @@ BEGIN
   p_reason := btrim(p_reason);
   p_business_reference_type := btrim(p_business_reference_type);
   p_business_reference_id := btrim(p_business_reference_id);
-  IF p_user_id <= 0 OR p_requested_amount <= 0 OR p_requested_amount > 9000000000000000
+  IF p_billing_account_id <= 0 OR p_requested_amount <= 0 OR p_requested_amount > 9000000000000000
      OR p_idempotency_key = '' OR length(p_idempotency_key) > 160
      OR p_actor_type <> 'service' OR p_actor_id <> 'payments'
      OR p_source <> 'stripe_dispute' OR p_reason = ''
@@ -105,7 +108,7 @@ BEGIN
   END IF;
 
   v_payload := jsonb_build_object(
-    'command_type', 'payment_dispute_debit', 'user_id', p_user_id, 'requested_amount', p_requested_amount,
+    'command_type', 'payment_dispute_debit', 'billing_account_id', p_billing_account_id, 'requested_amount', p_requested_amount,
     'actor', jsonb_build_object('type', p_actor_type, 'id', p_actor_id),
     'source', p_source, 'reason', p_reason,
     'business_reference', jsonb_build_object('type', p_business_reference_type, 'id', p_business_reference_id)
@@ -122,7 +125,7 @@ BEGIN
     END IF;
     RETURN QUERY
     SELECT COALESCE(request.credit_transaction_id, ''), 'payment_dispute_debit'::VARCHAR(24), request.debited_amount,
-      request.wallet_user_id, request.available_balance_after, request.reserved_balance_after, TRUE, request.created_at,
+      request.billing_account_id, request.available_balance_after, request.reserved_balance_after, TRUE, request.created_at,
       request.requested_amount, request.requested_amount - request.debited_amount
     FROM payment_dispute_debit_requests request
     WHERE request.idempotency_key = p_idempotency_key;
@@ -132,14 +135,14 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'IB001', MESSAGE = 'credit idempotency conflict';
   END IF;
 
-  PERFORM 1 FROM credit_wallets WHERE user_id = p_user_id FOR UPDATE;
+  PERFORM 1 FROM credit_wallets wallets WHERE wallets.billing_account_id = p_billing_account_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
   END IF;
-  v_shard_key := 'wallet:' || p_user_id::TEXT;
+  v_shard_key := 'billing-account:' || p_billing_account_id::TEXT;
   PERFORM accounts.id FROM credit_accounts accounts
-  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink')
+  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink')
   ORDER BY accounts.id FOR UPDATE;
   SELECT MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_available'),
          MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_reserved'),
@@ -148,8 +151,8 @@ BEGIN
          MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
   INTO v_available_id, v_reserved_id, v_sink_id, v_available_balance, v_reserved_balance
   FROM credit_accounts accounts
-  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink');
+  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink');
   IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_sink_id IS NULL THEN
     RAISE EXCEPTION 'credit wallet account set is incomplete';
   END IF;
@@ -157,16 +160,16 @@ BEGIN
 
   IF v_debited_amount = 0 THEN
     INSERT INTO payment_dispute_debit_requests (
-      id, wallet_user_id, idempotency_key, request_hash, requested_amount, debited_amount,
+      id, billing_account_id, wallet_user_id, idempotency_key, request_hash, requested_amount, debited_amount,
       available_balance_after, reserved_balance_after,
       business_reference_type, business_reference_id
     ) VALUES (
-      gen_random_uuid(), p_user_id, p_idempotency_key, v_hash, p_requested_amount, 0,
+      gen_random_uuid(), p_billing_account_id, NULL, p_idempotency_key, v_hash, p_requested_amount, 0,
       v_available_balance, v_reserved_balance,
       p_business_reference_type, p_business_reference_id
     ) RETURNING payment_dispute_debit_requests.created_at INTO v_created_at;
     RETURN QUERY SELECT ''::VARCHAR(64), 'payment_dispute_debit'::VARCHAR(24), 0::BIGINT,
-      p_user_id, v_available_balance, v_reserved_balance, FALSE, v_created_at, p_requested_amount, p_requested_amount;
+      p_billing_account_id, v_available_balance, v_reserved_balance, FALSE, v_created_at, p_requested_amount, p_requested_amount;
     RETURN;
   END IF;
 
@@ -174,35 +177,35 @@ BEGIN
     clock_timestamp()::TEXT || random()::TEXT || p_idempotency_key, 'UTF8'
   )), 'hex'), 1, 32);
   INSERT INTO credit_transactions (
-    transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
+    transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
     actor_type, actor_id, source, reason, business_reference_type, business_reference_id,
     command_amount, posting_count, available_balance_after, reserved_balance_after
   ) VALUES (
-    v_transaction_id, p_user_id, 'payment_dispute_debit', p_idempotency_key, v_hash,
+    v_transaction_id, p_billing_account_id, 'payment_dispute_debit', p_idempotency_key, v_hash,
     p_actor_type, p_actor_id, p_source, p_reason, p_business_reference_type, p_business_reference_id,
     v_debited_amount, 2, v_available_balance - v_debited_amount, v_reserved_balance
   );
   INSERT INTO credit_postings (transaction_id, account_id, amount)
   VALUES (v_transaction_id, v_available_id, -v_debited_amount), (v_transaction_id, v_sink_id, v_debited_amount);
   INSERT INTO payment_dispute_debit_requests (
-      id, wallet_user_id, idempotency_key, request_hash, requested_amount, debited_amount,
+      id, billing_account_id, wallet_user_id, idempotency_key, request_hash, requested_amount, debited_amount,
       available_balance_after, reserved_balance_after,
       credit_transaction_id, business_reference_type, business_reference_id
     ) VALUES (
-      gen_random_uuid(), p_user_id, p_idempotency_key, v_hash, p_requested_amount, v_debited_amount,
+      gen_random_uuid(), p_billing_account_id, NULL, p_idempotency_key, v_hash, p_requested_amount, v_debited_amount,
       v_available_balance - v_debited_amount, v_reserved_balance,
       v_transaction_id, p_business_reference_type, p_business_reference_id
   ) RETURNING payment_dispute_debit_requests.created_at INTO v_created_at;
   RETURN QUERY SELECT v_transaction_id, 'payment_dispute_debit'::VARCHAR(24), v_debited_amount,
-    p_user_id, v_available_balance - v_debited_amount, v_reserved_balance, FALSE, v_created_at,
+    p_billing_account_id, v_available_balance - v_debited_amount, v_reserved_balance, FALSE, v_created_at,
     p_requested_amount, p_requested_amount - v_debited_amount;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
 -- statement:end
 
 -- statement:begin
-CREATE FUNCTION execute_credit_payment_dispute_restore_v1(
-  p_user_id BIGINT,
+CREATE FUNCTION execute_credit_payment_dispute_restore_v2(
+  p_billing_account_id BIGINT,
   p_original_transaction_id TEXT,
   p_amount BIGINT,
   p_idempotency_key TEXT,
@@ -215,7 +218,7 @@ CREATE FUNCTION execute_credit_payment_dispute_restore_v1(
 )
 RETURNS TABLE (
   transaction_id VARCHAR(64), command_type VARCHAR(24), command_amount BIGINT,
-  wallet_user_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
+  billing_account_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
   replayed BOOLEAN, created_at TIMESTAMPTZ(3)
 )
 AS $$
@@ -241,7 +244,7 @@ BEGIN
   p_reason := btrim(p_reason);
   p_business_reference_type := btrim(p_business_reference_type);
   p_business_reference_id := btrim(p_business_reference_id);
-  IF p_user_id <= 0 OR p_original_transaction_id = '' OR length(p_original_transaction_id) > 64
+  IF p_billing_account_id <= 0 OR p_original_transaction_id = '' OR length(p_original_transaction_id) > 64
      OR p_amount <= 0 OR p_amount > 9000000000000000
      OR p_idempotency_key = '' OR length(p_idempotency_key) > 160
      OR p_actor_type <> 'service' OR p_actor_id <> 'payments'
@@ -252,7 +255,7 @@ BEGIN
   END IF;
 
   v_payload := jsonb_build_object(
-    'command_type', 'payment_dispute_restore', 'user_id', p_user_id, 'amount', p_amount,
+    'command_type', 'payment_dispute_restore', 'billing_account_id', p_billing_account_id, 'amount', p_amount,
     'related_transaction_id', p_original_transaction_id,
     'actor', jsonb_build_object('type', p_actor_type, 'id', p_actor_id),
     'source', p_source, 'reason', p_reason,
@@ -266,7 +269,7 @@ BEGIN
       RAISE EXCEPTION USING ERRCODE = 'IB001', MESSAGE = 'credit idempotency conflict';
     END IF;
     RETURN QUERY SELECT existing.transaction_id, existing.command_type, existing.command_amount,
-      existing.wallet_user_id, existing.available_balance_after, existing.reserved_balance_after,
+      existing.billing_account_id, existing.available_balance_after, existing.reserved_balance_after,
       TRUE, existing.created_at
     FROM credit_transactions existing WHERE existing.idempotency_key = p_idempotency_key;
     RETURN;
@@ -277,7 +280,7 @@ BEGIN
 
   SELECT original.command_amount INTO v_original_amount
   FROM credit_transactions original
-  WHERE original.transaction_id = p_original_transaction_id AND original.wallet_user_id = p_user_id
+  WHERE original.transaction_id = p_original_transaction_id AND original.billing_account_id = p_billing_account_id
     AND original.command_type = 'payment_dispute_debit' AND original.actor_type = 'service' AND original.actor_id = 'payments'
     AND original.source = 'stripe_dispute' AND original.business_reference_type = p_business_reference_type
     AND original.business_reference_id = p_business_reference_id
@@ -292,14 +295,14 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'payment dispute restore exceeds debited amount';
   END IF;
 
-  PERFORM 1 FROM credit_wallets WHERE user_id = p_user_id FOR UPDATE;
+  PERFORM 1 FROM credit_wallets wallets WHERE wallets.billing_account_id = p_billing_account_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
   END IF;
-  v_shard_key := 'wallet:' || p_user_id::TEXT;
+  v_shard_key := 'billing-account:' || p_billing_account_id::TEXT;
   PERFORM accounts.id FROM credit_accounts accounts
-  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink')
+  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink')
   ORDER BY accounts.id FOR UPDATE;
   SELECT MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_available'),
          MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_reserved'),
@@ -308,8 +311,8 @@ BEGIN
          MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
   INTO v_available_id, v_reserved_id, v_sink_id, v_available_balance, v_reserved_balance
   FROM credit_accounts accounts
-  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink');
+  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink');
   IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_sink_id IS NULL THEN
     RAISE EXCEPTION 'credit wallet account set is incomplete';
   END IF;
@@ -317,18 +320,18 @@ BEGIN
     clock_timestamp()::TEXT || random()::TEXT || p_idempotency_key, 'UTF8'
   )), 'hex'), 1, 32);
   INSERT INTO credit_transactions (
-    transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
+    transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
     actor_type, actor_id, source, reason, business_reference_type, business_reference_id,
     related_transaction_id, command_amount, posting_count, available_balance_after, reserved_balance_after
   ) VALUES (
-    v_transaction_id, p_user_id, 'payment_dispute_restore', p_idempotency_key, v_hash,
+    v_transaction_id, p_billing_account_id, 'payment_dispute_restore', p_idempotency_key, v_hash,
     p_actor_type, p_actor_id, p_source, p_reason, p_business_reference_type, p_business_reference_id,
     p_original_transaction_id, p_amount, 2, v_available_balance + p_amount, v_reserved_balance
   );
   INSERT INTO credit_postings (transaction_id, account_id, amount)
   VALUES (v_transaction_id, v_sink_id, -p_amount), (v_transaction_id, v_available_id, p_amount);
   RETURN QUERY SELECT created.transaction_id, created.command_type, created.command_amount,
-    created.wallet_user_id, created.available_balance_after, created.reserved_balance_after,
+    created.billing_account_id, created.available_balance_after, created.reserved_balance_after,
     FALSE, created.created_at
   FROM credit_transactions created WHERE created.transaction_id = v_transaction_id;
 END;
@@ -340,19 +343,19 @@ DO $$
 DECLARE trusted_schema TEXT := current_schema();
 BEGIN
   EXECUTE format(
-    'ALTER FUNCTION %I.execute_credit_payment_dispute_debit_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
+    'ALTER FUNCTION %I.execute_credit_payment_dispute_debit_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
     trusted_schema, trusted_schema
   );
   EXECUTE format(
-    'ALTER FUNCTION %I.execute_credit_payment_dispute_restore_v1(BIGINT, TEXT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
+    'ALTER FUNCTION %I.execute_credit_payment_dispute_restore_v2(BIGINT, TEXT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
     trusted_schema, trusted_schema
   );
 END;
 $$;
 -- statement:end
 
-REVOKE ALL ON FUNCTION execute_credit_payment_dispute_debit_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION execute_credit_payment_dispute_restore_v1(BIGINT, TEXT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION execute_credit_payment_dispute_debit_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION execute_credit_payment_dispute_restore_v2(BIGINT, TEXT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 
 CREATE TABLE payment_disputes (
   id UUID PRIMARY KEY,

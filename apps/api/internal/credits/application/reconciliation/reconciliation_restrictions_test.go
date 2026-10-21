@@ -15,7 +15,7 @@ func TestReconciliationRestrictionsTrackIndependentFindingsAndRecoverCommands(t 
 	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
 	ctx := t.Context()
 
-	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 94, Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("reconcile:grant", "reconcile-grant")}); err != nil {
+	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94), Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("reconcile:grant", "reconcile-grant")}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
 	type accountProjection struct {
@@ -26,7 +26,7 @@ func TestReconciliationRestrictionsTrackIndependentFindingsAndRecoverCommands(t 
 	rows, err := pool.Query(ctx, `
 SELECT account_role, id, balance
 FROM credit_accounts
-WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved')`)
+WHERE billing_account_id = (SELECT ensure_personal_billing_account_for_user(94)) AND account_role IN ('user_available', 'user_reserved')`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved'
 	if _, err := pool.Exec(ctx, `
 UPDATE credit_accounts
 SET balance = balance + CASE account_role WHEN 'user_available' THEN 7 ELSE 3 END
-WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved')`); err != nil {
+WHERE billing_account_id = (SELECT ensure_personal_billing_account_for_user(94)) AND account_role IN ('user_available', 'user_reserved')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
@@ -71,7 +71,7 @@ WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved'
 	if err != nil || run.Status != "completed" || run.CriticalCount == 0 || run.IsolatedWalletCount != 1 {
 		t.Fatalf("completed run = %+v, err = %v", run, err)
 	}
-	wallet, err := service.GetWallet(ctx, 94)
+	wallet, err := service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, 94))
 	if err != nil || wallet.Status != domain.WalletStatusActive || len(wallet.ActiveRestrictions) != 2 {
 		t.Fatalf("wallet = %+v, err = %v", wallet, err)
 	}
@@ -109,7 +109,7 @@ WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved'
 	if got := countRows(t, pool, `
 SELECT COUNT(*)
 FROM credit_wallet_restrictions
-WHERE wallet_user_id = 94
+WHERE billing_account_id = (SELECT ensure_personal_billing_account_for_user(94))
   AND restriction_type = 'ledger_integrity'
   AND source = 'reconciliation'
   AND related_object_type = 'finding'
@@ -119,15 +119,15 @@ WHERE wallet_user_id = 94
 	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_transactions`); got != ledgerBefore {
 		t.Fatalf("ledger transactions changed from %d to %d", ledgerBefore, got)
 	}
-	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 94, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("reconcile:blocked-grant", "reconcile-blocked-grant")}); !errors.Is(err, domain.ErrWalletRestricted) {
+	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("reconcile:blocked-grant", "reconcile-blocked-grant")}); !errors.Is(err, domain.ErrWalletRestricted) {
 		t.Fatalf("Grant() error = %v, want domain.ErrWalletRestricted", err)
 	}
 	deductMetadata := testhelpers.TestMetadata("reconcile:blocked-deduct", "reconcile-blocked-deduct")
 	deductMetadata.Actor = domain.Actor{Type: domain.ActorAdmin, ID: "1"}
-	if _, err := service.Deduct(ctx, ports.DeductionCommand{UserID: 94, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: deductMetadata}); !errors.Is(err, domain.ErrWalletRestricted) {
+	if _, err := service.Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: deductMetadata}); !errors.Is(err, domain.ErrWalletRestricted) {
 		t.Fatalf("Deduct() error = %v, want domain.ErrWalletRestricted", err)
 	}
-	if _, err := service.Hold(ctx, ports.HoldCommand{UserID: 94, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("reconcile:blocked-hold", "reconcile-blocked-hold")}); !errors.Is(err, domain.ErrWalletRestricted) {
+	if _, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("reconcile:blocked-hold", "reconcile-blocked-hold")}); !errors.Is(err, domain.ErrWalletRestricted) {
 		t.Fatalf("Hold() error = %v, want domain.ErrWalletRestricted", err)
 	}
 
@@ -177,13 +177,13 @@ WHERE wallet_user_id = 94
 	if err != nil || len(globalResolved.Findings) != 1 || globalResolved.Findings[0].ID != availableFinding.ID || globalResolved.Findings[0].ResolvedAt == nil {
 		t.Fatalf("global resolved findings = %+v, err = %v", globalResolved, err)
 	}
-	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE wallet_user_id = 94 AND released_at IS NULL`); got != 1 {
+	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE billing_account_id = (SELECT ensure_personal_billing_account_for_user(94)) AND released_at IS NULL`); got != 1 {
 		t.Fatalf("active restriction count after one repair = %d, want 1", got)
 	}
 	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE related_object_id = $1 AND released_at IS NULL`, strconv.FormatInt(reservedFinding.ID, 10)); got != 1 {
 		t.Fatalf("reserved finding active restriction count = %d, want 1", got)
 	}
-	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 94, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("reconcile:still-blocked", "reconcile-still-blocked")}); !errors.Is(err, domain.ErrWalletRestricted) {
+	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("reconcile:still-blocked", "reconcile-still-blocked")}); !errors.Is(err, domain.ErrWalletRestricted) {
 		t.Fatalf("Grant() after one repair error = %v, want domain.ErrWalletRestricted", err)
 	}
 
@@ -203,10 +203,10 @@ WHERE wallet_user_id = 94
 	if err := service.ExecuteReconciliation(ctx, fourth.ID); err != nil {
 		t.Fatal(err)
 	}
-	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE wallet_user_id = 94 AND released_at IS NULL`); got != 0 {
+	if got := countRows(t, pool, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE billing_account_id = (SELECT ensure_personal_billing_account_for_user(94)) AND released_at IS NULL`); got != 0 {
 		t.Fatalf("active restriction count after all repairs = %d, want 0", got)
 	}
-	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 94, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("reconcile:recovered", "reconcile-recovered")}); err != nil {
+	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("reconcile:recovered", "reconcile-recovered")}); err != nil {
 		t.Fatalf("Grant() after all repairs error = %v", err)
 	}
 
@@ -262,10 +262,10 @@ func TestReconciliationStaleHoldOnlyReportsWithoutIsolation(t *testing.T) {
 	pool := testdb.Open(t)
 	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
 	ctx := t.Context()
-	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: 95, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("stale:grant", "stale-grant")}); err != nil {
+	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 95), Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("stale:grant", "stale-grant")}); err != nil {
 		t.Fatal(err)
 	}
-	hold, err := service.Hold(ctx, ports.HoldCommand{UserID: 95, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: testhelpers.TestMetadata("stale:hold", "stale-hold")})
+	hold, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 95), Amount: testhelpers.MustCreditAmount(t, 5), Metadata: testhelpers.TestMetadata("stale:hold", "stale-hold")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +295,7 @@ func TestReconciliationStaleHoldOnlyReportsWithoutIsolation(t *testing.T) {
 	if staleFinding.ID == 0 {
 		t.Fatal("stale_hold finding not reported")
 	}
-	wallet, err := service.GetWallet(ctx, 95)
+	wallet, err := service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, 95))
 	if err != nil || wallet.Status != domain.WalletStatusActive {
 		t.Fatalf("wallet = %+v, err = %v", wallet, err)
 	}
@@ -304,9 +304,9 @@ func TestReconciliationStaleHoldOnlyReportsWithoutIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	restriction, err := service.RestrictWallet(ctx, ports.RestrictWalletCommand{
-		UserID: 95,
-		Type:   "ledger_integrity",
-		Source: "reconciliation",
+		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 95),
+		Type:             "ledger_integrity",
+		Source:           "reconciliation",
 		RelatedObject: domain.BusinessReference{
 			Type: "finding",
 			ID:   strconv.FormatInt(staleFinding.ID, 10),
@@ -343,7 +343,7 @@ func TestReconciliationSeparatesBillingSnapshotRiskFromTaskTraceAnomaly(t *testi
 	ctx := t.Context()
 	const userID int64 = 96
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
-	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 30), Metadata: testhelpers.TestMetadata("reconciliation-fact-split:grant", "reconciliation-fact-split-grant")}); err != nil {
+	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 30), Metadata: testhelpers.TestMetadata("reconciliation-fact-split:grant", "reconciliation-fact-split-grant")}); err != nil {
 		t.Fatal(err)
 	}
 	var priceID, priceVersion int64
@@ -432,7 +432,7 @@ func TestReconciliationSeparatesBillingSnapshotRiskFromTaskTraceAnomaly(t *testi
 	}
 	if got := countRows(t, pool, `
 SELECT COUNT(*) FROM credit_wallet_restrictions
-WHERE wallet_user_id = $1 AND restriction_type = 'ledger_integrity' AND source = 'reconciliation'
+WHERE billing_account_id = (SELECT ensure_personal_billing_account_for_user($1)) AND restriction_type = 'ledger_integrity' AND source = 'reconciliation'
   AND related_object_type = 'finding' AND related_object_id = $2 AND released_at IS NULL`, userID, strconv.FormatInt(billingSnapshotFinding.ID, 10)); got != 1 {
 		t.Fatalf("Billing Snapshot restriction count = %d, want 1", got)
 	}
@@ -486,7 +486,7 @@ func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t 
 	ctx := t.Context()
 	const userID int64 = 97
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
-	if _, err := service.Grant(ctx, ports.GrantCommand{UserID: userID, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("terminal-fact-risk:grant", "terminal-fact-risk-grant")}); err != nil {
+	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("terminal-fact-risk:grant", "terminal-fact-risk-grant")}); err != nil {
 		t.Fatal(err)
 	}
 	var priceID, priceVersion int64
@@ -496,7 +496,7 @@ func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t 
 
 	const capturedTaskID = "task_reconcile_corrupt_captured"
 	capturedHold := createReconciliationTaskFixture(t, pool, service, capturedTaskID, "completed", "", userID, priceID, priceVersion)
-	capture, err := service.Capture(ctx, ports.CaptureCommand{UserID: userID, HoldTransactionID: capturedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("terminal-fact-risk:capture", capturedTaskID)})
+	capture, err := service.Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: capturedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("terminal-fact-risk:capture", capturedTaskID)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -506,7 +506,7 @@ func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t 
 
 	const releasedTaskID = "task_reconcile_corrupt_released"
 	releasedHold := createReconciliationTaskFixture(t, pool, service, releasedTaskID, "failed", "provider failed", userID, priceID, priceVersion)
-	release, err := service.Release(ctx, ports.ReleaseCommand{UserID: userID, HoldTransactionID: releasedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("terminal-fact-risk:release", releasedTaskID)})
+	release, err := service.Release(ctx, ports.ReleaseCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: releasedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("terminal-fact-risk:release", releasedTaskID)})
 	if err != nil {
 		t.Fatal(err)
 	}

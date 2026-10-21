@@ -92,10 +92,15 @@ func TestControlIdempotencyClaimCommitsWithBusinessAndAudit(t *testing.T) {
 		scope.Rollback(txCtx)
 		t.Fatal("first claim must win")
 	}
+	joinAccountID, err := creditService.ResolvePersonalAccount(txCtx, walletUserID)
+	if err != nil {
+		scope.Rollback(txCtx)
+		t.Fatalf("ResolvePersonalAccount() error = %v", err)
+	}
 	result, err := creditService.Grant(txCtx, ports.GrantCommand{
-		UserID:   walletUserID,
-		Amount:   testhelpers.MustCreditAmount(t, 25),
-		Metadata: testhelpers.TestMetadata("control-idem-grant", "control-idem-grant"),
+		BillingAccountID: joinAccountID,
+		Amount:           testhelpers.MustCreditAmount(t, 25),
+		Metadata:         testhelpers.TestMetadata("control-idem-grant", "control-idem-grant"),
 	})
 	if err != nil {
 		scope.Rollback(txCtx)
@@ -215,10 +220,15 @@ func TestControlIdempotencyRollbackRemovesClaimBusinessAndAudit(t *testing.T) {
 		scope.Rollback(txCtx)
 		t.Fatalf("Claim: %v", err)
 	}
+	joinAccountID, err := creditService.ResolvePersonalAccount(txCtx, walletUserID)
+	if err != nil {
+		scope.Rollback(txCtx)
+		t.Fatalf("ResolvePersonalAccount() error = %v", err)
+	}
 	result, err := creditService.Grant(txCtx, ports.GrantCommand{
-		UserID:   walletUserID,
-		Amount:   testhelpers.MustCreditAmount(t, 25),
-		Metadata: testhelpers.TestMetadata("control-idem-rollback", "control-idem-rollback"),
+		BillingAccountID: joinAccountID,
+		Amount:           testhelpers.MustCreditAmount(t, 25),
+		Metadata:         testhelpers.TestMetadata("control-idem-rollback", "control-idem-rollback"),
 	})
 	if err != nil {
 		scope.Rollback(txCtx)

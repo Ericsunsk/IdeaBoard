@@ -49,6 +49,7 @@ import type {
   BadRequestResponse,
   ConflictResponse,
   ControlAckEnvelope,
+  ControlBillingAccountDetailEnvelope,
   ControlCatalogEnvelope,
   ControlModelPoolEnvelope,
   ControlNotFoundResponse,
@@ -67,7 +68,7 @@ import { controlMutator } from '../../../controlMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-export const getListControlBillingAccountsUrl = (params: ListControlBillingAccountsParams) => {
+export const getListControlBillingAccountsUrl = (params?: ListControlBillingAccountsParams) => {
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -84,10 +85,11 @@ export const getListControlBillingAccountsUrl = (params: ListControlBillingAccou
 }
 
 /**
- * @summary Resolve the implicit billing account for a workspace
+ * With workspace_id, resolves the implicit billing account for that workspace (single-item page). Without it, pages all stable Billing Accounts newest-first (Admin locate/audit for personal, shared and organization accounts) with the opaque cursor/page_size dialect and an optional owner_scope filter. Requires Idempotency-Key: no (read).
+ * @summary Locate billing accounts for platform administration
  */
 export const listControlBillingAccounts = async (
-  params: ListControlBillingAccountsParams,
+  params?: ListControlBillingAccountsParams,
   options?: Parameters<typeof controlMutator>[1],
 ): Promise<PaginatedControlBillingAccounts> => {
   return controlMutator<PaginatedControlBillingAccounts>(getListControlBillingAccountsUrl(params), {
@@ -106,7 +108,7 @@ export const getListControlBillingAccountsQueryOptions = <
   TData = Awaited<ReturnType<typeof listControlBillingAccounts>>,
   TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
 >(
-  params: MaybeRefOrGetter<ListControlBillingAccountsParams>,
+  params?: MaybeRefOrGetter<ListControlBillingAccountsParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listControlBillingAccounts>>, TError, TData>
@@ -136,14 +138,14 @@ export type ListControlBillingAccountsQueryError =
   BadRequestResponse | UnauthorizedResponse | ForbiddenResponse
 
 /**
- * @summary Resolve the implicit billing account for a workspace
+ * @summary Locate billing accounts for platform administration
  */
 
 export function useListControlBillingAccounts<
   TData = Awaited<ReturnType<typeof listControlBillingAccounts>>,
   TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
 >(
-  params: MaybeRefOrGetter<ListControlBillingAccountsParams>,
+  params?: MaybeRefOrGetter<ListControlBillingAccountsParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listControlBillingAccounts>>, TError, TData>
@@ -153,6 +155,95 @@ export function useListControlBillingAccounts<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListControlBillingAccountsQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetControlBillingAccountUrl = (billingAccountId: string) => {
+  return `/billing/accounts/${encodeURIComponent(String(billingAccountId))}`
+}
+
+/**
+ * Reads one stable Billing Account by its ba_ id with ownership linkage, explicitly linked workspaces, financial managers (usr_ identities) and the wallet summary. Customer-side Billing Owner/Admin standing never implies this platform-Admin read. Requires Idempotency-Key: no (read).
+ * @summary Read one billing account for platform administration
+ */
+export const getControlBillingAccount = async (
+  billingAccountId: string,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlBillingAccountDetailEnvelope> => {
+  return controlMutator<ControlBillingAccountDetailEnvelope>(
+    getGetControlBillingAccountUrl(billingAccountId),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getGetControlBillingAccountQueryKey = (billingAccountId: MaybeRefOrGetter<string>) => {
+  return ['billing', 'accounts', billingAccountId] as const
+}
+
+export const getGetControlBillingAccountQueryOptions = <
+  TData = Awaited<ReturnType<typeof getControlBillingAccount>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  billingAccountId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlBillingAccount>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetControlBillingAccountQueryKey(billingAccountId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getControlBillingAccount>>> = ({
+    signal,
+  }) => getControlBillingAccount(toValue(billingAccountId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () => toValue(billingAccountId) !== null && toValue(billingAccountId) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getControlBillingAccount>>, TError, TData>
+}
+
+export type GetControlBillingAccountQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getControlBillingAccount>>
+>
+export type GetControlBillingAccountQueryError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse
+
+/**
+ * @summary Read one billing account for platform administration
+ */
+
+export function useGetControlBillingAccount<
+  TData = Awaited<ReturnType<typeof getControlBillingAccount>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  billingAccountId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlBillingAccount>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetControlBillingAccountQueryOptions(billingAccountId, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

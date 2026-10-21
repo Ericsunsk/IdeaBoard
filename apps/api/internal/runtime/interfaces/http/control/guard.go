@@ -63,12 +63,17 @@ type ControlCreditCommands interface {
 	Deduct(ctx context.Context, command creditsports.DeductionCommand) (creditsports.CommandResult, error)
 	Correct(ctx context.Context, command creditsports.CorrectionCommand) (creditsports.CommandResult, error)
 	Refund(ctx context.Context, command creditsports.RefundCommand) (creditsports.CommandResult, error)
+	// ResolvePersonalAccount returns the target user's deterministic initial
+	// personal Billing Account (#916): control fund operations address the
+	// account, never a user wallet.
+	ResolvePersonalAccount(ctx context.Context, userID int64) (int64, error)
 }
 
 // ControlCreditReads is the Credits read side for the Control Plane.
 type ControlCreditReads interface {
-	GetWallet(ctx context.Context, userID int64) (creditsdomain.WalletDetails, error)
+	GetWallet(ctx context.Context, billingAccountID int64) (creditsdomain.WalletDetails, error)
 	ListLedger(ctx context.Context, input creditsdomain.ListLedgerInput) (creditsdomain.LedgerPage, error)
+	ResolvePersonalAccount(ctx context.Context, userID int64) (int64, error)
 }
 
 // ControlCreditDirectory resolves user identity both ways for the
@@ -90,9 +95,27 @@ type ControlTaskAdmin interface {
 }
 
 // ControlBillingAccountStore provisions the implicit per-workspace
-// billing account for control reads.
+// billing account for control reads and serves the explicit Admin
+// locate/audit surface (#923): platform-Admin addresses stable ba_
+// accounts directly, independent of any resolving Workspace.
 type ControlBillingAccountStore interface {
 	EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error)
+	GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancypg.BillingAccount, error)
+	GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancypg.BillingAccount, error)
+	GetAdminBillingAccountByPublicID(ctx context.Context, publicID string) (tenancypg.AdminBillingAccount, error)
+	ListBillingAccountsForAdmin(ctx context.Context, beforeID int64, ownerScope string, limit int) ([]tenancypg.AdminBillingAccount, error)
+	ListBillingAccountMembersForAdmin(ctx context.Context, billingAccountInternalID int64) ([]tenancy.BillingAccountMember, error)
+	ListExplicitlyLinkedWorkspaces(ctx context.Context, billingAccountInternalID int64) ([]tenancy.Workspace, error)
+}
+
+// ControlWalletRestrictions is the Admin restriction seam for the Control
+// Plane (#923). It exposes the typed credits.WalletRestrictionCommands only:
+// auto-restriction stays owned by Reconciliation, manual Admin
+// restrict/release acts on the explicit Billing Account with the platform
+// operator as Actor. Other contexts must not write the Restriction table.
+type ControlWalletRestrictions interface {
+	RestrictWallet(ctx context.Context, command creditsports.RestrictWalletCommand) (creditsports.WalletRestrictionChange, error)
+	ReleaseWalletRestriction(ctx context.Context, command creditsports.ReleaseWalletRestrictionCommand) (creditsports.WalletRestrictionChange, error)
 }
 
 // ContractControlDeps wires the Control Plane handlers. Every field is a
@@ -104,12 +127,17 @@ type ControlBillingAccountStore interface {
 // idempotency
 // uniformly around them.
 type ContractControlDeps struct {
-	Users          ControlUserService
-	Identity       identityports.IdentityAdminCommands
-	Impersonator   identityports.AdminUserImpersonator
-	Credits        ControlCreditCommands
-	CreditUsers    ControlCreditDirectory
-	CreditReads    ControlCreditReads
+	Users        ControlUserService
+	Identity     identityports.IdentityAdminCommands
+	Impersonator identityports.AdminUserImpersonator
+	Credits      ControlCreditCommands
+	CreditUsers  ControlCreditDirectory
+	CreditReads  ControlCreditReads
+	// Restrictions is the Admin wallet-restriction seam (#923): manual
+	// restrict/release on explicit Billing Accounts. Nil keeps the
+	// restriction routes fail-closed with 503 (same as the sibling
+	// credit seams).
+	Restrictions   ControlWalletRestrictions
 	Reconciliation credithttp.ReconciliationService
 	Tasks          ControlTaskAdmin
 	Tenancy        tenancy.Store

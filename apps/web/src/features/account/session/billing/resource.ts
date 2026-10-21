@@ -1,5 +1,6 @@
 import { listWorkspaceBillingRecords } from '../../../../api/generated-query/public/workspace-billing/workspace-billing'
 import type { PaginatedBillingRecords } from '../../../../api/generated-query/public/model'
+import type { BillingConsumptionReadScope } from '../billing-account/readScope'
 import { i18n } from '../../../../core/i18n'
 import {
   asWorkspaceBillingError,
@@ -7,10 +8,13 @@ import {
   requireAccountWorkspaceId,
 } from '../workspaceBilling'
 
-// User billing records boundary (W2 transports). Reads go through the Public
-// Data Plane (`GET /api/v1/workspaces/{id}/billing-records`, cursor
-// pagination over the opaque `next_cursor`) with local view types; the
-// deleted `GET /api/user/billing/records` route is gone.
+// User billing records boundary (v1 public plane).
+//
+// Reads go through `GET /api/v1/workspaces/{id}/billing-records`, cursor
+// pagination over the opaque `next_cursor`, scoped to the Workspace's
+// stable Billing Account. Settlement attributes the real operator and the
+// consuming Workspace and never rewrites history on member exit or owner
+// change. There is no owner-wallet projection and no fallback.
 export type BillingRecordKind = string
 
 export type BillingRecord = {
@@ -19,16 +23,13 @@ export type BillingRecord = {
   kind: BillingRecordKind
   title: string
   credit_delta: number
-  available_credits_after: number
+  available_credits_after?: number
 }
 
 export type BillingRecordPage = {
   records: BillingRecord[]
   next_cursor?: string
 }
-
-export type BillingRecordItem = BillingRecord
-export type BillingRecordPageData = BillingRecordPage
 
 export type ListUserBillingRecordsParams = {
   cursor?: string
@@ -37,7 +38,7 @@ export type ListUserBillingRecordsParams = {
 
 export const billingRecordsQueryKeys = {
   all: ['workspace', 'billing', 'records'] as const,
-  list: (workspaceId: string) => ['workspace', 'billing', 'records', workspaceId] as const,
+  list: (scope: BillingConsumptionReadScope) => ['workspace', 'billing', 'records', scope] as const,
 }
 
 export async function fetchBillingRecords(
@@ -71,7 +72,9 @@ export async function fetchBillingRecords(
       kind: record.kind,
       title: record.title,
       credit_delta: record.credit_delta,
-      available_credits_after: record.available_credits_after,
+      ...(record.available_credits_after === undefined
+        ? {}
+        : { available_credits_after: record.available_credits_after }),
     })),
     ...(page.meta.has_more && page.meta.next_cursor ? { next_cursor: page.meta.next_cursor } : {}),
   }

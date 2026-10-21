@@ -156,28 +156,18 @@ func TestBillingAccountOwnerStubProvesSeam(t *testing.T) {
 		t.Fatalf("ensure default workspace failed: %v", err)
 	}
 	queries := dbsqlc.New(db)
-	// The #804 hard cut requires a ba_-prefixed public_id on every billing
-	// account row; mint one through the contract kernel like production code.
-	billingPublicID, err := contract.MintPublicID("ba_", 12)
-	if err != nil {
-		t.Fatalf("mint billing account public id failed: %v", err)
-	}
-	stub, err := queries.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
-		PublicID:    billingPublicID,
-		WorkspaceID: dbutil.NullInt64(&workspace.InternalID),
-	})
-	if err != nil {
-		t.Fatalf("create billing account stub failed: %v", err)
-	}
-	loaded, err := queries.GetBillingAccountByWorkspaceID(ctx, stub.WorkspaceID)
+	// #916: the billing account (plus its Credit Wallet) is provisioned by
+	// the user-insert projection trigger through the deterministic personal
+	// resolution, so the stub already exists for the Default workspace.
+	loaded, err := queries.GetBillingAccountByWorkspaceID(ctx, dbutil.NullInt64(&workspace.InternalID))
 	if err != nil {
 		if database.IsNotFound(err) {
 			t.Fatal("billing account stub not found by workspace")
 		}
 		t.Fatalf("get billing account stub failed: %v", err)
 	}
-	if loaded.InternalID != stub.InternalID {
-		t.Fatalf("stub internal_id = %d, want %d", loaded.InternalID, stub.InternalID)
+	if !contract.IsBillingAccountID(loaded.PublicID) {
+		t.Fatalf("stub public_id = %q, want ba_ identity", loaded.PublicID)
 	}
 }
 

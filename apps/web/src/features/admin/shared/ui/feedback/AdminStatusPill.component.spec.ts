@@ -82,7 +82,11 @@ describe('AdminStatusPill', () => {
       'text-admin-caption',
     )
     await rerender({ label: 'medium-pill', variant: 'info', size: 'medium' })
-    expect(screen.getByText('medium-pill').parentElement).toHaveClass('h-6', 'px-2.5', 'text-admin-meta')
+    expect(screen.getByText('medium-pill').parentElement).toHaveClass(
+      'h-6',
+      'px-2.5',
+      'text-admin-meta',
+    )
   })
 
   it('forwards caller attributes to the same root through live prop updates', async () => {

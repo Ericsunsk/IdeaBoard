@@ -72,14 +72,15 @@ DECLARE
   snapshot_unit BIGINT;
   snapshot_quantity BIGINT;
   snapshot_user BIGINT;
+  snapshot_account BIGINT;
   snapshot_hold TEXT;
   valid_terminal BOOLEAN;
 BEGIN
   IF TG_OP = 'DELETE' THEN
     RAISE EXCEPTION USING ERRCODE = 'IB202', MESSAGE = 'task billing settlements cannot be deleted';
   END IF;
-  SELECT total_credits, unit_credits, quantity, user_id, hold_transaction_id
-  INTO snapshot_total, snapshot_unit, snapshot_quantity, snapshot_user, snapshot_hold
+  SELECT total_credits, unit_credits, quantity, user_id, billing_account_id, hold_transaction_id
+  INTO snapshot_total, snapshot_unit, snapshot_quantity, snapshot_user, snapshot_account, snapshot_hold
   FROM task_billing_snapshots
   WHERE task_id = NEW.task_id;
   IF NOT FOUND THEN
@@ -110,7 +111,7 @@ BEGIN
       WHERE transactions.transaction_id = NEW.capture_transaction_id
         AND transactions.command_type = 'capture'
         AND transactions.command_amount = NEW.captured_credits
-        AND transactions.wallet_user_id = snapshot_user
+        AND transactions.billing_account_id = snapshot_account
         AND transactions.related_transaction_id = snapshot_hold
         AND transactions.business_reference_type = 'task'
         AND transactions.business_reference_id = NEW.task_id
@@ -120,7 +121,7 @@ BEGIN
       WHERE transactions.transaction_id = NEW.release_transaction_id
         AND transactions.command_type = 'release'
         AND transactions.command_amount = NEW.released_credits
-        AND transactions.wallet_user_id = snapshot_user
+        AND transactions.billing_account_id = snapshot_account
         AND transactions.related_transaction_id = snapshot_hold
         AND transactions.business_reference_type = 'task'
         AND transactions.business_reference_id = NEW.task_id
@@ -389,7 +390,7 @@ BEGIN
     FROM credit_transactions transactions
     WHERE transactions.transaction_id = NEW.hold_transaction_id
       AND transactions.command_type = 'hold'
-      AND transactions.wallet_user_id = NEW.user_id
+      AND transactions.billing_account_id = NEW.billing_account_id
       AND transactions.command_amount = NEW.total_credits
       AND transactions.business_reference_type = 'task'
       AND transactions.business_reference_id = NEW.task_id
@@ -536,6 +537,8 @@ CREATE TABLE task_billing_settlements (
 CREATE TABLE task_billing_snapshots (
     task_id character varying(64) NOT NULL,
     user_id bigint NOT NULL,
+    workspace_id bigint,
+    billing_account_id bigint,
     service character varying(64) NOT NULL,
     sku character varying(128) NOT NULL,
     price_version_id bigint NOT NULL,
@@ -556,7 +559,9 @@ CREATE TABLE task_billing_snapshots (
     CONSTRAINT task_billing_snapshots_quantity_check CHECK ((quantity > 0)),
     CONSTRAINT task_billing_snapshots_total_credits_check CHECK (((total_credits >= 0) AND (total_credits <= '9000000000000000'::bigint))),
     CONSTRAINT task_billing_snapshots_unit_credits_check CHECK (((unit_credits >= 0) AND (unit_credits <= '9000000000000000'::bigint))),
-    CONSTRAINT task_billing_snapshots_user_id_check CHECK ((user_id > 0))
+    CONSTRAINT task_billing_snapshots_workspace_id_check CHECK ((workspace_id > 0)),
+    CONSTRAINT task_billing_snapshots_user_id_check CHECK ((user_id > 0)),
+    CONSTRAINT task_billing_snapshots_billing_account_check CHECK ((billing_account_id IS NOT NULL AND billing_account_id > 0))
 );
 
 
@@ -654,6 +659,9 @@ CREATE INDEX billing_current_prices_price_version_idx ON billing_current_prices 
 --
 
 CREATE INDEX idx_task_billing_snapshots_user_created ON task_billing_snapshots USING btree (user_id, created_at);
+
+CREATE INDEX idx_task_billing_snapshots_account_created ON task_billing_snapshots USING btree (billing_account_id, created_at);
+CREATE INDEX idx_task_billing_snapshots_account_workspace_created ON task_billing_snapshots USING btree (billing_account_id, workspace_id, created_at);
 
 
 --

@@ -28,8 +28,8 @@ RETURNING id::text`).Scan(&credentialID); err != nil {
 
 	orderID := "11111111-1111-4111-8111-111111111111"
 	if _, err := db.Exec(ctx, `
-INSERT INTO payment_orders (id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_product_id, idea_quantity, base_currency, base_amount_minor, terms_version, refund_policy_version, return_base_url, expires_at)
-VALUES ($1::uuid, 'IBP-20240101-EXPOSURE0001', gen_random_uuid(), 42, 'test-exposure-01', $2, 'cancelled', $3::uuid, 'acct_exposure', 'prod_exposure', 500, 'usd', 500, 'v1', 'v1', 'https://example.com/', now() + interval '1 hour')`,
+INSERT INTO payment_orders (id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_product_id, idea_quantity, base_currency, base_amount_minor, terms_version, refund_policy_version, return_base_url, expires_at)
+VALUES ($1::uuid, 'IBP-20240101-EXPOSURE0001', gen_random_uuid(), 42, ensure_personal_billing_account_for_user(42), 'test-exposure-01', $2, 'cancelled', $3::uuid, 'acct_exposure', 'prod_exposure', 500, 'usd', 500, 'v1', 'v1', 'https://example.com/', now() + interval '1 hour')`,
 		orderID, strings.Repeat("a", 64), credentialID); err != nil {
 		t.Fatalf("seed payment order: %v", err)
 	}
@@ -68,8 +68,8 @@ VALUES (gen_random_uuid(), $1::uuid, 42, 'dp_exposure_won', 'ch_exposure', 'clos
 
 	emptyID := "22222222-2222-4222-8222-222222222222"
 	if _, err := db.Exec(ctx, `
-INSERT INTO payment_orders (id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_product_id, idea_quantity, base_currency, base_amount_minor, terms_version, refund_policy_version, return_base_url, expires_at)
-VALUES ($1::uuid, 'IBP-20240101-EXPOSURE0002', gen_random_uuid(), 42, 'test-exposure-02', $2, 'cancelled', $3::uuid, 'acct_exposure', 'prod_exposure', 500, 'usd', 500, 'v1', 'v1', 'https://example.com/', now() + interval '1 hour')`,
+INSERT INTO payment_orders (id, public_order_number, public_token, user_id, billing_account_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_product_id, idea_quantity, base_currency, base_amount_minor, terms_version, refund_policy_version, return_base_url, expires_at)
+VALUES ($1::uuid, 'IBP-20240101-EXPOSURE0002', gen_random_uuid(), 42, ensure_personal_billing_account_for_user(42), 'test-exposure-02', $2, 'cancelled', $3::uuid, 'acct_exposure', 'prod_exposure', 500, 'usd', 500, 'v1', 'v1', 'https://example.com/', now() + interval '1 hour')`,
 		emptyID, strings.Repeat("b", 64), credentialID); err != nil {
 		t.Fatalf("seed empty payment order: %v", err)
 	}

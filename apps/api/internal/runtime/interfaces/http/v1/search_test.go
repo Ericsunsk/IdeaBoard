@@ -332,6 +332,12 @@ func TestV1VisionQueryLifecycle(t *testing.T) {
 	if billing.captures != 1 || billing.releases != 0 {
 		t.Fatalf("billing captures=%d releases=%d, want 1/0", billing.captures, billing.releases)
 	}
+	// Settlement binds the consuming workspace (#918): the Hold carries
+	// the workspace scope with the member as operator, never a bare
+	// personal wallet.
+	if billing.lastHoldWS != fx.ws.PublicID || billing.lastHoldBy != fx.member {
+		t.Fatalf("hold scope = (%q, %d), want (%q, %d)", billing.lastHoldWS, billing.lastHoldBy, fx.ws.PublicID, fx.member)
+	}
 	if len(extractor.lastInput.References) != 1 || extractor.lastInput.References[0].SourceID != "v1" {
 		t.Fatalf("extractor input = %+v, want the resolved owned reference (no bytes)", extractor.lastInput)
 	}

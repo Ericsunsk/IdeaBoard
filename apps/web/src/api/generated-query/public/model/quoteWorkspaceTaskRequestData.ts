@@ -10,6 +10,7 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { BoardId } from './boardId'
 import type { Service } from './service'
 
 export type QuoteWorkspaceTaskRequestData = {
@@ -18,4 +19,6 @@ export type QuoteWorkspaceTaskRequestData = {
   quantity?: number
   /** Output resolution; omitted input is normalized to the Service policy canonical value. */
   resolution?: string
+  /** Optional Canvas Board binding (board_...). The preflight enforces the same generate-capability gate as submit (invisible Boards 404 board_not_found, archived 409 board_archived, visible without generate 403 task_forbidden); omitted stays a workspace-level price preflight with no Board attribution. */
+  board_id?: BoardId
 }
