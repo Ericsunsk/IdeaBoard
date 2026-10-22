@@ -38,7 +38,7 @@ export const PAYMENT_ORDERS_MESSAGES = {
   emptyNone: '暂无支付订单',
   refundTitle: '确认退款',
   refundMessage: (publicOrderNumber: string, formattedQuantity: string) =>
-    `将为订单 ${publicOrderNumber} 发起 ${formattedQuantity} Ideas 退款。退款提交后会先预留余额，是否继续？该操作将记录操作人与原因。`,
+    `购买原则上不退款，仅在法律要求或购买时明确承诺的例外适用时操作。将为订单 ${publicOrderNumber} 发起 ${formattedQuantity} Ideas 原渠道退款，并先预留余额。确认已审核例外依据？该操作将记录操作人及退款结果。`,
   refundConfirm: '发起退款',
   refundFailed: '发起退款失败，请稍后重试',
   // Detail dialog.

@@ -145,10 +145,15 @@ func activeTestStripeConfiguration(t *testing.T, repo *testPaymentStores) paymen
 
 func createAdminPaymentOrder(t *testing.T, db *pgxpool.Pool, repo *testPaymentStores, userID int64, publicOrderNumber string, quantity int64) paymentsdomain.PaymentOrder {
 	t.Helper()
+	return createAdminPaymentOrderForAccount(t, repo, userID, paymentBillingAccount(t, db, userID), publicOrderNumber, quantity)
+}
+
+func createAdminPaymentOrderForAccount(t *testing.T, repo *testPaymentStores, userID, accountID int64, publicOrderNumber string, quantity int64) paymentsdomain.PaymentOrder {
+	t.Helper()
 	configuration := activeTestStripeConfiguration(t, repo)
 	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), paymentsdomain.CreatePaymentOrderIntentInput{
 		ID: uuid.NewString(), PublicOrderNumber: publicOrderNumber, PublicToken: uuid.NewString(), UserID: userID,
-		BillingAccountID:     paymentBillingAccount(t, db, userID),
+		BillingAccountID:     accountID,
 		ClientIdempotencyKey: "admin-read-" + strings.ToLower(publicOrderNumber[len(publicOrderNumber)-12:]),
 		RequestHash:          "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
 		StripeCredentialID:   configuration.CredentialID,

@@ -130,7 +130,6 @@ const (
 	MsgOrganizationLimitReached        = errorrender.MsgOrganizationLimitReached                       // CodeOrganizationLimitReached
 	MsgOrganizationClosed              = errorrender.MsgOrganizationClosed                             // CodeOrganizationClosed
 	MsgOrganizationClosureBlocked      = errorrender.MsgOrganizationClosureBlocked                     // CodeOrganizationClosureBlocked
-	MsgOrganizationNotClosed           = errorrender.MsgOrganizationNotClosed                          // CodeOrganizationNotClosed
 	MsgBadRequest31                    = errorrender.MsgBadRequest31                                   // CodeBadRequest
 	MsgPaginationCursorInvalid3        = errorrender.MsgPaginationCursorInvalid3                       // CodePaginationCursorInvalid
 	MsgIdempotencyKeyRequired2         = errorrender.MsgIdempotencyKeyRequired2                        // CodeIdempotencyKeyRequired

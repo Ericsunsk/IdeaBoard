@@ -20,7 +20,6 @@ import {
   provisionOrganization,
   removeOrganizationMember,
   renameWorkspace,
-  restoreOrganization,
   updateOrganizationMember,
   workspaceQueryKeys,
   type WorkspaceSummary,
@@ -204,21 +203,14 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
           input: { reason?: string | undefined },
         ) => {
           const closed = await closeOrganization(organizationId, input, {
-            idempotencyKey: organizationClosureIdempotencyKey('close'),
+            idempotencyKey: organizationClosureIdempotencyKey(),
           })
-          // Closure suspends every organization workspace at once: drop
+          // Closure permanently disables every organization workspace: drop
           // back to the Personal scope and refresh the list (access is
           // gone immediately, history is retained).
           scopeStore.selectPersonal()
           await refreshWorkspaceList()
           return closed
-        },
-        onRestoreOrganization: async (organizationId: string) => {
-          const restored = await restoreOrganization(organizationId, {
-            idempotencyKey: organizationClosureIdempotencyKey('restore'),
-          })
-          await refreshWorkspaceList()
-          return restored
         },
         onLeaveMember: async (organizationId: string, memberId: string): Promise<void> => {
           await removeOrganizationMember(organizationId, memberId)

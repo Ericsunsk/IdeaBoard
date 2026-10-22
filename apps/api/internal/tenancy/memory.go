@@ -458,7 +458,7 @@ func (s *InMemoryStore) orgCountForUserLocked(userID int64) int {
 		if _, ok := members[userID]; !ok {
 			continue
 		}
-		if org, ok := s.organizations[publicID]; !ok || org.ArchivedAt != nil {
+		if org, ok := s.organizations[publicID]; !ok || org.ArchivedAt != nil || org.IsClosed() {
 			continue
 		}
 		count++
@@ -519,7 +519,7 @@ func (s *InMemoryStore) ListOrganizationsForUser(ctx context.Context, userID int
 			continue
 		}
 		org, ok := s.organizations[publicID]
-		if !ok || org.ArchivedAt != nil {
+		if !ok || org.ArchivedAt != nil || org.IsClosed() {
 			continue
 		}
 		out = append(out, copyOrganization(org))
@@ -551,7 +551,7 @@ func (s *InMemoryStore) UpdateOrganization(ctx context.Context, publicID, name s
 	return copyOrganization(org), nil
 }
 
-// CloseOrganization suspends a live Organization in memory. The actor must
+// CloseOrganization permanently closes a live Organization in memory. The actor must
 // be the Owner; non-members read as not found, non-owners as forbidden.
 // The in-memory fixture holds no Task/payment state, so the in-flight
 // gate trivially passes; the postgres implementation enforces it.
@@ -577,31 +577,6 @@ func (s *InMemoryStore) CloseOrganization(ctx context.Context, organizationPubli
 	closedBy := actorUserID
 	org.ClosedBy = &closedBy
 	org.UpdatedAt = now
-	return copyOrganization(org), nil
-}
-
-// RestoreOrganization reopens a closed Organization in memory. The actor
-// must be the Owner; retained memberships resume with no rewrite.
-func (s *InMemoryStore) RestoreOrganization(ctx context.Context, organizationPublicID string, actorUserID int64) (*Organization, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	org, ok := s.organizations[organizationPublicID]
-	if !ok {
-		return nil, ErrNotFound
-	}
-	if !org.IsClosed() {
-		return nil, ErrOrganizationNotClosed
-	}
-	role, ok := s.orgMembers[organizationPublicID][actorUserID]
-	if !ok {
-		return nil, ErrNotFound
-	}
-	if role != RoleOwner {
-		return nil, ErrForbidden
-	}
-	org.ClosedAt = nil
-	org.ClosedBy = nil
-	org.UpdatedAt = s.clock()
 	return copyOrganization(org), nil
 }
 

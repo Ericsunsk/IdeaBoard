@@ -1,21 +1,6 @@
-// Package postgres implements Organization closure and restoration (#955).
-//
-// Only the Organization Owner initiates closure; closure immediately
-// suspends all member access and new spending while retaining membership,
-// Workspace, permission, and billing history rows. In-flight Tasks,
-// payment orders, refunds, disputes, and pending handover invites settle
-// first: any unsettled obligation fails the closure closed
-// (ErrOrganizationClosureBlocked) instead of stranding money facts.
-//
-// Balance disposal is fail-closed by construction: recharge terms are out
-// of scope for this ticket, so the disposition hook below always records
-// retained (funds stay in the closed Organization account with their
-// immutable history; nothing ever enters Personal). Refundable execution
-// against the original payment channel reuses the retained order refs
-// through the existing payment refund flow once recharge terms land.
-//
-// Owner restore reopens the Organization: the retained memberships and
-// permissions resume with no rewrite and no fund movement.
+// Package postgres implements permanent Organization closure.
+// Closure revokes access and spending permanently. Money facts remain for
+// audit and legally required remedies; no automatic refund or Personal transfer occurs.
 package postgres
 
 import (
@@ -35,7 +20,7 @@ import (
 // audit row. Older credited orders stay readable under their account.
 const maxClosureSnapshots = int32(500)
 
-// CloseOrganization suspends a live Organization. The actor must be the
+// CloseOrganization permanently closes a live Organization. The actor must be the
 // Owner; non-members read as not found (anti-enumeration), non-owners as
 // forbidden. Already-closed rows read as ErrOrganizationClosed so a
 // retried close never forks a second audit.
@@ -78,6 +63,11 @@ func (s *OrganizationStore) CloseOrganization(ctx context.Context, organizationP
 		if err := guardOrganizationClosureInflight(ctx, q, locked.InternalID, account.InternalID); err != nil {
 			return err
 		}
+		// Freeze and lock the Wallet before reading its closure snapshot. The
+		// same transaction rolls the freeze back if any closure check fails.
+		if err := q.FreezeOrganizationWallet(ctx, account.InternalID); err != nil {
+			return err
+		}
 		snapshot, err := snapshotOrganizationClosure(ctx, q, locked.InternalID, account.InternalID)
 		if err != nil {
 			return err
@@ -92,7 +82,7 @@ func (s *OrganizationStore) CloseOrganization(ctx context.Context, organizationP
 			AvailableBalance:   snapshot.available,
 			ReservedBalance:    snapshot.reserved,
 			CreditedOrderRefs:  snapshot.ordersJSON,
-			Disposition:        tenancy.OrganizationClosureRetained,
+			Disposition:        tenancy.OrganizationClosureExpired,
 			DispositionDetail:  snapshot.dispositionJSON,
 		}); err != nil {
 			if database.IsDuplicateConstraintError(err) {
@@ -118,60 +108,6 @@ func (s *OrganizationStore) CloseOrganization(ctx context.Context, organizationP
 		return nil
 	})
 	return closed, err
-}
-
-// RestoreOrganization reopens a closed Organization. The actor must be the
-// Owner; restoring a live Organization fails with
-// ErrOrganizationNotClosed. Retained memberships and permissions resume
-// with no rewrite and no fund movement.
-func (s *OrganizationStore) RestoreOrganization(ctx context.Context, organizationPublicID string, actorUserID int64) (*tenancy.Organization, error) {
-	organizationPublicID = strings.TrimSpace(organizationPublicID)
-	if organizationPublicID == "" || actorUserID <= 0 {
-		return nil, tenancy.ErrNotFound
-	}
-	var restored *tenancy.Organization
-	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
-		locked, err := q.LockOrganizationByPublicID(ctx, organizationPublicID)
-		if err != nil {
-			return notFound(err)
-		}
-		if !locked.ClosedAt.Valid {
-			return tenancy.ErrOrganizationNotClosed
-		}
-		membership, err := q.GetOrganizationMembership(ctx, dbsqlc.GetOrganizationMembershipParams{
-			OrganizationID: locked.InternalID, UserID: actorUserID,
-		})
-		if err != nil {
-			return notFound(err)
-		}
-		if membership.Role != tenancy.RoleOwner {
-			return tenancy.ErrForbidden
-		}
-		rows, err := q.MarkOrganizationClosureRestored(ctx, dbsqlc.MarkOrganizationClosureRestoredParams{
-			OrganizationID: locked.InternalID,
-			RestoredBy:     pgtype.Int8{Int64: actorUserID, Valid: true},
-		})
-		if err != nil {
-			return err
-		}
-		if rows != 1 {
-			return fmt.Errorf("tenancy: organization restore: missing open closure audit: %w", tenancy.ErrBillingConflict)
-		}
-		cleared, err := q.ClearOrganizationClosed(ctx, organizationPublicID)
-		if err != nil {
-			return err
-		}
-		if cleared != 1 {
-			return tenancy.ErrOrganizationNotClosed
-		}
-		read, err := q.GetOrganizationByPublicID(ctx, organizationPublicID)
-		if err != nil {
-			return notFound(err)
-		}
-		restored = mapOrganization(read)
-		return nil
-	})
-	return restored, err
 }
 
 // guardOrganizationClosureInflight fails the closure closed while any
@@ -213,9 +149,8 @@ func guardOrganizationClosureInflight(ctx context.Context, q *dbsqlc.Queries, or
 	return nil
 }
 
-// closureSnapshot pins the retained facts restore reinstates plus the
-// fail-closed balance disposition. No Ledger, Wallet, or payment row is
-// written here: funds stay untouched in the closed account.
+// closureSnapshot pins immutable closure audit facts. Balances and Ledger rows
+// remain unchanged; the permanently closed account cannot spend its balance.
 type closureSnapshot struct {
 	membershipJSON  []byte
 	workspaceJSON   []byte
@@ -261,7 +196,10 @@ func snapshotOrganizationClosure(ctx context.Context, q *dbsqlc.Queries, organiz
 	}
 	reserved, ok := balances.Max_2.(int64)
 	if !ok {
-		reserved = 0
+		return nil, tenancy.ErrBillingConflict
+	}
+	if reserved != 0 {
+		return nil, tenancy.ErrOrganizationClosureBlocked
 	}
 	orders, err := q.ListCreditedOrgPaymentOrders(ctx, dbsqlc.ListCreditedOrgPaymentOrdersParams{
 		BillingAccountID: pgtype.Int8{Int64: billingAccountID, Valid: true}, RowLimit: maxClosureSnapshots,
@@ -281,16 +219,11 @@ func snapshotOrganizationClosure(ctx context.Context, q *dbsqlc.Queries, organiz
 	if err != nil {
 		return nil, fmt.Errorf("tenancy: organization close: encode orders: %w", err)
 	}
-	// Recharge-terms hook (fail closed): no terms registry exists in this
-	// ticket, so refundable classification is impossible. The disposition
-	// stays retained with the hook outcome pinned for the future terms
-	// work; the original-channel refund then reuses credited_order_refs
-	// through the existing payment refund flow.
 	dispositionJSON, err := json.Marshal(map[string]any{
-		"outcome":                "recharge_terms_unresolved",
+		"outcome":                "permanently_closed",
 		"terms_versions":         terms,
 		"refund_policy_versions": refundPolicies,
-		"note":                   "retained in the closed organization account; never transferred to Personal",
+		"note":                   "permanently unavailable; no automatic refund or Personal transfer; legal and purchase commitments remain applicable",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("tenancy: organization close: encode disposition: %w", err)

@@ -130,8 +130,7 @@ func writeControlPaymentRefundError(c *gin.Context, err error) {
 		errors.Is(err, paymentcontracts.ErrRefundIdempotency),
 		errors.Is(err, paymentcontracts.ErrAdminPaymentOrderFilter):
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, runtimehttp.MsgBadRequest22)
-	case errors.Is(err, paymentcontracts.ErrRefundExpired),
-		errors.Is(err, paymentcontracts.ErrRefundOrderNotEligible),
+	case errors.Is(err, paymentcontracts.ErrRefundOrderNotEligible),
 		errors.Is(err, paymentcontracts.ErrRefundAmountExceeds),
 		errors.Is(err, paymentcontracts.ErrRefundProviderConflict):
 		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, runtimehttp.MsgConflict2)

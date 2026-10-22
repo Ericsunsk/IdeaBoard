@@ -1,6 +1,6 @@
 # 团队账单池竞品调研
 
-调研日期：2026-10-20。本文记录公开产品行为及其来源，供 IdeaBoard 的账单归属讨论使用；不是已接受的架构决策，也不据此推断竞品数据库模型。
+初次调研日期：2026-10-20；关闭与退款规则补充核实：2026-10-23。本文记录公开产品行为及其来源，供 IdeaBoard 的账单归属讨论使用；不是已接受的架构决策，也不据此推断竞品数据库模型。
 
 ## 调研结论
 
@@ -80,7 +80,7 @@
 
 ## 对 IdeaBoard 的讨论输入
 
-当前代码事实：
+初次调研时的代码快照（2026-10-20，非当前实现说明）：
 
 - `apps/api/internal/credits/CONTEXT.md` 将 Wallet 定义为单个 User 的账户；`apps/api/internal/tasking/infrastructure/adapters/workspace_credits_adapter.go` 的 Hold/Capture/Release 仍传入 UserID。
 - `apps/api/internal/tenancy/infrastructure/postgres/billing_account.go` 实际 provision Workspace 账单身份，Organization 支持仍为 future；这不等于已有团队共享余额。
@@ -97,3 +97,68 @@
 7. 资金归属应在任务提交时确定并随结算保留；Workspace 迁移、成员退出、团队所有权转让不宜让历史消费随当前关系漂移。
 
 下一轮应先确定：**一个 Workspace 的生成任务是否始终由同一个计费账户付款，还是允许成员在个人资金与团队资金之间选择？** 该选择会决定个人空间、团队空间、外部协作者和预算授权的模型，再决定 Organization 是否有独立存在的必要。
+
+## 关闭、删除与退款：2026-10-23 补充
+
+本次问题是 Organization 关闭后能否不退款。需要分别核实取消订阅、可恢复的组织关闭、永久删除账户、因违规终止，以及普通充值退款；这些动作不能互相替代。以下均为官方公开来源，尚未实际执行付款、删除或退款。
+
+### 产品对照
+
+| 产品 | 普通退款或取消订阅 | 终止、删除与余额 | 能否证明“组织关闭不退款、余额保留且可恢复” |
+| --- | --- | --- | --- |
+| TapNow | 原则上费用与已完成购买不可退款，法律要求或购买时明确承诺除外；取消订阅通常于当前付费周期结束时生效 | 终止后使用许可结束；公开条款没有承诺自动退款，也没有明确承诺关闭后保留余额、支持恢复 | 不能；可借鉴常规不退款规则，余额保留与恢复仍须自行定义 |
+| OpenRouter | 未使用的购买额度可在交易后 24 小时内申请退款，平台费用不退，加密货币支付不退 | Terms §9 明示非违规终止时剩余额度 30 天内原路退还；FAQ 又提示删除后重建账户无法找回未使用额度，存在需澄清的口径差异 | 不能；其终止条款反而包含退款承诺，不能概括成“关闭一律不退” |
+| Krea | 帮助文档允许满足低使用量等条件的订阅退款；取消订阅默认使用至本期结束 | 取消订阅后保留作品与账户历史；未核实 Organization 关闭或删除时的专门规则 | 不能；取消订阅保留数据不等于组织关闭永久保留余额 |
+
+### TapNow：常规不退款，但未公开组织关闭后的完整规则
+
+官方来源：[Terms of Service](https://www.tapnow.ai/terms-of-service) §10、§14、§22；[Enterprise](https://www.tapnow.ai/enterprise)。Terms 页面标注更新于 2025-09-01，合同主体为 Tamar AI Inc.。
+
+- §10：“Except where required by law or expressly stated at purchase, fees and completed purchases are non-refundable.” 即原则不退，保留法律及购买承诺例外。
+- Tapies/service credits 是使用功能的有限许可，无现金价值、不是法定货币；平台未另行说明时不可转让。不能将此概括成可以任意清零。
+- §10 只明确 promotional Tapies 可能过期，不能据此推断全部付费额度永久有效，或全部付费额度到期作废。
+- §14 规定终止后服务使用许可结束，支付等条款继续有效；没有说明组织关闭会自动退款，也没有说明关闭后余额冻结、保留或可恢复。
+- Enterprise 页面明确 shared credits、成员与使用量管理；§22 允许单独签署的协议优先，因此通用条款不能代替企业合同。
+- 适用范围限于已核实的国际站条款。`www.tapnow.top` 中国站请求出现 TLS 错误，中国区条款未核实；`/zh/terms-of-service` 仍显示同一英语合同。
+
+### OpenRouter：普通退款窗口与账户终止退款必须分开
+
+官方来源：[Terms of Service](https://openrouter.ai/terms)（页面标注更新于 2026-08-31）§4.1、§4.2、§9；[FAQ](https://openrouter.ai/docs/faq)。
+
+- **普通购买退款**：Terms §4.1 和 FAQ 一致，未使用 Credits 须在交易处理后 24 小时内申请；未使用金额原路退回，平台费用不退，加密货币支付不退。超出窗口的普通退款不被承诺。
+- **额度有效期**：Terms §4.2 保留自购买起 365 天后使未使用额度到期的权利，不等于保证额度永不过期，也不等于每笔额度必定自动到期。
+- **账户终止**：Terms §9 明示：“Except for OpenRouter's termination of your account for violation of these Terms, any Credits remaining in your account upon termination will be refunded to you through your original payment method within thirty (30) days of termination.” 因违规被终止不退款；其余终止条款包含剩余额度 30 天内原路退款的承诺。
+- **FAQ 口径差异**：删除账户的 FAQ 同时写道：“unused credits will be lost and cannot be reclaimed if you delete and later recreate your account.” 这明确否定删除重建后的额度找回，但没有解释它与 §9 终止退款承诺之间的关系。
+- **证据边界**：不能自行判断 FAQ 已推翻 Terms，也不能推断所有删除操作都会自动退款。具体删除与终止路径的结算顺序、加密支付例外及企业合同规则，仍需 OpenRouter 澄清。未找到足以确认可恢复 Organization 关闭流程的公开规则。
+
+#### 组织关闭后自动转入 Personal：未找到官方依据
+
+2026-10-23 再次读取上述 Terms、FAQ 及 [Organization Management 的转移说明](https://openrouter.ai/docs/cookbook/administration/organization-management#transferring-credits-from-personal-to-organization)：
+
+- 官方功能文档明确提供的是 **Personal → Organization** 的合格 Credits 自助转入，不是双向转账。需要启用 MFA、满足组织成员加入时长要求，并遵守组织接收转入后的冷却限制；按发票或后付费结算的组织不能接收预付 Credits。
+- 同页说明，退出 Organization 会失去组织资源、Credits 和 API Keys 的访问权，Personal 账户不受影响。没有承诺组织关闭时把组织余额自动转给管理员或个人账户。
+- Terms §4.4 同时写明 “Credits are non-transferable, including between accounts”，与上述已公开的单向转入功能存在文本口径差异；不能据此断言任何转账均不存在，也不能把功能文档扩大为 Organization → Personal 的许可。
+- Terms §4.3 明确 promotional Credits 不可退款、不可兑换且不可转让。不能将付费 Credits 的有限退款规则应用到赠送额度。
+- Terms §9 写的是符合条件的账户终止后 **原支付方式退款**，不是退成 Personal Credits；原渠道退款与账户内部余额转移是不同的产品行为。
+
+因此，当前公开证据支持“个人与组织资金分离、满足条件的个人额度可单向转入组织、符合条款时原渠道退款”。**不支持将“组织关闭自动把余额转给 Owner 的 Personal”描述为 OpenRouter 已验证的模式。** 完整的组织关闭结算流程仍未公开确认。
+
+### Krea：订阅退款有使用量门槛
+
+官方来源：[Refunds and Billing](https://www.krea.ai/docs/user-guide/help-and-support/refunds-and-billing)、[Manage Subscriptions](https://www.krea.ai/docs/user-guide/help-and-support/manage-subscriptions)、[Compute Units](https://www.krea.ai/docs/user-guide/help-and-support/compute-units)、[Organization Management](https://www.krea.ai/docs/user-guide/help-and-support/organization-management)、[Terms](https://www.krea.ai/terms)。
+
+- 退款帮助要求有效付费订阅、本月 Workspace 用量低于 650 compute units **且**少于 20 次生成，并说明通常处理近期扣款；退款预计 5–10 个工作日到账。符合条件时取消流程可提供退款选项。
+- 取消订阅默认保留高级权限至本期结束；保留历史、作品与用量记录，可用原账户重新订阅。这不构成 Organization 关闭或删除规则。
+- 一次性 compute pack 独立于订阅，购买额度须在 90 天内使用，不能以“数据保留”推断付费额度永久保留。
+- 更换 Workspace 的 Billing Account 不会转移原账户套餐、订阅或剩余额度。
+- Terms 页面标注 2024-05-20，原则上不按剩余周期比例退款、除明示例外不退已付费用；现行帮助文档明确了退款例外，引用时应一并说明。
+
+### IdeaBoard 的产品决策（2026-10-23）
+
+产品已明确选择购买原则上不退款，法律要求或购买时明确承诺除外；Organization 由 Owner
+二次确认后永久关闭，不能恢复，剩余余额不能再使用或转入 Personal，关闭本身不自动退款。
+不可变账务历史仍保留，例外退款和争议仍可按原支付事实处理。目标合同见
+[ADR-0038 §4](../adr/0038-personal-organization-billing-model.md#4-organization-永久关闭与余额)。
+
+常规不退款规则有 TapNow 官方条款依据；永久关闭及剩余余额使用权终止是本项目的明确决策，
+不是已核实的 TapNow/OpenRouter 组织关闭行为。此前提出的可恢复关闭建议已撤回，不能再据此验收。

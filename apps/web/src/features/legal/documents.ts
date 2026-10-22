@@ -1,9 +1,9 @@
 export const SUPPORT_EMAIL = 'support@ideaboard.art'
 
 export const LEGAL_DOCUMENT_VERSIONS = {
-  terms: '2026-10-09',
+  terms: '2026-10-23',
   privacy: '2026-10-09',
-  refund: '2026-10-09',
+  refund: '2026-10-23',
   acceptableUse: '2026-08-01',
 } as const
 

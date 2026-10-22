@@ -449,7 +449,6 @@ func TestStatusMatrixWorkspaceKernelCodes(t *testing.T) {
 		CodeOrganizationIdempotencyConflict: http.StatusConflict,
 		CodeOrganizationClosed:              http.StatusConflict,
 		CodeOrganizationClosureBlocked:      http.StatusConflict,
-		CodeOrganizationNotClosed:           http.StatusConflict,
 		CodeWorkspaceMemberNotFound:         http.StatusNotFound,
 		CodeWorkspaceMemberLimitReached:     http.StatusConflict,
 		CodeMembershipTransitionForbidden:   http.StatusForbidden,

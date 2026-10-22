@@ -18,8 +18,8 @@ const (
 	MinimumPurchaseIdeas       int64 = 500
 	MaximumPurchaseIdeas       int64 = 500_000
 	IdeasPerUSD                int64 = 100
-	CurrentTermsVersion              = "2026-08-01"
-	CurrentRefundPolicyVersion       = "2026-08-01"
+	CurrentTermsVersion              = "2026-10-23"
+	CurrentRefundPolicyVersion       = "2026-10-23"
 )
 
 var QuickPurchaseIdeaQuantities = [...]int64{1_000, 2_000, 3_000, 5_000, 10_000}

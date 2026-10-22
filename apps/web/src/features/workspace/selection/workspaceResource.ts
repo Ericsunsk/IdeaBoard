@@ -41,7 +41,6 @@ import {
   listOrganizationMembers as listOrganizationMembersTransport,
   listOrganizations,
   removeOrganizationMember as removeOrganizationMemberTransport,
-  restoreOrganization as restoreOrganizationTransport,
   updateOrganizationMember as updateOrganizationMemberTransport,
 } from '../../../api/generated-query/public/organizations/organizations'
 import { getGetUserQueryKey, getUser } from '../../../api/generated-query/public/user/user'
@@ -602,8 +601,8 @@ export async function removeOrganizationMember(
 // Organization closure collapses access and spending at once (#955): only
 // the Owner closes; the shared pool refuses while in-flight Tasks, payment
 // orders, refunds, disputes, or a pending handover invite settle. The
-// remaining balance stays in the closed account (never Personal) with a
-// fail-closed retained disposition until recharge terms land.
+// remaining balance becomes permanently unavailable, never transfers to
+// Personal, and does not automatically trigger a refund.
 export async function closeOrganization(
   organizationId: string,
   input: { reason?: string | undefined },
@@ -624,24 +623,4 @@ export async function closeOrganization(
     },
   )
   return parseOrganization(requireContractData<unknown>(response, 'Organization closure failed'))
-}
-
-// Organization restoration reopens a closed organization (#955): only the
-// Owner restores; retained memberships and permissions resume.
-export async function restoreOrganization(
-  organizationId: string,
-  options?: WorkspaceRequestOptions & { idempotencyKey?: string | undefined },
-): Promise<OrganizationSummary> {
-  const orgId = requireOpaqueId(organizationId, 'org', 'organization')
-  const response = await restoreOrganizationTransport(orgId, {
-    ...withSignal(options?.signal),
-    headers: buildContractRequestHeaders({
-      requestId: asTrimmedString(options?.requestId) ?? newRequestId(),
-      idempotencyKey: asTrimmedString(options?.idempotencyKey) ?? newRequestId(),
-    }),
-    ...(options?.authFailure == null ? {} : { authFailure: options.authFailure }),
-  })
-  return parseOrganization(
-    requireContractData<unknown>(response, 'Organization restoration failed'),
-  )
 }

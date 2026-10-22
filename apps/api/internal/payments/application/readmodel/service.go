@@ -131,7 +131,7 @@ func (s *Service) loadAdminPaymentOrderFacts(ctx context.Context, orderNumber st
 }
 
 func (s *Service) setRefundableIdeaQuantity(ctx context.Context, detail *AdminPaymentOrderDetailRecord, facts adminPaymentOrderFacts) error {
-	if detail.Status != paymentsdomain.PaymentOrderCredited || detail.PaidAt == nil || !s.now().UTC().Before(detail.PaidAt.Add(paymentsdomain.RefundEligibilityWindow)) {
+	if detail.Status != paymentsdomain.PaymentOrderCredited || detail.PaidAt == nil {
 		return nil
 	}
 	remaining := detail.IdeaQuantity

@@ -2,31 +2,34 @@
   <PublicLegalPage title="Refund Policy" :version="LEGAL_DOCUMENT_VERSIONS.refund">
     <p>This policy applies to Ideas purchased through IdeaBoard Checkout.</p>
 
-    <h2>1. Request Window</h2>
+    <h2>1. Purchase Policy</h2>
     <p>
-      Refund eligibility lasts for 14 days from the time payment is confirmed. Self-service refunds
-      are not currently available; contact the administrator within this period.
+      Purchases of Ideas are non-refundable, except where required by applicable law or expressly
+      promised at the time of purchase. Unused Ideas do not by themselves entitle you to a refund.
+      Contact support if you believe an exception applies; self-service refunds are not available.
     </p>
 
-    <h2>2. Eligible Quantity</h2>
+    <h2>2. Organization Closure</h2>
     <p>
-      The refundable quantity is the smaller of the amount not already refunded for the order and
-      the Ideas currently available in your account. Ideas that have already been consumed cannot be
-      refunded from that order.
+      Closing an Organization is permanent. Its remaining Ideas become permanently unavailable,
+      cannot be restored, and are not transferred to a Personal account. Organization closure does
+      not automatically trigger a refund. Exceptions required by applicable law or expressly
+      promised at the time of purchase still apply.
     </p>
 
-    <h2>3. Refund Amount</h2>
+    <h2>3. Approved Exceptions</h2>
     <p>
-      The product refund amount is calculated in the smallest unit of the original payment currency,
-      in proportion to the Ideas in the original order. Any taxes or other adjustments handled by
-      the payment provider are included according to the original transaction.
+      For an approved exception, the refund amount and eligible quantity are determined by the
+      applicable legal requirement or purchase promise and the original payment facts. We do not
+      refund the same payment twice. Taxes, fees, and currency adjustments are handled according to
+      the applicable requirement and the original transaction.
     </p>
 
     <h2>4. Processing</h2>
     <p>
-      After reviewing a request, the administrator processes the refund through the corresponding
-      original payment. Completion and the time it takes for funds to arrive are determined by the
-      payment provider and the payment institution.
+      Approved refunds are processed through the original payment method. Completion and the time it
+      takes for funds to arrive depend on the payment provider and the payment institution. Nothing
+      in this policy limits mandatory consumer rights.
     </p>
 
     <h2>5. Payment Disputes</h2>

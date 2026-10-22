@@ -91,9 +91,6 @@ VALUES ('staged member', $1, 'user', 1) RETURNING id`, randomStorageUID(t)).Scan
 	if _, err := organizations.CloseOrganization(carrier, org.PublicID, owner, "test"); err != nil {
 		t.Fatalf("close: %v", err)
 	}
-	if _, err := organizations.RestoreOrganization(carrier, org.PublicID, owner); err != nil {
-		t.Fatalf("restore: %v", err)
-	}
 	if err := tx.Rollback(ctx); err != nil {
 		t.Fatal(err)
 	}

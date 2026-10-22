@@ -135,9 +135,7 @@
       {{ t('workspace.switcher.members.readOnlyNote') }}
     </p>
 
-    <!-- Organization closure (issue #955, owner only): closing suspends
-      all access and spending while retaining history; restoring resumes
-      prior standing. Callbacks arrive opaquely from the workspace shell. -->
+    <!-- Permanent closure uses the same typed confirmation as Workspace deletion. -->
     <div
       v-if="shouldShowDangerZone"
       class="flex flex-col gap-2 border-t border-border pt-3"
@@ -146,67 +144,32 @@
       <p v-if="isClosed" class="m-0 text-xs text-muted-foreground" role="status">
         {{ t('workspace.management.closedNote') }}
       </p>
-      <template v-if="!isClosed">
+      <template v-else>
         <span class="text-xs font-semibold text-muted-foreground">
           {{ t('workspace.management.closeTitle') }}
         </span>
         <p class="m-0 text-xs text-muted-foreground">
           {{ t('workspace.management.closeHint') }}
         </p>
-        <div v-if="isCloseArmed" class="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- Accessible name via aria-label. -->
-          <Input
-            v-model="closeReason"
-            size="sm"
-            class="h-8 min-w-0 flex-1 text-xs"
-            :disabled="isClosing"
-            :maxlength="280"
-            :aria-label="t('workspace.management.closeReasonPlaceholder')"
-            :placeholder="t('workspace.management.closeReasonPlaceholder')"
-            @keydown.enter="close"
-          />
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            class="h-8 shrink-0"
-            :is-loading="isClosing"
-            :is-disabled="isClosing"
-            @click="close"
-          >
-            {{
-              isClosing
-                ? t('workspace.management.closing')
-                : t('workspace.management.closeConfirmAction')
-            }}
-          </Button>
-        </div>
-        <div v-else>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            class="h-8 shrink-0 text-destructive"
-            @click="isCloseArmed = true"
-          >
-            {{ t('workspace.management.closeAction') }}
-          </Button>
-        </div>
-      </template>
-      <template v-else>
+        <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- Accessible name via aria-label. -->
+        <Input
+          v-model="closeReason"
+          size="sm"
+          class="h-8 min-w-0 text-xs"
+          :disabled="isClosing"
+          :maxlength="280"
+          :aria-label="t('workspace.management.closeReasonPlaceholder')"
+          :placeholder="t('workspace.management.closeReasonPlaceholder')"
+        />
         <Button
           type="button"
+          variant="outline"
           size="sm"
-          class="h-8 shrink-0 self-start"
-          :is-loading="isRestoring"
-          :is-disabled="isRestoring"
-          @click="restore"
+          class="h-8 shrink-0 self-start text-destructive"
+          :is-disabled="isClosing"
+          @click="isCloseArmed = true"
         >
-          {{
-            isRestoring
-              ? t('workspace.management.restoring')
-              : t('workspace.management.restoreAction')
-          }}
+          {{ t('workspace.management.closeAction') }}
         </Button>
       </template>
       <p v-if="closureError" class="m-0 text-xs text-destructive" role="alert">
@@ -214,6 +177,21 @@
       </p>
     </div>
   </section>
+  <UserConfirmDialog
+    :is-visible="isCloseArmed"
+    :title="t('workspace.management.closeTitle')"
+    :message="t('workspace.management.closeHint')"
+    :confirm-label="t('workspace.management.closeConfirmAction')"
+    :expected-confirm-text="props.organizationName"
+    :confirm-input-label="
+      t('workspace.management.closeConfirmInputLabel', { name: props.organizationName })
+    "
+    :confirm-input-placeholder="t('workspace.management.closeConfirmInputPlaceholder')"
+    :is-loading="isClosing"
+    intent="danger"
+    @update:is-visible="isCloseArmed = $event"
+    @confirm="close"
+  />
 </template>
 
 <script setup lang="ts">
@@ -221,6 +199,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
 import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import type {
   OrganizationMemberSummary,
@@ -256,8 +235,6 @@ const props = withDefaults(
           input: { reason?: string | undefined },
         ) => Promise<{ status?: string | undefined }>)
       | undefined
-    onRestoreOrganization?:
-      ((organizationId: string) => Promise<{ status?: string | undefined }>) | undefined
   }>(),
   {
     organizationStatus: 'active',
@@ -268,7 +245,6 @@ const props = withDefaults(
     canLeave: false,
     onLeave: undefined,
     onCloseOrganization: undefined,
-    onRestoreOrganization: undefined,
   },
 )
 
@@ -285,9 +261,7 @@ watch(
 )
 const isClosed = computed(() => statusRef.value === 'closed')
 const shouldShowDangerZone = computed(
-  () =>
-    props.actorRole === 'owner' &&
-    (props.onCloseOrganization !== undefined || props.onRestoreOrganization !== undefined),
+  () => props.actorRole === 'owner' && props.onCloseOrganization !== undefined,
 )
 
 const members = ref<OrganizationMemberSummary[]>([])
@@ -300,7 +274,6 @@ const inviteRole = ref<'member' | 'admin'>('member')
 const closeReason = ref('')
 const isCloseArmed = ref(false)
 const isClosing = ref(false)
-const isRestoring = ref(false)
 const closureError = ref<string | null>(null)
 
 function roleLabel(role: OrganizationRole): string {
@@ -359,7 +332,7 @@ function toClosureError(error: unknown, fallback: string): string {
 }
 
 async function close(): Promise<void> {
-  if (!props.onCloseOrganization || isClosing.value) return
+  if (!props.onCloseOrganization || !isCloseArmed.value || isClosed.value || isClosing.value) return
   isClosing.value = true
   closureError.value = null
   try {
@@ -370,23 +343,10 @@ async function close(): Promise<void> {
     isCloseArmed.value = false
     closeReason.value = ''
   } catch (error) {
+    isCloseArmed.value = false
     closureError.value = toClosureError(error, t('workspace.management.closeFailed'))
   } finally {
     isClosing.value = false
-  }
-}
-
-async function restore(): Promise<void> {
-  if (!props.onRestoreOrganization || isRestoring.value) return
-  isRestoring.value = true
-  closureError.value = null
-  try {
-    await props.onRestoreOrganization(props.organizationId)
-    statusRef.value = 'active'
-  } catch (error) {
-    closureError.value = toClosureError(error, t('workspace.management.restoreFailed'))
-  } finally {
-    isRestoring.value = false
   }
 }
 

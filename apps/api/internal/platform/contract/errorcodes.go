@@ -59,15 +59,9 @@ const (
 	CodeWorkspaceMemberLimitReached     Code = "workspace_member_limit_reached"
 	CodeOrganizationMemberNotFound      Code = "organization_member_not_found"
 	CodeOrganizationLimitReached        Code = "organization_limit_reached"
-	// Organization closure codes (issue #955). Wire-stable: operating on
-	// a closed Organization renders organization_closed (409, only Owner
-	// restore reopens); closure refused by unsettled in-flight Tasks,
-	// payment orders, refunds, disputes, or pending handover renders
-	// organization_closure_blocked (409); restoring a live Organization
-	// renders organization_not_closed (409).
+	// Permanent closure and unsettled-obligation conflicts.
 	CodeOrganizationClosed            Code = "organization_closed"
 	CodeOrganizationClosureBlocked    Code = "organization_closure_blocked"
-	CodeOrganizationNotClosed         Code = "organization_not_closed"
 	CodeWorkspaceActiveTasks          Code = "workspace_active_tasks"
 	CodeMembershipTransitionForbidden Code = "membership_transition_forbidden"
 	// Default workspace lifecycle codes (Default resolution). Wire-stable:
@@ -447,7 +441,7 @@ func StatusOf(code Code) int {
 	case CodeTaskIdempotencyConflict, CodeIdempotencyConflict, CodeConflict,
 		CodeWorkspaceIdempotencyConflict, CodeOrganizationIdempotencyConflict,
 		CodeWorkspaceMemberLimitReached, CodeOrganizationLimitReached, CodeWorkspaceDefaultConflict, CodeWorkspaceActiveTasks,
-		CodeOrganizationClosed, CodeOrganizationClosureBlocked, CodeOrganizationNotClosed,
+		CodeOrganizationClosed, CodeOrganizationClosureBlocked,
 		CodeBoardRevisionConflict, CodeBoardIdempotencyConflict, CodeBoardArchived,
 		CodeUploadStateConflict, CodeUploadIdempotencyConflict,
 		CodeMediaNotReady, CodeMediaIdempotencyConflict, CodeBillingCheckoutConflict,

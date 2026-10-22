@@ -511,21 +511,6 @@ const organizationPanelProps = computed(() => {
             return closed
           },
         }),
-    ...(panel.onRestoreOrganization === undefined
-      ? {}
-      : {
-          onRestoreOrganization: async (organizationId: string) => {
-            const restored = await panel.onRestoreOrganization?.(organizationId)
-            if (restored && managedOrganization.value?.id === organizationId) {
-              managedOrganization.value = {
-                id: managedOrganization.value.id,
-                name: restored.name || managedOrganization.value.name,
-                status: 'active',
-              }
-            }
-            return restored
-          },
-        }),
   }
 })
 

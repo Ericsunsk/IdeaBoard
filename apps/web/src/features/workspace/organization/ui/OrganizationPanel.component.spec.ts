@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { defineComponent } from 'vue'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import OrganizationPanel from './OrganizationPanel.vue'
 import type { OrganizationMemberSummary } from '../../selection/workspaceResource'
@@ -47,6 +48,17 @@ describe('OrganizationPanel', () => {
   })
 })
 
+// Keep the shared typed-confirm controls real and replace only the Reka
+// shell, as in UserConfirmDialog specs (jsdom does not load overlay CSS).
+const DialogRootStub = defineComponent({
+  props: { open: { type: Boolean, required: true } },
+  template: '<div v-if="open"><slot /></div>',
+})
+const DialogPassthroughStub = defineComponent({ template: '<slot />' })
+const DialogContentStub = defineComponent({
+  template: '<section role="dialog"><slot /></section>',
+})
+
 describe('OrganizationPanel closure (955)', () => {
   function renderClosure(
     overrides?: Partial<Parameters<typeof renderManagement>[0]> & {
@@ -57,10 +69,19 @@ describe('OrganizationPanel closure (955)', () => {
       ) => Promise<{
         status?: string
       }>
-      onRestoreOrganization?: (organizationId: string) => Promise<{ status?: string }>
     },
   ) {
     return renderWithUser(OrganizationPanel, {
+      global: {
+        stubs: {
+          DialogRoot: DialogRootStub,
+          DialogPortal: DialogPassthroughStub,
+          DialogOverlay: DialogPassthroughStub,
+          DialogContent: DialogContentStub,
+          DialogDescription: DialogPassthroughStub,
+          DialogTitle: DialogPassthroughStub,
+        },
+      },
       props: {
         organizationId: 'org_c3',
         organizationName: 'Acme',
@@ -79,27 +100,26 @@ describe('OrganizationPanel closure (955)', () => {
         ...(overrides?.onCloseOrganization
           ? { onCloseOrganization: overrides.onCloseOrganization }
           : {}),
-        ...(overrides?.onRestoreOrganization
-          ? { onRestoreOrganization: overrides.onRestoreOrganization }
-          : {}),
       },
     })
   }
 
-  it('closes with a reason after an explicit confirm step', async () => {
+  it('requires the organization name before permanently closing with a reason', async () => {
     const onCloseOrganization = vi.fn(async () => ({ status: 'closed' }))
     const { user } = renderClosure({ onCloseOrganization })
     await waitFor(() => expect(screen.getByText('usr_admin')).toBeTruthy())
+    await user.type(screen.getByPlaceholderText('Reason (optional)'), 'winding down')
     await user.click(screen.getByRole('button', { name: 'Close organization' }))
-    const reason = screen.getByPlaceholderText('Reason (optional)')
-    await user.type(reason, 'winding down')
-    await user.click(screen.getByRole('button', { name: 'Confirm closure' }))
+    const confirm = screen.getByRole('button', { name: 'Confirm closure' })
+    expect(confirm).toBeDisabled()
+    expect(onCloseOrganization).not.toHaveBeenCalled()
+    await user.type(screen.getByPlaceholderText('Organization name'), 'Acme')
+    await user.click(confirm)
     await waitFor(() =>
       expect(onCloseOrganization).toHaveBeenCalledWith('org_c3', { reason: 'winding down' }),
     )
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Restore organization' })).toBeTruthy(),
-    )
+    await waitFor(() => expect(screen.getByText('Permanently closed')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Restore organization' })).toBeNull()
   })
 
   it('surfaces the blocked copy when closure is refused', async () => {
@@ -109,18 +129,30 @@ describe('OrganizationPanel closure (955)', () => {
     const { user } = renderClosure({ onCloseOrganization })
     await waitFor(() => expect(screen.getByText('usr_admin')).toBeTruthy())
     await user.click(screen.getByRole('button', { name: 'Close organization' }))
+    await user.type(screen.getByPlaceholderText('Organization name'), 'Acme')
     await user.click(screen.getByRole('button', { name: 'Confirm closure' }))
     await waitFor(() => expect(screen.getByText(/unsettled tasks or funds/)).toBeTruthy())
   })
 
-  it('hides member management and offers restore while closed', async () => {
-    const onRestoreOrganization = vi.fn(async () => ({ status: 'active' }))
-    const { user } = renderClosure({ organizationStatus: 'closed', onRestoreOrganization })
+  it('shows permanent closure without a restoration action', async () => {
+    renderClosure({
+      organizationStatus: 'closed',
+      onCloseOrganization: vi.fn(async () => ({ status: 'closed' })),
+    })
     await waitFor(() => expect(screen.getByText('usr_admin')).toBeTruthy())
     expect(screen.queryByPlaceholderText('usr_…')).toBeNull()
-    expect(screen.getByText('Closed')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Restore organization' }))
-    await waitFor(() => expect(onRestoreOrganization).toHaveBeenCalledWith('org_c3'))
+    expect(screen.getByText('Permanently closed')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Close organization' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Restore organization' })).toBeNull()
+  })
+
+  it('cancels the confirmation without closing', async () => {
+    const onCloseOrganization = vi.fn(async () => ({ status: 'closed' }))
+    const { user } = renderClosure({ onCloseOrganization })
+    await user.click(screen.getByRole('button', { name: 'Close organization' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onCloseOrganization).not.toHaveBeenCalled()
+    expect(screen.queryByPlaceholderText('Organization name')).toBeNull()
   })
 
   it('hides the danger zone from non-owners', async () => {
@@ -128,7 +160,6 @@ describe('OrganizationPanel closure (955)', () => {
       actorRole: 'member',
       currentUserId: 'usr_member',
       onCloseOrganization: vi.fn(async () => ({ status: 'closed' })),
-      onRestoreOrganization: vi.fn(async () => ({ status: 'active' })),
     })
     await waitFor(() => expect(screen.getByText('usr_admin')).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Close organization' })).toBeNull()

@@ -24,6 +24,14 @@
       recharges, so taxes are not automatically calculated for this service.
     </p>
 
+    <p>
+      Purchases are non-refundable except where required by applicable law or expressly promised at
+      the time of purchase. Closing an Organization is permanent: its remaining Ideas become
+      permanently unavailable, cannot be restored or transferred to a Personal account, and do not
+      automatically qualify for a refund. Applicable legal rights and purchase promises remain in
+      effect. See our <RouterLink :to="REFUND_POLICY_PATH">Refund Policy</RouterLink> for details.
+    </p>
+
     <h2>3. Payment and Credit Delivery</h2>
     <p>
       Payments are processed by our payment provider. Returning to IdeaBoard in your browser does
@@ -68,4 +76,5 @@
 <script setup lang="ts">
 import PublicLegalPage from '../components/PublicLegalPage.vue'
 import { LEGAL_CONTACTS, LEGAL_DOCUMENT_VERSIONS } from '../documents'
+import { REFUND_POLICY_PATH } from '../routePaths'
 </script>

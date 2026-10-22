@@ -109,7 +109,7 @@ var (
 	// Handlers render it as 403 membership_transition_forbidden.
 	ErrOrganizationOwnerImmutable = errors.New("tenancy: organization owner change requires explicit handover")
 	// ErrOrganizationClosed reports a mutation attempted on a closed
-	// Organization (#955). Only Owner restore reopens it; every other
+	// Organization (#955). Closure is permanent; every
 	// member/workspace/billing mutation fails closed while closed.
 	// Handlers render it as 409 organization_closed.
 	ErrOrganizationClosed = errors.New("tenancy: organization is closed")
@@ -119,10 +119,6 @@ var (
 	// handover invite on the shared pool. Handlers render it as 409
 	// organization_closure_blocked.
 	ErrOrganizationClosureBlocked = errors.New("tenancy: organization has unsettled obligations")
-	// ErrOrganizationNotClosed reports a restore attempted on a live
-	// Organization (#955). Handlers render it as 409
-	// organization_not_closed.
-	ErrOrganizationNotClosed = errors.New("tenancy: organization is not closed")
 )
 
 // IsValidRole reports whether role is a known membership role.
@@ -168,7 +164,7 @@ func (w *Workspace) IsDefaultWorkspace() bool {
 // Organization mirrors the agreed organizations row. Closure (#955) is a
 // state flag, not a delete: ClosedAt/ClosedBy suspend all member access
 // and new spending while membership, Workspace, permission, and billing
-// history rows are retained. Only the Owner restores.
+// history rows are retained for audit; closure is permanent.
 type Organization struct {
 	InternalID int64
 	PublicID   string
@@ -201,26 +197,20 @@ const (
 	OrganizationStatusClosed = "closed"
 )
 
-// OrganizationClosureDisposition is the fail-closed balance outcome recorded
-// at closure (#955). Recharge terms themselves are out of scope: unknown
-// terms never trigger an original-channel refund nor a Personal transfer,
-// so the only disposition this ticket produces is retained (funds stay in
-// the closed Organization account with their immutable history).
-const (
-	OrganizationClosureRetained = "retained"
-)
+// OrganizationClosureExpired records that the remaining credits are permanently
+// unavailable. Legal and purchase commitments remain applicable.
+const OrganizationClosureExpired = "expired"
 
 // OrganizationClosureMemberSnapshot pins one membership row at closure.
+// OrganizationClosure is the immutable audit of permanent closure. Financial
+// history remains available for reconciliation and legally required remedies.
 type OrganizationClosureMemberSnapshot struct {
 	UserID int64  `json:"user_id"`
 	Role   string `json:"role"`
 }
 
-// OrganizationClosure is one closure event for an Organization (#955): the
-// audit fact (who/when/reason), the retained membership/Workspace snapshots
-// restore reinstates, and the fail-closed balance disposition. Rows are
-// append-only except the restore stamp; money facts (Wallet, Ledger,
-// snapshots, orders) are never named here and survive by construction.
+// OrganizationClosure is the immutable audit of permanent closure. Financial
+// history remains available for reconciliation and legally required remedies.
 type OrganizationClosure struct {
 	InternalID             int64
 	OrganizationInternalID int64
@@ -236,8 +226,6 @@ type OrganizationClosure struct {
 	CreditedOrderNumbers   []string
 	Disposition            string
 	DispositionDetail      string
-	RestoredAt             *time.Time
-	RestoredBy             *int64
 }
 
 // WorkspaceMember is one workspace_memberships row projected for the API.
@@ -327,18 +315,10 @@ type OrganizationStore interface {
 	GetOrganization(ctx context.Context, publicID string) (*Organization, error)
 	ListOrganizationsForUser(ctx context.Context, userID int64) ([]*Organization, error)
 	UpdateOrganization(ctx context.Context, publicID, name string) (*Organization, error)
-	// CloseOrganization suspends a live Organization (#955): only the Owner
-	// initiates; closure is refused with ErrOrganizationClosureBlocked
-	// while in-flight Tasks, payment orders, refunds, disputes, or a
-	// pending handover invite settle on the shared pool. Success retains
-	// memberships, Workspaces, permissions, and billing history while
-	// suspending access and new spending; remaining balance stays in the
-	// closed account (fail-closed disposition, never Personal).
+	// CloseOrganization permanently closes the Organization and its remaining
+	// credits. Only Owner may close; unsettled obligations block closure.
+	// Financial history is retained; no automatic refund or Personal transfer occurs.
 	CloseOrganization(ctx context.Context, organizationPublicID string, actorUserID int64, reason string) (*Organization, error)
-	// RestoreOrganization reopens a closed Organization (#955): only the
-	// Owner restores; retained memberships and permissions resume.
-	// Restoring a live Organization fails with ErrOrganizationNotClosed.
-	RestoreOrganization(ctx context.Context, organizationPublicID string, actorUserID int64) (*Organization, error)
 	GetOrganizationRole(ctx context.Context, organizationPublicID string, userID int64) (string, bool, error)
 	ListOrganizationWorkspaces(ctx context.Context, organizationPublicID string) ([]*Workspace, error)
 	CreateOrganizationWorkspace(ctx context.Context, organizationPublicID string, ownerUserID int64, name string) (*Workspace, error)

@@ -7,9 +7,6 @@ import (
 
 type PaymentRefundStatus string
 
-// RefundEligibilityWindow is the maximum age of a credited order eligible for refund.
-const RefundEligibilityWindow = 14 * 24 * time.Hour
-
 const (
 	PaymentRefundPending   PaymentRefundStatus = "pending"
 	PaymentRefundSucceeded PaymentRefundStatus = "succeeded"

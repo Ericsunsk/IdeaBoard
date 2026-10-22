@@ -1510,10 +1510,20 @@ BEGIN
   IF p_billing_account_id <= 0 OR p_status NOT IN ('active', 'frozen') THEN
     RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid billing account wallet status command';
   END IF;
-  UPDATE credit_wallets SET status = p_status, updated_at = now() WHERE billing_account_id = p_billing_account_id;
+  -- Wallet locking serializes activation with permanent Organization closure.
+  PERFORM billing_account_id FROM credit_wallets
+  WHERE billing_account_id = p_billing_account_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
   END IF;
+  IF p_status = 'active' AND EXISTS (
+    SELECT 1 FROM billing_accounts accounts
+    JOIN organizations org ON org.internal_id = accounts.organization_id
+    WHERE accounts.internal_id = p_billing_account_id AND org.closed_at IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = 'IB003', MESSAGE = 'closed organization wallet cannot be activated';
+  END IF;
+  UPDATE credit_wallets SET status = p_status, updated_at = now() WHERE billing_account_id = p_billing_account_id;
 END;
 $$;
 

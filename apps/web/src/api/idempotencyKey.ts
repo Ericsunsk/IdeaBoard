@@ -29,12 +29,12 @@ export function organizationCreationIdempotencyKey(): string {
   return createIdempotencyKey('organization-create')
 }
 
-// Organization closure key per operation (issue #955,
-// `organization:close|restore` backend scopes bound to operator +
+// Organization closure key (issue #955,
+// `organization:close` backend scope bound to operator +
 // organization). Retries of the SAME attempt must reuse the returned
 // value; a new operator intent needs a fresh call.
-export function organizationClosureIdempotencyKey(operation: 'close' | 'restore'): string {
-  return createIdempotencyKey(`organization:${operation}`)
+export function organizationClosureIdempotencyKey(): string {
+  return createIdempotencyKey('organization:close')
 }
 
 // Workspace deletion key: caller-generated per delete attempt (the backend

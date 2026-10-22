@@ -68,18 +68,14 @@ export type UserAccountMenuOrganizationPanel = {
   // Self-leave also resets the Personal/Organization scope and refreshes the
   // list (defaults to onRemoveMember when omitted).
   onLeaveMember?: ((organizationId: string, memberId: string) => Promise<void>) | undefined
-  // Organization closure and restoration (issue #955, owner only). The
-  // panel renders the danger zone when these callbacks are present;
-  // closure suspends access and spending while retaining history, and
-  // restore resumes prior standing.
+  // Permanent Organization closure (owner only). Access and spending end;
+  // unused balance cannot be restored or transferred to Personal.
   onCloseOrganization?:
     | ((
         organizationId: string,
         input: { reason?: string | undefined },
       ) => Promise<UserAccountMenuOrganizationItem>)
     | undefined
-  onRestoreOrganization?:
-    ((organizationId: string) => Promise<UserAccountMenuOrganizationItem>) | undefined
 }
 
 export type UserAccountMenuWorkspace = {

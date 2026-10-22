@@ -38,7 +38,6 @@ var (
 
 	ErrRefundUnavailable      = errors.New(msgRefundUnavailable)
 	ErrRefundOrderNotEligible = errors.New(msgRefundOrderNotEligible)
-	ErrRefundExpired          = errors.New(msgRefundExpired)
 	ErrRefundAmountInvalid    = errors.New(msgRefundAmountInvalid)
 	ErrRefundAmountExceeds    = errors.New(msgRefundAmountExceeds)
 	ErrRefundIdempotency      = errors.New(msgRefundIdempotency)
@@ -77,7 +76,6 @@ const (
 	msgStripeConfigurationInvalid        = "收到的 Stripe 配置不完整"                           // ErrStripeConfigurationInvalid
 	msgRefundUnavailable                 = "退款服务暂不可用"                                   // ErrRefundUnavailable
 	msgRefundOrderNotEligible            = "支付订单当前不满足退款条件"                              // ErrRefundOrderNotEligible
-	msgRefundExpired                     = "支付订单已超过 14 天退款期限"                           // ErrRefundExpired
 	msgRefundAmountInvalid               = "退款 Idea 数量无效"                               // ErrRefundAmountInvalid
 	msgRefundAmountExceeds               = "退款 Idea 数量超过可退余额"                           // ErrRefundAmountExceeds
 	msgRefundIdempotency                 = "退款幂等键无效"                                    // ErrRefundIdempotency

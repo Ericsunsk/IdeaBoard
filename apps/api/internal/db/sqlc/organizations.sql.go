@@ -11,20 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const clearOrganizationClosed = `-- name: ClearOrganizationClosed :execrows
-UPDATE organizations
-SET closed_at = NULL, closed_by = NULL, updated_at = now()
-WHERE public_id = $1 AND closed_at IS NOT NULL
-`
-
-func (q *Queries) ClearOrganizationClosed(ctx context.Context, publicID string) (int64, error) {
-	result, err := q.db.Exec(ctx, clearOrganizationClosed, publicID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const countActiveOrgSearchOperations = `-- name: CountActiveOrgSearchOperations :one
 SELECT COUNT(*)
 FROM ai_search_operations AS op
@@ -87,7 +73,7 @@ const countOrganizationsByUserID = `-- name: CountOrganizationsByUserID :one
 SELECT COUNT(*)
 FROM organizations AS o
 INNER JOIN organization_memberships AS m ON m.organization_id = o.internal_id
-WHERE m.user_id = $1 AND o.archived_at IS NULL
+WHERE m.user_id = $1 AND o.archived_at IS NULL AND o.closed_at IS NULL
 `
 
 func (q *Queries) CountOrganizationsByUserID(ctx context.Context, userID int64) (int64, error) {
@@ -207,6 +193,15 @@ func (q *Queries) DeleteOrganizationMembership(ctx context.Context, arg DeleteOr
 	return result.RowsAffected(), nil
 }
 
+const freezeOrganizationWallet = `-- name: FreezeOrganizationWallet :exec
+SELECT set_billing_account_wallet_status($1::BIGINT, 'frozen'::TEXT)
+`
+
+func (q *Queries) FreezeOrganizationWallet(ctx context.Context, billingAccountID int64) error {
+	_, err := q.db.Exec(ctx, freezeOrganizationWallet, billingAccountID)
+	return err
+}
+
 const getOrganizationByInternalID = `-- name: GetOrganizationByInternalID :one
 SELECT internal_id, public_id, name, created_at, updated_at, archived_at, closed_at, closed_by
 FROM organizations
@@ -314,7 +309,7 @@ RETURNING internal_id, organization_id, billing_account_id,
   closed_at, closed_by, reason,
   membership_snapshot, workspace_snapshot,
   available_balance, reserved_balance, credited_order_refs,
-  disposition, disposition_detail, restored_at, restored_by
+  disposition, disposition_detail
 `
 
 type InsertOrganizationClosureParams struct {
@@ -360,8 +355,6 @@ func (q *Queries) InsertOrganizationClosure(ctx context.Context, arg InsertOrgan
 		&i.CreditedOrderRefs,
 		&i.Disposition,
 		&i.DispositionDetail,
-		&i.RestoredAt,
-		&i.RestoredBy,
 	)
 	return i, err
 }
@@ -507,7 +500,7 @@ const listOrganizationsByUserID = `-- name: ListOrganizationsByUserID :many
 SELECT o.internal_id, o.public_id, o.name, o.created_at, o.updated_at, o.archived_at, o.closed_at, o.closed_by
 FROM organizations AS o
 INNER JOIN organization_memberships AS m ON m.organization_id = o.internal_id
-WHERE m.user_id = $1 AND o.archived_at IS NULL
+WHERE m.user_id = $1 AND o.archived_at IS NULL AND o.closed_at IS NULL
 ORDER BY o.internal_id ASC
 LIMIT $2
 `
@@ -554,10 +547,8 @@ WHERE public_id = $1
 FOR UPDATE
 `
 
-// Organization closure queries (#955). Close/Restore pin the organization
-// row FOR UPDATE so concurrent closes serialize; the open-closure unique
-// index collapses a lost race to the winner via the insert conflict plus
-// the SetOrganizationClosed row count below.
+// Permanent Organization closure. Row locks serialize closure with mutations;
+// the unique closure audit prevents a second close.
 func (q *Queries) LockOrganizationByPublicID(ctx context.Context, publicID string) (Organization, error) {
 	row := q.db.QueryRow(ctx, lockOrganizationByPublicID, publicID)
 	var i Organization
@@ -586,26 +577,6 @@ func (q *Queries) LockUserRow(ctx context.Context, userID int64) (int64, error) 
 	var id int64
 	err := row.Scan(&id)
 	return id, err
-}
-
-const markOrganizationClosureRestored = `-- name: MarkOrganizationClosureRestored :execrows
-UPDATE organization_closures
-SET restored_at = now(), restored_by = $1
-WHERE organization_id = $2
-  AND restored_at IS NULL
-`
-
-type MarkOrganizationClosureRestoredParams struct {
-	RestoredBy     pgtype.Int8 `json:"restored_by"`
-	OrganizationID int64       `json:"organization_id"`
-}
-
-func (q *Queries) MarkOrganizationClosureRestored(ctx context.Context, arg MarkOrganizationClosureRestoredParams) (int64, error) {
-	result, err := q.db.Exec(ctx, markOrganizationClosureRestored, arg.RestoredBy, arg.OrganizationID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
 }
 
 const setOrganizationClosed = `-- name: SetOrganizationClosed :execrows

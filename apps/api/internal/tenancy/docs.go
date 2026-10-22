@@ -39,8 +39,8 @@
 // interface as its test-only double; it must never be wired in production.
 // The durable backend lives in infrastructure/postgres and implements Store
 // against sqlc (never hand-edit internal/db/sqlc/*). Its OrganizationStore
-// owns Organization creation, membership, Workspace creation, closure, and
-// restore transactions; the composite Store embeds it alongside Workspace
+// owns Organization creation, membership, Workspace creation, and permanent
+// closure transactions; the composite Store embeds it alongside Workspace
 // lifecycle. Organization mutations lock the Organization before checking
 // state or roles, and all reads/writes join the same caller transaction.
 // Workspace row creation is a transaction-local persistence primitive shared

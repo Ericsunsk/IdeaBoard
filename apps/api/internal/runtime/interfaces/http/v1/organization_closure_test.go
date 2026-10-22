@@ -3,6 +3,7 @@ package v1
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -10,9 +11,8 @@ import (
 	"ideaboard/api/internal/tenancy"
 )
 
-// Organization closure lifecycle over HTTP (#955): only the Owner closes
-// and restores; closure suspends member access and mutations while reads
-// stay visible; restore resumes prior standing.
+// Permanent Organization closure over HTTP: only Owner closes; access and
+// spending stop permanently, and no restore endpoint exists.
 func TestV1OrganizationClosure(t *testing.T) {
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
@@ -85,37 +85,18 @@ func TestV1OrganizationClosure(t *testing.T) {
 		t.Fatalf("workspace create while closed = %d %v, want 409 organization_closed", status, wsPayload)
 	}
 
-	restoreCall := func(userID int64, key string) (int, map[string]any) {
-		call := v1Call{method: http.MethodPost, path: restorePath, userID: userID}
-		if key != "" {
-			call.headers = map[string]string{contract.IdempotencyKeyHeader: key}
-		}
-		status, _, payload := doV1(t, engine, call)
-		return status, payload
+	restoreResponse := httptest.NewRecorder()
+	engine.ServeHTTP(restoreResponse, httptest.NewRequest(http.MethodPost, restorePath, nil))
+	if restoreResponse.Code != http.StatusNotFound {
+		t.Fatalf("restore endpoint = %d, want 404", restoreResponse.Code)
 	}
-	if status, payload := restoreCall(owner, ""); status != 400 ||
-		v1ErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
-		t.Fatalf("restore without key = %d %v, want 400", status, payload)
-	}
-	if status, payload := restoreCall(member, "restore-member"); status != 403 ||
-		v1ErrorCode(t, payload) != string(contract.CodeOrganizationForbidden) {
-		t.Fatalf("member restore = %d %v, want 403", status, payload)
-	}
-	status, restored := restoreCall(owner, "restore-1")
-	if status != 200 {
-		t.Fatalf("owner restore = %d %v", status, restored)
-	}
-	if got := restored["data"].(map[string]any)["status"]; got != tenancy.OrganizationStatusActive {
-		t.Fatalf("restored status = %v, want active", got)
-	}
-	if status, payload := restoreCall(owner, "restore-2"); status != 409 ||
-		v1ErrorCode(t, payload) != string(contract.CodeOrganizationNotClosed) {
-		t.Fatalf("second restore = %d %v, want 409 organization_not_closed", status, payload)
+	if status, replay := closeCall(owner, "close-1", `{"data":{"reason":"winding down"}}`); status != 200 || replay["data"].(map[string]any)["status"] != tenancy.OrganizationStatusClosed {
+		t.Fatalf("close replay = %d %v, want original success", status, replay)
 	}
 }
 
 // Closed Organizations suspend workspace content access over HTTP (#955):
-// member workspace reads converge to 404 until restore.
+// member workspace reads converge to 404 permanently.
 func TestV1ClosedOrganizationSuspendsWorkspaceAccess(t *testing.T) {
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
@@ -160,12 +141,4 @@ func TestV1ClosedOrganizationSuspendsWorkspaceAccess(t *testing.T) {
 		}
 	}
 
-	status, _, restored := doV1(t, engine, v1Call{method: http.MethodPost, path: "/api/v1/organizations/" + orgID + "/restore", userID: owner,
-		headers: map[string]string{contract.IdempotencyKeyHeader: "org-suspend-restore"}})
-	if status != 200 {
-		t.Fatalf("restore = %d %v", status, restored)
-	}
-	if status, _, _ := doV1(t, engine, v1Call{method: http.MethodGet, path: wsPath, userID: owner}); status != 200 {
-		t.Fatalf("GET workspace after restore = %d, want 200", status)
-	}
 }

@@ -28,7 +28,6 @@ import {
   provisionWorkspace,
   removeOrganizationMember,
   renameWorkspace,
-  restoreOrganization,
   updateOrganizationMember,
   workspaceApiUrls,
   WORKSPACE_NAME_MAX_LENGTH,
@@ -676,39 +675,5 @@ describe('organization closure (955)', () => {
       closedAt: '2026-10-22T00:00:01Z',
     })
     expect(seen).toEqual([{ key: 'org-close:1', body: { data: { reason: 'winding down' } } }])
-  })
-
-  it('restores a closed organization back to active', async () => {
-    const seenKeys: (string | null)[] = []
-    useMswHandlers(
-      http.post('/api/v1/organizations/:organizationId/restore', ({ request }) => {
-        seenKeys.push(request.headers.get('Idempotency-Key'))
-        return HttpResponse.json({
-          data: {
-            id: 'org_c3',
-            name: 'Acme',
-            status: 'active',
-            created_at: '2026-10-22T00:00:00Z',
-          },
-        })
-      }),
-    )
-    await expect(
-      restoreOrganization('org_c3', { idempotencyKey: 'org-restore:1' }),
-    ).resolves.toEqual({ publicId: 'org_c3', name: 'Acme', status: 'active' })
-    expect(seenKeys).toEqual(['org-restore:1'])
-  })
-
-  it('defaults a missing status to active (stub tolerance)', async () => {
-    useMswHandlers(
-      http.post('/api/v1/organizations/:organizationId/restore', () =>
-        HttpResponse.json({ data: { id: 'org_c3', name: 'Acme' } }),
-      ),
-    )
-    await expect(restoreOrganization('org_c3')).resolves.toEqual({
-      publicId: 'org_c3',
-      name: 'Acme',
-      status: 'active',
-    })
   })
 })

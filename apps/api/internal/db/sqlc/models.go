@@ -597,8 +597,6 @@ type OrganizationClosure struct {
 	CreditedOrderRefs  []byte             `json:"credited_order_refs"`
 	Disposition        string             `json:"disposition"`
 	DispositionDetail  []byte             `json:"disposition_detail"`
-	RestoredAt         pgtype.Timestamptz `json:"restored_at"`
-	RestoredBy         pgtype.Int8        `json:"restored_by"`
 }
 
 type OrganizationMembership struct {

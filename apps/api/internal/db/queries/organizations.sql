@@ -22,7 +22,7 @@ LIMIT 1;
 SELECT o.internal_id, o.public_id, o.name, o.created_at, o.updated_at, o.archived_at, o.closed_at, o.closed_by
 FROM organizations AS o
 INNER JOIN organization_memberships AS m ON m.organization_id = o.internal_id
-WHERE m.user_id = sqlc.arg(user_id) AND o.archived_at IS NULL
+WHERE m.user_id = sqlc.arg(user_id) AND o.archived_at IS NULL AND o.closed_at IS NULL
 ORDER BY o.internal_id ASC
 LIMIT sqlc.arg(row_limit);
 
@@ -58,7 +58,7 @@ WHERE organization_id = sqlc.arg(organization_id) AND role = 'owner';
 SELECT COUNT(*)
 FROM organizations AS o
 INNER JOIN organization_memberships AS m ON m.organization_id = o.internal_id
-WHERE m.user_id = sqlc.arg(user_id) AND o.archived_at IS NULL;
+WHERE m.user_id = sqlc.arg(user_id) AND o.archived_at IS NULL AND o.closed_at IS NULL;
 
 -- name: DeleteOrganizationMembership :execrows
 DELETE FROM organization_memberships
@@ -77,10 +77,8 @@ WHERE m.workspace_id = w.internal_id
   AND w.organization_id = sqlc.arg(organization_id)
   AND m.user_id = sqlc.arg(user_id);
 
--- Organization closure queries (#955). Close/Restore pin the organization
--- row FOR UPDATE so concurrent closes serialize; the open-closure unique
--- index collapses a lost race to the winner via the insert conflict plus
--- the SetOrganizationClosed row count below.
+-- Permanent Organization closure. Row locks serialize closure with mutations;
+-- the unique closure audit prevents a second close.
 
 -- name: LockOrganizationByPublicID :one
 SELECT internal_id, public_id, name, created_at, updated_at, archived_at, closed_at, closed_by
@@ -92,11 +90,6 @@ FOR UPDATE;
 UPDATE organizations
 SET closed_at = now(), closed_by = sqlc.arg(closed_by), updated_at = now()
 WHERE public_id = sqlc.arg(public_id) AND closed_at IS NULL;
-
--- name: ClearOrganizationClosed :execrows
-UPDATE organizations
-SET closed_at = NULL, closed_by = NULL, updated_at = now()
-WHERE public_id = sqlc.arg(public_id) AND closed_at IS NOT NULL;
 
 -- name: InsertOrganizationClosure :one
 INSERT INTO organization_closures (
@@ -115,13 +108,7 @@ RETURNING internal_id, organization_id, billing_account_id,
   closed_at, closed_by, reason,
   membership_snapshot, workspace_snapshot,
   available_balance, reserved_balance, credited_order_refs,
-  disposition, disposition_detail, restored_at, restored_by;
-
--- name: MarkOrganizationClosureRestored :execrows
-UPDATE organization_closures
-SET restored_at = now(), restored_by = sqlc.arg(restored_by)
-WHERE organization_id = sqlc.arg(organization_id)
-  AND restored_at IS NULL;
+  disposition, disposition_detail;
 
 -- name: ListOrganizationMembersForSnapshot :many
 SELECT m.user_id, m.role
@@ -191,3 +178,6 @@ WHERE orders.billing_account_id = sqlc.arg(billing_account_id)
   AND orders.status = 'credited'
 ORDER BY orders.created_at ASC
 LIMIT sqlc.arg(row_limit);
+
+-- name: FreezeOrganizationWallet :exec
+SELECT set_billing_account_wallet_status(sqlc.arg(billing_account_id)::BIGINT, 'frozen'::TEXT);

@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/credits"
+	creditdomain "ideaboard/api/internal/credits/domain"
+	creditports "ideaboard/api/internal/credits/ports"
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/google/uuid"
@@ -76,10 +79,33 @@ VALUES ($1, $2, $3, $4, $5, $6, '0123456789abcdef0123456789abcdef0123456789abcde
 	return orderID
 }
 
-func TestOrganizationCloseRestoreLifecycle(t *testing.T) {
+func TestOrganizationPermanentClosure(t *testing.T) {
 	db := newTenancyTestDB(t)
 	ctx := context.Background()
 	store, owner, _, member, org, ws, accountID := closureFixture(t, db, ctx)
+
+	// Seed actual paid credit facts. Closure must not manufacture a refund,
+	// transfer, or unbalanced Ledger mutation when credits become unavailable.
+	creditService := credits.NewService(db)
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	amount, err := creditdomain.NewCreditAmount(500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata := creditdomain.CommandMetadata{
+		IdempotencyKey: "closure-credit-grant", Actor: creditdomain.Actor{Type: creditdomain.ActorSystem, ID: "test"},
+		Source: "test", Reason: "closure balance", BusinessReference: creditdomain.BusinessReference{Type: "organization", ID: org.PublicID},
+	}
+	if _, err := creditService.InTx(tx).Grant(ctx, creditports.GrantCommand{BillingAccountID: accountID, Amount: amount, Metadata: metadata}); err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	// The member holds an explicit workspace grant (org Members never
 	// inherit workspace access); the grant must survive closure.
@@ -137,15 +163,15 @@ func TestOrganizationCloseRestoreLifecycle(t *testing.T) {
 	var disposition, reason string
 	var available, reserved int64
 	if err := db.QueryRow(ctx, `SELECT COUNT(*), MAX(disposition), MAX(reason), MAX(available_balance), MAX(reserved_balance)
-FROM organization_closures WHERE organization_id = $1 AND restored_at IS NULL`, org.InternalID).Scan(&auditCount, &disposition, &reason, &available, &reserved); err != nil {
+FROM organization_closures WHERE organization_id = $1`, org.InternalID).Scan(&auditCount, &disposition, &reason, &available, &reserved); err != nil {
 		t.Fatalf("read closure audit failed: %v", err)
 	}
-	if auditCount != 1 || disposition != tenancy.OrganizationClosureRetained || reason != "winding down" {
+	if auditCount != 1 || disposition != tenancy.OrganizationClosureExpired || reason != "winding down" {
 		t.Fatalf("closure audit = count %d disposition %q reason %q", auditCount, disposition, reason)
 	}
 	var membershipJSON, detailJSON []byte
 	if err := db.QueryRow(ctx, `SELECT membership_snapshot, disposition_detail FROM organization_closures
-WHERE organization_id = $1 AND restored_at IS NULL`, org.InternalID).Scan(&membershipJSON, &detailJSON); err != nil {
+WHERE organization_id = $1`, org.InternalID).Scan(&membershipJSON, &detailJSON); err != nil {
 		t.Fatalf("read closure snapshots failed: %v", err)
 	}
 	var pinned []tenancy.OrganizationClosureMemberSnapshot
@@ -153,8 +179,8 @@ WHERE organization_id = $1 AND restored_at IS NULL`, org.InternalID).Scan(&membe
 		t.Fatalf("membership snapshot = %d members %v, want 3", len(pinned), err)
 	}
 	var detail map[string]any
-	if err := json.Unmarshal(detailJSON, &detail); err != nil || detail["outcome"] != "recharge_terms_unresolved" {
-		t.Fatalf("disposition detail = %v %v, want recharge_terms_unresolved", detail, err)
+	if err := json.Unmarshal(detailJSON, &detail); err != nil || detail["outcome"] != "permanently_closed" {
+		t.Fatalf("disposition detail = %v %v, want permanently_closed", detail, err)
 	}
 
 	// Funds survive closure: the org Wallet is untouched and nothing
@@ -175,31 +201,41 @@ WHERE def.owner_user_id = $1 AND def.organization_id IS NULL AND def.is_default 
 		t.Fatalf("balances after close: org %d (snapshot %d), personal %d", orgAvailable, available, personalAvailable)
 	}
 
-	// Owner restores; prior memberships and permissions resume.
-	restored, err := store.RestoreOrganization(ctx, org.PublicID, owner)
+	if available != 500 || reserved != 0 {
+		t.Fatalf("closure balances = %d/%d, want 500/0", available, reserved)
+	}
+	var status string
+	if err := db.QueryRow(ctx, `SELECT status FROM credit_wallets WHERE billing_account_id = $1`, accountID).Scan(&status); err != nil || status != "frozen" {
+		t.Fatalf("closed wallet = %q %v, want frozen", status, err)
+	}
+	if _, err := db.Exec(ctx, `SELECT set_billing_account_wallet_status($1, 'active')`, accountID); err == nil {
+		t.Fatal("closed organization wallet could be reactivated")
+	}
+	tx, err = db.Begin(ctx)
 	if err != nil {
-		t.Fatalf("restore failed: %v", err)
+		t.Fatal(err)
 	}
-	if restored.IsClosed() || restored.Status() != tenancy.OrganizationStatusActive {
-		t.Fatalf("restored status = %q, want active", restored.Status())
+	metadata.IdempotencyKey = "closure-credit-hold"
+	_, holdErr := creditService.InTx(tx).Hold(ctx, creditports.HoldCommand{BillingAccountID: accountID, Amount: amount, Metadata: metadata})
+	_ = tx.Rollback(ctx)
+	if !errors.Is(holdErr, creditdomain.ErrWalletFrozen) {
+		t.Fatalf("closed wallet hold = %v, want frozen", holdErr)
 	}
-	if role, ok, err := store.GetWorkspaceRole(ctx, ws.PublicID, member); err != nil || !ok {
-		t.Fatalf("member workspace role after restore = %v %v, want member", role, err)
+	var creditTransactions int
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM credit_transactions WHERE billing_account_id = $1`, accountID).Scan(&creditTransactions); err != nil || creditTransactions != 1 {
+		t.Fatalf("closed financial history = %d %v, want only original grant", creditTransactions, err)
 	}
-	if role, ok, err := store.GetWorkspaceRole(ctx, ws.PublicID, owner); err != nil || !ok || role != tenancy.RoleOwner {
-		t.Fatalf("owner workspace role after restore = %v %v, want owner", role, err)
-	}
-	members, err = store.ListOrganizationMembers(ctx, org.PublicID)
-	if err != nil || len(members) != 3 {
-		t.Fatalf("members after restore = %d %+v, want 3", len(members), err)
-	}
-	var openAudits int
-	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM organization_closures WHERE organization_id = $1 AND restored_at IS NULL`, org.InternalID).Scan(&openAudits); err != nil || openAudits != 0 {
-		t.Fatalf("open audits after restore = %d %v, want 0", openAudits, err)
-	}
-	var history int
-	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM organization_closures WHERE organization_id = $1`, org.InternalID).Scan(&history); err != nil || history != 1 {
-		t.Fatalf("closure history after restore = %d %v, want 1", history, err)
+
+	// A permanently closed Organization releases the one-active-organization
+	// slot for all previous members without rewriting historical membership.
+	for _, userID := range []int64{owner, member} {
+		listed, err := store.ListOrganizationsForUser(ctx, userID)
+		if err != nil || len(listed) != 0 {
+			t.Fatalf("active organizations after closure = %d %v, want 0", len(listed), err)
+		}
+		if _, err := store.CreateOrganization(ctx, userID, "replacement"); err != nil {
+			t.Fatalf("create replacement organization: %v", err)
+		}
 	}
 }
 
@@ -224,15 +260,7 @@ func TestOrganizationCloseAuthorization(t *testing.T) {
 	if _, err := store.CloseOrganization(ctx, org.PublicID, owner, "again"); !errors.Is(err, tenancy.ErrOrganizationClosed) {
 		t.Fatalf("second close = %v, want ErrOrganizationClosed", err)
 	}
-	if _, err := store.RestoreOrganization(ctx, org.PublicID, admin); !errors.Is(err, tenancy.ErrForbidden) {
-		t.Fatalf("admin restore = %v, want ErrForbidden", err)
-	}
-	if _, err := store.RestoreOrganization(ctx, org.PublicID, owner); err != nil {
-		t.Fatalf("owner restore failed: %v", err)
-	}
-	if _, err := store.RestoreOrganization(ctx, org.PublicID, owner); !errors.Is(err, tenancy.ErrOrganizationNotClosed) {
-		t.Fatalf("second restore = %v, want ErrOrganizationNotClosed", err)
-	}
+
 }
 
 func TestOrganizationCloseBlockedByInflightTasks(t *testing.T) {
@@ -374,5 +402,19 @@ WHERE billing_account_id = $2 AND status = 'pending'`, owner, accountID); err !=
 	}
 	if !closed.IsClosed() {
 		t.Fatalf("org not closed after handover settle")
+	}
+}
+
+func TestOrganizationCloseBlockedByReservedCredits(t *testing.T) {
+	db := newTenancyTestDB(t)
+	ctx := context.Background()
+	store, owner, _, _, org, _, accountID := closureFixture(t, db, ctx)
+	handoverGrantAndHold(t, ctx, db, credits.NewService(db), accountID, owner, "closure-reserved")
+	if _, err := store.CloseOrganization(ctx, org.PublicID, owner, ""); !errors.Is(err, tenancy.ErrOrganizationClosureBlocked) {
+		t.Fatalf("close with reserved credits = %v, want blocked", err)
+	}
+	var status string
+	if err := db.QueryRow(ctx, `SELECT status FROM credit_wallets WHERE billing_account_id = $1`, accountID).Scan(&status); err != nil || status != "active" {
+		t.Fatalf("failed closure wallet = %q %v, want active after rollback", status, err)
 	}
 }

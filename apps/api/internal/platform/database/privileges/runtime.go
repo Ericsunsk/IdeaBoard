@@ -202,9 +202,9 @@ func RuntimePrivilegePolicy() Policy {
 				Required: []Privilege{
 					PrivilegeSelect,
 					PrivilegeInsert,
-					PrivilegeUpdate,
 				},
 				Forbidden: []Privilege{
+					PrivilegeUpdate,
 					PrivilegeDelete,
 					PrivilegeTruncate,
 					PrivilegeReferences,

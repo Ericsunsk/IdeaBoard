@@ -248,7 +248,6 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps runtimehttp.AuthD
 	group.GET("/organizations/:organization_id", handler.getOrganization)
 	group.PATCH("/organizations/:organization_id", handler.updateOrganization)
 	group.POST("/organizations/:organization_id/closure", handler.closeOrganization)
-	group.POST("/organizations/:organization_id/restore", handler.restoreOrganization)
 	group.GET("/organizations/:organization_id/members", handler.listOrganizationMembers)
 	group.POST("/organizations/:organization_id/members", handler.addOrganizationMember)
 	group.PATCH("/organizations/:organization_id/members/:member_id", handler.updateOrganizationMember)

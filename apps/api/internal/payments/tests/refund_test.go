@@ -368,17 +368,24 @@ func TestProportionalRefundAmountUsesCumulativeRounding(t *testing.T) {
 	}
 }
 
-func TestPaymentRefundRejectsExactFourteenDayBoundary(t *testing.T) {
+func TestAdminExceptionRefundHasNoGeneralFourteenDayWindow(t *testing.T) {
 	db := testdb.Open(t)
 	repo := newTestPaymentStores(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
-	order := createCreditedRefundOrder(t, db, repo, now.Add(-paymentsdomain.RefundEligibilityWindow))
-	_, _, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
+	order := createCreditedRefundOrder(t, db, repo, now.Add(-30*24*time.Hour))
+	refund, replayed, err := repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 1,
-		IdempotencyKey: "refund-integration-expired", Now: now,
+		IdempotencyKey: "refund-exception-after-thirty-days", Now: now,
 	})
-	if !errors.Is(err, paymentcontracts.ErrRefundExpired) {
-		t.Fatalf("exact boundary error = %v", err)
+	if err != nil || replayed || refund.Status != paymentsdomain.PaymentRefundPending {
+		t.Fatalf("Admin exception refund = %+v, replayed = %v, error = %v", refund, replayed, err)
+	}
+	_, replayed, err = repo.CreatePendingPaymentRefund(t.Context(), paymentrefund.CreatePendingPaymentRefundInput{
+		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 1,
+		IdempotencyKey: "refund-exception-after-thirty-days", Now: now.Add(time.Hour),
+	})
+	if err != nil || !replayed {
+		t.Fatalf("Admin exception replay = %v, error = %v", replayed, err)
 	}
 }
 
@@ -491,11 +498,13 @@ func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) 
 
 func createCreditedRefundOrder(t *testing.T, db *pgxpool.Pool, repo *testPaymentStores, paidAt time.Time) paymentsdomain.PaymentOrder {
 	t.Helper()
+	return createCreditedRefundOrderForAccount(t, repo, paymentBillingAccount(t, db, 42), paidAt)
+}
+
+func createCreditedRefundOrderForAccount(t *testing.T, repo *testPaymentStores, accountID int64, paidAt time.Time) paymentsdomain.PaymentOrder {
+	t.Helper()
 	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
-	if _, err := db.Exec(t.Context(), `SELECT ensure_personal_billing_account_for_user(42)`); err != nil {
-		t.Fatal(err)
-	}
-	order := createAdminPaymentOrder(t, db, repo, 42, "IBP-20260804-REFUND000001", 500)
+	order := createAdminPaymentOrderForAccount(t, repo, 42, accountID, "IBP-20260804-REFUND000001", 500)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), paymentsdomain.BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: "cus_refund", StripeSessionID: "cs_refund",
 		CheckoutURL: "https://checkout.stripe.example/refund", ExpiresAt: order.ExpiresAt,

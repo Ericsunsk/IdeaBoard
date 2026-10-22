@@ -181,7 +181,10 @@ A Refund reverses a Capture; a Purchase Refund settles an external-payment refun
 - Wallet lifecycle status and active Restrictions are orthogonal.
   Grant, Deduction, and Hold require active lifecycle plus zero active
   Restrictions; the Payments-typed PurchaseRefundHold is not spending and may
-  bypass Restrictions while lifecycle is active to reserve pending Ideas;
+  bypass Restrictions while lifecycle is active to reserve pending Ideas.
+  The same typed reservation also remains available on a permanently closed
+  Organization pool for legal or purchase-promise refunds, without reactivating
+  the Wallet or enabling spending; other frozen Wallets remain rejected;
   Capture and Release must still converge existing Holds;
   authenticated-Admin linked Refund/Correction keeps its repair duty.
   Idempotency replay returns the original result before the current gate.

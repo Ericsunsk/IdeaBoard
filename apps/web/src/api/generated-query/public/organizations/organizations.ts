@@ -463,7 +463,7 @@ export const getCloseOrganizationUrl = (organizationId: string) => {
 }
 
 /**
- * Requires Idempotency-Key. Only the owner may close. Closure immediately suspends all member access and new spending while retaining membership, Workspace, permission, and billing history. Unsettled Tasks, payment orders, refunds, disputes, or a pending handover invite refuse closure with organization_closure_blocked; remaining balance stays in the closed account (never Personal).
+ * Requires Idempotency-Key. Only the owner may close. Closure permanently ends all member access and spending. Organization content and unused balance cannot be restored; billing and audit history remain available for retention obligations. Unsettled Tasks, payment orders, refunds, disputes, or a pending handover invite refuse closure with organization_closure_blocked. Unused balance becomes permanently unavailable and never transfers to Personal. Closure does not automatically refund purchases; applicable law and explicit purchase commitments remain exceptions.
  * @summary Close an organization (owner only)
  */
 export const closeOrganization = async (
@@ -588,109 +588,6 @@ export const useCloseOrganization = <
   TContext
 > => {
   return useMutation(getCloseOrganizationMutationOptions(options), queryClient)
-}
-export const getRestoreOrganizationUrl = (organizationId: string) => {
-  return `/organizations/${encodeURIComponent(String(organizationId))}/restore`
-}
-
-/**
- * Requires Idempotency-Key. Only the owner may restore; retained memberships and permissions resume. No request body is required. Restoring a live organization reads as 409 organization_not_closed.
- * @summary Restore a closed organization (owner only)
- */
-export const restoreOrganization = async (
-  organizationId: string,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<OrganizationEnvelope> => {
-  return publicMutator<OrganizationEnvelope>(getRestoreOrganizationUrl(organizationId), {
-    ...options,
-    method: 'POST',
-  })
-}
-
-export const getRestoreOrganizationMutationKey = () => ['restoreOrganization'] as const
-
-export const getRestoreOrganizationMutationOptions = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ForbiddenResponse
-    | NotFoundResponse
-    | ConflictResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof restoreOrganization>>,
-    TError,
-    RestoreOrganizationMutationVariables,
-    TContext
-  >
-  request?: SecondParameter<typeof publicMutator>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof restoreOrganization>>,
-  TError,
-  RestoreOrganizationMutationVariables,
-  TContext
-> => {
-  const mutationKey = getRestoreOrganizationMutationKey()
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof restoreOrganization>>,
-    RestoreOrganizationMutationVariables
-  > = (props) => {
-    const { organizationId } = props ?? {}
-
-    return restoreOrganization(organizationId, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type RestoreOrganizationMutationResult = NonNullable<
-  Awaited<ReturnType<typeof restoreOrganization>>
->
-
-export type RestoreOrganizationMutationError =
-  | BadRequestResponse
-  | UnauthorizedResponse
-  | ForbiddenResponse
-  | NotFoundResponse
-  | ConflictResponse
-export type RestoreOrganizationMutationVariables = { organizationId: string }
-
-/**
- * @summary Restore a closed organization (owner only)
- */
-export const useRestoreOrganization = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ForbiddenResponse
-    | NotFoundResponse
-    | ConflictResponse,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof restoreOrganization>>,
-      TError,
-      RestoreOrganizationMutationVariables,
-      TContext
-    >
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof restoreOrganization>>,
-  TError,
-  RestoreOrganizationMutationVariables,
-  TContext
-> => {
-  return useMutation(getRestoreOrganizationMutationOptions(options), queryClient)
 }
 export const getListOrganizationWorkspacesUrl = (organizationId: string) => {
   return `/organizations/${encodeURIComponent(String(organizationId))}/workspaces`

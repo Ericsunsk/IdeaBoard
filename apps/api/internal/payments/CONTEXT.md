@@ -39,6 +39,8 @@ The shared PostgreSQL repository owns `GetPaymentOrderPayerAccount`: Refund, Web
 
 ## Invariants
 
+- Purchases are non-refundable except where required by applicable law or expressly promised at purchase. Admin refunds support reviewed exceptions through the existing original-payment workflow; there is no general fourteen-day refund entitlement or time cutoff. Permanent Organization closure never automatically refunds or transfers Ideas to Personal, and does not remove mandatory rights or purchase promises.
+
 - Stripe API Key and Webhook Secret are stored encrypted with platform secret material; they must never enter HTTP responses, logs, the Webhook Inbox, or Admin audit.
 - Payments persists only the minimal Stripe IDs, amounts, currency, statuses, times, receipt URL, terms version, and restricted error summaries needed for convergence and audit; card data, full billing addresses, full raw payloads, plaintext Secrets, and internal stack traces are forbidden, and payment-fact retention is decided by a controlled ops process, never by manually deleting linked Ledger rows or unsettled states.
 - Checkout enables neither Stripe Automatic Tax nor proactively requests or stores Customer addresses; minimal Billing data Stripe or a Payment Method collects for compliance is outside what the app can suppress.

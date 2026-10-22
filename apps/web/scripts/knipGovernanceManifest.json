@@ -16843,7 +16843,7 @@
       "exports": ["OrganizationMemberList"]
     },
     "src/api/generated-query/public/model/organizationStatus.ts": {
-      "sha256": "c898f74dc1c93776452eac188e0ede3bbec8de346d0d26805a93124911e70260",
+      "sha256": "e03270fee89dbd9f1b195dc03ac04eb62f0bc6076242cf000c769765daef4a4e",
       "exports": ["OrganizationStatus"]
     },
     "src/api/generated-query/public/model/pageSizeParameter.ts": {
@@ -17443,7 +17443,7 @@
       "exports": ["WorkspaceVisionQueryStatus"]
     },
     "src/api/generated-query/public/organizations/organizations.ts": {
-      "sha256": "93abc14b7ebf93d13472b1ced90f416ba3e1f529790ee6193e71447217c4a969",
+      "sha256": "1994e4d5ea6f555b27f29f53945e82d30f9962e06906af4e6a84267ce86f8445",
       "exports": [
         "AddOrganizationMemberMutationBody",
         "AddOrganizationMemberMutationError",
@@ -17472,9 +17472,6 @@
         "RemoveOrganizationMemberMutationError",
         "RemoveOrganizationMemberMutationResult",
         "RemoveOrganizationMemberMutationVariables",
-        "RestoreOrganizationMutationError",
-        "RestoreOrganizationMutationResult",
-        "RestoreOrganizationMutationVariables",
         "UpdateOrganizationMemberMutationBody",
         "UpdateOrganizationMemberMutationError",
         "UpdateOrganizationMemberMutationResult",
@@ -17515,9 +17512,6 @@
         "getRemoveOrganizationMemberMutationKey",
         "getRemoveOrganizationMemberMutationOptions",
         "getRemoveOrganizationMemberUrl",
-        "getRestoreOrganizationMutationKey",
-        "getRestoreOrganizationMutationOptions",
-        "getRestoreOrganizationUrl",
         "getUpdateOrganizationMemberMutationKey",
         "getUpdateOrganizationMemberMutationOptions",
         "getUpdateOrganizationMemberUrl",
@@ -17528,7 +17522,6 @@
         "listOrganizationWorkspaces",
         "listOrganizations",
         "removeOrganizationMember",
-        "restoreOrganization",
         "updateOrganization",
         "updateOrganizationMember",
         "useAddOrganizationMember",
@@ -17540,7 +17533,6 @@
         "useListOrganizationWorkspaces",
         "useListOrganizations",
         "useRemoveOrganizationMember",
-        "useRestoreOrganization",
         "useUpdateOrganization",
         "useUpdateOrganizationMember"
       ]

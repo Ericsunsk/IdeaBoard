@@ -12,7 +12,7 @@
  */
 
 /**
- * Organization lifecycle status. Closed organizations suspend all member access and new spending while retaining membership, Workspace, permission, and billing history; only the Owner restores.
+ * Organization lifecycle status. Closed is permanent: access, spending, and unused balance cannot be restored. Billing and audit history remain retained; no Personal transfer or automatic refund occurs, subject to applicable law and purchase commitments.
  */
 export type OrganizationStatus = (typeof OrganizationStatus)[keyof typeof OrganizationStatus]
 

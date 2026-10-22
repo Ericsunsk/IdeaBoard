@@ -24,9 +24,6 @@ func renderOrganizationClosureError(c *gin.Context, err error) {
 	case errors.Is(err, tenancy.ErrOrganizationClosureBlocked):
 		contract.RenderError(c, contract.StatusOf(contract.CodeOrganizationClosureBlocked),
 			contract.CodeOrganizationClosureBlocked, runtimehttp.MsgOrganizationClosureBlocked)
-	case errors.Is(err, tenancy.ErrOrganizationNotClosed):
-		contract.RenderError(c, contract.StatusOf(contract.CodeOrganizationNotClosed),
-			contract.CodeOrganizationNotClosed, runtimehttp.MsgOrganizationNotClosed)
 	case errors.Is(err, tenancy.ErrForbidden):
 		contract.RenderError(c, http.StatusForbidden, contract.CodeOrganizationForbidden, runtimehttp.MsgForbidden)
 	case errors.Is(err, tenancy.ErrNotFound):
@@ -43,7 +40,7 @@ type v1CloseOrganizationBody struct {
 	} `json:"data"`
 }
 
-// closeOrganization suspends a live Organization (issue #955). Only the
+// closeOrganization permanently closes a live Organization (issue #955). Only the
 // Owner initiates; closure is refused while in-flight Tasks, payment
 // orders, refunds, disputes, or a pending handover invite settle.
 // Requires Idempotency-Key.
@@ -57,10 +54,6 @@ func (h *contractV1Handler) closeOrganization(c *gin.Context) {
 		return
 	}
 	if !runtimehttp.RequireOrganizationCapability(c, visible, role == tenancy.RoleOwner) {
-		return
-	}
-	if organization.IsClosed() {
-		renderOrganizationClosureError(c, tenancy.ErrOrganizationClosed)
 		return
 	}
 	key, err := contract.IdempotencyKeyFromHeader(c)
@@ -103,53 +96,4 @@ func (h *contractV1Handler) closeOrganization(c *gin.Context) {
 		return
 	}
 	contract.RenderSuccess(c, toOrganizationDTO(closed))
-}
-
-// restoreOrganization reopens a closed Organization (issue #955). Only the
-// Owner restores; retained memberships and permissions resume.
-// Requires Idempotency-Key. No request body is required.
-func (h *contractV1Handler) restoreOrganization(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	organization, role, visible := h.v1OrganizationContext(c, identityPrincipal)
-	if organization == nil {
-		return
-	}
-	if !runtimehttp.RequireOrganizationCapability(c, visible, role == tenancy.RoleOwner) {
-		return
-	}
-	if !organization.IsClosed() {
-		renderOrganizationClosureError(c, tenancy.ErrOrganizationNotClosed)
-		return
-	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, runtimehttp.MsgIdempotencyKeyRequired2)
-		c.Abort()
-		return
-	}
-	ctx := c.Request.Context()
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	scope := contract.IdempotencyScope(externalUser, "organization:restore")
-	hash := contract.HashIdempotencyRequest("organization:restore", organization.PublicID)
-	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
-		return h.deps.Store.RestoreOrganization(ctx, organization.PublicID, identityPrincipal.UserID())
-	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeOrganizationIdempotencyConflict, runtimehttp.MsgWorkspaceIdempotencyConflict)
-			c.Abort()
-			return
-		}
-		renderOrganizationClosureError(c, doErr)
-		return
-	}
-	restored, ok := result.(*tenancy.Organization)
-	if !ok || restored == nil {
-		renderOrganizationClosureError(c, errors.New("tenancy: organization restore type mismatch"))
-		return
-	}
-	contract.RenderSuccess(c, toOrganizationDTO(restored))
 }

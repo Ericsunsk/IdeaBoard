@@ -762,7 +762,6 @@ const (
 	MsgOrganizationNotFound                           = "组织不存在"                                 // runtimehttp.MsgOrganizationNotFound @ internal/runtime/interfaces/http/errors.go // CodeOrganizationNotFound
 	MsgOrganizationMemberNotFound                     = "组织成员不存在"                               // runtimehttp.MsgOrganizationMemberNotFound @ internal/runtime/interfaces/http/errors.go // CodeOrganizationMemberNotFound
 	MsgOrganizationLimitReached                       = "每位用户最多加入或创建一个组织"                       // runtimehttp.MsgOrganizationLimitReached @ internal/runtime/interfaces/http/errors.go // CodeOrganizationLimitReached
-	MsgOrganizationNotClosed                          = "组织未关闭"                                 // runtimehttp.MsgOrganizationNotClosed @ internal/runtime/interfaces/http/errors.go // CodeOrganizationNotClosed
 	MsgPaginationCursorInvalid                        = "分页游标无效"                                // runtimehttp.MsgPaginationCursorInvalid @ internal/runtime/interfaces/http/errors.go // CodePaginationCursorInvalid
 	MsgPaginationCursorInvalid2                       = "支付订单游标无效"                              // runtimehttp.MsgPaginationCursorInvalid2 @ internal/runtime/interfaces/http/errors.go // CodePaginationCursorInvalid
 	MsgPaginationCursorInvalid3                       = "分页游标无效"                                // runtimehttp.MsgPaginationCursorInvalid3 @ internal/runtime/interfaces/http/errors.go // CodePaginationCursorInvalid

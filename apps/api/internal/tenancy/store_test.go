@@ -308,11 +308,7 @@ func TestUpdateWorkspaceDefaultProtected(t *testing.T) {
 	}
 }
 
-// TestInMemoryOrganizationCloseRestore proves the closure state machine on
-// the test double: only the Owner closes/restores, closure suspends
-// workspace access and mutations while retaining rows, and restore resumes
-// prior standing.
-func TestInMemoryOrganizationCloseRestore(t *testing.T) {
+func TestInMemoryOrganizationPermanentClosure(t *testing.T) {
 	ctx := context.Background()
 	store := NewInMemoryStoreForTests()
 	const owner, member = 61, 62
@@ -343,17 +339,10 @@ func TestInMemoryOrganizationCloseRestore(t *testing.T) {
 	if _, err := store.CloseOrganization(ctx, org.PublicID, owner, ""); !errors.Is(err, ErrOrganizationClosed) {
 		t.Fatalf("second close = %v, want ErrOrganizationClosed", err)
 	}
-	if _, err := store.RestoreOrganization(ctx, org.PublicID, member); !errors.Is(err, ErrForbidden) {
-		t.Fatalf("member restore = %v, want ErrForbidden", err)
+	if listed, err := store.ListOrganizationsForUser(ctx, owner); err != nil || len(listed) != 0 {
+		t.Fatalf("active organizations after closure = %d %v", len(listed), err)
 	}
-	restored, err := store.RestoreOrganization(ctx, org.PublicID, owner)
-	if err != nil || restored.IsClosed() {
-		t.Fatalf("restore = %+v %v, want active", restored, err)
-	}
-	if role, ok, _ := store.GetWorkspaceRole(ctx, ws.PublicID, owner); !ok || role != RoleOwner {
-		t.Fatalf("owner workspace role after restore = %v, want owner", role)
-	}
-	if _, err := store.RestoreOrganization(ctx, org.PublicID, owner); !errors.Is(err, ErrOrganizationNotClosed) {
-		t.Fatalf("second restore = %v, want ErrOrganizationNotClosed", err)
+	if _, err := store.CreateOrganization(ctx, owner, "replacement"); err != nil {
+		t.Fatalf("replacement organization: %v", err)
 	}
 }

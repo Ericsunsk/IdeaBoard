@@ -711,7 +711,15 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
   END IF;
-  IF v_wallet_status <> 'active' THEN
+  -- Permanent Organization closure forbids spending, but does not cancel
+  -- legal or purchase-promise refund duties on the original payer account.
+  -- Only this Payments-typed reservation may use that closed pool; other
+  -- frozen Wallets retain their lifecycle gate.
+  IF v_wallet_status <> 'active' AND NOT EXISTS (
+    SELECT 1 FROM billing_accounts accounts
+    JOIN organizations org ON org.internal_id = accounts.organization_id
+    WHERE accounts.internal_id = p_billing_account_id AND org.closed_at IS NOT NULL
+  ) THEN
     RAISE EXCEPTION USING ERRCODE = 'IB003', MESSAGE = 'credit wallet frozen';
   END IF;
 

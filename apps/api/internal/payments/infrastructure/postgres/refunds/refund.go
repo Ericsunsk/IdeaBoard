@@ -122,8 +122,9 @@ func (s *Store) createExternalRefundFact(ctx context.Context, tx pgx.Tx, order p
 	// Dashboard-initiated refunds reserve through the Payments-typed
 	// PurchaseRefundHold, not the generic spending Hold: a spending
 	// restriction on an active Wallet must not block legitimate refund
-	// recovery, while frozen/tombstone lifecycles stay rejected by the
-	// routine gate. Insufficient Ideas surface as ErrInsufficientCredits
+	// recovery. Permanently closed Organization pools also remain eligible
+	// for legal/purchase-promise exceptions without reactivation; other
+	// frozen lifecycles stay rejected. Insufficient Ideas surface as ErrInsufficientCredits
 	// so dispatch records a durable anomaly for manual recovery.
 	holdResult, err := hold.PurchaseRefundHold(ctx, ports.PurchaseRefundHoldCommand{BillingAccountID: accountID, Amount: creditAmount, Metadata: domain.CommandMetadata{
 		IdempotencyKey: "refund-hold-" + refundID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: "Stripe Dashboard refund", BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refundID},
@@ -188,7 +189,7 @@ func (s *Store) CreatePendingPaymentRefund(ctx context.Context, input paymentref
 	} else if replayed {
 		return commitPendingRefundReplay(ctx, tx, owned, existing, order)
 	}
-	if err := validatePendingRefundEligibility(order, paidSubtotal, paidTotal, paidAt, input.Now); err != nil {
+	if err := validatePendingRefundEligibility(order, paidSubtotal, paidTotal, paidAt); err != nil {
 		return paymentsdomain.PaymentRefund{}, false, err
 	}
 	alreadyRefunded, disputedIdeas, err := loadPendingRefundBalances(ctx, tx, order.ID)
@@ -387,15 +388,12 @@ func validateExternalRefund(order postgres.PaymentOrderFacts, provider paymentpo
 	return nil
 }
 
-func validatePendingRefundEligibility(order paymentsdomain.PaymentOrder, paidSubtotal, paidTotal pgtype.Int8, paidAt pgtype.Timestamptz, now time.Time) error {
+func validatePendingRefundEligibility(order paymentsdomain.PaymentOrder, paidSubtotal, paidTotal pgtype.Int8, paidAt pgtype.Timestamptz) error {
 	if order.BillingAccountID <= 0 {
 		return paymentcontracts.ErrRefundOrderNotEligible
 	}
 	if order.Status != paymentsdomain.PaymentOrderCredited || order.StripeChargeID == "" || order.IdeaQuantity <= 0 || !paidSubtotal.Valid || paidSubtotal.Int64 <= 0 || !paidTotal.Valid || paidTotal.Int64 <= 0 || !paidAt.Valid {
 		return paymentcontracts.ErrRefundOrderNotEligible
-	}
-	if !now.Before(paidAt.Time.Add(paymentsdomain.RefundEligibilityWindow)) {
-		return paymentcontracts.ErrRefundExpired
 	}
 	return nil
 }

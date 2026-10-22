@@ -4,7 +4,7 @@ status: accepted
 
 # ADR-0038：Personal 与 Organization 资金池及 Workspace 归属
 
-产品规则已接受，项目尚未上线、没有存量用户或资金。当前实现中：账户创建/归属/换户/转账面已随 #950 收敛（独立 Workspace 账户创建、link 读写、换 payer、跨账户余额移动均已删除；解析只认创建时 scope）；组织基数、角色与 Workspace 访问映射及管理面切换已随 #951 落地；Personal 协作（Default 拒邀、无审批、缺席 unlimited）已随 #952 落地；额度矩阵（默认门退役、Owner 短路、403 矩阵）已随 #953 落地；Workspace Budget 已随 #954 全拆；组织关闭/恢复与余额保留已实现，按充值条款执行原渠道退款的能力仍待 #955 验收。本 ADR 记录目标合同，实现验收以对应 issue 为准。
+产品规则已接受，项目尚未上线、没有存量用户或资金。账户范围、组织角色、Personal 协作、成员额度与 Workspace Budget 退役已随 #950–#954 落地。2026-10-23 决定将原可恢复关闭改为永久关闭：关闭前二次确认，关闭后不再恢复组织或余额使用权，不自动退款或转入 Personal。#955 验收永久关闭，#956 验收完整资金池模型；本 ADR 记录目标合同，实现验收以对应 issue 为准。
 
 ## 背景
 
@@ -48,12 +48,15 @@ status: accepted
 - 达到消费额度时，阻止该用户发起新的消费；额度限制与账户可用余额共同生效。
 - 移除成员或协作者不得删除历史账务事实；重入同一资金范围时沿用该成员既有额度与消费历史，除非有明确管理操作修改。
 
-### 4. Organization 关闭、恢复与余额
+### 4. Organization 永久关闭与余额
 
 - Organization Owner 离开前必须将 Owner 身份显式交接给另一位组织成员；组织余额永远不转入任何人的 Personal 账户。
-- Owner 关闭 Organization 后，立即暂停全部成员访问与新消费，结清在途任务、退款和争议；保留成员关系、Workspace、权限及账务历史。
-- 未消费余额按充值条款处理：允许退款时退回原支付渠道；不支持退款或按条款保留时，余额留在已关闭的 Organization 账户，不转为个人资金。具体退款资格及时限由充值条款及适用法规决定。
-- Owner 可恢复 Organization；恢复后恢复关闭前的成员关系和权限。关闭本身不删除资金账户或历史账务。
+- 只有 Owner 可以关闭 Organization。关闭前必须二次确认，并明确提示操作不可恢复、所有成员失去组织及其 Workspace 的访问权、剩余余额不能再使用且不自动退款。
+- 关闭是永久终态，不是暂停。关闭后禁止组织访问、管理、充值及新消费，不提供恢复入口或恢复 API；任何人均不得将组织余额转入 Personal 或其他账户。
+- 在途 Task、支付订单、退款、争议及待处理 Owner 交接必须先结清或解决，否则阻止关闭。最终检查与关闭状态更新在同一事务内完成，不能让新消费或资金动作穿过关闭检查。
+- 购买原则上不退款，法律要求或购买时明确承诺的情况除外。关闭 Organization 本身不触发退款，也不取消这些例外；必要的例外退款与争议处理仍以原 Payment Order 和付款渠道为依据，不转为 Personal 额度。
+- 剩余余额的使用权在关闭时永久终止；不得通过新建 Organization、重入或恢复钱包重新使用。资金账户及不可变 Ledger、支付和结算历史保留，关闭不伪造消费、删除账务事实或直接改写历史余额。
+- 本决策采用 TapNow 已公开的常规不退款规则；永久关闭及其余额使用权终止是本项目明确选择的产品合同，不宣称已核实为 TapNow 的组织关闭流程。
 
 ## 后果
 
@@ -68,6 +71,6 @@ status: accepted
 - 本 ADR 取代 [ADR-0034](./0034-workspace-shared-consumption-budget.md) 的 Workspace 级消费预算决策。账务预占和账户余额保护继续保留。
 - 本 ADR 取代 [ADR-0035](./0035-member-cross-workspace-consumption-quota.md) 中额度按任意 Billing Account 聚合的范围表述；保留五种周期、submit-time 归属、并发防护、退款修正和失败收敛机制，目标额度主体限定为 Personal 或 Organization。
 - 本 ADR 取代 [ADR-0037](./0037-account-default-member-quota.md) 的未配置默认额度时邀请 fail-closed 规则；新成员默认不限额，邀请不依赖默认额度配置。
-- [ADR-0036](./0036-studio-handover-and-delete-funds-retention.md) 的不可变账务历史、显式 Owner 交接和删除期间保护继续适用；Organization 关闭/恢复与资金规则由本 ADR 取代或补充。
+- [ADR-0036](./0036-studio-handover-and-delete-funds-retention.md) 的不可变账务历史、显式 Owner 交接和删除期间保护继续适用；Organization 永久关闭与资金规则由本 ADR 取代或补充。
 
 以上是决策关系；旧实现已按上述票号删除，旧 ADR 描述的实现合同仅作历史理解，当前产品合同以本 ADR 为准。

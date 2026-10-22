@@ -4,6 +4,7 @@ import { render, screen } from '../../test/render'
 import { LEGAL_CONTACTS, LEGAL_DOCUMENT_VERSIONS, SUPPORT_EMAIL } from './documents'
 import { PUBLIC_LEGAL_LINKS } from './legalLinks'
 import TermsPage from './pages/TermsPage.vue'
+import RefundPolicyPage from './pages/RefundPolicyPage.vue'
 import {
   ACCEPTABLE_USE_PATH,
   PRIVACY_POLICY_PATH,
@@ -32,11 +33,11 @@ describe('legal route preservation (P2 no-op)', () => {
     ])
   })
 
-  it('keeps document versions and contact addresses stable', () => {
+  it('publishes the current document versions and contact addresses', () => {
     expect({ ...LEGAL_DOCUMENT_VERSIONS }).toEqual({
-      terms: '2026-10-09',
+      terms: '2026-10-23',
       privacy: '2026-10-09',
-      refund: '2026-10-09',
+      refund: '2026-10-23',
       acceptableUse: '2026-08-01',
     })
     expect(SUPPORT_EMAIL).toBe('support@ideaboard.art')
@@ -46,6 +47,27 @@ describe('legal route preservation (P2 no-op)', () => {
       privacy: 'privacy@ideaboard.art',
       copyright: 'copyright@ideaboard.art',
     })
+  })
+
+  it('states permanent Organization closure and preserves refund exceptions', () => {
+    render(RefundPolicyPage, {
+      global: {
+        stubs: {
+          RouterLink: { props: ['to'], template: '<a><slot /></a>' },
+        },
+      },
+    })
+
+    expect(screen.getByText(/Purchases of Ideas are non-refundable/)).toHaveTextContent(
+      /except where required by applicable law or expressly promised at the time of purchase/,
+    )
+    expect(screen.getByText(/Closing an Organization is permanent/)).toHaveTextContent(
+      /cannot be restored, and are not transferred to a Personal account/,
+    )
+    expect(screen.getByText(/Closing an Organization is permanent/)).toHaveTextContent(
+      /Exceptions required by applicable law or expressly promised at the time of purchase still apply/,
+    )
+    expect(screen.queryByText(/Refund eligibility lasts for 14 days/)).toBeNull()
   })
 
   it('renders the terms shell with the versioned title and contact links', () => {
@@ -58,7 +80,7 @@ describe('legal route preservation (P2 no-op)', () => {
     })
 
     expect(screen.getByRole('heading', { name: 'Terms of Service' })).toBeTruthy()
-    expect(screen.getByText('Effective date: 2026-10-09')).toBeTruthy()
+    expect(screen.getByText('Effective date: 2026-10-23')).toBeTruthy()
     expect(screen.getByText(/govern your access to and use of IdeaBoard/)).toBeTruthy()
     expect(screen.getByRole('link', { name: 'support@ideaboard.art' })).toHaveProperty(
       'href',

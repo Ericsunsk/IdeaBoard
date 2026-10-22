@@ -96,7 +96,6 @@ type Querier interface {
 	// Configuration replacement removes previous selections in the accepting transaction.
 	ClearBoardMemberships(ctx context.Context, arg ClearBoardMembershipsParams) (int64, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
-	ClearOrganizationClosed(ctx context.Context, publicID string) (int64, error)
 	CompleteControlIdempotency(ctx context.Context, arg CompleteControlIdempotencyParams) (int64, error)
 	CompleteLibraryMaterialization(ctx context.Context, arg CompleteLibraryMaterializationParams) (CompleteLibraryMaterializationRow, error)
 	CompletePaymentCheckoutShutdown(ctx context.Context, arg CompletePaymentCheckoutShutdownParams) (int64, error)
@@ -310,6 +309,7 @@ type Querier interface {
 	// (chk_tasks_terminal_consistency requires a non-blank error_message) and
 	// releases the lease.
 	FailWorkspaceTask(ctx context.Context, arg FailWorkspaceTaskParams) (Task, error)
+	FreezeOrganizationWallet(ctx context.Context, billingAccountID int64) error
 	GetActiveLibraryMaterializationByAsset(ctx context.Context, arg GetActiveLibraryMaterializationByAssetParams) (GetActiveLibraryMaterializationByAssetRow, error)
 	GetActiveStorageProfileSecretVersion(ctx context.Context, arg GetActiveStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	GetAdminPaymentOrder(ctx context.Context, orderNumber string) (GetAdminPaymentOrderRow, error)
@@ -637,10 +637,8 @@ type Querier interface {
 	// created_at) as updated_at. No dedup key: one asset may back many
 	// jobs; request idempotency stays handler-side (library:materialize).
 	LockLibraryMaterializationAsset(ctx context.Context, arg LockLibraryMaterializationAssetParams) error
-	// Organization closure queries (#955). Close/Restore pin the organization
-	// row FOR UPDATE so concurrent closes serialize; the open-closure unique
-	// index collapses a lost race to the winner via the insert conflict plus
-	// the SetOrganizationClosed row count below.
+	// Permanent Organization closure. Row locks serialize closure with mutations;
+	// the unique closure audit prevents a second close.
 	LockOrganizationByPublicID(ctx context.Context, publicID string) (Organization, error)
 	// Service Model Pool catalog queries (#848, ADR-0012).
 	//
@@ -668,7 +666,6 @@ type Querier interface {
 	// Lock affected Boards in a stable order before removing grants.
 	LockWorkspaceMemberBoards(ctx context.Context, arg LockWorkspaceMemberBoardsParams) ([]LockWorkspaceMemberBoardsRow, error)
 	LockWorkspaceMemberships(ctx context.Context, publicID string) (int64, error)
-	MarkOrganizationClosureRestored(ctx context.Context, arg MarkOrganizationClosureRestoredParams) (int64, error)
 	MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
 	// Account abandon (#919): any Billing Owner/Admin of the persisted payer
 	// account may abandon its open Checkout.

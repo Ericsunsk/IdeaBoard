@@ -39,8 +39,8 @@ Required before publication:
 - Optional Analytics/RUM remains disabled. Strictly necessary authentication, security, error, and operational logs remain allowed.
 - AI outputs may be used commercially subject to applicable law, Provider terms, and third-party rights. IdeaBoard does not guarantee copyrightability, originality, non-infringement, accuracy, or fitness for purpose.
 - NSFW/adult content and the prohibited uses defined below are not allowed.
-- Purchased Ideas do not expire, are non-transferable, cannot be sold or redeemed for cash, and are usable only within IdeaBoard.
-- Refund requests may be submitted within 14 calendar days. Refundable value is based on unused Ideas, subject to mandatory consumer rights and the exceptions in the Refund Policy.
+- Purchased Ideas have no scheduled expiry, are non-transferable, cannot be sold or redeemed for cash, and are usable only within IdeaBoard. Permanent Organization closure makes its remaining Ideas permanently unavailable.
+- Purchases are non-refundable except where required by applicable law or expressly promised at purchase. Organization closure does not automatically trigger a refund, restore Ideas, or transfer them to Personal; the same exceptions still apply.
 
 ## 4. Required Public Pages
 
@@ -55,7 +55,7 @@ The Terms must cover:
 - Private Boards, share-link visibility, collaborator responsibility, and revocation.
 - User ownership of inputs and the limited license required to host, process, transmit, render, and share content at the user's direction.
 - AI Provider processing, commercial-use permission, output limitations, and third-party rights.
-- Ideas as non-cash, non-transferable, non-expiring service credits.
+- Ideas as non-cash, non-transferable service credits with no scheduled expiry; permanent Organization closure ends access to its remaining Ideas.
 - Stripe payment processing, displayed currency, price, taxes, successful payment confirmation, and credit delivery.
 - Service availability, maintenance, feature and price changes, warranty disclaimers, liability limitations, and indemnity, subject to mandatory consumer law.
 - Governing law, disputes, legal notices, changes, and contact information after professional review.
@@ -81,9 +81,10 @@ The Privacy Policy must cover:
 
 The Refund Policy must cover:
 
-- A 14-calendar-day request window beginning when Stripe confirms payment.
-- Refund calculation using unused Ideas attributable to the order and the amount not previously refunded.
-- Ideas are fungible, so the implementation must use one deterministic ledger allocation rule (recommended: FIFO credit lots) for deciding which order's remaining Ideas are refundable. Partial refunds must define minor-unit rounding and tax/fee/FX treatment before the flow is enabled.
+- Purchases are non-refundable except where required by law or expressly promised at purchase; there is no general refund window or automatic refund entitlement.
+- Approved exceptions are reviewed against the applicable legal requirement or purchase promise and the original payment facts, without duplicate refunds.
+- Admin exception refunds use the persisted payer account and original order, reserve available Ideas before provider I/O, enforce cumulative payment caps, and settle idempotently. These technical limits do not override mandatory consumer rights; any shortfall requires an audited support resolution. Partial refunds define minor-unit rounding and tax/fee/FX treatment.
+- Permanent Organization closure makes its remaining Ideas unavailable, cannot be reversed, never transfers funds to Personal, and does not automatically trigger a refund; legal requirements and purchase promises still apply.
 - Treatment of consumed Ideas, failed tasks, duplicate charges, unauthorized charges, delayed credit delivery, taxes, fees, and exchange-rate differences.
 - Refunds to the original payment method only.
 - Expected review and Provider processing timelines without guaranteeing bank settlement time.
