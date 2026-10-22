@@ -1,11 +1,14 @@
-// Package postgres implements tenancy billing-account resolution (#915).
+// Package postgres implements tenancy billing-account resolution (ADR-0038).
 //
-// A Billing Account holds the unified balance; many Workspaces may share one
-// account. Resolution is explicit and fail-closed: explicit
-// workspace_billing_links first, else the Organization account for org
-// workspaces, else the per-workspace account. Missing, ambiguous, or
-// conflicting ownership fails closed instead of silently picking another
-// wallet. Joining a Workspace never merges personal funds.
+// A Billing Account holds the unified balance; many Workspaces share one
+// account. Exactly one Personal account exists per user (the
+// Default-workspace-anchored survivor) and exactly one shared account per
+// Organization. Resolution is fixed at Workspace creation scope: org
+// workspaces resolve to the Organization pool, personal workspaces to
+// their owner's Personal survivor. Missing or ownerless scopes fail
+// closed instead of silently picking another wallet. Joining a Workspace
+// never merges personal funds; creating an Organization never moves
+// existing Personal workspaces.
 //
 // All repository methods take context.Context first and use dbWithContext.
 // Resolution joins the caller-owned transaction via the *dbsqlc.Queries
@@ -114,13 +117,13 @@ func NewBillingAccountStore(db *pgxpool.Pool) *BillingAccountStore {
 }
 
 func (s *BillingAccountStore) dbWithContext(ctx context.Context) repositoryQueryer {
-	return repositoryQueryer{ctx: ctx, db: s.db, q: s.q}
+	return newRepositoryQueryer(ctx, s.db, s.q)
 }
 
 // EnsureBillingAccountForWorkspace provisions the stable billing account on
-// first read (Get-or-Create) via the #915 resolution order. The identity is
-// stable across Workspace Owner changes: it never derives from the current
-// Workspace Owner's personal wallet.
+// first read (Get-or-Create) via the fixed creation-scope order (ADR-0038).
+// The identity is stable across Workspace Owner changes: it never derives
+// from the current Workspace Owner's personal wallet.
 //
 // Concurrency: the partial unique indexes collapse concurrent first reads
 // to one row; the loser reads back the winner on duplicate error.
@@ -144,30 +147,17 @@ func EnsureBillingAccountForWorkspaceWithQueries(ctx context.Context, queries *d
 	return row, err
 }
 
-// resolveBillingAccountRow implements the stable order: explicit link, else
-// org account, else per-workspace account. It provisions the missing account
-// Get-or-Create style and fails closed on ambiguity or conflict.
+// resolveBillingAccountRow implements the fixed creation-scope order
+// (ADR-0038): the Organization pool for org workspaces, else the owner's
+// deterministic Personal survivor for personal workspaces (provisioned on
+// demand via ensure_personal_billing_account_for_user, so first reads
+// never fork per-workspace accounts). Ownerless personal scopes and
+// missing rows fail closed; there is no link indirection and no
+// per-workspace mint.
 func resolveBillingAccountRow(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID int64) (dbsqlc.BillingAccount, bool, error) {
 	if queries == nil || workspaceInternalID <= 0 {
 		return dbsqlc.BillingAccount{}, false, tenancy.ErrBillingWorkspaceInvalid
 	}
-	// 1. Explicit link (studio-shared or pinned org link).
-	if link, err := queries.GetWorkspaceBillingLink(ctx, workspaceInternalID); err == nil {
-		row, err := queries.GetBillingAccountByInternalID(ctx, link.BillingAccountID)
-		if err != nil {
-			if database.IsNotFound(err) {
-				return dbsqlc.BillingAccount{}, false, tenancy.ErrBillingNotFound
-			}
-			return dbsqlc.BillingAccount{}, false, err
-		}
-		if err := checkLinkOwnership(ctx, queries, workspaceInternalID, row); err != nil {
-			return dbsqlc.BillingAccount{}, false, err
-		}
-		return row, true, nil
-	} else if !database.IsNotFound(err) {
-		return dbsqlc.BillingAccount{}, false, err
-	}
-	// 2/3. Need the workspace row for org scope.
 	ws, err := queries.GetWorkspaceByInternalID(ctx, workspaceInternalID)
 	if err != nil {
 		if database.IsNotFound(err) {
@@ -178,7 +168,10 @@ func resolveBillingAccountRow(ctx context.Context, queries *dbsqlc.Queries, work
 	if ws.OrganizationID.Valid {
 		return resolveOrganizationAccount(ctx, queries, ws.OrganizationID.Int64)
 	}
-	return resolveWorkspaceAccount(ctx, queries, workspaceInternalID)
+	if !ws.OwnerUserID.Valid || ws.OwnerUserID.Int64 <= 0 {
+		return dbsqlc.BillingAccount{}, false, tenancy.ErrBillingConflict
+	}
+	return resolvePersonalAccount(ctx, queries, ws.OwnerUserID.Int64)
 }
 
 // resolveOrganizationAccount returns the shared org pool, provisioning once.
@@ -211,65 +204,32 @@ func resolveOrganizationAccount(ctx context.Context, queries *dbsqlc.Queries, or
 	return created, true, nil
 }
 
-// resolveWorkspaceAccount returns the per-workspace account, provisioning once.
-func resolveWorkspaceAccount(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID int64) (dbsqlc.BillingAccount, bool, error) {
-	key := pgtype.Int8{Int64: workspaceInternalID, Valid: true}
-	if row, err := queries.GetBillingAccountByWorkspaceID(ctx, key); err == nil {
-		return row, false, nil
-	} else if !database.IsNotFound(err) {
-		return dbsqlc.BillingAccount{}, false, err
+// resolvePersonalAccount returns the owner's deterministic Personal
+// survivor (the Default-workspace-anchored account), provisioning the
+// Default workspace, its membership, the account, and the owner grant on
+// demand through the caller's queries (no SQL-function dependency, so it
+// joins settlement transactions and works wherever the tenancy tables
+// exist). Personal workspaces never mint their own account and never read
+// link rows: every Personal scope of one user shares this pool.
+func resolvePersonalAccount(ctx context.Context, queries *dbsqlc.Queries, ownerUserID int64) (dbsqlc.BillingAccount, bool, error) {
+	if ownerUserID <= 0 {
+		return dbsqlc.BillingAccount{}, false, tenancy.ErrBillingWorkspaceInvalid
 	}
-	publicID, err := tenancy.NewBillingAccountPublicID()
+	def, err := ensureDefaultWorkspaceWithQueries(ctx, queries, ownerUserID)
 	if err != nil {
 		return dbsqlc.BillingAccount{}, false, err
 	}
-	created, err := queries.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
-		PublicID: publicID, WorkspaceID: key, OrganizationID: pgtype.Int8{},
-	})
-	if err != nil {
-		if database.IsDuplicateConstraintError(err) {
-			if row, readErr := queries.GetBillingAccountByWorkspaceID(ctx, key); readErr == nil {
-				return row, false, nil
-			}
-		}
+	if err := ensureWorkspaceAccountWithQueries(ctx, queries, def.InternalID, ownerUserID); err != nil {
 		return dbsqlc.BillingAccount{}, false, err
 	}
-	ensureBillingOwnerForWorkspace(ctx, queries, created.InternalID, workspaceInternalID)
-	return created, false, nil
-}
-
-// checkLinkOwnership fails closed when an explicit link points at a
-// conflicting owner: org workspaces may only link to their own org pool,
-// personal workspaces only to non-org accounts. Joining a Workspace never
-// merges funds across ownership boundaries.
-func checkLinkOwnership(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID int64, account dbsqlc.BillingAccount) error {
-	ws, err := queries.GetWorkspaceByInternalID(ctx, workspaceInternalID)
+	row, err := queries.GetBillingAccountByWorkspaceID(ctx, pgtype.Int8{Int64: def.InternalID, Valid: true})
 	if err != nil {
 		if database.IsNotFound(err) {
-			return tenancy.ErrBillingWorkspaceInvalid
+			return dbsqlc.BillingAccount{}, false, tenancy.ErrBillingNotFound
 		}
-		return err
+		return dbsqlc.BillingAccount{}, false, err
 	}
-	if ws.OrganizationID.Valid {
-		if !account.OrganizationID.Valid || account.OrganizationID.Int64 != ws.OrganizationID.Int64 {
-			return tenancy.ErrBillingConflict
-		}
-		return nil
-	}
-	if account.OrganizationID.Valid {
-		return tenancy.ErrBillingConflict
-	}
-	return nil
-}
-
-// ensureBillingOwnerForWorkspace seeds the workspace owner as billing owner
-// (idempotent). Management stays transferable afterwards.
-func ensureBillingOwnerForWorkspace(ctx context.Context, queries *dbsqlc.Queries, billingAccountID, workspaceInternalID int64) {
-	ws, err := queries.GetWorkspaceByInternalID(ctx, workspaceInternalID)
-	if err != nil || !ws.OwnerUserID.Valid || ws.OwnerUserID.Int64 <= 0 {
-		return
-	}
-	_ = ensureBillingOwner(ctx, queries, billingAccountID, ws.OwnerUserID.Int64)
+	return row, false, nil
 }
 
 // ensureBillingOwnerForOrg seeds the org owner as billing owner when
@@ -509,92 +469,6 @@ func (s *BillingAccountStore) GetBillingAccountByPublicID(ctx context.Context, p
 
 func isBillingAccountID(id string) bool {
 	return strings.HasPrefix(id, "ba_") && len(id) > 4
-}
-
-// LinkWorkspaceToBillingAccount creates the explicit stable association for
-// no-org studio sharing (and pinned org links). It fails closed on missing,
-// ambiguous, or conflicting ownership, and refuses silent payer switches:
-// an existing link to a different account reports ErrBillingConflict
-// (Workspace更换付款账户不在本批范围).
-//
-// The actor must hold Workspace Owner/Admin on the workspace AND Billing
-// Owner/Admin on the target account; space-only admins cannot rewire funds.
-func (s *BillingAccountStore) LinkWorkspaceToBillingAccount(ctx context.Context, workspaceInternalID, billingAccountInternalID, actorUserID int64) error {
-	if s == nil || s.db == nil {
-		return tenancy.ErrBillingStoreNotConfigured
-	}
-	return dbutil.WithTx(ctx, s.db, func(q *dbsqlc.Queries) error {
-		return linkWorkspaceToBillingAccount(ctx, q, s.db, workspaceInternalID, billingAccountInternalID, actorUserID)
-	})
-}
-
-func linkWorkspaceToBillingAccount(ctx context.Context, q *dbsqlc.Queries, pool *pgxpool.Pool, workspaceInternalID, billingAccountInternalID, actorUserID int64) error {
-	if workspaceInternalID <= 0 || billingAccountInternalID <= 0 || actorUserID <= 0 {
-		return tenancy.ErrBillingWorkspaceInvalid
-	}
-	// Workspace side: must exist and actor must be owner/admin.
-	ws, err := q.GetWorkspaceByInternalID(ctx, workspaceInternalID)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return tenancy.ErrBillingWorkspaceInvalid
-		}
-		return err
-	}
-	_ = ws
-	wsRole, err := workspaceRoleForLink(ctx, q, workspaceInternalID, actorUserID)
-	if err != nil {
-		return err
-	}
-	if wsRole != tenancy.RoleOwner && wsRole != tenancy.RoleAdmin {
-		return tenancy.ErrForbidden
-	}
-	// Funds side: target must exist and actor must be billing owner/admin.
-	account, err := lockBillingAccountInTx(ctx, q, billingAccountInternalID)
-	if err != nil {
-		return err
-	}
-	billingRole, err := q.GetBillingAccountMember(ctx, dbsqlc.GetBillingAccountMemberParams{
-		BillingAccountID: billingAccountInternalID, UserID: actorUserID,
-	})
-	if err != nil {
-		if database.IsNotFound(err) {
-			return tenancy.ErrBillingForbidden
-		}
-		return err
-	}
-	if !tenancy.IsBillingManager(billingRole.Role) {
-		return tenancy.ErrBillingForbidden
-	}
-	// Ownership boundary: no cross-owner silent merges.
-	if err := checkLinkOwnership(ctx, q, workspaceInternalID, account); err != nil {
-		return err
-	}
-	// No silent payer switch.
-	if existing, err := q.GetWorkspaceBillingLink(ctx, workspaceInternalID); err == nil {
-		if existing.BillingAccountID == billingAccountInternalID {
-			return nil
-		}
-		return tenancy.ErrBillingConflict
-	} else if !database.IsNotFound(err) {
-		return err
-	}
-	_, err = q.UpsertWorkspaceBillingLink(ctx, dbsqlc.UpsertWorkspaceBillingLinkParams{
-		WorkspaceID: workspaceInternalID, BillingAccountID: billingAccountInternalID,
-	})
-	return err
-}
-
-func workspaceRoleForLink(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID, userID int64) (string, error) {
-	row, err := q.GetWorkspaceMembershipByIDs(ctx, dbsqlc.GetWorkspaceMembershipByIDsParams{
-		WorkspaceID: workspaceInternalID, UserID: userID,
-	})
-	if err != nil {
-		if database.IsNotFound(err) {
-			return "", tenancy.ErrForbidden
-		}
-		return "", err
-	}
-	return row.Role, nil
 }
 
 // GetBillingAccountRole reports the caller's financial role on one account.

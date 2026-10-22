@@ -1,18 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  DEFAULT_QUOTA_PRESETS,
-  defaultMemberQuotaQueryKeys,
-  fetchDefaultMemberQuota,
   fetchMemberQuotaList,
   fetchSelfMemberQuota,
   isQuotaExhausted,
   MAX_MEMBER_QUOTA_LIMIT,
   memberQuotaQueryKeys,
   normalizeQuotaInput,
-  parseDefaultMemberQuotaData,
   parseMemberQuotaData,
   parseMemberQuotaList,
-  updateDefaultMemberQuota,
   updateMemberQuota,
 } from './resource'
 import { WORKSPACE_SELECTION_REQUIRED_CODE } from '../workspaceBilling'
@@ -181,111 +176,5 @@ describe('memberQuotaResource', () => {
     await expect(fetchMemberQuotaList('')).rejects.toMatchObject({
       code: WORKSPACE_SELECTION_REQUIRED_CODE,
     })
-  })
-
-  test('parses a monthly default with the account scope', () => {
-    expect(
-      parseDefaultMemberQuotaData({
-        billing_account_id: 'ba_1',
-        workspace_id: WORKSPACE_ID,
-        period: 'monthly',
-        limit_credits: 1000,
-      }),
-    ).toEqual({
-      billingAccountId: 'ba_1',
-      workspaceId: WORKSPACE_ID,
-      period: 'monthly',
-      limitCredits: 1000,
-    })
-  })
-
-  test('parses an unlimited default with no limit', () => {
-    expect(
-      parseDefaultMemberQuotaData({
-        billing_account_id: 'ba_1',
-        workspace_id: WORKSPACE_ID,
-        period: 'unlimited',
-      }),
-    ).toEqual({
-      billingAccountId: 'ba_1',
-      workspaceId: WORKSPACE_ID,
-      period: 'unlimited',
-      limitCredits: null,
-    })
-  })
-
-  test('rejects mismatched default shapes', () => {
-    expect(() =>
-      parseDefaultMemberQuotaData({
-        billing_account_id: 'ba_1',
-        workspace_id: WORKSPACE_ID,
-        period: 'monthly',
-      }),
-    ).toThrow()
-    expect(() =>
-      parseDefaultMemberQuotaData({
-        billing_account_id: 'ba_1',
-        workspace_id: WORKSPACE_ID,
-        period: 'unlimited',
-        limit_credits: 100,
-      }),
-    ).toThrow()
-    expect(() =>
-      parseDefaultMemberQuotaData({
-        billing_account_id: 'ws_1',
-        workspace_id: WORKSPACE_ID,
-        period: 'monthly',
-        limit_credits: 100,
-      }),
-    ).toThrow()
-  })
-
-  test('exposes the small/medium/large monthly presets', () => {
-    expect([...DEFAULT_QUOTA_PRESETS]).toEqual([200, 1000, 2000])
-  })
-
-  test('fetches the default through the workspace billing plane', async () => {
-    transport.request.mockResolvedValue({
-      data: {
-        billing_account_id: 'ba_1',
-        workspace_id: WORKSPACE_ID,
-        period: 'monthly',
-        limit_credits: 1000,
-      },
-    })
-    await expect(fetchDefaultMemberQuota(WORKSPACE_ID)).resolves.toMatchObject({
-      period: 'monthly',
-      limitCredits: 1000,
-    })
-    expect(transport.request).toHaveBeenCalledWith(
-      `/v1/workspaces/${WORKSPACE_ID}/default-member-quota`,
-      expect.objectContaining({ method: 'GET' }),
-    )
-    expect(defaultMemberQuotaQueryKeys.detail(WORKSPACE_ID)).toEqual([
-      'workspace',
-      'default-member-quota',
-      'detail',
-      WORKSPACE_ID,
-    ])
-  })
-
-  test('updates the default without idempotency keys', async () => {
-    transport.request.mockResolvedValue({
-      data: {
-        billing_account_id: 'ba_1',
-        workspace_id: WORKSPACE_ID,
-        period: 'monthly',
-        limit_credits: 200,
-      },
-    })
-    await expect(
-      updateDefaultMemberQuota(WORKSPACE_ID, { period: 'monthly', limitCredits: 200 }),
-    ).resolves.toMatchObject({ limitCredits: 200 })
-    expect(transport.request).toHaveBeenCalledWith(
-      `/v1/workspaces/${WORKSPACE_ID}/default-member-quota`,
-      expect.objectContaining({ method: 'PUT' }),
-    )
-    const [, options] = transport.request.mock.calls[0] as [string, Record<string, unknown>]
-    expect(options.headers).not.toMatchObject({ 'Idempotency-Key': expect.anything() })
   })
 })

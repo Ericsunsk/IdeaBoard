@@ -96,6 +96,7 @@ type Querier interface {
 	// Configuration replacement removes previous selections in the accepting transaction.
 	ClearBoardMemberships(ctx context.Context, arg ClearBoardMembershipsParams) (int64, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
+	ClearOrganizationClosed(ctx context.Context, publicID string) (int64, error)
 	CompleteControlIdempotency(ctx context.Context, arg CompleteControlIdempotencyParams) (int64, error)
 	CompleteLibraryMaterialization(ctx context.Context, arg CompleteLibraryMaterializationParams) (CompleteLibraryMaterializationRow, error)
 	CompletePaymentCheckoutShutdown(ctx context.Context, arg CompletePaymentCheckoutShutdownParams) (int64, error)
@@ -108,6 +109,8 @@ type Querier interface {
 	// lease. Outputs are inserted separately in the same caller-owned
 	// transaction (see InsertWorkspaceTaskOutput).
 	CompleteWorkspaceTask(ctx context.Context, arg CompleteWorkspaceTaskParams) (Task, error)
+	CountActiveOrgSearchOperations(ctx context.Context, organizationID pgtype.Int8) (int64, error)
+	CountActiveOrgTasks(ctx context.Context, organizationID pgtype.Int8) (int64, error)
 	CountActiveSearchOperationsForWorkspace(ctx context.Context, workspaceID pgtype.Int8) (int64, error)
 	CountAdminPaymentOrders(ctx context.Context, arg CountAdminPaymentOrdersParams) (int64, error)
 	CountBillingAccountOwners(ctx context.Context, billingAccountID int64) (int64, error)
@@ -116,8 +119,14 @@ type Querier interface {
 	// the status pills keep their global breakdown while a status is active.
 	CountControlTasks(ctx context.Context, arg CountControlTasksParams) ([]CountControlTasksRow, error)
 	CountLinkedWorkspacesForAccountExcluding(ctx context.Context, arg CountLinkedWorkspacesForAccountExcludingParams) (int64, error)
+	CountOpenOrgPaymentDisputes(ctx context.Context, billingAccountID pgtype.Int8) (int64, error)
+	CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error)
+	CountOrganizationsByUserID(ctx context.Context, userID int64) (int64, error)
 	CountOtherWorkspaceTasksForAccount(ctx context.Context, arg CountOtherWorkspaceTasksForAccountParams) (int64, error)
 	CountPendingBillingTransfersForAccount(ctx context.Context, billingAccountID int64) (int64, error)
+	CountPendingOrgPaymentRefunds(ctx context.Context, billingAccountID pgtype.Int8) (int64, error)
+	CountPendingOrgTransferInvites(ctx context.Context, billingAccountID int64) (int64, error)
+	CountUnsettledOrgPaymentOrders(ctx context.Context, billingAccountID pgtype.Int8) (int64, error)
 	CountUnsettledPaymentOrdersForAccount(ctx context.Context, billingAccountID pgtype.Int8) (int64, error)
 	CountWorkspaceMembers(ctx context.Context, workspaceID int64) (int64, error)
 	CountWorkspaceOwners(ctx context.Context, workspaceID int64) (int64, error)
@@ -275,6 +284,8 @@ type Querier interface {
 	DeleteControlIdempotencyRecord(ctx context.Context, arg DeleteControlIdempotencyRecordParams) error
 	DeleteLibraryAsset(ctx context.Context, arg DeleteLibraryAssetParams) (int64, error)
 	DeleteLibraryFolder(ctx context.Context, arg DeleteLibraryFolderParams) (int64, error)
+	DeleteOrgWorkspaceMembershipsForUser(ctx context.Context, arg DeleteOrgWorkspaceMembershipsForUserParams) error
+	DeleteOrganizationMembership(ctx context.Context, arg DeleteOrganizationMembershipParams) (int64, error)
 	DeleteServiceModelPoolEntries(ctx context.Context, service string) error
 	DeleteServiceModelPoolResolutions(ctx context.Context, service string) error
 	DeleteSystemConfigsByKeys(ctx context.Context, configKeys []string) error
@@ -306,13 +317,18 @@ type Querier interface {
 	// Billing Account resolution and membership queries (#915). Public references
 	// use public_id (ba_); internal_id stays database-internal.
 	//
-	// Resolution is explicit and fail-closed: one Workspace resolves to exactly
-	// one Billing Account via (1) explicit workspace_billing_links, else (2) the
-	// Organization account for org workspaces, else (3) the per-workspace
-	// account. Missing, ambiguous, or conflicting ownership fails closed in the
-	// caller (no silent fallback to another wallet). All queries are typed and
+	// Resolution is fixed at Workspace creation scope (ADR-0038): a Workspace in
+	// an Organization resolves to that Organization's shared pool, a personal
+	// Workspace resolves to its owner's deterministic Personal account
+	// (ensure_personal_billing_account_for_user: the Default-workspace-anchored
+	// account, provisioned on demand). Missing or ownerless scopes fail closed
+	// in the caller (no silent fallback to another wallet, no per-workspace
+	// mint, no link indirection). All queries are typed and
 	// join the caller-owned transaction via the passed Queries (no ambient pool
 	// use here), so Task settlement keeps Quote/Hold/Task/River atomic.
+	//
+	// workspace_billing_links rows are retired (writes closed, resolution no
+	// longer reads them); the table stays for read-only audit only.
 	GetBillingAccountByOrganizationID(ctx context.Context, organizationID pgtype.Int8) (BillingAccount, error)
 	GetBillingAccountByPublicID(ctx context.Context, publicID string) (BillingAccount, error)
 	GetBillingAccountByWorkspaceID(ctx context.Context, workspaceID pgtype.Int8) (BillingAccount, error)
@@ -335,15 +351,6 @@ type Querier interface {
 	// Settlement joins stay LEFT: tasks without billing facts (free or
 	// pre-settlement rows) still list.
 	GetControlTaskByPublicID(ctx context.Context, publicID string) (GetControlTaskByPublicIDRow, error)
-	// Account default new-member consumption quotas (#947). One row per
-	// Billing Account; absent means NOT CONFIGURED (fail closed: invites are
-	// blocked until a Billing Owner/Admin sets the default, never an implicit
-	// unlimited). The default seeds the per-member quota row on first join of
-	// the account consumption scope (same five periods as #946). All queries
-	// are typed; the invite path joins the caller-owned transaction so
-	// membership insert + quota seed stay atomic.
-	GetDefaultMemberQuota(ctx context.Context, billingAccountID int64) (BillingAccountDefaultMemberQuota, error)
-	GetDefaultMemberQuotaForUpdate(ctx context.Context, billingAccountID int64) (BillingAccountDefaultMemberQuota, error)
 	GetDefaultWorkspaceByOwner(ctx context.Context, ownerUserID pgtype.Int8) (Workspace, error)
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
 	GetLibraryAssetByPublicID(ctx context.Context, arg GetLibraryAssetByPublicIDParams) (GetLibraryAssetByPublicIDRow, error)
@@ -414,18 +421,10 @@ type Querier interface {
 	GetUserByPublicID(ctx context.Context, publicID pgtype.UUID) (User, error)
 	GetUserByStorageUID(ctx context.Context, storageUid string) (User, error)
 	GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error)
-	GetWorkspaceBillingLink(ctx context.Context, workspaceID int64) (WorkspaceBillingLink, error)
+	GetWalletBalancesForAccount(ctx context.Context, billingAccountID pgtype.Int8) (GetWalletBalancesForAccountRow, error)
 	GetWorkspaceBoard(ctx context.Context, arg GetWorkspaceBoardParams) (GetWorkspaceBoardRow, error)
 	GetWorkspaceBoardAccess(ctx context.Context, arg GetWorkspaceBoardAccessParams) (GetWorkspaceBoardAccessRow, error)
 	GetWorkspaceBoardMembership(ctx context.Context, arg GetWorkspaceBoardMembershipParams) (int64, error)
-	// Workspace shared consumption budgets (#945). One row per workspace;
-	// absent means unlimited (the default). The budget is a cumulative cap on
-	// settled + pending consumption in the current UTC period, not a wallet,
-	// grant, or balance reservation. All queries are typed and join the
-	// caller-owned transaction via the passed Queries, so Task/Vision
-	// settlement keeps Check/Quote/Hold/Task/River atomic.
-	GetWorkspaceBudget(ctx context.Context, workspaceID int64) (WorkspaceBudget, error)
-	GetWorkspaceBudgetForUpdate(ctx context.Context, workspaceID int64) (WorkspaceBudget, error)
 	GetWorkspaceByInternalID(ctx context.Context, internalID int64) (Workspace, error)
 	GetWorkspaceByPublicID(ctx context.Context, publicID string) (Workspace, error)
 	// GetWorkspaceMediaAssetID resolves a workspace-scoped media asset public
@@ -451,7 +450,7 @@ type Querier interface {
 	// ux_workspaces_default_owner: concurrent inserts for the same owner collapse
 	// to a single Default row, and the follow-up select always reads the winner.
 	InsertDefaultWorkspaceIgnore(ctx context.Context, arg InsertDefaultWorkspaceIgnoreParams) (int64, error)
-	InsertMemberQuotaFromDefault(ctx context.Context, arg InsertMemberQuotaFromDefaultParams) (BillingAccountMemberQuota, error)
+	InsertOrganizationClosure(ctx context.Context, arg InsertOrganizationClosureParams) (OrganizationClosure, error)
 	InsertPaymentAdminAction(ctx context.Context, arg InsertPaymentAdminActionParams) error
 	InsertPaymentCheckoutShutdown(ctx context.Context, arg InsertPaymentCheckoutShutdownParams) (PaymentCheckoutShutdown, error)
 	InsertPaymentOrderIntent(ctx context.Context, arg InsertPaymentOrderIntentParams) (PaymentOrder, error)
@@ -503,6 +502,7 @@ type Querier interface {
 	// cross-workspace assets list empty.
 	ListBoardsReferencingMediaAsset(ctx context.Context, arg ListBoardsReferencingMediaAssetParams) ([]string, error)
 	ListControlTasks(ctx context.Context, arg ListControlTasksParams) ([]ListControlTasksRow, error)
+	ListCreditedOrgPaymentOrders(ctx context.Context, arg ListCreditedOrgPaymentOrdersParams) ([]ListCreditedOrgPaymentOrdersRow, error)
 	ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error)
 	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
 	// Non-Default business Workspace scope for handover acceptance (#948):
@@ -525,7 +525,10 @@ type Querier interface {
 	// plus recent execution attempts. Attempt buckets stay empty until the
 	// worker records attempts; pending buckets are live immediately.
 	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
+	ListOrganizationMembers(ctx context.Context, arg ListOrganizationMembersParams) ([]OrganizationMembership, error)
+	ListOrganizationMembersForSnapshot(ctx context.Context, organizationID int64) ([]ListOrganizationMembersForSnapshotRow, error)
 	ListOrganizationOwners(ctx context.Context, organizationID int64) ([]OrganizationMembership, error)
+	ListOrganizationWorkspacePublicIDs(ctx context.Context, organizationID pgtype.Int8) ([]string, error)
 	ListOrganizationsByUserID(ctx context.Context, arg ListOrganizationsByUserIDParams) ([]Organization, error)
 	ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg ListPaymentOrdersForCheckoutShutdownParams) ([]PaymentOrder, error)
 	ListPaymentReconciliationAnomalies(ctx context.Context, rowLimit int32) ([]ListPaymentReconciliationAnomaliesRow, error)
@@ -634,6 +637,11 @@ type Querier interface {
 	// created_at) as updated_at. No dedup key: one asset may back many
 	// jobs; request idempotency stays handler-side (library:materialize).
 	LockLibraryMaterializationAsset(ctx context.Context, arg LockLibraryMaterializationAssetParams) error
+	// Organization closure queries (#955). Close/Restore pin the organization
+	// row FOR UPDATE so concurrent closes serialize; the open-closure unique
+	// index collapses a lost race to the winner via the insert conflict plus
+	// the SetOrganizationClosed row count below.
+	LockOrganizationByPublicID(ctx context.Context, publicID string) (Organization, error)
 	// Service Model Pool catalog queries (#848, ADR-0012).
 	//
 	// The pool repository (internal/generation/catalog) drives every write
@@ -646,10 +654,13 @@ type Querier interface {
 	// task row; wave 2 submit calls them inside the submit transaction.
 	LockServiceModelPool(ctx context.Context, service string) error
 	LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error)
-	// Lock the resolved payer and any account anchored to the Workspace before
-	// deletion. Stable ID ordering keeps the account -> Workspace lock order even
-	// when an explicitly shared Workspace already has an older anchor account.
-	// Resolve without provisioning; an unfunded Workspace returns no rows.
+	LockUserRow(ctx context.Context, userID int64) (int64, error)
+	// Lock the creation-scope payer before deletion (ADR-0038): the account
+	// anchored to the Workspace itself (Default survivor row, legacy anchors),
+	// the owner's Personal survivor (Default-workspace-anchored account), and
+	// the Organization pool for org scopes. Stable ID ordering keeps the
+	// account -> Workspace lock order. Resolve without provisioning; an
+	// unfunded Workspace returns no rows.
 	LockWorkspaceBillingAccounts(ctx context.Context, workspacePublicID string) ([]int64, error)
 	LockWorkspaceBoard(ctx context.Context, arg LockWorkspaceBoardParams) (LockWorkspaceBoardRow, error)
 	// Configuration writes lock Workspace membership before the Board row.
@@ -657,6 +668,7 @@ type Querier interface {
 	// Lock affected Boards in a stable order before removing grants.
 	LockWorkspaceMemberBoards(ctx context.Context, arg LockWorkspaceMemberBoardsParams) ([]LockWorkspaceMemberBoardsRow, error)
 	LockWorkspaceMemberships(ctx context.Context, publicID string) (int64, error)
+	MarkOrganizationClosureRestored(ctx context.Context, arg MarkOrganizationClosureRestoredParams) (int64, error)
 	MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
 	// Account abandon (#919): any Billing Owner/Admin of the persisted payer
 	// account may abandon its open Checkout.
@@ -681,6 +693,13 @@ type Querier interface {
 	MoveLibraryAssetsToFolder(ctx context.Context, arg MoveLibraryAssetsToFolderParams) (int64, error)
 	PurgeExpiredControlIdempotency(ctx context.Context) (int64, error)
 	RecordPaymentOrderPaid(ctx context.Context, arg RecordPaymentOrderPaidParams) (PaymentOrder, error)
+	// Re-issue after lapse (#948 follow-up): when the account's single pending
+	// invite has expired, the owner may send again. The pending row refreshes in
+	// place (new parties, key, and 7-day expiry under the same bti_ id), so the
+	// at-most-one-pending-per-account invariant needs no index change. Matches
+	// zero rows unless a lapsed pending invite exists; callers fall back to the
+	// pending guard on no match (lost race or still-live invite).
+	ReissueBillingTransferInvite(ctx context.Context, arg ReissueBillingTransferInviteParams) (BillingAccountTransferInvite, error)
 	RenameLibraryFolder(ctx context.Context, arg RenameLibraryFolderParams) (LibraryFolder, error)
 	RenameWorkspaceBoard(ctx context.Context, arg RenameWorkspaceBoardParams) (int64, error)
 	ReplacePaymentStripeConfiguration(ctx context.Context, arg ReplacePaymentStripeConfigurationParams) (PaymentStripeConfiguration, error)
@@ -706,6 +725,7 @@ type Querier interface {
 	// version first (callers distinguish via a re-read).
 	SetBoardWorkspaceAccess(ctx context.Context, arg SetBoardWorkspaceAccessParams) (int64, error)
 	SetCurrentStorageProfile(ctx context.Context, arg SetCurrentStorageProfileParams) (int64, error)
+	SetOrganizationClosed(ctx context.Context, arg SetOrganizationClosedParams) (int64, error)
 	SetTaskRoutingSnapshot(ctx context.Context, arg SetTaskRoutingSnapshotParams) (int64, error)
 	// Transitions read their result back through the data-modifying
 	// CTE's RETURNING list (joined to the untouched asset/media tables):
@@ -743,7 +763,6 @@ type Querier interface {
 	// the calling workspace or no row is written (fail-closed, never
 	// cross-workspace). Replays converge via ON CONFLICT DO NOTHING.
 	UpsertBoardDocumentMediaRef(ctx context.Context, arg UpsertBoardDocumentMediaRefParams) error
-	UpsertDefaultMemberQuota(ctx context.Context, arg UpsertDefaultMemberQuotaParams) (BillingAccountDefaultMemberQuota, error)
 	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)
 	UpsertMemberQuota(ctx context.Context, arg UpsertMemberQuotaParams) (BillingAccountMemberQuota, error)
 	UpsertOrganizationMembership(ctx context.Context, arg UpsertOrganizationMembershipParams) error
@@ -755,8 +774,6 @@ type Querier interface {
 	// trigger was removed with it). Only same-locator updates may proceed.
 	UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) (int64, error)
 	UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error
-	UpsertWorkspaceBillingLink(ctx context.Context, arg UpsertWorkspaceBillingLinkParams) (WorkspaceBillingLink, error)
-	UpsertWorkspaceBudget(ctx context.Context, arg UpsertWorkspaceBudgetParams) (WorkspaceBudget, error)
 	UpsertWorkspaceMembership(ctx context.Context, arg UpsertWorkspaceMembershipParams) error
 }
 

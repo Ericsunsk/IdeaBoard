@@ -27,18 +27,25 @@ import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
+  AddOrganizationMemberRequest,
   BadRequestResponse,
+  CloseOrganizationRequest,
   ConflictResponse,
   CreateOrganizationRequest,
   CreateOrganizationWorkspaceRequest,
+  DeletedEnvelope,
   ForbiddenResponse,
   ListOrganizationsParams,
   NotFoundResponse,
   OrganizationEnvelope,
+  OrganizationMemberEnvelope,
+  OrganizationMemberList,
   PaginatedOrganizations,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
+  UpdateOrganizationMemberRequest,
   UpdateOrganizationRequest,
+  UserId,
   WorkspaceEnvelope,
   WorkspaceList,
 } from '../model'
@@ -451,6 +458,240 @@ export const useUpdateOrganization = <
 > => {
   return useMutation(getUpdateOrganizationMutationOptions(options), queryClient)
 }
+export const getCloseOrganizationUrl = (organizationId: string) => {
+  return `/organizations/${encodeURIComponent(String(organizationId))}/closure`
+}
+
+/**
+ * Requires Idempotency-Key. Only the owner may close. Closure immediately suspends all member access and new spending while retaining membership, Workspace, permission, and billing history. Unsettled Tasks, payment orders, refunds, disputes, or a pending handover invite refuse closure with organization_closure_blocked; remaining balance stays in the closed account (never Personal).
+ * @summary Close an organization (owner only)
+ */
+export const closeOrganization = async (
+  organizationId: string,
+  closeOrganizationRequest: CloseOrganizationRequest,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<OrganizationEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return publicMutator<OrganizationEnvelope>(getCloseOrganizationUrl(organizationId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(closeOrganizationRequest),
+  })
+}
+
+export const getCloseOrganizationMutationKey = () => ['closeOrganization'] as const
+
+export const getCloseOrganizationMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ConflictResponse
+    | UnprocessableEntityResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof closeOrganization>>,
+    TError,
+    CloseOrganizationMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof closeOrganization>>,
+  TError,
+  CloseOrganizationMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCloseOrganizationMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof closeOrganization>>,
+    CloseOrganizationMutationVariables
+  > = (props) => {
+    const { organizationId, data } = props ?? {}
+
+    return closeOrganization(organizationId, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type CloseOrganizationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof closeOrganization>>
+>
+export type CloseOrganizationMutationBody = CloseOrganizationRequest
+export type CloseOrganizationMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | NotFoundResponse
+  | ConflictResponse
+  | UnprocessableEntityResponse
+export type CloseOrganizationMutationVariables = {
+  organizationId: string
+  data: CloseOrganizationRequest
+}
+
+/**
+ * @summary Close an organization (owner only)
+ */
+export const useCloseOrganization = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ConflictResponse
+    | UnprocessableEntityResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof closeOrganization>>,
+      TError,
+      CloseOrganizationMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof closeOrganization>>,
+  TError,
+  CloseOrganizationMutationVariables,
+  TContext
+> => {
+  return useMutation(getCloseOrganizationMutationOptions(options), queryClient)
+}
+export const getRestoreOrganizationUrl = (organizationId: string) => {
+  return `/organizations/${encodeURIComponent(String(organizationId))}/restore`
+}
+
+/**
+ * Requires Idempotency-Key. Only the owner may restore; retained memberships and permissions resume. No request body is required. Restoring a live organization reads as 409 organization_not_closed.
+ * @summary Restore a closed organization (owner only)
+ */
+export const restoreOrganization = async (
+  organizationId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<OrganizationEnvelope> => {
+  return publicMutator<OrganizationEnvelope>(getRestoreOrganizationUrl(organizationId), {
+    ...options,
+    method: 'POST',
+  })
+}
+
+export const getRestoreOrganizationMutationKey = () => ['restoreOrganization'] as const
+
+export const getRestoreOrganizationMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreOrganization>>,
+    TError,
+    RestoreOrganizationMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreOrganization>>,
+  TError,
+  RestoreOrganizationMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreOrganizationMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreOrganization>>,
+    RestoreOrganizationMutationVariables
+  > = (props) => {
+    const { organizationId } = props ?? {}
+
+    return restoreOrganization(organizationId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type RestoreOrganizationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreOrganization>>
+>
+
+export type RestoreOrganizationMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | NotFoundResponse
+  | ConflictResponse
+export type RestoreOrganizationMutationVariables = { organizationId: string }
+
+/**
+ * @summary Restore a closed organization (owner only)
+ */
+export const useRestoreOrganization = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreOrganization>>,
+      TError,
+      RestoreOrganizationMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof restoreOrganization>>,
+  TError,
+  RestoreOrganizationMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreOrganizationMutationOptions(options), queryClient)
+}
 export const getListOrganizationWorkspacesUrl = (organizationId: string) => {
   return `/organizations/${encodeURIComponent(String(organizationId))}/workspaces`
 }
@@ -541,6 +782,7 @@ export const getCreateOrganizationWorkspaceUrl = (organizationId: string) => {
 }
 
 /**
+ * Requires Idempotency-Key. Only organization owner/admin may create; every workspace charges the shared organization account.
  * @summary Create an organization workspace (org owner/admin only)
  */
 export const createOrganizationWorkspace = async (
@@ -666,4 +908,444 @@ export const useCreateOrganizationWorkspace = <
   TContext
 > => {
   return useMutation(getCreateOrganizationWorkspaceMutationOptions(options), queryClient)
+}
+export const getListOrganizationMembersUrl = (organizationId: string) => {
+  return `/organizations/${encodeURIComponent(String(organizationId))}/members`
+}
+
+/**
+ * No Idempotency-Key is required for this read. The organization itself is the management entry: it carries no boards, content, or consumption; workspace access follows the organization role mapping (owner/admin automatic, member explicit).
+ * @summary List organization members (org members only)
+ */
+export const listOrganizationMembers = async (
+  organizationId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<OrganizationMemberList> => {
+  return publicMutator<OrganizationMemberList>(getListOrganizationMembersUrl(organizationId), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListOrganizationMembersQueryKey = (organizationId: MaybeRefOrGetter<string>) => {
+  return ['organizations', organizationId, 'members'] as const
+}
+
+export const getListOrganizationMembersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listOrganizationMembers>>,
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
+>(
+  organizationId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listOrganizationMembers>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListOrganizationMembersQueryKey(organizationId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrganizationMembers>>> = ({
+    signal,
+  }) => listOrganizationMembers(toValue(organizationId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () => toValue(organizationId) !== null && toValue(organizationId) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listOrganizationMembers>>, TError, TData>
+}
+
+export type ListOrganizationMembersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listOrganizationMembers>>
+>
+export type ListOrganizationMembersQueryError =
+  UnauthorizedResponse | ForbiddenResponse | NotFoundResponse
+
+/**
+ * @summary List organization members (org members only)
+ */
+
+export function useListOrganizationMembers<
+  TData = Awaited<ReturnType<typeof listOrganizationMembers>>,
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
+>(
+  organizationId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listOrganizationMembers>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListOrganizationMembersQueryOptions(organizationId, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getAddOrganizationMemberUrl = (organizationId: string) => {
+  return `/organizations/${encodeURIComponent(String(organizationId))}/members`
+}
+
+/**
+ * Requires Idempotency-Key. Only owner may grant admin; owner grants never flow here (explicit handover only). The invitee joining a second organization fails closed with organization_limit_reached.
+ * @summary Invite an organization member (owner/admin only)
+ */
+export const addOrganizationMember = async (
+  organizationId: string,
+  addOrganizationMemberRequest: AddOrganizationMemberRequest,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<OrganizationMemberEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return publicMutator<OrganizationMemberEnvelope>(getAddOrganizationMemberUrl(organizationId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(addOrganizationMemberRequest),
+  })
+}
+
+export const getAddOrganizationMemberMutationKey = () => ['addOrganizationMember'] as const
+
+export const getAddOrganizationMemberMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ConflictResponse
+    | UnprocessableEntityResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addOrganizationMember>>,
+    TError,
+    AddOrganizationMemberMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addOrganizationMember>>,
+  TError,
+  AddOrganizationMemberMutationVariables,
+  TContext
+> => {
+  const mutationKey = getAddOrganizationMemberMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addOrganizationMember>>,
+    AddOrganizationMemberMutationVariables
+  > = (props) => {
+    const { organizationId, data } = props ?? {}
+
+    return addOrganizationMember(organizationId, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AddOrganizationMemberMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addOrganizationMember>>
+>
+export type AddOrganizationMemberMutationBody = AddOrganizationMemberRequest
+export type AddOrganizationMemberMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | NotFoundResponse
+  | ConflictResponse
+  | UnprocessableEntityResponse
+export type AddOrganizationMemberMutationVariables = {
+  organizationId: string
+  data: AddOrganizationMemberRequest
+}
+
+/**
+ * @summary Invite an organization member (owner/admin only)
+ */
+export const useAddOrganizationMember = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ConflictResponse
+    | UnprocessableEntityResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof addOrganizationMember>>,
+      TError,
+      AddOrganizationMemberMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof addOrganizationMember>>,
+  TError,
+  AddOrganizationMemberMutationVariables,
+  TContext
+> => {
+  return useMutation(getAddOrganizationMemberMutationOptions(options), queryClient)
+}
+export const getUpdateOrganizationMemberUrl = (organizationId: string, memberId: UserId) => {
+  return `/organizations/${encodeURIComponent(String(organizationId))}/members/${encodeURIComponent(String(memberId))}`
+}
+
+/**
+ * No Idempotency-Key is required. Only owner changes admin roles; owner rows are immutable here (explicit handover only). Admin demotion immediately drops automatic all-workspace access and keeps only explicit workspace grants.
+ * @summary Change an organization member role (owner-only for admin roles)
+ */
+export const updateOrganizationMember = async (
+  organizationId: string,
+  memberId: UserId,
+  updateOrganizationMemberRequest: UpdateOrganizationMemberRequest,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<OrganizationMemberEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return publicMutator<OrganizationMemberEnvelope>(
+    getUpdateOrganizationMemberUrl(organizationId, memberId),
+    {
+      ...options,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(updateOrganizationMemberRequest),
+    },
+  )
+}
+
+export const getUpdateOrganizationMemberMutationKey = () => ['updateOrganizationMember'] as const
+
+export const getUpdateOrganizationMemberMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | UnprocessableEntityResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateOrganizationMember>>,
+    TError,
+    UpdateOrganizationMemberMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateOrganizationMember>>,
+  TError,
+  UpdateOrganizationMemberMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateOrganizationMemberMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateOrganizationMember>>,
+    UpdateOrganizationMemberMutationVariables
+  > = (props) => {
+    const { organizationId, memberId, data } = props ?? {}
+
+    return updateOrganizationMember(organizationId, memberId, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type UpdateOrganizationMemberMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateOrganizationMember>>
+>
+export type UpdateOrganizationMemberMutationBody = UpdateOrganizationMemberRequest
+export type UpdateOrganizationMemberMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | NotFoundResponse
+  | UnprocessableEntityResponse
+export type UpdateOrganizationMemberMutationVariables = {
+  organizationId: string
+  memberId: UserId
+  data: UpdateOrganizationMemberRequest
+}
+
+/**
+ * @summary Change an organization member role (owner-only for admin roles)
+ */
+export const useUpdateOrganizationMember = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | UnprocessableEntityResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateOrganizationMember>>,
+      TError,
+      UpdateOrganizationMemberMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateOrganizationMember>>,
+  TError,
+  UpdateOrganizationMemberMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateOrganizationMemberMutationOptions(options), queryClient)
+}
+export const getRemoveOrganizationMemberUrl = (organizationId: string, memberId: UserId) => {
+  return `/organizations/${encodeURIComponent(String(organizationId))}/members/${encodeURIComponent(String(memberId))}`
+}
+
+/**
+ * Requires Idempotency-Key. Leaving immediately removes access to all organization workspaces; created content stays organization-owned. Owner rows are immutable here (explicit handover only).
+ * @summary Remove an organization member or leave (member self-leave allowed)
+ */
+export const removeOrganizationMember = async (
+  organizationId: string,
+  memberId: UserId,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<DeletedEnvelope> => {
+  return publicMutator<DeletedEnvelope>(getRemoveOrganizationMemberUrl(organizationId, memberId), {
+    ...options,
+    method: 'DELETE',
+  })
+}
+
+export const getRemoveOrganizationMemberMutationKey = () => ['removeOrganizationMember'] as const
+
+export const getRemoveOrganizationMemberMutationOptions = <
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeOrganizationMember>>,
+    TError,
+    RemoveOrganizationMemberMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removeOrganizationMember>>,
+  TError,
+  RemoveOrganizationMemberMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRemoveOrganizationMemberMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removeOrganizationMember>>,
+    RemoveOrganizationMemberMutationVariables
+  > = (props) => {
+    const { organizationId, memberId } = props ?? {}
+
+    return removeOrganizationMember(organizationId, memberId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type RemoveOrganizationMemberMutationResult = NonNullable<
+  Awaited<ReturnType<typeof removeOrganizationMember>>
+>
+
+export type RemoveOrganizationMemberMutationError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse
+export type RemoveOrganizationMemberMutationVariables = { organizationId: string; memberId: UserId }
+
+/**
+ * @summary Remove an organization member or leave (member self-leave allowed)
+ */
+export const useRemoveOrganizationMember = <
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof removeOrganizationMember>>,
+      TError,
+      RemoveOrganizationMemberMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof removeOrganizationMember>>,
+  TError,
+  RemoveOrganizationMemberMutationVariables,
+  TContext
+> => {
+  return useMutation(getRemoveOrganizationMemberMutationOptions(options), queryClient)
 }

@@ -1,3 +1,5 @@
+import type { Component } from 'vue'
+
 export type UserAccountMenuItemKey = 'profile' | 'admin' | 'home' | 'logout' | 'login' | 'register'
 
 export type UserAccountMenuItemTone = 'default' | 'danger'
@@ -23,23 +25,62 @@ export type UserAccountMenuWorkspaceItem = {
 
 type UserAccountMenuWorkspaceStatus = 'loading' | 'ready' | 'error' | 'empty'
 
-export type UserAccountMenuWorkspaceCreateInput = { name: string } & (
-  | {
-      /** Organization creates always use the organization pool. */
-      organizationId: string
-      billingAccountId?: never
-      isNewBillingAccount?: never
-    }
-  | {
-      organizationId?: undefined
-      /** Explicit shared ba_ account, resolved before creation is enabled. */
-      billingAccountId?: string | undefined
-      /** Fresh isolated account for an independently operated business. */
-      isNewBillingAccount?: boolean | undefined
-    }
-)
+export type UserAccountMenuWorkspaceCreateInput = {
+  name: string
+  /** Organization creates always use the organization pool. */
+  organizationId?: string | undefined
+}
 
-export type UserAccountMenuOrganizationItem = { publicId: string; name: string }
+export type UserAccountMenuOrganizationItem = {
+  publicId: string
+  name: string
+  status?: 'active' | 'closed' | undefined
+  closedAt?: string | undefined
+}
+
+export type UserAccountMenuOrganizationMember = {
+  userId: string
+  role: 'owner' | 'admin' | 'member'
+  createdAt?: string | undefined
+}
+
+export type UserAccountMenuOrganizationMemberRole = 'member' | 'admin'
+
+// Organization management panel (issue #951): the workspace shell owns the
+// management UI component and its transport callbacks; the account menu only
+// carries them through as an opaque `Component` plus plain functions so the
+// account feature never imports the workspace feature. The settings dialog
+// resolves the caller's single organization and renders the panel, exposing
+// the management surface as soon as the organization exists.
+export type UserAccountMenuOrganizationPanel = {
+  component: Component
+  onLoadMembers: (organizationId: string) => Promise<UserAccountMenuOrganizationMember[]>
+  onInviteMember: (
+    organizationId: string,
+    input: { userId: string; role: UserAccountMenuOrganizationMemberRole },
+  ) => Promise<UserAccountMenuOrganizationMember>
+  onUpdateMember: (
+    organizationId: string,
+    memberId: string,
+    input: { role: UserAccountMenuOrganizationMemberRole },
+  ) => Promise<UserAccountMenuOrganizationMember>
+  onRemoveMember: (organizationId: string, memberId: string) => Promise<void>
+  // Self-leave also resets the Personal/Organization scope and refreshes the
+  // list (defaults to onRemoveMember when omitted).
+  onLeaveMember?: ((organizationId: string, memberId: string) => Promise<void>) | undefined
+  // Organization closure and restoration (issue #955, owner only). The
+  // panel renders the danger zone when these callbacks are present;
+  // closure suspends access and spending while retaining history, and
+  // restore resumes prior standing.
+  onCloseOrganization?:
+    | ((
+        organizationId: string,
+        input: { reason?: string | undefined },
+      ) => Promise<UserAccountMenuOrganizationItem>)
+    | undefined
+  onRestoreOrganization?:
+    ((organizationId: string) => Promise<UserAccountMenuOrganizationItem>) | undefined
+}
 
 export type UserAccountMenuWorkspace = {
   items: UserAccountMenuWorkspaceItem[]
@@ -58,6 +99,12 @@ export type UserAccountMenuWorkspace = {
   onLoadOrganizations?: (() => Promise<UserAccountMenuOrganizationItem[]>) | undefined
   onCreateOrganization?:
     ((name: string, idempotencyKey: string) => Promise<UserAccountMenuOrganizationItem>) | undefined
+  // Organization management panel (issue #951, opaque component + callbacks).
+  organizationPanel?: UserAccountMenuOrganizationPanel | undefined
+  /** Active Personal/Organization scope (951): null while unresolved. */
+  activeScope?: { kind: 'personal' } | { kind: 'organization'; organizationId: string } | undefined
+  onSelectPersonal?: (() => void) | undefined
+  onSelectOrganization?: ((organizationId: string) => void | Promise<void>) | undefined
   onSelect: (workspaceId: string) => void
   onCreate: (input: UserAccountMenuWorkspaceCreateInput) => Promise<UserAccountMenuWorkspaceItem>
   onRename: (workspaceId: string, name: string) => Promise<UserAccountMenuWorkspaceItem>

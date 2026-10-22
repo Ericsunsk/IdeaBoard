@@ -1,11 +1,9 @@
 import {
-  getDefaultMemberQuota,
   getSelfMemberQuota,
   listMemberQuotas,
-  setDefaultMemberQuota,
   setMemberQuota,
 } from '../../../../api/generated-query/public/workspace-billing/workspace-billing'
-import type { DefaultMemberQuota, MemberQuota } from '../../../../api/generated-query/public/model'
+import type { MemberQuota } from '../../../../api/generated-query/public/model'
 import { i18n } from '../../../../core/i18n'
 import { isOpaqueId, opaqueIdPrefix } from '../../../../api/contractKernel'
 import { requireAccountWorkspaceId, resolveWorkspaceBillingData } from '../workspaceBilling'
@@ -44,14 +42,6 @@ export const memberQuotaQueryKeys = {
   self: (workspaceId: string) => ['workspace', 'member-quota', 'self', workspaceId] as const,
   list: (workspaceId: string) => ['workspace', 'member-quota', 'list', workspaceId] as const,
 }
-
-/** Capped quota windows shared by the member and default editors. */
-export const CAPPED_QUOTA_PERIODS: readonly MemberQuotaPeriod[] = [
-  'daily',
-  'weekly',
-  'monthly',
-  'fixed',
-]
 
 export function parseQuotaPeriodValue(value: unknown): MemberQuotaPeriod | null {
   if (
@@ -221,87 +211,4 @@ export async function updateMemberQuota(
     fallback,
   )
   return parseMemberQuotaData(raw)
-}
-
-// Account default new-member quota (#947): one policy per Billing Account,
-// absent means NOT CONFIGURED (fail closed, never implicit unlimited).
-// Only Billing Owner/Admin writes; any member reads. Changing it never
-// touches existing per-member rows.
-
-export type DefaultMemberQuotaSummary = {
-  billingAccountId: string
-  workspaceId: string
-  period: MemberQuotaPeriod
-  limitCredits: number | null
-}
-
-/** Preset monthly Ideas for the default picker (small/medium/large). */
-export const DEFAULT_QUOTA_PRESETS = [200, 1000, 2000] as const
-
-export const defaultMemberQuotaQueryKeys = {
-  all: ['workspace', 'default-member-quota'] as const,
-  detail: (workspaceId: string) =>
-    ['workspace', 'default-member-quota', 'detail', workspaceId] as const,
-}
-
-export function parseDefaultMemberQuotaData(input: unknown): DefaultMemberQuotaSummary {
-  const data = input as DefaultMemberQuota
-  if (
-    typeof data.billing_account_id !== 'string' ||
-    !isOpaqueId(data.billing_account_id) ||
-    opaqueIdPrefix(data.billing_account_id) !== 'ba'
-  ) {
-    throw new Error('Invalid default member quota account')
-  }
-  if (
-    typeof data.workspace_id !== 'string' ||
-    !isOpaqueId(data.workspace_id) ||
-    opaqueIdPrefix(data.workspace_id) !== 'ws'
-  ) {
-    throw new Error('Invalid default member quota workspace')
-  }
-  const period = requireQuotaPeriod(data.period)
-  const limitCredits = optionalPositiveInt(data.limit_credits ?? null)
-  if (period !== 'unlimited' && limitCredits == null) {
-    throw new Error('Capped default member quota requires a limit')
-  }
-  if (period === 'unlimited' && limitCredits != null) {
-    throw new Error('Unlimited default member quota carries no limit')
-  }
-  return {
-    billingAccountId: data.billing_account_id,
-    workspaceId: data.workspace_id,
-    period,
-    limitCredits,
-  }
-}
-
-export async function fetchDefaultMemberQuota(
-  workspaceId: string,
-  signal?: AbortSignal,
-): Promise<DefaultMemberQuotaSummary> {
-  const id = requireAccountWorkspaceId(workspaceId)
-  const fallback = i18n.global.t('workspace.quota.defaultLoadFailed')
-  const raw = await resolveWorkspaceBillingData<unknown>(
-    getDefaultMemberQuota(id, { signal }),
-    fallback,
-  )
-  return parseDefaultMemberQuotaData(raw)
-}
-
-export type UpdateDefaultMemberQuotaInput = UpdateMemberQuotaInput
-
-export async function updateDefaultMemberQuota(
-  workspaceId: string,
-  input: UpdateDefaultMemberQuotaInput,
-  signal?: AbortSignal,
-): Promise<DefaultMemberQuotaSummary> {
-  const id = requireAccountWorkspaceId(workspaceId)
-  const fallback = i18n.global.t('workspace.quota.defaultSaveFailed')
-  const body = normalizeQuotaInput(input)
-  const raw = await resolveWorkspaceBillingData<unknown>(
-    setDefaultMemberQuota(id, { data: body }, { signal }),
-    fallback,
-  )
-  return parseDefaultMemberQuotaData(raw)
 }

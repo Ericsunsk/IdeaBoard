@@ -45,16 +45,13 @@ export default {
     createDialogNameLabel: 'Workspace name',
     createDialogConfirm: 'Create workspace',
     defaultNewName: 'New workspace',
-    billingChoiceLabel: 'Billing account',
-    billingOrganizationHint: 'Workspaces in organization {organization} use its shared account.',
-    billingSharedTitle: 'Share the current account',
-    billingSharedHint:
-      'New space shares account {account}: one balance across spaces, no new wallet.',
-    billingSharedHintFallback:
-      'New space shares your current account: one balance across spaces, no new wallet.',
-    billingNewTitle: 'Create an independent account',
-    billingNewHint: 'New space gets its own funds account for an independently operated business.',
-    billingIsolationNote: 'Balances never merge or move across accounts owned by the same person.',
+    scopeLabel: 'Workspace scope',
+    scopePersonalTitle: 'Personal',
+    scopePersonalHint:
+      'New space uses your Personal account. All Personal spaces share one balance; the scope never changes.',
+    scopeOrganizationTitle: 'Organization',
+    scopeOrganizationHint:
+      'New space in {organization} uses its shared account. The scope never changes.',
     nameExists: 'A workspace with this name already exists.',
     loadFailed: 'Could not load workspaces.',
     createFailed: 'Could not create the workspace. Please try again.',
@@ -109,8 +106,7 @@ export default {
       invalidRequest: 'This member change is invalid.',
       memberUnknown: 'This member is no longer available.',
       actionFailed: 'Could not complete the action. Try again.',
-      defaultMissing:
-        'Set the default quota for new members first, then invite. Only billing managers can set it.',
+      defaultPrivate: 'The Default workspace is private and cannot invite collaborators.',
     },
     organization: {
       scope: 'Workspace scope',
@@ -127,30 +123,21 @@ export default {
     },
     handover: {
       title: 'Funds account handover',
-      account: 'Funds account: {account}',
-      scopeNote:
-        'Acceptance transfers financial ownership and grants Owner access to every linked business workspace. The Default workspace is excluded. Balance, history and quotas stay with this account; the previous Owner becomes an Admin.',
-      recipient: 'Recipient',
-      pickRecipient: 'Select a workspace member',
-      recipientHint:
-        'Invite the recipient to this workspace first so they can review and respond in these settings.',
-      initiate: 'Send handover invitation',
+      handOver: 'Transfer',
+      handOverTo: 'Transfer funds ownership to {name}',
+      initiateConfirm:
+        'Hand {account} to {to}? Valid for 7 days; ownership stays put until acceptance.',
+      acceptConfirm: 'Accept ownership of {account}? You become the funds Owner.',
+      rejectConfirm: 'Decline the handover? Ownership stays put and it can be resent.',
+      cancelConfirm: 'Cancel the handover? Ownership stays put and it can be resent.',
+      recipientNotice: 'You have a pending handover. Respond in the member list above.',
       invites: 'Handover invitations',
       inviteParties: '{from} → {to}',
-      grantedScope: 'Owner access granted to {count} business workspaces.',
+      expiresNote: 'Valid for 7 days; can be resent after expiry.',
       accept: 'Accept handover',
       reject: 'Reject invitation',
       cancel: 'Cancel invitation',
       empty: 'No handover invitations.',
-      managers: 'Financial managers',
-      detachNote:
-        'Leaving removes financial management access only. Funds, history and workspace membership remain. The last Owner must hand over ownership before leaving.',
-      leave: 'Leave funds account',
-      detach: 'Remove financial access',
-      detachConfirm:
-        'Remove financial access for {member}? Funds, billing history and workspace membership will be retained.',
-      decisionConfirm:
-        'Apply this decision to funds account {account}? Accepting grants financial ownership and Owner access to all linked business workspaces, excluding Default. Balance, history and quotas stay unchanged.',
       saved: 'Financial management updated.',
       loadFailed: 'Could not load financial management. Please retry.',
       status: {
@@ -158,34 +145,13 @@ export default {
         accepted: 'Accepted',
         rejected: 'Rejected',
         cancelled: 'Cancelled',
+        expired: 'Expired',
       },
       initiateFailed: 'Could not send the handover invitation. Please try again.',
       acceptFailed: 'Could not accept the handover invitation. Please try again.',
       rejectFailed: 'Could not decline the handover invitation. Please try again.',
       cancelFailed: 'Could not cancel the handover invitation. Please try again.',
-      detachFailed: 'Could not remove the billing member. Please try again.',
     },
-  },
-  budget: {
-    title: 'Consumption budget',
-    periodMonthly: 'Monthly',
-    periodUnlimited: 'Unlimited',
-    usedOf: '{used} / {limit} Ideas used',
-    usedUnlimited: '{used} Ideas used',
-    remaining: '{remaining} Ideas left',
-    periodRange: '{start} – {end}',
-    exhausted:
-      'Budget exhausted. New paid generations and Vision Search are paused until the next period or a higher limit.',
-    managerOnly:
-      'Only billing managers can change the budget. Workspace admins cannot raise a pool-granted budget.',
-    limitLabel: 'Monthly limit (Ideas)',
-    save: 'Save',
-    saving: 'Saving…',
-    saved: 'Budget updated.',
-    setUnlimited: 'Switch to unlimited',
-    loadFailed: 'Could not load the budget.',
-    saveFailed: 'Could not save the budget. Please try again.',
-    invalidLimit: 'Enter a positive whole number up to {max}.',
   },
   quota: {
     title: 'Member quota',
@@ -201,7 +167,7 @@ export default {
     exhausted:
       'Personal quota exhausted. New paid generations and Vision Search are paused until the next window or a higher limit.',
     managerOnly:
-      'Only billing managers can change member quotas. Workspace admins cannot raise a pool-granted quota.',
+      'Only the Personal account holder and organization owners or admins can change member quotas. Workspace admins cannot raise a pool-granted quota.',
     memberLabel: 'Member',
     periodLabel: 'Period',
     limitLabel: 'Limit (Ideas)',
@@ -214,19 +180,47 @@ export default {
     invalidLimit: 'Enter a positive whole number up to {max}.',
     pickMember: 'Pick a member first.',
     noQuotas: 'No member quotas set. Everyone is unlimited.',
-    defaultTitle: 'Default quota for new members',
-    defaultOf: 'New members get {limit} Ideas',
-    defaultUnlimited: 'New members are unlimited',
-    defaultMissing:
-      'No default quota yet. Invites are paused until a billing manager sets the default.',
-    defaultAffectsNewOnly:
-      'Changing the default only affects later joins; existing members keep their quota and usage.',
-    defaultManagerOnly:
-      'Only billing managers can set the default. Workspace admins reuse it when inviting.',
-    defaultLoadFailed: 'Could not load the default quota.',
-    defaultSaveFailed: 'Could not save the default quota. Please try again.',
-    defaultSaved: 'Default quota updated.',
-    presetLabel: 'Monthly presets',
-    presetMonthly: '{limit} / month',
+    sharedAccountNote:
+      'Collaborator usage charges the shared account balance and is summed across every workspace of the account, attributed to the real operator.',
+  },
+  limits: {
+    title: 'Usage limits',
+    manageShow: 'Manage limits',
+    manageHide: 'Hide management',
+  },
+  scope: {
+    switcherLabel: 'Personal or organization scope',
+    personal: 'Personal',
+    organization: 'Organization',
+    createOrganization: 'New organization',
+    personalHint: 'Personal spaces share your Personal balance.',
+    organizationHint: '{name} spaces share the organization balance.',
+  },
+  management: {
+    title: '{name} management',
+    managementNote:
+      'The organization itself is the management entry: no boards, content, or consumption here. Owner/admin reach every organization workspace automatically; members need an explicit per-workspace grant.',
+    inviteTitle: 'Invite organization member',
+    invitePlaceholder: 'usr_…',
+    workspaceGrantNote:
+      'Members need an explicit per-workspace grant before they can edit that workspace.',
+    leaveAction: 'Leave',
+    leaving: 'Leaving…',
+    limitReached: 'Each user may join or create at most one organization.',
+    statusClosed: 'Closed',
+    closedNote:
+      'This organization is closed. Access and spending are suspended; history is retained. Only the owner can restore it.',
+    closeTitle: 'Close organization',
+    closeHint:
+      'Closing suspends all member access and spending. Memberships, workspaces, and billing history are retained; remaining balance stays in the organization account.',
+    closeReasonPlaceholder: 'Reason (optional)',
+    closeAction: 'Close organization',
+    closeConfirmAction: 'Confirm closure',
+    closing: 'Closing…',
+    restoreAction: 'Restore organization',
+    restoring: 'Restoring…',
+    closeFailed: 'Could not close the organization.',
+    closeBlocked: 'The organization still has unsettled tasks or funds. Settle them and retry.',
+    restoreFailed: 'Could not restore the organization.',
   },
 } as const

@@ -211,6 +211,9 @@ describe('workspaceMembersResource errors', () => {
     )
     expect(classifyWorkspaceMemberError(codedError('workspace_not_found'))).toBe('hidden')
     expect(classifyWorkspaceMemberError(codedError('workspace_forbidden'))).toBe('forbidden')
+    expect(classifyWorkspaceMemberError(codedError('workspace_default_protected'))).toBe(
+      'default-protected',
+    )
     expect(classifyWorkspaceMemberError(codedError('workspace_member_limit_reached'))).toBe(
       'member-limit',
     )
@@ -219,9 +222,6 @@ describe('workspaceMembersResource errors', () => {
     )
     expect(classifyWorkspaceMemberError(codedError('workspace_idempotency_conflict'))).toBe(
       'idempotency-conflict',
-    )
-    expect(classifyWorkspaceMemberError(codedError('default_member_quota_not_configured'))).toBe(
-      'missing-default',
     )
     expect(classifyWorkspaceMemberError(codedError('validation_failed'))).toBe('invalid')
     expect(classifyWorkspaceMemberError(codedError('bad_request'))).toBe('invalid')

@@ -10,6 +10,11 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { i18n } from '../../../core/i18n'
 import { render } from '../../../test/render'
 import { USER_BOARDS_PATH, USER_CANVAS_PATH } from '../routePaths'
+import {
+  installOrganizationScopeStore,
+  memoryOrganizationScopePersist,
+  resetOrganizationScopeStore,
+} from '../organization/scope'
 import { useWorkspaceSwitcher } from './useWorkspaceSwitcher'
 import type { WorkspaceSummary } from '../selection/workspaceResource'
 
@@ -53,6 +58,10 @@ vi.mock('../selection/workspaceResource', () => ({
   renameWorkspace: resourceMocks.renameWorkspace,
   deleteWorkspace: resourceMocks.deleteWorkspace,
   fetchOrganizations: vi.fn(),
+  fetchOrganizationMembers: vi.fn(),
+  inviteOrganizationMember: vi.fn(),
+  updateOrganizationMember: vi.fn(),
+  removeOrganizationMember: vi.fn(),
   provisionOrganization: vi.fn(),
   workspaceQueryKeys: { list: ['workspaces'] },
 }))
@@ -111,6 +120,8 @@ describe('useWorkspaceSwitcher', () => {
     resourceMocks.renameWorkspace.mockReset()
     resourceMocks.deleteWorkspace.mockReset()
     selectionMocks.useWorkspaceSelection.mockReset()
+    resetOrganizationScopeStore()
+    installOrganizationScopeStore({ persist: memoryOrganizationScopePersist() })
   })
 
   test('lands on the gallery without the stale boardId when switching from canvas', async () => {
@@ -140,6 +151,38 @@ describe('useWorkspaceSwitcher', () => {
       query: { workspace: 'ws_team2', accountTab: 'profile' },
     })
     expect(routerMocks.push).not.toHaveBeenCalled()
+  })
+
+  test('switches to an organization workspace through the draft guard and gallery landing', async () => {
+    const selection = stubSelection()
+    const beforeWorkspaceChange = vi.fn().mockResolvedValue(true)
+    const switcher = renderSwitcher({ beforeWorkspaceChange })
+
+    await switcher.menuProps.value.onSelectOrganization?.('org_c3')
+
+    expect(beforeWorkspaceChange).toHaveBeenCalledOnce()
+    expect(installOrganizationScopeStore().getScope()).toEqual({
+      kind: 'organization',
+      organizationId: 'org_c3',
+    })
+    expect(selection.selectWorkspace).toHaveBeenCalledWith(TEAM.publicId)
+    expect(routerMocks.push).toHaveBeenCalledWith({
+      path: USER_BOARDS_PATH,
+      query: { workspace: TEAM.publicId },
+    })
+  })
+
+  test('clears the old workspace URL when the selected scope has no workspaces', async () => {
+    stubSelection({ items: ref([DEFAULT]) })
+    const switcher = renderSwitcher()
+
+    await switcher.menuProps.value.onSelectOrganization?.('org_c3')
+
+    expect(routerMocks.push).toHaveBeenCalledWith({ path: USER_BOARDS_PATH, query: {} })
+    expect(installOrganizationScopeStore().getScope()).toEqual({
+      kind: 'organization',
+      organizationId: 'org_c3',
+    })
   })
 
   test.each(['select', 'delete'] as const)(

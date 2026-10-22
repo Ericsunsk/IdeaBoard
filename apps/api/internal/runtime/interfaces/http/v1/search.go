@@ -28,9 +28,8 @@ package v1
 // renders search_vision_not_configured (503); key reuse with a
 // different request renders search_idempotency_conflict (409). Vision
 // billing failures reuse the #804 codes (billing_quote_unavailable
-// 503 transient, billing_wallet_restricted 403) plus the Task-side
-// tricolor 403s (workspace_budget_exhausted #945, member_quota_exhausted
-// #946); unpriced vision SKUs
+// 503 transient, billing_wallet_restricted 403) plus the member quota
+// 403 (member_quota_exhausted #946); unpriced vision SKUs
 // (catalog lacks a price) degrade to free with a billing_deferred
 // metric + backfill note instead of 422, proceeding at amount 0 with
 // ledger Hold/Capture/Release skipped.
@@ -74,7 +73,6 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/searchcatalog"
 	"ideaboard/api/internal/tenancy"
-	"ideaboard/api/internal/workspacebudgets"
 
 	"github.com/gin-gonic/gin"
 )
@@ -373,16 +371,15 @@ func (h *contractV1Handler) createVisionQuery(c *gin.Context) {
 				c.Abort()
 				return
 			}
-			// Budget/quota failures ride the same billing branch as the
-			// wallet/quote gates so they converge to the Task-side
-			// tricolor 403s (workspace_budget_exhausted /
-			// member_quota_exhausted) instead of the 503 default below.
+			// Quota failures ride the same billing branch as the
+			// wallet/quote gates so they converge to the member quota
+			// 403 (member_quota_exhausted) instead of the 503 default below.
 			// The quote path wraps failures with multi-%w alongside
 			// errV1BillingQuoteUnavailable; errors.Is still matches the
-			// budget/quota cause through that chain, and
-			// renderSearchBillingError checks those cases first.
+			// quota cause through that chain, and
+			// renderSearchBillingError checks that case first.
 			if errors.Is(doErr, errV1BillingRestricted) || errors.Is(doErr, errV1BillingQuoteUnavailable) ||
-				errors.Is(doErr, workspacebudgets.ErrBudgetExhausted) || errors.Is(doErr, memberquotas.ErrQuotaExhausted) {
+				errors.Is(doErr, memberquotas.ErrQuotaExhausted) {
 				renderSearchBillingError(c, doErr)
 				return
 			}
@@ -405,16 +402,12 @@ func renderSearchBillingError(c *gin.Context, err error) {
 		return
 	}
 	switch {
-	// Workspace budget (#945) and member quota (#946) gates mirror the
-	// Task-side tricolor feedback: 403 workspace_budget_exhausted /
-	// member_quota_exhausted, distinct from 403 billing_wallet_restricted
-	// and 503 billing_quote_unavailable. These cases stay first: the
+	// Member quota (#946) gate mirrors the Task-side quota feedback:
+	// 403 member_quota_exhausted, distinct from 403 billing_wallet_restricted
+	// and 503 billing_quote_unavailable. This case stays first: the
 	// quote path wraps failures with multi-%w alongside
-	// errV1BillingQuoteUnavailable, so a wrapped budget/quota cause must
+	// errV1BillingQuoteUnavailable, so a wrapped quota cause must
 	// win over the transient branch below.
-	case errors.Is(err, workspacebudgets.ErrBudgetExhausted):
-		contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceBudgetExhausted),
-			contract.CodeWorkspaceBudgetExhausted, runtimehttp.MsgWorkspaceBudgetExhausted)
 	case errors.Is(err, memberquotas.ErrQuotaExhausted):
 		contract.RenderError(c, contract.StatusOf(contract.CodeMemberQuotaExhausted),
 			contract.CodeMemberQuotaExhausted, runtimehttp.MsgMemberQuotaExhausted)
@@ -634,8 +627,8 @@ func (h *contractV1Handler) runVisionQuery(c *gin.Context, workspace *tenancy.Wo
 // workspace_not_found/library_asset_not_found (404), validation_failed (422),
 // pagination_cursor_invalid (400), bad_request (400), idempotency_key_required (400),
 // service_unavailable (503) plus #804 billing_quote_unavailable (503
-// transient)/billing_wallet_restricted (403) plus the Task-side tricolor
-// 403s workspace_budget_exhausted (#945)/member_quota_exhausted (#946).
+// transient)/billing_wallet_restricted (403) plus the member quota
+// 403 member_quota_exhausted (#946).
 // Unpriced vision SKUs never
 // surface billing_pricing_unavailable (422): they degrade to free with a
 // billing_deferred metric + backfill note (amount 0, ledger skipped).

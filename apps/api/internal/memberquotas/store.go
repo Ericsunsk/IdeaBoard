@@ -9,6 +9,7 @@ import (
 	"ideaboard/api/internal/consumptionread"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/tenancy"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -22,11 +23,10 @@ import (
 // never writes the Credits Ledger; the ledger Hold that follows a passed
 // check is the reservation (no sub-wallet, no separate quota hold row).
 //
-// Lock order is load-bearing: settlement checks lock the workspace budget
-// row first and the member quota row second. Task submit and Vision
-// reserve both run the budget check before the quota check in the same
-// transaction, so concurrent submits serialize in one order and never
-// deadlock each other.
+// Lock order is load-bearing: settlement checks lock the member quota
+// row FOR UPDATE as the per-member serialization point. Task submit and
+// Vision reserve run the quota check in the same transaction before the
+// Hold, so concurrent submits serialize here and never deadlock each other.
 type Store struct {
 	db *pgxpool.Pool
 	q  *dbsqlc.Queries
@@ -78,8 +78,11 @@ type SetResult struct {
 // 1..MaxLimitCredits; unlimited clears the limit. Adjusting never clears
 // usage (usage is derived from immutable settlement facts, never stored
 // here) and never tops up the wallet. Existing rows survive: rejoining
-// members keep their cap and their accrued usage. Callers enforce
-// Billing Owner/Admin before calling.
+// members keep their cap and their accrued usage. Callers enforce the
+// #953 role matrix before calling (Organization: Owner sets Admin,
+// Owner/Admin set Member, Admin never touches Owner/Admin, Owner stays
+// unlimited via the check short-circuit; Personal: the account holder
+// manages collaborators).
 func (s *Store) SetQuota(ctx context.Context, billingAccountID, userID int64, period string, limitCredits *int64, updatedByUserID int64) (SetResult, error) {
 	period = strings.TrimSpace(period)
 	if period == "" {
@@ -134,15 +137,18 @@ func (s *Store) ListQuotas(ctx context.Context, billingAccountID int64) ([]Quota
 
 // CheckQuotaInTx enforces the member's remaining quota inside the
 // caller's settlement transaction (Task submit / Vision reserve). It runs
-// after the workspace-budget check in the same transaction (fixed lock
-// order: budget row first, quota row second), using reservedAt for its window:
+// in the same transaction after the Quote and before the Hold, using
+// reservedAt for its window:
 //
-//  1. Lock the member quota row FOR UPDATE (the per-member
+//  1. Organization Owners short-circuit to unlimited: the check locks
+//     nothing and allows immediately, so an Owner row (even a capped one
+//     left by an earlier write) never gates consumption.
+//  2. Lock the member quota row FOR UPDATE (the per-member
 //     serialization point; concurrent submits by the same member
 //     serialize here and the loser observes the winner's committed
 //     Hold, so concurrency cannot bypass).
-//  2. Absent/unlimited or non-positive amounts allow immediately.
-//  3. Otherwise sum submit-time-attributed usage in the reservation window
+//  3. Absent/unlimited or non-positive amounts allow immediately.
+//  4. Otherwise sum submit-time-attributed usage in the reservation window
 //     (settled net captures with linked refunds corrected to their
 //     original period, plus pending Holds, across every Workspace
 //     sharing the account) and fail closed with ErrQuotaExhausted when
@@ -164,6 +170,11 @@ func (s *Store) CheckQuotaInTx(ctx context.Context, tx pgx.Tx, billingAccountID,
 	if amount <= 0 {
 		return nil
 	}
+	if owner, err := isOrganizationOwner(ctx, tx, billingAccountID, userID); err != nil {
+		return err
+	} else if owner {
+		return nil
+	}
 	row, err := dbsqlc.New(tx).GetMemberQuotaForUpdate(ctx, dbsqlc.GetMemberQuotaForUpdateParams{
 		BillingAccountID: billingAccountID, UserID: userID,
 	})
@@ -181,7 +192,8 @@ func (s *Store) CheckQuotaInTx(ctx context.Context, tx pgx.Tx, billingAccountID,
 // fence concurrent submits (only the settlement-transaction check does
 // that); it reports not-ready early so callers see the quota reason
 // before spending a Hold. A nil pool, unknown member, or unlimited quota
-// allows; over-cap returns ErrQuotaExhausted.
+// allows; over-cap returns ErrQuotaExhausted. Organization Owners
+// short-circuit to unlimited, mirroring CheckQuotaInTx.
 func (s *Store) CheckQuotaForQuote(ctx context.Context, billingAccountID, userID int64, amount int64, reservedAt time.Time) error {
 	if reservedAt.IsZero() {
 		return errors.New("memberquotas: reservation time is required")
@@ -191,6 +203,13 @@ func (s *Store) CheckQuotaForQuote(ctx context.Context, billingAccountID, userID
 	}
 	if s == nil || s.q == nil || billingAccountID <= 0 || userID <= 0 {
 		return nil
+	}
+	if s.db != nil {
+		if owner, err := isOrganizationOwner(ctx, s.db, billingAccountID, userID); err != nil {
+			return err
+		} else if owner {
+			return nil
+		}
 	}
 	row, err := s.q.GetMemberQuota(ctx, dbsqlc.GetMemberQuotaParams{
 		BillingAccountID: billingAccountID, UserID: userID,
@@ -244,54 +263,23 @@ func int64PtrOrNil(v pgtype.Int8) *int64 {
 	return &out
 }
 
-// GetDefaultPolicy reads one account's default new-member quota policy.
-// ok=false means absent (NOT CONFIGURED); callers fail closed instead
-// of treating it as unlimited.
-func (s *Store) GetDefaultPolicy(ctx context.Context, billingAccountID int64) (period string, limitCredits *int64, ok bool, err error) {
-	if s == nil || s.q == nil || billingAccountID <= 0 {
-		return "", nil, false, ErrQuotaNotFound
+// isOrganizationOwner reports whether userID holds the Owner role on the
+// Organization backing billingAccountID (#953: Owner is always unlimited).
+// Personal accounts (no organization_id) never match; missing accounts or
+// memberships read as non-owner (the caller then applies the normal quota
+// row). Database failures fail closed.
+func isOrganizationOwner(ctx context.Context, q consumptionread.Queryer, billingAccountID, userID int64) (bool, error) {
+	row := q.QueryRow(ctx, `SELECT organization_id FROM billing_accounts WHERE internal_id = $1`, billingAccountID)
+	var org pgtype.Int8
+	if err := row.Scan(&org); err != nil {
+		return false, nil
 	}
-	row, err := s.q.GetDefaultMemberQuota(ctx, billingAccountID)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return "", nil, false, nil
-		}
-		return "", nil, false, err
+	if !org.Valid {
+		return false, nil
 	}
-	return row.Period, int64PtrOrNil(row.LimitCredits), true, nil
-}
-
-// SetDefaultPolicy validates and upserts one account's default new-member
-// quota policy. period="" normalizes to unlimited. Every capped period
-// requires 1..MaxLimitCredits; unlimited clears the limit. Changing the
-// default only affects later joins; existing per-member rows keep their
-// cap and accrued usage. Callers enforce Billing Owner/Admin before
-// calling.
-func (s *Store) SetDefaultPolicy(ctx context.Context, billingAccountID int64, period string, limitCredits *int64, updatedByUserID int64) (SetResult, error) {
-	period = strings.TrimSpace(period)
-	if period == "" {
-		period = PeriodUnlimited
+	var role string
+	if err := q.QueryRow(ctx, `SELECT role FROM organization_memberships WHERE organization_id = $1 AND user_id = $2`, org.Int64, userID).Scan(&role); err != nil {
+		return false, nil
 	}
-	if err := ValidateSet(period, limitCredits); err != nil {
-		return SetResult{}, err
-	}
-	if s == nil || s.q == nil || billingAccountID <= 0 {
-		return SetResult{}, ErrQuotaNotFound
-	}
-	var limit pgtype.Int8
-	if limitCredits != nil {
-		limit = pgtype.Int8{Int64: *limitCredits, Valid: true}
-	}
-	var updatedBy pgtype.Int8
-	if updatedByUserID > 0 {
-		updatedBy = pgtype.Int8{Int64: updatedByUserID, Valid: true}
-	}
-	row, err := s.q.UpsertDefaultMemberQuota(ctx, dbsqlc.UpsertDefaultMemberQuotaParams{
-		BillingAccountID: billingAccountID, Period: period,
-		LimitCredits: limit, UpdatedByUserID: updatedBy,
-	})
-	if err != nil {
-		return SetResult{}, err
-	}
-	return SetResult{Period: row.Period, LimitCredits: int64PtrOrNil(row.LimitCredits)}, nil
+	return strings.TrimSpace(role) == tenancy.RoleOwner, nil
 }

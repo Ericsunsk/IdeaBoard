@@ -95,16 +95,17 @@ const createBillingTransferInvite = `-- name: CreateBillingTransferInvite :one
 
 INSERT INTO billing_account_transfer_invites (
   public_id, billing_account_id, billing_account_public_id,
-  from_user_id, to_user_id, status, idempotency_key
+  from_user_id, to_user_id, status, idempotency_key, expires_at
 )
 VALUES (
   $1, $2,
   $3, $4,
-  $5, 'pending', $6
+  $5, 'pending', $6,
+  now() + INTERVAL '7 days'
 )
 RETURNING internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
 `
 
 type CreateBillingTransferInviteParams struct {
@@ -143,6 +144,7 @@ func (q *Queries) CreateBillingTransferInvite(ctx context.Context, arg CreateBil
 		&i.IdempotencyKey,
 		&i.ScopeWorkspacePublicIds,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 		&i.DecidedAt,
 		&i.DecidedBy,
 	)
@@ -159,7 +161,7 @@ WHERE public_id = $4
   AND status = 'pending'
 RETURNING internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
 `
 
 type DecideBillingTransferInviteParams struct {
@@ -188,6 +190,7 @@ func (q *Queries) DecideBillingTransferInvite(ctx context.Context, arg DecideBil
 		&i.IdempotencyKey,
 		&i.ScopeWorkspacePublicIds,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 		&i.DecidedAt,
 		&i.DecidedBy,
 	)
@@ -197,7 +200,7 @@ func (q *Queries) DecideBillingTransferInvite(ctx context.Context, arg DecideBil
 const getBillingTransferInviteByAccountIdem = `-- name: GetBillingTransferInviteByAccountIdem :one
 SELECT internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
 FROM billing_account_transfer_invites
 WHERE billing_account_id = $1
   AND idempotency_key = $2
@@ -223,6 +226,7 @@ func (q *Queries) GetBillingTransferInviteByAccountIdem(ctx context.Context, arg
 		&i.IdempotencyKey,
 		&i.ScopeWorkspacePublicIds,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 		&i.DecidedAt,
 		&i.DecidedBy,
 	)
@@ -232,7 +236,7 @@ func (q *Queries) GetBillingTransferInviteByAccountIdem(ctx context.Context, arg
 const getBillingTransferInviteByPublicID = `-- name: GetBillingTransferInviteByPublicID :one
 SELECT internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
 FROM billing_account_transfer_invites
 WHERE public_id = $1
 LIMIT 1
@@ -252,6 +256,7 @@ func (q *Queries) GetBillingTransferInviteByPublicID(ctx context.Context, public
 		&i.IdempotencyKey,
 		&i.ScopeWorkspacePublicIds,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 		&i.DecidedAt,
 		&i.DecidedBy,
 	)
@@ -261,7 +266,7 @@ func (q *Queries) GetBillingTransferInviteByPublicID(ctx context.Context, public
 const getBillingTransferInviteForUpdate = `-- name: GetBillingTransferInviteForUpdate :one
 SELECT internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
 FROM billing_account_transfer_invites
 WHERE public_id = $1
 FOR UPDATE
@@ -281,6 +286,7 @@ func (q *Queries) GetBillingTransferInviteForUpdate(ctx context.Context, publicI
 		&i.IdempotencyKey,
 		&i.ScopeWorkspacePublicIds,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 		&i.DecidedAt,
 		&i.DecidedBy,
 	)
@@ -290,7 +296,7 @@ func (q *Queries) GetBillingTransferInviteForUpdate(ctx context.Context, publicI
 const getPendingBillingTransferForAccount = `-- name: GetPendingBillingTransferForAccount :one
 SELECT internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
 FROM billing_account_transfer_invites
 WHERE billing_account_id = $1
   AND status = 'pending'
@@ -311,6 +317,7 @@ func (q *Queries) GetPendingBillingTransferForAccount(ctx context.Context, billi
 		&i.IdempotencyKey,
 		&i.ScopeWorkspacePublicIds,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 		&i.DecidedAt,
 		&i.DecidedBy,
 	)
@@ -320,7 +327,7 @@ func (q *Queries) GetPendingBillingTransferForAccount(ctx context.Context, billi
 const listBillingTransferInvitesForAccount = `-- name: ListBillingTransferInvitesForAccount :many
 SELECT internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
 FROM billing_account_transfer_invites
 WHERE billing_account_id = $1
   AND ($2::BIGINT = 0 OR to_user_id = $2)
@@ -361,6 +368,7 @@ func (q *Queries) ListBillingTransferInvitesForAccount(ctx context.Context, arg 
 			&i.IdempotencyKey,
 			&i.ScopeWorkspacePublicIds,
 			&i.CreatedAt,
+			&i.ExpiresAt,
 			&i.DecidedAt,
 			&i.DecidedBy,
 		); err != nil {
@@ -428,4 +436,58 @@ func (q *Queries) ListHandoverWorkspacesForAccount(ctx context.Context, billingA
 		return nil, err
 	}
 	return items, nil
+}
+
+const reissueBillingTransferInvite = `-- name: ReissueBillingTransferInvite :one
+UPDATE billing_account_transfer_invites
+SET from_user_id = $1,
+    to_user_id = $2,
+    idempotency_key = $3,
+    created_at = now(),
+    expires_at = now() + INTERVAL '7 days'
+WHERE billing_account_id = $4
+  AND status = 'pending'
+  AND expires_at <= now()
+RETURNING internal_id, public_id, billing_account_id, billing_account_public_id,
+  from_user_id, to_user_id, status, idempotency_key,
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
+`
+
+type ReissueBillingTransferInviteParams struct {
+	FromUserID       int64  `json:"from_user_id"`
+	ToUserID         int64  `json:"to_user_id"`
+	IdempotencyKey   string `json:"idempotency_key"`
+	BillingAccountID int64  `json:"billing_account_id"`
+}
+
+// Re-issue after lapse (#948 follow-up): when the account's single pending
+// invite has expired, the owner may send again. The pending row refreshes in
+// place (new parties, key, and 7-day expiry under the same bti_ id), so the
+// at-most-one-pending-per-account invariant needs no index change. Matches
+// zero rows unless a lapsed pending invite exists; callers fall back to the
+// pending guard on no match (lost race or still-live invite).
+func (q *Queries) ReissueBillingTransferInvite(ctx context.Context, arg ReissueBillingTransferInviteParams) (BillingAccountTransferInvite, error) {
+	row := q.db.QueryRow(ctx, reissueBillingTransferInvite,
+		arg.FromUserID,
+		arg.ToUserID,
+		arg.IdempotencyKey,
+		arg.BillingAccountID,
+	)
+	var i BillingAccountTransferInvite
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.BillingAccountID,
+		&i.BillingAccountPublicID,
+		&i.FromUserID,
+		&i.ToUserID,
+		&i.Status,
+		&i.IdempotencyKey,
+		&i.ScopeWorkspacePublicIds,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.DecidedAt,
+		&i.DecidedBy,
+	)
+	return i, err
 }

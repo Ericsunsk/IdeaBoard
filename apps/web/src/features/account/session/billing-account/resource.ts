@@ -6,8 +6,8 @@ import { requireAccountWorkspaceId, resolveWorkspaceBillingData } from '../works
 // Stable Billing Account boundary (issue #922).
 //
 // A Billing Account (ba_) holds the unified balance; many Workspaces may
-// share one account (organization pool or explicit no-org link) while
-// independent accounts stay isolated. The Workspace is the consumption
+// share the same Personal account or Organization pool while those
+// funds scopes stay isolated. The Workspace is the consumption
 // location, the User is the real operator; the account identity never
 // derives from the current Workspace Owner wallet and never rewrites
 // history on member exit or owner change.
@@ -16,6 +16,7 @@ export type BillingAccountScope = {
   workspaceId: string
   isShared: boolean
   consumptionScope: WorkspaceBillingAccount['consumption_scope']
+  canManageMemberQuotas: boolean
 }
 
 export const billingAccountQueryKeys = {
@@ -36,7 +37,8 @@ export async function fetchBillingAccount(
   )
   if (
     account.workspace_id !== id ||
-    !['account', 'workspace', 'member'].includes(account.consumption_scope)
+    !['account', 'workspace', 'member'].includes(account.consumption_scope) ||
+    typeof account.can_manage_member_quotas !== 'boolean'
   ) {
     throw new Error(fallback)
   }
@@ -45,5 +47,6 @@ export async function fetchBillingAccount(
     workspaceId: account.workspace_id,
     isShared: account.shared === true,
     consumptionScope: account.consumption_scope,
+    canManageMemberQuotas: account.can_manage_member_quotas,
   }
 }

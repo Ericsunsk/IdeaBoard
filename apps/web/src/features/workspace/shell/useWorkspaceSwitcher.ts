@@ -9,20 +9,29 @@ import type {
   UserAccountMenuWorkspaceCreateInput,
 } from '../../account/ui/chrome/userAccountMenu.types'
 import { USER_BOARDS_PATH } from '../routePaths'
+import { organizationClosureIdempotencyKey } from '../../../api/idempotencyKey'
 import {
   WORKSPACE_NAME_MAX_LENGTH,
+  closeOrganization,
   deleteWorkspace,
+  fetchOrganizationMembers,
   fetchOrganizations,
+  inviteOrganizationMember,
   provisionOrganization,
+  removeOrganizationMember,
   renameWorkspace,
+  restoreOrganization,
+  updateOrganizationMember,
   workspaceQueryKeys,
   type WorkspaceSummary,
 } from '../selection/workspaceResource'
+import { getOrganizationScopeStore, type OrganizationScope } from '../organization/scope'
 import {
   WORKSPACE_URL_PARAM,
   useWorkspaceSelection,
   type WorkspaceSelectionStatus,
 } from '../selection/workspaceContext'
+import OrganizationPanel from '../organization/ui/OrganizationPanel.vue'
 
 // Canvas board identity rides the URL as a literal `boardId` query param (no
 // shared constant); switching workspaces always drops it so the gallery never
@@ -80,6 +89,42 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     landOnGalleryWorkspace(workspaceId)
   }
 
+  async function switchScope(scope: OrganizationScope): Promise<void> {
+    const scopeStore = getOrganizationScopeStore()
+    const currentScope = scopeStore.getScope()
+    if (
+      currentScope.kind === scope.kind &&
+      (scope.kind === 'personal' ||
+        (currentScope.kind === 'organization' &&
+          currentScope.organizationId === scope.organizationId))
+    ) {
+      return
+    }
+    if ((await options?.beforeWorkspaceChange?.()) === false) return
+
+    const scopedItems = selection.items.value.filter((item) =>
+      scope.kind === 'personal'
+        ? item.organizationId == null
+        : item.organizationId === scope.organizationId,
+    )
+    const target =
+      scopedItems.find((item) => item.publicId === selection.selectedId.value) ?? scopedItems[0]
+    scopeStore.select(scope)
+    if (target) {
+      landOnGalleryWorkspace(target.publicId)
+      return
+    }
+
+    // The scope itself remains useful for organization management when it has
+    // no content workspaces. Drop the old workspace and board from the URL.
+    const query: LocationQueryRaw = { ...route.query }
+    delete query[WORKSPACE_URL_PARAM]
+    delete query[CANVAS_BOARD_ID_PARAM]
+    const destination = { path: USER_BOARDS_PATH, query }
+    if (route.path === USER_BOARDS_PATH) void router.replace(destination)
+    else void router.push(destination)
+  }
+
   async function refreshWorkspaceList(): Promise<void> {
     await queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.list })
   }
@@ -90,8 +135,6 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     const created = await selection.provisionWorkspace({
       name: input.name,
       ...(input.organizationId === undefined ? {} : { organizationId: input.organizationId }),
-      ...(input.billingAccountId === undefined ? {} : { billingAccountId: input.billingAccountId }),
-      ...(input.isNewBillingAccount === true ? { isNewBillingAccount: true } : {}),
     })
     await refreshWorkspaceList()
     return created
@@ -131,6 +174,8 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
   const menuProps = computed<UserAccountMenuWorkspace>(() => {
     // Track locale so the load-error copy follows language switches.
     void i18n.global.locale.value
+    const scopeStore = getOrganizationScopeStore()
+    const scope: OrganizationScope = scopeStore.getScope()
     return {
       items: selection.items.value,
       selectedId: selection.selectedId.value,
@@ -143,6 +188,48 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
       currentUserId: userStore.user?.public_id ?? null,
       onLoadOrganizations: fetchOrganizations,
       onCreateOrganization: provisionOrganization,
+      // Organization management panel (issue #951): the shell owns the
+      // component and its transport callbacks; the account menu renders it
+      // opaquely so the organization management surface appears as soon as
+      // the caller holds an organization. Self-leave also drops back to the
+      // Personal scope and refreshes the list (access is gone immediately).
+      organizationPanel: {
+        component: OrganizationPanel,
+        onLoadMembers: fetchOrganizationMembers,
+        onInviteMember: inviteOrganizationMember,
+        onUpdateMember: updateOrganizationMember,
+        onRemoveMember: removeOrganizationMember,
+        onCloseOrganization: async (
+          organizationId: string,
+          input: { reason?: string | undefined },
+        ) => {
+          const closed = await closeOrganization(organizationId, input, {
+            idempotencyKey: organizationClosureIdempotencyKey('close'),
+          })
+          // Closure suspends every organization workspace at once: drop
+          // back to the Personal scope and refresh the list (access is
+          // gone immediately, history is retained).
+          scopeStore.selectPersonal()
+          await refreshWorkspaceList()
+          return closed
+        },
+        onRestoreOrganization: async (organizationId: string) => {
+          const restored = await restoreOrganization(organizationId, {
+            idempotencyKey: organizationClosureIdempotencyKey('restore'),
+          })
+          await refreshWorkspaceList()
+          return restored
+        },
+        onLeaveMember: async (organizationId: string, memberId: string): Promise<void> => {
+          await removeOrganizationMember(organizationId, memberId)
+          scopeStore.selectPersonal()
+          await refreshWorkspaceList()
+        },
+      },
+      activeScope: scope,
+      onSelectPersonal: () => void switchScope({ kind: 'personal' }),
+      onSelectOrganization: (organizationId: string) =>
+        switchScope({ kind: 'organization', organizationId }),
       onSelect: switchToGalleryWorkspace,
       onCreate: createWorkspaceItem,
       onRename: renameWorkspaceItem,

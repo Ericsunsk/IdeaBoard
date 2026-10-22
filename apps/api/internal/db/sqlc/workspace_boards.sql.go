@@ -789,7 +789,16 @@ WITH authorized AS MATERIALIZED (
     AND (b.archived_at IS NULL OR $3)
     AND b.owner_user_id IS NOT NULL
     AND $4
-    AND EXISTS (SELECT 1 FROM workspace_memberships AS wm WHERE wm.workspace_id = w.internal_id AND wm.user_id = $1 AND btrim(wm.role) IN ('owner', 'admin', 'member'))
+    AND (
+      EXISTS (SELECT 1 FROM workspace_memberships AS wm WHERE wm.workspace_id = w.internal_id AND wm.user_id = $1 AND btrim(wm.role) IN ('owner', 'admin', 'member'))
+      OR EXISTS (
+        SELECT 1 FROM organization_memberships AS om
+        WHERE om.organization_id = w.organization_id
+          AND w.organization_id IS NOT NULL
+          AND om.user_id = $1
+          AND btrim(om.role) IN ('owner', 'admin')
+      )
+    )
     AND (
       b.owner_user_id = $1
       OR (m.user_id IS NOT NULL AND b.workspace_access IN ('viewer', 'editor'))

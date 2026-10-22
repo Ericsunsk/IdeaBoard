@@ -119,7 +119,7 @@
             <div class="flex min-w-0 flex-col gap-1">
               <span
                 v-if="data.billing_account_id || data.wallet_public_id"
-                class="text-xs font-semibold text-foreground"
+                class="text-admin-meta font-semibold text-foreground"
               >
                 {{
                   data.billing_account_id ??

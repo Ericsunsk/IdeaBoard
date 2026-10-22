@@ -17,7 +17,6 @@ import (
 	quotadomain "ideaboard/api/internal/memberquotas"
 	"ideaboard/api/internal/platform/idempotency"
 	searchdomain "ideaboard/api/internal/searchcatalog/domain"
-	budgetdomain "ideaboard/api/internal/workspacebudgets"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -42,10 +41,6 @@ var (
 	// a billing status), per anti-enumeration: outsiders learn nothing
 	// about the payer.
 	ErrVisionWorkspaceNotFound = errors.New("vision search workspace is not visible")
-	// ErrVisionBudgetExhausted reports that a vision request would exceed
-	// the Workspace's remaining shared consumption budget for the current
-	// period (403 workspace_budget_exhausted, #945). Alias, not a copy.
-	ErrVisionBudgetExhausted = budgetdomain.ErrBudgetExhausted
 	// ErrVisionQuotaExhausted reports that a vision request would exceed
 	// the member's remaining cross-workspace consumption quota for the
 	// current window (403 member_quota_exhausted, #946). Alias, not a
@@ -132,22 +127,11 @@ type VisionBillingService struct {
 	credits  *credits.Service
 	vision   *VisionSearchService
 	accounts VisionBillingAccountResolver
-	// budgets enforces the Workspace shared consumption budget inside
-	// the reservation transaction (#945: after Quote, before Hold,
-	// same snapshot). Nil means no budget enforcement (unlimited).
-	budgets VisionBudgetChecker
 	// quotas enforces the member cross-workspace consumption quota
-	// inside the reservation transaction (#946: after the budget check,
-	// before Hold, same snapshot). Nil means no quota enforcement
-	// (unlimited). Both constraints stay independently effective.
+	// inside the reservation transaction (#946: after Quote, before
+	// Hold, same snapshot). Nil means no quota enforcement
+	// (unlimited).
 	quotas VisionQuotaChecker
-}
-
-// VisionBudgetChecker enforces the Workspace shared consumption budget
-// inside the Vision reservation transaction. Production implements it on
-// the workspacebudgets Store; tests stub it.
-type VisionBudgetChecker interface {
-	CheckBudgetByInternalIDInTx(ctx context.Context, tx pgx.Tx, workspaceInternalID int64, amount int64, reservedAt time.Time) error
 }
 
 // VisionQuotaChecker enforces the member cross-workspace consumption
@@ -165,15 +149,6 @@ func NewVisionBillingService(pool *pgxpool.Pool, catalog *billingapplication.Bil
 // fake settlement identity; production uses NewVisionBillingService.
 func NewVisionBillingServiceWithResolver(pool *pgxpool.Pool, catalog *billingapplication.BillableItemCatalog, creditService *credits.Service, vision *VisionSearchService, resolver VisionBillingAccountResolver) *VisionBillingService {
 	return &VisionBillingService{pool: pool, catalog: catalog, credits: creditService, vision: vision, accounts: resolver}
-}
-
-// SetBudgetChecker installs the Workspace budget seam. Nil keeps the
-// unlimited semantic (no enforcement).
-func (s *VisionBillingService) SetBudgetChecker(checker VisionBudgetChecker) {
-	if s == nil {
-		return
-	}
-	s.budgets = checker
 }
 
 // SetQuotaChecker installs the member quota seam. Nil keeps the

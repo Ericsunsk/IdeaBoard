@@ -305,7 +305,7 @@ const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   },
   'src/features/account/ui/profile/ProfilePane.vue': {
     counts: {
-      'text-px': 3,
+      'text-px': 1,
     },
     reason: 'Profile hero numerals sit outside the type scale (30/34/24 display sizes).',
   },

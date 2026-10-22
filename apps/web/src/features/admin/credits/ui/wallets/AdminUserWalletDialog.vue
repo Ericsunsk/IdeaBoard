@@ -44,7 +44,7 @@
       <!-- 0. 账户归属与财务成员（仅账户模式：审计身份关联） -->
       <div
         v-if="isAccountMode"
-        class="flex flex-col gap-1.5 rounded-panel border border-border bg-muted/50 px-3.5 py-2.5 text-xs"
+        class="flex flex-col gap-1.5 rounded-panel border border-border bg-muted/50 px-3.5 py-2.5 text-admin-meta"
       >
         <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span class="text-muted-foreground">

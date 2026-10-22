@@ -10,7 +10,6 @@ var apiOwnedTableNames = []string{
 	"billing_accounts",
 	"billing_account_members",
 	"billing_account_member_quotas",
-	"billing_account_default_member_quotas",
 	"billing_account_transfer_invites",
 	"workspace_billing_links",
 	"board_access_event_outbox",
@@ -53,7 +52,6 @@ var apiOwnedTableNames = []string{
 	"upload_sessions",
 	"users",
 	"users_used_uids",
-	"workspace_budgets",
 	"workspace_events",
 	"workspace_memberships",
 	"workspaces",
@@ -200,6 +198,22 @@ func RuntimePrivilegePolicy() Policy {
 			},
 			{
 				Kind:  KindTable,
+				Names: []string{"organization_closures"},
+				Required: []Privilege{
+					PrivilegeSelect,
+					PrivilegeInsert,
+					PrivilegeUpdate,
+				},
+				Forbidden: []Privilege{
+					PrivilegeDelete,
+					PrivilegeTruncate,
+					PrivilegeReferences,
+					PrivilegeTrigger,
+				},
+				PublicForbidden: allTablePrivileges,
+			},
+			{
+				Kind:  KindTable,
 				Names: []string{"user_deletion_requests"},
 				Required: []Privilege{
 					PrivilegeSelect,
@@ -249,6 +263,13 @@ func RuntimePrivilegePolicy() Policy {
 					PrivilegeTrigger,
 				},
 				PublicForbidden: allTablePrivileges,
+			},
+			{
+				Kind:            KindSequence,
+				Names:           []string{"organization_closures_internal_id_seq"},
+				Required:        []Privilege{PrivilegeUsage, PrivilegeSelect},
+				Forbidden:       []Privilege{PrivilegeUpdate},
+				PublicForbidden: allSequencePrivileges,
 			},
 			{
 				Kind:            KindSequence,

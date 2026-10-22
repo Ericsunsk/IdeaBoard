@@ -30,10 +30,18 @@ import { withSignal } from '../../../core/utils/request'
 //   unknown emails converge to 404 `workspace_member_not_found`.
 // - invite (POST): owner/admin only, requires `Idempotency-Key` per attempt;
 //   re-adding keeps the current role; admin inviting owner renders 403.
+//   Personal Default is private: invites there render 403
+//   `workspace_default_protected`. Other Personal workspaces invite freely
+//   with no per-invite holder approval: consumption charges the holder's
+//   shared Personal account with the real operator on each record, and an
+//   unconfigured collaborator quota reads as unlimited (the holder sets it
+//   later without clearing usage).
 // - role change (PATCH): no `Idempotency-Key`; promoting to owner requires
 //   owner; the last owner cannot be demoted (`membership_transition_forbidden`).
 // - removal (DELETE): requires `Idempotency-Key` per attempt; self-leave is
 //   allowed but the last owner is protected; board grants are swept server-side.
+//   Removal never deletes quota state or historical consumption: rejoining
+//   restores the same (Billing Account, User) row and usage.
 
 /** Workspace membership role on the wire. */
 export type WorkspaceMemberRole = 'owner' | 'admin' | 'member'
@@ -61,11 +69,11 @@ export type WorkspaceMemberFailureReason =
   | 'unknown-user'
   | 'hidden'
   | 'forbidden'
+  | 'default-protected'
   | 'last-owner'
   | 'member-limit'
   | 'idempotency-conflict'
   | 'invalid'
-  | 'missing-default'
   | 'sync-failed'
 
 const WORKSPACE_MEMBER_ROLES: readonly WorkspaceMemberRole[] = ['owner', 'admin', 'member']
@@ -225,14 +233,14 @@ export function classifyWorkspaceMemberError(error: unknown): WorkspaceMemberFai
       return 'hidden'
     case 'workspace_forbidden':
       return 'forbidden'
+    case 'workspace_default_protected':
+      return 'default-protected'
     case 'membership_transition_forbidden':
       return 'last-owner'
     case 'workspace_member_limit_reached':
       return 'member-limit'
     case 'workspace_idempotency_conflict':
       return 'idempotency-conflict'
-    case 'default_member_quota_not_configured':
-      return 'missing-default'
     case 'bad_request':
     case 'validation_failed':
     case 'idempotency_key_required':

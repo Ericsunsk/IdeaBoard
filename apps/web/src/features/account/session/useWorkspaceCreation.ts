@@ -1,15 +1,13 @@
-import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
+import { computed, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { organizationCreationIdempotencyKey } from '../../../api/idempotencyKey'
 import { useAppToast } from '../../../core/composables/useAppToast'
-import { fetchBillingAccount } from './billing-account/resource'
 
 type OrganizationItem = { publicId: string; name: string }
 
 export function useWorkspaceCreation(options: {
   workspaces: MaybeRefOrGetter<readonly { publicId: string; organizationId: string | null }[]>
   activeWorkspaceId: MaybeRefOrGetter<string>
-  isOpen: MaybeRefOrGetter<boolean>
   isCreating: MaybeRefOrGetter<boolean>
   nameMaxLength: MaybeRefOrGetter<number>
   onLoadOrganizations?: (() => Promise<OrganizationItem[]>) | undefined
@@ -23,13 +21,10 @@ export function useWorkspaceCreation(options: {
       (item) => item.publicId === toValue(options.activeWorkspaceId),
     ),
   )
-  // The dialog pins its source account. An unresolved shared payer never falls
-  // through to the server's personal Default account.
-  const createBillingMode = ref<'shared' | 'new'>('shared')
-  const sharedBillingAccountId = ref<string | null>(null)
-  const isSharedAccountLoading = ref(false)
-  const sharedAccountError = ref<string | null>(null)
-  let createAccountRequest = 0
+  // Billing scope (ADR-0038) is the creation scope and nothing else:
+  // Personal workspaces resolve to the caller's Personal account,
+  // Organization workspaces to the shared org pool. No billing choice
+  // exists, and the scope never switches after creation.
   const createScopeId = ref('personal')
   const createOrganizationId = computed(() =>
     createScopeId.value === 'personal' ? null : createScopeId.value,
@@ -53,16 +48,6 @@ export function useWorkspaceCreation(options: {
       }
     }
     return [...known.values()]
-  })
-  const createSourceWorkspaceId = computed(() => {
-    const inScope = toValue(options.workspaces).filter(
-      (item) => item.organizationId === createOrganizationId.value,
-    )
-    return (
-      inScope.find((item) => item.publicId === toValue(options.activeWorkspaceId))?.publicId ??
-      inScope[0]?.publicId ??
-      ''
-    )
   })
   async function loadOrganizations(): Promise<void> {
     if (!options.onLoadOrganizations) return
@@ -115,85 +100,29 @@ export function useWorkspaceCreation(options: {
     () =>
       !toValue(options.isCreating) &&
       !isCreatingOrganization.value &&
-      !isOrganizationFormOpen.value &&
-      (createOrganizationId.value != null ||
-        (createBillingMode.value === 'new' && !createOrganizationId.value) ||
-        (!isSharedAccountLoading.value &&
-          sharedBillingAccountId.value != null &&
-          sharedAccountError.value == null)),
+      !isOrganizationFormOpen.value,
   )
-  const sharedAccountHint = computed(() => {
-    if (createOrganizationId.value)
-      return t('workspace.switcher.billingOrganizationHint', {
-        organization: createOrganizationId.value,
-      })
-    const current = sharedBillingAccountId.value
-    return current
-      ? t('workspace.switcher.billingSharedHint', { account: current })
-      : t('workspace.switcher.billingSharedHintFallback')
-  })
-
-  async function loadSharedAccountForCreate(): Promise<void> {
-    const request = ++createAccountRequest
-    const workspaceId = createSourceWorkspaceId.value
-    sharedBillingAccountId.value = null
-    sharedAccountError.value = null
-    isSharedAccountLoading.value = true
-    try {
-      const account = await fetchBillingAccount(workspaceId)
-      if (request !== createAccountRequest) return
-      sharedBillingAccountId.value = account.billingAccountId
-    } catch {
-      if (request !== createAccountRequest) return
-      sharedAccountError.value = t('account.errors.billingAccountLoadFailed')
-    } finally {
-      if (request === createAccountRequest) isSharedAccountLoading.value = false
+  const createScopeHint = computed(() => {
+    const orgId = createOrganizationId.value
+    if (orgId) {
+      const orgName =
+        createScopeOptions.value.find((item) => item.publicId === orgId)?.name ?? orgId
+      return t('workspace.switcher.scopeOrganizationHint', { organization: orgName })
     }
-  }
-
-  watch([() => toValue(options.isOpen), createSourceWorkspaceId, createScopeId], ([isOpen]) => {
-    ++createAccountRequest
-    sharedBillingAccountId.value = null
-    sharedAccountError.value = null
-    isSharedAccountLoading.value = false
-    if (isOpen) {
-      createBillingMode.value = 'shared'
-      if (!createOrganizationId.value) void loadSharedAccountForCreate()
-    }
+    return t('workspace.switcher.scopePersonalHint')
   })
-
-  watch(
-    () => toValue(options.activeWorkspaceId),
-    () => {
-      if (toValue(options.isOpen) && !toValue(options.isCreating)) {
-        createScopeId.value = activeWorkspace.value?.organizationId ?? 'personal'
-      }
-    },
-  )
-
   function prepare(): void {
-    createBillingMode.value = 'shared'
-    sharedBillingAccountId.value = null
     createScopeId.value = activeWorkspace.value?.organizationId ?? 'personal'
     isOrganizationFormOpen.value = false
     organizationError.value = null
     void loadOrganizations()
   }
-  function fundingInput():
-    | { organizationId: string }
-    | { isNewBillingAccount: true }
-    | { billingAccountId: string }
-    | null {
-    if (!canSubmitCreate.value) return null
+  function fundingInput(): { organizationId: string } | Record<string, never> {
     if (createOrganizationId.value) return { organizationId: createOrganizationId.value }
-    if (createBillingMode.value === 'new') return { isNewBillingAccount: true }
-    return sharedBillingAccountId.value ? { billingAccountId: sharedBillingAccountId.value } : null
+    return {}
   }
   return {
-    createBillingMode,
-    sharedAccountHint,
-    isSharedAccountLoading,
-    sharedAccountError,
+    createScopeHint,
     createScopeId,
     createOrganizationId,
     createScopeOptions,
@@ -204,7 +133,6 @@ export function useWorkspaceCreation(options: {
     organizationError,
     isCreatingOrganization,
     canSubmitCreate,
-    loadSharedAccountForCreate,
     loadOrganizations,
     createOrganization,
     prepare,

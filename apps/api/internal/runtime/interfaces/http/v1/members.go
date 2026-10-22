@@ -90,8 +90,9 @@ func renderMemberTransitionError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, tenancy.ErrWorkspaceMemberLimitReached):
 		contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceMemberLimitReached, "Workspace supports up to 5 members, including owners")
-	case errors.Is(err, tenancy.ErrDefaultQuotaNotConfigured):
-		contract.RenderError(c, http.StatusConflict, contract.CodeDefaultMemberQuotaNotConfigured, runtimehttp.MsgDefaultMemberQuotaNotConfigured)
+	case errors.Is(err, tenancy.ErrDefaultWorkspaceProtected):
+		contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceDefaultProtected),
+			contract.CodeWorkspaceDefaultProtected, runtimehttp.MsgWorkspaceDefaultProtected)
 	case errors.Is(err, tenancy.ErrLastOwner):
 		contract.RenderError(c, contract.StatusOf(contract.CodeMembershipTransitionForbidden),
 			contract.CodeMembershipTransitionForbidden, runtimehttp.MsgMembershipTransitionForbidden2)
@@ -207,6 +208,16 @@ func (h *contractV1Handler) addWorkspaceMember(c *gin.Context) {
 	// uses withWorkspace plus a manual bind instead of
 	// withV1WorkspaceBody.
 	h.withWorkspace(c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx) {
+		// Personal Default is private (#952): fail closed before any
+		// key or body handling beyond visibility. Non-Default Personal
+		// workspaces invite freely with no per-invite holder approval;
+		// absent collaborator quota reads as unlimited.
+		if wctx.Workspace.IsDefaultWorkspace() {
+			contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceDefaultProtected),
+				contract.CodeWorkspaceDefaultProtected, runtimehttp.MsgWorkspaceDefaultProtected)
+			c.Abort()
+			return
+		}
 		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return

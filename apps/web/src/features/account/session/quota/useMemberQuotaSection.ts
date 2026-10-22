@@ -5,7 +5,6 @@ import { useAppToast } from '../../../../core/composables/useAppToast'
 import { accountScoped, noRetry } from '../../../../core/query/queryDefaults'
 import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import {
-  CAPPED_QUOTA_PERIODS,
   fetchMemberQuotaList,
   fetchSelfMemberQuota,
   isQuotaExhausted as isExhausted,
@@ -20,16 +19,11 @@ import {
 } from './resource'
 import { workspaceMembersQueryOptions, type WorkspaceMemberEntry } from '../accountWorkspace'
 
-// Member quota section controller for the workspace settings dialog. The
-// self read rides TanStack Query for every member; the manager list and
-// the roster picker converge by invalidation — never optimistic. Only
-// billing managers see management controls (`canManage` derives from the
-// billing-account consumption scope the dialog resolves); the backend
-// still enforces 403 for every write.
+// The account projection supplies the capability using the server quota policy.
+// Consumption visibility and unrelated Organization roles never grant it.
 type MemberQuotaSectionOptions = {
   workspaceId: MaybeRefOrGetter<string>
-  /** Billing-account consumption scope: 'account' means the caller is a billing manager. */
-  consumptionScope: MaybeRefOrGetter<string | null | undefined>
+  canManage: MaybeRefOrGetter<boolean>
   isExpanded: MaybeRefOrGetter<boolean>
 }
 
@@ -39,7 +33,7 @@ export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
   const queryClient = useQueryClient()
 
   const workspaceIdOf = (): string => toValue(options.workspaceId).trim()
-  const canManage = computed(() => toValue(options.consumptionScope) === 'account')
+  const canManage = computed(() => toValue(options.canManage))
 
   const selfQuery = useQuery({
     queryKey: computed(() => memberQuotaQueryKeys.self(workspaceIdOf())),
@@ -146,6 +140,11 @@ export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
       }
       input = { period, limitCredits: limit }
     }
+    await persistQuota(userId, input)
+  }
+
+  async function persistQuota(userId: string, input: UpdateMemberQuotaInput): Promise<void> {
+    if (isSaving.value || !canManage.value) return
     isSaving.value = true
     saveError.value = null
     try {
@@ -160,20 +159,8 @@ export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
     }
   }
 
-  async function clearQuota(userId: string): Promise<void> {
-    if (isSaving.value) return
-    isSaving.value = true
-    saveError.value = null
-    try {
-      await updateMemberQuota(workspaceIdOf(), userId, { period: 'unlimited' })
-      await invalidateQuotaQueries()
-      toast.success(t('workspace.quota.saved'))
-    } catch (error) {
-      saveError.value = describeSaveError(error)
-      toast.error(saveError.value)
-    } finally {
-      isSaving.value = false
-    }
+  function clearQuota(userId: string): Promise<void> {
+    return persistQuota(userId, { period: 'unlimited' })
   }
 
   return {
@@ -189,7 +176,6 @@ export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
     canManage,
     memberOptions,
     memberLabel,
-    cappedPeriods: CAPPED_QUOTA_PERIODS,
     targetUserId,
     targetPeriod,
     limitDraft,

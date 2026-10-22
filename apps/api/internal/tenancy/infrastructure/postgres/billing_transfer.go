@@ -16,6 +16,7 @@ package postgres
 import (
 	"context"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
@@ -40,6 +41,7 @@ func mapTransferInvite(row dbsqlc.BillingAccountTransferInvite) *tenancy.Billing
 		Status:                  row.Status,
 		ScopeWorkspacePublicIDs: scope,
 		CreatedAt:               dbutil.TimeValue(row.CreatedAt),
+		ExpiresAt:               dbutil.TimeValue(row.ExpiresAt),
 	}
 	if row.DecidedAt.Valid {
 		t := row.DecidedAt.Time
@@ -88,7 +90,9 @@ func (s *BillingAccountStore) InitiateBillingTransferInvite(ctx context.Context,
 		// Unknown recipients fail closed via the to_user_id FK: map the
 		// foreign-key violation to not-found instead of leaking a raw
 		// constraint error (no extra pool connection inside the tx, so
-		// concurrent initiates never deadlock on pool exhaustion).
+		// concurrent initiates never deadlock on pool exhaustion). A replay
+		// may return a lapsed invite when the caller reuses a key past its
+		// expiry; re-issue (fresh key) refreshes the row below instead.
 		if existing, err := q.GetBillingTransferInviteByAccountIdem(ctx, dbsqlc.GetBillingTransferInviteByAccountIdemParams{
 			BillingAccountID: billingAccountInternalID, IdempotencyKey: idempotencyKey,
 		}); err == nil {
@@ -98,6 +102,19 @@ func (s *BillingAccountStore) InitiateBillingTransferInvite(ctx context.Context,
 			}
 			invited = mapTransferInvite(existing)
 			return nil
+		}
+		// At most one pending per account: a lapsed pending invite is
+		// re-issued in place (same bti_ id, fresh parties/key/expiry) so a
+		// new send after lapse never forks and never hits the pending
+		// unique index. Zero rows means no lapsed invite: fall through to
+		// the live-pending guard below.
+		if reissued, err := q.ReissueBillingTransferInvite(ctx, dbsqlc.ReissueBillingTransferInviteParams{
+			BillingAccountID: billingAccountInternalID, FromUserID: fromUserID, ToUserID: toUserID, IdempotencyKey: idempotencyKey,
+		}); err == nil {
+			invited = mapTransferInvite(reissued)
+			return nil
+		} else if !database.IsNotFound(err) {
+			return err
 		}
 		// At most one pending per account: concurrent initiates collapse.
 		if pending, err := q.GetPendingBillingTransferForAccount(ctx, billingAccountInternalID); err == nil {
@@ -236,6 +253,12 @@ func lockPendingBillingTransferInTx(ctx context.Context, q *dbsqlc.Queries, acco
 		return invite, tenancy.ErrBillingNotFound
 	}
 	if invite.Status != tenancy.BillingTransferPending {
+		return invite, tenancy.ErrBillingConflict
+	}
+	// A lapsed invite never moves funds or membership: every decision
+	// fails closed with conflict, and the row stays pending-lapsed so the
+	// owner may re-issue it.
+	if expiresAt := dbutil.TimeValue(invite.ExpiresAt); !expiresAt.IsZero() && !time.Now().Before(expiresAt) {
 		return invite, tenancy.ErrBillingConflict
 	}
 	return invite, nil

@@ -32,6 +32,11 @@ export type WorkspaceMemberSectionOptions = {
   workspaceId: MaybeRefOrGetter<string>
   currentUserId?: MaybeRefOrGetter<string | null | undefined> | undefined
   isExpanded: MaybeRefOrGetter<boolean>
+  // Personal Default is private (#952): the section hides the invite bar
+  // and blocks invite attempts with the private-workspace copy. Callers
+  // pass the workspace list's isDefault marker; the backend still enforces
+  // 403 workspace_default_protected.
+  isDefaultWorkspace?: MaybeRefOrGetter<boolean | null | undefined> | undefined
 }
 
 export function memberDisplayName(entry: WorkspaceMemberEntry): string {
@@ -48,14 +53,14 @@ function memberFailureCopyKey(
       return unknownUserKey
     case 'forbidden':
       return 'workspace.switcher.members.noPermission'
+    case 'default-protected':
+      return 'workspace.switcher.members.defaultPrivate'
     case 'last-owner':
       return 'workspace.switcher.members.lastOwner'
     case 'member-limit':
       return 'workspace.switcher.members.memberLimitReached'
     case 'idempotency-conflict':
       return 'workspace.switcher.members.conflict'
-    case 'missing-default':
-      return 'workspace.switcher.members.defaultMissing'
     case 'invalid':
       return 'workspace.switcher.members.invalidRequest'
     default:
@@ -84,6 +89,7 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
   })
   const canManage = computed(() => myRole.value === 'owner' || myRole.value === 'admin')
   const isOwner = computed(() => myRole.value === 'owner')
+  const isDefaultWorkspace = computed(() => toValue(options.isDefaultWorkspace) === true)
 
   const isLoading = computed(() => rosterQuery.isLoading.value)
   const hasLoadError = computed(() => rosterQuery.isError.value)
@@ -127,6 +133,10 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
   }
 
   async function inviteMember(): Promise<void> {
+    if (isDefaultWorkspace.value) {
+      toast.error(t('workspace.switcher.members.defaultPrivate'))
+      return
+    }
     const email = inviteEmail.value.trim()
     if (!email) {
       toast.error(t('workspace.switcher.members.emailEmpty'))
@@ -232,6 +242,7 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
     myRole,
     canManage,
     isOwner,
+    isDefaultWorkspace,
     isLoading,
     hasLoadError,
     retryRoster,

@@ -22,6 +22,8 @@ export interface BillingTransferInvite {
   status: BillingTransferInviteStatus
   scope_workspace_ids: string[]
   created_at?: string
+  /** Lapse time (7 days after issue). A pending invite at or past this time never moves funds or membership; decisions on it fail closed and the owner may re-issue. */
+  expires_at?: string
   decided_at?: string
   decided_by?: string
 }

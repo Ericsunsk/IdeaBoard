@@ -13,7 +13,6 @@ export default {
   service_resolution_unavailable: 'This resolution is unavailable right now.',
   prompt_unavailable: 'This prompt is unavailable right now. Please try again later.',
   wallet_restricted: 'Ideas are temporarily unavailable for this account.',
-  workspace_budget_exhausted: 'This workspace has used up its budget for this period.',
   member_quota_exhausted: 'You have used up your personal quota for this period.',
   vision_search_not_configured: 'Visual Search is unavailable right now.',
   vision_search_unavailable: 'Visual Search is unavailable right now. Please try again later.',
@@ -38,6 +37,12 @@ export default {
   board_access_conflict: 'Access changed elsewhere. Refresh and try again.',
   board_precondition_required: 'Access state is outdated. Refresh and try again.',
   board_member_not_found: 'Board member not found.',
+  organization_not_found: 'Organization not found.',
+  organization_member_not_found: 'Organization member not found.',
+  organization_limit_reached: 'Each user may join or create at most one organization.',
+  organization_closed: 'This organization is closed.',
+  organization_closure_blocked:
+    'The organization still has unsettled tasks or funds. Settle them and retry.',
+  organization_not_closed: 'This organization is not closed.',
   membership_transition_forbidden: 'The last manager cannot be removed or demoted.',
-  default_member_quota_not_configured: 'Set the default quota for new members first, then invite.',
 } as const

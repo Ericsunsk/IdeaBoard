@@ -8,21 +8,22 @@
 -- name: CreateBillingTransferInvite :one
 INSERT INTO billing_account_transfer_invites (
   public_id, billing_account_id, billing_account_public_id,
-  from_user_id, to_user_id, status, idempotency_key
+  from_user_id, to_user_id, status, idempotency_key, expires_at
 )
 VALUES (
   sqlc.arg(public_id), sqlc.arg(billing_account_id),
   sqlc.arg(billing_account_public_id), sqlc.arg(from_user_id),
-  sqlc.arg(to_user_id), 'pending', sqlc.arg(idempotency_key)
+  sqlc.arg(to_user_id), 'pending', sqlc.arg(idempotency_key),
+  now() + INTERVAL '7 days'
 )
 RETURNING internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by;
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by;
 
 -- name: GetBillingTransferInviteByAccountIdem :one
 SELECT internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
 FROM billing_account_transfer_invites
 WHERE billing_account_id = sqlc.arg(billing_account_id)
   AND idempotency_key = sqlc.arg(idempotency_key)
@@ -31,7 +32,7 @@ LIMIT 1;
 -- name: GetBillingTransferInviteByPublicID :one
 SELECT internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
 FROM billing_account_transfer_invites
 WHERE public_id = sqlc.arg(public_id)
 LIMIT 1;
@@ -39,7 +40,7 @@ LIMIT 1;
 -- name: GetBillingTransferInviteForUpdate :one
 SELECT internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
 FROM billing_account_transfer_invites
 WHERE public_id = sqlc.arg(public_id)
 FOR UPDATE;
@@ -47,7 +48,7 @@ FOR UPDATE;
 -- name: GetPendingBillingTransferForAccount :one
 SELECT internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
 FROM billing_account_transfer_invites
 WHERE billing_account_id = sqlc.arg(billing_account_id)
   AND status = 'pending'
@@ -56,7 +57,7 @@ LIMIT 1;
 -- name: ListBillingTransferInvitesForAccount :many
 SELECT internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by
 FROM billing_account_transfer_invites
 WHERE billing_account_id = sqlc.arg(billing_account_id)
   AND (sqlc.arg(recipient_user_id)::BIGINT = 0 OR to_user_id = sqlc.arg(recipient_user_id))
@@ -74,13 +75,33 @@ WHERE public_id = sqlc.arg(public_id)
   AND status = 'pending'
 RETURNING internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
-  scope_workspace_public_ids, created_at, decided_at, decided_by;
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by;
 
 -- name: CountPendingBillingTransfersForAccount :one
 SELECT COUNT(*)
 FROM billing_account_transfer_invites
 WHERE billing_account_id = sqlc.arg(billing_account_id)
   AND status = 'pending';
+
+-- name: ReissueBillingTransferInvite :one
+-- Re-issue after lapse (#948 follow-up): when the account's single pending
+-- invite has expired, the owner may send again. The pending row refreshes in
+-- place (new parties, key, and 7-day expiry under the same bti_ id), so the
+-- at-most-one-pending-per-account invariant needs no index change. Matches
+-- zero rows unless a lapsed pending invite exists; callers fall back to the
+-- pending guard on no match (lost race or still-live invite).
+UPDATE billing_account_transfer_invites
+SET from_user_id = sqlc.arg(from_user_id),
+    to_user_id = sqlc.arg(to_user_id),
+    idempotency_key = sqlc.arg(idempotency_key),
+    created_at = now(),
+    expires_at = now() + INTERVAL '7 days'
+WHERE billing_account_id = sqlc.arg(billing_account_id)
+  AND status = 'pending'
+  AND expires_at <= now()
+RETURNING internal_id, public_id, billing_account_id, billing_account_public_id,
+  from_user_id, to_user_id, status, idempotency_key,
+  scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by;
 
 -- name: ListHandoverWorkspacesForAccount :many
 -- Non-Default business Workspace scope for handover acceptance (#948):

@@ -132,7 +132,7 @@ export const getAddWorkspaceMemberUrl = (workspaceId: string) => {
 }
 
 /**
- * Requires the Idempotency-Key header. Re-adding an existing member keeps the current role, including when the workspace is full. Workspaces support at most 5 members including owners; exceeding this limit renders 409 workspace_member_limit_reached. New members require the account default new-member quota to be configured: absent defaults render 409 default_member_quota_not_configured (fail closed, never implicit unlimited) and the inviter reuses it atomically (the inviter cannot raise the default here). Reusing a key with a different request renders 409 workspace_idempotency_conflict.
+ * Requires the Idempotency-Key header. Re-adding an existing member keeps the current role, including when the workspace is full. Workspaces support at most 5 members including owners; exceeding this limit renders 409 workspace_member_limit_reached. The Personal Default workspace is private: invites there render 403 workspace_default_protected. Other Personal workspaces invite freely: the Workspace Owner/Admin adds collaborators directly with no per-invite Personal account-holder approval, consumption charges the holder's shared Personal Billing Account with the real operator kept on each record, and an unconfigured collaborator quota reads as unlimited (the holder may set it later without clearing usage). Removing and re-adding a collaborator preserves quota state and historical consumption. Reusing a key with a different request renders 409 workspace_idempotency_conflict.
  * @summary Add a workspace member (owner/admin only; owner-only promotion)
  */
 export const addWorkspaceMember = async (
@@ -508,7 +508,7 @@ export const getRemoveWorkspaceMemberUrl = (workspaceId: string, memberId: strin
 }
 
 /**
- * Removes a workspace member. Requires the Idempotency-Key header. Reusing a key with a different request renders 409 workspace_idempotency_conflict.
+ * Removes a workspace member. Requires the Idempotency-Key header. Removal never deletes quota state or historical consumption: the member's (Billing Account, User) quota row and settled usage stay readable under the account and are restored on rejoin. Reusing a key with a different request renders 409 workspace_idempotency_conflict.
  * @summary Remove a workspace member (last owner cannot be removed)
  */
 export const removeWorkspaceMember = async (

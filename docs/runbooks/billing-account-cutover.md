@@ -22,6 +22,13 @@
 [ADR-0037](../adr/0037-account-default-member-quota.md) 与
 [Credits CONTEXT](../../apps/api/internal/credits/CONTEXT.md) 为准。
 
+> 现状说明：`20261029000000_workspace_budgets` 与 `20261031000000_default_member_quotas`
+> 建的表已由 `20261103000000_drop_default_member_quotas` /
+> `20261104000000_drop_workspace_budgets` 退役，对应 `…/budget` 与
+> `…/default-member-quota` 端点已删除。新切换只认
+> [billing-personal-organization-migration.md](./billing-personal-organization-migration.md)
+> 与 ADR-0038，本文范围描述保留为历史基线，不再作为新 cutover 依据。
+
 ## 1. 停止新资金写入
 
 没有全局资金总开关（设计如此：避免一个误操作冻结全平台）。停写 = 停入口 +
@@ -60,7 +67,7 @@ SELECT count(*) FROM credit_holds WHERE billing_account_id IS NULL;
 SELECT count(*) FROM credit_wallet_restrictions WHERE billing_account_id IS NULL;
 SELECT count(*) FROM payment_orders WHERE billing_account_id IS NULL;
 SELECT count(*) FROM payment_customers WHERE billing_account_id IS NULL;
--- 旧例程已下线（只剩 v3 通用 + v2 支付专用账户例程）
+-- 已退役例程不得残留；当前 v3 通用 / v2 支付例程不属于本查询。
 SELECT proname FROM pg_proc
 WHERE proname IN ('execute_credit_command_v2','provision_credit_wallet',
   'set_credit_wallet_status','execute_credit_purchase_v1');

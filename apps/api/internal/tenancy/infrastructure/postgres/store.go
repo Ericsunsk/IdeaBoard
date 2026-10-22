@@ -50,6 +50,7 @@ type ObjectDeleter interface {
 // Store is the postgres tenancy.Store. It must never be replaced by the
 // test-only InMemoryStore in production wiring.
 type Store struct {
+	*OrganizationStore
 	db      *pgxpool.Pool
 	q       *dbsqlc.Queries
 	objects ObjectDeleter
@@ -68,23 +69,23 @@ type repositoryQueryer struct {
 // in tests that only assert row effects; a nil deleter skips post-commit
 // storage cleanup.
 func NewStore(db *pgxpool.Pool, objects ObjectDeleter) *Store {
-	return &Store{db: db, q: dbsqlc.New(db), objects: objects}
+	return &Store{OrganizationStore: NewOrganizationStore(db), db: db, q: dbsqlc.New(db), objects: objects}
 }
 
 func (s *Store) dbWithContext(ctx context.Context) repositoryQueryer {
-	return repositoryQueryer{ctx: ctx, db: s.db, q: s.q}
+	return newRepositoryQueryer(ctx, s.db, s.q)
+}
+
+// Bind reads as well as writes to the caller-owned transaction. Lifecycle
+// adapters share this constructor so composed repositories see staged state.
+func newRepositoryQueryer(ctx context.Context, pool *pgxpool.Pool, q *dbsqlc.Queries) repositoryQueryer {
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		q = dbsqlc.New(ambient)
+	}
+	return repositoryQueryer{ctx: ctx, db: pool, q: q}
 }
 
 func (db repositoryQueryer) withTx(run func(*dbsqlc.Queries) error) error {
-	// Ambient guard transaction (control audit atomicity, step 3): when
-	// the guard staged its mutation transaction in the context, the
-	// tenancy writes join it as participants. The transaction is
-	// BORROWED (the guard began it and the guard commits or rolls it
-	// back), so this path never begins, commits, or rolls back. With no
-	// carrier the legacy owned-transaction path below runs unchanged.
-	if ambient, ok := dbutil.AmbientTxFromContext(db.ctx); ok {
-		return run(dbsqlc.New(ambient))
-	}
 	return dbutil.WithTx(db.ctx, db.db, run)
 }
 
@@ -120,17 +121,6 @@ func nullInt64(value int64) pgtype.Int8 {
 	return pgtype.Int8{Int64: value, Valid: true}
 }
 
-func mapOrganization(row dbsqlc.Organization) *tenancy.Organization {
-	return &tenancy.Organization{
-		InternalID: row.InternalID,
-		PublicID:   row.PublicID,
-		Name:       row.Name,
-		ArchivedAt: dbutil.TimePtr(row.ArchivedAt),
-		CreatedAt:  dbutil.TimeValue(row.CreatedAt),
-		UpdatedAt:  dbutil.TimeValue(row.UpdatedAt),
-	}
-}
-
 func mapWorkspace(row dbsqlc.Workspace, organizationPublicID *string) *tenancy.Workspace {
 	return &tenancy.Workspace{
 		InternalID:     row.InternalID,
@@ -159,7 +149,7 @@ func (s *Store) resolveOrgPublicID(ctx context.Context, q *dbsqlc.Queries, organ
 }
 
 func (s *Store) mapWorkspaceRow(ctx context.Context, row dbsqlc.Workspace) (*tenancy.Workspace, error) {
-	orgPublicID, err := s.resolveOrgPublicID(ctx, s.q, row.OrganizationID)
+	orgPublicID, err := s.resolveOrgPublicID(ctx, s.dbWithContext(ctx).q, row.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -202,9 +192,10 @@ func (s *Store) GetWorkspace(ctx context.Context, publicID string) (*tenancy.Wor
 	return s.mapWorkspaceRow(ctx, row)
 }
 
-// ListWorkspacesForUser lists membership-visible workspaces. Owners always
-// hold an owner membership row (granted at create/ensure time), so a
-// membership join matches the in-memory Store exactly.
+// ListWorkspacesForUser lists effective-visible workspaces (ADR-0038
+// #951): direct membership rows plus automatic org Owner/Admin access to
+// every workspace of their organization. Personal scopes use direct rows
+// only; org Members see only explicitly granted workspaces.
 func (s *Store) ListWorkspacesForUser(ctx context.Context, userID int64) ([]*tenancy.Workspace, error) {
 	rows, err := s.dbWithContext(ctx).q.ListWorkspacesByUserID(ctx, dbsqlc.ListWorkspacesByUserIDParams{
 		UserID: userID, RowLimit: maxTenancyRows,
@@ -212,7 +203,81 @@ func (s *Store) ListWorkspacesForUser(ctx context.Context, userID int64) ([]*ten
 	if err != nil {
 		return nil, err
 	}
-	return s.mapWorkspaceRows(ctx, rows)
+	mapped, err := s.mapWorkspaceRows(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{}, len(mapped))
+	for _, w := range mapped {
+		seen[w.PublicID] = struct{}{}
+	}
+	orgs, err := s.dbWithContext(ctx).q.ListOrganizationsByUserID(ctx, dbsqlc.ListOrganizationsByUserIDParams{
+		UserID: userID, RowLimit: maxTenancyRows,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, org := range orgs {
+		roleRow, err := s.dbWithContext(ctx).q.GetOrganizationMembership(ctx, dbsqlc.GetOrganizationMembershipParams{
+			OrganizationID: org.InternalID, UserID: userID,
+		})
+		if err != nil {
+			continue
+		}
+		if roleRow.Role != tenancy.RoleOwner && roleRow.Role != tenancy.RoleAdmin {
+			continue
+		}
+		orgWorkspaces, err := s.dbWithContext(ctx).q.ListWorkspacesByOrganizationID(ctx, dbsqlc.ListWorkspacesByOrganizationIDParams{
+			OrganizationID: pgtype.Int8{Int64: org.InternalID, Valid: true},
+			RowLimit:       maxTenancyRows,
+		})
+		if err != nil {
+			return nil, err
+		}
+		orgPublicID := org.PublicID
+		for _, row := range orgWorkspaces {
+			if _, ok := seen[row.PublicID]; ok {
+				continue
+			}
+			seen[row.PublicID] = struct{}{}
+			mapped = append(mapped, mapWorkspace(row, &orgPublicID))
+		}
+	}
+	sort.Slice(mapped, func(i, j int) bool {
+		if mapped[i].CreatedAt.Equal(mapped[j].CreatedAt) {
+			return mapped[i].PublicID < mapped[j].PublicID
+		}
+		return mapped[i].CreatedAt.Before(mapped[j].CreatedAt)
+	})
+	// Closed Organizations suspend Workspace listing (#955): the
+	// Organization itself stays visible for restore, its Workspaces do
+	// not. Cardinality caps the distinct-org lookups at one; the org rows
+	// above already carry closed_at, so the common path needs no extra
+	// fetch (misses fall back to GetOrganization fail-closed).
+	closedByPublic := make(map[string]bool, len(orgs))
+	for _, org := range orgs {
+		closedByPublic[org.PublicID] = org.ClosedAt.Valid
+	}
+	visible := mapped[:0]
+	for _, w := range mapped {
+		if w.OrganizationID == nil {
+			visible = append(visible, w)
+			continue
+		}
+		closed, known := closedByPublic[*w.OrganizationID]
+		if !known {
+			organization, err := s.GetOrganization(ctx, *w.OrganizationID)
+			if err != nil {
+				return nil, err
+			}
+			closed = organization.IsClosed()
+			closedByPublic[*w.OrganizationID] = closed
+		}
+		if !closed {
+			visible = append(visible, w)
+		}
+	}
+	return visible, nil
 }
 
 func (s *Store) mapWorkspaceRows(ctx context.Context, rows []dbsqlc.Workspace) ([]*tenancy.Workspace, error) {
@@ -224,7 +289,7 @@ func (s *Store) mapWorkspaceRows(ctx context.Context, rows []dbsqlc.Workspace) (
 	}
 	publicIDs := make(map[int64]string, len(orgIDs))
 	for internalID := range orgIDs {
-		row, err := s.q.GetOrganizationByInternalID(ctx, internalID)
+		row, err := s.dbWithContext(ctx).q.GetOrganizationByInternalID(ctx, internalID)
 		if err != nil {
 			return nil, notFound(err)
 		}
@@ -250,92 +315,35 @@ func (s *Store) mapWorkspaceRows(ctx context.Context, rows []dbsqlc.Workspace) (
 // mints the Default row. A second Default create for the same owner fails
 // with tenancy.ErrDefaultWorkspaceConflict.
 //
-// Billing linkage (#944) is atomic with the workspace row in the same
-// transaction, so authorization failures never leave a half-linked
-// workspace: org workspaces resolve to the shared org pool (billing opts
-// rejected with ErrBillingConflict, never the creator personal pool);
-// personal workspaces link to an explicit ba_ account (caller must be
-// Billing Owner/Admin, ErrBillingForbidden) or mint a fresh isolated
-// per-workspace account (NewBillingAccount, creator becomes billing
-// owner, no balance merge). Empty billing opts keep the legacy lazy
-// mode (no link row, per-workspace account resolved on first billing
-// read) for direct Store callers; the Public API always passes an
-// explicit choice so new spaces never auto-create a wallet implicitly.
+// Billing scope (ADR-0038) is the creation scope, fixed permanently:
+// organization workspaces share the organization's pool (ensured in the same
+// transaction, never the creator personal pool); personal workspaces resolve
+// to the owner's deterministic Personal account at read time (no
+// per-workspace mint, no link row). Creating an Organization never moves
+// existing Personal workspaces.
 func (s *Store) CreateWorkspace(ctx context.Context, params tenancy.CreateWorkspaceParams) (*tenancy.Workspace, error) {
 	if err := tenancy.ValidateName(params.Name); err != nil {
 		return nil, err
 	}
-	if params.IsDefault && params.OrganizationID != nil {
-		return nil, tenancy.ErrDefaultWorkspaceConflict
-	}
-	// Billing opts are mutually exclusive and Default/org-scoped guarded.
-	if params.BillingAccountPublicID != nil && params.NewBillingAccount {
-		return nil, tenancy.ErrBillingConflict
-	}
-	if params.IsDefault && (params.BillingAccountPublicID != nil || params.NewBillingAccount) {
-		return nil, tenancy.ErrBillingConflict
-	}
-	var billingTarget string
-	if params.BillingAccountPublicID != nil {
-		billingTarget = strings.TrimSpace(*params.BillingAccountPublicID)
-		if !strings.HasPrefix(billingTarget, "ba_") || len(billingTarget) <= 3 {
-			return nil, tenancy.ErrBillingNotFound
-		}
-		if params.OrganizationID != nil {
-			return nil, tenancy.ErrBillingConflict
-		}
-	}
-	if params.NewBillingAccount && params.OrganizationID != nil {
-		return nil, tenancy.ErrBillingConflict
-	}
-	var orgInternal pgtype.Int8
-	var orgPublicID *string
 	if params.OrganizationID != nil {
-		org, err := s.GetOrganization(ctx, *params.OrganizationID)
-		if err != nil {
-			return nil, err
+		if params.IsDefault {
+			return nil, tenancy.ErrDefaultWorkspaceConflict
 		}
-		orgInternal = pgtype.Int8{Int64: org.InternalID, Valid: true}
-		orgPublicID = &org.PublicID
+		return s.CreateOrganizationWorkspace(ctx, *params.OrganizationID, params.OwnerUserID, params.Name)
 	}
-	if !orgInternal.Valid && params.OwnerUserID <= 0 {
+	if params.OwnerUserID <= 0 {
 		return nil, tenancy.ErrWorkspaceOwnerRequired
 	}
-	var created dbsqlc.Workspace
 	for attempt := 0; attempt < mintAttempts; attempt++ {
 		publicID, err := tenancy.NewWorkspacePublicID()
 		if err != nil {
 			return nil, err
 		}
+		var created dbsqlc.Workspace
 		err = s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
-			// Organization workspaces carry no owner_user_id per
-			// chk_workspaces_owner_xor (org owns the workspace); the
-			// creator still gains an owner membership row below.
-			ownerCol := nullInt64(params.OwnerUserID)
-			if orgInternal.Valid {
-				ownerCol = pgtype.Int8{}
-			}
-			row, insertErr := q.CreateWorkspace(ctx, dbsqlc.CreateWorkspaceParams{
-				PublicID:       publicID,
-				OrganizationID: orgInternal,
-				OwnerUserID:    ownerCol,
-				Name:           strings.TrimSpace(params.Name),
-				IsDefault:      params.IsDefault && !orgInternal.Valid,
-			})
-			if insertErr != nil {
-				return insertErr
-			}
-			created = row
-			if params.OwnerUserID > 0 {
-				if err := q.UpsertWorkspaceMembership(ctx, dbsqlc.UpsertWorkspaceMembershipParams{
-					WorkspaceID: row.InternalID,
-					UserID:      params.OwnerUserID,
-					Role:        tenancy.RoleOwner,
-				}); err != nil {
-					return err
-				}
-			}
-			return s.createBillingInTx(ctx, q, row, orgInternal, params, billingTarget)
+			var err error
+			created, err = createWorkspaceInTx(ctx, q, publicID, pgtype.Int8{}, params)
+			return err
 		})
 		if isPublicIDConflict(err) {
 			continue
@@ -346,87 +354,66 @@ func (s *Store) CreateWorkspace(ctx context.Context, params tenancy.CreateWorksp
 		if err != nil {
 			return nil, err
 		}
-		return mapWorkspace(created, orgPublicID), nil
+		return mapWorkspace(created, nil), nil
 	}
 	return nil, tenancy.ErrConflict
 }
 
-// createBillingInTx provisions the creation-time billing linkage inside the
-// same workspace transaction (#944). Org workspaces ensure the shared org
-// pool (no per-workspace account, no link row); Default rows mint their own
-// deterministic personal account; personal NewBillingAccount mints a fresh
-// isolated per-workspace account; explicit BillingAccountPublicID links to
-// an authorized non-org account; empty opts keep the legacy lazy mode.
-func (s *Store) createBillingInTx(ctx context.Context, q *dbsqlc.Queries, row dbsqlc.Workspace, orgInternal pgtype.Int8, params tenancy.CreateWorkspaceParams, billingTarget string) error {
+// createWorkspaceInTx is the shared persistence primitive for Personal and
+// Organization creation. The caller owns validation, authorization, scope
+// locking, and the transaction; insert, membership, and funds identity stay atomic.
+func createWorkspaceInTx(ctx context.Context, q *dbsqlc.Queries, publicID string, orgInternal pgtype.Int8, params tenancy.CreateWorkspaceParams) (dbsqlc.Workspace, error) {
+	ownerCol := nullInt64(params.OwnerUserID)
 	if orgInternal.Valid {
-		// Org pool Get-or-Create (concurrent first workspaces collapse on
-		// the org unique index; the loser reads back the winner).
-		if account, err := q.GetBillingAccountByOrganizationID(ctx, orgInternal); err == nil {
-			_, err = lockBillingAccountInTx(ctx, q, account.InternalID)
-			return err
-		} else if !database.IsNotFound(err) {
-			return err
-		}
-		publicID, err := tenancy.NewBillingAccountPublicID()
-		if err != nil {
-			return err
-		}
-		created, err := q.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
-			PublicID: publicID, WorkspaceID: pgtype.Int8{},
-			OrganizationID: orgInternal,
-		})
-		if err != nil {
-			if database.IsDuplicateConstraintError(err) {
-				return nil
-			}
-			return err
-		}
-		ensureBillingOwnerForOrg(ctx, q, created.InternalID, orgInternal.Int64)
-		return nil
+		ownerCol = pgtype.Int8{}
 	}
-	// Personal scope.
-	if params.IsDefault || params.NewBillingAccount {
-		return s.ensureWorkspaceAccountInTx(ctx, q, row.InternalID, params.OwnerUserID)
-	}
-	if billingTarget == "" {
-		return nil
-	}
-	target, err := q.GetBillingAccountByPublicID(ctx, billingTarget)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return tenancy.ErrBillingNotFound
-		}
-		return err
-	}
-	if _, err := lockBillingAccountInTx(ctx, q, target.InternalID); err != nil {
-		return err
-	}
-	if target.OrganizationID.Valid {
-		return tenancy.ErrBillingConflict
-	}
-	member, err := q.GetBillingAccountMember(ctx, dbsqlc.GetBillingAccountMemberParams{
-		BillingAccountID: target.InternalID, UserID: params.OwnerUserID,
+	row, err := q.CreateWorkspace(ctx, dbsqlc.CreateWorkspaceParams{
+		PublicID:       publicID,
+		OrganizationID: orgInternal,
+		OwnerUserID:    ownerCol,
+		Name:           strings.TrimSpace(params.Name),
+		IsDefault:      params.IsDefault && !orgInternal.Valid,
 	})
 	if err != nil {
-		if database.IsNotFound(err) {
-			return tenancy.ErrBillingForbidden
+		return dbsqlc.Workspace{}, err
+	}
+	if params.OwnerUserID > 0 {
+		if err := q.UpsertWorkspaceMembership(ctx, dbsqlc.UpsertWorkspaceMembershipParams{
+			WorkspaceID: row.InternalID, UserID: params.OwnerUserID, Role: tenancy.RoleOwner,
+		}); err != nil {
+			return dbsqlc.Workspace{}, err
 		}
-		return err
 	}
-	if !tenancy.IsBillingManager(member.Role) {
-		return tenancy.ErrBillingForbidden
+	if err := createBillingInTx(ctx, q, row, orgInternal, params); err != nil {
+		return dbsqlc.Workspace{}, err
 	}
-	_, err = q.UpsertWorkspaceBillingLink(ctx, dbsqlc.UpsertWorkspaceBillingLinkParams{
-		WorkspaceID: row.InternalID, BillingAccountID: target.InternalID,
-	})
-	return err
+	return row, nil
 }
 
-// ensureWorkspaceAccountInTx Get-or-Creates the per-workspace account for a
-// freshly minted workspace plus the creator billing-owner grant. The wallet
-// row follows via the account-insert trigger; no link row is written (the
-// per-workspace account is the resolution fallback).
-func (s *Store) ensureWorkspaceAccountInTx(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID, ownerUserID int64) error {
+// createBillingInTx provisions the creation-time funds identity inside the
+// same workspace transaction (ADR-0038). Org workspaces ensure the shared
+// org pool (no per-workspace account, no link row); Default rows mint
+// their own deterministic personal account (the owner's Personal
+// survivor); other personal workspaces need no billing write (they resolve
+// to the owner's Personal survivor at read time).
+func createBillingInTx(ctx context.Context, q *dbsqlc.Queries, row dbsqlc.Workspace, orgInternal pgtype.Int8, params tenancy.CreateWorkspaceParams) error {
+	if orgInternal.Valid {
+		return ensureOrganizationAccountInTx(ctx, q, orgInternal.Int64, 0)
+	}
+	// Personal scope: only the Default row owns a billing write (the
+	// Personal survivor anchor). Other personal workspaces resolve to it.
+	if params.IsDefault {
+		return ensureWorkspaceAccountWithQueries(ctx, q, row.InternalID, params.OwnerUserID)
+	}
+	return nil
+}
+
+// ensureWorkspaceAccountWithQueries Get-or-Creates the per-workspace
+// account for a freshly minted workspace plus the creator billing-owner
+// grant. The wallet row follows via the account-insert trigger. Only the
+// Default workspace row owns such an anchor (the Personal survivor);
+// business workspaces never call this.
+func ensureWorkspaceAccountWithQueries(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID, ownerUserID int64) error {
 	if workspaceInternalID <= 0 {
 		return tenancy.ErrBillingWorkspaceInvalid
 	}
@@ -463,45 +450,6 @@ func (s *Store) ensureWorkspaceAccountInTx(ctx context.Context, q *dbsqlc.Querie
 		return err
 	}
 	return tenancy.ErrConflict
-}
-
-// ensureOrganizationAccountInTx Get-or-Creates the shared org pool plus the
-// creator billing-owner grant inside the caller's transaction (#944). The
-// wallet row follows via the account-insert trigger. Concurrent first
-// workspaces collapse on the org unique index; the loser reads back the
-// winner and leaves existing grants untouched.
-func (s *Store) ensureOrganizationAccountInTx(ctx context.Context, q *dbsqlc.Queries, organizationInternalID, ownerUserID int64) error {
-	if organizationInternalID <= 0 {
-		return tenancy.ErrBillingWorkspaceInvalid
-	}
-	orgKey := pgtype.Int8{Int64: organizationInternalID, Valid: true}
-	if _, err := q.GetBillingAccountByOrganizationID(ctx, orgKey); err == nil {
-		return nil
-	} else if !database.IsNotFound(err) {
-		return err
-	}
-	publicID, err := tenancy.NewBillingAccountPublicID()
-	if err != nil {
-		return err
-	}
-	created, err := q.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
-		PublicID: publicID, WorkspaceID: pgtype.Int8{},
-		OrganizationID: orgKey,
-	})
-	if err != nil {
-		if database.IsDuplicateConstraintError(err) {
-			return nil
-		}
-		return err
-	}
-	if ownerUserID > 0 {
-		_, _ = q.UpsertBillingAccountMember(ctx, dbsqlc.UpsertBillingAccountMemberParams{
-			BillingAccountID: created.InternalID, UserID: ownerUserID, Role: tenancy.BillingRoleOwner,
-		})
-	} else {
-		ensureBillingOwnerForOrg(ctx, q, created.InternalID, organizationInternalID)
-	}
-	return nil
 }
 
 // UpdateWorkspace renames an existing workspace; missing rows read
@@ -642,47 +590,45 @@ FROM workspaces WHERE public_id = $1 FOR UPDATE`, publicID).Scan(&workspaceID, &
 
 // guardWorkspaceDeleteFunds enforces the #948 funds guards inside the
 // workspace delete transaction (row lock already held, so concurrent
-// submissions/invites serialize here). It resolves the existing payer
-// without provisioning and fails closed with ErrBillingConflict when
-// unsettled payment orders, pending handover invites, or shared-anchor
-// references still need the funds row. Wallets, Ledger, snapshots, and
-// operation rows are never named here (red lines, retained by construction).
+// submissions/invites serialize here). It resolves the creation-scope
+// payer without provisioning (deletion must never mint a wallet as a side
+// effect): the Organization pool for org scopes, the owner's Personal
+// survivor for personal scopes. Unsettled payment orders and live pending
+// handover invites converge on the stored payer first. Lapsed (expired)
+// invites never block: they move nothing and the owner may re-issue after
+// the scope is gone. Wallets, Ledger, snapshots, and operation rows are
+// never named here (red lines, retained by construction).
 func guardWorkspaceDeleteFunds(ctx context.Context, tx pgx.Tx, workspaceID int64, lockedAccountIDs []int64) error {
 	var payerID *int64
-	// Explicit link first (studio sharing), then org pool, then per-workspace.
-	var linkedID int64
-	if err := tx.QueryRow(ctx, `SELECT billing_account_id FROM workspace_billing_links WHERE workspace_id = $1`, workspaceID).Scan(&linkedID); err == nil {
-		payerID = &linkedID
-	} else if !database.IsNotFound(err) {
-		return fmt.Errorf("tenancy: workspace delete: resolve link: %w", err)
+	var orgID, ownerID pgtype.Int8
+	if err := tx.QueryRow(ctx, `SELECT organization_id, owner_user_id FROM workspaces WHERE internal_id = $1`, workspaceID).Scan(&orgID, &ownerID); err != nil {
+		return fmt.Errorf("tenancy: workspace delete: resolve scope: %w", err)
 	}
-	if payerID == nil {
-		var orgID pgtype.Int8
-		if err := tx.QueryRow(ctx, `SELECT organization_id FROM workspaces WHERE internal_id = $1`, workspaceID).Scan(&orgID); err != nil {
-			return fmt.Errorf("tenancy: workspace delete: resolve org scope: %w", err)
+	if orgID.Valid && orgID.Int64 > 0 {
+		var orgAccount int64
+		if err := tx.QueryRow(ctx, `SELECT internal_id FROM billing_accounts WHERE organization_id = $1 LIMIT 1`, orgID.Int64).Scan(&orgAccount); err == nil {
+			payerID = &orgAccount
+		} else if !database.IsNotFound(err) {
+			return fmt.Errorf("tenancy: workspace delete: resolve org account: %w", err)
 		}
-		if orgID.Valid && orgID.Int64 > 0 {
-			var orgAccount int64
-			if err := tx.QueryRow(ctx, `SELECT internal_id FROM billing_accounts WHERE organization_id = $1 LIMIT 1`, orgID.Int64).Scan(&orgAccount); err == nil {
-				payerID = &orgAccount
-			} else if !database.IsNotFound(err) {
-				return fmt.Errorf("tenancy: workspace delete: resolve org account: %w", err)
-			}
-		} else {
-			var wsAccount int64
-			if err := tx.QueryRow(ctx, `SELECT internal_id FROM billing_accounts WHERE workspace_id = $1 LIMIT 1`, workspaceID).Scan(&wsAccount); err == nil {
-				payerID = &wsAccount
-			} else if !database.IsNotFound(err) {
-				return fmt.Errorf("tenancy: workspace delete: resolve workspace account: %w", err)
-			}
+	} else if ownerID.Valid && ownerID.Int64 > 0 {
+		// Personal survivor without provisioning: the Default-anchored
+		// account when it exists, otherwise no payer and no guard.
+		var survivor int64
+		if err := tx.QueryRow(ctx, `SELECT ba.internal_id FROM billing_accounts AS ba
+JOIN workspaces AS def ON def.internal_id = ba.workspace_id
+WHERE def.owner_user_id = $1 AND def.organization_id IS NULL AND def.is_default LIMIT 1`, ownerID.Int64).Scan(&survivor); err == nil {
+			payerID = &survivor
+		} else if !database.IsNotFound(err) {
+			return fmt.Errorf("tenancy: workspace delete: resolve personal survivor: %w", err)
 		}
 	}
 	if payerID == nil {
 		return nil
 	}
-	// A first explicit link may have committed while deletion waited for
-	// the Workspace lock. Refuse that changed scope instead of acquiring a
-	// new account lock after the Workspace and inverting handover ordering.
+	// The scope is fixed at creation, so the payer cannot change while
+	// deletion waits for the Workspace lock. A payer outside the
+	// pre-locked set still fails closed instead of deleting shared money.
 	if !slices.Contains(lockedAccountIDs, *payerID) {
 		return tenancy.ErrBillingConflict
 	}
@@ -697,7 +643,7 @@ func guardWorkspaceDeleteFunds(ctx context.Context, tx pgx.Tx, workspaceID int64
 	}
 	var pendingInvite bool
 	if err := tx.QueryRow(ctx, `SELECT EXISTS (
-  SELECT 1 FROM billing_account_transfer_invites WHERE billing_account_id = ANY($1::bigint[]) AND status = 'pending'
+  SELECT 1 FROM billing_account_transfer_invites WHERE billing_account_id = ANY($1::bigint[]) AND status = 'pending' AND expires_at > now()
 )`, lockedAccountIDs).Scan(&pendingInvite); err != nil {
 		return fmt.Errorf("tenancy: workspace delete: check pending handover: %w", err)
 	}
@@ -867,8 +813,50 @@ func (s *Store) cleanupWorkspaceObjects(ctx context.Context, keys []string) {
 	}
 }
 
+// ensureDefaultWorkspaceWithQueries idempotently provisions the user's
+// Default workspace plus its owner membership through the caller's
+// queries (INSERT ... ON CONFLICT DO NOTHING plus read-back, so
+// concurrent callers converge to a single Default row). The Personal
+// survivor account follows via ensureWorkspaceAccountWithQueries at the
+// call sites that need funds identity.
+func ensureDefaultWorkspaceWithQueries(ctx context.Context, q *dbsqlc.Queries, userID int64) (dbsqlc.Workspace, error) {
+	if userID <= 0 {
+		return dbsqlc.Workspace{}, tenancy.ErrPersonalWorkspaceUserRequired
+	}
+	for attempt := 0; attempt < mintAttempts; attempt++ {
+		publicID, err := tenancy.NewWorkspacePublicID()
+		if err != nil {
+			return dbsqlc.Workspace{}, err
+		}
+		if _, insertErr := q.InsertDefaultWorkspaceIgnore(ctx, dbsqlc.InsertDefaultWorkspaceIgnoreParams{
+			PublicID:    publicID,
+			OwnerUserID: pgtype.Int8{Int64: userID, Valid: true},
+			Name:        "My Workspace",
+		}); insertErr != nil {
+			if isPublicIDConflict(insertErr) {
+				continue
+			}
+			return dbsqlc.Workspace{}, insertErr
+		}
+		selected, selectErr := q.GetDefaultWorkspaceByOwner(ctx, pgtype.Int8{Int64: userID, Valid: true})
+		if selectErr != nil {
+			return dbsqlc.Workspace{}, selectErr
+		}
+		if err := q.UpsertWorkspaceMembership(ctx, dbsqlc.UpsertWorkspaceMembershipParams{
+			WorkspaceID: selected.InternalID,
+			UserID:      userID,
+			Role:        tenancy.RoleOwner,
+		}); err != nil {
+			return dbsqlc.Workspace{}, err
+		}
+		return selected, nil
+	}
+	return dbsqlc.Workspace{}, tenancy.ErrConflict
+}
+
 // EnsureDefaultWorkspace idempotently provisions the user's Default
-// workspace plus its deterministic personal Billing Account (#944). Concurrent
+// workspace plus its deterministic Personal Billing Account (the survivor
+// anchor, ADR-0038). Concurrent
 // callers collapse on ux_workspaces_default_owner
 // (INSERT ... ON CONFLICT DO NOTHING) and all read back the same row.
 // Users holding only non-Default personal rows get a fresh Default row;
@@ -881,63 +869,68 @@ func (s *Store) EnsureDefaultWorkspace(ctx context.Context, userID int64) (*tena
 	if userID <= 0 {
 		return nil, tenancy.ErrPersonalWorkspaceUserRequired
 	}
-	for attempt := 0; attempt < mintAttempts; attempt++ {
-		publicID, err := tenancy.NewWorkspacePublicID()
+	var row dbsqlc.Workspace
+	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
+		selected, err := ensureDefaultWorkspaceWithQueries(ctx, q, userID)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		var row dbsqlc.Workspace
-		err = s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
-			if _, insertErr := q.InsertDefaultWorkspaceIgnore(ctx, dbsqlc.InsertDefaultWorkspaceIgnoreParams{
-				PublicID:    publicID,
-				OwnerUserID: pgtype.Int8{Int64: userID, Valid: true},
-				Name:        "My Workspace",
-			}); insertErr != nil {
-				return insertErr
-			}
-			selected, selectErr := q.GetDefaultWorkspaceByOwner(ctx, pgtype.Int8{Int64: userID, Valid: true})
-			if selectErr != nil {
-				return selectErr
-			}
-			row = selected
-			if err := q.UpsertWorkspaceMembership(ctx, dbsqlc.UpsertWorkspaceMembershipParams{
-				WorkspaceID: row.InternalID,
-				UserID:      userID,
-				Role:        tenancy.RoleOwner,
-			}); err != nil {
-				return err
-			}
-			return s.ensureWorkspaceAccountInTx(ctx, q, row.InternalID, userID)
-		})
-		if isPublicIDConflict(err) {
-			continue
-		}
-		if err != nil {
-			return nil, notFound(err)
-		}
-		return mapWorkspace(row, nil), nil
+		row = selected
+		return ensureWorkspaceAccountWithQueries(ctx, q, row.InternalID, userID)
+	})
+	if err != nil {
+		return nil, notFound(err)
 	}
-	return nil, tenancy.ErrConflict
+	return mapWorkspace(row, nil), nil
 }
 
-// GetWorkspaceRole reports the caller's direct workspace membership role.
-// It returns ok=false when the workspace exists but the user is not a
-// member, and ErrNotFound when the workspace does not exist.
+// GetWorkspaceRole reports the caller's effective workspace role
+// (ADR-0038 #951): personal scopes use the direct row; organization
+// scopes grant org Owner/Admin their org role automatically, org Members
+// use only their explicit row, and non-org-members hold nothing
+// (join-first, even with a stale direct row).
 func (s *Store) GetWorkspaceRole(ctx context.Context, workspacePublicID string, userID int64) (string, bool, error) {
 	workspace, err := s.GetWorkspace(ctx, workspacePublicID)
 	if err != nil {
 		return "", false, err
 	}
-	row, err := s.dbWithContext(ctx).q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
-		WorkspaceID: workspace.InternalID, UserID: userID,
-	})
-	if database.IsNotFound(err) {
-		return "", false, nil
+	// Closed Organizations suspend all Workspace content access (#955):
+	// every member, including Owner/Admin, reads as non-member while
+	// closed. Organization management (restore) stays on the org
+	// endpoints via GetOrganizationRole, which this gate never touches.
+	if !workspace.IsPersonal() && workspace.OrganizationID != nil {
+		organization, err := s.GetOrganization(ctx, *workspace.OrganizationID)
+		if err != nil {
+			if err == tenancy.ErrNotFound {
+				return "", false, nil
+			}
+			return "", false, err
+		}
+		if organization.IsClosed() {
+			return "", false, nil
+		}
 	}
-	if err != nil {
+	directRole, directMember := "", false
+	if row, err := s.dbWithContext(ctx).q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
+		WorkspaceID: workspace.InternalID, UserID: userID,
+	}); err == nil {
+		directRole, directMember = row.Role, true
+	} else if !database.IsNotFound(err) {
 		return "", false, err
 	}
-	return row.Role, true, nil
+	if workspace.IsPersonal() {
+		return directRole, directMember, nil
+	}
+	orgRole, orgMember := "", false
+	if workspace.OrganizationID != nil {
+		if role, member, err := s.GetOrganizationRole(ctx, *workspace.OrganizationID, userID); err == nil {
+			orgRole, orgMember = role, member
+		} else if err != tenancy.ErrNotFound {
+			return "", false, err
+		}
+	}
+	role, ok := tenancy.EffectiveWorkspaceRole(workspace, orgRole, orgMember, directRole, directMember)
+	return role, ok, nil
 }
 
 // ListWorkspaceMembers lists direct workspace members ordered by user id
@@ -961,7 +954,7 @@ func (s *Store) mapWorkspaceMembers(ctx context.Context, publicID string, rows [
 	for _, row := range rows {
 		userIDs = append(userIDs, row.UserID)
 	}
-	externalIDs, err := userExternalIDs(ctx, s.q, userIDs)
+	externalIDs, err := userExternalIDs(ctx, s.dbWithContext(ctx).q, userIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -977,18 +970,41 @@ func sortMembersByUserID(members []*tenancy.WorkspaceMember) {
 	sort.Slice(members, func(i, j int) bool { return members[i].UserID < members[j].UserID })
 }
 
+// rejectClosedOrgWorkspaceInTx fails workspace membership writes closed
+// while the owning Organization is closed (#955). Personal scopes always
+// pass; missing organization rows read as not found.
+func rejectClosedOrgWorkspaceInTx(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID int64) error {
+	workspaceRow, err := q.GetWorkspaceByInternalID(ctx, workspaceInternalID)
+	if err != nil {
+		return notFound(err)
+	}
+	if !workspaceRow.OrganizationID.Valid {
+		return nil
+	}
+	organization, err := q.GetOrganizationByInternalID(ctx, workspaceRow.OrganizationID.Int64)
+	if err != nil {
+		return notFound(err)
+	}
+	if organization.ClosedAt.Valid {
+		return tenancy.ErrOrganizationClosed
+	}
+	return nil
+}
+
 // AddWorkspaceMember grants a membership idempotently: re-adding keeps the
 // existing role (parity with the in-memory Store).
 //
-// First join of the account consumption scope (#947) atomically seeds the
-// member quota row from the account default in the same transaction:
-// the membership insert, stable payer resolution, default fail-closed
-// check, and quota seed commit or roll back together. Re-adding keeps
-// the existing role and never copies quota; multi-space joins preserve
-// the first row (ON CONFLICT DO NOTHING); rejoining keeps the cap and
-// accrued usage. Absent default fails closed with
-// ErrDefaultQuotaNotConfigured (never implicit unlimited); the inviter
-// cannot raise the default (no quota params on this path).
+// Personal collaboration (#952, ADR-0038): the Personal Default workspace
+// is private and rejects invites with ErrDefaultWorkspaceProtected (fail
+// closed, 403 workspace_default_protected). Non-Default Personal
+// workspaces invite freely: Workspace Owner/Admin add and remove
+// collaborators without per-invite account-holder approval, and no quota
+// row is seeded here. Absent quota reads as unlimited everywhere
+// (memberquotas.IsUnlimited); the Personal account holder sets per-member
+// caps later via SetQuota without clearing accrued usage. Multi-space
+// joins and rejoins preserve the existing quota row and immutable
+// consumption history (quota rows are never written or deleted on this
+// path; the old #947 fail-closed default gate is cut, not kept).
 func (s *Store) AddWorkspaceMember(ctx context.Context, workspacePublicID string, targetUserID int64, role string) (*tenancy.WorkspaceMember, error) {
 	role = strings.TrimSpace(role)
 	if !tenancy.IsValidRole(role) {
@@ -999,6 +1015,25 @@ func (s *Store) AddWorkspaceMember(ctx context.Context, workspacePublicID string
 		workspaceID, err := q.LockWorkspaceMemberships(ctx, strings.TrimSpace(workspacePublicID))
 		if err != nil {
 			return notFound(err)
+		}
+		workspaceRow, err := q.GetWorkspaceByInternalID(ctx, workspaceID)
+		if err != nil {
+			return notFound(err)
+		}
+		if err := rejectClosedOrgWorkspaceInTx(ctx, q, workspaceID); err != nil {
+			return err
+		}
+		// Personal Default is private (#952): fail closed before any
+		// membership or quota write.
+		if !workspaceRow.OrganizationID.Valid && workspaceRow.IsDefault {
+			return tenancy.ErrDefaultWorkspaceProtected
+		}
+		if workspaceRow.OrganizationID.Valid {
+			if _, err := q.GetOrganizationMembership(ctx, dbsqlc.GetOrganizationMembershipParams{
+				OrganizationID: workspaceRow.OrganizationID.Int64, UserID: targetUserID,
+			}); err != nil {
+				return notFound(err)
+			}
 		}
 		lookup := dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspaceID, UserID: targetUserID}
 		row, err := q.GetWorkspaceMembership(ctx, lookup)
@@ -1019,9 +1054,6 @@ func (s *Store) AddWorkspaceMember(ctx context.Context, workspacePublicID string
 			if err != nil {
 				return notFound(err)
 			}
-			if err := seedMemberQuotaFromDefault(ctx, q, workspaceID, targetUserID); err != nil {
-				return err
-			}
 		}
 		if err != nil {
 			return notFound(err)
@@ -1036,37 +1068,6 @@ func (s *Store) AddWorkspaceMember(ctx context.Context, workspacePublicID string
 	return added, err
 }
 
-// seedMemberQuotaFromDefault seeds one member quota row from the account
-// default inside the caller's membership transaction (#947). It resolves
-// the stable payer without changing resolution order (explicit link, org
-// pool, per-workspace account, provisioning Get-or-Create like reads),
-// fails closed with ErrDefaultQuotaNotConfigured when the account has no
-// default (never implicit unlimited), and preserves existing rows
-// (multi-space joins and rejoins keep the first cap and usage).
-func seedMemberQuotaFromDefault(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID, targetUserID int64) error {
-	account, _, err := resolveBillingAccountRow(ctx, q, workspaceInternalID)
-	if err != nil {
-		return err
-	}
-	if _, err := q.GetDefaultMemberQuota(ctx, account.InternalID); err != nil {
-		if database.IsNotFound(err) {
-			return tenancy.ErrDefaultQuotaNotConfigured
-		}
-		return err
-	}
-	_, err = q.InsertMemberQuotaFromDefault(ctx, dbsqlc.InsertMemberQuotaFromDefaultParams{
-		BillingAccountID: account.InternalID, UserID: targetUserID,
-		UpdatedByUserID: pgtype.Int8{},
-	})
-	if err != nil {
-		if database.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-	return nil
-}
-
 // UpdateWorkspaceMemberRole applies the agreed role-transition rules before
 // persisting the new role.
 func (s *Store) UpdateWorkspaceMemberRole(ctx context.Context, workspacePublicID string, actorUserID, targetUserID int64, newRole string) (*tenancy.WorkspaceMember, error) {
@@ -1075,6 +1076,9 @@ func (s *Store) UpdateWorkspaceMemberRole(ctx context.Context, workspacePublicID
 		workspaceID, err := q.LockWorkspaceMemberships(ctx, strings.TrimSpace(workspacePublicID))
 		if err != nil {
 			return notFound(err)
+		}
+		if err := rejectClosedOrgWorkspaceInTx(ctx, q, workspaceID); err != nil {
+			return err
 		}
 		target, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
 			WorkspaceID: workspaceID, UserID: targetUserID,
@@ -1118,6 +1122,9 @@ func (s *Store) RemoveWorkspaceMember(ctx context.Context, workspacePublicID str
 		workspaceID, err := q.LockWorkspaceMemberships(ctx, strings.TrimSpace(workspacePublicID))
 		if err != nil {
 			return notFound(err)
+		}
+		if err := rejectClosedOrgWorkspaceInTx(ctx, q, workspaceID); err != nil {
+			return err
 		}
 		target, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
 			WorkspaceID: workspaceID, UserID: targetUserID,
@@ -1172,148 +1179,4 @@ func (s *Store) mutationContext(ctx context.Context, q *dbsqlc.Queries, workspac
 		return "", 0, err
 	}
 	return actorRole, int(owners), nil
-}
-
-// CreateOrganization mints an org_ organization and grants the creator the
-// owner membership in the same transaction. The stable organization Billing
-// Account (#944) is provisioned in the same transaction with the creator as
-// billing owner (wallet via trigger), so org creation/first config never
-// leaves an org without its funds identity and org workspaces never fall
-// back to the creator personal pool.
-func (s *Store) CreateOrganization(ctx context.Context, ownerUserID int64, name string) (*tenancy.Organization, error) {
-	if err := tenancy.ValidateName(name); err != nil {
-		return nil, err
-	}
-	var created dbsqlc.Organization
-	for attempt := 0; attempt < mintAttempts; attempt++ {
-		publicID, err := tenancy.NewOrganizationPublicID()
-		if err != nil {
-			return nil, err
-		}
-		err = s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
-			row, insertErr := q.CreateOrganization(ctx, dbsqlc.CreateOrganizationParams{
-				PublicID: publicID, Name: strings.TrimSpace(name),
-			})
-			if insertErr != nil {
-				return insertErr
-			}
-			created = row
-			if err := q.UpsertOrganizationMembership(ctx, dbsqlc.UpsertOrganizationMembershipParams{
-				OrganizationID: row.InternalID,
-				UserID:         ownerUserID,
-				Role:           tenancy.RoleOwner,
-			}); err != nil {
-				return err
-			}
-			return s.ensureOrganizationAccountInTx(ctx, q, row.InternalID, ownerUserID)
-		})
-		if isPublicIDConflict(err) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		return mapOrganization(created), nil
-	}
-	return nil, tenancy.ErrConflict
-}
-
-// GetOrganization resolves an organization by opaque public id.
-func (s *Store) GetOrganization(ctx context.Context, publicID string) (*tenancy.Organization, error) {
-	row, err := s.dbWithContext(ctx).q.GetOrganizationByPublicID(ctx, strings.TrimSpace(publicID))
-	if err != nil {
-		return nil, notFound(err)
-	}
-	return mapOrganization(row), nil
-}
-
-// ListOrganizationsForUser lists membership-visible organizations.
-func (s *Store) ListOrganizationsForUser(ctx context.Context, userID int64) ([]*tenancy.Organization, error) {
-	rows, err := s.dbWithContext(ctx).q.ListOrganizationsByUserID(ctx, dbsqlc.ListOrganizationsByUserIDParams{
-		UserID: userID, RowLimit: maxTenancyRows,
-	})
-	if err != nil {
-		return nil, err
-	}
-	out := make([]*tenancy.Organization, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, mapOrganization(row))
-	}
-	return out, nil
-}
-
-// UpdateOrganization renames a live organization; archived or missing rows
-// read as not found.
-func (s *Store) UpdateOrganization(ctx context.Context, publicID, name string) (*tenancy.Organization, error) {
-	if err := tenancy.ValidateName(name); err != nil {
-		return nil, err
-	}
-	rows, err := s.dbWithContext(ctx).q.UpdateOrganizationName(ctx, dbsqlc.UpdateOrganizationNameParams{
-		Name: strings.TrimSpace(name), PublicID: strings.TrimSpace(publicID),
-	})
-	if err != nil {
-		return nil, err
-	}
-	if rows == 0 {
-		return nil, tenancy.ErrNotFound
-	}
-	return s.GetOrganization(ctx, publicID)
-}
-
-// GetOrganizationRole reports the caller's direct organization membership
-// role, ok=false when the organization exists but the user is not a member.
-func (s *Store) GetOrganizationRole(ctx context.Context, organizationPublicID string, userID int64) (string, bool, error) {
-	organization, err := s.GetOrganization(ctx, organizationPublicID)
-	if err != nil {
-		return "", false, err
-	}
-	row, err := s.dbWithContext(ctx).q.GetOrganizationMembership(ctx, dbsqlc.GetOrganizationMembershipParams{
-		OrganizationID: organization.InternalID, UserID: userID,
-	})
-	if database.IsNotFound(err) {
-		return "", false, nil
-	}
-	if err != nil {
-		return "", false, err
-	}
-	return row.Role, true, nil
-}
-
-// ListOrganizationWorkspaces lists workspaces owned by an organization.
-func (s *Store) ListOrganizationWorkspaces(ctx context.Context, organizationPublicID string) ([]*tenancy.Workspace, error) {
-	organization, err := s.GetOrganization(ctx, organizationPublicID)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := s.dbWithContext(ctx).q.ListWorkspacesByOrganizationID(ctx, dbsqlc.ListWorkspacesByOrganizationIDParams{
-		OrganizationID: pgtype.Int8{Int64: organization.InternalID, Valid: true},
-		RowLimit:       maxTenancyRows,
-	})
-	if err != nil {
-		return nil, err
-	}
-	out := make([]*tenancy.Workspace, 0, len(rows))
-	for _, row := range rows {
-		orgPublicID := organization.PublicID
-		out = append(out, mapWorkspace(row, &orgPublicID))
-	}
-	return out, nil
-}
-
-// CreateOrganizationWorkspace mints a ws_ workspace under an organization.
-// The creator gains an owner membership row.
-func (s *Store) CreateOrganizationWorkspace(ctx context.Context, organizationPublicID string, ownerUserID int64, name string) (*tenancy.Workspace, error) {
-	if err := tenancy.ValidateName(name); err != nil {
-		return nil, err
-	}
-	organization, err := s.GetOrganization(ctx, organizationPublicID)
-	if err != nil {
-		return nil, err
-	}
-	params := tenancy.CreateWorkspaceParams{
-		Name:           name,
-		OrganizationID: &organization.PublicID,
-		OwnerUserID:    ownerUserID,
-	}
-	return s.CreateWorkspace(ctx, params)
 }

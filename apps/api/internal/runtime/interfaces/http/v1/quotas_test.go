@@ -4,14 +4,15 @@ package v1
 //
 // Fresh-DB friendly: in-memory tenancy store + fakes only, no testdb.
 // Behavioral coverage: self unlimited default, self capped read with
-// usage + remaining, hidden-workspace 404, Billing Owner/Admin writes,
-// space-only admin 403 (a Workspace admin cannot raise a pool-granted
+// usage + remaining, hidden-workspace 404, Personal Billing Owner writes,
+// Billing Admin/space-only admin 403 (a Workspace admin cannot raise a pool-granted
 // quota; API and UI permissions agree), manager-only list, set-input 422
 // shapes, and task quote/submit quota exhaustion (403
 // member_quota_exhausted, distinct from budget/insufficiency).
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -32,13 +33,10 @@ import (
 )
 
 type fakeMemberQuotas struct {
-	mu        sync.Mutex
-	period    map[quotaKey]string
-	limit     map[quotaKey]*int64
-	used      map[quotaKey]int64
-	defPeriod map[int64]string
-	defLimit  map[int64]*int64
-	defSet    map[int64]bool
+	mu     sync.Mutex
+	period map[quotaKey]string
+	limit  map[quotaKey]*int64
+	used   map[quotaKey]int64
 }
 
 type quotaKey struct {
@@ -96,35 +94,6 @@ func (f *fakeMemberQuotas) UsageForPeriod(_ context.Context, billingAccountID, u
 	return f.used[quotaKey{billingAccountID, userID}], nil
 }
 
-func (f *fakeMemberQuotas) GetDefaultPolicy(_ context.Context, billingAccountID int64) (string, *int64, bool, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.defSet != nil && f.defSet[billingAccountID] {
-		return f.defPeriod[billingAccountID], f.defLimit[billingAccountID], true, nil
-	}
-	return "", nil, false, nil
-}
-
-func (f *fakeMemberQuotas) SetDefaultPolicy(_ context.Context, billingAccountID int64, period string, limitCredits *int64, _ int64) (memberquotas.SetResult, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if err := memberquotas.ValidateSet(period, limitCredits); err != nil {
-		return memberquotas.SetResult{}, err
-	}
-	if period == "" {
-		period = memberquotas.PeriodUnlimited
-	}
-	if f.defPeriod == nil {
-		f.defPeriod = make(map[int64]string)
-		f.defLimit = make(map[int64]*int64)
-		f.defSet = make(map[int64]bool)
-	}
-	f.defPeriod[billingAccountID] = period
-	f.defLimit[billingAccountID] = limitCredits
-	f.defSet[billingAccountID] = true
-	return memberquotas.SetResult{Period: period, LimitCredits: limitCredits}, nil
-}
-
 func (f *fakeMemberQuotas) setUsed(account, user, used int64) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -137,12 +106,9 @@ func (f *fakeMemberQuotas) setUsed(account, user, used int64) {
 func newQuotaTestFixture() (*billingTestFixture, *fakeMemberQuotas) {
 	fx := newBillingTestFixture()
 	quotas := &fakeMemberQuotas{
-		period:    make(map[quotaKey]string),
-		limit:     make(map[quotaKey]*int64),
-		used:      make(map[quotaKey]int64),
-		defPeriod: make(map[int64]string),
-		defLimit:  make(map[int64]*int64),
-		defSet:    make(map[int64]bool),
+		period: make(map[quotaKey]string),
+		limit:  make(map[quotaKey]*int64),
+		used:   make(map[quotaKey]int64),
 	}
 	fx.deps.Quotas = quotas
 	return fx, quotas
@@ -503,5 +469,65 @@ func TestV1TaskSubmitQuotaExhausted(t *testing.T) {
 	}
 	if items, _ := v1Data(t, list).([]any); len(items) != 0 {
 		t.Fatalf("tasks after blocked submit = %d, want 0 (no residue)", len(items))
+	}
+}
+
+func TestV1QuotaPersonalBillingAdminCannotManage(t *testing.T) {
+	ctx := context.Background()
+	fx, quotas := newQuotaTestFixture()
+	ws := v1WorkspaceFixture(t, ctx, fx.store, "quota", 11)
+	account := fx.mustAccount(t, ctx, ws)
+	fx.accounts.roles = map[int64]map[int64]string{account: {11: tenancy.BillingRoleAdmin}}
+	engine := fx.engine()
+	path := "/api/v1/workspaces/" + ws.PublicID + "/member-quotas"
+	for _, call := range []v1Call{
+		{method: http.MethodGet, path: path, userID: 11},
+		{method: http.MethodPut, path: path + "/" + quotaUserPublicID(11), userID: 11, body: `{"data":{"period":"daily","limit_credits":100}}`},
+	} {
+		status, _, payload := doV1(t, engine, call)
+		if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeBillingAccountForbidden) {
+			t.Fatalf("Personal Billing Admin %s = %d %v, want 403 billing_account_forbidden", call.method, status, payload)
+		}
+	}
+	if len(quotas.period) != 0 {
+		t.Fatal("denied quota write must not persist a row")
+	}
+}
+
+type quotaRoleLookupFailure struct {
+	tenancy.Store
+	failedUserID int64
+}
+
+func (s quotaRoleLookupFailure) GetOrganizationRole(ctx context.Context, organizationID string, userID int64) (string, bool, error) {
+	if userID == s.failedUserID {
+		return "", false, errors.New("role lookup failed")
+	}
+	return s.Store.GetOrganizationRole(ctx, organizationID, userID)
+}
+
+func TestV1QuotaSetRoleLookupFailureDoesNotWrite(t *testing.T) {
+	ctx := context.Background()
+	fx, quotas := newQuotaTestFixture()
+	org, err := fx.store.CreateOrganization(ctx, 11, "quota-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "quota-workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx.dir.ensure(12)
+	fx.deps.Tenancy = quotaRoleLookupFailure{Store: fx.store, failedUserID: 12}
+	status, _, payload := doV1(t, fx.engine(), v1Call{
+		method: http.MethodPut, userID: 11,
+		path: "/api/v1/workspaces/" + ws.PublicID + "/member-quotas/" + quotaUserPublicID(12),
+		body: `{"data":{"period":"daily","limit_credits":100}}`,
+	})
+	if status != http.StatusServiceUnavailable || v1ErrorCode(t, payload) != string(contract.CodeServiceUnavailable) {
+		t.Fatalf("target lookup failure = %d %v, want 503 service_unavailable", status, payload)
+	}
+	if len(quotas.period) != 0 {
+		t.Fatal("role lookup failure must not persist a quota row")
 	}
 }

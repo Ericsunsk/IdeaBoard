@@ -6,7 +6,7 @@
 
     <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
       <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-        <div class="text-base font-bold text-foreground">
+        <div class="text-admin-title font-bold text-foreground">
           {{ t('admin.billingAccount.title') }}
         </div>
         <div
@@ -18,7 +18,7 @@
             v-for="opt in scopeOptions"
             :key="opt.value"
             type="button"
-            class="rounded-control px-3 py-1 text-xs font-semibold transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer"
+            class="rounded-control px-3 py-1 text-admin-meta font-semibold transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer"
             :class="
               ownerScope === opt.value
                 ? 'bg-card text-foreground shadow-raised'
@@ -62,7 +62,7 @@
 
         <AdminColumn :header="t('admin.billingAccount.accountColumn')" style="width: 220px">
           <template #body="{ data }">
-            <AdminMono class="text-xs font-bold text-foreground">
+            <AdminMono class="text-admin-meta font-bold text-foreground">
               {{ data.billing_account_id }}
             </AdminMono>
           </template>
@@ -81,7 +81,7 @@
         <AdminColumn :header="t('admin.billingAccount.linkageColumn')" style="min-width: 200px">
           <template #body="{ data }">
             <AdminMono
-              class="block max-w-64 truncate text-xs text-muted-foreground"
+              class="block max-w-64 truncate text-admin-meta text-muted-foreground"
               :title="data.workspace_id ?? data.organization_id ?? ''"
             >
               {{ data.workspace_id ?? data.organization_id ?? '' }}
@@ -91,7 +91,7 @@
 
         <AdminColumn :header="t('admin.billingAccount.createdColumn')" style="width: 170px">
           <template #body="{ data }">
-            <AdminMono class="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+            <AdminMono class="whitespace-nowrap text-admin-meta tabular-nums text-muted-foreground">
               {{ formatAdminDateTimeWithSeconds(data.created_at) }}
             </AdminMono>
           </template>
@@ -112,7 +112,7 @@
     </div>
 
     <div class="flex items-center justify-between">
-      <span class="text-xs font-normal text-muted-foreground">
+      <span class="text-admin-meta font-normal text-muted-foreground">
         {{ t('admin.billingAccount.footerCount', { count: accounts.length }) }}
       </span>
       <div class="flex items-center gap-2">

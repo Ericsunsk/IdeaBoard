@@ -15,9 +15,8 @@
 // transaction. Capture, Release, and background reconciliation converge on
 // the STORED payer; they never re-resolve from the live Owner or
 // membership, so handovers and departures mid-flight cannot move the
-// money. The Workspace shared budget (#945) and the member
-// cross-workspace quota (#946) join this same transaction after Quote
-// and before Hold; both stay independently effective.
+// money. The member cross-workspace quota (#946) joins this same
+// transaction after Quote and before Hold.
 package application
 
 import (
@@ -122,18 +121,11 @@ func (s *VisionBillingService) reserve(ctx context.Context, workspacePublicID st
 	if err != nil {
 		return visionReservation{}, ErrVisionPricingUnavailable
 	}
-	// Workspace shared budget gate (#945): after Quote, before Hold, in
+	// Member quota gate (#946): after Quote, before Hold, in
 	// this same reservation transaction. The ledger Hold that follows is
 	// the reservation; terminal Capture/Release needs no re-check and
-	// in-flight operations converge on their submit-time period facts.
-	// A nil checker means unlimited. The member quota gate (#946) runs
-	// next at the same boundary, in the same fixed lock order as Task
-	// submit (budget row first, quota row second).
-	if s.budgets != nil && quote.TotalCredits > 0 {
-		if err := s.budgets.CheckBudgetByInternalIDInTx(ctx, tx, identity.WorkspaceInternalID, quote.TotalCredits, quote.QuotedAt); err != nil {
-			return visionReservation{}, err
-		}
-	}
+	// in-flight operations converge on their submit-time facts.
+	// A nil checker means unlimited.
 	if s.quotas != nil && quote.TotalCredits > 0 {
 		if err := s.quotas.CheckQuotaInTx(ctx, tx, identity.BillingAccountID, userID, quote.TotalCredits, quote.QuotedAt); err != nil {
 			return visionReservation{}, err

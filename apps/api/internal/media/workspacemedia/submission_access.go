@@ -34,6 +34,15 @@ func (a *TaskSubmissionAuthorizer) AuthorizeSubmission(ctx context.Context, tx p
 	if err != nil {
 		return binding, err
 	}
+	// Closed Organizations suspend new spending (#955): the settlement
+	// transaction fails closed even if the HTTP prelude was bypassed.
+	// Terminal Capture/Release on row-pinned accounts still converge
+	// (they never pass this gate), so history survives closure.
+	if closed, err := isOrganizationClosedForWorkspace(ctx, q, workspaceID); err != nil {
+		return binding, err
+	} else if closed {
+		return binding, workspacetasks.ErrForbidden
+	}
 	if boardID := strings.TrimSpace(input.BoardID); boardID != "" {
 		if a.TaskBoards == nil {
 			return binding, workspacetasks.ErrSettlementUnavailable
@@ -85,6 +94,24 @@ func (a *TaskSubmissionAuthorizer) AuthorizeSubmission(ctx context.Context, tx p
 }
 
 // merged from internal/media/workspacemedia/taskassets.go (structural consolidation; symbols unchanged).
+// isOrganizationClosedForWorkspace reports whether the workspace belongs
+// to a closed Organization (#955). Personal scopes and missing rows read
+// as open here; callers keep their own not-found handling.
+func isOrganizationClosedForWorkspace(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string) (bool, error) {
+	row, err := q.GetWorkspaceByPublicID(ctx, strings.TrimSpace(workspacePublicID))
+	if err != nil {
+		return false, nil
+	}
+	if !row.OrganizationID.Valid {
+		return false, nil
+	}
+	org, err := q.GetOrganizationByInternalID(ctx, row.OrganizationID.Int64)
+	if err != nil {
+		return false, nil
+	}
+	return org.ClosedAt.Valid, nil
+}
+
 // TaskAssetAdapter supplies readiness facts for worker execution of accepted
 // immutable inputs. Submission authorization belongs to TaskSubmissionAuthorizer.
 type TaskAssetAdapter struct {

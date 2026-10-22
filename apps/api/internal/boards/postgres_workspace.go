@@ -200,20 +200,55 @@ func (s *PostgresWorkspaceBoardStore) getBoard(ctx context.Context, workspacePub
 }
 
 // boardRoleTx resolves current membership and selected members through ResolveRole.
+// Organization Owner/Admin (#951) count as workspace members via their org
+// role even without an explicit workspace row; org Members and personal
+// scopes use the direct row only.
+func organizationWorkspaceOpenTx(ctx context.Context, q *dbsqlc.Queries, workspace dbsqlc.Workspace) (bool, error) {
+	if !workspace.OrganizationID.Valid {
+		return true, nil
+	}
+	organization, err := q.GetOrganizationByInternalID(ctx, workspace.OrganizationID.Int64)
+	if err != nil {
+		return false, err
+	}
+	return !organization.ClosedAt.Valid, nil
+}
+
 func boardRoleTx(ctx context.Context, q *dbsqlc.Queries, board *V1Board, userID int64) (AccessRole, bool, error) {
 	workspace, err := q.GetWorkspaceByPublicID(ctx, board.WorkspacePublicID)
 	if err != nil {
 		return "", false, err
 	}
-	membership, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspace.InternalID, UserID: userID})
-	if database.IsNotFound(err) {
-		return "", false, nil
-	}
+	open, err := organizationWorkspaceOpenTx(ctx, q, workspace)
 	if err != nil {
 		return "", false, err
 	}
-	if !IsWorkspaceMemberRole(membership.Role) {
+	if !open {
 		return "", false, nil
+	}
+	membership, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspace.InternalID, UserID: userID})
+	if err == nil {
+		if !IsWorkspaceMemberRole(membership.Role) {
+			return "", false, nil
+		}
+	} else if database.IsNotFound(err) {
+		if !workspace.OrganizationID.Valid {
+			return "", false, nil
+		}
+		orgMember, orgErr := q.GetOrganizationMembership(ctx, dbsqlc.GetOrganizationMembershipParams{
+			OrganizationID: workspace.OrganizationID.Int64, UserID: userID,
+		})
+		if database.IsNotFound(orgErr) {
+			return "", false, nil
+		}
+		if orgErr != nil {
+			return "", false, orgErr
+		}
+		if orgMember.Role != tenancy.RoleOwner && orgMember.Role != tenancy.RoleAdmin {
+			return "", false, nil
+		}
+	} else {
+		return "", false, err
 	}
 	_, err = q.GetWorkspaceBoardMembership(ctx, dbsqlc.GetWorkspaceBoardMembershipParams{WorkspacePublicID: board.WorkspacePublicID, BoardPublicID: board.PublicID, UserID: userID})
 	if err != nil && !database.IsNotFound(err) {
@@ -290,15 +325,36 @@ func (s *PostgresWorkspaceBoardStore) CreateBoard(ctx context.Context, workspace
 		if err != nil {
 			return err
 		}
-		member, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspace.InternalID, UserID: creatorUserID})
-		if database.IsNotFound(err) {
-			return ErrNotFound
-		}
+		open, err := organizationWorkspaceOpenTx(ctx, q, workspace)
 		if err != nil {
 			return err
 		}
-		if !IsWorkspaceMemberRole(member.Role) {
+		if !open {
 			return ErrNotFound
+		}
+		member, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspace.InternalID, UserID: creatorUserID})
+		if err == nil {
+			if !IsWorkspaceMemberRole(member.Role) {
+				return ErrNotFound
+			}
+		} else if database.IsNotFound(err) {
+			if !workspace.OrganizationID.Valid {
+				return ErrNotFound
+			}
+			orgMember, orgErr := q.GetOrganizationMembership(ctx, dbsqlc.GetOrganizationMembershipParams{
+				OrganizationID: workspace.OrganizationID.Int64, UserID: creatorUserID,
+			})
+			if database.IsNotFound(orgErr) {
+				return ErrNotFound
+			}
+			if orgErr != nil {
+				return orgErr
+			}
+			if orgMember.Role != tenancy.RoleOwner && orgMember.Role != tenancy.RoleAdmin {
+				return ErrNotFound
+			}
+		} else if err != nil {
+			return err
 		}
 
 		row, err := q.CreateWorkspaceBoard(ctx, dbsqlc.CreateWorkspaceBoardParams{

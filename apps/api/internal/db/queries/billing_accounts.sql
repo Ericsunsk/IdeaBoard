@@ -1,13 +1,18 @@
 -- Billing Account resolution and membership queries (#915). Public references
 -- use public_id (ba_); internal_id stays database-internal.
 --
--- Resolution is explicit and fail-closed: one Workspace resolves to exactly
--- one Billing Account via (1) explicit workspace_billing_links, else (2) the
--- Organization account for org workspaces, else (3) the per-workspace
--- account. Missing, ambiguous, or conflicting ownership fails closed in the
--- caller (no silent fallback to another wallet). All queries are typed and
+-- Resolution is fixed at Workspace creation scope (ADR-0038): a Workspace in
+-- an Organization resolves to that Organization's shared pool, a personal
+-- Workspace resolves to its owner's deterministic Personal account
+-- (ensure_personal_billing_account_for_user: the Default-workspace-anchored
+-- account, provisioned on demand). Missing or ownerless scopes fail closed
+-- in the caller (no silent fallback to another wallet, no per-workspace
+-- mint, no link indirection). All queries are typed and
 -- join the caller-owned transaction via the passed Queries (no ambient pool
 -- use here), so Task settlement keeps Quote/Hold/Task/River atomic.
+--
+-- workspace_billing_links rows are retired (writes closed, resolution no
+-- longer reads them); the table stays for read-only audit only.
 
 -- name: GetBillingAccountByOrganizationID :one
 SELECT internal_id, public_id, workspace_id, organization_id, created_at, updated_at
@@ -47,18 +52,6 @@ WHERE (sqlc.arg(before_id)::BIGINT = 0 OR b.internal_id < sqlc.arg(before_id)::B
     OR (sqlc.arg(owner_scope)::TEXT = 'workspace' AND b.organization_id IS NULL))
 ORDER BY b.internal_id DESC
 LIMIT sqlc.arg(row_limit);
-
--- name: GetWorkspaceBillingLink :one
-SELECT workspace_id, billing_account_id, created_at
-FROM workspace_billing_links
-WHERE workspace_id = sqlc.arg(workspace_id)
-LIMIT 1;
-
--- name: UpsertWorkspaceBillingLink :one
-INSERT INTO workspace_billing_links (workspace_id, billing_account_id)
-VALUES (sqlc.arg(workspace_id), sqlc.arg(billing_account_id))
-ON CONFLICT (workspace_id) DO UPDATE SET billing_account_id = EXCLUDED.billing_account_id
-RETURNING workspace_id, billing_account_id, created_at;
 
 -- name: ListWorkspacesByBillingAccountID :many
 SELECT w.internal_id, w.public_id, w.organization_id, w.owner_user_id, w.name, w.is_default, w.created_at, w.updated_at
@@ -121,19 +114,20 @@ WHERE organization_id = sqlc.arg(organization_id) AND role = 'owner'
 ORDER BY user_id ASC;
 
 -- name: LockWorkspaceBillingAccounts :many
--- Lock the resolved payer and any account anchored to the Workspace before
--- deletion. Stable ID ordering keeps the account -> Workspace lock order even
--- when an explicitly shared Workspace already has an older anchor account.
--- Resolve without provisioning; an unfunded Workspace returns no rows.
+-- Lock the creation-scope payer before deletion (ADR-0038): the account
+-- anchored to the Workspace itself (Default survivor row, legacy anchors),
+-- the owner's Personal survivor (Default-workspace-anchored account), and
+-- the Organization pool for org scopes. Stable ID ordering keeps the
+-- account -> Workspace lock order. Resolve without provisioning; an
+-- unfunded Workspace returns no rows.
 SELECT b.internal_id
 FROM workspaces AS w
-LEFT JOIN workspace_billing_links AS l ON l.workspace_id = w.internal_id
+LEFT JOIN workspaces AS def ON def.owner_user_id = w.owner_user_id
+  AND def.organization_id IS NULL
+  AND def.is_default
 JOIN billing_accounts AS b ON b.workspace_id = w.internal_id
-  OR b.internal_id = COALESCE(
-    l.billing_account_id,
-    (SELECT a.internal_id FROM billing_accounts AS a WHERE a.organization_id = w.organization_id),
-    (SELECT a.internal_id FROM billing_accounts AS a WHERE a.workspace_id = w.internal_id)
-  )
+  OR (w.is_default = FALSE AND def.internal_id IS NOT NULL AND b.workspace_id = def.internal_id)
+  OR (w.organization_id IS NOT NULL AND b.organization_id = w.organization_id)
 WHERE w.public_id = sqlc.arg(workspace_public_id)
 ORDER BY b.internal_id
 FOR NO KEY UPDATE OF b;

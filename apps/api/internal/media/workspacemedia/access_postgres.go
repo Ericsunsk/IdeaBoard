@@ -122,17 +122,34 @@ func lockWorkspaceMemberRole(ctx context.Context, q *dbsqlc.Queries, workspaceID
 	if err != nil {
 		return "", err
 	}
-	member, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspace, UserID: userID})
-	if database.IsNotFound(err) {
-		return "", ErrNotFound
-	}
-	if err != nil {
+	if member, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspace, UserID: userID}); err == nil {
+		if checkMemberPrecondition(member.Role) != nil {
+			return "", ErrNotFound
+		}
+		return member.Role, nil
+	} else if !database.IsNotFound(err) {
 		return "", err
 	}
-	if checkMemberPrecondition(member.Role) != nil {
+	workspaceRow, err := q.GetWorkspaceByInternalID(ctx, workspace)
+	if err != nil {
 		return "", ErrNotFound
 	}
-	return member.Role, nil
+	if !workspaceRow.OrganizationID.Valid {
+		return "", ErrNotFound
+	}
+	orgMember, orgErr := q.GetOrganizationMembership(ctx, dbsqlc.GetOrganizationMembershipParams{
+		OrganizationID: workspaceRow.OrganizationID.Int64, UserID: userID,
+	})
+	if database.IsNotFound(orgErr) {
+		return "", ErrNotFound
+	}
+	if orgErr != nil {
+		return "", orgErr
+	}
+	if orgMember.Role != "owner" && orgMember.Role != "admin" {
+		return "", ErrNotFound
+	}
+	return orgMember.Role, nil
 }
 
 func loadAuthorizedAsset(ctx context.Context, q *dbsqlc.Queries, workspaceID, assetID string, userID int64, role string, access BoardAccess) (*Asset, error) {

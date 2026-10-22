@@ -32,13 +32,13 @@
             >{{ t('account.rewards.redeem') }}</Button
           >
         </div>
-        <p class="m-0 text-xs text-muted-foreground" role="note">
+        <p class="m-0 text-admin-meta text-muted-foreground" role="note">
           {{ t('account.rewards.beneficiaryNote') }}
         </p>
         <p
           v-if="redeemFailed"
           id="account-reward-code-error"
-          class="m-0 border-0 bg-transparent p-0 text-xs font-semibold text-destructive"
+          class="m-0 border-0 bg-transparent p-0 text-admin-meta font-semibold text-destructive"
           role="alert"
         >
           {{ redeemErrorText }}
@@ -47,7 +47,7 @@
     </section>
 
     <section class="grid min-w-0 gap-3" aria-labelledby="reward-history-heading">
-      <h3 id="reward-history-heading" class="m-0 text-lg font-bold text-foreground">
+      <h3 id="reward-history-heading" class="m-0 text-admin-heading font-bold text-foreground">
         {{ t('account.rewards.historyTitle') }}
       </h3>
       <DataTableFrame
@@ -134,7 +134,7 @@
             role="status"
           >
             <span class="font-semibold text-foreground">{{ t('account.rewards.emptyTitle') }}</span>
-            <span class="mt-1 text-sm text-muted-foreground">{{
+            <span class="mt-1 text-admin-content text-muted-foreground">{{
               t('account.rewards.emptyDescription')
             }}</span>
           </div>

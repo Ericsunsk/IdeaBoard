@@ -26,9 +26,20 @@
 
     <!-- Loaded Content: Invite Bar & Roster List -->
     <template v-else>
-      <!-- Invite Member Card (when canManage) -->
+      <!-- Personal Default is private (#952): no invite bar, only the
+        private note. Other Personal workspaces invite freely; consumption
+        charges the holder's shared Personal account. -->
+      <p
+        v-if="section.isDefaultWorkspace.value"
+        class="m-0 rounded-control border border-border bg-muted/40 p-3 text-xs leading-normal text-muted-foreground"
+        aria-live="polite"
+      >
+        {{ t('workspace.switcher.members.defaultPrivate') }}
+      </p>
+
+      <!-- Invite Member Card (when canManage, never on Default) -->
       <section
-        v-if="section.canManage.value"
+        v-if="section.canManage.value && !section.isDefaultWorkspace.value"
         :class="accountCardPanelClass"
         aria-label="Invite Member"
       >
@@ -121,74 +132,119 @@
 
               <!-- Right: Role Control + Action -->
               <div class="flex items-center gap-2 shrink-0">
-                <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The trigger carries its accessible name via :aria-label; the rule cannot see through the Select primitive. -->
-                <Select
-                  v-if="section.canManage.value"
-                  :model-value="entry.role"
-                  :disabled="section.isPending(`role:${entry.userId}`)"
-                  @update:model-value="onRoleChange(entry.userId, $event)"
+                <template
+                  v-if="handover.addressedInvite.value && entry.userId === props.currentUserId"
                 >
-                  <SelectTrigger
+                  <Button
+                    type="button"
                     size="sm"
-                    class="w-auto min-w-24 cursor-pointer gap-1.5"
+                    class="h-8 px-3"
+                    :is-disabled="handover.isSaving.value"
+                    :aria-label="t('workspace.switcher.handover.accept')"
+                    @click="handover.requestDecision(handover.addressedInvite.value, 'accept')"
+                  >
+                    {{ t('workspace.switcher.handover.accept') }}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    class="h-8 px-3"
+                    :is-disabled="handover.isSaving.value"
+                    :aria-label="t('workspace.switcher.handover.reject')"
+                    @click="handover.requestDecision(handover.addressedInvite.value, 'reject')"
+                  >
+                    {{ t('workspace.switcher.handover.reject') }}
+                  </Button>
+                </template>
+                <template v-else>
+                  <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The trigger carries its accessible name via :aria-label; the rule cannot see through the Select primitive. -->
+                  <Select
+                    v-if="section.canManage.value"
+                    :model-value="entry.role"
+                    :disabled="section.isPending(`role:${entry.userId}`)"
+                    @update:model-value="onRoleChange(entry.userId, $event)"
+                  >
+                    <SelectTrigger
+                      size="sm"
+                      class="w-auto min-w-24 cursor-pointer gap-1.5"
+                      :aria-label="
+                        t('workspace.switcher.members.roleForMember', {
+                          userId: memberDisplayName(entry),
+                        })
+                      "
+                    >
+                      <SelectValue>{{ roleLabel(entry.role) }}</SelectValue>
+                      <SelectIcon>
+                        <NavArrowDown class="size-3.5 shrink-0" aria-hidden="true" />
+                      </SelectIcon>
+                    </SelectTrigger>
+                    <SelectContent
+                      position="popper"
+                      align="end"
+                      :side-offset="appOverlayMenuSideOffset"
+                    >
+                      <SelectViewport>
+                        <SelectItem value="member">
+                          <SelectItemText>{{
+                            t('workspace.switcher.members.roleMember')
+                          }}</SelectItemText>
+                        </SelectItem>
+                        <SelectItem value="admin">
+                          <SelectItemText>{{
+                            t('workspace.switcher.members.roleAdmin')
+                          }}</SelectItemText>
+                        </SelectItem>
+                        <SelectItem v-if="section.isOwner.value" value="owner">
+                          <SelectItemText>{{
+                            t('workspace.switcher.members.roleOwner')
+                          }}</SelectItemText>
+                        </SelectItem>
+                      </SelectViewport>
+                    </SelectContent>
+                  </Select>
+                  <span
+                    v-else
+                    class="shrink-0 rounded-pill px-2.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground"
+                  >
+                    {{ roleLabel(entry.role) }}
+                  </span>
+
+                  <!-- Funds handover: billing owners start a transfer from a
+                  member row (never the own row); the backend still enforces
+                  owner-only initiation. -->
+                  <button
+                    v-if="handover.canHandOverTo(entry.userId)"
+                    type="button"
+                    class="h-8 px-2.5 rounded-control text-admin-meta font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="handover.isSaving.value"
                     :aria-label="
-                      t('workspace.switcher.members.roleForMember', {
-                        userId: memberDisplayName(entry),
+                      t('workspace.switcher.handover.handOverTo', {
+                        name: memberDisplayName(entry),
                       })
                     "
+                    @click="handover.requestHandOver(entry.userId)"
                   >
-                    <SelectValue>{{ roleLabel(entry.role) }}</SelectValue>
-                    <SelectIcon>
-                      <NavArrowDown class="size-3.5 shrink-0" aria-hidden="true" />
-                    </SelectIcon>
-                  </SelectTrigger>
-                  <SelectContent
-                    position="popper"
-                    align="end"
-                    :side-offset="appOverlayMenuSideOffset"
-                  >
-                    <SelectViewport>
-                      <SelectItem value="member">
-                        <SelectItemText>{{
-                          t('workspace.switcher.members.roleMember')
-                        }}</SelectItemText>
-                      </SelectItem>
-                      <SelectItem value="admin">
-                        <SelectItemText>{{
-                          t('workspace.switcher.members.roleAdmin')
-                        }}</SelectItemText>
-                      </SelectItem>
-                      <SelectItem v-if="section.isOwner.value" value="owner">
-                        <SelectItemText>{{
-                          t('workspace.switcher.members.roleOwner')
-                        }}</SelectItemText>
-                      </SelectItem>
-                    </SelectViewport>
-                  </SelectContent>
-                </Select>
-                <span
-                  v-else
-                  class="shrink-0 rounded-pill px-2.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground"
-                >
-                  {{ roleLabel(entry.role) }}
-                </span>
+                    {{ t('workspace.switcher.handover.handOver') }}
+                  </button>
 
-                <!-- Independent Leave/Remove text button at the row end -->
-                <button
-                  v-if="
-                    section.canManage.value && section.confirmingRemoveId.value !== entry.userId
-                  "
-                  type="button"
-                  class="h-8 px-2.5 rounded-control text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="section.isPending(`remove:${entry.userId}`)"
-                  @click="section.requestRemove(entry.userId)"
-                >
-                  {{
-                    entry.userId === props.currentUserId
-                      ? t('workspace.switcher.members.leaveAction')
-                      : t('workspace.switcher.members.removeAction')
-                  }}
-                </button>
+                  <!-- Independent Leave/Remove text button at the row end -->
+                  <button
+                    v-if="
+                      section.canManage.value && section.confirmingRemoveId.value !== entry.userId
+                    "
+                    type="button"
+                    class="h-8 px-2.5 rounded-control text-admin-meta font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="section.isPending(`remove:${entry.userId}`)"
+                    @click="section.requestRemove(entry.userId)"
+                  >
+                    {{
+                      entry.userId === props.currentUserId
+                        ? t('workspace.switcher.members.leaveAction')
+                        : t('workspace.switcher.members.removeAction')
+                    }}
+                  </button>
+                </template>
               </div>
             </div>
 
@@ -240,9 +296,23 @@
       </section>
     </template>
   </section>
+  <!-- Funds handover confirmation: ordinary danger confirm (no typing) for
+    initiation, primary for acceptance. Backend still enforces owner-only
+    initiation and recipient-only decisions. -->
+  <UserConfirmDialog
+    :is-visible="handover.confirmation.value != null"
+    :title="handoverTitle"
+    :message="handoverMessage"
+    :confirm-label="handoverTitle"
+    :intent="handover.confirmation.value?.kind === 'accept' ? 'primary' : 'danger'"
+    :is-loading="handover.isSaving.value"
+    @update:is-visible="handover.dismissConfirmation()"
+    @confirm="handover.confirm()"
+  />
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NavArrowDown, SendMail } from '@iconoir/vue'
 import { Button } from '@/components/ui/button'
@@ -260,10 +330,12 @@ import {
 import { Spinner } from '@/components/ui/spinner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
+import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
 import { resolveMemberAvatar, resolveMemberInitial } from '../../../../core/media/avatarUrl'
 import { appOverlayMenuSideOffset } from '../../../../theme/appOverlayMenu'
 import { useUserStore } from '../../../auth'
 import { accountCardPanelClass } from '../shared/ui'
+import { useBillingTransferSection } from '../../session/billing-transfer/useBillingTransferSection'
 import { memberDisplayName, useWorkspaceMemberSection } from './useWorkspaceMemberSection'
 import type { WorkspaceMemberRole } from '../../session/accountWorkspace'
 
@@ -272,6 +344,9 @@ const props = defineProps<{
   workspaceName: string
   currentUserId?: string | null | undefined
   isExpanded: boolean
+  // Personal Default marker from the workspace list (#952): when true the
+  // invite bar hides and the private note shows instead.
+  isDefaultWorkspace?: boolean | undefined
 }>()
 
 const { t } = useI18n()
@@ -281,6 +356,31 @@ const section = useWorkspaceMemberSection({
   workspaceId: () => props.workspaceId,
   currentUserId: () => props.currentUserId,
   isExpanded: () => props.isExpanded,
+  isDefaultWorkspace: () => props.isDefaultWorkspace ?? false,
+})
+
+const handover = useBillingTransferSection({
+  workspaceId: () => props.workspaceId,
+  currentUserId: () => props.currentUserId,
+})
+
+const handoverTitle = computed(() => {
+  const pending = handover.confirmation.value
+  if (pending?.kind === 'invite') return t('workspace.switcher.handover.handOver')
+  return t(`workspace.switcher.handover.${pending?.kind ?? 'accept'}`)
+})
+const handoverMessage = computed(() => {
+  const pending = handover.confirmation.value
+  if (pending?.kind === 'invite') {
+    const target = section.roster.value.find((entry) => entry.userId === pending.targetUserId)
+    return t('workspace.switcher.handover.initiateConfirm', {
+      account: handover.account.value?.billingAccountId ?? '',
+      to: target ? memberDisplayName(target) : pending.targetUserId,
+    })
+  }
+  return t(`workspace.switcher.handover.${pending?.kind ?? 'accept'}Confirm`, {
+    account: handover.account.value?.billingAccountId ?? '',
+  })
 })
 
 function roleLabel(role: WorkspaceMemberRole): string {

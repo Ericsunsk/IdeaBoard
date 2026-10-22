@@ -34,13 +34,11 @@ import type {
   CancelWorkspaceBillingTransfer200,
   CreateWorkspaceBillingQuoteRequest,
   CreateWorkspaceCheckoutRequest,
-  DefaultMemberQuotaEnvelope,
   ErrorEnvelope,
   GetWorkspaceBillingTransfer200,
   GetWorkspaceUsageParams,
   InitiateBillingTransferRequest,
   InitiateWorkspaceBillingTransfer201,
-  LinkWorkspaceBillingAccountRequest,
   ListWorkspaceBillingAccountMembers200,
   ListWorkspaceBillingRecordsParams,
   ListWorkspaceBillingTransfers200,
@@ -54,9 +52,7 @@ import type {
   PaginatedWorkspaceRecharges,
   RejectWorkspaceBillingTransfer200,
   RemoveWorkspaceBillingAccountMember200,
-  SetDefaultMemberQuotaRequest,
   SetMemberQuotaRequest,
-  SetWorkspaceBudgetRequest,
   TransferBillingAccountRequest,
   TransferWorkspaceBillingAccount200,
   UnauthorizedResponse,
@@ -66,7 +62,6 @@ import type {
   UserId,
   WorkspaceBillingAccountEnvelope,
   WorkspaceBillingQuoteEnvelope,
-  WorkspaceBudgetEnvelope,
   WorkspaceCheckoutSessionEnvelope,
   WorkspaceCreditsBalanceEnvelope,
   WorkspacePendingOrderEnvelope,
@@ -166,124 +161,6 @@ export function useGetWorkspaceBillingAccount<
   return query
 }
 
-export const getLinkWorkspaceBillingAccountUrl = (workspaceId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/billing-account/link`
-}
-
-/**
- * Creates the explicit stable association for no-org studio sharing. Requires Workspace Owner/Admin on the workspace AND Billing Owner/Admin on the target account; space-only admins render 403 billing_account_forbidden. Conflicting ownership or a payer switch renders 409 billing_account_conflict (fail closed). Requires the Idempotency-Key header.
- * @summary Link a workspace to a shared billing account (workspace owner/admin + billing manager only)
- */
-export const linkWorkspaceBillingAccount = async (
-  workspaceId: string,
-  linkWorkspaceBillingAccountRequest: LinkWorkspaceBillingAccountRequest,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<WorkspaceBillingAccountEnvelope> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
-  return publicMutator<WorkspaceBillingAccountEnvelope>(
-    getLinkWorkspaceBillingAccountUrl(workspaceId),
-    {
-      ...options,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-      body: JSON.stringify(linkWorkspaceBillingAccountRequest),
-    },
-  )
-}
-
-export const getLinkWorkspaceBillingAccountMutationKey = () =>
-  ['linkWorkspaceBillingAccount'] as const
-
-export const getLinkWorkspaceBillingAccountMutationOptions = <
-  TError = BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof linkWorkspaceBillingAccount>>,
-    TError,
-    LinkWorkspaceBillingAccountMutationVariables,
-    TContext
-  >
-  request?: SecondParameter<typeof publicMutator>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof linkWorkspaceBillingAccount>>,
-  TError,
-  LinkWorkspaceBillingAccountMutationVariables,
-  TContext
-> => {
-  const mutationKey = getLinkWorkspaceBillingAccountMutationKey()
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof linkWorkspaceBillingAccount>>,
-    LinkWorkspaceBillingAccountMutationVariables
-  > = (props) => {
-    const { workspaceId, data } = props ?? {}
-
-    return linkWorkspaceBillingAccount(workspaceId, data, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type LinkWorkspaceBillingAccountMutationResult = NonNullable<
-  Awaited<ReturnType<typeof linkWorkspaceBillingAccount>>
->
-export type LinkWorkspaceBillingAccountMutationBody = LinkWorkspaceBillingAccountRequest
-export type LinkWorkspaceBillingAccountMutationError =
-  BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse
-export type LinkWorkspaceBillingAccountMutationVariables = {
-  workspaceId: string
-  data: LinkWorkspaceBillingAccountRequest
-}
-
-/**
- * @summary Link a workspace to a shared billing account (workspace owner/admin + billing manager only)
- */
-export const useLinkWorkspaceBillingAccount = <
-  TError = BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof linkWorkspaceBillingAccount>>,
-      TError,
-      LinkWorkspaceBillingAccountMutationVariables,
-      TContext
-    >
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof linkWorkspaceBillingAccount>>,
-  TError,
-  LinkWorkspaceBillingAccountMutationVariables,
-  TContext
-> => {
-  return useMutation(getLinkWorkspaceBillingAccountMutationOptions(options), queryClient)
-}
 export const getListWorkspaceBillingAccountMembersUrl = (workspaceId: string) => {
   return `/workspaces/${encodeURIComponent(String(workspaceId))}/billing-account/members`
 }
@@ -869,7 +746,7 @@ export const getInitiateWorkspaceBillingTransferUrl = (workspaceId: string) => {
 }
 
 /**
- * Only the current Billing Owner may initiate; the recipient accepts or rejects, and the initiator may cancel while pending. The Default Workspace never transfers; acceptance grants the recipient Workspace Owner on every non-Default business Workspace associated with the account. Identity, balance, and history stay stable; only management changes. Requires the Idempotency-Key header. At most one pending invite per account.
+ * Only the current Billing Owner may initiate; the recipient accepts or rejects, and the initiator may cancel while pending. Invitations lapse 7 days after issue: a lapsed invite moves nothing and the owner may send again. The Default Workspace never transfers; acceptance grants the recipient Workspace Owner on every non-Default business Workspace associated with the account. Identity, balance, and history stay stable; only management changes. Requires the Idempotency-Key header. At most one pending invite per account.
  * @summary Invite a new billing account owner (billing owner only)
  */
 export const initiateWorkspaceBillingTransfer = async (
@@ -1177,7 +1054,7 @@ export const getAcceptWorkspaceBillingTransferUrl = (workspaceId: string, invite
 }
 
 /**
- * Only the recipient may accept a pending invite; acceptance makes the recipient Billing Owner, steps the previous Owner down to Admin, and grants Workspace Owner on every non-Default business Workspace. The Default Workspace never transfers. Requires the Idempotency-Key header.
+ * Only the recipient may accept a pending invite; acceptance makes the recipient Billing Owner, steps the previous Owner down to Admin, and grants Workspace Owner on every non-Default business Workspace. The Default Workspace never transfers. A lapsed invite (past expires_at) fails closed and moves nothing. Requires the Idempotency-Key header.
  * @summary Accept a billing handover invitation (recipient only)
  */
 export const acceptWorkspaceBillingTransfer = async (
@@ -1882,219 +1759,13 @@ export function useGetWorkspaceUsage<
   return query
 }
 
-export const getGetWorkspaceBudgetUrl = (workspaceId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/budget`
-}
-
-/**
- * Any workspace member reads the cap with live usage and remaining quota for the current period (monthly UTC calendar month, or unlimited when no cap is set). The budget is a cumulative cap on settled plus pending consumption (paid Task generations and Vision Search), not a wallet or reservation: adjusting the limit never clears usage, and a monthly reset starts a new UTC month without deleting history. Block reasons surface on quote/submit as 402 task_insufficient_credits (balance shortfall) vs 403 workspace_budget_exhausted (cap reached) vs 403 billing_wallet_restricted (other funds limits). Hidden workspaces render 404 workspace_not_found.
- * @summary Get the workspace shared consumption budget with live usage
- */
-export const getWorkspaceBudget = async (
-  workspaceId: string,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<WorkspaceBudgetEnvelope> => {
-  return publicMutator<WorkspaceBudgetEnvelope>(getGetWorkspaceBudgetUrl(workspaceId), {
-    ...options,
-    method: 'GET',
-  })
-}
-
-export const getGetWorkspaceBudgetQueryKey = (workspaceId: MaybeRefOrGetter<string>) => {
-  return ['workspaces', workspaceId, 'budget'] as const
-}
-
-export const getGetWorkspaceBudgetQueryOptions = <
-  TData = Awaited<ReturnType<typeof getWorkspaceBudget>>,
-  TError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
->(
-  workspaceId: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBudget>>, TError, TData>>
-    request?: SecondParameter<typeof publicMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getGetWorkspaceBudgetQueryKey(workspaceId)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkspaceBudget>>> = ({ signal }) =>
-    getWorkspaceBudget(toValue(workspaceId), { signal, ...requestOptions })
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(workspaceId) !== null && toValue(workspaceId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBudget>>, TError, TData>
-}
-
-export type GetWorkspaceBudgetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getWorkspaceBudget>>
->
-export type GetWorkspaceBudgetQueryError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope
-
-/**
- * @summary Get the workspace shared consumption budget with live usage
- */
-
-export function useGetWorkspaceBudget<
-  TData = Awaited<ReturnType<typeof getWorkspaceBudget>>,
-  TError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
->(
-  workspaceId: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBudget>>, TError, TData>>
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetWorkspaceBudgetQueryOptions(workspaceId, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getSetWorkspaceBudgetUrl = (workspaceId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/budget`
-}
-
-/**
- * Sets the workspace cap to monthly (with limit_credits) or unlimited (no limit_credits). Requires Billing Owner/Admin on the resolved account: workspace-only admins render 403 billing_account_forbidden and cannot raise a pool-granted budget. Adjusting the limit never clears usage and never tops up any balance. Invalid input renders 422 validation_failed with details.fields naming period/limit_credits. No Idempotency-Key header is used: the set is naturally idempotent.
- * @summary Set the workspace shared consumption budget (billing manager only)
- */
-export const setWorkspaceBudget = async (
-  workspaceId: string,
-  setWorkspaceBudgetRequest: SetWorkspaceBudgetRequest,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<WorkspaceBudgetEnvelope> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
-  return publicMutator<WorkspaceBudgetEnvelope>(getSetWorkspaceBudgetUrl(workspaceId), {
-    ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(setWorkspaceBudgetRequest),
-  })
-}
-
-export const getSetWorkspaceBudgetMutationKey = () => ['setWorkspaceBudget'] as const
-
-export const getSetWorkspaceBudgetMutationOptions = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ErrorEnvelope
-    | NotFoundResponse
-    | UnprocessableEntityResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof setWorkspaceBudget>>,
-    TError,
-    SetWorkspaceBudgetMutationVariables,
-    TContext
-  >
-  request?: SecondParameter<typeof publicMutator>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof setWorkspaceBudget>>,
-  TError,
-  SetWorkspaceBudgetMutationVariables,
-  TContext
-> => {
-  const mutationKey = getSetWorkspaceBudgetMutationKey()
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof setWorkspaceBudget>>,
-    SetWorkspaceBudgetMutationVariables
-  > = (props) => {
-    const { workspaceId, data } = props ?? {}
-
-    return setWorkspaceBudget(workspaceId, data, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type SetWorkspaceBudgetMutationResult = NonNullable<
-  Awaited<ReturnType<typeof setWorkspaceBudget>>
->
-export type SetWorkspaceBudgetMutationBody = SetWorkspaceBudgetRequest
-export type SetWorkspaceBudgetMutationError =
-  | BadRequestResponse
-  | UnauthorizedResponse
-  | ErrorEnvelope
-  | NotFoundResponse
-  | UnprocessableEntityResponse
-export type SetWorkspaceBudgetMutationVariables = {
-  workspaceId: string
-  data: SetWorkspaceBudgetRequest
-}
-
-/**
- * @summary Set the workspace shared consumption budget (billing manager only)
- */
-export const useSetWorkspaceBudget = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ErrorEnvelope
-    | NotFoundResponse
-    | UnprocessableEntityResponse,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof setWorkspaceBudget>>,
-      TError,
-      SetWorkspaceBudgetMutationVariables,
-      TContext
-    >
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof setWorkspaceBudget>>,
-  TError,
-  SetWorkspaceBudgetMutationVariables,
-  TContext
-> => {
-  return useMutation(getSetWorkspaceBudgetMutationOptions(options), queryClient)
-}
 export const getListMemberQuotasUrl = (workspaceId: string) => {
   return `/workspaces/${encodeURIComponent(String(workspaceId))}/member-quotas`
 }
 
 /**
- * Billing Owner/Admin lists every explicitly set quota on the resolved account with live usage and remaining quota for the current window. Other members render 403 billing_account_forbidden and read their own row via the self endpoint. Quotas cap one member's settled plus pending consumption across every workspace sharing the account (paid Task generations and Vision Search), never a sub-wallet: adjusting the limit never clears usage, unused periodic quota never rolls over, and rejoining never re-issues. Hidden workspaces render 404 workspace_not_found.
- * @summary List member cross-workspace quotas with live usage (billing manager only)
+ * Organization Owner/Admin (org scopes) or the Personal account holder (personal scopes) lists every explicitly set quota on the resolved account with live usage and remaining quota for the current window. Other members render 403 billing_account_forbidden and read their own row via the self endpoint. Quotas cap one member's settled plus pending consumption across every workspace sharing the account (paid Task generations and Vision Search), never a sub-wallet: adjusting the limit never clears usage, unused periodic quota never rolls over, and rejoining never re-issues. New members default to unlimited; invites never gate on a default. Organization Owners always read as unlimited. Hidden workspaces render 404 workspace_not_found.
+ * @summary List member cross-workspace quotas with live usage (managers only)
  */
 export const listMemberQuotas = async (
   workspaceId: string,
@@ -2139,7 +1810,7 @@ export type ListMemberQuotasQueryResult = NonNullable<Awaited<ReturnType<typeof 
 export type ListMemberQuotasQueryError = UnauthorizedResponse | ErrorEnvelope | NotFoundResponse
 
 /**
- * @summary List member cross-workspace quotas with live usage (billing manager only)
+ * @summary List member cross-workspace quotas with live usage (managers only)
  */
 
 export function useListMemberQuotas<
@@ -2169,7 +1840,7 @@ export const getGetSelfMemberQuotaUrl = (workspaceId: string) => {
 }
 
 /**
- * Any workspace member reads their own quota with live usage and remaining quota for the current window on the resolved account (daily/weekly/monthly UTC windows, fixed lifetime cap, or unlimited when no cap is set). Absent means unlimited. Block reasons surface on quote/submit as 402 task_insufficient_credits (balance shortfall) vs 403 workspace_budget_exhausted (workspace cap reached) vs 403 member_quota_exhausted (member cap reached) vs 403 billing_wallet_restricted (other funds limits). Hidden workspaces render 404 workspace_not_found.
+ * Any workspace member reads their own quota with live usage and remaining quota for the current window on the resolved account (daily/weekly/monthly UTC windows, fixed lifetime cap, or unlimited when no cap is set). Absent means unlimited; Organization Owners always read as unlimited. Block reasons surface on quote/submit as 402 task_insufficient_credits (balance shortfall) vs 403 member_quota_exhausted (member cap reached) vs 403 billing_wallet_restricted (other funds limits). Hidden workspaces render 404 workspace_not_found.
  * @summary Get the caller's member quota with live usage
  */
 export const getSelfMemberQuota = async (
@@ -2247,8 +1918,8 @@ export const getSetMemberQuotaUrl = (workspaceId: string, userId: UserId) => {
 }
 
 /**
- * Sets one member's quota to daily/weekly/monthly/fixed (with limit_credits) or unlimited (no limit_credits). Requires Billing Owner/Admin on the resolved account: workspace-only admins render 403 billing_account_forbidden and cannot raise a pool-granted quota. Adjusting the limit never clears usage and never tops up any balance; unused periodic quota never rolls over. Invalid input renders 422 validation_failed with details.fields naming period/limit_credits. No Idempotency-Key header is used: the set is naturally idempotent.
- * @summary Set a member cross-workspace quota (billing manager only)
+ * Sets one member's quota to daily/weekly/monthly/fixed (with limit_credits) or unlimited (no limit_credits). Organization scopes require Org Owner/Admin (Owner sets Admin, Owner/Admin set Member, Admin editing Owner/Admin renders 403 billing_account_forbidden, capped writes for an Owner render 403); Personal scopes require the Personal account holder (Billing Owner); Billing Admins and Workspace Admins alone render 403 billing_account_forbidden. One row aggregates that member's usage across all workspaces of the account. Adjusting the limit never clears usage and never tops up any balance; unused periodic quota never rolls over. Invalid input renders 422 validation_failed with details.fields naming period/limit_credits. No Idempotency-Key header is used: the set is naturally idempotent.
+ * @summary Set a member cross-workspace quota (managers only)
  */
 export const setMemberQuota = async (
   workspaceId: string,
@@ -2341,7 +2012,7 @@ export type SetMemberQuotaMutationVariables = {
 }
 
 /**
- * @summary Set a member cross-workspace quota (billing manager only)
+ * @summary Set a member cross-workspace quota (managers only)
  */
 export const useSetMemberQuota = <
   TError =
@@ -2369,217 +2040,6 @@ export const useSetMemberQuota = <
   TContext
 > => {
   return useMutation(getSetMemberQuotaMutationOptions(options), queryClient)
-}
-export const getGetDefaultMemberQuotaUrl = (workspaceId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/default-member-quota`
-}
-
-/**
- * Any workspace member reads the default new-member quota on the resolved account (daily/weekly/monthly UTC windows, fixed lifetime cap, or unlimited). Absent defaults render 409 default_member_quota_not_configured (fail closed, never implicit unlimited): a Billing Owner/Admin sets it first via PUT. Hidden workspaces render 404 workspace_not_found.
- * @summary Get the account default new-member quota (members only)
- */
-export const getDefaultMemberQuota = async (
-  workspaceId: string,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<DefaultMemberQuotaEnvelope> => {
-  return publicMutator<DefaultMemberQuotaEnvelope>(getGetDefaultMemberQuotaUrl(workspaceId), {
-    ...options,
-    method: 'GET',
-  })
-}
-
-export const getGetDefaultMemberQuotaQueryKey = (workspaceId: MaybeRefOrGetter<string>) => {
-  return ['workspaces', workspaceId, 'default-member-quota'] as const
-}
-
-export const getGetDefaultMemberQuotaQueryOptions = <
-  TData = Awaited<ReturnType<typeof getDefaultMemberQuota>>,
-  TError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
->(
-  workspaceId: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getDefaultMemberQuota>>, TError, TData>
-    >
-    request?: SecondParameter<typeof publicMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getGetDefaultMemberQuotaQueryKey(workspaceId)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getDefaultMemberQuota>>> = ({ signal }) =>
-    getDefaultMemberQuota(toValue(workspaceId), { signal, ...requestOptions })
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(workspaceId) !== null && toValue(workspaceId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof getDefaultMemberQuota>>, TError, TData>
-}
-
-export type GetDefaultMemberQuotaQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getDefaultMemberQuota>>
->
-export type GetDefaultMemberQuotaQueryError =
-  UnauthorizedResponse | NotFoundResponse | ErrorEnvelope
-
-/**
- * @summary Get the account default new-member quota (members only)
- */
-
-export function useGetDefaultMemberQuota<
-  TData = Awaited<ReturnType<typeof getDefaultMemberQuota>>,
-  TError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
->(
-  workspaceId: MaybeRefOrGetter<string>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getDefaultMemberQuota>>, TError, TData>
-    >
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetDefaultMemberQuotaQueryOptions(workspaceId, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getSetDefaultMemberQuotaUrl = (workspaceId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/default-member-quota`
-}
-
-/**
- * Sets the account default to daily/weekly/monthly/fixed (with limit_credits) or unlimited (no limit_credits). Requires Billing Owner/Admin on the resolved account: workspace-only admins render 403 billing_account_forbidden and cannot raise the pool default. Changing the default only affects later joins; existing per-member rows keep their cap and accrued usage. Invalid input renders 422 validation_failed with details.fields naming period/limit_credits. No Idempotency-Key header is used: the set is naturally idempotent.
- * @summary Set the account default new-member quota (billing manager only)
- */
-export const setDefaultMemberQuota = async (
-  workspaceId: string,
-  setDefaultMemberQuotaRequest: SetDefaultMemberQuotaRequest,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<DefaultMemberQuotaEnvelope> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
-  return publicMutator<DefaultMemberQuotaEnvelope>(getSetDefaultMemberQuotaUrl(workspaceId), {
-    ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(setDefaultMemberQuotaRequest),
-  })
-}
-
-export const getSetDefaultMemberQuotaMutationKey = () => ['setDefaultMemberQuota'] as const
-
-export const getSetDefaultMemberQuotaMutationOptions = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ErrorEnvelope
-    | NotFoundResponse
-    | UnprocessableEntityResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof setDefaultMemberQuota>>,
-    TError,
-    SetDefaultMemberQuotaMutationVariables,
-    TContext
-  >
-  request?: SecondParameter<typeof publicMutator>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof setDefaultMemberQuota>>,
-  TError,
-  SetDefaultMemberQuotaMutationVariables,
-  TContext
-> => {
-  const mutationKey = getSetDefaultMemberQuotaMutationKey()
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof setDefaultMemberQuota>>,
-    SetDefaultMemberQuotaMutationVariables
-  > = (props) => {
-    const { workspaceId, data } = props ?? {}
-
-    return setDefaultMemberQuota(workspaceId, data, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type SetDefaultMemberQuotaMutationResult = NonNullable<
-  Awaited<ReturnType<typeof setDefaultMemberQuota>>
->
-export type SetDefaultMemberQuotaMutationBody = SetDefaultMemberQuotaRequest
-export type SetDefaultMemberQuotaMutationError =
-  | BadRequestResponse
-  | UnauthorizedResponse
-  | ErrorEnvelope
-  | NotFoundResponse
-  | UnprocessableEntityResponse
-export type SetDefaultMemberQuotaMutationVariables = {
-  workspaceId: string
-  data: SetDefaultMemberQuotaRequest
-}
-
-/**
- * @summary Set the account default new-member quota (billing manager only)
- */
-export const useSetDefaultMemberQuota = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ErrorEnvelope
-    | NotFoundResponse
-    | UnprocessableEntityResponse,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof setDefaultMemberQuota>>,
-      TError,
-      SetDefaultMemberQuotaMutationVariables,
-      TContext
-    >
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof setDefaultMemberQuota>>,
-  TError,
-  SetDefaultMemberQuotaMutationVariables,
-  TContext
-> => {
-  return useMutation(getSetDefaultMemberQuotaMutationOptions(options), queryClient)
 }
 export const getCreateWorkspaceCheckoutSessionUrl = (workspaceId: string) => {
   return `/workspaces/${encodeURIComponent(String(workspaceId))}/checkout-sessions`

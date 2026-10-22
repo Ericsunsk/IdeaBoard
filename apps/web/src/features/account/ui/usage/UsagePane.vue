@@ -24,7 +24,7 @@
       <p class="m-0 font-semibold text-destructive">
         {{ isForbidden ? t('account.usage.forbiddenTitle') : t('account.errors.usageLoadFailed') }}
       </p>
-      <p class="mt-1 mb-0 text-sm text-muted-foreground">
+      <p class="mt-1 mb-0 text-admin-content text-muted-foreground">
         {{ isForbidden ? t('account.usage.forbiddenDescription') : errorMessage(error) }}
       </p>
       <Button
@@ -38,7 +38,7 @@
     </section>
 
     <template v-else-if="usage">
-      <p v-if="billingAccountId" class="mb-3 text-xs text-muted-foreground" role="status">
+      <p v-if="billingAccountId" class="mb-3 text-admin-meta text-muted-foreground" role="status">
         {{ t('account.usage.sharedAccount', { account: billingAccountId }) }}
       </p>
       <section :class="summaryPanelClass" :aria-label="t('account.usage.summaryAria')">
@@ -53,7 +53,9 @@
             >
               {{ metric.value }}
             </p>
-            <p class="mt-3 mb-0 text-sm font-semibold text-muted-foreground">{{ metric.label }}</p>
+            <p class="mt-3 mb-0 text-admin-content font-semibold text-muted-foreground">
+              {{ metric.label }}
+            </p>
           </article>
         </div>
       </section>
@@ -94,11 +96,11 @@
             class="mt-3 flex min-w-0 flex-col items-start justify-between gap-3 rounded-control border border-destructive/25 bg-muted px-3 py-2 sm:flex-row sm:items-center"
             role="alert"
           >
-            <p class="m-0 min-w-0 text-sm text-destructive">{{ errorMessage(error) }}</p>
+            <p class="m-0 min-w-0 text-admin-content text-destructive">{{ errorMessage(error) }}</p>
             <Button
               type="button"
               variant="ghost"
-              class="!shrink-0 !p-0 !text-sm !font-semibold !text-primary"
+              class="!shrink-0 !p-0 !text-admin-content !font-semibold !text-primary"
               @click="retry()"
             >
               {{ t('account.usage.retryCurrentRange') }}

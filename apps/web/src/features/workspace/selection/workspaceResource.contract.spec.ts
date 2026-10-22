@@ -8,9 +8,16 @@ import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import {
   buildWorkspaceCreateHeaders,
   classifyWorkspaceAccessError,
+  closeOrganization,
   deleteWorkspace,
+  effectiveOrganizationWorkspaceAccess,
   fetchAllWorkspaces,
+  fetchOrganizationMembers,
   fetchOrganizations,
+  inviteOrganizationMember,
+  isOrganizationWorkspace,
+  isPersonalWorkspace,
+  parseOrganizationMember,
   provisionOrganization,
   fetchPrincipal,
   fetchWorkspacePage,
@@ -19,7 +26,10 @@ import {
   parseWorkspaceItem,
   parseWorkspacePage,
   provisionWorkspace,
+  removeOrganizationMember,
   renameWorkspace,
+  restoreOrganization,
+  updateOrganizationMember,
   workspaceApiUrls,
   WORKSPACE_NAME_MAX_LENGTH,
   WORKSPACE_PAGE_SIZE_DEFAULT,
@@ -235,7 +245,7 @@ describe('workspace creation', () => {
     expect(seen[0]?.body).toEqual({ data: { name: 'New' } })
   })
 
-  it('sends an explicit shared account or a fresh independent flag', async () => {
+  it('sends only name and organization scope (no billing choice)', async () => {
     const seen: Array<{ body: unknown }> = []
     useMswHandlers(
       http.post('/api/v1/workspaces', async ({ request }) => {
@@ -246,20 +256,14 @@ describe('workspace creation', () => {
       }),
     )
 
+    await provisionWorkspace({ name: 'Biz' }, { idempotencyKey: 'workspace-create:shared-1' })
     await provisionWorkspace(
-      { name: 'Biz', billingAccountId: 'ba_personal_1' },
-      { idempotencyKey: 'workspace-create:shared-1' },
-    )
-    await provisionWorkspace(
-      { name: 'Solo', isNewBillingAccount: true },
-      { idempotencyKey: 'workspace-create:new-1' },
+      { name: 'Org', organizationId: 'org_c3' },
+      { idempotencyKey: 'workspace-create:org-1' },
     )
 
-    expect(seen[0]?.body).toEqual({
-      data: { name: 'Biz', billing_account_id: 'ba_personal_1' },
-    })
-    // eslint-disable-next-line governance/boolean-prefix -- Orval wire field mirrors openapi.public.yaml.
-    expect(seen[1]?.body).toEqual({ data: { name: 'Solo', new_billing_account: true } })
+    expect(seen[0]?.body).toEqual({ data: { name: 'Biz' } })
+    expect(seen[1]?.body).toEqual({ data: { name: 'Org', organization_id: 'org_c3' } })
   })
 
   it('generates a fresh idempotency key per new intent', () => {
@@ -278,21 +282,6 @@ describe('workspace creation', () => {
       provisionWorkspace({ name: 'x'.repeat(WORKSPACE_NAME_MAX_LENGTH + 1) }),
     ).rejects.toThrow()
     await expect(provisionWorkspace({ name: 'Ok', organizationId: 'nope' })).rejects.toThrow()
-    await expect(provisionWorkspace({ name: 'Ok', billingAccountId: 'nope' })).rejects.toThrow()
-    await expect(
-      provisionWorkspace({
-        name: 'Ok',
-        billingAccountId: 'ba_personal_1',
-        isNewBillingAccount: true,
-      }),
-    ).rejects.toThrow()
-    await expect(
-      provisionWorkspace({
-        name: 'Ok',
-        organizationId: 'org_c3',
-        billingAccountId: 'ba_personal_1',
-      }),
-    ).rejects.toThrow()
   })
 
   it('parses the creation-time billing account without breaking legacy payloads', () => {
@@ -537,8 +526,8 @@ describe('organization account setup', () => {
       }),
     )
     expect(await fetchOrganizations()).toEqual([
-      { publicId: 'org_existing', name: 'Existing' },
-      { publicId: 'org_new', name: 'No workspaces yet' },
+      { publicId: 'org_existing', name: 'Existing', status: 'active' },
+      { publicId: 'org_new', name: 'No workspaces yet', status: 'active' },
     ])
   })
   it('creates an organization with a caller-pinned retry key', async () => {
@@ -556,6 +545,7 @@ describe('organization account setup', () => {
     expect(await provisionOrganization(' Acme ', 'organization-create:attempt')).toEqual({
       publicId: 'org_acme',
       name: 'Acme',
+      status: 'active',
     })
     await provisionOrganization('Acme', 'organization-create:attempt')
     expect(seenKeys).toEqual(['organization-create:attempt', 'organization-create:attempt'])
@@ -567,5 +557,158 @@ describe('organization account setup', () => {
       ),
     )
     await expect(fetchOrganizations()).rejects.toThrow('Invalid organization cursor')
+  })
+})
+
+describe('organization membership (951)', () => {
+  it('parses organization members and builds member URLs', () => {
+    expect(parseOrganizationMember({ user_id: 'usr_a1', role: 'admin' })).toEqual({
+      userId: 'usr_a1',
+      role: 'admin',
+    })
+    expect(workspaceApiUrls.organizationMembers('org_c3')).toContain(
+      '/api/v1/organizations/org_c3/members',
+    )
+    expect(workspaceApiUrls.organizationMemberDetail('org_c3', 'usr_a1')).toContain(
+      '/api/v1/organizations/org_c3/members/usr_a1',
+    )
+  })
+
+  it('derives organization workspace access without a second fetch', () => {
+    expect(
+      effectiveOrganizationWorkspaceAccess({ organizationRole: 'owner', hasWorkspaceGrant: false }),
+    ).toBe(true)
+    expect(
+      effectiveOrganizationWorkspaceAccess({ organizationRole: 'admin', hasWorkspaceGrant: false }),
+    ).toBe(true)
+    expect(
+      effectiveOrganizationWorkspaceAccess({
+        organizationRole: 'member',
+        hasWorkspaceGrant: false,
+      }),
+    ).toBe(false)
+    expect(
+      effectiveOrganizationWorkspaceAccess({ organizationRole: 'member', hasWorkspaceGrant: true }),
+    ).toBe(true)
+    expect(
+      effectiveOrganizationWorkspaceAccess({ organizationRole: null, hasWorkspaceGrant: true }),
+    ).toBe(false)
+    expect(isPersonalWorkspace({ organizationId: null })).toBe(true)
+    expect(isOrganizationWorkspace({ organizationId: 'org_c3' }, 'org_c3')).toBe(true)
+    expect(isOrganizationWorkspace({ organizationId: 'org_c3' }, 'org_other')).toBe(false)
+  })
+
+  it('lists organization members through the generated transport', async () => {
+    useMswHandlers(
+      http.get('/api/v1/organizations/:organizationId/members', () =>
+        HttpResponse.json({
+          data: [
+            { user_id: 'usr_owner', role: 'owner' },
+            { user_id: 'usr_member', role: 'member' },
+          ],
+        }),
+      ),
+    )
+    await expect(fetchOrganizationMembers('org_c3')).resolves.toEqual([
+      { userId: 'usr_owner', role: 'owner' },
+      { userId: 'usr_member', role: 'member' },
+    ])
+  })
+
+  it('invites, updates, and removes organization members with idempotency keys', async () => {
+    const seen: string[] = []
+    useMswHandlers(
+      http.post('/api/v1/organizations/:organizationId/members', async ({ request }) => {
+        seen.push(request.headers.get('Idempotency-Key') ?? '')
+        return HttpResponse.json({ data: { user_id: 'usr_new', role: 'member' } }, { status: 201 })
+      }),
+      http.patch('/api/v1/organizations/:organizationId/members/:memberId', () =>
+        HttpResponse.json({ data: { user_id: 'usr_new', role: 'admin' } }),
+      ),
+      http.delete('/api/v1/organizations/:organizationId/members/:memberId', () =>
+        // eslint-disable-next-line governance/boolean-prefix -- Wire contract field (DeletedEnvelope), same shape as workspace deletion.
+        HttpResponse.json({ data: { deleted: true } }),
+      ),
+    )
+    await expect(
+      inviteOrganizationMember('org_c3', { userId: 'usr_new', role: 'member' }),
+    ).resolves.toEqual({ userId: 'usr_new', role: 'member' })
+    await expect(updateOrganizationMember('org_c3', 'usr_new', { role: 'admin' })).resolves.toEqual(
+      { userId: 'usr_new', role: 'admin' },
+    )
+    await expect(removeOrganizationMember('org_c3', 'usr_new')).resolves.toBeUndefined()
+    expect(seen[0]).toBeTruthy()
+  })
+
+  it('refuses owner grants client-side (handover only)', async () => {
+    await expect(
+      inviteOrganizationMember('org_c3', { userId: 'usr_new', role: 'owner' as never }),
+    ).rejects.toThrow()
+    await expect(
+      updateOrganizationMember('org_c3', 'usr_new', { role: 'owner' as never }),
+    ).rejects.toThrow()
+  })
+})
+
+describe('organization closure (955)', () => {
+  it('closes with a reason and parses the closed status', async () => {
+    const seen: { key: string | null; body: unknown }[] = []
+    useMswHandlers(
+      http.post('/api/v1/organizations/:organizationId/closure', async ({ request }) => {
+        seen.push({ key: request.headers.get('Idempotency-Key'), body: await request.json() })
+        return HttpResponse.json({
+          data: {
+            id: 'org_c3',
+            name: 'Acme',
+            status: 'closed',
+            closed_at: '2026-10-22T00:00:01Z',
+            created_at: '2026-10-22T00:00:00Z',
+          },
+        })
+      }),
+    )
+    await expect(
+      closeOrganization('org_c3', { reason: ' winding down ' }, { idempotencyKey: 'org-close:1' }),
+    ).resolves.toEqual({
+      publicId: 'org_c3',
+      name: 'Acme',
+      status: 'closed',
+      closedAt: '2026-10-22T00:00:01Z',
+    })
+    expect(seen).toEqual([{ key: 'org-close:1', body: { data: { reason: 'winding down' } } }])
+  })
+
+  it('restores a closed organization back to active', async () => {
+    const seenKeys: (string | null)[] = []
+    useMswHandlers(
+      http.post('/api/v1/organizations/:organizationId/restore', ({ request }) => {
+        seenKeys.push(request.headers.get('Idempotency-Key'))
+        return HttpResponse.json({
+          data: {
+            id: 'org_c3',
+            name: 'Acme',
+            status: 'active',
+            created_at: '2026-10-22T00:00:00Z',
+          },
+        })
+      }),
+    )
+    await expect(
+      restoreOrganization('org_c3', { idempotencyKey: 'org-restore:1' }),
+    ).resolves.toEqual({ publicId: 'org_c3', name: 'Acme', status: 'active' })
+    expect(seenKeys).toEqual(['org-restore:1'])
+  })
+
+  it('defaults a missing status to active (stub tolerance)', async () => {
+    useMswHandlers(
+      http.post('/api/v1/organizations/:organizationId/restore', () =>
+        HttpResponse.json({ data: { id: 'org_c3', name: 'Acme' } }),
+      ),
+    )
+    await expect(restoreOrganization('org_c3')).resolves.toEqual({
+      publicId: 'org_c3',
+      name: 'Acme',
+      status: 'active',
+    })
   })
 })

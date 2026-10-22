@@ -28,6 +28,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -35,6 +36,7 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gin-gonic/gin"
 )
 
@@ -275,6 +277,24 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 				t.Errorf("%s must contain kernel marker %q (contract kernel regression)", name, marker)
 			}
 		}
+	}
+}
+
+func TestOrganizationMemberWriteRolesCannotAssignOwner(t *testing.T) {
+	doc, err := openapi3.NewLoader().LoadFromFile(filepath.Join("..", "..", "..", "..", "openapi.public.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, name := range []string{"AddOrganizationMemberRequest", "UpdateOrganizationMemberRequest"} {
+		t.Run(name, func(t *testing.T) {
+			requestSchema := doc.Components.Schemas[name].Value
+			dataSchema := requestSchema.Properties["data"].Value
+			roleSchema := dataSchema.Properties["role"].Value
+			if got, want := roleSchema.Enum, []any{"admin", "member"}; !reflect.DeepEqual(got, want) {
+				t.Fatalf("role enum = %v, want %v", got, want)
+			}
+		})
 	}
 }
 

@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"testing"
 
@@ -12,11 +11,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Focused coverage for #944 creation-time explicit accounts: new-user
+// Focused coverage for ADR-0038 creation-time funds identities: new-user
 // idempotent provision (Default workspace + personal account, concurrent),
-// personal default shared linkage (no new wallet), explicit independent
-// accounts (isolated, same owner), org workspaces on the org pool (never
-// personal), and fail-closed authorization with no half-linked workspaces.
+// Personal business workspaces sharing the owner's account (no new wallet),
+// and org workspaces sharing the organization pool (never Personal).
 func TestWorkspaceCreateDefaultProvisionIsIdempotent(t *testing.T) {
 	db := newTenancyTestDB(t)
 	ctx := context.Background()
@@ -67,7 +65,7 @@ func TestWorkspaceCreateDefaultProvisionIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestWorkspaceCreateSharedPersonalLinkCreatesNoWallet(t *testing.T) {
+func TestWorkspaceCreatePersonalSharesSurvivorNoWallet(t *testing.T) {
 	db := newTenancyTestDB(t)
 	ctx := context.Background()
 	store := NewStore(db, nil)
@@ -87,14 +85,12 @@ func TestWorkspaceCreateSharedPersonalLinkCreatesNoWallet(t *testing.T) {
 		t.Fatalf("count wallets failed: %v", err)
 	}
 
-	// Two business spaces explicitly share the personal pool in one tx each.
-	personalPublic := personal.PublicID
+	// Two business spaces share the Personal survivor by creation scope
+	// alone: no billing option exists, no new wallet, no link row.
 	shared := make([]*tenancy.Workspace, 2)
 	for i := range shared {
 		ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
-			Name:                   "shared-biz",
-			OwnerUserID:            owner,
-			BillingAccountPublicID: &personalPublic,
+			Name: "shared-biz", OwnerUserID: owner,
 		})
 		if err != nil {
 			t.Fatalf("create shared %d failed: %v", i, err)
@@ -106,16 +102,20 @@ func TestWorkspaceCreateSharedPersonalLinkCreatesNoWallet(t *testing.T) {
 		if err != nil || resolved.PublicID != personal.PublicID {
 			t.Fatalf("shared %d resolved = %+v %v, want %q", i, resolved, err, personal.PublicID)
 		}
-		if !resolved.Shared {
-			t.Fatalf("shared %d must report shared=true: %+v", i, resolved)
-		}
 		// No per-workspace account row was minted for the sharing spaces.
 		var rows int64
 		if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM billing_accounts WHERE workspace_id = $1`, ws.InternalID).Scan(&rows); err != nil {
 			t.Fatalf("count studio account failed: %v", err)
 		}
 		if rows != 0 {
-			t.Fatalf("shared workspace minted %d accounts, want 0 (link only)", rows)
+			t.Fatalf("shared workspace minted %d accounts, want 0 (survivor only)", rows)
+		}
+		var links int64
+		if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM workspace_billing_links WHERE workspace_id = $1`, ws.InternalID).Scan(&links); err != nil {
+			t.Fatalf("count links failed: %v", err)
+		}
+		if links != 0 {
+			t.Fatalf("shared workspace wrote %d links, want 0", links)
 		}
 	}
 	var walletsAfter int64
@@ -123,11 +123,11 @@ func TestWorkspaceCreateSharedPersonalLinkCreatesNoWallet(t *testing.T) {
 		t.Fatalf("count wallets failed: %v", err)
 	}
 	if walletsAfter != walletsBefore {
-		t.Fatalf("wallets %d -> %d, want no new wallet for shared links", walletsBefore, walletsAfter)
+		t.Fatalf("wallets %d -> %d, want no new wallet for shared scope", walletsBefore, walletsAfter)
 	}
 }
 
-func TestWorkspaceCreateIndependentAccountStaysIsolated(t *testing.T) {
+func TestWorkspaceCreateHasNoIndependentAccount(t *testing.T) {
 	db := newTenancyTestDB(t)
 	ctx := context.Background()
 	store := NewStore(db, nil)
@@ -142,36 +142,32 @@ func TestWorkspaceCreateIndependentAccountStaysIsolated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve personal failed: %v", err)
 	}
-	independent, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
-		Name: "independent-biz", OwnerUserID: owner, NewBillingAccount: true,
+	// The independent-account option is removed (ADR-0038): a second
+	// business workspace resolves to the same Personal survivor.
+	second, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
+		Name: "second-biz", OwnerUserID: owner,
 	})
 	if err != nil {
-		t.Fatalf("create independent failed: %v", err)
+		t.Fatalf("create second failed: %v", err)
 	}
-	resolved, err := baStore.EnsureBillingAccountForWorkspace(ctx, independent.InternalID, independent.PublicID)
+	resolved, err := baStore.EnsureBillingAccountForWorkspace(ctx, second.InternalID, second.PublicID)
 	if err != nil {
-		t.Fatalf("resolve independent failed: %v", err)
+		t.Fatalf("resolve second failed: %v", err)
 	}
-	if resolved.PublicID == personal.PublicID {
-		t.Fatal("independent account must not reuse the personal pool")
+	if resolved.PublicID != personal.PublicID || resolved.InternalID != personal.InternalID {
+		t.Fatalf("second scope = %+v, want survivor %+v", resolved, personal)
 	}
-	if resolved.Shared {
-		t.Fatalf("independent account must report shared=false: %+v", resolved)
+	role, ok, err := baStore.GetBillingAccountRole(ctx, resolved.InternalID, owner)
+	if err != nil || !ok || role != tenancy.BillingRoleOwner {
+		t.Fatalf("owner role on survivor = %q ok=%v err=%v, want owner", role, ok, err)
 	}
-	// Same owner manages both without merging: grants on both identities.
-	for _, accountID := range []int64{personal.InternalID, resolved.InternalID} {
-		role, ok, err := baStore.GetBillingAccountRole(ctx, accountID, owner)
-		if err != nil || !ok || role != tenancy.BillingRoleOwner {
-			t.Fatalf("owner role on %d = %q ok=%v err=%v, want owner", accountID, role, ok, err)
-		}
-	}
-	// No link row for the independent space (its own per-workspace row).
+	// No link row for the second space (scope resolution, not linkage).
 	var links int64
-	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM workspace_billing_links WHERE workspace_id = $1`, independent.InternalID).Scan(&links); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM workspace_billing_links WHERE workspace_id = $1`, second.InternalID).Scan(&links); err != nil {
 		t.Fatalf("count links failed: %v", err)
 	}
 	if links != 0 {
-		t.Fatalf("independent links = %d, want 0", links)
+		t.Fatalf("second links = %d, want 0", links)
 	}
 }
 
@@ -224,13 +220,12 @@ func TestWorkspaceCreateOrganizationUsesOrgPool(t *testing.T) {
 	}
 }
 
-func TestWorkspaceCreateUnauthorizedLeavesNoWorkspace(t *testing.T) {
+func TestWorkspaceCreateScopeFixedAtCreation(t *testing.T) {
 	db := newTenancyTestDB(t)
 	ctx := context.Background()
 	store := NewStore(db, nil)
 	baStore := NewBillingAccountStore(db)
 	owner := createTenancyTestUser(t, db)
-	outsider := createTenancyTestUser(t, db)
 
 	def, err := store.EnsureDefaultWorkspace(ctx, owner)
 	if err != nil {
@@ -244,35 +239,28 @@ func TestWorkspaceCreateUnauthorizedLeavesNoWorkspace(t *testing.T) {
 	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM workspaces`).Scan(&before); err != nil {
 		t.Fatalf("count workspaces failed: %v", err)
 	}
-	personalPublic := personal.PublicID
-	_, err = store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
-		Name:                   "hijack",
-		OwnerUserID:            outsider,
-		BillingAccountPublicID: &personalPublic,
+	// Personal creation carries no billing choice: it resolves to the
+	// survivor and writes no link or account row.
+	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
+		Name: "scoped", OwnerUserID: owner,
 	})
-	if !errors.Is(err, tenancy.ErrBillingForbidden) {
-		t.Fatalf("unauthorized link err = %v, want ErrBillingForbidden", err)
+	if err != nil {
+		t.Fatalf("create failed: %v", err)
 	}
-	// Unknown ba_ target fails closed without a workspace.
-	unknown := "ba_missing_000001"
-	_, err = store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
-		Name:                   "ghost",
-		OwnerUserID:            outsider,
-		BillingAccountPublicID: &unknown,
-	})
-	if !errors.Is(err, tenancy.ErrBillingNotFound) {
-		t.Fatalf("unknown target err = %v, want ErrBillingNotFound", err)
+	resolved, err := baStore.EnsureBillingAccountForWorkspace(ctx, ws.InternalID, ws.PublicID)
+	if err != nil || resolved.PublicID != personal.PublicID {
+		t.Fatalf("scoped resolve = %+v %v, want survivor %q", resolved, err, personal.PublicID)
 	}
 	var after int64
 	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM workspaces`).Scan(&after); err != nil {
 		t.Fatalf("count workspaces failed: %v", err)
 	}
-	if after != before {
-		t.Fatalf("workspaces %d -> %d, want rollback with no half workspace", before, after)
+	if after != before+1 {
+		t.Fatalf("workspaces %d -> %d, want exactly one new row", before, after)
 	}
 }
 
-func TestWorkspaceCreateOrgBillingOverrideFailsClosed(t *testing.T) {
+func TestWorkspaceCreateOrgScopeFixed(t *testing.T) {
 	db := newTenancyTestDB(t)
 	ctx := context.Background()
 	store := NewStore(db, nil)
@@ -295,25 +283,29 @@ func TestWorkspaceCreateOrgBillingOverrideFailsClosed(t *testing.T) {
 	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM workspaces`).Scan(&before); err != nil {
 		t.Fatalf("count workspaces failed: %v", err)
 	}
-	personalPublic := personal.PublicID
-	orgPublic := org.PublicID
-	// Personal pool must never back an org workspace.
-	if _, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
-		Name: "org-hijack", OrganizationID: &orgPublic, OwnerUserID: owner,
-		BillingAccountPublicID: &personalPublic,
-	}); !errors.Is(err, tenancy.ErrBillingConflict) {
-		t.Fatalf("org+personal err = %v, want ErrBillingConflict", err)
+	// Creating the Organization never moves existing Personal workspaces:
+	// they keep resolving to the Personal survivor while org workspaces
+	// use the org pool.
+	orgWs, err := store.CreateOrganizationWorkspace(ctx, org.PublicID, owner, "org-space")
+	if err != nil {
+		t.Fatalf("create org workspace failed: %v", err)
 	}
-	if _, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
-		Name: "org-new", OrganizationID: &orgPublic, OwnerUserID: owner, NewBillingAccount: true,
-	}); !errors.Is(err, tenancy.ErrBillingConflict) {
-		t.Fatalf("org+new err = %v, want ErrBillingConflict", err)
+	orgAcc, err := baStore.EnsureBillingAccountForWorkspace(ctx, orgWs.InternalID, orgWs.PublicID)
+	if err != nil {
+		t.Fatalf("resolve org workspace failed: %v", err)
+	}
+	if orgAcc.PublicID == personal.PublicID {
+		t.Fatalf("org scope must not reuse personal pool: %q", orgAcc.PublicID)
+	}
+	still, err := baStore.EnsureBillingAccountForWorkspace(ctx, def.InternalID, def.PublicID)
+	if err != nil || still.PublicID != personal.PublicID {
+		t.Fatalf("personal survivor moved after org create: %+v %v", still, err)
 	}
 	var after int64
 	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM workspaces`).Scan(&after); err != nil {
 		t.Fatalf("count workspaces failed: %v", err)
 	}
-	if after != before {
-		t.Fatalf("workspaces %d -> %d, want no half workspace on org conflict", before, after)
+	if after != before+1 {
+		t.Fatalf("workspaces %d -> %d, want exactly one new row", before, after)
 	}
 }

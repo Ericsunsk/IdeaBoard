@@ -108,29 +108,6 @@ CREATE TABLE workspace_billing_links (
 
 CREATE INDEX idx_workspace_billing_links_account ON workspace_billing_links (billing_account_id, workspace_id);
 
--- Workspace shared consumption budget (#945).
---
--- One row per workspace; absent means unlimited (the default). The budget
--- is a cumulative cap on settled + pending consumption in the current
--- period, not a wallet, grant, or balance reservation. Adjusting the limit
--- never clears usage; a monthly reset starts a new UTC calendar month
--- without deleting history. Consumption attribution locks to the submit-time
--- period (task snapshot quoted_at / vision operation created_at, both UTC);
--- linked consumption refunds correct the original period, so a cross-period
--- refund never grants current-period quota.
-CREATE TABLE workspace_budgets (
-  workspace_id BIGINT PRIMARY KEY REFERENCES workspaces(internal_id) ON DELETE CASCADE,
-  period TEXT NOT NULL DEFAULT 'unlimited' CHECK (period IN ('monthly', 'unlimited')),
-  limit_credits BIGINT CHECK (limit_credits IS NULL OR (limit_credits > 0 AND limit_credits <= 9000000000000000)),
-  updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT chk_workspace_budgets_period_limit CHECK (
-    (period = 'unlimited' AND limit_credits IS NULL)
-    OR (period = 'monthly' AND limit_credits IS NOT NULL AND limit_credits > 0 AND limit_credits <= 9000000000000000)
-  )
-);
-
 -- Member cross-workspace consumption quota (#946).
 --
 -- One row per (Billing Account, User); absent means unlimited (the default).
@@ -161,30 +138,6 @@ CREATE TABLE billing_account_member_quotas (
 );
 
 CREATE INDEX idx_member_quotas_user ON billing_account_member_quotas (user_id, billing_account_id);
-
--- Account default new-member consumption quota (#947).
---
--- One row per Billing Account; absent means NOT CONFIGURED (fail closed:
--- invites are blocked until a Billing Owner/Admin sets the default, never
--- an implicit unlimited). The default seeds the per-member quota row on
--- first join of the account consumption scope (same five periods as #946:
--- daily / weekly / monthly UTC windows, fixed lifetime cap, or unlimited).
--- Changing the default only affects later joins; existing rows keep their
--- cap and accrued usage (per-member SetQuota). Rows and immutable
--- settlement history survive membership changes; only account deletion
--- cascades.
-CREATE TABLE billing_account_default_member_quotas (
-  billing_account_id BIGINT PRIMARY KEY REFERENCES billing_accounts(internal_id) ON DELETE CASCADE,
-  period TEXT NOT NULL DEFAULT 'unlimited' CHECK (period IN ('daily', 'weekly', 'monthly', 'fixed', 'unlimited')),
-  limit_credits BIGINT CHECK (limit_credits IS NULL OR (limit_credits > 0 AND limit_credits <= 9000000000000000)),
-  updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT chk_default_member_quotas_period_limit CHECK (
-    (period = 'unlimited' AND limit_credits IS NULL)
-    OR (period IN ('daily', 'weekly', 'monthly', 'fixed') AND limit_credits IS NOT NULL AND limit_credits > 0 AND limit_credits <= 9000000000000000)
-  )
-);
 
 -- Every Billing Account owns exactly one Credit Wallet (#916): provisioning
 -- follows account creation, never the current Workspace Owner's personal
@@ -305,6 +258,9 @@ REVOKE ALL ON FUNCTION ensure_personal_billing_account_for_user(BIGINT) FROM PUB
 -- never deletes the handover history; the ba_ snapshot stays readable.
 -- Funds never move: acceptance only rewrites billing_account_members plus
 -- non-Default Workspace memberships, never Wallet/Ledger/snapshot rows.
+-- A pending invitation lapses 7 days after issue (expires_at): a lapsed
+-- invite never moves funds or membership, decisions on it fail closed, and
+-- the owner may re-issue (the pending row refreshes in place).
 CREATE TABLE billing_account_transfer_invites (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
@@ -316,6 +272,7 @@ CREATE TABLE billing_account_transfer_invites (
   idempotency_key TEXT NOT NULL,
   scope_workspace_public_ids TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '7 days'),
   decided_at TIMESTAMPTZ,
   decided_by BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
   CONSTRAINT uq_transfer_invites_public_id UNIQUE (public_id),

@@ -2,12 +2,12 @@ package workspacetasks_test
 
 // Member cross-workspace quota settlement tests (#946).
 //
-// The quota check joins the submit settlement transaction after the
-// workspace-budget check and before Hold: over-quota submits fail closed
+// The quota check joins the submit settlement transaction after Quote
+// and before Hold: over-quota submits fail closed
 // with ErrMemberQuotaExhausted (403 member_quota_exhausted, distinct from
-// 402 insufficiency, 403 workspace_budget_exhausted, and 403 wallet
-// restriction) and leave no task row, no Hold, and no queue entry. Budget
-// and quota stay independently effective: both must pass. Terminal Fail
+// 402 insufficiency and 403 wallet
+// restriction) and leave no task row, no Hold, and no queue entry.
+// Terminal Fail
 // releases converge usage down so a blocked member can submit after
 // recovery.
 //
@@ -21,7 +21,6 @@ import (
 
 	"ideaboard/api/internal/memberquotas"
 	"ideaboard/api/internal/tasking/workspacetasks"
-	"ideaboard/api/internal/workspacebudgets"
 )
 
 func openQuotaAtomicEnv(t *testing.T) (*atomicEnv, *memberquotas.Store) {
@@ -38,6 +37,15 @@ func setDailyQuota(t *testing.T, quotas *memberquotas.Store, accountID, userID, 
 	if _, err := quotas.SetQuota(context.Background(), accountID, userID, memberquotas.PeriodDaily, &limit, userID); err != nil {
 		t.Fatalf("set daily quota: %v", err)
 	}
+}
+
+func taskCount(t *testing.T, env *atomicEnv) int {
+	t.Helper()
+	var count int
+	if err := env.pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM tasks WHERE workspace_id = (SELECT internal_id FROM workspaces WHERE public_id = $1)`, env.ws).Scan(&count); err != nil {
+		t.Fatalf("count tasks: %v", err)
+	}
+	return count
 }
 
 // TestQuotaExhaustedBlocksSubmitWithoutResidue proves an over-quota submit
@@ -69,25 +77,14 @@ func TestQuotaExhaustedBlocksSubmitWithoutResidue(t *testing.T) {
 	}
 }
 
-// TestQuotaAndBudgetIndependentlyEffective proves the two caps constrain
-// separately: a submit blocked by one gate reports that gate's reason,
-// and a fitting submit settles under both.
-func TestQuotaAndBudgetIndependentlyEffective(t *testing.T) {
+// TestQuotaGateReportsOwnReason proves the quota gate constrains
+// submits on its own: a submit blocked by the quota reports the quota
+// reason, and a fitting submit settles on the funded wallet.
+func TestQuotaGateReportsOwnReason(t *testing.T) {
 	env, quotas := openQuotaAtomicEnv(t)
 	ctx := context.Background()
-	budgets := workspacebudgets.NewStore(env.pool)
-	env.serviceDeps.Budgets = budgets
-	env.service = workspacetasks.NewService(env.serviceDeps)
-	var wsID int64
-	if err := env.pool.QueryRow(ctx, `SELECT internal_id FROM workspaces WHERE public_id = $1`, env.ws).Scan(&wsID); err != nil {
-		t.Fatalf("resolve quota workspace: %v", err)
-	}
 
-	// Roomy budget, tight quota: the quota gate reports first.
-	roomy := int64(1000)
-	if _, err := budgets.SetBudget(ctx, wsID, workspacebudgets.PeriodMonthly, &roomy, env.userID); err != nil {
-		t.Fatalf("set roomy budget: %v", err)
-	}
+	// Tight quota: the quota gate reports.
 	setDailyQuota(t, quotas, env.accountID, env.userID, 15)
 	_, err := env.service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: env.ws, OwnerUserID: env.userID,
@@ -96,33 +93,11 @@ func TestQuotaAndBudgetIndependentlyEffective(t *testing.T) {
 	if !errors.Is(err, workspacetasks.ErrMemberQuotaExhausted) {
 		t.Fatalf("quota-blocked Create error = %v, want ErrMemberQuotaExhausted", err)
 	}
-	if errors.Is(err, workspacetasks.ErrWorkspaceBudgetExhausted) {
-		t.Fatalf("quota block misreports as budget exhaustion: %v", err)
-	}
 
-	// Roomy quota, tight budget: the budget gate reports instead.
+	// Roomy quota: the same funded wallet settles.
 	roomyQuota := int64(1000)
 	if _, err := quotas.SetQuota(ctx, env.accountID, env.userID, memberquotas.PeriodDaily, &roomyQuota, env.userID); err != nil {
 		t.Fatalf("set roomy quota: %v", err)
-	}
-	tight := int64(15)
-	if _, err := budgets.SetBudget(ctx, wsID, workspacebudgets.PeriodMonthly, &tight, env.userID); err != nil {
-		t.Fatalf("set tight budget: %v", err)
-	}
-	_, err = env.service.Create(ctx, workspacetasks.CreateInput{
-		WorkspaceID: env.ws, OwnerUserID: env.userID,
-		Service: "render", Quantity: 2, Resolution: "1k",
-	}, "quota-key-"+randomAtomicHex(t, 4))
-	if !errors.Is(err, workspacetasks.ErrWorkspaceBudgetExhausted) {
-		t.Fatalf("budget-blocked Create error = %v, want ErrWorkspaceBudgetExhausted", err)
-	}
-	if errors.Is(err, workspacetasks.ErrMemberQuotaExhausted) {
-		t.Fatalf("budget block misreports as quota exhaustion: %v", err)
-	}
-
-	// Both roomy: the same funded wallet settles.
-	if _, err := budgets.SetBudget(ctx, wsID, workspacebudgets.PeriodMonthly, &roomy, env.userID); err != nil {
-		t.Fatalf("reopen budget: %v", err)
 	}
 	fitting := env.createPaidTaskKeyed(t, 1, "quota-key-"+randomAtomicHex(t, 4))
 	if fitting.BillingSnapshot.TotalCredits != 10 {
@@ -165,7 +140,8 @@ func TestQuotaCrossWorkspaceFailRecovery(t *testing.T) {
 	env, quotas := openQuotaAtomicEnv(t)
 	ctx := context.Background()
 
-	// Second workspace sharing the same Billing Account.
+	// Second workspace of the same owner: it shares the Personal
+	// survivor by creation scope (no link), so quota accumulates.
 	ws2 := "ws_atomic2" + randomAtomicHex(t, 6)
 	if _, err := env.pool.Exec(ctx, `INSERT INTO workspaces (public_id, owner_user_id, name) VALUES ($1, $2, 'atomic-settle-ws-2')`, ws2, env.userID); err != nil {
 		t.Fatalf("seed second workspace: %v", err)
@@ -177,9 +153,6 @@ func TestQuotaCrossWorkspaceFailRecovery(t *testing.T) {
 	var wsID int64
 	if err := env.pool.QueryRow(ctx, `SELECT internal_id FROM workspaces WHERE public_id = $1`, env.ws).Scan(&wsID); err != nil {
 		t.Fatalf("resolve first workspace: %v", err)
-	}
-	if _, err := env.pool.Exec(ctx, `INSERT INTO workspace_billing_links (workspace_id, billing_account_id) VALUES ($1, $2)`, ws2ID, env.accountID); err != nil {
-		t.Fatalf("link second workspace: %v", err)
 	}
 	if _, err := env.pool.Exec(ctx, `INSERT INTO workspace_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner') ON CONFLICT DO NOTHING`, ws2ID, env.userID); err != nil {
 		t.Fatalf("seed sibling membership: %v", err)

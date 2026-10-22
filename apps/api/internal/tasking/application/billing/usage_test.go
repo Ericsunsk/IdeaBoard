@@ -65,7 +65,7 @@ WHERE billing_account_id = $1`, explainAccountID, location.String())
 	if err := rows.Err(); err != nil {
 		t.Fatalf("read task billing plan: %v", err)
 	}
-	if !strings.Contains(plan.String(), "idx_task_billing_snapshots_account_created") {
+	if !strings.Contains(plan.String(), "idx_task_billing_snapshots_account_created") && !strings.Contains(plan.String(), "idx_task_billing_snapshots_account_workspace_created") {
 		t.Fatalf("normal planner did not use Task Billing usage index:\n%s", plan.String())
 	}
 }

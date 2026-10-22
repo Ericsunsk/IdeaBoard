@@ -80,16 +80,9 @@ type ContractV1Deps struct {
 	// workspacetasks.TxBillingAccountResolver (the postgres store does);
 	// in-memory HTTP fixtures inject their test double instead.
 	TaskBillingAccounts workspacetasks.TxBillingAccountResolver
-	// TaskBudgets enforces the Workspace shared consumption budget
-	// inside the submit settlement transaction (#945: after Quote,
-	// before Hold, same snapshot). Production wires the
-	// workspacebudgets Store; in-memory HTTP fixtures inject their
-	// test double instead. Nil means no budget enforcement
-	// (unlimited).
-	TaskBudgets workspacetasks.TxWorkspaceBudgetChecker
 	// TaskQuotas enforces the member cross-workspace consumption quota
-	// inside the submit settlement transaction (#946: after the budget
-	// check, before Hold, same snapshot). Production wires the
+	// inside the submit settlement transaction (#946: after Quote,
+	// before Hold, same snapshot). Production wires the
 	// memberquotas Store; in-memory HTTP fixtures inject their test
 	// double instead. Nil means no quota enforcement (unlimited).
 	TaskQuotas workspacetasks.TxMemberQuotaChecker
@@ -104,12 +97,6 @@ type ContractV1Deps struct {
 	// mirroring the submit Hold). Production wires the Credits service;
 	// tests inject their double. Nil fails the preflight closed.
 	TaskQuoteWallets taskQuoteWalletReader
-	// TaskQuoteBudgets reads the Workspace shared consumption budget
-	// for the quote/readiness preflight (#945: same cap submit
-	// enforces, reported early). Production wires the workspacebudgets
-	// Store; tests inject their double. Nil skips the budget gate
-	// (unlimited).
-	TaskQuoteBudgets taskQuoteBudgetReader
 	// TaskQuoteQuotas reads the member cross-workspace consumption
 	// quota for the quote/readiness preflight (#946: same cap submit
 	// enforces, reported early). Production wires the memberquotas
@@ -260,6 +247,12 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps runtimehttp.AuthD
 	group.POST("/organizations", handler.createOrganization)
 	group.GET("/organizations/:organization_id", handler.getOrganization)
 	group.PATCH("/organizations/:organization_id", handler.updateOrganization)
+	group.POST("/organizations/:organization_id/closure", handler.closeOrganization)
+	group.POST("/organizations/:organization_id/restore", handler.restoreOrganization)
+	group.GET("/organizations/:organization_id/members", handler.listOrganizationMembers)
+	group.POST("/organizations/:organization_id/members", handler.addOrganizationMember)
+	group.PATCH("/organizations/:organization_id/members/:member_id", handler.updateOrganizationMember)
+	group.DELETE("/organizations/:organization_id/members/:member_id", handler.removeOrganizationMember)
 	group.GET("/organizations/:organization_id/workspaces", handler.listOrganizationWorkspaces)
 	group.POST("/organizations/:organization_id/workspaces", handler.createOrganizationWorkspace)
 	// Workspace upload sessions + media assets (issue #803, restored
@@ -507,10 +500,8 @@ func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
 
 type v1CreateWorkspaceBody struct {
 	Data struct {
-		Name              string  `json:"name"`
-		OrganizationID    *string `json:"organization_id"`
-		BillingAccountID  *string `json:"billing_account_id"`
-		NewBillingAccount *bool   `json:"new_billing_account"`
+		Name           string  `json:"name"`
+		OrganizationID *string `json:"organization_id"`
 	} `json:"data"`
 }
 
@@ -548,38 +539,12 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 		}
 		orgID = &candidate
 	}
-	// Creation-time billing choice (#944): explicit shared ba_ or a fresh
-	// isolated account. Both set, or either set on an org scope, fails
-	// closed (never silently pick another pool).
-	var billingAccountID *string
-	newBillingAccount := false
-	if body.Data.NewBillingAccount != nil {
-		newBillingAccount = *body.Data.NewBillingAccount
-	}
-	if body.Data.BillingAccountID != nil {
-		candidate := strings.TrimSpace(*body.Data.BillingAccountID)
-		if !contract.IsBillingAccountID(candidate) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeBillingAccountNotFound, runtimehttp.MsgBillingAccountNotFound)
-			c.Abort()
-			return
-		}
-		billingAccountID = &candidate
-	}
-	if billingAccountID != nil && newBillingAccount {
-		contract.RenderError(c, http.StatusConflict, contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
-		c.Abort()
-		return
-	}
-	if orgID != nil && (billingAccountID != nil || newBillingAccount) {
-		contract.RenderError(c, http.StatusConflict, contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
-		c.Abort()
-		return
-	}
-	if (billingAccountID != nil || newBillingAccount) && h.deps.BillingAccounts == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
-		c.Abort()
-		return
-	}
+	// Billing scope (ADR-0038) is the creation scope and nothing else:
+	// personal workspaces resolve to the caller's Personal survivor,
+	// organization scopes use the shared org pool. There is no
+	// billing_account_id / new_billing_account option; unknown fields fail
+	// closed at strict binding above, and scope changes after creation do
+	// not exist (the link surface is removed).
 	ctx := c.Request.Context()
 	// Organization-scoped creation requires org visibility: hidden orgs
 	// (unknown id or caller holds no membership) converge to 404
@@ -597,50 +562,23 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 			}
 		}
 	}
-	// Default shared linkage: personal workspaces without an explicit
-	// choice link to the caller's deterministic personal account (Default
-	// workspace pool), so no-org business spaces share one balance and no
-	// new wallet is minted implicitly. Resolution happens before the
-	// idempotency claim so failures never claim the key.
-	if orgID == nil && billingAccountID == nil && !newBillingAccount && h.deps.BillingAccounts != nil {
-		def, defErr := h.deps.Store.EnsureDefaultWorkspace(ctx, identityPrincipal.UserID())
-		if defErr != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
-			c.Abort()
-			return
-		}
-		personal, resErr := h.deps.BillingAccounts.EnsureBillingAccountForWorkspace(ctx, def.InternalID, def.PublicID)
-		if resErr != nil {
-			renderBillingAccountError(c, resErr)
-			return
-		}
-		resolved := personal.PublicID
-		billingAccountID = &resolved
-	}
+	// Default shared linkage is gone (ADR-0038): personal workspaces
+	// resolve to the owner's Personal survivor at read time, so creation
+	// writes no billing state. Resolution happens inside the settlement
+	// transaction; failures there never claim the idempotency key because
+	// the claim below only covers the workspace row.
 	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 	orgPart := ""
 	if orgID != nil {
 		orgPart = *orgID
 	}
-	billingPart := ""
-	if newBillingAccount {
-		billingPart = "new-billing-account"
-	} else if billingAccountID != nil {
-		billingPart = *billingAccountID
-	}
 	scope := contract.IdempotencyScope(externalUser, "workspace:create")
-	hash := contract.HashIdempotencyRequest("workspace:create", name, orgPart, billingPart)
+	hash := contract.HashIdempotencyRequest("workspace:create", name, orgPart)
 	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
 		// Plain POST creation (no organization) always mints a non-Default
 		// personal workspace; such rows are unlimited. Only
 		// EnsureDefaultWorkspace mints the Default row.
 		params := tenancy.CreateWorkspaceParams{Name: name, OrganizationID: orgID, OwnerUserID: identityPrincipal.UserID()}
-		if billingAccountID != nil {
-			params.BillingAccountPublicID = billingAccountID
-		}
-		if newBillingAccount {
-			params.NewBillingAccount = true
-		}
 		if orgID != nil {
 			return h.deps.Store.CreateOrganizationWorkspace(ctx, *orgID, identityPrincipal.UserID(), name)
 		}

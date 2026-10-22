@@ -20,6 +20,12 @@
 // before the backend slice lands; stub-only defaults are marked inline.
 // When the backend regenerates, stub tolerance narrows without changing the
 // domain types exported here.
+//
+// Billing scope (ADR-0038) is the creation scope and nothing else:
+// omitted organization_id creates a Personal workspace on the caller's
+// Personal account, an organization_id creates an Organization workspace
+// on the shared org pool. The scope is fixed at creation; there is no
+// billing choice to pass and no payer switch afterwards.
 
 import {
   createWorkspace,
@@ -29,8 +35,14 @@ import {
   updateWorkspace,
 } from '../../../api/generated-query/public/workspaces/workspaces'
 import {
+  addOrganizationMember as addOrganizationMemberTransport,
+  closeOrganization as closeOrganizationTransport,
   createOrganization as createOrganizationTransport,
+  listOrganizationMembers as listOrganizationMembersTransport,
   listOrganizations,
+  removeOrganizationMember as removeOrganizationMemberTransport,
+  restoreOrganization as restoreOrganizationTransport,
+  updateOrganizationMember as updateOrganizationMemberTransport,
 } from '../../../api/generated-query/public/organizations/organizations'
 import { getGetUserQueryKey, getUser } from '../../../api/generated-query/public/user/user'
 import type { ListWorkspacesParams } from '../../../api/generated-query/public/model'
@@ -263,48 +275,8 @@ export async function fetchPrincipal(options?: WorkspaceRequestOptions): Promise
   return parsePrincipal(response)
 }
 
-export type ProvisionWorkspaceBillingInput = {
-  /** Explicit shared ba_ account to link; omitted defaults to the current account with no new wallet. */
-  billingAccountId?: string | undefined
-  /** Fresh isolated account for an independently operated business. */
-  isNewBillingAccount?: boolean | undefined
-}
-
-function normalizeBillingChoice(input: ProvisionWorkspaceBillingInput): {
-  billingAccountId: string | undefined
-  shouldCreateIsolatedAccount: boolean
-} {
-  const billingAccountId =
-    input.billingAccountId == null
-      ? undefined
-      : (() => {
-          const trimmed = input.billingAccountId.trim()
-          if (!isOpaqueId(trimmed) || opaqueIdPrefix(trimmed) !== 'ba') {
-            throw new Error('Invalid billing account opaque ID')
-          }
-          return trimmed
-        })()
-  const shouldCreateIsolatedAccount = input.isNewBillingAccount === true
-  if (billingAccountId !== undefined && shouldCreateIsolatedAccount) {
-    throw new Error('billing_account_id and new_billing_account are mutually exclusive')
-  }
-  return { billingAccountId, shouldCreateIsolatedAccount }
-}
-
-function assertOrganizationBillingScope(
-  organizationId: string | null,
-  billing: { billingAccountId: string | undefined; shouldCreateIsolatedAccount: boolean },
-): void {
-  if (
-    organizationId != null &&
-    (billing.billingAccountId !== undefined || billing.shouldCreateIsolatedAccount)
-  ) {
-    throw new Error('Organization workspaces always use the organization account')
-  }
-}
-
 export async function provisionWorkspace(
-  input: { name: string; organizationId?: string | undefined } & ProvisionWorkspaceBillingInput,
+  input: { name: string; organizationId?: string | undefined },
   options?: WorkspaceRequestOptions & { idempotencyKey?: string | undefined },
 ): Promise<WorkspaceSummary> {
   const name = typeof input.name === 'string' ? input.name.trim() : ''
@@ -313,17 +285,11 @@ export async function provisionWorkspace(
     throw new Error('Workspace name is too long')
   }
   const organizationId = optionalOpaqueId(input.organizationId, 'org', 'organization')
-  const billing = normalizeBillingChoice(input)
-  assertOrganizationBillingScope(organizationId, billing)
   const response = await createWorkspace(
     {
       data: {
         name,
         ...(organizationId == null ? {} : { organization_id: organizationId }),
-        ...(billing.billingAccountId === undefined
-          ? {}
-          : { billing_account_id: billing.billingAccountId }),
-        ...(billing.shouldCreateIsolatedAccount ? { new_billing_account: true } : {}),
       },
     },
     {
@@ -419,6 +385,12 @@ export const workspaceApiUrls = {
     resolveApiUrl(`/api/v1/organizations/${encodeURIComponent(organizationId)}`),
   organizationWorkspaces: (organizationId: string): string =>
     resolveApiUrl(`/api/v1/organizations/${encodeURIComponent(organizationId)}/workspaces`),
+  organizationMembers: (organizationId: string): string =>
+    resolveApiUrl(`/api/v1/organizations/${encodeURIComponent(organizationId)}/members`),
+  organizationMemberDetail: (organizationId: string, memberId: string): string =>
+    resolveApiUrl(
+      `/api/v1/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(memberId)}`,
+    ),
 }
 
 // Single source of truth for server state: TanStack Query caches under these
@@ -428,15 +400,36 @@ export const workspaceQueryKeys = {
   all: ['workspaces'] as const,
   list: getListWorkspacesQueryKey(),
   principal: getGetUserQueryKey(),
+  organizations: ['organizations'] as const,
+  organizationMembers: (organizationId: string) =>
+    ['organizations', organizationId, 'members'] as const,
 }
 
-export type OrganizationSummary = { publicId: string; name: string }
+export type OrganizationStatus = 'active' | 'closed'
+
+export type OrganizationSummary = {
+  publicId: string
+  name: string
+  status: OrganizationStatus
+  closedAt?: string | undefined
+}
+
+function parseOrganizationStatus(value: unknown): OrganizationStatus {
+  if (value === 'closed') return 'closed'
+  return 'active'
+}
 
 function parseOrganization(raw: unknown): OrganizationSummary {
   if (!isRecord(raw) || typeof raw.name !== 'string' || !raw.name.trim()) {
     throw new Error('Invalid organization payload')
   }
-  return { publicId: requireOpaqueId(raw.id, 'org', 'organization'), name: raw.name }
+  const closedAt = typeof raw.closed_at === 'string' && raw.closed_at ? raw.closed_at : undefined
+  return {
+    publicId: requireOpaqueId(raw.id, 'org', 'organization'),
+    name: raw.name,
+    status: parseOrganizationStatus(raw.status),
+    ...(closedAt === undefined ? {} : { closedAt }),
+  }
 }
 
 export async function fetchOrganizations(): Promise<OrganizationSummary[]> {
@@ -478,4 +471,177 @@ export async function provisionOrganization(
     },
   )
   return parseOrganization(requireContractData<unknown>(response, 'Organization creation failed'))
+}
+
+export type OrganizationRole = 'owner' | 'admin' | 'member'
+
+export type OrganizationMemberSummary = {
+  userId: string
+  role: OrganizationRole
+  createdAt?: string | undefined
+}
+
+function parseOrganizationRole(value: unknown): OrganizationRole {
+  if (value === 'owner' || value === 'admin' || value === 'member') return value
+  throw new Error('Invalid organization member role')
+}
+
+export function parseOrganizationMember(raw: unknown): OrganizationMemberSummary {
+  if (!isRecord(raw)) throw new Error('Invalid organization member payload')
+  const userId = requireOpaqueId(raw.user_id ?? raw.userId, 'usr', 'organization member')
+  const role = parseOrganizationRole(raw.role)
+  const createdAt = typeof raw.created_at === 'string' ? raw.created_at : undefined
+  return { userId, role, ...(createdAt === undefined ? {} : { createdAt }) }
+}
+
+export function isPersonalWorkspace(item: Pick<WorkspaceSummary, 'organizationId'>): boolean {
+  return item.organizationId == null
+}
+
+export function isOrganizationWorkspace(
+  item: Pick<WorkspaceSummary, 'organizationId'>,
+  organizationId?: string | null,
+): boolean {
+  if (item.organizationId == null) return false
+  if (organizationId == null) return true
+  return item.organizationId === organizationId
+}
+
+// The organization itself is the management entry (#951): it carries no
+// boards, content, or consumption. Workspace access follows the role
+// mapping — owner/admin automatic on every organization workspace, member
+// only with an explicit per-workspace grant. Non-members hold nothing
+// until they join the organization.
+export function effectiveOrganizationWorkspaceAccess(input: {
+  organizationRole: OrganizationRole | null
+  hasWorkspaceGrant: boolean
+}): boolean {
+  if (input.organizationRole === 'owner' || input.organizationRole === 'admin') return true
+  if (input.organizationRole === 'member') return input.hasWorkspaceGrant
+  return false
+}
+
+export async function fetchOrganizationMembers(
+  organizationId: string,
+  options?: WorkspaceRequestOptions,
+): Promise<OrganizationMemberSummary[]> {
+  const orgId = requireOpaqueId(organizationId, 'org', 'organization')
+  const response = await listOrganizationMembersTransport(orgId, toRequestConfig(options))
+  const data = requireContractData<unknown>(response, 'Organization member list failed')
+  if (!Array.isArray(data)) throw new Error('Invalid organization member list')
+  return data.map(parseOrganizationMember)
+}
+
+export async function inviteOrganizationMember(
+  organizationId: string,
+  input: { userId: string; role: Exclude<OrganizationRole, 'owner'> },
+  options?: WorkspaceRequestOptions & { idempotencyKey?: string | undefined },
+): Promise<OrganizationMemberSummary> {
+  const orgId = requireOpaqueId(organizationId, 'org', 'organization')
+  const userId = requireOpaqueId(input.userId, 'usr', 'organization member')
+  const role = parseOrganizationRole(input.role)
+  if (role === 'owner') throw new Error('Organization owner change requires explicit handover')
+  const response = await addOrganizationMemberTransport(
+    orgId,
+    { data: { user_id: userId, role } },
+    {
+      ...withSignal(options?.signal),
+      headers: buildContractRequestHeaders({
+        requestId: asTrimmedString(options?.requestId) ?? newRequestId(),
+        idempotencyKey: asTrimmedString(options?.idempotencyKey) ?? newRequestId(),
+      }),
+      ...(options?.authFailure == null ? {} : { authFailure: options.authFailure }),
+    },
+  )
+  return parseOrganizationMember(
+    requireContractData<unknown>(response, 'Organization member invite failed'),
+  )
+}
+
+export async function updateOrganizationMember(
+  organizationId: string,
+  memberId: string,
+  input: { role: Exclude<OrganizationRole, 'owner'> },
+  options?: WorkspaceRequestOptions,
+): Promise<OrganizationMemberSummary> {
+  const orgId = requireOpaqueId(organizationId, 'org', 'organization')
+  const userId = requireOpaqueId(memberId, 'usr', 'organization member')
+  const role = parseOrganizationRole(input.role)
+  if (role === 'owner') throw new Error('Organization owner change requires explicit handover')
+  const response = await updateOrganizationMemberTransport(
+    orgId,
+    userId,
+    { data: { role } },
+    toRequestConfig(options),
+  )
+  return parseOrganizationMember(
+    requireContractData<unknown>(response, 'Organization member update failed'),
+  )
+}
+
+export async function removeOrganizationMember(
+  organizationId: string,
+  memberId: string,
+  options?: WorkspaceRequestOptions & { idempotencyKey?: string | undefined },
+): Promise<void> {
+  const orgId = requireOpaqueId(organizationId, 'org', 'organization')
+  const userId = requireOpaqueId(memberId, 'usr', 'organization member')
+  const response = await removeOrganizationMemberTransport(orgId, userId, {
+    ...withSignal(options?.signal),
+    headers: buildContractRequestHeaders({
+      requestId: asTrimmedString(options?.requestId) ?? newRequestId(),
+      idempotencyKey: asTrimmedString(options?.idempotencyKey) ?? newRequestId(),
+    }),
+    ...(options?.authFailure == null ? {} : { authFailure: options.authFailure }),
+  })
+  const data = requireContractData<unknown>(response, 'Organization member removal failed')
+  if (!isRecord(data) || data.deleted !== true)
+    throw new Error('Organization member removal failed')
+}
+
+// Organization closure collapses access and spending at once (#955): only
+// the Owner closes; the shared pool refuses while in-flight Tasks, payment
+// orders, refunds, disputes, or a pending handover invite settle. The
+// remaining balance stays in the closed account (never Personal) with a
+// fail-closed retained disposition until recharge terms land.
+export async function closeOrganization(
+  organizationId: string,
+  input: { reason?: string | undefined },
+  options?: WorkspaceRequestOptions & { idempotencyKey?: string | undefined },
+): Promise<OrganizationSummary> {
+  const orgId = requireOpaqueId(organizationId, 'org', 'organization')
+  const reason = (input.reason ?? '').trim().slice(0, 280)
+  const response = await closeOrganizationTransport(
+    orgId,
+    { data: { ...(reason ? { reason } : {}) } },
+    {
+      ...withSignal(options?.signal),
+      headers: buildContractRequestHeaders({
+        requestId: asTrimmedString(options?.requestId) ?? newRequestId(),
+        idempotencyKey: asTrimmedString(options?.idempotencyKey) ?? newRequestId(),
+      }),
+      ...(options?.authFailure == null ? {} : { authFailure: options.authFailure }),
+    },
+  )
+  return parseOrganization(requireContractData<unknown>(response, 'Organization closure failed'))
+}
+
+// Organization restoration reopens a closed organization (#955): only the
+// Owner restores; retained memberships and permissions resume.
+export async function restoreOrganization(
+  organizationId: string,
+  options?: WorkspaceRequestOptions & { idempotencyKey?: string | undefined },
+): Promise<OrganizationSummary> {
+  const orgId = requireOpaqueId(organizationId, 'org', 'organization')
+  const response = await restoreOrganizationTransport(orgId, {
+    ...withSignal(options?.signal),
+    headers: buildContractRequestHeaders({
+      requestId: asTrimmedString(options?.requestId) ?? newRequestId(),
+      idempotencyKey: asTrimmedString(options?.idempotencyKey) ?? newRequestId(),
+    }),
+    ...(options?.authFailure == null ? {} : { authFailure: options.authFailure }),
+  })
+  return parseOrganization(
+    requireContractData<unknown>(response, 'Organization restoration failed'),
+  )
 }

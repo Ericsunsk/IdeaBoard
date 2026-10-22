@@ -15,11 +15,17 @@ import (
 type v1OrganizationDTO struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
+	Status    string `json:"status"`
+	ClosedAt  string `json:"closed_at,omitempty"`
 	CreatedAt string `json:"created_at"`
 }
 
 func toOrganizationDTO(o *tenancy.Organization) v1OrganizationDTO {
-	return v1OrganizationDTO{ID: o.PublicID, Name: o.Name, CreatedAt: v1FormatTime(o.CreatedAt)}
+	dto := v1OrganizationDTO{ID: o.PublicID, Name: o.Name, Status: o.Status(), CreatedAt: v1FormatTime(o.CreatedAt)}
+	if o.ClosedAt != nil {
+		dto.ClosedAt = v1FormatTime(*o.ClosedAt)
+	}
+	return dto
 }
 
 func (h *contractV1Handler) listOrganizations(c *gin.Context) {
@@ -115,6 +121,11 @@ func (h *contractV1Handler) createOrganization(c *gin.Context) {
 			c.Abort()
 			return
 		}
+		if errors.Is(doErr, tenancy.ErrOrganizationLimitReached) {
+			contract.RenderError(c, http.StatusConflict, contract.CodeOrganizationLimitReached, runtimehttp.MsgOrganizationLimitReached)
+			c.Abort()
+			return
+		}
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable53)
 		c.Abort()
 		return
@@ -175,6 +186,10 @@ func (h *contractV1Handler) updateOrganization(c *gin.Context) {
 	}
 	updated, err := h.deps.Store.UpdateOrganization(c.Request.Context(), organization.PublicID, name)
 	if err != nil {
+		if errors.Is(err, tenancy.ErrOrganizationClosed) {
+			renderOrganizationClosureError(c, err)
+			return
+		}
 		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
 		c.Abort()
 		return
@@ -259,6 +274,10 @@ func (h *contractV1Handler) createOrganizationWorkspace(c *gin.Context) {
 		if contract.IsIdempotencyConflict(doErr) {
 			contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, runtimehttp.MsgWorkspaceIdempotencyConflict)
 			c.Abort()
+			return
+		}
+		if errors.Is(doErr, tenancy.ErrOrganizationClosed) {
+			renderOrganizationClosureError(c, doErr)
 			return
 		}
 		if errors.Is(doErr, tenancy.ErrNotFound) {

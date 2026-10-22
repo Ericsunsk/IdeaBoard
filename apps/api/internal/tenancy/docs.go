@@ -1,31 +1,24 @@
 // Package tenancy owns the Workspace, Organization, and membership
 // lifecycle (issue #801) plus stable Billing Account resolution and
-// financial management (issue #915).
+// financial management (ADR-0038).
 //
 // The durable schema (organizations, workspaces,
 // organization_memberships, workspace_memberships, billing_accounts,
-// billing_account_members, workspace_billing_links) is created by a sibling
+// billing_account_members) is created by a sibling
 // stream; this package programs to the AGREED interface via the Store
 // interface below so handlers and tests do not block on it. Repository
 // methods take context.Context first and the future postgres
 // implementation must use the dbWithContext(ctx) pattern.
 //
-// Billing Account model (#915): the stable funds identity holds the unified
-// balance; many Workspaces may share one account (org pool or explicit
-// no-org studio link), independent accounts stay isolated. Resolution joins
-// the caller transaction and fails closed on missing, ambiguous, or
-// conflicting ownership; joining a Workspace never merges personal funds.
-// Financial Owner/Admin manages recharge, bills, quotas, and budgets;
-// Workspace Owner/Admin standing alone grants no financial management, and
-// financial management grants no Board content access. Ownership is
-// transferable, never lifetime-bound.
-//
-// The durable schema (organizations, workspaces,
-// organization_memberships, workspace_memberships) is created by a sibling
-// stream; this package programs to the AGREED interface via the Store
-// interface below so handlers and tests do not block on it. Repository
-// methods take context.Context first and the future postgres
-// implementation must use the dbWithContext(ctx) pattern.
+// Billing Account model (ADR-0038): the stable funds identity holds the
+// unified balance; one Personal account exists per user and one shared
+// account per Organization. Workspace scope is fixed at creation and
+// never switches. Resolution joins the caller transaction and fails
+// closed on missing or ownerless scopes; joining a Workspace never merges
+// personal funds. Financial Owner/Admin manages recharge, bills, and
+// quotas; Workspace Owner/Admin standing alone grants no financial
+// management, and financial management grants no Board content access.
+// Ownership is transferable, never lifetime-bound.
 //
 // Personal workspace rule (agreed): organization_id IS NULL marks personal
 // scope. Every user additionally owns exactly one Default personal
@@ -44,6 +37,12 @@
 //
 // The in-memory store (memory.go) stays at the top level next to the Store
 // interface as its test-only double; it must never be wired in production.
-// The durable backend lives in infrastructure/postgres and swaps it out by
-// implementing Store against sqlc (never hand-edit internal/db/sqlc/*).
+// The durable backend lives in infrastructure/postgres and implements Store
+// against sqlc (never hand-edit internal/db/sqlc/*). Its OrganizationStore
+// owns Organization creation, membership, Workspace creation, closure, and
+// restore transactions; the composite Store embeds it alongside Workspace
+// lifecycle. Organization mutations lock the Organization before checking
+// state or roles, and all reads/writes join the same caller transaction.
+// Workspace row creation is a transaction-local persistence primitive shared
+// by Personal and Organization creation, not a nested lifecycle call.
 package tenancy

@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"ideaboard/api/internal/platform/contract"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
@@ -42,5 +43,55 @@ func TestV1WorkspaceMemberLimit(t *testing.T) {
 	status, payload = call(2, "capacity-existing")
 	if status != http.StatusCreated {
 		t.Fatalf("existing member at capacity = %d %v", status, payload)
+	}
+}
+
+// TestV1DefaultWorkspaceInviteProtected proves Personal collaboration
+// (#952) at the HTTP boundary without a database: the Personal Default
+// workspace is private and rejects invites with 403
+// workspace_default_protected (leaving no membership behind), while a
+// non-Default Personal workspace invites freely with no account-default
+// gate (absent quota reads as unlimited).
+func TestV1DefaultWorkspaceInviteProtected(t *testing.T) {
+	ctx := context.Background()
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	engine := newV1TestEngine(store, dir)
+
+	const owner, target int64 = 1, 2
+	dir.ensure(owner)
+	dir.ensure(target)
+	def, err := store.EnsureDefaultWorkspace(ctx, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	invite := func(workspacePublicID string, key string) (int, map[string]any) {
+		status, _, payload := doV1(t, engine, v1Call{
+			method: http.MethodPost, path: runtimehttp.ContractV1GroupPath + "/workspaces/" + workspacePublicID + "/members",
+			userID: owner,
+			body:   fmt.Sprintf(`{"data":{"user_id":%q,"role":"member"}}`, tenancy.FormatUserPublicID(dir.ensure(target))),
+			headers: map[string]string{
+				contract.IdempotencyKeyHeader: key,
+			},
+		})
+		return status, payload
+	}
+	if status, payload := invite(def.PublicID, "default-invite-1"); status != http.StatusForbidden ||
+		v1ErrorCode(t, payload) != string(contract.CodeWorkspaceDefaultProtected) {
+		t.Fatalf("default invite = %d %v, want 403 workspace_default_protected", status, payload)
+	}
+	if _, member, _ := store.GetWorkspaceRole(ctx, def.PublicID, target); member {
+		t.Fatal("blocked default invite must not create a membership")
+	}
+	if _, err := store.AddWorkspaceMember(ctx, def.PublicID, target, tenancy.RoleMember); !errors.Is(err, tenancy.ErrDefaultWorkspaceProtected) {
+		t.Fatalf("store default invite = %v, want ErrDefaultWorkspaceProtected", err)
+	}
+
+	plain := v1WorkspaceFixture(t, ctx, store, "plain-collab", owner)
+	if status, payload := invite(plain.PublicID, "plain-invite-1"); status != http.StatusCreated {
+		t.Fatalf("plain invite = %d %v, want 201 (open, no default gate)", status, payload)
+	}
+	if _, member, _ := store.GetWorkspaceRole(ctx, plain.PublicID, target); !member {
+		t.Fatal("open invite must create a membership")
 	}
 }

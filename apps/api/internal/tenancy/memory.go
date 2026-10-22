@@ -126,13 +126,24 @@ func (s *InMemoryStore) ListWorkspacesForUser(ctx context.Context, userID int64)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []*Workspace
-	for publicID, members := range s.wsMembers {
-		if _, ok := members[userID]; !ok {
+	for publicID, w := range s.workspaces {
+		directRole, directMember := "", false
+		if members, ok := s.wsMembers[publicID]; ok {
+			directRole, directMember = members[userID]
+		}
+		var orgRole string
+		var orgMember bool
+		if !w.IsPersonal() && w.OrganizationID != nil {
+			orgRole, orgMember = s.orgMembers[*w.OrganizationID][userID]
+		}
+		if _, ok := EffectiveWorkspaceRole(w, orgRole, orgMember, directRole, directMember); !ok {
 			continue
 		}
-		w, ok := s.workspaces[publicID]
-		if !ok {
-			continue
+		// Closed Organizations suspend Workspace listing (#955).
+		if !w.IsPersonal() && w.OrganizationID != nil {
+			if org, ok := s.organizations[*w.OrganizationID]; ok && org.IsClosed() {
+				continue
+			}
 		}
 		out = append(out, copyWorkspace(w))
 	}
@@ -149,36 +160,14 @@ func (s *InMemoryStore) CreateWorkspace(ctx context.Context, params CreateWorksp
 	if err := ValidateName(params.Name); err != nil {
 		return nil, err
 	}
+	if params.OrganizationID != nil {
+		if params.IsDefault {
+			return nil, ErrDefaultWorkspaceConflict
+		}
+		return s.CreateOrganizationWorkspace(ctx, *params.OrganizationID, params.OwnerUserID, params.Name)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if params.IsDefault && params.OrganizationID != nil {
-		return nil, ErrDefaultWorkspaceConflict
-	}
-	// #944 creation-time guards (parity with postgres): billing opts are
-	// mutually exclusive; Default and org scopes reject explicit billing
-	// choices fail-closed instead of silently picking another pool.
-	if params.BillingAccountPublicID != nil && params.NewBillingAccount {
-		return nil, ErrBillingConflict
-	}
-	if params.IsDefault && (params.BillingAccountPublicID != nil || params.NewBillingAccount) {
-		return nil, ErrBillingConflict
-	}
-	if params.BillingAccountPublicID != nil {
-		if target := strings.TrimSpace(*params.BillingAccountPublicID); !strings.HasPrefix(target, "ba_") || len(target) <= 3 {
-			return nil, ErrBillingNotFound
-		}
-		if params.OrganizationID != nil {
-			return nil, ErrBillingConflict
-		}
-	}
-	if params.NewBillingAccount && params.OrganizationID != nil {
-		return nil, ErrBillingConflict
-	}
-	if params.OrganizationID != nil {
-		if _, ok := s.organizations[*params.OrganizationID]; !ok {
-			return nil, ErrNotFound
-		}
-	}
 	if params.IsDefault && params.OwnerUserID <= 0 {
 		return nil, ErrPersonalWorkspaceUserRequired
 	}
@@ -303,14 +292,32 @@ func (s *InMemoryStore) EnsureDefaultWorkspace(ctx context.Context, userID int64
 func (s *InMemoryStore) GetWorkspaceRole(ctx context.Context, workspacePublicID string, userID int64) (string, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.workspaces[workspacePublicID]; !ok {
+	w, ok := s.workspaces[workspacePublicID]
+	if !ok {
 		return "", false, ErrNotFound
 	}
-	members, ok := s.wsMembers[workspacePublicID]
-	if !ok {
-		return "", false, nil
+	// Closed Organizations suspend all Workspace content access (#955).
+	if !w.IsPersonal() && w.OrganizationID != nil {
+		if org, ok := s.organizations[*w.OrganizationID]; ok && org.IsClosed() {
+			return "", false, nil
+		}
 	}
-	role, ok := members[userID]
+	directRole, directMember := "", false
+	if members, ok := s.wsMembers[workspacePublicID]; ok {
+		directRole, directMember = members[userID]
+	}
+	if w.IsPersonal() {
+		return directRole, directMember, nil
+	}
+	orgID := ""
+	if w.OrganizationID != nil {
+		orgID = *w.OrganizationID
+	}
+	orgRole, orgMember := "", false
+	if orgID != "" {
+		orgRole, orgMember = s.orgMembers[orgID][userID]
+	}
+	role, ok := EffectiveWorkspaceRole(w, orgRole, orgMember, directRole, directMember)
 	return role, ok, nil
 }
 
@@ -355,8 +362,24 @@ func (s *InMemoryStore) AddWorkspaceMember(ctx context.Context, workspacePublicI
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.workspaces[workspacePublicID]; !ok {
+	w, ok := s.workspaces[workspacePublicID]
+	if !ok {
 		return nil, ErrNotFound
+	}
+	// Personal Default is private (#952): it never gains collaborators.
+	// Non-Default Personal workspaces invite freely (absent quota reads
+	// as unlimited); Organization workspaces still require prior org
+	// membership below.
+	if w.IsDefaultWorkspace() {
+		return nil, ErrDefaultWorkspaceProtected
+	}
+	if !w.IsPersonal() && w.OrganizationID != nil {
+		if _, ok := s.orgMembers[*w.OrganizationID][targetUserID]; !ok {
+			return nil, ErrNotFound
+		}
+		if org, ok := s.organizations[*w.OrganizationID]; ok && org.IsClosed() {
+			return nil, ErrOrganizationClosed
+		}
 	}
 	if existing, ok := s.wsMembers[workspacePublicID][targetUserID]; ok {
 		return &WorkspaceMember{WorkspacePublicID: workspacePublicID, UserID: targetUserID, Role: existing}, nil
@@ -379,6 +402,11 @@ func (s *InMemoryStore) UpdateWorkspaceMemberRole(ctx context.Context, workspace
 	if _, ok := s.workspaces[workspacePublicID]; !ok {
 		return nil, ErrNotFound
 	}
+	if w := s.workspaces[workspacePublicID]; !w.IsPersonal() && w.OrganizationID != nil {
+		if org, ok := s.organizations[*w.OrganizationID]; ok && org.IsClosed() {
+			return nil, ErrOrganizationClosed
+		}
+	}
 	members := s.wsMembers[workspacePublicID]
 	current, ok := members[targetUserID]
 	if !ok {
@@ -397,6 +425,11 @@ func (s *InMemoryStore) RemoveWorkspaceMember(ctx context.Context, workspacePubl
 	defer s.mu.Unlock()
 	if _, ok := s.workspaces[workspacePublicID]; !ok {
 		return nil, ErrNotFound
+	}
+	if w := s.workspaces[workspacePublicID]; !w.IsPersonal() && w.OrganizationID != nil {
+		if org, ok := s.organizations[*w.OrganizationID]; ok && org.IsClosed() {
+			return nil, ErrOrganizationClosed
+		}
 	}
 	members := s.wsMembers[workspacePublicID]
 	current, ok := members[targetUserID]
@@ -419,12 +452,29 @@ func (s *InMemoryStore) RemoveWorkspaceMember(ctx context.Context, workspacePubl
 	return cleaned, nil
 }
 
+func (s *InMemoryStore) orgCountForUserLocked(userID int64) int {
+	count := 0
+	for publicID, members := range s.orgMembers {
+		if _, ok := members[userID]; !ok {
+			continue
+		}
+		if org, ok := s.organizations[publicID]; !ok || org.ArchivedAt != nil {
+			continue
+		}
+		count++
+	}
+	return count
+}
+
 func (s *InMemoryStore) CreateOrganization(ctx context.Context, ownerUserID int64, name string) (*Organization, error) {
 	if err := ValidateName(name); err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.orgCountForUserLocked(ownerUserID) >= 1 {
+		return nil, ErrOrganizationLimitReached
+	}
 	publicID, err := NewOrganizationPublicID()
 	if err != nil {
 		return nil, err
@@ -436,7 +486,7 @@ func (s *InMemoryStore) CreateOrganization(ctx context.Context, ownerUserID int6
 	org := &Organization{
 		InternalID: s.nextInternalIDLocked(),
 		PublicID:   publicID,
-		Name:       name,
+		Name:       strings.TrimSpace(name),
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -493,7 +543,64 @@ func (s *InMemoryStore) UpdateOrganization(ctx context.Context, publicID, name s
 	if !ok || org.ArchivedAt != nil {
 		return nil, ErrNotFound
 	}
+	if org.IsClosed() {
+		return nil, ErrOrganizationClosed
+	}
 	org.Name = name
+	org.UpdatedAt = s.clock()
+	return copyOrganization(org), nil
+}
+
+// CloseOrganization suspends a live Organization in memory. The actor must
+// be the Owner; non-members read as not found, non-owners as forbidden.
+// The in-memory fixture holds no Task/payment state, so the in-flight
+// gate trivially passes; the postgres implementation enforces it.
+func (s *InMemoryStore) CloseOrganization(ctx context.Context, organizationPublicID string, actorUserID int64, reason string) (*Organization, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	org, ok := s.organizations[organizationPublicID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	if org.IsClosed() {
+		return nil, ErrOrganizationClosed
+	}
+	role, ok := s.orgMembers[organizationPublicID][actorUserID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	if role != RoleOwner {
+		return nil, ErrForbidden
+	}
+	now := s.clock()
+	org.ClosedAt = &now
+	closedBy := actorUserID
+	org.ClosedBy = &closedBy
+	org.UpdatedAt = now
+	return copyOrganization(org), nil
+}
+
+// RestoreOrganization reopens a closed Organization in memory. The actor
+// must be the Owner; retained memberships resume with no rewrite.
+func (s *InMemoryStore) RestoreOrganization(ctx context.Context, organizationPublicID string, actorUserID int64) (*Organization, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	org, ok := s.organizations[organizationPublicID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	if !org.IsClosed() {
+		return nil, ErrOrganizationNotClosed
+	}
+	role, ok := s.orgMembers[organizationPublicID][actorUserID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	if role != RoleOwner {
+		return nil, ErrForbidden
+	}
+	org.ClosedAt = nil
+	org.ClosedBy = nil
 	org.UpdatedAt = s.clock()
 	return copyOrganization(org), nil
 }
@@ -538,6 +645,15 @@ func (s *InMemoryStore) CreateOrganizationWorkspace(ctx context.Context, organiz
 	if _, ok := s.organizations[organizationPublicID]; !ok {
 		return nil, ErrNotFound
 	}
+	if s.organizations[organizationPublicID].IsClosed() {
+		return nil, ErrOrganizationClosed
+	}
+	if role := s.orgMembers[organizationPublicID][ownerUserID]; role != RoleOwner && role != RoleAdmin {
+		if _, ok := s.orgMembers[organizationPublicID][ownerUserID]; !ok {
+			return nil, ErrNotFound
+		}
+		return nil, ErrForbidden
+	}
 	publicID, err := NewWorkspacePublicID()
 	if err != nil {
 		return nil, err
@@ -553,7 +669,7 @@ func (s *InMemoryStore) CreateOrganizationWorkspace(ctx context.Context, organiz
 		PublicID:       publicID,
 		OrganizationID: &orgID,
 		OwnerUserID:    &owner,
-		Name:           name,
+		Name:           strings.TrimSpace(name),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -562,15 +678,150 @@ func (s *InMemoryStore) CreateOrganizationWorkspace(ctx context.Context, organiz
 	return copyWorkspace(w), nil
 }
 
+func (s *InMemoryStore) orgOwnerCountLocked(organizationPublicID string) int {
+	count := 0
+	for _, role := range s.orgMembers[organizationPublicID] {
+		if role == RoleOwner {
+			count++
+		}
+	}
+	return count
+}
+
+func (s *InMemoryStore) ListOrganizationMembers(ctx context.Context, organizationPublicID string) ([]*OrganizationMember, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.organizations[organizationPublicID]; !ok {
+		return nil, ErrNotFound
+	}
+	members := s.orgMembers[organizationPublicID]
+	out := make([]*OrganizationMember, 0, len(members))
+	for userID, role := range members {
+		out = append(out, &OrganizationMember{
+			OrganizationPublicID: organizationPublicID,
+			UserID:               userID,
+			Role:                 role,
+			CreatedAt:            s.clock(),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].UserID < out[j].UserID })
+	return out, nil
+}
+
+func (s *InMemoryStore) AddOrganizationMember(ctx context.Context, organizationPublicID string, targetUserID int64, role string) (*OrganizationMember, error) {
+	role = strings.TrimSpace(role)
+	if !IsValidRole(role) || role == RoleOwner {
+		return nil, ErrForbidden
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.organizations[organizationPublicID]; !ok {
+		return nil, ErrNotFound
+	}
+	if s.organizations[organizationPublicID].IsClosed() {
+		return nil, ErrOrganizationClosed
+	}
+	if existing, ok := s.orgMembers[organizationPublicID][targetUserID]; ok {
+		return &OrganizationMember{OrganizationPublicID: organizationPublicID, UserID: targetUserID, Role: existing}, nil
+	}
+	if s.orgCountForUserLocked(targetUserID) >= 1 {
+		return nil, ErrOrganizationLimitReached
+	}
+	members, ok := s.orgMembers[organizationPublicID]
+	if !ok {
+		members = make(map[int64]string)
+		s.orgMembers[organizationPublicID] = members
+	}
+	members[targetUserID] = role
+	return &OrganizationMember{OrganizationPublicID: organizationPublicID, UserID: targetUserID, Role: role, CreatedAt: s.clock()}, nil
+}
+
+func (s *InMemoryStore) UpdateOrganizationMemberRole(ctx context.Context, organizationPublicID string, actorUserID, targetUserID int64, newRole string) (*OrganizationMember, error) {
+	newRole = strings.TrimSpace(newRole)
+	if !IsValidRole(newRole) {
+		return nil, ErrForbidden
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.organizations[organizationPublicID]; !ok {
+		return nil, ErrNotFound
+	}
+	if s.organizations[organizationPublicID].IsClosed() {
+		return nil, ErrOrganizationClosed
+	}
+	members := s.orgMembers[organizationPublicID]
+	current, ok := members[targetUserID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	actorRole := members[actorUserID]
+	if err := CheckOrganizationMemberMutation(actorRole, actorUserID, targetUserID, current, newRole, s.orgOwnerCountLocked(organizationPublicID), false); err != nil {
+		return nil, err
+	}
+	members[targetUserID] = newRole
+	return &OrganizationMember{OrganizationPublicID: organizationPublicID, UserID: targetUserID, Role: newRole}, nil
+}
+
+func (s *InMemoryStore) RemoveOrganizationMember(ctx context.Context, organizationPublicID string, actorUserID, targetUserID int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.organizations[organizationPublicID]; !ok {
+		return ErrNotFound
+	}
+	if s.organizations[organizationPublicID].IsClosed() {
+		return ErrOrganizationClosed
+	}
+	members := s.orgMembers[organizationPublicID]
+	current, ok := members[targetUserID]
+	if !ok {
+		return ErrNotFound
+	}
+	actorRole := members[actorUserID]
+	if err := CheckOrganizationMemberMutation(actorRole, actorUserID, targetUserID, current, "", s.orgOwnerCountLocked(organizationPublicID), true); err != nil {
+		return err
+	}
+	delete(members, targetUserID)
+	for publicID, w := range s.workspaces {
+		if w.OrganizationID != nil && *w.OrganizationID == organizationPublicID {
+			if wsMembers, ok := s.wsMembers[publicID]; ok {
+				delete(wsMembers, targetUserID)
+			}
+		}
+	}
+	return nil
+}
+
 // WithWorkspaceMembers keeps the membership snapshot stable throughout a dependent mutation.
+// The role function reports the effective workspace role (#951): org
+// Owner/Admin via their org role, others via the direct row.
 func (s *InMemoryStore) WithWorkspaceMembers(ctx context.Context, workspacePublicID string, action func(roleFor func(int64) string) error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.workspaces[workspacePublicID]; !ok {
+	w, ok := s.workspaces[workspacePublicID]
+	if !ok {
 		return ErrNotFound
 	}
-	return action(func(userID int64) string { return s.wsMembers[workspacePublicID][userID] })
+	return action(func(userID int64) string {
+		direct := s.wsMembers[workspacePublicID][userID]
+		directMember := false
+		if _, ok := s.wsMembers[workspacePublicID][userID]; ok {
+			directMember = true
+		}
+		if w.IsPersonal() {
+			return direct
+		}
+		var orgRole string
+		var orgMember bool
+		if w.OrganizationID != nil {
+			orgRole, orgMember = s.orgMembers[*w.OrganizationID][userID]
+		}
+		role, ok := EffectiveWorkspaceRole(w, orgRole, orgMember, direct, directMember)
+		if !ok {
+			return ""
+		}
+		return role
+	})
 }

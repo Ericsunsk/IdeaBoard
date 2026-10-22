@@ -1,21 +1,20 @@
-// Vision workspace settlement identity (#918).
+// Vision workspace settlement identity (ADR-0038).
 //
 // A Vision Search call bills the consuming Workspace's stable Billing
-// Account (#915 resolution: explicit workspace_billing_links, else the
-// Organization pool, else the per-workspace account; fail closed), never
-// the operator's personal wallet. The operation row persists the
-// settlement triple: submitter (user_id, the real initiator, also the
+// Account (fixed creation scope: the Organization pool for org workspaces,
+// the owner's deterministic Personal account for personal workspaces; fail
+// closed), never the operator's personal wallet. The operation row persists
+// the settlement triple: submitter (user_id, the real initiator, also the
 // Actor on every Command), consumption location (workspace_id), and payer
 // (billing_account_id). Hold/Capture/Release and background reconciliation
 // converge on the stored payer; they never re-resolve from the live Owner
 // or membership, so an owner handover or member departure mid-flight
 // cannot move the money.
 //
-// Future consumption limits (945/946 budgets/quotas) join this same
-// settlement transaction: the resolver runs inside the caller's tx before
-// Quote/Hold, so a limit check added here would fence the Hold atomically
-// with the operation insert. This file implements no limit math, only the
-// boundary.
+// The member quota (#946) joins this same settlement transaction: the
+// resolver runs inside the caller's tx before Quote/Hold, so the quota
+// check fences the Hold atomically with the operation insert. This file
+// implements no limit math, only the boundary.
 
 package application
 
@@ -41,7 +40,7 @@ type VisionSettlementIdentity struct {
 
 // VisionBillingAccountResolver resolves the settlement triple inside the
 // caller's transaction and fails closed on ambiguity or conflict. The
-// production implementation below owns the #915 chain; tests inject a
+// production implementation below owns the fixed-scope chain; tests inject a
 // fake. Resolution never falls back to a personal wallet: scopeless
 // callers do not exist on this path (every vision call names its
 // consuming workspace).
@@ -54,7 +53,7 @@ type VisionBillingAccountResolver interface {
 	ResolveWorkspaceInternalID(ctx context.Context, tx pgx.Tx, workspacePublicID string) (int64, error)
 }
 
-// visionBillingAccountResolver is the production #915 chain over the
+// visionBillingAccountResolver is the production fixed-scope chain over the
 // caller's transaction: workspace visibility + membership gate, then the
 // stable account resolution. Hidden workspaces and non-members converge
 // to ErrVisionWorkspaceNotFound (never a distinct billing status), per
@@ -71,10 +70,31 @@ func (visionBillingAccountResolver) ResolveVisionSettlementInTx(ctx context.Cont
 	if err != nil {
 		return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
 	}
+	// Closed Organizations suspend new spending (#955): the settlement
+	// transaction fails closed even if the HTTP prelude was bypassed.
+	// Terminal Capture/Release on row-pinned accounts never pass this
+	// gate, so history survives closure.
+	if workspace.OrganizationID.Valid {
+		org, err := queries.GetOrganizationByInternalID(ctx, workspace.OrganizationID.Int64)
+		if err != nil {
+			return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
+		}
+		if org.ClosedAt.Valid {
+			return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
+		}
+	}
 	if _, err := queries.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
 		WorkspaceID: workspace.InternalID, UserID: actorUserID,
 	}); err != nil {
-		return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
+		if workspace.OrganizationID.Valid {
+			if orgMember, orgErr := queries.GetOrganizationMembership(ctx, dbsqlc.GetOrganizationMembershipParams{
+				OrganizationID: workspace.OrganizationID.Int64, UserID: actorUserID,
+			}); orgErr != nil || (orgMember.Role != "owner" && orgMember.Role != "admin") {
+				return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
+			}
+		} else {
+			return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
+		}
 	}
 	account, err := tenancypg.EnsureBillingAccountForWorkspaceWithQueries(ctx, queries, workspace.InternalID)
 	if err != nil {

@@ -72,6 +72,7 @@ CREATE TABLE workspaces (
     OR (organization_id IS NULL AND owner_user_id IS NOT NULL)
   )
 );
+CREATE UNIQUE INDEX ux_workspaces_default_owner ON workspaces(owner_user_id) WHERE organization_id IS NULL AND is_default;
 
 CREATE TABLE workspace_memberships (
  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id),
@@ -149,6 +150,7 @@ CREATE TABLE billing_accounts (
     OR (workspace_id IS NULL AND organization_id IS NOT NULL)
   )
 );
+CREATE UNIQUE INDEX ux_billing_accounts_workspace ON billing_accounts (workspace_id) WHERE workspace_id IS NOT NULL;
 
 CREATE TABLE workspace_billing_links (
   workspace_id BIGINT PRIMARY KEY REFERENCES workspaces(internal_id) ON DELETE CASCADE,

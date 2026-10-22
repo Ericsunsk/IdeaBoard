@@ -58,7 +58,7 @@
               ref="renameInputRef"
               v-model="draftName"
               size="sm"
-              class="h-9 max-w-xs text-sm"
+              class="h-9 max-w-xs text-admin-content"
               :disabled="isRenamingName"
               :aria-label="renameAriaLabel"
               @keydown="handleRenameKeydown"
@@ -86,7 +86,7 @@
           </div>
           <div v-else class="flex min-w-0 items-center gap-2">
             <p
-              class="m-0 min-w-0 flex-1 truncate text-[24px] leading-tight font-bold tracking-normal text-foreground sm:text-[30px]"
+              class="m-0 min-w-0 flex-1 truncate text-admin-modal-title-mobile leading-tight font-bold tracking-normal text-foreground sm:text-admin-modal-title"
             >
               {{ currentDisplayName }}
             </p>

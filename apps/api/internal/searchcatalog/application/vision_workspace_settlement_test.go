@@ -657,3 +657,34 @@ func TestVisionWorkspacePermissionAndFundsGate(t *testing.T) {
 		t.Fatal("underfunded call fell back to the personal wallet")
 	}
 }
+
+// Closed Organizations suspend new Vision spending at the settlement
+// seam (#955): the production resolver fails closed inside the caller's
+// transaction even if the HTTP prelude was bypassed. Terminal
+// Capture/Release on row-pinned accounts never pass this gate.
+func TestVisionSettlementRefusesClosedOrganization(t *testing.T) {
+	env := openVisionWorkspaceEnv(t, 7)
+	ctx := context.Background()
+	owner := env.createUser(t, "vision-closed-owner")
+	env.createOrg(t, "org_visionclosed01", map[int64]string{owner: "owner"})
+	env.createOrgWorkspace(t, "org_visionclosed01", "ws_visionclosed01", map[int64]string{owner: "owner"})
+
+	resolve := func() error {
+		tx, err := env.pool.Begin(ctx)
+		if err != nil {
+			t.Fatalf("begin tx: %v", err)
+		}
+		defer tx.Rollback(ctx)
+		_, err = visionBillingAccountResolver{}.ResolveVisionSettlementInTx(ctx, tx, "ws_visionclosed01", owner)
+		return err
+	}
+	if err := resolve(); err != nil {
+		t.Fatalf("open org resolve = %v, want nil", err)
+	}
+	if _, err := env.pool.Exec(ctx, `UPDATE organizations SET closed_at = now() WHERE public_id = 'org_visionclosed01'`); err != nil {
+		t.Fatalf("close org: %v", err)
+	}
+	if err := resolve(); !errors.Is(err, ErrVisionWorkspaceNotFound) {
+		t.Fatalf("closed org resolve = %v, want ErrVisionWorkspaceNotFound", err)
+	}
+}

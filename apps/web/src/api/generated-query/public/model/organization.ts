@@ -11,6 +11,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { OrganizationId } from './organizationId'
+import type { OrganizationStatus } from './organizationStatus'
 
 export interface Organization {
   id: OrganizationId
@@ -19,6 +20,9 @@ export interface Organization {
    * @maxLength 120
    */
   name: string
+  status?: OrganizationStatus
+  /** RFC3339 UTC timestamp; omitted unless closed. */
+  closed_at?: string
   /** RFC3339 UTC timestamp. */
   created_at: string
 }

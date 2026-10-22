@@ -307,3 +307,53 @@ func TestUpdateWorkspaceDefaultProtected(t *testing.T) {
 		t.Fatalf("rename plain = %+v, %v; want renamed", renamed, err)
 	}
 }
+
+// TestInMemoryOrganizationCloseRestore proves the closure state machine on
+// the test double: only the Owner closes/restores, closure suspends
+// workspace access and mutations while retaining rows, and restore resumes
+// prior standing.
+func TestInMemoryOrganizationCloseRestore(t *testing.T) {
+	ctx := context.Background()
+	store := NewInMemoryStoreForTests()
+	const owner, member = 61, 62
+	org, err := store.CreateOrganization(ctx, owner, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddOrganizationMember(ctx, org.PublicID, member, RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := store.CreateOrganizationWorkspace(ctx, org.PublicID, owner, "space")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CloseOrganization(ctx, org.PublicID, member, ""); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("member close = %v, want ErrForbidden", err)
+	}
+	closed, err := store.CloseOrganization(ctx, org.PublicID, owner, "done")
+	if err != nil || !closed.IsClosed() || closed.Status() != OrganizationStatusClosed {
+		t.Fatalf("close = %+v %v, want closed", closed, err)
+	}
+	if _, ok, _ := store.GetWorkspaceRole(ctx, ws.PublicID, owner); ok {
+		t.Fatalf("owner workspace role while closed, want suspended")
+	}
+	if _, err := store.UpdateOrganization(ctx, org.PublicID, "late"); !errors.Is(err, ErrOrganizationClosed) {
+		t.Fatalf("rename while closed = %v, want ErrOrganizationClosed", err)
+	}
+	if _, err := store.CloseOrganization(ctx, org.PublicID, owner, ""); !errors.Is(err, ErrOrganizationClosed) {
+		t.Fatalf("second close = %v, want ErrOrganizationClosed", err)
+	}
+	if _, err := store.RestoreOrganization(ctx, org.PublicID, member); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("member restore = %v, want ErrForbidden", err)
+	}
+	restored, err := store.RestoreOrganization(ctx, org.PublicID, owner)
+	if err != nil || restored.IsClosed() {
+		t.Fatalf("restore = %+v %v, want active", restored, err)
+	}
+	if role, ok, _ := store.GetWorkspaceRole(ctx, ws.PublicID, owner); !ok || role != RoleOwner {
+		t.Fatalf("owner workspace role after restore = %v, want owner", role)
+	}
+	if _, err := store.RestoreOrganization(ctx, org.PublicID, owner); !errors.Is(err, ErrOrganizationNotClosed) {
+		t.Fatalf("second restore = %v, want ErrOrganizationNotClosed", err)
+	}
+}

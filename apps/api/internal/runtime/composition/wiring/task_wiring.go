@@ -40,7 +40,6 @@ import (
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	taskworker "ideaboard/api/internal/tasking/interfaces/worker"
 	"ideaboard/api/internal/tasking/workspacetasks"
-	"ideaboard/api/internal/workspacebudgets"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -260,11 +259,8 @@ func NewAppTaskRuntime(
 		TaskBilling: workspaceStore,
 		Quoter:      workspaceQuoter, Holder: workspaceHolder,
 		Queue: workspaceEnqueuer, Assets: workspaceAssets, Resolver: workspaceRouter,
-		// #945: the Workspace shared consumption budget joins the
-		// settlement transaction after Quote and before Hold.
-		Budgets: workspacebudgets.NewStore(dbs.DB),
 		// #946: the member cross-workspace consumption quota joins the
-		// same transaction after the budget check and before Hold.
+		// settlement transaction after Quote and before Hold.
 		Quotas: memberquotas.NewStore(dbs.DB),
 	})
 	// The worker settles terminal transitions through the bridge, not the
@@ -383,11 +379,8 @@ func NewAppTaskRuntime(
 		return AppTaskServices{}, AppWorkerRuntime{}, fmt.Errorf("failed to initialize user event fanout: %w", err)
 	}
 	visionBillingService := searchapplication.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, nil)
-	// #945: the Workspace shared consumption budget joins the Vision
+	// #946: the member cross-workspace consumption quota joins the Vision
 	// reservation transaction after Quote and before Hold.
-	visionBillingService.SetBudgetChecker(workspacebudgets.NewStore(dbs.DB))
-	// #946: the member cross-workspace consumption quota joins the same
-	// transaction after the budget check and before Hold.
 	visionBillingService.SetQuotaChecker(memberquotas.NewStore(dbs.DB))
 	visionBillingPeriodicJobs := visionbilling.VisionBillingPeriodicJobs()
 	// #833: the webhook store was built above so the River worker and the HTTP

@@ -22,9 +22,14 @@ func handoverFixture(t *testing.T, db *pgxpool.Pool, ctx context.Context) (store
 	baStore = NewBillingAccountStore(db)
 	owner = createTenancyTestUser(t, db)
 	recipient = createTenancyTestUser(t, db)
-	// Business workspace (non-Default) for the owner.
-	var err error
-	ws, err = store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "studio-a", OwnerUserID: owner, NewBillingAccount: true})
+	// Organization business workspace (ADR-0038 handover scope: org
+	// workspaces on the shared pool; personal workspaces resolve to the
+	// owner's survivor and carry no handover scope).
+	org, err := store.CreateOrganization(ctx, owner, "handover-org")
+	if err != nil {
+		t.Fatalf("create org failed: %v", err)
+	}
+	ws, err = store.CreateOrganizationWorkspace(ctx, org.PublicID, owner, "studio-a")
 	if err != nil {
 		t.Fatalf("create workspace failed: %v", err)
 	}
@@ -32,11 +37,13 @@ func handoverFixture(t *testing.T, db *pgxpool.Pool, ctx context.Context) (store
 	if err != nil {
 		t.Fatalf("resolve account failed: %v", err)
 	}
-	if _, err := db.Exec(ctx, `INSERT INTO billing_account_default_member_quotas (billing_account_id, period, limit_credits, updated_by_user_id) VALUES ($1, 'monthly', 1000, $2)`, account.InternalID, owner); err != nil {
-		t.Fatalf("configure default member quota: %v", err)
+	// Recipient joins the Organization first (#951 join-first: org
+	// workspaces admit only org members), then holds workspace membership
+	// so the HTTP prelude (member-only) admits accept/reject; acceptance
+	// then promotes to Owner.
+	if _, err := store.AddOrganizationMember(ctx, org.PublicID, recipient, tenancy.RoleMember); err != nil {
+		t.Fatalf("add recipient to org failed: %v", err)
 	}
-	// Recipient holds workspace membership so the HTTP prelude (member-only)
-	// admits accept/reject; acceptance then promotes to Owner.
 	if _, err := store.AddWorkspaceMember(ctx, ws.PublicID, recipient, tenancy.RoleMember); err != nil {
 		t.Fatalf("add recipient to workspace failed: %v", err)
 	}
@@ -89,11 +96,36 @@ func TestHandoverInviteIdempotentReplayAndConflict(t *testing.T) {
 func TestHandoverAcceptGrantsScopeWithoutDefault(t *testing.T) {
 	db := newTenancyTestDB(t)
 	ctx := context.Background()
-	store, baStore, owner, recipient, ws, account := handoverFixture(t, db, ctx)
-	// Second business workspace sharing the same account.
-	wsB, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "studio-b", OwnerUserID: owner, BillingAccountPublicID: &account.PublicID})
+	store := NewStore(db, nil)
+	baStore := NewBillingAccountStore(db)
+	owner := createTenancyTestUser(t, db)
+	recipient := createTenancyTestUser(t, db)
+	// Organization with two business workspaces sharing the org pool
+	// (ADR-0038 handover scope: org workspaces, never Default).
+	org, err := store.CreateOrganization(ctx, owner, "Handover Org")
 	if err != nil {
-		t.Fatalf("create second workspace failed: %v", err)
+		t.Fatalf("create org failed: %v", err)
+	}
+	ws, err := store.CreateOrganizationWorkspace(ctx, org.PublicID, owner, "org-studio-a")
+	if err != nil {
+		t.Fatalf("create org workspace failed: %v", err)
+	}
+	wsB, err := store.CreateOrganizationWorkspace(ctx, org.PublicID, owner, "org-studio-b")
+	if err != nil {
+		t.Fatalf("create second org workspace failed: %v", err)
+	}
+	account, err := baStore.EnsureBillingAccountForWorkspace(ctx, ws.InternalID, ws.PublicID)
+	if err != nil {
+		t.Fatalf("resolve org pool failed: %v", err)
+	}
+	if account.OwnerType != BillingOwnerOrganization {
+		t.Fatalf("handover account owner_type = %q, want organization", account.OwnerType)
+	}
+	if _, err := store.AddOrganizationMember(ctx, org.PublicID, recipient, tenancy.RoleMember); err != nil {
+		t.Fatalf("add recipient to org failed: %v", err)
+	}
+	if _, err := store.AddWorkspaceMember(ctx, ws.PublicID, recipient, tenancy.RoleMember); err != nil {
+		t.Fatalf("add recipient to workspace failed: %v", err)
 	}
 	// Default workspace for the owner (never transferred).
 	def, err := store.EnsureDefaultWorkspace(ctx, owner)
@@ -290,16 +322,13 @@ func TestBillingMemberDetachKeepsFunds(t *testing.T) {
 	}
 }
 
-// Membership-focused fixtures opt into a policy explicitly; tests for the
-// unconfigured gate keep the account default absent.
+// Membership fixtures no longer seed an account default (#953 retires the
+// #947 default gate): invites always succeed and absent quotas read as
+// unlimited.
 func configureWorkspaceDefaultQuota(t *testing.T, db *pgxpool.Pool, workspace *tenancy.Workspace) {
 	t.Helper()
 	ctx := context.Background()
-	account, err := NewBillingAccountStore(db).EnsureBillingAccountForWorkspace(ctx, workspace.InternalID, workspace.PublicID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(ctx, `INSERT INTO billing_account_default_member_quotas (billing_account_id, period) VALUES ($1, 'unlimited')`, account.InternalID); err != nil {
+	if _, err := NewBillingAccountStore(db).EnsureBillingAccountForWorkspace(ctx, workspace.InternalID, workspace.PublicID); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -51,15 +51,9 @@ type Service struct {
 	// without it.
 	submissionClaims TxSubmissionClaimStore
 	billingAccounts  TxBillingAccountResolver
-	// budgets enforces the Workspace shared consumption budget inside
-	// the settlement transaction (#945: after Quote, before Hold, same
-	// snapshot). Nil means no budget enforcement (unlimited); the
-	// member-quota seam for #946 stays a separate boundary.
-	budgets TxWorkspaceBudgetChecker
 	// quotas enforces the member cross-workspace consumption quota inside
-	// the settlement transaction (#946: after the budget check, before
-	// Hold, same snapshot). Nil means no quota enforcement (unlimited).
-	// The two constraints stay independently effective: both must pass.
+	// the settlement transaction (#946: after Quote, before Hold, same
+	// snapshot). Nil means no quota enforcement (unlimited).
 	quotas TxMemberQuotaChecker
 	events []TaskEvent
 	now    func() time.Time
@@ -100,14 +94,9 @@ type ServiceDeps struct {
 	// store that cannot resolve fails closed (no seam ->
 	// ErrSettlementUnavailable) rather than spending an owner wallet.
 	BillingAccounts TxBillingAccountResolver
-	// Budgets enforces the Workspace shared consumption budget inside
-	// the settlement transaction (#945: after Quote, before Hold, same
-	// snapshot). Nil means no budget enforcement (unlimited).
-	Budgets TxWorkspaceBudgetChecker
 	// Quotas enforces the member cross-workspace consumption quota
-	// inside the settlement transaction (#946: after the budget check,
-	// before Hold, same snapshot). Nil means no quota enforcement
-	// (unlimited). Both constraints stay independently effective.
+	// inside the settlement transaction (#946: after Quote, before Hold,
+	// same snapshot). Nil means no quota enforcement (unlimited).
 	Quotas TxMemberQuotaChecker
 }
 
@@ -126,7 +115,7 @@ func NewService(deps ServiceDeps) *Service {
 		queue: deps.Queue, assets: deps.Assets,
 		resolver: deps.Resolver, saveSnapshot: deps.SnapshotSaver, now: time.Now,
 		submissionClaims: deps.SubmissionClaims, acceptance: deps.Acceptance,
-		billingAccounts: deps.BillingAccounts, budgets: deps.Budgets, quotas: deps.Quotas,
+		billingAccounts: deps.BillingAccounts, quotas: deps.Quotas,
 	}
 }
 

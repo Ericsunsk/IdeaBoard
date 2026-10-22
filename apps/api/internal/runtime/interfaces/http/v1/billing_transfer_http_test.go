@@ -243,7 +243,12 @@ func TestV1TransferInviteCrossAccountDecisionsHaveNoEffects(t *testing.T) {
 			if decision == "cancel" {
 				actor = 7
 			}
-			unrelated := v1WorkspaceFixture(t, ctx, fx.store, "unrelated", actor)
+			// The unrelated workspace lives in a third holder's scope
+			// (ADR-0038: one Personal survivor per holder), so its payer
+			// account can never see the source invite; the actor reads it as
+			// an explicit workspace member.
+			unrelated := v1WorkspaceFixture(t, ctx, fx.store, "unrelated", 9)
+			fx.store.SeedWorkspaceMember(unrelated.PublicID, actor, tenancy.RoleMember)
 			account, err := fx.accounts.EnsureBillingAccountForWorkspace(ctx, source.InternalID, source.PublicID)
 			if err != nil {
 				t.Fatal(err)

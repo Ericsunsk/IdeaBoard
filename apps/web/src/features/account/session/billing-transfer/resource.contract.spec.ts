@@ -8,7 +8,6 @@ import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import {
   acceptTransferInvite,
   cancelTransferInvite,
-  detachBillingMember,
   fetchBillingManagers,
   fetchTransferInvites,
   initiateTransferInvite,
@@ -28,15 +27,8 @@ const AGREED_INVITE = {
   status: 'pending',
   scope_workspace_ids: [],
   created_at: '2026-10-21T00:00:00Z',
+  expires_at: '2026-10-28T00:00:00Z',
 }
-
-/**
- * Detach wire shape.
- * @externalContract Public API RemoveWorkspaceBillingAccountMember200Data:
- * consumed verbatim from the generated contract (`DELETE
- * .../billing-account/members/{id}` renders `{ data: { removed: true } }`).
- */
-type DetachConfirmation = { data: { removed: boolean } }
 
 describe('billing transfer invite envelope', () => {
   test('lists the agreed pending invite', async () => {
@@ -55,6 +47,27 @@ describe('billing transfer invite envelope', () => {
         status: 'pending',
         scopeWorkspaceIds: [],
         createdAt: '2026-10-21T00:00:00Z',
+        expiresAt: '2026-10-28T00:00:00Z',
+      },
+    ])
+  })
+
+  test('parses the agreed expiry without requiring it', async () => {
+    useMswHandlers(
+      http.get('/api/v1/workspaces/:workspaceId/billing-account/transfer-invites', () =>
+        HttpResponse.json({
+          data: [{ ...AGREED_INVITE, expires_at: undefined, created_at: undefined }],
+        }),
+      ),
+    )
+    await expect(fetchTransferInvites(WORKSPACE_ID)).resolves.toEqual([
+      {
+        publicId: INVITE_ID,
+        billingAccountId: 'ba_shared01',
+        fromUserId: FROM_USER,
+        toUserId: TO_USER,
+        status: 'pending',
+        scopeWorkspaceIds: [],
       },
     ])
   })
@@ -133,15 +146,6 @@ describe('billing transfer invite envelope', () => {
     await expect(cancelTransferInvite(WORKSPACE_ID, INVITE_ID)).resolves.toMatchObject({
       status: 'cancelled',
     })
-  })
-
-  test('detach removes the management row without a response body contract', async () => {
-    useMswHandlers(
-      http.delete('/api/v1/workspaces/:workspaceId/billing-account/members/:memberId', () =>
-        HttpResponse.json({ data: { removed: true } } satisfies DetachConfirmation),
-      ),
-    )
-    await expect(detachBillingMember(WORKSPACE_ID, TO_USER)).resolves.toBeUndefined()
   })
 })
 

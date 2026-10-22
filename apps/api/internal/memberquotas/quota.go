@@ -51,8 +51,7 @@ const (
 var (
 	// ErrQuotaExhausted reports that a consumption request would exceed
 	// the member's remaining quota for the current period. Callers
-	// render it distinctly from balance insufficiency (402), the
-	// workspace budget (403 workspace_budget_exhausted), and other
+	// render it distinctly from balance insufficiency (402) and other
 	// funds restrictions (403 billing_wallet_restricted).
 	ErrQuotaExhausted = errors.New("memberquotas: member quota exhausted")
 	// ErrQuotaInvalid reports a malformed quota set request (unknown

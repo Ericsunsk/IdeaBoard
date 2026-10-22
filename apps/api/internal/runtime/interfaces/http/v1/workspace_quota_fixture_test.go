@@ -10,16 +10,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Existing membership/media fixtures configure a real account policy
-// explicitly; the unconfigured-default gate remains covered separately.
+// Quota fixtures no longer seed an account default (#953 retires the #947
+// default gate): invites always succeed and absent quotas read as unlimited.
 func configureV1WorkspaceDefaultQuota(t *testing.T, db *pgxpool.Pool, workspace *tenancy.Workspace) {
 	t.Helper()
 	ctx := context.Background()
-	account, err := tenancypg.NewBillingAccountStore(db).EnsureBillingAccountForWorkspace(ctx, workspace.InternalID, workspace.PublicID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(ctx, `INSERT INTO billing_account_default_member_quotas (billing_account_id, period) VALUES ($1, 'unlimited')`, account.InternalID); err != nil {
+	if _, err := tenancypg.NewBillingAccountStore(db).EnsureBillingAccountForWorkspace(ctx, workspace.InternalID, workspace.PublicID); err != nil {
 		t.Fatal(err)
 	}
 }

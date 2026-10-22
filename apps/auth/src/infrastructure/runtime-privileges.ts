@@ -10,7 +10,7 @@ const creditTables = [
   'credit_charges',
 ] as const
 const creditFunctions = [
-  'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)',
+  'execute_credit_command_v3(text,bigint,bigint,text,text,text,text,text,text,text,text)',
   'prevent_credit_ledger_mutation()',
   'guard_credit_account_projection()',
   'apply_credit_posting_balances()',

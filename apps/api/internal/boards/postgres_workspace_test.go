@@ -116,6 +116,44 @@ func TestPostgresWorkspaceBoardStoreLifecycle(t *testing.T) {
 	}
 }
 
+func TestPostgresWorkspaceBoardStoreOrganizationClosureSuspendsOwnerAndAdmin(t *testing.T) {
+	db := testdb.Open(t)
+	ctx := context.Background()
+	tenancyStore := tenancypg.NewStore(db, nil)
+	org, err := tenancyStore.CreateOrganization(ctx, postgresStoreOwner, "closed-board-org")
+	if err != nil {
+		t.Fatalf("create organization failed: %v", err)
+	}
+	if _, err := tenancyStore.AddOrganizationMember(ctx, org.PublicID, postgresStoreMember, tenancy.RoleAdmin); err != nil {
+		t.Fatalf("add organization admin failed: %v", err)
+	}
+	ws, err := tenancyStore.CreateOrganizationWorkspace(ctx, org.PublicID, postgresStoreOwner, "closed-board-space")
+	if err != nil {
+		t.Fatalf("create organization workspace failed: %v", err)
+	}
+	store := NewPostgresWorkspaceBoardStore(db, testDocumentAssetValidator)
+	boardID := mustCreatePostgresBoard(t, ctx, store, ws, "Org board")
+	if _, err := tenancyStore.CloseOrganization(ctx, org.PublicID, postgresStoreOwner, "suspend board access"); err != nil {
+		t.Fatalf("close organization failed: %v", err)
+	}
+
+	for _, userID := range []int64{postgresStoreOwner, postgresStoreMember} {
+		if _, visible, err := store.GetBoardRole(ctx, ws.PublicID, boardID, userID, ""); err != nil || visible {
+			t.Fatalf("closed organization user %d visible=%t err=%v, want invisible", userID, visible, err)
+		}
+		if _, err := store.RenameBoard(ctx, ws.PublicID, boardID, "Blocked rename", userID); !errors.Is(err, ErrNotFound) {
+			t.Errorf("closed organization user %d rename err=%v, want ErrNotFound", userID, err)
+		}
+		newBoardID, err := NewV1BoardPublicID()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.CreateBoard(ctx, ws.PublicID, userID, "Blocked create", newBoardID); !errors.Is(err, ErrNotFound) {
+			t.Errorf("closed organization user %d create err=%v, want ErrNotFound", userID, err)
+		}
+	}
+}
+
 func TestPostgresWorkspaceBoardStoreRejectsLegacyIDs(t *testing.T) {
 	ctx, store, ws := newPostgresWorkspaceBoardFixture(t)
 

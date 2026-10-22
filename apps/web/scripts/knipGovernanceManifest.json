@@ -4615,16 +4615,6 @@
         "evidence": ["src/features/account/index.ts#useBillingRecords"]
       }
     },
-    "src/features/account/session/budget/resource.ts": {
-      "normalizeBudgetInput": {
-        "kind": "test-contract",
-        "evidence": ["src/features/account/session/budget/resource.unit.spec.ts"]
-      },
-      "parseWorkspaceBudgetData": {
-        "kind": "test-contract",
-        "evidence": ["src/features/account/session/budget/resource.unit.spec.ts"]
-      }
-    },
     "src/features/account/session/chart.ts": {
       "buildUsageTrendChart": {
         "kind": "canonical-origin",
@@ -4850,10 +4840,6 @@
         "kind": "test-contract",
         "evidence": ["src/features/account/session/quota/resource.unit.spec.ts"]
       },
-      "parseDefaultMemberQuotaData": {
-        "kind": "test-contract",
-        "evidence": ["src/features/account/session/quota/resource.unit.spec.ts"]
-      },
       "parseMemberQuotaData": {
         "kind": "test-contract",
         "evidence": ["src/features/account/session/quota/resource.unit.spec.ts"]
@@ -5040,6 +5026,18 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/account/ui/chrome/userAccountMenu.types.ts#UserIdeaBalanceControl"
+        ]
+      },
+      "UserAccountMenuOrganizationMember": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/account/ui/chrome/userAccountMenu.types.ts#UserAccountMenuOrganizationMember"
+        ]
+      },
+      "UserAccountMenuOrganizationMemberRole": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/account/ui/chrome/userAccountMenu.types.ts#UserAccountMenuOrganizationMemberRole"
         ]
       }
     },
@@ -13859,6 +13857,162 @@
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#workspaceQueryKeys"
         ]
+      },
+      "effectiveOrganizationWorkspaceAccess": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#effectiveOrganizationWorkspaceAccess"
+        ]
+      },
+      "fetchOrganizationMembers": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#fetchOrganizationMembers"
+        ]
+      },
+      "fetchOrganizations": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#fetchOrganizations"
+        ]
+      },
+      "inviteOrganizationMember": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#inviteOrganizationMember"
+        ]
+      },
+      "isOrganizationWorkspace": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#isOrganizationWorkspace"
+        ]
+      },
+      "isPersonalWorkspace": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#isPersonalWorkspace"
+        ]
+      },
+      "parseOrganizationMember": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#parseOrganizationMember"
+        ]
+      },
+      "provisionOrganization": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#provisionOrganization"
+        ]
+      },
+      "removeOrganizationMember": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#removeOrganizationMember"
+        ]
+      },
+      "updateOrganizationMember": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#updateOrganizationMember"
+        ]
+      },
+      "createOrganizationScopeStore": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#createOrganizationScopeStore"
+        ]
+      },
+      "getOrganizationScopeStore": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#getOrganizationScopeStore"
+        ]
+      },
+      "installOrganizationScopeStore": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#installOrganizationScopeStore"
+        ]
+      },
+      "localStorageOrganizationScopePersist": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#localStorageOrganizationScopePersist"
+        ]
+      },
+      "memoryOrganizationScopePersist": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#memoryOrganizationScopePersist"
+        ]
+      },
+      "resetOrganizationScopeStore": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#resetOrganizationScopeStore"
+        ]
+      },
+      "resolveOrganizationScope": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#resolveOrganizationScope"
+        ]
+      },
+      "filterWorkspacesByScope": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#filterWorkspacesByScope"
+        ]
+      },
+      "parseOrganizationScope": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#parseOrganizationScope"
+        ]
+      },
+      "subscribeOrganizationScopeChange": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#subscribeOrganizationScopeChange"
+        ]
+      },
+      "useOrganizationScope": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#useOrganizationScope"
+        ]
+      },
+      "OrganizationMemberSummary": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#OrganizationMemberSummary"
+        ]
+      },
+      "OrganizationRole": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#OrganizationRole"
+        ]
+      },
+      "OrganizationSummary": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#OrganizationSummary"
+        ]
+      },
+      "OrganizationScope": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#OrganizationScope"
+        ]
+      },
+      "OrganizationScopeStore": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#OrganizationScopeStore"
+        ]
       }
     },
     "src/features/workspace/routePaths.ts": {
@@ -14059,6 +14213,14 @@
       "workspaceQueryKeys": {
         "kind": "canonical-origin",
         "evidence": ["src/features/workspace/index.ts#workspaceQueryKeys"]
+      },
+      "effectiveOrganizationWorkspaceAccess": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#effectiveOrganizationWorkspaceAccess"]
+      },
+      "parseOrganizationMember": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#parseOrganizationMember"]
       }
     },
     "src/features/workspace/selection/workspaceSelectionPort.ts": {
@@ -14359,6 +14521,48 @@
         "evidence": [
           "docs/frontend-seam-inventory.md: src/theme/lightboxScrim.ts#lightboxScrimLinkClass"
         ]
+      }
+    },
+    "src/features/workspace/organization/scope.ts": {
+      "createOrganizationScopeStore": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#createOrganizationScopeStore"]
+      },
+      "installOrganizationScopeStore": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#installOrganizationScopeStore"]
+      },
+      "localStorageOrganizationScopePersist": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#localStorageOrganizationScopePersist"]
+      },
+      "memoryOrganizationScopePersist": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#memoryOrganizationScopePersist"]
+      },
+      "resetOrganizationScopeStore": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#resetOrganizationScopeStore"]
+      },
+      "resolveOrganizationScope": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#resolveOrganizationScope"]
+      },
+      "filterWorkspacesByScope": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#filterWorkspacesByScope"]
+      },
+      "parseOrganizationScope": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#parseOrganizationScope"]
+      },
+      "subscribeOrganizationScopeChange": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#subscribeOrganizationScopeChange"]
+      },
+      "useOrganizationScope": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#useOrganizationScope"]
       }
     }
   },
@@ -16050,6 +16254,14 @@
       "sha256": "989a465737eab4034b91beb41cc6d7543e84188b08963bc175bf6968d20eeb0b",
       "exports": ["AddBillingAccountMemberRequestDataRole"]
     },
+    "src/api/generated-query/public/model/addOrganizationMemberRequest.ts": {
+      "sha256": "d8ecb67c3b7f87b4d8bd9300de440ab1e90c21459e1871930fb1f96c45ca6b73",
+      "exports": ["AddOrganizationMemberRequest"]
+    },
+    "src/api/generated-query/public/model/addOrganizationMemberRequestData.ts": {
+      "sha256": "0b5516c6a1cc756c0227fda079da74743c7d760df67180de788ee94c2bbef250",
+      "exports": ["AddOrganizationMemberRequestData"]
+    },
     "src/api/generated-query/public/model/addWorkspaceBillingAccountMember201.ts": {
       "sha256": "63ef7c43a9299506d808160ed9fd78ad3f8b927c73974cac2f3d056c2fe009fd",
       "exports": ["AddWorkspaceBillingAccountMember201"]
@@ -16061,6 +16273,10 @@
     "src/api/generated-query/public/model/addWorkspaceMemberRequestData.ts": {
       "sha256": "10dd5120a0396d6188f2849ad82e30934132eb5aec022612f0cd385d00496b68",
       "exports": ["AddWorkspaceMemberRequestData"]
+    },
+    "src/api/generated-query/public/model/assignableOrganizationRole.ts": {
+      "sha256": "452fc01cf60d6b323efcd591978d5783d4ca6a7605b0851698c59fc43cdb9f15",
+      "exports": ["AssignableOrganizationRole"]
     },
     "src/api/generated-query/public/model/avatarUploadResult.ts": {
       "sha256": "388d0b2693846286b5508c51c7e7225eb8ce61b30ea3f8b4febd3bf8a1d898c6",
@@ -16107,7 +16323,7 @@
       "exports": ["BillingRecordKind"]
     },
     "src/api/generated-query/public/model/billingTransferInvite.ts": {
-      "sha256": "c04015b1b97b51ef26aa9d1fb663bc112ab81f51d2acc1ffc26afb7b1c11e1a6",
+      "sha256": "10ca56f94e8456d68c9d7962ddd51267f85a4ad1e89134112ba638a064ed71f5",
       "exports": ["BillingTransferInvite"]
     },
     "src/api/generated-query/public/model/billingTransferInviteStatus.ts": {
@@ -16193,6 +16409,14 @@
     "src/api/generated-query/public/model/cancelWorkspaceTaskRequestData.ts": {
       "sha256": "9034be805bccd99f13cac4ba815f95a8e0d1fb33ad06b40f27f2008e753f6143",
       "exports": ["CancelWorkspaceTaskRequestData"]
+    },
+    "src/api/generated-query/public/model/closeOrganizationRequest.ts": {
+      "sha256": "68b3b25cdd24460aac616e6e5d2952c07b86f015339a2dd3b88e2272df502f87",
+      "exports": ["CloseOrganizationRequest"]
+    },
+    "src/api/generated-query/public/model/closeOrganizationRequestData.ts": {
+      "sha256": "8200b76688e3f08d59b88a5658859dd1a7595666a72e40b34bda4fcd09f22d65",
+      "exports": ["CloseOrganizationRequestData"]
     },
     "src/api/generated-query/public/model/completeUploadEnvelope.ts": {
       "sha256": "eddb120d24fdea1d248e9efd4f04bf11080730944362c63c4ed81a4d0d65b27e",
@@ -16287,7 +16511,7 @@
       "exports": ["CreateWorkspaceRequest"]
     },
     "src/api/generated-query/public/model/createWorkspaceRequestData.ts": {
-      "sha256": "17e08e35e9dc05569cb23870bd1c76a1b01d425c91ec59d47df86f8ee4e16e38",
+      "sha256": "86c72c53f902f519e2444ad2248fd20cae2db75cfed30108e0172ff56278f806",
       "exports": ["CreateWorkspaceRequestData"]
     },
     "src/api/generated-query/public/model/createWorkspaceTaskRequest.ts": {
@@ -16325,18 +16549,6 @@
     "src/api/generated-query/public/model/cursorParameter.ts": {
       "sha256": "d8683ab8a38730b3cdb12403027f6b7af033e7f943ac5b7cdd7c6496046df0d0",
       "exports": ["CursorParameter"]
-    },
-    "src/api/generated-query/public/model/defaultMemberQuota.ts": {
-      "sha256": "7856507d04af49770f3530a02d670082def2a91bf563fd90a00490fe00a5b2b8",
-      "exports": ["DefaultMemberQuota"]
-    },
-    "src/api/generated-query/public/model/defaultMemberQuotaEnvelope.ts": {
-      "sha256": "31b09769c880a458480600dd5d3819a749c5f0fec139f6f350af7daac5473958",
-      "exports": ["DefaultMemberQuotaEnvelope"]
-    },
-    "src/api/generated-query/public/model/defaultMemberQuotaPeriod.ts": {
-      "sha256": "0d253f32186c1b6a6c4194ddc27068f348467bdeb9cf9e1d66ade77cde1cab3c",
-      "exports": ["DefaultMemberQuotaPeriod"]
     },
     "src/api/generated-query/public/model/deletedEnvelope.ts": {
       "sha256": "b66f64eff073d2c9016b0c3511438a0cec2938f39f66fff1997d4af9e05106df",
@@ -16411,7 +16623,7 @@
       "exports": ["IfMatchParameter"]
     },
     "src/api/generated-query/public/model/index.ts": {
-      "sha256": "592a8ad3abc13513238efbaf3001e9a4b14b001da3886587608467e60f2be0ed",
+      "sha256": "1ebfcbaeb651ef3acb6c6fbf3c68af8f79e847d6b37ee2d2b1e54fb5dd81587a",
       "exports": []
     },
     "src/api/generated-query/public/model/initiateBillingTransferRequest.ts": {
@@ -16453,14 +16665,6 @@
     "src/api/generated-query/public/model/libraryFolderId.ts": {
       "sha256": "9894ae0e8af49f35ae3079146d1fad03e5a94e3a3c0371ecccd39255fe8f9652",
       "exports": ["LibraryFolderId"]
-    },
-    "src/api/generated-query/public/model/linkWorkspaceBillingAccountRequest.ts": {
-      "sha256": "6872bb074094afea39e2526b6c5628afc874b8e5934f30e434dcd9cf503d84ca",
-      "exports": ["LinkWorkspaceBillingAccountRequest"]
-    },
-    "src/api/generated-query/public/model/linkWorkspaceBillingAccountRequestData.ts": {
-      "sha256": "4122afeed48ebc6e631f75f27b054c7fc8e881ab157de9be327b4d1e8cb6e3fc",
-      "exports": ["LinkWorkspaceBillingAccountRequestData"]
     },
     "src/api/generated-query/public/model/listBoardRevisionsParams.ts": {
       "sha256": "b6a4a65fc0c84fedfad6b12f4feb82d09517aa04a63f6517d1102bdb224f628d",
@@ -16615,7 +16819,7 @@
       "exports": ["NotFoundResponse"]
     },
     "src/api/generated-query/public/model/organization.ts": {
-      "sha256": "958fec52a2c70e410a197952b2ae3410c795f5be4889180ac8abeea2031c0a36",
+      "sha256": "31e3d58dda0b5a2470f0495584d358535db9361531c19f4f0bdd26621b5da33d",
       "exports": ["Organization"]
     },
     "src/api/generated-query/public/model/organizationEnvelope.ts": {
@@ -16625,6 +16829,22 @@
     "src/api/generated-query/public/model/organizationId.ts": {
       "sha256": "b92fb19691df31eaad1f00461af26e8799b2b8a55cbed589d3a32d9f5b4ea294",
       "exports": ["OrganizationId"]
+    },
+    "src/api/generated-query/public/model/organizationMember.ts": {
+      "sha256": "bd79faf26746ca34d75c0a000e4f1f02ed02a744430efd368e82d9c2c86962df",
+      "exports": ["OrganizationMember"]
+    },
+    "src/api/generated-query/public/model/organizationMemberEnvelope.ts": {
+      "sha256": "2d0c25b8dddd2d290ab8b9fb390d55ccd5bc82f0c179db1e67439058964ffa9a",
+      "exports": ["OrganizationMemberEnvelope"]
+    },
+    "src/api/generated-query/public/model/organizationMemberList.ts": {
+      "sha256": "7a200499f970bff7bbabc3f0f372c613af0008788df432c209b422163d41d3c5",
+      "exports": ["OrganizationMemberList"]
+    },
+    "src/api/generated-query/public/model/organizationStatus.ts": {
+      "sha256": "c898f74dc1c93776452eac188e0ede3bbec8de346d0d26805a93124911e70260",
+      "exports": ["OrganizationStatus"]
     },
     "src/api/generated-query/public/model/pageSizeParameter.ts": {
       "sha256": "38601a57f82aaf102a77f288cd53412db478162bccaff6a9bcb65b08ecbdb5f9",
@@ -16822,18 +17042,6 @@
       "sha256": "d5fc4a96a644ee89616b9f000d7428d19cfed257f81de8a30d12bc739b3aaf3c",
       "exports": ["Service"]
     },
-    "src/api/generated-query/public/model/setDefaultMemberQuotaRequest.ts": {
-      "sha256": "d2fa41771e04dc5fa6c58aea311f9104d42b6bcbcb5c8d3fb3f0f2f4c59a473d",
-      "exports": ["SetDefaultMemberQuotaRequest"]
-    },
-    "src/api/generated-query/public/model/setDefaultMemberQuotaRequestData.ts": {
-      "sha256": "c997a077734619ff8975acfb23e82807197aa83f7d49f5c52053b0bc65c53042",
-      "exports": ["SetDefaultMemberQuotaRequestData"]
-    },
-    "src/api/generated-query/public/model/setDefaultMemberQuotaRequestDataPeriod.ts": {
-      "sha256": "8930f54b0492ac38e9c78ffe16f2655ecd49071ea81029097b6ab6643fff1f18",
-      "exports": ["SetDefaultMemberQuotaRequestDataPeriod"]
-    },
     "src/api/generated-query/public/model/setMemberQuotaRequest.ts": {
       "sha256": "72d7edd5bf6ce0013aa4262f3eac2b652ac7323bf8606c74fc9ef9f74df474d5",
       "exports": ["SetMemberQuotaRequest"]
@@ -16845,18 +17053,6 @@
     "src/api/generated-query/public/model/setMemberQuotaRequestDataPeriod.ts": {
       "sha256": "8f8b77e1ef1c32bae0ec4c5eff00e1cf3597bdc63c6463762440efecba72dbdc",
       "exports": ["SetMemberQuotaRequestDataPeriod"]
-    },
-    "src/api/generated-query/public/model/setWorkspaceBudgetRequest.ts": {
-      "sha256": "24d55b55a5440722478b7e0d73c104572aaf4b6059d93ad66a3eb5bced34ae60",
-      "exports": ["SetWorkspaceBudgetRequest"]
-    },
-    "src/api/generated-query/public/model/setWorkspaceBudgetRequestData.ts": {
-      "sha256": "ad19220f920ab217cadbfb435864683fc45e4dbc41d8f3095313e2b6cb0b2494",
-      "exports": ["SetWorkspaceBudgetRequestData"]
-    },
-    "src/api/generated-query/public/model/setWorkspaceBudgetRequestDataPeriod.ts": {
-      "sha256": "362f329f9906935ecce3dbac080ab8a38126766b0b0d323f4626a20253bbc792",
-      "exports": ["SetWorkspaceBudgetRequestDataPeriod"]
     },
     "src/api/generated-query/public/model/successEnvelope.ts": {
       "sha256": "adbebe8277c583bbba9ba94f810cdc4b8c948b286c7ef40982971a86db846745",
@@ -16970,6 +17166,14 @@
       "sha256": "b4a6fd83de9e5660edf6098f6236741117fec4819ebb49e693e511ab1f80cb72",
       "exports": ["UpdateBoardRequestData"]
     },
+    "src/api/generated-query/public/model/updateOrganizationMemberRequest.ts": {
+      "sha256": "8e4c861c332d84ec41692297943e8845f5b886751f7b644ae0ae0c95cd96bf84",
+      "exports": ["UpdateOrganizationMemberRequest"]
+    },
+    "src/api/generated-query/public/model/updateOrganizationMemberRequestData.ts": {
+      "sha256": "5a968b9682f91afda6f761819837ad7d2cd191f53dc56b3f479be5bfb92290fd",
+      "exports": ["UpdateOrganizationMemberRequestData"]
+    },
     "src/api/generated-query/public/model/updateOrganizationRequest.ts": {
       "sha256": "0088d5b8e41b587811b0f6ad85ee8e039806fae046de5d0e0ddc1059eea71cbe",
       "exports": ["UpdateOrganizationRequest"]
@@ -17063,7 +17267,7 @@
       "exports": ["WorkspaceAccess"]
     },
     "src/api/generated-query/public/model/workspaceBillingAccount.ts": {
-      "sha256": "de6d5182cfbff7dbef518941dc76af0d5be58d0634d9a615c2206021d374b71b",
+      "sha256": "6a581d5c8a9629d65a236c27e402fb56bc2584956fc73a094f7650fb8def6694",
       "exports": ["WorkspaceBillingAccount"]
     },
     "src/api/generated-query/public/model/workspaceBillingAccountConsumptionScope.ts": {
@@ -17085,18 +17289,6 @@
     "src/api/generated-query/public/model/workspaceBillingQuoteEnvelope.ts": {
       "sha256": "4ac63b07af04c6657d6f16216c45b3da04a63d7abb67a18db737048e89171178",
       "exports": ["WorkspaceBillingQuoteEnvelope"]
-    },
-    "src/api/generated-query/public/model/workspaceBudget.ts": {
-      "sha256": "cc5927d6ebd7b577810a72ac4ff2779e9a4e783b0b7ae8a357dfcd698d6c6af7",
-      "exports": ["WorkspaceBudget"]
-    },
-    "src/api/generated-query/public/model/workspaceBudgetEnvelope.ts": {
-      "sha256": "6bb0ca054477bfe8bf3d2b4ea0c3f04ebd5b70571ea4e98ac5b078b0fbd92e98",
-      "exports": ["WorkspaceBudgetEnvelope"]
-    },
-    "src/api/generated-query/public/model/workspaceBudgetPeriod.ts": {
-      "sha256": "9844cac08efa6495f7a30582dd0e112083a755432c77b86fcb0ebf4a2d1463a8",
-      "exports": ["WorkspaceBudgetPeriod"]
     },
     "src/api/generated-query/public/model/workspaceCheckoutSession.ts": {
       "sha256": "ad1d8560a35c3c5ba976809ba2763c799c62b0eaf2e482595f233dcfcccdde29",
@@ -17251,8 +17443,16 @@
       "exports": ["WorkspaceVisionQueryStatus"]
     },
     "src/api/generated-query/public/organizations/organizations.ts": {
-      "sha256": "f43e2f996d564ce52a0f657ffe68f09a2babd1d0bf4538b42722dc694ac4faec",
+      "sha256": "93abc14b7ebf93d13472b1ced90f416ba3e1f529790ee6193e71447217c4a969",
       "exports": [
+        "AddOrganizationMemberMutationBody",
+        "AddOrganizationMemberMutationError",
+        "AddOrganizationMemberMutationResult",
+        "AddOrganizationMemberMutationVariables",
+        "CloseOrganizationMutationBody",
+        "CloseOrganizationMutationError",
+        "CloseOrganizationMutationResult",
+        "CloseOrganizationMutationVariables",
         "CreateOrganizationMutationBody",
         "CreateOrganizationMutationError",
         "CreateOrganizationMutationResult",
@@ -17263,16 +17463,36 @@
         "CreateOrganizationWorkspaceMutationVariables",
         "GetOrganizationQueryError",
         "GetOrganizationQueryResult",
+        "ListOrganizationMembersQueryError",
+        "ListOrganizationMembersQueryResult",
         "ListOrganizationWorkspacesQueryError",
         "ListOrganizationWorkspacesQueryResult",
         "ListOrganizationsQueryError",
         "ListOrganizationsQueryResult",
+        "RemoveOrganizationMemberMutationError",
+        "RemoveOrganizationMemberMutationResult",
+        "RemoveOrganizationMemberMutationVariables",
+        "RestoreOrganizationMutationError",
+        "RestoreOrganizationMutationResult",
+        "RestoreOrganizationMutationVariables",
+        "UpdateOrganizationMemberMutationBody",
+        "UpdateOrganizationMemberMutationError",
+        "UpdateOrganizationMemberMutationResult",
+        "UpdateOrganizationMemberMutationVariables",
         "UpdateOrganizationMutationBody",
         "UpdateOrganizationMutationError",
         "UpdateOrganizationMutationResult",
         "UpdateOrganizationMutationVariables",
+        "addOrganizationMember",
+        "closeOrganization",
         "createOrganization",
         "createOrganizationWorkspace",
+        "getAddOrganizationMemberMutationKey",
+        "getAddOrganizationMemberMutationOptions",
+        "getAddOrganizationMemberUrl",
+        "getCloseOrganizationMutationKey",
+        "getCloseOrganizationMutationOptions",
+        "getCloseOrganizationUrl",
         "getCreateOrganizationMutationKey",
         "getCreateOrganizationMutationOptions",
         "getCreateOrganizationUrl",
@@ -17282,6 +17502,9 @@
         "getGetOrganizationQueryKey",
         "getGetOrganizationQueryOptions",
         "getGetOrganizationUrl",
+        "getListOrganizationMembersQueryKey",
+        "getListOrganizationMembersQueryOptions",
+        "getListOrganizationMembersUrl",
         "getListOrganizationWorkspacesQueryKey",
         "getListOrganizationWorkspacesQueryOptions",
         "getListOrganizationWorkspacesUrl",
@@ -17289,18 +17512,37 @@
         "getListOrganizationsQueryOptions",
         "getListOrganizationsUrl",
         "getOrganization",
+        "getRemoveOrganizationMemberMutationKey",
+        "getRemoveOrganizationMemberMutationOptions",
+        "getRemoveOrganizationMemberUrl",
+        "getRestoreOrganizationMutationKey",
+        "getRestoreOrganizationMutationOptions",
+        "getRestoreOrganizationUrl",
+        "getUpdateOrganizationMemberMutationKey",
+        "getUpdateOrganizationMemberMutationOptions",
+        "getUpdateOrganizationMemberUrl",
         "getUpdateOrganizationMutationKey",
         "getUpdateOrganizationMutationOptions",
         "getUpdateOrganizationUrl",
+        "listOrganizationMembers",
         "listOrganizationWorkspaces",
         "listOrganizations",
+        "removeOrganizationMember",
+        "restoreOrganization",
         "updateOrganization",
+        "updateOrganizationMember",
+        "useAddOrganizationMember",
+        "useCloseOrganization",
         "useCreateOrganization",
         "useCreateOrganizationWorkspace",
         "useGetOrganization",
+        "useListOrganizationMembers",
         "useListOrganizationWorkspaces",
         "useListOrganizations",
-        "useUpdateOrganization"
+        "useRemoveOrganizationMember",
+        "useRestoreOrganization",
+        "useUpdateOrganization",
+        "useUpdateOrganizationMember"
       ]
     },
     "src/api/generated-query/public/user/user.ts": {
@@ -17355,7 +17597,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-billing/workspace-billing.ts": {
-      "sha256": "f828d0e73317bf6f4fb7752d67628a9998a4a3a63bec8c9428ec21e7ccac0315",
+      "sha256": "b1cda93e683512b1e4545e212ec376e6b1b39724d2ad5b0c2bf463ed6adfd2cb",
       "exports": [
         "AbandonWorkspacePendingOrderMutationError",
         "AbandonWorkspacePendingOrderMutationResult",
@@ -17381,16 +17623,12 @@
         "CreateWorkspaceCheckoutSessionMutationError",
         "CreateWorkspaceCheckoutSessionMutationResult",
         "CreateWorkspaceCheckoutSessionMutationVariables",
-        "GetDefaultMemberQuotaQueryError",
-        "GetDefaultMemberQuotaQueryResult",
         "GetSelfMemberQuotaQueryError",
         "GetSelfMemberQuotaQueryResult",
         "GetWorkspaceBillingAccountQueryError",
         "GetWorkspaceBillingAccountQueryResult",
         "GetWorkspaceBillingTransferQueryError",
         "GetWorkspaceBillingTransferQueryResult",
-        "GetWorkspaceBudgetQueryError",
-        "GetWorkspaceBudgetQueryResult",
         "GetWorkspaceCheckoutSessionQueryError",
         "GetWorkspaceCheckoutSessionQueryResult",
         "GetWorkspaceCreditsBalanceQueryError",
@@ -17403,10 +17641,6 @@
         "InitiateWorkspaceBillingTransferMutationError",
         "InitiateWorkspaceBillingTransferMutationResult",
         "InitiateWorkspaceBillingTransferMutationVariables",
-        "LinkWorkspaceBillingAccountMutationBody",
-        "LinkWorkspaceBillingAccountMutationError",
-        "LinkWorkspaceBillingAccountMutationResult",
-        "LinkWorkspaceBillingAccountMutationVariables",
         "ListMemberQuotasQueryError",
         "ListMemberQuotasQueryResult",
         "ListWorkspaceBillingAccountMembersQueryError",
@@ -17427,18 +17661,10 @@
         "RemoveWorkspaceBillingAccountMemberMutationError",
         "RemoveWorkspaceBillingAccountMemberMutationResult",
         "RemoveWorkspaceBillingAccountMemberMutationVariables",
-        "SetDefaultMemberQuotaMutationBody",
-        "SetDefaultMemberQuotaMutationError",
-        "SetDefaultMemberQuotaMutationResult",
-        "SetDefaultMemberQuotaMutationVariables",
         "SetMemberQuotaMutationBody",
         "SetMemberQuotaMutationError",
         "SetMemberQuotaMutationResult",
         "SetMemberQuotaMutationVariables",
-        "SetWorkspaceBudgetMutationBody",
-        "SetWorkspaceBudgetMutationError",
-        "SetWorkspaceBudgetMutationResult",
-        "SetWorkspaceBudgetMutationVariables",
         "TransferWorkspaceBillingAccountMutationBody",
         "TransferWorkspaceBillingAccountMutationError",
         "TransferWorkspaceBillingAccountMutationResult",
@@ -17475,10 +17701,6 @@
         "getCreateWorkspaceCheckoutSessionMutationKey",
         "getCreateWorkspaceCheckoutSessionMutationOptions",
         "getCreateWorkspaceCheckoutSessionUrl",
-        "getDefaultMemberQuota",
-        "getGetDefaultMemberQuotaQueryKey",
-        "getGetDefaultMemberQuotaQueryOptions",
-        "getGetDefaultMemberQuotaUrl",
         "getGetSelfMemberQuotaQueryKey",
         "getGetSelfMemberQuotaQueryOptions",
         "getGetSelfMemberQuotaUrl",
@@ -17488,9 +17710,6 @@
         "getGetWorkspaceBillingTransferQueryKey",
         "getGetWorkspaceBillingTransferQueryOptions",
         "getGetWorkspaceBillingTransferUrl",
-        "getGetWorkspaceBudgetQueryKey",
-        "getGetWorkspaceBudgetQueryOptions",
-        "getGetWorkspaceBudgetUrl",
         "getGetWorkspaceCheckoutSessionQueryKey",
         "getGetWorkspaceCheckoutSessionQueryOptions",
         "getGetWorkspaceCheckoutSessionUrl",
@@ -17506,9 +17725,6 @@
         "getInitiateWorkspaceBillingTransferMutationKey",
         "getInitiateWorkspaceBillingTransferMutationOptions",
         "getInitiateWorkspaceBillingTransferUrl",
-        "getLinkWorkspaceBillingAccountMutationKey",
-        "getLinkWorkspaceBillingAccountMutationOptions",
-        "getLinkWorkspaceBillingAccountUrl",
         "getListMemberQuotasQueryKey",
         "getListMemberQuotasQueryOptions",
         "getListMemberQuotasUrl",
@@ -17537,15 +17753,9 @@
         "getRemoveWorkspaceBillingAccountMemberMutationOptions",
         "getRemoveWorkspaceBillingAccountMemberUrl",
         "getSelfMemberQuota",
-        "getSetDefaultMemberQuotaMutationKey",
-        "getSetDefaultMemberQuotaMutationOptions",
-        "getSetDefaultMemberQuotaUrl",
         "getSetMemberQuotaMutationKey",
         "getSetMemberQuotaMutationOptions",
         "getSetMemberQuotaUrl",
-        "getSetWorkspaceBudgetMutationKey",
-        "getSetWorkspaceBudgetMutationOptions",
-        "getSetWorkspaceBudgetUrl",
         "getTransferWorkspaceBillingAccountMutationKey",
         "getTransferWorkspaceBillingAccountMutationOptions",
         "getTransferWorkspaceBillingAccountUrl",
@@ -17554,13 +17764,11 @@
         "getUpdateWorkspaceBillingAccountMemberUrl",
         "getWorkspaceBillingAccount",
         "getWorkspaceBillingTransfer",
-        "getWorkspaceBudget",
         "getWorkspaceCheckoutSession",
         "getWorkspaceCreditsBalance",
         "getWorkspacePurchaseOptions",
         "getWorkspaceUsage",
         "initiateWorkspaceBillingTransfer",
-        "linkWorkspaceBillingAccount",
         "listMemberQuotas",
         "listWorkspaceBillingAccountMembers",
         "listWorkspaceBillingRecords",
@@ -17570,9 +17778,7 @@
         "listWorkspaceRecharges",
         "rejectWorkspaceBillingTransfer",
         "removeWorkspaceBillingAccountMember",
-        "setDefaultMemberQuota",
         "setMemberQuota",
-        "setWorkspaceBudget",
         "transferWorkspaceBillingAccount",
         "updateWorkspaceBillingAccountMember",
         "useAbandonWorkspacePendingOrder",
@@ -17582,17 +17788,14 @@
         "useContinueWorkspacePendingOrder",
         "useCreateWorkspaceBillingQuote",
         "useCreateWorkspaceCheckoutSession",
-        "useGetDefaultMemberQuota",
         "useGetSelfMemberQuota",
         "useGetWorkspaceBillingAccount",
         "useGetWorkspaceBillingTransfer",
-        "useGetWorkspaceBudget",
         "useGetWorkspaceCheckoutSession",
         "useGetWorkspaceCreditsBalance",
         "useGetWorkspacePurchaseOptions",
         "useGetWorkspaceUsage",
         "useInitiateWorkspaceBillingTransfer",
-        "useLinkWorkspaceBillingAccount",
         "useListMemberQuotas",
         "useListWorkspaceBillingAccountMembers",
         "useListWorkspaceBillingRecords",
@@ -17602,9 +17805,7 @@
         "useListWorkspaceRecharges",
         "useRejectWorkspaceBillingTransfer",
         "useRemoveWorkspaceBillingAccountMember",
-        "useSetDefaultMemberQuota",
         "useSetMemberQuota",
-        "useSetWorkspaceBudget",
         "useTransferWorkspaceBillingAccount",
         "useUpdateWorkspaceBillingAccountMember"
       ]
@@ -17781,7 +17982,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-members/workspace-members.ts": {
-      "sha256": "016709644a4918b73ad968f03e65f543a9bd9bac723a54c5f75231fb37408417",
+      "sha256": "6809628cf0b78c87de86fa41704519169d6a4be79d6b6e0f87633bc1cbc1ddca",
       "exports": [
         "AddWorkspaceMemberMutationBody",
         "AddWorkspaceMemberMutationError",
@@ -17868,7 +18069,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-tasks/workspace-tasks.ts": {
-      "sha256": "5b17867ee28d1b7d3b6d5ddb334a243f78ff7470996914e6846f682b5fce3192",
+      "sha256": "fb99add0c21ad7cb6da179cb8c3551cb838309b6981d5690824b13a813bf6a38",
       "exports": [
         "CancelWorkspaceTaskMutationBody",
         "CancelWorkspaceTaskMutationError",
@@ -17921,7 +18122,7 @@
       ]
     },
     "src/api/generated-query/public/workspaces/workspaces.ts": {
-      "sha256": "2787be4e59239d2d8fdcc28a37721a2a982cc8009c0b06697b0c650f5f9eb482",
+      "sha256": "10a07eb236894df2b673d9b5c6d02fdd093ccbf7adb5caf82d9bcf408e43aa1f",
       "exports": [
         "CreateWorkspaceMutationBody",
         "CreateWorkspaceMutationError",

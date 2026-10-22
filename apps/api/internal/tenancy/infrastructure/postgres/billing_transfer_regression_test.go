@@ -127,7 +127,11 @@ func TestHandoverDecisionRejectsAnotherAccountBeforeMutation(t *testing.T) {
 			db := newTenancyTestDB(t)
 			ctx := context.Background()
 			store, accounts, owner, recipient, _, account := handoverFixture(t, db, ctx)
-			unrelated, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "unrelated", OwnerUserID: owner, NewBillingAccount: true})
+			// A genuinely different funds identity: another user's
+			// Personal survivor (same-user workspaces share one pool,
+			// so a second user is required for cross-account checks).
+			stranger := createTenancyTestUser(t, db)
+			unrelated, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "unrelated", OwnerUserID: stranger})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -228,12 +232,21 @@ func TestHandoverWorkspaceCapRollsBackWholeDecision(t *testing.T) {
 	db := newTenancyTestDB(t)
 	ctx := context.Background()
 	store, accounts, owner, recipient, _, account := handoverFixture(t, db, ctx)
-	full, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "full-linked", OwnerUserID: owner, BillingAccountPublicID: &account.PublicID})
+	// A second scoped org workspace where the recipient holds no
+	// membership: fill it to the member cap so acceptance fails closed.
+	orgs, err := store.ListOrganizationsForUser(ctx, owner)
+	if err != nil || len(orgs) != 1 {
+		t.Fatalf("fixture orgs = %+v %v, want exactly the handover org", orgs, err)
+	}
+	full, err := store.CreateOrganizationWorkspace(ctx, orgs[0].PublicID, owner, "full-org")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for range tenancy.MaxWorkspaceMembers - 1 {
 		member := createTenancyTestUser(t, db)
+		if _, err := store.AddOrganizationMember(ctx, orgs[0].PublicID, member, tenancy.RoleMember); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := store.AddWorkspaceMember(ctx, full.PublicID, member, tenancy.RoleMember); err != nil {
 			t.Fatal(err)
 		}
@@ -301,37 +314,66 @@ func TestHandoverInvitationRecipientDiscovery(t *testing.T) {
 }
 
 func TestBillingWorkspaceScopeChangesWaitForAccount(t *testing.T) {
-	for _, mutation := range []string{"create", "link", "delete"} {
+	for _, mutation := range []string{"create-org", "delete"} {
 		t.Run(mutation, func(t *testing.T) {
 			db := newTenancyTestDB(t)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			store, accounts, owner, recipient, _, account := handoverFixture(t, db, ctx)
+			store, accounts, owner, recipient, _, _ := handoverFixture(t, db, ctx)
 			workspace, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "scope-target", OwnerUserID: owner})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if mutation == "delete" {
-				if err := accounts.LinkWorkspaceToBillingAccount(ctx, workspace.InternalID, account.InternalID, owner); err != nil {
+			// The link surface is removed (ADR-0038): scope is fixed at
+			// creation, so only org-pool creation and deletion serialize
+			// on the account lock now. The fixture owner already holds an
+			// organization (#951 at-most-one cardinality), so the second
+			// org uses a fresh user.
+			var orgPublic string
+			scopeOwner := owner
+			if mutation == "create-org" {
+				scopeOwner = createTenancyTestUser(t, db)
+				org, err := store.CreateOrganization(ctx, scopeOwner, "Scope Org")
+				if err != nil {
 					t.Fatal(err)
 				}
+				orgPublic = org.PublicID
 			}
 			tx, err := db.Begin(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer tx.Rollback(ctx)
-			if _, err := dbsqlc.New(tx).LockBillingAccount(ctx, account.InternalID); err != nil {
+			var lockedAccount int64
+			if mutation == "create-org" {
+				orgRow, err := store.GetOrganization(ctx, orgPublic)
+				if err != nil {
+					t.Fatal(err)
+				}
+				poolRow, err := dbsqlc.New(db).GetBillingAccountByOrganizationID(ctx, nullInt64(orgRow.InternalID))
+				if err != nil {
+					t.Fatal(err)
+				}
+				lockedAccount = poolRow.InternalID
+			} else {
+				// Deletion serializes on the workspace's own scope
+				// account (the Personal survivor here, not the
+				// fixture's org pool).
+				scope, err := accounts.EnsureBillingAccountForWorkspace(ctx, workspace.InternalID, workspace.PublicID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				lockedAccount = scope.InternalID
+			}
+			if _, err := dbsqlc.New(tx).LockBillingAccount(ctx, lockedAccount); err != nil {
 				t.Fatal(err)
 			}
 			done := make(chan error, 1)
 			go func() {
 				var err error
 				switch mutation {
-				case "create":
-					_, err = store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "blocked-create", OwnerUserID: owner, BillingAccountPublicID: &account.PublicID})
-				case "link":
-					err = accounts.LinkWorkspaceToBillingAccount(ctx, workspace.InternalID, account.InternalID, owner)
+				case "create-org":
+					_, err = store.CreateOrganizationWorkspace(ctx, orgPublic, scopeOwner, "blocked-org-space")
 				case "delete":
 					err = store.DeleteWorkspace(ctx, workspace.PublicID)
 				}
@@ -342,11 +384,7 @@ func TestBillingWorkspaceScopeChangesWaitForAccount(t *testing.T) {
 				// A handover started before deletion gets the funds guard checked
 				// after the account lock wait, before any scope disappears.
 				carrier := dbutil.ContextWithAmbientTx(ctx, tx)
-				if _, err := accounts.InitiateBillingTransferInvite(carrier, account.InternalID, owner, recipient, "before-delete"); err != nil {
-					t.Fatal(err)
-				}
-			} else {
-				if _, err := tx.Exec(ctx, `DELETE FROM billing_account_members WHERE billing_account_id = $1 AND user_id = $2`, account.InternalID, owner); err != nil {
+				if _, err := accounts.InitiateBillingTransferInvite(carrier, lockedAccount, owner, recipient, "before-delete"); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -354,12 +392,12 @@ func TestBillingWorkspaceScopeChangesWaitForAccount(t *testing.T) {
 				t.Fatal(err)
 			}
 			err = <-done
-			want := tenancy.ErrBillingForbidden
 			if mutation == "delete" {
-				want = tenancy.ErrBillingConflict
-			}
-			if !errors.Is(err, want) {
-				t.Fatalf("mutation = %v, want %v", err, want)
+				if !errors.Is(err, tenancy.ErrBillingConflict) {
+					t.Fatalf("mutation = %v, want %v", err, tenancy.ErrBillingConflict)
+				}
+			} else if err != nil {
+				t.Fatalf("org create after lock release = %v, want nil", err)
 			}
 			if _, err := store.GetWorkspace(ctx, workspace.PublicID); err != nil {
 				t.Fatalf("target vanished: %v", err)
@@ -368,21 +406,31 @@ func TestBillingWorkspaceScopeChangesWaitForAccount(t *testing.T) {
 	}
 }
 
-func TestBillingDeleteSerializesAnchoredAndResolvedAccounts(t *testing.T) {
+func TestBillingDeleteSerializesSurvivorAccount(t *testing.T) {
 	db := newTenancyTestDB(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	store, accounts, owner, recipient, _, shared := handoverFixture(t, db, ctx)
-	workspace, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "prior-anchor", OwnerUserID: owner, NewBillingAccount: true})
+	store, accounts, owner, recipient, _, _ := handoverFixture(t, db, ctx)
+	workspace, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "prior-anchor", OwnerUserID: owner})
 	if err != nil {
 		t.Fatal(err)
 	}
+	// No per-workspace anchor exists (ADR-0038): the workspace resolves
+	// to the owner's Personal survivor by scope.
 	anchor, err := accounts.EnsureBillingAccountForWorkspace(ctx, workspace.InternalID, workspace.PublicID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := accounts.LinkWorkspaceToBillingAccount(ctx, workspace.InternalID, shared.InternalID, owner); err != nil {
+	def, err := store.EnsureDefaultWorkspace(ctx, owner)
+	if err != nil {
 		t.Fatal(err)
+	}
+	survivor, err := accounts.EnsureBillingAccountForWorkspace(ctx, def.InternalID, def.PublicID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if anchor.InternalID != survivor.InternalID {
+		t.Fatalf("scope account = %d, want survivor %d", anchor.InternalID, survivor.InternalID)
 	}
 	tx, err := db.Begin(ctx)
 	if err != nil {
@@ -403,42 +451,6 @@ func TestBillingDeleteSerializesAnchoredAndResolvedAccounts(t *testing.T) {
 	}
 	if err := <-done; !errors.Is(err, tenancy.ErrBillingConflict) {
 		t.Fatalf("delete = %v, want pending anchor handover conflict", err)
-	}
-}
-
-func TestBillingDeleteRejectsPayerLinkedDuringWorkspaceLockWait(t *testing.T) {
-	db := newTenancyTestDB(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	store, accounts, owner, _, _, shared := handoverFixture(t, db, ctx)
-	workspace, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "racing-link", OwnerUserID: owner, NewBillingAccount: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx.Rollback(ctx)
-	// NO KEY UPDATE admits the link's FK KEY SHARE while holding deletion's
-	// exclusive Workspace lock back until the payer changes.
-	if _, err := tx.Exec(ctx, `SELECT internal_id FROM workspaces WHERE internal_id = $1 FOR NO KEY UPDATE`, workspace.InternalID); err != nil {
-		t.Fatal(err)
-	}
-	done := make(chan error, 1)
-	go func() { done <- store.DeleteWorkspace(ctx, workspace.PublicID) }()
-	waitForBillingMutationBlock(t, ctx, db, done, tx.Conn().PgConn().PID())
-	if err := accounts.LinkWorkspaceToBillingAccount(ctx, workspace.InternalID, shared.InternalID, owner); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := <-done; !errors.Is(err, tenancy.ErrBillingConflict) {
-		t.Fatalf("delete = %v, want changed payer conflict", err)
-	}
-	if _, err := store.GetWorkspace(ctx, workspace.PublicID); err != nil {
-		t.Fatalf("Workspace disappeared: %v", err)
 	}
 }
 

@@ -126,6 +126,11 @@ const (
 	MsgServiceUnavailable38            = errorrender.MsgServiceUnavailable38                           // CodeServiceUnavailable
 	MsgBadRequest30                    = errorrender.MsgBadRequest30                                   // CodeBadRequest
 	MsgOrganizationNotFound            = errorrender.MsgOrganizationNotFound                           // CodeOrganizationNotFound
+	MsgOrganizationMemberNotFound      = errorrender.MsgOrganizationMemberNotFound                     // CodeOrganizationMemberNotFound
+	MsgOrganizationLimitReached        = errorrender.MsgOrganizationLimitReached                       // CodeOrganizationLimitReached
+	MsgOrganizationClosed              = errorrender.MsgOrganizationClosed                             // CodeOrganizationClosed
+	MsgOrganizationClosureBlocked      = errorrender.MsgOrganizationClosureBlocked                     // CodeOrganizationClosureBlocked
+	MsgOrganizationNotClosed           = errorrender.MsgOrganizationNotClosed                          // CodeOrganizationNotClosed
 	MsgBadRequest31                    = errorrender.MsgBadRequest31                                   // CodeBadRequest
 	MsgPaginationCursorInvalid3        = errorrender.MsgPaginationCursorInvalid3                       // CodePaginationCursorInvalid
 	MsgIdempotencyKeyRequired2         = errorrender.MsgIdempotencyKeyRequired2                        // CodeIdempotencyKeyRequired
@@ -134,7 +139,6 @@ const (
 	MsgWorkspaceIdempotencyConflict    = errorrender.MsgWorkspaceIdempotencyConflict                   // CodeWorkspaceIdempotencyConflict
 	MsgBillingPricingUnavailable       = errorrender.MsgBillingPricingUnavailable                      // CodeBillingPricingUnavailable
 	MsgServiceUnavailable39            = errorrender.MsgServiceUnavailable39                           // CodeServiceUnavailable
-	MsgSetWorkspaceBudget              = errorrender.MsgSetWorkspaceBudget                             // CodeValidationFailed
 	MsgBadRequest32                    = errorrender.MsgBadRequest32                                   // CodeBadRequest
 	MsgRenderV1UsageError              = errorrender.MsgRenderV1UsageError                             // RenderV1UsageError @ v1/billing.go
 	MsgBadRequest33                    = errorrender.MsgBadRequest33                                   // CodeBadRequest
@@ -235,9 +239,6 @@ const (
 	MsgBadRequest36                    = errorrender.MsgBadRequest36                                   // CodeBadRequest
 	MsgBadRequest37                    = errorrender.MsgBadRequest37                                   // CodeBadRequest
 	MsgBadRequest38                    = errorrender.MsgBadRequest38                                   // CodeBadRequest
-	MsgWorkspaceBudgetExhausted        = errorrender.MsgWorkspaceBudgetExhausted                       // CodeWorkspaceBudgetExhausted
 	MsgMemberQuotaExhausted            = errorrender.MsgMemberQuotaExhausted                           // CodeMemberQuotaExhausted
 	MsgSetMemberQuota                  = errorrender.MsgSetMemberQuota                                 // CodeValidationFailed
-	MsgDefaultMemberQuotaNotConfigured = errorrender.MsgDefaultMemberQuotaNotConfigured                // CodeDefaultMemberQuotaNotConfigured
-	MsgDefaultMemberQuotaInvalid       = errorrender.MsgDefaultMemberQuotaInvalid                      // CodeValidationFailed
 )

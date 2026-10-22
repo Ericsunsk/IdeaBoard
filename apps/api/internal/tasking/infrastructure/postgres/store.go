@@ -249,11 +249,30 @@ func (s *Store) ResolveBillingAccountInTx(ctx context.Context, tx pgx.Tx, worksp
 		return 0, fmt.Errorf("tasking postgres: settlement transaction is nil")
 	}
 	q := s.q.WithTx(tx)
-	workspaceInternalID, err := resolveWorkspace(ctx, q, workspacePublicID)
+	workspacePublicID = strings.TrimSpace(workspacePublicID)
+	if !contract.IsValidPublicID(contract.PrefixWorkspace, workspacePublicID) {
+		return 0, workspacetasks.ErrNotFound
+	}
+	workspace, err := q.GetWorkspaceByPublicID(ctx, workspacePublicID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, workspacetasks.ErrNotFound
+		}
 		return 0, err
 	}
-	return resolveBillingAccount(ctx, q, workspaceInternalID)
+	if workspace.OrganizationID.Valid {
+		organization, err := q.GetOrganizationByInternalID(ctx, workspace.OrganizationID.Int64)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, workspacetasks.ErrNotFound
+		}
+		if err != nil {
+			return 0, err
+		}
+		if organization.ClosedAt.Valid {
+			return 0, workspacetasks.ErrNotFound
+		}
+	}
+	return resolveBillingAccount(ctx, q, workspace.InternalID)
 }
 
 // loadOutputs reads ordered output refs for one task row.

@@ -51,6 +51,7 @@ export function useBillingAccountContext(options: {
     billingAccountId: computed(() => account.value?.billingAccountId),
     consumptionScope: computed(() => account.value?.consumptionScope),
     isShared: computed(() => account.value?.isShared === true),
+    canManageMemberQuotas: computed(() => account.value?.canManageMemberQuotas === true),
     walletScope,
     readScope,
     isReady,

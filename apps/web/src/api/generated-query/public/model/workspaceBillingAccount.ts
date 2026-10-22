@@ -25,6 +25,8 @@ export interface WorkspaceBillingAccount {
   owner_type: WorkspaceBillingAccountOwnerType
   /** Server-resolved consumption visibility for the authenticated principal. */
   consumption_scope: WorkspaceBillingAccountConsumptionScope
+  /** Server-resolved quota management capability for this workspace account. Only the Personal account holder or this Organization's Owner/Admin may manage quotas. */
+  can_manage_member_quotas: boolean
   /** True when many Workspaces share one account; omitted when false. */
   shared?: boolean
   /** Omitted when empty. */

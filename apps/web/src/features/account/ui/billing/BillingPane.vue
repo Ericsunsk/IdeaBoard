@@ -1,6 +1,6 @@
 <template>
   <AccountPane :title="t('account.tabs.billingTransactions')">
-    <p v-if="billingAccountId" class="mb-3 text-xs text-muted-foreground" role="status">
+    <p v-if="billingAccountId" class="mb-3 text-admin-meta text-muted-foreground" role="status">
       {{ t('account.billingRecords.sharedAccount', { account: billingAccountId }) }}
     </p>
     <DataTableFrame
@@ -84,7 +84,7 @@
           <span class="font-semibold text-foreground">{{
             t('account.billingRecords.forbiddenTitle')
           }}</span>
-          <span class="mt-1 text-sm text-muted-foreground">{{
+          <span class="mt-1 text-admin-content text-muted-foreground">{{
             t('account.billingRecords.forbiddenDescription')
           }}</span>
           <Button variant="ghost" size="sm" class="mt-3" @click="retryInitial()">{{
@@ -109,7 +109,7 @@
           <span class="font-semibold text-foreground">{{
             t('account.billingRecords.emptyTitle')
           }}</span>
-          <span class="mt-1 text-sm text-muted-foreground">{{
+          <span class="mt-1 text-admin-content text-muted-foreground">{{
             t('account.billingRecords.emptyDescription')
           }}</span>
         </div>

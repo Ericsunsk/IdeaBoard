@@ -10,6 +10,7 @@ vi.mock('../../../../account/ui/chrome/useWorkspaceMemberSection', () => ({
     myRole: ref(null),
     canManage: ref(false),
     isOwner: ref(false),
+    isDefaultWorkspace: ref(false),
     isLoading: ref(false),
     hasLoadError: ref(false),
     retryRoster: vi.fn(),
@@ -26,8 +27,29 @@ vi.mock('../../../../account/ui/chrome/useWorkspaceMemberSection', () => ({
   }),
 }))
 import { h, ref } from 'vue'
-import { render, renderWithUser, screen, waitFor } from '../../../../../test/render'
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import type { RenderOptions } from '@testing-library/vue'
+import {
+  render,
+  renderWithUser as renderWithUserBase,
+  screen,
+  waitFor,
+} from '../../../../../test/render'
 import CanvasChrome from './CanvasChrome.vue'
+
+// The avatar menu mounts the real workspace settings dialog, whose billing
+// context rides TanStack Query. Provide a client like the account menu
+// harness does so these specs exercise the menu rows, not the provider.
+function renderWithUser<C>(view: C, options?: RenderOptions<C>) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return renderWithUserBase(view, {
+    ...options,
+    global: {
+      ...options?.global,
+      plugins: [...(options?.global?.plugins ?? []), [VueQueryPlugin, { queryClient }]],
+    },
+  })
+}
 
 describe('CanvasChrome', () => {
   it('keeps only accessible viewport zoom controls without autosave feedback controls', () => {

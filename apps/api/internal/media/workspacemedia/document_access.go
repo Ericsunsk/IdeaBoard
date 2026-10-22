@@ -28,14 +28,29 @@ func ValidateDocumentAssets(ctx context.Context, q *dbsqlc.Queries, workspaceID 
 	if err != nil {
 		return err
 	}
-	membership, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspace.InternalID, UserID: actorUserID})
-	if database.IsNotFound(err) {
-		return ErrNotFound
-	}
-	if err != nil {
+	workspaceRole := ""
+	if membership, err := q.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{WorkspaceID: workspace.InternalID, UserID: actorUserID}); err == nil {
+		workspaceRole = membership.Role
+	} else if database.IsNotFound(err) {
+		if !workspace.OrganizationID.Valid {
+			return ErrNotFound
+		}
+		orgMember, orgErr := q.GetOrganizationMembership(ctx, dbsqlc.GetOrganizationMembershipParams{
+			OrganizationID: workspace.OrganizationID.Int64, UserID: actorUserID,
+		})
+		if database.IsNotFound(orgErr) {
+			return ErrNotFound
+		}
+		if orgErr != nil {
+			return orgErr
+		}
+		if orgMember.Role != "owner" && orgMember.Role != "admin" {
+			return ErrNotFound
+		}
+		workspaceRole = orgMember.Role
+	} else if err != nil {
 		return err
 	}
-	workspaceRole := membership.Role
 	if err := checkMemberPrecondition(workspaceRole); err != nil {
 		return ErrNotFound
 	}

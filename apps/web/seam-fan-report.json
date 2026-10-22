@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "5764783d72f0e54717494c0519ad4205f95f8449",
+  "checkpointSha": "09cd852a743afd3d1feab8df24f840deb7f09f3a",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -135,11 +135,6 @@
         },
         {
           "from": "src/features/account/session/billing-transfer/resource.ts",
-          "to": "src/api/contractKernel.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/budget/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -305,6 +300,11 @@
         },
         {
           "from": "src/features/search/session/adapters/workspace.ts",
+          "to": "src/api/contractKernel.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/scope.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
         },
@@ -2734,11 +2734,6 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/account/session/budget/resource.ts",
-          "to": "src/api/generated-query/public/model/index.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/account/session/credits/resource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
@@ -2774,17 +2769,20 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 24,
-      "fanOut": 304,
+      "fanIn": 23,
+      "fanOut": 301,
       "fanOutTargets": [
         "src/api/generated-query/public/model/acceptWorkspaceBillingTransfer200.ts",
         "src/api/generated-query/public/model/accessIfMatchParameter.ts",
         "src/api/generated-query/public/model/addBillingAccountMemberRequest.ts",
         "src/api/generated-query/public/model/addBillingAccountMemberRequestData.ts",
         "src/api/generated-query/public/model/addBillingAccountMemberRequestDataRole.ts",
+        "src/api/generated-query/public/model/addOrganizationMemberRequest.ts",
+        "src/api/generated-query/public/model/addOrganizationMemberRequestData.ts",
         "src/api/generated-query/public/model/addWorkspaceBillingAccountMember201.ts",
         "src/api/generated-query/public/model/addWorkspaceMemberRequest.ts",
         "src/api/generated-query/public/model/addWorkspaceMemberRequestData.ts",
+        "src/api/generated-query/public/model/assignableOrganizationRole.ts",
         "src/api/generated-query/public/model/avatarUploadResult.ts",
         "src/api/generated-query/public/model/avatarUploadResultEnvelope.ts",
         "src/api/generated-query/public/model/badRequestResponse.ts",
@@ -2818,6 +2816,8 @@
         "src/api/generated-query/public/model/cancelWorkspaceBillingTransfer200.ts",
         "src/api/generated-query/public/model/cancelWorkspaceTaskRequest.ts",
         "src/api/generated-query/public/model/cancelWorkspaceTaskRequestData.ts",
+        "src/api/generated-query/public/model/closeOrganizationRequest.ts",
+        "src/api/generated-query/public/model/closeOrganizationRequestData.ts",
         "src/api/generated-query/public/model/completeUploadEnvelope.ts",
         "src/api/generated-query/public/model/completeUploadRequest.ts",
         "src/api/generated-query/public/model/completeUploadRequestData.ts",
@@ -2851,9 +2851,6 @@
         "src/api/generated-query/public/model/creditsLedgerEntry.ts",
         "src/api/generated-query/public/model/creditsLedgerEntryCommandType.ts",
         "src/api/generated-query/public/model/cursorParameter.ts",
-        "src/api/generated-query/public/model/defaultMemberQuota.ts",
-        "src/api/generated-query/public/model/defaultMemberQuotaEnvelope.ts",
-        "src/api/generated-query/public/model/defaultMemberQuotaPeriod.ts",
         "src/api/generated-query/public/model/deletedEnvelope.ts",
         "src/api/generated-query/public/model/deletedEnvelopeData.ts",
         "src/api/generated-query/public/model/derivativeWorkspaceLibraryAssetParams.ts",
@@ -2882,8 +2879,6 @@
         "src/api/generated-query/public/model/libraryFolder.ts",
         "src/api/generated-query/public/model/libraryFolderEnvelope.ts",
         "src/api/generated-query/public/model/libraryFolderId.ts",
-        "src/api/generated-query/public/model/linkWorkspaceBillingAccountRequest.ts",
-        "src/api/generated-query/public/model/linkWorkspaceBillingAccountRequestData.ts",
         "src/api/generated-query/public/model/listBoardRevisionsParams.ts",
         "src/api/generated-query/public/model/listBoardsParams.ts",
         "src/api/generated-query/public/model/listOrganizationsParams.ts",
@@ -2925,6 +2920,10 @@
         "src/api/generated-query/public/model/organization.ts",
         "src/api/generated-query/public/model/organizationEnvelope.ts",
         "src/api/generated-query/public/model/organizationId.ts",
+        "src/api/generated-query/public/model/organizationMember.ts",
+        "src/api/generated-query/public/model/organizationMemberEnvelope.ts",
+        "src/api/generated-query/public/model/organizationMemberList.ts",
+        "src/api/generated-query/public/model/organizationStatus.ts",
         "src/api/generated-query/public/model/pageSizeParameter.ts",
         "src/api/generated-query/public/model/paginatedBillingRecords.ts",
         "src/api/generated-query/public/model/paginatedBoardRevisions.ts",
@@ -2974,15 +2973,9 @@
         "src/api/generated-query/public/model/searchWorkspaceParams.ts",
         "src/api/generated-query/public/model/searchWorkspaceProviderItem.ts",
         "src/api/generated-query/public/model/service.ts",
-        "src/api/generated-query/public/model/setDefaultMemberQuotaRequest.ts",
-        "src/api/generated-query/public/model/setDefaultMemberQuotaRequestData.ts",
-        "src/api/generated-query/public/model/setDefaultMemberQuotaRequestDataPeriod.ts",
         "src/api/generated-query/public/model/setMemberQuotaRequest.ts",
         "src/api/generated-query/public/model/setMemberQuotaRequestData.ts",
         "src/api/generated-query/public/model/setMemberQuotaRequestDataPeriod.ts",
-        "src/api/generated-query/public/model/setWorkspaceBudgetRequest.ts",
-        "src/api/generated-query/public/model/setWorkspaceBudgetRequestData.ts",
-        "src/api/generated-query/public/model/setWorkspaceBudgetRequestDataPeriod.ts",
         "src/api/generated-query/public/model/successEnvelope.ts",
         "src/api/generated-query/public/model/successEnvelopeData.ts",
         "src/api/generated-query/public/model/successEnvelopeMeta.ts",
@@ -3011,6 +3004,8 @@
         "src/api/generated-query/public/model/updateBoardAccessRequestData.ts",
         "src/api/generated-query/public/model/updateBoardRequest.ts",
         "src/api/generated-query/public/model/updateBoardRequestData.ts",
+        "src/api/generated-query/public/model/updateOrganizationMemberRequest.ts",
+        "src/api/generated-query/public/model/updateOrganizationMemberRequestData.ts",
         "src/api/generated-query/public/model/updateOrganizationRequest.ts",
         "src/api/generated-query/public/model/updateOrganizationRequestData.ts",
         "src/api/generated-query/public/model/updateUserRequest.ts",
@@ -3040,9 +3035,6 @@
         "src/api/generated-query/public/model/workspaceBillingAccountOwnerType.ts",
         "src/api/generated-query/public/model/workspaceBillingQuote.ts",
         "src/api/generated-query/public/model/workspaceBillingQuoteEnvelope.ts",
-        "src/api/generated-query/public/model/workspaceBudget.ts",
-        "src/api/generated-query/public/model/workspaceBudgetEnvelope.ts",
-        "src/api/generated-query/public/model/workspaceBudgetPeriod.ts",
         "src/api/generated-query/public/model/workspaceCheckoutSession.ts",
         "src/api/generated-query/public/model/workspaceCheckoutSessionEnvelope.ts",
         "src/api/generated-query/public/model/workspaceCreditsBalance.ts",
@@ -3110,6 +3102,16 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/addOrganizationMemberRequest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/addOrganizationMemberRequestData.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/addWorkspaceBillingAccountMember201.ts",
           "kind": "runtime"
         },
@@ -3121,6 +3123,11 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/addWorkspaceMemberRequestData.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/assignableOrganizationRole.ts",
           "kind": "runtime"
         },
         {
@@ -3290,6 +3297,16 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/closeOrganizationRequest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/closeOrganizationRequestData.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/completeUploadEnvelope.ts",
           "kind": "runtime"
         },
@@ -3455,21 +3472,6 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/defaultMemberQuota.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/defaultMemberQuotaEnvelope.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/defaultMemberQuotaPeriod.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/deletedEnvelope.ts",
           "kind": "runtime"
         },
@@ -3606,16 +3608,6 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/libraryFolderId.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/linkWorkspaceBillingAccountRequest.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/linkWorkspaceBillingAccountRequestData.ts",
           "kind": "runtime"
         },
         {
@@ -3821,6 +3813,26 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/organizationId.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/organizationMember.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/organizationMemberEnvelope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/organizationMemberList.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/organizationStatus.ts",
           "kind": "runtime"
         },
         {
@@ -4070,21 +4082,6 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/setDefaultMemberQuotaRequest.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/setDefaultMemberQuotaRequestData.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/setDefaultMemberQuotaRequestDataPeriod.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/setMemberQuotaRequest.ts",
           "kind": "runtime"
         },
@@ -4096,21 +4093,6 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/setMemberQuotaRequestDataPeriod.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/setWorkspaceBudgetRequest.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/setWorkspaceBudgetRequestData.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/setWorkspaceBudgetRequestDataPeriod.ts",
           "kind": "runtime"
         },
         {
@@ -4251,6 +4233,16 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/updateBoardRequestData.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/updateOrganizationMemberRequest.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/updateOrganizationMemberRequestData.ts",
           "kind": "runtime"
         },
         {
@@ -4396,21 +4388,6 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/workspaceBillingQuoteEnvelope.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/workspaceBudget.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/workspaceBudgetEnvelope.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/public/model/index.ts",
-          "to": "src/api/generated-query/public/model/workspaceBudgetPeriod.ts",
           "kind": "runtime"
         },
         {
@@ -4608,8 +4585,8 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 24,
-      "targetFanOut": 304,
+      "targetFanIn": 23,
+      "targetFanOut": 301,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -4732,11 +4709,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/session/budget/resource.ts",
-          "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/session/credits/resource.ts",
           "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
@@ -4762,7 +4734,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 10,
+      "fanIn": 9,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -4806,7 +4778,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 10,
+      "targetFanIn": 9,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -5191,9 +5163,14 @@
           "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/shell/useWorkspaceSwitcher.ts",
+          "to": "src/api/idempotencyKey.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 18,
+      "fanIn": 19,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -5201,7 +5178,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 18,
+      "targetFanIn": 19,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -6518,22 +6495,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "src/components/ui/button/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "src/components/ui/button/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.vue",
-          "to": "src/components/ui/button/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/ui/chrome/WorkspaceCreateDialog.vue",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
@@ -6653,12 +6620,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/workspace/organization/ui/OrganizationPanel.vue",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/test/p1ThemeContracts.browser.spec.ts",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 34,
+      "fanIn": 33,
       "fanOut": 6,
       "fanOutTargets": [
         "node_modules/class-variance-authority/dist/index.js",
@@ -6704,7 +6676,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 34,
+      "targetFanIn": 33,
       "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -7432,22 +7404,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "src/components/ui/input/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "src/components/ui/input/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.vue",
-          "to": "src/components/ui/input/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/ui/chrome/WorkspaceCreateDialog.vue",
+          "to": "src/components/ui/input/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
           "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
         },
@@ -7507,12 +7469,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/workspace/organization/ui/OrganizationPanel.vue",
+          "to": "src/components/ui/input/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/test/p1ThemeContracts.browser.spec.ts",
           "to": "src/components/ui/input/index.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 18,
+      "fanIn": 17,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -7562,7 +7529,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 18,
+      "targetFanIn": 17,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -7670,12 +7637,7 @@
     "src/components/ui/select/index.ts": {
       "consumerEdges": [
         {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "src/components/ui/select/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
           "to": "src/components/ui/select/index.ts",
           "kind": "runtime"
         },
@@ -7695,7 +7657,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 5,
+      "fanIn": 4,
       "fanOut": 6,
       "fanOutTargets": [
         "node_modules/class-variance-authority/dist/index.js",
@@ -7906,7 +7868,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 5,
+      "targetFanIn": 4,
       "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -8000,22 +7962,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "src/components/ui/spinner/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "src/components/ui/spinner/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/components/ui/spinner/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.vue",
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
           "to": "src/components/ui/spinner/index.ts",
           "kind": "runtime"
         },
@@ -8060,7 +8012,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 15,
+      "fanIn": 13,
       "fanOut": 2,
       "fanOutTargets": ["node_modules/vue/index.js", "src/lib/utils.ts"],
       "outboundEdges": [
@@ -8079,7 +8031,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 15,
+      "targetFanIn": 13,
       "targetFanOut": 2,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -9158,6 +9110,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
+          "to": "src/core/components/UserConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
           "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
@@ -9178,7 +9135,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 6,
+      "fanIn": 7,
       "fanOut": 8,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -9236,7 +9193,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 6,
+      "targetFanIn": 7,
       "targetFanOut": 8,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -9430,17 +9387,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/session/budget/useWorkspaceBudgetSection.ts",
-          "to": "src/core/composables/useAppToast.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/session/profile/useProfileFeedback.ts",
-          "to": "src/core/composables/useAppToast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/quota/useDefaultMemberQuotaSection.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -9555,7 +9502,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 29,
+      "fanIn": 27,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/vue-sonner/lib/index.js"],
       "outboundEdges": [
@@ -9569,7 +9516,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 29,
+      "targetFanIn": 27,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -10873,17 +10820,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/session/budget/useWorkspaceBudgetSection.ts",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/session/profile/useProfileFeedback.ts",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/quota/useDefaultMemberQuotaSection.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -11048,6 +10985,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/workspace/organization/ui/OrganizationPanel.vue",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/selection/workspaceMembersResource.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
@@ -11068,7 +11010,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 43,
+      "fanIn": 42,
       "fanOut": 1,
       "fanOutTargets": ["src/core/i18n/index.ts"],
       "outboundEdges": [
@@ -11082,7 +11024,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 43,
+      "targetFanIn": 42,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -11282,11 +11224,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/session/budget/resource.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/session/chart.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -11372,22 +11309,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.component.spec.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.component.spec.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.component.spec.ts",
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.component.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -11958,7 +11885,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 150,
+      "fanIn": 147,
       "fanOut": 5,
       "fanOutTargets": [
         "node_modules/vitest/dist/index.js",
@@ -12028,7 +11955,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 150,
+      "targetFanIn": 147,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13609,22 +13536,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/session/budget/useWorkspaceBudgetSection.ts",
-          "to": "src/core/query/queryDefaults.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/session/credits/useCreditWallet.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/account/session/payments/useRecharge.ts",
-          "to": "src/core/query/queryDefaults.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/quota/useDefaultMemberQuotaSection.ts",
           "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
@@ -13714,7 +13631,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 26,
+      "fanIn": 24,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -13722,7 +13639,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 26,
+      "targetFanIn": 24,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -14885,12 +14802,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/workspace/organization/scope.ts",
+          "to": "src/core/utils/storage.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/workspace/selection/workspaceContext.ts",
           "to": "src/core/utils/storage.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 14,
+      "fanIn": 15,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -14898,7 +14820,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 14,
+      "targetFanIn": 15,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -15360,61 +15282,6 @@
         {
           "from": "src/features/account/session/billing/useBillingRecords.unit.spec.ts",
           "to": "src/test/render.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/budget/resource.ts",
-          "to": "src/api/contractKernel.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/budget/resource.ts",
-          "to": "src/api/generated-query/public/model/index.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/account/session/budget/resource.ts",
-          "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/budget/resource.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/budget/resource.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/budget/useWorkspaceBudgetSection.ts",
-          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/budget/useWorkspaceBudgetSection.ts",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/budget/useWorkspaceBudgetSection.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/budget/useWorkspaceBudgetSection.ts",
-          "to": "src/core/composables/useAppToast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/budget/useWorkspaceBudgetSection.ts",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/budget/useWorkspaceBudgetSection.ts",
-          "to": "src/core/query/queryDefaults.ts",
           "kind": "runtime"
         },
         {
@@ -15938,36 +15805,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/session/quota/useDefaultMemberQuotaSection.ts",
-          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/quota/useDefaultMemberQuotaSection.ts",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/quota/useDefaultMemberQuotaSection.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/quota/useDefaultMemberQuotaSection.ts",
-          "to": "src/core/composables/useAppToast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/quota/useDefaultMemberQuotaSection.ts",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/session/quota/useDefaultMemberQuotaSection.ts",
-          "to": "src/core/query/queryDefaults.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/session/quota/useMemberQuotaSection.ts",
           "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
           "kind": "runtime"
@@ -16398,141 +16235,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.component.spec.ts",
-          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.component.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.component.spec.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.component.spec.ts",
-          "to": "src/test/render.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.component.spec.ts",
-          "to": "src/test/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "node_modules/@iconoir/vue/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "src/components/ui/button/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "src/components/ui/input/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "src/components/ui/select/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "src/components/ui/spinner/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "src/core/components/LoadErrorPanel.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "src/theme/appOverlayMenu.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.component.spec.ts",
-          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.component.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.component.spec.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.component.spec.ts",
-          "to": "src/test/render.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.component.spec.ts",
-          "to": "src/test/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "node_modules/@iconoir/vue/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "src/components/ui/button/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "src/components/ui/input/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "src/components/ui/select/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "src/components/ui/spinner/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "src/core/components/LoadErrorPanel.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "src/theme/appOverlayMenu.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
           "to": "node_modules/@iconoir/vue/dist/index.js",
           "kind": "runtime"
@@ -16688,61 +16390,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.component.spec.ts",
-          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.component.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.component.spec.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.component.spec.ts",
-          "to": "src/test/render.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.component.spec.ts",
-          "to": "src/test/toast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.vue",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.vue",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.vue",
-          "to": "src/components/ui/button/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.vue",
-          "to": "src/components/ui/input/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.vue",
-          "to": "src/components/ui/spinner/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/WorkspaceBudgetSection.vue",
-          "to": "src/core/components/LoadErrorPanel.vue",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/ui/chrome/WorkspaceCreateDialog.vue",
           "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
@@ -16780,6 +16427,76 @@
         {
           "from": "src/features/account/ui/chrome/WorkspaceCreateDialog.vue",
           "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.component.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.component.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.component.spec.ts",
+          "to": "src/test/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
+          "to": "node_modules/@iconoir/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
+          "to": "src/components/ui/input/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
+          "to": "src/components/ui/select/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
+          "to": "src/components/ui/spinner/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
+          "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
+          "to": "src/theme/appOverlayMenu.ts",
           "kind": "runtime"
         },
         {
@@ -16834,6 +16551,11 @@
         },
         {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
           "to": "src/components/ui/avatar/index.ts",
           "kind": "runtime"
         },
@@ -16864,6 +16586,11 @@
         },
         {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
+          "to": "src/core/components/UserConfirmDialog.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
           "to": "src/core/media/avatarUrl.ts",
           "kind": "runtime"
         },
@@ -16875,6 +16602,31 @@
         {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
           "to": "src/theme/appOverlayMenu.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.component.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.component.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.component.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.component.spec.ts",
+          "to": "src/test/render.ts",
           "kind": "runtime"
         },
         {
@@ -16956,6 +16708,11 @@
           "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/userAccountMenu.types.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "type-only"
         },
         {
           "from": "src/features/account/ui/dialog/AccountDialog.browser.spec.ts",
@@ -18040,6 +17797,11 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.component.spec.ts",
+          "to": "src/features/account/ui/chrome/userAccountMenu.types.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
           "to": "src/features/account/ui/chrome/userAccountMenu.types.ts",
           "kind": "type-only"
@@ -18070,16 +17832,22 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 10,
-      "fanOut": 0,
-      "fanOutTargets": [],
-      "outboundEdges": [],
+      "fanIn": 11,
+      "fanOut": 1,
+      "fanOutTargets": ["node_modules/vue/index.js"],
+      "outboundEdges": [
+        {
+          "from": "src/features/account/ui/chrome/userAccountMenu.types.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "type-only"
+        }
+      ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 10,
-      "targetFanOut": 0,
+      "targetFanIn": 11,
+      "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -38557,9 +38325,11 @@
         }
       ],
       "fanIn": 1,
-      "fanOut": 12,
+      "fanOut": 14,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/@testing-library/vue/dist/index.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
@@ -38573,6 +38343,16 @@
         "src/theme/appOverlayMenu.ts"
       ],
       "outboundEdges": [
+        {
+          "from": "src/features/canvas/ui/chrome/components/CanvasChrome.component.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/chrome/components/CanvasChrome.component.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "type-only"
+        },
         {
           "from": "src/features/canvas/ui/chrome/components/CanvasChrome.component.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
@@ -38654,7 +38434,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 1,
-      "targetFanOut": 12,
+      "targetFanOut": 14,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -44640,7 +44420,7 @@
         }
       ],
       "fanIn": 32,
-      "fanOut": 54,
+      "fanOut": 55,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -44660,6 +44440,7 @@
         "src/api/mediaWorkspaceScope.ts",
         "src/api/sessionUserType.ts",
         "src/components/ui/button/index.ts",
+        "src/components/ui/input/index.ts",
         "src/core/auth/adminAccess.ts",
         "src/core/auth/routePolicy.ts",
         "src/core/components/StudioName.vue",
@@ -44746,6 +44527,61 @@
         {
           "from": "src/features/workspace/layout/WorkspaceLayout.vue",
           "to": "src/features/search/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/scope.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/scope.ts",
+          "to": "src/api/contractKernel.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/scope.ts",
+          "to": "src/core/utils/storage.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/scope.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/ui/OrganizationPanel.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/ui/OrganizationPanel.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/ui/OrganizationPanel.vue",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/ui/OrganizationPanel.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/ui/OrganizationPanel.vue",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/ui/OrganizationPanel.vue",
+          "to": "src/components/ui/input/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/organization/ui/OrganizationPanel.vue",
+          "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
@@ -45255,6 +45091,11 @@
         },
         {
           "from": "src/features/workspace/shell/useWorkspaceSwitcher.ts",
+          "to": "src/api/idempotencyKey.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/workspace/shell/useWorkspaceSwitcher.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -45299,7 +45140,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 32,
-      "targetFanOut": 54,
+      "targetFanOut": 55,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -45933,22 +45774,17 @@
     "src/theme/appOverlayMenu.ts": {
       "consumerEdges": [
         {
-          "from": "src/features/account/ui/chrome/DefaultMemberQuotaSection.vue",
-          "to": "src/theme/appOverlayMenu.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/MemberQuotaSection.vue",
-          "to": "src/theme/appOverlayMenu.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/ui/chrome/SupportChannelQr.vue",
           "to": "src/theme/appOverlayMenu.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "to": "src/theme/appOverlayMenu.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
           "to": "src/theme/appOverlayMenu.ts",
           "kind": "runtime"
         },
@@ -45978,7 +45814,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 9,
+      "fanIn": 8,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -45986,7 +45822,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 9,
+      "targetFanIn": 8,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,

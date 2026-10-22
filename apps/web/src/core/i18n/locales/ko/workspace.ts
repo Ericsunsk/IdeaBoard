@@ -46,14 +46,13 @@ export default {
     createDialogNameLabel: '워크스페이스 이름',
     createDialogConfirm: '워크스페이스 만들기',
     defaultNewName: '새 워크스페이스',
-    billingChoiceLabel: '결제 계정',
-    billingOrganizationHint: 'Workspaces in organization {organization} use its shared account.',
-    billingSharedTitle: '현재 계정 공유',
-    billingSharedHint: '새 공간이 계정 {account}을 공유합니다. 하나의 잔액, 새 지갑 없음.',
-    billingSharedHintFallback: '새 공간이 현재 계정을 공유합니다. 하나의 잔액, 새 지갑 없음.',
-    billingNewTitle: '독립 계정 만들기',
-    billingNewHint: '독립 운영 사업을 위해 새 공간에 전용 자금 계정을 만듭니다.',
-    billingIsolationNote: '같은 소유자의 계정 간 잔액은 합쳐지거나 이동하지 않습니다.',
+    scopeLabel: '워크스페이스 범위',
+    scopePersonalTitle: '개인',
+    scopePersonalHint:
+      '새 공간은 개인 계정을 사용합니다. 모든 개인 공간이 하나의 잔액을 공유하며 범위는 변경되지 않습니다.',
+    scopeOrganizationTitle: '조직',
+    scopeOrganizationHint:
+      '{organization}의 새 공간은 공용 계정을 사용합니다. 범위는 변경되지 않습니다.',
     nameExists: '이미 같은 이름의 워크스페이스가 있습니다.',
     loadFailed: '워크스페이스를 불러오지 못했습니다.',
     createFailed: '워크스페이스를 생성할 수 없습니다. 다시 시도해 주세요.',
@@ -108,8 +107,7 @@ export default {
       invalidRequest: '이 구성원 변경은 유효하지 않습니다.',
       memberUnknown: '이 구성원은 더 이상 사용할 수 없습니다.',
       actionFailed: '작업을 완료할 수 없습니다. 다시 시도해 주세요.',
-      defaultMissing:
-        '먼저 신규 멤버 기본 할당량을 설정한 뒤 초대하세요. 자금 관리자만 설정할 수 있습니다.',
+      defaultPrivate: '기본 워크스페이스는 비공개이며 협력자를 초대할 수 없습니다.',
     },
     organization: {
       scope: '작업 공간 소속',
@@ -126,30 +124,21 @@ export default {
     },
     handover: {
       title: '자금 계정 인계',
-      account: '자금 계정: {account}',
-      scopeNote:
-        '수락하면 자금 Owner 권한과 연결된 모든 비즈니스 작업 공간의 Owner 권한을 받습니다. Default 작업 공간은 제외됩니다. 잔액, 내역 및 한도는 계정에 유지되며 이전 Owner는 Admin이 됩니다.',
-      recipient: '수신자',
-      pickRecipient: '작업 공간 멤버 선택',
-      recipientHint:
-        '수신자가 이 설정에서 초대를 확인하고 응답할 수 있도록 먼저 현재 작업 공간에 초대하세요.',
-      initiate: '인계 초대 보내기',
+      handOver: '인계',
+      handOverTo: '{name}에게 자금 소유권 인계',
+      initiateConfirm:
+        '{account}를 {to}에게 인계할까요? 7일간 유효하며 수락 전까지 소유권은 변하지 않습니다.',
+      acceptConfirm: '{account}의 소유권을 수락할까요? 자금 Owner가 됩니다.',
+      rejectConfirm: '인계를 거절할까요? 소유권은 변하지 않으며 다시 보낼 수 있습니다.',
+      cancelConfirm: '인계를 취소할까요? 소유권은 변하지 않으며 다시 보낼 수 있습니다.',
+      recipientNotice: '응답 대기 중인 인계가 있습니다. 위 멤버 목록에서 응답하세요.',
       invites: '인계 초대',
       inviteParties: '{from} → {to}',
-      grantedScope: '{count}개 비즈니스 작업 공간에 Owner 권한이 부여되었습니다.',
+      expiresNote: '7일간 유효하며 만료 후 다시 보낼 수 있습니다.',
       accept: '인계 수락',
       reject: '초대 거절',
       cancel: '초대 취소',
       empty: '인계 초대가 없습니다.',
-      managers: '자금 관리자',
-      detachNote:
-        '나가면 자금 관리 권한만 제거됩니다. 잔액, 내역 및 작업 공간 멤버십은 유지됩니다. 마지막 Owner는 먼저 소유권을 인계해야 합니다.',
-      leave: '자금 계정 나가기',
-      detach: '자금 권한 제거',
-      detachConfirm:
-        '{member}의 자금 관리 권한을 제거할까요? 잔액, 내역 및 작업 공간 멤버십은 유지됩니다.',
-      decisionConfirm:
-        '자금 계정 {account}에 이 결정을 적용할까요? 수락하면 자금 소유권과 연결된 비즈니스 작업 공간의 Owner 권한을 받습니다. Default는 제외되며 잔액, 내역 및 한도는 유지됩니다.',
       saved: '자금 관리 권한이 업데이트되었습니다.',
       loadFailed: '자금 관리 정보를 불러오지 못했습니다. 다시 시도하세요.',
       status: {
@@ -157,34 +146,13 @@ export default {
         accepted: '수락됨',
         rejected: '거절됨',
         cancelled: '취소됨',
+        expired: '만료됨',
       },
       initiateFailed: '인계 초대를 보내지 못했습니다. 다시 시도해 주세요.',
       acceptFailed: '인계 초대를 수락하지 못했습니다. 다시 시도해 주세요.',
       rejectFailed: '인계 초대를 거절하지 못했습니다. 다시 시도해 주세요.',
       cancelFailed: '인계 초대를 취소하지 못했습니다. 다시 시도해 주세요.',
-      detachFailed: '결제 구성원을 제거하지 못했습니다. 다시 시도해 주세요.',
     },
-  },
-  budget: {
-    title: '소비 예산',
-    periodMonthly: '월간',
-    periodUnlimited: '무제한',
-    usedOf: '{used} / {limit} Ideas 사용됨',
-    usedUnlimited: '{used} Ideas 사용됨',
-    remaining: '{remaining} Ideas 남음',
-    periodRange: '{start} – {end}',
-    exhausted:
-      '예산이 소진되었습니다. 다음 기간이나 상향된 한도까지 새로운 유료 생성과 비전 검색이 중단됩니다.',
-    managerOnly:
-      '자금 관리자만 예산을 변경할 수 있습니다. 워크스페이스 관리자는 풀에서 부여된 예산을 인상할 수 없습니다.',
-    limitLabel: '월간 한도 (Ideas)',
-    save: '저장',
-    saving: '저장 중…',
-    saved: '예산이 업데이트되었습니다.',
-    setUnlimited: '무제한으로 전환',
-    loadFailed: '예산을 불러올 수 없습니다.',
-    saveFailed: '예산을 저장할 수 없습니다. 다시 시도해 주세요.',
-    invalidLimit: '{max} 이하의 양의 정수를 입력하세요.',
   },
   quota: {
     title: '멤버 할당량',
@@ -200,7 +168,7 @@ export default {
     exhausted:
       '개인 할당량이 소진되었습니다. 다음 기간이나 상향된 한도까지 새로운 유료 생성과 비전 검색이 중단됩니다.',
     managerOnly:
-      '자금 관리자만 멤버 할당량을 변경할 수 있습니다. 워크스페이스 관리자는 풀에서 부여된 할당량을 인상할 수 없습니다.',
+      'Personal 계정 소유자와 조직 소유자 또는 관리자만 멤버 할당량을 변경할 수 있습니다. 워크스페이스 관리자는 풀에서 부여된 할당량을 인상할 수 없습니다.',
     memberLabel: '멤버',
     periodLabel: '기간',
     limitLabel: '한도 (Ideas)',
@@ -213,19 +181,46 @@ export default {
     invalidLimit: '{max} 이하의 양의 정수를 입력하세요.',
     pickMember: '먼저 멤버를 선택하세요.',
     noQuotas: '설정된 멤버 할당량이 없습니다. 모두 무제한입니다.',
-    defaultTitle: '신규 멤버 기본 할당량',
-    defaultOf: '신규 멤버에게 {limit} Ideas 부여',
-    defaultUnlimited: '신규 멤버는 무제한입니다',
-    defaultMissing:
-      '기본 할당량이 아직 없습니다. 자금 관리자가 기본값을 설정할 때까지 초대가 중단됩니다.',
-    defaultAffectsNewOnly:
-      '기본값 변경은 이후 합류에만 적용됩니다. 기존 멤버는 할당량과 사용량을 유지합니다.',
-    defaultManagerOnly:
-      '자금 관리자만 기본값을 설정할 수 있습니다. 워크스페이스 관리자는 초대 시 이를 재사용합니다.',
-    defaultLoadFailed: '기본 할당량을 불러올 수 없습니다.',
-    defaultSaveFailed: '기본 할당량을 저장할 수 없습니다. 다시 시도해 주세요.',
-    defaultSaved: '기본 할당량이 업데이트되었습니다.',
-    presetLabel: '월간 프리셋',
-    presetMonthly: '{limit} / 월',
+    sharedAccountNote:
+      '협력자 소비는 공용 계정 잔액에서 차감되며 실제 작업자에게 귀속되어 계정의 모든 공간에 합산됩니다.',
+  },
+  limits: {
+    title: '사용량 한도',
+    manageShow: '한도 관리',
+    manageHide: '관리 숨기기',
+  },
+  scope: {
+    switcherLabel: '개인 또는 조직 범위',
+    personal: '개인',
+    organization: '조직',
+    createOrganization: '새 조직',
+    personalHint: '개인 공간은 Personal 잔액을 공유합니다.',
+    organizationHint: '{name} 공간은 조직 잔액을 공유합니다.',
+  },
+  management: {
+    title: '{name} 관리',
+    managementNote:
+      '조직 자체가 관리 입구입니다: 보드·콘텐츠·소모 없음. Owner/Admin은 모든 조직 공간에 자동 접근하며, Member는 공간별 명시적 승인이 필요합니다.',
+    inviteTitle: '조직 구성원 초대',
+    invitePlaceholder: 'usr_…',
+    workspaceGrantNote: 'Member는 해당 공간을 편집하기 전에 공간별 명시적 승인이 필요합니다.',
+    leaveAction: '나가기',
+    leaving: '나가는 중…',
+    limitReached: '사용자당 최대 하나의 조직에만 가입하거나 생성할 수 있습니다.',
+    statusClosed: '종료됨',
+    closedNote:
+      '이 조직은 종료되었습니다. 접근과 지출이 중단되며 기록은 유지됩니다. Owner만 복원할 수 있습니다.',
+    closeTitle: '조직 종료',
+    closeHint:
+      '종료하면 모든 접근과 지출이 중단됩니다. 구성원·공간·청구 기록은 유지되며, 잔액은 조직 계정에 남습니다.',
+    closeReasonPlaceholder: '사유 (선택)',
+    closeAction: '조직 종료',
+    closeConfirmAction: '종료 확인',
+    closing: '종료 중…',
+    restoreAction: '조직 복원',
+    restoring: '복원 중…',
+    closeFailed: '조직을 종료할 수 없습니다.',
+    closeBlocked: '미결제 작업 또는 자금이 남아 있습니다. 정산 후 다시 시도하세요.',
+    restoreFailed: '조직을 복원할 수 없습니다.',
   },
 } as const

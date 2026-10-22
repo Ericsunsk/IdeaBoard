@@ -12,7 +12,6 @@ export default {
   prompt_unavailable:
     'Esta indicación no está disponible en este momento. Inténtelo de nuevo más tarde.',
   wallet_restricted: 'Las Ideas no están disponibles temporalmente para esta cuenta.',
-  workspace_budget_exhausted: 'Este espacio de trabajo ha agotado su presupuesto de este período.',
   member_quota_exhausted: 'Has agotado tu cuota personal de este período.',
   vision_search_not_configured: 'La Búsqueda Visual no está disponible en este momento.',
   vision_search_unavailable:
@@ -41,7 +40,12 @@ export default {
   board_precondition_required:
     'El estado de acceso está desactualizado. Actualiza e inténtalo de nuevo.',
   board_member_not_found: 'Miembro del tablero no encontrado.',
+  organization_not_found: 'Organización no encontrada.',
+  organization_member_not_found: 'Miembro de la organización no encontrado.',
+  organization_limit_reached: 'Cada usuario puede unirse o crear como máximo una organización.',
+  organization_closed: 'Esta organización está cerrada.',
+  organization_closure_blocked:
+    'Aún hay tareas o fondos sin liquidar. Liquídalos e inténtalo de nuevo.',
+  organization_not_closed: 'Esta organización no está cerrada.',
   membership_transition_forbidden: 'El último gestor no se puede quitar ni degradar.',
-  default_member_quota_not_configured:
-    'Configure primero la cuota predeterminada para nuevos miembros y luego invite.',
 } as const

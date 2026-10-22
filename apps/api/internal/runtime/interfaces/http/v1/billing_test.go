@@ -37,9 +37,21 @@ import (
 
 var billingTestNow = time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
 
+// fakeBillingAccounts resolves stable billing accounts by creation scope
+// (ADR-0038): personal workspaces of one holder share the holder's
+// Personal survivor, organization workspaces share the org pool. There is
+// no per-workspace mint and no link indirection: the scope key derives
+// from the fixture tenancy store on every Ensure, mirroring the
+// production resolution order (org pool first, else holder survivor;
+// ownerless personal scopes fail closed).
 type fakeBillingAccounts struct {
-	mu        sync.Mutex
+	mu    sync.Mutex
+	store *tenancy.InMemoryStore
+	// accounts is keyed by stable billing-account internal ID (the
+	// anchoring workspace's internal ID); byScope maps a scope key to
+	// that account ID so every workspace in one scope resolves one row.
 	accounts  map[int64]tenancypg.BillingAccount
+	byScope   map[string]int64
 	byPublic  map[string]int64
 	roles     map[int64]map[int64]string
 	deny      map[int64]bool
@@ -48,17 +60,56 @@ type fakeBillingAccounts struct {
 	inviteSeq int64
 }
 
+// billingScopeOf derives the ADR-0038 funds scope for a fixture workspace:
+// "org:<organization public id>" for organization workspaces (shared org
+// pool, OwnerType organization), "personal:<holder user id>" for personal
+// ones (holder survivor, OwnerType workspace). Unknown workspaces and
+// ownerless personal scopes fail closed like production.
+func (f *fakeBillingAccounts) billingScopeOf(ctx context.Context, workspacePublicID string) (scope, ownerType string, shared bool, err error) {
+	if f.store == nil {
+		return "", "", false, tenancy.ErrBillingWorkspaceInvalid
+	}
+	ws, err := f.store.GetWorkspace(ctx, workspacePublicID)
+	if err != nil {
+		return "", "", false, tenancy.ErrBillingWorkspaceInvalid
+	}
+	if ws.OrganizationID != nil {
+		return "org:" + *ws.OrganizationID, tenancypg.BillingOwnerOrganization, true, nil
+	}
+	if ws.OwnerUserID == nil || *ws.OwnerUserID <= 0 {
+		return "", "", false, tenancy.ErrBillingConflict
+	}
+	return fmt.Sprintf("personal:%d", *ws.OwnerUserID), tenancypg.BillingOwnerWorkspace, false, nil
+}
+
 func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error) {
+	scope, ownerType, shared, err := f.billingScopeOf(ctx, workspacePublicID)
+	if err != nil {
+		return tenancypg.BillingAccount{}, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls++
-	if existing, ok := f.accounts[workspaceInternalID]; ok {
-		return existing, nil
+	if f.byScope == nil {
+		f.byScope = make(map[string]int64)
 	}
+	if accountID, ok := f.byScope[scope]; ok {
+		if existing, ok := f.accounts[accountID]; ok {
+			// Stable funds identity, resolving workspace: the account
+			// names the payer while handlers name the workspace from
+			// tenancy, so only the resolving location is refreshed.
+			existing.WorkspaceInternalID = workspaceInternalID
+			existing.WorkspacePublicID = workspacePublicID
+			return existing, nil
+		}
+	}
+	// First touch in this scope anchors the survivor: the stable
+	// identity other workspaces in the scope resolve afterwards.
 	account := tenancypg.BillingAccount{
 		InternalID:          workspaceInternalID,
 		PublicID:            "ba_test_" + workspacePublicID,
-		OwnerType:           tenancypg.BillingOwnerWorkspace,
+		OwnerType:           ownerType,
+		Shared:              shared,
 		WorkspaceInternalID: workspaceInternalID,
 		WorkspacePublicID:   workspacePublicID,
 		CreatedAt:           billingTestNow,
@@ -70,8 +121,9 @@ func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Conte
 	if f.byPublic == nil {
 		f.byPublic = make(map[string]int64)
 	}
-	f.accounts[workspaceInternalID] = account
-	f.byPublic[account.PublicID] = workspaceInternalID
+	f.accounts[account.InternalID] = account
+	f.byScope[scope] = account.InternalID
+	f.byPublic[account.PublicID] = account.InternalID
 	return account, nil
 }
 
@@ -221,25 +273,6 @@ func (f *fakeBillingAccounts) TransferBillingAccountOwnership(ctx context.Contex
 	}
 	f.roles[billingAccountInternalID][newOwnerID] = tenancy.BillingRoleOwner
 	f.roles[billingAccountInternalID][currentOwnerID] = tenancy.BillingRoleAdmin
-	return nil
-}
-
-func (f *fakeBillingAccounts) LinkWorkspaceToBillingAccount(ctx context.Context, workspaceInternalID, billingAccountInternalID, actorUserID int64) error {
-	role, ok, err := f.GetBillingAccountRole(ctx, billingAccountInternalID, actorUserID)
-	if err != nil {
-		return err
-	}
-	if !ok || !tenancy.IsBillingManager(role) {
-		return tenancy.ErrBillingForbidden
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	target, ok := f.accounts[billingAccountInternalID]
-	if !ok {
-		return tenancy.ErrBillingNotFound
-	}
-	target.Shared = true
-	f.accounts[workspaceInternalID] = target
 	return nil
 }
 
@@ -571,10 +604,11 @@ type billingTestFixture struct {
 }
 
 func newBillingTestFixture() *billingTestFixture {
+	store := tenancy.NewInMemoryStoreForTests()
 	fx := &billingTestFixture{
-		store:    tenancy.NewInMemoryStoreForTests(),
+		store:    store,
 		dir:      newStaticUserDirectory(),
-		accounts: &fakeBillingAccounts{},
+		accounts: &fakeBillingAccounts{store: store},
 		wallets: &fakeBillingWallets{
 			wallets: map[int64]domain.WalletDetails{},
 			ledgers: map[int64][]domain.LedgerTransaction{},
@@ -642,7 +676,7 @@ func TestV1BillingAccountProvisionsOnFirstRead(t *testing.T) {
 		t.Fatalf("GET billing-account status = %d (%v)", status, first)
 	}
 	data := v1Data(t, first).(map[string]any)
-	if data["workspace_id"] != ws.PublicID || data["owner_type"] != "workspace" {
+	if data["workspace_id"] != ws.PublicID || data["owner_type"] != "workspace" || data["can_manage_member_quotas"] != true {
 		t.Fatalf("billing account = %v, want workspace binding", data)
 	}
 	if _, ok := data["created_at"].(string); !ok {
@@ -655,6 +689,59 @@ func TestV1BillingAccountProvisionsOnFirstRead(t *testing.T) {
 	}
 	if v1Data(t, second).(map[string]any)["created_at"] != data["created_at"] {
 		t.Fatal("billing account provisioning is not idempotent")
+	}
+}
+
+func TestV1BillingQuotaCapabilityUsesWorkspaceScope(t *testing.T) {
+	ctx := t.Context()
+	fx := newBillingTestFixture()
+	org, err := fx.store.CreateOrganization(ctx, 11, "capability-org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range []struct {
+		userID int64
+		role   string
+	}{{12, tenancy.RoleAdmin}, {13, tenancy.RoleMember}} {
+		if _, err := fx.store.AddOrganizationMember(ctx, org.PublicID, m.userID, m.role); err != nil {
+			t.Fatal(err)
+		}
+	}
+	orgWorkspace, err := fx.store.CreateOrganizationWorkspace(ctx, org.PublicID, 11, "organization")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.store.AddWorkspaceMember(ctx, orgWorkspace.PublicID, 13, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	personalWorkspace := v1WorkspaceFixture(t, ctx, fx.store, "personal", 14)
+	fx.store.SeedWorkspaceMember(personalWorkspace.PublicID, 12, tenancy.RoleAdmin)
+	personalAccount := fx.mustAccount(t, ctx, personalWorkspace)
+	fx.accounts.roles = map[int64]map[int64]string{personalAccount: {14: tenancy.BillingRoleOwner, 12: tenancy.BillingRoleAdmin}}
+	for _, tc := range []struct {
+		name      string
+		workspace *tenancy.Workspace
+		actor     int64
+		want      bool
+	}{
+		{"organization owner", orgWorkspace, 11, true},
+		{"organization admin", orgWorkspace, 12, true},
+		{"organization member", orgWorkspace, 13, false},
+		{"personal holder", personalWorkspace, 14, true},
+		{"unrelated organization admin and billing admin", personalWorkspace, 12, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			status, _, payload := doV1(t, fx.engine(), v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + tc.workspace.PublicID + "/billing-account", userID: tc.actor})
+			if status != http.StatusOK || v1Data(t, payload).(map[string]any)["can_manage_member_quotas"] != tc.want {
+				t.Fatalf("quota capability = %d %v, want %v", status, payload, tc.want)
+			}
+		})
+	}
+
+	fx.deps.Tenancy = quotaRoleLookupFailure{Store: fx.store, failedUserID: 12}
+	status, _, payload := doV1(t, fx.engine(), v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + orgWorkspace.PublicID + "/billing-account", userID: 12})
+	if status != http.StatusServiceUnavailable || v1ErrorCode(t, payload) != string(contract.CodeServiceUnavailable) {
+		t.Fatalf("unavailable capability = %d %v, want 503", status, payload)
 	}
 }
 
@@ -762,8 +849,9 @@ func TestV1BillingBalanceAndLedgerCursor(t *testing.T) {
 }
 
 // TestV1BillingSharedBalanceSameAccount pins issue #922 rule 1 at the
-// read edge: two Workspaces sharing one Billing Account report the same
-// payer account and the same balance, while an independent account stays
+// read edge under ADR-0038 scope sharing: two Personal Workspaces of one
+// holder resolve one survivor Billing Account and report the same payer
+// account and the same balance, while another holder's scope stays
 // isolated. The balance names its workspace (consumption location) plus
 // the stable payer account; it never derives from the Workspace Owner.
 func TestV1BillingSharedBalanceSameAccount(t *testing.T) {
@@ -771,11 +859,13 @@ func TestV1BillingSharedBalanceSameAccount(t *testing.T) {
 	fx := newBillingTestFixture()
 	wsA := v1WorkspaceFixture(t, ctx, fx.store, "billing-shared-a", 11)
 	wsB := v1WorkspaceFixture(t, ctx, fx.store, "billing-shared-b", 11)
+	// Same holder scope shares without any link step: the second Ensure
+	// converges to the survivor anchored by the first.
 	accountA := fx.mustAccount(t, ctx, wsA)
-	fx.seedWallet(accountA, 980, 20)
-	if err := fx.accounts.LinkWorkspaceToBillingAccount(ctx, wsB.InternalID, accountA, 11); err != nil {
-		t.Fatalf("link shared account: %v", err)
+	if accountB := fx.mustAccount(t, ctx, wsB); accountB != accountA {
+		t.Fatalf("same-scope accounts = %d vs %d, want one stable payer", accountB, accountA)
 	}
+	fx.seedWallet(accountA, 980, 20)
 	engine := fx.engine()
 
 	readBalance := func(wsID string) map[string]any {
@@ -797,8 +887,9 @@ func TestV1BillingSharedBalanceSameAccount(t *testing.T) {
 		t.Fatalf("balance workspace scope = %v vs %v, want per-workspace consumption location", first["workspace_id"], second["workspace_id"])
 	}
 
-	// An independent workspace keeps its own isolated account and balance.
-	wsC := v1WorkspaceFixture(t, ctx, fx.store, "billing-shared-c", 11)
+	// An independent holder scope keeps its own isolated account and balance.
+	wsC := v1WorkspaceFixture(t, ctx, fx.store, "billing-shared-c", 12)
+	fx.store.SeedWorkspaceMember(wsC.PublicID, 11, tenancy.RoleAdmin)
 	accountC := fx.mustAccount(t, ctx, wsC)
 	fx.seedWallet(accountC, 10, 0)
 	third := readBalance(wsC.PublicID)
@@ -1139,6 +1230,10 @@ func TestV1BillingAccountReadsRequireFinancialGrant(t *testing.T) {
 			t.Fatalf("Billing Admin %s = %d %v", suffix, status, payload)
 		}
 	}
+	status, _, payload := doV1(t, fx.engine(), v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/billing-account", userID: 13})
+	if status != http.StatusOK || v1Data(t, payload).(map[string]any)["can_manage_member_quotas"] != false {
+		t.Fatalf("Billing Admin quota capability = %d %v, want denied", status, payload)
+	}
 	if fx.records.lastInput.WorkspaceID != 0 || fx.records.lastInput.ActorUserID != 0 {
 		t.Fatalf("financial admin records scoped unexpectedly: %+v", fx.records.lastInput)
 	}
@@ -1151,7 +1246,11 @@ func TestV1BillingAccountReadsRequireFinancialGrant(t *testing.T) {
 func TestV1BillingCheckoutKeysDoNotConflictAcrossAccounts(t *testing.T) {
 	fx := newBillingTestFixture()
 	first := v1WorkspaceFixture(t, t.Context(), fx.store, "first-account", 11)
-	second := v1WorkspaceFixture(t, t.Context(), fx.store, "second-account", 11)
+	// Distinct holder scopes own distinct payer accounts (ADR-0038); the
+	// same manager key stays independent across them. User 11 reads the
+	// second scope as an explicit workspace member.
+	second := v1WorkspaceFixture(t, t.Context(), fx.store, "second-account", 12)
+	fx.store.SeedWorkspaceMember(second.PublicID, 11, tenancy.RoleAdmin)
 	engine := fx.engine()
 	var previousSession string
 	for _, workspace := range []*tenancy.Workspace{first, second} {

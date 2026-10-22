@@ -5,7 +5,6 @@ import {
   listWorkspaceBillingTransfers,
   listWorkspaceBillingAccountMembers,
   rejectWorkspaceBillingTransfer,
-  removeWorkspaceBillingAccountMember,
 } from '../../../../api/generated-query/public/workspace-billing/workspace-billing'
 import {
   buildContractRequestHeaders,
@@ -41,8 +40,25 @@ export type BillingTransferInviteSummary = {
   status: BillingTransferStatus
   scopeWorkspaceIds: string[]
   createdAt?: string | undefined
+  expiresAt?: string | undefined
   decidedAt?: string | undefined
   decidedBy?: string | undefined
+}
+
+export function isTransferInviteLapsed(
+  invite: BillingTransferInviteSummary,
+  now = Date.now(),
+): boolean {
+  if (invite.status !== 'pending' || invite.expiresAt == null) return false
+  const deadline = Date.parse(invite.expiresAt)
+  return Number.isNaN(deadline) ? false : now >= deadline
+}
+
+export function isTransferInviteLive(
+  invite: BillingTransferInviteSummary,
+  now = Date.now(),
+): boolean {
+  return invite.status === 'pending' && !isTransferInviteLapsed(invite, now)
 }
 
 export const billingTransferQueryKeys = {
@@ -92,6 +108,16 @@ function requireTransferStatus(value: unknown): BillingTransferStatus {
   throw new Error('Invalid transfer invite status')
 }
 
+function parseScopeWorkspaceIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  return raw.map((id) => requireWorkspaceId(id))
+}
+
+function parseDecidedBy(raw: unknown): string | undefined {
+  const decidedRaw = asTrimmedString(raw)
+  return decidedRaw == null ? undefined : requireUserId(decidedRaw)
+}
+
 function parseTransferInvite(raw: unknown): BillingTransferInviteSummary {
   if (!isRecord(raw)) throw new Error('Invalid transfer invite payload')
   const publicId = requireTransferInviteId(raw.public_id ?? raw.publicId)
@@ -99,14 +125,11 @@ function parseTransferInvite(raw: unknown): BillingTransferInviteSummary {
   const fromUserId = requireUserId(raw.from_user_id ?? raw.fromUserId)
   const toUserId = requireUserId(raw.to_user_id ?? raw.toUserId)
   const status = requireTransferStatus(raw.status)
-  const scopeRaw = raw.scope_workspace_ids ?? raw.scopeWorkspaceIds
-  const scopeWorkspaceIds = Array.isArray(scopeRaw)
-    ? scopeRaw.map((id) => requireWorkspaceId(id))
-    : []
+  const scopeWorkspaceIds = parseScopeWorkspaceIds(raw.scope_workspace_ids ?? raw.scopeWorkspaceIds)
   const createdAt = asTrimmedString(raw.created_at ?? raw.createdAt)
+  const expiresAt = asTrimmedString(raw.expires_at ?? raw.expiresAt)
   const decidedAt = asTrimmedString(raw.decided_at ?? raw.decidedAt)
-  const decidedRaw = asTrimmedString(raw.decided_by ?? raw.decidedBy)
-  const decidedBy = decidedRaw == null ? undefined : requireUserId(decidedRaw)
+  const decidedBy = parseDecidedBy(raw.decided_by ?? raw.decidedBy)
   return {
     publicId,
     billingAccountId,
@@ -115,6 +138,7 @@ function parseTransferInvite(raw: unknown): BillingTransferInviteSummary {
     status,
     scopeWorkspaceIds,
     ...(createdAt === undefined ? {} : { createdAt }),
+    ...(expiresAt === undefined ? {} : { expiresAt }),
     ...(decidedAt === undefined ? {} : { decidedAt }),
     ...(decidedBy === undefined ? {} : { decidedBy }),
   }
@@ -244,20 +268,6 @@ export async function cancelTransferInvite(
     fallback,
   )
   return parseTransferInvite(data)
-}
-
-export async function detachBillingMember(
-  workspaceId: string,
-  memberId: string,
-  options?: BillingTransferRequestOptions,
-): Promise<void> {
-  const id = requireAccountWorkspaceId(workspaceId)
-  const target = requireUserId(memberId)
-  const fallback = i18n.global.t('workspace.switcher.handover.detachFailed')
-  await resolveWorkspaceBillingData<unknown>(
-    removeWorkspaceBillingAccountMember(id, target, readConfig(options)),
-    fallback,
-  )
 }
 
 export type BillingManagerSummary = {

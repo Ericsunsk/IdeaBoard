@@ -8,11 +8,13 @@ import (
 	"fmt"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/tasking/workspacetasks"
+	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -192,6 +194,41 @@ func TestWorkspaceTaskCancelAndFail(t *testing.T) {
 	}
 	if failed.Status != workspacetasks.StatusFailed || failed.ErrorMsg != "provider exploded" {
 		t.Fatalf("failed = %+v", failed)
+	}
+}
+
+func TestResolveBillingAccountInTxRejectsClosedOrganization(t *testing.T) {
+	db := newTaskTestDB(t)
+	ctx := context.Background()
+	tasks := NewStore(db)
+	_, ownerID := seedTaskWorkspace(t, db)
+	organizations := tenancypg.NewStore(db, nil)
+	organization, err := organizations.CreateOrganization(ctx, ownerID, "closed-task-billing")
+	if err != nil {
+		t.Fatalf("create organization: %v", err)
+	}
+	workspace, err := organizations.CreateOrganizationWorkspace(ctx, organization.PublicID, ownerID, "task-space")
+	if err != nil {
+		t.Fatalf("create organization workspace: %v", err)
+	}
+
+	resolve := func() (int64, error) {
+		tx, err := db.BeginTx(ctx, pgx.TxOptions{})
+		if err != nil {
+			t.Fatalf("begin transaction: %v", err)
+		}
+		defer tx.Rollback(ctx)
+		return tasks.ResolveBillingAccountInTx(ctx, tx, workspace.PublicID)
+	}
+
+	if accountID, err := resolve(); err != nil || accountID <= 0 {
+		t.Fatalf("open organization account resolution = %d, %v; want a valid account", accountID, err)
+	}
+	if _, err := db.Exec(ctx, `UPDATE organizations SET closed_at = now() WHERE internal_id = $1`, organization.InternalID); err != nil {
+		t.Fatalf("close organization: %v", err)
+	}
+	if accountID, err := resolve(); accountID != 0 || !errors.Is(err, workspacetasks.ErrNotFound) {
+		t.Fatalf("closed organization account resolution = %d, %v; want not found", accountID, err)
 	}
 }
 

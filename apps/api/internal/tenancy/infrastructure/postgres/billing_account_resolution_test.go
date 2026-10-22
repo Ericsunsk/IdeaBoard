@@ -75,7 +75,7 @@ func TestBillingResolutionSharesOrgPool(t *testing.T) {
 	}
 }
 
-func TestBillingResolutionNoOrgExplicitSharing(t *testing.T) {
+func TestBillingResolutionPersonalSurvivor(t *testing.T) {
 	db := newTenancyTestDB(t)
 	ctx := context.Background()
 	store := NewStore(db, nil)
@@ -94,22 +94,17 @@ func TestBillingResolutionNoOrgExplicitSharing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve default failed: %v", err)
 	}
-	// Explicitly associate the second business space with the studio pool.
-	// The actor is both workspace owner and billing owner (seeded at provision).
-	if err := baStore.LinkWorkspaceToBillingAccount(ctx, studio.InternalID, defAcc.InternalID, owner); err != nil {
-		t.Fatalf("explicit link failed: %v", err)
-	}
-	linked, err := baStore.EnsureBillingAccountForWorkspace(ctx, studio.InternalID, studio.PublicID)
+	// No link indirection (ADR-0038): the second Personal workspace
+	// resolves to the same Personal survivor by creation scope alone.
+	// The actor is workspace owner; no billing grant is consulted.
+	resolved, err := baStore.EnsureBillingAccountForWorkspace(ctx, studio.InternalID, studio.PublicID)
 	if err != nil {
-		t.Fatalf("resolve linked failed: %v", err)
+		t.Fatalf("resolve studio failed: %v", err)
 	}
-	if linked.PublicID != defAcc.PublicID || linked.InternalID != defAcc.InternalID {
-		t.Fatalf("no-org sharing: linked=%+v want %+v", linked, defAcc)
+	if resolved.PublicID != defAcc.PublicID || resolved.InternalID != defAcc.InternalID {
+		t.Fatalf("personal scope: resolved=%+v want %+v", resolved, defAcc)
 	}
-	if !linked.Shared {
-		t.Fatal("linked resolution must report shared=true")
-	}
-	// Independent account stays isolated.
+	// Independent account stays isolated per user.
 	other := createTenancyTestUser(t, db)
 	otherWS, err := store.EnsureDefaultWorkspace(ctx, other)
 	if err != nil {
@@ -232,7 +227,9 @@ func TestBillingResolutionFailClosed(t *testing.T) {
 		t.Fatalf("negative workspace err = %v, want ErrBillingWorkspaceInvalid", err)
 	}
 
-	// Conflicting ownership: org workspace cannot link to a personal pool.
+	// Scope is fixed at creation (ADR-0038): the link surface is removed,
+	// so cross-scope reads resolve to each scope's own pool instead of
+	// conflicting. Org and personal scopes stay isolated by construction.
 	org, err := store.CreateOrganization(ctx, owner, "Acme")
 	if err != nil {
 		t.Fatalf("create org failed: %v", err)
@@ -249,27 +246,26 @@ func TestBillingResolutionFailClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve personal failed: %v", err)
 	}
-	if err := baStore.LinkWorkspaceToBillingAccount(ctx, orgWS.InternalID, personalAcc.InternalID, owner); !errors.Is(err, tenancy.ErrBillingConflict) {
-		t.Fatalf("org->personal link err = %v, want ErrBillingConflict", err)
-	}
-
-	// Conflicting ownership: personal workspace cannot link to an org pool.
 	orgAcc, err := baStore.EnsureBillingAccountForWorkspace(ctx, orgWS.InternalID, orgWS.PublicID)
 	if err != nil {
 		t.Fatalf("resolve org failed: %v", err)
 	}
-	if err := baStore.LinkWorkspaceToBillingAccount(ctx, personal.InternalID, orgAcc.InternalID, owner); !errors.Is(err, tenancy.ErrBillingConflict) {
-		t.Fatalf("personal->org link err = %v, want ErrBillingConflict", err)
+	if orgAcc.PublicID == personalAcc.PublicID {
+		t.Fatalf("scope isolation violated: org %q == personal %q", orgAcc.PublicID, personalAcc.PublicID)
 	}
 
-	// Payer switches are out of scope: relinking to a different personal
-	// pool fails closed instead of silently moving funds.
+	// Every Personal workspace of one user shares the survivor: a second
+	// and third workspace resolve identically with no link step.
 	second, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "Second", OwnerUserID: owner})
 	if err != nil {
 		t.Fatalf("create second failed: %v", err)
 	}
-	if err := baStore.LinkWorkspaceToBillingAccount(ctx, second.InternalID, personalAcc.InternalID, owner); err != nil {
-		t.Fatalf("first link failed: %v", err)
+	secondAcc, err := baStore.EnsureBillingAccountForWorkspace(ctx, second.InternalID, second.PublicID)
+	if err != nil {
+		t.Fatalf("resolve second failed: %v", err)
+	}
+	if secondAcc.PublicID != personalAcc.PublicID {
+		t.Fatalf("second personal scope = %q, want survivor %q", secondAcc.PublicID, personalAcc.PublicID)
 	}
 	third, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "Third", OwnerUserID: owner})
 	if err != nil {
@@ -279,13 +275,8 @@ func TestBillingResolutionFailClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve third failed: %v", err)
 	}
-	if err := baStore.LinkWorkspaceToBillingAccount(ctx, second.InternalID, thirdAcc.InternalID, owner); !errors.Is(err, tenancy.ErrBillingConflict) {
-		t.Fatalf("payer switch err = %v, want ErrBillingConflict", err)
-	}
-
-	// Unknown ba_ target fails closed without leaking workspace existence.
-	if err := baStore.LinkWorkspaceToBillingAccount(ctx, second.InternalID, 999999999, owner); !errors.Is(err, tenancy.ErrBillingNotFound) {
-		t.Fatalf("unknown target err = %v, want ErrBillingNotFound", err)
+	if thirdAcc.PublicID != personalAcc.PublicID {
+		t.Fatalf("third personal scope = %q, want survivor %q", thirdAcc.PublicID, personalAcc.PublicID)
 	}
 }
 

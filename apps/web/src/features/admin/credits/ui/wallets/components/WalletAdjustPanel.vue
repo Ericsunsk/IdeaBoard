@@ -47,7 +47,7 @@
 
     <div
       v-if="activeTab === 'correction' && correctionSource"
-      class="flex items-center gap-2 rounded-panel border border-primary-line bg-primary-faint px-3.5 py-2.5 text-xs text-primary font-mono"
+      class="flex items-center gap-2 rounded-panel border border-primary-line bg-primary-faint px-3.5 py-2.5 text-admin-meta text-primary font-mono"
     >
       <span>{{
         t('admin.wallet.originalTransactionNotice', {

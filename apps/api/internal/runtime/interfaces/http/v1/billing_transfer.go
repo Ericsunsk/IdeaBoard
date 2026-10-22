@@ -52,6 +52,7 @@ type v1TransferInviteDTO struct {
 	Status            string   `json:"status"`
 	ScopeWorkspaceIDs []string `json:"scope_workspace_ids"`
 	CreatedAt         string   `json:"created_at,omitempty"`
+	ExpiresAt         string   `json:"expires_at,omitempty"`
 	DecidedAt         string   `json:"decided_at,omitempty"`
 	DecidedBy         string   `json:"decided_by,omitempty"`
 }
@@ -88,6 +89,9 @@ func (h *contractV1BillingHandler) toTransferInviteDTO(c *gin.Context, invite *t
 	}
 	if !invite.CreatedAt.IsZero() {
 		dto.CreatedAt = invite.CreatedAt.UTC().Format(time.RFC3339)
+	}
+	if !invite.ExpiresAt.IsZero() {
+		dto.ExpiresAt = invite.ExpiresAt.UTC().Format(time.RFC3339)
 	}
 	if invite.DecidedAt != nil && !invite.DecidedAt.IsZero() {
 		dto.DecidedAt = invite.DecidedAt.UTC().Format(time.RFC3339)

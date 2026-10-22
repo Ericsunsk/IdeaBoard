@@ -16,11 +16,10 @@ const (
 	RoleMember = "member"
 )
 
-// Billing Account financial roles (#915). Financial management (recharge,
-// bills, member quotas, workspace budgets) is separate from Workspace
-// content membership. Owner and Admin both manage recharge/bills/quotas;
-// only Owner transfers ownership. Financial management never grants Board
-// content access.
+// Billing Account financial roles (ADR-0038). Financial management (recharge,
+// bills, member quotas) is separate from Workspace content membership. Owner
+// and Admin both manage recharge/bills/quotas; only Owner transfers
+// ownership. Financial management never grants Board content access.
 const (
 	BillingRoleOwner = "owner"
 	BillingRoleAdmin = "admin"
@@ -55,7 +54,11 @@ var (
 	// ErrDefaultWorkspaceProtected reports a delete/rename
 	// attempt on a Default workspace. Handlers render it as 403
 	// (workspace_default_protected): the Default workspace is never
-	// deleted or renamed.
+	// deleted or renamed. Personal Default invites (#952) reuse the same
+	// sentinel: the Default workspace is private and never gains
+	// collaborators, so AddWorkspaceMember on a Default workspace fails
+	// with this error (403 workspace_default_protected) instead of a new
+	// wire code.
 	ErrDefaultWorkspaceProtected = errors.New("tenancy: default workspace cannot be deleted or renamed")
 	// ErrWorkspaceActiveTasks blocks deletion until pending/running Tasks settle.
 	ErrWorkspaceActiveTasks = errors.New("tenancy: workspace has active tasks")
@@ -92,17 +95,34 @@ var (
 	// ErrBillingLastOwner blocks removing or demoting the last billing
 	// owner (403 with billing_account_forbidden).
 	ErrBillingLastOwner = errors.New("tenancy: last billing owner cannot be removed or demoted")
-	// ErrDefaultQuotaNotConfigured reports an invite blocked by a missing
-	// account default new-member quota policy (#947, fail closed). The
-	// membership write rolls back; handlers render
-	// default_member_quota_not_configured (409) and guide the caller to
-	// have a Billing Owner/Admin set the default first. Absent default
-	// is never an implicit unlimited.
-	ErrDefaultQuotaNotConfigured = errors.New("tenancy: default member quota not configured")
 	// ErrNotUserPublicID reports an identifier without the usr_ prefix.
 	ErrNotUserPublicID = errors.New("tenancy: not a user public id")
 	// ErrMalformedUserPublicID reports a usr_ identifier with bad hex.
 	ErrMalformedUserPublicID = errors.New("tenancy: malformed user public id")
+	// ErrOrganizationLimitReached reports a create/join blocked by the
+	// at-most-one-Organization cardinality (ADR-0038 #951, fail closed).
+	// Handlers render it as 409 organization_limit_reached.
+	ErrOrganizationLimitReached = errors.New("tenancy: user already in an organization")
+	// ErrOrganizationOwnerImmutable reports a direct Owner role mutation
+	// outside the explicit handover path (#948 is the only Owner change
+	// path; direct promote/demote/remove of an Owner fails closed).
+	// Handlers render it as 403 membership_transition_forbidden.
+	ErrOrganizationOwnerImmutable = errors.New("tenancy: organization owner change requires explicit handover")
+	// ErrOrganizationClosed reports a mutation attempted on a closed
+	// Organization (#955). Only Owner restore reopens it; every other
+	// member/workspace/billing mutation fails closed while closed.
+	// Handlers render it as 409 organization_closed.
+	ErrOrganizationClosed = errors.New("tenancy: organization is closed")
+	// ErrOrganizationClosureBlocked reports a closure refused by unsettled
+	// in-flight obligations (#955): pending/running Tasks, unsettled
+	// payment orders, pending refunds, open disputes, or a pending
+	// handover invite on the shared pool. Handlers render it as 409
+	// organization_closure_blocked.
+	ErrOrganizationClosureBlocked = errors.New("tenancy: organization has unsettled obligations")
+	// ErrOrganizationNotClosed reports a restore attempted on a live
+	// Organization (#955). Handlers render it as 409
+	// organization_not_closed.
+	ErrOrganizationNotClosed = errors.New("tenancy: organization is not closed")
 )
 
 // IsValidRole reports whether role is a known membership role.
@@ -145,14 +165,79 @@ func (w *Workspace) IsDefaultWorkspace() bool {
 	return w != nil && w.IsPersonal() && w.IsDefault
 }
 
-// Organization mirrors the agreed organizations row.
+// Organization mirrors the agreed organizations row. Closure (#955) is a
+// state flag, not a delete: ClosedAt/ClosedBy suspend all member access
+// and new spending while membership, Workspace, permission, and billing
+// history rows are retained. Only the Owner restores.
 type Organization struct {
 	InternalID int64
 	PublicID   string
 	Name       string
 	ArchivedAt *time.Time
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	// ClosedAt marks an Owner-initiated closure; nil means active.
+	ClosedAt *time.Time
+	// ClosedBy is the Owner user id that initiated the closure.
+	ClosedBy  *int64
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// IsClosed reports whether the Organization is currently closed.
+func (o *Organization) IsClosed() bool {
+	return o != nil && o.ClosedAt != nil
+}
+
+// Status reports the lifecycle status wire value: closed or active.
+func (o *Organization) Status() string {
+	if o.IsClosed() {
+		return OrganizationStatusClosed
+	}
+	return OrganizationStatusActive
+}
+
+// Organization lifecycle statuses (#955). Wire-stable.
+const (
+	OrganizationStatusActive = "active"
+	OrganizationStatusClosed = "closed"
+)
+
+// OrganizationClosureDisposition is the fail-closed balance outcome recorded
+// at closure (#955). Recharge terms themselves are out of scope: unknown
+// terms never trigger an original-channel refund nor a Personal transfer,
+// so the only disposition this ticket produces is retained (funds stay in
+// the closed Organization account with their immutable history).
+const (
+	OrganizationClosureRetained = "retained"
+)
+
+// OrganizationClosureMemberSnapshot pins one membership row at closure.
+type OrganizationClosureMemberSnapshot struct {
+	UserID int64  `json:"user_id"`
+	Role   string `json:"role"`
+}
+
+// OrganizationClosure is one closure event for an Organization (#955): the
+// audit fact (who/when/reason), the retained membership/Workspace snapshots
+// restore reinstates, and the fail-closed balance disposition. Rows are
+// append-only except the restore stamp; money facts (Wallet, Ledger,
+// snapshots, orders) are never named here and survive by construction.
+type OrganizationClosure struct {
+	InternalID             int64
+	OrganizationInternalID int64
+	OrganizationPublicID   string
+	BillingAccountID       int64
+	ClosedAt               time.Time
+	ClosedBy               *int64
+	Reason                 string
+	MembershipSnapshot     []OrganizationClosureMemberSnapshot
+	WorkspacePublicIDs     []string
+	AvailableBalance       int64
+	ReservedBalance        int64
+	CreditedOrderNumbers   []string
+	Disposition            string
+	DispositionDetail      string
+	RestoredAt             *time.Time
+	RestoredBy             *int64
 }
 
 // WorkspaceMember is one workspace_memberships row projected for the API.
@@ -169,21 +254,16 @@ type WorkspaceMember struct {
 // it, and an owner holding a Default rejects a second one with
 // ErrDefaultWorkspaceConflict. Plain POST creation always passes false
 // (non-Default personal workspaces are unlimited).
-// Billing linkage (#944, creation-time explicit account):
-//   - Organization workspaces always use the organization pool; passing
-//     either billing field with an OrganizationID fails closed with
-//     ErrBillingConflict (never silently pick the creator personal pool).
-//   - Personal workspaces default to legacy auto mode (no link, per-workspace
-//     account resolved lazily) when both fields are empty, preserving the
-//     #915 resolution contract for direct Store callers. The Public API
-//     passes an explicit BillingAccountPublicID (shared, caller must be
-//     Billing Owner/Admin) or NewBillingAccount=true (fresh isolated
-//     per-workspace account, creator becomes billing owner) so creation
-//     never auto-creates a wallet implicitly and never leaves a half-linked
-//     workspace on authorization failure (single transaction, fail closed).
-//   - BillingAccountPublicID and NewBillingAccount are mutually exclusive
-//     (both set reports ErrBillingConflict). IsDefault workspaces reject
-//     both (the Default row owns the deterministic personal account).
+// Billing scope (ADR-0038) is the creation scope and nothing else:
+//   - Organization workspaces always use the organization pool.
+//   - Personal workspaces always use the owner's deterministic Personal
+//     account (the Default-workspace-anchored survivor); no per-workspace
+//     account is minted and no link row is written.
+//
+// The scope is fixed at creation: there is no payer switch, no
+// billing_account_id / new_billing_account option, and no link indirection.
+// IsDefault workspaces own the deterministic personal account row.
+// Creating an Organization never moves existing Personal workspaces.
 //
 // Repository methods take context.Context first.
 type CreateWorkspaceParams struct {
@@ -191,12 +271,6 @@ type CreateWorkspaceParams struct {
 	OrganizationID *string
 	OwnerUserID    int64
 	IsDefault      bool
-	// BillingAccountPublicID names an existing ba_ account to share
-	// (explicit workspace_billing_links row, same transaction).
-	BillingAccountPublicID *string
-	// NewBillingAccount mints a fresh isolated per-workspace account
-	// anchored to the new workspace (creator becomes billing owner).
-	NewBillingAccount bool
 }
 
 // Store is the AGREED tenancy persistence interface the DB sibling
@@ -253,9 +327,146 @@ type OrganizationStore interface {
 	GetOrganization(ctx context.Context, publicID string) (*Organization, error)
 	ListOrganizationsForUser(ctx context.Context, userID int64) ([]*Organization, error)
 	UpdateOrganization(ctx context.Context, publicID, name string) (*Organization, error)
+	// CloseOrganization suspends a live Organization (#955): only the Owner
+	// initiates; closure is refused with ErrOrganizationClosureBlocked
+	// while in-flight Tasks, payment orders, refunds, disputes, or a
+	// pending handover invite settle on the shared pool. Success retains
+	// memberships, Workspaces, permissions, and billing history while
+	// suspending access and new spending; remaining balance stays in the
+	// closed account (fail-closed disposition, never Personal).
+	CloseOrganization(ctx context.Context, organizationPublicID string, actorUserID int64, reason string) (*Organization, error)
+	// RestoreOrganization reopens a closed Organization (#955): only the
+	// Owner restores; retained memberships and permissions resume.
+	// Restoring a live Organization fails with ErrOrganizationNotClosed.
+	RestoreOrganization(ctx context.Context, organizationPublicID string, actorUserID int64) (*Organization, error)
 	GetOrganizationRole(ctx context.Context, organizationPublicID string, userID int64) (string, bool, error)
 	ListOrganizationWorkspaces(ctx context.Context, organizationPublicID string) ([]*Workspace, error)
 	CreateOrganizationWorkspace(ctx context.Context, organizationPublicID string, ownerUserID int64, name string) (*Workspace, error)
+	ListOrganizationMembers(ctx context.Context, organizationPublicID string) ([]*OrganizationMember, error)
+	AddOrganizationMember(ctx context.Context, organizationPublicID string, targetUserID int64, role string) (*OrganizationMember, error)
+	UpdateOrganizationMemberRole(ctx context.Context, organizationPublicID string, actorUserID, targetUserID int64, newRole string) (*OrganizationMember, error)
+	RemoveOrganizationMember(ctx context.Context, organizationPublicID string, actorUserID, targetUserID int64) error
+}
+
+// OrganizationMember is one organization_memberships row projected for the API.
+type OrganizationMember struct {
+	OrganizationPublicID string
+	UserID               int64
+	UserExternalID       string
+	Role                 string
+	CreatedAt            time.Time
+}
+
+// CheckOrganizationMemberAdd enforces invite rules: actor must be
+// owner|admin; only owners may grant admin; owner grants never flow
+// through this path (handover only).
+func CheckOrganizationMemberAdd(actorRole, newRole string) error {
+	switch strings.TrimSpace(actorRole) {
+	case RoleOwner:
+		if strings.TrimSpace(newRole) == RoleOwner {
+			return ErrOrganizationOwnerImmutable
+		}
+		if !IsValidRole(newRole) || strings.TrimSpace(newRole) == RoleOwner {
+			return ErrForbidden
+		}
+		return nil
+	case RoleAdmin:
+		switch strings.TrimSpace(newRole) {
+		case RoleMember:
+			return nil
+		case RoleAdmin, RoleOwner:
+			return ErrForbidden
+		default:
+			return ErrForbidden
+		}
+	default:
+		return ErrForbidden
+	}
+}
+
+// CheckOrganizationMemberMutation enforces org role-transition rules:
+//
+//   - actor must be owner|admin, except a member may remove themselves
+//     (leave; owner leave is still blocked without handover).
+//   - only Owner may change Admin roles (promote to admin or demote an
+//     admin); Admin touching an Admin fails closed.
+//   - Owner rows are immutable here: any transition to or from owner
+//     fails closed with ErrOrganizationOwnerImmutable (handover only).
+//   - the last owner cannot be removed or demoted (defense in depth;
+//     normally unreachable since Owner rows are immutable).
+func CheckOrganizationMemberMutation(actorRole string, actorUserID, targetUserID int64, targetCurrentRole, newRole string, ownerCount int, isRemove bool) error {
+	actorRole = strings.TrimSpace(actorRole)
+	targetCurrentRole = strings.TrimSpace(targetCurrentRole)
+	newRole = strings.TrimSpace(newRole)
+	isSelf := actorUserID == targetUserID
+
+	if targetCurrentRole == RoleOwner || (!isRemove && newRole == RoleOwner) {
+		return ErrOrganizationOwnerImmutable
+	}
+	if isRemove {
+		if isSelf {
+			return nil
+		}
+		switch actorRole {
+		case RoleOwner:
+			return nil
+		case RoleAdmin:
+			if targetCurrentRole == RoleAdmin {
+				return ErrForbidden
+			}
+			return nil
+		default:
+			return ErrForbidden
+		}
+	}
+
+	if !IsValidRole(newRole) || newRole == RoleOwner {
+		return ErrForbidden
+	}
+	if newRole == targetCurrentRole {
+		return nil
+	}
+	// Only Owner changes Admin roles.
+	touchesAdmin := targetCurrentRole == RoleAdmin || newRole == RoleAdmin
+	if touchesAdmin && actorRole != RoleOwner {
+		return ErrForbidden
+	}
+	switch actorRole {
+	case RoleOwner, RoleAdmin:
+		return nil
+	default:
+		return ErrForbidden
+	}
+}
+
+// EffectiveWorkspaceRole derives the caller's workspace role for
+// organization scopes (ADR-0038 #951): org Owner/Admin automatically hold
+// their org role on every org workspace without an explicit row; org
+// Members hold only their explicit workspace row; non-org-members hold
+// nothing (even with a stale direct row, fail closed to join-first).
+// Personal scopes use the direct row only.
+func EffectiveWorkspaceRole(workspace *Workspace, orgRole string, orgMember bool, directRole string, directMember bool) (string, bool) {
+	if workspace == nil {
+		return "", false
+	}
+	if workspace.IsPersonal() {
+		if !directMember {
+			return "", false
+		}
+		return directRole, true
+	}
+	if !orgMember {
+		return "", false
+	}
+	switch strings.TrimSpace(orgRole) {
+	case RoleOwner, RoleAdmin:
+		return strings.TrimSpace(orgRole), true
+	default:
+		if !directMember {
+			return "", false
+		}
+		return directRole, true
+	}
 }
 
 // ValidateName validates workspace/organization display names (1..120
@@ -364,7 +575,7 @@ func IsValidBillingRole(role string) bool {
 }
 
 // IsBillingManager reports whether a billing role may manage recharge,
-// bills, member quotas, and workspace budgets (Owner/Admin both).
+// bills, and member quotas (Owner/Admin both).
 func IsBillingManager(role string) bool {
 	return IsValidBillingRole(strings.TrimSpace(role))
 }
@@ -467,7 +678,9 @@ const (
 // BillingTransferInvite is one billing_account_transfer_invites row
 // projected for the API. BillingAccountPublicID is the stable ba_ funds
 // identity snapshot; ScopeWorkspacePublicIDs is the non-Default business
-// Workspace scope granted at acceptance (empty until accepted).
+// Workspace scope granted at acceptance (empty until accepted). ExpiresAt is
+// the 7-day lapse: a pending invite at or past ExpiresAt never moves funds
+// or membership, decisions on it fail closed, and the owner may re-issue.
 type BillingTransferInvite struct {
 	InternalID              int64
 	PublicID                string
@@ -478,8 +691,19 @@ type BillingTransferInvite struct {
 	Status                  string
 	ScopeWorkspacePublicIDs []string
 	CreatedAt               time.Time
+	ExpiresAt               time.Time
 	DecidedAt               *time.Time
 	DecidedBy               *int64
+}
+
+// Expired reports whether a pending invite has lapsed at now. Only pending
+// invites lapse; terminal invites carry their decided outcome regardless of
+// ExpiresAt. A zero ExpiresAt (predates the expiry column) never lapses.
+func (invite *BillingTransferInvite) Expired(now time.Time) bool {
+	if invite == nil || invite.Status != BillingTransferPending || invite.ExpiresAt.IsZero() {
+		return false
+	}
+	return !now.Before(invite.ExpiresAt)
 }
 
 // IsValidBillingTransferStatus reports whether status is a known invite state.

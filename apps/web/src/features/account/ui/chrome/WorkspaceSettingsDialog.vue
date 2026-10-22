@@ -105,172 +105,163 @@
             </div>
 
             <!-- Active Workspace Detail -->
-            <div v-else-if="activeWorkspace" class="flex flex-col gap-6">
-              <!-- Header Section -->
-              <header class="flex flex-col gap-2">
-                <div v-if="editingId === activeWorkspace.publicId" class="flex flex-col gap-2">
-                  <div class="flex items-center gap-2">
-                    <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The rename input carries its accessible name via aria-label -->
-                    <Input
-                      ref="renameInputRef"
-                      v-model="draftName"
-                      size="sm"
-                      class="h-9 max-w-xs text-sm bg-background"
-                      :invalid="renameError !== null"
-                      :disabled="isRenaming"
-                      :aria-label="
-                        t('workspace.switcher.renameAriaLabel', {
-                          name: workspaceItemName(activeWorkspace),
-                        })
-                      "
-                      :maxlength="nameFieldMaxLength"
-                      @keydown.enter="commitRename(activeWorkspace)"
-                      @keydown.esc.stop.prevent="cancelRename"
-                      @keydown.escape.stop.prevent="cancelRename"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      class="h-9 shrink-0"
-                      :is-loading="isRenaming"
-                      :is-disabled="isRenaming"
-                      @click="commitRename(activeWorkspace)"
-                    >
-                      {{ t('common.actions.save') }}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      class="h-9 shrink-0"
-                      :is-disabled="isRenaming"
-                      @click="cancelRename"
-                    >
-                      {{ t('common.actions.cancel') }}
-                    </Button>
-                  </div>
-                  <p
-                    v-if="renameError"
-                    class="m-0 text-xs leading-normal text-destructive"
-                    role="alert"
-                  >
-                    {{ renameError }}
-                  </p>
-                </div>
-                <div v-else class="flex items-center justify-between">
-                  <div class="min-w-0 flex-1">
+            <div v-else-if="activeWorkspace || organizationPanelProps" class="flex flex-col gap-6">
+              <!-- Organization management (issue #951): scope-level surface,
+                shown as soon as the caller holds an organization. -->
+              <component
+                :is="props.organizationPanel!.component"
+                v-if="organizationPanelProps"
+                :key="`org-${managedOrganization!.id}`"
+                v-bind="organizationPanelProps"
+              />
+              <template v-if="activeWorkspace">
+                <!-- Header Section -->
+                <header class="flex flex-col gap-2">
+                  <div v-if="editingId === activeWorkspace.publicId" class="flex flex-col gap-2">
                     <div class="flex items-center gap-2">
-                      <h2
-                        class="m-0 text-admin-modal-title leading-tight font-bold text-foreground truncate"
-                      >
-                        {{ workspaceItemName(activeWorkspace) }}
-                      </h2>
-                      <Button
-                        v-if="!isDefaultWorkspaceItem(activeWorkspace)"
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        class="size-7 text-muted-foreground hover:text-foreground"
-                        :title="
-                          t('workspace.switcher.renameAriaLabel', {
-                            name: workspaceItemName(activeWorkspace),
-                          })
-                        "
+                      <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The rename input carries its accessible name via aria-label -->
+                      <Input
+                        ref="renameInputRef"
+                        v-model="draftName"
+                        size="sm"
+                        class="h-9 max-w-xs text-sm bg-background"
+                        :invalid="renameError !== null"
+                        :disabled="isRenaming"
                         :aria-label="
                           t('workspace.switcher.renameAriaLabel', {
                             name: workspaceItemName(activeWorkspace),
                           })
                         "
-                        @click="startRename(activeWorkspace)"
+                        :maxlength="nameFieldMaxLength"
+                        @keydown.enter="commitRename(activeWorkspace)"
+                        @keydown.esc.stop.prevent="cancelRename"
+                        @keydown.escape.stop.prevent="cancelRename"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        class="h-9 shrink-0"
+                        :is-loading="isRenaming"
+                        :is-disabled="isRenaming"
+                        @click="commitRename(activeWorkspace)"
                       >
-                        <EditPencil class="size-3.5" aria-hidden="true" />
+                        {{ t('common.actions.save') }}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        class="h-9 shrink-0"
+                        :is-disabled="isRenaming"
+                        @click="cancelRename"
+                      >
+                        {{ t('common.actions.cancel') }}
                       </Button>
                     </div>
-                    <p class="m-0 mt-1 text-xs text-muted-foreground font-mono">
-                      ID: {{ activeWorkspace.publicId }}
+                    <p
+                      v-if="renameError"
+                      class="m-0 text-xs leading-normal text-destructive"
+                      role="alert"
+                    >
+                      {{ renameError }}
                     </p>
                   </div>
-                </div>
-              </header>
-
-              <!-- Members Section inside accountCardPanelClass -->
-              <WorkspaceMemberSection
-                :key="activeWorkspace.publicId"
-                :workspace-id="activeWorkspace.publicId"
-                :workspace-name="workspaceItemName(activeWorkspace)"
-                :current-user-id="props.currentUserId"
-                :is-expanded="true"
-              />
-
-              <BillingTransferSection
-                :key="`transfer-${activeWorkspace.publicId}`"
-                :workspace-id="activeWorkspace.publicId"
-                :current-user-id="props.currentUserId"
-              />
-
-              <!-- Shared consumption budget: usage visible to every member,
-                management gated to billing managers (backend enforces 403). -->
-              <WorkspaceBudgetSection
-                :key="`budget-${activeWorkspace.publicId}`"
-                :workspace-id="activeWorkspace.publicId"
-                :consumption-scope="billingAccount.consumptionScope.value ?? null"
-                :is-expanded="true"
-              />
-
-              <!-- Member cross-workspace quotas: self usage visible to
-                every member, management gated to billing managers
-                (backend enforces 403). -->
-              <MemberQuotaSection
-                :key="`quota-${activeWorkspace.publicId}`"
-                :workspace-id="activeWorkspace.publicId"
-                :consumption-scope="billingAccount.consumptionScope.value ?? null"
-                :is-expanded="true"
-              />
-
-              <!-- Account default new-member quota (#947): fail closed until
-                a Billing Owner/Admin sets it; invites reuse it atomically. -->
-              <DefaultMemberQuotaSection
-                :key="`default-quota-${activeWorkspace.publicId}`"
-                :workspace-id="activeWorkspace.publicId"
-                :consumption-scope="billingAccount.consumptionScope.value ?? null"
-                :is-expanded="true"
-              />
-
-              <!-- Delete row: hidden for the Default workspace (never deleted). -->
-              <section
-                v-if="!isDefaultWorkspaceItem(activeWorkspace)"
-                class="flex flex-col gap-2 rounded-control border border-border p-3"
-                :aria-label="t('workspace.switcher.archiveSectionLabel')"
-              >
-                <div class="flex items-center justify-between gap-2">
-                  <div class="min-w-0">
-                    <p class="m-0 text-sm font-medium text-foreground">
-                      {{ t('workspace.switcher.archiveTitle') }}
-                    </p>
-                    <p class="m-0 mt-0.5 text-xs text-muted-foreground">
-                      {{ t('workspace.switcher.archiveHint') }}
-                    </p>
+                  <div v-else class="flex items-center justify-between">
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2">
+                        <h2
+                          class="m-0 text-admin-modal-title leading-tight font-bold text-foreground truncate"
+                        >
+                          {{ workspaceItemName(activeWorkspace) }}
+                        </h2>
+                        <Button
+                          v-if="!isDefaultWorkspaceItem(activeWorkspace)"
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          class="size-7 text-muted-foreground hover:text-foreground"
+                          :title="
+                            t('workspace.switcher.renameAriaLabel', {
+                              name: workspaceItemName(activeWorkspace),
+                            })
+                          "
+                          :aria-label="
+                            t('workspace.switcher.renameAriaLabel', {
+                              name: workspaceItemName(activeWorkspace),
+                            })
+                          "
+                          @click="startRename(activeWorkspace)"
+                        >
+                          <EditPencil class="size-3.5" aria-hidden="true" />
+                        </Button>
+                      </div>
+                      <p class="m-0 mt-1 text-xs text-muted-foreground font-mono">
+                        ID: {{ activeWorkspace.publicId }}
+                      </p>
+                    </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    class="h-9 shrink-0"
-                    :is-disabled="isDeleting"
-                    :aria-label="t('workspace.switcher.archiveAction')"
-                    @click="requestDelete(activeWorkspace)"
-                  >
-                    {{ t('workspace.switcher.archiveAction') }}
-                  </Button>
-                </div>
-                <p
-                  v-if="deleteError"
-                  class="m-0 text-xs leading-normal text-destructive"
-                  role="alert"
+                </header>
+
+                <!-- Members Section inside accountCardPanelClass -->
+                <WorkspaceMemberSection
+                  :key="activeWorkspace.publicId"
+                  :workspace-id="activeWorkspace.publicId"
+                  :workspace-name="workspaceItemName(activeWorkspace)"
+                  :current-user-id="props.currentUserId"
+                  :is-expanded="true"
+                  :is-default-workspace="isDefaultWorkspaceItem(activeWorkspace)"
+                />
+
+                <BillingTransferSection
+                  :key="`transfer-${activeWorkspace.publicId}`"
+                  :workspace-id="activeWorkspace.publicId"
+                  :current-user-id="props.currentUserId"
+                />
+
+                <!-- Quota management uses the account's server-resolved capability. -->
+                <WorkspaceLimitsSection
+                  :key="`limits-${activeWorkspace.publicId}`"
+                  :workspace-id="activeWorkspace.publicId"
+                  :can-manage="billingAccount.canManageMemberQuotas.value"
+                  :is-expanded="true"
+                />
+
+                <!-- Delete row: hidden for the Default workspace (never deleted). -->
+                <section
+                  v-if="!isDefaultWorkspaceItem(activeWorkspace)"
+                  class="flex flex-col gap-2 rounded-control border border-border p-3"
+                  :aria-label="t('workspace.switcher.archiveSectionLabel')"
                 >
-                  {{ deleteError }}
-                </p>
-              </section>
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                      <p class="m-0 text-sm font-medium text-foreground">
+                        {{ t('workspace.switcher.archiveTitle') }}
+                      </p>
+                      <p class="m-0 mt-0.5 text-xs text-muted-foreground">
+                        {{ t('workspace.switcher.archiveHint') }}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      class="h-9 shrink-0"
+                      :is-disabled="isDeleting"
+                      :aria-label="t('workspace.switcher.archiveAction')"
+                      @click="requestDelete(activeWorkspace)"
+                    >
+                      {{ t('workspace.switcher.archiveAction') }}
+                    </Button>
+                  </div>
+                  <p
+                    v-if="deleteError"
+                    class="m-0 text-xs leading-normal text-destructive"
+                    role="alert"
+                  >
+                    {{ deleteError }}
+                  </p>
+                </section>
+              </template>
             </div>
 
             <!-- If no workspace is selected -->
@@ -340,15 +331,14 @@ import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import type {
   UserAccountMenuWorkspaceCreateInput,
   UserAccountMenuOrganizationItem,
+  UserAccountMenuOrganizationPanel,
   UserAccountMenuWorkspaceItem,
 } from './userAccountMenu.types'
 import WorkspaceCreateDialog from './WorkspaceCreateDialog.vue'
 import { useBillingAccountContext } from '../../session/billing-account/useBillingAccountContext'
 import { isDefaultWorkspaceItem } from './workspaceMenu'
 import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
-import DefaultMemberQuotaSection from './DefaultMemberQuotaSection.vue'
-import MemberQuotaSection from './MemberQuotaSection.vue'
-import WorkspaceBudgetSection from './WorkspaceBudgetSection.vue'
+import WorkspaceLimitsSection from './WorkspaceLimitsSection.vue'
 import BillingTransferSection from './BillingTransferSection.vue'
 import WorkspaceMemberSection from './WorkspaceMemberSection.vue'
 import {
@@ -372,6 +362,9 @@ const props = withDefaults(
     onCreateOrganization?:
       | ((name: string, idempotencyKey: string) => Promise<UserAccountMenuOrganizationItem>)
       | undefined
+    // Organization management panel (issue #951, opaque component owned by
+    // the workspace shell). Rendered once the caller holds an organization.
+    organizationPanel?: UserAccountMenuOrganizationPanel | null | undefined
     onRetry: () => void
     onCreate: (input: UserAccountMenuWorkspaceCreateInput) => Promise<UserAccountMenuWorkspaceItem>
     onRename: (workspaceId: string, name: string) => Promise<UserAccountMenuWorkspaceItem>
@@ -385,6 +378,7 @@ const props = withDefaults(
     currentUserId: null,
     onLoadOrganizations: undefined,
     onCreateOrganization: undefined,
+    organizationPanel: null,
   },
 )
 
@@ -427,6 +421,127 @@ const billingAccount = useBillingAccountContext({
   identity: () => props.currentUserId,
   isEnabled: () => props.isOpen && activeWorkspaceId.value !== '',
 })
+
+// Organization management surface (issue #951): scope-level, resolved from
+// the caller's single organization. The panel component and its transport
+// callbacks arrive opaquely through props (workspace-shell owned); this
+// dialog only resolves which organization to show and the caller's role in
+// it. Creating an organization in the create flow exposes this surface on
+// the next load below.
+const managedOrganization = ref<{
+  id: string
+  name: string
+  status: 'active' | 'closed'
+  closedAt?: string | undefined
+} | null>(null)
+const managedOrganizationRole = ref<'owner' | 'admin' | 'member' | null>(null)
+
+async function loadManagedOrganization(): Promise<void> {
+  managedOrganization.value = null
+  managedOrganizationRole.value = null
+  const panel = props.organizationPanel
+  if (!props.isOpen || !panel || !props.onLoadOrganizations) return
+  let first: UserAccountMenuOrganizationItem | undefined
+  try {
+    first = (await props.onLoadOrganizations())[0]
+  } catch {
+    return
+  }
+  if (!first) return
+  managedOrganization.value = {
+    id: first.publicId,
+    name: first.name,
+    status: first.status === 'closed' ? 'closed' : 'active',
+    ...(first.closedAt === undefined ? {} : { closedAt: first.closedAt }),
+  }
+  if (!props.currentUserId) return
+  try {
+    const members = await panel.onLoadMembers(first.publicId)
+    managedOrganizationRole.value =
+      members.find((member) => member.userId === props.currentUserId)?.role ?? null
+  } catch {
+    managedOrganizationRole.value = null
+  }
+}
+
+const organizationPanelProps = computed(() => {
+  const panel = props.organizationPanel
+  const org = managedOrganization.value
+  if (!panel || !org) return null
+  const role = managedOrganizationRole.value
+  const leave =
+    panel.onLeaveMember == null
+      ? undefined
+      : async (organizationId: string, memberId: string): Promise<void> => {
+          await panel.onLeaveMember?.(organizationId, memberId)
+          managedOrganization.value = null
+          managedOrganizationRole.value = null
+        }
+  return {
+    organizationId: org.id,
+    organizationName: org.name,
+    organizationStatus: org.status,
+    ...(org.closedAt === undefined ? {} : { closedAt: org.closedAt }),
+    actorRole: role,
+    currentUserId: props.currentUserId,
+    canManage: role === 'owner' || role === 'admin',
+    canLeave: role !== null,
+    onLoadMembers: panel.onLoadMembers,
+    onInviteMember: panel.onInviteMember,
+    onUpdateMember: panel.onUpdateMember,
+    onRemoveMember: panel.onRemoveMember,
+    ...(leave === undefined ? {} : { onLeave: leave }),
+    // Closure flips local status without reopening the dialog; the next
+    // load below re-reads the server truth.
+    ...(panel.onCloseOrganization === undefined
+      ? {}
+      : {
+          onCloseOrganization: async (
+            organizationId: string,
+            input: { reason?: string | undefined },
+          ) => {
+            const closed = await panel.onCloseOrganization?.(organizationId, input)
+            if (closed && managedOrganization.value?.id === organizationId) {
+              managedOrganization.value = {
+                ...managedOrganization.value,
+                status: 'closed',
+                ...(closed.closedAt === undefined ? {} : { closedAt: closed.closedAt }),
+              }
+            }
+            return closed
+          },
+        }),
+    ...(panel.onRestoreOrganization === undefined
+      ? {}
+      : {
+          onRestoreOrganization: async (organizationId: string) => {
+            const restored = await panel.onRestoreOrganization?.(organizationId)
+            if (restored && managedOrganization.value?.id === organizationId) {
+              managedOrganization.value = {
+                id: managedOrganization.value.id,
+                name: restored.name || managedOrganization.value.name,
+                status: 'active',
+              }
+            }
+            return restored
+          },
+        }),
+  }
+})
+
+watch(
+  () => props.isOpen,
+  (isNowOpen) => {
+    if (isNowOpen) void loadManagedOrganization()
+  },
+  { immediate: true },
+)
+watch(
+  () => props.organizationPanel,
+  () => {
+    if (props.isOpen) void loadManagedOrganization()
+  },
+)
 
 function workspaceItemName(item: UserAccountMenuWorkspaceItem): string {
   return isDefaultWorkspaceItem(item) ? t('workspace.switcher.defaultBadge') : item.name
@@ -532,6 +647,12 @@ watch(workspaceItems, (items) => {
     pendingCreateFocusId.value = null
     focusNewWorkspaceRow(pending)
   }
+})
+
+// An organization created in the create flow exposes its management surface
+// without reopening the dialog.
+watch(isCreateDialogOpen, (isNowOpen) => {
+  if (!isNowOpen && props.isOpen) void loadManagedOrganization()
 })
 
 function startRename(item: UserAccountMenuWorkspaceItem) {

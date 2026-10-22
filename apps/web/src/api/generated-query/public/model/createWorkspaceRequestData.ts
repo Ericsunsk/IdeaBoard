@@ -18,12 +18,6 @@ export type CreateWorkspaceRequestData = {
    * @maxLength 120
    */
   name: string
+  /** Omitted for a Personal workspace (the caller's Personal account); an organization_id creates an Organization workspace on the shared org pool. Fixed at creation. */
   organization_id?: OrganizationId | unknown
-  /**
-   * Explicit shared account to link (caller must be Billing Owner/Admin). Omitted defaults to the caller's personal account with no new wallet. Mutually exclusive with new_billing_account; rejected with organization scopes.
-   * @pattern ^ba_[A-Za-z0-9_-]+$
-   */
-  billing_account_id?: string
-  /** When true, mints a fresh isolated per-workspace account (creator becomes billing owner). Mutually exclusive with billing_account_id; rejected with organization scopes. */
-  new_billing_account?: boolean
 }

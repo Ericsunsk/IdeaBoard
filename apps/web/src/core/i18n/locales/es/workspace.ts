@@ -48,18 +48,13 @@ export default {
     createDialogNameLabel: 'Nombre del espacio de trabajo',
     createDialogConfirm: 'Crear espacio de trabajo',
     defaultNewName: 'Nuevo espacio',
-    billingChoiceLabel: 'Cuenta de pago',
-    billingOrganizationHint: 'Workspaces in organization {organization} use its shared account.',
-    billingSharedTitle: 'Compartir la cuenta actual',
-    billingSharedHint:
-      'El nuevo espacio comparte la cuenta {account}: un saldo común, sin billetera nueva.',
-    billingSharedHintFallback:
-      'El nuevo espacio comparte tu cuenta actual: un saldo común, sin billetera nueva.',
-    billingNewTitle: 'Crear una cuenta independiente',
-    billingNewHint:
-      'El nuevo espacio obtiene su propia cuenta de fondos para un negocio independiente.',
-    billingIsolationNote:
-      'Los saldos nunca se fusionan ni se mueven entre cuentas de la misma persona.',
+    scopeLabel: 'Ámbito del espacio',
+    scopePersonalTitle: 'Personal',
+    scopePersonalHint:
+      'El nuevo espacio usa tu cuenta personal. Todos los espacios personales comparten un saldo; el ámbito nunca cambia.',
+    scopeOrganizationTitle: 'Organización',
+    scopeOrganizationHint:
+      'El nuevo espacio en {organization} usa su cuenta compartida. El ámbito nunca cambia.',
     nameExists: 'Ya existe un espacio de trabajo con este nombre.',
     loadFailed: 'No se pudieron cargar los espacios de trabajo.',
     createFailed: 'No se pudo crear el espacio de trabajo. Inténtelo de nuevo.',
@@ -115,8 +110,7 @@ export default {
       invalidRequest: 'Este cambio de miembro no es válido.',
       memberUnknown: 'Este miembro ya no está disponible.',
       actionFailed: 'No se pudo completar la acción. Inténtelo de nuevo.',
-      defaultMissing:
-        'Configure primero la cuota predeterminada para nuevos miembros y luego invite. Solo los administradores de facturación pueden configurarla.',
+      defaultPrivate: 'El espacio predeterminado es privado y no puede invitar colaboradores.',
     },
     organization: {
       scope: 'Ámbito del espacio',
@@ -133,30 +127,21 @@ export default {
     },
     handover: {
       title: 'Transferencia de la cuenta de fondos',
-      account: 'Cuenta de fondos: {account}',
-      scopeNote:
-        'Al aceptar, se transfiere la propiedad financiera y el acceso de Owner a todos los espacios de negocio vinculados, salvo Default. El saldo, el historial y las cuotas permanecen en esta cuenta. El Owner anterior pasa a Admin.',
-      recipient: 'Destinatario',
-      pickRecipient: 'Selecciona un miembro del espacio',
-      recipientHint:
-        'Primero invita al destinatario a este espacio para que pueda revisar y responder desde estos ajustes.',
-      initiate: 'Enviar invitación de transferencia',
+      handOver: 'Traspasar',
+      handOverTo: 'Traspasar la titularidad de los fondos a {name}',
+      initiateConfirm:
+        '¿Traspasar {account} a {to}? Válida 7 días; la titularidad no cambia hasta la aceptación.',
+      acceptConfirm: '¿Aceptar la titularidad de {account}? Pasarás a ser Owner de los fondos.',
+      rejectConfirm: '¿Rechazar el traspaso? La titularidad no cambia y puede reenviarse.',
+      cancelConfirm: '¿Cancelar el traspaso? La titularidad no cambia y puede reenviarse.',
+      recipientNotice: 'Tienes un traspaso pendiente. Respóndelo en la lista de miembros.',
       invites: 'Invitaciones de transferencia',
       inviteParties: '{from} → {to}',
-      grantedScope: 'Acceso de Owner otorgado a {count} espacios de negocio.',
+      expiresNote: 'Válida 7 días; puede reenviarse tras caducar.',
       accept: 'Aceptar transferencia',
       reject: 'Rechazar invitación',
       cancel: 'Cancelar invitación',
       empty: 'No hay invitaciones de transferencia.',
-      managers: 'Administradores financieros',
-      detachNote:
-        'Salir solo elimina la administración financiera. Los fondos, el historial y la membresía permanecen. El último Owner debe transferir la propiedad antes de salir.',
-      leave: 'Salir de la cuenta de fondos',
-      detach: 'Eliminar acceso financiero',
-      detachConfirm:
-        '¿Eliminar el acceso financiero de {member}? Se conservarán los fondos, el historial y la membresía.',
-      decisionConfirm:
-        '¿Aplicar esta decisión a la cuenta de fondos {account}? Aceptar otorga la propiedad financiera y acceso de Owner a los espacios de negocio vinculados, salvo Default. El saldo, el historial y las cuotas no cambian.',
       saved: 'Administración financiera actualizada.',
       loadFailed: 'No se pudo cargar la administración financiera. Reinténtalo.',
       status: {
@@ -164,34 +149,13 @@ export default {
         accepted: 'Aceptada',
         rejected: 'Rechazada',
         cancelled: 'Cancelada',
+        expired: 'Caducada',
       },
       initiateFailed: 'No se pudo enviar la invitación de traspaso. Inténtelo de nuevo.',
       acceptFailed: 'No se pudo aceptar la invitación de traspaso. Inténtelo de nuevo.',
       rejectFailed: 'No se pudo rechazar la invitación de traspaso. Inténtelo de nuevo.',
       cancelFailed: 'No se pudo cancelar la invitación de traspaso. Inténtelo de nuevo.',
-      detachFailed: 'No se pudo eliminar el miembro de facturación. Inténtelo de nuevo.',
     },
-  },
-  budget: {
-    title: 'Presupuesto de consumo',
-    periodMonthly: 'Mensual',
-    periodUnlimited: 'Ilimitado',
-    usedOf: '{used} / {limit} Ideas utilizadas',
-    usedUnlimited: '{used} Ideas utilizadas',
-    remaining: 'Quedan {remaining} Ideas',
-    periodRange: '{start} – {end}',
-    exhausted:
-      'Presupuesto agotado. Las nuevas generaciones de pago y Visual Search están en pausa hasta el próximo período o un límite mayor.',
-    managerOnly:
-      'Solo los administradores de facturación pueden cambiar el presupuesto. Los administradores del espacio no pueden aumentar un presupuesto otorgado por el fondo.',
-    limitLabel: 'Límite mensual (Ideas)',
-    save: 'Guardar',
-    saving: 'Guardando…',
-    saved: 'Presupuesto actualizado.',
-    setUnlimited: 'Cambiar a ilimitado',
-    loadFailed: 'No se pudo cargar el presupuesto.',
-    saveFailed: 'No se pudo guardar el presupuesto. Inténtelo de nuevo.',
-    invalidLimit: 'Ingrese un número entero positivo hasta {max}.',
   },
   quota: {
     title: 'Cuota de miembro',
@@ -207,7 +171,7 @@ export default {
     exhausted:
       'Cuota personal agotada. Las nuevas generaciones de pago y Visual Search están en pausa hasta la próxima ventana o un límite mayor.',
     managerOnly:
-      'Solo los administradores de facturación pueden cambiar las cuotas de miembros. Los administradores del espacio no pueden aumentar una cuota otorgada por el fondo.',
+      'Solo el titular de la cuenta Personal y los propietarios o administradores de la organización pueden cambiar las cuotas de miembros. Los administradores del espacio no pueden aumentar una cuota otorgada por el fondo.',
     memberLabel: 'Miembro',
     periodLabel: 'Período',
     limitLabel: 'Límite (Ideas)',
@@ -220,19 +184,47 @@ export default {
     invalidLimit: 'Ingrese un número entero positivo hasta {max}.',
     pickMember: 'Seleccione primero un miembro.',
     noQuotas: 'Sin cuotas de miembros. Todos son ilimitados.',
-    defaultTitle: 'Cuota predeterminada para nuevos miembros',
-    defaultOf: 'Los nuevos miembros reciben {limit} Ideas',
-    defaultUnlimited: 'Los nuevos miembros son ilimitados',
-    defaultMissing:
-      'Aún no hay cuota predeterminada. Las invitaciones están en pausa hasta que un administrador de facturación la configure.',
-    defaultAffectsNewOnly:
-      'Cambiar el valor predeterminado solo afecta a futuras incorporaciones; los miembros existentes conservan su cuota y su uso.',
-    defaultManagerOnly:
-      'Solo los administradores de facturación pueden establecer el valor predeterminado. Los administradores del espacio lo reutilizan al invitar.',
-    defaultLoadFailed: 'No se pudo cargar la cuota predeterminada.',
-    defaultSaveFailed: 'No se pudo guardar la cuota predeterminada. Inténtelo de nuevo.',
-    defaultSaved: 'Cuota predeterminada actualizada.',
-    presetLabel: 'Preajustes mensuales',
-    presetMonthly: '{limit} / mes',
+    sharedAccountNote:
+      'El consumo de los colaboradores se descuenta del saldo compartido de la cuenta y se suma en todos sus espacios, atribuido al operador real.',
+  },
+  limits: {
+    title: 'Límites de uso',
+    manageShow: 'Gestionar límites',
+    manageHide: 'Ocultar gestión',
+  },
+  scope: {
+    switcherLabel: 'Ámbito personal u organización',
+    personal: 'Personal',
+    organization: 'Organización',
+    createOrganization: 'Nueva organización',
+    personalHint: 'Los espacios personales comparten tu saldo Personal.',
+    organizationHint: 'Los espacios de {name} comparten el saldo de la organización.',
+  },
+  management: {
+    title: 'Gestión de {name}',
+    managementNote:
+      'La organización es la entrada de gestión: sin tableros, contenido ni consumo aquí. Owner/admin acceden a todos los espacios; los miembros necesitan autorización por espacio.',
+    inviteTitle: 'Invitar miembro de la organización',
+    invitePlaceholder: 'usr_…',
+    workspaceGrantNote:
+      'Los miembros necesitan una autorización explícita por espacio antes de editarlo.',
+    leaveAction: 'Salir',
+    leaving: 'Saliendo…',
+    limitReached: 'Cada usuario puede unirse o crear como máximo una organización.',
+    statusClosed: 'Cerrada',
+    closedNote:
+      'Esta organización está cerrada. El acceso y el gasto están suspendidos; el historial se conserva. Solo el owner puede restaurarla.',
+    closeTitle: 'Cerrar organización',
+    closeHint:
+      'El cierre suspende todo acceso y gasto. Miembros, espacios e historial se conservan; el saldo restante queda en la cuenta.',
+    closeReasonPlaceholder: 'Motivo (opcional)',
+    closeAction: 'Cerrar organización',
+    closeConfirmAction: 'Confirmar cierre',
+    closing: 'Cerrando…',
+    restoreAction: 'Restaurar organización',
+    restoring: 'Restaurando…',
+    closeFailed: 'No se pudo cerrar la organización.',
+    closeBlocked: 'Aún hay tareas o fondos sin liquidar. Liquídalos e inténtalo de nuevo.',
+    restoreFailed: 'No se pudo restaurar la organización.',
   },
 } as const

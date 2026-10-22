@@ -80,7 +80,7 @@ func TestDeleteWorkspaceRejectsPendingSearch(t *testing.T) {
 	store := NewStore(db, nil)
 	baStore := NewBillingAccountStore(db)
 	userID := createTenancyTestUser(t, db)
-	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "search-guard", OwnerUserID: userID, NewBillingAccount: true})
+	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "search-guard", OwnerUserID: userID})
 	if err != nil {
 		t.Fatalf("create workspace failed: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestDeleteWorkspaceRejectsUnsettledPayments(t *testing.T) {
 	store := NewStore(db, nil)
 	baStore := NewBillingAccountStore(db)
 	userID := createTenancyTestUser(t, db)
-	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "pay-guard", OwnerUserID: userID, NewBillingAccount: true})
+	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "pay-guard", OwnerUserID: userID})
 	if err != nil {
 		t.Fatalf("create workspace failed: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestDeleteWorkspaceRejectsPendingHandover(t *testing.T) {
 	baStore := NewBillingAccountStore(db)
 	owner := createTenancyTestUser(t, db)
 	recipient := createTenancyTestUser(t, db)
-	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "handover-guard", OwnerUserID: owner, NewBillingAccount: true})
+	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "handover-guard", OwnerUserID: owner})
 	if err != nil {
 		t.Fatalf("create workspace failed: %v", err)
 	}
@@ -186,30 +186,35 @@ func TestDeleteWorkspaceRejectsPendingHandover(t *testing.T) {
 	}
 }
 
-func TestDeleteWorkspaceRejectsSharedAnchorInUse(t *testing.T) {
+func TestDeleteWorkspaceKeepsSharedSurvivor(t *testing.T) {
 	db := newTenancyTestDB(t)
 	ctx := context.Background()
 	store := NewStore(db, nil)
 	baStore := NewBillingAccountStore(db)
 	owner := createTenancyTestUser(t, db)
-	anchor, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "anchor", OwnerUserID: owner, NewBillingAccount: true})
+	first, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "first", OwnerUserID: owner})
 	if err != nil {
-		t.Fatalf("create anchor failed: %v", err)
+		t.Fatalf("create first failed: %v", err)
 	}
-	account, err := baStore.EnsureBillingAccountForWorkspace(ctx, anchor.InternalID, anchor.PublicID)
+	account, err := baStore.EnsureBillingAccountForWorkspace(ctx, first.InternalID, first.PublicID)
 	if err != nil {
-		t.Fatalf("resolve anchor account failed: %v", err)
+		t.Fatalf("resolve survivor failed: %v", err)
 	}
-	// Second business space explicitly shares the anchor account.
-	linked, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "linked", OwnerUserID: owner, BillingAccountPublicID: &account.PublicID})
+	// Second business space shares the same Personal survivor by scope.
+	second, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "second", OwnerUserID: owner})
 	if err != nil {
-		t.Fatalf("create linked workspace failed: %v", err)
+		t.Fatalf("create second workspace failed: %v", err)
 	}
-	_ = linked
-	if err := store.DeleteWorkspace(ctx, anchor.PublicID); !errors.Is(err, tenancy.ErrBillingConflict) {
-		t.Fatalf("delete shared anchor err = %v, want ErrBillingConflict", err)
+	// Deleting one Personal workspace never deletes shared money: the
+	// survivor stays and the sibling keeps resolving to it with the
+	// balance untouched.
+	if err := store.DeleteWorkspace(ctx, first.PublicID); err != nil {
+		t.Fatalf("delete first failed: %v", err)
 	}
-	// The shared funds row survives the rejected delete.
+	still, err := baStore.EnsureBillingAccountForWorkspace(ctx, second.InternalID, second.PublicID)
+	if err != nil || still.InternalID != account.InternalID {
+		t.Fatalf("sibling resolve = %+v %v, want survivor %d", still, err, account.InternalID)
+	}
 	var accounts int64
 	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM billing_accounts WHERE internal_id = $1`, account.InternalID).Scan(&accounts); err != nil || accounts != 1 {
 		t.Fatalf("shared account retained = %d err=%v, want 1", accounts, err)

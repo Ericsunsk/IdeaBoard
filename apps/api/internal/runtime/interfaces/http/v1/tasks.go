@@ -60,15 +60,6 @@ type taskQuoteWalletReader interface {
 	GetWallet(ctx context.Context, billingAccountID int64) (domain.WalletDetails, error)
 }
 
-// taskQuoteBudgetReader reads the Workspace shared consumption budget for
-// the quote/readiness preflight (#945: the same cap submit enforces,
-// reported early as not-ready). Production wires the workspacebudgets
-// Store; tests stub it. Nil skips the budget gate (unlimited) so existing
-// fixtures stay green.
-type taskQuoteBudgetReader interface {
-	CheckBudgetForQuote(ctx context.Context, workspaceInternalID int64, amount int64, reservedAt time.Time) error
-}
-
 // taskQuoteQuotaReader reads the member cross-workspace consumption quota
 // for the quote/readiness preflight (#946: the same cap submit enforces,
 // reported early as not-ready). Production wires the memberquotas Store;
@@ -159,7 +150,6 @@ func (h *contractV1Handler) taskService() *workspacetasks.Service {
 		Resolver: h.deps.TaskRouter, SnapshotSaver: h.deps.TaskSnapshotSaver,
 		Acceptance:      h.taskSubmissionAcceptance(),
 		BillingAccounts: h.deps.TaskBillingAccounts,
-		Budgets:         h.deps.TaskBudgets,
 		Quotas:          h.deps.TaskQuotas,
 	}
 	return workspacetasks.NewService(deps)
@@ -223,9 +213,6 @@ func renderTaskError(c *gin.Context, err error) {
 	case errors.Is(err, workspacetasks.ErrInsufficientCredits):
 		contract.RenderError(c, contract.StatusOf(contract.CodeTaskInsufficientCredits),
 			contract.CodeTaskInsufficientCredits, runtimehttp.MsgValidationFailed2)
-	case errors.Is(err, workspacetasks.ErrWorkspaceBudgetExhausted):
-		contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceBudgetExhausted),
-			contract.CodeWorkspaceBudgetExhausted, runtimehttp.MsgWorkspaceBudgetExhausted)
 	case errors.Is(err, workspacetasks.ErrMemberQuotaExhausted):
 		contract.RenderError(c, contract.StatusOf(contract.CodeMemberQuotaExhausted),
 			contract.CodeMemberQuotaExhausted, runtimehttp.MsgMemberQuotaExhausted)
@@ -898,16 +885,6 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 		if wallet.Available < snapshot.TotalCredits {
 			renderTaskError(c, fmt.Errorf("quote exceeds the resolved account balance: %w", workspacetasks.ErrInsufficientCredits))
 			return
-		}
-		// Workspace shared budget gate (#945: same cap submit enforces,
-		// reported here as not-ready before any Hold). Unlimited (nil
-		// reader or no budget row) passes through; over-cap renders
-		// 403 workspace_budget_exhausted via renderTaskError.
-		if h.deps.TaskQuoteBudgets != nil && snapshot.TotalCredits > 0 {
-			if err := h.deps.TaskQuoteBudgets.CheckBudgetForQuote(c.Request.Context(), workspace.InternalID, snapshot.TotalCredits, snapshot.QuotedAt); err != nil {
-				renderTaskError(c, err)
-				return
-			}
 		}
 		// Member quota gate (#946: same cap submit enforces, reported
 		// here as not-ready before any Hold). Unlimited (nil reader or

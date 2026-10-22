@@ -106,7 +106,6 @@ var workspaceRuntimeTableNames = []string{
 	"task_billing_snapshots",
 	"task_status_event_outbox",
 	"upload_sessions",
-	"workspace_budgets",
 	"workspace_events",
 	"workspace_memberships",
 	"workspaces",

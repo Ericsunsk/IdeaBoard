@@ -22,7 +22,7 @@
         class="flex flex-wrap items-center justify-between gap-2 rounded-control border border-border bg-muted/50 px-3 py-2"
       >
         <div class="min-w-0">
-          <span class="text-xs font-bold text-foreground">
+          <span class="text-admin-meta font-bold text-foreground">
             {{ restrictionLabel(restriction.type) }}
           </span>
           <AdminMono class="mt-0.5 block truncate text-admin-caption text-muted-foreground">

@@ -24,6 +24,7 @@ describe('billingAccountResource', () => {
       workspace_id: WORKSPACE_ID,
       owner_type: 'workspace',
       consumption_scope: 'account',
+      can_manage_member_quotas: true,
       shared: true,
     }
     transport.request.mockResolvedValue({ data: body })
@@ -34,6 +35,7 @@ describe('billingAccountResource', () => {
       workspaceId: WORKSPACE_ID,
       isShared: true,
       consumptionScope: 'account',
+      canManageMemberQuotas: true,
     })
     expect(transport.request).toHaveBeenCalledWith(
       `/v1/workspaces/${WORKSPACE_ID}/billing-account`,
@@ -54,6 +56,7 @@ describe('billingAccountResource', () => {
       workspace_id: WORKSPACE_ID,
       owner_type: 'organization',
       consumption_scope: 'member',
+      can_manage_member_quotas: false,
     }
     transport.request.mockResolvedValue({ data: body })
 
@@ -66,6 +69,34 @@ describe('billingAccountResource', () => {
   it('rejects an account response without a valid authorization scope', async () => {
     transport.request.mockResolvedValue({
       data: { billing_account_id: 'ba_1', workspace_id: WORKSPACE_ID, owner_type: 'workspace' },
+    })
+    await expect(fetchBillingAccount(WORKSPACE_ID)).rejects.toThrow()
+  })
+
+  it('keeps financial visibility separate from quota management', async () => {
+    transport.request.mockResolvedValue({
+      data: {
+        billing_account_id: 'ba_1',
+        workspace_id: WORKSPACE_ID,
+        owner_type: 'workspace',
+        consumption_scope: 'account',
+        can_manage_member_quotas: false,
+      },
+    })
+    await expect(fetchBillingAccount(WORKSPACE_ID)).resolves.toMatchObject({
+      consumptionScope: 'account',
+      canManageMemberQuotas: false,
+    })
+  })
+
+  it('fails closed when the management capability is absent', async () => {
+    transport.request.mockResolvedValue({
+      data: {
+        billing_account_id: 'ba_1',
+        workspace_id: WORKSPACE_ID,
+        owner_type: 'workspace',
+        consumption_scope: 'account',
+      },
     })
     await expect(fetchBillingAccount(WORKSPACE_ID)).rejects.toThrow()
   })

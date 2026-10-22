@@ -15,11 +15,11 @@
             {{ t('workspace.switcher.createDialogNameLabel') }}
           </DialogDescription>
           <div class="p-6">
-            <DialogTitle as="h3" class="m-0 text-lg font-semibold text-foreground">
+            <DialogTitle as="h3" class="m-0 text-admin-heading font-semibold text-foreground">
               {{ t('workspace.switcher.createDialogTitle') }}
             </DialogTitle>
             <div class="mt-5 mb-0 flex flex-col gap-2">
-              <label :for="createInputId" class="text-sm font-medium text-foreground">
+              <label :for="createInputId" class="text-admin-content font-medium text-foreground">
                 {{ t('workspace.switcher.createDialogNameLabel') }}
               </label>
               <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The create input carries its accessible name via aria-label -->
@@ -28,7 +28,7 @@
                 ref="createInputRef"
                 v-model="createName"
                 size="sm"
-                class="h-9 text-sm bg-background"
+                class="h-9 text-admin-content bg-background"
                 :invalid="createNameError !== null"
                 :disabled="isCreating"
                 :aria-label="t('workspace.switcher.createDialogNameLabel')"
@@ -39,20 +39,22 @@
               />
               <p
                 v-if="createNameError"
-                class="m-0 text-xs leading-normal text-destructive"
+                class="m-0 text-admin-meta leading-normal text-destructive"
                 role="alert"
               >
                 {{ createNameError }}
               </p>
             </div>
             <div v-if="props.onLoadOrganizations" class="mt-5 flex flex-col gap-2">
-              <label for="workspace-create-scope" class="text-sm font-medium text-foreground">{{
-                t('workspace.switcher.organization.scope')
-              }}</label>
+              <label
+                for="workspace-create-scope"
+                class="text-admin-content font-medium text-foreground"
+                >{{ t('workspace.switcher.organization.scope') }}</label
+              >
               <select
                 id="workspace-create-scope"
                 v-model="createScopeId"
-                class="h-9 rounded-control border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="h-9 rounded-control border border-input bg-background px-3 text-admin-content text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 :disabled="isCreating || isCreatingOrganization"
               >
                 <option value="personal">
@@ -68,13 +70,15 @@
               </select>
               <p
                 v-if="isOrganizationsLoading"
-                class="m-0 text-xs text-muted-foreground"
+                class="m-0 text-admin-meta text-muted-foreground"
                 role="status"
               >
                 {{ t('common.actions.loading') }}
               </p>
               <div v-if="organizationLoadError" class="flex flex-col gap-2">
-                <p class="m-0 text-xs text-destructive" role="alert">{{ organizationLoadError }}</p>
+                <p class="m-0 text-admin-meta text-destructive" role="alert">
+                  {{ organizationLoadError }}
+                </p>
                 <Button type="button" size="sm" variant="outline" @click="loadOrganizations()">{{
                   t('common.actions.retry')
                 }}</Button>
@@ -95,7 +99,7 @@
               >
                 <label
                   for="workspace-organization-name"
-                  class="text-xs font-medium text-foreground"
+                  class="text-admin-meta font-medium text-foreground"
                   >{{ t('workspace.switcher.organization.name') }}</label
                 >
                 <Input
@@ -105,10 +109,14 @@
                   :disabled="isCreatingOrganization"
                   :maxlength="nameFieldMaxLength"
                 />
-                <p class="m-0 text-xs text-muted-foreground">
+                <p class="m-0 text-admin-meta text-muted-foreground">
                   {{ t('workspace.switcher.organization.setupNote') }}
                 </p>
-                <p v-if="organizationError" class="m-0 text-xs text-destructive" role="alert">
+                <p
+                  v-if="organizationError"
+                  class="m-0 text-admin-meta text-destructive"
+                  role="alert"
+                >
                   {{ organizationError }}
                 </p>
                 <div class="flex gap-2">
@@ -131,85 +139,29 @@
                 </div>
               </div>
             </div>
-            <fieldset
-              class="mt-5 mb-0 flex flex-col gap-2"
-              :disabled="isCreating || isCreatingOrganization"
-            >
-              <legend class="text-sm font-medium text-foreground">
-                {{ t('workspace.switcher.billingChoiceLabel') }}
-              </legend>
-              <label
-                class="flex cursor-pointer items-start gap-2 rounded-control border border-border p-3"
-                :class="{ 'border-primary': createBillingMode === 'shared' }"
-              >
-                <input
-                  v-model="createBillingMode"
-                  type="radio"
-                  value="shared"
-                  class="mt-1"
-                  :disabled="isCreating"
-                />
-                <span class="min-w-0">
-                  <span class="block text-sm font-medium text-foreground">
-                    {{ t('workspace.switcher.billingSharedTitle') }}
-                  </span>
-                  <span class="mt-0.5 block text-xs text-muted-foreground">
-                    {{ sharedAccountHint }}
-                  </span>
+            <div class="mt-5 mb-0 flex flex-col gap-2">
+              <span class="text-admin-content font-medium text-foreground">
+                {{ t('workspace.switcher.scopeLabel') }}
+              </span>
+              <div class="rounded-control border border-border p-3">
+                <span class="block text-admin-content font-medium text-foreground">
+                  {{
+                    createOrganizationId
+                      ? t('workspace.switcher.scopeOrganizationTitle')
+                      : t('workspace.switcher.scopePersonalTitle')
+                  }}
                 </span>
-              </label>
-              <label
-                v-if="!createOrganizationId"
-                class="flex cursor-pointer items-start gap-2 rounded-control border border-border p-3"
-                :class="{ 'border-primary': createBillingMode === 'new' }"
-              >
-                <input
-                  v-model="createBillingMode"
-                  type="radio"
-                  value="new"
-                  class="mt-1"
-                  :disabled="isCreating"
-                />
-                <span class="min-w-0">
-                  <span class="block text-sm font-medium text-foreground">
-                    {{ t('workspace.switcher.billingNewTitle') }}
-                  </span>
-                  <span class="mt-0.5 block text-xs text-muted-foreground">
-                    {{ t('workspace.switcher.billingNewHint') }}
-                  </span>
-                  <span class="mt-0.5 block text-xs text-muted-foreground">
-                    {{ t('workspace.switcher.billingIsolationNote') }}
-                  </span>
+                <span class="mt-0.5 block text-admin-meta text-muted-foreground">
+                  {{ createScopeHint }}
                 </span>
-              </label>
-            </fieldset>
-            <p
-              v-if="isSharedAccountLoading && createBillingMode === 'shared'"
-              class="mt-2 text-xs text-muted-foreground"
-              role="status"
-            >
-              {{ t('common.actions.loading') }}
-            </p>
-            <div
-              v-if="sharedAccountError && createBillingMode === 'shared'"
-              class="mt-2 flex flex-col gap-2"
-            >
-              <p class="m-0 text-xs text-destructive" role="alert">{{ sharedAccountError }}</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                @click="loadSharedAccountForCreate()"
-              >
-                {{ t('common.actions.retry') }}
-              </Button>
+              </div>
             </div>
             <div class="mt-6 flex justify-end gap-2">
               <Button
                 type="button"
                 variant="ghost"
                 :is-disabled="isCreating || isCreatingOrganization"
-                class="rounded-pill px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+                class="rounded-pill px-4 py-2 text-admin-content font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
                 @click="cancelCreateDialog"
               >
                 {{ t('common.actions.cancel') }}
@@ -218,7 +170,7 @@
                 type="button"
                 :is-loading="isCreating"
                 :is-disabled="!canSubmitCreate"
-                class="rounded-pill px-4 py-2 text-sm font-semibold disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary-hover"
+                class="rounded-pill px-4 py-2 text-admin-content font-semibold disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary-hover"
                 @click="submitCreateFromDialog"
               >
                 {{
@@ -292,10 +244,7 @@ const createInputId = 'workspace-create-name-input'
 const createInputRef = useTemplateRef('createInputRef')
 const nameFieldMaxLength = computed(() => props.nameMaxLength + 1)
 const {
-  createBillingMode,
-  sharedAccountHint,
-  isSharedAccountLoading,
-  sharedAccountError,
+  createScopeHint,
   createScopeId,
   createOrganizationId,
   createScopeOptions,
@@ -306,7 +255,6 @@ const {
   organizationError,
   isCreatingOrganization,
   canSubmitCreate,
-  loadSharedAccountForCreate,
   loadOrganizations,
   createOrganization,
   prepare,
@@ -314,7 +262,6 @@ const {
 } = useWorkspaceCreation({
   workspaces: () => props.items,
   activeWorkspaceId: () => props.sourceWorkspaceId,
-  isOpen: isCreateDialogOpen,
   isCreating,
   nameMaxLength: () => props.nameMaxLength,
   onLoadOrganizations: props.onLoadOrganizations,
@@ -360,7 +307,6 @@ async function submitCreateFromDialog(): Promise<void> {
     return
   }
   const funding = fundingInput()
-  if (!funding) return
   isCreating.value = true
   createNameError.value = null
   try {

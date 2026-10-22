@@ -45,15 +45,6 @@ type BillingAccount struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
-type BillingAccountDefaultMemberQuota struct {
-	BillingAccountID int64              `json:"billing_account_id"`
-	Period           string             `json:"period"`
-	LimitCredits     pgtype.Int8        `json:"limit_credits"`
-	UpdatedByUserID  pgtype.Int8        `json:"updated_by_user_id"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
-}
-
 type BillingAccountMember struct {
 	BillingAccountID int64              `json:"billing_account_id"`
 	UserID           int64              `json:"user_id"`
@@ -82,6 +73,7 @@ type BillingAccountTransferInvite struct {
 	IdempotencyKey          string             `json:"idempotency_key"`
 	ScopeWorkspacePublicIds []string           `json:"scope_workspace_public_ids"`
 	CreatedAt               pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt               pgtype.Timestamptz `json:"expires_at"`
 	DecidedAt               pgtype.Timestamptz `json:"decided_at"`
 	DecidedBy               pgtype.Int8        `json:"decided_by"`
 }
@@ -587,6 +579,26 @@ type Organization struct {
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 	ArchivedAt pgtype.Timestamptz `json:"archived_at"`
+	ClosedAt   pgtype.Timestamptz `json:"closed_at"`
+	ClosedBy   pgtype.Int8        `json:"closed_by"`
+}
+
+type OrganizationClosure struct {
+	InternalID         int64              `json:"internal_id"`
+	OrganizationID     int64              `json:"organization_id"`
+	BillingAccountID   int64              `json:"billing_account_id"`
+	ClosedAt           pgtype.Timestamptz `json:"closed_at"`
+	ClosedBy           pgtype.Int8        `json:"closed_by"`
+	Reason             string             `json:"reason"`
+	MembershipSnapshot []byte             `json:"membership_snapshot"`
+	WorkspaceSnapshot  []byte             `json:"workspace_snapshot"`
+	AvailableBalance   int64              `json:"available_balance"`
+	ReservedBalance    int64              `json:"reserved_balance"`
+	CreditedOrderRefs  []byte             `json:"credited_order_refs"`
+	Disposition        string             `json:"disposition"`
+	DispositionDetail  []byte             `json:"disposition_detail"`
+	RestoredAt         pgtype.Timestamptz `json:"restored_at"`
+	RestoredBy         pgtype.Int8        `json:"restored_by"`
 }
 
 type OrganizationMembership struct {
@@ -1162,15 +1174,6 @@ type WorkspaceBillingLink struct {
 	WorkspaceID      int64              `json:"workspace_id"`
 	BillingAccountID int64              `json:"billing_account_id"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-}
-
-type WorkspaceBudget struct {
-	WorkspaceID     int64              `json:"workspace_id"`
-	Period          string             `json:"period"`
-	LimitCredits    pgtype.Int8        `json:"limit_credits"`
-	UpdatedByUserID pgtype.Int8        `json:"updated_by_user_id"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type WorkspaceEvent struct {

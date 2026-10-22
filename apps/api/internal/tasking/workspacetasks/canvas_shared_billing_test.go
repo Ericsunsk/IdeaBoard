@@ -5,18 +5,20 @@ package workspacetasks_test
 // What is proven here, over the real settlement seams (Billing catalog,
 // Credits Commands, postgres task Store, stable Billing Account
 // resolution):
-//   - Two workspaces sharing one Billing Account (explicit link, no
-//     organization) settle submits against that one payer with the real
-//     submitter as operator; no personal or owner wallet is touched.
+//   - Two Personal workspaces of one owner share the Personal survivor by
+//     creation scope (no link, no organization) and settle submits against
+//     that one payer with the real submitter as operator; no other wallet
+//     is touched.
 //   - Concurrent holds against the shared account cannot overdraft: every
 //     failure is ErrInsufficientCredits and the balance never goes
 //     negative.
 //   - A repeated submit (same key + hash) replays the original task with
 //     a single Hold; the same key with a different body is
 //     ErrIdempotencyConflict.
-//   - Member departure, billing ownership transfer, and payer-link
-//     changes never rewrite an existing Task's attribution: terminal
-//     Capture/Release converge on the submit-time account facts.
+//   - Member departure and billing ownership transfer never rewrite an
+//     existing Task's attribution: terminal Capture/Release converge on
+//     the submit-time account facts (scope is fixed at creation, so no
+//     payer switch exists).
 //   - Retry keeps the attribution and the Hold, mints a fresh execution
 //     token, and rotates the envelope past the stale token (stale jobs
 //     drop at dispatch on the envelope mismatch).
@@ -36,8 +38,9 @@ import (
 )
 
 // openSharedBillingSecondWorkspace provisions a second personal workspace
-// for the same owner and links it to the first workspace's stable Billing
-// Account (the no-organization cross-workspace sharing shape).
+// for the same owner. Under ADR-0038 it shares the owner's Personal
+// survivor by creation scope alone (no link, no organization): the
+// no-organization cross-workspace sharing shape.
 func openSharedBillingSecondWorkspace(t *testing.T, env *atomicEnv) (string, int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -54,9 +57,6 @@ func openSharedBillingSecondWorkspace(t *testing.T, env *atomicEnv) (string, int
 	var wsBInternal int64
 	if err := env.pool.QueryRow(ctx, `SELECT internal_id FROM workspaces WHERE public_id = $1`, wsB).Scan(&wsBInternal); err != nil {
 		t.Fatalf("resolve second settle workspace: %v", err)
-	}
-	if err := tenancypg.NewBillingAccountStore(env.pool).LinkWorkspaceToBillingAccount(ctx, wsBInternal, env.accountID, env.userID); err != nil {
-		t.Fatalf("link second workspace to shared account: %v", err)
 	}
 	return wsB, wsBInternal
 }

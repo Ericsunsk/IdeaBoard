@@ -74,13 +74,18 @@ LIMIT 1
 // Billing Account resolution and membership queries (#915). Public references
 // use public_id (ba_); internal_id stays database-internal.
 //
-// Resolution is explicit and fail-closed: one Workspace resolves to exactly
-// one Billing Account via (1) explicit workspace_billing_links, else (2) the
-// Organization account for org workspaces, else (3) the per-workspace
-// account. Missing, ambiguous, or conflicting ownership fails closed in the
-// caller (no silent fallback to another wallet). All queries are typed and
+// Resolution is fixed at Workspace creation scope (ADR-0038): a Workspace in
+// an Organization resolves to that Organization's shared pool, a personal
+// Workspace resolves to its owner's deterministic Personal account
+// (ensure_personal_billing_account_for_user: the Default-workspace-anchored
+// account, provisioned on demand). Missing or ownerless scopes fail closed
+// in the caller (no silent fallback to another wallet, no per-workspace
+// mint, no link indirection). All queries are typed and
 // join the caller-owned transaction via the passed Queries (no ambient pool
 // use here), so Task settlement keeps Quote/Hold/Task/River atomic.
+//
+// workspace_billing_links rows are retired (writes closed, resolution no
+// longer reads them); the table stays for read-only audit only.
 func (q *Queries) GetBillingAccountByOrganizationID(ctx context.Context, organizationID pgtype.Int8) (BillingAccount, error) {
 	row := q.db.QueryRow(ctx, getBillingAccountByOrganizationID, organizationID)
 	var i BillingAccount
@@ -136,20 +141,6 @@ func (q *Queries) GetBillingAccountMember(ctx context.Context, arg GetBillingAcc
 		&i.Role,
 		&i.CreatedAt,
 	)
-	return i, err
-}
-
-const getWorkspaceBillingLink = `-- name: GetWorkspaceBillingLink :one
-SELECT workspace_id, billing_account_id, created_at
-FROM workspace_billing_links
-WHERE workspace_id = $1
-LIMIT 1
-`
-
-func (q *Queries) GetWorkspaceBillingLink(ctx context.Context, workspaceID int64) (WorkspaceBillingLink, error) {
-	row := q.db.QueryRow(ctx, getWorkspaceBillingLink, workspaceID)
-	var i WorkspaceBillingLink
-	err := row.Scan(&i.WorkspaceID, &i.BillingAccountID, &i.CreatedAt)
 	return i, err
 }
 
@@ -439,22 +430,23 @@ func (q *Queries) LockBillingAccount(ctx context.Context, internalID int64) (Bil
 const lockWorkspaceBillingAccounts = `-- name: LockWorkspaceBillingAccounts :many
 SELECT b.internal_id
 FROM workspaces AS w
-LEFT JOIN workspace_billing_links AS l ON l.workspace_id = w.internal_id
+LEFT JOIN workspaces AS def ON def.owner_user_id = w.owner_user_id
+  AND def.organization_id IS NULL
+  AND def.is_default
 JOIN billing_accounts AS b ON b.workspace_id = w.internal_id
-  OR b.internal_id = COALESCE(
-    l.billing_account_id,
-    (SELECT a.internal_id FROM billing_accounts AS a WHERE a.organization_id = w.organization_id),
-    (SELECT a.internal_id FROM billing_accounts AS a WHERE a.workspace_id = w.internal_id)
-  )
+  OR (w.is_default = FALSE AND def.internal_id IS NOT NULL AND b.workspace_id = def.internal_id)
+  OR (w.organization_id IS NOT NULL AND b.organization_id = w.organization_id)
 WHERE w.public_id = $1
 ORDER BY b.internal_id
 FOR NO KEY UPDATE OF b
 `
 
-// Lock the resolved payer and any account anchored to the Workspace before
-// deletion. Stable ID ordering keeps the account -> Workspace lock order even
-// when an explicitly shared Workspace already has an older anchor account.
-// Resolve without provisioning; an unfunded Workspace returns no rows.
+// Lock the creation-scope payer before deletion (ADR-0038): the account
+// anchored to the Workspace itself (Default survivor row, legacy anchors),
+// the owner's Personal survivor (Default-workspace-anchored account), and
+// the Organization pool for org scopes. Stable ID ordering keeps the
+// account -> Workspace lock order. Resolve without provisioning; an
+// unfunded Workspace returns no rows.
 func (q *Queries) LockWorkspaceBillingAccounts(ctx context.Context, workspacePublicID string) ([]int64, error) {
 	rows, err := q.db.Query(ctx, lockWorkspaceBillingAccounts, workspacePublicID)
 	if err != nil {
@@ -497,24 +489,5 @@ func (q *Queries) UpsertBillingAccountMember(ctx context.Context, arg UpsertBill
 		&i.Role,
 		&i.CreatedAt,
 	)
-	return i, err
-}
-
-const upsertWorkspaceBillingLink = `-- name: UpsertWorkspaceBillingLink :one
-INSERT INTO workspace_billing_links (workspace_id, billing_account_id)
-VALUES ($1, $2)
-ON CONFLICT (workspace_id) DO UPDATE SET billing_account_id = EXCLUDED.billing_account_id
-RETURNING workspace_id, billing_account_id, created_at
-`
-
-type UpsertWorkspaceBillingLinkParams struct {
-	WorkspaceID      int64 `json:"workspace_id"`
-	BillingAccountID int64 `json:"billing_account_id"`
-}
-
-func (q *Queries) UpsertWorkspaceBillingLink(ctx context.Context, arg UpsertWorkspaceBillingLinkParams) (WorkspaceBillingLink, error) {
-	row := q.db.QueryRow(ctx, upsertWorkspaceBillingLink, arg.WorkspaceID, arg.BillingAccountID)
-	var i WorkspaceBillingLink
-	err := row.Scan(&i.WorkspaceID, &i.BillingAccountID, &i.CreatedAt)
 	return i, err
 }

@@ -353,21 +353,17 @@ paths:
       operationId: createWorkspace
       summary: Create a workspace
       description: >-
-        Creates a non-Default workspace with an explicit billing account.
-        Personal creates default to the caller's current (personal) account
-        via an explicit link so no-org business spaces share one balance
-        and no new wallet is minted implicitly; pass new_billing_account
-        true for a fresh isolated account (creator becomes billing owner,
-        balances never merge), or billing_account_id to share an authorized
-        account (caller must be Billing Owner/Admin, 403 otherwise).
-        Organization scopes always use the shared org pool: billing fields
-        with an organization_id render 409 billing_account_conflict, never
-        the creator personal pool. Failures roll back with no half-linked
-        workspace. The per-user Default workspace is only ever minted by
-        idempotent auto-provisioning. A second Default create renders 409
+        Creates a non-Default workspace with a fixed billing scope.
+        Personal creates resolve to the caller's Personal account (one
+        pool per user, shared by all Personal workspaces; no new wallet,
+        no link). Organization scopes always use the shared org pool.
+        Creating an Organization never moves existing Personal workspaces.
+        The scope is fixed at creation and never switches. The per-user
+        Default workspace is only ever minted by idempotent
+        auto-provisioning. A second Default create renders 409
         workspace_default_conflict. No Idempotency-Key reuse across
-        different billing choices: same key with a different billing
-        selection renders 409 workspace_idempotency_conflict.
+        different scopes: same key with a different organization_id
+        renders 409 workspace_idempotency_conflict.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -522,11 +518,15 @@ paths:
         keeps the current role, including when the workspace is full.
         Workspaces support at most 5 members including owners; exceeding
         this limit renders 409 workspace_member_limit_reached.
-        New members require the account default new-member quota to be
-        configured: absent defaults render 409
-        default_member_quota_not_configured (fail closed, never implicit
-        unlimited) and the inviter reuses it atomically (the inviter
-        cannot raise the default here). Reusing a key with a different request
+        The Personal Default workspace is private: invites there render 403
+        workspace_default_protected. Other Personal workspaces invite freely:
+        the Workspace Owner/Admin adds collaborators directly with no
+        per-invite Personal account-holder approval, consumption charges the
+        holder's shared Personal Billing Account with the real operator kept
+        on each record, and an unconfigured collaborator quota reads as
+        unlimited (the holder may set it later without clearing usage).
+        Removing and re-adding a collaborator preserves quota state and
+        historical consumption. Reusing a key with a different request
         renders 409 workspace_idempotency_conflict.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
@@ -641,6 +641,9 @@ paths:
       summary: Remove a workspace member (last owner cannot be removed)
       description: >-
         Removes a workspace member. Requires the Idempotency-Key header.
+        Removal never deletes quota state or historical consumption: the
+        member's (Billing Account, User) quota row and settled usage stay
+        readable under the account and are restored on rejoin.
         Reusing a key with a different request renders 409
         workspace_idempotency_conflict.
       parameters:
@@ -774,6 +777,83 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /organizations/{organization_id}/closure:
+    post:
+      tags: [Organizations]
+      operationId: closeOrganization
+      summary: Close an organization (owner only)
+      description: >-
+        Requires Idempotency-Key. Only the owner may close. Closure
+        immediately suspends all member access and new spending while
+        retaining membership, Workspace, permission, and billing
+        history. Unsettled Tasks, payment orders, refunds, disputes, or
+        a pending handover invite refuse closure with
+        organization_closure_blocked; remaining balance stays in the
+        closed account (never Personal).
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloseOrganizationRequest'
+      responses:
+        '200':
+          description: Organization closed.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /organizations/{organization_id}/restore:
+    post:
+      tags: [Organizations]
+      operationId: restoreOrganization
+      summary: Restore a closed organization (owner only)
+      description: >-
+        Requires Idempotency-Key. Only the owner may restore; retained
+        memberships and permissions resume. No request body is required.
+        Restoring a live organization reads as 409
+        organization_not_closed.
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Organization restored.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /organizations/{organization_id}/workspaces:
     get:
       tags: [Organizations]
@@ -801,6 +881,9 @@ paths:
       tags: [Organizations]
       operationId: createOrganizationWorkspace
       summary: Create an organization workspace (org owner/admin only)
+      description: >-
+        Requires Idempotency-Key. Only organization owner/admin may create;
+        every workspace charges the shared organization account.
       parameters:
         - $ref: '#/components/parameters/OrganizationId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -832,6 +915,150 @@ paths:
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /organizations/{organization_id}/members:
+    get:
+      tags: [Organizations]
+      operationId: listOrganizationMembers
+      summary: List organization members (org members only)
+      description: >-
+        No Idempotency-Key is required for this read.
+        The organization itself is the management entry: it carries no
+        boards, content, or consumption; workspace access follows the
+        organization role mapping (owner/admin automatic, member explicit).
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: Organization member list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMemberList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Organizations]
+      operationId: addOrganizationMember
+      summary: Invite an organization member (owner/admin only)
+      description: >-
+        Requires Idempotency-Key. Only owner may grant admin; owner grants
+        never flow here (explicit handover only). The invitee joining a
+        second organization fails closed with organization_limit_reached.
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddOrganizationMemberRequest'
+      responses:
+        '201':
+          description: Organization member invited.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMemberEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /organizations/{organization_id}/members/{member_id}:
+    patch:
+      tags: [Organizations]
+      operationId: updateOrganizationMember
+      summary: Change an organization member role (owner-only for admin roles)
+      description: >-
+        No Idempotency-Key is required. Only owner changes admin roles;
+        owner rows are immutable here (explicit handover only). Admin
+        demotion immediately drops automatic all-workspace access and keeps
+        only explicit workspace grants.
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - name: member_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrganizationMemberRequest'
+      responses:
+        '200':
+          description: Organization member updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMemberEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Organizations]
+      operationId: removeOrganizationMember
+      summary: Remove an organization member or leave (member self-leave allowed)
+      description: >-
+        Requires Idempotency-Key. Leaving immediately removes access to all
+        organization workspaces; created content stays organization-owned.
+        Owner rows are immutable here (explicit handover only).
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - name: member_id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/UserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Organization member removed.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /workspaces/{workspace_id}/boards:
     get:
       tags: [Boards]
@@ -1344,70 +1571,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /workspaces/{workspace_id}/billing-account/link:
-    post:
-      tags: [WorkspaceBilling]
-      operationId: linkWorkspaceBillingAccount
-      summary: Link a workspace to a shared billing account (workspace owner/admin + billing manager only)
-      description: >-
-        Creates the explicit stable association for no-org studio sharing.
-        Requires Workspace Owner/Admin on the workspace AND Billing
-        Owner/Admin on the target account; space-only admins render 403
-        billing_account_forbidden. Conflicting ownership or a payer switch
-        renders 409 billing_account_conflict (fail closed). Requires the
-        Idempotency-Key header.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LinkWorkspaceBillingAccountRequest'
-      responses:
-        '200':
-          description: Linked billing account.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WorkspaceBillingAccountEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          description: Visible-but-forbidden financial action (billing_account_forbidden) or space-only admin (workspace_forbidden).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Conflicting ownership or payer switch (billing_account_conflict).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Billing service unavailable (service_unavailable).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /workspaces/{workspace_id}/billing-account/members:
     get:
       tags: [WorkspaceBilling]
@@ -1737,7 +1900,9 @@ paths:
       summary: Invite a new billing account owner (billing owner only)
       description: >-
         Only the current Billing Owner may initiate; the recipient accepts
-        or rejects, and the initiator may cancel while pending. The Default
+        or rejects, and the initiator may cancel while pending. Invitations
+        lapse 7 days after issue: a lapsed invite moves nothing and the
+        owner may send again. The Default
         Workspace never transfers; acceptance grants the recipient Workspace
         Owner on every non-Default business Workspace associated with the
         account. Identity, balance, and history stay stable; only management
@@ -1913,7 +2078,8 @@ paths:
         Only the recipient may accept a pending invite; acceptance makes the
         recipient Billing Owner, steps the previous Owner down to Admin, and
         grants Workspace Owner on every non-Default business Workspace. The
-        Default Workspace never transfers. Requires the Idempotency-Key header.
+        Default Workspace never transfers. A lapsed invite (past expires_at)
+        fails closed and moves nothing. Requires the Idempotency-Key header.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - name: invite_id
@@ -2298,120 +2464,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /workspaces/{workspace_id}/budget:
-    get:
-      tags: [WorkspaceBilling]
-      operationId: getWorkspaceBudget
-      summary: Get the workspace shared consumption budget with live usage
-      description: >-
-        Any workspace member reads the cap with live usage and remaining
-        quota for the current period (monthly UTC calendar month, or
-        unlimited when no cap is set). The budget is a cumulative cap on
-        settled plus pending consumption (paid Task generations and Vision
-        Search), not a wallet or reservation: adjusting the limit never
-        clears usage, and a monthly reset starts a new UTC month without
-        deleting history. Block reasons surface on quote/submit as 402
-        task_insufficient_credits (balance shortfall) vs 403
-        workspace_budget_exhausted (cap reached) vs 403
-        billing_wallet_restricted (other funds limits). Hidden workspaces
-        render 404 workspace_not_found.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-      responses:
-        '200':
-          description: Workspace budget with live usage.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WorkspaceBudgetEnvelope'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '503':
-          description: Budget service unavailable (service_unavailable).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-    put:
-      tags: [WorkspaceBilling]
-      operationId: setWorkspaceBudget
-      summary: Set the workspace shared consumption budget (billing manager only)
-      description: >-
-        Sets the workspace cap to monthly (with limit_credits) or
-        unlimited (no limit_credits). Requires Billing Owner/Admin on the
-        resolved account: workspace-only admins render 403
-        billing_account_forbidden and cannot raise a pool-granted budget.
-        Adjusting the limit never clears usage and never tops up any
-        balance. Invalid input renders 422 validation_failed with
-        details.fields naming period/limit_credits. No Idempotency-Key
-        header is used: the set is naturally idempotent.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SetWorkspaceBudgetRequest'
-      responses:
-        '200':
-          description: Workspace budget updated, with live usage.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WorkspaceBudgetEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          description: Missing financial grant (billing_account_forbidden).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        '503':
-          description: Budget service unavailable (service_unavailable).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /workspaces/{workspace_id}/member-quotas:
     get:
       tags: [WorkspaceBilling]
       operationId: listMemberQuotas
-      summary: List member cross-workspace quotas with live usage (billing manager only)
+      summary: List member cross-workspace quotas with live usage (managers only)
       description: >-
-        Billing Owner/Admin lists every explicitly set quota on the
-        resolved account with live usage and remaining quota for the
-        current window. Other members render 403 billing_account_forbidden
-        and read their own row via the self endpoint. Quotas cap one
-        member's settled plus pending consumption across every workspace
-        sharing the account (paid Task generations and Vision Search),
-        never a sub-wallet: adjusting the limit never clears usage,
-        unused periodic quota never rolls over, and rejoining never
-        re-issues. Hidden workspaces render 404 workspace_not_found.
+        Organization Owner/Admin (org scopes) or the Personal account
+        holder (personal scopes) lists every
+        explicitly set quota on the resolved account with live usage and
+        remaining quota for the current window. Other members render 403
+        billing_account_forbidden and read their own row via the self
+        endpoint. Quotas cap one member's settled plus pending consumption
+        across every workspace sharing the account (paid Task generations
+        and Vision Search), never a sub-wallet: adjusting the limit never
+        clears usage, unused periodic quota never rolls over, and rejoining
+        never re-issues. New members default to unlimited; invites never
+        gate on a default. Organization Owners always read as unlimited.
+        Hidden workspaces render 404 workspace_not_found.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       responses:
@@ -2455,11 +2525,11 @@ paths:
         Any workspace member reads their own quota with live usage and
         remaining quota for the current window on the resolved account
         (daily/weekly/monthly UTC windows, fixed lifetime cap, or
-        unlimited when no cap is set). Absent means unlimited. Block
+        unlimited when no cap is set). Absent means unlimited;
+        Organization Owners always read as unlimited. Block
         reasons surface on quote/submit as 402 task_insufficient_credits
-        (balance shortfall) vs 403 workspace_budget_exhausted (workspace
-        cap reached) vs 403 member_quota_exhausted (member cap reached)
-        vs 403 billing_wallet_restricted (other funds limits). Hidden
+        (balance shortfall) vs 403 member_quota_exhausted (member cap
+        reached) vs 403 billing_wallet_restricted (other funds limits). Hidden
         workspaces render 404 workspace_not_found.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
@@ -2490,13 +2560,17 @@ paths:
     put:
       tags: [WorkspaceBilling]
       operationId: setMemberQuota
-      summary: Set a member cross-workspace quota (billing manager only)
+      summary: Set a member cross-workspace quota (managers only)
       description: >-
         Sets one member's quota to daily/weekly/monthly/fixed (with
-        limit_credits) or unlimited (no limit_credits). Requires Billing
-        Owner/Admin on the resolved account: workspace-only admins render
-        403 billing_account_forbidden and cannot raise a pool-granted
-        quota. Adjusting the limit never clears usage and never tops up
+        limit_credits) or unlimited (no limit_credits). Organization
+        scopes require Org Owner/Admin (Owner sets Admin, Owner/Admin set
+        Member, Admin editing Owner/Admin renders 403
+        billing_account_forbidden, capped writes for an Owner render 403);
+        Personal scopes require the Personal account holder (Billing Owner);
+        Billing Admins and Workspace Admins alone render 403
+        billing_account_forbidden. One row aggregates that member's usage
+        across all workspaces of the account. Adjusting the limit never clears usage and never tops up
         any balance; unused periodic quota never rolls over. Invalid input
         renders 422 validation_failed with details.fields naming
         period/limit_credits. No Idempotency-Key header is used: the set
@@ -2551,109 +2625,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /workspaces/{workspace_id}/default-member-quota:
-    get:
-      tags: [WorkspaceBilling]
-      operationId: getDefaultMemberQuota
-      summary: Get the account default new-member quota (members only)
-      description: >-
-        Any workspace member reads the default new-member quota on the
-        resolved account (daily/weekly/monthly UTC windows, fixed lifetime
-        cap, or unlimited). Absent defaults render 409
-        default_member_quota_not_configured (fail closed, never implicit
-        unlimited): a Billing Owner/Admin sets it first via PUT. Hidden
-        workspaces render 404 workspace_not_found.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-      responses:
-        '200':
-          description: Default new-member quota.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DefaultMemberQuotaEnvelope'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Default not configured (default_member_quota_not_configured).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Quota service unavailable (service_unavailable).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-    put:
-      tags: [WorkspaceBilling]
-      operationId: setDefaultMemberQuota
-      summary: Set the account default new-member quota (billing manager only)
-      description: >-
-        Sets the account default to daily/weekly/monthly/fixed (with
-        limit_credits) or unlimited (no limit_credits). Requires Billing
-        Owner/Admin on the resolved account: workspace-only admins render
-        403 billing_account_forbidden and cannot raise the pool default.
-        Changing the default only affects later joins; existing per-member
-        rows keep their cap and accrued usage. Invalid input renders 422
-        validation_failed with details.fields naming period/limit_credits.
-        No Idempotency-Key header is used: the set is naturally idempotent.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SetDefaultMemberQuotaRequest'
-      responses:
-        '200':
-          description: Default new-member quota updated.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DefaultMemberQuotaEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          description: Missing financial grant (billing_account_forbidden).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        '503':
-          description: Quota service unavailable (service_unavailable).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+
   /workspaces/{workspace_id}/checkout-sessions:
     post:
       tags: [WorkspaceBilling]
@@ -3239,8 +3211,6 @@ paths:
         reuse with a different request renders 409
         task_idempotency_conflict. Insufficient Ideas render 402
         task_insufficient_credits. A request that would exceed the
-        workspace shared consumption budget renders 403
-        workspace_budget_exhausted; a request that would exceed the
         member's cross-workspace quota renders 403 member_quota_exhausted.
         Billing settles against a server-side
         quote for the ai-image:<service> SKU (unpriced or unregistered SKU
@@ -3296,7 +3266,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '403':
-          description: Visible-but-forbidden (task_forbidden), restricted wallet (billing_wallet_restricted), exhausted workspace budget (workspace_budget_exhausted), or exhausted member quota (member_quota_exhausted).
+          description: Visible-but-forbidden (task_forbidden), restricted wallet (billing_wallet_restricted), or exhausted member quota (member_quota_exhausted).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -3441,9 +3411,7 @@ paths:
         Viewers never read ready), and the resolved account Wallet gates
         funds (402 task_insufficient_credits vs 403
         billing_wallet_restricted, mirroring the submit Hold). The
-        workspace shared consumption budget gates the same quote (403
-        workspace_budget_exhausted when the cap is reached), and the
-        member cross-workspace quota gates it too (403
+        member cross-workspace quota gates the same quote (403
         member_quota_exhausted when the member cap is reached). Financial
         management alone grants no Board standing. Unpriced or
         unregistered SKU renders billing_pricing_unavailable 422
@@ -3484,7 +3452,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '403':
-          description: Visible-but-forbidden (task_forbidden), restricted wallet (billing_wallet_restricted), exhausted workspace budget (workspace_budget_exhausted), or exhausted member quota (member_quota_exhausted).
+          description: Visible-but-forbidden (task_forbidden), restricted wallet (billing_wallet_restricted), or exhausted member quota (member_quota_exhausted).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -4823,6 +4791,22 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/Organization'
+    OrganizationMemberEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/OrganizationMember'
+    OrganizationMemberList:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizationMember'
     WorkspaceMemberEnvelope:
       type: object
       required: [data]
@@ -4923,6 +4907,10 @@ components:
       type: string
       enum: [owner, admin, member]
       description: Workspace/organization membership role.
+    AssignableOrganizationRole:
+      type: string
+      enum: [admin, member]
+      description: Organization roles assignable through member write endpoints; owner changes require explicit handover.
     User:
       type: object
       required: [id, status]
@@ -4998,10 +4986,47 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        status:
+          $ref: '#/components/schemas/OrganizationStatus'
+        closed_at:
+          type: string
+          format: date-time
+          description: RFC3339 UTC timestamp; omitted unless closed.
         created_at:
           type: string
           format: date-time
           description: RFC3339 UTC timestamp.
+    OrganizationStatus:
+      type: string
+      enum: [active, closed]
+      description: >-
+        Organization lifecycle status. Closed organizations suspend all
+        member access and new spending while retaining membership,
+        Workspace, permission, and billing history; only the Owner
+        restores.
+    OrganizationMember:
+      type: object
+      required: [user_id, role]
+      additionalProperties: false
+      properties:
+        user_id:
+          $ref: '#/components/schemas/UserId'
+        role:
+          $ref: '#/components/schemas/MembershipRole'
+        created_at:
+          type: string
+          format: date-time
+        email:
+          type: string
+          format: email
+          description: >-
+            Organization-visible member email for display assistance only.
+            Omitted when unavailable; never used as a write identity.
+        avatar:
+          type: string
+          description: >-
+            Organization-visible member avatar public URL. Omitted when
+            unavailable.
     WorkspaceMember:
       type: object
       required: [user_id, role]
@@ -5046,20 +5071,10 @@ components:
               anyOf:
                 - $ref: '#/components/schemas/OrganizationId'
                 - nullable: true
-            billing_account_id:
-              type: string
-              pattern: ^ba_[A-Za-z0-9_-]+$
               description: >-
-                Explicit shared account to link (caller must be Billing
-                Owner/Admin). Omitted defaults to the caller's personal
-                account with no new wallet. Mutually exclusive with
-                new_billing_account; rejected with organization scopes.
-            new_billing_account:
-              type: boolean
-              description: >-
-                When true, mints a fresh isolated per-workspace account
-                (creator becomes billing owner). Mutually exclusive with
-                billing_account_id; rejected with organization scopes.
+                Omitted for a Personal workspace (the caller's Personal
+                account); an organization_id creates an Organization
+                workspace on the shared org pool. Fixed at creation.
     UpdateUserRequest:
       type: object
       required: [data]
@@ -5142,6 +5157,19 @@ components:
               type: string
               minLength: 1
               maxLength: 120
+    CloseOrganizationRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          properties:
+            reason:
+              type: string
+              maxLength: 280
+              description: Optional owner-supplied closure reason.
     CreateOrganizationWorkspaceRequest:
       type: object
       required: [data]
@@ -5156,6 +5184,32 @@ components:
               type: string
               minLength: 1
               maxLength: 120
+    AddOrganizationMemberRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [user_id, role]
+          additionalProperties: false
+          properties:
+            user_id:
+              $ref: '#/components/schemas/UserId'
+            role:
+              $ref: '#/components/schemas/AssignableOrganizationRole'
+    UpdateOrganizationMemberRequest:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [role]
+          additionalProperties: false
+          properties:
+            role:
+              $ref: '#/components/schemas/AssignableOrganizationRole'
     PaginatedWorkspaces:
       type: object
       required: [data, meta]
@@ -5839,7 +5893,7 @@ components:
           $ref: '#/components/schemas/AvatarUploadResult'
     WorkspaceBillingAccount:
       type: object
-      required: [billing_account_id, workspace_id, owner_type, consumption_scope]
+      required: [billing_account_id, workspace_id, owner_type, consumption_scope, can_manage_member_quotas]
       additionalProperties: false
       properties:
         billing_account_id:
@@ -5856,6 +5910,9 @@ components:
           type: string
           enum: [account, workspace, member]
           description: Server-resolved consumption visibility for the authenticated principal.
+        can_manage_member_quotas:
+          type: boolean
+          description: Server-resolved quota management capability for this workspace account. Only the Personal account holder or this Organization's Owner/Admin may manage quotas.
         shared:
           type: boolean
           description: True when many Workspaces share one account; omitted when false.
@@ -5882,19 +5939,6 @@ components:
           type: string
           format: date-time
           description: Omitted when empty.
-    LinkWorkspaceBillingAccountRequest:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          type: object
-          required: [billing_account_id]
-          additionalProperties: false
-          properties:
-            billing_account_id:
-              type: string
-              pattern: ^ba_[A-Za-z0-9_-]+$
     AddBillingAccountMemberRequest:
       type: object
       required: [data]
@@ -5972,6 +6016,10 @@ components:
         created_at:
           type: string
           format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          description: Lapse time (7 days after issue). A pending invite at or past this time never moves funds or membership; decisions on it fail closed and the owner may re-issue.
         decided_at:
           type: string
           format: date-time
@@ -6141,70 +6189,6 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/WorkspaceUsage'
-    WorkspaceBudget:
-      type: object
-      required: [workspace_id, billing_account_id, period, used_credits]
-      additionalProperties: false
-      properties:
-        workspace_id:
-          type: string
-          description: Consuming workspace (ws_).
-        billing_account_id:
-          type: string
-          pattern: '^ba_[A-Za-z0-9_-]+$'
-          description: Payer account (ba_) granting this budget; stable across workspace switches and member changes.
-        period:
-          type: string
-          enum: [monthly, unlimited]
-          description: monthly caps per UTC calendar month; unlimited sets no cap (the default).
-        limit_credits:
-          type: integer
-          format: int64
-          minimum: 1
-          description: Monthly cap in integer credits; omitted for unlimited.
-        used_credits:
-          type: integer
-          format: int64
-          minimum: 0
-          description: Settled net captures (linked refunds correct their original period) plus pending holds in the current period, across all members.
-        remaining_credits:
-          type: integer
-          format: int64
-          minimum: 0
-          description: limit_credits minus used_credits clamped at zero; omitted for unlimited.
-        period_start:
-          type: string
-          format: date-time
-          description: Current UTC month start (monthly only).
-        period_end:
-          type: string
-          format: date-time
-          description: Current UTC month end, exclusive (monthly only).
-    WorkspaceBudgetEnvelope:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          $ref: '#/components/schemas/WorkspaceBudget'
-    SetWorkspaceBudgetRequest:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          type: object
-          required: [period]
-          additionalProperties: false
-          properties:
-            period:
-              type: string
-              enum: [monthly, unlimited]
-            limit_credits:
-              type: integer
-              format: int64
-              minimum: 1
-              description: Required for monthly, forbidden for unlimited.
     MemberQuota:
       type: object
       required: [billing_account_id, user_id, period, used_credits]
@@ -6261,53 +6245,6 @@ components:
           items:
             $ref: '#/components/schemas/MemberQuota'
     SetMemberQuotaRequest:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          type: object
-          required: [period]
-          additionalProperties: false
-          properties:
-            period:
-              type: string
-              enum: [daily, weekly, monthly, fixed, unlimited]
-            limit_credits:
-              type: integer
-              format: int64
-              minimum: 1
-              description: Required for capped periods, forbidden for unlimited.
-    DefaultMemberQuota:
-      type: object
-      required: [billing_account_id, workspace_id, period]
-      additionalProperties: false
-      properties:
-        billing_account_id:
-          type: string
-          pattern: '^ba_[A-Za-z0-9_-]+$'
-          description: Payer account (ba_) whose new members reuse this default; stable across workspace switches and member changes.
-        workspace_id:
-          type: string
-          pattern: '^ws_[A-Za-z0-9_-]+$'
-          description: Resolving workspace (consumption location) for this read.
-        period:
-          type: string
-          enum: [daily, weekly, monthly, fixed, unlimited]
-          description: daily/weekly/monthly cap per UTC day, Monday-start week, or calendar month; fixed caps lifetime cumulative spend; unlimited sets no cap.
-        limit_credits:
-          type: integer
-          format: int64
-          minimum: 1
-          description: Capped-period limit in integer credits; omitted for unlimited.
-    DefaultMemberQuotaEnvelope:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          $ref: '#/components/schemas/DefaultMemberQuota'
-    SetDefaultMemberQuotaRequest:
       type: object
       required: [data]
       additionalProperties: false

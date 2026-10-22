@@ -109,7 +109,6 @@ type billingAccountStore interface {
 	AddBillingAccountMember(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, role string) (*tenancy.BillingAccountMember, error)
 	UpdateBillingAccountMemberRole(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, newRole string) (*tenancy.BillingAccountMember, error)
 	TransferBillingAccountOwnership(ctx context.Context, billingAccountInternalID, currentOwnerID, newOwnerID int64) error
-	LinkWorkspaceToBillingAccount(ctx context.Context, workspaceInternalID, billingAccountInternalID, actorUserID int64) error
 	// Studio handover invitations (#948, invite-style ownership transfer).
 	InitiateBillingTransferInvite(ctx context.Context, billingAccountInternalID, fromUserID, toUserID int64, idempotencyKey string) (*tenancy.BillingTransferInvite, error)
 	GetBillingTransferInvite(ctx context.Context, publicID string) (*tenancy.BillingTransferInvite, error)
@@ -211,10 +210,6 @@ type ContractV1BillingDeps struct {
 	PendingOrders   v1PendingOrderService
 	Recharges       v1RechargeHistoryService
 	Rewards         v1RewardsUserService
-	// Budgets persists the Workspace shared consumption budget and
-	// derives live usage (#945). Zero value keeps the budget surface
-	// fail-closed; production fills it in http_wiring.go.
-	Budgets workspaceBudgetStore
 	// Quotas persists the member cross-workspace consumption quotas
 	// and derives live usage (#946). Zero value keeps the quota
 	// surface fail-closed; production fills it in http_wiring.go.
@@ -237,7 +232,6 @@ func RegisterContractV1BillingRoutesOnEngine(r *gin.Engine, authDeps runtimehttp
 	group.Use(runtimehttp.PublicContractChain()...)
 	group.Use(runtimehttp.V1AuthMiddleware(authDeps), runtimehttp.ResolvePrincipal())
 	group.GET("/workspaces/:workspace_id/billing-account", handler.getBillingAccount)
-	group.POST("/workspaces/:workspace_id/billing-account/link", handler.linkBillingAccount)
 	group.GET("/workspaces/:workspace_id/billing-account/members", handler.listBillingAccountMembers)
 	group.POST("/workspaces/:workspace_id/billing-account/members", handler.addBillingAccountMember)
 	group.PATCH("/workspaces/:workspace_id/billing-account/members/:member_id", handler.updateBillingAccountMember)
@@ -254,22 +248,14 @@ func RegisterContractV1BillingRoutesOnEngine(r *gin.Engine, authDeps runtimehttp
 	group.GET("/workspaces/:workspace_id/credits/ledger", handler.listCreditsLedger)
 	group.GET("/workspaces/:workspace_id/billing-records", handler.listBillingRecords)
 	group.GET("/workspaces/:workspace_id/usage", handler.getUsage)
-	// Workspace shared consumption budget (#945): any member reads
-	// the cap with live usage; only Billing Owner/Admin writes.
-	group.GET("/workspaces/:workspace_id/budget", handler.getWorkspaceBudget)
-	group.PUT("/workspaces/:workspace_id/budget", handler.setWorkspaceBudget)
-	// Member cross-workspace consumption quotas (#946): Billing
-	// Owner/Admin lists and writes every member's quota; any member
-	// reads their own quota with live usage.
+	// Member cross-workspace consumption quotas (#946, #953): managers
+	// list and write every member's quota (Organization Owner/Admin on org
+	// scopes, Billing Owner/Admin on personal scopes); any member reads
+	// their own quota with live usage. New members default to unlimited;
+	// invites never gate on a default.
 	group.GET("/workspaces/:workspace_id/member-quotas", handler.listMemberQuotas)
 	group.GET("/workspaces/:workspace_id/member-quotas/self", handler.getMemberQuotaSelf)
 	group.PUT("/workspaces/:workspace_id/member-quotas/:user_id", handler.setMemberQuota)
-	// Account default new-member quota (#947): any member reads the
-	// default; only Billing Owner/Admin writes. Absent renders 409
-	// default_member_quota_not_configured (fail closed, never implicit
-	// unlimited); invites along the same account reuse it atomically.
-	group.GET("/workspaces/:workspace_id/default-member-quota", handler.getDefaultMemberQuota)
-	group.PUT("/workspaces/:workspace_id/default-member-quota", handler.setDefaultMemberQuota)
 	group.POST("/workspaces/:workspace_id/checkout-sessions", handler.createCheckoutSession)
 	group.GET("/workspaces/:workspace_id/checkout-sessions/:session_id", handler.getCheckoutSession)
 	// Gaps batch (#809-close, backend B): purchase options, pending
@@ -356,13 +342,14 @@ func (h *contractV1BillingHandler) consumptionReadScope(c *gin.Context, wctx v1W
 }
 
 type v1BillingAccountDTO struct {
-	ConsumptionScope string `json:"consumption_scope"`
-	BillingAccountID string `json:"billing_account_id"`
-	WorkspaceID      string `json:"workspace_id"`
-	OwnerType        string `json:"owner_type"`
-	Shared           bool   `json:"shared,omitempty"`
-	CreatedAt        string `json:"created_at,omitempty"`
-	UpdatedAt        string `json:"updated_at,omitempty"`
+	CanManageMemberQuotas bool   `json:"can_manage_member_quotas"`
+	ConsumptionScope      string `json:"consumption_scope"`
+	BillingAccountID      string `json:"billing_account_id"`
+	WorkspaceID           string `json:"workspace_id"`
+	OwnerType             string `json:"owner_type"`
+	Shared                bool   `json:"shared,omitempty"`
+	CreatedAt             string `json:"created_at,omitempty"`
+	UpdatedAt             string `json:"updated_at,omitempty"`
 }
 
 func (h *contractV1BillingHandler) getBillingAccount(c *gin.Context) {
@@ -381,11 +368,17 @@ func (h *contractV1BillingHandler) getBillingAccount(c *gin.Context) {
 		if !ok {
 			return
 		}
+		canManageQuotas, err := h.canManageMemberQuotas(c.Request.Context(), workspace, account.InternalID, wctx.Principal.UserID())
+		if err != nil {
+			renderBillingAccountError(c, err)
+			return
+		}
 		dto := v1BillingAccountDTO{
-			ConsumptionScope: scope,
-			BillingAccountID: account.PublicID,
-			WorkspaceID:      workspace.PublicID,
-			OwnerType:        account.OwnerType,
+			CanManageMemberQuotas: canManageQuotas,
+			ConsumptionScope:      scope,
+			BillingAccountID:      account.PublicID,
+			WorkspaceID:           workspace.PublicID,
+			OwnerType:             account.OwnerType,
 		}
 		if account.Shared {
 			dto.Shared = true

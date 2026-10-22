@@ -142,7 +142,6 @@ func TestV1BillingManagementUnavailablePrecedesInput(t *testing.T) {
 	for _, route := range []struct{ method, suffix string }{
 		{http.MethodGet, "/billing-account"},
 		{http.MethodGet, "/billing-account/members"},
-		{http.MethodPost, "/billing-account/link"},
 		{http.MethodPost, "/billing-account/members"},
 		{http.MethodPatch, "/billing-account/members/usr_missing"},
 		{http.MethodPost, "/billing-account/transfer"},

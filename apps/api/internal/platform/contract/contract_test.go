@@ -447,6 +447,9 @@ func TestStatusMatrixWorkspaceKernelCodes(t *testing.T) {
 		CodeOrganizationNotFound:            http.StatusNotFound,
 		CodeOrganizationForbidden:           http.StatusForbidden,
 		CodeOrganizationIdempotencyConflict: http.StatusConflict,
+		CodeOrganizationClosed:              http.StatusConflict,
+		CodeOrganizationClosureBlocked:      http.StatusConflict,
+		CodeOrganizationNotClosed:           http.StatusConflict,
 		CodeWorkspaceMemberNotFound:         http.StatusNotFound,
 		CodeWorkspaceMemberLimitReached:     http.StatusConflict,
 		CodeMembershipTransitionForbidden:   http.StatusForbidden,
@@ -482,10 +485,7 @@ func TestStatusMatrixWorkspaceKernelCodes(t *testing.T) {
 		CodeTaskStateConflict:       http.StatusConflict,
 		CodeTaskInsufficientCredits: http.StatusPaymentRequired,
 
-		CodeWorkspaceBudgetExhausted: http.StatusForbidden,
-		CodeMemberQuotaExhausted:     http.StatusForbidden,
-
-		CodeDefaultMemberQuotaNotConfigured: http.StatusConflict,
+		CodeMemberQuotaExhausted: http.StatusForbidden,
 
 		CodeLibraryFolderNotFound:          http.StatusNotFound,
 		CodeLibraryAssetNotFound:           http.StatusNotFound,

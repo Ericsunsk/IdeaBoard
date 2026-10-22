@@ -1,19 +1,18 @@
 package v1
 
-// Workspace Billing Account management (#915): stable resolution plus
-// financial-manager membership.
+// Workspace Billing Account management (ADR-0038): fixed creation-scope
+// resolution plus financial-manager membership.
 //
 // Funds identity (ba_) is stable and never derives from the current
 // Workspace Owner's personal wallet. Workspace records the consumption
 // location, User records the actual operator, and Task persists all three.
-// Organization is optional: org workspaces share the org pool, no-org studio
-// spaces explicitly link to the same studio account, independent accounts
-// stay isolated.
+// Exactly one Personal account exists per user and one shared account per
+// Organization; Workspace scope is fixed at creation and never switches.
 //
 // Financial management never grants Board content access, and Workspace
-// Owner/Admin standing alone never grants financial management: recharge,
-// member quotas, and workspace budgets require Billing Owner/Admin.
-// Ownership is transferable and never lifetime-bound.
+// Owner/Admin standing alone never grants financial management. Personal
+// member quotas require the account holder; Organization quotas follow
+// the Organization Owner/Admin role matrix in memberquotas.Policy.
 
 import (
 	"errors"
@@ -33,12 +32,6 @@ type v1BillingMemberDTO struct {
 	UserID    string `json:"user_id"`
 	Role      string `json:"role"`
 	CreatedAt string `json:"created_at,omitempty"`
-}
-
-type v1LinkBillingAccountBody struct {
-	Data struct {
-		BillingAccountID string `json:"billing_account_id"`
-	} `json:"data"`
 }
 
 type v1AddBillingMemberBody struct {
@@ -110,78 +103,6 @@ func (h *contractV1BillingHandler) resolveBillingMemberUserID(c *gin.Context, ra
 		return 0, false
 	}
 	return userID, true
-}
-
-// linkBillingAccount creates the explicit stable association for no-org
-// studio sharing. The caller must hold Workspace Owner/Admin on the
-// workspace AND Billing Owner/Admin on the target account; space-only
-// admins fail closed with billing_account_forbidden. An existing link to a
-// different account fails closed with billing_account_conflict (payer
-// switches are out of scope).
-func (h *contractV1BillingHandler) linkBillingAccount(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx) {
-		if h.deps.BillingAccounts == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-			c.Abort()
-			return
-		}
-		key, err := contract.IdempotencyKeyFromHeader(c)
-		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, runtimehttp.MsgIdempotencyKeyRequired2)
-			c.Abort()
-			return
-		}
-		var body v1LinkBillingAccountBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-			writeV1InputError(c)
-			return
-		}
-		targetID := strings.TrimSpace(body.Data.BillingAccountID)
-		if !contract.IsBillingAccountID(targetID) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeBillingAccountNotFound, runtimehttp.MsgBillingAccountNotFound)
-			c.Abort()
-			return
-		}
-		target, err := h.deps.BillingAccounts.GetBillingAccountByPublicID(c.Request.Context(), targetID)
-		if err != nil {
-			renderBillingAccountError(c, err)
-			return
-		}
-		externalUser := tenancy.FormatUserPublicID(wctx.Principal.PublicID())
-		scope := contract.IdempotencyScope(externalUser, "billing.account.link")
-		hash := contract.HashIdempotencyRequest("billing.account.link", wctx.Workspace.PublicID, targetID)
-		_, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), scope, wctx.Principal.UserID(), key, hash, func() (any, error) {
-			return nil, h.deps.BillingAccounts.LinkWorkspaceToBillingAccount(
-				c.Request.Context(), wctx.Workspace.InternalID, target.InternalID, wctx.Principal.UserID())
-		})
-		if doErr != nil {
-			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
-				c.Abort()
-				return
-			}
-			renderBillingAccountError(c, doErr)
-			return
-		}
-		account, resolved := h.billingAccountForWorkspace(c, wctx.Workspace)
-		if !resolved {
-			return
-		}
-		dto := v1BillingAccountDTO{
-			BillingAccountID: account.PublicID, WorkspaceID: wctx.Workspace.PublicID,
-			OwnerType: account.OwnerType,
-		}
-		if account.Shared {
-			dto.Shared = true
-		}
-		if !account.CreatedAt.IsZero() {
-			dto.CreatedAt = account.CreatedAt.UTC().Format(time.RFC3339)
-		}
-		if !account.UpdatedAt.IsZero() {
-			dto.UpdatedAt = account.UpdatedAt.UTC().Format(time.RFC3339)
-		}
-		contract.RenderSuccess(c, dto)
-	})
 }
 
 func (h *contractV1BillingHandler) listBillingAccountMembers(c *gin.Context) {

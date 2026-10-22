@@ -94,7 +94,7 @@ test('verifyAuthRuntimePrivileges rejects a role that can write Credits', async 
   assert.ok(Array.isArray(inspectedFunctions))
   assert.ok(
     inspectedFunctions.includes(
-      'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)',
+      'execute_credit_command_v3(text,bigint,bigint,text,text,text,text,text,text,text,text)',
     ),
   )
   assert.equal(

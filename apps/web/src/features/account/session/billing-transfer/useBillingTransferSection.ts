@@ -14,21 +14,23 @@ import { billingAccountQueryKeys } from '../billing-account/resource'
 import { useBillingAccountContext } from '../billing-account/useBillingAccountContext'
 import { creditsQueryKeys } from '../credits/resource'
 import { memberQuotaQueryKeys } from '../quota/resource'
-import { workspaceBudgetQueryKeys } from '../budget/resource'
 import {
   acceptTransferInvite,
   billingTransferQueryKeys,
   cancelTransferInvite,
-  detachBillingMember,
   fetchBillingManagers,
   fetchTransferInvites,
   initiateTransferInvite,
+  isTransferInviteLive,
   rejectTransferInvite,
-  type BillingManagerSummary,
   type BillingTransferInviteSummary,
 } from './resource'
 
 type Decision = 'accept' | 'reject' | 'cancel'
+
+type Confirmation =
+  | { kind: Decision; invite: BillingTransferInviteSummary }
+  | { kind: 'invite'; targetUserId: string }
 
 function useTransferQueries(workspaceId: () => string, identity: () => string) {
   const isEnabled = computed(() => workspaceId() !== '' && identity() !== '')
@@ -73,8 +75,17 @@ export function useBillingTransferSection(options: {
     account.value?.consumptionScope === 'account' ? (managersQuery.data.value ?? []) : [],
   )
   const myRole = computed(() => managers.value.find((member) => member.userId === identity())?.role)
-  const hasPendingInvite = computed(() =>
-    invites.value.some((invite) => invite.status === 'pending'),
+  // Only live (unexpired pending) invites gate decisions and re-issue: a
+  // lapsed invite moves nothing and the owner may send again.
+  const liveInvites = computed(() => invites.value.filter((invite) => isTransferInviteLive(invite)))
+  const hasPendingInvite = computed(() => liveInvites.value.length > 0)
+  const addressedInvite = computed(
+    () =>
+      liveInvites.value.find(
+        (invite) =>
+          invite.toUserId === identity() &&
+          invite.billingAccountId === account.value?.billingAccountId,
+      ) ?? null,
   )
   const hasLoadError = computed(
     () =>
@@ -92,63 +103,42 @@ export function useBillingTransferSection(options: {
   )
   const isSaving = ref(false)
   const actionError = ref<string | null>(null)
-  const recipientId = ref('')
-  const confirmation = ref<
-    | { kind: Decision; invite: BillingTransferInviteSummary }
-    | { kind: 'detach'; member: BillingManagerSummary }
-    | null
-  >(null)
+  const confirmation = ref<Confirmation | null>(null)
   const canInitiate = computed(
     () => myRole.value === 'owner' && !hasPendingInvite.value && !hasLoadError.value,
   )
-  const recipients = computed(() =>
-    (rosterQuery.data.value ?? []).filter((member) => member.userId !== identity()),
-  )
-  const canInvite = computed(
-    () =>
-      canInitiate.value && recipients.value.some((member) => member.userId === recipientId.value),
-  )
+  // Handover starts from a member row (owner view, never the own row).
+  function canHandOverTo(targetUserId: string): boolean {
+    return canInitiate.value && targetUserId !== '' && targetUserId !== identity()
+  }
   let intent: { signature: string; key: string } | null = null
   let scopeVersion = 0
 
   watch([workspaceId, identity], () => {
     ++scopeVersion
-    recipientId.value = ''
     confirmation.value = null
     actionError.value = null
     intent = null
-  })
-  watch(recipientId, () => {
-    intent = null
-    actionError.value = null
   })
 
   function memberName(userId: string): string {
     return rosterQuery.data.value?.find((member) => member.userId === userId)?.email || userId
   }
   function canDecide(invite: BillingTransferInviteSummary, decision: Decision): boolean {
-    if (invite.status !== 'pending' || invite.billingAccountId !== account.value?.billingAccountId)
-      return false
+    if (!isTransferInviteLive(invite)) return false
+    if (invite.billingAccountId !== account.value?.billingAccountId) return false
     return decision === 'cancel' ? invite.fromUserId === identity() : invite.toUserId === identity()
   }
-  function canDetach(member: BillingManagerSummary): boolean {
-    if (!myRole.value || hasLoadError.value) return false
-    if (
-      member.role === 'owner' &&
-      managers.value.filter((manager) => manager.role === 'owner').length <= 1
-    )
-      return false
-    return (
-      myRole.value === 'owner' ||
-      member.userId === identity() ||
-      (myRole.value === 'admin' && member.role === 'admin')
-    )
+  // Every handover confirmation mints a fresh intent: retries of one open
+  // dialog reuse its key, while a later re-issue (after lapse or a terminal
+  // decision) starts a new key instead of replaying the old invite.
+  function requestHandOver(targetUserId: string): void {
+    if (isSaving.value || !canHandOverTo(targetUserId)) return
+    intent = null
+    confirmation.value = { kind: 'invite', targetUserId }
   }
   function requestDecision(invite: BillingTransferInviteSummary, kind: Decision): void {
     if (!isSaving.value && canDecide(invite, kind)) confirmation.value = { kind, invite }
-  }
-  function requestDetach(member: BillingManagerSummary): void {
-    if (!isSaving.value && canDetach(member)) confirmation.value = { kind: 'detach', member }
   }
   function dismissConfirmation(): void {
     if (!isSaving.value) confirmation.value = null
@@ -173,12 +163,11 @@ export function useBillingTransferSection(options: {
         workspaceQueryKeys.list,
         creditsQueryKeys.all,
         memberQuotaQueryKeys.all,
-        workspaceBudgetQueryKeys.all,
       ].map((queryKey) => client.invalidateQueries({ queryKey })),
     )
   }
   async function runMutation(
-    operation: 'invite' | Decision | 'detach',
+    operation: 'invite' | Decision,
     target: string,
     run: (scopeId: string, key: string | undefined) => Promise<BillingTransferInviteSummary | void>,
   ): Promise<void> {
@@ -186,13 +175,13 @@ export function useBillingTransferSection(options: {
     const scopeId = workspaceId()
     const version = scopeVersion
     const signature = `${scopeId}:${identity()}:${operation}:${target}`
-    if (operation !== 'detach' && intent?.signature !== signature) {
+    if (intent?.signature !== signature) {
       intent = { signature, key: workspaceBillingTransferIdempotencyKey(operation) }
     }
     isSaving.value = true
     actionError.value = null
     try {
-      const changed = await run(scopeId, operation === 'detach' ? undefined : intent?.key)
+      const changed = await run(scopeId, intent?.key)
       await invalidate(scopeId, changed ?? undefined)
       if (version !== scopeVersion) return
       confirmation.value = null
@@ -209,32 +198,27 @@ export function useBillingTransferSection(options: {
       isSaving.value = false
     }
   }
-  async function initiate(): Promise<void> {
-    if (!canInvite.value) return
-    const target = recipientId.value
-    await runMutation('invite', target, (id, key) =>
-      initiateTransferInvite(id, target, { idempotencyKey: key }),
-    )
-  }
   async function confirm(): Promise<void> {
     const pending = confirmation.value
     if (!pending) return
-    if (pending.kind === 'detach') {
-      if (!canDetach(pending.member)) return
-      const userId = pending.member.userId
-      await runMutation('detach', userId, (id) => detachBillingMember(id, userId))
-    } else {
-      if (!canDecide(pending.invite, pending.kind)) return
-      const { kind, invite } = pending
-      const decide = {
-        accept: acceptTransferInvite,
-        reject: rejectTransferInvite,
-        cancel: cancelTransferInvite,
-      }[kind]
-      await runMutation(kind, invite.publicId, (id, key) =>
-        decide(id, invite.publicId, { idempotencyKey: key }),
+    if (pending.kind === 'invite') {
+      if (!canHandOverTo(pending.targetUserId)) return
+      const target = pending.targetUserId
+      await runMutation('invite', target, (id, key) =>
+        initiateTransferInvite(id, target, { idempotencyKey: key }),
       )
+      return
     }
+    if (!canDecide(pending.invite, pending.kind)) return
+    const { kind, invite } = pending
+    const decide = {
+      accept: acceptTransferInvite,
+      reject: rejectTransferInvite,
+      cancel: cancelTransferInvite,
+    }[kind]
+    await runMutation(kind, invite.publicId, (id, key) =>
+      decide(id, invite.publicId, { idempotencyKey: key }),
+    )
   }
   return {
     account,
@@ -245,18 +229,14 @@ export function useBillingTransferSection(options: {
     retry,
     isSaving,
     actionError,
-    canInitiate,
-    canInvite,
-    recipientId,
-    recipients,
+    canHandOverTo,
+    addressedInvite,
     memberName,
     canDecide,
-    canDetach,
+    requestHandOver,
     requestDecision,
-    requestDetach,
     confirmation,
     dismissConfirmation,
-    initiate,
     confirm,
   }
 }

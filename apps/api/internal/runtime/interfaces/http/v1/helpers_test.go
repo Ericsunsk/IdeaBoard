@@ -1077,6 +1077,189 @@ func TestV1Organizations(t *testing.T) {
 	}
 }
 
+func TestV1OrganizationMembers(t *testing.T) {
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	engine := newV1TestEngine(store, dir)
+
+	const owner, admin, member, outsider = 31, 32, 33, 34
+	for _, userID := range []int64{owner, admin, member, outsider} {
+		dir.ensure(userID)
+	}
+	usr := func(userID int64) string {
+		return tenancy.FormatUserPublicID(testUUIDForUser(userID))
+	}
+	key := func(parts ...string) map[string]string {
+		return map[string]string{contract.IdempotencyKeyHeader: strings.Join(parts, "-")}
+	}
+
+	status, _, created := doV1(t, engine, v1Call{method: http.MethodPost, path: "/api/v1/organizations", userID: owner,
+		body: `{"data":{"name":"acme"}}`, headers: key("org", "create")})
+	if status != 201 {
+		t.Fatalf("create org = %d %v", status, created)
+	}
+	orgID := created["data"].(map[string]any)["id"].(string)
+	memberPath := "/api/v1/organizations/" + orgID + "/members"
+
+	// At most one organization: creating a second one fails closed.
+	status, _, second := doV1(t, engine, v1Call{method: http.MethodPost, path: "/api/v1/organizations", userID: owner,
+		body: `{"data":{"name":"second"}}`, headers: key("org", "create", "2")})
+	if status != 409 || v1ErrorCode(t, second) != string(contract.CodeOrganizationLimitReached) {
+		t.Fatalf("second org = %d %v, want 409 organization_limit_reached", status, second)
+	}
+
+	invite := func(actor int64, target string, role string) (int, map[string]any) {
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodPost, path: memberPath, userID: actor,
+			body:    fmt.Sprintf(`{"data":{"user_id":%q,"role":%q}}`, target, role),
+			headers: key("org", "invite", fmt.Sprint(actor), target, role)})
+		return status, payload
+	}
+	if status, _ := invite(owner, usr(admin), tenancy.RoleAdmin); status != 201 {
+		t.Fatalf("owner invites admin = %d, want 201", status)
+	}
+	if status, _ := invite(admin, usr(member), tenancy.RoleMember); status != 201 {
+		t.Fatalf("admin invites member = %d, want 201", status)
+	}
+	// Admins cannot grant admin; members cannot invite; owner grants never
+	// flow through invite (explicit handover only).
+	if status, payload := invite(admin, usr(outsider), tenancy.RoleAdmin); status != 403 ||
+		v1ErrorCode(t, payload) != string(contract.CodeMembershipTransitionForbidden) {
+		t.Fatalf("admin invites admin = %d %v, want 403 membership_transition_forbidden", status, payload)
+	}
+	if status, _ := invite(member, usr(outsider), tenancy.RoleMember); status != 403 {
+		t.Fatalf("member invites = %d, want 403", status)
+	}
+	if status, payload := invite(owner, usr(outsider), tenancy.RoleOwner); status == 201 || status == 200 {
+		t.Fatalf("owner-role invite = %d %v, want failure", status, payload)
+	}
+
+	// Joining a second organization fails closed.
+	status, _, orgB := doV1(t, engine, v1Call{method: http.MethodPost, path: "/api/v1/organizations", userID: outsider,
+		body: `{"data":{"name":"other"}}`, headers: key("org", "create", "b")})
+	if status != 201 {
+		t.Fatalf("outsider creates org = %d %v", status, orgB)
+	}
+	orgBID := orgB["data"].(map[string]any)["id"].(string)
+	status, _, joinPayload := doV1(t, engine, v1Call{method: http.MethodPost,
+		path: "/api/v1/organizations/" + orgBID + "/members", userID: outsider,
+		body:    fmt.Sprintf(`{"data":{"user_id":%q,"role":%q}}`, usr(owner), tenancy.RoleMember),
+		headers: key("org", "invite", "b", "owner")})
+	if status != 409 || v1ErrorCode(t, joinPayload) != string(contract.CodeOrganizationLimitReached) {
+		t.Fatalf("second-org join = %d %v, want 409 organization_limit_reached", status, joinPayload)
+	}
+
+	// Only owner/admin create organization workspaces on the shared pool.
+	wsPath := "/api/v1/organizations/" + orgID + "/workspaces"
+	status, _, wsPayload := doV1(t, engine, v1Call{method: http.MethodPost, path: wsPath, userID: owner,
+		body: `{"data":{"name":"org-ws"}}`, headers: key("org", "ws", "1")})
+	if status != 201 {
+		t.Fatalf("owner creates org workspace = %d %v", status, wsPayload)
+	}
+	wsID := wsPayload["data"].(map[string]any)["id"].(string)
+	wsDetail := "/api/v1/workspaces/" + wsID
+	if status, _, _ := doV1(t, engine, v1Call{method: http.MethodPost, path: wsPath, userID: member,
+		body: `{"data":{"name":"nope"}}`, headers: key("org", "ws", "2")}); status != 403 {
+		t.Fatalf("member creates org workspace = %d, want 403", status)
+	}
+	if status, _, _ := doV1(t, engine, v1Call{method: http.MethodPost, path: wsPath, userID: outsider,
+		body: `{"data":{"name":"nope"}}`, headers: key("org", "ws", "3")}); status != 404 {
+		t.Fatalf("outsider creates org workspace = %d, want 404", status)
+	}
+
+	getWS := func(userID int64) int {
+		status, _, _ := doV1(t, engine, v1Call{method: http.MethodGet, path: wsDetail, userID: userID})
+		return status
+	}
+	// Owner/admin hold automatic access; members need an explicit grant;
+	// non-members stay hidden until they join.
+	if got := getWS(owner); got != 200 {
+		t.Fatalf("owner reads org workspace = %d, want 200", got)
+	}
+	if got := getWS(admin); got != 200 {
+		t.Fatalf("admin reads org workspace = %d, want 200", got)
+	}
+	if got := getWS(member); got != 404 {
+		t.Fatalf("member reads org workspace = %d, want 404 before grant", got)
+	}
+	if got := getWS(outsider); got != 404 {
+		t.Fatalf("outsider reads org workspace = %d, want 404", got)
+	}
+	patchWS := func(userID int64) int {
+		status, _, _ := doV1(t, engine, v1Call{method: http.MethodPatch, path: wsDetail, userID: userID,
+			body: `{"data":{"name":"renamed"}}`})
+		return status
+	}
+	if got := patchWS(owner); got != 200 {
+		t.Fatalf("owner renames org workspace = %d, want 200", got)
+	}
+	if got := patchWS(admin); got != 200 {
+		t.Fatalf("admin renames org workspace = %d, want 200", got)
+	}
+
+	// Owner/admin authorize member workspace access; the grant can read but
+	// workspace rename stays owner/admin-only server-side.
+	grant := func(actor, target int64, role string) (int, map[string]any) {
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodPost, path: wsDetail + "/members", userID: actor,
+			body:    fmt.Sprintf(`{"data":{"user_id":%q,"role":%q}}`, usr(target), role),
+			headers: key("ws", "grant", fmt.Sprint(actor), fmt.Sprint(target))})
+		return status, payload
+	}
+	if status, payload := grant(owner, member, tenancy.RoleMember); status != 201 {
+		t.Fatalf("owner grants member workspace = %d %v, want 201", status, payload)
+	}
+	if got := getWS(member); got != 200 {
+		t.Fatalf("member reads org workspace = %d, want 200 after grant", got)
+	}
+	if got := patchWS(member); got != 403 {
+		t.Fatalf("member renames org workspace = %d, want 403", got)
+	}
+	// Grants require organization membership first (join-first fail closed).
+	if status, _ := grant(owner, outsider, tenancy.RoleMember); status != 404 {
+		t.Fatalf("grant to non-org-member = %d, want 404", status)
+	}
+
+	// Only owners change admin roles. Demotion drops automatic all-workspace
+	// access and keeps only explicit grants (none here, so hidden).
+	patchMember := func(actor, target int64, role string) (int, map[string]any) {
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodPatch,
+			path: memberPath + "/" + usr(target), userID: actor,
+			body: fmt.Sprintf(`{"data":{"role":%q}}`, role)})
+		return status, payload
+	}
+	if status, _ := patchMember(admin, member, tenancy.RoleAdmin); status != 403 {
+		t.Fatalf("admin promotes member = %d, want 403", status)
+	}
+	if status, _ := patchMember(owner, admin, tenancy.RoleMember); status != 200 {
+		t.Fatalf("owner demotes admin = %d, want 200", status)
+	}
+	if got := getWS(admin); got != 404 {
+		t.Fatalf("demoted admin reads org workspace = %d, want 404", got)
+	}
+
+	// Leaving removes every workspace grant at once; content stays
+	// organization-owned and visible to remaining members.
+	remove := func(actor, target int64) (int, map[string]any) {
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodDelete,
+			path: memberPath + "/" + usr(target), userID: actor,
+			headers: key("org", "remove", fmt.Sprint(actor), fmt.Sprint(target))})
+		return status, payload
+	}
+	if status, _ := remove(member, member); status != 200 {
+		t.Fatalf("member self-leave = %d, want 200", status)
+	}
+	if got := getWS(member); got != 404 {
+		t.Fatalf("left member reads org workspace = %d, want 404", got)
+	}
+	if got := getWS(owner); got != 200 {
+		t.Fatalf("owner reads org workspace after leave = %d, want 200 (content retained)", got)
+	}
+	// Owner rows are immutable outside explicit handover.
+	if status, payload := remove(owner, owner); status != 403 ||
+		v1ErrorCode(t, payload) != string(contract.CodeMembershipTransitionForbidden) {
+		t.Fatalf("owner self-leave = %d %v, want 403 membership_transition_forbidden", status, payload)
+	}
+}
+
 func TestResolvePrincipalTenantScope(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	newContext := func(userID int64, workspaceParam string) (*gin.Context, *httptest.ResponseRecorder) {

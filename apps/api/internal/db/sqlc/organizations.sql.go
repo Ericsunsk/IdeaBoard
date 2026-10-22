@@ -7,13 +7,145 @@ package dbsqlc
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const clearOrganizationClosed = `-- name: ClearOrganizationClosed :execrows
+UPDATE organizations
+SET closed_at = NULL, closed_by = NULL, updated_at = now()
+WHERE public_id = $1 AND closed_at IS NOT NULL
+`
+
+func (q *Queries) ClearOrganizationClosed(ctx context.Context, publicID string) (int64, error) {
+	result, err := q.db.Exec(ctx, clearOrganizationClosed, publicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const countActiveOrgSearchOperations = `-- name: CountActiveOrgSearchOperations :one
+SELECT COUNT(*)
+FROM ai_search_operations AS op
+INNER JOIN workspaces AS w ON w.internal_id = op.workspace_id
+WHERE w.organization_id = $1
+  AND op.status IN ('pending', 'reconciliation_pending')
+`
+
+func (q *Queries) CountActiveOrgSearchOperations(ctx context.Context, organizationID pgtype.Int8) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveOrgSearchOperations, organizationID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countActiveOrgTasks = `-- name: CountActiveOrgTasks :one
+SELECT COUNT(*)
+FROM tasks AS t
+INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
+WHERE w.organization_id = $1
+  AND t.status IN ('pending', 'running')
+`
+
+func (q *Queries) CountActiveOrgTasks(ctx context.Context, organizationID pgtype.Int8) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveOrgTasks, organizationID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countOpenOrgPaymentDisputes = `-- name: CountOpenOrgPaymentDisputes :one
+SELECT COUNT(*)
+FROM payment_disputes AS disputes
+INNER JOIN payment_orders AS orders ON orders.id = disputes.payment_order_id
+WHERE orders.billing_account_id = $1
+  AND disputes.status = 'open'
+`
+
+func (q *Queries) CountOpenOrgPaymentDisputes(ctx context.Context, billingAccountID pgtype.Int8) (int64, error) {
+	row := q.db.QueryRow(ctx, countOpenOrgPaymentDisputes, billingAccountID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countOrganizationOwners = `-- name: CountOrganizationOwners :one
+SELECT COUNT(*)
+FROM organization_memberships
+WHERE organization_id = $1 AND role = 'owner'
+`
+
+func (q *Queries) CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countOrganizationOwners, organizationID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countOrganizationsByUserID = `-- name: CountOrganizationsByUserID :one
+SELECT COUNT(*)
+FROM organizations AS o
+INNER JOIN organization_memberships AS m ON m.organization_id = o.internal_id
+WHERE m.user_id = $1 AND o.archived_at IS NULL
+`
+
+func (q *Queries) CountOrganizationsByUserID(ctx context.Context, userID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countOrganizationsByUserID, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countPendingOrgPaymentRefunds = `-- name: CountPendingOrgPaymentRefunds :one
+SELECT COUNT(*)
+FROM payment_refunds AS refunds
+INNER JOIN payment_orders AS orders ON orders.id = refunds.payment_order_id
+WHERE orders.billing_account_id = $1
+  AND refunds.status = 'pending'
+`
+
+func (q *Queries) CountPendingOrgPaymentRefunds(ctx context.Context, billingAccountID pgtype.Int8) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingOrgPaymentRefunds, billingAccountID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countPendingOrgTransferInvites = `-- name: CountPendingOrgTransferInvites :one
+SELECT COUNT(*)
+FROM billing_account_transfer_invites AS invites
+WHERE invites.billing_account_id = $1
+  AND invites.status = 'pending'
+  AND invites.expires_at > now()
+`
+
+func (q *Queries) CountPendingOrgTransferInvites(ctx context.Context, billingAccountID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingOrgTransferInvites, billingAccountID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countUnsettledOrgPaymentOrders = `-- name: CountUnsettledOrgPaymentOrders :one
+SELECT COUNT(*)
+FROM payment_orders AS orders
+WHERE orders.billing_account_id = $1
+  AND orders.status IN ('creating', 'checkout_open', 'async_payment_pending', 'paid_pending_credit')
+`
+
+func (q *Queries) CountUnsettledOrgPaymentOrders(ctx context.Context, billingAccountID pgtype.Int8) (int64, error) {
+	row := q.db.QueryRow(ctx, countUnsettledOrgPaymentOrders, billingAccountID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
 
 const createOrganization = `-- name: CreateOrganization :one
 
 INSERT INTO organizations (public_id, name)
 VALUES ($1, $2)
-RETURNING internal_id, public_id, name, created_at, updated_at, archived_at
+RETURNING internal_id, public_id, name, created_at, updated_at, archived_at, closed_at, closed_by
 `
 
 type CreateOrganizationParams struct {
@@ -33,12 +165,50 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
+		&i.ClosedAt,
+		&i.ClosedBy,
 	)
 	return i, err
 }
 
+const deleteOrgWorkspaceMembershipsForUser = `-- name: DeleteOrgWorkspaceMembershipsForUser :exec
+DELETE FROM workspace_memberships AS m
+USING workspaces AS w
+WHERE m.workspace_id = w.internal_id
+  AND w.organization_id = $1
+  AND m.user_id = $2
+`
+
+type DeleteOrgWorkspaceMembershipsForUserParams struct {
+	OrganizationID pgtype.Int8 `json:"organization_id"`
+	UserID         int64       `json:"user_id"`
+}
+
+func (q *Queries) DeleteOrgWorkspaceMembershipsForUser(ctx context.Context, arg DeleteOrgWorkspaceMembershipsForUserParams) error {
+	_, err := q.db.Exec(ctx, deleteOrgWorkspaceMembershipsForUser, arg.OrganizationID, arg.UserID)
+	return err
+}
+
+const deleteOrganizationMembership = `-- name: DeleteOrganizationMembership :execrows
+DELETE FROM organization_memberships
+WHERE organization_id = $1 AND user_id = $2
+`
+
+type DeleteOrganizationMembershipParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	UserID         int64 `json:"user_id"`
+}
+
+func (q *Queries) DeleteOrganizationMembership(ctx context.Context, arg DeleteOrganizationMembershipParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOrganizationMembership, arg.OrganizationID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getOrganizationByInternalID = `-- name: GetOrganizationByInternalID :one
-SELECT internal_id, public_id, name, created_at, updated_at, archived_at
+SELECT internal_id, public_id, name, created_at, updated_at, archived_at, closed_at, closed_by
 FROM organizations
 WHERE internal_id = $1
 LIMIT 1
@@ -54,12 +224,14 @@ func (q *Queries) GetOrganizationByInternalID(ctx context.Context, internalID in
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
+		&i.ClosedAt,
+		&i.ClosedBy,
 	)
 	return i, err
 }
 
 const getOrganizationByPublicID = `-- name: GetOrganizationByPublicID :one
-SELECT internal_id, public_id, name, created_at, updated_at, archived_at
+SELECT internal_id, public_id, name, created_at, updated_at, archived_at, closed_at, closed_by
 FROM organizations
 WHERE public_id = $1
 LIMIT 1
@@ -75,6 +247,8 @@ func (q *Queries) GetOrganizationByPublicID(ctx context.Context, publicID string
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
+		&i.ClosedAt,
+		&i.ClosedBy,
 	)
 	return i, err
 }
@@ -102,8 +276,235 @@ func (q *Queries) GetOrganizationMembership(ctx context.Context, arg GetOrganiza
 	return i, err
 }
 
+const getWalletBalancesForAccount = `-- name: GetWalletBalancesForAccount :one
+SELECT
+  MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_available'),
+  MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
+FROM credit_accounts AS accounts
+WHERE accounts.billing_account_id = $1
+  AND accounts.account_role IN ('user_available', 'user_reserved')
+`
+
+type GetWalletBalancesForAccountRow struct {
+	Max   interface{} `json:"max"`
+	Max_2 interface{} `json:"max_2"`
+}
+
+func (q *Queries) GetWalletBalancesForAccount(ctx context.Context, billingAccountID pgtype.Int8) (GetWalletBalancesForAccountRow, error) {
+	row := q.db.QueryRow(ctx, getWalletBalancesForAccount, billingAccountID)
+	var i GetWalletBalancesForAccountRow
+	err := row.Scan(&i.Max, &i.Max_2)
+	return i, err
+}
+
+const insertOrganizationClosure = `-- name: InsertOrganizationClosure :one
+INSERT INTO organization_closures (
+  organization_id, billing_account_id, closed_by, reason,
+  membership_snapshot, workspace_snapshot,
+  available_balance, reserved_balance, credited_order_refs,
+  disposition, disposition_detail
+)
+VALUES (
+  $1, $2, $3, $4,
+  $5, $6,
+  $7, $8, $9,
+  $10, $11
+)
+RETURNING internal_id, organization_id, billing_account_id,
+  closed_at, closed_by, reason,
+  membership_snapshot, workspace_snapshot,
+  available_balance, reserved_balance, credited_order_refs,
+  disposition, disposition_detail, restored_at, restored_by
+`
+
+type InsertOrganizationClosureParams struct {
+	OrganizationID     int64       `json:"organization_id"`
+	BillingAccountID   int64       `json:"billing_account_id"`
+	ClosedBy           pgtype.Int8 `json:"closed_by"`
+	Reason             string      `json:"reason"`
+	MembershipSnapshot []byte      `json:"membership_snapshot"`
+	WorkspaceSnapshot  []byte      `json:"workspace_snapshot"`
+	AvailableBalance   int64       `json:"available_balance"`
+	ReservedBalance    int64       `json:"reserved_balance"`
+	CreditedOrderRefs  []byte      `json:"credited_order_refs"`
+	Disposition        string      `json:"disposition"`
+	DispositionDetail  []byte      `json:"disposition_detail"`
+}
+
+func (q *Queries) InsertOrganizationClosure(ctx context.Context, arg InsertOrganizationClosureParams) (OrganizationClosure, error) {
+	row := q.db.QueryRow(ctx, insertOrganizationClosure,
+		arg.OrganizationID,
+		arg.BillingAccountID,
+		arg.ClosedBy,
+		arg.Reason,
+		arg.MembershipSnapshot,
+		arg.WorkspaceSnapshot,
+		arg.AvailableBalance,
+		arg.ReservedBalance,
+		arg.CreditedOrderRefs,
+		arg.Disposition,
+		arg.DispositionDetail,
+	)
+	var i OrganizationClosure
+	err := row.Scan(
+		&i.InternalID,
+		&i.OrganizationID,
+		&i.BillingAccountID,
+		&i.ClosedAt,
+		&i.ClosedBy,
+		&i.Reason,
+		&i.MembershipSnapshot,
+		&i.WorkspaceSnapshot,
+		&i.AvailableBalance,
+		&i.ReservedBalance,
+		&i.CreditedOrderRefs,
+		&i.Disposition,
+		&i.DispositionDetail,
+		&i.RestoredAt,
+		&i.RestoredBy,
+	)
+	return i, err
+}
+
+const listCreditedOrgPaymentOrders = `-- name: ListCreditedOrgPaymentOrders :many
+SELECT orders.public_order_number, orders.terms_version, orders.refund_policy_version
+FROM payment_orders AS orders
+WHERE orders.billing_account_id = $1
+  AND orders.status = 'credited'
+ORDER BY orders.created_at ASC
+LIMIT $2
+`
+
+type ListCreditedOrgPaymentOrdersParams struct {
+	BillingAccountID pgtype.Int8 `json:"billing_account_id"`
+	RowLimit         int32       `json:"row_limit"`
+}
+
+type ListCreditedOrgPaymentOrdersRow struct {
+	PublicOrderNumber   string `json:"public_order_number"`
+	TermsVersion        string `json:"terms_version"`
+	RefundPolicyVersion string `json:"refund_policy_version"`
+}
+
+func (q *Queries) ListCreditedOrgPaymentOrders(ctx context.Context, arg ListCreditedOrgPaymentOrdersParams) ([]ListCreditedOrgPaymentOrdersRow, error) {
+	rows, err := q.db.Query(ctx, listCreditedOrgPaymentOrders, arg.BillingAccountID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCreditedOrgPaymentOrdersRow
+	for rows.Next() {
+		var i ListCreditedOrgPaymentOrdersRow
+		if err := rows.Scan(&i.PublicOrderNumber, &i.TermsVersion, &i.RefundPolicyVersion); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrganizationMembers = `-- name: ListOrganizationMembers :many
+SELECT m.organization_id, m.user_id, m.role, m.created_at
+FROM organization_memberships AS m
+WHERE m.organization_id = $1
+ORDER BY m.user_id ASC
+LIMIT $2
+`
+
+type ListOrganizationMembersParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	RowLimit       int32 `json:"row_limit"`
+}
+
+func (q *Queries) ListOrganizationMembers(ctx context.Context, arg ListOrganizationMembersParams) ([]OrganizationMembership, error) {
+	rows, err := q.db.Query(ctx, listOrganizationMembers, arg.OrganizationID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OrganizationMembership
+	for rows.Next() {
+		var i OrganizationMembership
+		if err := rows.Scan(
+			&i.OrganizationID,
+			&i.UserID,
+			&i.Role,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrganizationMembersForSnapshot = `-- name: ListOrganizationMembersForSnapshot :many
+SELECT m.user_id, m.role
+FROM organization_memberships AS m
+WHERE m.organization_id = $1
+ORDER BY m.user_id ASC
+`
+
+type ListOrganizationMembersForSnapshotRow struct {
+	UserID int64  `json:"user_id"`
+	Role   string `json:"role"`
+}
+
+func (q *Queries) ListOrganizationMembersForSnapshot(ctx context.Context, organizationID int64) ([]ListOrganizationMembersForSnapshotRow, error) {
+	rows, err := q.db.Query(ctx, listOrganizationMembersForSnapshot, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOrganizationMembersForSnapshotRow
+	for rows.Next() {
+		var i ListOrganizationMembersForSnapshotRow
+		if err := rows.Scan(&i.UserID, &i.Role); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrganizationWorkspacePublicIDs = `-- name: ListOrganizationWorkspacePublicIDs :many
+SELECT w.public_id
+FROM workspaces AS w
+WHERE w.organization_id = $1
+ORDER BY w.internal_id ASC
+`
+
+func (q *Queries) ListOrganizationWorkspacePublicIDs(ctx context.Context, organizationID pgtype.Int8) ([]string, error) {
+	rows, err := q.db.Query(ctx, listOrganizationWorkspacePublicIDs, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var public_id string
+		if err := rows.Scan(&public_id); err != nil {
+			return nil, err
+		}
+		items = append(items, public_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrganizationsByUserID = `-- name: ListOrganizationsByUserID :many
-SELECT o.internal_id, o.public_id, o.name, o.created_at, o.updated_at, o.archived_at
+SELECT o.internal_id, o.public_id, o.name, o.created_at, o.updated_at, o.archived_at, o.closed_at, o.closed_by
 FROM organizations AS o
 INNER JOIN organization_memberships AS m ON m.organization_id = o.internal_id
 WHERE m.user_id = $1 AND o.archived_at IS NULL
@@ -132,6 +533,8 @@ func (q *Queries) ListOrganizationsByUserID(ctx context.Context, arg ListOrganiz
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
+			&i.ClosedAt,
+			&i.ClosedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -141,6 +544,87 @@ func (q *Queries) ListOrganizationsByUserID(ctx context.Context, arg ListOrganiz
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockOrganizationByPublicID = `-- name: LockOrganizationByPublicID :one
+
+SELECT internal_id, public_id, name, created_at, updated_at, archived_at, closed_at, closed_by
+FROM organizations
+WHERE public_id = $1
+FOR UPDATE
+`
+
+// Organization closure queries (#955). Close/Restore pin the organization
+// row FOR UPDATE so concurrent closes serialize; the open-closure unique
+// index collapses a lost race to the winner via the insert conflict plus
+// the SetOrganizationClosed row count below.
+func (q *Queries) LockOrganizationByPublicID(ctx context.Context, publicID string) (Organization, error) {
+	row := q.db.QueryRow(ctx, lockOrganizationByPublicID, publicID)
+	var i Organization
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.Name,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ArchivedAt,
+		&i.ClosedAt,
+		&i.ClosedBy,
+	)
+	return i, err
+}
+
+const lockUserRow = `-- name: LockUserRow :one
+SELECT id
+FROM users
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockUserRow(ctx context.Context, userID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, lockUserRow, userID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const markOrganizationClosureRestored = `-- name: MarkOrganizationClosureRestored :execrows
+UPDATE organization_closures
+SET restored_at = now(), restored_by = $1
+WHERE organization_id = $2
+  AND restored_at IS NULL
+`
+
+type MarkOrganizationClosureRestoredParams struct {
+	RestoredBy     pgtype.Int8 `json:"restored_by"`
+	OrganizationID int64       `json:"organization_id"`
+}
+
+func (q *Queries) MarkOrganizationClosureRestored(ctx context.Context, arg MarkOrganizationClosureRestoredParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markOrganizationClosureRestored, arg.RestoredBy, arg.OrganizationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setOrganizationClosed = `-- name: SetOrganizationClosed :execrows
+UPDATE organizations
+SET closed_at = now(), closed_by = $1, updated_at = now()
+WHERE public_id = $2 AND closed_at IS NULL
+`
+
+type SetOrganizationClosedParams struct {
+	ClosedBy pgtype.Int8 `json:"closed_by"`
+	PublicID string      `json:"public_id"`
+}
+
+func (q *Queries) SetOrganizationClosed(ctx context.Context, arg SetOrganizationClosedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setOrganizationClosed, arg.ClosedBy, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateOrganizationName = `-- name: UpdateOrganizationName :execrows
