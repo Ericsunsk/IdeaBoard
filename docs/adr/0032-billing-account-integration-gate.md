@@ -43,9 +43,9 @@ defaults, #948 handover).
    effective until #945–#948 land; no quota math was added to pass this gate.
 5. No new acceptance-test framework. Browser/manual acceptance stays with the
    user; this gate reuses `go test`, vitest suites, `schemarelease`, Atlas
-   validation, sqlc/Orval drift, and contract scripts. Cutover/stop-write/
-   recovery/rollback procedure lives in
-   [billing-account-cutover.md](../runbooks/billing-account-cutover.md);
+   validation, sqlc/Orval drift, and contract scripts. The current Fresh
+   Database integration procedure lives in
+   [billing-personal-organization-validation.md](../runbooks/billing-personal-organization-validation.md);
    image rollback never implies database restore.
 
 ## Consequences

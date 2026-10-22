@@ -4,13 +4,13 @@ status: accepted
 
 # ADR-0038：Personal 与 Organization 资金池及 Workspace 归属
 
-产品规则已接受并已在生产行为中生效：账户创建/归属/换户/转账面已随 #950 收敛（独立 Workspace 账户创建、link 读写、换 payer、跨账户余额移动均已删除；解析只认创建时 scope）；组织基数、角色与 Workspace 访问映射及管理面切换已随 #951 落地；Personal 协作（Default 拒邀、无审批、缺席 unlimited）已随 #952 落地；额度矩阵（默认门退役、Owner 短路、403 矩阵）已随 #953 落地；Workspace Budget 已随 #954 全拆；组织关闭/恢复/余额处置已随 #955 落地。本 ADR 只记最终结构。
+产品规则已接受，项目尚未上线、没有存量用户或资金。当前实现中：账户创建/归属/换户/转账面已随 #950 收敛（独立 Workspace 账户创建、link 读写、换 payer、跨账户余额移动均已删除；解析只认创建时 scope）；组织基数、角色与 Workspace 访问映射及管理面切换已随 #951 落地；Personal 协作（Default 拒邀、无审批、缺席 unlimited）已随 #952 落地；额度矩阵（默认门退役、Owner 短路、403 矩阵）已随 #953 落地；Workspace Budget 已随 #954 全拆；组织关闭/恢复与余额保留已实现，按充值条款执行原渠道退款的能力仍待 #955 验收。本 ADR 记录目标合同，实现验收以对应 issue 为准。
 
 ## 背景
 
-当前已接受的计费设计允许同一用户管理多个独立 Billing Account、创建 Workspace 时选择共享或独立账户，并提供 Workspace Budget、账户级 Member Quota 和必须预先配置的默认成员额度。产品讨论决定收敛成 Personal 与可选 Organization 两个资金范围：个人业务空间共享 Personal 资金池，组织业务空间共享 Organization 资金池；Workspace 是内容与授权边界，不再是资金边界。
+此前计费方案允许同一用户管理多个独立 Billing Account、创建 Workspace 时选择共享或独立账户，并提供 Workspace Budget、账户级 Member Quota 和必须预先配置的默认成员额度。产品讨论决定收敛成 Personal 与可选 Organization 两个资金范围：个人业务空间共享 Personal 资金池，组织业务空间共享 Organization 资金池；Workspace 是内容与授权边界，不再是资金边界。
 
-此决策改变既有产品合同，但保留资金事实的稳定性：Wallet/Ledger、支付、退款、Task/Vision submit-time payer snapshot、事务预占与结算等账务正确性机制继续有效。实现迁移必须单独处理既有账户和限制数据，不得静默合并或改写不可变资金记录。
+项目按 pre-launch clean break 在 Fresh Database 初始化此模型，不需要存量账户或余额迁移。Wallet/Ledger、支付、退款、Task/Vision submit-time payer snapshot、事务预占与结算等账务正确性机制继续有效；上线后产生的不可变资金记录不得改写。
 
 ## 决策
 
@@ -60,7 +60,7 @@ status: accepted
 - 不再向用户提供 Workspace 独立 Billing Account 选择、Workspace Budget 或 Workspace 余额转账。Organization 资金直接共享；Personal 与 Organization 是仅有的用户资金范围。
 - Workspace 内容访问仍需遵循 Organization 角色映射和 Member 的逐 Workspace 授权；资金范围不能替代内容授权。
 - 消费额度的实际使用在 Task/Vision 的事务性 Quote/Hold 边界执行；钱包余额检查、预占、结算、退款关联、并发保护和失败释放继续保留。独立 Workspace 账户创建、Workspace Link 读写、换 payer、跨账户余额移动、Workspace Budget、账户默认成员额度门均已删除，无残留、无双实现。
-- 既有多账户余额按 #949 处置规则收敛（空库收敛，不合并、不重写 Ledger、不改写历史 payer 快照）；Organization 关闭状态对读写授权的门禁、在途结算与余额处置按本 ADR §4 执行。
+- 发布与验收以 Fresh Database 为前提，不提供旧多账户模型的数据迁移、兼容路径或双实现；初始化及集成核验见 [资金池验收手册](../runbooks/billing-personal-organization-validation.md)。Organization 关闭状态对读写授权的门禁、在途结算与余额处置按本 ADR §4 执行。
 
 ## 取代关系
 
@@ -70,4 +70,4 @@ status: accepted
 - 本 ADR 取代 [ADR-0037](./0037-account-default-member-quota.md) 的未配置默认额度时邀请 fail-closed 规则；新成员默认不限额，邀请不依赖默认额度配置。
 - [ADR-0036](./0036-studio-handover-and-delete-funds-retention.md) 的不可变账务历史、显式 Owner 交接和删除期间保护继续适用；Organization 关闭/恢复与资金规则由本 ADR 取代或补充。
 
-以上是决策关系；旧实现已按上述票号删除，旧 ADR 描述的实现合同仅作历史理解，生产行为以本 ADR 为准。
+以上是决策关系；旧实现已按上述票号删除，旧 ADR 描述的实现合同仅作历史理解，当前产品合同以本 ADR 为准。
