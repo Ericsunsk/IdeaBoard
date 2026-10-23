@@ -15,10 +15,9 @@ import {
   fetchOrganizationMembers,
   fetchOrganizations,
   inviteOrganizationMember,
-  isOrganizationWorkspace,
-  isPersonalWorkspace,
   parseOrganizationMember,
   provisionOrganization,
+  renameOrganization,
   fetchPrincipal,
   fetchWorkspacePage,
   normalizeWorkspaceListParams,
@@ -353,6 +352,54 @@ describe('workspace rename', () => {
   })
 })
 
+describe('organization rename', () => {
+  it('renames through PATCH with a name-only body and parses the envelope', async () => {
+    const seen: Array<{ body: unknown; requestId: string | null }> = []
+    useMswHandlers(
+      http.patch('/api/v1/organizations/:organizationId', async ({ request }) => {
+        seen.push({ body: await request.json(), requestId: request.headers.get('request-id') })
+        return HttpResponse.json({
+          data: {
+            id: 'org_c3',
+            name: 'Renamed',
+            created_at: '2026-10-22T00:00:00Z',
+          },
+        })
+      }),
+    )
+
+    const updated = await renameOrganization('org_c3', { name: '  Renamed  ' })
+
+    expect(updated).toMatchObject({ publicId: 'org_c3', name: 'Renamed', status: 'active' })
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?.body).toEqual({ data: { name: 'Renamed' } })
+    expect(seen[0]?.requestId).toBeTruthy()
+  })
+
+  it('validates the organization id and name before touching the network', async () => {
+    await expect(renameOrganization('123', { name: 'Ok' })).rejects.toThrow()
+    await expect(renameOrganization('org_c3', { name: '   ' })).rejects.toThrow()
+    await expect(
+      renameOrganization('org_c3', { name: 'x'.repeat(WORKSPACE_NAME_MAX_LENGTH + 1) }),
+    ).rejects.toThrow()
+  })
+
+  it('surfaces the server machine code instead of swallowing it', async () => {
+    useMswHandlers(
+      http.patch('/api/v1/organizations/:organizationId', () =>
+        HttpResponse.json(
+          { error: { code: 'organization_forbidden', message: 'No', request_id: 'r1' } },
+          { status: 403 },
+        ),
+      ),
+    )
+
+    await expect(renameOrganization('org_c3', { name: 'Nope' })).rejects.toMatchObject({
+      code: 'organization_forbidden',
+    })
+  })
+})
+
 describe('workspace default marker', () => {
   it('parses is_default and defaults absent markers to false', () => {
     expect(
@@ -592,9 +639,6 @@ describe('organization membership (951)', () => {
     expect(
       effectiveOrganizationWorkspaceAccess({ organizationRole: null, hasWorkspaceGrant: true }),
     ).toBe(false)
-    expect(isPersonalWorkspace({ organizationId: null })).toBe(true)
-    expect(isOrganizationWorkspace({ organizationId: 'org_c3' }, 'org_c3')).toBe(true)
-    expect(isOrganizationWorkspace({ organizationId: 'org_c3' }, 'org_other')).toBe(false)
   })
 
   it('lists organization members through the generated transport', async () => {

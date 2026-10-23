@@ -1,4 +1,4 @@
-import { requireContractData } from '../../../../../api/contractKernel'
+import { requireContractData } from '@/api/contractKernel'
 import { buildControlMutationHeaders } from '../../../shared/index'
 import type { ControlMutationOptions } from '../../../shared/index'
 import { loadControlSetting } from '../../../shared/index'
@@ -11,7 +11,7 @@ import {
   listControlStorageProviders,
   testControlStorageProfile,
   updateControlStorageProfile,
-} from '../../../../../api/generated-query/control/control-platform/control-platform'
+} from '@/api/generated-query/control/control-platform/control-platform'
 import type {
   StorageProfile,
   StorageProfilePayload,

@@ -54,7 +54,8 @@ describe('four-locale service copy (i18n/four-locale-service-copy)', () => {
     const rendered: string[] = []
     for (const locale of ALL_LOCALES) {
       await expect(setUserLocale(locale)).resolves.toBe(true)
-      const label = String(i18n.global.t('billing.insufficientCredits'))
+      // Canonical source: `errorCodes.insufficient_credits` (backend code unique source).
+      const label = String(i18n.global.t('errorCodes.insufficient_credits'))
       expect(label).toBe(SERVICE_LABELS[locale])
       rendered.push(label)
     }

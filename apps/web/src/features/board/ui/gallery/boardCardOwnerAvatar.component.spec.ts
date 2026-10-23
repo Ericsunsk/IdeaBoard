@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { setUserLocale } from '../../../../core/i18n'
 import { renderWithUser, screen } from '../../../../test/render'
 import { makeSessionUser } from '../../../../test/factories'
-import { useUserStore } from '../../../auth'
 import type { BoardMeta } from '../../session/catalog/boards'
 import { makeBoardMeta } from '../../testing'
 import BoardCard from './BoardCard.vue'
 
-function renderCard(board: BoardMeta) {
+function renderCard(
+  board: BoardMeta,
+  currentUser?: { public_id?: string | null; avatar?: string | null } | null,
+) {
   return renderWithUser(BoardCard, {
     props: {
       board,
@@ -17,6 +19,7 @@ function renderCard(board: BoardMeta) {
       renameDraft: '',
       isMenuOpen: true,
       displayDate: 'today',
+      ...(currentUser !== undefined ? { currentUser } : {}),
     },
   })
 }
@@ -66,21 +69,16 @@ describe('BoardCard owner avatar', () => {
   })
 
   test('falls back to the viewer session avatar for the self entry', () => {
-    const store = useUserStore()
-    store.setAuth(
+    const view = renderCard(
+      teamBoard(),
       makeSessionUser({
         public_id: 'usr_alice',
         avatar: '/api/v1/public/users/usr_alice/avatar?v=6',
       }),
     )
-    try {
-      const view = renderCard(teamBoard())
-      expect(view.container.querySelector('img')?.getAttribute('src')).toBe(
-        '/api/v1/public/users/usr_alice/avatar?v=6&size=64',
-      )
-    } finally {
-      store.clearAuth()
-    }
+    expect(view.container.querySelector('img')?.getAttribute('src')).toBe(
+      '/api/v1/public/users/usr_alice/avatar?v=6&size=64',
+    )
   })
 
   test('renders the badge with no avatar on private cards', () => {

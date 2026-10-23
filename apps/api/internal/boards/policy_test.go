@@ -232,7 +232,7 @@ func TestAccessMatrixCatalogEquivalenceSpotCheck(t *testing.T) {
 // 2+5): the same behavior matrix runs unchanged on the postgres store.
 // Skips without API_TEST_DATABASE_DSN like every other Postgres integration
 // test. Repository methods keep context.Context first and the
-// dbWithContext pattern (see postgres_workspace.go).
+// dbWithContext pattern (see postgres_store_board.go).
 
 func TestAccessMatrixPostgres(t *testing.T) {
 	db := testdb.Open(t)
@@ -574,8 +574,8 @@ func TestBoardsDomainHasNoHandlerOrRuntimeImports(t *testing.T) {
 
 func TestRoleAdaptersDelegateToUnifiedPolicy(t *testing.T) {
 	adapters := map[string]string{
-		"workspace.go":          "boardRoleLocked",
-		"postgres_workspace.go": "boardRoleTx",
+		"workspace.go":       "boardRoleLocked",
+		"postgres_access.go": "boardRoleTx",
 	}
 	for file, adapter := range adapters {
 		raw, err := os.ReadFile(file)

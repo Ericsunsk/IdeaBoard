@@ -3,7 +3,7 @@
     <div
       v-if="isVisible"
       ref="menuRef"
-      class="canvas-node-context-menu absolute z-[160] w-40 min-w-40 max-w-40 rounded-panel bg-[var(--canvas-glass-bg)] p-1.5 shadow-[var(--canvas-shadow-floating)] backdrop-blur-[var(--canvas-glass-blur)] [border:var(--canvas-control-border-width)_solid_var(--canvas-glass-border)]"
+      class="canvas-node-context-menu absolute z-popover w-40 min-w-40 max-w-40 rounded-panel bg-[var(--canvas-glass-bg)] p-1.5 shadow-[var(--canvas-shadow-floating)] backdrop-blur-[var(--canvas-glass-blur)] [border:var(--canvas-control-border-width)_solid_var(--canvas-glass-border)]"
       :style="menuStyle"
       role="menu"
       :aria-label="t('canvas.contextMenu.label')"

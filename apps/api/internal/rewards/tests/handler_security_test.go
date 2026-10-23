@@ -5,13 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/rewards"
@@ -23,38 +21,14 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestRewardRedeemDoesNotFailAfterCommittedResultWhenIdentityIsUnavailable(t *testing.T) {
-	for _, replayed := range []bool{false, true} {
-		t.Run(fmt.Sprintf("replayed=%t", replayed), func(t *testing.T) {
-			handler := rewardhttp.NewUserHandler(rewardHandlerServiceStub{redeem: func(context.Context, ports.RedeemCommand) (ports.RedeemResult, error) {
-				return ports.RedeemResult{
-					Redemption:       ports.Redemption{ID: 9, UserID: 41, CreditAmount: 25},
-					CreditedAmount:   25,
-					AvailableBalance: 125,
-					Replayed:         replayed,
-				}, nil
-			}})
-			router := rewardRedeemRouter(t, handler, 41)
-
-			recorder := performRawRewardRedeem(t, router, `{"code":"SECURE01"}`)
-
-			if recorder.Code != http.StatusOK {
-				t.Fatalf("status = %d, want %d; body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
-			}
-		})
-	}
-}
-
 type rewardHandlerServiceStub struct {
 	create          func(context.Context, ports.CreateRewardCodeCommand) (ports.CreatedRewardCode, error)
 	setEnabled      func(context.Context, ports.SetRewardCodeEnabledCommand) (ports.RewardCode, error)
 	delete          func(context.Context, ports.DeleteRewardCodeCommand) (ports.DeletedRewardCode, error)
-	redeem          func(context.Context, ports.RedeemCommand) (ports.RedeemResult, error)
 	search          func(context.Context, ports.SearchRewardCodesInput) (ports.RewardCodePage, error)
 	update          func(context.Context, ports.UpdateRewardCodeCommand) (ports.UpdatedRewardCode, error)
 	listRedemptions func(context.Context, ports.ListAdminRedemptionsInput) (ports.AdminRedemptionPage, error)
 	getRedemption   func(context.Context, ports.GetAdminRedemptionInput) (ports.AdminRedemptionDetail, error)
-	listUser        func(context.Context, ports.ListRedemptionsInput) (ports.RedemptionHistoryPage, error)
 }
 
 func (s rewardHandlerServiceStub) CreateRewardCode(ctx context.Context, input ports.CreateRewardCodeCommand) (ports.CreatedRewardCode, error) {
@@ -98,16 +72,6 @@ func (s rewardHandlerServiceStub) UpdateRewardCode(
 	return s.update(ctx, command)
 }
 
-func (s rewardHandlerServiceStub) Redeem(
-	ctx context.Context,
-	command ports.RedeemCommand,
-) (ports.RedeemResult, error) {
-	if s.redeem == nil {
-		return ports.RedeemResult{}, nil
-	}
-	return s.redeem(ctx, command)
-}
-
 func (s rewardHandlerServiceStub) ListAdminRedemptions(
 	ctx context.Context,
 	input ports.ListAdminRedemptionsInput,
@@ -123,13 +87,6 @@ func (s rewardHandlerServiceStub) GetAdminRedemption(ctx context.Context, input 
 		return ports.AdminRedemptionDetail{}, nil
 	}
 	return s.getRedemption(ctx, input)
-}
-
-func (s rewardHandlerServiceStub) ListRedemptions(ctx context.Context, input ports.ListRedemptionsInput) (ports.RedemptionHistoryPage, error) {
-	if s.listUser == nil {
-		return ports.RedemptionHistoryPage{}, nil
-	}
-	return s.listUser(ctx, input)
 }
 
 type recordingIdentityProjection struct {
@@ -229,99 +186,6 @@ func TestAdminRedemptionListFailsClosedForMissingIdentityMapping(t *testing.T) {
 	}
 }
 
-func TestRewardRedeemRequiresAuthenticationAndDisablesCaching(t *testing.T) {
-	handler := rewardhttp.NewUserHandler(rewardHandlerServiceStub{redeem: func(context.Context, ports.RedeemCommand) (ports.RedeemResult, error) {
-		t.Fatal("unauthenticated request reached Rewards service")
-		return ports.RedeemResult{}, nil
-	}})
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.POST("/user/rewards/redeem", handler.Redeem)
-
-	recorder := performRawRewardRedeem(t, router, `{"code":"SECURE01"}`)
-
-	if recorder.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d, want %d; body=%s", recorder.Code, http.StatusUnauthorized, recorder.Body.String())
-	}
-	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("Cache-Control = %q, want no-store", got)
-	}
-}
-
-func TestRewardRedeemCannotTargetAnotherUserFromRequestBody(t *testing.T) {
-	handler := rewardhttp.NewUserHandler(rewardHandlerServiceStub{redeem: func(context.Context, ports.RedeemCommand) (ports.RedeemResult, error) {
-		t.Fatal("request containing a target user reached Rewards service")
-		return ports.RedeemResult{}, nil
-	}})
-	router := rewardRedeemRouter(t, handler, 41)
-
-	recorder := performRawRewardRedeem(t, router, `{"code":"SECURE01","user_id":42}`)
-
-	assertRewardErrorResponse(t, recorder, http.StatusBadRequest, "参数错误")
-	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("Cache-Control = %q, want no-store", got)
-	}
-}
-
-func TestRewardRedeemLimitsEachAuthenticatedUser(t *testing.T) {
-	now := time.Date(2026, time.July, 16, 12, 0, 0, 0, time.UTC)
-	serviceCalls := 0
-	service := rewardHandlerServiceStub{redeem: func(context.Context, ports.RedeemCommand) (ports.RedeemResult, error) {
-		serviceCalls++
-		return ports.RedeemResult{CreditedAmount: 1}, nil
-	}}
-	handler := rewardhttp.NewUserHandlerWithOptions(service, rewards.RedemptionHandlerOptions{
-		Now: func() time.Time { return now },
-	})
-
-	user41 := rewardRedeemRouter(t, handler, 41)
-	for attempt := 1; attempt <= rewards.DefaultRedemptionAttemptLimit; attempt++ {
-		recorder := performRawRewardRedeemWithKey(t, user41, `{"code":"SECURE01"}`, fmt.Sprintf("secure-key-%d", attempt))
-		if recorder.Code != http.StatusOK {
-			t.Fatalf("attempt %d status = %d; body=%s", attempt, recorder.Code, recorder.Body.String())
-		}
-	}
-	limited := performRawRewardRedeemWithKey(t, user41, `{"code":"SECURE01"}`, "secure-key-limited")
-	assertRewardErrorResponse(t, limited, http.StatusTooManyRequests, "操作过于频繁，请稍后重试")
-	if got := limited.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("rate-limited Cache-Control = %q, want no-store", got)
-	}
-	if serviceCalls != rewards.DefaultRedemptionAttemptLimit {
-		t.Fatalf("service calls = %d, want %d", serviceCalls, rewards.DefaultRedemptionAttemptLimit)
-	}
-
-	user42 := rewardRedeemRouter(t, handler, 42)
-	if recorder := performRawRewardRedeem(t, user42, `{"code":"SECURE01"}`); recorder.Code != http.StatusOK {
-		t.Fatalf("other user status = %d; body=%s", recorder.Code, recorder.Body.String())
-	}
-}
-
-func TestRewardRedeemDoesNotLogOrReturnSensitiveCodeMaterial(t *testing.T) {
-	const rawCode = "SECRET294"
-	const fullDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	requestBody := `{"code":"` + rawCode + `"}`
-	var logs bytes.Buffer
-	previousLogger := slog.Default()
-	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
-	t.Cleanup(func() { slog.SetDefault(previousLogger) })
-
-	service := rewardHandlerServiceStub{redeem: func(context.Context, ports.RedeemCommand) (ports.RedeemResult, error) {
-		return ports.RedeemResult{}, errors.New("lookup failed code=" + rawCode + " digest=" + fullDigest + " body=" + requestBody)
-	}}
-	handler := rewardhttp.NewUserHandler(service)
-	router := rewardRedeemRouter(t, handler, 41)
-
-	responseRecorder := performRawRewardRedeem(t, router, requestBody)
-	assertRewardErrorResponse(t, responseRecorder, http.StatusInternalServerError, "网络错误，请重试")
-
-	observable := logs.String() + responseRecorder.Body.String()
-	for _, forbidden := range []string{rawCode, fullDigest, requestBody} {
-		if strings.Contains(observable, forbidden) {
-			t.Fatalf("logs or response exposed sensitive value %q: %s", forbidden, observable)
-		}
-	}
-}
-
 func TestRewardCodeUpdateWithCodeRequiresAdminAndDoesNotExposeSensitiveMaterial(t *testing.T) {
 	const rawCode = "ADMIN-SECRET-294"
 	const fullDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -418,32 +282,6 @@ func TestRewardCodeManagementRejectsUnknownJSONFields(t *testing.T) {
 	recorder := performRawAdminRewardRequest(t, router, http.MethodPatch,
 		"/admin/rewards/codes/1", `{"display_name":"Secure","credit_amount":1,"max_redemptions":0,"code":"SECURE01","user_id":42}`)
 	assertRewardErrorResponse(t, recorder, http.StatusBadRequest, "参数错误")
-}
-
-func rewardRedeemRouter(t *testing.T, handler *rewards.UserHandler, userID int64) http.Handler {
-	t.Helper()
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.Use(func(c *gin.Context) {
-		testsupport.SetPrincipal(t, c, userID, principal.RoleUser)
-		c.Next()
-	})
-	router.POST("/user/rewards/redeem", handler.Redeem)
-	return router
-}
-
-func performRawRewardRedeem(t *testing.T, router http.Handler, body string) *httptest.ResponseRecorder {
-	return performRawRewardRedeemWithKey(t, router, body, "security-test-key")
-}
-
-func performRawRewardRedeemWithKey(t *testing.T, router http.Handler, body, key string) *httptest.ResponseRecorder {
-	t.Helper()
-	request := httptest.NewRequest(http.MethodPost, "/user/rewards/redeem", strings.NewReader(body))
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Idempotency-Key", key)
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, request)
-	return recorder
 }
 
 func performRawAdminRewardRequest(

@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import type { useAsyncAction } from '../../../../../core/composables/useAsyncAction'
+import type { useAsyncAction } from '@/core/composables/useAsyncAction'
 import type { AdminConfirmPort } from '../../../shared/index'
 import { useOptimisticToggle } from '../../../shared/index'
 import {

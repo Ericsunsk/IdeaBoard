@@ -22,6 +22,7 @@ import (
 	"context"
 	"strings"
 
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/contract"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
@@ -74,14 +75,10 @@ func (visionBillingAccountResolver) ResolveVisionSettlementInTx(ctx context.Cont
 	// transaction fails closed even if the HTTP prelude was bypassed.
 	// Terminal Capture/Release on row-pinned accounts never pass this
 	// gate, so history survives closure.
-	if workspace.OrganizationID.Valid {
-		org, err := queries.GetOrganizationByInternalID(ctx, workspace.OrganizationID.Int64)
-		if err != nil {
-			return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
-		}
-		if org.ClosedAt.Valid {
-			return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
-		}
+	if closed, err := dbutil.IsOrganizationClosedForWorkspace(ctx, queries, workspacePublicID); err != nil {
+		return VisionSettlementIdentity{}, err
+	} else if closed {
+		return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
 	}
 	if _, err := queries.GetWorkspaceMembership(ctx, dbsqlc.GetWorkspaceMembershipParams{
 		WorkspaceID: workspace.InternalID, UserID: actorUserID,
@@ -111,17 +108,19 @@ func (visionBillingAccountResolver) ResolveVisionSettlementInTx(ctx context.Cont
 
 // ResolveWorkspaceInternalID maps a ws_ public id to its internal id
 // without any membership gate (capture/release scope verification only).
+// It delegates to the canonical dbutil seam so the vision path cannot
+// drift from tasking/media/library resolution.
 func (visionBillingAccountResolver) ResolveWorkspaceInternalID(ctx context.Context, tx pgx.Tx, workspacePublicID string) (int64, error) {
 	workspacePublicID = strings.TrimSpace(workspacePublicID)
 	if tx == nil || !contract.IsWorkspaceID(workspacePublicID) {
 		return 0, ErrVisionWorkspaceNotFound
 	}
-	workspace, err := dbsqlc.New(tx).GetWorkspaceByPublicID(ctx, workspacePublicID)
+	internalID, err := dbutil.ResolveWorkspaceInternalID(ctx, dbsqlc.New(tx), workspacePublicID)
 	if err != nil {
 		return 0, ErrVisionWorkspaceNotFound
 	}
-	if workspace.InternalID <= 0 {
+	if internalID <= 0 {
 		return 0, ErrVisionWorkspaceNotFound
 	}
-	return workspace.InternalID, nil
+	return internalID, nil
 }

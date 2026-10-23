@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { h, nextTick } from 'vue'
-import { renderWithUser, screen, within } from '../../../../../test/render'
+import { renderWithUser, screen, within } from '@/test/render'
 import AdminDialogShell from './AdminDialogShell.vue'
 
 function renderShell(

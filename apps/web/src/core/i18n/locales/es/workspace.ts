@@ -40,6 +40,7 @@ export default {
     title: 'Espacios de trabajo',
     rowTitle: 'Espacio de trabajo',
     manage: 'Gestionar espacios de trabajo',
+    settingsAction: 'Configuración',
     defaultBadge: 'Predeterminado',
     listLabel: 'Lista de espacios de trabajo',
     createAction: 'Añadir nuevo',
@@ -113,8 +114,6 @@ export default {
       defaultPrivate: 'El espacio predeterminado es privado y no puede invitar colaboradores.',
     },
     organization: {
-      scope: 'Ámbito del espacio',
-      personal: 'Personal / estudio',
       new: 'Crear organización',
       name: 'Nombre de la organización',
       setupNote:
@@ -124,6 +123,7 @@ export default {
       invalidName: 'Introduce un nombre de organización de 1 a {max} caracteres.',
       loadFailed: 'No se pudieron cargar las organizaciones. Reinténtalo.',
       createFailed: 'No se pudo crear la organización. Reinténtalo.',
+      renameFailed: 'No se pudo cambiar el nombre de la organización. Inténtelo de nuevo.',
     },
     handover: {
       title: 'Transferencia de la cuenta de fondos',
@@ -191,14 +191,6 @@ export default {
     title: 'Límites de uso',
     manageShow: 'Gestionar límites',
     manageHide: 'Ocultar gestión',
-  },
-  scope: {
-    switcherLabel: 'Ámbito personal u organización',
-    personal: 'Personal',
-    organization: 'Organización',
-    createOrganization: 'Nueva organización',
-    personalHint: 'Los espacios personales comparten tu saldo Personal.',
-    organizationHint: 'Los espacios de {name} comparten el saldo de la organización.',
   },
   management: {
     title: 'Gestión de {name}',

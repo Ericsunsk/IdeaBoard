@@ -1,209 +1,197 @@
 <template>
-  <DialogRoot :open="panel.isOpen.value" @update:open="handleOpenUpdate">
-    <DialogPortal>
-      <DialogOverlay @click="handleMaskClick" />
-      <DialogContent
-        :class="cn(dialogContentBaseClass, shareDialogContentClass)"
-        :show-close="true"
-        :close-label="t('board.shareDialog.close')"
-        :aria-busy="isDialogBusy"
-        @escape-key-down="handleEscape"
-        @pointer-down-outside="blockOutsideDismiss"
-      >
-        <div class="min-h-0 overflow-y-auto">
-          <DialogDescription class="sr-only">
-            {{ t('board.shareDialog.title') }}
-          </DialogDescription>
-          <div :class="shareDialogClasses.shell">
-            <div :class="shareDialogClasses.header">
-              <DialogTitle as="h2" :class="shareDialogClasses.title">
-                {{ dialogTitle }}
-              </DialogTitle>
-            </div>
+  <DialogShell
+    :is-open="panel.isOpen.value"
+    :title="dialogTitle"
+    :size="sharePreset.size"
+    :is-busy="dialog.isBusy.value"
+    :has-close="sharePreset.hasClose"
+    :close-label="t('board.shareDialog.close')"
+    :content-class="shareDialogContentClass"
+    @update:open="handleOpenUpdate"
+    @close="afterDialogHidden"
+  >
+    <div class="min-h-0 overflow-y-auto">
+      <div :class="shareDialogClasses.shell">
+        <div :class="shareDialogClasses.header">
+          <h2 :class="shareDialogClasses.title">
+            {{ dialogTitle }}
+          </h2>
+        </div>
 
-            <div
-              v-if="dialog.isOpening.value"
-              :class="shareDialogClasses.loading"
-              aria-live="polite"
+        <div v-if="dialog.isOpening.value" :class="shareDialogClasses.loading" aria-live="polite">
+          <Spinner :class="shareDialogClasses.spinner" />
+        </div>
+
+        <LoadErrorPanel
+          v-else-if="dialog.openError.value"
+          :message="t('board.shareDialog.membersUnavailable')"
+          :retry-label="t('board.shareDialog.retry')"
+          @retry="dialog.retryOpen()"
+        />
+
+        <template v-else-if="dialog.facts.value">
+          <template v-if="dialog.canManage.value">
+            <section
+              :class="shareDialogClasses.section"
+              :aria-label="t('board.shareDialog.workspace')"
             >
-              <Spinner :class="shareDialogClasses.spinner" />
-            </div>
+              <h3 :class="shareDialogClasses.sectionTitle">
+                {{ t('board.shareDialog.workspace') }}
+              </h3>
+              <div
+                :class="shareDialogClasses.accessButtonGroup"
+                role="group"
+                :aria-label="t('board.shareDialog.workspaceLabel')"
+              >
+                <Button
+                  type="button"
+                  size="sm"
+                  :variant="isAccessOn ? 'default' : 'outline'"
+                  :is-disabled="dialog.isBusy.value"
+                  :is-loading="dialog.isBusy.value"
+                  :aria-pressed="isAccessOn ? 'true' : 'false'"
+                  class="flex-1 active:scale-[0.98] transition-transform"
+                  @click="onToggleAccessSwitch"
+                >
+                  {{
+                    isAccessOn
+                      ? t('board.shareDialog.workspaceOff')
+                      : t('board.shareDialog.workspaceOn')
+                  }}
+                </Button>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  :variant="dialog.workspaceAccess.value === 'viewer' ? 'default' : 'outline'"
+                  :is-disabled="dialog.isBusy.value || !isAccessOn"
+                  :is-loading="dialog.isBusy.value"
+                  :aria-pressed="dialog.workspaceAccess.value === 'viewer' ? 'true' : 'false'"
+                  class="flex-1 active:scale-[0.98] transition-transform"
+                  @click="onSelectWorkspaceAccess('viewer')"
+                >
+                  {{ t('board.shareDialog.roleViewer') }}
+                </Button>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  :variant="dialog.workspaceAccess.value === 'editor' ? 'default' : 'outline'"
+                  :is-disabled="dialog.isBusy.value || !isAccessOn"
+                  :is-loading="dialog.isBusy.value"
+                  :aria-pressed="dialog.workspaceAccess.value === 'editor' ? 'true' : 'false'"
+                  class="flex-1 active:scale-[0.98] transition-transform"
+                  @click="onSelectWorkspaceAccess('editor')"
+                >
+                  {{ t('board.shareDialog.roleEditor') }}
+                </Button>
+              </div>
+            </section>
 
             <LoadErrorPanel
-              v-else-if="dialog.openError.value"
+              v-if="dialog.hasMembersError.value"
               :message="t('board.shareDialog.membersUnavailable')"
               :retry-label="t('board.shareDialog.retry')"
-              @retry="dialog.retryOpen()"
+              @retry="dialog.retryQueries()"
             />
 
-            <template v-else-if="dialog.facts.value">
-              <template v-if="dialog.canManage.value">
-                <section
-                  :class="shareDialogClasses.section"
-                  :aria-label="t('board.shareDialog.workspace')"
+            <template v-else>
+              <section
+                :class="shareDialogClasses.section"
+                :aria-label="t('board.shareDialog.members')"
+              >
+                <h3 :class="shareDialogClasses.sectionTitle">
+                  {{ t('board.shareDialog.members') }}
+                </h3>
+
+                <div
+                  :class="shareDialogClasses.avatarRow"
+                  role="group"
+                  :aria-label="t('board.shareDialog.members')"
                 >
-                  <h3 :class="shareDialogClasses.sectionTitle">
-                    {{ t('board.shareDialog.workspace') }}
-                  </h3>
-                  <div
-                    :class="shareDialogClasses.accessButtonGroup"
-                    role="group"
-                    :aria-label="t('board.shareDialog.workspaceLabel')"
+                  <component
+                    :is="row.isCreator ? 'span' : 'button'"
+                    v-for="row in dialog.memberRows.value"
+                    :key="row.userId"
+                    :type="row.isCreator ? undefined : 'button'"
+                    :class="[shareDialogClasses.avatarButton, row.isCreator && 'cursor-default']"
+                    :aria-pressed="row.isCreator || row.isSelected ? 'true' : 'false'"
+                    :aria-label="memberAriaLabel(row)"
+                    :title="memberTitle(row)"
+                    :disabled="row.isCreator ? undefined : !isAccessOn || dialog.isBusy.value"
+                    @mouseenter="!row.isCreator && (hoveredUserId = row.userId)"
+                    @mouseleave="!row.isCreator && (hoveredUserId = null)"
+                    @focus="!row.isCreator && (hoveredUserId = row.userId)"
+                    @blur="!row.isCreator && (hoveredUserId = null)"
+                    @click="!row.isCreator && dialog.toggleMember(row.userId)"
                   >
-                    <Button
-                      type="button"
-                      size="sm"
-                      :variant="isAccessOn ? 'default' : 'outline'"
-                      :is-disabled="dialog.isBusy.value"
-                      :is-loading="dialog.isBusy.value"
-                      :aria-pressed="isAccessOn ? 'true' : 'false'"
-                      class="flex-1 active:scale-[0.98] transition-transform"
-                      @click="onToggleAccessSwitch"
-                    >
-                      {{
-                        isAccessOn
-                          ? t('board.shareDialog.workspaceOff')
-                          : t('board.shareDialog.workspaceOn')
-                      }}
-                    </Button>
-
-                    <Button
-                      type="button"
-                      size="sm"
-                      :variant="dialog.workspaceAccess.value === 'viewer' ? 'default' : 'outline'"
-                      :is-disabled="dialog.isBusy.value || !isAccessOn"
-                      :is-loading="dialog.isBusy.value"
-                      :aria-pressed="dialog.workspaceAccess.value === 'viewer' ? 'true' : 'false'"
-                      class="flex-1 active:scale-[0.98] transition-transform"
-                      @click="onSelectWorkspaceAccess('viewer')"
-                    >
-                      {{ t('board.shareDialog.roleViewer') }}
-                    </Button>
-
-                    <Button
-                      type="button"
-                      size="sm"
-                      :variant="dialog.workspaceAccess.value === 'editor' ? 'default' : 'outline'"
-                      :is-disabled="dialog.isBusy.value || !isAccessOn"
-                      :is-loading="dialog.isBusy.value"
-                      :aria-pressed="dialog.workspaceAccess.value === 'editor' ? 'true' : 'false'"
-                      class="flex-1 active:scale-[0.98] transition-transform"
-                      @click="onSelectWorkspaceAccess('editor')"
-                    >
-                      {{ t('board.shareDialog.roleEditor') }}
-                    </Button>
-                  </div>
-                </section>
-
-                <LoadErrorPanel
-                  v-if="dialog.hasMembersError.value"
-                  :message="t('board.shareDialog.membersUnavailable')"
-                  :retry-label="t('board.shareDialog.retry')"
-                  @retry="dialog.retryQueries()"
-                />
-
-                <template v-else>
-                  <section
-                    :class="shareDialogClasses.section"
-                    :aria-label="t('board.shareDialog.members')"
-                  >
-                    <h3 :class="shareDialogClasses.sectionTitle">
-                      {{ t('board.shareDialog.members') }}
-                    </h3>
-
-                    <div
-                      :class="shareDialogClasses.avatarRow"
-                      role="group"
-                      :aria-label="t('board.shareDialog.members')"
-                    >
-                      <component
-                        :is="row.isCreator ? 'span' : 'button'"
-                        v-for="row in dialog.memberRows.value"
-                        :key="row.userId"
-                        :type="row.isCreator ? undefined : 'button'"
+                    <div class="relative flex items-center justify-center">
+                      <Avatar
                         :class="[
-                          shareDialogClasses.avatarButton,
-                          row.isCreator && 'cursor-default',
+                          'size-10 transition-[transform,box-shadow,opacity,filter] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]',
+                          row.isCreator || row.isSelected
+                            ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                            : 'border border-border opacity-40 grayscale hover:opacity-80 hover:grayscale-0',
                         ]"
-                        :aria-pressed="row.isCreator || row.isSelected ? 'true' : 'false'"
-                        :aria-label="memberAriaLabel(row)"
-                        :title="memberTitle(row)"
-                        :disabled="row.isCreator ? undefined : !isAccessOn || dialog.isBusy.value"
-                        @mouseenter="!row.isCreator && (hoveredUserId = row.userId)"
-                        @mouseleave="!row.isCreator && (hoveredUserId = null)"
-                        @focus="!row.isCreator && (hoveredUserId = row.userId)"
-                        @blur="!row.isCreator && (hoveredUserId = null)"
-                        @click="!row.isCreator && dialog.toggleMember(row.userId)"
                       >
-                        <div class="relative flex items-center justify-center">
-                          <Avatar
-                            :class="[
-                              'size-10 transition-[transform,box-shadow,opacity,filter] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]',
-                              row.isCreator || row.isSelected
-                                ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
-                                : 'border border-border opacity-40 grayscale hover:opacity-80 hover:grayscale-0',
-                            ]"
-                          >
-                            <AvatarImage
-                              v-if="resolveMemberAvatar(row, userStore.user)"
-                              :src="resolveMemberAvatar(row, userStore.user)!"
-                              :alt="memberDisplayName(row)"
-                            />
-                            <AvatarFallback class="text-xs font-semibold uppercase">
-                              {{ resolveMemberInitial(row) }}
-                            </AvatarFallback>
-                          </Avatar>
+                        <AvatarImage
+                          v-if="resolveMemberAvatar(row, currentUser)"
+                          :src="resolveMemberAvatar(row, currentUser)!"
+                          :alt="memberDisplayName(row)"
+                        />
+                        <AvatarFallback class="text-xs font-semibold uppercase">
+                          {{ resolveMemberInitial(row) }}
+                        </AvatarFallback>
+                      </Avatar>
 
-                          <span
-                            v-if="row.isCreator"
-                            :class="shareDialogClasses.avatarCreatorBadge"
-                            :title="t('board.shareDialog.creator')"
-                            aria-hidden="true"
-                          >
-                            ★
-                          </span>
-                          <span
-                            v-else-if="row.isSelected"
-                            :class="shareDialogClasses.avatarGrantedBadge"
-                            aria-hidden="true"
-                          >
-                            <Check class="size-2.5 stroke-[3]" />
-                          </span>
+                      <span
+                        v-if="row.isCreator"
+                        :class="shareDialogClasses.avatarCreatorBadge"
+                        :title="t('board.shareDialog.creator')"
+                        aria-hidden="true"
+                      >
+                        ★
+                      </span>
+                      <span
+                        v-else-if="row.isSelected"
+                        :class="shareDialogClasses.avatarGrantedBadge"
+                        aria-hidden="true"
+                      >
+                        <Check class="size-2.5 stroke-[3]" />
+                      </span>
 
-                          <span
-                            v-if="dialog.isBusy.value"
-                            class="absolute inset-0 flex items-center justify-center rounded-pill bg-background/60"
-                            aria-hidden="true"
-                          >
-                            <Spinner class="size-4 text-primary" />
-                          </span>
-                        </div>
-                      </component>
+                      <span
+                        v-if="dialog.isBusy.value"
+                        class="absolute inset-0 flex items-center justify-center rounded-pill bg-background/60"
+                        aria-hidden="true"
+                      >
+                        <Spinner class="size-4 text-primary" />
+                      </span>
                     </div>
-
-                    <p :class="shareDialogClasses.emptyNote" aria-live="polite">
-                      {{ activeMemberHint }}
-                    </p>
-                  </section>
-                </template>
-              </template>
-
-              <template v-else>
-                <div :class="shareDialogClasses.section">
-                  <p :class="shareDialogClasses.statusLine">{{ ownPermissionCopy }}</p>
-                  <p :class="shareDialogClasses.statusLine">{{ statusCopy }}</p>
-                  <p :class="shareDialogClasses.statusLine">{{ generalCopy }}</p>
-                  <p :class="shareDialogClasses.statusLine">
-                    {{ t('board.shareDialog.readOnlyNote') }}
-                  </p>
+                  </component>
                 </div>
-              </template>
+
+                <p :class="shareDialogClasses.emptyNote" aria-live="polite">
+                  {{ activeMemberHint }}
+                </p>
+              </section>
             </template>
-          </div>
-        </div>
-      </DialogContent>
-    </DialogPortal>
-  </DialogRoot>
+          </template>
+
+          <template v-else>
+            <div :class="shareDialogClasses.section">
+              <p :class="shareDialogClasses.statusLine">{{ ownPermissionCopy }}</p>
+              <p :class="shareDialogClasses.statusLine">{{ statusCopy }}</p>
+              <p :class="shareDialogClasses.statusLine">{{ generalCopy }}</p>
+              <p :class="shareDialogClasses.statusLine">
+                {{ t('board.shareDialog.readOnlyNote') }}
+              </p>
+            </div>
+          </template>
+        </template>
+      </div>
+    </div>
+  </DialogShell>
 </template>
 
 <script setup lang="ts">
@@ -212,26 +200,17 @@ import { useI18n } from 'vue-i18n'
 import { Check } from '@iconoir/vue'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogRoot,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { dialogContentBaseClass } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
-import { cn } from '@/lib/utils'
-import {
-  defineDialogSurfaceIntent,
-  useOverlayInteractionLifecycle,
-} from '../../../../core/composables/useOverlayInteractionLifecycle'
+import DialogShell from '../../../../core/components/DialogShell.vue'
+import { dialogShellPresets } from '../../../../core/components/dialogShell'
 import type { ShareMemberRow } from '../../session/share/useShareRoster'
 import { useShareDialog, type ShareDialogDeps } from '../../session/share/useShareDialog'
-import { useUserStore } from '../../../auth'
 import type { SharePanel } from '../../session/share/useSharePanel'
-import { resolveMemberAvatar, resolveMemberInitial } from '../../../../core/media/avatarUrl'
+import {
+  resolveMemberAvatar,
+  resolveMemberInitial,
+  type MemberAvatarViewer,
+} from '../../../../core/media/avatarUrl'
 import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
 import { shareDialogClasses, shareDialogContentClass } from './skin'
 
@@ -239,57 +218,31 @@ const props = defineProps<{
   panel: SharePanel
   ensureDraftSaved?: ((boardId: string) => Promise<boolean>) | undefined
   deps?: ShareDialogDeps | undefined
+  /** Session viewer injected from the page/screen seam (no auth store import). */
+  currentUser?: MemberAvatarViewer | undefined
 }>()
 
 const { t } = useI18n()
-const userStore = useUserStore()
+const sharePreset = dialogShellPresets.share
+const currentUser = computed(() => props.currentUser ?? null)
 const dialog = useShareDialog({
   panel: props.panel,
   ...(props.ensureDraftSaved ? { ensureDraftSaved: props.ensureDraftSaved } : {}),
   ...(props.deps ?? {}),
 })
 
-const {
-  ariaBusy: isDialogBusy,
-  canDismiss,
-  completeClose,
-  handleVisibilityChange,
-  requestClose,
-} = useOverlayInteractionLifecycle({
-  isVisible: () => props.panel.isOpen.value,
-  busy: () => dialog.isBusy.value,
-  surface: defineDialogSurfaceIntent(),
-  onVisibilityChange: (isVisible) => {
-    if (!isVisible) props.panel.close()
-  },
-})
-
-function closeDialogView() {
-  if (handleVisibilityChange(false)) afterDialogHidden()
-}
+const dialogTitle = computed(() => t('board.shareDialog.title'))
 
 function handleOpenUpdate(isOpen: boolean) {
-  if (!isOpen) closeDialogView()
-}
-
-function handleMaskClick() {
-  if (requestClose('mask')) afterDialogHidden()
-}
-
-function handleEscape(event: KeyboardEvent) {
-  if (!canDismiss('escape')) event.preventDefault()
-}
-
-function blockOutsideDismiss(event: Event) {
-  event.preventDefault()
+  if (!isOpen) {
+    props.panel.close()
+    afterDialogHidden()
+  }
 }
 
 function afterDialogHidden() {
-  completeClose()
   props.panel.handleHidden()
 }
-
-const dialogTitle = computed(() => t('board.shareDialog.title'))
 
 const statusCopy = computed(() => {
   switch (dialog.accessState.value) {

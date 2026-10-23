@@ -261,14 +261,11 @@ func (s *Store) ResolveBillingAccountInTx(ctx context.Context, tx pgx.Tx, worksp
 		return 0, err
 	}
 	if workspace.OrganizationID.Valid {
-		organization, err := q.GetOrganizationByInternalID(ctx, workspace.OrganizationID.Int64)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return 0, workspacetasks.ErrNotFound
-		}
+		closed, err := dbutil.IsOrganizationClosedForWorkspace(ctx, q, workspacePublicID)
 		if err != nil {
 			return 0, err
 		}
-		if organization.ClosedAt.Valid {
+		if closed {
 			return 0, workspacetasks.ErrNotFound
 		}
 	}

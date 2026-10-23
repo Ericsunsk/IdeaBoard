@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
+import { http, HttpResponse, useMswHandlers } from '@/test/msw'
 import { createAdminStorageResource } from './resource'
 import type { StorageProfilePayload } from '../../core/storage/profiles'
 

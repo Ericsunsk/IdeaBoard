@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen, waitFor } from '../../../../../test/render'
+import { renderWithUser, screen, waitFor } from '@/test/render'
 import RewardCodePlaintextDialog from './RewardCodePlaintextDialog.vue'
 import { REWARD_CODES_MESSAGES } from './messages'
 

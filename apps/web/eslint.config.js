@@ -226,6 +226,119 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/features/admin/**/*.{ts,tsx,vue}'],
+    ignores: ['src/features/admin/shared/session/overlay/useAdminDialogInteraction.ts'],
+    // Admin src-root imports ride the `@/` alias (first batch: five-level
+    // `../../../../../api|core|test|...` converged). Deep relatives that
+    // reach `src/` stay banned so the alias cannot silently regress.
+    // Intra-admin `shared` and cross-feature `features/*` relatives stay
+    // allowed; the Overlay base-lifecycle ban below mirrors the page/app
+    // rule so admin pages keep both guards (the single adapter file above
+    // stays exempt as the legitimate base-lifecycle owner).
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/useOverlayInteractionLifecycle'],
+              message:
+                'Route, page, and app layers must use a dialog Overlay adapter or feature-owned public Overlay adapter instead of the base lifecycle directly.',
+            },
+            {
+              group: ['**/overlay-lifecycle/useCanvasCustomLayerOverlay'],
+              message:
+                'Import Canvas Overlay lifecycle through the overlay-lifecycle public barrel instead of its implementation file.',
+            },
+            {
+              group: [
+                '../../../../api',
+                '../../../../api/**',
+                '../../../../core',
+                '../../../../core/**',
+                '../../../../test',
+                '../../../../test/**',
+                '../../../../lib',
+                '../../../../lib/**',
+                '../../../../theme',
+                '../../../../theme/**',
+                '../../../../components',
+                '../../../../components/**',
+                '../../../../app',
+                '../../../../app/**',
+                '../../../../../api',
+                '../../../../../api/**',
+                '../../../../../core',
+                '../../../../../core/**',
+                '../../../../../test',
+                '../../../../../test/**',
+                '../../../../../lib',
+                '../../../../../lib/**',
+                '../../../../../theme',
+                '../../../../../theme/**',
+                '../../../../../components',
+                '../../../../../components/**',
+                '../../../../../app',
+                '../../../../../app/**',
+                '../../../../../../api',
+                '../../../../../../api/**',
+                '../../../../../../core',
+                '../../../../../../core/**',
+                '../../../../../../test',
+                '../../../../../../test/**',
+                '../../../../../../lib',
+                '../../../../../../lib/**',
+                '../../../../../../theme',
+                '../../../../../../theme/**',
+                '../../../../../../components',
+                '../../../../../../components/**',
+                '../../../../../../app',
+                '../../../../../../app/**',
+              ],
+              message:
+                'Use @/ alias for src-root imports in admin instead of deep relative paths.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      'src/features/canvas/ui/screens/internal/useCanvasLibraryIsland.ts',
+      'src/features/canvas/session/image-workflow/useImageWorkflowExecution.ts',
+      'src/features/board/ui/gallery/BoardCard.vue',
+      'src/features/board/ui/share/ShareDialog.vue',
+    ],
+    // First-batch seam guard: these leaves receive workspace/auth via
+    // ports/props injection from the page/screen seam (no direct store
+    // imports). `core/utils/auth` stays allowed (different import names).
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/workspace', '**/workspace/**', '**/auth', '**/auth/**'],
+              importNames: [
+                'getWorkspaceSelectionStore',
+                'resetWorkspaceSelectionStore',
+                'installWorkspaceSelectionStore',
+                'createWorkspaceSelectionStore',
+                'useWorkspaceSelection',
+                'subscribeWorkspaceSelectionChange',
+                'useUserStore',
+                'useAuthSession',
+              ],
+              message:
+                'Board/Canvas leaves receive workspace/auth via ports/props injection from the page/screen seam instead of direct store imports.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // P0 sole new error: Canvas interaction state must stay local. The
     // independent rule preserves the existing page/app Overlay restrictions.
     // Query types follow the same scope; test/provider harnesses are exempt.

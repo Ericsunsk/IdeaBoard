@@ -138,7 +138,7 @@
 import { AdminTable } from '../../../shared'
 import { AdminColumn } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
-import ActionButton from '../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminSwitch } from '../../../shared'
 import {
   adminTableCardClass,

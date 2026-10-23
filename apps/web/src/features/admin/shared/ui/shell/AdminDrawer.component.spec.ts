@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen, within } from '../../../../../test/render'
+import { renderWithUser, screen, within } from '@/test/render'
 import AdminDrawer from './AdminDrawer.vue'
 
 function renderDrawer(

@@ -6,15 +6,14 @@
 // content, or consumption); workspace access follows the role mapping
 // (owner/admin automatic, member explicit, non-member hidden until join).
 
-import { computed, shallowRef } from 'vue'
+import { shallowRef } from 'vue'
 import {
   readLocalStorageItem,
   removeLocalStorageItem,
   writeLocalStorageItem,
 } from '../../../core/utils/storage'
 import { isOpaqueId, opaqueIdPrefix } from '../../../api/contractKernel'
-import type { OrganizationSummary, WorkspaceSummary } from '../selection/workspaceResource'
-import { isOrganizationWorkspace, isPersonalWorkspace } from '../selection/workspaceResource'
+import type { OrganizationSummary } from '../selection/workspaceResource'
 
 const ORGANIZATION_SCOPE_STORAGE_KEY = 'ideaboard.organization.scope.v1'
 
@@ -28,7 +27,7 @@ function asOrganizationId(value: unknown): string | null {
   return trimmed
 }
 
-export function parseOrganizationScope(raw: unknown): OrganizationScope {
+function parseOrganizationScope(raw: unknown): OrganizationScope {
   const orgId = asOrganizationId(raw)
   if (orgId) return { kind: 'organization', organizationId: orgId }
   return { kind: 'personal' }
@@ -42,7 +41,7 @@ function serializeOrganizationScope(scope: OrganizationScope): string | null {
 // Resolution: an explicit stored organization wins when the caller still
 // holds it; otherwise Personal. A caller with no organization always
 // resolves Personal.
-export function resolveOrganizationScope(
+function resolveOrganizationScope(
   organizations: readonly OrganizationSummary[],
   storedRaw?: unknown,
 ): OrganizationScope {
@@ -51,16 +50,6 @@ export function resolveOrganizationScope(
     return { kind: 'organization', organizationId: stored }
   }
   return { kind: 'personal' }
-}
-
-export function filterWorkspacesByScope(
-  items: readonly WorkspaceSummary[],
-  scope: OrganizationScope,
-): WorkspaceSummary[] {
-  if (scope.kind === 'organization') {
-    return items.filter((item) => isOrganizationWorkspace(item, scope.organizationId))
-  }
-  return items.filter(isPersonalWorkspace)
 }
 
 type OrganizationScopePersist = {
@@ -84,27 +73,6 @@ export function localStorageOrganizationScopePersist(
       }
     },
   }
-}
-
-export function memoryOrganizationScopePersist(
-  initial: OrganizationScope = { kind: 'personal' },
-): OrganizationScopePersist {
-  let current = initial
-  return {
-    readScope: () => current,
-    writeScope: (scope) => {
-      current = scope
-    },
-  }
-}
-
-const scopeListeners = new Set<(scope: OrganizationScope) => void>()
-
-export function subscribeOrganizationScopeChange(
-  listener: (scope: OrganizationScope) => void,
-): () => void {
-  scopeListeners.add(listener)
-  return () => scopeListeners.delete(listener)
 }
 
 export function createOrganizationScopeStore(deps?: {
@@ -132,13 +100,11 @@ export function createOrganizationScopeStore(deps?: {
       scope.value = scopeNext
       isPrimed = true
       persist.writeScope(scopeNext)
-      scopeListeners.forEach((listener) => listener(scopeNext))
     },
     selectPersonal(): void {
       scope.value = { kind: 'personal' }
       isPrimed = true
       persist.writeScope({ kind: 'personal' })
-      scopeListeners.forEach((listener) => listener({ kind: 'personal' }))
     },
     reconcile(organizations: readonly OrganizationSummary[]): OrganizationScope {
       const currentScope = current()
@@ -174,32 +140,4 @@ export function installOrganizationScopeStore(deps?: {
 
 export function getOrganizationScopeStore(): OrganizationScopeStore {
   return installOrganizationScopeStore()
-}
-
-export function resetOrganizationScopeStore(): void {
-  sharedScopeStore = null
-}
-
-export function useOrganizationScope(options?: {
-  store?: OrganizationScopeStore | undefined
-  organizations?: readonly OrganizationSummary[] | undefined
-}) {
-  const store = options?.store ?? getOrganizationScopeStore()
-  const scope = computed(() => store.getScope())
-  const scopedKind = computed(() => scope.value.kind)
-  const activeOrganizationId = computed(() =>
-    scope.value.kind === 'organization' ? scope.value.organizationId : null,
-  )
-  return {
-    scope,
-    scopedKind,
-    activeOrganizationId,
-    selectPersonal: () => store.selectPersonal(),
-    selectOrganization: (organizationId: string) => {
-      const orgId = asOrganizationId(organizationId)
-      if (!orgId) throw new Error('Invalid organization scope')
-      store.select({ kind: 'organization', organizationId: orgId })
-    },
-    reconcile: (organizations: readonly OrganizationSummary[]) => store.reconcile(organizations),
-  }
 }

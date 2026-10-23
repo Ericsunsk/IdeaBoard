@@ -47,10 +47,10 @@
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
-          <AdminStatusPill
+          <StatusBadge
             v-if="detailTask"
             :label="getTaskStatusDefinition(detailTask.status).text"
-            :variant="getTaskStatusDefinition(detailTask.status).variant"
+            :tone="getTaskStatusDefinition(detailTask.status).tone"
             size="small"
           />
         </div>
@@ -301,9 +301,9 @@
                   {{ attempt.resolved_model || '-' }}
                 </span>
               </div>
-              <AdminStatusPill
+              <StatusBadge
                 :label="getAttemptStatusLabel(attempt.status)"
-                :variant="getAttemptStatusVariant(attempt.status)"
+                :tone="getAttemptStatusTone(attempt.status)"
                 size="small"
               />
             </div>
@@ -499,14 +499,14 @@ import {
   XmarkCircle,
 } from '@iconoir/vue'
 import { DialogTitle } from 'reka-ui'
-import { AdminStatusPill } from '../../shared'
+import { StatusBadge } from '../../shared'
 import { AdminButton } from '../../shared'
 import { AdminAlert } from '../../shared'
 import { AdminEmptyState } from '../../shared'
-import ActionButton from '../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminDialogShell } from '../../shared'
 import TaskResultStatusBanner from './TaskResultStatusBanner.vue'
-import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
+import { formatIdeaAmount } from '@/core/i18n/userIdeaCurrency'
 import { getTaskPriorityLabel } from './columns'
 import { adminTaskStatuses, getTaskStatusDefinition } from '../core/status'
 import type { AdminMonitorDetailModel } from '../resource'
@@ -520,7 +520,7 @@ import {
   getAttemptRetryLayerLabel,
   getAttemptStageLabel,
   getAttemptStatusLabel,
-  getAttemptStatusVariant,
+  getAttemptStatusTone,
   getBillingSettlementLabel,
   getDetailExecutionModelLabel,
   getDetailExecutionProviderLabel,

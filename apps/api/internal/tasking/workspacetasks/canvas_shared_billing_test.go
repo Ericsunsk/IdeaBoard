@@ -15,7 +15,7 @@ package workspacetasks_test
 //   - A repeated submit (same key + hash) replays the original task with
 //     a single Hold; the same key with a different body is
 //     ErrIdempotencyConflict.
-//   - Member departure and billing ownership transfer never rewrite an
+//   - Member departure and billing manager role changes never rewrite an
 //     existing Task's attribution: terminal Capture/Release converge on
 //     the submit-time account facts (scope is fixed at creation, so no
 //     payer switch exists).
@@ -197,7 +197,7 @@ func TestCanvasSubmitIdempotencyReplaySingleHold(t *testing.T) {
 }
 
 // TestCanvasTerminalSettlesOriginalAccountAfterTenancyChange proves member
-// departure, billing ownership transfer, and payer-link changes never
+// departure, billing manager role changes, and payer-link changes never
 // rewrite an existing Task's attribution: terminal settlement converges on
 // the submit-time account facts.
 func TestCanvasTerminalSettlesOriginalAccountAfterTenancyChange(t *testing.T) {
@@ -210,8 +210,8 @@ func TestCanvasTerminalSettlesOriginalAccountAfterTenancyChange(t *testing.T) {
 		t.Fatalf("task billing account = %d, want %d", held.BillingAccountID, env.accountID)
 	}
 
-	// Tenancy churn after the Hold: hand billing ownership to a second
-	// user and remove the submitter's workspace membership entirely.
+	// Tenancy churn after the Hold: change the billing managers and
+	// remove the submitter's workspace membership entirely.
 	storageUID := "T" + strings.ToUpper(randomAtomicHex(t, 3))[:5]
 	var otherUser int64
 	if err := env.pool.QueryRow(ctx,
@@ -221,11 +221,11 @@ func TestCanvasTerminalSettlesOriginalAccountAfterTenancyChange(t *testing.T) {
 		t.Fatalf("seed second user: %v", err)
 	}
 	baStore := tenancypg.NewBillingAccountStore(env.pool)
-	if _, err := baStore.AddBillingAccountMember(ctx, env.accountID, env.userID, otherUser, tenancy.BillingRoleAdmin); err != nil {
+	if _, err := baStore.AddBillingAccountMember(ctx, env.accountID, env.userID, otherUser, tenancy.BillingRoleOwner); err != nil {
 		t.Fatalf("add billing admin: %v", err)
 	}
-	if err := baStore.TransferBillingAccountOwnership(ctx, env.accountID, env.userID, otherUser); err != nil {
-		t.Fatalf("transfer billing ownership: %v", err)
+	if _, err := baStore.UpdateBillingAccountMemberRole(ctx, env.accountID, otherUser, env.userID, tenancy.BillingRoleAdmin); err != nil {
+		t.Fatalf("demote previous billing owner: %v", err)
 	}
 	if _, err := env.pool.Exec(ctx, `DELETE FROM workspace_memberships WHERE user_id = $1 AND workspace_id = (SELECT internal_id FROM workspaces WHERE public_id = $2)`, env.userID, env.ws); err != nil {
 		t.Fatalf("remove submitter membership: %v", err)

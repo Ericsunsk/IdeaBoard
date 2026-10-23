@@ -4,7 +4,7 @@ import search from './search'
 import canvas from './canvas'
 import library from './library'
 import billing from './billing'
-import errors from './errors'
+import errorCodes from './errors'
 import workspace from './workspace'
 import account from './account'
 import board from './board'
@@ -17,11 +17,23 @@ export default {
   canvas,
   library,
   billing,
-  errorCodes: errors,
+  errorCodes,
   workspace,
   account,
   board,
   admin,
 } as const
 
-export { common, auth, search, canvas, library, billing, errors, workspace, account, board, admin }
+export {
+  common,
+  auth,
+  search,
+  canvas,
+  library,
+  billing,
+  errorCodes,
+  workspace,
+  account,
+  board,
+  admin,
+}

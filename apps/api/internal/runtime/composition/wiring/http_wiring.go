@@ -1,3 +1,9 @@
+// Wiring segment 4/4: HTTP routes (assembly only).
+//
+// This file only annotates and composes: it joins the kernel with the v1
+// and control planes on one gin engine. Request/response rules live in the
+// owning handlers (runtime/interfaces/http, v1, control); nothing here
+// writes business facts.
 package wiring
 
 import (
@@ -18,7 +24,8 @@ import (
 	"ideaboard/api/internal/identity/users/application/administration"
 	"ideaboard/api/internal/identity/users/application/authsync"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
-	libraryapplication "ideaboard/api/internal/library/application"
+	libraryreadthrough "ideaboard/api/internal/library/application/readthrough"
+	librarysources "ideaboard/api/internal/library/application/sources"
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	materializerassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
@@ -128,7 +135,7 @@ func NewAppRouter(
 	// (fail closed) instead of serving silent 404s.
 	boardStore := boards.NewPostgresWorkspaceBoardStore(repos.db, workspacemedia.ValidateDocumentAssets)
 	libraryStore := librarypostgres.NewService(repos.db, &workspacemedia.LibraryPublicationAuthorizer{Boards: boardStore, TaskBoards: &boardtaskaccess.Authorizer{Store: boardStore}})
-	librarySources := &libraryapplication.SourceResolver{Store: libraryStore}
+	librarySources := &librarysources.SourceResolver{Store: libraryStore}
 	libraryMaterializer, err := materializerassets.NewLibraryMaterializer(materializerassets.LibraryMaterializerDeps{
 		Media: taskServices.workspaceTaskMedia, Objects: services.storageService,
 		Fetcher: materializerassets.RemoteLibrarySourceFetcher{},
@@ -137,8 +144,8 @@ func NewAppRouter(
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize library materializer: %w", err)
 	}
-	libraryReadThrough := libraryapplication.NewReadThroughService(
-		libraryStore, libraryMaterializer, libraryapplication.GoroutineExecutor{}, libraryapplication.DefaultReadThroughTimeout)
+	libraryReadThrough := libraryreadthrough.NewReadThroughService(
+		libraryStore, libraryMaterializer, libraryreadthrough.GoroutineExecutor{}, libraryreadthrough.DefaultReadThroughTimeout)
 	mediaRenderer := imgproxy.NewRenderer(imgproxyConfigFromApp(cfg), services.storageService)
 	mediaPreviews, err := preview.NewService(imgproxyConfigFromApp(cfg), configinfra.RuntimeUploadDir, mediaRenderer)
 	if err != nil {

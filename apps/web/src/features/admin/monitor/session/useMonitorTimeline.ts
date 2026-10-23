@@ -1,12 +1,12 @@
 import { computed, ref, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 import type { ChartDataset } from 'chart.js'
 import { adminChartPlugins, adminChartTheme, defineAdminChartTooltip } from '../../shared'
-import { formatLocaleNumber } from '../../../../core/i18n/formatters'
+import { formatLocaleNumber } from '@/core/i18n/formatters'
 import {
   formatCompactNumber,
   resolveChartScaleMax,
   withAlpha,
-} from '../../../../core/lib/chartPrimitives'
+} from '@/core/lib/chartPrimitives'
 import { adminTaskStatuses } from '../core/status'
 import { taskMetricDefinitions, monitorChartSpecs } from '../../shared'
 import { timeRangePresets, type TimeRangePresetKey } from '../core/timeRange'

@@ -8,8 +8,8 @@
 /**
  * AdminBadge：shadcn Badge 承载的通用徽标（计数/标签等非状态用途）。
  *
- * 状态表达已收口到 AdminStatusPill（同样 shadcn Badge 载体，带语义圆点/脉冲）：
- * 新的状态胶囊请用 AdminStatusPill。
+ * 状态表达已收口到 StatusBadge（同样 shadcn Badge 载体，带语义圆点/脉冲）：
+ * 新的状态胶囊请用 StatusBadge（`tone`）。
  */
 import { computed, type HTMLAttributes } from 'vue'
 import { Badge, type BadgeVariants } from '@/components/ui/badge'

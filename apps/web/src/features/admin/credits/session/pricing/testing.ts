@@ -1,5 +1,5 @@
 import type { HttpHandler } from 'msw'
-import { http, HttpResponse } from '../../../../../test/msw'
+import { http, HttpResponse } from '@/test/msw'
 
 // Shared fixtures + MSW builder for the billable catalog surface
 // (`/api/control/v1/billing/catalog`). The builder covers the duplicated GET

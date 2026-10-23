@@ -32,13 +32,13 @@ describe('reconciliation finding presentation', () => {
   it('combines severity, risk and isolation into one risk expression', () => {
     expect(
       getFindingRiskPresentation({ severity: 'critical', risk: 'high', isolated: true } as never),
-    ).toEqual({ label: '严重 · 高风险 · Wallet 已限制', variant: 'danger' })
+    ).toEqual({ label: '严重 · 高风险 · Wallet 已限制', tone: 'danger' })
     expect(
       getFindingRiskPresentation({ severity: 'warning', risk: 'low', isolated: false } as never),
-    ).toEqual({ label: '警告 · 低风险 · 仅报告', variant: 'warning' })
+    ).toEqual({ label: '警告 · 低风险 · 仅报告', tone: 'warning' })
     expect(
       getFindingRiskPresentation({ severity: 'warning', risk: 'low', isolated: true } as never),
-    ).toEqual({ label: '警告 · 低风险 · Wallet 已限制', variant: 'danger' })
+    ).toEqual({ label: '警告 · 低风险 · Wallet 已限制', tone: 'danger' })
   })
 
   it('renders complete nested details without throwing', () => {

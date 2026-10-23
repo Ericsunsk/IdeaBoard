@@ -85,7 +85,7 @@ LIMIT 1
 // use here), so Task settlement keeps Quote/Hold/Task/River atomic.
 //
 // workspace_billing_links rows are retired (writes closed, resolution no
-// longer reads them); the table stays for read-only audit only.
+// longer reads them); the table stays for handover/admin-audit reads only.
 func (q *Queries) GetBillingAccountByOrganizationID(ctx context.Context, organizationID pgtype.Int8) (BillingAccount, error) {
 	row := q.db.QueryRow(ctx, getBillingAccountByOrganizationID, organizationID)
 	var i BillingAccount
@@ -288,47 +288,6 @@ func (q *Queries) ListBillingAccountsForAdmin(ctx context.Context, arg ListBilli
 	return items, nil
 }
 
-const listBillingAccountsForUser = `-- name: ListBillingAccountsForUser :many
-SELECT b.internal_id, b.public_id, b.workspace_id, b.organization_id, b.created_at, b.updated_at
-FROM billing_accounts AS b
-INNER JOIN billing_account_members AS m ON m.billing_account_id = b.internal_id
-WHERE m.user_id = $1
-ORDER BY b.internal_id ASC
-LIMIT $2
-`
-
-type ListBillingAccountsForUserParams struct {
-	UserID   int64 `json:"user_id"`
-	RowLimit int32 `json:"row_limit"`
-}
-
-func (q *Queries) ListBillingAccountsForUser(ctx context.Context, arg ListBillingAccountsForUserParams) ([]BillingAccount, error) {
-	rows, err := q.db.Query(ctx, listBillingAccountsForUser, arg.UserID, arg.RowLimit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []BillingAccount
-	for rows.Next() {
-		var i BillingAccount
-		if err := rows.Scan(
-			&i.InternalID,
-			&i.PublicID,
-			&i.WorkspaceID,
-			&i.OrganizationID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listOrganizationOwners = `-- name: ListOrganizationOwners :many
 SELECT organization_id, user_id, role, created_at
 FROM organization_memberships
@@ -375,6 +334,8 @@ type ListWorkspacesByBillingAccountIDParams struct {
 	RowLimit         int32 `json:"row_limit"`
 }
 
+// Admin-audit read path (ListExplicitlyLinkedWorkspaces); resolution never
+// uses link rows (ADR-0038).
 func (q *Queries) ListWorkspacesByBillingAccountID(ctx context.Context, arg ListWorkspacesByBillingAccountIDParams) ([]Workspace, error) {
 	rows, err := q.db.Query(ctx, listWorkspacesByBillingAccountID, arg.BillingAccountID, arg.RowLimit)
 	if err != nil {

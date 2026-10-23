@@ -2,11 +2,9 @@ package tests
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"ideaboard/api/internal/credits"
@@ -98,83 +96,6 @@ func newIdempotencyAdminRouter(t *testing.T, handler *rewards.AdminCommandHandle
 	})
 	router.POST("/admin/rewards/codes", handler.CreateRewardCode)
 	return router
-}
-
-func TestRewardRedeemRequiresIdempotencyKey(t *testing.T) {
-	handler := rewardhttp.NewUserHandler(rewardHandlerServiceStub{})
-	router := rewardRedeemRouter(t, handler, 41)
-
-	request := httptest.NewRequest(http.MethodPost, "/user/rewards/redeem", strings.NewReader(`{"code":"MISSING-KEY"}`))
-	request.Header.Set("Content-Type", "application/json")
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, request)
-
-	assertRewardMachineCode(t, recorder, http.StatusBadRequest, "reward_invalid_input")
-}
-
-func TestRewardRedeemBindsKeyToCodeAndReplaysBeforeRateLimit(t *testing.T) {
-	serviceCalls := 0
-	handler := rewardhttp.NewUserHandler(rewardHandlerServiceStub{redeem: func(_ context.Context, command ports.RedeemCommand) (ports.RedeemResult, error) {
-		serviceCalls++
-		return ports.RedeemResult{CreditedAmount: int64(len(command.Code))}, nil
-	}})
-	router := rewardRedeemRouter(t, handler, 41)
-
-	for attempt := 0; attempt < rewards.DefaultRedemptionAttemptLimit+2; attempt++ {
-		result, _ := performRewardWriteWithKey[ports.RedeemResult](t, router, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "REPLAY01"}, "same-key", http.StatusOK)
-		if attempt > 0 && !result.Replayed {
-			t.Fatalf("attempt %d replayed=false, want true", attempt+1)
-		}
-	}
-	if serviceCalls != 1 {
-		t.Fatalf("service calls=%d, want 1", serviceCalls)
-	}
-
-	_, conflict := performRewardWriteWithKey[ports.RedeemResult](t, router, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "OTHER001"}, "same-key", http.StatusConflict)
-	assertRewardMachineCode(t, conflict, http.StatusConflict, "reward_code_idempotency_conflict")
-	if serviceCalls != 1 {
-		t.Fatalf("conflicting request executed service; calls=%d", serviceCalls)
-	}
-}
-
-func TestRewardRedeemReplaysFirstResult(t *testing.T) {
-	pool := testdb.Open(t)
-	creditService := credits.NewService(pool)
-	service := newTestRewardService(t, pool, creditService)
-	if _, err := service.CreateRewardCode(t.Context(), ports.CreateRewardCodeCommand{
-		DisplayName: "Idempotent replay", Code: "REPLAY-KEY-2026", CreditAmount: 12,
-		IdempotencyKey: "replay-key-create", ActorUserID: 1,
-	}); err != nil {
-		t.Fatalf("CreateRewardCode() error = %v", err)
-	}
-	provisionRewardWallet(t, pool, creditService, 7)
-
-	handler := rewardhttp.NewUserHandler(service)
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.Use(func(c *gin.Context) {
-		testsupport.SetPrincipal(t, c, 7, principal.RoleUser)
-		c.Next()
-	})
-	router.POST("/user/rewards/redeem", handler.Redeem)
-
-	redeem := func(key string) (ports.RedeemResult, *httptest.ResponseRecorder) {
-		return performRewardWriteWithKey[ports.RedeemResult](
-			t, router, http.MethodPost, "/user/rewards/redeem",
-			map[string]any{"code": "REPLAY-KEY-2026"}, key, http.StatusOK,
-		)
-	}
-	first, _ := redeem("replay-key-1")
-	replay, _ := redeem("replay-key-1")
-	if first.Redemption.ID == 0 || replay.Redemption.ID != first.Redemption.ID {
-		t.Fatalf("first=%+v replay=%+v, want same redemption", first, replay)
-	}
-	if first.Replayed || !replay.Replayed {
-		t.Fatalf("replayed flags first=%v replay=%v, want false/true", first.Replayed, replay.Replayed)
-	}
-	if first.CreditedAmount != 12 || replay.CreditedAmount != 12 {
-		t.Fatalf("credited first=%d replay=%d, want 12", first.CreditedAmount, replay.CreditedAmount)
-	}
 }
 
 func TestRewardCreateRequiresIdempotencyKey(t *testing.T) {

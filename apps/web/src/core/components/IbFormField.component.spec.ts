@@ -16,7 +16,6 @@ const FormHarness = defineComponent({
         error="__required__:请输入账号"
         field-id="username"
         required
-        inline-required
       >
         <input
           v-bind="{
@@ -59,7 +58,7 @@ const FormHarness = defineComponent({
 })
 
 describe('IbFormField', () => {
-  it('connects labels, required state, and inline required errors without a redundant Message', async () => {
+  it('connects labels, required state, and persistent error descriptions', async () => {
     const { user } = renderWithUser(FormHarness)
 
     const username = screen.getByLabelText(/账号/)
@@ -79,7 +78,7 @@ describe('IbFormField', () => {
     expect(password).toHaveFocus()
   })
 
-  it('gives every non-inline error a unique Message and screen-reader association', () => {
+  it('gives every error a unique element and screen-reader association', () => {
     renderWithUser(FormHarness)
 
     const password = screen.getByLabelText(/^密码/)

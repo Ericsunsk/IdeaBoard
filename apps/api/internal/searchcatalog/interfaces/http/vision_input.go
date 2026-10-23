@@ -375,61 +375,51 @@ func isExternalReferenceHost(host, provider string) bool {
 var visionErrorTable = []errorrender.Mapping{
 	{
 		Targets: []error{domain.ErrVisionInput},
-		Status:  http.StatusBadRequest,
 		Code:    string(contract.CodeVisionSearchInputInvalid),
 		Message: errorrender.MsgVisionSearchInputInvalid,
 	},
 	{
 		Targets: []error{domain.ErrVisionImageInvalid},
-		Status:  http.StatusBadRequest,
 		Code:    string(contract.CodeVisionSearchImageInvalid),
 		Message: errorrender.MsgVisionSearchImageInvalid,
 	},
 	{
 		Targets: []error{domain.ErrVisionImageUnavailable},
-		Status:  http.StatusBadRequest,
 		Code:    string(contract.CodeVisionSearchImageUnavailable),
 		Message: errorrender.MsgVisionSearchImageUnavailable,
 	},
 	{
 		Targets: []error{domain.ErrVisionNotConfigured},
-		Status:  http.StatusServiceUnavailable,
 		Code:    string(contract.CodeVisionSearchNotConfigured),
 		Message: errorrender.MsgVisionSearchNotConfigured,
 	},
 	{
 		Targets: []error{domain.ErrVisionUnavailable},
-		Status:  http.StatusServiceUnavailable,
 		Code:    string(contract.CodeVisionSearchUnavailable),
 		Message: errorrender.MsgVisionSearchUnavailable,
 	},
 	{
 		Targets: []error{domain.ErrVisionSchema},
-		Status:  http.StatusBadGateway,
 		Code:    string(contract.CodeVisionSearchSchemaError),
 		Message: errorrender.MsgVisionSearchSchemaError,
 	},
 	{
 		Targets: []error{&domain.VisionProviderError{Kind: domain.VisionProviderFailureCredentials}},
-		Status:  http.StatusBadGateway,
 		Code:    string(contract.CodeVisionSearchCredentials),
 		Message: errorrender.MsgVisionSearchCredentials,
 	},
 	{
 		Targets: []error{&domain.VisionProviderError{Kind: domain.VisionProviderFailureQuota}},
-		Status:  http.StatusBadGateway,
 		Code:    string(contract.CodeVisionSearchQuota),
 		Message: errorrender.MsgVisionSearchQuota,
 	},
 	{
 		Targets: []error{&domain.VisionProviderError{Kind: domain.VisionProviderFailureTimeout}},
-		Status:  http.StatusGatewayTimeout,
 		Code:    string(contract.CodeVisionSearchTimeout),
 		Message: errorrender.MsgVisionSearchTimeout,
 	},
 	{
 		Targets: []error{&domain.VisionProviderError{Kind: domain.VisionProviderFailureNetwork}},
-		Status:  http.StatusBadGateway,
 		Code:    string(contract.CodeVisionSearchNetwork),
 		Message: errorrender.MsgVisionSearchNetwork,
 	},

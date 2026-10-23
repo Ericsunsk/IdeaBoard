@@ -22,13 +22,11 @@
 
 <script setup lang="ts">
 import { computed, useId } from 'vue'
-import type {
-  FormFieldContractProps,
-  FormFieldContractSlotProps,
+import {
+  resolveFormFieldState,
+  type FormFieldContractProps,
+  type FormFieldContractSlotProps,
 } from '@/core/components/formFieldContract'
-
-/** Admin adapter for the neutral field contract. Admin owns markup and tokens. */
-export type AdminFormFieldSlotProps = Pick<FormFieldContractSlotProps, 'describedbyId' | 'invalid'>
 
 const props = withDefaults(
   defineProps<
@@ -49,24 +47,31 @@ const props = withDefaults(
 )
 
 defineSlots<{
-  default(props: AdminFormFieldSlotProps): unknown
+  default(props: FormFieldContractSlotProps): unknown
 }>()
 
 const generatedId = useId()
-const fieldId = computed(() => props.for || `admin-form-field-${generatedId}`)
-const hasError = computed(() => Boolean(props.error))
-const hasHint = computed(() => Boolean(props.hint))
-const hintElementId = computed(() => (hasHint.value ? `${fieldId.value}-hint` : undefined))
-const errorElementId = computed(() => (hasError.value ? `${fieldId.value}-error` : undefined))
-const describedbyId = computed(() => errorElementId.value ?? hintElementId.value)
+// Id/a11y state comes from the neutral contract: same `describedbyId`/`invalid`
+// derivation as the core adapter, Admin only supplies markup and tokens.
+const state = computed(() =>
+  resolveFormFieldState({
+    fieldId: props.for,
+    fallbackId: `admin-form-field-${generatedId}`,
+    error: props.error,
+    hint: props.hint,
+  }),
+)
+const hasError = computed(() => state.value.invalid)
+const hintElementId = computed(() => state.value.hintId)
+const errorElementId = computed(() => state.value.errorId)
 const fieldClass = computed(() =>
   props.bodyClass ? ['flex min-w-0 flex-col', props.bodyClass] : 'flex min-w-0 flex-col gap-1.5',
 )
 const labelTextClass = computed(
   () => props.labelClass || 'text-admin-meta font-admin-emphasis text-muted-foreground',
 )
-const slotProps = computed<AdminFormFieldSlotProps>(() => ({
-  describedbyId: describedbyId.value,
-  invalid: hasError.value,
+const slotProps = computed<FormFieldContractSlotProps>(() => ({
+  ...state.value,
+  required: props.required,
 }))
 </script>

@@ -4,14 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/rewards"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
 	"ideaboard/api/internal/rewards/ports"
@@ -206,42 +203,10 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			}
 		})
 	}
-
-	redeemCases := []struct {
-		name       string
-		redeemErr  error
-		wantStatus int
-		wantCode   string
-		wantMsg    string
-	}{
-		{name: "invalid Code", redeemErr: rewardsdomain.ErrInvalidCode, wantStatus: http.StatusUnprocessableEntity, wantCode: "reward_code_unavailable", wantMsg: "兑换码无效或已失效"},
-		{name: "unavailable Code", redeemErr: rewardsdomain.ErrCodeUnavailable, wantStatus: http.StatusUnprocessableEntity, wantCode: "reward_code_unavailable", wantMsg: "兑换码无效或已失效"},
-		{name: "frozen Wallet", redeemErr: rewardsdomain.ErrWalletFrozen, wantStatus: http.StatusConflict, wantCode: "reward_wallet_locked", wantMsg: "当前账户无法兑换奖励"},
-		{name: "unknown failure", redeemErr: errors.New("credit grant timeout"), wantStatus: http.StatusInternalServerError, wantCode: "reward_redeem_failed", wantMsg: "网络错误，请重试"},
-	}
-	for _, testCase := range redeemCases {
-		t.Run("redeem "+testCase.name, func(t *testing.T) {
-			handler := rewardhttp.NewUserHandler(rewardHandlerServiceStub{redeem: func(context.Context, ports.RedeemCommand) (ports.RedeemResult, error) {
-				return ports.RedeemResult{}, testCase.redeemErr
-			}})
-			router := rewardRedeemRouter(t, handler, 41)
-			recorder := performRawRewardRedeem(t, router, `{"code":"MACHINE01"}`)
-			assertRewardMachineError(t, recorder, testCase.wantStatus, testCase.wantCode, testCase.wantMsg)
-			if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
-				t.Fatalf("Cache-Control = %q, want no-store", got)
-			}
-		})
-	}
 }
 
 func TestRewardUnavailableServiceRendersMachineCode(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-
-	t.Run("user redeem without service", func(t *testing.T) {
-		router := rewardRedeemRouter(t, rewardhttp.NewUserHandler(nil), 41)
-		recorder := performRawRewardRedeem(t, router, `{"code":"MACHINE01"}`)
-		assertRewardMachineError(t, recorder, http.StatusServiceUnavailable, "reward_service_unavailable", "网络错误，请重试")
-	})
 
 	t.Run("admin command without service", func(t *testing.T) {
 		handler := rewardhttp.NewAdminCommandHandler(nil)
@@ -254,21 +219,6 @@ func TestRewardUnavailableServiceRendersMachineCode(t *testing.T) {
 		recorder := performRawAdminRewardRequest(t, router, http.MethodPost, "/admin/rewards/codes", `{"display_name":"x"}`)
 		assertRewardMachineError(t, recorder, http.StatusServiceUnavailable, "reward_service_unavailable", "奖励服务暂不可用")
 	})
-}
-
-func TestRewardRedeemThrottleRendersMachineCode(t *testing.T) {
-	now := time.Date(2026, time.July, 16, 12, 0, 0, 0, time.UTC)
-	handler := rewardhttp.NewUserHandlerWithOptions(rewardHandlerServiceStub{redeem: func(context.Context, ports.RedeemCommand) (ports.RedeemResult, error) {
-		return ports.RedeemResult{CreditedAmount: 1}, nil
-	}}, rewards.RedemptionHandlerOptions{Now: func() time.Time { return now }})
-	router := rewardRedeemRouter(t, handler, 41)
-	for attempt := 1; attempt <= rewards.DefaultRedemptionAttemptLimit; attempt++ {
-		if recorder := performRawRewardRedeemWithKey(t, router, `{"code":"MACHINE01"}`, fmt.Sprintf("machine-key-%d", attempt)); recorder.Code != http.StatusOK {
-			t.Fatalf("attempt %d status = %d; body=%s", attempt, recorder.Code, recorder.Body.String())
-		}
-	}
-	limited := performRawRewardRedeem(t, router, `{"code":"MACHINE01"}`)
-	assertRewardMachineError(t, limited, http.StatusTooManyRequests, "reward_rate_limited", "操作过于频繁，请稍后重试")
 }
 
 func assertRewardMachineError(t *testing.T, recorder *httptest.ResponseRecorder, wantStatus int, wantCode, wantMsg string) {
@@ -289,7 +239,7 @@ func assertRewardMachineError(t *testing.T, recorder *httptest.ResponseRecorder,
 	}
 }
 
-func adminRedemptionListRouter(t *testing.T, handler *rewards.AdminReadHandler) http.Handler {
+func adminRedemptionListRouter(t *testing.T, handler *rewardhttp.AdminReadHandler) http.Handler {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -301,7 +251,7 @@ func adminRedemptionListRouter(t *testing.T, handler *rewards.AdminReadHandler) 
 	return router
 }
 
-func adminRedemptionDetailRouter(t *testing.T, handler *rewards.AdminReadHandler) http.Handler {
+func adminRedemptionDetailRouter(t *testing.T, handler *rewardhttp.AdminReadHandler) http.Handler {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -313,7 +263,7 @@ func adminRedemptionDetailRouter(t *testing.T, handler *rewards.AdminReadHandler
 	return router
 }
 
-func adminRewardSearchRouter(t *testing.T, handler *rewards.AdminReadHandler) http.Handler {
+func adminRewardSearchRouter(t *testing.T, handler *rewardhttp.AdminReadHandler) http.Handler {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

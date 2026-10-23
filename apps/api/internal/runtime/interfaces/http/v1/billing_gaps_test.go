@@ -372,10 +372,6 @@ func (f *fakeGapBillingAccounts) UpdateBillingAccountMemberRole(ctx context.Cont
 	return nil, tenancy.ErrBillingStoreNotConfigured
 }
 
-func (f *fakeGapBillingAccounts) TransferBillingAccountOwnership(ctx context.Context, billingAccountInternalID, currentOwnerID, newOwnerID int64) error {
-	return tenancy.ErrBillingStoreNotConfigured
-}
-
 func (f *fakeGapBillingAccounts) InitiateBillingTransferInvite(ctx context.Context, billingAccountInternalID, fromUserID, toUserID int64, idempotencyKey string) (*tenancy.BillingTransferInvite, error) {
 	return nil, tenancy.ErrBillingStoreNotConfigured
 }

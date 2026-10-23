@@ -1,3 +1,10 @@
+// Wiring segment 3/4: task runtime and workers (assembly only).
+//
+// This file only annotates and composes: it builds the shared workspace
+// settlement pieces, the River client/workers, and the event fanout once
+// and shares the instances with the HTTP submit path. Settlement, retry,
+// and rendering rules live in tasking/worker providers; nothing here writes
+// business facts beyond assembly.
 package wiring
 
 import (

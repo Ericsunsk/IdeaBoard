@@ -12,7 +12,7 @@
 
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import { getServiceIcon } from '../../../../../core/components/serviceIcons'
+import { getServiceIcon } from '@/core/components/serviceIcons'
 import { getAdminServiceGroupMeta, getAdminServiceMeta } from '../../core/serviceAdminMeta'
 
 const props = defineProps<{

@@ -112,7 +112,11 @@
         :items="canvasNodeMenuItems"
         @create="handleNodeContextMenuCreate"
       />
-      <ShareDialog :panel="sharePanel" :ensure-draft-saved="ensureCanvasDraftSaved" />
+      <ShareDialog
+        :panel="sharePanel"
+        :ensure-draft-saved="ensureCanvasDraftSaved"
+        :current-user="userStore.user"
+      />
     </div>
   </div>
 </template>
@@ -228,13 +232,17 @@ const activeTool = computed({
 })
 const isCanvasMinimapEnabled = ref(false)
 const isDuplicateModifierPressed = ref(false)
-const canvasLibrary = useCanvasLibraryIsland()
 const toast = useAppToast()
 // Workspace id comes from the shared selection store (primed from persisted
 // selection); no workspace query is issued from the Canvas screen.
+// This screen is the workspace seam: lower layers receive the id via
+// injected resolvers instead of importing the selection store.
 const workspaceSelectionStore = getWorkspaceSelectionStore()
 workspaceSelectionStore.getSelectedId()
 const canvasWorkspaceId = workspaceSelectionStore.selectedId
+const canvasLibrary = useCanvasLibraryIsland({
+  getWorkspaceId: () => canvasWorkspaceId.value,
+})
 
 function requireCanvasWorkspaceId(): string {
   return requireWorkspaceId(canvasWorkspaceId.value)
@@ -280,6 +288,7 @@ const workspace = useCanvasWorkspaceRuntime({
   router,
   getUserIdentity,
   getWorkspaceId: requireCanvasWorkspaceId,
+  isWorkspaceAvailable: () => canvasWorkspaceId.value != null,
   flowPaneAdapter,
   uploadApi,
   graphEditingBrowser,

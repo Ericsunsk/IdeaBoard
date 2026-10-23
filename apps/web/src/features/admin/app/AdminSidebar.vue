@@ -166,10 +166,10 @@ import {
   type AdminNavigationGroup,
   type AdminNavigationItem,
 } from './navigation'
-import SiteBrandLogo from '../../../core/components/SiteBrandLogo.vue'
-import { brandMarkClasses } from '../../../core/lib/brandMark'
-import { useSiteBranding } from '../../../core/composables/useSiteBranding'
-import { i18n } from '../../../core/i18n'
+import SiteBrandLogo from '@/core/components/SiteBrandLogo.vue'
+import { brandMarkClasses } from '@/core/lib/brandMark'
+import { useSiteBranding } from '@/core/composables/useSiteBranding'
+import { i18n } from '@/core/i18n'
 
 defineProps<{
   activeKey: string

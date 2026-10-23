@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SERVICE } from '../../../../core/contracts/imageServices'
+import { SERVICE } from '@/core/contracts/imageServices'
 import { getServicePromptVariables } from './promptVariables'
 
 describe('service prompt variables', () => {

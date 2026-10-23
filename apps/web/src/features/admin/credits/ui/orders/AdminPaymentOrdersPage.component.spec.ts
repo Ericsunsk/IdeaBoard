@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen, waitFor } from '../../../../../test/render'
-import { mockAppToast, type AppToastMocks } from '../../../../../test/toast'
+import { renderWithUser, screen, waitFor } from '@/test/render'
+import { mockAppToast, type AppToastMocks } from '@/test/toast'
 import AdminPaymentOrdersPage from './AdminPaymentOrdersPage.vue'
 
 const resource = vi.hoisted(() => ({

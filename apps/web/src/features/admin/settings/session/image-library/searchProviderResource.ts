@@ -3,8 +3,8 @@ import {
   listControlSearchProviders,
   testControlSearchProvider,
   updateControlSearchProvider,
-} from '../../../../../api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '../../../../../api/contractKernel'
+} from '@/api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '@/api/contractKernel'
 import { withControlCopy } from '../../../shared/index'
 import type {
   SearchProviderId,

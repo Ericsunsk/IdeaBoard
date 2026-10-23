@@ -1,9 +1,9 @@
-import { requireContractData } from '../../../../api/contractKernel'
+import { requireContractData } from '@/api/contractKernel'
 import { buildControlMutationHeaders } from '../../shared'
 import {
   listControlFeaturePrompts,
   saveControlFeaturePrompt,
-} from '../../../../api/generated-query/control/control-platform/control-platform'
+} from '@/api/generated-query/control/control-platform/control-platform'
 import { withControlCopy } from '../../shared'
 
 export type FeaturePrompt = {

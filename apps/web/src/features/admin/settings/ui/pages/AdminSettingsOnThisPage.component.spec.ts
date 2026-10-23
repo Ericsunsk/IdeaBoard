@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import AdminSettingsOnThisPage from './AdminSettingsOnThisPage.vue'
 
 describe('AdminSettingsOnThisPage', () => {

@@ -70,9 +70,22 @@ export class BoardPayloadError extends Error {
 }
 
 /** Fail-closed workspace resolution: throws before any network call when unset. */
-export function requireBoardWorkspaceId(explicit?: string | null): string {
+export type BoardWorkspaceIdResolver = () => string | null
+
+function defaultBoardWorkspaceIdResolver(): string | null {
+  try {
+    return getWorkspaceSelectionStore().getSelectedId()
+  } catch {
+    return null
+  }
+}
+
+export function requireBoardWorkspaceId(
+  explicit?: string | null,
+  resolve?: BoardWorkspaceIdResolver,
+): string {
   return requireSharedWorkspaceId(
-    explicit?.trim() ? explicit : getWorkspaceSelectionStore().getSelectedId(),
+    explicit?.trim() ? explicit : (resolve ?? defaultBoardWorkspaceIdResolver)(),
     () => new BoardWorkspaceUnavailableError(),
   )
 }

@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import type { TaskStatus } from '../../shared'
 import { usePagePagination } from '../../shared'
-import { stripUndefined } from '../../../../api/stripUndefined'
+import { stripUndefined } from '@/api/stripUndefined'
 import { useQueryPolling } from '../../shared'
 import {
   useAdminTaskListResource,

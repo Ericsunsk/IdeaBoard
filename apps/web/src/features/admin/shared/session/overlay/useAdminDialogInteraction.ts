@@ -2,7 +2,7 @@ import { onScopeDispose, type MaybeRefOrGetter } from 'vue'
 import {
   defineDialogSurfaceIntent,
   useOverlayInteractionLifecycle,
-} from '../../../../../core/composables/useOverlayInteractionLifecycle'
+} from '@/core/composables/useOverlayInteractionLifecycle'
 
 type AdminDialogInteractionOptions = {
   isVisible: MaybeRefOrGetter<boolean>

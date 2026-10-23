@@ -48,43 +48,36 @@ const (
 var billingDomainErrorTable = []errorrender.Mapping{
 	{
 		Targets: []error{billing.ErrInvalidSKU, billing.ErrInvalidQuantity, billing.ErrInvalidCatalogEntry, billing.ErrInvalidOutputResolution},
-		Status:  http.StatusBadRequest,
 		Code:    codeBillingInvalidInput,
 		Message: errorrender.MsgMatches,
 	},
 	{
 		Targets: []error{billing.ErrSKUNotFound},
-		Status:  http.StatusNotFound,
 		Code:    codeBillingSKUNotFound,
 		Message: errorrender.MsgMatches2,
 	},
 	{
 		Targets: []error{billing.ErrPricingUnavailable},
-		Status:  http.StatusUnprocessableEntity,
 		Code:    codeBillingPricingUnavailable,
 		Message: errorrender.MsgMatches3,
 	},
 	{
 		Targets: []error{billing.ErrItemNotArchived},
-		Status:  http.StatusConflict,
 		Code:    codeBillingItemNotArchived,
 		Message: errorrender.MsgMatches4,
 	},
 	{
 		Targets: []error{billing.ErrArchivedItemInUse},
-		Status:  http.StatusConflict,
 		Code:    codeBillingArchivedItemInUse,
 		Message: errorrender.MsgMatches5,
 	},
 	{
 		Targets: []error{billing.ErrQuoteTotalExceeded},
-		Status:  http.StatusUnprocessableEntity,
 		Code:    codeBillingQuoteTotalExceeded,
 		Message: errorrender.MsgMatches6,
 	},
 	{
 		Targets: []error{billing.ErrServiceUnavailable},
-		Status:  http.StatusServiceUnavailable,
 		Code:    codeBillingServiceUnavailable,
 		Message: errorrender.MsgMatches7,
 	},

@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { renderWithUser, screen, waitFor } from '../../../test/render'
+import { renderWithUser, screen, waitFor } from '@/test/render'
 import AdminLayout from './AdminLayout.vue'
 
 vi.mock('../../../core/composables/useSupportChannels', () => ({

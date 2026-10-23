@@ -65,9 +65,9 @@
       :style="{ width: '120px' }"
     >
       <template #body="{ data }">
-        <AdminStatusPill
+        <StatusBadge
           :label="getStripeStatusLabel(data.stripeStatus)"
-          :variant="stripeStatusVariant(data.stripeStatus)"
+          :tone="stripeStatusTone(data.stripeStatus)"
           size="small"
         />
       </template>
@@ -79,9 +79,9 @@
       :style="{ width: '120px' }"
     >
       <template #body="{ data }">
-        <AdminStatusPill
+        <StatusBadge
           :label="getCreditStatusLabel(data.creditStatus)"
-          :variant="creditStatusVariant(data.creditStatus)"
+          :tone="creditStatusTone(data.creditStatus)"
           size="small"
         />
       </template>
@@ -89,10 +89,10 @@
 
     <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.anomalyColumn" :style="{ width: '110px' }">
       <template #body="{ data }">
-        <AdminStatusPill
+        <StatusBadge
           v-if="data.anomalousAt"
           :label="PAYMENT_ORDERS_MESSAGES.anomalyBadge"
-          variant="danger"
+          tone="danger"
           size="small"
         />
         <span v-else class="text-xs text-muted-foreground">{{ ADMIN_NUMERIC_EMPTY }}</span>
@@ -137,7 +137,7 @@
 
 <script setup lang="ts">
 import { Eye } from '@iconoir/vue'
-import { AdminStatusPill, type AdminStatusPillVariant } from '../../../shared'
+import { StatusBadge, type AppStatusTone } from '../../../shared'
 import { AdminColumn } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
 import { AdminMono } from '../../../shared'
@@ -151,7 +151,7 @@ import {
   adminTableRowActionButtonClass,
   adminTableStyle,
 } from '../../../shared'
-import { formatLocaleNumber } from '../../../../../core/i18n/formatters'
+import { formatLocaleNumber } from '@/core/i18n/formatters'
 import {
   formatPaymentDateTime,
   formatPaymentMoney,
@@ -169,14 +169,14 @@ defineProps<{
 
 const emit = defineEmits<{ 'open-detail': [publicOrderNumber: string] }>()
 
-function stripeStatusVariant(status: string): AdminStatusPillVariant {
+function stripeStatusTone(status: string): AppStatusTone {
   if (status === 'paid') return 'success'
   if (status === 'payment_failed') return 'danger'
   if (status === 'open' || status === 'async_payment_pending') return 'warning'
   return 'neutral'
 }
 
-function creditStatusVariant(status: string): AdminStatusPillVariant {
+function creditStatusTone(status: string): AppStatusTone {
   if (status === 'credited') return 'success'
   if (status === 'pending') return 'warning'
   return 'neutral'

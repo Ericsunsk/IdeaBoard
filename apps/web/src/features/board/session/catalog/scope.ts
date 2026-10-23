@@ -3,12 +3,19 @@ import {
   getRecoverableAuthStorageUserScope,
   subscribeAuthStorageScopeChange,
 } from '../../../../core/utils/auth'
-import { getWorkspaceSelectionStore, subscribeWorkspaceSelectionChange } from '../../../workspace'
+import {
+  getWorkspaceSelectionStore as getDefaultWorkspaceSelectionStore,
+  subscribeWorkspaceSelectionChange as subscribeDefaultWorkspaceSelectionChange,
+} from '../../../workspace'
 
 // Active User + Workspace scope gates repository views and async mutations.
 // Local cache keys may use the remembered user during transient auth loss to
 // preserve drafts. Explicit logout clears that recovery scope; neither path
 // infers a missing workspace from legacy user-only caches.
+//
+// Ports seam: the workspace selection is an injected port (default: the
+// `features/workspace` selection store). Lower layers resolve through
+// `getBoardScope`/subscriptions, never by importing the store directly.
 
 export type BoardScope = {
   userScope: string | null
@@ -21,17 +28,52 @@ export type CompleteBoardScope = BoardScope & {
   workspaceId: string
 }
 
+export type BoardScopeWorkspacePort = {
+  getSelectedId: () => string | null
+  subscribeSelectionChange: (listener: (id: string | null) => void) => () => void
+}
+
+function defaultWorkspacePort(): BoardScopeWorkspacePort {
+  return {
+    getSelectedId: () => {
+      try {
+        return getDefaultWorkspaceSelectionStore().getSelectedId()
+      } catch {
+        return null
+      }
+    },
+    subscribeSelectionChange: (listener) => subscribeDefaultWorkspaceSelectionChange(listener),
+  }
+}
+
+let workspacePort: BoardScopeWorkspacePort = defaultWorkspacePort()
+let stopWorkspaceResidency: (() => void) | null = null
+
+export function setBoardScopeWorkspacePortForTests(
+  port: Partial<BoardScopeWorkspacePort>,
+): void {
+  stopWorkspaceResidency?.()
+  workspacePort = { ...workspacePort, ...port }
+  stopWorkspaceResidency = workspacePort.subscribeSelectionChange(advanceResidency)
+}
+
+export function resetBoardScopeWorkspacePortForTests(): void {
+  stopWorkspaceResidency?.()
+  workspacePort = defaultWorkspacePort()
+  stopWorkspaceResidency = workspacePort.subscribeSelectionChange(advanceResidency)
+}
+
 let residency = 0
 const advanceResidency = () => {
   residency += 1
 }
 subscribeAuthStorageScopeChange(advanceResidency)
-subscribeWorkspaceSelectionChange(advanceResidency)
+stopWorkspaceResidency = workspacePort.subscribeSelectionChange(advanceResidency)
 
 export function getBoardScope(): BoardScope {
   return {
     userScope: getAuthStorageUserScope(),
-    workspaceId: getWorkspaceSelectionStore().getSelectedId(),
+    workspaceId: workspacePort.getSelectedId(),
     residency,
   }
 }
@@ -39,7 +81,7 @@ export function getBoardScope(): BoardScope {
 export function getRecoverableBoardScope(): BoardScope {
   return {
     userScope: getRecoverableAuthStorageUserScope(),
-    workspaceId: getWorkspaceSelectionStore().getSelectedId(),
+    workspaceId: workspacePort.getSelectedId(),
     residency,
   }
 }
@@ -66,7 +108,7 @@ export function boardScopeKey(
 export function subscribeBoardScopeChange(listener: (scope: BoardScope) => void): () => void {
   const emit = () => listener(getBoardScope())
   const unsubscribeAuth = subscribeAuthStorageScopeChange(emit)
-  const unsubscribeWorkspace = subscribeWorkspaceSelectionChange(emit)
+  const unsubscribeWorkspace = workspacePort.subscribeSelectionChange(emit)
   return () => {
     unsubscribeAuth()
     unsubscribeWorkspace()

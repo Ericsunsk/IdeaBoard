@@ -15,8 +15,8 @@ func TestMappingMatchesAndScopeFilter(t *testing.T) {
 	sentinelAdmin := errors.New("admin failure")
 	sentinelShared := errors.New("shared failure")
 	table := []Mapping{
-		{Targets: []error{sentinelAdmin}, Status: http.StatusConflict, Code: "test_conflict", Message: "conflict", Scope: "admin"},
-		{Targets: []error{sentinelShared}, Status: http.StatusBadRequest, Code: "test_bad", Message: "bad"},
+		{Targets: []error{sentinelAdmin}, Code: "conflict", Message: "conflict", Scope: "admin"},
+		{Targets: []error{sentinelShared}, Code: "bad_request", Message: "bad"},
 	}
 	if !table[0].Matches(sentinelAdmin) || table[0].Matches(sentinelShared) {
 		t.Fatal("Matches must use errors.Is membership")
@@ -53,29 +53,42 @@ func renderMapped(t *testing.T, err error, table []Mapping, opts MappedOptions) 
 func TestRenderMappedFirstMatchWins(t *testing.T) {
 	sentinel := errors.New("boom")
 	table := []Mapping{
-		{Targets: []error{sentinel}, Status: http.StatusConflict, Code: "first", Message: "first"},
-		{Targets: []error{sentinel}, Status: http.StatusBadRequest, Code: "second", Message: "second"},
+		{Targets: []error{sentinel}, Code: "conflict", Message: "first"},
+		{Targets: []error{sentinel}, Code: "bad_request", Message: "second"},
 	}
 	status, body := renderMapped(t, sentinel, table, MappedOptions{
 		DefaultStatus: http.StatusInternalServerError, DefaultCode: "dflt", DefaultMessage: "dflt",
 	})
-	if status != http.StatusConflict || body["code"] != "first" || body["msg"] != "first" {
-		t.Fatalf("status=%d body=%v, want 409 first/first", status, body)
+	if status != http.StatusConflict || body["code"] != "conflict" || body["msg"] != "first" {
+		t.Fatalf("status=%d body=%v, want 409 conflict/first", status, body)
 	}
 }
 
 func TestRenderMappedScopeSelectsRows(t *testing.T) {
 	sentinel := errors.New("invalid code")
 	table := []Mapping{
-		{Targets: []error{sentinel}, Status: http.StatusBadRequest, Code: "invalid", Message: "invalid", Scope: "admin"},
-		{Targets: []error{sentinel}, Status: http.StatusUnprocessableEntity, Code: "unavailable", Message: "unavailable", Scope: "redeem"},
+		{Targets: []error{sentinel}, Code: "bad_request", Message: "invalid", Scope: "admin"},
+		{Targets: []error{sentinel}, Code: "validation_failed", Message: "unavailable", Scope: "redeem"},
 	}
 	opts := MappedOptions{DefaultStatus: http.StatusInternalServerError, DefaultCode: "d", DefaultMessage: "d"}
-	if status, body := renderMapped(t, sentinel, table, withScope(opts, "redeem")); status != http.StatusUnprocessableEntity || body["code"] != "unavailable" {
+	if status, body := renderMapped(t, sentinel, table, withScope(opts, "redeem")); status != http.StatusUnprocessableEntity || body["code"] != "validation_failed" {
 		t.Fatalf("redeem scope: status=%d body=%v", status, body)
 	}
-	if status, body := renderMapped(t, sentinel, table, withScope(opts, "admin")); status != http.StatusBadRequest || body["code"] != "invalid" {
+	if status, body := renderMapped(t, sentinel, table, withScope(opts, "admin")); status != http.StatusBadRequest || body["code"] != "bad_request" {
 		t.Fatalf("admin scope: status=%d body=%v", status, body)
+	}
+}
+
+func TestRenderMappedStatusDerivesFromCentralRegistry(t *testing.T) {
+	sentinel := errors.New("boom")
+	// The edge table carries no status: an unregistered Code fails closed
+	// to 500 through the central registry, never a caller mistake.
+	table := []Mapping{{Targets: []error{sentinel}, Code: "unregistered_code_xyz", Message: "m"}}
+	status, body := renderMapped(t, sentinel, table, MappedOptions{
+		DefaultStatus: http.StatusBadRequest, DefaultCode: "d", DefaultMessage: "dflt",
+	})
+	if status != http.StatusInternalServerError || body["code"] != "unregistered_code_xyz" {
+		t.Fatalf("unregistered code: status=%d body=%v, want 500 fail-closed", status, body)
 	}
 }
 
@@ -85,7 +98,7 @@ func withScope(opts MappedOptions, scope string) MappedOptions {
 }
 
 func TestRenderMappedDefaultAndNumeric(t *testing.T) {
-	table := []Mapping{{Targets: []error{errors.New("other")}, Status: http.StatusBadRequest, Code: "x", Message: "x"}}
+	table := []Mapping{{Targets: []error{errors.New("other")}, Code: "unregistered_for_default_path", Message: "x"}}
 	status, body := renderMapped(t, errors.New("unknown"), table, MappedOptions{
 		DefaultStatus: http.StatusInternalServerError, DefaultCode: "op_failed", DefaultMessage: "failed",
 	})
@@ -104,12 +117,12 @@ func TestRenderMappedDefaultAndNumeric(t *testing.T) {
 func TestRenderMappedEmptyMessageFallsBackWithoutLeak(t *testing.T) {
 	const secret = "SECRET_MUST_NOT_ESCAPE"
 	sentinel := errors.New("sentinel")
-	table := []Mapping{{Targets: []error{sentinel}, Status: http.StatusBadRequest, Code: "empty", Message: ""}}
+	table := []Mapping{{Targets: []error{sentinel}, Code: "bad_request", Message: ""}}
 	status, body := renderMapped(t, errors.Join(sentinel, errors.New(secret)), table, MappedOptions{
 		DefaultStatus: http.StatusInternalServerError, DefaultCode: "d", DefaultMessage: "dflt",
 		FallbackMessage: "fallback",
 	})
-	if status != http.StatusBadRequest || body["code"] != "empty" || body["msg"] != "fallback" {
+	if status != http.StatusBadRequest || body["code"] != "bad_request" || body["msg"] != "fallback" {
 		t.Fatalf("fallback: status=%d body=%v", status, body)
 	}
 	raw, _ := json.Marshal(body)

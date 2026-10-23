@@ -72,12 +72,12 @@ GROUP BY billing_account_id`).Scan(&grantAccount, &grantCount); err != nil {
 	}
 }
 
-// TestWelcomeGrantSurvivesBillingAccountOwnershipTransfer verifies that
-// moving account management (owner handover) never mints a new Welcome
+// TestWelcomeGrantSurvivesBillingManagerRoleChanges verifies that
+// changing account manager roles never mints a new Welcome
 // Grant: re-provisioning either identity still replays, both personal
 // balances stay exactly at their single grants, and no new welcome_claim
 // Ledger fact appears.
-func TestWelcomeGrantSurvivesBillingAccountOwnershipTransfer(t *testing.T) {
+func TestWelcomeGrantSurvivesBillingManagerRoleChanges(t *testing.T) {
 	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
@@ -107,11 +107,11 @@ func TestWelcomeGrantSurvivesBillingAccountOwnershipTransfer(t *testing.T) {
 			ownerAccount, successorAccount)
 	}
 
-	if _, err := accounts.AddBillingAccountMember(ctx, ownerAccount, owner.User.ID, successor.User.ID, tenancy.BillingRoleAdmin); err != nil {
+	if _, err := accounts.AddBillingAccountMember(ctx, ownerAccount, owner.User.ID, successor.User.ID, tenancy.BillingRoleOwner); err != nil {
 		t.Fatalf("AddBillingAccountMember() error = %v", err)
 	}
-	if err := accounts.TransferBillingAccountOwnership(ctx, ownerAccount, owner.User.ID, successor.User.ID); err != nil {
-		t.Fatalf("TransferBillingAccountOwnership() error = %v", err)
+	if _, err := accounts.UpdateBillingAccountMemberRole(ctx, ownerAccount, successor.User.ID, owner.User.ID, tenancy.BillingRoleAdmin); err != nil {
+		t.Fatalf("UpdateBillingAccountMemberRole() error = %v", err)
 	}
 
 	ownerReplay, err := service.ProvisionIdentity(ctx, VerifiedIdentity{
@@ -120,7 +120,7 @@ func TestWelcomeGrantSurvivesBillingAccountOwnershipTransfer(t *testing.T) {
 		ClaimIdentityVerified: true, Role: "user",
 	})
 	if err != nil {
-		t.Fatalf("replay owner after transfer: %v", err)
+		t.Fatalf("replay owner after manager-role changes: %v", err)
 	}
 	successorReplay, err := service.ProvisionIdentity(ctx, VerifiedIdentity{
 		AuthUserID: "auth-transfer-successor", DisplayName: "transfer-successor",
@@ -128,13 +128,13 @@ func TestWelcomeGrantSurvivesBillingAccountOwnershipTransfer(t *testing.T) {
 		ClaimIdentityVerified: true, Role: "user",
 	})
 	if err != nil {
-		t.Fatalf("replay successor after transfer: %v", err)
+		t.Fatalf("replay successor after manager-role changes: %v", err)
 	}
 	if ownerReplay.WelcomeGranted || successorReplay.WelcomeGranted {
-		t.Fatalf("transfer minted a new grant: owner=%+v successor=%+v", ownerReplay, successorReplay)
+		t.Fatalf("manager-role changes minted a new grant: owner=%+v successor=%+v", ownerReplay, successorReplay)
 	}
 	if ownerReplay.Wallet.Available != 100 || successorReplay.Wallet.Available != 100 {
-		t.Fatalf("balances after transfer owner=%d successor=%d, want 100/100",
+		t.Fatalf("balances after manager-role changes owner=%d successor=%d, want 100/100",
 			ownerReplay.Wallet.Available, successorReplay.Wallet.Available)
 	}
 
@@ -146,7 +146,7 @@ func TestWelcomeGrantSurvivesBillingAccountOwnershipTransfer(t *testing.T) {
 		t.Fatal(err)
 	}
 	if welcomeClaims != 2 || welcomeGrants != 2 {
-		t.Fatalf("welcome claims=%d grants=%d, want 2/2 (transfer mints nothing)", welcomeClaims, welcomeGrants)
+		t.Fatalf("welcome claims=%d grants=%d, want 2/2 (manager-role changes mint nothing)", welcomeClaims, welcomeGrants)
 	}
 }
 

@@ -1,6 +1,6 @@
 import { computed, watch, type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import { useQuery, type Query } from '@tanstack/vue-query'
-import { noRetry } from '../../../../../core/query/queryDefaults'
+import { noRetry } from '@/core/query/queryDefaults'
 
 /**
  * Shared TanStack Query owner for Admin list lifecycles.

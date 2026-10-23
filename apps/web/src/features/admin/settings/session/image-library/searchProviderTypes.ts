@@ -2,7 +2,7 @@ import {
   EXTERNAL_IMAGE_PROVIDERS,
   EXTERNAL_IMAGE_PROVIDER_LABELS,
   type ExternalImageProvider,
-} from '../../../../../core/contracts/externalImageProviders'
+} from '@/core/contracts/externalImageProviders'
 
 export type SearchProviderId = ExternalImageProvider
 

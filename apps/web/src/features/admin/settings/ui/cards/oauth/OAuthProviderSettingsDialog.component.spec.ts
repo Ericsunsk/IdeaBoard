@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen, waitFor, within } from '../../../../../../test/render'
+import { renderWithUser, screen, waitFor, within } from '@/test/render'
 import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 
 vi.mock('../../../../shared/session/brand/brandLogoResource', () => ({

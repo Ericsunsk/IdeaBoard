@@ -14,7 +14,7 @@ import (
 )
 
 // Focused coverage for #915 resolution: no-org sharing, multi-org isolation,
-// same-user multi-account management, non-org admin + handover, tx-joinable
+// same-user multi-account management, non-org manager role changes, tx-joinable
 // resolution, and fail-closed missing/ambiguous/conflict paths.
 func TestBillingResolutionSharesOrgPool(t *testing.T) {
 	db := newTenancyTestDB(t)
@@ -130,7 +130,7 @@ func TestBillingResolutionPersonalSurvivor(t *testing.T) {
 	}
 }
 
-func TestBillingNonOrgAdminAndHandover(t *testing.T) {
+func TestBillingNonOrgManagerRoleChanges(t *testing.T) {
 	db := newTenancyTestDB(t)
 	ctx := context.Background()
 	store := NewStore(db, nil)
@@ -161,9 +161,12 @@ func TestBillingNonOrgAdminAndHandover(t *testing.T) {
 	if _, err := baStore.ListBillingAccountMembers(ctx, acc.InternalID, outsider); !errors.Is(err, tenancy.ErrBillingForbidden) {
 		t.Fatalf("outsider list err = %v, want ErrBillingForbidden", err)
 	}
-	// Handover: ownership moves, identity/history stay stable.
-	if err := baStore.TransferBillingAccountOwnership(ctx, acc.InternalID, owner, admin); err != nil {
-		t.Fatalf("transfer failed: %v", err)
+	// Explicit manager-role changes leave the account identity/history stable.
+	if _, err := baStore.UpdateBillingAccountMemberRole(ctx, acc.InternalID, owner, admin, tenancy.BillingRoleOwner); err != nil {
+		t.Fatalf("promote admin failed: %v", err)
+	}
+	if _, err := baStore.UpdateBillingAccountMemberRole(ctx, acc.InternalID, admin, owner, tenancy.BillingRoleAdmin); err != nil {
+		t.Fatalf("demote previous manager failed: %v", err)
 	}
 	role, ok, err := baStore.GetBillingAccountRole(ctx, acc.InternalID, admin)
 	if err != nil || !ok || role != tenancy.BillingRoleOwner {
@@ -173,9 +176,9 @@ func TestBillingNonOrgAdminAndHandover(t *testing.T) {
 	if err != nil || !ok || role != tenancy.BillingRoleAdmin {
 		t.Fatalf("previous owner role = %q ok=%v err=%v, want admin/true/nil", role, ok, err)
 	}
-	// Previous owner (now admin) cannot transfer again.
-	if err := baStore.TransferBillingAccountOwnership(ctx, acc.InternalID, owner, outsider); !errors.Is(err, tenancy.ErrBillingForbidden) {
-		t.Fatalf("ex-owner transfer err = %v, want ErrBillingForbidden", err)
+	// An Admin cannot grant another Owner.
+	if _, err := baStore.AddBillingAccountMember(ctx, acc.InternalID, owner, outsider, tenancy.BillingRoleOwner); !errors.Is(err, tenancy.ErrBillingForbidden) {
+		t.Fatalf("admin grant owner err = %v, want ErrBillingForbidden", err)
 	}
 }
 
@@ -313,10 +316,9 @@ func TestBillingMemberRoleChanges(t *testing.T) {
 		t.Fatalf("promote to owner = %+v %v", updated, err)
 	}
 	// Last-owner guard: demoting the only remaining owner fails closed.
-	// First hand the account fully to other (owner->admin), then try to
-	// demote other while it is the last owner.
-	if err := baStore.TransferBillingAccountOwnership(ctx, acc.InternalID, owner, other); err != nil {
-		t.Fatalf("transfer to other failed: %v", err)
+	// With two Owners, demote the first before attempting to demote the last.
+	if _, err := baStore.UpdateBillingAccountMemberRole(ctx, acc.InternalID, other, owner, tenancy.BillingRoleAdmin); err != nil {
+		t.Fatalf("demote previous owner failed: %v", err)
 	}
 	if _, err := baStore.UpdateBillingAccountMemberRole(ctx, acc.InternalID, other, other, tenancy.BillingRoleAdmin); !errors.Is(err, tenancy.ErrBillingLastOwner) {
 		t.Fatalf("last owner demote err = %v, want ErrBillingLastOwner", err)

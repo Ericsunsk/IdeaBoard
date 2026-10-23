@@ -89,7 +89,7 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 		t.Fatal(err)
 	}
 	var priceID, priceVersion int64
-	if err := pool.QueryRow(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation', 'Reconciliation Test', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT price_version_id, version FROM publish_billing_prices('test:reconciliation', 'Reconciliation Test', '', '{"1k": 5}'::jsonb, 1)`).Scan(&priceID, &priceVersion); err != nil {
 		t.Fatal(err)
 	}
 
@@ -285,7 +285,7 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 		t.Fatal(err)
 	}
 	var priceID, priceVersion int64
-	if err := pool.QueryRow(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation', 'Active Held Test', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT price_version_id, version FROM publish_billing_prices('test:reconciliation', 'Active Held Test', '', '{"1k": 5}'::jsonb, 1)`).Scan(&priceID, &priceVersion); err != nil {
 		t.Fatal(err)
 	}
 

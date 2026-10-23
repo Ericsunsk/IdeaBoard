@@ -58,7 +58,7 @@ func TestRuntimeRoleCanUseTypedBillingCommandsButCannotMutateCatalogDirectly(t *
 	if err := dbprivileges.Verify(ctx, conn, policies...); err != nil {
 		t.Fatalf("verify runtime privilege policies error = %v", err)
 	}
-	if _, err := conn.Exec(ctx, `SELECT * FROM publish_billing_price($1, $2, $3, $4, $5)`, "test:runtime", "Runtime", "", 0, 1); err != nil {
+	if _, err := conn.Exec(ctx, `SELECT * FROM publish_billing_prices($1, $2, $3, $4::jsonb, $5)`, "test:runtime", "Runtime", "", `{"1k": 0}`, 1); err != nil {
 		t.Fatalf("typed free price command: %v", err)
 	}
 	var count int

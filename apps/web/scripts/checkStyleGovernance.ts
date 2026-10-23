@@ -226,15 +226,17 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   },
   'src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue': {
     counts: {
-      'hex-color': 1,
+      'hex-color': 0,
     },
-    reason: 'Outpaint handle fill is a canvas drawing constant.',
+    reason:
+      'Cleared: outpaint handle fill now resolves through canvas tokens; allowance stays registered at zero so reintroduction is caught as an overage.',
   },
   'src/features/canvas/ui/nodes/primitives/NodeActionButton.vue': {
     counts: {
-      'hex-color': 1,
+      'hex-color': 0,
     },
-    reason: 'Stage ghost/primary button ink colors are canvas drawing constants.',
+    reason:
+      'Cleared: stage ghost/primary button ink now resolves through canvas tokens; allowance stays registered at zero so reintroduction is caught as an overage.',
   },
   'src/features/canvas/ui/styles/node-input-thumbnails.css': {
     counts: {

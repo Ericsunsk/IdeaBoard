@@ -99,9 +99,9 @@
         </AdminColumn>
         <AdminColumn :header="CREDIT_HEALTH_MESSAGES.runHistoryStatusColumn" style="width: 110px">
           <template #body="{ data }">
-            <AdminStatusPill
+            <StatusBadge
               :label="getRunStatusLabel(data.status)"
-              :variant="getRunStatusVariant(data.status)"
+              :tone="getRunStatusTone(data.status)"
               size="small"
             />
           </template>
@@ -195,9 +195,9 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { useIntervalFn } from '@vueuse/core'
 import { Refresh } from '@iconoir/vue'
 import { AdminAlert } from '../../../shared'
-import { AdminStatusPill } from '../../../shared'
+import { StatusBadge } from '../../../shared'
 import { AdminButton } from '../../../shared'
-import ActionButton from '../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminColumn } from '../../../shared'
 import { AdminSpinner } from '../../../shared'
 import { AdminTable } from '../../../shared'
@@ -212,7 +212,7 @@ import {
   formatAdminDateTimeWithSeconds,
   formatReconciliationRunError,
   getRunStatusLabel,
-  getRunStatusVariant,
+  getRunStatusTone,
 } from '../../core/shared/format'
 import { adminTableClass, adminTableFrameClass, adminTextButtonClass } from '../../../shared'
 import { ADMIN_TABLE_EXPANDER_COLUMN_WIDTH } from '../../../shared'

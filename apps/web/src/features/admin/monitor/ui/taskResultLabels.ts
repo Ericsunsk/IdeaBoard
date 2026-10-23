@@ -28,7 +28,7 @@ export function getAttemptStatusLabel(status: string) {
   )
 }
 
-export function getAttemptStatusVariant(
+export function getAttemptStatusTone(
   status: string,
 ): 'success' | 'danger' | 'warning' | 'neutral' | 'info' {
   const variantByStatus: Record<string, 'success' | 'danger' | 'warning' | 'neutral' | 'info'> = {

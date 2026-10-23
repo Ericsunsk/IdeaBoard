@@ -1,3 +1,9 @@
+// Wiring segment 1/4: pools and repositories (assembly only).
+//
+// This file only annotates and composes: it opens pools, verifies runtime
+// privileges, and builds repository adapters. Business logic lives in the
+// owning contexts (credits, billing, identity, media, payments, prompts,
+// rewards, search, tasking); nothing here writes business facts.
 package wiring
 
 import (

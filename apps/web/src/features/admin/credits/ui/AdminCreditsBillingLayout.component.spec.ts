@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useMswHandlers } from '../../../../test/msw'
-import { renderWithUser, screen } from '../../../../test/render'
+import { useMswHandlers } from '@/test/msw'
+import { renderWithUser, screen } from '@/test/render'
 import {
   createCreditHealthHandlers,
   createCreditHealthMswState,

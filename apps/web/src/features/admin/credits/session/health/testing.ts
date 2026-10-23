@@ -1,5 +1,5 @@
 import type { HttpHandler } from 'msw'
-import { http, HttpResponse } from '../../../../../test/msw'
+import { http, HttpResponse } from '@/test/msw'
 
 // Shared fixtures + MSW builders for the credit-health surface
 // (`/api/control/v1/credits/health`, `.../reconciliation/runs`). State stays

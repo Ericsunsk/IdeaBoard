@@ -7,21 +7,24 @@ import {
   requireWorkspaceId,
 } from '../../../../library'
 import { useAppToast } from '../../../../../core/composables/useAppToast'
-import { getWorkspaceSelectionStore } from '../../../../workspace'
+
+export type UseCanvasLibraryIslandOptions = {
+  /** Workspace id resolver injected from the screen seam (no store import). */
+  getWorkspaceId?: (() => string | null) | undefined
+}
 
 /** Owns Canvas-local Library visibility and its shared Library coordination facts. */
-export function useCanvasLibraryIsland() {
+export function useCanvasLibraryIsland(options?: UseCanvasLibraryIslandOptions) {
+  const getWorkspaceId = options?.getWorkspaceId ?? (() => null)
   const isOpen = ref(false)
   const isMounted = ref(false)
   const isFocusWithin = ref(false)
   const folderFacts = createLibraryFolderFacts(() =>
-    listAllWorkspaceLibraryFolders(
-      requireWorkspaceId(getWorkspaceSelectionStore().getSelectedId()),
-    ),
+    listAllWorkspaceLibraryFolders(requireWorkspaceId(getWorkspaceId())),
   )
   const mutationPublisher = createLibraryMutationPublisher(folderFacts)
   const saveModule = createLibrarySaveModule({
-    workspaceId: () => getWorkspaceSelectionStore().getSelectedId(),
+    workspaceId: () => getWorkspaceId(),
     mutationPublisher,
     notify: useAppToast(),
   })

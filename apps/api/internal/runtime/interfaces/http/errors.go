@@ -4,8 +4,8 @@ import "ideaboard/api/internal/platform/errorrender"
 
 // Backend-owned user-facing copy for this package (ADR-0017 follow-up).
 //
-// Wording lives exactly once in platform/errorrender/copy.go ("Runtime HTTP
-// kernel copy" block); every constant below is an alias forwarding there,
+// Wording lives exactly once in platform/errorrender/copy_runtime.go;
+// every constant below is an alias forwarding there,
 // so v1/ and control/ keep rendering runtimehttp.Msg* with zero behavior
 // change. Four kernel names collided with existing errorrender names and
 // forward to MsgRuntimeInterfacesHTTP* per the ADR-0017 duplicate rule.
@@ -135,6 +135,7 @@ const (
 	MsgIdempotencyKeyRequired2         = errorrender.MsgIdempotencyKeyRequired2                        // CodeIdempotencyKeyRequired
 	MsgCreateWorkspace                 = errorrender.MsgCreateWorkspace                                // CreateWorkspace @ v1/routes.go
 	MsgCreateWorkspace2                = errorrender.MsgCreateWorkspace2                               // CreateWorkspace @ v1/routes.go
+	MsgWorkspaceActiveTasks            = errorrender.MsgWorkspaceActiveTasks                           // CodeWorkspaceActiveTasks
 	MsgWorkspaceIdempotencyConflict    = errorrender.MsgWorkspaceIdempotencyConflict                   // CodeWorkspaceIdempotencyConflict
 	MsgBillingPricingUnavailable       = errorrender.MsgBillingPricingUnavailable                      // CodeBillingPricingUnavailable
 	MsgServiceUnavailable39            = errorrender.MsgServiceUnavailable39                           // CodeServiceUnavailable

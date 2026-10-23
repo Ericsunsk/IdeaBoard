@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
   parseOutputResolution,
-} from '../../../../../core/contracts/generationContract'
-import { SERVICE, SERVICE_SLUGS } from '../../../../../core/contracts/imageServices'
+} from '@/core/contracts/generationContract'
+import { SERVICE, SERVICE_SLUGS } from '@/core/contracts/imageServices'
 
 // #856 service + resolution catalog contract: Canvas, Admin Prompt,
 // Pricing, and Model Pool read these two shared sources instead of local

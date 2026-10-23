@@ -56,9 +56,9 @@ An Execution Plan belongs to Canvas and may produce multiple Tasks. A Routing Sn
   the hold atomically with the task transition. Events stage only after the
   settlement unit is durable: synchronously for owned transactions, via a
   post-commit hook for guard-borrowed ones, never on rollback.
-- Budget and member-quota checks (945/946) join the settlement transaction
-  between stable-account resolution and the Hold; no quota computation runs
-  in this boundary yet.
+- Member-quota checks join the settlement transaction after Quote and before
+  Hold, using the resolved Billing Account and actual submitting User. Holds,
+  Capture, and Release settle against the submission-time quota window.
 - Submission validates current Workspace membership, Board generation capability,
   and canonical Media read permission for every input and mask within the same
   transaction as Quote, Hold, Task insert, and queue insertion.

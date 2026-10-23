@@ -5,9 +5,9 @@ import {
   revokeControlUserSessions,
   unbanControlUser,
   updateControlUserRole,
-} from '../../../../api/generated-query/control/control-users/control-users'
-import { requireContractData } from '../../../../api/contractKernel'
-import { controlUserIdempotencyKey } from '../../../../api/idempotencyKey'
+} from '@/api/generated-query/control/control-users/control-users'
+import { requireContractData } from '@/api/contractKernel'
+import { controlUserIdempotencyKey } from '@/api/idempotencyKey'
 import { buildControlMutationHeaders, type ControlMutationOptions } from '../../shared'
 import { withControlCopy } from '../../shared'
 

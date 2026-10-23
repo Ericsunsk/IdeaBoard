@@ -174,34 +174,69 @@ func resolveBillingAccountRow(ctx context.Context, queries *dbsqlc.Queries, work
 	return resolvePersonalAccount(ctx, queries, ws.OwnerUserID.Int64)
 }
 
-// resolveOrganizationAccount returns the shared org pool, provisioning once.
-func resolveOrganizationAccount(ctx context.Context, queries *dbsqlc.Queries, organizationInternalID int64) (dbsqlc.BillingAccount, bool, error) {
+// ensureOrganizationBillingAccountInTx is the single internal-only
+// Get-or-Create seam for the shared Organization pool. Existing accounts
+// are read without row locks: settlement may already hold the Workspace
+// lock, whereas lifecycle mutations lock the account before the Workspace.
+// Financial mutations take their own explicit account lock. This helper
+// mints the stub row once on first use and converges mint races on the
+// duplicate-key read-back. CreateBillingAccountStub remains the sole
+// billing_accounts insert primitive: all Organization scopes resolve
+// through this helper, and the Personal Default anchor path is the only
+// other stub caller. ownerUserID > 0 grants that user billing ownership
+// (creation path); 0 falls back to the discoverable org Owner via
+// ensureBillingOwnerForOrg (resolution path).
+func ensureOrganizationBillingAccountInTx(ctx context.Context, queries *dbsqlc.Queries, organizationInternalID, ownerUserID int64) (dbsqlc.BillingAccount, error) {
 	if organizationInternalID <= 0 {
-		return dbsqlc.BillingAccount{}, false, tenancy.ErrBillingWorkspaceInvalid
+		return dbsqlc.BillingAccount{}, tenancy.ErrBillingWorkspaceInvalid
 	}
-	if row, err := queries.GetBillingAccountByOrganizationID(ctx, pgtype.Int8{Int64: organizationInternalID, Valid: true}); err == nil {
-		return row, true, nil
+	orgKey := pgtype.Int8{Int64: organizationInternalID, Valid: true}
+	if row, err := queries.GetBillingAccountByOrganizationID(ctx, orgKey); err == nil {
+		return row, nil
 	} else if !database.IsNotFound(err) {
-		return dbsqlc.BillingAccount{}, false, err
+		return dbsqlc.BillingAccount{}, err
 	}
 	publicID, err := tenancy.NewBillingAccountPublicID()
 	if err != nil {
-		return dbsqlc.BillingAccount{}, false, err
+		return dbsqlc.BillingAccount{}, err
 	}
 	created, err := queries.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
 		PublicID: publicID, WorkspaceID: pgtype.Int8{},
-		OrganizationID: pgtype.Int8{Int64: organizationInternalID, Valid: true},
+		OrganizationID: orgKey,
 	})
 	if err != nil {
 		if database.IsDuplicateConstraintError(err) {
-			if row, readErr := queries.GetBillingAccountByOrganizationID(ctx, pgtype.Int8{Int64: organizationInternalID, Valid: true}); readErr == nil {
-				return row, true, nil
+			if row, readErr := queries.GetBillingAccountByOrganizationID(ctx, orgKey); readErr == nil {
+				grantOrganizationBillingOwner(ctx, queries, row.InternalID, organizationInternalID, ownerUserID)
+				return row, nil
 			}
 		}
+		return dbsqlc.BillingAccount{}, err
+	}
+	grantOrganizationBillingOwner(ctx, queries, created.InternalID, organizationInternalID, ownerUserID)
+	return created, nil
+}
+
+// grantOrganizationBillingOwner seeds the explicit billing owner when known,
+// else the discoverable org Owner. Empty pools stay manageable once a member
+// is granted; existing grants are never overwritten here.
+func grantOrganizationBillingOwner(ctx context.Context, queries *dbsqlc.Queries, billingAccountID, organizationInternalID, ownerUserID int64) {
+	if ownerUserID > 0 {
+		_, _ = queries.UpsertBillingAccountMember(ctx, dbsqlc.UpsertBillingAccountMemberParams{
+			BillingAccountID: billingAccountID, UserID: ownerUserID, Role: tenancy.BillingRoleOwner,
+		})
+		return
+	}
+	ensureBillingOwnerForOrg(ctx, queries, billingAccountID, organizationInternalID)
+}
+
+// resolveOrganizationAccount returns the shared org pool, provisioning once.
+func resolveOrganizationAccount(ctx context.Context, queries *dbsqlc.Queries, organizationInternalID int64) (dbsqlc.BillingAccount, bool, error) {
+	row, err := ensureOrganizationBillingAccountInTx(ctx, queries, organizationInternalID, 0)
+	if err != nil {
 		return dbsqlc.BillingAccount{}, false, err
 	}
-	ensureBillingOwnerForOrg(ctx, queries, created.InternalID, organizationInternalID)
-	return created, true, nil
+	return row, true, nil
 }
 
 // resolvePersonalAccount returns the owner's deterministic Personal
@@ -600,54 +635,6 @@ func (s *BillingAccountStore) UpdateBillingAccountMemberRole(ctx context.Context
 		return nil
 	})
 	return updated, err
-}
-
-// TransferBillingAccountOwnership hands management to another manager: the
-// new owner becomes owner and the previous owner steps down to admin.
-// Identity, balance, and history stay stable; only management changes.
-func (s *BillingAccountStore) TransferBillingAccountOwnership(ctx context.Context, billingAccountInternalID, currentOwnerID, newOwnerID int64) error {
-	if s == nil || s.db == nil {
-		return tenancy.ErrBillingStoreNotConfigured
-	}
-	if currentOwnerID <= 0 || newOwnerID <= 0 || currentOwnerID == newOwnerID {
-		return tenancy.ErrBillingWorkspaceInvalid
-	}
-	return dbutil.WithTx(ctx, s.db, func(q *dbsqlc.Queries) error {
-		if _, err := lockBillingAccountInTx(ctx, q, billingAccountInternalID); err != nil {
-			return err
-		}
-		current, err := q.GetBillingAccountMember(ctx, dbsqlc.GetBillingAccountMemberParams{
-			BillingAccountID: billingAccountInternalID, UserID: currentOwnerID,
-		})
-		if err != nil {
-			if database.IsNotFound(err) {
-				return tenancy.ErrBillingForbidden
-			}
-			return err
-		}
-		if !tenancy.IsBillingOwner(current.Role) {
-			return tenancy.ErrBillingForbidden
-		}
-		target, err := q.GetBillingAccountMember(ctx, dbsqlc.GetBillingAccountMemberParams{
-			BillingAccountID: billingAccountInternalID, UserID: newOwnerID,
-		})
-		if err != nil {
-			if database.IsNotFound(err) {
-				return tenancy.ErrBillingNotFound
-			}
-			return err
-		}
-		_ = target
-		if _, err := q.UpsertBillingAccountMember(ctx, dbsqlc.UpsertBillingAccountMemberParams{
-			BillingAccountID: billingAccountInternalID, UserID: newOwnerID, Role: tenancy.BillingRoleOwner,
-		}); err != nil {
-			return err
-		}
-		_, err = q.UpsertBillingAccountMember(ctx, dbsqlc.UpsertBillingAccountMemberParams{
-			BillingAccountID: billingAccountInternalID, UserID: currentOwnerID, Role: tenancy.BillingRoleAdmin,
-		})
-		return err
-	})
 }
 
 func ownerTypeOf(row dbsqlc.BillingAccount) string {

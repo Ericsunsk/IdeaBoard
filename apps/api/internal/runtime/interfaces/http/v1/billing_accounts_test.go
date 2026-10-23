@@ -144,7 +144,6 @@ func TestV1BillingManagementUnavailablePrecedesInput(t *testing.T) {
 		{http.MethodGet, "/billing-account/members"},
 		{http.MethodPost, "/billing-account/members"},
 		{http.MethodPatch, "/billing-account/members/usr_missing"},
-		{http.MethodPost, "/billing-account/transfer"},
 		{http.MethodGet, "/purchase-options"},
 	} {
 		t.Run(route.method+route.suffix, func(t *testing.T) {
@@ -163,5 +162,22 @@ func TestV1BillingManagementUnavailablePrecedesInput(t *testing.T) {
 				t.Fatalf("unavailable message=%v, want %q", message, runtimehttp.MsgServiceUnavailable39)
 			}
 		})
+	}
+}
+
+// Ownership handover requires the invitation/acceptance flow; there is no
+// direct transfer endpoint that bypasses recipient acceptance.
+func TestV1DirectBillingTransferRouteAbsent(t *testing.T) {
+	fx := newBillingTestFixture()
+	ws := v1WorkspaceFixture(t, context.Background(), fx.store, "billing-invite-only", 11)
+	engine := fx.engine()
+	path := "/api/v1/workspaces/" + ws.PublicID + "/billing-account/transfer"
+	status, _, body := doV1RoundTrip(t, engine, v1Call{
+		method: http.MethodPost, path: path, userID: 11,
+		body:    `{"data":{"new_owner_user_id":"usr_missing"}}`,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "direct-handover-removed"},
+	}, "test-direct-transfer-")
+	if status != http.StatusNotFound {
+		t.Fatalf("direct transfer status = %d, want 404 (%s)", status, body)
 	}
 }

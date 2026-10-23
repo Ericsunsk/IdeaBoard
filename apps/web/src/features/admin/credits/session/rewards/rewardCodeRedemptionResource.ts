@@ -1,15 +1,15 @@
 import {
   getControlRewardRedemption,
   listControlRewardRedemptions,
-} from '../../../../../api/generated-query/control/control-credits/control-credits'
-import { requireContractData } from '../../../../../api/contractKernel'
-import { withSignal } from '../../../../../core/utils/request'
+} from '@/api/generated-query/control/control-credits/control-credits'
+import { requireContractData } from '@/api/contractKernel'
+import { withSignal } from '@/core/utils/request'
 import { createControlError } from '../../../shared'
 import type {
   ControlAdminRedemption,
   ControlAdminRedemptionDetail,
   ControlAdminRedemptionPage,
-} from '../../../../../api/generated-query/control/model'
+} from '@/api/generated-query/control/model'
 
 // Admin reward redemption boundary (W2 transports). List/get ride the
 // Control Plane redemption operations

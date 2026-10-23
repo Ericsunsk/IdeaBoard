@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, nextTick, ref } from 'vue'
-import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
+import { http, HttpResponse, useMswHandlers } from '@/test/msw'
 import { useAccessSettings } from './access/useAccessSettings'
 import { useBrandingSettings } from './branding/useBrandingSettings'
 import { useMediaUploadSettings } from './upload/useMediaUploadSettings'

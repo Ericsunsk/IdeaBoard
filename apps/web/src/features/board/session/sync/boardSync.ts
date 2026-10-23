@@ -45,7 +45,7 @@ import {
 } from '../../core/document/nodes'
 import { queryClient } from '../../../../core/query/queryClient'
 import { QueryObserver } from '@tanstack/vue-query'
-import { workspaceQueryKeys } from '../../../workspace'
+import { workspaceQueryKeys as defaultWorkspaceQueryKeys } from '../../../workspace'
 import {
   adoptBoardRenameRevision,
   boardDocumentOptions,
@@ -372,7 +372,7 @@ const WORKSPACE_SELECTION_READY_TIMEOUT_MS = 5_000
 
 function readWorkspaceListQueryStatus(): 'pending' | 'error' | 'success' | null {
   try {
-    return queryClient.getQueryState(workspaceQueryKeys.list)?.status ?? null
+    return queryClient.getQueryState(defaultWorkspaceQueryKeys.list)?.status ?? null
   } catch {
     return null
   }

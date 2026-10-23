@@ -62,7 +62,8 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
-	libraryapplication "ideaboard/api/internal/library/application"
+	libraryreadthrough "ideaboard/api/internal/library/application/readthrough"
+	librarysources "ideaboard/api/internal/library/application/sources"
 	librarydomain "ideaboard/api/internal/library/domain"
 	libraryports "ideaboard/api/internal/library/ports"
 	mediadomain "ideaboard/api/internal/media/derivatives/domain"
@@ -115,8 +116,8 @@ type ContractV1LibraryDeps struct {
 	// orchestration (issue #908). Nil keeps the Canvas import read
 	// path fail-closed (404 without spawning); composition injects
 	// the typed service built over the store/materializer/executor.
-	ReadThrough *libraryapplication.ReadThroughService
-	Sources     *libraryapplication.SourceResolver
+	ReadThrough *libraryreadthrough.ReadThroughService
+	Sources     *librarysources.SourceResolver
 }
 
 func (d *ContractV1LibraryDeps) normalize() {

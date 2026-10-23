@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { HttpResponse, http, useMswHandlers } from '../../../../../test/msw'
+import { HttpResponse, http, useMswHandlers } from '@/test/msw'
 import {
   adminPaymentOrderNumber as orderNumber,
   makePaymentOrderDetail as makeApiDetail,
   makePaymentOrderSummary as makeApiSummary,
-} from '../../../../../test/factories'
+} from '@/test/factories'
 import { createAdminPaymentOrderApiAdapter } from './paymentOrderApiAdapter'
 import { createAdminPaymentOrderResource } from './paymentOrderResource'
 

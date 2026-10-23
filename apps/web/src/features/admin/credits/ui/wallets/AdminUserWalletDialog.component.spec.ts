@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { i18n } from '../../../../../core/i18n'
-import { loadLocaleMessages } from '../../../../../core/i18n/userLocale'
-import { renderWithUser, screen, waitFor } from '../../../../../test/render'
+import { i18n } from '@/core/i18n'
+import { loadLocaleMessages } from '@/core/i18n/userLocale'
+import { renderWithUser, screen, waitFor } from '@/test/render'
 import type { Ref } from 'vue'
 import type {
   AdminCreditLedgerTransaction,

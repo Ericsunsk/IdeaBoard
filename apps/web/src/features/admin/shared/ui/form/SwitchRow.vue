@@ -1,7 +1,7 @@
 <template>
   <!-- 单页防抖行原语：status 槽以 statusMinWidth 锁宽（短文案居中不收缩），
     switch 槽 shrink-0 固定位。规则：Switch 永不绑状态 key（同一节点翻转，
-    不 remount）；StatusPill 只换色（label/variant/pulse，不重建行）；
+    不 remount）；StatusBadge 只换色（label/tone/pulse，不重建行）；
     pulse 默认关闭，开启时也只是绝对定位透明度动画，不触发布局。 -->
   <div class="flex items-center" :class="gapClass">
     <span
@@ -9,10 +9,10 @@
       :style="{ minWidth: statusMinWidth }"
       data-testid="switch-row-status-slot"
     >
-      <AdminStatusPill
+      <StatusBadge
         v-if="pill !== undefined"
         :label="pill"
-        :variant="pillVariant"
+        :tone="pillTone"
         :pulse="pulse"
         :size="pillSize"
         class="justify-center whitespace-nowrap"
@@ -38,16 +38,16 @@
 </template>
 
 <script setup lang="ts">
-import AdminStatusPill, { type AdminStatusPillVariant } from '../feedback/AdminStatusPill.vue'
+import StatusBadge, { type AppStatusTone } from '@/core/components/StatusBadge.vue'
 import AdminSwitch from './AdminSwitch.vue'
 
 export type AdminSwitchRowPillSize = 'small' | 'medium'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     /** Status 文案；undefined 时渲染同宽空占位（加载中/加载失败开关不动）。 */
     pill?: string | undefined
-    pillVariant?: AdminStatusPillVariant | undefined
+    pillTone?: AppStatusTone | undefined
     /** 默认 false：success↔neutral 翻转不挂载/卸载 pulse，少一次 DOM 增删。 */
     pulse?: boolean | undefined
     /** status 槽最小宽（style 绑定，任意值都生效，如 '68px'）。 */
@@ -64,7 +64,7 @@ withDefaults(
   }>(),
   {
     pill: undefined,
-    pillVariant: 'neutral',
+    pillTone: 'neutral',
     pulse: false,
     pillSize: 'small',
     gapClass: 'gap-3',

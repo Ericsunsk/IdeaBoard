@@ -46,13 +46,11 @@ var stripeWebhookErrorTable = []paymentErrorMapping{
 			paymentports.ErrInvalidWebhookSignature, paymentports.ErrWebhookSignatureExpired,
 			paymentports.ErrMalformedWebhookPayload,
 		},
-		Status:  http.StatusBadRequest,
 		Code:    string(contract.CodeWebhookSignatureInvalid),
 		Message: errorrender.MsgRenderMappedPaymentError,
 	},
 	{
 		Targets: []error{paymentcontracts.ErrStripeConfigurationNotFound, paymentcontracts.ErrStripeConfigurationInvalid},
-		Status:  http.StatusServiceUnavailable,
 		Code:    string(contract.CodeWebhookConfigurationMissing),
 		Message: errorrender.MsgRenderMappedPaymentError2,
 	},

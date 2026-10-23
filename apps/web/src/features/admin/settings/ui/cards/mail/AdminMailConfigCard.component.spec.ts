@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen, waitFor, within } from '../../../../../../test/render'
+import { renderWithUser, screen, waitFor, within } from '@/test/render'
 import AdminMailConfigCard from './AdminMailConfigCard.vue'
 import type { AdminMailConfigResource } from '../../../session/mail/resource'
 import type { MailConfigSummary } from '../../../session/mail/types'
@@ -61,7 +61,7 @@ describe('AdminMailConfigCard', () => {
   it('renders only the safe configuration metadata and never hydrates the API Key', async () => {
     renderCard()
 
-    // 健康三态（方案 A）：ready→Ready success，载体统一 AdminStatusPill，无英文孤岛。
+    // 健康三态（方案 A）：ready→Ready success，载体统一 StatusBadge，无英文孤岛。
     const ready = await screen.findByText('Ready')
     expect(ready).toBeVisible()
     expect(ready.parentElement?.className ?? '').toContain('bg-success-soft')

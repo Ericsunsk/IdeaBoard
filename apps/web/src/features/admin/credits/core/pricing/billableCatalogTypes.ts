@@ -1,4 +1,4 @@
-import type { OutputResolution as CatalogResolution } from '../../../../../core/contracts/generationContract'
+import type { OutputResolution as CatalogResolution } from '@/core/contracts/generationContract'
 
 export type AdminBillableItemStatus = 'unpriced' | 'active' | 'disabled' | 'archived'
 // Pricing and pool resolutions are the shared catalog values (1k/2k/4k):

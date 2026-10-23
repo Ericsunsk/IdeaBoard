@@ -81,10 +81,26 @@ func baselineMigration(t *testing.T) (string, string) {
 
 func TestTransactionLockOrdering(t *testing.T) {
 	settle := readOrderFile(t, filepath.Join("workspacetasks", "settle_tx.go"))
-	boards := readOrderFile(t, filepath.Join("..", "boards", "postgres_workspace.go"))
+	boardsDir := filepath.Join("..", "boards")
+	boardsParts := []string{"postgres_access.go", "postgres_store_board.go", "postgres_revision.go", "postgres_catalog.go"}
+	boardsPieces := make([]string, 0, len(boardsParts))
+	for _, part := range boardsParts {
+		boardsPieces = append(boardsPieces, readOrderFile(t, filepath.Join(boardsDir, part)))
+	}
+	boards := strings.Join(boardsPieces, "\n")
 	tenancy := readOrderFile(t, filepath.Join("..", "tenancy", "infrastructure", "postgres", "store.go"))
 	billing := readOrderFile(t, filepath.Join("..", "billing", "infrastructure", "postgres", "store.go"))
 	baselineFile, baseline := baselineMigration(t)
+
+	t.Run("organization workspace creation locks its account before workspace insert", func(t *testing.T) {
+		creation := sliceBetween(t, "tenancy store.go", tenancy,
+			"func createWorkspaceInTx", "func createBillingInTx")
+		assertCallOrder(t, "tenancy store.go:createWorkspaceInTx", creation, []string{
+			"ensureOrganizationBillingAccountInTx(ctx, q, orgInternal.Int64, 0)",
+			"lockBillingAccountInTx(ctx, q, account.InternalID)",
+			"q.CreateWorkspace(ctx,",
+		})
+	})
 
 	t.Run("settlement submit walks authorize claim quote hold task snapshot billing enqueue", func(t *testing.T) {
 		body := sliceBetween(t, "settle_tx.go", settle,
@@ -122,15 +138,15 @@ func TestTransactionLockOrdering(t *testing.T) {
 	})
 
 	t.Run("board writes lock workspace membership before board rows", func(t *testing.T) {
-		hierarchy := sliceBetween(t, "postgres_workspace.go", boards,
+		hierarchy := sliceBetween(t, "postgres_access.go", boards,
 			"func lockWritableBoardTx", "func (s *PostgresWorkspaceBoardStore) CreateBoard")
-		assertCallOrder(t, "postgres_workspace.go:lockWritableBoardTx", hierarchy, []string{
+		assertCallOrder(t, "postgres_access.go:lockWritableBoardTx", hierarchy, []string{
 			"lockWorkspaceMembersTx(ctx, q, workspacePublicID)",
 			"q.LockWorkspaceBoardAccess(ctx,",
 		})
-		accept := sliceBetween(t, "postgres_workspace.go", boards,
+		accept := sliceBetween(t, "postgres_revision.go", boards,
 			"func (s *PostgresWorkspaceBoardStore) ReplaceDocument", "func (s *PostgresWorkspaceBoardStore) ListRevisions")
-		assertCallOrder(t, "postgres_workspace.go:ReplaceDocument", accept, []string{
+		assertCallOrder(t, "postgres_revision.go:ReplaceDocument", accept, []string{
 			"lockWritableBoardTx(ctx, q, workspacePublicID, trimmedID, actorUserID)",
 			"q.LockWorkspaceBoard(ctx,",
 			"s.validateDocumentAssets(ctx, q,",
@@ -149,9 +165,9 @@ func TestTransactionLockOrdering(t *testing.T) {
 			"grants.RemoveWorkspaceMemberGrants(dbutil.ContextWithAmbientTx(ctx, tx), workspacePublicID, targetUserID)",
 			"q.DeleteWorkspaceMembership(ctx,",
 		})
-		cleanup := sliceBetween(t, "postgres_workspace.go", boards,
+		cleanup := sliceBetween(t, "postgres_access.go", boardsPieces[0],
 			"func (s *PostgresWorkspaceBoardStore) RemoveWorkspaceMemberGrants", "")
-		assertCallOrder(t, "postgres_workspace.go:RemoveWorkspaceMemberGrants", cleanup, []string{
+		assertCallOrder(t, "postgres_access.go:RemoveWorkspaceMemberGrants", cleanup, []string{
 			"q.ListWorkspaceMemberBoardGrants(ctx,",
 			"q.LockWorkspaceMemberBoards(ctx,",
 			"q.DeleteWorkspaceMemberBoardGrants(ctx,",

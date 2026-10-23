@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import AdminConfirmDialog from './AdminConfirmDialog.vue'
 import { activeAdminConfirm, useAdminConfirm } from '../../session/feedback/useAdminConfirm'
 

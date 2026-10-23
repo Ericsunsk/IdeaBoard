@@ -1,47 +1,26 @@
 <template>
-  <DialogRoot :open="true" @update:open="handleOpenUpdate">
-    <DialogPortal>
-      <DialogOverlay @click="handleMaskClick" />
-      <DialogContent
-        :show-close="false"
-        :class="cn(dialogContentBaseClass, authDialogContentClass)"
-        :aria-label="props.ariaLabel"
-        :aria-busy="props.busy || undefined"
-        @escape-key-down="handleEscape"
-        @open-auto-focus="handleOpenAutoFocus"
-        @pointer-down-outside="blockOutsideDismiss"
-      >
-        <div ref="panelRef" class="min-h-0 overflow-y-auto">
-          <DialogTitle class="sr-only">
-            {{ props.ariaLabel ?? t('auth.signIn') }}
-          </DialogTitle>
-          <DialogDescription v-if="props.description" class="sr-only">
-            {{ props.description }}
-          </DialogDescription>
-          <slot />
-        </div>
-      </DialogContent>
-    </DialogPortal>
-  </DialogRoot>
+  <DialogShell
+    :is-open="true"
+    :title="props.ariaLabel ?? t('auth.signIn')"
+    :description="props.description"
+    :size="authPreset.size"
+    :is-busy="props.busy"
+    :has-close="authPreset.hasClose"
+    :content-class="authDialogContentClass"
+    @update:open="handleOpenUpdate"
+    @open-auto-focus="handleOpenAutoFocus"
+  >
+    <div ref="panelRef" class="min-h-0 overflow-y-auto">
+      <slot />
+    </div>
+  </DialogShell>
 </template>
 
 <script setup lang="ts">
-import {
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogRoot,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { dialogContentBaseClass } from '@/components/ui/dialog'
-import { cn } from '@/lib/utils'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  defineDialogSurfaceIntent,
-  useOverlayInteractionLifecycle,
-} from '../../../core/composables/useOverlayInteractionLifecycle'
+import DialogShell from '../../../core/components/DialogShell.vue'
+import { dialogShellPresets } from '../../../core/components/dialogShell'
 import { authDialogContentClass } from './modalUi'
 
 const props = withDefaults(
@@ -58,26 +37,10 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-
-const { canDismiss, handleVisibilityChange } = useOverlayInteractionLifecycle({
-  isVisible: () => true,
-  busy: () => props.busy,
-  surface: defineDialogSurfaceIntent(),
-  onVisibilityChange: (visible) => {
-    if (!visible) emit('close')
-  },
-})
+const authPreset = dialogShellPresets.auth
 
 function handleOpenUpdate(open: boolean) {
-  if (!open) handleVisibilityChange(false)
-}
-
-function handleMaskClick() {
-  if (canDismiss('mask')) handleVisibilityChange(false)
-}
-
-function handleEscape(event: KeyboardEvent) {
-  if (!canDismiss('escape')) event.preventDefault()
+  if (!open) emit('close')
 }
 
 /*
@@ -95,9 +58,5 @@ function handleOpenAutoFocus(event: Event) {
   if (!target) return
   event.preventDefault()
   target.focus()
-}
-
-function blockOutsideDismiss(event: Event) {
-  event.preventDefault()
 }
 </script>

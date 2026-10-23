@@ -5,9 +5,9 @@ import {
   getControlBrandingSetting,
   updateControlBrandingSetting,
   uploadControlBrandingLogo,
-} from '../../../../../api/generated-query/control/control-platform/control-platform'
-import type { ControlBrandingLogoUpload } from '../../../../../api/generated-query/control/model/controlBrandingLogoUpload'
-import { requireContractData } from '../../../../../api/contractKernel'
+} from '@/api/generated-query/control/control-platform/control-platform'
+import type { ControlBrandingLogoUpload } from '@/api/generated-query/control/model/controlBrandingLogoUpload'
+import { requireContractData } from '@/api/contractKernel'
 import { buildControlMutationHeaders } from '../../../shared/index'
 import type { AdminBrandingSettingsFeedback } from '../useSettingsFeedback'
 import {
@@ -19,7 +19,7 @@ import {
   validateSiteBrandingSetting,
   writeSiteBrandingQueryCache,
   type BrandingSetting,
-} from '../../../../../core/composables/useSiteBranding'
+} from '@/core/composables/useSiteBranding'
 import { useSettingsLifecycle } from '../useSettingsLifecycle'
 import { withControlCopy } from '../../../shared/index'
 

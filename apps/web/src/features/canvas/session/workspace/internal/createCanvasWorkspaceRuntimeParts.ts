@@ -26,6 +26,8 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   router: Router
   getUserIdentity: () => { userId: number; userUid: string }
   getWorkspaceId?: (() => string) | undefined
+  /** Workspace availability gate injected from the screen seam. */
+  isWorkspaceAvailable?: (() => boolean) | undefined
   flowPaneAdapter: CanvasVueFlowAdapter
   uploadApi: CanvasGraphEditingUploadAdapter
   materializeLibraryAsset: LibraryAssetMaterializer
@@ -115,6 +117,15 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     },
     executionCore,
     cancelTasks: taskLifecycle.cancelTasks,
+    isWorkspaceAvailable:
+      options.isWorkspaceAvailable ??
+      (() => {
+        try {
+          return !!options.getWorkspaceId?.()
+        } catch {
+          return false
+        }
+      }),
   })
   hydratePendingImageLeases = imageWorkflow.hydratePendingImageLeases ?? (() => 0)
 

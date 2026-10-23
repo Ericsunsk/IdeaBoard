@@ -1,17 +1,17 @@
 <template>
   <section
-    class="flex flex-col gap-3 rounded-control border border-border p-3"
+    class="flex flex-col gap-3 rounded-panel border border-border bg-card p-4 shadow-raised sm:p-5"
     :aria-label="t('workspace.management.title', { name: props.organizationName })"
   >
     <div class="flex items-center justify-between gap-2">
       <div class="min-w-0">
-        <p class="m-0 text-sm font-medium text-foreground">
+        <p class="m-0 text-admin-content font-medium text-foreground">
           {{ t('workspace.management.title', { name: props.organizationName }) }}
         </p>
-        <p class="m-0 mt-0.5 text-xs text-muted-foreground">
+        <p class="m-0 mt-0.5 text-admin-meta text-muted-foreground">
           {{ t('workspace.management.managementNote') }}
         </p>
-        <p v-if="isClosed" class="m-0 mt-1 text-xs font-medium text-muted-foreground">
+        <p v-if="isClosed" class="m-0 mt-1 text-admin-meta font-medium text-muted-foreground">
           {{ t('workspace.management.statusClosed') }}
         </p>
       </div>
@@ -28,7 +28,7 @@
       </Button>
     </div>
 
-    <p v-if="loadError" class="m-0 text-xs text-destructive" role="alert">
+    <p v-if="loadError" class="m-0 text-admin-meta text-destructive" role="alert">
       {{ loadError }}
       <Button type="button" variant="ghost" size="sm" class="h-6 px-2" @click="reload">
         {{ t('common.actions.retry') }}
@@ -42,9 +42,11 @@
         class="flex items-center justify-between gap-2 rounded-control bg-muted/40 px-2 py-1.5"
       >
         <div class="flex min-w-0 items-center gap-2">
-          <span class="truncate font-mono text-xs text-foreground">{{ member.userId }}</span>
+          <span class="truncate font-mono text-admin-meta text-foreground">{{
+            member.userId
+          }}</span>
           <span
-            class="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-admin-caption text-muted-foreground"
+            class="shrink-0 rounded-pill border border-border px-1.5 py-0.5 text-admin-caption text-muted-foreground"
           >
             {{ roleLabel(member.role) }}
           </span>
@@ -58,7 +60,7 @@
         <div class="flex shrink-0 items-center gap-1">
           <select
             v-if="canManageRole(member)"
-            class="h-7 rounded-control border border-border bg-background text-xs"
+            class="h-7 rounded-control border border-border bg-background text-admin-meta"
             :value="member.role"
             :disabled="isSaving"
             :aria-label="t('workspace.switcher.members.roleForMember', { userId: member.userId })"
@@ -86,7 +88,7 @@
       v-if="props.canManage && !isClosed"
       class="flex flex-col gap-2 border-t border-border pt-3"
     >
-      <span class="text-xs font-semibold text-muted-foreground">
+      <span class="text-admin-meta font-semibold text-muted-foreground">
         {{ t('workspace.management.inviteTitle') }}
       </span>
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -94,7 +96,7 @@
         <Input
           v-model="inviteUserId"
           size="sm"
-          class="h-8 min-w-0 flex-1 font-mono text-xs"
+          class="h-8 min-w-0 flex-1 font-mono text-admin-meta"
           :disabled="isSaving"
           :aria-label="t('workspace.management.invitePlaceholder')"
           :placeholder="t('workspace.management.invitePlaceholder')"
@@ -102,7 +104,7 @@
         />
         <select
           v-model="inviteRole"
-          class="h-8 rounded-control border border-border bg-background text-xs"
+          class="h-8 rounded-control border border-border bg-background text-admin-meta"
           :disabled="isSaving"
           :aria-label="
             t('workspace.switcher.members.roleForMember', { userId: inviteUserId || 'new' })
@@ -124,38 +126,37 @@
           {{ t('workspace.switcher.members.inviteAction') }}
         </Button>
       </div>
-      <p v-if="actionError" class="m-0 text-xs text-destructive" role="alert">
+      <p v-if="actionError" class="m-0 text-admin-meta text-destructive" role="alert">
         {{ actionError }}
       </p>
-      <p class="m-0 text-xs text-muted-foreground">
+      <p class="m-0 text-admin-meta text-muted-foreground">
         {{ t('workspace.management.workspaceGrantNote') }}
       </p>
     </div>
-    <p v-else class="m-0 text-xs text-muted-foreground">
+    <p v-else class="m-0 text-admin-meta text-muted-foreground">
       {{ t('workspace.switcher.members.readOnlyNote') }}
     </p>
 
-    <!-- Permanent closure uses the same typed confirmation as Workspace deletion. -->
     <div
       v-if="shouldShowDangerZone"
       class="flex flex-col gap-2 border-t border-border pt-3"
       :aria-label="t('workspace.management.closeTitle')"
     >
-      <p v-if="isClosed" class="m-0 text-xs text-muted-foreground" role="status">
+      <p v-if="isClosed" class="m-0 text-admin-meta text-muted-foreground" role="status">
         {{ t('workspace.management.closedNote') }}
       </p>
       <template v-else>
-        <span class="text-xs font-semibold text-muted-foreground">
+        <span class="text-admin-meta font-semibold text-muted-foreground">
           {{ t('workspace.management.closeTitle') }}
         </span>
-        <p class="m-0 text-xs text-muted-foreground">
+        <p class="m-0 text-admin-meta text-muted-foreground">
           {{ t('workspace.management.closeHint') }}
         </p>
         <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- Accessible name via aria-label. -->
         <Input
           v-model="closeReason"
           size="sm"
-          class="h-8 min-w-0 text-xs"
+          class="h-8 min-w-0 text-admin-meta"
           :disabled="isClosing"
           :maxlength="280"
           :aria-label="t('workspace.management.closeReasonPlaceholder')"
@@ -172,7 +173,7 @@
           {{ t('workspace.management.closeAction') }}
         </Button>
       </template>
-      <p v-if="closureError" class="m-0 text-xs text-destructive" role="alert">
+      <p v-if="closureError" class="m-0 text-admin-meta text-destructive" role="alert">
         {{ closureError }}
       </p>
     </div>
@@ -250,8 +251,7 @@ const props = withDefaults(
 
 const { t } = useI18n()
 
-// Closure is owner-driven and flips locally on success; the dialog
-// re-reads server truth on its next load.
+// Closure is owner-driven; the dialog re-reads server truth on its next load.
 const statusRef = ref<OrganizationStatus>(props.organizationStatus)
 watch(
   () => props.organizationStatus,
@@ -312,17 +312,19 @@ async function reload(): Promise<void> {
   }
 }
 
+const ACTION_ERROR_RULES: Array<[string, string]> = [
+  ['organization_limit_reached', 'workspace.management.limitReached'],
+  ['organization_closed', 'workspace.management.closeBlocked'],
+  ['organization_closure_blocked', 'workspace.management.closeBlocked'],
+  ['membership_transition_forbidden', 'workspace.switcher.members.noPermission'],
+  ['organization_member_not_found', 'workspace.switcher.members.memberUnknown'],
+  ['not_found', 'workspace.switcher.members.memberUnknown'],
+]
+
 function toActionError(error: unknown): string {
   const code = userErrorCode(error)?.toLowerCase() ?? ''
-  if (code.includes('organization_limit_reached')) return t('workspace.management.limitReached')
-  if (code.includes('organization_closed') || code.includes('organization_closure_blocked'))
-    return t('workspace.management.closeBlocked')
-  if (code.includes('membership_transition_forbidden'))
-    return t('workspace.switcher.members.noPermission')
-  if (code.includes('organization_member_not_found'))
-    return t('workspace.switcher.members.memberUnknown')
-  if (code.includes('not_found')) return t('workspace.switcher.members.memberUnknown')
-  return t('workspace.switcher.members.actionFailed')
+  const hit = ACTION_ERROR_RULES.find(([substr]) => code.includes(substr))
+  return t(hit?.[1] ?? 'workspace.switcher.members.actionFailed')
 }
 
 function toClosureError(error: unknown, fallback: string): string {

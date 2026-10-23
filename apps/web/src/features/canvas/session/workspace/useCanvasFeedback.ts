@@ -42,7 +42,7 @@ export function createCanvasFeedback(
     appToast.warning(message)
   }
   const insufficientCredits = () => {
-    appToast.warning(i18n.global.t('billing.insufficientCredits'), {
+    appToast.warning(i18n.global.t('errorCodes.insufficient_credits'), {
       id: insufficientCreditsToastId,
       duration: 6000,
       action: {

@@ -87,8 +87,8 @@ import { AdminAlert } from '../../../shared'
 import { AdminChartCard } from '../../../shared'
 import { AdminRangedLineChartCard } from '../../../shared'
 import { AdminSummaryCard } from '../../../shared'
-import ChartRenderer from '../../../../../core/components/ChartRenderer.vue'
-import { formatDisplayErrorMessage } from '../../../../../core/utils/errorMessages'
+import ChartRenderer from '@/core/components/ChartRenderer.vue'
+import { formatDisplayErrorMessage } from '@/core/utils/errorMessages'
 import { adminChartPlugins, useAdminChartReady } from '../../../shared'
 import {
   adminChartCanvasClass,

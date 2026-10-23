@@ -74,7 +74,7 @@
         :available-credits="wallet?.available_credits ?? fallbackAvailableCredits"
         :reserved-credits="wallet?.reserved_credits"
         :account-status="accountStatus"
-        :account-status-variant="accountStatusVariant"
+        :account-status-tone="accountStatusTone"
         :active-restrictions="activeRestrictions"
         :is-user-disabled-or-closing="isUserDisabledOrClosing"
         :command-pending="isCommandPending"
@@ -162,12 +162,12 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Refresh } from '@iconoir/vue'
-import ActionButton from '../../../../../core/components/ActionButton.vue'
-import { createUniqueId } from '../../../../../core/utils/ids'
+import ActionButton from '@/core/components/ActionButton.vue'
+import { createUniqueId } from '@/core/utils/ids'
 import { AdminDialogShell } from '../../../shared'
 import { useAdminConfirm } from '../../../shared'
 import { useAdminCreditsBillingOperationsFeedback } from '../../session/shared/feedback'
-import { formatIdeaAmount } from '../../../../../core/i18n/userIdeaCurrency'
+import { formatIdeaAmount } from '@/core/i18n/userIdeaCurrency'
 import {
   useAdminWalletResource,
   type AdminWalletTarget,
@@ -252,7 +252,7 @@ const accountStatus = computed(() => {
   if (activeRestrictions.value.length > 0) return t('admin.wallet.statusRestricted')
   return t('admin.wallet.statusActive')
 })
-const accountStatusVariant = computed<'success' | 'warning' | 'danger'>(() => {
+const accountStatusTone = computed<'success' | 'warning' | 'danger'>(() => {
   if (accountStatus.value === t('admin.wallet.statusActive')) return 'success'
   if (accountStatus.value === t('admin.wallet.statusRestricted')) return 'warning'
   return 'danger'

@@ -23,7 +23,7 @@
               class="size-4 shrink-0 text-muted-foreground"
             />
             <FastArrowRight v-else class="size-3.5 text-warning shrink-0" />
-            <span class="truncate text-foreground">{{
+            <span class="truncate text-foreground" :title="emptyPlaceholder(getTaskRowView(data).serviceSlug)">{{
               emptyPlaceholder(getTaskRowView(data).serviceSlug)
             }}</span>
             <span
@@ -99,11 +99,11 @@
         </template>
         <template #body="{ data }">
           <AdminMono as="div" class="flex items-center gap-2 text-xs tabular-nums">
-            <!-- 竖直状态指示条 (复用 Events 表的状态 Token 颜色) -->
+            <!-- 竖直状态指示条（metric 语义 dot 色；未知状态回退中性 token，不用 raw 调色板） -->
             <span
               :class="[
                 'h-3.5 w-[3px] shrink-0 rounded-pill',
-                getTaskRowView(data).metric?.dotClass || 'bg-slate-400',
+                getTaskRowView(data).metric?.dotClass || 'bg-muted-foreground',
               ]"
             />
             <!-- 精确时间戳 2026-09-17 12:18:35 -->

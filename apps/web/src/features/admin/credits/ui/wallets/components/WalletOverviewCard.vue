@@ -30,7 +30,7 @@
             {{ t('admin.wallet.accountStatus') }}
           </span>
           <div class="flex items-center gap-1.5 pt-0.5">
-            <AdminStatusPill :label="accountStatus" :variant="accountStatusVariant" />
+            <StatusBadge :label="accountStatus" :tone="accountStatusTone" />
           </div>
         </div>
       </div>
@@ -92,9 +92,9 @@
 import { useI18n } from 'vue-i18n'
 import { Minus, Plus, WarningTriangle } from '@iconoir/vue'
 import { AdminAlert } from '../../../../shared'
-import ActionButton from '../../../../../../core/components/ActionButton.vue'
-import { AdminStatusPill } from '../../../../shared'
-import { formatIdeaAmount } from '../../../../../../core/i18n/userIdeaCurrency'
+import ActionButton from '@/core/components/ActionButton.vue'
+import { StatusBadge } from '../../../../shared'
+import { formatIdeaAmount } from '@/core/i18n/userIdeaCurrency'
 
 type WalletRestriction = {
   restriction_id: string
@@ -106,7 +106,7 @@ defineProps<{
   availableCredits: number
   reservedCredits?: number | undefined
   accountStatus: string
-  accountStatusVariant: 'success' | 'warning' | 'danger'
+  accountStatusTone: 'success' | 'warning' | 'danger'
   activeRestrictions: readonly WalletRestriction[]
   isUserDisabledOrClosing: boolean
   commandPending: boolean

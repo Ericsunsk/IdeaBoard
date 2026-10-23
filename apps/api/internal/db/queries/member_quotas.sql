@@ -4,8 +4,7 @@
 -- every Workspace sharing the account, not a wallet, grant, or balance
 -- reservation. All queries are typed and join the caller-owned transaction
 -- via the passed Queries, so Task/Vision settlement keeps Check/Quote/
--- Hold/Task/River atomic with the workspace-budget check at the same
--- boundary (budget row first, quota row second: one fixed lock order).
+-- Hold/Task/River atomic at the same boundary (one fixed lock order).
 
 -- name: GetMemberQuota :one
 SELECT billing_account_id, user_id, period, limit_credits, updated_by_user_id, created_at, updated_at

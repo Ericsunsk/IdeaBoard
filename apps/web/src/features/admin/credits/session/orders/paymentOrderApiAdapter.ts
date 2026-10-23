@@ -3,11 +3,11 @@ import {
   createControlPaymentRefund,
   getControlPaymentOrder,
   listControlPaymentOrders,
-} from '../../../../../api/generated-query/control/control-payments/control-payments'
-import type { ListControlPaymentOrdersParams } from '../../../../../api/generated-query/control/model'
-import { requireContractData } from '../../../../../api/contractKernel'
-import { stripUndefined } from '../../../../../api/stripUndefined'
-import { PAGE_SIZES } from '../../../../../core/config/pagination'
+} from '@/api/generated-query/control/control-payments/control-payments'
+import type { ListControlPaymentOrdersParams } from '@/api/generated-query/control/model'
+import { requireContractData } from '@/api/contractKernel'
+import { stripUndefined } from '@/api/stripUndefined'
+import { PAGE_SIZES } from '@/core/config/pagination'
 import { withControlCopy } from '../../../shared'
 import type {
   AdminPaymentOrderStatus,

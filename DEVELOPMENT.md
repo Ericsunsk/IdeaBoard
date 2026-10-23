@@ -192,16 +192,18 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | API build                        | `cd apps/api && go build ./...`                                                                                                                                                  |
 | Production dead-code scan        | `cd apps/api && GOTOOLCHAIN="go$(awk '/^go [0-9]/ {print $2; exit}' go.mod)" deadcode ./...`                                                                                     |
 | Test reachability dead-code scan | `cd apps/api && GOTOOLCHAIN="go$(awk '/^go [0-9]/ {print $2; exit}' go.mod)" deadcode -test ./...`                                                                               |
-| Schema snapshot generation       | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' BASE_SHA=HEAD go run ./cmd/schemarelease --write-artifact`                                                                    |
-| Schema Release check             | `cd apps/api && BASE_SHA="$(git merge-base HEAD origin/main)" API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schemarelease`                                                     |
-| sqlc regeneration                | `cd apps/api && go tool sqlc generate`                                                                                                                                           |
+| Schema snapshot generation（本地）     | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' BASE_SHA=HEAD go run ./cmd/schemarelease --write-artifact`                                                                    |
+| Schema Release check（CI/release）     | `cd apps/api && BASE_SHA="$(git merge-base HEAD origin/main)" API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schemarelease`                                                     |
+| sqlc regeneration（query-only）        | `cd apps/api && go tool sqlc generate`                                                                                                                                           |
 | Auth build                       | `cd apps/auth && npm run build`                                                                                                                                                  |
 | Credits million dataset          | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' CREDITS_LOAD_TEST=1 go test ./internal/credits/application/commands -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
 | Usage million dataset            | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v`                         |
 
+Schema Release 的 `BASE_SHA` 按场景取值，不要混用：本地生成用 `BASE_SHA=HEAD`，只比 working tree 与 `HEAD` 的差集，避免把未合入的历史误判为 release 变更；CI/release check 用 `BASE_SHA="$(git merge-base HEAD origin/main)"`，比 PR 已合入范围加 working tree。`--base-sha` 缺省读 `BASE_SHA` env，`--head-sha` 缺省为 `HEAD`，`api.yml` 传 `--base-sha "${ATLAS_BASE_SHA:-HEAD}"` 与上述语义一致；`API_TEST_DATABASE_DSN` 必填，缺失即 fail-closed。`--write-artifact` 仍先跑完全部只读校验再发布 `schema.sql`，不是跳检直写。
+
 ### Frontend 工具与治理规则
 
-Formatter 使用 Prettier（`singleQuote`、无分号、`printWidth: 100`），通过 `npm run format:check` 检查。i18n 使用四 bundle parity check；交互与样式行为通过 Playwright browser specs 验证。
+Formatter 使用 Prettier（`singleQuote`、无分号、`printWidth: 100`），通过 `npm run format:check` 检查。i18n 四 locale（`en`、`zh-CN`、`es`、`ko`）parity 由 `apps/web/scripts/checkLocaleParity.ts`（`npm run lint:locale-parity`）与 `localeParity.unit.spec.ts` 锁定，CI 通过 governance 与 unit jobs 执行同一校验；交互与样式行为通过 Playwright browser specs 验证。
 
 ESLint 直接执行治理规则。Canvas 高频交互态禁用 Query 为 error；其余治理规则的 severity 以 `eslint.config.js` 为准。boolean-prefix 使用 TypeScript type-aware ESLint，现有例外保存在 `apps/web/scripts/booleanNaming.baseline.json` 的 declaration identities（file、lexical owner、kind/name、occurrence）；新增同文件声明仍 warning，lint 不自动刷新基线，`npm run lint` 以 `--max-warnings=0` 拒绝任何 warning。自有 boolean fields 与仓内消费者直接使用 predicate names，不保留旧名 alias。DOM、第三方 SDK 与 generated DTO 字段按真实类型契约检查；自有 wire/persisted DTO 用 `@externalContract` 标明外部契约，仅豁免该契约的字段。显式 dictionary 的 keys 是 identities，显式声明的自有 fields 仍受命名检查。`no-barrel-import` 提示 cascading/未声明 barrel，canonical public Seams 按 inventory 保留。
 
@@ -290,13 +292,15 @@ TEST_MODE=standard TEST_SHARD=0 TEST_SHARD_COUNT=1 ./scripts/ci-parity.sh api-te
 
 普通 `go test ./...` 仍允许在未配置测试数据库时跳过 integration tests；严格 fail-closed 仅由 parity/CI mode 启用。完整 lint、build、migration、sqlc drift 和 vulnerability checks 仍由上表与 GitHub 的独立 jobs 执行。
 
-修改 `apps/api/internal/db/queries` 或 schema 后：
+修改 `apps/api/internal/db/queries`（query-only，不动 fragment/manifest）后：
 
 ```bash
 cd apps/api
 go tool sqlc generate
 git diff --exit-code -- internal/db/sqlc
 ```
+
+修改 domain fragment 或 `manifest` 后不要手跑 `sqlc generate` 直写 `schema.sql`：走 `schema-release` canonical lifecycle，先用 `--write-artifact` 生成 `schema.sql`（内部已校验 sqlc 生成一致），再运行默认 check；CI 和 release gate 只运行默认只读 check。
 
 Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration 创建。API schema 由 Atlas versioned migrations 管理；若本地数据库不符合当前 Atlas history，请显式重建 Fresh Database，不要补空 migration、手删 Ledger 或尝试兼容性回放。
 
@@ -380,7 +384,7 @@ Generated API:
 sqlc:
 
 - `apps/api/internal/db/sqlc/*.go` 不手动编辑。
-- SQL schema/query 变更后运行 `go tool sqlc generate`。
+- query-only 变更运行 `go tool sqlc generate` 并以 `git diff --exit-code -- internal/db/sqlc` 确认 drift；fragment/manifest 变更走 `schema-release` canonical lifecycle，不要手跑 `sqlc generate` 直写 `schema.sql`。
 - Atlas migrations 位于 `apps/api/internal/db/migrations/`，由 `apps/api/atlas.hcl` 与 `atlas.sum` 管理。
 - Atlas migration 生成使用 `atlas migrate diff`；完整性与 Fresh replay 使用 `scripts/atlas-migration-check.sh`。CI 先在隔离 database 执行 `atlas migrate validate`，再在集成 database 执行 Fresh apply 与 incremental idempotency apply；不要把 Atlas Pro-only 的 `atlas migrate lint` 加入流水线。
 - API schema 由独立 `api-migrate` image 执行 Atlas versioned migrations，再执行 `finalize-migrate` 完成 River 与 runtime privilege setup。Pre-launch rebaseline 只能原子删除旧 SQL chain 并新增一个更高版本 baseline，随后重建 Fresh Database；不得手工编辑 Atlas revisions 表。

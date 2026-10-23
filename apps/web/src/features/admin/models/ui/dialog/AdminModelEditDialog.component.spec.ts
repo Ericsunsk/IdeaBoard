@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, within } from '@testing-library/vue'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import AdminModelEditDialog from './AdminModelEditDialog.vue'
 import type { AdminModelItem } from '../../core/catalogData'
 

@@ -75,7 +75,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { formatDisplayErrorMessage } from '../../../../../core/utils/errorMessages'
+import { formatDisplayErrorMessage } from '@/core/utils/errorMessages'
 import { useAdminTaskCancellationFeedback } from '../../session/useAdminMonitorFeedback'
 import AdminTaskResultDialog from '../AdminTaskResultDialog.vue'
 import { AdminAlert } from '../../../shared'
@@ -102,7 +102,7 @@ import { DEMO_MODE_QUERY_VALUE, createDemoTaskDetail } from '../../session/demoD
 import { useMonitorDemo } from '../../session/useMonitorDemo'
 import { useMonitorTimeline } from '../../session/useMonitorTimeline'
 import { monitorChartSpecs, type TaskMetricStatsSnapshot } from '../../../shared'
-import { stringParam } from '../../../../../core/router/queryParams'
+import { stringParam } from '@/core/router/queryParams'
 import { MONITOR_MESSAGES } from './messages'
 
 const adminConfirm = useAdminConfirm()

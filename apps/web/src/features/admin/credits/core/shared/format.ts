@@ -1,5 +1,5 @@
 import type { CreditReconciliationRun } from '../../session/shared/api'
-import { sanitizeApiErrorMessage } from '../../../../../core/utils/errorMessages'
+import { sanitizeApiErrorMessage } from '@/core/utils/errorMessages'
 
 // Ledger command vocabulary (issue #809). The legacy generated
 // `CreditLedgerTransaction` model is gone; the control ledger types the
@@ -46,7 +46,7 @@ export function getCreditCommandSign(command: string) {
   return command === 'grant' || command === 'release' || command === 'refund' ? '+' : '-'
 }
 
-export function getCreditCommandVariant(command: string): 'success' | 'danger' | 'warning' {
+export function getCreditCommandTone(command: string): 'success' | 'danger' | 'warning' {
   if (command === 'grant' || command === 'release' || command === 'refund') return 'success'
   if (command === 'deduction' || command === 'capture') return 'danger'
   return 'warning'
@@ -56,7 +56,7 @@ export function getRunStatusLabel(status: CreditReconciliationRun['status']) {
   return { queued: '排队中', running: '执行中', completed: '已完成', failed: '失败' }[status]
 }
 
-export function getRunStatusVariant(
+export function getRunStatusTone(
   status: CreditReconciliationRun['status'],
 ): 'success' | 'danger' | 'warning' {
   if (status === 'completed') return 'success'

@@ -6,7 +6,7 @@ import {
   getAttemptRetryLayerLabel,
   getAttemptStageLabel,
   getAttemptStatusLabel,
-  getAttemptStatusVariant,
+  getAttemptStatusTone,
   getBillingSettlementLabel,
   getDetailExecutionModelLabel,
   getDetailExecutionProviderLabel,
@@ -29,8 +29,8 @@ describe('taskResultLabels', () => {
   it('maps attempt status, stage, and variant with passthrough fallback', () => {
     expect(getAttemptStatusLabel('failed')).toBe('失败')
     expect(getAttemptStatusLabel('mystery')).toBe('mystery')
-    expect(getAttemptStatusVariant('failed')).toBe('danger')
-    expect(getAttemptStatusVariant('mystery')).toBe('neutral')
+    expect(getAttemptStatusTone('failed')).toBe('danger')
+    expect(getAttemptStatusTone('mystery')).toBe('neutral')
     expect(getAttemptStageLabel('queued')).toBe('排队中')
     expect(getAttemptStageLabel('mystery')).toBe('mystery')
   })

@@ -110,7 +110,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import ActionButton from '../../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminButton } from '../../../../shared'
 import { AdminFormField } from '../../../../shared'
 import { AdminInput } from '../../../../shared'

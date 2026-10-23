@@ -141,6 +141,7 @@
             :rename-draft="renameDraft"
             :is-menu-open="activeMenuBoardId === board.id"
             :display-date="formatCatalogDate(board.updatedAt)"
+            :current-user="userStore.user"
             @click-board="openBoardFromCard(board.id)"
             @toggle-menu="toggleBoardMenu(board.id)"
             @rename-action="startRename(board)"
@@ -179,7 +180,7 @@
       @confirm="confirmDelete"
     />
 
-    <ShareDialog :panel="sharePanel" />
+    <ShareDialog :panel="sharePanel" :current-user="userStore.user" />
   </div>
 </template>
 
@@ -211,11 +212,14 @@ import { Spinner } from '@/components/ui/spinner'
 import { formatCatalogDate, useCatalog, type CatalogSortMode } from './useCatalog'
 import ShareDialog from '../share/ShareDialog.vue'
 import { useSharePanel } from '../../session/share/useSharePanel'
+import { useUserStore } from '../../../auth'
 
 const router = useRouter()
 const { t } = useI18n()
 const rangeToggleControlClass = createPageChromeRoundControlClass()
 const sharePanel = useSharePanel()
+// Page seam owns auth + workspace reads; gallery leaves receive them as props.
+const userStore = useUserStore()
 // Fresh profiles need Workspace selection before catalog hydration.
 useWorkspaceSelection()
 const controller = useCatalog({

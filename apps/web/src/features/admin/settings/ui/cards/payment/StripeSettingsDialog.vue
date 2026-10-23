@@ -32,16 +32,16 @@
         </div>
       </div>
       <div class="flex items-center gap-1.5">
-        <AdminStatusPill
+        <StatusBadge
           :label="PAYMENTS_MESSAGES.productReadyState(summary.isProductReady)"
-          :variant="summary.isProductReady ? 'success' : 'neutral'"
+          :tone="summary.isProductReady ? 'success' : 'neutral'"
           size="small"
         />
       </div>
       <div class="flex items-center gap-1.5">
-        <AdminStatusPill
+        <StatusBadge
           :label="PAYMENTS_MESSAGES.webhookReadyState(summary.isWebhookReady)"
-          :variant="summary.isWebhookReady ? 'success' : 'neutral'"
+          :tone="summary.isWebhookReady ? 'success' : 'neutral'"
           size="small"
         />
       </div>
@@ -153,7 +153,7 @@ import * as v from 'valibot'
 import { useForm } from '@/components/ui/form'
 import { AdminDialogActions } from '../../../../shared/index'
 import { AdminInput } from '../../../../shared/index'
-import { AdminStatusPill } from '../../../../shared/index'
+import { StatusBadge } from '../../../../shared/index'
 import { AdminSwitch } from '../../../../shared/index'
 import { AdminSettingsDialogFrame } from '../../../../shared/index'
 import { AdminFormField } from '../../../../shared/index'

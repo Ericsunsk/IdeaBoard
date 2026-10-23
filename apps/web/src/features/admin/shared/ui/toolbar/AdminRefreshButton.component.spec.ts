@@ -1,6 +1,6 @@
 import { fireEvent } from '@testing-library/vue'
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '../../../../../test/render'
+import { render, screen } from '@/test/render'
 import AdminRefreshButton from './AdminRefreshButton.vue'
 
 describe('AdminRefreshButton', () => {

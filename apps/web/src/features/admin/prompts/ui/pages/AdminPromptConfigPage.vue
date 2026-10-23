@@ -103,17 +103,17 @@
               </template>
             </AdminColumn>
 
-            <!-- 2. Status（方案 A：载体统一 AdminStatusPill） -->
+            <!-- 2. Status（方案 A：载体统一 StatusBadge） -->
             <AdminColumn field="status" header="Status" :style="{ width: '105px' }">
               <template #body="{ data }">
-                <AdminStatusPill
+                <StatusBadge
                   v-if="rowView(data.slug).status !== 'unsupported'"
                   :label="
                     rowView(data.slug).status === 'configured'
                       ? PROMPTS_MESSAGES.configured
                       : PROMPTS_MESSAGES.unconfigured
                   "
-                  :variant="rowView(data.slug).status === 'configured' ? 'success' : 'info'"
+                  :tone="rowView(data.slug).status === 'configured' ? 'success' : 'info'"
                   size="small"
                 />
                 <span v-else :class="adminTableMutedValueClass">—</span>
@@ -225,13 +225,13 @@ import { Refresh, Search, Spark, Xmark } from '@iconoir/vue'
 import { usePromptConfigFeedback } from '../../session/usePromptConfigFeedback'
 import { AdminButton } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
-import ActionButton from '../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminTable } from '../../../shared'
 import { AdminColumn } from '../../../shared'
 import { AdminServiceCell } from '../../../shared'
 import { AdminOptionFilter } from '../../../shared'
 import { AdminRefreshButton } from '../../../shared'
-import { AdminStatusPill } from '../../../shared'
+import { StatusBadge } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
 import PromptConfigEditorDialog from '../editors/PromptConfigEditorDialog.vue'
 import { usePromptConfigFilters } from '../../core/filtering'

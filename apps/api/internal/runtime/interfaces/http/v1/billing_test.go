@@ -255,27 +255,6 @@ func (f *fakeBillingAccounts) UpdateBillingAccountMemberRole(ctx context.Context
 	return &tenancy.BillingAccountMember{BillingAccountID: billingAccountInternalID, UserID: targetUserID, Role: newRole}, nil
 }
 
-func (f *fakeBillingAccounts) TransferBillingAccountOwnership(ctx context.Context, billingAccountInternalID, currentOwnerID, newOwnerID int64) error {
-	role, ok, err := f.GetBillingAccountRole(ctx, billingAccountInternalID, currentOwnerID)
-	if err != nil {
-		return err
-	}
-	if !ok || !tenancy.IsBillingOwner(role) {
-		return tenancy.ErrBillingForbidden
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.roles == nil {
-		f.roles = make(map[int64]map[int64]string)
-	}
-	if f.roles[billingAccountInternalID] == nil {
-		f.roles[billingAccountInternalID] = make(map[int64]string)
-	}
-	f.roles[billingAccountInternalID][newOwnerID] = tenancy.BillingRoleOwner
-	f.roles[billingAccountInternalID][currentOwnerID] = tenancy.BillingRoleAdmin
-	return nil
-}
-
 func (f *fakeBillingAccounts) billingRoleLocked(billingAccountInternalID, userID int64) (string, bool) {
 	if f.deny != nil && f.deny[userID] {
 		return "", false

@@ -1,5 +1,5 @@
 import { formatAdminDisplayError, type AdminToastPort, useAdminToast } from '../../shared/index'
-import { unsupportedUploadImageMessage } from '../../../../core/utils/imageUploadSupport'
+import { unsupportedUploadImageMessage } from '@/core/utils/imageUploadSupport'
 
 // 反馈公约（admin）：领域文案收口到本文件的 feedback 工厂，调用方只表达意图
 // （saved/saveFailed/testPassed/…），不直接拼 toast 文案。`useAdminToast` 直调仅

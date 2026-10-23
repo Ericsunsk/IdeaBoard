@@ -86,12 +86,12 @@
           </template>
         </AdminColumn>
 
-        <!-- Status 列（健康三态：正常/异常/未验证，载体统一 AdminStatusPill） -->
+        <!-- Status 列（健康三态：正常/异常/未验证，载体统一 StatusBadge） -->
         <AdminColumn field="status" :header="STATUS_COLUMN_HEADER" :style="{ width: '105px' }">
           <template #body="{ data }">
-            <AdminStatusPill
+            <StatusBadge
               :label="storageHealthLabel(data.health)"
-              :variant="storageHealthVariant(data.health)"
+              :tone="storageHealthTone(data.health)"
               size="small"
             />
           </template>
@@ -210,10 +210,10 @@
 
 <script setup lang="ts">
 import type { Component } from 'vue'
-import ActionButton from '../../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminColumn } from '../../../../shared/index'
 import { AdminEmptyState } from '../../../../shared/index'
-import { AdminStatusPill } from '../../../../shared/index'
+import { StatusBadge } from '../../../../shared/index'
 import { AdminSwitch } from '../../../../shared/index'
 import { AdminTable } from '../../../../shared/index'
 import {
@@ -272,7 +272,7 @@ function storageHealthLabel(health: StorageHealth): string {
   return STORAGE_HEALTH_LABEL[health]
 }
 
-function storageHealthVariant(health: StorageHealth): 'success' | 'danger' | 'neutral' {
+function storageHealthTone(health: StorageHealth): 'success' | 'danger' | 'neutral' {
   return STORAGE_HEALTH_VARIANT[health]
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '../../../../../test/render'
+import { render, screen } from '@/test/render'
 import { timeRangePresets } from '../../core/timeRange'
 import TaskControlToolbar from './TaskControlToolbar.vue'
 

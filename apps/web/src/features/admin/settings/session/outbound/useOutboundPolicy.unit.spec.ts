@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent } from 'vue'
-import { useMswHandlers } from '../../../../../test/msw'
+import { useMswHandlers } from '@/test/msw'
 import type { AdminOutboundPolicyFeedback } from '../useSettingsFeedback'
 import { useOutboundPolicy } from './useOutboundPolicy'
 import { createOutboundPolicyHandlers, createOutboundPolicyMswState } from '../testing'

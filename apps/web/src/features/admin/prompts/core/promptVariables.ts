@@ -1,4 +1,4 @@
-import { SERVICE, type Service } from '../../../../core/contracts/imageServices'
+import { SERVICE, type Service } from '@/core/contracts/imageServices'
 
 export type ServicePromptVariableTone = 'prompt' | 'control' | 'context'
 

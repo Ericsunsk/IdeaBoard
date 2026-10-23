@@ -97,13 +97,12 @@ export type UserAccountMenuWorkspace = {
     ((name: string, idempotencyKey: string) => Promise<UserAccountMenuOrganizationItem>) | undefined
   // Organization management panel (issue #951, opaque component + callbacks).
   organizationPanel?: UserAccountMenuOrganizationPanel | undefined
-  /** Active Personal/Organization scope (951): null while unresolved. */
-  activeScope?: { kind: 'personal' } | { kind: 'organization'; organizationId: string } | undefined
-  onSelectPersonal?: (() => void) | undefined
-  onSelectOrganization?: ((organizationId: string) => void | Promise<void>) | undefined
   onSelect: (workspaceId: string) => void
   onCreate: (input: UserAccountMenuWorkspaceCreateInput) => Promise<UserAccountMenuWorkspaceItem>
   onRename: (workspaceId: string, name: string) => Promise<UserAccountMenuWorkspaceItem>
+  onRenameOrganization?:
+    | ((organizationId: string, name: string) => Promise<UserAccountMenuOrganizationItem>)
+    | undefined
   onDelete: (workspaceId: string) => Promise<void>
   onRetry: () => void
 }

@@ -1,15 +1,15 @@
 import {
   getControlCatalogModelPool,
   replaceControlCatalogModelPool,
-} from '../../../../../api/generated-query/control/control-billing/control-billing'
-import { requireContractData } from '../../../../../api/contractKernel'
+} from '@/api/generated-query/control/control-billing/control-billing'
+import { requireContractData } from '@/api/contractKernel'
 import { createAdminGatewayResource } from '../../../models/resource'
 import { buildControlMutationHeaders, type ControlMutationOptions } from '../../../shared'
 import { withControlCopy } from '../../../shared'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
   parseOutputResolution,
-} from '../../../../../core/contracts/generationContract'
+} from '@/core/contracts/generationContract'
 import type {
   AdminModelPool,
   AdminModelPoolEntry,

@@ -4,8 +4,8 @@ import { computed } from 'vue'
 import {
   getControlMediaUploadSetting,
   updateControlMediaUploadSetting,
-} from '../../../../../api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '../../../../../api/contractKernel'
+} from '@/api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '@/api/contractKernel'
 import { buildControlMutationHeaders } from '../../../shared/index'
 import type { AdminMediaUploadSettingsFeedback } from '../useSettingsFeedback'
 import { useSettingsLifecycle } from '../useSettingsLifecycle'

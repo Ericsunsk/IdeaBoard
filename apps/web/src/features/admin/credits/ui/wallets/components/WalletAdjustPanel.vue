@@ -2,7 +2,7 @@
   <section class="flex flex-col gap-4 rounded-panel border border-border bg-card p-5 shadow-raised">
     <div class="flex items-center justify-between border-b border-border pb-3">
       <div class="flex items-center gap-2">
-        <!-- Tab 圆点对齐 Pill 语义色：grant/refund 走 success（与 getCreditCommandVariant
+        <!-- Tab 圆点对齐 Pill 语义色：grant/refund 走 success（与 getCreditCommandTone
              一致），deduction 走 destructive；refund 不再用 warning。 -->
         <span
           class="size-2 rounded-pill"
@@ -108,10 +108,10 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import ActionButton from '../../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminFormField } from '../../../../shared'
 import { AdminNumberInput } from '../../../../shared'
-import { formatIdeaAmount } from '../../../../../../core/i18n/userIdeaCurrency'
+import { formatIdeaAmount } from '@/core/i18n/userIdeaCurrency'
 import type { AdminCreditLedgerTransaction } from '../../../session/wallets/resource'
 import type { CreditCommandValidation } from '../../../core/wallets/creditCommandContract'
 

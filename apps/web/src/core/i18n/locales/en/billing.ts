@@ -1,6 +1,5 @@
-/** Credits, pricing, and payment copy. */
+/** Payment UI copy. Backend error-code copy lives exclusively in `errorCodes`. */
 export default {
   rechargeNow: 'Top up now',
-  insufficientCredits: 'You need more Ideas to run this action.',
   insufficientBalanceDetail: 'Not enough Ideas (need {required}, you have {available}).',
 } as const

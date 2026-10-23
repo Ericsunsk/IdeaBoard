@@ -53,8 +53,6 @@ import type {
   RejectWorkspaceBillingTransfer200,
   RemoveWorkspaceBillingAccountMember200,
   SetMemberQuotaRequest,
-  TransferBillingAccountRequest,
-  TransferWorkspaceBillingAccount200,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
   UpdateBillingAccountMemberRequest,
@@ -622,124 +620,6 @@ export const useRemoveWorkspaceBillingAccountMember = <
   TContext
 > => {
   return useMutation(getRemoveWorkspaceBillingAccountMemberMutationOptions(options), queryClient)
-}
-export const getTransferWorkspaceBillingAccountUrl = (workspaceId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/billing-account/transfer`
-}
-
-/**
- * Only the current Owner may transfer; the previous Owner steps down to Admin so the account never loses its last Owner. Identity, balance, and history stay stable; only management changes. Requires the Idempotency-Key header.
- * @summary Transfer billing account ownership (billing owner only)
- */
-export const transferWorkspaceBillingAccount = async (
-  workspaceId: string,
-  transferBillingAccountRequest: TransferBillingAccountRequest,
-  options?: Parameters<typeof publicMutator>[1],
-): Promise<TransferWorkspaceBillingAccount200> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
-  return publicMutator<TransferWorkspaceBillingAccount200>(
-    getTransferWorkspaceBillingAccountUrl(workspaceId),
-    {
-      ...options,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-      body: JSON.stringify(transferBillingAccountRequest),
-    },
-  )
-}
-
-export const getTransferWorkspaceBillingAccountMutationKey = () =>
-  ['transferWorkspaceBillingAccount'] as const
-
-export const getTransferWorkspaceBillingAccountMutationOptions = <
-  TError = BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof transferWorkspaceBillingAccount>>,
-    TError,
-    TransferWorkspaceBillingAccountMutationVariables,
-    TContext
-  >
-  request?: SecondParameter<typeof publicMutator>
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof transferWorkspaceBillingAccount>>,
-  TError,
-  TransferWorkspaceBillingAccountMutationVariables,
-  TContext
-> => {
-  const mutationKey = getTransferWorkspaceBillingAccountMutationKey()
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined }
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof transferWorkspaceBillingAccount>>,
-    TransferWorkspaceBillingAccountMutationVariables
-  > = (props) => {
-    const { workspaceId, data } = props ?? {}
-
-    return transferWorkspaceBillingAccount(workspaceId, data, requestOptions)
-  }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-export type TransferWorkspaceBillingAccountMutationResult = NonNullable<
-  Awaited<ReturnType<typeof transferWorkspaceBillingAccount>>
->
-export type TransferWorkspaceBillingAccountMutationBody = TransferBillingAccountRequest
-export type TransferWorkspaceBillingAccountMutationError =
-  BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse
-export type TransferWorkspaceBillingAccountMutationVariables = {
-  workspaceId: string
-  data: TransferBillingAccountRequest
-}
-
-/**
- * @summary Transfer billing account ownership (billing owner only)
- */
-export const useTransferWorkspaceBillingAccount = <
-  TError = BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof transferWorkspaceBillingAccount>>,
-      TError,
-      TransferWorkspaceBillingAccountMutationVariables,
-      TContext
-    >
-    request?: SecondParameter<typeof publicMutator>
-  },
-  queryClient?: QueryClient,
-): UseMutationReturnType<
-  Awaited<ReturnType<typeof transferWorkspaceBillingAccount>>,
-  TError,
-  TransferWorkspaceBillingAccountMutationVariables,
-  TContext
-> => {
-  return useMutation(getTransferWorkspaceBillingAccountMutationOptions(options), queryClient)
 }
 export const getInitiateWorkspaceBillingTransferUrl = (workspaceId: string) => {
   return `/workspaces/${encodeURIComponent(String(workspaceId))}/billing-account/transfer-invites`

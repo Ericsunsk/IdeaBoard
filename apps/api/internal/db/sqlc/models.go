@@ -578,7 +578,6 @@ type Organization struct {
 	Name       string             `json:"name"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
-	ArchivedAt pgtype.Timestamptz `json:"archived_at"`
 	ClosedAt   pgtype.Timestamptz `json:"closed_at"`
 	ClosedBy   pgtype.Int8        `json:"closed_by"`
 }

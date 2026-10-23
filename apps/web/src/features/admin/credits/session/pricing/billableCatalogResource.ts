@@ -3,13 +3,13 @@ import {
   listControlBillingCatalog,
   publishControlCatalogPrices,
   setControlCatalogAvailability,
-} from '../../../../../api/generated-query/control/control-billing/control-billing'
-import { requireContractData } from '../../../../../api/contractKernel'
-import { stripUndefined } from '../../../../../api/stripUndefined'
+} from '@/api/generated-query/control/control-billing/control-billing'
+import { requireContractData } from '@/api/contractKernel'
+import { stripUndefined } from '@/api/stripUndefined'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
   parseOutputResolution,
-} from '../../../../../core/contracts/generationContract'
+} from '@/core/contracts/generationContract'
 import type {
   AdminBillableItemAvailability,
   AdminBillableItemCard,

@@ -10,7 +10,6 @@ CREATE TABLE organizations (
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  archived_at TIMESTAMPTZ NULL,
   CONSTRAINT uq_organizations_public_id UNIQUE (public_id),
   -- Kernel prefix pin: mirrors contract.PrefixOrganization.
   CONSTRAINT chk_organizations_public_id CHECK (public_id LIKE 'org\_%')

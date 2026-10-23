@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { fireEvent, within } from '@testing-library/vue'
-import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
-import { renderWithUser, screen, waitFor } from '../../../../../test/render'
+import { http, HttpResponse, useMswHandlers } from '@/test/msw'
+import { renderWithUser, screen, waitFor } from '@/test/render'
 import AdminModelsPage from './AdminModelsPage.vue'
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))

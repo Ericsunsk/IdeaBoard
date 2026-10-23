@@ -114,13 +114,13 @@
             MODELS_MESSAGES.referenceNoData
           }}</span>
           <span v-else class="flex flex-wrap justify-end gap-1">
-            <!-- 能力徽标收口 AdminStatusPill：supported→success，未知/不支持→neutral；
+            <!-- 能力徽标收口 StatusBadge：supported→success，未知/不支持→neutral；
                  静态属性不呼吸；✓/✗/? 后缀保留 false 与未知区分（不再用 line-through）。 -->
-            <AdminStatusPill
+            <StatusBadge
               v-for="capability in capabilities"
               :key="capability.key"
               :label="`${capability.label}${capability.supported === true ? '✓' : capability.supported === false ? '✗' : '?'}`"
-              :variant="capability.supported === true ? 'success' : 'neutral'"
+              :tone="capability.supported === true ? 'success' : 'neutral'"
               :pulse="false"
               size="small"
             />
@@ -174,19 +174,19 @@
           <span v-if="statusKind === 'unknown'" class="font-medium text-muted-foreground">{{
             MODELS_MESSAGES.referenceNoData
           }}</span>
-          <!-- 上游状态收口 AdminStatusPill：deprecated→danger 红色预警，beta→neutral；
+          <!-- 上游状态收口 StatusBadge：deprecated→danger 红色预警，beta→neutral；
                缺失即无预警，绝不误报；静态属性不呼吸。 -->
-          <AdminStatusPill
+          <StatusBadge
             v-else-if="statusKind === 'deprecated'"
             :label="MODELS_MESSAGES.referenceDeprecated(snapshot.status)"
-            variant="danger"
+            tone="danger"
             :pulse="false"
             size="small"
           />
-          <AdminStatusPill
+          <StatusBadge
             v-else-if="statusKind === 'beta'"
             :label="snapshot.status ?? ''"
-            variant="neutral"
+            tone="neutral"
             :pulse="false"
             size="small"
           />
@@ -206,7 +206,7 @@
 import { computed, ref, watch } from 'vue'
 import { watchDebounced } from '@vueuse/core'
 import { Cube, Refresh } from '@iconoir/vue'
-import { AdminStatusPill } from '../../../../shared'
+import { StatusBadge } from '../../../../shared'
 import { createAdminGatewayResource } from '../../../resource'
 import { resolveModelBrandLogo } from '../../../../shared'
 import {

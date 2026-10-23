@@ -45,20 +45,12 @@ type Querier interface {
 	ClaimControlIdempotency(ctx context.Context, arg ClaimControlIdempotencyParams) (ClaimControlIdempotencyRow, error)
 	ClaimDuePaymentOrderReconciliations(ctx context.Context, arg ClaimDuePaymentOrderReconciliationsParams) ([]ClaimDuePaymentOrderReconciliationsRow, error)
 	ClaimPaymentWebhookEvent(ctx context.Context, stripeEventID string) (int64, error)
-	// Durable submit idempotency fact (task_submission_idempotency), written
-	// inside the settlement transaction so a committed claim always has its task
-	// row and a rolled-back settlement leaves no claim behind.
-	//
-	// The workspace is resolved by public id inside the statement, so the scope
-	// predicate rides on the same query as the insert and the workspace scope
-	// guard covers it. A caller that cannot see the workspace inserts nothing and
-	// reads no claim, so it fails closed rather than settling outside its
-	// workspace.
-	//
-	// ON CONFLICT DO NOTHING is the concurrency fence: a concurrent submit of the
-	// same key blocks on the primary key until the first transaction commits or
-	// rolls back, then observes the winner. The claim must be written BEFORE the
-	// Hold so a replay never reaches the ledger at all.
+	// Control Plane global task read model (#809-close). Operators see every
+	// workspace (no membership gating at the repository; the control guard
+	// owns capability auth and every call is audited). Unknown ids read as
+	// zero rows (the adapter converges to ErrNotFound, never 403).
+	// Settlement joins stay LEFT: tasks without billing facts (free or
+	// pre-settlement rows) still list.
 	ClaimTaskSubmissionIdempotency(ctx context.Context, arg ClaimTaskSubmissionIdempotencyParams) (ClaimTaskSubmissionIdempotencyRow, error)
 	// ClaimTask fences one task execution with the lease token. A pending task is
 	// claimed normally; a River redelivery of the same job may reacquire its
@@ -110,23 +102,19 @@ type Querier interface {
 	CompleteWorkspaceTask(ctx context.Context, arg CompleteWorkspaceTaskParams) (Task, error)
 	CountActiveOrgSearchOperations(ctx context.Context, organizationID pgtype.Int8) (int64, error)
 	CountActiveOrgTasks(ctx context.Context, organizationID pgtype.Int8) (int64, error)
-	CountActiveSearchOperationsForWorkspace(ctx context.Context, workspaceID pgtype.Int8) (int64, error)
+	// Payment admin reads (split from payments.sql).
 	CountAdminPaymentOrders(ctx context.Context, arg CountAdminPaymentOrdersParams) (int64, error)
 	CountBillingAccountOwners(ctx context.Context, billingAccountID int64) (int64, error)
 	CountBoardYUpdates(ctx context.Context, arg CountBoardYUpdatesParams) (int64, error)
 	// Counts honor the user/keyword filters but never the status filter, so
 	// the status pills keep their global breakdown while a status is active.
 	CountControlTasks(ctx context.Context, arg CountControlTasksParams) ([]CountControlTasksRow, error)
-	CountLinkedWorkspacesForAccountExcluding(ctx context.Context, arg CountLinkedWorkspacesForAccountExcludingParams) (int64, error)
 	CountOpenOrgPaymentDisputes(ctx context.Context, billingAccountID pgtype.Int8) (int64, error)
 	CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error)
 	CountOrganizationsByUserID(ctx context.Context, userID int64) (int64, error)
-	CountOtherWorkspaceTasksForAccount(ctx context.Context, arg CountOtherWorkspaceTasksForAccountParams) (int64, error)
-	CountPendingBillingTransfersForAccount(ctx context.Context, billingAccountID int64) (int64, error)
 	CountPendingOrgPaymentRefunds(ctx context.Context, billingAccountID pgtype.Int8) (int64, error)
 	CountPendingOrgTransferInvites(ctx context.Context, billingAccountID int64) (int64, error)
 	CountUnsettledOrgPaymentOrders(ctx context.Context, billingAccountID pgtype.Int8) (int64, error)
-	CountUnsettledPaymentOrdersForAccount(ctx context.Context, billingAccountID pgtype.Int8) (int64, error)
 	CountWorkspaceMembers(ctx context.Context, workspaceID int64) (int64, error)
 	CountWorkspaceOwners(ctx context.Context, workspaceID int64) (int64, error)
 	CountWorkspaceTasks(ctx context.Context, workspacePublicID string) (int64, error)
@@ -328,7 +316,7 @@ type Querier interface {
 	// use here), so Task settlement keeps Quote/Hold/Task/River atomic.
 	//
 	// workspace_billing_links rows are retired (writes closed, resolution no
-	// longer reads them); the table stays for read-only audit only.
+	// longer reads them); the table stays for handover/admin-audit reads only.
 	GetBillingAccountByOrganizationID(ctx context.Context, organizationID pgtype.Int8) (BillingAccount, error)
 	GetBillingAccountByPublicID(ctx context.Context, publicID string) (BillingAccount, error)
 	GetBillingAccountByWorkspaceID(ctx context.Context, workspaceID pgtype.Int8) (BillingAccount, error)
@@ -344,12 +332,10 @@ type Querier interface {
 	GetBoardRevisionByNumber(ctx context.Context, arg GetBoardRevisionByNumberParams) (GetBoardRevisionByNumberRow, error)
 	GetControlIdempotency(ctx context.Context, arg GetControlIdempotencyParams) (GetControlIdempotencyRow, error)
 	GetControlTaskBilling(ctx context.Context, taskID string) (GetControlTaskBillingRow, error)
-	// Control Plane global task read model (#809-close). Operators see every
-	// workspace (no membership gating at the repository; the control guard
-	// owns capability auth and every call is audited). Unknown ids read as
-	// zero rows (the adapter converges to ErrNotFound, never 403).
-	// Settlement joins stay LEFT: tasks without billing facts (free or
-	// pre-settlement rows) still list.
+	// Workspace task control-plane reads (split from workspace_tasks.sql).
+	// Operators see every workspace (no membership gating at the repository;
+	// the control guard owns capability auth and every call is audited).
+	// Scope guard: these names stay allowlisted in scripts/sql-workspace-scope-check.sh.
 	GetControlTaskByPublicID(ctx context.Context, publicID string) (GetControlTaskByPublicIDRow, error)
 	GetDefaultWorkspaceByOwner(ctx context.Context, ownerUserID pgtype.Int8) (Workspace, error)
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
@@ -374,8 +360,7 @@ type Querier interface {
 	// every Workspace sharing the account, not a wallet, grant, or balance
 	// reservation. All queries are typed and join the caller-owned transaction
 	// via the passed Queries, so Task/Vision settlement keeps Check/Quote/
-	// Hold/Task/River atomic with the workspace-budget check at the same
-	// boundary (budget row first, quota row second: one fixed lock order).
+	// Hold/Task/River atomic at the same boundary (one fixed lock order).
 	GetMemberQuota(ctx context.Context, arg GetMemberQuotaParams) (BillingAccountMemberQuota, error)
 	GetMemberQuotaForUpdate(ctx context.Context, arg GetMemberQuotaForUpdateParams) (BillingAccountMemberQuota, error)
 	GetOrganizationByInternalID(ctx context.Context, internalID int64) (Organization, error)
@@ -385,6 +370,7 @@ type Querier interface {
 	// Account Stripe Customer (#919): reused per payer Billing Account, never
 	// per operator, so test/live stay isolated and key rotation never duplicates.
 	GetPaymentCustomerByAccount(ctx context.Context, arg GetPaymentCustomerByAccountParams) (PaymentCustomer, error)
+	// Payment order lifecycle (split from payments.sql).
 	// Account idempotency scope (#919): the durable replay scope is the payer
 	// Billing Account, never the operator. Same key + same hash replays, same
 	// key + different hash conflicts; cross-account key reuse never replays.
@@ -404,6 +390,7 @@ type Querier interface {
 	// explicit tx release the lock immediately, so they behave like the plain
 	// read they replaced.
 	GetPaymentOrderByIDForUpdate(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
+	// Payment Stripe configuration (split from payments.sql).
 	GetPaymentStripeConfiguration(ctx context.Context) (PaymentStripeConfiguration, error)
 	GetPaymentStripeCredential(ctx context.Context, id pgtype.UUID) (PaymentStripeCredential, error)
 	GetPaymentStripeCredentialForOrder(ctx context.Context, id pgtype.UUID) (PaymentStripeCredential, error)
@@ -455,6 +442,7 @@ type Querier interface {
 	InsertPaymentCheckoutShutdown(ctx context.Context, arg InsertPaymentCheckoutShutdownParams) (PaymentCheckoutShutdown, error)
 	InsertPaymentOrderIntent(ctx context.Context, arg InsertPaymentOrderIntentParams) (PaymentOrder, error)
 	InsertPaymentStripeCredential(ctx context.Context, arg InsertPaymentStripeCredentialParams) (PaymentStripeCredential, error)
+	// Payment webhook inbox (split from payments.sql).
 	InsertPaymentWebhookEvent(ctx context.Context, arg InsertPaymentWebhookEventParams) (int64, error)
 	InsertServiceModelPoolEntry(ctx context.Context, arg InsertServiceModelPoolEntryParams) (ServiceModelPoolEntry, error)
 	InsertServiceModelPoolResolution(ctx context.Context, arg InsertServiceModelPoolResolutionParams) error
@@ -490,7 +478,6 @@ type Querier interface {
 	ListBillingAccountManagerIDs(ctx context.Context, billingAccountID int64) ([]int64, error)
 	ListBillingAccountMembers(ctx context.Context, arg ListBillingAccountMembersParams) ([]BillingAccountMember, error)
 	ListBillingAccountsForAdmin(ctx context.Context, arg ListBillingAccountsForAdminParams) ([]ListBillingAccountsForAdminRow, error)
-	ListBillingAccountsForUser(ctx context.Context, arg ListBillingAccountsForUserParams) ([]BillingAccount, error)
 	ListBillingTransferInvitesForAccount(ctx context.Context, arg ListBillingTransferInvitesForAccountParams) ([]BillingAccountTransferInvite, error)
 	ListBoardRevisions(ctx context.Context, arg ListBoardRevisionsParams) ([]ListBoardRevisionsRow, error)
 	ListBoardYUpdates(ctx context.Context, arg ListBoardYUpdatesParams) ([]ListBoardYUpdatesRow, error)
@@ -593,6 +580,7 @@ type Querier interface {
 	// rides in task_outputs.metadata (see #819's mapping); it is
 	// projected alongside the asset row.
 	ListTaskMediaAssets(ctx context.Context, arg ListTaskMediaAssetsParams) ([]ListTaskMediaAssetsRow, error)
+	// Payment reconciliation sweep (split from payments.sql).
 	ListUnsettledPaymentOrders(ctx context.Context) ([]PaymentOrder, error)
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
@@ -610,6 +598,8 @@ type Querier interface {
 	// (internal task ids resolved from the same page).
 	ListWorkspaceTaskOutputsByTaskIDs(ctx context.Context, taskIds []int64) ([]TaskOutput, error)
 	ListWorkspaceTasks(ctx context.Context, arg ListWorkspaceTasksParams) ([]Task, error)
+	// Admin-audit read path (ListExplicitlyLinkedWorkspaces); resolution never
+	// uses link rows (ADR-0038).
 	ListWorkspacesByBillingAccountID(ctx context.Context, arg ListWorkspacesByBillingAccountIDParams) ([]Workspace, error)
 	ListWorkspacesByOrganizationID(ctx context.Context, arg ListWorkspacesByOrganizationIDParams) ([]Workspace, error)
 	ListWorkspacesByUserID(ctx context.Context, arg ListWorkspacesByUserIDParams) ([]Workspace, error)
@@ -617,27 +607,13 @@ type Querier interface {
 	// Serialize financial authority changes and Workspace scope mutations on the
 	// stable account before reading roles or taking Workspace/invitation locks.
 	LockBillingAccount(ctx context.Context, internalID int64) (BillingAccount, error)
-	// Materialization durable jobs (#828 slice A, Phase 4 of #809).
-	//
+	// Workspace library materialization jobs (split from workspace_library.sql).
 	// Status words: the public API exposes pending/running/completed/failed
-	// while the durable CHECK stores pending/processing/completed/failed
-	// (chk_library_materializations_status). The store maps running <->
-	// processing at the boundary; SQL below uses the durable words.
-	// Terminal states (completed/failed) are immutable: transition
-	// statements guard on status IN ('pending','processing') so concurrent
-	// settlers converge on the winner; a guarded miss reads back the stored
-	// snapshot so idempotent replays converge instead of resurrecting jobs.
-	// Completion CHECK: completed needs media_asset_id + completed_at,
-	// failed needs completed_at. The result link resolves the caller's
-	// asset_... public id to media_assets.internal_id workspace-scoped
-	// (GetMediaAssetByPublicID in workspace_media.sql). error_code has no
-	// durable column: failures persist error_message only and reads report
-	// an empty code (follow-up migration if the taxonomy must persist).
-	// Rows carry no updated_at: reads report COALESCE(completed_at,
-	// created_at) as updated_at. No dedup key: one asset may back many
-	// jobs; request idempotency stays handler-side (library:materialize).
+	// while the durable CHECK stores pending/processing/completed/failed.
+	// Scope guard: scripts/sql-workspace-scope-check.sh enforces one workspace_id key per query.
 	LockLibraryMaterializationAsset(ctx context.Context, arg LockLibraryMaterializationAssetParams) error
-	// Permanent Organization closure. Row locks serialize closure with mutations;
+	// Organization closure guards (split from organizations.sql).
+	// Permanent Organization closure (#955). Row locks serialize closure with mutations;
 	// the unique closure audit prevents a second close.
 	LockOrganizationByPublicID(ctx context.Context, publicID string) (Organization, error)
 	// Service Model Pool catalog queries (#848, ADR-0012).

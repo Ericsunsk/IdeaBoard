@@ -35,32 +35,82 @@
               </DialogDescription>
             </div>
 
-            <!-- Workspace List Nav -->
+            <!-- Workspace List Nav: Personal + Organization groups, always expanded -->
             <nav
-              class="flex-1 overflow-y-auto space-y-1"
+              class="flex-1 overflow-y-auto space-y-5"
               :aria-label="t('workspace.switcher.listLabel')"
             >
-              <Button
-                v-for="item in workspaceItems"
-                :key="item.publicId"
-                type="button"
-                variant="ghost"
-                :class="accountNavTabClass(item.publicId === activeWorkspaceId)"
-                :aria-current="item.publicId === activeWorkspaceId ? 'page' : undefined"
-                :title="workspaceItemName(item)"
-                :data-workspace-nav="item.publicId"
-                @click="selectWorkspace(item)"
+              <section
+                aria-labelledby="workspace-settings-group-personal"
+                data-settings-group="personal"
               >
-                <span class="truncate">{{ workspaceItemName(item) }}</span>
-              </Button>
+                <p
+                  id="workspace-settings-group-personal"
+                  class="mb-2 px-2 text-admin-meta leading-5 font-semibold tracking-normal text-muted-foreground"
+                >
+                  {{ t('workspace.switcher.scopePersonalTitle') }}
+                </p>
+                <div class="space-y-1">
+                  <Button
+                    v-for="item in personalWorkspaces"
+                    :key="item.publicId"
+                    type="button"
+                    variant="ghost"
+                    :class="accountNavTabClass(isWorkspaceActive(item))"
+                    :aria-current="isWorkspaceActive(item) ? 'page' : undefined"
+                    :title="workspaceItemName(item)"
+                    :data-workspace-nav="item.publicId"
+                    @click="selectWorkspace(item)"
+                  >
+                    <span class="truncate">{{ workspaceItemName(item) }}</span>
+                  </Button>
+                  <p
+                    v-if="personalWorkspaces.length === 0"
+                    class="px-2 py-4 text-xs text-muted-foreground"
+                    aria-live="polite"
+                  >
+                    {{ t('workspace.switcher.empty') }}
+                  </p>
+                </div>
+              </section>
 
-              <p
-                v-if="workspaceItems.length === 0"
-                class="px-2 py-4 text-xs text-muted-foreground"
-                aria-live="polite"
+              <section
+                aria-labelledby="workspace-settings-group-organization"
+                data-settings-group="organization"
               >
-                {{ t('workspace.switcher.empty') }}
-              </p>
+                <p
+                  id="workspace-settings-group-organization"
+                  class="mb-2 px-2 text-admin-meta leading-5 font-semibold tracking-normal text-muted-foreground"
+                >
+                  {{ managedOrganization?.name ?? t('workspace.switcher.scopeOrganizationTitle') }}
+                </p>
+                <div class="space-y-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    :class="accountNavTabClass(isOrganizationSettingsSelected)"
+                    :aria-current="isOrganizationSettingsSelected ? 'page' : undefined"
+                    :title="t('workspace.switcher.settingsAction')"
+                    data-organization-settings="true"
+                    @click="selectOrganizationSettings"
+                  >
+                    <span class="truncate">{{ t('workspace.switcher.settingsAction') }}</span>
+                  </Button>
+                  <Button
+                    v-for="item in organizationWorkspaces"
+                    :key="item.publicId"
+                    type="button"
+                    variant="ghost"
+                    :class="accountNavTabClass(isWorkspaceActive(item))"
+                    :aria-current="isWorkspaceActive(item) ? 'page' : undefined"
+                    :title="workspaceItemName(item)"
+                    :data-workspace-nav="item.publicId"
+                    @click="selectWorkspace(item)"
+                  >
+                    <span class="truncate">{{ workspaceItemName(item) }}</span>
+                  </Button>
+                </div>
+              </section>
             </nav>
 
             <!-- Add Workspace Button at Bottom of Sidebar -->
@@ -78,7 +128,6 @@
             </div>
           </aside>
 
-          <!-- Right Content Pane (accountContentPaneClass: bg-muted/40) -->
           <main :class="accountContentPaneClass">
             <!-- Loading State -->
             <div
@@ -104,16 +153,162 @@
               </Button>
             </div>
 
-            <!-- Active Workspace Detail -->
-            <div v-else-if="activeWorkspace || organizationPanelProps" class="flex flex-col gap-6">
-              <!-- Organization management (issue #951): scope-level surface,
-                shown as soon as the caller holds an organization. -->
-              <component
-                :is="props.organizationPanel!.component"
-                v-if="organizationPanelProps"
-                :key="`org-${managedOrganization!.id}`"
-                v-bind="organizationPanelProps"
-              />
+            <!-- Organization settings pane: mutually exclusive with workspace rows -->
+            <div v-else-if="isOrganizationSettingsSelected" class="flex flex-col gap-6">
+              <template v-if="!managedOrganization">
+                <header class="flex flex-col gap-2">
+                  <h2
+                    class="m-0 text-admin-modal-title leading-tight font-bold text-foreground truncate"
+                  >
+                    {{ t('workspace.switcher.settingsAction') }}
+                  </h2>
+                  <p class="m-0 mt-1 text-admin-meta text-muted-foreground">
+                    {{ t('workspace.switcher.organization.setupNote') }}
+                  </p>
+                </header>
+                <section
+                  v-if="props.onCreateOrganization"
+                  :class="[accountCardPanelClass, 'flex flex-col gap-2']"
+                  :aria-label="t('workspace.switcher.organization.new')"
+                >
+                  <label
+                    for="workspace-settings-organization-name"
+                    class="text-admin-content font-medium text-foreground"
+                  >
+                    {{ t('workspace.switcher.organization.name') }}
+                  </label>
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The create input carries its accessible name via aria-label -->
+                    <Input
+                      id="workspace-settings-organization-name"
+                      v-model="settingsOrganizationName"
+                      size="sm"
+                      class="h-9 min-w-0 flex-1 text-admin-content bg-background"
+                      :invalid="settingsOrganizationError !== null"
+                      :disabled="isSettingsCreatingOrganization"
+                      :aria-label="t('workspace.switcher.organization.name')"
+                      :maxlength="nameFieldMaxLength"
+                      @keydown.enter="createOrganizationFromSettings"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      class="h-9 shrink-0"
+                      :is-loading="isSettingsCreatingOrganization"
+                      :is-disabled="isSettingsCreatingOrganization"
+                      @click="createOrganizationFromSettings"
+                    >
+                      {{ t('workspace.switcher.organization.confirm') }}
+                    </Button>
+                  </div>
+                  <p
+                    v-if="settingsOrganizationError"
+                    class="m-0 text-admin-meta leading-normal text-destructive"
+                    role="alert"
+                  >
+                    {{ settingsOrganizationError }}
+                  </p>
+                </section>
+              </template>
+
+              <template v-else>
+                <header class="flex flex-col gap-2">
+                  <div v-if="isRenamingOrganization" class="flex flex-col gap-2">
+                    <div class="flex items-center gap-2">
+                      <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The rename input carries its accessible name via aria-label -->
+                      <Input
+                        ref="organizationRenameInputRef"
+                        v-model="organizationDraftName"
+                        size="sm"
+                        class="h-9 max-w-xs text-admin-content bg-background"
+                        :invalid="organizationRenameError !== null"
+                        :disabled="isRenamingOrganizationBusy"
+                        :aria-label="
+                          t('workspace.switcher.renameAriaLabel', {
+                            name: managedOrganization.name,
+                          })
+                        "
+                        :maxlength="nameFieldMaxLength"
+                        @keydown.enter="commitOrganizationRename"
+                        @keydown.esc.stop.prevent="cancelOrganizationRename"
+                        @keydown.escape.stop.prevent="cancelOrganizationRename"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        class="h-9 shrink-0"
+                        :is-loading="isRenamingOrganizationBusy"
+                        :is-disabled="isRenamingOrganizationBusy"
+                        @click="commitOrganizationRename"
+                      >
+                        {{ t('common.actions.save') }}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        class="h-9 shrink-0"
+                        :is-disabled="isRenamingOrganizationBusy"
+                        @click="cancelOrganizationRename"
+                      >
+                        {{ t('common.actions.cancel') }}
+                      </Button>
+                    </div>
+                    <p
+                      v-if="organizationRenameError"
+                      class="m-0 text-admin-meta leading-normal text-destructive"
+                      role="alert"
+                    >
+                      {{ organizationRenameError }}
+                    </p>
+                  </div>
+                  <div v-else class="flex items-center justify-between">
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2">
+                        <h2
+                          class="m-0 text-admin-modal-title leading-tight font-bold text-foreground truncate"
+                        >
+                          {{ managedOrganization.name }}
+                        </h2>
+                        <Button
+                          v-if="canRenameOrganization"
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          class="size-7 text-muted-foreground hover:text-foreground"
+                          :title="
+                            t('workspace.switcher.renameAriaLabel', {
+                              name: managedOrganization.name,
+                            })
+                          "
+                          :aria-label="
+                            t('workspace.switcher.renameAriaLabel', {
+                              name: managedOrganization.name,
+                            })
+                          "
+                          @click="startOrganizationRename"
+                        >
+                          <EditPencil class="size-3.5" aria-hidden="true" />
+                        </Button>
+                      </div>
+                      <p class="m-0 mt-1 text-admin-meta text-muted-foreground font-mono">
+                        ID: {{ managedOrganization.id }}
+                      </p>
+                    </div>
+                  </div>
+                </header>
+                <component
+                  :is="props.organizationPanel!.component"
+                  v-if="organizationPanelProps"
+                  :key="`org-${managedOrganization.id}`"
+                  v-bind="organizationPanelProps"
+                />
+              </template>
+            </div>
+
+            <!-- Active Workspace Detail (per-workspace pane; the scope-level
+              organization panel lives in the Settings pane only) -->
+            <div v-else-if="activeWorkspace" class="flex flex-col gap-6">
               <template v-if="activeWorkspace">
                 <!-- Header Section -->
                 <header class="flex flex-col gap-2">
@@ -336,12 +531,14 @@ import type {
 } from './userAccountMenu.types'
 import WorkspaceCreateDialog from './WorkspaceCreateDialog.vue'
 import { useBillingAccountContext } from '../../session/billing-account/useBillingAccountContext'
+import { useWorkspaceCreation } from '../../session/useWorkspaceCreation'
 import { isDefaultWorkspaceItem } from './workspaceMenu'
 import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
 import WorkspaceLimitsSection from './WorkspaceLimitsSection.vue'
 import BillingTransferSection from './BillingTransferSection.vue'
 import WorkspaceMemberSection from './WorkspaceMemberSection.vue'
 import {
+  accountCardPanelClass,
   accountCloseButtonClass,
   accountContentPaneClass,
   accountDialogContentClass,
@@ -362,12 +559,14 @@ const props = withDefaults(
     onCreateOrganization?:
       | ((name: string, idempotencyKey: string) => Promise<UserAccountMenuOrganizationItem>)
       | undefined
-    // Organization management panel (issue #951, opaque component owned by
-    // the workspace shell). Rendered once the caller holds an organization.
+    // Opaque organization panel owned by the workspace shell.
     organizationPanel?: UserAccountMenuOrganizationPanel | null | undefined
     onRetry: () => void
     onCreate: (input: UserAccountMenuWorkspaceCreateInput) => Promise<UserAccountMenuWorkspaceItem>
     onRename: (workspaceId: string, name: string) => Promise<UserAccountMenuWorkspaceItem>
+    onRenameOrganization?:
+      | ((organizationId: string, name: string) => Promise<UserAccountMenuOrganizationItem>)
+      | undefined
     onDelete: (workspaceId: string) => Promise<void>
   }>(),
   {
@@ -378,6 +577,7 @@ const props = withDefaults(
     currentUserId: null,
     onLoadOrganizations: undefined,
     onCreateOrganization: undefined,
+    onRenameOrganization: undefined,
     organizationPanel: null,
   },
 )
@@ -390,6 +590,21 @@ const { t } = useI18n()
 const toast = useAppToast()
 
 const workspaceItems = computed(() => props.items)
+
+// Left nav groups: Personal rows carry a null organizationId.
+const personalWorkspaces = computed(() =>
+  workspaceItems.value.filter((item) => item.organizationId == null),
+)
+const organizationWorkspaces = computed(() =>
+  workspaceItems.value.filter((item) => item.organizationId != null),
+)
+
+// Settings selection stays independent from the workspace selection.
+const isOrganizationSettingsSelected = ref(false)
+
+function isWorkspaceActive(item: UserAccountMenuWorkspaceItem): boolean {
+  return !isOrganizationSettingsSelected.value && item.publicId === activeWorkspaceId.value
+}
 
 const activeWorkspaceId = ref<string>(props.selectedId ?? workspaceItems.value[0]?.publicId ?? '')
 
@@ -419,15 +634,11 @@ const activeWorkspace = computed(() => {
 const billingAccount = useBillingAccountContext({
   workspaceId: activeWorkspaceId,
   identity: () => props.currentUserId,
-  isEnabled: () => props.isOpen && activeWorkspaceId.value !== '',
+  isEnabled: () =>
+    props.isOpen && !isOrganizationSettingsSelected.value && activeWorkspaceId.value !== '',
 })
 
-// Organization management surface (issue #951): scope-level, resolved from
-// the caller's single organization. The panel component and its transport
-// callbacks arrive opaquely through props (workspace-shell owned); this
-// dialog only resolves which organization to show and the caller's role in
-// it. Creating an organization in the create flow exposes this surface on
-// the next load below.
+// Scope-level organization resolved from the caller's single organization.
 const managedOrganization = ref<{
   id: string
   name: string
@@ -491,8 +702,6 @@ const organizationPanelProps = computed(() => {
     onUpdateMember: panel.onUpdateMember,
     onRemoveMember: panel.onRemoveMember,
     ...(leave === undefined ? {} : { onLeave: leave }),
-    // Closure flips local status without reopening the dialog; the next
-    // load below re-reads the server truth.
     ...(panel.onCloseOrganization === undefined
       ? {}
       : {
@@ -533,6 +742,10 @@ function workspaceItemName(item: UserAccountMenuWorkspaceItem): string {
 }
 
 function selectWorkspace(item: UserAccountMenuWorkspaceItem) {
+  isOrganizationSettingsSelected.value = false
+  if (isRenamingOrganization.value) {
+    cancelOrganizationRename()
+  }
   if (editingId.value && editingId.value !== item.publicId) {
     cancelRename()
   }
@@ -546,8 +759,17 @@ function selectWorkspace(item: UserAccountMenuWorkspaceItem) {
   activeWorkspaceId.value = item.publicId
 }
 
-// Native maxlength sits one char past the contract ceiling so over-limit
-// input stays typable and surfaces the inline nameTooLong copy via validateName.
+function selectOrganizationSettings() {
+  if (editingId.value) {
+    cancelRename()
+  }
+  if (pendingDeleteItem.value && !isDeleting.value) {
+    closeDeleteDialog()
+  }
+  isOrganizationSettingsSelected.value = true
+}
+
+// Maxlength sits one char past the ceiling so over-limit input stays typable.
 const nameFieldMaxLength = computed(() => props.nameMaxLength + 1)
 
 const isCreating = ref(false)
@@ -607,6 +829,7 @@ function openCreateDialog(): void {
 }
 
 function handleWorkspaceCreated(created: UserAccountMenuWorkspaceItem): void {
+  isOrganizationSettingsSelected.value = false
   activeWorkspaceId.value = created.publicId
   pendingCreateFocusId.value = created.publicId
   focusNewWorkspaceRow(created.publicId)
@@ -634,11 +857,19 @@ watch(workspaceItems, (items) => {
   }
 })
 
-// An organization created in the create flow exposes its management surface
-// without reopening the dialog.
+// Reload the management surface after the create dialog closes.
 watch(isCreateDialogOpen, (isNowOpen) => {
   if (!isNowOpen && props.isOpen) void loadManagedOrganization()
 })
+
+function focusRenameInput(host: unknown): void {
+  const holder = host as { $el?: unknown } | null
+  const target = (holder?.$el ?? holder) as HTMLElement | null
+  if (target instanceof HTMLInputElement) {
+    target.focus()
+    target.select()
+  }
+}
 
 function startRename(item: UserAccountMenuWorkspaceItem) {
   if (isDefaultWorkspaceItem(item)) return
@@ -647,12 +878,7 @@ function startRename(item: UserAccountMenuWorkspaceItem) {
   draftName.value = item.name
   renameError.value = null
   void nextTick(() => {
-    const host = renameInputRef.value as unknown as { $el?: unknown } | null
-    const input = (host?.$el ?? host) as HTMLElement | null
-    if (input instanceof HTMLInputElement) {
-      input.focus()
-      input.select()
-    }
+    focusRenameInput(renameInputRef.value)
   })
 }
 
@@ -695,6 +921,106 @@ const isDeleting = ref(false)
 const deleteError = ref<string | null>(null)
 const isDeleteDialogVisible = computed(() => pendingDeleteItem.value !== null)
 const pendingDeleteName = computed(() => pendingDeleteItem.value?.name ?? '')
+
+// Organization rename: inline error only; the name converges after PATCH succeeds.
+const isRenamingOrganization = ref(false)
+const organizationDraftName = ref('')
+const isRenamingOrganizationBusy = ref(false)
+const organizationRenameError = ref<string | null>(null)
+const organizationRenameInputRef = useTemplateRef('organizationRenameInputRef')
+
+const canRenameOrganization = computed(
+  () =>
+    props.onRenameOrganization != null &&
+    (organizationPanelProps.value?.canManage ?? false) &&
+    (managedOrganization.value?.status ?? 'active') !== 'closed',
+)
+
+function validateOrganizationName(raw: string): string | null {
+  const next = raw.trim()
+  if (!next || next.length > props.nameMaxLength) {
+    return t('workspace.switcher.organization.invalidName', { max: props.nameMaxLength })
+  }
+  return null
+}
+
+function startOrganizationRename(): void {
+  const org = managedOrganization.value
+  if (!org || !canRenameOrganization.value) return
+  isRenamingOrganization.value = true
+  organizationDraftName.value = org.name
+  organizationRenameError.value = null
+  void nextTick(() => {
+    focusRenameInput(organizationRenameInputRef.value)
+  })
+}
+
+function cancelOrganizationRename(): void {
+  isRenamingOrganization.value = false
+  organizationRenameError.value = null
+}
+
+async function commitOrganizationRename(): Promise<void> {
+  const org = managedOrganization.value
+  if (!org || !isRenamingOrganization.value || isRenamingOrganizationBusy.value) return
+  const next = organizationDraftName.value.trim()
+  if (next === org.name) {
+    cancelOrganizationRename()
+    return
+  }
+  const violation = validateOrganizationName(organizationDraftName.value)
+  if (violation) {
+    organizationRenameError.value = violation
+    return
+  }
+  if (!props.onRenameOrganization) {
+    cancelOrganizationRename()
+    return
+  }
+  isRenamingOrganizationBusy.value = true
+  organizationRenameError.value = null
+  try {
+    const updated = await props.onRenameOrganization(org.id, next)
+    managedOrganization.value = {
+      ...org,
+      name: updated.name,
+      status: updated.status === 'closed' ? 'closed' : 'active',
+      ...(updated.closedAt === undefined ? {} : { closedAt: updated.closedAt }),
+    }
+    isRenamingOrganization.value = false
+  } catch {
+    organizationRenameError.value = t('workspace.switcher.organization.renameFailed')
+  } finally {
+    isRenamingOrganizationBusy.value = false
+  }
+}
+
+// Organization creation inside the Settings pane reuses the shared creation composable.
+const settingsCreation = useWorkspaceCreation({
+  workspaces: workspaceItems,
+  activeWorkspaceId,
+  isCreating,
+  nameMaxLength: () => props.nameMaxLength,
+  onLoadOrganizations: props.onLoadOrganizations,
+  onCreateOrganization: props.onCreateOrganization,
+})
+const settingsOrganizationName = settingsCreation.organizationName
+const settingsOrganizationError = computed(() => settingsCreation.organizationError.value)
+const isSettingsCreatingOrganization = computed(() => settingsCreation.isCreatingOrganization.value)
+
+async function createOrganizationFromSettings(): Promise<void> {
+  await settingsCreation.createOrganization()
+  if (settingsCreation.createOrganizationId.value == null) return
+  props.onRetry()
+  await loadManagedOrganization()
+  const firstOrgWorkspace = organizationWorkspaces.value[0]
+  if (firstOrgWorkspace) {
+    isOrganizationSettingsSelected.value = false
+    activeWorkspaceId.value = firstOrgWorkspace.publicId
+    pendingCreateFocusId.value = firstOrgWorkspace.publicId
+    focusNewWorkspaceRow(firstOrgWorkspace.publicId)
+  }
+}
 
 function requestDelete(item: UserAccountMenuWorkspaceItem) {
   if (isDefaultWorkspaceItem(item) || isDeleting.value) return

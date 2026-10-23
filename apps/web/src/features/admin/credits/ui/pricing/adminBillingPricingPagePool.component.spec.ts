@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
-import { renderWithUser, screen, waitFor, within } from '../../../../../test/render'
+import { http, HttpResponse, useMswHandlers } from '@/test/msw'
+import { renderWithUser, screen, waitFor, within } from '@/test/render'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
 import {
   createBillingCatalogHandlers,

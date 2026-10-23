@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { defineComponent, nextTick, ref } from 'vue'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import SwitchRow from './SwitchRow.vue'
 
 describe('SwitchRow', () => {
   it('locks the status slot and pill to the configured min width without a switch', () => {
     renderWithUser(SwitchRow, {
-      props: { pill: 'Active', pillVariant: 'success', statusMinWidth: '84px' },
+      props: { pill: 'Active', pillTone: 'success', statusMinWidth: '84px' },
     })
 
     const slot = screen.getByTestId('switch-row-status-slot')
@@ -30,9 +30,9 @@ describe('SwitchRow', () => {
     expect(placeholder.className).toContain('h-6')
   })
 
-  it('keeps pulse off by default so variant flips never mount extra DOM', () => {
+  it('keeps pulse off by default so tone flips never mount extra DOM', () => {
     const { container } = renderWithUser(SwitchRow, {
-      props: { pill: 'Active', pillVariant: 'success', statusMinWidth: '84px' },
+      props: { pill: 'Active', pillTone: 'success', statusMinWidth: '84px' },
     })
 
     expect(container.querySelector('.status-badge-pulse')).toBeNull()
@@ -40,7 +40,7 @@ describe('SwitchRow', () => {
 
   it('only adds the pulse layer when pulse is explicitly enabled', () => {
     const { container } = renderWithUser(SwitchRow, {
-      props: { pill: 'Active', pillVariant: 'success', pulse: true, statusMinWidth: '84px' },
+      props: { pill: 'Active', pillTone: 'success', pulse: true, statusMinWidth: '84px' },
     })
 
     const pulse = container.querySelector('.status-badge-pulse')
@@ -67,14 +67,14 @@ describe('SwitchRow', () => {
     expect(emitted()['update:modelValue']).toEqual([[true]])
   })
 
-  it('keeps the same switch node across pill label and variant changes', async () => {
+  it('keeps the same switch node across pill label and tone changes', async () => {
     const pill = ref('Active')
-    const variant = ref<'success' | 'neutral'>('success')
+    const tone = ref<'success' | 'neutral'>('success')
     const on = ref(false)
     const Wrapper = defineComponent({
       components: { SwitchRow },
-      setup: () => ({ pill, variant, on }),
-      template: `<SwitchRow :pill="pill" :pill-variant="variant" status-min-width="68px" v-model="on" :switch-attrs="{ 'aria-label': 'row enabled' }" />`,
+      setup: () => ({ pill, tone, on }),
+      template: `<SwitchRow :pill="pill" :pill-tone="tone" status-min-width="68px" v-model="on" :switch-attrs="{ 'aria-label': 'row enabled' }" />`,
     })
     renderWithUser(Wrapper)
 
@@ -85,7 +85,7 @@ describe('SwitchRow', () => {
 
     // 状态翻转只换色：同一 DOM 节点保留 checked，不绑状态 key。
     pill.value = 'Disabled'
-    variant.value = 'neutral'
+    tone.value = 'neutral'
     await nextTick()
 
     expect(screen.getByText('Disabled')).toBeVisible()

@@ -136,6 +136,13 @@ func checkReusableWorkflows(root string) {
 	requireEqual(semanticCheck["working-directory"], "apps/api", "Migration semantics must use the API project root")
 	requireContains(stringValue(semanticCheck["run"]), `go run ./cmd/schemarelease --base-sha "${ATLAS_BASE_SHA:-HEAD}"`, "Migration gate must compare migration replay and snapshot semantics")
 	requireStep(migrationGate, "Test snapshot fixtures and NATS integration")
+	staticContracts := object(object(api, "jobs"), "static-contracts")
+	sqlScope := requireStep(staticContracts, "Check workspace SQL scope predicates")
+	requireEqual(stringValue(sqlScope["run"]), "bash scripts/sql-workspace-scope-check.sh", "API contracts must run the workspace scope guard")
+	openapiPattern := requireStep(staticContracts, "Check OpenAPI scalar pattern consistency")
+	requireEqual(stringValue(openapiPattern["run"]), "bash scripts/openapi-pattern-check.sh", "API contracts must run the OpenAPI pattern guard")
+	backendCopy := requireStep(staticContracts, "Check backend copy vocabulary")
+	requireEqual(stringValue(backendCopy["run"]), "bash scripts/check-backend-copy.sh", "API contracts must run the backend copy guard")
 
 	auth := loadWorkflow(root, "auth.yml")
 	requireEqual(object(auth, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "Auth workflow must not upload Docker build records")

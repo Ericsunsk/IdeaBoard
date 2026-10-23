@@ -7,7 +7,7 @@
     :class="props.class"
   >
     <template #header-actions>
-      <AdminStatusPill v-if="!props.plain && statusLabel" :label="statusLabel" variant="neutral" />
+      <StatusBadge v-if="!props.plain && statusLabel" :label="statusLabel" tone="neutral" />
     </template>
     <template #default>
       <div class="flex flex-col gap-5">
@@ -56,7 +56,7 @@
 <script setup lang="ts">
 import { computed, type HTMLAttributes } from 'vue'
 import { AdminEditorActions } from '../../../../shared/index'
-import { AdminStatusPill } from '../../../../shared/index'
+import { StatusBadge } from '../../../../shared/index'
 import { AdminSpinner } from '../../../../shared/index'
 import { AdminTextarea } from '../../../../shared/index'
 import { AdminFormField } from '../../../../shared/index'

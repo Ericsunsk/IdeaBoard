@@ -1,131 +1,125 @@
 <template>
   <!-- 创建新文件夹弹窗 -->
-  <DialogRoot :open="createOpen" @update:open="emit('update:createOpen', $event)">
-    <DialogPortal>
-      <DialogOverlay />
-      <DialogContent
-        class="bg-popover"
-        :style="{ width: 'min(420px, calc(100vw - 32px))' }"
-        :aria-label="t('library.dialogs.newFolderTitle')"
-        @pointer-down-outside="blockDialogOutsideDismiss"
+  <DialogShell
+    :is-open="createOpen"
+    :title="t('library.dialogs.newFolderTitle')"
+    :description="t('library.dialogs.folderNameLabel')"
+    :size="sharePreset.size"
+    :is-busy="createSaving"
+    :has-close="sharePreset.hasClose"
+    :close-label="t('library.dialogs.cancel')"
+    content-class="bg-popover w-[min(420px,calc(100vw-32px))]"
+    @update:open="emit('update:createOpen', $event)"
+  >
+    <div class="min-h-0 overflow-y-auto">
+      <form
+        class="p-6"
+        @submit.prevent="submitCreate"
+        @focusin="emit('focus-scope-change', true)"
+        @focusout="emit('focus-scope-change', false)"
       >
-        <div class="min-h-0 overflow-y-auto">
-          <DialogDescription class="sr-only">
-            {{ t('library.dialogs.newFolderTitle') }}
-          </DialogDescription>
-          <form
-            class="p-6"
-            @submit.prevent="submitCreate"
-            @focusin="emit('focus-scope-change', true)"
-            @focusout="emit('focus-scope-change', false)"
+        <h3 class="m-0 text-lg font-semibold">{{ t('library.dialogs.newFolderTitle') }}</h3>
+        <IbFormField
+          v-slot="{ ariaInvalid, describedbyId, fieldId, invalid }"
+          :label="t('library.dialogs.folderNameLabel')"
+          :error="createError"
+          field-id="island-folder-name"
+          field-class="mt-5"
+          label-class="block text-sm font-semibold"
+        >
+          <Input
+            :id="fieldId"
+            v-model="createDraft"
+            type="text"
+            maxlength="100"
+            autofocus
+            :class="['mt-2', ibFormInputClass, invalid ? ibFormInputErrorClass : '']"
+            :invalid="invalid"
+            :aria-invalid="ariaInvalid"
+            :aria-describedby="describedbyId"
+            :placeholder="t('library.dialogs.folderNamePlaceholder')"
+          />
+        </IbFormField>
+        <div class="mt-6 flex justify-end gap-2">
+          <Button
+            type="button"
+            class="rounded-pill bg-transparent px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted cursor-pointer"
+            @click="emit('update:createOpen', false)"
           >
-            <h3 class="m-0 text-lg font-semibold">{{ t('library.dialogs.newFolderTitle') }}</h3>
-            <IbFormField
-              v-slot="{ ariaInvalid, describedbyId, fieldId, invalid }"
-              :label="t('library.dialogs.folderNameLabel')"
-              :error="createError"
-              field-id="island-folder-name"
-              field-class="mt-5"
-              label-class="block text-sm font-semibold"
-            >
-              <Input
-                :id="fieldId"
-                v-model="createDraft"
-                type="text"
-                maxlength="100"
-                autofocus
-                :class="['mt-2', ibFormInputClass, invalid ? ibFormInputErrorClass : '']"
-                :invalid="invalid"
-                :aria-invalid="ariaInvalid"
-                :aria-describedby="describedbyId"
-                :placeholder="t('library.dialogs.folderNamePlaceholder')"
-              />
-            </IbFormField>
-            <div class="mt-6 flex justify-end gap-2">
-              <Button
-                type="button"
-                class="rounded-pill bg-transparent px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted cursor-pointer"
-                @click="emit('update:createOpen', false)"
-              >
-                {{ t('library.dialogs.cancel') }}
-              </Button>
-              <Button
-                type="submit"
-                :is-disabled="createSaving || !createDraft.trim()"
-                class="rounded-pill bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
-              >
-                {{ t('library.dialogs.create') }}
-              </Button>
-            </div>
-          </form>
+            {{ t('library.dialogs.cancel') }}
+          </Button>
+          <Button
+            type="submit"
+            :is-disabled="createSaving || !createDraft.trim()"
+            class="rounded-pill bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
+          >
+            {{ t('library.dialogs.create') }}
+          </Button>
         </div>
-      </DialogContent>
-    </DialogPortal>
-  </DialogRoot>
+      </form>
+    </div>
+  </DialogShell>
 
   <!-- 重命名文件夹弹窗 -->
-  <DialogRoot :open="renameOpen" @update:open="emit('update:renameOpen', $event)">
-    <DialogPortal>
-      <DialogOverlay />
-      <DialogContent
-        class="bg-popover"
-        :style="{ width: 'min(420px, calc(100vw - 32px))' }"
-        :aria-label="t('library.dialogs.renameFolderTitle')"
-        @pointer-down-outside="blockDialogOutsideDismiss"
+  <DialogShell
+    :is-open="renameOpen"
+    :title="t('library.dialogs.renameFolderTitle')"
+    :description="t('library.dialogs.folderNameLabel')"
+    :size="sharePreset.size"
+    :is-busy="renameSaving"
+    :has-close="sharePreset.hasClose"
+    :close-label="t('library.dialogs.cancel')"
+    content-class="bg-popover w-[min(420px,calc(100vw-32px))]"
+    @update:open="emit('update:renameOpen', $event)"
+  >
+    <div class="min-h-0 overflow-y-auto">
+      <form
+        class="p-6"
+        @submit.prevent="submitRename"
+        @focusin="emit('focus-scope-change', true)"
+        @focusout="emit('focus-scope-change', false)"
       >
-        <div class="min-h-0 overflow-y-auto">
-          <DialogDescription class="sr-only">
-            {{ t('library.dialogs.renameFolderTitle') }}
-          </DialogDescription>
-          <form
-            class="p-6"
-            @submit.prevent="submitRename"
-            @focusin="emit('focus-scope-change', true)"
-            @focusout="emit('focus-scope-change', false)"
+        <h3 class="m-0 text-lg font-semibold">{{ t('library.dialogs.renameFolderTitle') }}</h3>
+        <IbFormField
+          v-slot="{ ariaInvalid, describedbyId, fieldId, invalid }"
+          :label="t('library.dialogs.folderNameLabel')"
+          :error="renameError"
+          field-id="island-rename-folder-name"
+          field-class="mt-5"
+          label-class="block text-sm font-semibold"
+        >
+          <Input
+            :id="fieldId"
+            v-model="renameDraft"
+            type="text"
+            maxlength="100"
+            autofocus
+            :class="['mt-2', ibFormInputClass, invalid ? ibFormInputErrorClass : '']"
+            :invalid="invalid"
+            :aria-invalid="ariaInvalid"
+            :aria-describedby="describedbyId"
+            :placeholder="t('library.dialogs.folderNamePlaceholder')"
+          />
+        </IbFormField>
+        <div class="mt-6 flex justify-end gap-2">
+          <Button
+            type="button"
+            class="rounded-pill bg-transparent px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted cursor-pointer"
+            @click="emit('update:renameOpen', false)"
           >
-            <h3 class="m-0 text-lg font-semibold">{{ t('library.dialogs.renameFolderTitle') }}</h3>
-            <IbFormField
-              v-slot="{ ariaInvalid, describedbyId, fieldId, invalid }"
-              :label="t('library.dialogs.folderNameLabel')"
-              :error="renameError"
-              field-id="island-rename-folder-name"
-              field-class="mt-5"
-              label-class="block text-sm font-semibold"
-            >
-              <Input
-                :id="fieldId"
-                v-model="renameDraft"
-                type="text"
-                maxlength="100"
-                autofocus
-                :class="['mt-2', ibFormInputClass, invalid ? ibFormInputErrorClass : '']"
-                :invalid="invalid"
-                :aria-invalid="ariaInvalid"
-                :aria-describedby="describedbyId"
-                :placeholder="t('library.dialogs.folderNamePlaceholder')"
-              />
-            </IbFormField>
-            <div class="mt-6 flex justify-end gap-2">
-              <Button
-                type="button"
-                class="rounded-pill bg-transparent px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted cursor-pointer"
-                @click="emit('update:renameOpen', false)"
-              >
-                {{ t('library.dialogs.cancel') }}
-              </Button>
-              <Button
-                type="submit"
-                :is-disabled="renameSaving || !renameDraft.trim()"
-                class="rounded-pill bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
-              >
-                {{ t('library.dialogs.save') }}
-              </Button>
-            </div>
-          </form>
+            {{ t('library.dialogs.cancel') }}
+          </Button>
+          <Button
+            type="submit"
+            :is-disabled="renameSaving || !renameDraft.trim()"
+            class="rounded-pill bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
+          >
+            {{ t('library.dialogs.save') }}
+          </Button>
         </div>
-      </DialogContent>
-    </DialogPortal>
-  </DialogRoot>
+      </form>
+    </div>
+  </DialogShell>
 </template>
 
 <script setup lang="ts">
@@ -133,13 +127,8 @@ import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogRoot,
-} from '@/components/ui/dialog'
+import DialogShell from '../../../core/components/DialogShell.vue'
+import { dialogShellPresets } from '../../../core/components/dialogShell'
 import IbFormField from '../../../core/components/IbFormField.vue'
 import { ibFormInputClass, ibFormInputErrorClass } from '../../../theme/formControls'
 import { userFacingErrorCopy } from '../../../core/errors/errorCatalog'
@@ -159,10 +148,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-
-function blockDialogOutsideDismiss(event: Event) {
-  event.preventDefault()
-}
+const sharePreset = dialogShellPresets.share
 
 const createDraft = ref('')
 const createError = ref('')

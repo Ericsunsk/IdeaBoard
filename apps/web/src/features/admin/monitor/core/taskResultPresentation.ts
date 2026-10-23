@@ -1,12 +1,12 @@
-import { calcDurationSeconds, formatDurationSeconds } from '../../../../core/utils/dateTime'
+import { calcDurationSeconds, formatDurationSeconds } from '@/core/utils/dateTime'
 import {
   sanitizeApiErrorMessage,
   sanitizeTaskErrorMessage,
-} from '../../../../core/utils/errorMessages'
-import { i18n } from '../../../../core/i18n'
+} from '@/core/utils/errorMessages'
+import { i18n } from '@/core/i18n'
 import { adminTaskStatuses } from './status'
 import { getSafeTaskResultImageUrl, getSafeTaskResultImageUrls } from './taskResultImages'
-import { isRecord } from '../../../../core/utils/guards'
+import { isRecord } from '@/core/utils/guards'
 import type { AdminMonitorDetailModel, AdminMonitorListItemModel } from '../resource'
 
 const RESULT_MAX_STRING_LENGTH = 300

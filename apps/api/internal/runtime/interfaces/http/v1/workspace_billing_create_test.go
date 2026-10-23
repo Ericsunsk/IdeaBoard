@@ -110,10 +110,6 @@ func (f *stubBillingAccounts) UpdateBillingAccountMemberRole(_ context.Context, 
 	return nil, tenancy.ErrBillingForbidden
 }
 
-func (f *stubBillingAccounts) TransferBillingAccountOwnership(_ context.Context, _, _, _ int64) error {
-	return tenancy.ErrBillingForbidden
-}
-
 func (f *stubBillingAccounts) InitiateBillingTransferInvite(_ context.Context, _, _, _ int64, _ string) (*tenancy.BillingTransferInvite, error) {
 	return nil, tenancy.ErrBillingStoreNotConfigured
 }

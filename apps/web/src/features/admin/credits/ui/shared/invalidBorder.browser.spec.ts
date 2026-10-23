@@ -13,9 +13,9 @@ import '@testing-library/jest-dom/vitest'
 
 import { page, userEvent as browserUser } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { renderWithUser } from '../../../../../test/render'
+import { renderWithUser } from '@/test/render'
 import { AdminInput } from '../../../shared'
-import '../../../../../app/style.css'
+import '@/app/style.css'
 
 function styleOf(element: Element): CSSStyleDeclaration {
   return window.getComputedStyle(element)

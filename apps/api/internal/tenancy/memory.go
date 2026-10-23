@@ -458,7 +458,7 @@ func (s *InMemoryStore) orgCountForUserLocked(userID int64) int {
 		if _, ok := members[userID]; !ok {
 			continue
 		}
-		if org, ok := s.organizations[publicID]; !ok || org.ArchivedAt != nil || org.IsClosed() {
+		if org, ok := s.organizations[publicID]; !ok || org.IsClosed() {
 			continue
 		}
 		count++
@@ -519,7 +519,7 @@ func (s *InMemoryStore) ListOrganizationsForUser(ctx context.Context, userID int
 			continue
 		}
 		org, ok := s.organizations[publicID]
-		if !ok || org.ArchivedAt != nil || org.IsClosed() {
+		if !ok || org.IsClosed() {
 			continue
 		}
 		out = append(out, copyOrganization(org))
@@ -540,7 +540,7 @@ func (s *InMemoryStore) UpdateOrganization(ctx context.Context, publicID, name s
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	org, ok := s.organizations[publicID]
-	if !ok || org.ArchivedAt != nil {
+	if !ok {
 		return nil, ErrNotFound
 	}
 	if org.IsClosed() {

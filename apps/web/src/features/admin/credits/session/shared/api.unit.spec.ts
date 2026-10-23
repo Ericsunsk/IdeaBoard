@@ -33,7 +33,7 @@ vi.mock(
   () => billingMocks,
 )
 
-import type { ControlWalletRestrictionResult } from '../../../../../api/generated-query/control/model/controlWalletRestrictionResult'
+import type { ControlWalletRestrictionResult } from '@/api/generated-query/control/model/controlWalletRestrictionResult'
 import { adminCreditsBillingApi } from './api'
 
 describe('credits billing API adapter', () => {

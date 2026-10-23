@@ -4,7 +4,7 @@ import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import { boardOperationIdempotencyKey } from '../../../../api/idempotencyKey'
 import { getBoardScope, isBoardScopeCurrent } from '../catalog/scope'
 import { boardQueryKeys } from '../sync/boardQueryKeys'
-import { fetchWorkspaceMembers } from '../../../workspace'
+import { fetchWorkspaceMembers as defaultFetchWorkspaceMembers } from '../../../workspace'
 import {
   fetchBoardAccessFact,
   fetchWorkspaceBoardMeta,
@@ -50,14 +50,14 @@ export type ShareActionResult =
 export type ShareTransport = {
   fetchMeta: typeof fetchWorkspaceBoardMeta
   fetchAccess: typeof fetchBoardAccessFact
-  fetchRoster: typeof fetchWorkspaceMembers
+  fetchRoster: typeof defaultFetchWorkspaceMembers
   replaceAccess: typeof replaceBoardSharing
 }
 
 export const shareTransport: ShareTransport = {
   fetchMeta: fetchWorkspaceBoardMeta,
   fetchAccess: fetchBoardAccessFact,
-  fetchRoster: fetchWorkspaceMembers,
+  fetchRoster: defaultFetchWorkspaceMembers,
   replaceAccess: replaceBoardSharing,
 }
 

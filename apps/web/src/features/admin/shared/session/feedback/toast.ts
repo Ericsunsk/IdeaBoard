@@ -1,8 +1,8 @@
-import { useAppToast } from '../../../../../core/composables/useAppToast'
+import { useAppToast } from '@/core/composables/useAppToast'
 import {
   extractSafeApiErrorMessage,
   formatDisplayErrorMessage,
-} from '../../../../../core/utils/errorMessages'
+} from '@/core/utils/errorMessages'
 
 export type AdminToastPort = Pick<
   ReturnType<typeof useAppToast>,

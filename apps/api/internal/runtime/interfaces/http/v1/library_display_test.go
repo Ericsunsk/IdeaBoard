@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	libraryapplication "ideaboard/api/internal/library/application"
+	librarysources "ideaboard/api/internal/library/application/sources"
 	librarydomain "ideaboard/api/internal/library/domain"
 	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
 	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
@@ -31,7 +31,7 @@ func TestV1LibraryDisplayAuthorizationAndNoMaterialization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sources := &libraryapplication.SourceResolver{Store: lib}
+	sources := &librarysources.SourceResolver{Store: lib}
 	engine := newV1MediaTestEngine(f.store, f.dir, ContractV1Deps{Media: f.media, MediaObjects: f.objects, MediaRenderer: renderer, MediaPreviews: previews, Library: ContractV1LibraryDeps{Store: lib, Sources: sources}})
 	path := libraryDisplay(f.ws.PublicID, asset).Variants[0].URL
 	for _, test := range []struct {
@@ -107,7 +107,7 @@ func TestV1LibraryDisplayUsesCompletedManagedLink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sources := &libraryapplication.SourceResolver{Store: lib}
+	sources := &librarysources.SourceResolver{Store: lib}
 	engine := newV1MediaTestEngine(f.store, f.dir, ContractV1Deps{Media: f.media, MediaObjects: f.objects, MediaRenderer: renderer, MediaPreviews: previews, Library: ContractV1LibraryDeps{Store: lib, Sources: sources}})
 	status, headers, body := doV1RoundTrip(t, engine, v1Call{method: "GET", path: libraryDisplay(f.ws.PublicID, asset).Variants[0].URL, userID: f.member}, "library-display-linked-")
 	if status != 200 || headers.Get("Cache-Control") != "private, max-age=300" || !strings.Contains(body, managed.StorageKey) {
@@ -162,7 +162,7 @@ func TestV1LibraryDisplayDirectManagedLinks(t *testing.T) {
 		{"dangling canonical asset", dangling, http.StatusNotFound},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			sources := &libraryapplication.SourceResolver{Store: lib}
+			sources := &librarysources.SourceResolver{Store: lib}
 			engine := newV1MediaTestEngine(f.store, f.dir, ContractV1Deps{Media: f.media, MediaObjects: f.objects, MediaRenderer: renderer, MediaPreviews: previews, Library: ContractV1LibraryDeps{Store: lib, Sources: sources}})
 			status, headers, _ := doV1RoundTrip(t, engine, v1Call{method: "GET", path: libraryDisplay(f.ws.PublicID, tt.target).Variants[0].URL, userID: f.member}, "library-direct-")
 			if status != tt.status {

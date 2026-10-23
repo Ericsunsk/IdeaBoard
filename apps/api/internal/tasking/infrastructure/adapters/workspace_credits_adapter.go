@@ -5,25 +5,14 @@ package adapters
 // This holder adapts credits.Commands to workspacetasks.Holder. Only
 // Credits owns ledger writes; this seam performs none directly.
 //
-// The workspacetasks.Holder Capture/Release signature carries no userID,
-// but credits Commands require one for wallet resolution. The adapter
-// records hold_transaction_id -> userID at Hold time (process-local,
-// deleted on Capture/Release) so settlement converges without an
-// interface change. A process restart between Hold and terminal settle
-// loses that map, but never the hold's owner: the terminal path reads the
-// userID from the settled task row (the TxHolder variants below), and if
-// no worker ever reaches the terminal path the final-timeout settlement
-// sweep releases the hold the same way (see workspacetasks.StalledSettlementThreshold).
-// It is never released by a second Hold.
-//
-// The TxHolder variants (HoldInTx/CaptureInTx/ReleaseInTx) take the userID
-// explicitly from the settled task row and run through
-// credits.Service.InTx(tx), so terminal settlement never depends on the
-// process-local map.
+// Both Holder variants receive the stable Billing Account and actual actor.
+// Transactional commands join the task settlement transaction through
+// credits.Service.InTx(tx); terminal commands use the persisted Task facts.
+// Credits sentinels already match the task boundary, so errors propagate
+// unchanged without a second mapping.
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"ideaboard/api/internal/platform/errorrender"
 
@@ -57,19 +46,6 @@ func taskCommandMetadata(idempotencyKey, taskID string, actorUserID int64) domai
 	}
 }
 
-func mapHolderError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if errors.Is(err, domain.ErrInsufficientCredits) {
-		return fmt.Errorf("%w: %w", workspacetasks.ErrInsufficientCredits, err)
-	}
-	if errors.Is(err, domain.ErrWalletRestricted) {
-		return fmt.Errorf("%w: %w", workspacetasks.ErrWalletRestricted, err)
-	}
-	return err
-}
-
 func (h *WorkspaceTaskHolder) Hold(ctx context.Context, billingAccountID, actorUserID int64, amount int64, idempotencyKey, taskID string) (string, error) {
 	if h == nil || h.credits == nil {
 		return "", fmt.Errorf("workspace task holder is not configured: %w", workspacetasks.ErrQuoteUnavailable)
@@ -87,7 +63,7 @@ func (h *WorkspaceTaskHolder) Hold(ctx context.Context, billingAccountID, actorU
 		Metadata:         taskCommandMetadata(idempotencyKey, taskID, actorUserID),
 	})
 	if err != nil {
-		return "", mapHolderError(err)
+		return "", err
 	}
 	return result.TransactionID, nil
 }
@@ -109,10 +85,7 @@ func (h *WorkspaceTaskHolder) Capture(ctx context.Context, billingAccountID, act
 		Amount:            creditAmount,
 		Metadata:          taskCommandMetadata("task-capture:"+taskID, taskID, actorUserID),
 	})
-	if err != nil {
-		return mapHolderError(err)
-	}
-	return nil
+	return err
 }
 
 func (h *WorkspaceTaskHolder) Release(ctx context.Context, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) error {
@@ -132,10 +105,7 @@ func (h *WorkspaceTaskHolder) Release(ctx context.Context, billingAccountID, act
 		Amount:            creditAmount,
 		Metadata:          taskCommandMetadata("task-release:"+taskID, taskID, actorUserID),
 	})
-	if err != nil {
-		return mapHolderError(err)
-	}
-	return nil
+	return err
 }
 
 // HoldInTx reserves Ideas inside the settlement transaction through the
@@ -161,14 +131,14 @@ func (h *WorkspaceTaskHolder) HoldInTx(ctx context.Context, tx pgx.Tx, billingAc
 		Metadata:         taskCommandMetadata(idempotencyKey, taskID, actorUserID),
 	})
 	if err != nil {
-		return "", mapHolderError(err)
+		return "", err
 	}
 	return result.TransactionID, nil
 }
 
 // CaptureInTx converges a hold to revenue inside the settlement
-// transaction. The userID comes from the settled task row, never the
-// process-local map. It satisfies workspacetasks.TxHolder.
+// transaction using the persisted Task attribution. It satisfies
+// workspacetasks.TxHolder.
 func (h *WorkspaceTaskHolder) CaptureInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) (string, error) {
 	if h == nil || h.credits == nil {
 		return "", fmt.Errorf("workspace task holder is not configured: %w", workspacetasks.ErrQuoteUnavailable)
@@ -193,7 +163,7 @@ func (h *WorkspaceTaskHolder) CaptureInTx(ctx context.Context, tx pgx.Tx, billin
 		Metadata:          taskCommandMetadata("task-capture:"+taskID, taskID, actorUserID),
 	})
 	if err != nil {
-		return "", mapHolderError(err)
+		return "", err
 	}
 	return result.TransactionID, nil
 }
@@ -224,7 +194,7 @@ func (h *WorkspaceTaskHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, billin
 		Metadata:          taskCommandMetadata("task-release:"+taskID, taskID, actorUserID),
 	})
 	if err != nil {
-		return "", mapHolderError(err)
+		return "", err
 	}
 	return result.TransactionID, nil
 }

@@ -69,7 +69,7 @@
 
 <script setup lang="ts">
 import { InfoCircle, NavArrowDown, NavArrowUp } from '@iconoir/vue'
-import ChartRenderer from '../../../../../core/components/ChartRenderer.vue'
+import ChartRenderer from '@/core/components/ChartRenderer.vue'
 import { adminCompactIconButtonClass } from '../../../shared'
 import { taskMetricDefinitions, type TaskMetricStatsSnapshot } from '../../../shared'
 import type { useMonitorTimeline } from '../../session/useMonitorTimeline'

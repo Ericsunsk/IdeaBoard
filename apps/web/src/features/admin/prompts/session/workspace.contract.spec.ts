@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useAsyncAction } from '../../../../core/composables/useAsyncAction'
-import { createDeferred } from '../../../../test/deferred'
+import { useAsyncAction } from '@/core/composables/useAsyncAction'
+import { createDeferred } from '@/test/deferred'
 import type { AdminPromptConfigResource, FeaturePrompt } from './resource'
 import { createAdminPromptConfigWorkspace } from './workspace'
 

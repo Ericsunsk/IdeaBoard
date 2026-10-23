@@ -19,9 +19,9 @@
 
         <AdminColumn :header="t('admin.wallet.type')" style="width: 96px">
           <template #body="{ data }">
-            <AdminStatusPill
+            <StatusBadge
               :label="getCreditCommandLabel(data.command_type)"
-              :variant="getCreditCommandVariant(data.command_type)"
+              :tone="getCreditCommandTone(data.command_type)"
               size="small"
             />
           </template>
@@ -134,10 +134,10 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { AdminStatusPill } from '../../../../shared'
+import { StatusBadge } from '../../../../shared'
 import { AdminButton } from '../../../../shared'
 import { AdminMono } from '../../../../shared'
-import ActionButton from '../../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminColumn } from '../../../../shared'
 import { AdminEmptyState } from '../../../../shared'
 import { AdminTable } from '../../../../shared'
@@ -145,10 +145,10 @@ import { ADMIN_IDENTITY_EMPTY, emptyPlaceholder } from '../../../../shared'
 import {
   formatAdminDateTimeWithSeconds,
   getCreditCommandLabel,
-  getCreditCommandVariant,
+  getCreditCommandTone,
   getCreditCommandSign,
 } from '../../../core/shared/format'
-import { formatIdeaAmount } from '../../../../../../core/i18n/userIdeaCurrency'
+import { formatIdeaAmount } from '@/core/i18n/userIdeaCurrency'
 import type { AdminCreditLedgerTransaction } from '../../../session/wallets/resource'
 import {
   isCorrectableTransaction,

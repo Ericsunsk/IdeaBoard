@@ -1,6 +1,6 @@
 import { defineComponent, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import AdminRowActionsPopover from './AdminRowActionsPopover.vue'
 
 type RowActionsPopoverRef = {

@@ -8,9 +8,9 @@ import {
   formatCompactNumber,
   type ChartOptions,
   withAlpha,
-} from '../../../../../core/lib/chartPrimitives'
-import { resolveChartAnimation } from '../../../../../core/motion/chartMotion'
-import { isDarkModeActive } from '../../../../../theme/composables/useTheme'
+} from '@/core/lib/chartPrimitives'
+import { resolveChartAnimation } from '@/core/motion/chartMotion'
+import { isDarkModeActive } from '@/theme/composables/useTheme'
 import { adminThemeTokenFallbacks, adminThemeTokenVars } from '../../core/adminThemeTokens'
 
 export const adminChartStrokeWidth = 1

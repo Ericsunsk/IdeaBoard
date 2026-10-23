@@ -33,16 +33,15 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue'
 import { displayErrorMessage } from '../../core/utils/formValidation'
-import type { FormFieldContractProps, FormFieldContractSlotProps } from './formFieldContract'
-
-export type IbFormFieldSlotProps = FormFieldContractSlotProps & {
-  ariaInvalid: true | undefined
-}
+import {
+  resolveFormFieldState,
+  type FormFieldContractProps,
+  type FormFieldContractSlotProps,
+} from './formFieldContract'
 
 const props = withDefaults(
   defineProps<
     FormFieldContractProps & {
-      required?: boolean
       showMessage?: boolean
       fieldClass?: string
       labelClass?: string
@@ -59,25 +58,26 @@ const props = withDefaults(
 )
 
 defineSlots<{
-  default(props: IbFormFieldSlotProps): unknown
+  default(props: FormFieldContractSlotProps): unknown
   'header-extra'?(): unknown
 }>()
 
 const generatedId = useId()
-const resolvedFieldId = computed(() => props.fieldId || `ib-form-field-${generatedId}`)
-const errorId = computed(() => `${resolvedFieldId.value}-error`)
-const invalid = computed(() => Boolean(props.error))
-// Errors always render as persistent text below the control, the same contract
-// AdminFormField keeps. The old inline-required path swapped the error into the
-// input's placeholder, where it vanished the moment the user typed.
-const describedbyId = computed(() => (invalid.value ? errorId.value : undefined))
+// Id/a11y state is derived once in the neutral contract: this adapter renders
+// no hint surface, so hint stays out of the describedby chain here.
+const state = computed(() =>
+  resolveFormFieldState({
+    fieldId: props.fieldId,
+    fallbackId: `ib-form-field-${generatedId}`,
+    error: props.error,
+  }),
+)
+const resolvedFieldId = computed(() => state.value.fieldId)
+const invalid = computed(() => state.value.invalid)
+const errorId = computed(() => state.value.errorId)
 const errorMessage = computed(() => displayErrorMessage(props.error))
-const slotProps = computed<IbFormFieldSlotProps>(() => ({
-  ariaInvalid: invalid.value ? true : undefined,
-  describedbyId: describedbyId.value,
-  errorId: invalid.value ? errorId.value : undefined,
-  fieldId: resolvedFieldId.value,
-  invalid: invalid.value,
+const slotProps = computed<FormFieldContractSlotProps>(() => ({
+  ...state.value,
   required: props.required,
 }))
 </script>

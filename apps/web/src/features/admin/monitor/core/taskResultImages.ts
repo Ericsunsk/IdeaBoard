@@ -1,5 +1,5 @@
-import { resolveAssetUrl } from '../../../../core/config/runtimeUrls'
-import { isMediaAssetDeliveryPath } from '../../../../core/media/mediaAssetPath'
+import { resolveAssetUrl } from '@/core/config/runtimeUrls'
+import { isMediaAssetDeliveryPath } from '@/core/media/mediaAssetPath'
 
 const HTTP_URL_RE = /^https?:\/\//i
 const ENCODED_BACKSLASH_RE = /%5c/i

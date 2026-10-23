@@ -8,8 +8,8 @@ import {
   updateControlLoginLockoutSetting,
   updateControlRateLimitSetting,
   updateControlRegistrationSetting,
-} from '../../../../../api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '../../../../../api/contractKernel'
+} from '@/api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '@/api/contractKernel'
 import type { AdminAccessSettingsFeedback } from '../useSettingsFeedback'
 import { useSettingsLifecycle } from '../useSettingsLifecycle'
 import { withControlCopy } from '../../../shared/index'

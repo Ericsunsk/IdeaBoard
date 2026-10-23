@@ -12,9 +12,8 @@ import { render } from '../../../test/render'
 import { USER_BOARDS_PATH, USER_CANVAS_PATH } from '../routePaths'
 import {
   installOrganizationScopeStore,
-  memoryOrganizationScopePersist,
-  resetOrganizationScopeStore,
 } from '../organization/scope'
+import type { OrganizationScope } from '../organization/scope'
 import { useWorkspaceSwitcher } from './useWorkspaceSwitcher'
 import type { WorkspaceSummary } from '../selection/workspaceResource'
 
@@ -27,6 +26,7 @@ const queryMocks = vi.hoisted(() => ({ invalidateQueries: vi.fn() }))
 const selectionMocks = vi.hoisted(() => ({ useWorkspaceSelection: vi.fn() }))
 const resourceMocks = vi.hoisted(() => ({
   renameWorkspace: vi.fn(),
+  renameOrganization: vi.fn(),
   deleteWorkspace: vi.fn(),
 }))
 
@@ -56,6 +56,7 @@ vi.mock('../selection/workspaceContext', () => ({
 vi.mock('../selection/workspaceResource', () => ({
   WORKSPACE_NAME_MAX_LENGTH: 120,
   renameWorkspace: resourceMocks.renameWorkspace,
+  renameOrganization: resourceMocks.renameOrganization,
   deleteWorkspace: resourceMocks.deleteWorkspace,
   fetchOrganizations: vi.fn(),
   fetchOrganizationMembers: vi.fn(),
@@ -63,7 +64,7 @@ vi.mock('../selection/workspaceResource', () => ({
   updateOrganizationMember: vi.fn(),
   removeOrganizationMember: vi.fn(),
   provisionOrganization: vi.fn(),
-  workspaceQueryKeys: { list: ['workspaces'] },
+  workspaceQueryKeys: { list: ['workspaces'], organizations: ['organizations'] },
 }))
 
 const currentUser = ref<unknown>(null)
@@ -95,6 +96,16 @@ function stubSelection(overrides: Record<string, unknown> = {}) {
   return selection
 }
 
+function memoryScopePersist(initial: OrganizationScope = { kind: 'personal' }) {
+  let current = initial
+  return {
+    readScope: () => current,
+    writeScope: (scope: OrganizationScope) => {
+      current = scope
+    },
+  }
+}
+
 function renderSwitcher(options?: Parameters<typeof useWorkspaceSwitcher>[0]) {
   let switcher: ReturnType<typeof useWorkspaceSwitcher> | undefined
   const Consumer = defineComponent({
@@ -118,10 +129,10 @@ describe('useWorkspaceSwitcher', () => {
     routerMocks.replace.mockReset()
     queryMocks.invalidateQueries.mockReset()
     resourceMocks.renameWorkspace.mockReset()
+    resourceMocks.renameOrganization.mockReset()
     resourceMocks.deleteWorkspace.mockReset()
     selectionMocks.useWorkspaceSelection.mockReset()
-    resetOrganizationScopeStore()
-    installOrganizationScopeStore({ persist: memoryOrganizationScopePersist() })
+    installOrganizationScopeStore({ persist: memoryScopePersist() })
   })
 
   test('lands on the gallery without the stale boardId when switching from canvas', async () => {
@@ -151,38 +162,6 @@ describe('useWorkspaceSwitcher', () => {
       query: { workspace: 'ws_team2', accountTab: 'profile' },
     })
     expect(routerMocks.push).not.toHaveBeenCalled()
-  })
-
-  test('switches to an organization workspace through the draft guard and gallery landing', async () => {
-    const selection = stubSelection()
-    const beforeWorkspaceChange = vi.fn().mockResolvedValue(true)
-    const switcher = renderSwitcher({ beforeWorkspaceChange })
-
-    await switcher.menuProps.value.onSelectOrganization?.('org_c3')
-
-    expect(beforeWorkspaceChange).toHaveBeenCalledOnce()
-    expect(installOrganizationScopeStore().getScope()).toEqual({
-      kind: 'organization',
-      organizationId: 'org_c3',
-    })
-    expect(selection.selectWorkspace).toHaveBeenCalledWith(TEAM.publicId)
-    expect(routerMocks.push).toHaveBeenCalledWith({
-      path: USER_BOARDS_PATH,
-      query: { workspace: TEAM.publicId },
-    })
-  })
-
-  test('clears the old workspace URL when the selected scope has no workspaces', async () => {
-    stubSelection({ items: ref([DEFAULT]) })
-    const switcher = renderSwitcher()
-
-    await switcher.menuProps.value.onSelectOrganization?.('org_c3')
-
-    expect(routerMocks.push).toHaveBeenCalledWith({ path: USER_BOARDS_PATH, query: {} })
-    expect(installOrganizationScopeStore().getScope()).toEqual({
-      kind: 'organization',
-      organizationId: 'org_c3',
-    })
   })
 
   test.each(['select', 'delete'] as const)(
@@ -311,6 +290,35 @@ describe('useWorkspaceSwitcher', () => {
     })
     expect(resourceMocks.renameWorkspace).not.toHaveBeenCalled()
     expect(queryMocks.invalidateQueries).not.toHaveBeenCalled()
+    expect(routerMocks.push).not.toHaveBeenCalled()
+    expect(routerMocks.replace).not.toHaveBeenCalled()
+  })
+
+  test('renames the organization through PATCH and refreshes the organization list', async () => {
+    const updated = { publicId: 'org_c3', name: 'Renamed', status: 'active' as const }
+    resourceMocks.renameOrganization.mockResolvedValue(updated)
+    stubSelection()
+    const switcher = renderSwitcher()
+
+    await expect(switcher.renameOrganizationItem('org_c3', 'Renamed')).resolves.toEqual(updated)
+
+    expect(resourceMocks.renameOrganization).toHaveBeenCalledWith('org_c3', { name: 'Renamed' })
+    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['organizations'] })
+    expect(routerMocks.push).not.toHaveBeenCalled()
+    expect(routerMocks.replace).not.toHaveBeenCalled()
+  })
+
+  test('exposes organization rename through menu props without leaving the route', async () => {
+    const updated = { publicId: 'org_c3', name: 'Renamed', status: 'active' as const }
+    resourceMocks.renameOrganization.mockResolvedValue(updated)
+    stubSelection()
+    const switcher = renderSwitcher()
+
+    await expect(
+      switcher.menuProps.value.onRenameOrganization?.('org_c3', 'Renamed'),
+    ).resolves.toEqual(updated)
+
+    expect(resourceMocks.renameOrganization).toHaveBeenCalledWith('org_c3', { name: 'Renamed' })
     expect(routerMocks.push).not.toHaveBeenCalled()
     expect(routerMocks.replace).not.toHaveBeenCalled()
   })

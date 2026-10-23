@@ -6,13 +6,13 @@ status: accepted
 
 产品规则已接受，项目尚未上线、没有存量用户或资金。账户范围、组织角色、Personal 协作、成员额度与 Workspace Budget 退役已随 #950–#954 落地。2026-10-23 决定将原可恢复关闭改为永久关闭：关闭前二次确认，关闭后不再恢复组织或余额使用权，不自动退款或转入 Personal。#955 验收永久关闭，#956 验收完整资金池模型；本 ADR 记录目标合同，实现验收以对应 issue 为准。
 
-## 背景
+## Context
 
 此前计费方案允许同一用户管理多个独立 Billing Account、创建 Workspace 时选择共享或独立账户，并提供 Workspace Budget、账户级 Member Quota 和必须预先配置的默认成员额度。产品讨论决定收敛成 Personal 与可选 Organization 两个资金范围：个人业务空间共享 Personal 资金池，组织业务空间共享 Organization 资金池；Workspace 是内容与授权边界，不再是资金边界。
 
 项目按 pre-launch clean break 在 Fresh Database 初始化此模型，不需要存量账户或余额迁移。Wallet/Ledger、支付、退款、Task/Vision submit-time payer snapshot、事务预占与结算等账务正确性机制继续有效；上线后产生的不可变资金记录不得改写。
 
-## 决策
+## Decision
 
 ### 1. 资金范围与 Workspace 归属
 
@@ -58,7 +58,7 @@ status: accepted
 - 剩余余额的使用权在关闭时永久终止；不得通过新建 Organization、重入或恢复钱包重新使用。资金账户及不可变 Ledger、支付和结算历史保留，关闭不伪造消费、删除账务事实或直接改写历史余额。
 - 本决策采用 TapNow 已公开的常规不退款规则；永久关闭及其余额使用权终止是本项目明确选择的产品合同，不宣称已核实为 TapNow 的组织关闭流程。
 
-## 后果
+## Consequences
 
 - 不再向用户提供 Workspace 独立 Billing Account 选择、Workspace Budget 或 Workspace 余额转账。Organization 资金直接共享；Personal 与 Organization 是仅有的用户资金范围。
 - Workspace 内容访问仍需遵循 Organization 角色映射和 Member 的逐 Workspace 授权；资金范围不能替代内容授权。
@@ -74,3 +74,7 @@ status: accepted
 - [ADR-0036](./0036-studio-handover-and-delete-funds-retention.md) 的不可变账务历史、显式 Owner 交接和删除期间保护继续适用；Organization 永久关闭与资金规则由本 ADR 取代或补充。
 
 以上是决策关系；旧实现已按上述票号删除，旧 ADR 描述的实现合同仅作历史理解，当前产品合同以本 ADR 为准。
+
+## Status
+
+Accepted

@@ -288,11 +288,6 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the confirmation dialog uses the shared strong-card surface; DOM visibility checks cannot detect a surface token regression.',
     },
   ],
-  'src/features/admin/shared/ui/feedback/AdminStatusPill.component.spec.ts': [
-    {
-      reason: 'Verifies the Badge carrier, semantic tone and dot colors, and fixed size tokens.',
-    },
-  ],
   'src/features/admin/shared/ui/form/AdminSwitch.component.spec.ts': [
     {
       reason:
@@ -464,6 +459,12 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
     {
       reason:
         'Verifies the single table-container scroll surface and its mechanical accessibility class.',
+    },
+  ],
+  'src/core/components/DialogShell.component.spec.ts': [
+    {
+      reason:
+        'Verifies the shared dialog size contract (data-size plus width/motion/stacking classes); class strings are the contract surface DialogShell exposes.',
     },
   ],
   'src/core/components/ActionButton.component.spec.ts': [

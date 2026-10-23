@@ -2,9 +2,9 @@ import type {
   ControlCreditCommandRequest,
   ControlCreditCorrectionRequest,
   ControlCreditRefundRequest,
-} from '../../../../../api/generated-query/control/model'
-import { formatIdeaAmount } from '../../../../../core/i18n/userIdeaCurrency'
-import { createUniqueId } from '../../../../../core/utils/ids'
+} from '@/api/generated-query/control/model'
+import { formatIdeaAmount } from '@/core/i18n/userIdeaCurrency'
+import { createUniqueId } from '@/core/utils/ids'
 
 export type AdminCreditCommandKind = 'grant' | 'deduction' | 'refund' | 'correction'
 

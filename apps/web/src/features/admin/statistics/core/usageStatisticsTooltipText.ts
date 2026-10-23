@@ -2,7 +2,7 @@
 // Why: 4 处 tooltip 回调之前手写 `toLocaleString()` / `toFixed(1) + '%'`，格式分散；
 // 收敛到这里后，有限输入的渲染字符串与原来逐字节一致（由 contract spec 锁定），
 // 非法输入（NaN/null/undefined/非数字）显式渲染为 `—`，不得静默归零伪造数据。
-import { formatLocaleNumber } from '../../../../core/i18n/formatters'
+import { formatLocaleNumber } from '@/core/i18n/formatters'
 
 const INVALID_STATISTIC_TEXT = '—'
 

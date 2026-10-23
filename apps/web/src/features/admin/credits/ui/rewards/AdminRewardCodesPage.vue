@@ -113,7 +113,7 @@
         </template>
       </AdminColumn>
 
-      <!-- 状态列（载体统一 AdminStatusPill；启用只用开关，胶囊保留生命周期） -->
+      <!-- 状态列（载体统一 StatusBadge；启用只用开关，胶囊保留生命周期） -->
       <AdminColumn
         field="status"
         :header="REWARD_CODES_MESSAGES.statusColumn"
@@ -123,7 +123,7 @@
           <!-- 防抖行收口到 SwitchRow：68px status 槽锁宽 + switch 固定位，不绑 key。 -->
           <SwitchRow
             :pill="statusPresentation(data.status).label"
-            :pill-variant="statusPresentation(data.status).variant"
+            :pill-tone="statusPresentation(data.status).tone"
             status-min-width="68px"
             :model-value="data.enabled"
             :switch-attrs="{
@@ -211,14 +211,14 @@ import { MoreHoriz, Refresh } from '@iconoir/vue'
 import { AdminCollectionPageShell } from '../../../shared'
 import { AdminColumn } from '../../../shared'
 import { AdminAlert } from '../../../shared'
-import type { AdminStatusPillVariant } from '../../../shared'
+import type { AppStatusTone } from '../../../shared'
 import { SwitchRow } from '../../../shared'
 import { AdminButton } from '../../../shared'
-import ActionButton from '../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminSelect } from '../../../shared'
 import { AdminTable } from '../../../shared'
-import { formatIdeaAmount } from '../../../../../core/i18n/userIdeaCurrency'
-import { formatLocaleDate } from '../../../../../core/i18n/formatters'
+import { formatIdeaAmount } from '@/core/i18n/userIdeaCurrency'
+import { formatLocaleDate } from '@/core/i18n/formatters'
 import { AdminRowActionsPopover } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
@@ -452,17 +452,17 @@ function formatExpiresAt(value?: string): string {
 
 function statusPresentation(status: RewardCode['status']): {
   label: string
-  variant: AdminStatusPillVariant
+  tone: AppStatusTone
 } {
   switch (status) {
     case 'expired':
-      return { label: REWARD_CODES_MESSAGES.statusExpired, variant: 'neutral' }
+      return { label: REWARD_CODES_MESSAGES.statusExpired, tone: 'neutral' }
     case 'exhausted':
-      return { label: REWARD_CODES_MESSAGES.statusExhausted, variant: 'warning' }
+      return { label: REWARD_CODES_MESSAGES.statusExhausted, tone: 'warning' }
     case 'disabled':
-      return { label: REWARD_CODES_MESSAGES.statusDisabled, variant: 'neutral' }
+      return { label: REWARD_CODES_MESSAGES.statusDisabled, tone: 'neutral' }
     case 'enabled':
-      return { label: REWARD_CODES_MESSAGES.statusEnabled, variant: 'success' }
+      return { label: REWARD_CODES_MESSAGES.statusEnabled, tone: 'success' }
   }
 }
 </script>

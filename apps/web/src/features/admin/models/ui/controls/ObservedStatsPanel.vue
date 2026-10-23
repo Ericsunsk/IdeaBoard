@@ -58,13 +58,13 @@
           {{ MODELS_MESSAGES.referenceNoData }}
         </div>
         <div v-else class="flex flex-wrap gap-1">
-          <!-- 在售 SKU 状态收口 AdminStatusPill：onSale→success，非在售→neutral；
+          <!-- 在售 SKU 状态收口 StatusBadge：onSale→success，非在售→neutral；
                静态属性不呼吸（pulse=false），文案保持“名称 · 在售/非在售”。 -->
-          <AdminStatusPill
+          <StatusBadge
             v-for="margin in observed!.skuMargins"
             :key="margin.sku"
             :label="`${margin.displayName || margin.sku} ${MODELS_MESSAGES.observedSaleState(margin.onSale)}`"
-            :variant="margin.onSale ? 'success' : 'neutral'"
+            :tone="margin.onSale ? 'success' : 'neutral'"
             :pulse="false"
             size="small"
             :title="margin.service"
@@ -89,7 +89,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { AdminStatusPill } from '../../../shared'
+import { StatusBadge } from '../../../shared'
 import {
   formatObservedFailure,
   formatObservedRate,

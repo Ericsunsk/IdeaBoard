@@ -151,7 +151,7 @@ function onSubmit(prompt: string) {
 .image-node-outpaint-handle {
   position: absolute;
   border: 1.5px solid var(--outpaint-frame-accent);
-  background: #ffffff;
+  background: var(--color-media-foreground);
   border-radius: var(--radius-pill);
   padding: 0;
   pointer-events: auto;

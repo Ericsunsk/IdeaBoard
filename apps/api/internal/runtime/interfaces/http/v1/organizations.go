@@ -140,18 +140,9 @@ func (h *contractV1Handler) createOrganization(c *gin.Context) {
 }
 
 func (h *contractV1Handler) getOrganization(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	organization, _, visible := h.v1OrganizationContext(c, identityPrincipal)
-	if organization == nil {
-		return
-	}
-	if !runtimehttp.RequireOrganizationCapability(c, visible, visible) {
-		return
-	}
-	contract.RenderSuccess(c, toOrganizationDTO(organization))
+	h.withOrganization(c, v1OrganizationOpts{}, func(octx v1OrganizationCtx) {
+		contract.RenderSuccess(c, toOrganizationDTO(octx.Organization))
+	})
 }
 
 type v1UpdateOrganizationBody struct {
@@ -161,69 +152,53 @@ type v1UpdateOrganizationBody struct {
 }
 
 func (h *contractV1Handler) updateOrganization(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	organization, role, visible := h.v1OrganizationContext(c, identityPrincipal)
-	if organization == nil {
-		return
-	}
-	if !runtimehttp.RequireOrganizationCapability(c, visible, role == tenancy.RoleOwner || role == tenancy.RoleAdmin) {
-		return
-	}
-	var body v1UpdateOrganizationBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		writeV1InputError(c)
-		return
-	}
-	name := strings.TrimSpace(body.Data.Name)
-	if validateErr := tenancy.ValidateName(name); validateErr != nil {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			runtimehttp.MsgCreateOrganization, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
-		c.Abort()
-		return
-	}
-	updated, err := h.deps.Store.UpdateOrganization(c.Request.Context(), organization.PublicID, name)
-	if err != nil {
-		if errors.Is(err, tenancy.ErrOrganizationClosed) {
-			renderOrganizationClosureError(c, err)
+	h.withOrganization(c, v1OrganizationOpts{Allow: func(role string, _ bool) bool {
+		return role == tenancy.RoleOwner || role == tenancy.RoleAdmin
+	}}, func(octx v1OrganizationCtx) {
+		var body v1UpdateOrganizationBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
 			return
 		}
-		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
-		c.Abort()
-		return
-	}
-	contract.RenderSuccess(c, toOrganizationDTO(updated))
+		name := strings.TrimSpace(body.Data.Name)
+		if validateErr := tenancy.ValidateName(name); validateErr != nil {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				runtimehttp.MsgCreateOrganization, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+			c.Abort()
+			return
+		}
+		updated, err := h.deps.Store.UpdateOrganization(c.Request.Context(), octx.Organization.PublicID, name)
+		if err != nil {
+			if errors.Is(err, tenancy.ErrOrganizationClosed) {
+				renderOrganizationClosureError(c, err)
+				return
+			}
+			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
+			c.Abort()
+			return
+		}
+		contract.RenderSuccess(c, toOrganizationDTO(updated))
+	})
 }
 
 func (h *contractV1Handler) listOrganizationWorkspaces(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	organization, _, visible := h.v1OrganizationContext(c, identityPrincipal)
-	if organization == nil {
-		return
-	}
-	if !runtimehttp.RequireOrganizationCapability(c, visible, visible) {
-		return
-	}
-	workspaces, err := h.deps.Store.ListOrganizationWorkspaces(c.Request.Context(), organization.PublicID)
-	if err != nil {
-		if errors.Is(err, tenancy.ErrNotFound) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
-		} else {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable53)
+	h.withOrganization(c, v1OrganizationOpts{}, func(octx v1OrganizationCtx) {
+		workspaces, err := h.deps.Store.ListOrganizationWorkspaces(c.Request.Context(), octx.Organization.PublicID)
+		if err != nil {
+			if errors.Is(err, tenancy.ErrNotFound) {
+				contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
+			} else {
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable53)
+			}
+			c.Abort()
+			return
 		}
-		c.Abort()
-		return
-	}
-	page := make([]v1WorkspaceDTO, 0, len(workspaces))
-	for _, w := range workspaces {
-		page = append(page, toWorkspaceDTO(w))
-	}
-	contract.RenderSuccess(c, page)
+		page := make([]v1WorkspaceDTO, 0, len(workspaces))
+		for _, w := range workspaces {
+			page = append(page, toWorkspaceDTO(w))
+		}
+		contract.RenderSuccess(c, page)
+	})
 }
 
 type v1CreateOrganizationWorkspaceBody struct {
@@ -233,66 +208,61 @@ type v1CreateOrganizationWorkspaceBody struct {
 }
 
 func (h *contractV1Handler) createOrganizationWorkspace(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	organization, role, visible := h.v1OrganizationContext(c, identityPrincipal)
-	if organization == nil {
-		return
-	}
-	if !runtimehttp.RequireOrganizationCapability(c, visible, role == tenancy.RoleOwner || role == tenancy.RoleAdmin) {
-		return
-	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, runtimehttp.MsgIdempotencyKeyRequired2)
-		c.Abort()
-		return
-	}
-	var body v1CreateOrganizationWorkspaceBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		writeV1InputError(c)
-		return
-	}
-	name := strings.TrimSpace(body.Data.Name)
-	if validateErr := tenancy.ValidateName(name); validateErr != nil {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			runtimehttp.MsgCreateWorkspace, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
-		c.Abort()
-		return
-	}
-	ctx := c.Request.Context()
-	orgID := organization.PublicID
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	scope := contract.IdempotencyScope(externalUser, "workspace:create")
-	hash := contract.HashIdempotencyRequest("workspace:create", name, orgID)
-	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
-		return h.deps.Store.CreateOrganizationWorkspace(ctx, orgID, identityPrincipal.UserID(), name)
-	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, runtimehttp.MsgWorkspaceIdempotencyConflict)
+	h.withOrganization(c, v1OrganizationOpts{Allow: func(role string, _ bool) bool {
+		return role == tenancy.RoleOwner || role == tenancy.RoleAdmin
+	}}, func(octx v1OrganizationCtx) {
+		identityPrincipal := octx.Principal
+		organization := octx.Organization
+		key, err := contract.IdempotencyKeyFromHeader(c)
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, runtimehttp.MsgIdempotencyKeyRequired2)
 			c.Abort()
 			return
 		}
-		if errors.Is(doErr, tenancy.ErrOrganizationClosed) {
-			renderOrganizationClosureError(c, doErr)
+		var body v1CreateOrganizationWorkspaceBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
 			return
 		}
-		if errors.Is(doErr, tenancy.ErrNotFound) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
-		} else {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
+		name := strings.TrimSpace(body.Data.Name)
+		if validateErr := tenancy.ValidateName(name); validateErr != nil {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				runtimehttp.MsgCreateWorkspace, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+			c.Abort()
+			return
 		}
-		c.Abort()
-		return
-	}
-	created, ok := result.(*tenancy.Workspace)
-	if !ok || created == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
-		c.Abort()
-		return
-	}
-	contract.RenderCreated(c, toWorkspaceDTO(created))
+		ctx := c.Request.Context()
+		orgID := organization.PublicID
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		scope := contract.IdempotencyScope(externalUser, "workspace:create")
+		hash := contract.HashIdempotencyRequest("workspace:create", name, orgID)
+		result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
+			return h.deps.Store.CreateOrganizationWorkspace(ctx, orgID, identityPrincipal.UserID(), name)
+		})
+		if doErr != nil {
+			if contract.IsIdempotencyConflict(doErr) {
+				contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, runtimehttp.MsgWorkspaceIdempotencyConflict)
+				c.Abort()
+				return
+			}
+			if errors.Is(doErr, tenancy.ErrOrganizationClosed) {
+				renderOrganizationClosureError(c, doErr)
+				return
+			}
+			if errors.Is(doErr, tenancy.ErrNotFound) {
+				contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
+			} else {
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
+			}
+			c.Abort()
+			return
+		}
+		created, ok := result.(*tenancy.Workspace)
+		if !ok || created == nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable38)
+			c.Abort()
+			return
+		}
+		contract.RenderCreated(c, toWorkspaceDTO(created))
+	})
 }

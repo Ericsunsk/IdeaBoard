@@ -38,6 +38,7 @@ export default {
     title: '워크스페이스',
     rowTitle: '워크스페이스',
     manage: '워크스페이스 관리',
+    settingsAction: '설정',
     defaultBadge: '기본',
     listLabel: '워크스페이스 목록',
     createAction: '새로 추가',
@@ -110,8 +111,6 @@ export default {
       defaultPrivate: '기본 워크스페이스는 비공개이며 협력자를 초대할 수 없습니다.',
     },
     organization: {
-      scope: '작업 공간 소속',
-      personal: '개인 / 스튜디오',
       new: '조직 만들기',
       name: '조직 이름',
       setupNote:
@@ -121,6 +120,7 @@ export default {
       invalidName: '조직 이름을 1~{max}자로 입력하세요.',
       loadFailed: '조직 목록을 불러오지 못했습니다. 다시 시도하세요.',
       createFailed: '조직을 만들지 못했습니다. 다시 시도하세요.',
+      renameFailed: '조직 이름을 변경할 수 없습니다. 다시 시도해 주세요.',
     },
     handover: {
       title: '자금 계정 인계',
@@ -188,14 +188,6 @@ export default {
     title: '사용량 한도',
     manageShow: '한도 관리',
     manageHide: '관리 숨기기',
-  },
-  scope: {
-    switcherLabel: '개인 또는 조직 범위',
-    personal: '개인',
-    organization: '조직',
-    createOrganization: '새 조직',
-    personalHint: '개인 공간은 Personal 잔액을 공유합니다.',
-    organizationHint: '{name} 공간은 조직 잔액을 공유합니다.',
   },
   management: {
     title: '{name} 관리',

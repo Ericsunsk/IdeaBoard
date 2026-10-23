@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ControlAckEnvelope } from '../../../api/generated-query/control/model'
+import type { ControlAckEnvelope } from '@/api/generated-query/control/model'
 import * as monitorResource from './resource'
 import {
   ADMIN_MONITOR_QUERY_KEY,

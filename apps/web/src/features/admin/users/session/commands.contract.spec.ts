@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { useAdminUserCommands } from './commands'
-import { makeAdminUserCommandTarget } from '../../../../test/factories'
+import { makeAdminUserCommandTarget } from '@/test/factories'
 
 describe('admin user commands', () => {
   it('opens the ban dialog for active users and submits the ban payload', async () => {

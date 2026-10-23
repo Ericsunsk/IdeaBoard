@@ -15,6 +15,7 @@ type CreateCanvasWorkspaceImageWorkflowOptions = {
   feedback: Pick<CanvasFeedback, 'imageTools' | 'taskExecution'>
   executionCore: PendingImageExecutionCore
   cancelTasks: (taskIds: readonly string[]) => void
+  isWorkspaceAvailable: () => boolean
 }
 
 export function createCanvasWorkspaceImageWorkflow(
@@ -31,6 +32,7 @@ export function createCanvasWorkspaceImageWorkflow(
       refreshNodeInternals: options.graph.executionPort.refreshNodeInternals,
       executionCore: options.executionCore,
       cancelTasks: options.cancelTasks,
+      isWorkspaceAvailable: options.isWorkspaceAvailable,
     },
     flowPaneAdapter: options.flowPaneAdapter,
     openImageUrlPreview: options.openImageUrlPreview,

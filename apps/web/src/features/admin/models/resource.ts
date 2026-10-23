@@ -9,15 +9,15 @@ import {
   saveControlAIGatewayCatalog,
   testControlAIGatewayConnection,
   updateControlAIGateway,
-} from '../../../api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '../../../api/contractKernel'
+} from '@/api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '@/api/contractKernel'
 import {
   buildControlMutationHeaders,
   createControlError,
   type ControlMutationOptions,
 } from '../shared'
 import { withControlCopy } from '../shared'
-import { isRecord } from '../../../core/utils/guards'
+import { isRecord } from '@/core/utils/guards'
 import type {
   AdminModelItem,
   ModelObservedSkuMargin,

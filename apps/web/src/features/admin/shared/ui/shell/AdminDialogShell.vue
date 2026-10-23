@@ -85,6 +85,7 @@ import {
   DialogTitle,
 } from 'reka-ui'
 import { useAdminDialogInteraction } from '../../session/overlay/useAdminDialogInteraction'
+import { dialogShellSizeClasses, type DialogShellSize } from '@/core/components/dialogShell'
 import {
   adminDialogChromeClass,
   adminDialogChromeCloseClass,
@@ -103,7 +104,7 @@ import {
   adminOverlayMaskClass,
 } from '../../core/uiClasses'
 
-export type AdminDialogSize = 'slim' | 'compact' | 'form' | 'medium' | 'wide'
+export type AdminDialogSize = DialogShellSize
 export type AdminDialogContentLayout = 'form' | 'scrollable' | 'plain'
 
 const props = withDefaults(
@@ -139,13 +140,7 @@ const contentAriaLabel = computed(() =>
   hasCustomHeader.value ? (props.ariaLabel ?? props.header ?? '对话框') : undefined,
 )
 
-const dialogWidthClasses: Record<AdminDialogSize, string> = {
-  slim: 'w-[min(23rem,calc(100vw-1.5rem))] max-w-[23rem]',
-  compact: 'w-[min(30rem,calc(100vw-1.5rem))] max-w-[30rem]',
-  form: 'w-[min(35rem,calc(100vw-1.5rem))] max-w-[35rem]',
-  medium: 'w-[min(46rem,calc(100vw-1.5rem))] max-w-[46rem]',
-  wide: 'w-[min(61.25rem,calc(100vw-1.5rem))] max-w-[61.25rem]',
-}
+const dialogWidthClasses: Record<AdminDialogSize, string> = dialogShellSizeClasses
 
 const dialogScrollableViewportClass = `${adminDialogScrollableBodyClass} max-h-[min(68dvh,40rem)]`
 const contentLayoutClasses: Record<AdminDialogContentLayout, string> = {

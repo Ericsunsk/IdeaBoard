@@ -5,7 +5,6 @@ import { queryClient } from '../../../../core/query/queryClient'
 import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
 import { mockAppToast } from '../../../../test/toast'
 import { makeSessionUser } from '../../../../test/factories'
-import { useUserStore } from '../../../auth'
 import { primeAuthenticatedWorkspace, selectWorkspace } from '../../testing'
 import { boardQueryKeys } from '../../session/sync/boardQueryKeys'
 import { useSharePanel } from '../../session/share/useSharePanel'
@@ -31,6 +30,7 @@ function setup(
     isCreator?: boolean
     access?: Partial<WorkspaceBoardAccessFact>
     isCached?: boolean
+    currentUser?: { public_id?: string | null; avatar?: string | null } | null
     roster?: Array<{
       userId: string
       role: 'member'
@@ -91,7 +91,11 @@ function setup(
   const panel = useSharePanel()
   panels.push(panel)
   const view = renderWithUser(ShareDialog, {
-    props: { panel, deps: { transport } },
+    props: {
+      panel,
+      deps: { transport },
+      ...(options.currentUser !== undefined ? { currentUser: options.currentUser } : {}),
+    },
     global: { plugins: [[VueQueryPlugin, { queryClient: client }]] },
   })
   panel.open(BOARD, 'Campaign')
@@ -297,61 +301,53 @@ describe('selected-member Board sharing', () => {
   })
 
   test('prefers the roster avatar over the viewer avatar and never leaks it', async () => {
-    const store = useUserStore()
-    store.setAuth(
-      makeSessionUser({ public_id: other, avatar: '/api/v1/public/users/usr_other/avatar?v=5' }),
-    )
-    try {
-      setup({
-        roster: [
-          { userId: creator, role: 'member', email: 'creator@example.com' },
-          { userId: member, role: 'member', email: 'member@example.com' },
-          {
-            userId: other,
-            role: 'member',
-            email: 'other@example.com',
-            avatar_url: '/avatar-other.png',
-          },
-        ],
-      })
+    setup({
+      currentUser: makeSessionUser({
+        public_id: other,
+        avatar: '/api/v1/public/users/usr_other/avatar?v=5',
+      }),
+      roster: [
+        { userId: creator, role: 'member', email: 'creator@example.com' },
+        { userId: member, role: 'member', email: 'member@example.com' },
+        {
+          userId: other,
+          role: 'member',
+          email: 'other@example.com',
+          avatar_url: '/avatar-other.png',
+        },
+      ],
+    })
 
-      const otherButton = await screen.findByRole('button', { name: /other@example\.com/ })
-      expect(within(otherButton).getByRole('img', { hidden: true })).toHaveAttribute(
-        'src',
-        '/avatar-other.png',
-      )
-      // The viewer avatar never leaks onto other members.
-      const memberButton = screen.getByRole('button', { name: /member@example\.com/ })
-      expect(within(memberButton).queryByRole('img', { hidden: true })).toBeNull()
-    } finally {
-      store.clearAuth()
-    }
+    const otherButton = await screen.findByRole('button', { name: /other@example\.com/ })
+    expect(within(otherButton).getByRole('img', { hidden: true })).toHaveAttribute(
+      'src',
+      '/avatar-other.png',
+    )
+    // The viewer avatar never leaks onto other members.
+    const memberButton = screen.getByRole('button', { name: /member@example\.com/ })
+    expect(within(memberButton).queryByRole('img', { hidden: true })).toBeNull()
   })
 
   test('falls back to the viewer session avatar for the viewer entry', async () => {
-    const store = useUserStore()
-    store.setAuth(
-      makeSessionUser({ public_id: member, avatar: '/api/v1/public/users/usr_member/avatar?v=6' }),
-    )
-    try {
-      setup({
-        roster: [
-          { userId: creator, role: 'member', email: 'creator@example.com' },
-          { userId: member, role: 'member', email: 'member@example.com' },
-          { userId: other, role: 'member', email: 'other@example.com' },
-        ],
-      })
+    setup({
+      currentUser: makeSessionUser({
+        public_id: member,
+        avatar: '/api/v1/public/users/usr_member/avatar?v=6',
+      }),
+      roster: [
+        { userId: creator, role: 'member', email: 'creator@example.com' },
+        { userId: member, role: 'member', email: 'member@example.com' },
+        { userId: other, role: 'member', email: 'other@example.com' },
+      ],
+    })
 
-      const memberButton = await screen.findByRole('button', { name: /member@example\.com/ })
-      expect(within(memberButton).getByRole('img', { hidden: true })).toHaveAttribute(
-        'src',
-        '/api/v1/public/users/usr_member/avatar?v=6&size=64',
-      )
-      const creatorEl = screen.getByTitle('creator@example.com (Creator)')
-      expect(within(creatorEl as HTMLElement).queryByRole('img', { hidden: true })).toBeNull()
-    } finally {
-      store.clearAuth()
-    }
+    const memberButton = await screen.findByRole('button', { name: /member@example\.com/ })
+    expect(within(memberButton).getByRole('img', { hidden: true })).toHaveAttribute(
+      'src',
+      '/api/v1/public/users/usr_member/avatar?v=6&size=64',
+    )
+    const creatorEl = screen.getByTitle('creator@example.com (Creator)')
+    expect(within(creatorEl as HTMLElement).queryByRole('img', { hidden: true })).toBeNull()
   })
 
   test('A→B→A does not emit success for a write from the old Share residency', async () => {

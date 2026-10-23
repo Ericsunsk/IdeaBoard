@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderWithUser, screen } from '../../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import AdminStorageTable, { type StorageTableRow } from './AdminStorageTable.vue'
 import type { StorageCard } from '../../../core/storage/profiles'
 

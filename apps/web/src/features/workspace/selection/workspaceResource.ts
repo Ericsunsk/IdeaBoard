@@ -41,6 +41,7 @@ import {
   listOrganizationMembers as listOrganizationMembersTransport,
   listOrganizations,
   removeOrganizationMember as removeOrganizationMemberTransport,
+  updateOrganization as updateOrganizationTransport,
   updateOrganizationMember as updateOrganizationMemberTransport,
 } from '../../../api/generated-query/public/organizations/organizations'
 import { getGetUserQueryKey, getUser } from '../../../api/generated-query/public/user/user'
@@ -472,6 +473,30 @@ export async function provisionOrganization(
   return parseOrganization(requireContractData<unknown>(response, 'Organization creation failed'))
 }
 
+// Explicit PATCH rename (owner/admin only server-side). No Idempotency-Key:
+// renames are idempotent by value, so retries replay safely without one.
+export async function renameOrganization(
+  organizationId: string,
+  input: { name: string },
+  options?: WorkspaceRequestOptions,
+): Promise<OrganizationSummary> {
+  const orgId = requireOpaqueId(organizationId, 'org', 'organization')
+  const name = typeof input.name === 'string' ? input.name.trim() : ''
+  if (!name || name.length > WORKSPACE_NAME_MAX_LENGTH) {
+    throw new Error('Invalid organization name')
+  }
+  const response = await updateOrganizationTransport(
+    orgId,
+    {
+      data: {
+        name,
+      },
+    },
+    toRequestConfig(options),
+  )
+  return parseOrganization(requireContractData<unknown>(response, 'Organization rename failed'))
+}
+
 export type OrganizationRole = 'owner' | 'admin' | 'member'
 
 export type OrganizationMemberSummary = {
@@ -491,19 +516,6 @@ export function parseOrganizationMember(raw: unknown): OrganizationMemberSummary
   const role = parseOrganizationRole(raw.role)
   const createdAt = typeof raw.created_at === 'string' ? raw.created_at : undefined
   return { userId, role, ...(createdAt === undefined ? {} : { createdAt }) }
-}
-
-export function isPersonalWorkspace(item: Pick<WorkspaceSummary, 'organizationId'>): boolean {
-  return item.organizationId == null
-}
-
-export function isOrganizationWorkspace(
-  item: Pick<WorkspaceSummary, 'organizationId'>,
-  organizationId?: string | null,
-): boolean {
-  if (item.organizationId == null) return false
-  if (organizationId == null) return true
-  return item.organizationId === organizationId
 }
 
 // The organization itself is the management entry (#951): it carries no

@@ -31,7 +31,7 @@
         charges the holder's shared Personal account. -->
       <p
         v-if="section.isDefaultWorkspace.value"
-        class="m-0 rounded-control border border-border bg-muted/40 p-3 text-xs leading-normal text-muted-foreground"
+        class="m-0 rounded-control border border-border bg-muted/40 p-3 text-admin-meta leading-normal text-muted-foreground"
         aria-live="polite"
       >
         {{ t('workspace.switcher.members.defaultPrivate') }}

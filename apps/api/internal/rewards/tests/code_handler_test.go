@@ -19,11 +19,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
+func TestRewardCodeAdminHTTPContract(t *testing.T) {
 	pool := testdb.Open(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	userHandler := rewardhttp.NewUserHandler(service)
 	adminCommandHandler := rewardhttp.NewAdminCommandHandler(service)
 	adminReadHandler := rewardhttp.NewAdminReadHandler(service, nil)
 	gin.SetMode(gin.TestMode)
@@ -206,56 +205,22 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 	}
 
 	provisionRewardWallet(t, pool, creditService, 3)
-	userRouter := gin.New()
-	userRouter.Use(func(c *gin.Context) {
-		testsupport.SetPrincipal(t, c, 3, principal.RoleUser)
-		c.Next()
-	})
-	userRouter.POST("/user/rewards/redeem", userHandler.Redeem)
-	userRouter.GET("/user/rewards/redemptions", userHandler.ListRedemptions)
-	redeemed, redeemRecorder := performRewardWriteWithKey[ports.RedeemResult](
-		t, userRouter, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "HTTP-ROTATED-2026"}, "http-reward-redeem", http.StatusOK,
-	)
-	if redeemRecorder.Header().Get("Cache-Control") != "no-store" || redeemed.CreditedAmount != 25 {
-		t.Fatalf("redeem = %+v Cache-Control=%q", redeemed, redeemRecorder.Header().Get("Cache-Control"))
+	// User HTTP edge is deleted; the canonical redeem path is the v1
+	// workspace surface (billing_gaps). Seed the redeemed fact through
+	// the service seam so the admin delete-conflict below still covers
+	// the redeemed-code guard.
+	redeemed, err := service.Redeem(t.Context(), ports.RedeemCommand{UserID: 3, Code: "HTTP-ROTATED-2026"})
+	if err != nil {
+		t.Fatalf("Redeem() error = %v", err)
 	}
-	var redeemPayload struct {
-		Data struct {
-			Redemption map[string]json.RawMessage `json:"redemption"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(redeemRecorder.Body.Bytes(), &redeemPayload); err != nil {
-		t.Fatalf("decode redeem response: %v", err)
-	}
-	for _, field := range []string{"user_public_id", "display_name"} {
-		if _, found := redeemPayload.Data.Redemption[field]; !found {
-			t.Fatalf("redeem redemption omitted contract field %q", field)
-		}
-	}
-	for _, field := range []string{"reward_code_display_name", "masked_code_hint"} {
-		if _, found := redeemPayload.Data.Redemption[field]; found {
-			t.Fatalf("redeem redemption unexpectedly exposed snapshot field %q", field)
-		}
+	if redeemed.CreditedAmount != 25 {
+		t.Fatalf("redeem = %+v, want credited 25", redeemed)
 	}
 	_, redeemedDeleteRecorder := performRewardRequestWithRecorder[struct{}](
 		t, adminRouter, http.MethodDelete, codePath, nil, http.StatusConflict,
 	)
 	if redeemedDeleteRecorder.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("redeemed delete Cache-Control=%q", redeemedDeleteRecorder.Header().Get("Cache-Control"))
-	}
-	invalidRaw := "INVALID-SECRET-9999"
-	_, invalidRecorder := performRewardWriteWithKey[struct{}](
-		t, userRouter, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": invalidRaw}, "http-reward-redeem-invalid", http.StatusUnprocessableEntity,
-	)
-	if invalidRecorder.Header().Get("Cache-Control") != "no-store" || strings.Contains(invalidRecorder.Body.String(), invalidRaw) {
-		t.Fatalf("invalid response leaked raw Code: %s", invalidRecorder.Body.String())
-	}
-	_, historyRecorder := performRewardRequestWithRecorder[ports.RedemptionHistoryPage](
-		t, userRouter, http.MethodGet, "/user/rewards/redemptions", nil, http.StatusOK,
-	)
-	if historyRecorder.Header().Get("Cache-Control") != "no-store" ||
-		strings.Contains(historyRecorder.Body.String(), "HTTPREWARD2026") {
-		t.Fatalf("history response leaked raw Code: %s", historyRecorder.Body.String())
 	}
 }
 

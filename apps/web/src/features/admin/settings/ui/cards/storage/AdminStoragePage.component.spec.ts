@@ -1,8 +1,8 @@
 import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen, waitFor, within } from '../../../../../../test/render'
-import { expectDomOrder } from '../../../../../../test/domOrder'
-import { mockAppToast } from '../../../../../../test/toast'
+import { renderWithUser, screen, waitFor, within } from '@/test/render'
+import { expectDomOrder } from '@/test/domOrder'
+import { mockAppToast } from '@/test/toast'
 import AdminStoragePage from './AdminStoragePage.vue'
 import AdminStorageTable from './AdminStorageTable.vue'
 
@@ -162,7 +162,7 @@ describe('AdminStoragePage', () => {
     })
 
     expect(await screen.findByText('生产环境 OSS')).toBeInTheDocument()
-    // 健康三态（方案 A）：当前→Ready success，载体统一 AdminStatusPill，无英文孤岛。
+    // 健康三态（方案 A）：当前→Ready success，载体统一 StatusBadge，无英文孤岛。
     const ready = screen.getByText('Ready')
     expect(ready).toBeVisible()
     expect(ready.parentElement?.className ?? '').toContain('bg-success-soft')
@@ -254,7 +254,7 @@ describe('AdminStoragePage', () => {
       },
     })
 
-    // 方案 A：异常 danger，统一 AdminStatusPill；配置缺失只占位“—”，无内嵌诊断。
+    // 方案 A：异常 danger，统一 StatusBadge；配置缺失只占位“—”，无内嵌诊断。
     const abnormal = screen.getByText('Error')
     expect(abnormal).toBeVisible()
     expect(abnormal.parentElement?.className ?? '').toContain('bg-destructive-soft')

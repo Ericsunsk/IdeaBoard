@@ -1,8 +1,7 @@
 package contract
 
 import (
-	"net/http"
-
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/idempotency"
 )
 
@@ -21,8 +20,7 @@ const (
 
 	// CodeIdempotencyKeyRequired and CodeIdempotencyConflict are promoted
 	// to global from platform/idempotency. The values are aliased (not
-	// copied) so the kernel registry and the legacy edge helper cannot
-	// drift apart.
+	// copied) so the kernel and idempotency edge use the same wire values.
 	CodeIdempotencyKeyRequired Code = Code(idempotency.CodeRequired)
 	CodeIdempotencyConflict    Code = Code(idempotency.CodeConflict)
 
@@ -391,117 +389,5 @@ const (
 // codes fail closed to 500: an unregistered code is a server bug, never a
 // caller mistake.
 func StatusOf(code Code) int {
-	switch code {
-	case CodePaginationCursorInvalid, CodeIdempotencyKeyRequired, CodeBadRequest,
-		CodeBillingInvalidInput,
-		CodeCreditInvalidInput,
-		CodeRewardInvalidInput, CodeRewardCodeIDInvalid, CodeRewardRedemptionIDInvalid,
-		CodeRewardPaginationInvalid, CodeRewardCodeInvalid,
-		CodeBoardInvalidInput, CodeBoardMemberRoleInvalid, CodeBoardMemberSelfInvalid,
-		CodeIdentityRequestInvalid, CodeIdentityUserPublicIDInvalid,
-		CodeStorageInvalidInput, CodeStorageProfileInvalid,
-		CodeStripeConfigurationInvalidInput, CodeCheckoutInvalidInput,
-		CodeRechargeHistoryLimitInvalid, CodeRechargeHistoryCursorInvalid,
-		CodeWebhookSignatureInvalid,
-		CodeAdminPaymentOrderFilterInvalid, CodeAdminPaymentOrderCursorInvalid,
-		CodeSearchRequestInvalid, CodeSearchProviderAPIKeyInvalid,
-		CodeSearchLimitInvalid, CodeSearchQueryInvalid, CodeSearchCursorInvalid,
-		CodeSearchProviderTestFailed,
-		CodeVisionSearchInputInvalid, CodeVisionSearchImageInvalid,
-		CodeVisionSearchImageUnavailable,
-		CodeTaskStatisticsRequestInvalid:
-		return http.StatusBadRequest
-	case CodeUnauthorized, CodeIdentityUnauthorized:
-		return http.StatusUnauthorized
-	case CodeForbidden, CodeWorkspaceForbidden, CodeOrganizationForbidden, CodeMembershipTransitionForbidden,
-		CodeWorkspaceDefaultProtected,
-		CodeBoardForbidden, CodeBillingWalletRestricted, CodeTaskForbidden, CodeEventForbidden,
-		CodeBoardPermissionDenied, CodeStripePermissionDenied, CodeIdentityForbidden,
-		CodeBillingAccountForbidden,
-		CodeMemberQuotaExhausted,
-		// CodeIdentityUpstreamRejected renders with the upstream 401/403
-		// status kept explicit at the impersonation edge; the registry
-		// pins 403 as the representative denial.
-		CodeIdentityUpstreamRejected:
-		return http.StatusForbidden
-	case CodeNotFound, CodeWorkspaceNotFound, CodeOrganizationNotFound, CodeWorkspaceMemberNotFound,
-		CodeOrganizationMemberNotFound,
-		CodeBoardNotFound, CodeBoardMemberNotFound,
-		CodeUploadNotFound, CodeMediaNotFound, CodeBillingSessionNotFound,
-		CodeBillingAccountNotFound,
-		CodeLibraryFolderNotFound, CodeLibraryAssetNotFound, CodeLibraryMaterializationNotFound,
-		CodeTaskNotFound, CodeEventNotFound, CodeEventSubscriptionNotFound, CodeControlNotFound,
-		CodeBillingSKUNotFound,
-		CodeCreditWalletNotFound, CodeCreditChargeNotFound, CodeCreditReconciliationNotFound,
-		CodeRewardCodeNotFound, CodeRewardRedemptionNotFound,
-		CodeIdentityUserNotFound, CodeSearchProviderNotFound:
-		return http.StatusNotFound
-	case CodeUploadExpired, CodeMediaArchived:
-		return http.StatusGone
-	case CodeTaskIdempotencyConflict, CodeIdempotencyConflict, CodeConflict,
-		CodeWorkspaceIdempotencyConflict, CodeOrganizationIdempotencyConflict,
-		CodeWorkspaceMemberLimitReached, CodeOrganizationLimitReached, CodeWorkspaceDefaultConflict, CodeWorkspaceActiveTasks,
-		CodeOrganizationClosed, CodeOrganizationClosureBlocked,
-		CodeBoardRevisionConflict, CodeBoardIdempotencyConflict, CodeBoardArchived,
-		CodeUploadStateConflict, CodeUploadIdempotencyConflict,
-		CodeMediaNotReady, CodeMediaIdempotencyConflict, CodeBillingCheckoutConflict,
-		CodeLibraryIdempotencyConflict, CodeSearchIdempotencyConflict,
-		CodeTaskStateConflict, CodeEventSubscriptionConflict,
-		CodeBillingItemNotArchived, CodeBillingArchivedItemInUse,
-		CodeRewardCodeConflict, CodeRewardCodeIdempotencyConflict,
-		CodeRewardCodeCapInvalid, CodeRewardCodeRedeemed, CodeRewardRedeemConflict,
-		CodeRewardWalletLocked,
-		CodeCreditIdempotencyConflict,
-		CodeBoardNameConflict, CodeBoardIDConflict,
-		CodeIdentityConflict, CodeStripeConfigurationChanged, CodeCheckoutConflict,
-		CodeWalletNotRechargeable, CodeBillingAccountConflict,
-		CodeSearchProviderTestRequired, CodeSearchProviderAPIKeyRequired:
-		return http.StatusConflict
-	case CodeValidationFailed, CodeUploadValidationFailed, CodeMediaValidationFailed,
-		CodeServiceResolutionUnavailable,
-		CodeBillingPricingUnavailable,
-		CodeBillingQuoteTotalExceeded, CodeRewardCodeUnavailable,
-		CodeCreditInsufficientCredits, CodeCreditRefundExceedsCharge,
-		CodeStripeConfigurationUnprocessable,
-		CodePaymentAlreadyCompleted, CodeCheckoutSessionExpired, CodeCheckoutRequestRejected:
-		return http.StatusUnprocessableEntity
-	case CodeRateLimited, CodeRewardRateLimited,
-		CodeTaskMonitorConcurrencyLimited:
-		return http.StatusTooManyRequests
-	case CodeServiceUnavailable, CodeBillingQuoteUnavailable,
-		CodeSearchProviderUnavailable, CodeSearchVisionNotConfigured,
-		CodeBillingServiceUnavailable, CodeRewardServiceUnavailable,
-		CodeCreditReconciliationUnavailable,
-		CodeStorageServiceUnavailable, CodeIdentityServiceUnavailable,
-		CodeStripeProviderUnavailable, CodePaymentServiceUnavailable,
-		CodePurchasesUnavailable, CodeWebhookConfigurationMissing,
-		CodeSearchUnavailable,
-		CodeVisionSearchUnavailable, CodeVisionSearchNotConfigured:
-		return http.StatusServiceUnavailable
-	case CodeContractNotImplemented:
-		return http.StatusNotImplemented
-	case CodeSearchVisionProviderError,
-		CodeIdentityUpstreamUnavailable,
-		CodeVisionSearchProviderError, CodeVisionSearchSchemaError,
-		CodeVisionSearchCredentials, CodeVisionSearchQuota, CodeVisionSearchNetwork:
-		return http.StatusBadGateway
-	case CodeVisionSearchTimeout:
-		return http.StatusGatewayTimeout
-	case CodeTaskInsufficientCredits:
-		return http.StatusPaymentRequired
-	case CodeBoardPreconditionRequired:
-		return http.StatusPreconditionRequired
-	case CodeBoardAccessConflict:
-		return http.StatusPreconditionFailed
-	case CodeBillingOperationFailed, CodeRewardOperationFailed, CodeRewardRedeemFailed,
-		CodeCreditOperationFailed,
-		CodeBoardOperationFailed, CodeStorageOperationFailed, CodeIdentityOperationFailed:
-		// Explicit 500 pins: same as the fail-closed default, kept so
-		// the registry documents every promoted code's exact status.
-		return http.StatusInternalServerError
-	case CodeCreditWalletFrozen, CodeCreditWalletRestricted:
-		return http.StatusLocked
-	default:
-		return http.StatusInternalServerError
-	}
+	return errorrender.StatusForCode(errorrender.Code(code))
 }

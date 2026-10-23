@@ -118,7 +118,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useI18n } from 'vue-i18n'
 import { resolveMemberAvatar, resolveMemberInitial } from '../../../../core/media/avatarUrl'
-import { useUserStore } from '../../../auth'
+import type { MemberAvatarViewer } from '../../../../core/media/avatarUrl'
 import type { CatalogEntry } from './contract'
 import type { BoardListSceneEntry } from '../../session/sync/boardQueries'
 import SceneThumbnail from './SceneThumbnail.vue'
@@ -132,6 +132,8 @@ const props = defineProps<{
   renameDraft: string
   isMenuOpen: boolean
   displayDate: string
+  /** Session viewer injected from the page seam (no auth store import). */
+  currentUser?: MemberAvatarViewer | undefined
 }>()
 
 const emit = defineEmits<{
@@ -148,7 +150,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const userStore = useUserStore()
+const currentUser = computed(() => props.currentUser ?? null)
 
 // Owner avatar row (bare size-5 avatar, no ring): team
 // (workspace-posture) cards render the creator avatar; private cards and
@@ -163,7 +165,7 @@ const ownerAvatarEntry = computed(() => {
   return { userId, avatar_url: props.board.ownerAvatarUrl ?? undefined }
 })
 const ownerAvatarSrc = computed(() =>
-  ownerAvatarEntry.value ? resolveMemberAvatar(ownerAvatarEntry.value, userStore.user) : undefined,
+  ownerAvatarEntry.value ? resolveMemberAvatar(ownerAvatarEntry.value, currentUser.value) : undefined,
 )
 const ownerAvatarInitial = computed(() =>
   ownerAvatarEntry.value ? resolveMemberInitial(ownerAvatarEntry.value) : 'U',

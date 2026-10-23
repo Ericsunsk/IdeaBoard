@@ -1,6 +1,6 @@
 import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import ModelPoolEditorPanel from './ModelPoolEditorPanel.vue'
 import type {
   AdminBillableItemCard,

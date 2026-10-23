@@ -195,7 +195,7 @@ import { AdminDialogShell } from '../../../shared'
 import { AdminFormField } from '../../../shared'
 import { AdminInput } from '../../../shared'
 import { AdminNumberInput } from '../../../shared'
-import { createUniqueId } from '../../../../../core/utils/ids'
+import { createUniqueId } from '@/core/utils/ids'
 import type { RewardCode, UpdateRewardCodeInput } from '../../session/rewards/resource'
 import { generateRewardCode } from '../../core/rewards/rewardCodeGenerator'
 import {

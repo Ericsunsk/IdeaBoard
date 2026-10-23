@@ -1,4 +1,4 @@
-import { requireContractData } from '../../../../api/contractKernel'
+import { requireContractData } from '@/api/contractKernel'
 import type { ControlErrorMessages } from './controlMutation'
 import { withControlCopy } from './controlCopy'
 

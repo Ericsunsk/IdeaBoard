@@ -70,9 +70,9 @@
 
         <AdminColumn :header="t('admin.billingAccount.ownerColumn')" style="width: 140px">
           <template #body="{ data }">
-            <AdminStatusPill
+            <StatusBadge
               :label="ownerLabel(data.owner_type)"
-              :variant="data.owner_type === 'organization' ? 'warning' : 'success'"
+              :tone="data.owner_type === 'organization' ? 'warning' : 'success'"
               size="small"
             />
           </template>
@@ -150,13 +150,13 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Refresh } from '@iconoir/vue'
-import ActionButton from '../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminAlert } from '../../../shared'
 import { AdminButton } from '../../../shared'
 import { AdminColumn } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
 import { AdminMono } from '../../../shared'
-import { AdminStatusPill } from '../../../shared'
+import { StatusBadge } from '../../../shared'
 import { AdminTable } from '../../../shared'
 import { formatAdminDateTimeWithSeconds } from '../../core/shared/format'
 import {

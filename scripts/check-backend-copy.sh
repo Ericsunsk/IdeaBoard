@@ -3,14 +3,14 @@
 #
 # Backend copy vocabulary guard.
 #
-# Backend user-facing copy lives in the centralized table
-# (apps/api/internal/platform/errorrender/copy.go, see docs/adr/0017-backend-copy-centralization.md
+# Backend user-facing copy lives in the centralized tables
+# (apps/api/internal/platform/errorrender/copy*.go, see docs/adr/0017-backend-copy-centralization.md
 # plus its runtimehttp-kernel follow-up; the scan still covers the legacy
 # apps/api/internal/**/message.go and apps/api/internal/**/errors.go names
 # for transitional or skipped packages). The runtimehttp kernel table
 # (apps/api/internal/runtime/interfaces/http/errors.go) is alias-only and
 # must stay free of string literals (pinned by the alias guard below);
-# wording lives exactly once in copy.go.
+# wording lives exactly once in copy*.go.
 # wording is managed centrally in the "Backend Copy
 # Vocabulary" section of apps/api/CONTEXT.md. This script is the
 # mechanical pin: every banned variant below must never reappear
@@ -75,8 +75,8 @@ banned_variants=(
 tables=()
 while IFS= read -r table; do
   tables+=("$table")
-done < <(find "$repo_root/apps/api/internal" -type f \( -name 'message.go' -o -name 'errors.go' -o -name 'copy.go' \) | sort)
-(( ${#tables[@]} > 0 )) || die "no message.go/errors.go tables found under $repo_root/apps/api/internal"
+done < <(find "$repo_root/apps/api/internal" -type f \( -name 'message.go' -o -name 'errors.go' -o -name 'copy*.go' \) | sort)
+(( ${#tables[@]} > 0 )) || die "no message.go/errors.go/copy*.go tables found under $repo_root/apps/api/internal"
 
 fail=0
 hits=0
@@ -113,7 +113,7 @@ if [[ -f "$kernel_aliases" ]]; then
     | grep -Ev '^[[:space:]]*Msg[A-Za-z0-9_]+[[:space:]]*=[[:space:]]*errorrender\.Msg[A-Za-z0-9_]+[[:space:]]*$' || true)"
   if [[ -n "$kernel_leftover" ]]; then
     printf 'NON-ALIAS content in %s:\n%s\n' "$kernel_aliases" "$kernel_leftover" >&2
-    printf 'Kernel copy must stay alias-only; add wording in platform/errorrender/copy.go.\n' >&2
+    printf 'Kernel copy must stay alias-only; add wording in platform/errorrender/copy*.go.\n' >&2
     exit 1
   fi
 fi

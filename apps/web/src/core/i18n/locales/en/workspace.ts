@@ -37,6 +37,7 @@ export default {
     title: 'Workspaces',
     rowTitle: 'Workspace',
     manage: 'Manage workspaces',
+    settingsAction: 'Settings',
     defaultBadge: 'Default',
     listLabel: 'Workspace list',
     createAction: 'Add New',
@@ -109,8 +110,6 @@ export default {
       defaultPrivate: 'The Default workspace is private and cannot invite collaborators.',
     },
     organization: {
-      scope: 'Workspace scope',
-      personal: 'Personal / studio',
       new: 'Create organization',
       name: 'Organization name',
       setupNote:
@@ -120,6 +119,7 @@ export default {
       invalidName: 'Enter an organization name of 1–{max} characters.',
       loadFailed: 'Could not load organizations. Please retry.',
       createFailed: 'Could not create the organization. Please retry.',
+      renameFailed: 'Could not rename the organization. Please try again.',
     },
     handover: {
       title: 'Funds account handover',
@@ -187,14 +187,6 @@ export default {
     title: 'Usage limits',
     manageShow: 'Manage limits',
     manageHide: 'Hide management',
-  },
-  scope: {
-    switcherLabel: 'Personal or organization scope',
-    personal: 'Personal',
-    organization: 'Organization',
-    createOrganization: 'New organization',
-    personalHint: 'Personal spaces share your Personal balance.',
-    organizationHint: '{name} spaces share the organization balance.',
   },
   management: {
     title: '{name} management',

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/platform/errorrender"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 
 	"github.com/gin-gonic/gin"
@@ -63,18 +64,21 @@ func TestRewardDomainTableHasNoEmptyMessages(t *testing.T) {
 		if row.Code == "" || row.Message == "" {
 			t.Errorf("row %d targets=%v has empty code/message", i, row.Targets)
 		}
-		if row.Status < 400 || row.Status >= 600 {
-			t.Errorf("row %d (%s) status = %d, want 4xx/5xx", i, row.Code, row.Status)
+		// Status is never stored per row: it derives from the central
+		// registry by Code, so every row must resolve to a 4xx/5xx
+		// outcome there (unknown codes fail closed to 500).
+		if status := errorrender.StatusForCode(errorrender.Code(row.Code)); status < 400 || status >= 600 {
+			t.Errorf("row %d (%s) registry status = %d, want 4xx/5xx", i, row.Code, status)
 		}
 		switch row.Scope {
-		case "", rewardScopeAdmin, rewardScopeRedeem:
+		case "", rewardScopeAdmin:
 		default:
-			t.Errorf("row %d (%s) scope = %q, want admin/redeem/empty", i, row.Code, row.Scope)
+			t.Errorf("row %d (%s) scope = %q, want admin/empty", i, row.Code, row.Scope)
 		}
 	}
 }
 
-func TestRewardRedeemScopeSharesSingleInvalidOutcome(t *testing.T) {
+func TestRewardAdminScopeSharesSingleInvalidOutcome(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cases := []struct {
 		scope      string
@@ -83,23 +87,11 @@ func TestRewardRedeemScopeSharesSingleInvalidOutcome(t *testing.T) {
 		wantCode   string
 	}{
 		{scope: rewardScopeAdmin, err: rewardsdomain.ErrInvalidCode, wantStatus: http.StatusBadRequest, wantCode: codeRewardCodeInvalid},
-		{scope: rewardScopeRedeem, err: rewardsdomain.ErrInvalidCode, wantStatus: http.StatusUnprocessableEntity, wantCode: codeRewardCodeUnavailable},
-		{scope: rewardScopeRedeem, err: rewardsdomain.ErrCodeUnavailable, wantStatus: http.StatusUnprocessableEntity, wantCode: codeRewardCodeUnavailable},
-		{scope: rewardScopeRedeem, err: rewardsdomain.ErrWalletFrozen, wantStatus: http.StatusConflict, wantCode: codeRewardWalletLocked},
 		{scope: rewardScopeAdmin, err: rewardsdomain.ErrRewardCodeConflict, wantStatus: http.StatusConflict, wantCode: codeRewardCodeIdempotencyConflict},
-		// Admin-only rows never leak into the redeem surface: an admin
-		// conflict on redeem renders the redeem default, not the admin row.
-		{scope: rewardScopeRedeem, err: rewardsdomain.ErrRewardCodeConflict, wantStatus: http.StatusInternalServerError, wantCode: codeRewardRedeemFailed},
 	}
 	for _, tc := range cases {
-		var writer func(*gin.Context, error)
-		if tc.scope == rewardScopeAdmin {
-			writer = writeRewardError
-		} else {
-			writer = writeRewardRedeemError
-		}
 		router := gin.New()
-		router.GET("/err", func(c *gin.Context) { writer(c, tc.err) })
+		router.GET("/err", func(c *gin.Context) { writeRewardError(c, tc.err) })
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/err", nil))
 		if recorder.Code != tc.wantStatus {

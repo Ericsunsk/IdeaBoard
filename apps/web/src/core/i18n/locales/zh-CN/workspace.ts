@@ -35,6 +35,7 @@ export default {
     title: '工作区',
     rowTitle: '工作区',
     manage: '管理工作区',
+    settingsAction: '设置',
     defaultBadge: '默认',
     listLabel: '工作区列表',
     createAction: '新建工作区',
@@ -103,8 +104,6 @@ export default {
       defaultPrivate: '默认空间为私有，不可邀请协作者。',
     },
     organization: {
-      scope: '工作区归属',
-      personal: '个人 / 工作室',
       new: '创建组织',
       name: '组织名称',
       setupNote:
@@ -114,6 +113,7 @@ export default {
       invalidName: '请输入 1–{max} 个字符的组织名称。',
       loadFailed: '组织列表加载失败，请重试。',
       createFailed: '组织创建失败，请重试。',
+      renameFailed: '组织重命名失败，请重试。',
     },
     handover: {
       title: '资金账户交接',
@@ -178,14 +178,6 @@ export default {
     title: '用量额度',
     manageShow: '管理额度',
     manageHide: '收起管理',
-  },
-  scope: {
-    switcherLabel: '个人或组织范围',
-    personal: '个人',
-    organization: '组织',
-    createOrganization: '新建组织',
-    personalHint: '个人空间共用你的 Personal 余额。',
-    organizationHint: '{name} 的空间共用组织余额。',
   },
   management: {
     title: '{name} 管理',

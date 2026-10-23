@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"net/http"
 	"strconv"
@@ -196,20 +195,20 @@ func renderTaskError(c *gin.Context, err error) {
 	}
 	switch {
 	case errors.Is(err, workspacetasks.ErrNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, runtimehttp.MsgControlNotFound8)
+		contract.RenderError(c, contract.StatusOf(contract.CodeTaskNotFound), contract.CodeTaskNotFound, runtimehttp.MsgControlNotFound8)
 	case errors.Is(err, workspacetasks.ErrBoardNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, runtimehttp.MsgBoardNotFound)
+		contract.RenderError(c, contract.StatusOf(contract.CodeBoardNotFound), contract.CodeBoardNotFound, runtimehttp.MsgBoardNotFound)
 	case errors.Is(err, workspacetasks.ErrBoardArchived):
 		contract.RenderError(c, contract.StatusOf(contract.CodeBoardArchived), contract.CodeBoardArchived, runtimehttp.MsgBoardArchived)
 	case errors.Is(err, workspacetasks.ErrForbidden):
-		contract.RenderError(c, http.StatusForbidden, contract.CodeTaskForbidden, runtimehttp.MsgForbidden)
+		contract.RenderError(c, contract.StatusOf(contract.CodeTaskForbidden), contract.CodeTaskForbidden, runtimehttp.MsgForbidden)
 	case errors.Is(err, workspacetasks.ErrIdempotencyConflict):
 		// The durable submit claim already holds this (workspace, operation,
 		// key) for a different request body. Reusing a key across different
 		// bodies is a client bug, never a replay.
-		contract.RenderError(c, http.StatusConflict, contract.CodeTaskIdempotencyConflict, runtimehttp.MsgWorkspaceIdempotencyConflict)
+		contract.RenderError(c, contract.StatusOf(contract.CodeTaskIdempotencyConflict), contract.CodeTaskIdempotencyConflict, runtimehttp.MsgWorkspaceIdempotencyConflict)
 	case errors.Is(err, workspacetasks.ErrStateConflict):
-		contract.RenderError(c, http.StatusConflict, contract.CodeTaskStateConflict, runtimehttp.MsgTaskStateConflict)
+		contract.RenderError(c, contract.StatusOf(contract.CodeTaskStateConflict), contract.CodeTaskStateConflict, runtimehttp.MsgTaskStateConflict)
 	case errors.Is(err, workspacetasks.ErrInsufficientCredits):
 		contract.RenderError(c, contract.StatusOf(contract.CodeTaskInsufficientCredits),
 			contract.CodeTaskInsufficientCredits, runtimehttp.MsgValidationFailed2)
@@ -217,7 +216,7 @@ func renderTaskError(c *gin.Context, err error) {
 		contract.RenderError(c, contract.StatusOf(contract.CodeMemberQuotaExhausted),
 			contract.CodeMemberQuotaExhausted, runtimehttp.MsgMemberQuotaExhausted)
 	case errors.Is(err, workspacetasks.ErrQuoteUnavailable):
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, runtimehttp.MsgBillingQuoteUnavailable)
+		contract.RenderError(c, contract.StatusOf(contract.CodeBillingQuoteUnavailable), contract.CodeBillingQuoteUnavailable, runtimehttp.MsgBillingQuoteUnavailable)
 	// An empty eligible pool converges to 422
 	// service_resolution_unavailable with the normalized request values at
 	// details.fields.service/details.fields.resolution (ADR-0012 rule 8).
@@ -228,18 +227,18 @@ func renderTaskError(c *gin.Context, err error) {
 			fields["service"] = unavailable.Service
 			fields["resolution"] = string(unavailable.Resolution)
 		}
-		contract.RenderErrorWithDetails(c, http.StatusUnprocessableEntity, contract.CodeServiceResolutionUnavailable, "该清晰度暂不可用",
+		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeServiceResolutionUnavailable), contract.CodeServiceResolutionUnavailable, runtimehttp.MsgBillingPoolUnavailable,
 			contract.FieldErrors{Fields: fields})
 	case errors.Is(err, workspacetasks.ErrWalletRestricted):
-		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, runtimehttp.MsgBillingWalletRestricted2)
+		contract.RenderError(c, contract.StatusOf(contract.CodeBillingWalletRestricted), contract.CodeBillingWalletRestricted, runtimehttp.MsgBillingWalletRestricted2)
 	case errors.Is(err, workspacetasks.ErrMediaNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, runtimehttp.MsgMediaNotFound2)
+		contract.RenderError(c, contract.StatusOf(contract.CodeMediaNotFound), contract.CodeMediaNotFound, runtimehttp.MsgMediaNotFound2)
 	case errors.Is(err, workspacetasks.ErrMediaNotReady):
-		contract.RenderError(c, http.StatusConflict, contract.CodeMediaNotReady, runtimehttp.MsgMediaNotReady)
+		contract.RenderError(c, contract.StatusOf(contract.CodeMediaNotReady), contract.CodeMediaNotReady, runtimehttp.MsgMediaNotReady)
 	case errors.Is(err, workspacetasks.ErrMediaArchived):
 		contract.RenderError(c, contract.StatusOf(contract.CodeMediaArchived), contract.CodeMediaArchived, runtimehttp.MsgMediaArchived)
 	default:
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable25)
+		contract.RenderError(c, contract.StatusOf(contract.CodeServiceUnavailable), contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable25)
 	}
 	c.Abort()
 }
@@ -865,10 +864,10 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 			renderTaskError(c, err)
 			return
 		}
-		// Funds gate on the resolved account (submit Hold parity):
-		// active restrictions deny first, then sufficiency. Frozen and
-		// missing wallets pass through exactly as the submit Hold maps
-		// them (no second mapping to drift).
+		// Funds gate on the resolved account (submit Hold parity via
+		// workspacetasks.CheckFundsGate): active restrictions deny first,
+		// then sufficiency. Frozen and missing wallets pass through
+		// exactly as the submit Hold maps them (no second mapping to drift).
 		wallet, err := h.deps.TaskQuoteWallets.GetWallet(c.Request.Context(), account.InternalID)
 		if err != nil {
 			if errors.Is(err, domain.ErrWalletRestricted) {
@@ -878,12 +877,8 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 			renderTaskError(c, err)
 			return
 		}
-		if len(wallet.ActiveRestrictions) > 0 {
-			renderTaskError(c, workspacetasks.ErrWalletRestricted)
-			return
-		}
-		if wallet.Available < snapshot.TotalCredits {
-			renderTaskError(c, fmt.Errorf("quote exceeds the resolved account balance: %w", workspacetasks.ErrInsufficientCredits))
+		if err := workspacetasks.CheckFundsGate(wallet.Available, snapshot.TotalCredits, len(wallet.ActiveRestrictions) > 0); err != nil {
+			renderTaskError(c, err)
 			return
 		}
 		// Member quota gate (#946: same cap submit enforces, reported

@@ -207,7 +207,7 @@ import { AdminSettingsDialogFrame } from '../../../../shared/index'
 import { AdminFormField } from '../../../../shared/index'
 import { AdminLogoPickerPopover } from '../../../../shared/index'
 import { formatAdminDisplayError, useAdminToast } from '../../../../shared/index'
-import { useAppClipboard } from '../../../../../../core/composables/useAppClipboard'
+import { useAppClipboard } from '@/core/composables/useAppClipboard'
 import { secretField } from '../../../../shared/index'
 import {
   createOAuthProviderSettingsResource,
@@ -217,7 +217,7 @@ import {
 import {
   getOAuthProviderLabel,
   type OAuthProviderCode,
-} from '../../../../../../core/auth/oauthProviders'
+} from '@/core/auth/oauthProviders'
 import { resolveOAuthProviderLogo } from './logo'
 import { OAUTH_MESSAGES } from './messages'
 

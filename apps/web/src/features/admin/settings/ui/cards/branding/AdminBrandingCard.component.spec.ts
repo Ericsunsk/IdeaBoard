@@ -1,8 +1,8 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { http, HttpResponse, useMswHandlers } from '../../../../../../test/msw'
-import { renderWithUser, screen, waitFor } from '../../../../../../test/render'
-import { mockAppToast } from '../../../../../../test/toast'
+import { http, HttpResponse, useMswHandlers } from '@/test/msw'
+import { renderWithUser, screen, waitFor } from '@/test/render'
+import { mockAppToast } from '@/test/toast'
 import AdminBrandingCard from './AdminBrandingCard.vue'
 
 vi.mock('../../../../../../core/composables/useAppToast')

@@ -4,16 +4,16 @@ import {
   searchControlRewardCodes,
   setControlRewardCodeEnabled,
   updateControlRewardCode,
-} from '../../../../../api/generated-query/control/control-credits/control-credits'
+} from '@/api/generated-query/control/control-credits/control-credits'
 import type {
   ControlCreatedRewardCode,
   ControlRewardCode,
   ControlRewardCodePage,
   ControlUpdatedRewardCode,
-} from '../../../../../api/generated-query/control/model'
-import { requireContractData } from '../../../../../api/contractKernel'
-import { withSignal } from '../../../../../core/utils/request'
-import { controlCreditIdempotencyKey } from '../../../../../api/idempotencyKey'
+} from '@/api/generated-query/control/model'
+import { requireContractData } from '@/api/contractKernel'
+import { withSignal } from '@/core/utils/request'
+import { controlCreditIdempotencyKey } from '@/api/idempotencyKey'
 import {
   buildControlMutationHeaders,
   createControlError,

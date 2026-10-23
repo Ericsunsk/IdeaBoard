@@ -83,7 +83,7 @@
           </template>
         </AdminColumn>
 
-        <!-- Status 列（健康三态：正常/异常/未验证，载体统一 AdminStatusPill） -->
+        <!-- Status 列（健康三态：正常/异常/未验证，载体统一 StatusBadge） -->
         <AdminColumn field="status" :header="STATUS_COLUMN_HEADER" :style="{ width: '105px' }">
           <template #body="{ data }">
             <!-- 变色走过渡：Badge 本体自带 transition-colors，包一层把过渡带给圆点
@@ -91,9 +91,9 @@
             <div
               class="[&_span]:transition-colors [&_span]:duration-[var(--motion-control-duration)] [&_span]:ease-[var(--motion-control-easing)]"
             >
-              <AdminStatusPill
+              <StatusBadge
                 :label="testStateLabel(data.test_state)"
-                :variant="testStateVariant(data.test_state)"
+                :tone="testStateTone(data.test_state)"
                 size="small"
               />
             </div>
@@ -143,11 +143,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Search } from '@iconoir/vue'
-import ActionButton from '../../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminColumn } from '../../../../shared/index'
 import { AdminEmptyState } from '../../../../shared/index'
 import { AdminInput } from '../../../../shared/index'
-import { AdminStatusPill } from '../../../../shared/index'
+import { StatusBadge } from '../../../../shared/index'
 import { AdminSwitch } from '../../../../shared/index'
 import { AdminTable } from '../../../../shared/index'
 import { useOptimisticToggle } from '../../../../shared/index'
@@ -232,7 +232,7 @@ function testStateLabel(state: SearchProviderTestState): string {
   return TEST_STATE_LABEL[state]
 }
 
-function testStateVariant(state: SearchProviderTestState): 'success' | 'danger' | 'neutral' {
+function testStateTone(state: SearchProviderTestState): 'success' | 'danger' | 'neutral' {
   return TEST_STATE_VARIANT[state]
 }
 

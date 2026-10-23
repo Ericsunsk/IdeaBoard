@@ -727,7 +727,7 @@ func (h *contractV1Handler) deleteWorkspace(c *gin.Context) {
 			return
 		}
 		if errors.Is(fnErr, tenancy.ErrWorkspaceActiveTasks) {
-			contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceActiveTasks), contract.CodeWorkspaceActiveTasks, "工作区仍有进行中的任务，请等待完成或取消后再删除")
+			contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceActiveTasks), contract.CodeWorkspaceActiveTasks, runtimehttp.MsgWorkspaceActiveTasks)
 			c.Abort()
 			return
 		}

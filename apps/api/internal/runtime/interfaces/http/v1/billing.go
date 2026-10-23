@@ -108,7 +108,6 @@ type billingAccountStore interface {
 	ListBillingAccountMembers(ctx context.Context, billingAccountInternalID, actorUserID int64) ([]tenancy.BillingAccountMember, error)
 	AddBillingAccountMember(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, role string) (*tenancy.BillingAccountMember, error)
 	UpdateBillingAccountMemberRole(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, newRole string) (*tenancy.BillingAccountMember, error)
-	TransferBillingAccountOwnership(ctx context.Context, billingAccountInternalID, currentOwnerID, newOwnerID int64) error
 	// Studio handover invitations (#948, invite-style ownership transfer).
 	InitiateBillingTransferInvite(ctx context.Context, billingAccountInternalID, fromUserID, toUserID int64, idempotencyKey string) (*tenancy.BillingTransferInvite, error)
 	GetBillingTransferInvite(ctx context.Context, publicID string) (*tenancy.BillingTransferInvite, error)
@@ -236,7 +235,6 @@ func RegisterContractV1BillingRoutesOnEngine(r *gin.Engine, authDeps runtimehttp
 	group.POST("/workspaces/:workspace_id/billing-account/members", handler.addBillingAccountMember)
 	group.PATCH("/workspaces/:workspace_id/billing-account/members/:member_id", handler.updateBillingAccountMember)
 	group.DELETE("/workspaces/:workspace_id/billing-account/members/:member_id", handler.removeBillingAccountMember)
-	group.POST("/workspaces/:workspace_id/billing-account/transfer", handler.transferBillingAccountOwnership)
 	// Studio handover invitations (#948, invite-style ownership transfer).
 	group.POST("/workspaces/:workspace_id/billing-account/transfer-invites", handler.initiateTransferInvite)
 	group.GET("/workspaces/:workspace_id/billing-account/transfer-invites", handler.listTransferInvites)

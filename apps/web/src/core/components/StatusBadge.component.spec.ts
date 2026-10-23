@@ -97,4 +97,27 @@ describe('StatusBadge', () => {
     expect(classes).toContain('w-full')
     expect(classes).toContain('font-bold')
   })
+  it('forwards caller attributes to the same root through live prop updates', async () => {
+    const { container, rerender } = render(StatusBadge, {
+      props: { label: 'ready', tone: 'success' },
+      attrs: {
+        class: 'w-full font-bold',
+        style: 'opacity: 0.5; width: 120px',
+        'aria-label': 'status',
+      },
+    })
+    const root = screen.getByLabelText('status')
+    expect(container.firstElementChild).toBe(root)
+    expect(root).toHaveClass('w-full', 'font-bold')
+    expect(root).toHaveStyle({ opacity: '0.5', width: '120px' })
+    expect(root.children).toHaveLength(2)
+
+    await rerender({ label: 'failed', tone: 'danger', pulse: false, size: 'small' })
+    expect(screen.getByLabelText('status')).toBe(root)
+    expect(root).toHaveTextContent('failed')
+    expect(root).toHaveClass('bg-destructive-soft', 'h-5', 'w-full', 'font-bold')
+    expect(root.querySelector('.status-badge-pulse')).toBeNull()
+    expect(root).not.toHaveAttribute('tone')
+    expect(root).not.toHaveAttribute('variant')
+  })
 })

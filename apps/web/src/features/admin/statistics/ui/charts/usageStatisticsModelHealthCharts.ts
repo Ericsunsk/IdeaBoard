@@ -4,7 +4,7 @@ import {
   type ChartData,
   type ChartOptions,
   type ChartTooltipItem,
-} from '../../../../../core/lib/chartPrimitives'
+} from '@/core/lib/chartPrimitives'
 import type { AdminStatistics } from '../../session/resource'
 import {
   adminChartTheme,

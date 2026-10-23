@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { i18n } from '../../../../../../core/i18n'
-import { loadLocaleMessages } from '../../../../../../core/i18n/userLocale'
-import { renderWithUser, screen } from '../../../../../../test/render'
+import { i18n } from '@/core/i18n'
+import { loadLocaleMessages } from '@/core/i18n/userLocale'
+import { renderWithUser, screen } from '@/test/render'
 import WalletRestrictionPanel from './WalletRestrictionPanel.vue'
 
 describe('WalletRestrictionPanel', () => {

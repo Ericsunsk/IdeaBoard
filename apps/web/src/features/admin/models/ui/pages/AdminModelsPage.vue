@@ -238,7 +238,7 @@ import {
 } from '@iconoir/vue'
 import { AdminAlert } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
-import ActionButton from '../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { adminDashboardRootClass } from '../../../shared'
 import { adminToolbarButtonClass } from '../../../shared'
 import AdminModelAddDialog from '../dialog/AdminModelAddDialog.vue'

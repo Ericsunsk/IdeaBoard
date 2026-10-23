@@ -16,7 +16,7 @@
         v-if="!props.plain"
         :model-value="enabled"
         :pill="statusLabel"
-        :pill-variant="statusVariant"
+        :pill-tone="statusTone"
         status-min-width="104px"
         pill-size="medium"
         gap-class="gap-2"
@@ -165,7 +165,7 @@
 import { computed, onMounted, ref, type HTMLAttributes } from 'vue'
 import * as v from 'valibot'
 import { useForm, firstFormError } from '@/components/ui/form'
-import ActionButton from '../../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminEditorActions } from '../../../../shared/index'
 import { AdminInput } from '../../../../shared/index'
 import { AdminAlert } from '../../../../shared/index'
@@ -258,7 +258,7 @@ const switchDisabled = computed(() => controlsDisabled.value || !summary.value)
 const testDisabled = computed(
   () => controlsDisabled.value || !summary.value?.configured || !recipient.value.trim(),
 )
-// 健康三态（方案 A）：Ready/异常/未验证，载体统一 AdminStatusPill。
+// 健康三态（方案 A）：Ready/异常/未验证，载体统一 StatusBadge。
 // - ready → Ready(success)
 // - unavailable → 异常(danger)
 // - not_tested / not_configured → 未验证(neutral)：not_tested 只是“保存后待一次
@@ -277,7 +277,7 @@ const statusLabel = computed(() => {
   if (readiness === 'unavailable') return MAIL_STATUS_ABNORMAL
   return MAIL_STATUS_UNVERIFIED
 })
-const statusVariant = computed(() => {
+const statusTone = computed(() => {
   if (error.value) return 'neutral' as const
   const readiness = summary.value?.readiness
   if (readiness === 'ready') return 'success' as const

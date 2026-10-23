@@ -1899,14 +1899,6 @@
         ]
       }
     },
-    "src/core/components/IbFormField.vue": {
-      "IbFormFieldSlotProps": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/core/components/IbFormField.vue#IbFormFieldSlotProps"
-        ]
-      }
-    },
     "src/core/components/RangedLineChartCard.vue": {
       "RangedLineChartProps": {
         "kind": "canonical-public",
@@ -2648,10 +2640,6 @@
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/en/index.ts#common"]
       },
-      "errors": {
-        "kind": "canonical-public",
-        "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/en/index.ts#errors"]
-      },
       "library": {
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/en/index.ts#library"]
@@ -2667,6 +2655,12 @@
       "default": {
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/en/index.ts#default"]
+      },
+      "errorCodes": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/i18n/locales/en/index.ts#errorCodes"
+        ]
       }
     },
     "src/core/i18n/locales/es/index.ts": {
@@ -2694,10 +2688,6 @@
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/es/index.ts#common"]
       },
-      "errors": {
-        "kind": "canonical-public",
-        "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/es/index.ts#errors"]
-      },
       "library": {
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/es/index.ts#library"]
@@ -2709,6 +2699,12 @@
       "workspace": {
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/es/index.ts#workspace"]
+      },
+      "errorCodes": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/i18n/locales/es/index.ts#errorCodes"
+        ]
       }
     },
     "src/core/i18n/locales/ko/index.ts": {
@@ -2736,10 +2732,6 @@
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/ko/index.ts#common"]
       },
-      "errors": {
-        "kind": "canonical-public",
-        "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/ko/index.ts#errors"]
-      },
       "library": {
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/ko/index.ts#library"]
@@ -2751,6 +2743,12 @@
       "workspace": {
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/ko/index.ts#workspace"]
+      },
+      "errorCodes": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/i18n/locales/ko/index.ts#errorCodes"
+        ]
       }
     },
     "src/core/i18n/locales/zh-CN/index.ts": {
@@ -2782,10 +2780,6 @@
         "kind": "canonical-public",
         "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/zh-CN/index.ts#common"]
       },
-      "errors": {
-        "kind": "canonical-public",
-        "evidence": ["docs/frontend-seam-inventory.md: src/core/i18n/locales/zh-CN/index.ts#errors"]
-      },
       "library": {
         "kind": "canonical-public",
         "evidence": [
@@ -2800,6 +2794,12 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/core/i18n/locales/zh-CN/index.ts#workspace"
+        ]
+      },
+      "errorCodes": {
+        "kind": "canonical-public",
+        "evidence": [
+          "docs/frontend-seam-inventory.md: src/core/i18n/locales/zh-CN/index.ts#errorCodes"
         ]
       }
     },
@@ -6262,22 +6262,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/feedback/AdminAlert.vue#AdminAlertSeverity"
-        ]
-      }
-    },
-    "src/features/admin/shared/ui/feedback/AdminStatusPill.vue": {
-      "AdminStatusPillVariant": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/feedback/AdminStatusPill.vue#AdminStatusPillVariant"
-        ]
-      }
-    },
-    "src/features/admin/shared/ui/form/AdminFormField.vue": {
-      "AdminFormFieldSlotProps": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/ui/form/AdminFormField.vue#AdminFormFieldSlotProps"
         ]
       }
     },
@@ -13654,12 +13638,6 @@
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#WorkspaceSelectionPersist"
         ]
       },
-      "WorkspaceSelectionPort": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#WorkspaceSelectionPort"
-        ]
-      },
       "WorkspaceSelectionSource": {
         "kind": "canonical-public",
         "evidence": [
@@ -13720,22 +13698,10 @@
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#fetchWorkspacePage"
         ]
       },
-      "getWorkspaceSelectionPort": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#getWorkspaceSelectionPort"
-        ]
-      },
       "getWorkspaceSelectionStore": {
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#getWorkspaceSelectionStore"
-        ]
-      },
-      "installWorkspaceSelectionPort": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#installWorkspaceSelectionPort"
         ]
       },
       "installWorkspaceSelectionStore": {
@@ -13754,12 +13720,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#memoryWorkspacePersist"
-        ]
-      },
-      "memoryWorkspaceSelectionPersist": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#memoryWorkspaceSelectionPersist"
         ]
       },
       "normalizeWorkspaceListParams": {
@@ -13798,12 +13758,6 @@
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#renameWorkspace"
         ]
       },
-      "resetWorkspaceSelectionPort": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#resetWorkspaceSelectionPort"
-        ]
-      },
       "resetWorkspaceSelectionStore": {
         "kind": "canonical-public",
         "evidence": [
@@ -13840,12 +13794,6 @@
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#useWorkspaceSelection"
         ]
       },
-      "useWorkspaceSelectionPort": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#useWorkspaceSelectionPort"
-        ]
-      },
       "workspaceApiUrls": {
         "kind": "canonical-public",
         "evidence": [
@@ -13880,18 +13828,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#inviteOrganizationMember"
-        ]
-      },
-      "isOrganizationWorkspace": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#isOrganizationWorkspace"
-        ]
-      },
-      "isPersonalWorkspace": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#isPersonalWorkspace"
         ]
       },
       "parseOrganizationMember": {
@@ -13940,48 +13876,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#localStorageOrganizationScopePersist"
-        ]
-      },
-      "memoryOrganizationScopePersist": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#memoryOrganizationScopePersist"
-        ]
-      },
-      "resetOrganizationScopeStore": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#resetOrganizationScopeStore"
-        ]
-      },
-      "resolveOrganizationScope": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#resolveOrganizationScope"
-        ]
-      },
-      "filterWorkspacesByScope": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#filterWorkspacesByScope"
-        ]
-      },
-      "parseOrganizationScope": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#parseOrganizationScope"
-        ]
-      },
-      "subscribeOrganizationScopeChange": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#subscribeOrganizationScopeChange"
-        ]
-      },
-      "useOrganizationScope": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/workspace/index.ts#useOrganizationScope"
         ]
       },
       "OrganizationMemberSummary": {
@@ -14129,6 +14023,18 @@
       "useWorkspaceSelection": {
         "kind": "canonical-origin",
         "evidence": ["src/features/workspace/index.ts#useWorkspaceSelection"]
+      },
+      "installWorkspaceSelectionStore": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#installWorkspaceSelectionStore"]
+      },
+      "WorkspaceSelectionPersist": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#WorkspaceSelectionPersist"]
+      },
+      "WorkspaceProvisionFn": {
+        "kind": "canonical-origin",
+        "evidence": ["src/features/workspace/index.ts#WorkspaceProvisionFn"]
       }
     },
     "src/features/workspace/selection/workspaceMembersResource.ts": {
@@ -14221,36 +14127,6 @@
       "parseOrganizationMember": {
         "kind": "canonical-origin",
         "evidence": ["src/features/workspace/index.ts#parseOrganizationMember"]
-      }
-    },
-    "src/features/workspace/selection/workspaceSelectionPort.ts": {
-      "WORKSPACE_SELECTION_STORAGE_KEY": {
-        "kind": "test-contract",
-        "evidence": ["src/features/workspace/selection/workspaceSelectionPort.contract.spec.ts"]
-      },
-      "WorkspaceSelectionPort": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#WorkspaceSelectionPort"]
-      },
-      "getWorkspaceSelectionPort": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#getWorkspaceSelectionPort"]
-      },
-      "installWorkspaceSelectionPort": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#installWorkspaceSelectionPort"]
-      },
-      "memoryWorkspaceSelectionPersist": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#memoryWorkspaceSelectionPersist"]
-      },
-      "resetWorkspaceSelectionPort": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#resetWorkspaceSelectionPort"]
-      },
-      "useWorkspaceSelectionPort": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#useWorkspaceSelectionPort"]
       }
     },
     "src/features/workspace/shell/useWorkspaceAccountControls.ts": {
@@ -14419,20 +14295,6 @@
         ]
       }
     },
-    "src/theme/composables/themeKeyboard.ts": {
-      "THEME_SEGMENT_MODES": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/theme/composables/themeKeyboard.ts#THEME_SEGMENT_MODES"
-        ]
-      },
-      "createThemeKeyboardHandler": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/theme/composables/themeKeyboard.ts#createThemeKeyboardHandler"
-        ]
-      }
-    },
     "src/theme/composables/themeMode.ts": {
       "StoredThemeMode": {
         "kind": "canonical-public",
@@ -14536,33 +14398,9 @@
         "kind": "canonical-origin",
         "evidence": ["src/features/workspace/index.ts#localStorageOrganizationScopePersist"]
       },
-      "memoryOrganizationScopePersist": {
+      "OrganizationScope": {
         "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#memoryOrganizationScopePersist"]
-      },
-      "resetOrganizationScopeStore": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#resetOrganizationScopeStore"]
-      },
-      "resolveOrganizationScope": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#resolveOrganizationScope"]
-      },
-      "filterWorkspacesByScope": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#filterWorkspacesByScope"]
-      },
-      "parseOrganizationScope": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#parseOrganizationScope"]
-      },
-      "subscribeOrganizationScopeChange": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#subscribeOrganizationScopeChange"]
-      },
-      "useOrganizationScope": {
-        "kind": "canonical-origin",
-        "evidence": ["src/features/workspace/index.ts#useOrganizationScope"]
+        "evidence": ["src/features/workspace/index.ts#OrganizationScope"]
       }
     }
   },
@@ -16623,7 +16461,7 @@
       "exports": ["IfMatchParameter"]
     },
     "src/api/generated-query/public/model/index.ts": {
-      "sha256": "1ebfcbaeb651ef3acb6c6fbf3c68af8f79e847d6b37ee2d2b1e54fb5dd81587a",
+      "sha256": "6be273c0fa39a324a2491f493ecbaa3835f0b653da14d470b7cb73a7b5d6f074",
       "exports": []
     },
     "src/api/generated-query/public/model/initiateBillingTransferRequest.ts": {
@@ -17114,22 +16952,6 @@
       "sha256": "a675cfeda832c718adb2378feb8f30a40f7f20e5e251a69711b708b3e3848994",
       "exports": ["TaskStatus"]
     },
-    "src/api/generated-query/public/model/transferBillingAccountRequest.ts": {
-      "sha256": "9a42a426375e460449cd99cc2d81526b431ddc624113954d5d6b235a13c8e8e2",
-      "exports": ["TransferBillingAccountRequest"]
-    },
-    "src/api/generated-query/public/model/transferBillingAccountRequestData.ts": {
-      "sha256": "7ad6aef6997ec2c724dcf08d356f56fbced79877e6db535105979a9cc3976a33",
-      "exports": ["TransferBillingAccountRequestData"]
-    },
-    "src/api/generated-query/public/model/transferWorkspaceBillingAccount200.ts": {
-      "sha256": "7cdd9fa9dbcd66d6221b382bf154de03902054db64659ffddbdb28b719d7409f",
-      "exports": ["TransferWorkspaceBillingAccount200"]
-    },
-    "src/api/generated-query/public/model/transferWorkspaceBillingAccount200Data.ts": {
-      "sha256": "757f983cf5b8172899246d3510a3fdd2dfafcc0b8a46c6fbefc9d06d31fe2eea",
-      "exports": ["TransferWorkspaceBillingAccount200Data"]
-    },
     "src/api/generated-query/public/model/unauthorizedResponse.ts": {
       "sha256": "18e308649b1ccb1cf18dadf57ceb4578334d5a6f3e60774809ceb78fe13d2596",
       "exports": ["UnauthorizedResponse"]
@@ -17589,7 +17411,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-billing/workspace-billing.ts": {
-      "sha256": "b1cda93e683512b1e4545e212ec376e6b1b39724d2ad5b0c2bf463ed6adfd2cb",
+      "sha256": "7bc57d9190cad49079ea67129090a5701c69377dbf7b57e82bec10ac2c5eec5e",
       "exports": [
         "AbandonWorkspacePendingOrderMutationError",
         "AbandonWorkspacePendingOrderMutationResult",
@@ -17657,10 +17479,6 @@
         "SetMemberQuotaMutationError",
         "SetMemberQuotaMutationResult",
         "SetMemberQuotaMutationVariables",
-        "TransferWorkspaceBillingAccountMutationBody",
-        "TransferWorkspaceBillingAccountMutationError",
-        "TransferWorkspaceBillingAccountMutationResult",
-        "TransferWorkspaceBillingAccountMutationVariables",
         "UpdateWorkspaceBillingAccountMemberMutationBody",
         "UpdateWorkspaceBillingAccountMemberMutationError",
         "UpdateWorkspaceBillingAccountMemberMutationResult",
@@ -17748,9 +17566,6 @@
         "getSetMemberQuotaMutationKey",
         "getSetMemberQuotaMutationOptions",
         "getSetMemberQuotaUrl",
-        "getTransferWorkspaceBillingAccountMutationKey",
-        "getTransferWorkspaceBillingAccountMutationOptions",
-        "getTransferWorkspaceBillingAccountUrl",
         "getUpdateWorkspaceBillingAccountMemberMutationKey",
         "getUpdateWorkspaceBillingAccountMemberMutationOptions",
         "getUpdateWorkspaceBillingAccountMemberUrl",
@@ -17771,7 +17586,6 @@
         "rejectWorkspaceBillingTransfer",
         "removeWorkspaceBillingAccountMember",
         "setMemberQuota",
-        "transferWorkspaceBillingAccount",
         "updateWorkspaceBillingAccountMember",
         "useAbandonWorkspacePendingOrder",
         "useAcceptWorkspaceBillingTransfer",
@@ -17798,7 +17612,6 @@
         "useRejectWorkspaceBillingTransfer",
         "useRemoveWorkspaceBillingAccountMember",
         "useSetMemberQuota",
-        "useTransferWorkspaceBillingAccount",
         "useUpdateWorkspaceBillingAccountMember"
       ]
     },
@@ -18550,7 +18363,6 @@
         "src/features/admin/shared/ui/popover/AdminPopover.component.spec.ts",
         "src/features/admin/shared/ui/toolbar/AdminRefreshButton.component.spec.ts",
         "src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.component.spec.ts",
-        "src/features/admin/shared/ui/feedback/AdminStatusPill.component.spec.ts",
         "src/features/admin/shared/ui/shell/AdminSurfaceFrame.component.spec.ts",
         "src/features/admin/shared/ui/form/AdminSwitch.component.spec.ts",
         "src/features/admin/shared/ui/table/AdminTable.component.spec.ts",
@@ -18638,13 +18450,6 @@
         "src/features/search/session/useVisionQueryLifecycle.unit.spec.ts",
         "src/features/search/ui/components/SearchSavePopover.component.spec.ts",
         "src/features/search/session/screenRuntime.unit.spec.ts"
-      ]
-    },
-    "src/theme/composables/themeKeyboard.ts": {
-      "kind": "retained-public-or-test-support",
-      "evidence": [
-        "src/shared/theme/composables/themeKeyboard.shim.ts",
-        "src/theme/composables/themeKeyboard.contract.spec.ts"
       ]
     }
   }

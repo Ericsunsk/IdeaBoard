@@ -74,15 +74,15 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 .node-action-btn.variant-stage-ghost {
   border: none;
   border-radius: var(--radius-control);
-  background: color-mix(in srgb, rgb(75 85 99) 72%, transparent);
-  color: #f9fafb;
+  background: color-mix(in srgb, var(--color-media-scrim) 72%, transparent);
+  color: var(--color-media-foreground);
   min-height: 26px;
   padding: 0 10px;
   font-weight: 500;
 }
 
 .node-action-btn.variant-stage-ghost:hover:not(:disabled) {
-  background: color-mix(in srgb, rgb(75 85 99) 88%, transparent);
+  background: color-mix(in srgb, var(--color-media-scrim) 88%, transparent);
 }
 
 .node-action-btn.variant-tool:hover:not(:disabled),

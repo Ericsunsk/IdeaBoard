@@ -123,9 +123,9 @@
               :key="`${kind}-${run.id}`"
               class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 py-2.5"
             >
-              <AdminStatusPill
+              <StatusBadge
                 :label="getRunStatusLabel(run.status)"
-                :variant="getRunStatusVariant(run.status)"
+                :tone="getRunStatusTone(run.status)"
                 size="small"
               />
               <span class="font-mono text-xs font-bold text-foreground"> Run #{{ run.id }} </span>
@@ -164,9 +164,9 @@
 import { computed, ref } from 'vue'
 import { CheckCircle, Clock, WarningTriangle, XmarkCircle } from '@iconoir/vue'
 import { AdminAlert } from '../../../shared'
-import { AdminStatusPill } from '../../../shared'
+import { StatusBadge } from '../../../shared'
 import { AdminButton } from '../../../shared'
-import ActionButton from '../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminSpinner } from '../../../shared'
 import { formatAdminDisplayError, useAdminToast } from '../../../shared'
 import { adminDashboardRootClass, adminTextButtonClass } from '../../../shared'
@@ -174,7 +174,7 @@ import {
   formatAdminDateTimeWithSeconds,
   formatReconciliationRunError,
   getRunStatusLabel,
-  getRunStatusVariant,
+  getRunStatusTone,
 } from '../../core/shared/format'
 import AdminCreditFindingQueue from './AdminCreditFindingQueue.vue'
 import AdminCreditRunHistoryDialog from './AdminCreditRunHistoryDialog.vue'

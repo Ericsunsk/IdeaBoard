@@ -39,16 +39,16 @@ const (
 // handlers. Rows are ordered from the most specific outcome to the most
 // generic; the first match wins.
 var creditErrorTable = []errorrender.Mapping{
-	{Targets: []error{domain.ErrInvalidCommand}, Status: http.StatusBadRequest, Code: codeCreditInvalidInput, Message: errorrender.MsgCreditsInterfacesHTTPPackage},
-	{Targets: []error{domain.ErrIdempotencyConflict}, Status: http.StatusConflict, Code: codeCreditIdempotencyConflict, Message: errorrender.MsgPackage2},
-	{Targets: []error{domain.ErrWalletNotFound}, Status: http.StatusNotFound, Code: codeCreditWalletNotFound, Message: errorrender.MsgPackage3},
-	{Targets: []error{domain.ErrWalletFrozen}, Status: http.StatusLocked, Code: codeCreditWalletFrozen, Message: errorrender.MsgPackage4},
-	{Targets: []error{domain.ErrWalletRestricted}, Status: http.StatusLocked, Code: codeCreditWalletRestricted, Message: errorrender.MsgPackage5},
-	{Targets: []error{domain.ErrInsufficientCredits}, Status: http.StatusUnprocessableEntity, Code: codeCreditInsufficientCredits, Message: errorrender.MsgPackage6},
-	{Targets: []error{domain.ErrChargeNotFound}, Status: http.StatusNotFound, Code: codeCreditChargeNotFound, Message: errorrender.MsgPackage7},
-	{Targets: []error{domain.ErrRefundExceedsCharge}, Status: http.StatusUnprocessableEntity, Code: codeCreditRefundExceedsCharge, Message: errorrender.MsgPackage8},
-	{Targets: []error{domain.ErrReconciliationNotFound}, Status: http.StatusNotFound, Code: codeCreditReconciliationNotFound, Message: errorrender.MsgPackage9},
-	{Targets: []error{domain.ErrReconciliationUnavailable}, Status: http.StatusServiceUnavailable, Code: codeCreditReconciliationAvailable, Message: errorrender.MsgPackage10},
+	{Targets: []error{domain.ErrInvalidCommand}, Code: codeCreditInvalidInput, Message: errorrender.MsgCreditsInterfacesHTTPPackage},
+	{Targets: []error{domain.ErrIdempotencyConflict}, Code: codeCreditIdempotencyConflict, Message: errorrender.MsgPackage2},
+	{Targets: []error{domain.ErrWalletNotFound}, Code: codeCreditWalletNotFound, Message: errorrender.MsgPackage3},
+	{Targets: []error{domain.ErrWalletFrozen}, Code: codeCreditWalletFrozen, Message: errorrender.MsgPackage4},
+	{Targets: []error{domain.ErrWalletRestricted}, Code: codeCreditWalletRestricted, Message: errorrender.MsgPackage5},
+	{Targets: []error{domain.ErrInsufficientCredits}, Code: codeCreditInsufficientCredits, Message: errorrender.MsgPackage6},
+	{Targets: []error{domain.ErrChargeNotFound}, Code: codeCreditChargeNotFound, Message: errorrender.MsgPackage7},
+	{Targets: []error{domain.ErrRefundExceedsCharge}, Code: codeCreditRefundExceedsCharge, Message: errorrender.MsgPackage8},
+	{Targets: []error{domain.ErrReconciliationNotFound}, Code: codeCreditReconciliationNotFound, Message: errorrender.MsgPackage9},
+	{Targets: []error{domain.ErrReconciliationUnavailable}, Code: codeCreditReconciliationAvailable, Message: errorrender.MsgPackage10},
 }
 
 func writeCreditError(c *gin.Context, err error) {

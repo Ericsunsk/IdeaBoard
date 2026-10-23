@@ -347,7 +347,7 @@ func TestReconciliationSeparatesBillingSnapshotRiskFromTaskTraceAnomaly(t *testi
 		t.Fatal(err)
 	}
 	var priceID, priceVersion int64
-	if err := pool.QueryRow(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation-fact-split', 'Reconciliation Fact Split', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT price_version_id, version FROM publish_billing_prices('test:reconciliation-fact-split', 'Reconciliation Fact Split', '', '{"1k": 5}'::jsonb, 1)`).Scan(&priceID, &priceVersion); err != nil {
 		t.Fatal(err)
 	}
 
@@ -490,7 +490,7 @@ func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t 
 		t.Fatal(err)
 	}
 	var priceID, priceVersion int64
-	if err := pool.QueryRow(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:terminal-fact-risk', 'Terminal Fact Risk', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT price_version_id, version FROM publish_billing_prices('test:terminal-fact-risk', 'Terminal Fact Risk', '', '{"1k": 5}'::jsonb, 1)`).Scan(&priceID, &priceVersion); err != nil {
 		t.Fatal(err)
 	}
 

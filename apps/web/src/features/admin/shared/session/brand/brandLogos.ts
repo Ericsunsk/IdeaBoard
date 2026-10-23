@@ -1,7 +1,7 @@
 import { ref } from 'vue'
-import { resolveApiUrl } from '../../../../../core/config/runtimeUrls'
+import { resolveApiUrl } from '@/core/config/runtimeUrls'
 import { CONTROL_API_PREFIX } from '../../core/controlTransport'
-import { getGetControlAIGatewayBrandLogoUrl } from '../../../../../api/generated-query/control/control-platform/control-platform'
+import { getGetControlAIGatewayBrandLogoUrl } from '@/api/generated-query/control/control-platform/control-platform'
 
 // Brand logo override vocabulary (issue #809). The legacy generated models
 // are gone; this module owns the scope/key sets its pickers and resources
@@ -78,8 +78,8 @@ import logoTencentCloud from '../../ui/assets/storage-vendors/tencentcloud.ico'
 
 // 身份与认证
 import logoGithub from '../../ui/assets/oauth/github.svg'
-import logoGoogleOAuth from '../../../../../core/assets/oauth/google.svg'
-import logoDiscord from '../../../../../core/assets/oauth/discord.svg'
+import logoGoogleOAuth from '@/core/assets/oauth/google.svg'
+import logoDiscord from '@/core/assets/oauth/discord.svg'
 // 图片搜索供应商（站内现成资产，不走 models.dev：上游仅有通用占位图）
 import logoUnsplash from '../../ui/assets/search-providers/unsplash.svg'
 import logoPexels from '../../ui/assets/search-providers/pexels.svg'

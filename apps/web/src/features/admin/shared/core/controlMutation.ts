@@ -1,4 +1,4 @@
-import { buildContractRequestHeaders, newRequestId } from '../../../../api/contractKernel'
+import { buildContractRequestHeaders, newRequestId } from '@/api/contractKernel'
 
 /** Common options carried by every Admin Control mutation. */
 export type ControlMutationOptions = {

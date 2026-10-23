@@ -2,23 +2,19 @@
 // lifecycle (issue #801) plus stable Billing Account resolution and
 // financial management (ADR-0038).
 //
-// The durable schema (organizations, workspaces,
-// organization_memberships, workspace_memberships, billing_accounts,
-// billing_account_members) is created by a sibling
-// stream; this package programs to the AGREED interface via the Store
-// interface below so handlers and tests do not block on it. Repository
-// methods take context.Context first and the future postgres
-// implementation must use the dbWithContext(ctx) pattern.
+// Repository methods take context.Context first. The PostgreSQL adapters
+// use dbWithContext(ctx) so reads and writes join the caller transaction.
 //
 // Billing Account model (ADR-0038): the stable funds identity holds the
 // unified balance; one Personal account exists per user and one shared
 // account per Organization. Workspace scope is fixed at creation and
 // never switches. Resolution joins the caller transaction and fails
 // closed on missing or ownerless scopes; joining a Workspace never merges
-// personal funds. Financial Owner/Admin manages recharge, bills, and
-// quotas; Workspace Owner/Admin standing alone grants no financial
-// management, and financial management grants no Board content access.
-// Ownership is transferable, never lifetime-bound.
+// personal funds. Financial Owner/Admin manages recharge and bills.
+// Personal member quotas require the account holder; Organization quotas
+// follow the Organization Owner/Admin role policy. Workspace Owner/Admin
+// standing alone grants no financial management, and financial management
+// grants no Board content access.
 //
 // Personal workspace rule (agreed): organization_id IS NULL marks personal
 // scope. Every user additionally owns exactly one Default personal

@@ -115,19 +115,19 @@ func ResolvePrincipal() gin.HandlerFunc {
 	}
 }
 
-// RequireWorkspaceCapability renders the visibility-aware authorization
-// outcome for an explicit workspace context: hidden resources (the caller
-// cannot see the workspace at all) converge to 404 workspace_not_found so
-// existence is not leaked, while visible-but-forbidden callers get 403.
+// RequireCapability renders the visibility-aware authorization outcome
+// behind every explicit scope gate (Resolve -> LoadRole -> Require):
+// hidden resources converge to the scope's 404 so existence is not
+// leaked, while visible-but-forbidden callers get the scope's 403.
 // It returns true when allowed (caller continues) and aborts otherwise.
-func RequireWorkspaceCapability(c *gin.Context, visible, allowed bool) bool {
+func RequireCapability(c *gin.Context, visible, allowed bool, notFoundCode contract.Code, forbiddenCode contract.Code, notFoundMsg, forbiddenMsg string) bool {
 	switch {
 	case !visible:
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, MsgListControlBillingAccounts)
+		contract.RenderError(c, http.StatusNotFound, notFoundCode, notFoundMsg)
 		c.Abort()
 		return false
 	case !allowed:
-		contract.RenderError(c, http.StatusForbidden, contract.CodeWorkspaceForbidden, MsgForbidden)
+		contract.RenderError(c, http.StatusForbidden, forbiddenCode, forbiddenMsg)
 		c.Abort()
 		return false
 	default:
@@ -135,22 +135,24 @@ func RequireWorkspaceCapability(c *gin.Context, visible, allowed bool) bool {
 	}
 }
 
+// RequireWorkspaceCapability renders the visibility-aware authorization
+// outcome for an explicit workspace context: hidden resources (the caller
+// cannot see the workspace at all) converge to 404 workspace_not_found so
+// existence is not leaked, while visible-but-forbidden callers get 403.
+// It returns true when allowed (caller continues) and aborts otherwise.
+func RequireWorkspaceCapability(c *gin.Context, visible, allowed bool) bool {
+	return RequireCapability(c, visible, allowed,
+		contract.CodeWorkspaceNotFound, contract.CodeWorkspaceForbidden,
+		MsgListControlBillingAccounts, MsgForbidden)
+}
+
 // RequireOrganizationCapability is the organization-scoped counterpart:
 // hidden orgs converge to 404 organization_not_found, visible-but-
 // forbidden to 403.
 func RequireOrganizationCapability(c *gin.Context, visible, allowed bool) bool {
-	switch {
-	case !visible:
-		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, MsgOrganizationNotFound)
-		c.Abort()
-		return false
-	case !allowed:
-		contract.RenderError(c, http.StatusForbidden, contract.CodeOrganizationForbidden, MsgForbidden)
-		c.Abort()
-		return false
-	default:
-		return true
-	}
+	return RequireCapability(c, visible, allowed,
+		contract.CodeOrganizationNotFound, contract.CodeOrganizationForbidden,
+		MsgOrganizationNotFound, MsgForbidden)
 }
 
 // PublicContractChain is the Public Data Plane middleware chain

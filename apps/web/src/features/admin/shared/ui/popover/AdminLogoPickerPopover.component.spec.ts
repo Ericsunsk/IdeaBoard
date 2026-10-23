@@ -1,7 +1,7 @@
 import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/vue'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import AdminLogoPickerPopover from './AdminLogoPickerPopover.vue'
 import {
   getAdminBrandLogoOverride,

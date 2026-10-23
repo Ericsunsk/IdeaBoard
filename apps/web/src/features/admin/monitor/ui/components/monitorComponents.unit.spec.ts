@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import TaskControlToolbar from './TaskControlToolbar.vue'
 import TaskEventsCard from './TaskEventsCard.vue'
 import TaskActivityTable from './TaskActivityTable.vue'

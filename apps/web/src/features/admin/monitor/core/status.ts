@@ -1,10 +1,10 @@
 import { TaskStatus, type TaskStatus as TaskStatusValue } from '../../shared'
 
-// Pill 直连：与 AdminStatusPillVariant 同构，domain 内自有定义以免反向依赖组件层。
-type TaskStatusPillVariant = 'success' | 'danger' | 'warning' | 'neutral' | 'info'
+// Pill 直连：与 StatusBadge `tone` 同构，domain 内自有定义以免反向依赖组件层。
+type TaskStatusTone = 'success' | 'danger' | 'warning' | 'neutral' | 'info'
 
 export interface TaskStatusDefinition {
-  variant: TaskStatusPillVariant
+  tone: TaskStatusTone
   text: string
   color: string
   bannerClass: string
@@ -26,14 +26,14 @@ export const adminTaskStatuses = TaskStatus
 
 const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
   [TaskStatus.pending]: {
-    variant: 'info',
+    tone: 'info',
     text: '等待中',
     color: PENDING_STATUS_COLOR,
     bannerClass: PENDING_BANNER_CLASS,
     dotClass: PENDING_DOT_CLASS,
   },
   [TaskStatus.running]: {
-    variant: 'warning',
+    tone: 'warning',
     text: '执行中',
     color: 'var(--warning)',
     bannerClass:
@@ -41,7 +41,7 @@ const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
     dotClass: 'bg-warning shadow-admin-status-dot-running',
   },
   [TaskStatus.completed]: {
-    variant: 'success',
+    tone: 'success',
     text: '已完成',
     color: 'var(--success)',
     bannerClass:
@@ -49,7 +49,7 @@ const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
     dotClass: 'bg-success shadow-admin-status-dot-success',
   },
   [TaskStatus.failed]: {
-    variant: 'danger',
+    tone: 'danger',
     text: '失败',
     color: 'var(--destructive)',
     bannerClass:
@@ -57,7 +57,7 @@ const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
     dotClass: 'bg-destructive shadow-admin-status-dot-danger',
   },
   [TaskStatus.cancelled]: {
-    variant: 'neutral',
+    tone: 'neutral',
     text: '已停止',
     color: DEFAULT_STATUS_COLOR,
     bannerClass: DEFAULT_BANNER_CLASS,
@@ -68,7 +68,7 @@ const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
 export function getTaskStatusDefinition(status: string): TaskStatusDefinition {
   return (
     taskStatusDefinitions[status as TaskStatusValue] || {
-      variant: 'neutral',
+      tone: 'neutral',
       text: status,
       color: DEFAULT_STATUS_COLOR,
       bannerClass: DEFAULT_BANNER_CLASS,

@@ -15,7 +15,8 @@ import (
 const maxFeaturePromptRequestBytes = 64 << 10
 
 type FeaturePromptHandler struct {
-	promptRepo *FeaturePromptRepository
+	reader FeaturePromptReader
+	writer FeaturePromptWriter
 }
 
 type featurePromptPayload struct {
@@ -26,8 +27,8 @@ type featurePromptListResponse struct {
 	Prompts []FeaturePromptConfig `json:"prompts"`
 }
 
-func NewFeaturePromptHandler(promptRepo *FeaturePromptRepository) *FeaturePromptHandler {
-	return &FeaturePromptHandler{promptRepo: promptRepo}
+func NewFeaturePromptHandler(store FeaturePromptStore) *FeaturePromptHandler {
+	return &FeaturePromptHandler{reader: store, writer: store}
 }
 
 func (h *FeaturePromptHandler) Get(c *gin.Context) {
@@ -36,7 +37,7 @@ func (h *FeaturePromptHandler) Get(c *gin.Context) {
 		response.Error(c, 400, err.Error())
 		return
 	}
-	config, err := h.promptRepo.GetConfig(c.Request.Context(), slug)
+	config, err := h.reader.GetConfig(c.Request.Context(), slug)
 	if err != nil {
 		if errors.Is(err, ErrFeaturePromptUnsupported) {
 			response.Error(c, 400, err.Error())
@@ -49,7 +50,7 @@ func (h *FeaturePromptHandler) Get(c *gin.Context) {
 }
 
 func (h *FeaturePromptHandler) List(c *gin.Context) {
-	configs, err := h.promptRepo.ListConfigs(c.Request.Context())
+	configs, err := h.reader.ListConfigs(c.Request.Context())
 	if err != nil {
 		response.InternalError(c, 500, errorrender.MsgPromptsGet, err)
 		return
@@ -75,7 +76,7 @@ func (h *FeaturePromptHandler) Save(c *gin.Context) {
 		return
 	}
 	updatedBy := identityPrincipal.UserID()
-	config, err := h.promptRepo.SaveConfig(c.Request.Context(), slug, *req.Prompt, &updatedBy)
+	config, err := h.writer.SaveConfig(c.Request.Context(), slug, *req.Prompt, &updatedBy)
 	if err != nil {
 		if errors.Is(err, ErrFeaturePromptUnsupported) {
 			response.Error(c, 400, err.Error())

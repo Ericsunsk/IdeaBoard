@@ -1,8 +1,8 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { stripUndefined } from '../../../../../api/stripUndefined'
-import { PAGE_SIZES } from '../../../../../core/config/pagination'
-import { keepPrevious } from '../../../../../core/query/queryDefaults'
+import { stripUndefined } from '@/api/stripUndefined'
+import { PAGE_SIZES } from '@/core/config/pagination'
+import { keepPrevious } from '@/core/query/queryDefaults'
 import {
   adminCreditsBillingApi,
   type AdminBillingAccountListItem,

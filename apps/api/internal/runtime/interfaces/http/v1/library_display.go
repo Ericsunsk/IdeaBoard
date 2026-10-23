@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 
-	libraryapplication "ideaboard/api/internal/library/application"
+	librarysources "ideaboard/api/internal/library/application/sources"
 	librarydomain "ideaboard/api/internal/library/domain"
 	mediadomain "ideaboard/api/internal/media/derivatives/domain"
 
@@ -55,7 +55,7 @@ func (h *contractV1Handler) derivativeLibraryAsset(c *gin.Context) {
 	}
 	if sourceErr != nil {
 		status := http.StatusNotFound
-		if errors.Is(sourceErr, libraryapplication.ErrSourceUnavailable) {
+		if errors.Is(sourceErr, librarysources.ErrSourceUnavailable) {
 			status = http.StatusServiceUnavailable
 		}
 		runtimehttp.RenderV1BinaryError(c, status)

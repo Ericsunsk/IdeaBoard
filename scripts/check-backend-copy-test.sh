@@ -97,4 +97,45 @@ if REPO_ROOT="$tmp" bash "$checker" >/dev/null 2>&1; then
 fi
 echo "OK: literal kernel table fails"
 
+# Case 5: copy*.go tables are scanned too (covers copy_runtime.go).
+# A banned variant hiding in copy_runtime.go must fail.
+mkdir -p "$tmp/apps/api/internal/platform/errorrender"
+cat > "$tmp/apps/api/internal/platform/errorrender/copy_runtime.go" <<'EOF'
+package errorrender
+
+const (
+	MsgFixtureRuntime = "搜索服务暂时不可用"
+)
+EOF
+if REPO_ROOT="$tmp" bash "$checker" >/dev/null 2>&1; then
+  echo "FAIL: banned variant in copy_runtime.go should fail" >&2
+  exit 1
+fi
+echo "OK: banned variant in copy_runtime.go fails"
+cat > "$tmp/apps/api/internal/platform/errorrender/copy_runtime.go" <<'EOF'
+package errorrender
+
+const (
+	MsgFixtureRuntime = "搜索服务暂不可用"
+)
+EOF
+rm -f "$tmp/apps/api/internal/fixture/message.go"
+# Case 4 leaves the literal kernel table behind; restore alias-only so
+# this case isolates copy_runtime.go coverage.
+cat > "$alias_file" <<'EOF'
+package http
+
+import "ideaboard/api/internal/platform/errorrender"
+
+const (
+	MsgBadRequest = errorrender.MsgBadRequest
+)
+EOF
+if REPO_ROOT="$tmp" bash "$checker" >/dev/null 2>&1; then
+  echo "OK: canonical-only copy_runtime.go passes"
+else
+  echo "FAIL: canonical-only copy_runtime.go should pass" >&2
+  exit 1
+fi
+
 echo "check-backend-copy self-test: OK"

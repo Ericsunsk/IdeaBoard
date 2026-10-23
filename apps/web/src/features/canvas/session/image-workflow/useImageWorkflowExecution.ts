@@ -18,7 +18,6 @@ import type { CanvasGraphStore } from '../../core/graph'
 import type { CanvasRendererMetricsPort } from '../../session/flow-adapter'
 import type { CanvasFeedback } from '../workspace/useCanvasFeedback.ts'
 import type { TaskImageResult } from '../../../../core/query/taskResult'
-import { getWorkspaceSelectionStore } from '../../../workspace'
 
 type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
 
@@ -34,8 +33,12 @@ export type UseImageWorkflowExecutionOptions = {
   executionCore: PendingImageExecutionCore
   cancelTasks: (taskIds: readonly string[]) => void
   waitTaskImageResults?: (taskId: string) => Promise<TaskImageResult[]>
-  /** Workspace gate: canvas task actions stay disabled without a selection. */
-  isWorkspaceAvailable?: (() => boolean) | undefined
+  /**
+   * Workspace gate (fail-closed): canvas task actions stay disabled without
+   * a selection. Injected from the screen seam; no store import here so the
+   * execution stays hermetic and test doubles ride the same option.
+   */
+  isWorkspaceAvailable: () => boolean
 }
 
 export type ImageWorkflowExecution = ImageWorkflowCommands & {
@@ -80,10 +83,9 @@ export function useImageWorkflowExecution(
 
   // Workspace gate (fail-closed): without a selected workspace every canvas
   // task action stays disabled with guidance; the adapter throws the same
-  // guidance when execution is attempted directly. Defaults to the shared
-  // selection store; tests inject a stub.
-  const isWorkspaceAvailable =
-    options.isWorkspaceAvailable ?? (() => getWorkspaceSelectionStore().getSelectedId() != null)
+  // guidance when execution is attempted directly. Injected from the screen
+  // seam (CanvasScreen derives it from the selection id).
+  const isWorkspaceAvailable = options.isWorkspaceAvailable
 
   function isGenerationAvailable(): boolean {
     if (!isWorkspaceAvailable()) return false

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { h } from 'vue'
 import { fireEvent } from '@testing-library/vue'
-import { renderWithUser, screen, within } from '../../../../../test/render'
+import { renderWithUser, screen, within } from '@/test/render'
 import AdminColumn from '../AdminColumn.vue'
 import AdminTable from './AdminTable.vue'
 

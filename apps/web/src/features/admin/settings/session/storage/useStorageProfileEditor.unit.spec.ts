@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockAppToast } from '../../../../../test/toast'
+import { mockAppToast } from '@/test/toast'
 import { useStorageProfileEditor } from './useStorageProfileEditor'
 import {
   normalizeProfile,

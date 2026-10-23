@@ -12,6 +12,10 @@ deployment constraints、data ownership 或 durable technology choices 的决策
 - 新增 ADR 前扫描已有 ADR 的最大编号，然后递增。
 - slug 使用 lowercase `kebab-case`，描述 decision，而不是 implementation task。
 
+## Number Gaps
+
+编号永不复用：`0002` 与 `0004` 是已删除的历史 ADR 留下的空号，不是待分配编号。新增 ADR 只向前递增，不要回填空号。
+
 ## Status
 
 每篇 ADR 应包含以下 status 之一：

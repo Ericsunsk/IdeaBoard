@@ -1,4 +1,4 @@
-import type { Service } from '../../../../core/contracts/imageServices'
+import type { Service } from '@/core/contracts/imageServices'
 import {
   ADMIN_SERVICE_GROUPS,
   ADMIN_SERVICE_ORDER,

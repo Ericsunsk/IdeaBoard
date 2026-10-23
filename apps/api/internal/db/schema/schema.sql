@@ -365,7 +365,6 @@ CREATE TABLE organizations (
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  archived_at TIMESTAMPTZ NULL,
   CONSTRAINT uq_organizations_public_id UNIQUE (public_id),
   -- Kernel prefix pin: mirrors contract.PrefixOrganization.
   CONSTRAINT chk_organizations_public_id CHECK (public_id LIKE 'org\_%')
@@ -470,6 +469,15 @@ CREATE TABLE workspace_memberships (
 );
 
 CREATE INDEX idx_workspace_memberships_user ON workspace_memberships (user_id, workspace_id);
+-- Billing Account tenancy foundation (#804/#915/#916/#948).
+--
+-- Moved from workspaces.sql: a Billing Account is owned by exactly one
+-- Workspace (initial owner) or exactly one Organization. The public_id is
+-- the API-facing identifier per contract kernel (#800). Membership,
+-- workspace links, member quotas, transfer invites, and the wallet
+-- provisioning trigger/functions live here; Credits owns the Wallet rows
+-- and the provision function this trigger calls at runtime (no FK, no DDL
+-- dependency cycle). Manifest order: after workspace, before credits/tasks.
 
 -- Billing Account foundation (#804). A Billing Account is owned by exactly
 -- one Workspace (initial owner) or exactly one Organization. The public_id
@@ -4177,111 +4185,6 @@ BEGIN
   RAISE EXCEPTION USING ERRCODE = 'IB201', MESSAGE = 'task billing snapshots are immutable';
 END;
 $$;
-
---
--- Name: publish_billing_price(text, text, text, bigint, bigint); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION publish_billing_price(p_sku text, p_display_name text, p_description text, p_unit_credits bigint, p_actor_id bigint) RETURNS TABLE(price_version_id bigint, version bigint, unit_credits bigint, created_by bigint, created_at timestamp with time zone)
-    LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'public', 'pg_catalog', 'pg_temp'
-    AS $_$
-DECLARE
-  v_old_price_version_id BIGINT;
-  v_old_version BIGINT;
-  v_old_unit_credits BIGINT;
-  v_version BIGINT;
-  v_price_version_id BIGINT;
-  v_materialized BOOLEAN;
-  v_inserted BIGINT;
-BEGIN
-  p_sku := lower(btrim(p_sku));
-  p_display_name := btrim(p_display_name);
-  p_description := btrim(COALESCE(p_description, ''));
-  IF p_sku IS NULL
-     OR p_sku !~ '^[a-z][a-z0-9-]{0,31}:[a-z][a-z0-9._-]{0,94}$'
-     OR char_length(p_sku) > 128
-     OR p_display_name IS NULL
-     OR char_length(p_display_name) NOT BETWEEN 1 AND 120
-     OR char_length(p_description) > 1000
-     OR p_unit_credits IS NULL
-     OR p_unit_credits < 0
-     OR p_unit_credits > 9000000000000000
-     OR p_actor_id IS NULL
-     OR p_actor_id <= 0 THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB101', MESSAGE = 'invalid billing price publish command';
-  END IF;
-
-  INSERT INTO billing_skus (
-    sku, display_name, description, enabled, created_by, updated_by
-  ) VALUES (
-    p_sku, p_display_name, p_description, TRUE, p_actor_id, p_actor_id
-  ) ON CONFLICT (sku) DO NOTHING;
-  GET DIAGNOSTICS v_inserted = ROW_COUNT;
-  v_materialized := v_inserted > 0;
-
-  SELECT skus.current_price_version_id, prices.version, prices.unit_credits
-  INTO v_old_price_version_id, v_old_version, v_old_unit_credits
-  FROM billing_skus skus
-  LEFT JOIN billing_price_versions prices
-    ON prices.sku = skus.sku
-   AND prices.price_version_id = skus.current_price_version_id
-  WHERE skus.sku = p_sku
-  FOR UPDATE OF skus;
-
-  UPDATE billing_skus
-  SET display_name = p_display_name,
-      description = p_description,
-      enabled = CASE WHEN v_old_price_version_id IS NULL THEN TRUE ELSE enabled END,
-      updated_by = p_actor_id,
-      updated_at = clock_timestamp()
-  WHERE sku = p_sku;
-
-  SELECT COALESCE(max(prices.version), 0) + 1
-  INTO v_version
-  FROM billing_price_versions prices
-  WHERE prices.sku = p_sku;
-
-  INSERT INTO billing_price_versions (sku, version, unit_credits, created_by)
-  VALUES (p_sku, v_version, p_unit_credits, p_actor_id)
-  RETURNING billing_price_versions.price_version_id INTO v_price_version_id;
-
-  UPDATE billing_skus
-  SET current_price_version_id = v_price_version_id,
-      updated_by = p_actor_id,
-      updated_at = clock_timestamp()
-  WHERE sku = p_sku;
-
-  INSERT INTO billing_admin_actions (
-    action_type, sku, price_version_id, actor_id, metadata
-  ) VALUES (
-    'create_price', p_sku, v_price_version_id, p_actor_id,
-    jsonb_build_object(
-      'materialized', v_materialized,
-      'old', CASE
-        WHEN v_old_price_version_id IS NULL THEN NULL
-        ELSE jsonb_build_object(
-          'price_version_id', v_old_price_version_id,
-          'version', v_old_version,
-          'unit_credits', v_old_unit_credits
-        )
-      END,
-      'new', jsonb_build_object(
-        'price_version_id', v_price_version_id,
-        'version', v_version,
-        'unit_credits', p_unit_credits
-      ),
-      'outcome', 'published'
-    )
-  );
-
-  RETURN QUERY
-  SELECT prices.price_version_id, prices.version, prices.unit_credits,
-         prices.created_by, prices.created_at
-  FROM billing_price_versions prices
-  WHERE prices.price_version_id = v_price_version_id;
-END;
-$_$;
 
 --
 -- Name: set_billing_item_availability(text, boolean, bigint); Type: FUNCTION; Schema: public; Owner: -

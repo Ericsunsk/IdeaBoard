@@ -1,5 +1,5 @@
 import type { HttpHandler } from 'msw'
-import { http, HttpResponse } from '../../../../test/msw'
+import { http, HttpResponse } from '@/test/msw'
 
 type OutboundPolicyUpdate = {
   allow_hosts: string[]

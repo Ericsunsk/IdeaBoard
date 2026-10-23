@@ -1,4 +1,4 @@
-import { formatLocaleNumber } from '../../../../../core/i18n/formatters'
+import { formatLocaleNumber } from '@/core/i18n/formatters'
 import type { AdminBillableItemCard, PricingVariant } from './billableCatalogTypes'
 
 // 定价表各列定宽（单源，调列宽只改这里；对齐任务监控页 columns.ts 惯例）。

@@ -86,8 +86,8 @@ import { AdminDialogActions } from '../../../shared'
 import { AdminDialogShell } from '../../../shared'
 import { AdminFormField } from '../../../shared'
 import { AdminNumberInput } from '../../../shared'
-import { formatLocaleNumber } from '../../../../../core/i18n/formatters'
-import { OUTPUT_RESOLUTION_OPTIONS } from '../../../../../core/contracts/generationContract'
+import { formatLocaleNumber } from '@/core/i18n/formatters'
+import { OUTPUT_RESOLUTION_OPTIONS } from '@/core/contracts/generationContract'
 import type {
   AdminBillableItemCard,
   AdminModelPoolEntry,

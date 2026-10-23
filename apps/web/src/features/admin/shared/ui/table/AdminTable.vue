@@ -1,4 +1,8 @@
 <template>
+  <!-- 表格分层：ui/table 是原子（Table/Head/Row/Cell…只管单元素样式），本文件及
+    同目录 AdminTable* 是唯一数据封装（列声明/选择/展开/空态/加载都收口这里）。
+    业务页只许用 AdminTable (+AdminColumn)，禁直拼 <table>/ui 原子；
+    唯一例外是模型导入对话框的本地多选列表（见 tableLayering 契约 spec）。 -->
   <div class="min-w-0 overflow-hidden" :class="frameClass">
     <div
       :class="scrollable ? 'app-scrollbar overflow-x-auto' : 'min-w-0'"

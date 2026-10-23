@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { h } from 'vue'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import { AdminTabs, AdminTabsContent, AdminTabsList, AdminTabsTrigger } from './adminTabsAtoms'
 
 describe('AdminTabs', () => {

@@ -158,6 +158,47 @@ func (h *contractV1BillingHandler) withWorkspace(c *gin.Context, opts v1Workspac
 	v1WorkspacePrelude(c, require, resolve, opts.Allow, fn)
 }
 
+// v1OrganizationCtx carries the resolved shared org prelude.
+type v1OrganizationCtx struct {
+	Principal    principal.Principal
+	Organization *tenancy.Organization
+	Role         string
+}
+
+// v1OrganizationOpts tunes the shared org prelude (Resolve ->
+// LoadRole -> Require). Zero value is the member-only gate (hidden
+// orgs converge to 404 organization_not_found).
+type v1OrganizationOpts struct {
+	// Allow maps (role, visible) to the capability `allowed` flag.
+	Allow func(role string, visible bool) bool
+}
+
+// withOrganization runs the shared prelude for organization-scoped v1
+// handlers (same Resolve -> LoadRole -> Require core as workspaces).
+// Order matches the hand-rolled preludes it replaces: principal ->
+// store guard -> organization context -> capability.
+func (h *contractV1Handler) withOrganization(c *gin.Context, opts v1OrganizationOpts, fn func(v1OrganizationCtx)) {
+	p, ok := v1RequestPrincipal(c)
+	if !ok {
+		return
+	}
+	if !h.requireStore(c) {
+		return
+	}
+	organization, role, visible := h.v1OrganizationContext(c, p)
+	if organization == nil {
+		return
+	}
+	allowed := visible
+	if opts.Allow != nil {
+		allowed = opts.Allow(role, visible)
+	}
+	if !runtimehttp.RequireOrganizationCapability(c, visible, allowed) {
+		return
+	}
+	fn(v1OrganizationCtx{Principal: p, Organization: organization, Role: role})
+}
+
 // requireStoreAndBoards chains the tenancy + boards nil-seam guards
 // with the original short-circuit order.
 func (h *contractV1Handler) requireStoreAndBoards(c *gin.Context) bool {

@@ -77,12 +77,6 @@ RETURNING internal_id, public_id, billing_account_id, billing_account_public_id,
   from_user_id, to_user_id, status, idempotency_key,
   scope_workspace_public_ids, created_at, expires_at, decided_at, decided_by;
 
--- name: CountPendingBillingTransfersForAccount :one
-SELECT COUNT(*)
-FROM billing_account_transfer_invites
-WHERE billing_account_id = sqlc.arg(billing_account_id)
-  AND status = 'pending';
-
 -- name: ReissueBillingTransferInvite :one
 -- Re-issue after lapse (#948 follow-up): when the account's single pending
 -- invite has expired, the owner may send again. The pending row refreshes in
@@ -128,27 +122,3 @@ WHERE w.is_default = FALSE
     )
   )
 ORDER BY w.internal_id ASC;
-
--- name: CountActiveSearchOperationsForWorkspace :one
-SELECT COUNT(*)
-FROM ai_search_operations
-WHERE workspace_id = sqlc.arg(workspace_id)
-  AND status IN ('pending', 'reconciliation_pending');
-
--- name: CountUnsettledPaymentOrdersForAccount :one
-SELECT COUNT(*)
-FROM payment_orders
-WHERE billing_account_id = sqlc.arg(billing_account_id)
-  AND status IN ('creating', 'checkout_open', 'async_payment_pending', 'paid_pending_credit');
-
--- name: CountLinkedWorkspacesForAccountExcluding :one
-SELECT COUNT(*)
-FROM workspace_billing_links
-WHERE billing_account_id = sqlc.arg(billing_account_id)
-  AND workspace_id <> sqlc.arg(exclude_workspace_id);
-
--- name: CountOtherWorkspaceTasksForAccount :one
-SELECT COUNT(*)
-FROM tasks
-WHERE billing_account_id = sqlc.arg(billing_account_id)
-  AND workspace_id <> sqlc.arg(exclude_workspace_id);

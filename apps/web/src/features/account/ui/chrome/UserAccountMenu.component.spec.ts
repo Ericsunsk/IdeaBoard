@@ -624,20 +624,22 @@ describe('UserAccountMenu', () => {
       expect(screen.queryByRole('menuitem', { name: 'Team' })).not.toBeInTheDocument()
     })
 
-    it('limits settings and the current label to the active organization scope', async () => {
+    it('shows all workspaces in the submenu and settings without scope filtering', async () => {
       const workspace = workspaceControls({
         selectedId: 'ws_personal1',
-        activeScope: { kind: 'organization', organizationId: 'org_c3' },
       })
       const view = await openMenuWithWorkspace(workspace)
-      const trigger = await screen.findByRole('menuitem', { name: 'Workspaces' })
-      expect(trigger).toHaveTextContent('Workspaces')
+      const trigger = await screen.findByRole('menuitem', { name: 'Default' })
+      expect(trigger).toBeVisible()
+
+      const teamOption = await openWorkspaceSubmenu(trigger)
+      expect(teamOption).toBeVisible()
 
       await view.user.click(screen.getByRole('button', { name: 'Manage workspaces' }))
       await screen.findByRole('heading', { name: 'Workspaces' })
 
       expect(screen.getByRole('button', { name: 'Team' })).toBeVisible()
-      expect(screen.queryByRole('button', { name: 'Default' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Default' })).toBeVisible()
     })
 
     it('opens the naming dialog with a unique default name and creates on confirm', async () => {
@@ -799,7 +801,8 @@ describe('UserAccountMenu', () => {
       await view.user.click(screen.getByRole('button', { name: 'Add New' }))
       // Scope is fixed at creation: Personal renders as a read-only row
       // and no billing radios or More-actions toggle exist.
-      expect(screen.getByText('Personal')).toBeVisible()
+      const createDialog = await screen.findByRole('dialog', { name: 'New workspace' })
+      expect(within(createDialog).getByText('Personal')).toBeVisible()
       expect(screen.getByText(/New space uses your Personal account/)).toBeVisible()
       expect(screen.queryByRole('radio')).toBeNull()
       expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull()

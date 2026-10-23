@@ -1791,78 +1791,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /workspaces/{workspace_id}/billing-account/transfer:
-    post:
-      tags: [WorkspaceBilling]
-      operationId: transferWorkspaceBillingAccount
-      summary: Transfer billing account ownership (billing owner only)
-      description: >-
-        Only the current Owner may transfer; the previous Owner steps down
-        to Admin so the account never loses its last Owner. Identity,
-        balance, and history stay stable; only management changes. Requires
-        the Idempotency-Key header.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TransferBillingAccountRequest'
-      responses:
-        '200':
-          description: Ownership transferred.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data]
-                additionalProperties: false
-                properties:
-                  data:
-                    type: object
-                    required: [transferred]
-                    additionalProperties: false
-                    properties:
-                      transferred:
-                        type: boolean
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          description: Visible-but-forbidden transfer (billing_account_forbidden).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Conflicting transfer (billing_account_conflict).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Billing service unavailable (service_unavailable).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /workspaces/{workspace_id}/billing-account/transfer-invites:
     post:
       tags: [WorkspaceBilling]
@@ -5937,18 +5865,6 @@ components:
             role:
               type: string
               enum: [owner, admin]
-    TransferBillingAccountRequest:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          type: object
-          required: [new_owner_user_id]
-          additionalProperties: false
-          properties:
-            new_owner_user_id:
-              type: string
     InitiateBillingTransferRequest:
       type: object
       required: [data]

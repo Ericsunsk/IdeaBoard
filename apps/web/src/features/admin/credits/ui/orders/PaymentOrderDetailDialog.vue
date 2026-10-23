@@ -46,9 +46,9 @@
               {{ detail.user.displayName }}
             </div>
           </div>
-          <AdminStatusPill
+          <StatusBadge
             :label="getPaymentOrderStatusPresentation(detail.status).label"
-            :variant="getPaymentOrderStatusPresentation(detail.status).variant"
+            :tone="getPaymentOrderStatusPresentation(detail.status).tone"
             size="small"
           />
         </div>
@@ -85,9 +85,9 @@
           <h3 id="payment-reconciliation" class="text-admin-body font-bold text-foreground">
             {{ PAYMENT_ORDERS_MESSAGES.reconciliationTitle }}
           </h3>
-          <AdminStatusPill
+          <StatusBadge
             :label="PAYMENT_ORDERS_MESSAGES.anomalyState(detail.reconciliation.anomalous)"
-            :variant="detail.reconciliation.anomalous ? 'danger' : 'neutral'"
+            :tone="detail.reconciliation.anomalous ? 'danger' : 'neutral'"
             size="small"
           />
         </div>
@@ -169,9 +169,9 @@
               {{ PAYMENT_ORDERS_MESSAGES.refundActionTitle }}
             </h3>
           </div>
-          <AdminStatusPill
+          <StatusBadge
             :label="PAYMENT_ORDERS_MESSAGES.refundableBadge(formatIdeas(refundableIdeas))"
-            variant="info"
+            tone="info"
             size="small"
           />
         </div>
@@ -226,9 +226,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { AdminAlert } from '../../../shared'
-import { AdminStatusPill } from '../../../shared'
+import { StatusBadge } from '../../../shared'
 import { AdminButton } from '../../../shared'
-import ActionButton from '../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminNumberInput } from '../../../shared'
 import { AdminSpinner } from '../../../shared'
 import { AdminDialogShell } from '../../../shared'
@@ -239,7 +239,7 @@ import {
   getPaymentOrderStatusPresentation,
   getStripeStatusLabel,
 } from '../../core/orders/paymentOrderPresentation'
-import { formatLocaleNumber } from '../../../../../core/i18n/formatters'
+import { formatLocaleNumber } from '@/core/i18n/formatters'
 import { PAYMENT_ORDERS_MESSAGES } from './messages'
 import type {
   AdminPaymentDisputeSummary,

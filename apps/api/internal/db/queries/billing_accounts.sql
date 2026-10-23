@@ -12,7 +12,7 @@
 -- use here), so Task settlement keeps Quote/Hold/Task/River atomic.
 --
 -- workspace_billing_links rows are retired (writes closed, resolution no
--- longer reads them); the table stays for read-only audit only.
+-- longer reads them); the table stays for handover/admin-audit reads only.
 
 -- name: GetBillingAccountByOrganizationID :one
 SELECT internal_id, public_id, workspace_id, organization_id, created_at, updated_at
@@ -54,6 +54,8 @@ ORDER BY b.internal_id DESC
 LIMIT sqlc.arg(row_limit);
 
 -- name: ListWorkspacesByBillingAccountID :many
+-- Admin-audit read path (ListExplicitlyLinkedWorkspaces); resolution never
+-- uses link rows (ADR-0038).
 SELECT w.internal_id, w.public_id, w.organization_id, w.owner_user_id, w.name, w.is_default, w.created_at, w.updated_at
 FROM workspaces AS w
 INNER JOIN workspace_billing_links AS l ON l.workspace_id = w.internal_id
@@ -71,14 +73,6 @@ SELECT billing_account_id, user_id, role, created_at
 FROM billing_account_members
 WHERE billing_account_id = sqlc.arg(billing_account_id)
 ORDER BY user_id ASC
-LIMIT sqlc.arg(row_limit);
-
--- name: ListBillingAccountsForUser :many
-SELECT b.internal_id, b.public_id, b.workspace_id, b.organization_id, b.created_at, b.updated_at
-FROM billing_accounts AS b
-INNER JOIN billing_account_members AS m ON m.billing_account_id = b.internal_id
-WHERE m.user_id = sqlc.arg(user_id)
-ORDER BY b.internal_id ASC
 LIMIT sqlc.arg(row_limit);
 
 -- name: UpsertBillingAccountMember :one

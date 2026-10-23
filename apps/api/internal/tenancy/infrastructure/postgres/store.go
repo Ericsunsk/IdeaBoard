@@ -363,6 +363,18 @@ func (s *Store) CreateWorkspace(ctx context.Context, params tenancy.CreateWorksp
 // Organization creation. The caller owns validation, authorization, scope
 // locking, and the transaction; insert, membership, and funds identity stay atomic.
 func createWorkspaceInTx(ctx context.Context, q *dbsqlc.Queries, publicID string, orgInternal pgtype.Int8, params tenancy.CreateWorkspaceParams) (dbsqlc.Workspace, error) {
+	if orgInternal.Valid {
+		account, err := ensureOrganizationBillingAccountInTx(ctx, q, orgInternal.Int64, 0)
+		if err != nil {
+			return dbsqlc.Workspace{}, err
+		}
+		// Scope creation is a lifecycle write, unlike payer resolution during
+		// settlement. Take its explicit account lock before inserting the
+		// Workspace so it serializes with financial authority changes.
+		if _, err := lockBillingAccountInTx(ctx, q, account.InternalID); err != nil {
+			return dbsqlc.Workspace{}, err
+		}
+	}
 	ownerCol := nullInt64(params.OwnerUserID)
 	if orgInternal.Valid {
 		ownerCol = pgtype.Int8{}
@@ -384,22 +396,19 @@ func createWorkspaceInTx(ctx context.Context, q *dbsqlc.Queries, publicID string
 			return dbsqlc.Workspace{}, err
 		}
 	}
-	if err := createBillingInTx(ctx, q, row, orgInternal, params); err != nil {
+	if err := createBillingInTx(ctx, q, row, params); err != nil {
 		return dbsqlc.Workspace{}, err
 	}
 	return row, nil
 }
 
 // createBillingInTx provisions the creation-time funds identity inside the
-// same workspace transaction (ADR-0038). Org workspaces ensure the shared
-// org pool (no per-workspace account, no link row); Default rows mint
+// same workspace transaction (ADR-0038). Organization pools are ensured
+// and locked before the Workspace insert. Default rows mint
 // their own deterministic personal account (the owner's Personal
 // survivor); other personal workspaces need no billing write (they resolve
 // to the owner's Personal survivor at read time).
-func createBillingInTx(ctx context.Context, q *dbsqlc.Queries, row dbsqlc.Workspace, orgInternal pgtype.Int8, params tenancy.CreateWorkspaceParams) error {
-	if orgInternal.Valid {
-		return ensureOrganizationAccountInTx(ctx, q, orgInternal.Int64, 0)
-	}
+func createBillingInTx(ctx context.Context, q *dbsqlc.Queries, row dbsqlc.Workspace, params tenancy.CreateWorkspaceParams) error {
 	// Personal scope: only the Default row owns a billing write (the
 	// Personal survivor anchor). Other personal workspaces resolve to it.
 	if params.IsDefault {
@@ -412,7 +421,9 @@ func createBillingInTx(ctx context.Context, q *dbsqlc.Queries, row dbsqlc.Worksp
 // account for a freshly minted workspace plus the creator billing-owner
 // grant. The wallet row follows via the account-insert trigger. Only the
 // Default workspace row owns such an anchor (the Personal survivor);
-// business workspaces never call this.
+// business workspaces never call this. Internal-only: this is the Personal
+// counterpart to ensureOrganizationBillingAccountInTx; both resolve through
+// CreateBillingAccountStub, the sole billing_accounts insert primitive.
 func ensureWorkspaceAccountWithQueries(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID, ownerUserID int64) error {
 	if workspaceInternalID <= 0 {
 		return tenancy.ErrBillingWorkspaceInvalid
@@ -972,7 +983,9 @@ func sortMembersByUserID(members []*tenancy.WorkspaceMember) {
 
 // rejectClosedOrgWorkspaceInTx fails workspace membership writes closed
 // while the owning Organization is closed (#955). Personal scopes always
-// pass; missing organization rows read as not found.
+// pass; missing organization rows read as not found. The closed decision
+// itself stays in tenancy.CheckWorkspaceWritable so the store never
+// re-reads ClosedAt inline.
 func rejectClosedOrgWorkspaceInTx(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID int64) error {
 	workspaceRow, err := q.GetWorkspaceByInternalID(ctx, workspaceInternalID)
 	if err != nil {
@@ -985,10 +998,7 @@ func rejectClosedOrgWorkspaceInTx(ctx context.Context, q *dbsqlc.Queries, worksp
 	if err != nil {
 		return notFound(err)
 	}
-	if organization.ClosedAt.Valid {
-		return tenancy.ErrOrganizationClosed
-	}
-	return nil
+	return tenancy.CheckWorkspaceWritable(mapOrganization(organization))
 }
 
 // AddWorkspaceMember grants a membership idempotently: re-adding keeps the

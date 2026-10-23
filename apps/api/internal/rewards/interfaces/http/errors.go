@@ -45,72 +45,60 @@ const (
 	codeRewardRedemptionNotFound      = string(contract.CodeRewardRedemptionNotFound)
 	codeRewardCodeUnavailable         = string(contract.CodeRewardCodeUnavailable)
 	codeRewardWalletLocked            = string(contract.CodeRewardWalletLocked)
-	codeRewardRateLimited             = string(contract.CodeRewardRateLimited)
 	codeRewardServiceUnavailable      = string(contract.CodeRewardServiceUnavailable)
 	codeRewardOperationFailed         = string(contract.CodeRewardOperationFailed)
-	codeRewardRedeemFailed            = string(contract.CodeRewardRedeemFailed)
 )
 
-// Reward scopes partition the single domain table across surfaces:
-// admin writes render through writeRewardError, user redeem through
-// writeRewardRedeemError. Unscoped rows serve both; scoped rows serve
-// one surface (notably ErrInvalidCode: 400 invalid for admin, 422
-// unavailable for redeem so callers branch on one code).
+// Reward scopes partition the single domain table across surfaces: admin
+// writes render through writeRewardError. Unscoped rows serve the admin
+// surface; scoped rows are limited to it.
 const (
-	rewardScopeAdmin  = "admin"
-	rewardScopeRedeem = "redeem"
+	rewardScopeAdmin = "admin"
 )
 
 // rewardDomainErrorTable is the single source of truth for mapping domain
-// failures to the machine-readable envelope, shared by the admin and
-// redeem surfaces via Scope. Rows are ordered from the most specific
-// outcome to the most generic; the first in-scope match wins.
+// failures to the machine-readable envelope for the admin surface via
+// Scope. Rows are ordered from the most specific outcome to the most
+// generic; the first in-scope match wins.
 var rewardDomainErrorTable = []errorrender.Mapping{
 	{
 		Targets: []error{rewardsdomain.ErrRewardCodeConflict},
-		Status:  http.StatusConflict,
 		Code:    codeRewardCodeIdempotencyConflict,
 		Message: errorrender.MsgRender2,
 		Scope:   rewardScopeAdmin,
 	},
 	{
 		Targets: []error{rewardsdomain.ErrCodeCollision},
-		Status:  http.StatusConflict,
 		Code:    codeRewardCodeConflict,
 		Message: errorrender.MsgRender3,
 		Scope:   rewardScopeAdmin,
 	},
 	{
 		Targets: []error{rewardsdomain.ErrRewardCodeNotFound},
-		Status:  http.StatusNotFound,
 		Code:    codeRewardCodeNotFound,
 		Message: errorrender.MsgRender4,
 		Scope:   rewardScopeAdmin,
 	},
 	{
 		Targets: []error{rewardsdomain.ErrCapBelowRedemptions},
-		Status:  http.StatusConflict,
 		Code:    codeRewardCodeCapInvalid,
 		Message: errorrender.MsgRender5,
 		Scope:   rewardScopeAdmin,
 	},
 	{
 		Targets: []error{rewardsdomain.ErrRewardCodeRedeemed},
-		Status:  http.StatusConflict,
 		Code:    codeRewardCodeRedeemed,
 		Message: errorrender.MsgRender6,
 		Scope:   rewardScopeAdmin,
 	},
 	{
 		Targets: []error{rewardsdomain.ErrRedemptionNotFound},
-		Status:  http.StatusNotFound,
 		Code:    codeRewardRedemptionNotFound,
 		Message: errorrender.MsgRender7,
 		Scope:   rewardScopeAdmin,
 	},
 	{
 		Targets: []error{rewardsdomain.ErrCodeUnavailable},
-		Status:  http.StatusUnprocessableEntity,
 		Code:    codeRewardCodeUnavailable,
 		Message: errorrender.MsgRender8,
 	},
@@ -121,23 +109,14 @@ var rewardDomainErrorTable = []errorrender.Mapping{
 		// generic 500. credits/domain stays the single source; this row
 		// only lists its target.
 		Targets: []error{rewardsdomain.ErrWalletFrozen, creditsdomain.ErrWalletFrozen},
-		Status:  http.StatusConflict,
 		Code:    codeRewardWalletLocked,
 		Message: errorrender.MsgRender9,
 	},
 	{
 		Targets: []error{rewardsdomain.ErrInvalidCode},
-		Status:  http.StatusBadRequest,
 		Code:    codeRewardCodeInvalid,
 		Message: errorrender.MsgRewardInvalidInput,
 		Scope:   rewardScopeAdmin,
-	},
-	{
-		Targets: []error{rewardsdomain.ErrInvalidCode},
-		Status:  http.StatusUnprocessableEntity,
-		Code:    codeRewardCodeUnavailable,
-		Message: errorrender.MsgRender8,
-		Scope:   rewardScopeRedeem,
 	},
 }
 
@@ -195,32 +174,11 @@ func writeRewardError(c *gin.Context, err error) {
 	})
 }
 
-// writeRewardRedeemError renders user redeem failures through the shared
-// table (redeem scope). Invalid and unavailable codes share the 422
-// outcome so callers branch on one code.
-func writeRewardRedeemError(c *gin.Context, err error) {
-	errorrender.RenderMapped(c, err, rewardDomainErrorTable, errorrender.MappedOptions{
-		Scope:            rewardScopeRedeem,
-		DefaultStatus:    http.StatusInternalServerError,
-		DefaultCode:      codeRewardRedeemFailed,
-		DefaultMessage:   errorrender.MsgRewardRedeemFailed,
-		FallbackMessage:  errorrender.MsgRewardsInterfacesHTTPRender,
-		UnmatchedLog:     "reward operation failed",
-		UnmatchedAttrs:   rewardUnmatchedAttrs,
-		OmitUnmatchedErr: true,
-	})
-}
-
 // writeRewardInputError renders request-shape failures (malformed JSON,
 // unknown fields, illegal IDs, illegal pagination) through the machine
 // envelope so callers never match on copy.
 func writeRewardInputError(c *gin.Context, code, message string) {
 	errorrender.Render(c, http.StatusBadRequest, code, message)
-}
-
-// writeRewardRateLimitedError renders the per-user redeem throttle outcome.
-func writeRewardRateLimitedError(c *gin.Context) {
-	errorrender.Render(c, http.StatusTooManyRequests, codeRewardRateLimited, errorrender.MsgRewardRateLimited)
 }
 
 // writeRewardUnavailableError renders a missing service dependency.

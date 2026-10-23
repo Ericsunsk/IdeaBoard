@@ -1,6 +1,6 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen, waitFor } from '../../../../../test/render'
+import { renderWithUser, screen, waitFor } from '@/test/render'
 import RewardCodeRedemptionsDialog from './RewardCodeRedemptionsDialog.vue'
 import type { RewardCode } from '../../session/rewards/resource'
 

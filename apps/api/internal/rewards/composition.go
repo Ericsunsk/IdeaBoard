@@ -108,16 +108,12 @@ func (s *Service) ListRedemptions(ctx context.Context, input ports.ListRedemptio
 
 // --- Re-exports for consumers and bootstrap ---
 
-type UserHandler = rewardhttp.UserHandler
 type AdminCommandHandler = rewardhttp.AdminCommandHandler
 type AdminReadHandler = rewardhttp.AdminReadHandler
 
 type IdentityProjection = ports.IdentityProjection
 type IdentityProjectionReader = ports.IdentityProjectionReader
 type CodeKeyring = domain.CodeKeyring
-type RedemptionHandlerOptions = rewardhttp.RedemptionHandlerOptions
-
-const DefaultRedemptionAttemptLimit = rewardhttp.DefaultRedemptionAttemptLimit
 
 func ParseCodeKeyring(raw string) (CodeKeyring, error) {
 	return domain.ParseCodeKeyring(raw)

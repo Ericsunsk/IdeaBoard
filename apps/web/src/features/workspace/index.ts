@@ -21,8 +21,6 @@ export {
   fetchPrincipal,
   fetchWorkspacePage,
   inviteOrganizationMember,
-  isOrganizationWorkspace,
-  isPersonalWorkspace,
   normalizeWorkspaceListParams,
   parseOrganizationMember,
   parsePrincipal,
@@ -50,13 +48,6 @@ export {
   getOrganizationScopeStore,
   installOrganizationScopeStore,
   localStorageOrganizationScopePersist,
-  memoryOrganizationScopePersist,
-  resetOrganizationScopeStore,
-  resolveOrganizationScope,
-  filterWorkspacesByScope,
-  parseOrganizationScope,
-  subscribeOrganizationScopeChange,
-  useOrganizationScope,
 } from './organization/scope'
 export type { OrganizationScope, OrganizationScopeStore } from './organization/scope'
 export {
@@ -79,14 +70,6 @@ export type {
   WorkspaceSelectionStatus,
   WorkspaceSelectionStore,
 } from './selection/workspaceContext'
-export {
-  getWorkspaceSelectionPort,
-  installWorkspaceSelectionPort,
-  memoryWorkspaceSelectionPersist,
-  resetWorkspaceSelectionPort,
-  useWorkspaceSelectionPort,
-} from './selection/workspaceSelectionPort'
-export type { WorkspaceSelectionPort } from './selection/workspaceSelectionPort'
 export {
   fetchWorkspaceMembers,
   workspaceMembersQueryOptions,

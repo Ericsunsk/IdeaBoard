@@ -21,8 +21,7 @@ func TestPaymentErrorRenderFallsBackToFixedSafeMessage(t *testing.T) {
 	sentinel := errors.New("sentinel")
 	mapping := paymentErrorMapping{
 		Targets: []error{sentinel},
-		Status:  http.StatusBadRequest,
-		Code:    "test_empty_message",
+		Code:    "webhook_signature_invalid",
 	}
 	router := gin.New()
 	router.GET("/err", func(c *gin.Context) {
@@ -41,7 +40,7 @@ func TestPaymentErrorRenderFallsBackToFixedSafeMessage(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Code != "test_empty_message" || body.Msg != "请求处理失败，请稍后重试" {
+	if body.Code != "webhook_signature_invalid" || body.Msg != "请求处理失败，请稍后重试" {
 		t.Fatalf("response = %+v, want fixed fallback", body)
 	}
 	if strings.Contains(recorder.Body.String(), secret) {

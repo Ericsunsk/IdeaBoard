@@ -110,9 +110,9 @@ import { computed, ref, watch } from 'vue'
 import { Refresh, Xmark } from '@iconoir/vue'
 import { AdminAlert } from '../../../shared'
 import { AdminSelect } from '../../../shared'
-import ActionButton from '../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminSwitch } from '../../../shared'
-import { OUTPUT_RESOLUTION_OPTIONS } from '../../../../../core/contracts/generationContract'
+import { OUTPUT_RESOLUTION_OPTIONS } from '@/core/contracts/generationContract'
 import type {
   AdminModelPoolEntry,
   AdminPoolCatalogModel,

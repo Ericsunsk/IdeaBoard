@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
-import { useTheme } from '../../../../../theme/composables/useTheme'
+import { useTheme } from '@/theme/composables/useTheme'
 import { adminThemeTokenFallbacks } from '../../../shared'
 import { GetAdminStatisticsRange, type AdminStatistics } from '../../session/resource'
 import { useUsageStatisticsCharts } from './useUsageStatisticsCharts'

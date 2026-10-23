@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
-import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
-import { renderWithUser, screen, waitFor, within } from '../../../../../test/render'
+import { http, HttpResponse, useMswHandlers } from '@/test/msw'
+import { renderWithUser, screen, waitFor, within } from '@/test/render'
 import type { AdminStatistics } from '../../session/resource'
 import AdminStatisticsPage from './AdminStatisticsPage.vue'
 

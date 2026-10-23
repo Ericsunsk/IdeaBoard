@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAdminUserCommands } from './commands'
-import { makeAdminUserCommandTarget } from '../../../../test/factories'
+import { makeAdminUserCommandTarget } from '@/test/factories'
 
 const userQueryClientMock = vi.hoisted(() => ({
   invalidateQueries: vi.fn().mockResolvedValue(undefined),

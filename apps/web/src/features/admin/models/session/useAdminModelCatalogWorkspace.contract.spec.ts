@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { renderWithUser, waitFor } from '../../../../test/render'
+import { renderWithUser, waitFor } from '@/test/render'
 import { useAdminModelCatalogWorkspace } from './useAdminModelCatalogWorkspace'
 import type { AdminGatewayCatalog } from '../resource'
 import type { AdminModelItem } from '../core/catalogData'

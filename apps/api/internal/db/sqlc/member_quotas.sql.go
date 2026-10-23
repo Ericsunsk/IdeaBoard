@@ -30,8 +30,7 @@ type GetMemberQuotaParams struct {
 // every Workspace sharing the account, not a wallet, grant, or balance
 // reservation. All queries are typed and join the caller-owned transaction
 // via the passed Queries, so Task/Vision settlement keeps Check/Quote/
-// Hold/Task/River atomic with the workspace-budget check at the same
-// boundary (budget row first, quota row second: one fixed lock order).
+// Hold/Task/River atomic at the same boundary (one fixed lock order).
 func (q *Queries) GetMemberQuota(ctx context.Context, arg GetMemberQuotaParams) (BillingAccountMemberQuota, error) {
 	row := q.db.QueryRow(ctx, getMemberQuota, arg.BillingAccountID, arg.UserID)
 	var i BillingAccountMemberQuota

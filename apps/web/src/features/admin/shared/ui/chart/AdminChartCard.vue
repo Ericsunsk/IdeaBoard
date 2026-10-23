@@ -17,8 +17,8 @@
 </template>
 
 <script setup lang="ts">
-import ChartCard from '../../../../../core/components/ChartCard.vue'
-import ChartPanel, { type ChartPanelSize } from '../../../../../core/components/ChartPanel.vue'
+import ChartCard from '@/core/components/ChartCard.vue'
+import ChartPanel, { type ChartPanelSize } from '@/core/components/ChartPanel.vue'
 
 withDefaults(
   defineProps<{

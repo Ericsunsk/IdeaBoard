@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HttpResponse, http, useMswHandlers } from '../../../../../test/msw'
+import { HttpResponse, http, useMswHandlers } from '@/test/msw'
 import { createAdminStripeSettingsResource, type ApiStripeConfigurationSummary } from './resource'
 
 const responseData: ApiStripeConfigurationSummary = {

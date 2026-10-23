@@ -30,7 +30,7 @@
       <template v-else>
         <div v-for="row in rows" :key="row.key" class="flex items-center justify-between gap-3">
           <span class="text-admin-body font-medium text-foreground">{{ row.label }}</span>
-          <AdminStatusPill :label="row.status" :variant="row.variant" />
+          <StatusBadge :label="row.status" :tone="row.tone" />
         </div>
       </template>
     </div>
@@ -42,9 +42,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import ActionButton from '../../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminSpinner } from '../../../../shared/index'
-import { AdminStatusPill } from '../../../../shared/index'
+import { StatusBadge } from '../../../../shared/index'
 import StripeSettingsDialog from './StripeSettingsDialog.vue'
 import { createAdminStripeSettingsResource } from '../../../session/payment/resource'
 import { formatAdminDisplayError, useAdminToast } from '../../../../shared/index'
@@ -74,19 +74,19 @@ const rows = computed(() => [
     key: 'configured',
     label: '收款配置',
     status: M.paymentConfiguredState(summary.value?.isConfigured ?? false),
-    variant: 'neutral' as const,
+    tone: 'neutral' as const,
   },
   {
     key: 'product',
     label: '商品税率',
     status: PAYMENTS_MESSAGES.productReadyState(summary.value?.isProductReady ?? false),
-    variant: summary.value?.isProductReady ? ('success' as const) : ('neutral' as const),
+    tone: summary.value?.isProductReady ? ('success' as const) : ('neutral' as const),
   },
   {
     key: 'webhook',
     label: 'Webhook',
     status: PAYMENTS_MESSAGES.webhookReadyState(summary.value?.isWebhookReady ?? false),
-    variant: summary.value?.isWebhookReady ? ('success' as const) : ('neutral' as const),
+    tone: summary.value?.isWebhookReady ? ('success' as const) : ('neutral' as const),
   },
 ])
 

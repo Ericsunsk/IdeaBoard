@@ -1,6 +1,6 @@
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import AdminMonitorPage from './AdminMonitorPage.vue'
 
 const mocks = vi.hoisted(() => ({

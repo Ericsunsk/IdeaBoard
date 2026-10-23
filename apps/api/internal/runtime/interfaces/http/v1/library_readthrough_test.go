@@ -21,7 +21,8 @@ import (
 	"testing"
 	"time"
 
-	libraryapplication "ideaboard/api/internal/library/application"
+	libraryreadthrough "ideaboard/api/internal/library/application/readthrough"
+	librarysources "ideaboard/api/internal/library/application/sources"
 	librarydomain "ideaboard/api/internal/library/domain"
 	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
 	materializerassets "ideaboard/api/internal/media/assets"
@@ -138,18 +139,18 @@ func newV1ReadThroughFixture(t *testing.T, fetcher interface {
 	// owns lifecycle + replay; Media owns download + writes. The stub
 	// fetcher rides a real LibraryMaterializer so the tests keep
 	// covering the production download->ingest path with fake bytes.
-	replay := &libraryapplication.SourceResolver{Store: lib}
+	replay := &librarysources.SourceResolver{Store: lib}
 	rawMaterializer, err := materializerassets.NewLibraryMaterializer(materializerassets.LibraryMaterializerDeps{
 		Media: media, Objects: objects, Fetcher: fetcher, Replay: replay,
 	})
 	if err != nil {
 		t.Fatalf("NewLibraryMaterializer: %v", err)
 	}
-	var executor libraryapplication.Executor = libraryapplication.GoroutineExecutor{}
+	var executor libraryreadthrough.Executor = libraryreadthrough.GoroutineExecutor{}
 	if inlineSpawn {
-		executor = libraryapplication.SpawnFunc(func(fn func()) { fn() })
+		executor = libraryreadthrough.SpawnFunc(func(fn func()) { fn() })
 	}
-	readThrough := libraryapplication.NewReadThroughService(lib, rawMaterializer, executor, 0)
+	readThrough := libraryreadthrough.NewReadThroughService(lib, rawMaterializer, executor, 0)
 	if readThrough == nil {
 		t.Fatal("NewReadThroughService returned nil for test deps")
 	}

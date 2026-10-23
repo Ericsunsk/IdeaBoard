@@ -141,9 +141,9 @@
           :style="{ width: '18%', minWidth: '140px' }"
         >
           <template #body="{ data }">
-            <AdminStatusPill
+            <StatusBadge
               :label="getFindingRiskPresentation(data).label"
-              :variant="getFindingRiskPresentation(data).variant"
+              :tone="getFindingRiskPresentation(data).tone"
               size="small"
             />
           </template>
@@ -216,10 +216,10 @@
         <p class="mt-2 mb-0 text-admin-body leading-6 text-muted-foreground">
           {{ getFindingTypePresentation(selectedFinding.finding_type).summary }}
         </p>
-        <AdminStatusPill
+        <StatusBadge
           class="mt-3"
           :label="getFindingRiskPresentation(selectedFinding).label"
-          :variant="getFindingRiskPresentation(selectedFinding).variant"
+          :tone="getFindingRiskPresentation(selectedFinding).tone"
           size="small"
         />
       </section>
@@ -320,17 +320,17 @@
 import { computed, ref, watch } from 'vue'
 import { Eye, Refresh } from '@iconoir/vue'
 import { AdminAlert } from '../../../shared'
-import { AdminStatusPill } from '../../../shared'
+import { StatusBadge } from '../../../shared'
 import { AdminButton } from '../../../shared'
 import { AdminMono } from '../../../shared'
-import ActionButton from '../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminColumn } from '../../../shared'
 import { AdminDrawer } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
 import { AdminPagerControls } from '../../../shared'
 import { AdminTable } from '../../../shared'
 import { useAdminCursorCollection } from '../../../shared'
-import { adminPolling } from '../../../../../core/query/queryDefaults'
+import { adminPolling } from '@/core/query/queryDefaults'
 import {
   adminFramedIconButtonClass,
   adminTableCardClass,

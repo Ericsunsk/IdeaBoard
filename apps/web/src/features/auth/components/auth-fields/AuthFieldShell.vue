@@ -1,4 +1,7 @@
 <template>
+  <!-- Auth surface adapter: field state (ids/invalid/describedby) comes from
+    IbFormField over the neutral formFieldContract; auth only supplies surface
+    chrome (leading icon slot, loading spinner) and input tokens. -->
   <IbFormField
     :label="label"
     :error="error"
@@ -47,7 +50,8 @@
 
 <script setup lang="ts">
 import { Spinner } from '@/components/ui/spinner'
-import IbFormField, { type IbFormFieldSlotProps } from '../../../../core/components/IbFormField.vue'
+import IbFormField from '../../../../core/components/IbFormField.vue'
+import type { FormFieldContractSlotProps } from '../../../../core/components/formFieldContract'
 import { ibFormInputIconClass } from '../../../../theme/formControls'
 
 withDefaults(
@@ -75,7 +79,7 @@ withDefaults(
 defineSlots<{
   default(
     props: Pick<
-      IbFormFieldSlotProps,
+      FormFieldContractSlotProps,
       'ariaInvalid' | 'describedbyId' | 'fieldId' | 'invalid' | 'required'
     >,
   ): unknown

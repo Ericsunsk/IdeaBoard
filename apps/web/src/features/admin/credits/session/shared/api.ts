@@ -4,11 +4,11 @@ import {
   listControlReconciliationFindings,
   listControlReconciliationRuns,
   startControlReconciliation,
-} from '../../../../../api/generated-query/control/control-credits/control-credits'
+} from '@/api/generated-query/control/control-credits/control-credits'
 import type {
   ListControlReconciliationFindingsParams,
   ListControlReconciliationRunsParams,
-} from '../../../../../api/generated-query/control/model'
+} from '@/api/generated-query/control/model'
 import {
   createControlCreditCorrection,
   createControlCreditDeduction,
@@ -20,11 +20,11 @@ import {
   listControlCreditLedger,
   releaseControlWalletRestriction,
   restrictControlWallet,
-} from '../../../../../api/generated-query/control/control-credits/control-credits'
+} from '@/api/generated-query/control/control-credits/control-credits'
 import {
   getControlBillingAccount,
   listControlBillingAccounts,
-} from '../../../../../api/generated-query/control/control-billing/control-billing'
+} from '@/api/generated-query/control/control-billing/control-billing'
 import type {
   ControlBillingAccountDetail,
   ControlCreditCommandRequest,
@@ -39,8 +39,8 @@ import type {
   ListControlBillingAccountLedgerParams,
   ListControlBillingAccountsParams,
   ListControlCreditLedgerParams,
-} from '../../../../../api/generated-query/control/model'
-import { requireContractData } from '../../../../../api/contractKernel'
+} from '@/api/generated-query/control/model'
+import { requireContractData } from '@/api/contractKernel'
 import { buildControlMutationHeaders, type ControlMutationOptions } from '../../../shared'
 
 // Reconciliation views (issue #809). The legacy `admin-credits` generated

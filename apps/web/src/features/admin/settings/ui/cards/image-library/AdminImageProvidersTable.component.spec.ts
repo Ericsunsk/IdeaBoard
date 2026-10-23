@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen, waitFor } from '../../../../../../test/render'
+import { renderWithUser, screen, waitFor } from '@/test/render'
 import AdminImageProvidersTable from './AdminImageProvidersTable.vue'
 import type { AdminSearchProviderResource } from '../../../session/image-library/searchProviderResource'
 import type {
@@ -482,7 +482,7 @@ describe('AdminImageProvidersTable', () => {
       props: { configs: failedConfigs, resource },
     })
 
-    // Status 列保留为真相源（方案 A：failed→Error danger，统一 AdminStatusPill）。
+    // Status 列保留为真相源（方案 A：failed→Error danger，统一 StatusBadge）。
     const abnormal = screen.getByText('Error')
     expect(abnormal).toBeVisible()
     expect(abnormal.parentElement?.className ?? '').toContain('bg-destructive-soft')

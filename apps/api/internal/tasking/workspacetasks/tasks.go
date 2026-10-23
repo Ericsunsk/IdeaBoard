@@ -108,8 +108,7 @@ var (
 	// ErrValidation reports a 422-class failure (kind/assets/params).
 	ErrValidation = errors.New("workspacetasks: validation failed")
 	// ErrInsufficientCredits is the canonical credits hold failure
-	// (402 task_insufficient_credits). Alias, not a copy: the holder
-	// pairs it with the underlying credits cause via multi-%w.
+	// (402 task_insufficient_credits). The holder propagates it unchanged.
 	ErrInsufficientCredits = creditsdomain.ErrInsufficientCredits
 	// ErrQuoteUnavailable reports a server-side price snapshot failure
 	// (503 billing_quote_unavailable). It stays a distinct routing
@@ -121,8 +120,7 @@ var (
 	// Production task mutation never falls back to compensating writes.
 	ErrSettlementUnavailable = errors.New("workspacetasks: settlement unavailable")
 	// ErrWalletRestricted is the canonical credits restriction failure
-	// (403 billing_wallet_restricted). Alias, not a copy: see
-	// ErrInsufficientCredits for the multi-%w pairing.
+	// (403 billing_wallet_restricted). The holder propagates it unchanged.
 	ErrWalletRestricted = creditsdomain.ErrWalletRestricted
 	// ErrMemberQuotaExhausted reports that a submit would exceed the
 	// member's remaining cross-workspace consumption quota for the

@@ -1,6 +1,6 @@
 import { fireEvent } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '../../../../../test/render'
+import { render, screen } from '@/test/render'
 import AdminEditorActions from './AdminEditorActions.vue'
 
 describe('AdminEditorActions', () => {

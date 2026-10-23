@@ -94,41 +94,6 @@
               :class="submenuContentClass"
             >
               <div
-                v-if="props.workspace?.activeScope && props.workspace?.onSelectPersonal"
-                class="flex items-center gap-1 px-2 py-1.5"
-                role="tablist"
-                :aria-label="t('workspace.scope.switcherLabel')"
-              >
-                <button
-                  type="button"
-                  class="h-7 flex-1 cursor-pointer rounded-control px-2 text-xs"
-                  :class="
-                    props.workspace.activeScope.kind === 'personal'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-muted'
-                  "
-                  role="tab"
-                  :aria-selected="props.workspace.activeScope.kind === 'personal'"
-                  @click="props.workspace.onSelectPersonal?.()"
-                >
-                  {{ t('workspace.scope.personal') }}
-                </button>
-                <button
-                  type="button"
-                  class="h-7 flex-1 cursor-pointer truncate rounded-control px-2 text-xs"
-                  :class="
-                    props.workspace.activeScope.kind === 'organization'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-muted'
-                  "
-                  role="tab"
-                  :aria-selected="props.workspace.activeScope.kind === 'organization'"
-                  @click="handleScopeOrganizationClick"
-                >
-                  {{ t('workspace.scope.organization') }}
-                </button>
-              </div>
-              <div
                 v-if="isWorkspaceLoading"
                 class="flex items-center gap-2 px-2.5 py-2"
                 aria-live="polite"
@@ -313,6 +278,9 @@
         :on-create-organization="props.workspace?.onCreateOrganization"
         :organization-panel="props.workspace?.organizationPanel ?? null"
         :on-rename="handleWorkspaceRename"
+        :on-rename-organization="
+          props.workspace?.onRenameOrganization ? handleOrganizationRename : undefined
+        "
         :on-delete="handleWorkspaceDelete"
         @update:is-open="isWorkspaceSettingsOpen = $event"
       />
@@ -460,18 +428,7 @@ const isGuest = computed(() => Boolean(loginItem.value && registerItem.value))
 const WORKSPACE_NAME_MAX_LENGTH_FALLBACK = 120
 
 const isWorkspaceRowVisible = computed(() => !isGuest.value && props.workspace != null)
-const activeScope = computed(() => props.workspace?.activeScope ?? null)
-const visibleWorkspaces = computed(() => {
-  const items = props.workspace?.items ?? []
-  const scope = activeScope.value
-  if (scope?.kind === 'organization') {
-    return items.filter((item) => item.organizationId === scope.organizationId)
-  }
-  if (scope?.kind === 'personal') {
-    return items.filter((item) => item.organizationId == null)
-  }
-  return items
-})
+const visibleWorkspaces = computed(() => props.workspace?.items ?? [])
 const visibleSelectedId = computed(() => {
   const selectedId = props.workspace?.selectedId
   return selectedId && visibleWorkspaces.value.some((item) => item.publicId === selectedId)
@@ -501,20 +458,6 @@ function handleWorkspaceSelect(workspaceId: string) {
   isWorkspaceSubOpen.value = false
   open.value = false
   props.workspace?.onSelect(workspaceId)
-}
-
-async function handleScopeOrganizationClick() {
-  const workspace = props.workspace
-  if (!workspace) return
-  if (workspace.activeScope?.kind === 'organization') return
-  try {
-    const orgs = await workspace.onLoadOrganizations?.()
-    const first = orgs?.[0]
-    if (first) await workspace.onSelectOrganization?.(first.publicId)
-  } catch {
-    // Scope switch stays on Personal when the organization list fails;
-    // the workspace list retry affordance below surfaces the failure.
-  }
 }
 
 function handleWorkspaceRetry(event: Event) {
@@ -549,6 +492,12 @@ async function handleWorkspaceCreate(input: UserAccountMenuWorkspaceCreateInput)
 
 async function handleWorkspaceRename(workspaceId: string, name: string) {
   return requireWorkspace().onRename(workspaceId, name)
+}
+
+async function handleOrganizationRename(organizationId: string, name: string) {
+  const renameOrganization = requireWorkspace().onRenameOrganization
+  if (!renameOrganization) throw new Error('Organization rename is unavailable')
+  return renameOrganization(organizationId, name)
 }
 
 async function handleWorkspaceDelete(workspaceId: string) {

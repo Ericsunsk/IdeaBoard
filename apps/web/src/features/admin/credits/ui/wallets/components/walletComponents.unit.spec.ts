@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen } from '../../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import WalletOverviewCard from './WalletOverviewCard.vue'
 import WalletAdjustPanel from './WalletAdjustPanel.vue'
 import WalletLedgerTable from './WalletLedgerTable.vue'
@@ -13,7 +13,7 @@ describe('Wallet Subcomponents', () => {
         availableCredits: 500,
         reservedCredits: 20,
         accountStatus: '正常',
-        accountStatusVariant: 'success',
+        accountStatusTone: 'success',
         activeRestrictions: [],
         isUserDisabledOrClosing: false,
         commandPending: false,
@@ -58,7 +58,7 @@ describe('Wallet Subcomponents', () => {
     { tab: 'deduction', dot: 'bg-destructive' },
     { tab: 'refund', dot: 'bg-success' },
   ] as const)('pins WalletAdjustPanel $tab dot to Pill semantic $dot', ({ tab, dot }) => {
-    // Tab 圆点对齐 Pill 语义色：grant/refund→success（与 getCreditCommandVariant
+    // Tab 圆点对齐 Pill 语义色：grant/refund→success（与 getCreditCommandTone
     // 一致），deduction→destructive；refund 不再用 warning。
     const { unmount } = renderWithUser(WalletAdjustPanel, {
       props: {

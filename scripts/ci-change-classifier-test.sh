@@ -265,6 +265,13 @@ assert_output_line "${atlas_migration_output}" 'realtime=false'
 assert_output_line "${atlas_migration_output}" 'migration_integration=true'
 assert_output_line "${atlas_migration_output}" 'ops=true'
 
+contract_guard_output="$(printf '%s\n' scripts/sql-workspace-scope-check.sh scripts/openapi-pattern-check.sh scripts/check-backend-copy.sh | "${classifier}")"
+
+assert_output_line "${contract_guard_output}" 'api=true'
+assert_output_line "${contract_guard_output}" 'web=false'
+assert_output_line "${contract_guard_output}" 'realtime=false'
+assert_output_line "${contract_guard_output}" 'ops=true'
+
 gate_output="$(printf '%s\n' scripts/ci-gate.sh | "${classifier}")"
 
 assert_output_line "${gate_output}" 'web=true'

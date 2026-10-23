@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { makeAdminUserListItem } from '../../../../test/factories'
+import { makeAdminUserListItem } from '@/test/factories'
 import {
   createAdminUserRowView,
   getUserActionItems,
@@ -54,9 +54,9 @@ describe('admin user view model', () => {
       isAdmin: true,
       isActive: false,
       roleLabel: 'Admin',
-      roleVariant: 'danger',
+      roleTone: 'danger',
       statusLabel: '封禁',
-      statusVariant: 'danger',
+      statusTone: 'danger',
     })
     expect(row.createdDateLabel).toBe('2026-06-29')
   })

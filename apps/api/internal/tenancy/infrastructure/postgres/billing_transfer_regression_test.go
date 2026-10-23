@@ -170,7 +170,7 @@ func TestHandoverDecisionRejectsAnotherAccountBeforeMutation(t *testing.T) {
 }
 
 func TestBillingMutationWaitsThenRechecksActorAuthority(t *testing.T) {
-	for _, mutation := range []string{"add", "update", "detach", "transfer", "initiate", "accept"} {
+	for _, mutation := range []string{"add", "update", "detach", "initiate", "accept"} {
 		t.Run(mutation, func(t *testing.T) {
 			db := newTenancyTestDB(t)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -202,8 +202,6 @@ func TestBillingMutationWaitsThenRechecksActorAuthority(t *testing.T) {
 					_, err = accounts.UpdateBillingAccountMemberRole(ctx, account.InternalID, owner, recipient, tenancy.BillingRoleOwner)
 				case "detach":
 					err = accounts.RemoveBillingAccountMember(ctx, account.InternalID, owner, recipient)
-				case "transfer":
-					err = accounts.TransferBillingAccountOwnership(ctx, account.InternalID, owner, recipient)
 				case "initiate":
 					_, err = accounts.InitiateBillingTransferInvite(ctx, account.InternalID, owner, third, "after-revocation")
 				case "accept":

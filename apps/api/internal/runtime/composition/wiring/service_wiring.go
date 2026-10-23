@@ -1,3 +1,9 @@
+// Wiring segment 2/4: domain services (assembly only).
+//
+// This file only annotates and composes: it wires platform services with
+// context-owned stores and adapters. Business rules live in the owning
+// contexts (credits Commands, billing Catalog, payments Service, rewards
+// Service, identity lifecycle); nothing here writes business facts.
 package wiring
 
 import (

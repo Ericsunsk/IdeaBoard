@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ControlCreatedRewardCode } from '../../../../../api/generated-query/control/model/controlCreatedRewardCode'
+import type { ControlCreatedRewardCode } from '@/api/generated-query/control/model/controlCreatedRewardCode'
 import { createAdminRewardCodeResource } from './resource'
 
 const transport = vi.hoisted(() => ({

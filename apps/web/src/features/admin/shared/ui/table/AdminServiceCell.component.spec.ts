@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Search } from '@iconoir/vue'
 import { markRaw } from 'vue'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import AdminServiceCell from './AdminServiceCell.vue'
 
 describe('AdminServiceCell', () => {

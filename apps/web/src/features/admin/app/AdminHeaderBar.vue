@@ -65,9 +65,9 @@
                 <div class="min-w-0">
                   <div class="text-admin-content font-bold text-foreground">异常雷达</div>
                 </div>
-                <AdminStatusPill
+                <StatusBadge
                   :label="hasAnomalies ? `${anomalyCount} 项` : '正常'"
-                  :variant="hasAnomalies ? 'danger' : 'success'"
+                  :tone="hasAnomalies ? 'danger' : 'success'"
                   :pulse="hasAnomalies"
                   size="small"
                 />
@@ -133,17 +133,17 @@
 </template>
 
 <script setup lang="ts">
-import { useSupportChannels } from '../../../core/composables/useSupportChannels'
+import { useSupportChannels } from '@/core/composables/useSupportChannels'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { AdminPopover } from '../shared'
 import { AdminPopoverTrigger } from '../shared'
 import { AdminPopoverContent } from '../shared'
-import { AdminStatusPill } from '../shared'
+import { StatusBadge } from '../shared'
 import { BellNotificationSolid as BellIcon, Menu as MenuIcon, Xmark } from '@iconoir/vue'
 import type { AdminNavigationItem } from './navigation'
 import { useUserStore } from '../../auth'
-import { useLogoutRedirect } from '../../../core/composables/useLogoutRedirect'
+import { useLogoutRedirect } from '@/core/composables/useLogoutRedirect'
 import { useAnomalyRadar } from '../shared'
 import { useAdminToast } from '../shared'
 import type { AdminAnomalyItem } from '../shared'

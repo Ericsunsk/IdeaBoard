@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
-import { renderWithUser, screen, waitFor } from '../../../../../test/render'
-import { expectDomOrder } from '../../../../../test/domOrder'
+import { http, HttpResponse, useMswHandlers } from '@/test/msw'
+import { renderWithUser, screen, waitFor } from '@/test/render'
+import { expectDomOrder } from '@/test/domOrder'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
 import {
   createBillingCatalogHandlers,

@@ -164,10 +164,10 @@
         </template>
       </AdminColumn>
 
-      <!-- 角色列（方案 A：载体统一 AdminStatusPill，非状态徽标亦收口） -->
+      <!-- 角色列（方案 A：载体统一 StatusBadge，非状态徽标亦收口） -->
       <AdminColumn field="role" :header="USERS_MESSAGES.role" :style="{ width: '105px' }">
         <template #body="{ data: user }">
-          <AdminStatusPill :label="user.roleLabel" :variant="user.roleVariant" size="small" />
+          <StatusBadge :label="user.roleLabel" :tone="user.roleTone" size="small" />
         </template>
       </AdminColumn>
 
@@ -190,10 +190,10 @@
         </template>
       </AdminColumn>
 
-      <!-- 状态列（方案 A：载体统一 AdminStatusPill，正常 success / 封禁 danger） -->
+      <!-- 状态列（方案 A：载体统一 StatusBadge，正常 success / 封禁 danger） -->
       <AdminColumn field="status" :header="USERS_MESSAGES.status" :style="{ width: '105px' }">
         <template #body="{ data: user }">
-          <AdminStatusPill :label="user.statusLabel" :variant="user.statusVariant" size="small" />
+          <StatusBadge :label="user.statusLabel" :tone="user.statusTone" size="small" />
         </template>
       </AdminColumn>
 
@@ -260,7 +260,7 @@
 <script setup lang="ts">
 import { Discord, Globe, Google, Mail, MoreHoriz, Refresh } from '@iconoir/vue'
 import { computed, ref } from 'vue'
-import { AdminStatusPill } from '../../../shared'
+import { StatusBadge } from '../../../shared'
 import { AdminButton } from '../../../shared'
 import { AdminCollectionPageShell } from '../../../shared'
 import { AdminColumn } from '../../../shared'
@@ -288,7 +288,7 @@ import { banDurationOptions } from '../../session/commands'
 import { useAdminUsersContext } from '../../session/context'
 import { useUsersFeedback } from '../../session/useUsersFeedback'
 import { USERS_MESSAGES } from './messages'
-import { resolveSizedAvatarUrl } from '../../../../../core/media/avatarUrl'
+import { resolveSizedAvatarUrl } from '@/core/media/avatarUrl'
 import {
   getCountryFlag,
   getCountryLabel,

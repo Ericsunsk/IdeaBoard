@@ -47,16 +47,6 @@ type v1UpdateBillingMemberBody struct {
 	} `json:"data"`
 }
 
-type v1TransferBillingAccountBody struct {
-	Data struct {
-		NewOwnerUserID string `json:"new_owner_user_id"`
-	} `json:"data"`
-}
-
-type v1TransferBillingAccountDTO struct {
-	Transferred bool `json:"transferred"`
-}
-
 func (h *contractV1BillingHandler) toBillingMemberDTO(c *gin.Context, m *tenancy.BillingAccountMember) (v1BillingMemberDTO, bool) {
 	if h.deps.Users == nil {
 		contract.RenderError(c, http.StatusNotImplemented,
@@ -233,54 +223,5 @@ func (h *contractV1BillingHandler) updateBillingAccountMember(c *gin.Context) {
 			return
 		}
 		contract.RenderSuccess(c, dto)
-	})
-}
-
-// transferBillingAccountOwnership hands management to another manager. Only
-// the current Owner may transfer; the previous Owner steps down to Admin so
-// the account never loses its last Owner. Identity, balance, and history
-// stay stable; only management changes.
-func (h *contractV1BillingHandler) transferBillingAccountOwnership(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
-		if h.deps.BillingAccounts == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-			c.Abort()
-			return
-		}
-		key, err := contract.IdempotencyKeyFromHeader(c)
-		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, runtimehttp.MsgIdempotencyKeyRequired2)
-			c.Abort()
-			return
-		}
-		var body v1TransferBillingAccountBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-			writeV1InputError(c)
-			return
-		}
-		newOwnerID, ok := h.resolveBillingMemberUserID(c, body.Data.NewOwnerUserID)
-		if !ok {
-			return
-		}
-		account, resolved := h.billingAccountForWorkspace(c, wctx.Workspace)
-		if !resolved {
-			return
-		}
-		externalUser := tenancy.FormatUserPublicID(wctx.Principal.PublicID())
-		hash := contract.HashIdempotencyRequest("billing.account.transfer", wctx.Workspace.PublicID, body.Data.NewOwnerUserID)
-		_, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), contract.IdempotencyScope(externalUser, "billing.account.transfer"), wctx.Principal.UserID(), key, hash, func() (any, error) {
-			return nil, h.deps.BillingAccounts.TransferBillingAccountOwnership(
-				c.Request.Context(), account.InternalID, wctx.Principal.UserID(), newOwnerID)
-		})
-		if doErr != nil {
-			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
-				c.Abort()
-				return
-			}
-			renderBillingAccountError(c, doErr)
-			return
-		}
-		contract.RenderSuccess(c, v1TransferBillingAccountDTO{Transferred: true})
 	})
 }

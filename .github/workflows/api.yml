@@ -358,6 +358,22 @@ jobs:
           OPENAPI_BREAKING_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: ./scripts/openapi-breaking-check.sh "${BASE_SHA}"
 
+  static-contracts:
+    name: API Static Contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - name: Check workspace SQL scope predicates
+        run: bash scripts/sql-workspace-scope-check.sh
+
+      - name: Check OpenAPI scalar pattern consistency
+        run: bash scripts/openapi-pattern-check.sh
+      - name: Check backend copy vocabulary
+        run: bash scripts/check-backend-copy.sh
+
   image:
     name: API PR Image
     if: inputs.build_images

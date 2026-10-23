@@ -20,11 +20,13 @@ import {
   provisionOrganization,
   removeOrganizationMember,
   renameWorkspace,
+  renameOrganization,
   updateOrganizationMember,
   workspaceQueryKeys,
+  type OrganizationSummary,
   type WorkspaceSummary,
 } from '../selection/workspaceResource'
-import { getOrganizationScopeStore, type OrganizationScope } from '../organization/scope'
+import { getOrganizationScopeStore } from '../organization/scope'
 import {
   WORKSPACE_URL_PARAM,
   useWorkspaceSelection,
@@ -88,42 +90,6 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     landOnGalleryWorkspace(workspaceId)
   }
 
-  async function switchScope(scope: OrganizationScope): Promise<void> {
-    const scopeStore = getOrganizationScopeStore()
-    const currentScope = scopeStore.getScope()
-    if (
-      currentScope.kind === scope.kind &&
-      (scope.kind === 'personal' ||
-        (currentScope.kind === 'organization' &&
-          currentScope.organizationId === scope.organizationId))
-    ) {
-      return
-    }
-    if ((await options?.beforeWorkspaceChange?.()) === false) return
-
-    const scopedItems = selection.items.value.filter((item) =>
-      scope.kind === 'personal'
-        ? item.organizationId == null
-        : item.organizationId === scope.organizationId,
-    )
-    const target =
-      scopedItems.find((item) => item.publicId === selection.selectedId.value) ?? scopedItems[0]
-    scopeStore.select(scope)
-    if (target) {
-      landOnGalleryWorkspace(target.publicId)
-      return
-    }
-
-    // The scope itself remains useful for organization management when it has
-    // no content workspaces. Drop the old workspace and board from the URL.
-    const query: LocationQueryRaw = { ...route.query }
-    delete query[WORKSPACE_URL_PARAM]
-    delete query[CANVAS_BOARD_ID_PARAM]
-    const destination = { path: USER_BOARDS_PATH, query }
-    if (route.path === USER_BOARDS_PATH) void router.replace(destination)
-    else void router.push(destination)
-  }
-
   async function refreshWorkspaceList(): Promise<void> {
     await queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.list })
   }
@@ -155,6 +121,19 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     return updated
   }
 
+  // Organization rename rides PATCH /organizations/:id (owner/admin only
+  // server-side). Renames are idempotent by value, so retries replay safely
+  // without an Idempotency-Key. Refresh the organization list so the
+  // settings shell re-reads the management surface on its next load.
+  async function renameOrganizationItem(
+    organizationId: string,
+    name: string,
+  ): Promise<OrganizationSummary> {
+    const updated = await renameOrganization(organizationId, { name })
+    await queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.organizations })
+    return updated
+  }
+
   // Reuse the selection seam's fallback after deleting the selected workspace.
   async function deleteWorkspaceItem(workspaceId: string): Promise<void> {
     const isSelectedWorkspace = selection.selectedId.value === workspaceId
@@ -174,7 +153,6 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     // Track locale so the load-error copy follows language switches.
     void i18n.global.locale.value
     const scopeStore = getOrganizationScopeStore()
-    const scope: OrganizationScope = scopeStore.getScope()
     return {
       items: selection.items.value,
       selectedId: selection.selectedId.value,
@@ -218,13 +196,10 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
           await refreshWorkspaceList()
         },
       },
-      activeScope: scope,
-      onSelectPersonal: () => void switchScope({ kind: 'personal' }),
-      onSelectOrganization: (organizationId: string) =>
-        switchScope({ kind: 'organization', organizationId }),
       onSelect: switchToGalleryWorkspace,
       onCreate: createWorkspaceItem,
       onRename: renameWorkspaceItem,
+      onRenameOrganization: renameOrganizationItem,
       onDelete: deleteWorkspaceItem,
       onRetry: () => {
         void selection.refetch()
@@ -237,6 +212,7 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     switchToGalleryWorkspace,
     createWorkspaceItem,
     renameWorkspaceItem,
+    renameOrganizationItem,
     deleteWorkspaceItem,
   }
 }

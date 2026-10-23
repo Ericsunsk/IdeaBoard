@@ -1,4 +1,4 @@
-h1:lPV3qL0xEKheeTHe1e8MQusAFqbV9zNCdz6VLO5y9n4=
+h1:4QlyVxSMVTNaXtOogzj4zjJB8EXc9ywEUx+58ORiYvA=
 20261020000000_baseline.sql h1:Fpqe+04wrz22ibGoHfDHz+s0WBq8GSYDkguIesUcWSU=
 20261020000001_board_y_updates.sql h1:fQb6dWRkE+cm22VIddfEVbXDLML9p7QzkjhCIz8bbxQ=
 20261020000002_drop_workspaces_archived_at.sql h1:yZj35gEPGxSzPy+heq9eudveMrB0P+mPYXd9ywJKh3k=
@@ -16,3 +16,5 @@ h1:lPV3qL0xEKheeTHe1e8MQusAFqbV9zNCdz6VLO5y9n4=
 20261103000000_drop_default_member_quotas.sql h1:Owv84lSg3ae2iJLD1jxEBdiHD2lNcsMfYz7GZMyDzfs=
 20261104000000_drop_workspace_budgets.sql h1:NhjHG7MueDoqLrPSawgz+ZEeN2zKlLVZaJ1N7JOka9w=
 20261104000001_permanent_organization_closure.sql h1:JnOUQXN4nEnZaTu//bJq58fM++Djezxuh5BOBhH+U0M=
+20261104000002_drop_organizations_archived_at.sql h1:jYssuoXv8q7O139wBMJBtMI59y4RPZNEX/VutfdeXLA=
+20261104000003_drop_publish_billing_price.sql h1:96oykTFfA8YtvKDHeKNz7w84hEiAZtDC/eL4TEjmmLM=

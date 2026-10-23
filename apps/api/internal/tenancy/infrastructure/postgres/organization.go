@@ -53,51 +53,11 @@ func mapOrganization(row dbsqlc.Organization) *tenancy.Organization {
 		InternalID: row.InternalID,
 		PublicID:   row.PublicID,
 		Name:       row.Name,
-		ArchivedAt: dbutil.TimePtr(row.ArchivedAt),
 		ClosedAt:   dbutil.TimePtr(row.ClosedAt),
 		ClosedBy:   dbutil.Int64Ptr(row.ClosedBy),
 		CreatedAt:  dbutil.TimeValue(row.CreatedAt),
 		UpdatedAt:  dbutil.TimeValue(row.UpdatedAt),
 	}
-}
-
-// ensureOrganizationAccountInTx provisions the shared org pool and its
-// billing-owner grant inside the caller's transaction. The wallet follows
-// via the account-insert trigger. Existing accounts are locked before use
-// and their grants stay untouched; ownerUserID=0 resolves the org Owner.
-func ensureOrganizationAccountInTx(ctx context.Context, q *dbsqlc.Queries, organizationInternalID, ownerUserID int64) error {
-	if organizationInternalID <= 0 {
-		return tenancy.ErrBillingWorkspaceInvalid
-	}
-	orgKey := pgtype.Int8{Int64: organizationInternalID, Valid: true}
-	if account, err := q.GetBillingAccountByOrganizationID(ctx, orgKey); err == nil {
-		_, err = lockBillingAccountInTx(ctx, q, account.InternalID)
-		return err
-	} else if !database.IsNotFound(err) {
-		return err
-	}
-	publicID, err := tenancy.NewBillingAccountPublicID()
-	if err != nil {
-		return err
-	}
-	created, err := q.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
-		PublicID: publicID, WorkspaceID: pgtype.Int8{},
-		OrganizationID: orgKey,
-	})
-	if err != nil {
-		if database.IsDuplicateConstraintError(err) {
-			return nil
-		}
-		return err
-	}
-	if ownerUserID > 0 {
-		_, _ = q.UpsertBillingAccountMember(ctx, dbsqlc.UpsertBillingAccountMemberParams{
-			BillingAccountID: created.InternalID, UserID: ownerUserID, Role: tenancy.BillingRoleOwner,
-		})
-	} else {
-		ensureBillingOwnerForOrg(ctx, q, created.InternalID, organizationInternalID)
-	}
-	return nil
 }
 
 // CreateOrganization mints an org_ organization and grants the creator the
@@ -148,7 +108,10 @@ func (s *OrganizationStore) CreateOrganization(ctx context.Context, ownerUserID 
 			}); err != nil {
 				return err
 			}
-			return ensureOrganizationAccountInTx(ctx, q, row.InternalID, ownerUserID)
+			if _, err := ensureOrganizationBillingAccountInTx(ctx, q, row.InternalID, ownerUserID); err != nil {
+				return err
+			}
+			return nil
 		})
 		if isPublicIDConflict(err) {
 			continue
@@ -185,8 +148,8 @@ func (s *OrganizationStore) ListOrganizationsForUser(ctx context.Context, userID
 	return out, nil
 }
 
-// UpdateOrganization renames a live organization; archived, closed, or
-// missing rows read as not found (closed) or are refused.
+// UpdateOrganization renames a live organization; closed or missing rows
+// read as not found (closed) or are refused.
 func (s *OrganizationStore) UpdateOrganization(ctx context.Context, publicID, name string) (*tenancy.Organization, error) {
 	if err := tenancy.ValidateName(name); err != nil {
 		return nil, err

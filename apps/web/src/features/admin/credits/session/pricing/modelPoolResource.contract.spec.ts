@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
+import { http, HttpResponse, useMswHandlers } from '@/test/msw'
 import {
   createAdminModelPoolResource,
   fetchAdminModelPool,

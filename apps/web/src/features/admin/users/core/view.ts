@@ -1,10 +1,10 @@
 import type { AdminUserListItem } from '../session/resource'
-import { formatDateOnly } from '../../../../core/utils/dateTime'
-import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
+import { formatDateOnly } from '@/core/utils/dateTime'
+import { formatIdeaAmount } from '@/core/i18n/userIdeaCurrency'
 
 type AdminUserRole = 'admin' | 'user'
 type AdminUserStatus = 0 | 1
-type AdminUserTagVariant = 'danger' | 'neutral' | 'success'
+type AdminUserTagTone = 'danger' | 'neutral' | 'success'
 
 export type AdminUserCommandTarget = {
   publicId: string
@@ -26,9 +26,9 @@ export type AdminUserRowView = AdminUserCommandTarget & {
   isAdmin: boolean
   isActive: boolean
   roleLabel: string
-  roleVariant: AdminUserTagVariant
+  roleTone: AdminUserTagTone
   statusLabel: string
-  statusVariant: AdminUserTagVariant
+  statusTone: AdminUserTagTone
 }
 
 export type UserActionKey = 'status' | 'revoke' | 'impersonate' | 'role' | 'delete'
@@ -91,9 +91,9 @@ export function createAdminUserRowView(user: AdminUserListItem): AdminUserRowVie
     isAdmin,
     isActive,
     roleLabel: isAdmin ? 'Admin' : 'User',
-    roleVariant: isAdmin ? 'danger' : 'neutral',
+    roleTone: isAdmin ? 'danger' : 'neutral',
     statusLabel: isActive ? '正常' : '封禁',
-    statusVariant: isActive ? 'success' : 'danger',
+    statusTone: isActive ? 'success' : 'danger',
   }
 }
 

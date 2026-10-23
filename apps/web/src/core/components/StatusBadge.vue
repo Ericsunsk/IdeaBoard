@@ -17,8 +17,7 @@ import { cn } from '@/lib/utils'
 
 // Project-level status base over shadcn Badge. Five visual semantics:
 // neutral / info (covers processing + information states) / success / warning / danger.
-// Processing is expressed as info (or success/warning) + pulse, not a sixth tone,
-// so AdminStatusPill can wrap this 1:1 on `variant`.
+// Processing is expressed as info (or success/warning) + pulse, not a sixth tone.
 export type AppStatusTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
 export type AppStatusBadgeSize = 'small' | 'medium'
 

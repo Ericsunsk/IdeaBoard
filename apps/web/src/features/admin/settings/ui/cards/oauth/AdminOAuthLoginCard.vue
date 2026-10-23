@@ -44,9 +44,9 @@
               provider.label
             }}</span>
           </div>
-          <AdminStatusPill
+          <StatusBadge
             :label="OAUTH_MESSAGES.oauthEnabledLabel(provider.enabled)"
-            :variant="provider.enabled ? 'success' : 'neutral'"
+            :tone="provider.enabled ? 'success' : 'neutral'"
           />
         </div>
       </template>
@@ -59,9 +59,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import ActionButton from '../../../../../../core/components/ActionButton.vue'
+import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminSpinner } from '../../../../shared/index'
-import { AdminStatusPill } from '../../../../shared/index'
+import { StatusBadge } from '../../../../shared/index'
 import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 import {
   createOAuthProviderSettingsResource,
@@ -70,7 +70,7 @@ import {
 import {
   getOAuthProviderLabel,
   type OAuthProviderCode,
-} from '../../../../../../core/auth/oauthProviders'
+} from '@/core/auth/oauthProviders'
 import { resolveOAuthProviderLogo } from './logo'
 import { OAUTH_MESSAGES } from './messages'
 import { SETTINGS_MESSAGES as M } from '../../pages/messages'

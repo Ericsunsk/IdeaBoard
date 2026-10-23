@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SERVICE, SERVICE_SLUGS } from '../../../../core/contracts/imageServices'
+import { SERVICE, SERVICE_SLUGS } from '@/core/contracts/imageServices'
 import { featureMap, getFeaturePromptStatus, groupedFeatureGroups } from './featurePromptMeta'
 
 describe('featurePromptMeta', () => {

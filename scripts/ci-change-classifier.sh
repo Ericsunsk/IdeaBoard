@@ -15,6 +15,7 @@ while IFS= read -r changed_path; do
     .github/workflows/migration-integration.yml) migration_integration=true; ops=true; has_non_docs_change=true ;;
     .github/workflows/docker-images.yml | .github/workflows/deploy-production.yml) ops=true; has_non_docs_change=true ;;
     scripts/ci-migration-integration* | scripts/atlas-migration-check*) api=true; auth=true; migration_integration=true; ops=true; has_non_docs_change=true ;;
+    scripts/sql-workspace-scope-check* | scripts/openapi-pattern-check* | scripts/check-backend-copy*) api=true; ops=true; has_non_docs_change=true ;;
     apps/api/openapi.public.yaml | apps/api/openapi.control.yaml | apps/api/openapi.events.yaml) web=true; api=true; has_non_docs_change=true ;;
     apps/api/atlas.hcl) api=true; migration_integration=true; has_non_docs_change=true ;;
     apps/api/internal/db/migrations/*.sql | apps/api/internal/db/migrations/atlas.sum | apps/api/internal/db/schema/*) api=true; migration_integration=true; has_non_docs_change=true ;;

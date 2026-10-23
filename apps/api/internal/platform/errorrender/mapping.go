@@ -7,6 +7,12 @@
 // wire-stable code/copy) plus a thin writer that passes its frozen
 // default and logging knobs.
 //
+// HTTP status is never stored in the edge table: Code is the single
+// key and StatusForCode (the central Code -> status registry) is the
+// single truth, so per-edge status literals cannot drift from the
+// registry. An unregistered Code fails closed to 500 at render time,
+// never as a caller mistake.
+//
 // Rules:
 //   - Rows are ordered most-specific first; the first in-scope match wins.
 //   - Scope "" participates in every scope; a non-empty render scope only
@@ -31,12 +37,13 @@ import (
 )
 
 // Mapping binds one stable outcome to its wire rendering. Code is the
-// wire-stable machine code from platform/contract; Message is the frozen
-// safe copy owned by the edge package; Scope partitions one table across
-// surfaces ("" = all scopes).
+// wire-stable machine code from the central registry (StatusForCode);
+// Message is the frozen safe copy owned by the edge package; Scope
+// partitions one table across surfaces ("" = all scopes). The HTTP
+// status always derives from the registry via Code, never from a
+// per-row literal.
 type Mapping struct {
 	Targets []error
-	Status  int
 	Code    string
 	Message string
 	Scope   string
@@ -89,8 +96,9 @@ type MappedOptions struct {
 }
 
 // RenderMapped renders err through table: the first in-scope match wins
-// via the machine envelope; unmatched errors render the default (logged
-// only when UnmatchedLog is set).
+// via the machine envelope (status resolved from the central registry
+// by Code); unmatched errors render the default (logged only when
+// UnmatchedLog is set).
 func RenderMapped(c *gin.Context, err error, table []Mapping, opts MappedOptions) {
 	for _, row := range table {
 		if !row.InScope(opts.Scope) {
@@ -99,8 +107,9 @@ func RenderMapped(c *gin.Context, err error, table []Mapping, opts MappedOptions
 		if !row.Matches(err) {
 			continue
 		}
-		if opts.MatchedLogAtOrAbove != 0 && row.Status >= opts.MatchedLogAtOrAbove {
-			args := []any{"status", row.Status, "code", row.Code}
+		status := StatusForCode(Code(row.Code))
+		if opts.MatchedLogAtOrAbove != 0 && status >= opts.MatchedLogAtOrAbove {
+			args := []any{"status", status, "code", row.Code}
 			if opts.MatchedAttrs != nil {
 				args = append(args, opts.MatchedAttrs(row, err)...)
 			} else {
@@ -112,13 +121,13 @@ func RenderMapped(c *gin.Context, err error, table []Mapping, opts MappedOptions
 		message := row.Message
 		if message == "" {
 			slog.Error("error mapping missing safe message",
-				"code", row.Code, "status", row.Status, "err", err)
+				"code", row.Code, "status", status, "err", err)
 			message = opts.FallbackMessage
 			if message == "" {
 				message = opts.DefaultMessage
 			}
 		}
-		Render(c, row.Status, row.Code, message)
+		Render(c, status, row.Code, message)
 		return
 	}
 	if opts.UnmatchedLog != "" {

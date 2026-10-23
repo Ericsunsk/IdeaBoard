@@ -124,11 +124,13 @@ check_file() {
 
 allow_str="${predicate_allowlist[*]}"
 check_file "$query_dir/workspace_tasks.sql" 'w.public_id = sqlc.arg(workspace_public_id)' "$allow_str"
+check_file "$query_dir/workspace_tasks_control.sql" 'w.public_id = sqlc.arg(workspace_public_id)' "$allow_str"
 check_file "$query_dir/workspace_media.sql" 'w.public_id = sqlc.arg(workspace_public_id)' "$allow_str"
 check_file "$query_dir/workspace_boards.sql" 'w.public_id = sqlc.arg(workspace_public_id)' "$allow_str"
 # Library keys every lookup by the resolved workspace internal id instead of
 # the public_id join; no allowlist entries exist today (fail closed on new ones).
 check_file "$query_dir/workspace_library.sql" 'sqlc.arg(workspace_id)' ""
+check_file "$query_dir/workspace_library_materializations.sql" 'sqlc.arg(workspace_id)' ""
 
 if [ "$fail" -ne 0 ]; then
   echo >&2

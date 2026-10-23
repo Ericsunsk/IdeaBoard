@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, within } from '@testing-library/vue'
-import { renderWithUser, screen, waitFor } from '../../../../../test/render'
+import { renderWithUser, screen, waitFor } from '@/test/render'
 import AdminGatewayConfigDialog from './AdminGatewayConfigDialog.vue'
 import type { AdminGatewayConnection, GatewayConnectionSummary } from '../../resource'
 

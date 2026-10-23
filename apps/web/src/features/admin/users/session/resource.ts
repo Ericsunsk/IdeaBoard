@@ -12,13 +12,13 @@ import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import {
   getListControlUsersQueryKey,
   listControlUsers,
-} from '../../../../api/generated-query/control/control-users/control-users'
+} from '@/api/generated-query/control/control-users/control-users'
 import type {
   ControlUser,
   ListControlUsersParams,
-} from '../../../../api/generated-query/control/model'
-import { stripUndefined } from '../../../../api/stripUndefined'
-import { normalizePageSize, PAGE_SIZES } from '../../../../core/config/pagination'
+} from '@/api/generated-query/control/model'
+import { stripUndefined } from '@/api/stripUndefined'
+import { normalizePageSize, PAGE_SIZES } from '@/core/config/pagination'
 import { useAdminCursorCollection } from '../../shared'
 
 type AdminUsersRoleFilterValue = 'admin' | 'user'

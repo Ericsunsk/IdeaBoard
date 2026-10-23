@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
-import { render, screen, userEvent, waitFor } from '../../../../../test/render'
+import { render, screen, userEvent, waitFor } from '@/test/render'
 import AdminOptionFilter from './AdminOptionFilter.vue'
 
 /**

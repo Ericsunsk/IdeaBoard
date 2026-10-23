@@ -1,13 +1,13 @@
 import { buildControlMutationHeaders, type ControlMutationOptions } from '../../../shared/index'
-import type { ControlMailConfigRequest } from '../../../../../api/generated-query/control/model/controlMailConfigRequest'
+import type { ControlMailConfigRequest } from '@/api/generated-query/control/model/controlMailConfigRequest'
 import { loadControlSetting } from '../../../shared/index'
 import {
   deleteControlMailSetting,
   getControlMailSetting,
   testControlMailSetting,
   updateControlMailSetting,
-} from '../../../../../api/generated-query/control/control-platform/control-platform'
-import { requireContractData } from '../../../../../api/contractKernel'
+} from '@/api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '@/api/contractKernel'
 import type { MailConfigSummary, MailConfigUpdate } from './types'
 import { withControlCopy } from '../../../shared/index'
 

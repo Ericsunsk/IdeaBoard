@@ -1,8 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
-import { i18n } from '../../../../../core/i18n'
-import { loadLocaleMessages } from '../../../../../core/i18n/userLocale'
-import { renderWithUser, screen, within } from '../../../../../test/render'
+import { i18n } from '@/core/i18n'
+import { loadLocaleMessages } from '@/core/i18n/userLocale'
+import { renderWithUser, screen, within } from '@/test/render'
 import AdminBillingAccountsPage from './AdminBillingAccountsPage.vue'
 
 vi.mock('../../session/accounts/resource', () => {

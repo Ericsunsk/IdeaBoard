@@ -22,7 +22,6 @@ var billingNoDirectAccessSequenceNames = []string{
 }
 
 var billingCommandFunctionSignatures = []string{
-	"publish_billing_price(TEXT, TEXT, TEXT, BIGINT, BIGINT)",
 	"publish_billing_prices(TEXT, TEXT, TEXT, JSONB, BIGINT)",
 	"set_billing_item_availability(TEXT, BOOLEAN, BIGINT)",
 	"delete_archived_billing_item(TEXT, BIGINT)",

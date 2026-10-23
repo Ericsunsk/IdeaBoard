@@ -298,7 +298,7 @@ describe('AdminModelEditDialog subcomponents', () => {
       expect(await screen.findByText('text / image → text')).toBeInTheDocument()
       expect(await screen.findByText('2025-04-14 / 截止 2024-04')).toBeInTheDocument()
       expect(await screen.findByText('gpt-nano')).toBeInTheDocument()
-      // 能力徽标收口 AdminStatusPill：supported→success，unsupported→neutral，
+      // 能力徽标收口 StatusBadge：supported→success，unsupported→neutral，
       // 静态属性不呼吸；✓/✗ 后缀保留区分。
       const supportedPill = (await screen.findByText(/工具调用✓/)).parentElement!
       expect(supportedPill).toHaveClass('bg-success-soft', 'text-success')

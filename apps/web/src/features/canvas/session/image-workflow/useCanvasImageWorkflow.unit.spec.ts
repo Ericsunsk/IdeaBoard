@@ -101,6 +101,7 @@ function createOptions() {
       refreshNodeInternals: vi.fn(),
       executionCore: createPendingImageExecutionCore(),
       cancelTasks: vi.fn(),
+      isWorkspaceAvailable: () => true,
     },
     flowPaneAdapter: {
       screenToFlowCoordinate: vi.fn((point) => point),

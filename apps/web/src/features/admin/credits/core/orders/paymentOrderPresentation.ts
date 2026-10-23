@@ -1,21 +1,21 @@
-import { formatMinorCurrencyValue } from '../../../../../core/utils/currency'
+import { formatMinorCurrencyValue } from '@/core/utils/currency'
 import type { AdminPaymentOrderStatus } from './paymentOrderTypes'
 
-// Pill 直连：与 AdminStatusPillVariant 同构，模块内自有定义以免依赖组件层。
-type PaymentOrderStatusVariant = 'success' | 'danger' | 'warning' | 'neutral' | 'info'
+// Pill 直连：与 StatusBadge `tone` 同构，模块内自有定义以免依赖组件层。
+type PaymentOrderStatusTone = 'success' | 'danger' | 'warning' | 'neutral' | 'info'
 
 const lifecyclePresentation: Record<
   AdminPaymentOrderStatus,
-  { label: string; variant: PaymentOrderStatusVariant }
+  { label: string; tone: PaymentOrderStatusTone }
 > = {
-  creating: { label: '创建中', variant: 'info' },
-  checkout_open: { label: '待支付', variant: 'warning' },
-  async_payment_pending: { label: '异步确认中', variant: 'info' },
-  paid_pending_credit: { label: '待到账', variant: 'warning' },
-  credited: { label: '已到账', variant: 'success' },
-  cancelled: { label: '已取消', variant: 'neutral' },
-  expired: { label: '已过期', variant: 'neutral' },
-  payment_failed: { label: '支付失败', variant: 'danger' },
+  creating: { label: '创建中', tone: 'info' },
+  checkout_open: { label: '待支付', tone: 'warning' },
+  async_payment_pending: { label: '异步确认中', tone: 'info' },
+  paid_pending_credit: { label: '待到账', tone: 'warning' },
+  credited: { label: '已到账', tone: 'success' },
+  cancelled: { label: '已取消', tone: 'neutral' },
+  expired: { label: '已过期', tone: 'neutral' },
+  payment_failed: { label: '支付失败', tone: 'danger' },
 }
 
 const stripeLabels: Record<string, string> = {

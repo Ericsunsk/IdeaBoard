@@ -13,12 +13,14 @@ INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_i
 VALUES (sqlc.arg(public_id), sqlc.arg(workspace_id), sqlc.arg(submitter_user_id), sqlc.arg(billing_account_id), sqlc.arg(service), sqlc.arg(workflow_input), 'pending', sqlc.arg(priority), 0, '', '')
 RETURNING internal_id, public_id, workspace_id, submitter_user_id, billing_account_id, service, workflow_input, status, priority, retry_count, lease_token, error_message, created_at, updated_at, started_at, completed_at, cancelled_at, cancelled_by_user_id, routing_snapshot;
 
+
 -- name: GetWorkspaceTaskByPublicID :one
 SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id, t.routing_snapshot
 FROM tasks AS t
 INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
 WHERE t.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id)
 LIMIT 1;
+
 
 -- name: ListWorkspaceTasks :many
 SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id, t.routing_snapshot
@@ -27,6 +29,7 @@ INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
 WHERE w.public_id = sqlc.arg(workspace_public_id)
 ORDER BY t.created_at DESC, t.internal_id DESC
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
+
 
 -- name: CountWorkspaceTasks :one
 SELECT COUNT(*)
@@ -40,6 +43,7 @@ WHERE w.public_id = sqlc.arg(workspace_public_id);
 -- A different token still gets zero rows, preserving the single-worker
 -- fence. The caller distinguishes already-converged/invisible rows via
 -- GetWorkspaceTaskByPublicID.
+
 -- name: ClaimWorkspaceTask :one
 UPDATE tasks AS t
 SET status = 'running', lease_token = sqlc.arg(lease_token), started_at = now(), updated_at = now()
@@ -78,6 +82,7 @@ RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.bil
 -- Zero rows means the lease fence rejected the claim exactly as
 -- ClaimWorkspaceTask does, so the caller converges through the same
 -- GetWorkspaceTaskByPublicID path.
+
 -- name: ClaimWorkspaceTaskWithAttempt :one
 WITH claimed AS (
   UPDATE tasks AS t
@@ -123,6 +128,7 @@ FROM claimed AS c;
 -- CompleteWorkspaceTask flips a live task to completed and releases the
 -- lease. Outputs are inserted separately in the same caller-owned
 -- transaction (see InsertWorkspaceTaskOutput).
+
 -- name: CompleteWorkspaceTask :one
 UPDATE tasks AS t
 SET status = 'completed', lease_token = '', error_message = '', completed_at = now(), updated_at = now()
@@ -136,6 +142,7 @@ RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.bil
 -- FailWorkspaceTask flips a live task to failed with the terminal error
 -- (chk_tasks_terminal_consistency requires a non-blank error_message) and
 -- releases the lease.
+
 -- name: FailWorkspaceTask :one
 UPDATE tasks AS t
 SET status = 'failed', lease_token = '', error_message = sqlc.arg(error_message), completed_at = now(), updated_at = now()
@@ -150,6 +157,7 @@ RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.bil
 -- to pending with retry_count incremented, the lease released (pending rows
 -- must carry an empty lease_token), and the fresh execution token recorded
 -- in the workflow_input envelope.
+
 -- name: RetryWorkspaceTask :one
 UPDATE tasks AS t
 SET status = 'pending', lease_token = '', retry_count = t.retry_count + 1,
@@ -166,6 +174,7 @@ RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.bil
 -- requires cancelled_at) and releases the lease. The tasks table carries
 -- no cancel_reason column, so the reason is recorded in the
 -- workflow_input envelope for read-back parity.
+
 -- name: CancelWorkspaceTask :one
 UPDATE tasks AS t
 SET status = 'cancelled', lease_token = '', cancelled_at = now(), cancelled_by_user_id = sqlc.narg(cancelled_by_user_id),
@@ -180,6 +189,7 @@ RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.bil
 
 -- DeleteWorkspaceTask removes a task row (settlement compensation rollback
 -- on enqueue failure). Outputs cascade.
+
 -- name: DeleteWorkspaceTask :execrows
 DELETE FROM tasks AS t
 USING workspaces AS w
@@ -189,6 +199,7 @@ AND w.public_id = sqlc.arg(workspace_public_id);
 
 -- InsertWorkspaceTaskOutput accepts the output reference and its immutable
 -- Media origin from the persisted Task in the same statement.
+
 -- name: InsertWorkspaceTaskOutput :one
 WITH source AS (
   SELECT t.*
@@ -216,6 +227,7 @@ WITH source AS (
 SELECT internal_id, task_id, output_index, output_kind, media_asset_id, remote_url, metadata, created_at
 FROM inserted;
 
+
 -- name: ListWorkspaceTaskOutputs :many
 SELECT o.internal_id, o.task_id, o.output_index, o.output_kind, o.media_asset_id, o.remote_url, o.metadata, o.created_at
 FROM task_outputs AS o
@@ -226,6 +238,7 @@ ORDER BY o.output_index ASC;
 
 -- ListWorkspaceTaskOutputsByTaskIDs batches output reads for list pages
 -- (internal task ids resolved from the same page).
+
 -- name: ListWorkspaceTaskOutputsByTaskIDs :many
 SELECT internal_id, task_id, output_index, output_kind, media_asset_id, remote_url, metadata, created_at
 FROM task_outputs
@@ -235,6 +248,7 @@ ORDER BY task_id ASC, output_index ASC;
 -- GetWorkspaceMediaAssetID resolves a workspace-scoped media asset public
 -- id for output association. Minimal lookup only; the full media surface
 -- belongs to #820.
+
 -- name: GetWorkspaceMediaAssetID :one
 SELECT m.internal_id
 FROM media_assets AS m
@@ -249,68 +263,7 @@ LIMIT 1;
 -- Settlement joins stay LEFT: tasks without billing facts (free or
 -- pre-settlement rows) still list.
 
--- name: GetControlTaskByPublicID :one
-SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id, t.routing_snapshot,
-  w.public_id AS workspace_public_id
-FROM tasks AS t
-INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
-WHERE t.public_id = sqlc.arg(public_id)
-LIMIT 1;
 
--- name: ListControlTasks :many
-SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id, t.routing_snapshot,
-  w.public_id AS workspace_public_id,
-  s.total_credits AS billing_total_credits,
-  st.state AS settlement_state,
-  st.captured_credits AS settlement_captured_credits
-FROM tasks AS t
-INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
-LEFT JOIN task_billing_snapshots AS s ON s.task_id = t.public_id
-LEFT JOIN task_billing_settlements AS st ON st.task_id = t.public_id
-WHERE (sqlc.arg(status) = '' OR t.status = sqlc.arg(status))
-  AND (sqlc.arg(submitter_user_id) = 0 OR t.submitter_user_id = sqlc.arg(submitter_user_id))
-  AND (sqlc.arg(keyword) = ''
-    OR t.public_id ILIKE '%' || sqlc.arg(keyword) || '%'
-    OR t.service ILIKE '%' || sqlc.arg(keyword) || '%'
-    OR t.error_message ILIKE '%' || sqlc.arg(keyword) || '%')
-ORDER BY t.created_at DESC, t.internal_id DESC
-LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
-
--- Counts honor the user/keyword filters but never the status filter, so
--- the status pills keep their global breakdown while a status is active.
--- name: CountControlTasks :many
-SELECT t.status AS status, COUNT(*) AS count
-FROM tasks AS t
-WHERE (sqlc.arg(submitter_user_id) = 0 OR t.submitter_user_id = sqlc.arg(submitter_user_id))
-  AND (sqlc.arg(keyword) = ''
-    OR t.public_id ILIKE '%' || sqlc.arg(keyword) || '%'
-    OR t.service ILIKE '%' || sqlc.arg(keyword) || '%'
-    OR t.error_message ILIKE '%' || sqlc.arg(keyword) || '%')
-GROUP BY t.status;
-
--- name: GetControlTaskBilling :one
-SELECT s.sku, s.display_name, s.price_version_id, s.price_version, s.output_resolution, s.unit_credits, s.quantity, s.total_credits, s.quoted_at, s.hold_transaction_id,
-  st.state AS settlement_state, st.captured_credits AS settlement_captured_credits, st.settled_at AS settlement_settled_at
-FROM task_billing_snapshots AS s
-LEFT JOIN task_billing_settlements AS st ON st.task_id = s.task_id
-WHERE s.task_id = sqlc.arg(task_id)
-ORDER BY s.created_at DESC
-LIMIT 1;
-
--- Durable submit idempotency fact (task_submission_idempotency), written
--- inside the settlement transaction so a committed claim always has its task
--- row and a rolled-back settlement leaves no claim behind.
---
--- The workspace is resolved by public id inside the statement, so the scope
--- predicate rides on the same query as the insert and the workspace scope
--- guard covers it. A caller that cannot see the workspace inserts nothing and
--- reads no claim, so it fails closed rather than settling outside its
--- workspace.
---
--- ON CONFLICT DO NOTHING is the concurrency fence: a concurrent submit of the
--- same key blocks on the primary key until the first transaction commits or
--- rolls back, then observes the winner. The claim must be written BEFORE the
--- Hold so a replay never reaches the ledger at all.
 -- name: ClaimTaskSubmissionIdempotency :one
 INSERT INTO task_submission_idempotency (workspace_id, operation, idempotency_key, request_hash, task_public_id)
 SELECT w.internal_id, sqlc.arg(operation), sqlc.arg(idempotency_key), sqlc.arg(request_hash), sqlc.arg(task_public_id)
@@ -318,6 +271,7 @@ FROM workspaces AS w
 WHERE w.public_id = sqlc.arg(workspace_public_id)
 ON CONFLICT (workspace_id, operation, idempotency_key) DO NOTHING
 RETURNING task_public_id, request_hash;
+
 
 -- name: GetTaskSubmissionIdempotency :one
 SELECT c.task_public_id, c.request_hash
@@ -367,6 +321,7 @@ LIMIT 1;
 -- read it (CONTEXT.md). The Release itself still passes the ledger's own
 -- held-status CAS plus the task-release:<task_id> idempotency key, so a
 -- double sweep cannot double-release.
+
 -- name: ListStalledHeldWorkspaceTasks :many
 SELECT w.public_id AS workspace_public_id, t.public_id
 FROM tasks AS t

@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen, waitFor, within } from '../../../../../../test/render'
-import { mockAppToast } from '../../../../../../test/toast'
+import { renderWithUser, screen, waitFor, within } from '@/test/render'
+import { mockAppToast } from '@/test/toast'
 import AdminOAuthLoginCard from './AdminOAuthLoginCard.vue'
 import type { OAuthProviderSettingsResource } from '../../../session/oauth/resource'
 

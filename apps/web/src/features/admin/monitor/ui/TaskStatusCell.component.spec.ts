@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderWithUser, screen } from '../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import TaskStatusCell from './TaskStatusCell.vue'
 import type { AdminTaskRow } from '../session/useAdminTaskList'
 
@@ -25,7 +25,7 @@ describe('TaskStatusCell', () => {
   it('renders the metric pill for known statuses', () => {
     renderWithUser(TaskStatusCell, { props: { row: makeRow({ status: 'failed' }) } })
 
-    // 方案 A：载体统一 AdminStatusPill，文案收敛中文（core/status 单源）。
+    // 方案 A：载体统一 StatusBadge，文案收敛中文（core/status 单源）。
     expect(screen.getByText('失败')).toBeInTheDocument()
   })
 

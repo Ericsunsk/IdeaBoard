@@ -15,10 +15,20 @@ import {
 } from '../../../../../api/workspaceTaskTransport'
 import { taskCancellationIdempotencyKey } from '../../../../../api/idempotencyKey'
 import { i18n } from '../../../../../core/i18n'
-import { getWorkspaceSelectionStore } from '../../../../workspace'
+import { getWorkspaceSelectionStore as getDefaultWorkspaceSelectionStore } from '../../../../workspace'
 import { errorCode, errorStatus } from './canvasTaskContractMapping'
 
 export const CANVAS_WORKSPACE_REQUIRED_MESSAGE = 'Select a workspace before running image tasks.'
+
+export type CanvasWorkspaceIdResolver = () => string | null
+
+function defaultCanvasWorkspaceIdResolver(): string | null {
+  try {
+    return getDefaultWorkspaceSelectionStore().getSelectedId()
+  } catch {
+    return null
+  }
+}
 
 export class CanvasWorkspaceUnavailableError extends Error {
   readonly kind = 'workspace-unavailable' as const
@@ -35,10 +45,10 @@ export function isCanvasWorkspaceUnavailableError(
   return error instanceof CanvasWorkspaceUnavailableError
 }
 
-/** Single source of truth: the `features/workspace` selection store. */
-export function requireCanvasWorkspaceId(): string {
+/** Single source of truth: the `features/workspace` selection store (via injected port). */
+export function requireCanvasWorkspaceId(resolve?: CanvasWorkspaceIdResolver): string {
   return requireSharedWorkspaceId(
-    getWorkspaceSelectionStore().getSelectedId(),
+    (resolve ?? defaultCanvasWorkspaceIdResolver)(),
     () => new CanvasWorkspaceUnavailableError(),
   )
 }
@@ -81,8 +91,7 @@ function isTaskStateConflict(error: unknown): boolean {
 export async function cancelCanvasWorkspaceTask(taskId: string, reason?: string): Promise<void> {
   const trimmed = taskId.trim()
   if (!trimmed) return
-  const workspaceId =
-    resolveCanvasTaskWorkspaceId(trimmed) ?? getWorkspaceSelectionStore().getSelectedId()
+  const workspaceId = resolveCanvasTaskWorkspaceId(trimmed) ?? defaultCanvasWorkspaceIdResolver()
   if (!workspaceId) {
     // Fail closed: never cancel into an unknown workspace. The lifecycle
     // reports this via its final-failure path.

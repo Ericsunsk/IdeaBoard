@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -526,12 +527,9 @@ func TestStatusMatrixWorkspaceKernelCodes(t *testing.T) {
 }
 
 func TestErrorCodeRegistryConsistency(t *testing.T) {
-	// Registry-consistency guard: every Code const declared in
-	// errorcodes.go must appear in a StatusOf case clause (status
-	// mapping) and vice versa, and every wire string must be unique.
-	// A newly added Code without a StatusOf entry would otherwise
-	// fail closed to 500 silently. Go consts are invisible to
-	// reflect, so the test parses its own package source instead.
+	// Every declared wire code must appear in the single status registry
+	// and vice versa. Explicit 500 entries distinguish registered server
+	// failures from unknown codes, and wire strings must remain unique.
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller(0) failed")
@@ -573,40 +571,41 @@ func TestErrorCodeRegistryConsistency(t *testing.T) {
 	if len(declared) == 0 {
 		t.Fatal("no Code consts found in errorcodes.go")
 	}
-	var statusOf *ast.FuncDecl
-	for _, decl := range node.Decls {
-		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Name.Name != "StatusOf" {
-			continue
+	registryPath := filepath.Join(filepath.Dir(thisFile), "..", "errorrender", "registry.go")
+	registry, err := parser.ParseFile(fset, registryPath, nil, 0)
+	if err != nil {
+		t.Fatalf("parse errorrender registry: %v", err)
+	}
+	var statusForCode *ast.FuncDecl
+	for _, decl := range registry.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == "StatusForCode" {
+			statusForCode = fn
 		}
-		statusOf = fn
 	}
-	if statusOf == nil {
-		t.Fatal("StatusOf not found in errorcodes.go")
+	if statusForCode == nil {
+		t.Fatal("StatusForCode not found in errorrender registry")
 	}
-	cased := map[string]bool{}
-	ast.Inspect(statusOf.Body, func(n ast.Node) bool {
+	registered := map[string]bool{}
+	ast.Inspect(statusForCode.Body, func(n ast.Node) bool {
 		cc, ok := n.(*ast.CaseClause)
 		if !ok {
 			return true
 		}
 		for _, expr := range cc.List {
-			if id, ok := expr.(*ast.Ident); ok && strings.HasPrefix(id.Name, "Code") {
-				cased[id.Name] = true
+			lit, ok := expr.(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				t.Errorf("status registry case must name a wire string: %T", expr)
+				continue
 			}
+			wire, err := strconv.Unquote(lit.Value)
+			if err != nil {
+				t.Errorf("invalid registry wire literal %q: %v", lit.Value, err)
+				continue
+			}
+			registered[wire] = true
 		}
 		return true
 	})
-	for name := range declared {
-		if !cased[name] {
-			t.Errorf("contract.%s is declared but has no StatusOf mapping", name)
-		}
-	}
-	for name := range cased {
-		if _, ok := declared[name]; !ok {
-			t.Errorf("StatusOf maps %s which is not a declared Code const", name)
-		}
-	}
 	// Wire-string uniqueness. Non-literal values are the two promoted
 	// idempotency aliases; resolve them through the live consts and
 	// fail loud if a third non-literal form ever appears.
@@ -629,5 +628,13 @@ func TestErrorCodeRegistryConsistency(t *testing.T) {
 			continue
 		}
 		seen[wire] = name
+		if !registered[wire] {
+			t.Errorf("contract.%s (%q) has no status registry mapping", name, wire)
+		}
+	}
+	for wire := range registered {
+		if _, ok := seen[wire]; !ok {
+			t.Errorf("status registry maps %q which is not a declared Code", wire)
+		}
 	}
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderWithUser, screen } from '../../../../../test/render'
+import { renderWithUser, screen } from '@/test/render'
 import BillingStatusCell from './BillingStatusCell.vue'
 import type { AdminBillableItemStatus } from '../../core/pricing/billableCatalogTypes'
 

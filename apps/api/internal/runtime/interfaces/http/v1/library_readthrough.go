@@ -19,7 +19,7 @@ package v1
 // Ownership (issue #908):
 //   - Media (media/assets.LibraryMaterializer) owns remote download
 //     and managed-media writes.
-//   - Library application (library/application.ReadThroughService)
+//   - Library application (library/application/readthrough.ReadThroughService)
 //     owns materialization lifecycle + replay orchestration
 //     (resolve/claim/dedup/fetch/settle over typed
 //     store/materializer/executor seams injected by composition).

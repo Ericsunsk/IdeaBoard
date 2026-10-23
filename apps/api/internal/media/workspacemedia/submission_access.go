@@ -95,21 +95,12 @@ func (a *TaskSubmissionAuthorizer) AuthorizeSubmission(ctx context.Context, tx p
 
 // merged from internal/media/workspacemedia/taskassets.go (structural consolidation; symbols unchanged).
 // isOrganizationClosedForWorkspace reports whether the workspace belongs
-// to a closed Organization (#955). Personal scopes and missing rows read
-// as open here; callers keep their own not-found handling.
+// to a closed Organization (#955). Personal scopes are open; unknown states
+// return errors and cannot grant access. It delegates
+// to the canonical dbutil seam so media cannot drift from tasking, boards,
+// and vision.
 func isOrganizationClosedForWorkspace(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string) (bool, error) {
-	row, err := q.GetWorkspaceByPublicID(ctx, strings.TrimSpace(workspacePublicID))
-	if err != nil {
-		return false, nil
-	}
-	if !row.OrganizationID.Valid {
-		return false, nil
-	}
-	org, err := q.GetOrganizationByInternalID(ctx, row.OrganizationID.Int64)
-	if err != nil {
-		return false, nil
-	}
-	return org.ClosedAt.Valid, nil
+	return dbutil.IsOrganizationClosedForWorkspace(ctx, q, workspacePublicID)
 }
 
 // TaskAssetAdapter supplies readiness facts for worker execution of accepted
