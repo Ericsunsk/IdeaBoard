@@ -55,7 +55,7 @@ describe('board draft overlay', () => {
       state: makePromptBoardState(1_000, 'remote-older'),
     })
 
-    await hydrateBoardsFromServer()
+    await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     expect(listBoards()[0]?.name).toBe('Local Rename')
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('local-newer')
@@ -104,7 +104,7 @@ describe('board draft overlay', () => {
       relationship: { is_creator: false, has_direct_grant: true },
     })
 
-    await hydrateBoardsFromServer()
+    await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     expect(listBoards()[0]).toMatchObject({
       name: 'Local Rename',
@@ -129,7 +129,10 @@ describe('board draft overlay', () => {
       state: makePromptBoardState(1_000, 'remote-winner'),
     })
 
-    await hydrateBoardsFromServer({ shouldPreserveLocalNewer: false })
+    await hydrateBoardsFromServer({
+      shouldIncludeDocuments: true,
+      shouldPreserveLocalNewer: false,
+    })
 
     expect(listBoards()[0]?.name).toBe('Remote Winner')
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('remote-winner')

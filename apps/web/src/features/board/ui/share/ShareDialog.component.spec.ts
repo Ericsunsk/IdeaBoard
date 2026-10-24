@@ -99,7 +99,17 @@ function setup(
     global: { plugins: [[VueQueryPlugin, { queryClient: client }]] },
   })
   panel.open(BOARD, 'Campaign')
-  return { ...view, transport, client, panel, access: () => access, meta }
+  return {
+    ...view,
+    transport,
+    client,
+    panel,
+    access: () => access,
+    setRemoteAccess: (next: WorkspaceBoardAccessFact) => {
+      access = next
+    },
+    meta,
+  }
 }
 
 beforeEach(async () => {
@@ -208,6 +218,53 @@ describe('selected-member Board sharing', () => {
       'aria-pressed',
       'false',
     )
+  })
+
+  test('reopening a remotely privatized board ignores old sharing data and fetches the write version', async () => {
+    const { user, transport, client, panel, meta, setRemoteAccess } = setup()
+    const selected = await screen.findByRole('button', { name: /usr_member/ })
+    await waitFor(() => expect(selected).toBeEnabled())
+    expect(selected).toHaveAttribute('aria-pressed', 'true')
+    expect(transport.fetchAccess).toHaveBeenCalledOnce()
+    panel.close()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    // Another session removes sharing. SSE invalidates the old access cache
+    // while the catalog refresh already reports the new private fact.
+    const privateMeta: WorkspaceBoardMeta = {
+      ...meta,
+      workspaceAccess: 'none',
+      accessState: 'private',
+    }
+    queryClient.setQueryData(boardQueryKeys.list(WORKSPACE), [privateMeta])
+    await client.invalidateQueries({
+      queryKey: boardQueryKeys.access(WORKSPACE, BOARD),
+      exact: true,
+    })
+    setRemoteAccess({
+      workspaceAccess: 'none',
+      memberUserIds: [],
+      accessVersion: 9,
+      accessState: 'private',
+    })
+    panel.open(BOARD, 'Campaign')
+    const toggle = await screen.findByRole('button', { name: 'On' })
+    await waitFor(() => expect(toggle).toBeEnabled())
+    expect(screen.getByRole('button', { name: /usr_member/ })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(transport.fetchAccess).toHaveBeenCalledOnce()
+
+    await user.click(toggle)
+    await waitFor(() => expect(transport.replaceAccess).toHaveBeenCalledOnce())
+    expect(transport.replaceAccess).toHaveBeenCalledWith(
+      WORKSPACE,
+      BOARD,
+      { workspaceAccess: 'viewer', memberUserIds: [] },
+      expect.objectContaining({ expectedVersion: 9 }),
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Off' })).toBeEnabled())
   })
 
   test('selected readers see their permission without a sharing mutation surface', async () => {

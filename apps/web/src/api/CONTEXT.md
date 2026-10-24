@@ -30,6 +30,16 @@ Orval output (`public/` + `control/` per `apps/web/orval.config.ts`) lives under
 - Invalidation targets the narrowest stable root (prefix) for scope clears (`walletQueryRoot`, `[...RUN_HISTORY_QUERY_ROOT]`); composed keys append criteria/cursor after the root.
 - Freshness/polling options ride `core/query/queryDefaults` presets (`noRetry` / `accountScoped` / `adminPolling` / `keepPrevious`); visibility-aware polling stays on `useQueryPolling`, never in a preset.
 
+## Request-Count Hard Constraints
+
+Same feature, fewer backend round trips. Three rules, no exceptions without a contract-spec entry:
+
+1. **Single provider + scalar keys**: one screen shares one `useQuery` per domain (roster is the exemplar: MemberSection/LimitsSection/TransferSection/ShareRoster share `getListWorkspaceMembersQueryKey`). Keys carry only `workspaceId` / `billingAccountId` / `identity` scalars (`identity` suffix allowed for per-viewer isolation); never embed scope objects or arrays. No dual-key systems for the same endpoint (generated helper and hand-rolled factory must interop on one prefix, see `billingTransferQueryKeys.members`).
+2. **Minimal invalidation**: default `exact: true` or predicate-scoped refresh; never invalidate `*.all` roots or the credits/billing/member-quota triple on a single-domain write (transfer invite/reject/cancel refresh invites + managers + roster; acceptance also refreshes the affected ownership, quota and consumption projections). `retry()` is per-error-state and single-instance, never an unconditional refetch-all.
+3. **Lazy + aggregate-first**: `managers` / `quota-list` load on expand/role only; Canvas/Gallery default `shouldIncludeDocuments: false` and fetch a single document by `boardId`; new same-screen GETs go into `billing-overview` / `?expand=` first, never as new parallel endpoints.
+
+Gates: every hand-rolled `*QueryKeys` / `*_QUERY_ROOT` factory must be registered in `src/features/account/session/queryKeyRequestBudget.contract.spec.ts` (unregistered factories fail CI); same-screen cold-cache distinct GETs over 4 must land as aggregate-read or lazy-load, not as parallel endpoints.
+
 ## Invariants
 
 - Transport-DTO to feature-model translation happens in adapter/resource layers; domain code never imports Vue, router, Query, or generated DTOs.

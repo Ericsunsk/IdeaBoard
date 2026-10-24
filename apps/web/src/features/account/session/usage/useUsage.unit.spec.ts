@@ -4,7 +4,7 @@ import { defineComponent, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, test, vi } from 'vitest'
 import { renderWithUser } from '../../../../test/render'
 import { billingAccountQueryKeys } from '../billing-account/resource'
-import type { AccountUsage, UsageRange } from './resource'
+import { usageQueryKeys, type AccountUsage, type UsageRange } from './resource'
 import { useUsage } from './useUsage'
 
 const fetchUsageMock = vi.hoisted(() => vi.fn())
@@ -165,29 +165,18 @@ describe('useUsage', () => {
     expect(screen.getByTestId('last-credit')).toHaveTextContent(/^$/)
   })
 
-  it('uses a 30 second stale window and refetches stale data when the window regains focus', async () => {
+  it('uses a 30 second stale window and stays consistent with the global focus policy', async () => {
     const initial = buildUsage('30d', 30)
     fetchUsageMock.mockResolvedValue(initial)
     const { queryClient } = renderUsageHost()
 
     await waitFor(() => expect(fetchUsageMock).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.getByTestId('request-state')).toHaveTextContent('ready'))
-    const queryKey = [
-      'workspace',
-      'usage',
-      'current',
-      {
-        workspaceId: 'ws_1',
-        billingAccountId: 'ba_1',
-        identity: 'user-1',
-        consumptionScope: 'account',
-      },
-      '30d',
-    ] as const
+    const queryKey = usageQueryKeys.current('ws_1', 'ba_1', 'user-1', 'account', '30d')
     const query = queryClient.getQueryCache().find({ queryKey })
     expect(query?.options).toMatchObject({
       staleTime: 30_000,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
       retry: false,
     })
 
@@ -200,7 +189,7 @@ describe('useUsage', () => {
     })
     await waitFor(() => expect(query?.isStale()).toBe(true))
     queryClient.getQueryCache().onFocus()
-    await waitFor(() => expect(fetchUsageMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(fetchUsageMock).toHaveBeenCalledTimes(1))
   })
 })
 

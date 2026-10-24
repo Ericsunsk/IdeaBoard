@@ -11,6 +11,12 @@ import { requireAccountWorkspaceId, resolveWorkspaceBillingData } from '../works
 // location, the User is the real operator; the account identity never
 // derives from the current Workspace Owner wallet and never rewrites
 // history on member exit or owner change.
+//
+// Query-key convergence: the identity-aware `billingAccountQueryKeys` below
+// is the single billing-account key. The generated
+// `getGetWorkspaceBillingAccount*` hooks stay unused (raw fetcher only);
+// managers reuse the generated members key factory with an identity suffix
+// (see billing-transfer/resource).
 export type BillingAccountScope = {
   billingAccountId: string
   workspaceId: string

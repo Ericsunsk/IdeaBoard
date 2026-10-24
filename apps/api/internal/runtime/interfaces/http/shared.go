@@ -32,9 +32,14 @@ import (
 // V1UserDirectory translates between internal numeric user ids and the
 // external usr_<hex> identifiers without leaking database ids to the API.
 // Production adapts the identity UserRepository; tests use a static map.
+// GetUserPublicIDs resolves many ids in ONE repository round trip,
+// replacing per-member GetUserPublicID N+1 loops in member/quota/billing
+// list projections; unknown ids are omitted by the directory and required
+// identity projections reject missing ids.
 type V1UserDirectory interface {
 	ResolveUserID(ctx context.Context, publicID uuid.UUID) (int64, error)
 	GetUserPublicID(ctx context.Context, userID int64) (uuid.UUID, error)
+	GetUserPublicIDs(ctx context.Context, userIDs []int64) (map[int64]uuid.UUID, error)
 }
 
 // usersRepositoryDirectory adapts identityports.UserRepository to
@@ -82,6 +87,42 @@ func (d usersRepositoryDirectory) GetUserPublicID(ctx context.Context, userID in
 		return uuid.Nil, tenancy.ErrNotFound
 	}
 	return user.PublicID, nil
+}
+
+// GetUserPublicIDs resolves many ids in ONE GetByIDs round trip. Unknown
+// ids are omitted; required identity projections reject missing ids.
+// A nil repository resolves to no facts (handlers guard Users==nil).
+func (d usersRepositoryDirectory) GetUserPublicIDs(ctx context.Context, userIDs []int64) (map[int64]uuid.UUID, error) {
+	out := make(map[int64]uuid.UUID, len(userIDs))
+	if d.repo == nil {
+		return out, nil
+	}
+	seen := make(map[int64]struct{}, len(userIDs))
+	deduped := make([]int64, 0, len(userIDs))
+	for _, id := range userIDs {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		deduped = append(deduped, id)
+	}
+	if len(deduped) == 0 {
+		return out, nil
+	}
+	usersByID, err := d.repo.GetByIDs(ctx, deduped)
+	if err != nil {
+		return nil, err
+	}
+	for id, user := range usersByID {
+		if user == nil || user.PublicID == uuid.Nil {
+			continue
+		}
+		out[id] = user.PublicID
+	}
+	return out, nil
 }
 
 func (d usersRepositoryDirectory) UpdateUserAvatar(ctx context.Context, userID int64, avatar string) error {

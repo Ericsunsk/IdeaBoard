@@ -35,6 +35,7 @@ import type {
   CreateOrganizationWorkspaceRequest,
   DeletedEnvelope,
   ForbiddenResponse,
+  GetOrganizationParams,
   ListOrganizationsParams,
   NotFoundResponse,
   OrganizationEnvelope,
@@ -253,25 +254,42 @@ export const useCreateOrganization = <
 > => {
   return useMutation(getCreateOrganizationMutationOptions(options), queryClient)
 }
-export const getGetOrganizationUrl = (organizationId: string) => {
-  return `/organizations/${encodeURIComponent(String(organizationId))}`
+export const getGetOrganizationUrl = (organizationId: string, params?: GetOrganizationParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/organizations/${encodeURIComponent(String(organizationId))}?${stringifiedParams}`
+    : `/organizations/${encodeURIComponent(String(organizationId))}`
 }
 
 /**
+ * Optional ?expand= collapses the organization panel into one request: members embeds the member list with email/avatar display facts, workspaces embeds the organization workspace list, role embeds the caller organization role (resolved once, never re-fetched per expansion). Default shape (no expand) is unchanged. Unknown values render 400 bad_request. No Idempotency-Key: read-only, safe to retry.
  * @summary Get an organization by explicit organization context
  */
 export const getOrganization = async (
   organizationId: string,
+  params?: GetOrganizationParams,
   options?: Parameters<typeof publicMutator>[1],
 ): Promise<OrganizationEnvelope> => {
-  return publicMutator<OrganizationEnvelope>(getGetOrganizationUrl(organizationId), {
+  return publicMutator<OrganizationEnvelope>(getGetOrganizationUrl(organizationId, params), {
     ...options,
     method: 'GET',
   })
 }
 
-export const getGetOrganizationQueryKey = (organizationId: MaybeRefOrGetter<string>) => {
-  return ['organizations', organizationId] as const
+export const getGetOrganizationQueryKey = (
+  organizationId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetOrganizationParams>,
+) => {
+  return ['organizations', organizationId, ...(params ? [params] : [])] as const
 }
 
 export const getGetOrganizationQueryOptions = <
@@ -279,6 +297,7 @@ export const getGetOrganizationQueryOptions = <
   TError = UnauthorizedResponse | NotFoundResponse,
 >(
   organizationId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetOrganizationParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrganization>>, TError, TData>>
     request?: SecondParameter<typeof publicMutator>
@@ -286,10 +305,10 @@ export const getGetOrganizationQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getGetOrganizationQueryKey(organizationId)
+  const queryKey = getGetOrganizationQueryKey(organizationId, params)
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrganization>>> = ({ signal }) =>
-    getOrganization(toValue(organizationId), { signal, ...requestOptions })
+    getOrganization(toValue(organizationId), toValue(params), { signal, ...requestOptions })
 
   return {
     queryKey,
@@ -313,13 +332,14 @@ export function useGetOrganization<
   TError = UnauthorizedResponse | NotFoundResponse,
 >(
   organizationId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetOrganizationParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrganization>>, TError, TData>>
     request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetOrganizationQueryOptions(organizationId, options)
+  const queryOptions = getGetOrganizationQueryOptions(organizationId, params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

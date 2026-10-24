@@ -81,6 +81,7 @@ function createHarness(initialBoards: BoardMeta[] = rangeBoards()) {
       duplicate: vi.fn(async () => ({ isOk: true as const, board: makeBoardMeta('copied') })),
       delete: vi.fn(async () => ({ isOk: true as const, isRemoteWasMissing: false })),
     },
+    observeDocument: vi.fn(() => vi.fn()),
     dispose: vi.fn(),
   }
   const navigation: CatalogNavigation = { openBoard: vi.fn() }

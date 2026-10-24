@@ -1,4 +1,4 @@
-import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import { QueryClient, VueQueryPlugin, type QueryFilters } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
 import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
@@ -659,7 +659,10 @@ describe('RechargePane', () => {
     const historyTable = await screen.findByRole('table', { name: 'Top-up history table' })
     expect(await within(historyTable).findByText('$30.00 USD')).toBeVisible()
     expect(screen.queryByText('Processing Ideas')).not.toBeInTheDocument()
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: creditsQueryKeys.all })
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: creditsQueryKeys.all,
+      exact: false,
+    } satisfies QueryFilters)
   })
 
   it('keeps a final reconciliation failure visible while allowing a replacement purchase', async () => {

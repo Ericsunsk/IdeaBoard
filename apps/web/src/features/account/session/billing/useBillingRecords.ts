@@ -13,10 +13,17 @@ export function useBillingRecords(enabled: MaybeRefOrGetter<boolean> = true) {
   const billing = useBillingAccount(enabled)
 
   const query = useInfiniteQuery({
-    queryKey: computed(() => billingRecordsQueryKeys.list(billing.readScope.value)),
+    queryKey: computed(() =>
+      billingRecordsQueryKeys.list(
+        billing.readScope.value.workspaceId,
+        billing.readScope.value.billingAccountId,
+        billing.readScope.value.identity,
+        billing.readScope.value.consumptionScope ?? '',
+      ),
+    ),
     queryFn: ({ queryKey, pageParam, signal }) =>
       fetchBillingRecords(
-        queryKey[3].workspaceId,
+        queryKey[3],
         {
           page_size: pageSize,
           ...(pageParam ? { cursor: pageParam } : {}),

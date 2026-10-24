@@ -10,8 +10,11 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { MembershipRole } from './membershipRole'
 import type { OrganizationId } from './organizationId'
+import type { OrganizationMember } from './organizationMember'
 import type { OrganizationStatus } from './organizationStatus'
+import type { Workspace } from './workspace'
 
 export interface Organization {
   id: OrganizationId
@@ -25,4 +28,15 @@ export interface Organization {
   closed_at?: string
   /** RFC3339 UTC timestamp. */
   created_at: string
+  /** Caller organization role; present only with ?expand=role on the detail endpoint or ?expand=role on the list endpoint. */
+  role?: MembershipRole
+  /**
+   * Visible workspace count; present only with ?expand=workspace_counts on the list endpoint. Closed organizations report zero.
+   * @minimum 0
+   */
+  workspace_count?: number
+  /** Organization members with email/avatar display facts; present only with ?expand=members on the detail endpoint. Absent reads as empty. */
+  members?: OrganizationMember[]
+  /** Organization workspaces; present only with ?expand=workspaces on the detail endpoint. Absent reads as empty. */
+  workspaces?: Workspace[]
 }

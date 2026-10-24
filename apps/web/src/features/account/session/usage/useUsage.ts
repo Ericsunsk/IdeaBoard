@@ -19,13 +19,26 @@ export function useUsage(
   const billing = useBillingAccount(enabled)
   const lastSuccessful = shallowRef<SuccessfulUsage>()
   const query = useQuery({
-    queryKey: computed(() => usageQueryKeys.current(billing.readScope.value, selectedRange.value)),
+    queryKey: computed(() =>
+      usageQueryKeys.current(
+        billing.readScope.value.workspaceId,
+        billing.readScope.value.billingAccountId,
+        billing.readScope.value.identity,
+        billing.readScope.value.consumptionScope ?? '',
+        selectedRange.value,
+      ),
+    ),
     queryFn: async ({ queryKey, signal }): Promise<SuccessfulUsage> => {
       // Read scope from the key, never from the closure: a late response
       // from a previous workspace or account must not replace the current
-      // selection.
-      const scope = queryKey[3]
-      const requestRange = queryKey[4]
+      // selection. Keys stay scalar-only (no scope objects).
+      const scope: BillingConsumptionReadScope = {
+        workspaceId: queryKey[3],
+        billingAccountId: queryKey[4],
+        identity: queryKey[5],
+        consumptionScope: queryKey[6] as BillingConsumptionReadScope['consumptionScope'],
+      }
+      const requestRange = queryKey[7]
       return {
         scope,
         range: requestRange,
@@ -34,7 +47,9 @@ export function useUsage(
     },
     enabled: billing.isReady,
     ...accountScoped(STALE_TIME_MS.usage),
-    refetchOnWindowFocus: true,
+    // Explicitly consistent with the global queryClient default (false):
+    // usage never refetches on window focus; reloads ride invalidate.
+    refetchOnWindowFocus: false,
     ...noRetry(),
   })
 

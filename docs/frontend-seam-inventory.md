@@ -3954,9 +3954,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 23,
-      "measuredFanOut": 297,
+      "measuredFanOut": 304,
       "targetFanIn": 23,
-      "targetFanOut": 297,
+      "targetFanOut": 304,
       "ownershipScope": [
         "src/api/generated-query/public/model/index.ts"
       ],
@@ -4050,9 +4050,12 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "ExternalLibraryAsset",
         "ExternalLibraryAssetSource",
         "ForbiddenResponse",
+        "GetOrganizationParams",
         "GetPublicBrandingLogoParams",
         "GetPublicUserAvatarParams",
         "GetPublicUserAvatarSize",
+        "GetWorkspaceBillingOverviewParams",
+        "GetWorkspaceBillingOverviewRange",
         "GetWorkspaceBillingTransfer200",
         "GetWorkspaceUsageParams",
         "GetWorkspaceUsageRange",
@@ -4070,6 +4073,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "LibraryFolderId",
         "ListBoardRevisionsParams",
         "ListBoardsParams",
+        "ListMemberQuotasParams",
+        "ListMemberQuotasScope",
         "ListOrganizationsParams",
         "ListWorkspaceBillingAccountMembers200",
         "ListWorkspaceBillingRecordsParams",
@@ -4218,6 +4223,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "WorkspaceBillingAccountConsumptionScope",
         "WorkspaceBillingAccountEnvelope",
         "WorkspaceBillingAccountOwnerType",
+        "WorkspaceBillingOverview",
+        "WorkspaceBillingOverviewEnvelope",
         "WorkspaceBillingQuote",
         "WorkspaceBillingQuoteEnvelope",
         "WorkspaceCheckoutSession",
@@ -4349,9 +4356,12 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/generated-query/public/model/externalLibraryAsset.ts",
         "src/api/generated-query/public/model/externalLibraryAssetSource.ts",
         "src/api/generated-query/public/model/forbiddenResponse.ts",
+        "src/api/generated-query/public/model/getOrganizationParams.ts",
         "src/api/generated-query/public/model/getPublicBrandingLogoParams.ts",
         "src/api/generated-query/public/model/getPublicUserAvatarParams.ts",
         "src/api/generated-query/public/model/getPublicUserAvatarSize.ts",
+        "src/api/generated-query/public/model/getWorkspaceBillingOverviewParams.ts",
+        "src/api/generated-query/public/model/getWorkspaceBillingOverviewRange.ts",
         "src/api/generated-query/public/model/getWorkspaceBillingTransfer200.ts",
         "src/api/generated-query/public/model/getWorkspaceUsageParams.ts",
         "src/api/generated-query/public/model/getWorkspaceUsageRange.ts",
@@ -4369,6 +4379,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/generated-query/public/model/libraryFolderId.ts",
         "src/api/generated-query/public/model/listBoardRevisionsParams.ts",
         "src/api/generated-query/public/model/listBoardsParams.ts",
+        "src/api/generated-query/public/model/listMemberQuotasParams.ts",
+        "src/api/generated-query/public/model/listMemberQuotasScope.ts",
         "src/api/generated-query/public/model/listOrganizationsParams.ts",
         "src/api/generated-query/public/model/listWorkspaceBillingAccountMembers200.ts",
         "src/api/generated-query/public/model/listWorkspaceBillingRecordsParams.ts",
@@ -4517,6 +4529,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/generated-query/public/model/workspaceBillingAccountConsumptionScope.ts",
         "src/api/generated-query/public/model/workspaceBillingAccountEnvelope.ts",
         "src/api/generated-query/public/model/workspaceBillingAccountOwnerType.ts",
+        "src/api/generated-query/public/model/workspaceBillingOverview.ts",
+        "src/api/generated-query/public/model/workspaceBillingOverviewEnvelope.ts",
         "src/api/generated-query/public/model/workspaceBillingQuote.ts",
         "src/api/generated-query/public/model/workspaceBillingQuoteEnvelope.ts",
         "src/api/generated-query/public/model/workspaceCheckoutSession.ts",
@@ -4682,6 +4696,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/billing-transfer/useBillingTransferSection.ts",
+          "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/billing/resource.ts",
           "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
@@ -4712,9 +4731,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 9,
+      "measuredFanIn": 10,
       "measuredFanOut": 4,
-      "targetFanIn": 9,
+      "targetFanIn": 10,
       "targetFanOut": 4,
       "ownershipScope": [
         "src/api/generated-query/public/workspace-billing/workspace-billing.ts"
@@ -4748,6 +4767,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "GetSelfMemberQuotaQueryResult",
         "GetWorkspaceBillingAccountQueryError",
         "GetWorkspaceBillingAccountQueryResult",
+        "GetWorkspaceBillingOverviewQueryError",
+        "GetWorkspaceBillingOverviewQueryResult",
         "GetWorkspaceBillingTransferQueryError",
         "GetWorkspaceBillingTransferQueryResult",
         "GetWorkspaceCheckoutSessionQueryError",
@@ -4824,6 +4845,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "getGetWorkspaceBillingAccountQueryKey",
         "getGetWorkspaceBillingAccountQueryOptions",
         "getGetWorkspaceBillingAccountUrl",
+        "getGetWorkspaceBillingOverviewQueryKey",
+        "getGetWorkspaceBillingOverviewQueryOptions",
+        "getGetWorkspaceBillingOverviewUrl",
         "getGetWorkspaceBillingTransferQueryKey",
         "getGetWorkspaceBillingTransferQueryOptions",
         "getGetWorkspaceBillingTransferUrl",
@@ -4877,6 +4901,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "getUpdateWorkspaceBillingAccountMemberMutationOptions",
         "getUpdateWorkspaceBillingAccountMemberUrl",
         "getWorkspaceBillingAccount",
+        "getWorkspaceBillingOverview",
         "getWorkspaceBillingTransfer",
         "getWorkspaceCheckoutSession",
         "getWorkspaceCreditsBalance",
@@ -4903,6 +4928,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "useCreateWorkspaceCheckoutSession",
         "useGetSelfMemberQuota",
         "useGetWorkspaceBillingAccount",
+        "useGetWorkspaceBillingOverview",
         "useGetWorkspaceBillingTransfer",
         "useGetWorkspaceCheckoutSession",
         "useGetWorkspaceCreditsBalance",
@@ -5276,7 +5302,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
         },
@@ -8300,17 +8326,17 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/chrome/WorkspaceCreateDialog.vue",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
-          "to": "src/core/composables/useAppToast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -13622,9 +13648,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 4,
-      "measuredFanOut": 92,
+      "measuredFanOut": 99,
       "targetFanIn": 4,
-      "targetFanOut": 92,
+      "targetFanOut": 99,
       "ownershipScope": [
         "src/features/account/"
       ],
@@ -13763,20 +13789,24 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "useUsage"
       ],
       "targetFanOutTargets": [
+        "fs",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/vue/dist/index.js",
+        "node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js",
         "node_modules/@vueuse/core/dist/index.js",
         "node_modules/qrcode.vue/dist/qrcode.vue.cjs.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "path",
         "src/api/client.ts",
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/model/index.ts",
         "src/api/generated-query/public/user/user.ts",
         "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
+        "src/api/generated-query/public/workspace-members/workspace-members.ts",
         "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
         "src/api/idempotencyKey.ts",
         "src/api/sessionUserType.ts",
@@ -13840,6 +13870,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/utils/workspaceId.ts",
         "src/features/admin/routePaths.ts",
         "src/features/auth/index.ts",
+        "src/features/board/index.ts",
+        "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/features/workspace/selection/workspaceContext.ts",
         "src/features/workspace/selection/workspaceMembersResource.ts",
@@ -13854,9 +13886,71 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/theme/appOverlayMenu.ts",
         "src/theme/composables/useTheme.ts",
         "src/theme/formControls.ts",
+        "url",
         "vitest/browser"
       ],
       "notes": "account feature seam; cross-feature consumers in workspace shell."
+    },
+    {
+      "path": "src/features/account/session/workspace-settings/index.ts",
+      "kind": "canonical",
+      "owner": "account-workspace-settings",
+      "surfaceBaseline": true,
+      "allowedConsumers": [
+        {
+          "from": "src/features/account/session/billing-transfer/useBillingTransferSection.ts",
+          "to": "src/features/account/session/workspace-settings/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/quota/useMemberQuotaSection.ts",
+          "to": "src/features/account/session/workspace-settings/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
+          "to": "src/features/account/session/workspace-settings/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
+          "to": "src/features/account/session/workspace-settings/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/features/account/session/workspace-settings/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "measuredFanIn": 5,
+      "measuredFanOut": 11,
+      "targetFanIn": 5,
+      "targetFanOut": 11,
+      "notes": "Settings roster/account read lifecycle and member actions; shared and independent mounts use one session module.",
+      "ownershipScope": [
+        "src/features/account/session/workspace-settings/"
+      ],
+      "publicExports": [
+        "memberDisplayName",
+        "provideWorkspaceSettingsReads",
+        "useWorkspaceMemberSection",
+        "useWorkspaceSettingsBillingAccount",
+        "useWorkspaceSettingsRoster"
+      ],
+      "targetFanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/@testing-library/vue/dist/index.js",
+        "node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js",
+        "node_modules/vitest/dist/index.js",
+        "node_modules/vue-i18n/index.js",
+        "node_modules/vue/index.js",
+        "src/api/idempotencyKey.ts",
+        "src/core/composables/useAppToast.ts",
+        "src/features/account/session/accountWorkspace.ts",
+        "src/features/account/session/billing-account/resource.ts",
+        "src/features/account/session/billing-account/useBillingAccountContext.ts"
+      ]
     },
     {
       "path": "src/features/account/ui/chrome/SupportChannelQr.vue",
@@ -18079,6 +18173,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/features/account/session/queryKeyRequestBudget.contract.spec.ts",
+          "to": "src/features/board/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/core/graph/canvasGraphGeometry.unit.spec.ts",
           "to": "src/features/board/index.ts",
           "kind": "runtime"
@@ -18334,9 +18433,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 49,
+      "measuredFanIn": 50,
       "measuredFanOut": 68,
-      "targetFanIn": 49,
+      "targetFanIn": 50,
       "targetFanOut": 68,
       "ownershipScope": [
         "src/features/board/"
@@ -23939,6 +24038,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "surfaceBaseline": true,
       "allowedConsumers": [
         {
+          "from": "src/features/account/session/queryKeyRequestBudget.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/app/AdminHeaderBar.vue",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
@@ -24089,9 +24193,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 30,
+      "measuredFanIn": 31,
       "measuredFanOut": 56,
-      "targetFanIn": 30,
+      "targetFanIn": 31,
       "targetFanOut": 56,
       "ownershipScope": [
         "src/features/workspace/"
@@ -24988,9 +25092,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/generated-query/public/index.ts` | cascading | api | 610 | 0 → 0 | 11 → 11 |
 | `src/api/generated-query/public/model/board.ts` | canonical | api | 1 | 4 → 4 | 7 → 7 |
 | `src/api/generated-query/public/model/boardDocument.ts` | canonical | api | 1 | 3 → 3 | 3 → 3 |
-| `src/api/generated-query/public/model/index.ts` | canonical | api | 297 | 23 → 23 | 297 → 297 |
+| `src/api/generated-query/public/model/index.ts` | canonical | api | 304 | 23 → 23 | 304 → 304 |
 | `src/api/generated-query/public/user/user.ts` | canonical | api | 46 | 6 → 6 | 4 → 4 |
-| `src/api/generated-query/public/workspace-billing/workspace-billing.ts` | canonical | api | 200 | 9 → 9 | 4 → 4 |
+| `src/api/generated-query/public/workspace-billing/workspace-billing.ts` | canonical | api | 207 | 10 → 10 | 4 → 4 |
 | `src/api/generated-query/public/workspace-library/workspace-library.ts` | canonical | api | 82 | 3 → 3 | 4 → 4 |
 | `src/api/generated-query/public/workspace-rewards/workspace-rewards.ts` | canonical | api | 16 | 2 → 2 | 4 → 4 |
 | `src/api/generated-query/public/workspace-search/workspace-search.ts` | canonical | api | 16 | 3 → 3 | 4 → 4 |
@@ -25032,7 +25136,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/components/ChartRenderer.vue` | canonical | core | 1 | 3 → 3 | 3 → 3 |
 | `src/core/components/DataTableColumn.vue` | canonical | core | 3 | 4 → 4 | 1 → 1 |
 | `src/core/components/DataTableFrame.vue` | canonical | core | 2 | 4 → 4 | 3 → 3 |
-| `src/core/components/IbFormField.vue` | canonical | core | 2 | 5 → 5 | 3 → 3 |
+| `src/core/components/IbFormField.vue` | canonical | core | 1 | 5 → 5 | 3 → 3 |
 | `src/core/components/RangedLineChartCard.vue` | canonical | core | 2 | 2 → 2 | 7 → 7 |
 | `src/core/components/SiteBrandLogo.vue` | canonical | core | 1 | 3 → 3 | 0 → 0 |
 | `src/core/components/StatusBadge.vue` | canonical | core | 3 | 5 → 5 | 3 → 3 |
@@ -25100,7 +25204,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/utils/polling.ts` | canonical | core | 5 | 6 → 6 | 0 → 0 |
 | `src/core/utils/storage.ts` | canonical | core | 8 | 15 → 15 | 0 → 0 |
 | `src/core/utils/workspaceId.ts` | canonical | core | 2 | 8 → 8 | 1 → 1 |
-| `src/features/account/index.ts` | canonical | account | 132 | 4 → 4 | 92 → 92 |
+| `src/features/account/index.ts` | canonical | account | 132 | 4 → 4 | 99 → 99 |
+| `src/features/account/session/workspace-settings/index.ts` | canonical | account-workspace-settings | 5 | 5 → 5 | 11 → 11 |
 | `src/features/account/ui/chrome/SupportChannelQr.vue` | canonical | account | 1 | 1 → 1 | 9 → 9 |
 | `src/features/account/ui/chrome/UserAccountMenu.vue` | canonical | account | 1 | 6 → 6 | 17 → 17 |
 | `src/features/account/ui/chrome/UserCreditBalanceButton.vue` | canonical | account | 1 | 1 → 1 | 2 → 2 |
@@ -25119,7 +25224,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/core/tableColumns.ts` | canonical | admin | 2 | 2 → 2 | 0 → 0 |
 | `src/features/admin/shared/core/taskMetricTokens.ts` | canonical | admin | 7 | 3 → 3 | 0 → 0 |
 | `src/features/admin/shared/core/uiClasses.ts` | canonical | admin | 40 | 17 → 17 | 0 → 0 |
-| `src/features/admin/shared/index.ts` | canonical | admin | 237 | 123 → 123 | 57 → 57 |
+| `src/features/admin/shared/index.ts` | canonical | admin | 236 | 123 → 123 | 57 → 57 |
 | `src/features/admin/shared/session/anomalyRules.ts` | canonical | admin | 4 | 3 → 3 | 3 → 3 |
 | `src/features/admin/shared/session/brand/brandLogos.ts` | canonical | admin | 14 | 6 → 6 | 14 → 14 |
 | `src/features/admin/shared/session/brand/useBrandLogoOverrides.ts` | canonical | admin | 1 | 1 → 1 | 5 → 5 |
@@ -25145,7 +25250,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/feedback/AdminAlert.vue` | canonical | admin | 2 | 2 → 2 | 2 → 2 |
 | `src/features/admin/shared/ui/feedback/AdminConfirmDialog.vue` | canonical | admin | 1 | 3 → 3 | 4 → 4 |
 | `src/features/admin/shared/ui/feedback/AdminEmptyState.vue` | canonical | admin | 1 | 1 → 1 | 2 → 2 |
-| `src/features/admin/shared/ui/form/AdminFormField.vue` | canonical | admin | 2 | 2 → 2 | 2 → 2 |
+| `src/features/admin/shared/ui/form/AdminFormField.vue` | canonical | admin | 1 | 2 → 2 | 2 → 2 |
 | `src/features/admin/shared/ui/form/AdminInput.vue` | canonical | admin | 1 | 3 → 3 | 5 → 5 |
 | `src/features/admin/shared/ui/form/AdminNumberInput.vue` | canonical | admin | 1 | 2 → 2 | 3 → 3 |
 | `src/features/admin/shared/ui/form/AdminSelect.vue` | canonical | admin | 2 | 2 → 2 | 5 → 5 |
@@ -25175,7 +25280,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/ui/toolbar/AdminRowActionsPopover.vue` | canonical | admin | 2 | 2 → 2 | 2 → 2 |
 | `src/features/admin/shared/ui/toolbar/AdminToolbarSearch.vue` | canonical | admin | 1 | 2 → 2 | 3 → 3 |
 | `src/features/auth/index.ts` | canonical | auth | 28 | 35 → 35 | 46 → 46 |
-| `src/features/board/index.ts` | canonical | board | 221 | 49 → 49 | 68 → 68 |
+| `src/features/board/index.ts` | canonical | board | 221 | 50 → 50 | 68 → 68 |
 | `src/features/board/ports/canvas.ts` | canonical | board | 66 | 99 → 99 | 68 → 68 |
 | `src/features/board/ports/canvasSession.ts` | canonical | board | 27 | 11 → 11 | 68 → 68 |
 | `src/features/board/ports/testing.ts` | canonical | board | 2 | 6 → 6 | 1 → 1 |
@@ -25227,7 +25332,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/legal/routePaths.ts` | canonical | legal | 4 | 5 → 5 | 0 → 0 |
 | `src/features/library/index.ts` | canonical | library | 83 | 27 → 27 | 51 → 51 |
 | `src/features/search/index.ts` | canonical | search | 21 | 2 → 2 | 48 → 48 |
-| `src/features/workspace/index.ts` | canonical | workspace | 58 | 30 → 30 | 56 → 56 |
+| `src/features/workspace/index.ts` | canonical | workspace | 58 | 31 → 31 | 56 → 56 |
 | `src/features/workspace/routePaths.ts` | canonical | workspace | 8 | 33 → 33 | 1 → 1 |
 | `src/features/workspace/routes/workspaceRoutes.ts` | canonical | workspace | 2 | 3 → 3 | 13 → 13 |
 | `src/features/workspace/selection/workspaceContext.ts` | canonical | workspace | 20 | 4 → 4 | 11 → 11 |

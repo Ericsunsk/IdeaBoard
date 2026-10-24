@@ -102,6 +102,18 @@ FROM workspaces
 WHERE owner_user_id = sqlc.arg(owner_user_id) AND organization_id IS NULL AND is_default
 LIMIT 1;
 
+-- Batch workspace counts per organization (organization list
+-- expand=workspace_counts): a single GROUP BY replaces per-organization
+-- ListWorkspacesByOrganizationID round trips. Closed organizations report
+-- zero: their workspaces stay hidden from listing, matching
+-- ListWorkspacesForUser visibility.
+-- name: CountWorkspacesByOrganizationPublicIDs :many
+SELECT o.public_id AS organization_public_id, COUNT(w.internal_id) AS workspace_count
+FROM organizations AS o
+LEFT JOIN workspaces AS w ON w.organization_id = o.internal_id AND o.closed_at IS NULL
+WHERE o.public_id = ANY(sqlc.arg(organization_public_ids)::text[])
+GROUP BY o.public_id;
+
 -- Billing Account owner stub (#801). Full lifecycle belongs to #804.
 -- name: CreateBillingAccountStub :one
 INSERT INTO billing_accounts (public_id, workspace_id, organization_id)

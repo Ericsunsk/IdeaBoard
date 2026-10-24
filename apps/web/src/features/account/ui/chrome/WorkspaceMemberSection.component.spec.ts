@@ -3,6 +3,7 @@ import { computed, defineComponent, ref, toValue, type MaybeRefOrGetter } from '
 import {
   QueryClient,
   VueQueryPlugin,
+  type InvalidateQueryFilters,
   type QueryKey,
   type UseQueryOptions,
 } from '@tanstack/vue-query'
@@ -13,6 +14,13 @@ import { makeSessionUser } from '../../../../test/factories'
 import { useUserStore } from '../../../auth'
 import WorkspaceSettingsDialog from './WorkspaceSettingsDialog.vue'
 import type { WorkspaceMemberEntry } from '../../session/accountWorkspace'
+import { billingAccountQueryKeys } from '../../session/billing-account/resource'
+import { billingRecordsQueryKeys } from '../../session/billing/resource'
+import { billingTransferQueryKeys } from '../../session/billing-transfer/resource'
+import { creditsQueryKeys } from '../../session/credits/resource'
+import { memberQuotaQueryKeys } from '../../session/quota/resource'
+import { usageQueryKeys } from '../../session/usage/resource'
+import { workspaceQueryKeys } from '../../session/accountWorkspace'
 
 vi.mock('../../../../core/composables/useAppToast')
 vi.mock('./BillingTransferSection.vue', () => ({ default: { template: '<div />' } }))
@@ -121,12 +129,13 @@ function classifyReason(code: string): string {
   }
 }
 
-vi.mock('../../../workspace/selection/workspaceMembersResource', () => ({
+vi.mock('../../session/accountWorkspace', async (load) => ({
+  ...(await load<typeof import('../../session/accountWorkspace')>()),
   // The TanStack assertion is the naming contract: `retry`/`enabled` stay
   // verbatim as the query client's public API (mirrors the resource).
   workspaceMembersQueryOptions: (workspaceId: MaybeRefOrGetter<string>) =>
     ({
-      queryKey: fakeKey(workspaceId),
+      queryKey: computed(() => fakeKey(workspaceId)),
       queryFn: () => {
         maybeFail('list')
         return Promise.resolve(cloneRoster(toValue(workspaceId).trim()))
@@ -135,10 +144,6 @@ vi.mock('../../../workspace/selection/workspaceMembersResource', () => ({
       retry: false,
       enabled: computed(() => toValue(workspaceId).trim().length > 0),
     }) as UseQueryOptions<WorkspaceMemberEntry[], Error, WorkspaceMemberEntry[], QueryKey>,
-  fetchWorkspaceMembers: (workspaceId: string) => {
-    maybeFail('list')
-    return Promise.resolve(cloneRoster(workspaceId))
-  },
   lookupWorkspaceMemberId: (workspaceId: string, email: string) => {
     maybeFail('lookup')
     const userId = fakeMembers.lookup.get(email.trim().toLowerCase())
@@ -791,9 +796,82 @@ describe('member row handover', () => {
           idempotencyKey: expect.any(String),
         }),
       )
-      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['workspace', 'billing-transfer'] })
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: [...billingTransferQueryKeys.list('ws_personal1'), ME],
+        exact: true,
+      } satisfies InvalidateQueryFilters)
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: billingTransferQueryKeys.members('ws_personal1', ME),
+        exact: true,
+      } satisfies InvalidateQueryFilters)
+      if (decision === 'reject') {
+        expect(invalidate).not.toHaveBeenCalledWith(
+          expect.objectContaining({ queryKey: workspaceQueryKeys.list }),
+        )
+      }
     },
   )
+
+  test('acceptance refreshes ownership projections only in the transferred account scope', async () => {
+    let hasAccepted = false
+    handoverTransport.account.mockImplementation(async (workspaceId: string) => ({
+      billingAccountId: ACCOUNT,
+      workspaceId,
+      isShared: true,
+      consumptionScope: hasAccepted ? 'account' : 'member',
+      canManageMemberQuotas: hasAccepted,
+    }))
+    handoverTransport.invites.mockResolvedValue([liveInvite(ME)])
+    handoverTransport.accept.mockImplementation(async () => {
+      hasAccepted = true
+      const accepted = {
+        ...liveInvite(ME),
+        status: 'accepted',
+        scopeWorkspaceIds: ['ws_personal1', 'ws_team2'],
+      }
+      handoverTransport.invites.mockResolvedValue([accepted])
+      return accepted
+    })
+    const { user, queryClient } = renderMembersDialog()
+    await screen.findByRole('button', { name: 'Accept handover' })
+    const accountKey = billingAccountQueryKeys.detail('ws_personal1', ME)
+    expect(queryClient.getQueryData(accountKey)).toMatchObject({
+      consumptionScope: 'member',
+      canManageMemberQuotas: false,
+    })
+    const affectedKeys = [
+      workspaceQueryKeys.list,
+      billingAccountQueryKeys.detail('ws_team2', ME),
+      ...['ws_personal1', 'ws_team2'].flatMap((id) => [
+        memberQuotaQueryKeys.self(id),
+        memberQuotaQueryKeys.list(id),
+        usageQueryKeys.current(id, ACCOUNT, ME, 'member', '30d'),
+        billingRecordsQueryKeys.list(id, ACCOUNT, ME, 'member'),
+      ]),
+    ]
+    const untouchedKeys = [
+      billingAccountQueryKeys.detail('ws_team3', ME),
+      billingAccountQueryKeys.detail('ws_team2', 'usr_other'),
+      usageQueryKeys.current('ws_team3', ACCOUNT, ME, 'member', '30d'),
+      usageQueryKeys.current('ws_team2', 'ba_other', ME, 'member', '30d'),
+      billingRecordsQueryKeys.list('ws_team2', ACCOUNT, 'usr_other', 'member'),
+      creditsQueryKeys.wallet('ws_personal1', ACCOUNT, ME),
+    ]
+    for (const key of [...affectedKeys, ...untouchedKeys]) queryClient.setQueryData(key, [])
+
+    await confirmHandoverDialog(user, 'Accept handover')
+    await waitFor(() => expect(toast.success).toHaveBeenCalled())
+    expect(queryClient.getQueryData(accountKey)).toMatchObject({
+      consumptionScope: 'account',
+      canManageMemberQuotas: true,
+    })
+    for (const key of affectedKeys) {
+      expect(queryClient.getQueryState(key)?.isInvalidated, JSON.stringify(key)).toBe(true)
+    }
+    for (const key of untouchedKeys) {
+      expect(queryClient.getQueryState(key)?.isInvalidated, JSON.stringify(key)).toBe(false)
+    }
+  })
 
   test('re-offers the handover action after an invite lapses', async () => {
     ownerAccount()

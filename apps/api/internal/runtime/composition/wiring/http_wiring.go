@@ -14,6 +14,7 @@ import (
 
 	aigatewayapplication "ideaboard/api/internal/aigateway/application"
 	aigatewaydomain "ideaboard/api/internal/aigateway/domain"
+	"ideaboard/api/internal/billingoverview"
 	"ideaboard/api/internal/boards"
 	boardtaskaccess "ideaboard/api/internal/boards/taskaccess"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
@@ -312,6 +313,13 @@ func NewAppRouter(
 			// #946: member cross-workspace quotas (caps + live
 			// usage reads, Billing Owner/Admin writes, self reads own).
 			Quotas: memberquotas.NewStore(repos.db),
+			// Member display facts (email + avatar) for billing member
+			// and transfer-invite shapes, same batch seam as the
+			// workspace/org member lists.
+			MemberDisplay: v1.NewMemberDisplayService(repos.userRepo, services.authServiceClient),
+			// Required read-only snapshot for the billing overview fan-out
+			// (REPEATABLE READ with ambient-carrier join).
+			Snapshot: billingoverview.PostgresSnapshot(repos.db),
 		},
 		// Control administration shares domain handlers and stores. The guard
 		// enforces authorization, rate limits, idempotency and durable audit.

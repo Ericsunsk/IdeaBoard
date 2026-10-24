@@ -96,8 +96,8 @@ func (v1FakeBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ pgx.
 // EnsureBillingAccountForWorkspace serves the quote-preflight resolution
 // from the same fixed fixture account submit holds (#917: one payer for
 // quote, readiness, and submit in these fixtures).
-func (v1FakeBillingAccounts) EnsureBillingAccountForWorkspace(_ context.Context, _ int64, _ string) (tenancypg.BillingAccount, error) {
-	return tenancypg.BillingAccount{InternalID: 7001, PublicID: "ba_quote0000001", OwnerType: tenancypg.BillingOwnerWorkspace}, nil
+func (v1FakeBillingAccounts) EnsureBillingAccountForWorkspace(_ context.Context, _ int64, _ string) (tenancy.BillingAccount, error) {
+	return tenancy.BillingAccount{InternalID: 7001, PublicID: "ba_quote0000001", OwnerType: tenancypg.BillingOwnerWorkspace}, nil
 }
 
 // v1FakeQuoteWallets serves the quote-preflight funds gate from a

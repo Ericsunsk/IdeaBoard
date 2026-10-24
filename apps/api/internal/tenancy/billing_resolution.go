@@ -86,3 +86,18 @@ func IsValidBillingTransferStatus(status string) bool {
 		return false
 	}
 }
+
+// BillingAccount is the stable funds-identity projection. Internal numeric
+// keys never cross the HTTP boundary except InternalID for joins; the API
+// addresses the account via its ba_ PublicID plus the resolving Workspace.
+type BillingAccount struct {
+	InternalID int64
+	PublicID   string
+	OwnerType  string
+	// WorkspaceInternalID is the resolving workspace (consumption location).
+	WorkspaceInternalID int64
+	WorkspacePublicID   string
+	Shared              bool
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}

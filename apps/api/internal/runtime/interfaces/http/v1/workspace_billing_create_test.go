@@ -57,16 +57,16 @@ func (s *spyWorkspaceStore) lastParams() tenancy.CreateWorkspaceParams {
 // workspace_create_billing suite.
 type stubBillingAccounts struct {
 	mu       sync.Mutex
-	personal tenancypg.BillingAccount
+	personal tenancy.BillingAccount
 }
 
 func newStubBillingAccounts() *stubBillingAccounts {
-	return &stubBillingAccounts{personal: tenancypg.BillingAccount{
+	return &stubBillingAccounts{personal: tenancy.BillingAccount{
 		InternalID: 9001, PublicID: "ba_personal_test9", OwnerType: tenancypg.BillingOwnerWorkspace,
 	}}
 }
 
-func (f *stubBillingAccounts) EnsureBillingAccountForWorkspace(_ context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error) {
+func (f *stubBillingAccounts) EnsureBillingAccountForWorkspace(_ context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	out := f.personal
@@ -76,22 +76,22 @@ func (f *stubBillingAccounts) EnsureBillingAccountForWorkspace(_ context.Context
 	return out, nil
 }
 
-func (f *stubBillingAccounts) GetBillingAccountByPublicID(_ context.Context, publicID string) (tenancypg.BillingAccount, error) {
+func (f *stubBillingAccounts) GetBillingAccountByPublicID(_ context.Context, publicID string) (tenancy.BillingAccount, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if publicID == f.personal.PublicID {
 		return f.personal, nil
 	}
-	return tenancypg.BillingAccount{}, tenancy.ErrBillingNotFound
+	return tenancy.BillingAccount{}, tenancy.ErrBillingNotFound
 }
 
-func (f *stubBillingAccounts) GetBillingAccountByInternalID(_ context.Context, id int64) (tenancypg.BillingAccount, error) {
+func (f *stubBillingAccounts) GetBillingAccountByInternalID(_ context.Context, id int64) (tenancy.BillingAccount, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if id == f.personal.InternalID {
 		return f.personal, nil
 	}
-	return tenancypg.BillingAccount{}, tenancy.ErrBillingNotFound
+	return tenancy.BillingAccount{}, tenancy.ErrBillingNotFound
 }
 
 func (f *stubBillingAccounts) GetBillingAccountRole(_ context.Context, _, _ int64) (string, bool, error) {

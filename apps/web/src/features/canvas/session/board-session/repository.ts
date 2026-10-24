@@ -46,27 +46,44 @@ export function createBoardSessionRepository(
   isDraftDirty?: (boardId: string) => boolean,
 ): BoardSessionRepository {
   const boardRepository = useBoardRepository()
+  let stopDocument: (() => void) | undefined
+  let loadGeneration = 0
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      loadGeneration += 1
+      stopDocument?.()
+    })
+  }
   if (isDraftDirty && getCurrentScope()) {
     const stop = boardRepository.registerDraftGuard?.(isDraftDirty)
     if (stop) onScopeDispose(stop)
   }
 
   async function load(boardId: string): Promise<BoardSnapshot | null> {
+    const generation = ++loadGeneration
+    stopDocument?.()
+    stopDocument = undefined
     const scope = getBoardScope()
     const normalized = normalizeBoardId(boardId)
     if (!normalized) return null
     // Read before hydration so malformed local state is rejected at its storage boundary;
     // hydration must not silently replace or mask a recoverable local validation error.
     loadBoardState(normalized)
+    // Canvas entry hydrates the route board only: the gallery cover already
+    // rode the list meta inline previewScene, so no other document fetches.
     const hydrateResult = await boardRepository.commands.hydrate({
       shouldIncludeDocuments: true,
       shouldForce: false,
+      onlyBoardIds: [normalized],
     })
     if (!isBoardScopeCurrent(scope)) throw new Error('BOARD_SCOPE_CHANGED')
     if (!hydrateResult.isOk && hydrateResult.error instanceof InvalidBoardStateError) {
       throw hydrateResult.error
     }
     const state = loadBoardState(normalized)
+    if (state && generation === loadGeneration) {
+      stopDocument = boardRepository.observeDocument(normalized)
+    }
     return state ? serializeBoardState(state, 'session-snapshot') : null
   }
 

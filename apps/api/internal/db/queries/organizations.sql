@@ -91,3 +91,23 @@ WHERE m.workspace_id = w.internal_id
 
 -- Permanent Organization closure. Row locks serialize closure with mutations;
 -- the unique closure audit prevents a second close.
+
+-- Batch organization roles for one user across organizations: a single ANY
+-- lookup replaces per-organization GetOrganizationMembership round trips
+-- (workspace listing fan-out, organization list expand=role).
+-- name: ListOrganizationRolesForUser :many
+SELECT o.public_id AS organization_public_id, m.role AS role
+FROM organizations AS o
+INNER JOIN organization_memberships AS m ON m.organization_id = o.internal_id
+WHERE o.public_id = ANY(sqlc.arg(organization_public_ids)::text[])
+  AND m.user_id = sqlc.arg(user_id);
+
+-- Batch organization roles for many users inside one organization: a single
+-- ANY lookup replaces per-row GetOrganizationRole round trips (member-quota
+-- list normalization, organization member expansion).
+-- name: ListOrganizationRolesByUserIDs :many
+SELECT m.user_id AS user_id, m.role AS role
+FROM organization_memberships AS m
+INNER JOIN organizations AS o ON o.internal_id = m.organization_id
+WHERE o.public_id = sqlc.arg(organization_public_id)
+  AND m.user_id = ANY(sqlc.arg(user_ids)::bigint[]);

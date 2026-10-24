@@ -24,10 +24,11 @@ type Scope struct {
 	OrganizationID string
 }
 
-// OrganizationRoleReader is the tenancy seam used by the quota policy. The
-// policy does not depend on an HTTP handler or a concrete tenancy store.
+// OrganizationRoleReader is the tenancy seam used by the quota policy.
+// Batch normalization requires one role lookup for the whole page.
 type OrganizationRoleReader interface {
 	GetOrganizationRole(ctx context.Context, organizationPublicID string, userID int64) (role string, member bool, err error)
+	GetOrganizationRoles(ctx context.Context, organizationPublicID string, userIDs []int64) (map[int64]string, error)
 }
 
 // Policy owns the Organization role matrix for quota reads and writes.
@@ -58,6 +59,35 @@ func (p Policy) NormalizeRead(ctx context.Context, scope Scope, userID int64, pe
 		return PeriodUnlimited, nil, nil
 	}
 	return period, limit, nil
+}
+
+// NormalizeReadBatch returns normalized quota rows in input order without
+// mutating the persisted rows. Organization scopes use one role lookup;
+// Personal scopes need no role lookup.
+func (p Policy) NormalizeReadBatch(ctx context.Context, scope Scope, rows []QuotaRow) ([]QuotaRow, error) {
+	out := make([]QuotaRow, 0, len(rows))
+	var roles map[int64]string
+	if len(rows) > 0 && scope.Kind == ScopeOrganization && scope.OrganizationID != "" {
+		if p.OrganizationRoles == nil {
+			return nil, errors.New("memberquotas: organization role reader is not configured")
+		}
+		userIDs := make([]int64, 0, len(rows))
+		for _, row := range rows {
+			userIDs = append(userIDs, row.UserID)
+		}
+		var err error
+		roles, err = p.OrganizationRoles.GetOrganizationRoles(ctx, scope.OrganizationID, userIDs)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, row := range rows {
+		if roles[row.UserID] == tenancy.RoleOwner || row.Period == "" {
+			row.Period, row.LimitCredits = PeriodUnlimited, nil
+		}
+		out = append(out, row)
+	}
+	return out, nil
 }
 
 // CanManage decides whether an actor may list or write quotas. Organization

@@ -61,9 +61,9 @@ export function useRewardRedemption() {
     },
     prependRedemption: (redemption) => prependRewardRedemption(queryClient, redemption),
     invalidateBillingRecords: () =>
-      queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all }),
+      queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all, exact: false }),
     invalidateRedemptions: () =>
-      queryClient.invalidateQueries({ queryKey: rewardRedemptionsQueryKeys.all }),
+      queryClient.invalidateQueries({ queryKey: rewardRedemptionsQueryKeys.all, exact: false }),
   })
 }
 

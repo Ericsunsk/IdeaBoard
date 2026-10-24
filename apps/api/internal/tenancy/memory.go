@@ -590,6 +590,81 @@ func (s *InMemoryStore) GetOrganizationRole(ctx context.Context, organizationPub
 	return role, ok, nil
 }
 
+// GetOrganizationRoles resolves one role per user in a single locked pass.
+func (s *InMemoryStore) GetOrganizationRoles(ctx context.Context, organizationPublicID string, userIDs []int64) (map[int64]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make(map[int64]string, len(userIDs))
+	if _, ok := s.organizations[organizationPublicID]; !ok {
+		return nil, ErrNotFound
+	}
+	members := s.orgMembers[organizationPublicID]
+	for _, id := range userIDs {
+		if id <= 0 {
+			continue
+		}
+		if role, ok := members[id]; ok {
+			out[id] = role
+		}
+	}
+	return out, nil
+}
+
+// ListOrganizationRolesForUser resolves one user's role per organization in
+// a single locked pass.
+func (s *InMemoryStore) ListOrganizationRolesForUser(ctx context.Context, organizationPublicIDs []string, userID int64) (map[string]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make(map[string]string, len(organizationPublicIDs))
+	if userID <= 0 {
+		return out, nil
+	}
+	for _, id := range organizationPublicIDs {
+		trimmed := strings.TrimSpace(id)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := s.organizations[trimmed]; !ok {
+			continue
+		}
+		if role, ok := s.orgMembers[trimmed][userID]; ok {
+			out[trimmed] = role
+		}
+	}
+	return out, nil
+}
+
+// ListOrganizationWorkspaceCounts counts visible workspaces per organization
+// in a single locked pass. Closed organizations report zero, matching
+// ListWorkspacesForUser visibility; unknown organizations are omitted.
+func (s *InMemoryStore) ListOrganizationWorkspaceCounts(ctx context.Context, organizationPublicIDs []string) (map[string]int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make(map[string]int64, len(organizationPublicIDs))
+	for _, id := range organizationPublicIDs {
+		trimmed := strings.TrimSpace(id)
+		if trimmed == "" {
+			continue
+		}
+		org, ok := s.organizations[trimmed]
+		if !ok {
+			continue
+		}
+		if org.IsClosed() {
+			out[trimmed] = 0
+			continue
+		}
+		var count int64
+		for _, w := range s.workspaces {
+			if w.OrganizationID != nil && *w.OrganizationID == trimmed {
+				count++
+			}
+		}
+		out[trimmed] = count
+	}
+	return out, nil
+}
+
 func (s *InMemoryStore) ListOrganizationWorkspaces(ctx context.Context, organizationPublicID string) ([]*Workspace, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -144,7 +144,16 @@ export async function replaceShareAccess(
   const client = deps.client ?? queryClient
   if (!isShareScopeCurrent(scope)) return scopeChanged()
   try {
-    await transport.fetchMeta(scope.workspaceId, scope.boardId)
+    // Reuse the catalog meta access facts when cached: the gallery list
+    // already carries capabilities/workspaceAccess, so the pre-write meta
+    // GET only fires on a cold cache.
+    const cached = client.getQueryData<Array<{ id?: string }>>(
+      boardQueryKeys.list(scope.workspaceId) as never,
+    )
+    const hasCachedMeta = Array.isArray(cached)
+      ? cached.some((entry) => entry?.id === scope.boardId)
+      : false
+    if (!hasCachedMeta) await transport.fetchMeta(scope.workspaceId, scope.boardId)
   } catch (error) {
     if (!isShareScopeCurrent(scope)) return scopeChanged()
     invalidateShareQueries(client, scope.workspaceId, scope.boardId)

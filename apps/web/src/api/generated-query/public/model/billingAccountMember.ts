@@ -18,4 +18,8 @@ export interface BillingAccountMember {
   role: BillingAccountMemberRole
   /** Omitted when empty. */
   created_at?: string
+  /** Manager-visible member email for display assistance only. Omitted when unavailable; never used as a write identity. */
+  email?: string
+  /** Manager-visible member avatar public URL. Omitted when the member has no custom avatar or the value is unavailable. */
+  avatar?: string
 }

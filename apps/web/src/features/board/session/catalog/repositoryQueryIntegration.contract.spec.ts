@@ -58,6 +58,10 @@ describe('production Board repository Query integration', () => {
     repositories.push(result)
     return result
   }
+  function openDocument(catalog: BoardRepository) {
+    stops.push(catalog.observeDocument('board-1'))
+    return catalog.commands.hydrate({ shouldIncludeDocuments: true, onlyBoardIds: ['board-1'] })
+  }
   function remote(revision: number, text = 'server', workspaceId = WORKSPACE_ID) {
     apiState.boardsResponse.data = apiState.boardsResponse.data.filter(
       (board) => board.id !== 'board-1',
@@ -123,10 +127,113 @@ describe('production Board repository Query integration', () => {
     ).toHaveLength(0)
   })
 
+  it('observes only the Canvas route document and releases it on navigation and disposal', async () => {
+    for (const id of ['board-2', 'board-3']) {
+      addRemoteBoardFixture(apiState, WORKSPACE_ID, {
+        id,
+        name: id,
+        createdAt: 100,
+        updatedAt: 1000,
+        revision: 7,
+        state: makePromptBoardState(1000, id),
+      })
+    }
+    const documentReads = () =>
+      mocks.request.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.endsWith('/document'))
+    const catalog = repository()
+    await catalog.commands.hydrate()
+    expect(documentReads()).toEqual([])
+    const scope = effectScope()
+    stops.push(() => scope.stop())
+    const session = scope.run(() => createBoardSessionRepository())!
+    await session.load('board-1')
+    expect(documentReads()).toEqual([`/v1/workspaces/${WORKSPACE_ID}/boards/board-1/document`])
+    const oldQuery = queryClient.getQueryCache().find({
+      queryKey: boardQueryKeys.document(WORKSPACE_ID, 'board-1'),
+      exact: true,
+    })!
+    expect(oldQuery.getObserversCount()).toBe(1)
+    await session.load('board-2')
+    expect(oldQuery.getObserversCount()).toBe(0)
+    expect(documentReads()).toEqual([
+      `/v1/workspaces/${WORKSPACE_ID}/boards/board-1/document`,
+      `/v1/workspaces/${WORKSPACE_ID}/boards/board-2/document`,
+    ])
+    const currentQuery = queryClient.getQueryCache().find({
+      queryKey: boardQueryKeys.document(WORKSPACE_ID, 'board-2'),
+      exact: true,
+    })!
+    expect(currentQuery.getObserversCount()).toBe(1)
+    await queryClient.invalidateQueries({
+      queryKey: boardQueryKeys.document(WORKSPACE_ID, 'board-1'),
+      exact: true,
+    })
+    expect(documentReads()).toHaveLength(2)
+    scope.stop()
+    expect(currentQuery.getObserversCount()).toBe(0)
+    await queryClient.invalidateQueries({
+      queryKey: boardQueryKeys.document(WORKSPACE_ID, 'board-2'),
+      exact: true,
+    })
+    expect(documentReads()).toHaveLength(2)
+  })
+
+  it.each(['workspace', 'auth'] as const)(
+    'releases document leases on a %s transition',
+    async (transition) => {
+      const catalog = repository()
+      const stopOld = catalog.observeDocument('board-1')
+      stops.push(stopOld)
+      await catalog.commands.hydrate({ shouldIncludeDocuments: true, onlyBoardIds: ['board-1'] })
+      const oldQuery = queryClient.getQueryCache().find({
+        queryKey: boardQueryKeys.document(WORKSPACE_ID, 'board-1'),
+        exact: true,
+      })!
+      expect(oldQuery.getObserversCount()).toBe(1)
+
+      if (transition === 'auth') clearStoredAuth()
+      else getWorkspaceSelectionStore().select(OTHER_WORKSPACE_ID)
+      expect(oldQuery.getObserversCount()).toBe(0)
+      const reads = mocks.request.mock.calls.length
+      await queryClient.invalidateQueries({ queryKey: oldQuery.queryKey, exact: true })
+      expect(mocks.request).toHaveBeenCalledTimes(reads)
+
+      if (transition === 'workspace') {
+        remote(9, 'other workspace', OTHER_WORKSPACE_ID)
+        await openDocument(catalog)
+        const currentQuery = queryClient.getQueryCache().find({
+          queryKey: boardQueryKeys.document(OTHER_WORKSPACE_ID, 'board-1'),
+          exact: true,
+        })!
+        expect(currentQuery.getObserversCount()).toBe(1)
+        stopOld()
+        expect(currentQuery.getObserversCount()).toBe(1)
+      }
+    },
+  )
+
+  it('stops observing the route document when the authorized catalog removes it', async () => {
+    const catalog = repository()
+    await openDocument(catalog)
+    const query = queryClient.getQueryCache().find({
+      queryKey: boardQueryKeys.document(WORKSPACE_ID, 'board-1'),
+      exact: true,
+    })!
+    expect(query.getObserversCount()).toBe(1)
+    apiState.boardsResponse.data = []
+    await catalog.commands.hydrate()
+    expect(query.getObserversCount()).toBe(0)
+    const reads = mocks.request.mock.calls.length
+    await queryClient.invalidateQueries({ queryKey: query.queryKey, exact: true })
+    expect(mocks.request).toHaveBeenCalledTimes(reads)
+  })
+
   it('refetches and projects a clean document through the production observer after SSE', async () => {
     vi.useFakeTimers()
     const catalog = repository()
-    await catalog.commands.hydrate()
+    await openDocument(catalog)
     expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('server')
     remote(10, 'latest from HTTP')
     emit('board.document_replaced', 10)
@@ -167,7 +274,7 @@ describe('production Board repository Query integration', () => {
         )(url, config)
       },
     )
-    const hydrate = catalog.commands.hydrate()
+    const hydrate = openDocument(catalog)
     await vi.waitFor(() =>
       expect(mocks.request.mock.calls.some(([url]) => String(url).endsWith('/document'))).toBe(
         true,
@@ -175,7 +282,7 @@ describe('production Board repository Query integration', () => {
     )
     getWorkspaceSelectionStore().select(OTHER_WORKSPACE_ID)
     expect(oldSignal?.aborted).toBe(true)
-    const newHydrate = catalog.commands.hydrate()
+    const newHydrate = openDocument(catalog)
     await expect(newHydrate).resolves.toEqual({ isOk: true })
     resolveOld({ data: oldDocument })
     await expect(hydrate).resolves.toMatchObject({ isOk: false })
@@ -189,7 +296,7 @@ describe('production Board repository Query integration', () => {
   it('accepts new remote content after save even when the local clock is newer', async () => {
     vi.useFakeTimers()
     const catalog = repository()
-    await catalog.commands.hydrate()
+    await openDocument(catalog)
     const saved = setBoardState('board-1', makePromptBoardState(1000, 'saved edit'))!
     await syncBoardToServer('board-1', saved)
     await vi.advanceTimersByTimeAsync(0)
@@ -205,7 +312,7 @@ describe('production Board repository Query integration', () => {
   it('marks a conflicted local draft stale without a document GET or advancing its base', async () => {
     vi.useFakeTimers()
     const catalog = repository()
-    await catalog.commands.hydrate()
+    await openDocument(catalog)
     setBoardState('board-1', makePromptBoardState(1000, 'unsaved edit'))
     apiState.saveError = { status: 409, code: 'board_revision_conflict' }
     await expect(syncBoardToServer('board-1')).rejects.toMatchObject({ status: 409 })
@@ -225,7 +332,7 @@ describe('production Board repository Query integration', () => {
   it('does not clear a newer draft when an older in-flight save finishes', async () => {
     vi.useFakeTimers()
     const catalog = repository()
-    await catalog.commands.hydrate()
+    await openDocument(catalog)
     const submitted = setBoardState('board-1', makePromptBoardState(1000, 'submitted edit'))!
     const request = createMockWorkspaceBoardApiRequest(apiState)
     let finish!: () => void
@@ -256,7 +363,7 @@ describe('production Board repository Query integration', () => {
   it('protects live Canvas edits before the autosave debounce persists them', async () => {
     vi.useFakeTimers()
     const catalog = repository()
-    await catalog.commands.hydrate()
+    await openDocument(catalog)
     const scope = effectScope()
     stops.push(() => scope.stop())
     let isLiveDirty = true
@@ -279,7 +386,7 @@ describe('production Board repository Query integration', () => {
   it('reuses ordinary Canvas navigation reads within the document freshness window', async () => {
     vi.useFakeTimers()
     const catalog = repository()
-    await catalog.commands.hydrate()
+    await openDocument(catalog)
     const session = createBoardSessionRepository()
     await session.load('board-1')
     expect(mocks.request).toHaveBeenCalledTimes(2)
@@ -291,13 +398,13 @@ describe('production Board repository Query integration', () => {
   it('keeps the same live session guard on workspace navigation and releases it on disposal', async () => {
     vi.useFakeTimers()
     const catalog = repository()
-    await catalog.commands.hydrate()
+    await openDocument(catalog)
     const scope = effectScope()
     stops.push(() => scope.stop())
     scope.run(() => createBoardSessionRepository((boardId) => boardId === 'board-1'))
     getWorkspaceSelectionStore().select(OTHER_WORKSPACE_ID)
     remote(7, 'other workspace', OTHER_WORKSPACE_ID)
-    await catalog.commands.hydrate()
+    await openDocument(catalog)
     remote(10, 'remote edit', OTHER_WORKSPACE_ID)
     const reads = mocks.request.mock.calls.length
     const source = MockEventSource.instances.at(-1)!
@@ -331,7 +438,7 @@ describe('production Board repository Query integration', () => {
     ])
     replaceBoardStateMap({ 'board-1': makePromptBoardState(2000, 'offline draft') })
     const catalog = repository()
-    await catalog.commands.hydrate()
+    await openDocument(catalog)
     remote(10, 'remote edit')
     const reads = mocks.request.mock.calls.length
     emit('board.document_replaced', 10)
@@ -348,7 +455,7 @@ describe('production Board repository Query integration', () => {
     ])
     replaceBoardStateMap({ 'board-1': makePromptBoardState(2000, 'local draft') })
     const catalog = repository()
-    await catalog.commands.hydrate()
+    await openDocument(catalog)
     expect(catalog.viewModel.boards.value[0]?.name).toBe('Server Board')
     expect(getBoardById('board-1')?.name).toBe('Local Rename')
     remote(8, 'remote winner')
@@ -366,7 +473,7 @@ describe('production Board repository Query integration', () => {
   it('reads the newer catalog document before Canvas navigation despite its cached freshness', async () => {
     vi.useFakeTimers()
     const catalog = repository()
-    await catalog.commands.hydrate()
+    await catalog.commands.hydrate({ shouldIncludeDocuments: true, onlyBoardIds: ['board-1'] })
     remote(8, 'revision eight')
     await catalog.commands.hydrate({ shouldIncludeDocuments: false })
     expect(catalog.viewModel.boards.value[0]?.revision).toBe(8)

@@ -1,4 +1,4 @@
-import { QueryClient, type InfiniteData } from '@tanstack/vue-query'
+import { QueryClient, type InfiniteData, type QueryFilters } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
 import { billingRecordsQueryKeys } from '../billing/resource'
 import { creditsQueryKeys } from '../credits/resource'
@@ -101,16 +101,25 @@ describe('createRewardRedemptionWorkflow', () => {
       setAvailableBalance: () => invalidateUserMoney(queryClient),
       prependRedemption: (redemption) => prependRewardRedemption(queryClient, redemption),
       invalidateBillingRecords: () =>
-        queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all, exact: false }),
       invalidateRedemptions: () =>
-        queryClient.invalidateQueries({ queryKey: rewardRedemptionsQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: rewardRedemptionsQueryKeys.all, exact: false }),
     })
 
     await expect(workflow.redeem('IDEA2026')).resolves.toEqual(redeemed)
 
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: creditsQueryKeys.all })
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: billingRecordsQueryKeys.all })
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: rewardRedemptionsQueryKeys.all })
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: creditsQueryKeys.all,
+      exact: false,
+    } satisfies QueryFilters)
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: billingRecordsQueryKeys.all,
+      exact: false,
+    } satisfies QueryFilters)
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: rewardRedemptionsQueryKeys.all,
+      exact: false,
+    } satisfies QueryFilters)
   })
 
   it('prepends a new history item and never duplicates a replayed redemption', () => {

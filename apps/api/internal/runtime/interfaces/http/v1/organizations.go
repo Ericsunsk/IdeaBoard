@@ -18,6 +18,22 @@ type v1OrganizationDTO struct {
 	Status    string `json:"status"`
 	ClosedAt  string `json:"closed_at,omitempty"`
 	CreatedAt string `json:"created_at"`
+	// Role is the caller's direct organization role, present only with
+	// ?expand=role (resolved once by the shared org prelude, never
+	// re-fetched per expansion).
+	Role string `json:"role,omitempty"`
+	// WorkspaceCount is the visible workspace count, present only with
+	// ?expand=workspace_counts on the list endpoint. Closed
+	// organizations report zero, matching workspace listing visibility.
+	WorkspaceCount *int64 `json:"workspace_count,omitempty"`
+	// Members is the organization member list with email/avatar display,
+	// present only with ?expand=members on the detail endpoint (and only
+	// when non-empty; absent reads as empty).
+	Members []v1OrganizationMemberDTO `json:"members,omitempty"`
+	// Workspaces is the organization workspace list, present only with
+	// ?expand=workspaces on the detail endpoint (and only when
+	// non-empty; absent reads as empty).
+	Workspaces []v1WorkspaceDTO `json:"workspaces,omitempty"`
 }
 
 func toOrganizationDTO(o *tenancy.Organization) v1OrganizationDTO {
@@ -31,6 +47,12 @@ func toOrganizationDTO(o *tenancy.Organization) v1OrganizationDTO {
 func (h *contractV1Handler) listOrganizations(c *gin.Context) {
 	identityPrincipal, ok := v1RequestPrincipal(c)
 	if !ok || !h.requireStore(c) {
+		return
+	}
+	// ?expand=role,workspace_counts is optional and additive: the default
+	// list shape is unchanged. Unknown values render 400 bad_request.
+	expand, ok := parseExpandQuery(c, "role", "workspace_counts")
+	if !ok {
 		return
 	}
 	pageSize, ok := v1PageSize(c)
@@ -62,9 +84,48 @@ func (h *contractV1Handler) listOrganizations(c *gin.Context) {
 	if end > len(organizations) {
 		end = len(organizations)
 	}
+	// Batch expansions: one role lookup and one count lookup for the whole
+	// page, replacing per-organization GetOrganizationRole and
+	// ListWorkspacesByOrganizationID round trips.
+	roles := map[string]string{}
+	counts := map[string]int64{}
+	if expand["role"] || expand["workspace_counts"] {
+		orgIDs := make([]string, 0, end-offset)
+		for _, o := range organizations[offset:end] {
+			orgIDs = append(orgIDs, o.PublicID)
+		}
+		if expand["role"] {
+			fetched, err := h.deps.Store.ListOrganizationRolesForUser(c.Request.Context(), orgIDs, identityPrincipal.UserID())
+			if err != nil {
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable53)
+				c.Abort()
+				return
+			}
+			roles = fetched
+		}
+		if expand["workspace_counts"] {
+			fetched, err := h.deps.Store.ListOrganizationWorkspaceCounts(c.Request.Context(), orgIDs)
+			if err != nil {
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable53)
+				c.Abort()
+				return
+			}
+			counts = fetched
+		}
+	}
 	page := make([]v1OrganizationDTO, 0, end-offset)
 	for _, o := range organizations[offset:end] {
-		page = append(page, toOrganizationDTO(o))
+		dto := toOrganizationDTO(o)
+		if expand["role"] {
+			// Membership-backed rows always carry a role; a raced
+			// removal reads as empty without failing the list.
+			dto.Role = roles[o.PublicID]
+		}
+		if expand["workspace_counts"] {
+			count := counts[o.PublicID]
+			dto.WorkspaceCount = &count
+		}
+		page = append(page, dto)
 	}
 	meta := contract.NewPageMeta("", false)
 	if end < len(organizations) {
@@ -141,7 +202,55 @@ func (h *contractV1Handler) createOrganization(c *gin.Context) {
 
 func (h *contractV1Handler) getOrganization(c *gin.Context) {
 	h.withOrganization(c, v1OrganizationOpts{}, func(octx v1OrganizationCtx) {
-		contract.RenderSuccess(c, toOrganizationDTO(octx.Organization))
+		// ?expand=members,workspaces,role is optional and additive: the
+		// default detail shape is unchanged (one organization read for
+		// the whole panel instead of three). Unknown values render 400
+		// bad_request. The caller's role reuses the prelude resolution
+		// (GetOrganizationRole runs once per request, never per
+		// expansion).
+		expand, ok := parseExpandQuery(c, "members", "workspaces", "role")
+		if !ok {
+			return
+		}
+		dto := toOrganizationDTO(octx.Organization)
+		if expand["role"] {
+			dto.Role = octx.Role
+		}
+		if expand["members"] {
+			members, err := h.deps.Store.ListOrganizationMembers(c.Request.Context(), octx.Organization.PublicID)
+			if err != nil {
+				contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
+				c.Abort()
+				return
+			}
+			memberPage, ok := h.toOrganizationMemberDTOs(c, members)
+			if !ok {
+				return
+			}
+			if len(memberPage) > 0 {
+				dto.Members = memberPage
+			}
+		}
+		if expand["workspaces"] {
+			workspaces, err := h.deps.Store.ListOrganizationWorkspaces(c.Request.Context(), octx.Organization.PublicID)
+			if err != nil {
+				if errors.Is(err, tenancy.ErrNotFound) {
+					contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, runtimehttp.MsgOrganizationNotFound)
+				} else {
+					contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable53)
+				}
+				c.Abort()
+				return
+			}
+			workspacePage := make([]v1WorkspaceDTO, 0, len(workspaces))
+			for _, w := range workspaces {
+				workspacePage = append(workspacePage, toWorkspaceDTO(w))
+			}
+			if len(workspacePage) > 0 {
+				dto.Workspaces = workspacePage
+			}
+		}
+		contract.RenderSuccess(c, dto)
 	})
 }
 

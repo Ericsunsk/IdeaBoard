@@ -203,7 +203,7 @@ Schema Release 的 `BASE_SHA` 按场景取值，不要混用：本地生成用 `
 
 ### Frontend 工具与治理规则
 
-Formatter 使用 Prettier（`singleQuote`、无分号、`printWidth: 100`），通过 `npm run format:check` 检查。i18n 四 locale（`en`、`zh-CN`、`es`、`ko`）parity 由 `apps/web/scripts/checkLocaleParity.ts`（`npm run lint:locale-parity`）与 `localeParity.unit.spec.ts` 锁定，CI 通过 governance 与 unit jobs 执行同一校验；交互与样式行为通过 Playwright browser specs 验证。
+Formatter 使用 Prettier（`singleQuote`、无分号、`printWidth: 100`），通过 `npm run format:check` 检查。i18n 四 locale（`en`、`zh-CN`、`es`、`ko`）parity 由 `apps/web/scripts/checkLocaleParity.ts`（`npm run lint:locale-parity`）与 `localeParity.unit.spec.ts` 锁定，CI 通过 governance 与 unit jobs 执行同一校验；交互与样式行为通过 Playwright browser specs 验证。请求数硬约束见 [api CONTEXT](./apps/web/src/api/CONTEXT.md)（单 provider + 标量 key、最小化 invalidate、懒加载 + 聚合读优先）；新增 query key 工厂必须在 `queryKeyRequestBudget.contract.spec.ts` 登记，同屏 distinct GET 超 4 个必须走聚合读或懒加载。
 
 ESLint 直接执行治理规则。Canvas 高频交互态禁用 Query 为 error；其余治理规则的 severity 以 `eslint.config.js` 为准。boolean-prefix 使用 TypeScript type-aware ESLint，现有例外保存在 `apps/web/scripts/booleanNaming.baseline.json` 的 declaration identities（file、lexical owner、kind/name、occurrence）；新增同文件声明仍 warning，lint 不自动刷新基线，`npm run lint` 以 `--max-warnings=0` 拒绝任何 warning。自有 boolean fields 与仓内消费者直接使用 predicate names，不保留旧名 alias。DOM、第三方 SDK 与 generated DTO 字段按真实类型契约检查；自有 wire/persisted DTO 用 `@externalContract` 标明外部契约，仅豁免该契约的字段。显式 dictionary 的 keys 是 identities，显式声明的自有 fields 仍受命名检查。`no-barrel-import` 提示 cascading/未声明 barrel，canonical public Seams 按 inventory 保留。
 

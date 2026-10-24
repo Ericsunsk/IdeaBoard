@@ -73,16 +73,42 @@ func (h *contractV1Handler) listOrganizationMembers(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		page := make([]v1OrganizationMemberDTO, 0, len(members))
-		for _, m := range members {
-			dto, ok := h.toOrganizationMemberDTO(c, m)
-			if !ok {
-				return
-			}
-			page = append(page, dto)
+		page, ok := h.toOrganizationMemberDTOs(c, members)
+		if !ok {
+			return
 		}
 		contract.RenderSuccess(c, page)
 	})
+}
+
+// toOrganizationMemberDTOs builds the organization member list in three
+// round trips total: the store list (caller) plus one identity batch and
+// one display batch, replacing the per-member GetUserPublicID N+1 loop and
+// covering organization members with the same email/avatar enrichment the
+// workspace list carries. Unknown identities fail closed with 503,
+// matching the single-row toOrganizationMemberDTO.
+func (h *contractV1Handler) toOrganizationMemberDTOs(c *gin.Context, members []*tenancy.OrganizationMember) ([]v1OrganizationMemberDTO, bool) {
+	userIDs := userIDsOfOrganizationMembers(members)
+	publicIDs, ok := batchUserPublicIDs(c.Request.Context(), c, h.deps.Users, userIDs)
+	if !ok {
+		return nil, false
+	}
+	display := batchDisplayFacts(c.Request.Context(), h.deps.MemberDisplay, userIDs)
+	page := make([]v1OrganizationMemberDTO, 0, len(members))
+	for _, m := range members {
+		if m == nil {
+			continue
+		}
+		dto := v1OrganizationMemberDTO{UserID: publicIDs[m.UserID], Role: m.Role}
+		if created := v1FormatTime(m.CreatedAt); created != "" {
+			dto.CreatedAt = created
+		}
+		if email, avatar := applyDisplayFact(display, m.UserID); email != "" || avatar != "" {
+			dto.Email, dto.Avatar = email, avatar
+		}
+		page = append(page, dto)
+	}
+	return page, true
 }
 
 type v1AddOrganizationMemberBody struct {

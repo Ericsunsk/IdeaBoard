@@ -85,21 +85,6 @@ const (
 	BillingOwnerOrganization = "organization"
 )
 
-// BillingAccount is the stable funds-identity projection. Internal numeric
-// keys never cross the HTTP boundary except InternalID for joins; the API
-// addresses the account via its ba_ PublicID plus the resolving Workspace.
-type BillingAccount struct {
-	InternalID int64
-	PublicID   string
-	OwnerType  string
-	// WorkspaceInternalID is the resolving workspace (consumption location).
-	WorkspaceInternalID int64
-	WorkspacePublicID   string
-	Shared              bool
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-}
-
 // BillingAccountStore provisions and resolves stable billing accounts.
 // Repository methods take context.Context first and use dbWithContext(ctx).
 type BillingAccountStore struct {
@@ -127,13 +112,13 @@ func (s *BillingAccountStore) dbWithContext(ctx context.Context) repositoryQuery
 //
 // Concurrency: the partial unique indexes collapse concurrent first reads
 // to one row; the loser reads back the winner on duplicate error.
-func (s *BillingAccountStore) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (BillingAccount, error) {
+func (s *BillingAccountStore) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error) {
 	if s == nil || s.q == nil {
-		return BillingAccount{}, tenancy.ErrBillingStoreNotConfigured
+		return tenancy.BillingAccount{}, tenancy.ErrBillingStoreNotConfigured
 	}
 	row, shared, err := resolveBillingAccountRow(ctx, s.dbWithContext(ctx).q, workspaceInternalID)
 	if err != nil {
-		return BillingAccount{}, err
+		return tenancy.BillingAccount{}, err
 	}
 	return mapBillingAccount(row, workspaceInternalID, workspacePublicID, shared), nil
 }
@@ -295,7 +280,7 @@ func ensureBillingOwner(ctx context.Context, queries *dbsqlc.Queries, billingAcc
 }
 
 // AdminBillingAccount is the platform-Admin locate/audit projection of one
-// stable funds identity (#923). Unlike the workspace-resolving BillingAccount
+// stable funds identity (#923). Unlike the workspace-resolving tenancy.BillingAccount
 // above, it carries both linkage public ids so Admin can audit personal,
 // studio-shared, and organization accounts without a resolving Workspace.
 type AdminBillingAccount struct {
@@ -422,18 +407,18 @@ func (s *BillingAccountStore) ListExplicitlyLinkedWorkspaces(ctx context.Context
 // GetBillingAccountByInternalID resolves a stable account for display and
 // fund-operation attribution (#916). Internal callers only; the ba_ public id
 // crosses the HTTP boundary, never the numeric key.
-func (s *BillingAccountStore) GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (BillingAccount, error) {
+func (s *BillingAccountStore) GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancy.BillingAccount, error) {
 	if s == nil || s.q == nil || billingAccountInternalID <= 0 {
-		return BillingAccount{}, tenancy.ErrBillingNotFound
+		return tenancy.BillingAccount{}, tenancy.ErrBillingNotFound
 	}
 	row, err := s.dbWithContext(ctx).q.GetBillingAccountByInternalID(ctx, billingAccountInternalID)
 	if err != nil {
 		if database.IsNotFound(err) {
-			return BillingAccount{}, tenancy.ErrBillingNotFound
+			return tenancy.BillingAccount{}, tenancy.ErrBillingNotFound
 		}
-		return BillingAccount{}, err
+		return tenancy.BillingAccount{}, err
 	}
-	return BillingAccount{
+	return tenancy.BillingAccount{
 		InternalID: row.InternalID, PublicID: row.PublicID, OwnerType: ownerTypeOf(row),
 		CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt),
 	}, nil
@@ -481,22 +466,22 @@ func (s *BillingAccountStore) GetAdminBillingAccountByPublicID(ctx context.Conte
 // GetBillingAccountByPublicID resolves a stable ba_ account for explicit
 // linking. Hidden ba_ ids converge to ErrBillingNotFound (never workspace
 // existence), per anti-enumeration.
-func (s *BillingAccountStore) GetBillingAccountByPublicID(ctx context.Context, publicID string) (BillingAccount, error) {
+func (s *BillingAccountStore) GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancy.BillingAccount, error) {
 	if s == nil || s.q == nil {
-		return BillingAccount{}, tenancy.ErrBillingStoreNotConfigured
+		return tenancy.BillingAccount{}, tenancy.ErrBillingStoreNotConfigured
 	}
 	trimmed := strings.TrimSpace(publicID)
 	if !isBillingAccountID(trimmed) {
-		return BillingAccount{}, tenancy.ErrBillingNotFound
+		return tenancy.BillingAccount{}, tenancy.ErrBillingNotFound
 	}
 	row, err := s.dbWithContext(ctx).q.GetBillingAccountByPublicID(ctx, trimmed)
 	if err != nil {
 		if database.IsNotFound(err) {
-			return BillingAccount{}, tenancy.ErrBillingNotFound
+			return tenancy.BillingAccount{}, tenancy.ErrBillingNotFound
 		}
-		return BillingAccount{}, err
+		return tenancy.BillingAccount{}, err
 	}
-	return BillingAccount{
+	return tenancy.BillingAccount{
 		InternalID: row.InternalID, PublicID: row.PublicID, OwnerType: ownerTypeOf(row),
 		CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt),
 	}, nil
@@ -654,8 +639,8 @@ func textOrEmpty(value pgtype.Text) string {
 	return value.String
 }
 
-func mapBillingAccount(row dbsqlc.BillingAccount, workspaceInternalID int64, workspacePublicID string, shared bool) BillingAccount {
-	return BillingAccount{
+func mapBillingAccount(row dbsqlc.BillingAccount, workspaceInternalID int64, workspacePublicID string, shared bool) tenancy.BillingAccount {
+	return tenancy.BillingAccount{
 		InternalID:          row.InternalID,
 		PublicID:            row.PublicID,
 		OwnerType:           ownerTypeOf(row),

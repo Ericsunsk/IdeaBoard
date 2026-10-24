@@ -196,38 +196,81 @@ func (s *Store) GetWorkspace(ctx context.Context, publicID string) (*tenancy.Wor
 // #951): direct membership rows plus automatic org Owner/Admin access to
 // every workspace of their organization. Personal scopes use direct rows
 // only; org Members see only explicitly granted workspaces.
+//
+// Read fan-out is bounded: direct rows, organization rows, one batched role
+// lookup, and one workspace list per owned/admined organization (cardinality
+// caps organizations at one per user). Organization public ids resolve from
+// the already-fetched organization rows instead of per-workspace lookups;
+// only stale direct rows outside the caller's organizations fall back to a
+// single GetOrganization each.
 func (s *Store) ListWorkspacesForUser(ctx context.Context, userID int64) ([]*tenancy.Workspace, error) {
-	rows, err := s.dbWithContext(ctx).q.ListWorkspacesByUserID(ctx, dbsqlc.ListWorkspacesByUserIDParams{
+	q := s.dbWithContext(ctx).q
+	rows, err := q.ListWorkspacesByUserID(ctx, dbsqlc.ListWorkspacesByUserIDParams{
 		UserID: userID, RowLimit: maxTenancyRows,
 	})
 	if err != nil {
 		return nil, err
 	}
-	mapped, err := s.mapWorkspaceRows(ctx, rows)
+	orgs, err := q.ListOrganizationsByUserID(ctx, dbsqlc.ListOrganizationsByUserIDParams{
+		UserID: userID, RowLimit: maxTenancyRows,
+	})
 	if err != nil {
 		return nil, err
+	}
+	orgPublicByInternal := make(map[int64]string, len(orgs))
+	orgPublicIDs := make([]string, 0, len(orgs))
+	for _, org := range orgs {
+		orgPublicByInternal[org.InternalID] = org.PublicID
+		orgPublicIDs = append(orgPublicIDs, org.PublicID)
+	}
+	mapped := make([]*tenancy.Workspace, 0, len(rows))
+	for _, row := range rows {
+		var orgPublicID *string
+		if row.OrganizationID.Valid {
+			if publicID, ok := orgPublicByInternal[row.OrganizationID.Int64]; ok {
+				duplicate := publicID
+				orgPublicID = &duplicate
+			} else {
+				// Stale direct row outside the caller's organizations:
+				// resolve once and remember for the rest of the page.
+				resolved, resolveErr := s.resolveOrgPublicID(ctx, q, row.OrganizationID)
+				if resolveErr != nil {
+					return nil, resolveErr
+				}
+				if resolved != nil {
+					orgPublicByInternal[row.OrganizationID.Int64] = *resolved
+					duplicate := *resolved
+					orgPublicID = &duplicate
+				}
+			}
+		}
+		mapped = append(mapped, mapWorkspace(row, orgPublicID))
 	}
 	seen := make(map[string]struct{}, len(mapped))
 	for _, w := range mapped {
 		seen[w.PublicID] = struct{}{}
 	}
-	orgs, err := s.dbWithContext(ctx).q.ListOrganizationsByUserID(ctx, dbsqlc.ListOrganizationsByUserIDParams{
-		UserID: userID, RowLimit: maxTenancyRows,
-	})
-	if err != nil {
-		return nil, err
+	// One batched role lookup replaces the per-organization
+	// GetOrganizationMembership round trips: only Owner/Admin
+	// organizations contribute automatic workspace access.
+	roles := make(map[string]string, len(orgs))
+	if len(orgPublicIDs) > 0 {
+		roleRows, roleErr := q.ListOrganizationRolesForUser(ctx, dbsqlc.ListOrganizationRolesForUserParams{
+			OrganizationPublicIds: orgPublicIDs, UserID: userID,
+		})
+		if roleErr != nil {
+			return nil, roleErr
+		}
+		for _, row := range roleRows {
+			roles[row.OrganizationPublicID] = row.Role
+		}
 	}
 	for _, org := range orgs {
-		roleRow, err := s.dbWithContext(ctx).q.GetOrganizationMembership(ctx, dbsqlc.GetOrganizationMembershipParams{
-			OrganizationID: org.InternalID, UserID: userID,
-		})
-		if err != nil {
+		role := roles[org.PublicID]
+		if role != tenancy.RoleOwner && role != tenancy.RoleAdmin {
 			continue
 		}
-		if roleRow.Role != tenancy.RoleOwner && roleRow.Role != tenancy.RoleAdmin {
-			continue
-		}
-		orgWorkspaces, err := s.dbWithContext(ctx).q.ListWorkspacesByOrganizationID(ctx, dbsqlc.ListWorkspacesByOrganizationIDParams{
+		orgWorkspaces, err := q.ListWorkspacesByOrganizationID(ctx, dbsqlc.ListWorkspacesByOrganizationIDParams{
 			OrganizationID: pgtype.Int8{Int64: org.InternalID, Valid: true},
 			RowLimit:       maxTenancyRows,
 		})
@@ -251,12 +294,12 @@ func (s *Store) ListWorkspacesForUser(ctx context.Context, userID int64) ([]*ten
 	})
 	// Closed Organizations suspend Workspace listing (#955): the
 	// Organization itself stays visible for restore, its Workspaces do
-	// not. Cardinality caps the distinct-org lookups at one; the org rows
-	// above already carry closed_at, so the common path needs no extra
-	// fetch (misses fall back to GetOrganization fail-closed).
+	// not. Listed organization rows are open by query construction
+	// (ListOrganizationsByUserID filters closed_at); only stale direct
+	// rows outside them need a fallback closed check.
 	closedByPublic := make(map[string]bool, len(orgs))
 	for _, org := range orgs {
-		closedByPublic[org.PublicID] = org.ClosedAt.Valid
+		closedByPublic[org.PublicID] = false
 	}
 	visible := mapped[:0]
 	for _, w := range mapped {
@@ -278,33 +321,6 @@ func (s *Store) ListWorkspacesForUser(ctx context.Context, userID int64) ([]*ten
 		}
 	}
 	return visible, nil
-}
-
-func (s *Store) mapWorkspaceRows(ctx context.Context, rows []dbsqlc.Workspace) ([]*tenancy.Workspace, error) {
-	orgIDs := make(map[int64]struct{})
-	for _, row := range rows {
-		if row.OrganizationID.Valid {
-			orgIDs[row.OrganizationID.Int64] = struct{}{}
-		}
-	}
-	publicIDs := make(map[int64]string, len(orgIDs))
-	for internalID := range orgIDs {
-		row, err := s.dbWithContext(ctx).q.GetOrganizationByInternalID(ctx, internalID)
-		if err != nil {
-			return nil, notFound(err)
-		}
-		publicIDs[internalID] = row.PublicID
-	}
-	out := make([]*tenancy.Workspace, 0, len(rows))
-	for _, row := range rows {
-		var orgPublicID *string
-		if row.OrganizationID.Valid {
-			publicID := publicIDs[row.OrganizationID.Int64]
-			orgPublicID = &publicID
-		}
-		out = append(out, mapWorkspace(row, orgPublicID))
-	}
-	return out, nil
 }
 
 // CreateWorkspace mints a ws_ workspace under an organization (by public id)

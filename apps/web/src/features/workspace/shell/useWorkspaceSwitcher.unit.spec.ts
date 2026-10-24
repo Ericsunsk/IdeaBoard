@@ -5,14 +5,13 @@
 // gallery landing (no stale boardId), creation preserving canvas scope,
 // rename refresh,
 // and menu-prop mapping.
+import type { QueryFilters } from '@tanstack/vue-query'
 import { computed, defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { i18n } from '../../../core/i18n'
 import { render } from '../../../test/render'
 import { USER_BOARDS_PATH, USER_CANVAS_PATH } from '../routePaths'
-import {
-  installOrganizationScopeStore,
-} from '../organization/scope'
+import { installOrganizationScopeStore } from '../organization/scope'
 import type { OrganizationScope } from '../organization/scope'
 import { useWorkspaceSwitcher } from './useWorkspaceSwitcher'
 import type { WorkspaceSummary } from '../selection/workspaceResource'
@@ -242,7 +241,10 @@ describe('useWorkspaceSwitcher', () => {
     await expect(switcher.createWorkspaceItem({ name: 'New space' })).resolves.toEqual(created)
 
     expect(selection.provisionWorkspace).toHaveBeenCalledWith({ name: 'New space' })
-    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspaces'] })
+    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['workspaces'],
+      exact: true,
+    } satisfies QueryFilters)
     expect(beforeWorkspaceChange).not.toHaveBeenCalled()
     expect(selection.selectWorkspace).not.toHaveBeenCalled()
     expect(selection.selectedId.value).toBe(DEFAULT.publicId)
@@ -276,7 +278,10 @@ describe('useWorkspaceSwitcher', () => {
     expect(resourceMocks.renameWorkspace).toHaveBeenCalledWith('ws_team2', {
       name: 'Renamed',
     })
-    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspaces'] })
+    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['workspaces'],
+      exact: true,
+    } satisfies QueryFilters)
     expect(routerMocks.push).not.toHaveBeenCalled()
     expect(routerMocks.replace).not.toHaveBeenCalled()
   })
@@ -303,7 +308,10 @@ describe('useWorkspaceSwitcher', () => {
     await expect(switcher.renameOrganizationItem('org_c3', 'Renamed')).resolves.toEqual(updated)
 
     expect(resourceMocks.renameOrganization).toHaveBeenCalledWith('org_c3', { name: 'Renamed' })
-    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['organizations'] })
+    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['organizations'],
+      exact: true,
+    } satisfies QueryFilters)
     expect(routerMocks.push).not.toHaveBeenCalled()
     expect(routerMocks.replace).not.toHaveBeenCalled()
   })
@@ -379,7 +387,10 @@ describe('useWorkspaceSwitcher', () => {
     await expect(switcher.deleteWorkspaceItem('ws_team2')).resolves.toBeUndefined()
 
     expect(resourceMocks.deleteWorkspace).toHaveBeenCalledWith('ws_team2')
-    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspaces'] })
+    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['workspaces'],
+      exact: true,
+    } satisfies QueryFilters)
     expect(selectedId.value).toBe(DEFAULT.publicId)
     expect(selection.selectWorkspace).toHaveBeenCalledWith('ws_default1')
     expect(routerMocks.push).toHaveBeenCalledWith({
@@ -396,7 +407,10 @@ describe('useWorkspaceSwitcher', () => {
 
     await switcher.deleteWorkspaceItem(TEAM.publicId)
 
-    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspaces'] })
+    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['workspaces'],
+      exact: true,
+    } satisfies QueryFilters)
     expect(selection.selectWorkspace).not.toHaveBeenCalled()
     expect(routerMocks.push).not.toHaveBeenCalled()
     expect(routerMocks.replace).not.toHaveBeenCalled()

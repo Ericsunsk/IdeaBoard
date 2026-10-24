@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/consumptionread"
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tenancy"
@@ -49,13 +50,37 @@ type QuotaRow struct {
 	LimitCredits     *int64
 }
 
+// queriesForSnapshot returns tx-bound Queries when ctx carries the ambient
+// read snapshot, else the pool-bound Queries. Overview reads share one
+// snapshot; independent reads use the pool.
+func (s *Store) queriesForSnapshot(ctx context.Context) *dbsqlc.Queries {
+	if tx, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		return dbsqlc.New(tx)
+	}
+	return s.q
+}
+
+// queryerForSnapshot returns the ambient snapshot transaction when present,
+// else the pool, so usage reads observe the same snapshot as the quota rows.
+// A nil pool with no carrier fails closed at the call sites below.
+func (s *Store) queryerForSnapshot(ctx context.Context) consumptionread.Queryer {
+	if tx, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		return tx
+	}
+	return s.db
+}
+
 // GetQuotaRow reads one member quota row. ok=false means absent,
 // which callers treat as unlimited (the default); it is not an error.
 func (s *Store) GetQuotaRow(ctx context.Context, billingAccountID, userID int64) (period string, limitCredits *int64, ok bool, err error) {
-	if s == nil || s.q == nil || billingAccountID <= 0 || userID <= 0 {
+	if s == nil || billingAccountID <= 0 || userID <= 0 {
 		return "", nil, false, ErrQuotaNotFound
 	}
-	row, err := s.q.GetMemberQuota(ctx, dbsqlc.GetMemberQuotaParams{
+	q := s.queriesForSnapshot(ctx)
+	if q == nil {
+		return "", nil, false, ErrQuotaNotFound
+	}
+	row, err := q.GetMemberQuota(ctx, dbsqlc.GetMemberQuotaParams{
 		BillingAccountID: billingAccountID, UserID: userID,
 	})
 	if err != nil {
@@ -114,12 +139,17 @@ func (s *Store) SetQuota(ctx context.Context, billingAccountID, userID int64, pe
 
 // ListQuotas lists the explicitly set quota rows for one account, oldest
 // member first, bounded by MaxListQuotas. Members without a row are
-// unlimited and intentionally absent.
+// unlimited and intentionally absent. Joins the ambient read snapshot when
+// present (billing overview fan-out).
 func (s *Store) ListQuotas(ctx context.Context, billingAccountID int64) ([]QuotaRow, error) {
-	if s == nil || s.q == nil || billingAccountID <= 0 {
+	if s == nil || billingAccountID <= 0 {
 		return nil, ErrQuotaNotFound
 	}
-	rows, err := s.q.ListMemberQuotasByAccount(ctx, dbsqlc.ListMemberQuotasByAccountParams{
+	q := s.queriesForSnapshot(ctx)
+	if q == nil {
+		return nil, ErrQuotaNotFound
+	}
+	rows, err := q.ListMemberQuotasByAccount(ctx, dbsqlc.ListMemberQuotasByAccountParams{
 		BillingAccountID: billingAccountID, RowLimit: MaxListQuotas,
 	})
 	if err != nil {
@@ -247,12 +277,34 @@ func checkQuotaUsage(ctx context.Context, q consumptionread.Queryer, row dbsqlc.
 // [periodStart, periodEnd) across every Workspace sharing the account:
 // settled net captures (linked refunds correct their original capture's
 // period) plus pending Holds. A nil periodStart sums all time (the fixed
-// and unlimited views). Reads see committed facts only.
+// and unlimited views). Reads see committed facts only, or the ambient
+// read snapshot when present (billing overview fan-out).
 func (s *Store) UsageForPeriod(ctx context.Context, billingAccountID, userID int64, periodStart, periodEnd *time.Time) (int64, error) {
-	if s == nil || s.db == nil || billingAccountID <= 0 || userID <= 0 {
+	if s == nil || billingAccountID <= 0 || userID <= 0 {
 		return 0, ErrQuotaNotFound
 	}
-	return consumptionread.UsedCreditsForMember(ctx, s.db, billingAccountID, userID, periodStart, periodEnd)
+	q := s.queryerForSnapshot(ctx)
+	if q == nil {
+		return 0, ErrQuotaNotFound
+	}
+	return consumptionread.UsedCreditsForMember(ctx, q, billingAccountID, userID, periodStart, periodEnd)
+}
+
+// UsageForPeriodBatch reports many members' consumed credits in one
+// statement (GROUP BY user_id), replacing per-member UsageForPeriod round
+// trips in quota list normalization and the billing overview fan-out.
+// Absent users are omitted from the map (callers treat missing as zero).
+// The bounds apply to every member; callers group rows by window or pass
+// nil bounds for the fixed/unlimited views.
+func (s *Store) UsageForPeriodBatch(ctx context.Context, billingAccountID int64, userIDs []int64, periodStart, periodEnd *time.Time) (map[int64]int64, error) {
+	if s == nil || billingAccountID <= 0 {
+		return nil, ErrQuotaNotFound
+	}
+	q := s.queryerForSnapshot(ctx)
+	if q == nil {
+		return nil, ErrQuotaNotFound
+	}
+	return consumptionread.UsedCreditsForMembers(ctx, q, billingAccountID, userIDs, periodStart, periodEnd)
 }
 
 func int64PtrOrNil(v pgtype.Int8) *int64 {

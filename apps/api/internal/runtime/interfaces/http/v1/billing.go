@@ -39,12 +39,12 @@ package v1
 import (
 	"context"
 	"errors"
-	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"net/http"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/billingoverview"
 	billingrecordsports "ideaboard/api/internal/billingrecords/ports"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/generation/routing"
@@ -52,8 +52,8 @@ import (
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/platform/contract"
+	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"ideaboard/api/internal/tenancy"
-	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	usageapplication "ideaboard/api/internal/usage/application"
 	usagedomain "ideaboard/api/internal/usage/domain"
 	usageports "ideaboard/api/internal/usage/ports"
@@ -97,13 +97,13 @@ func renderBillingPricingUnavailable(c *gin.Context, err error) bool {
 // Resolution joins the caller transaction inside the store; handlers only
 // pass workspace scope plus the authenticated principal.
 type billingAccountStore interface {
-	EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error)
-	GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancypg.BillingAccount, error)
+	EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error)
+	GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancy.BillingAccount, error)
 	// GetBillingAccountByInternalID resolves the stable ba_ funds identity
 	// for a beneficiary account (#921): reward redemption credits the
 	// caller's initial personal account, and the edge maps it to ba_ so
 	// the UI can name the actual credited account.
-	GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancypg.BillingAccount, error)
+	GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancy.BillingAccount, error)
 	GetBillingAccountRole(ctx context.Context, billingAccountInternalID, userID int64) (string, bool, error)
 	ListBillingAccountMembers(ctx context.Context, billingAccountInternalID, actorUserID int64) ([]tenancy.BillingAccountMember, error)
 	AddBillingAccountMember(ctx context.Context, billingAccountInternalID, actorUserID, targetUserID int64, role string) (*tenancy.BillingAccountMember, error)
@@ -213,6 +213,16 @@ type ContractV1BillingDeps struct {
 	// and derives live usage (#946). Zero value keeps the quota
 	// surface fail-closed; production fills it in http_wiring.go.
 	Quotas memberQuotaStore
+	// MemberDisplay resolves member display facts (Auth-owned email plus
+	// avatar public URL) for the billing member/transfer-invite shapes
+	// (display auxiliaries; usr_ stays the write identity). Nil fails
+	// closed to no facts (fields omitted) and never fails the request.
+	// Production wires NewMemberDisplayService over the users repository
+	// plus the Auth email reader; tests inject fakes.
+	MemberDisplay V1MemberDisplayProvider
+	// Snapshot is required for overview reads. Production uses a read-only
+	// PostgreSQL snapshot; in-memory fixtures supply an explicit adapter.
+	Snapshot billingoverview.Snapshot
 }
 
 func (d *ContractV1BillingDeps) normalize() {
@@ -246,6 +256,9 @@ func RegisterContractV1BillingRoutesOnEngine(r *gin.Engine, authDeps runtimehttp
 	group.GET("/workspaces/:workspace_id/credits/ledger", handler.listCreditsLedger)
 	group.GET("/workspaces/:workspace_id/billing-records", handler.listBillingRecords)
 	group.GET("/workspaces/:workspace_id/usage", handler.getUsage)
+	// Billing overview aggregation (panel fan-out in one request; every
+	// legacy read above stays untouched).
+	group.GET("/workspaces/:workspace_id/billing-overview", handler.getBillingOverview)
 	// Member cross-workspace consumption quotas (#946, #953): managers
 	// list and write every member's quota (Organization Owner/Admin on org
 	// scopes, Billing Owner/Admin on personal scopes); any member reads
@@ -307,36 +320,31 @@ func (h *contractV1BillingHandler) billingWorkspaceContext(c *gin.Context, p pri
 // workspace reads (#915 resolution, #916 funds identity). There is no
 // owner-wallet fallback: every read addresses the resolved Billing Account,
 // so sharing a Workspace never exposes another wallet.
-func (h *contractV1BillingHandler) billingAccountForWorkspace(c *gin.Context, workspace *tenancy.Workspace) (tenancypg.BillingAccount, bool) {
+func (h *contractV1BillingHandler) billingAccountForWorkspace(c *gin.Context, workspace *tenancy.Workspace) (tenancy.BillingAccount, bool) {
 	if h.deps.BillingAccounts == nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable41)
 		c.Abort()
-		return tenancypg.BillingAccount{}, false
+		return tenancy.BillingAccount{}, false
 	}
 	account, err := h.deps.BillingAccounts.EnsureBillingAccountForWorkspace(
 		c.Request.Context(), workspace.InternalID, workspace.PublicID)
 	if err != nil {
 		renderBillingAccountError(c, err)
-		return tenancypg.BillingAccount{}, false
+		return tenancy.BillingAccount{}, false
 	}
 	return account, true
 }
 
 // consumptionReadScope is shared by summary and itemized reads. Workspace
 // membership does not confer account-wide financial visibility.
-func (h *contractV1BillingHandler) consumptionReadScope(c *gin.Context, wctx v1WorkspaceCtx, account tenancypg.BillingAccount) (domain.UsageFilter, string, bool) {
+func (h *contractV1BillingHandler) consumptionReadScope(c *gin.Context, wctx v1WorkspaceCtx, account tenancy.BillingAccount) (domain.UsageFilter, string, bool) {
 	role, member, err := h.deps.BillingAccounts.GetBillingAccountRole(c.Request.Context(), account.InternalID, wctx.Principal.UserID())
 	if err != nil {
 		renderBillingAccountError(c, err)
 		return domain.UsageFilter{}, "", false
 	}
-	if member && (role == tenancy.BillingRoleOwner || role == tenancy.BillingRoleAdmin) {
-		return domain.UsageFilter{}, "account", true
-	}
-	if wctx.Role == tenancy.RoleOwner || wctx.Role == tenancy.RoleAdmin {
-		return domain.UsageFilter{WorkspaceID: wctx.Workspace.InternalID}, "workspace", true
-	}
-	return domain.UsageFilter{ActorUserID: wctx.Principal.UserID()}, "member", true
+	filter, scope := billingoverview.ConsumptionScope(wctx.Workspace.InternalID, wctx.Principal.UserID(), wctx.Role, role, member)
+	return filter, scope, true
 }
 
 type v1BillingAccountDTO struct {
@@ -371,24 +379,30 @@ func (h *contractV1BillingHandler) getBillingAccount(c *gin.Context) {
 			renderBillingAccountError(c, err)
 			return
 		}
-		dto := v1BillingAccountDTO{
-			CanManageMemberQuotas: canManageQuotas,
-			ConsumptionScope:      scope,
-			BillingAccountID:      account.PublicID,
-			WorkspaceID:           workspace.PublicID,
-			OwnerType:             account.OwnerType,
-		}
-		if account.Shared {
-			dto.Shared = true
-		}
-		if !account.CreatedAt.IsZero() {
-			dto.CreatedAt = account.CreatedAt.UTC().Format(time.RFC3339)
-		}
-		if !account.UpdatedAt.IsZero() {
-			dto.UpdatedAt = account.UpdatedAt.UTC().Format(time.RFC3339)
-		}
-		contract.RenderSuccess(c, dto)
+		contract.RenderSuccess(c, toBillingAccountDTO(workspace, account, scope, canManageQuotas))
 	})
+}
+
+// toBillingAccountDTO is the single account projection behind the billing
+// account read and the billing overview aggregation.
+func toBillingAccountDTO(workspace *tenancy.Workspace, account tenancy.BillingAccount, scope string, canManageQuotas bool) v1BillingAccountDTO {
+	dto := v1BillingAccountDTO{
+		CanManageMemberQuotas: canManageQuotas,
+		ConsumptionScope:      scope,
+		BillingAccountID:      account.PublicID,
+		WorkspaceID:           workspace.PublicID,
+		OwnerType:             account.OwnerType,
+	}
+	if account.Shared {
+		dto.Shared = true
+	}
+	if !account.CreatedAt.IsZero() {
+		dto.CreatedAt = account.CreatedAt.UTC().Format(time.RFC3339)
+	}
+	if !account.UpdatedAt.IsZero() {
+		dto.UpdatedAt = account.UpdatedAt.UTC().Format(time.RFC3339)
+	}
+	return dto
 }
 
 // renderBillingAccountError maps stable-resolution outcomes onto the wire:
@@ -419,25 +433,25 @@ func renderBillingAccountError(c *gin.Context, err error) {
 // requireBillingManager resolves the stable account for a workspace and
 // reports whether the caller holds Billing Owner/Admin. Workspace
 // Owner/Admin standing alone never grants financial management.
-func (h *contractV1BillingHandler) requireBillingManager(c *gin.Context, workspace *tenancy.Workspace, userID int64) (tenancypg.BillingAccount, bool) {
+func (h *contractV1BillingHandler) requireBillingManager(c *gin.Context, workspace *tenancy.Workspace, userID int64) (tenancy.BillingAccount, bool) {
 	if h.deps.BillingAccounts == nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
 		c.Abort()
-		return tenancypg.BillingAccount{}, false
+		return tenancy.BillingAccount{}, false
 	}
 	account, resolved := h.billingAccountForWorkspace(c, workspace)
 	if !resolved {
-		return tenancypg.BillingAccount{}, false
+		return tenancy.BillingAccount{}, false
 	}
 	role, ok, err := h.deps.BillingAccounts.GetBillingAccountRole(c.Request.Context(), account.InternalID, userID)
 	if err != nil {
 		renderBillingAccountError(c, err)
-		return tenancypg.BillingAccount{}, false
+		return tenancy.BillingAccount{}, false
 	}
 	if !ok || !tenancy.IsBillingManager(role) {
 		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingAccountForbidden, runtimehttp.MsgBillingAccountForbidden)
 		c.Abort()
-		return tenancypg.BillingAccount{}, false
+		return tenancy.BillingAccount{}, false
 	}
 	return account, true
 }

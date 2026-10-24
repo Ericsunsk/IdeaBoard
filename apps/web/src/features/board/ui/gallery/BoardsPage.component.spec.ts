@@ -36,6 +36,7 @@ function renderCatalog(mode: CatalogSortMode) {
         duplicate: vi.fn(),
         delete: vi.fn(),
       },
+      observeDocument: vi.fn(() => vi.fn()),
       dispose: vi.fn(),
     },
     scenes: {
@@ -83,6 +84,7 @@ function createRecoveryCatalog(initialBoards: BoardMeta[] = []) {
       duplicate: vi.fn(),
       delete: vi.fn(),
     },
+    observeDocument: vi.fn(() => vi.fn()),
     dispose: vi.fn(),
   }
   const catalog = createGalleryController({

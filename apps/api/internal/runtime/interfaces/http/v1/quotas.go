@@ -55,7 +55,6 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"ideaboard/api/internal/tenancy"
-	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 
 	"github.com/gin-gonic/gin"
 )
@@ -65,10 +64,8 @@ import (
 // New members default to unlimited (absent row reads as unlimited);
 // invites never gate on a default (#953 retires the #947 default surface).
 type memberQuotaStore interface {
-	GetQuotaRow(ctx context.Context, billingAccountID, userID int64) (string, *int64, bool, error)
+	memberquotas.ReadStore
 	SetQuota(ctx context.Context, billingAccountID, userID int64, period string, limitCredits *int64, updatedByUserID int64) (memberquotas.SetResult, error)
-	ListQuotas(ctx context.Context, billingAccountID int64) ([]memberquotas.QuotaRow, error)
-	UsageForPeriod(ctx context.Context, billingAccountID, userID int64, periodStart, periodEnd *time.Time) (int64, error)
 }
 
 type v1MemberQuotaDTO struct {
@@ -82,45 +79,31 @@ type v1MemberQuotaDTO struct {
 	PeriodEnd        *string `json:"period_end,omitempty"`
 }
 
-func toMemberQuotaDTO(billingAccountPublicID, userPublicID, period string, limitCredits *int64, used int64, periodStart, periodEnd *time.Time) v1MemberQuotaDTO {
+func quotaReadingDTO(billingAccountPublicID, userPublicID string, reading memberquotas.Reading) v1MemberQuotaDTO {
 	dto := v1MemberQuotaDTO{
 		BillingAccountID: billingAccountPublicID,
 		UserID:           userPublicID,
-		Period:           period,
-		UsedCredits:      used,
+		Period:           reading.Period,
+		UsedCredits:      reading.Used,
 	}
-	if limitCredits != nil {
-		limit := *limitCredits
+	if reading.Limit != nil {
+		limit := *reading.Limit
 		dto.LimitCredits = &limit
-		remaining := limit - used
+		remaining := limit - reading.Used
 		if remaining < 0 {
 			remaining = 0
 		}
 		dto.RemainingCredits = &remaining
 	}
-	if periodStart != nil && !periodStart.IsZero() {
-		start := periodStart.UTC().Format(time.RFC3339)
+	if reading.Start != nil && !reading.Start.IsZero() {
+		start := reading.Start.UTC().Format(time.RFC3339)
 		dto.PeriodStart = &start
 	}
-	if periodEnd != nil && !periodEnd.IsZero() {
-		end := periodEnd.UTC().Format(time.RFC3339)
+	if reading.End != nil && !reading.End.IsZero() {
+		end := reading.End.UTC().Format(time.RFC3339)
 		dto.PeriodEnd = &end
 	}
 	return dto
-}
-
-func (h *contractV1BillingHandler) memberQuotaReading(c *gin.Context, billingAccountID, userID int64, period string, limitCredits *int64) (int64, *time.Time, *time.Time, bool) {
-	var start, end *time.Time
-	if !memberquotas.IsUnlimited(period, limitCredits) {
-		start, end, _ = memberquotas.CurrentBounds(period, time.Now().UTC())
-	}
-	used, err := h.deps.Quotas.UsageForPeriod(c.Request.Context(), billingAccountID, userID, start, end)
-	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-		c.Abort()
-		return 0, nil, nil, false
-	}
-	return used, start, end, true
 }
 
 func (h *contractV1BillingHandler) memberQuotaPublicID(c *gin.Context, userID int64) (string, bool) {
@@ -138,16 +121,6 @@ func (h *contractV1BillingHandler) memberQuotaPublicID(c *gin.Context, userID in
 	return tenancy.FormatUserPublicID(publicID), true
 }
 
-func quotaScope(workspace *tenancy.Workspace) memberquotas.Scope {
-	if workspace.OrganizationID == nil {
-		return memberquotas.Scope{Kind: memberquotas.ScopePersonal}
-	}
-	return memberquotas.Scope{
-		Kind:           memberquotas.ScopeOrganization,
-		OrganizationID: *workspace.OrganizationID,
-	}
-}
-
 func (h *contractV1BillingHandler) quotaPolicy() memberquotas.Policy {
 	return memberquotas.Policy{OrganizationRoles: h.deps.Tenancy}
 }
@@ -160,32 +133,10 @@ func (h *contractV1BillingHandler) getMemberQuotaSelf(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		account, resolved := h.billingAccountForWorkspace(c, workspace)
-		if !resolved {
-			return
+		dto, ok := h.readMemberQuotaSelf(c, workspace, wctx.Principal.UserID())
+		if ok {
+			contract.RenderSuccess(c, dto)
 		}
-		userID := wctx.Principal.UserID()
-		period, limit, _, err := h.deps.Quotas.GetQuotaRow(c.Request.Context(), account.InternalID, userID)
-		if err != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-			c.Abort()
-			return
-		}
-		period, limit, err = h.quotaPolicy().NormalizeRead(c.Request.Context(), quotaScope(workspace), userID, period, limit)
-		if err != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-			c.Abort()
-			return
-		}
-		used, start, end, ok := h.memberQuotaReading(c, account.InternalID, userID, period, limit)
-		if !ok {
-			return
-		}
-		userPublicID, ok := h.memberQuotaPublicID(c, userID)
-		if !ok {
-			return
-		}
-		contract.RenderSuccess(c, toMemberQuotaDTO(account.PublicID, userPublicID, period, limit, used, start, end))
 	})
 }
 
@@ -193,20 +144,20 @@ func (h *contractV1BillingHandler) getMemberQuotaSelf(c *gin.Context) {
 // resolved account. Personal scopes require the Billing Owner gate
 // (the holder manages collaborators); Organization scopes require Org
 // Owner/Admin (Admins need not hold a Billing grant to manage Members).
-func (h *contractV1BillingHandler) requireQuotaManager(c *gin.Context, workspace *tenancy.Workspace, actorUserID int64) (tenancypg.BillingAccount, bool) {
+func (h *contractV1BillingHandler) requireQuotaManager(c *gin.Context, workspace *tenancy.Workspace, actorUserID int64) (tenancy.BillingAccount, bool) {
 	account, resolved := h.billingAccountForWorkspace(c, workspace)
 	if !resolved {
-		return tenancypg.BillingAccount{}, false
+		return tenancy.BillingAccount{}, false
 	}
 	allowed, err := h.canManageMemberQuotas(c.Request.Context(), workspace, account.InternalID, actorUserID)
 	if err != nil {
 		renderBillingAccountError(c, err)
-		return tenancypg.BillingAccount{}, false
+		return tenancy.BillingAccount{}, false
 	}
 	if !allowed {
 		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingAccountForbidden, runtimehttp.MsgBillingAccountForbidden)
 		c.Abort()
-		return tenancypg.BillingAccount{}, false
+		return tenancy.BillingAccount{}, false
 	}
 	return account, true
 }
@@ -222,7 +173,7 @@ func (h *contractV1BillingHandler) canManageMemberQuotas(ctx context.Context, wo
 		}
 		personalOwner = member && role == tenancy.BillingRoleOwner
 	}
-	return h.quotaPolicy().CanManage(ctx, quotaScope(workspace), actorUserID, personalOwner)
+	return h.quotaPolicy().CanManage(ctx, memberquotas.ScopeForWorkspace(workspace), actorUserID, personalOwner)
 }
 
 // checkQuotaTargetRole delegates the #953 write matrix to the quota policy
@@ -230,7 +181,7 @@ func (h *contractV1BillingHandler) canManageMemberQuotas(ctx context.Context, wo
 // the Personal holder fact; period is the validated request period.
 func (h *contractV1BillingHandler) checkQuotaTargetRole(c *gin.Context, workspace *tenancy.Workspace, actorUserID, targetUserID int64, period string) bool {
 	// requireQuotaManager already established the Personal holder fact.
-	allowed, err := h.quotaPolicy().CanSet(c.Request.Context(), quotaScope(workspace), actorUserID, targetUserID, period, workspace.OrganizationID == nil)
+	allowed, err := h.quotaPolicy().CanSet(c.Request.Context(), memberquotas.ScopeForWorkspace(workspace), actorUserID, targetUserID, period, workspace.OrganizationID == nil)
 	if err != nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
 		c.Abort()
@@ -244,12 +195,52 @@ func (h *contractV1BillingHandler) checkQuotaTargetRole(c *gin.Context, workspac
 	return true
 }
 
+// quotaPageDTOs maps the shared normalized read to the wire contract.
+func (h *contractV1BillingHandler) quotaPageDTOs(ctx context.Context, c *gin.Context, scope memberquotas.Scope, account tenancy.BillingAccount, rows []memberquotas.QuotaRow) ([]v1MemberQuotaDTO, bool) {
+	readings, err := (memberquotas.Reader{Store: h.deps.Quotas, Policy: h.quotaPolicy()}).Page(ctx, scope, account.InternalID, rows)
+	if err != nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
+		c.Abort()
+		return nil, false
+	}
+	ids := make([]int64, 0, len(readings))
+	for _, reading := range readings {
+		ids = append(ids, reading.UserID)
+	}
+	publicIDs, ok := batchUserPublicIDs(ctx, c, h.deps.Users, ids)
+	if !ok {
+		return nil, false
+	}
+	page := make([]v1MemberQuotaDTO, 0, len(readings))
+	for _, reading := range readings {
+		page = append(page, quotaReadingDTO(account.PublicID, publicIDs[reading.UserID], reading))
+	}
+	return page, true
+}
+
 func (h *contractV1BillingHandler) listMemberQuotas(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
 		workspace := wctx.Workspace
 		if h.deps.Quotas == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
 			c.Abort()
+			return
+		}
+		// ?scope=self shortcut: any member reads only their own quota
+		// through the list envelope (single-item page), without the
+		// manager gate the full list requires. Unknown scopes render
+		// 400 bad_request (canonical generic bad params).
+		if scope := strings.TrimSpace(c.Query("scope")); scope != "" {
+			if scope != "self" {
+				contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeBadRequest), contract.CodeBadRequest,
+					runtimehttp.MsgBadRequest4, contract.FieldErrors{Fields: map[string]string{"scope": "invalid"}})
+				c.Abort()
+				return
+			}
+			dto, ok := h.readMemberQuotaSelf(c, workspace, wctx.Principal.UserID())
+			if ok {
+				contract.RenderSuccess(c, []v1MemberQuotaDTO{dto})
+			}
 			return
 		}
 		account, ok := h.requireQuotaManager(c, workspace, wctx.Principal.UserID())
@@ -262,28 +253,30 @@ func (h *contractV1BillingHandler) listMemberQuotas(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		page := make([]v1MemberQuotaDTO, 0, len(rows))
-		for _, row := range rows {
-			// Organization Owners read as unlimited even when a stale
-			// capped row survives (#953).
-			period, limit, err := h.quotaPolicy().NormalizeRead(c.Request.Context(), quotaScope(workspace), row.UserID, row.Period, row.LimitCredits)
-			if err != nil {
-				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-				c.Abort()
-				return
-			}
-			used, start, end, ok := h.memberQuotaReading(c, account.InternalID, row.UserID, period, limit)
-			if !ok {
-				return
-			}
-			userPublicID, ok := h.memberQuotaPublicID(c, row.UserID)
-			if !ok {
-				return
-			}
-			page = append(page, toMemberQuotaDTO(account.PublicID, userPublicID, period, limit, used, start, end))
+		page, ok := h.quotaPageDTOs(c.Request.Context(), c, memberquotas.ScopeForWorkspace(workspace), account, rows)
+		if !ok {
+			return
 		}
 		contract.RenderSuccess(c, page)
 	})
+}
+
+func (h *contractV1BillingHandler) readMemberQuotaSelf(c *gin.Context, workspace *tenancy.Workspace, userID int64) (v1MemberQuotaDTO, bool) {
+	account, resolved := h.billingAccountForWorkspace(c, workspace)
+	if !resolved {
+		return v1MemberQuotaDTO{}, false
+	}
+	reading, err := (memberquotas.Reader{Store: h.deps.Quotas, Policy: h.quotaPolicy()}).Self(c.Request.Context(), memberquotas.ScopeForWorkspace(workspace), account.InternalID, userID)
+	if err != nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
+		c.Abort()
+		return v1MemberQuotaDTO{}, false
+	}
+	userPublicID, ok := h.memberQuotaPublicID(c, userID)
+	if !ok {
+		return v1MemberQuotaDTO{}, false
+	}
+	return quotaReadingDTO(account.PublicID, userPublicID, reading), true
 }
 
 type v1SetMemberQuotaBody struct {
@@ -347,14 +340,16 @@ func (h *contractV1BillingHandler) setMemberQuota(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		used, start, end, ok := h.memberQuotaReading(c, account.InternalID, targetUserID, saved.Period, saved.LimitCredits)
-		if !ok {
+		reading, err := (memberquotas.Reader{Store: h.deps.Quotas}).Read(c.Request.Context(), account.InternalID, targetUserID, saved.Period, saved.LimitCredits)
+		if err != nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
+			c.Abort()
 			return
 		}
 		userPublicID, ok := h.memberQuotaPublicID(c, targetUserID)
 		if !ok {
 			return
 		}
-		contract.RenderSuccess(c, toMemberQuotaDTO(account.PublicID, userPublicID, saved.Period, saved.LimitCredits, used, start, end))
+		contract.RenderSuccess(c, quotaReadingDTO(account.PublicID, userPublicID, reading))
 	})
 }

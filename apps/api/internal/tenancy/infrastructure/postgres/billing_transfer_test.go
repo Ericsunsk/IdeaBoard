@@ -16,7 +16,7 @@ import (
 // replay, concurrent collapse, Default exclusion, workspace scope, old
 // Owner exit, and funds stability (no new account, no balance move).
 
-func handoverFixture(t *testing.T, db *pgxpool.Pool, ctx context.Context) (store *Store, baStore *BillingAccountStore, owner, recipient int64, ws *tenancy.Workspace, account BillingAccount) {
+func handoverFixture(t *testing.T, db *pgxpool.Pool, ctx context.Context) (store *Store, baStore *BillingAccountStore, owner, recipient int64, ws *tenancy.Workspace, account tenancy.BillingAccount) {
 	t.Helper()
 	store = NewStore(db, nil)
 	baStore = NewBillingAccountStore(db)

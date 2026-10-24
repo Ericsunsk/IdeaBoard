@@ -17,7 +17,10 @@ import { creditsQueryKeys } from './credits/resource'
 import { usageQueryKeys } from './usage/resource'
 
 export function invalidateUserMoney(queryClient: QueryClient): void {
-  void queryClient.invalidateQueries({ queryKey: creditsQueryKeys.all })
-  void queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all })
-  void queryClient.invalidateQueries({ queryKey: usageQueryKeys.all })
+  // Sanctioned settlement fan-out (sole prefix exception): credits wallet,
+  // billing records and usage always move together on grant/capture/release.
+  // All other invalidations default to `exact: true` on the narrow key.
+  void queryClient.invalidateQueries({ queryKey: creditsQueryKeys.all, exact: false })
+  void queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all, exact: false })
+  void queryClient.invalidateQueries({ queryKey: usageQueryKeys.all, exact: false })
 }

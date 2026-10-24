@@ -56,6 +56,19 @@ func (s stubControlAuditDirectory) GetUserPublicID(context.Context, int64) (uuid
 	return uuid.Nil, errors.New("not implemented")
 }
 
+func (s stubControlAuditDirectory) GetUserPublicIDs(_ context.Context, userIDs []int64) (map[int64]uuid.UUID, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	out := make(map[int64]uuid.UUID, len(userIDs))
+	for _, id := range userIDs {
+		if id == s.id {
+			out[id] = uuid.Nil
+		}
+	}
+	return out, nil
+}
+
 // failingControlAuditStore always fails the INSERT.
 type failingControlAuditStore struct {
 	calls int

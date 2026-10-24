@@ -45,11 +45,20 @@ describe('usageResource', () => {
       identity: 'user-1',
       consumptionScope: 'account' as const,
     }
-    expect(usageQueryKeys.current(scope, '7d')).toEqual([
+    expect(usageQueryKeys.current(
+      scope.workspaceId,
+      scope.billingAccountId,
+      scope.identity,
+      scope.consumptionScope,
+      '7d',
+    )).toEqual([
       'workspace',
       'usage',
       'current',
-      scope,
+      WORKSPACE_ID,
+      'ba_1',
+      'user-1',
+      'account',
       '7d',
     ])
   })

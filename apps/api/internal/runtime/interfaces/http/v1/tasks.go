@@ -20,7 +20,6 @@ import (
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
-	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/workflow"
 	"ideaboard/api/internal/workflow/paramkeys"
 
@@ -48,7 +47,7 @@ type (
 // tenancy billing-account store (the same Ensure seam the workspace
 // billing reads use); tests stub it. Nil fails the preflight closed.
 type taskQuoteBillingAccountReader interface {
-	EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error)
+	EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error)
 }
 
 // taskQuoteWalletReader reads the account Wallet for the preflight funds

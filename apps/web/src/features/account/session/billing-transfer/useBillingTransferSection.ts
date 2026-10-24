@@ -5,15 +5,15 @@ import { workspaceBillingTransferIdempotencyKey } from '../../../../api/idempote
 import { useAppToast } from '../../../../core/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { accountScoped, noRetry } from '../../../../core/query/queryDefaults'
-import {
-  invalidateWorkspaceMemberQueries,
-  workspaceMembersQueryOptions,
-  workspaceQueryKeys,
-} from '../accountWorkspace'
+import { invalidateWorkspaceMemberQueries, workspaceQueryKeys } from '../accountWorkspace'
 import { billingAccountQueryKeys } from '../billing-account/resource'
-import { useBillingAccountContext } from '../billing-account/useBillingAccountContext'
-import { creditsQueryKeys } from '../credits/resource'
+import { billingRecordsQueryKeys } from '../billing/resource'
 import { memberQuotaQueryKeys } from '../quota/resource'
+import { usageQueryKeys } from '../usage/resource'
+import {
+  useWorkspaceSettingsBillingAccount,
+  useWorkspaceSettingsRoster,
+} from '../workspace-settings'
 import {
   acceptTransferInvite,
   billingTransferQueryKeys,
@@ -34,7 +34,7 @@ type Confirmation =
 
 function useTransferQueries(workspaceId: () => string, identity: () => string) {
   const isEnabled = computed(() => workspaceId() !== '' && identity() !== '')
-  const accountContext = useBillingAccountContext({ workspaceId, identity, isEnabled })
+  const accountContext = useWorkspaceSettingsBillingAccount({ workspaceId, identity, isEnabled })
   const invitesQuery = useQuery({
     queryKey: computed(() => [...billingTransferQueryKeys.list(workspaceId()), identity()]),
     queryFn: ({ signal }) => fetchTransferInvites(workspaceId(), { signal }),
@@ -45,14 +45,13 @@ function useTransferQueries(workspaceId: () => string, identity: () => string) {
   const managersQuery = useQuery({
     queryKey: computed(() => billingTransferQueryKeys.members(workspaceId(), identity())),
     queryFn: ({ signal }) => fetchBillingManagers(workspaceId(), signal),
-    enabled: computed(() => isEnabled.value && accountContext.consumptionScope.value === 'account'),
+    enabled: computed(
+      () => isEnabled.value && accountContext.account.value?.consumptionScope === 'account',
+    ),
     ...accountScoped(),
     ...noRetry(),
   })
-  const rosterQuery = useQuery({
-    ...workspaceMembersQueryOptions(workspaceId),
-    enabled: isEnabled,
-  })
+  const rosterQuery = useWorkspaceSettingsRoster({ workspaceId, isEnabled })
   return { accountContext, invitesQuery, managersQuery, rosterQuery }
 }
 
@@ -144,27 +143,76 @@ export function useBillingTransferSection(options: {
     if (!isSaving.value) confirmation.value = null
   }
   function retry(): void {
-    void accountContext.retry()
-    void invitesQuery.refetch()
-    void rosterQuery.refetch()
-    if (account.value?.consumptionScope === 'account') void managersQuery.refetch()
+    // Directed retry: only the failed instance refetches so one section
+    // error never refetches the whole dialog (no double retry with the
+    // dialog-level billing account).
+    if (accountContext.error.value != null) {
+      void accountContext.retry()
+      return
+    }
+    if (invitesQuery.isError.value) {
+      void invitesQuery.refetch()
+      return
+    }
+    if (rosterQuery.isError.value) {
+      void rosterQuery.retry()
+      return
+    }
+    if (account.value?.consumptionScope === 'account' && managersQuery.isError.value) {
+      void managersQuery.refetch()
+    }
   }
   async function invalidate(
     scopeId: string,
-    changed?: BillingTransferInviteSummary,
+    viewer: string,
+    operation: 'invite' | Decision,
+    changed?: BillingTransferInviteSummary | undefined,
   ): Promise<void> {
-    for (const id of new Set([scopeId, ...(changed?.scopeWorkspaceIds ?? [])])) {
+    // Every decision changes invitation/manager/roster facts. Acceptance
+    // additionally changes ownership and consumption visibility, even though
+    // the account identity and its wallet balance stay the same.
+    const affected = new Set([scopeId, ...(changed?.scopeWorkspaceIds ?? [])])
+    const refreshes: Array<Promise<void>> = []
+    for (const id of affected) {
       invalidateWorkspaceMemberQueries(client, id)
+      refreshes.push(
+        client.invalidateQueries({
+          queryKey: [...billingTransferQueryKeys.list(id), viewer],
+          exact: true,
+        }),
+      )
+      refreshes.push(
+        client.invalidateQueries({
+          queryKey: billingTransferQueryKeys.members(id, viewer),
+          exact: true,
+        }),
+      )
+      if (operation === 'accept') {
+        refreshes.push(
+          client.invalidateQueries({
+            queryKey: billingAccountQueryKeys.detail(id, viewer),
+            exact: true,
+          }),
+          client.invalidateQueries({ queryKey: memberQuotaQueryKeys.self(id), exact: true }),
+          client.invalidateQueries({ queryKey: memberQuotaQueryKeys.list(id), exact: true }),
+        )
+      }
     }
-    await Promise.all(
-      [
-        billingTransferQueryKeys.all,
-        billingAccountQueryKeys.all,
-        workspaceQueryKeys.list,
-        creditsQueryKeys.all,
-        memberQuotaQueryKeys.all,
-      ].map((queryKey) => client.invalidateQueries({ queryKey })),
-    )
+    if (operation === 'accept') {
+      refreshes.push(
+        client.invalidateQueries({ queryKey: workspaceQueryKeys.list, exact: true }),
+        ...[usageQueryKeys.all, billingRecordsQueryKeys.all].map((queryKey) =>
+          client.invalidateQueries({
+            queryKey,
+            predicate: (query) =>
+              affected.has(String(query.queryKey[3])) &&
+              query.queryKey[4] === changed?.billingAccountId &&
+              query.queryKey[5] === viewer,
+          }),
+        ),
+      )
+    }
+    await Promise.all(refreshes)
   }
   async function runMutation(
     operation: 'invite' | Decision,
@@ -173,8 +221,9 @@ export function useBillingTransferSection(options: {
   ): Promise<void> {
     if (isSaving.value) return
     const scopeId = workspaceId()
+    const viewer = identity()
     const version = scopeVersion
-    const signature = `${scopeId}:${identity()}:${operation}:${target}`
+    const signature = `${scopeId}:${viewer}:${operation}:${target}`
     if (intent?.signature !== signature) {
       intent = { signature, key: workspaceBillingTransferIdempotencyKey(operation) }
     }
@@ -182,7 +231,7 @@ export function useBillingTransferSection(options: {
     actionError.value = null
     try {
       const changed = await run(scopeId, intent?.key)
-      await invalidate(scopeId, changed ?? undefined)
+      await invalidate(scopeId, viewer, operation, changed ?? undefined)
       if (version !== scopeVersion) return
       confirmation.value = null
       intent = null

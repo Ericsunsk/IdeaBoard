@@ -1,6 +1,5 @@
 import { listWorkspaceBillingRecords } from '../../../../api/generated-query/public/workspace-billing/workspace-billing'
 import type { PaginatedBillingRecords } from '../../../../api/generated-query/public/model'
-import type { BillingConsumptionReadScope } from '../billing-account/readScope'
 import { i18n } from '../../../../core/i18n'
 import {
   asWorkspaceBillingError,
@@ -38,7 +37,10 @@ export type ListUserBillingRecordsParams = {
 
 export const billingRecordsQueryKeys = {
   all: ['workspace', 'billing', 'records'] as const,
-  list: (scope: BillingConsumptionReadScope) => ['workspace', 'billing', 'records', scope] as const,
+  // Scalar-only key: workspace + account + identity + scope. Never embed a
+  // scope object so key equality stays referentially stable across renders.
+  list: (workspaceId: string, billingAccountId: string, identity: string, consumptionScope: string) =>
+    ['workspace', 'billing', 'records', workspaceId, billingAccountId, identity, consumptionScope] as const,
 }
 
 export async function fetchBillingRecords(

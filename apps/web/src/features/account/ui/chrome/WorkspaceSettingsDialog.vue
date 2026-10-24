@@ -526,11 +526,12 @@ import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import type {
   UserAccountMenuWorkspaceCreateInput,
   UserAccountMenuOrganizationItem,
+  UserAccountMenuOrganizationMember,
   UserAccountMenuOrganizationPanel,
   UserAccountMenuWorkspaceItem,
 } from './userAccountMenu.types'
 import WorkspaceCreateDialog from './WorkspaceCreateDialog.vue'
-import { useBillingAccountContext } from '../../session/billing-account/useBillingAccountContext'
+import { provideWorkspaceSettingsReads } from '../../session/workspace-settings'
 import { useWorkspaceCreation } from '../../session/useWorkspaceCreation'
 import { isDefaultWorkspaceItem } from './workspaceMenu'
 import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
@@ -631,7 +632,7 @@ const activeWorkspace = computed(() => {
   return workspaceItems.value.find((item) => item.publicId === activeWorkspaceId.value) ?? null
 })
 
-const billingAccount = useBillingAccountContext({
+const billingAccount = provideWorkspaceSettingsReads({
   workspaceId: activeWorkspaceId,
   identity: () => props.currentUserId,
   isEnabled: () =>
@@ -647,30 +648,90 @@ const managedOrganization = ref<{
 } | null>(null)
 const managedOrganizationRole = ref<'owner' | 'admin' | 'member' | null>(null)
 
+// In-flight dedupe: the isOpen / organizationPanel / create-dialog watchers
+// converge on one load so rapid toggles never fire parallel list+member walks.
+let managedOrganizationLoad: Promise<void> | null = null
+let managedOrganizationGeneration = 0
+
 async function loadManagedOrganization(): Promise<void> {
-  managedOrganization.value = null
-  managedOrganizationRole.value = null
-  const panel = props.organizationPanel
-  if (!props.isOpen || !panel || !props.onLoadOrganizations) return
-  let first: UserAccountMenuOrganizationItem | undefined
-  try {
-    first = (await props.onLoadOrganizations())[0]
-  } catch {
-    return
-  }
-  if (!first) return
+  if (managedOrganizationLoad) return managedOrganizationLoad
+  const generation = ++managedOrganizationGeneration
+  managedOrganizationLoad = runManagedOrganizationLoad(generation).finally(() => {
+    if (managedOrganizationGeneration === generation) managedOrganizationLoad = null
+  })
+  return managedOrganizationLoad
+}
+
+function resolveHintOrganizationId(): string | null {
+  return (
+    organizationWorkspaces.value[0]?.organizationId ??
+    workspaceItems.value.find((item) => item.organizationId != null)?.organizationId ??
+    null
+  )
+}
+
+function applyManagedOrganization(first: UserAccountMenuOrganizationItem): void {
   managedOrganization.value = {
     id: first.publicId,
     name: first.name,
     status: first.status === 'closed' ? 'closed' : 'active',
     ...(first.closedAt === undefined ? {} : { closedAt: first.closedAt }),
   }
-  if (!props.currentUserId) return
+}
+
+async function resolveManagedOrganizationRole(
+  panel: UserAccountMenuOrganizationPanel,
+  first: UserAccountMenuOrganizationItem,
+  hintOrganizationId: string | null,
+  hintMembersPromise: Promise<UserAccountMenuOrganizationMember[] | null> | null,
+  generation: number,
+): Promise<void> {
+  if (!props.currentUserId) {
+    managedOrganizationRole.value = null
+    return
+  }
+  const hinted =
+    hintMembersPromise && first.publicId === hintOrganizationId ? await hintMembersPromise : null
+  const members = hinted ?? (await panel.onLoadMembers(first.publicId).catch(() => null))
+  if (managedOrganizationGeneration !== generation) return
+  managedOrganizationRole.value =
+    members?.find((member) => member.userId === props.currentUserId)?.role ?? null
+}
+
+async function runManagedOrganizationLoad(generation: number): Promise<void> {
+  const panel = props.organizationPanel
+  if (!props.isOpen || !panel || !props.onLoadOrganizations) return
+  // Hint the organization from the workspace list so the member read can
+  // start in parallel with the organization list instead of serially after it.
+  const hintOrganizationId = resolveHintOrganizationId()
+  const organizationsPromise = props.onLoadOrganizations()
+  const hintMembersPromise =
+    hintOrganizationId && props.currentUserId
+      ? panel.onLoadMembers(hintOrganizationId).catch(() => null)
+      : null
+  let first: UserAccountMenuOrganizationItem | undefined
   try {
-    const members = await panel.onLoadMembers(first.publicId)
-    managedOrganizationRole.value =
-      members.find((member) => member.userId === props.currentUserId)?.role ?? null
+    first = (await organizationsPromise)[0]
   } catch {
+    return
+  }
+  if (managedOrganizationGeneration !== generation) return
+  if (!first) {
+    managedOrganization.value = null
+    managedOrganizationRole.value = null
+    return
+  }
+  applyManagedOrganization(first)
+  try {
+    await resolveManagedOrganizationRole(
+      panel,
+      first,
+      hintOrganizationId,
+      hintMembersPromise,
+      generation,
+    )
+  } catch {
+    if (managedOrganizationGeneration !== generation) return
     managedOrganizationRole.value = null
   }
 }
@@ -724,17 +785,11 @@ const organizationPanelProps = computed(() => {
 })
 
 watch(
-  () => props.isOpen,
-  (isNowOpen) => {
+  [() => props.isOpen, () => props.organizationPanel],
+  ([isNowOpen]) => {
     if (isNowOpen) void loadManagedOrganization()
   },
   { immediate: true },
-)
-watch(
-  () => props.organizationPanel,
-  () => {
-    if (props.isOpen) void loadManagedOrganization()
-  },
 )
 
 function workspaceItemName(item: UserAccountMenuWorkspaceItem): string {

@@ -37,6 +37,44 @@ func (q *Queries) CountWorkspaceOwners(ctx context.Context, workspaceID int64) (
 	return count, err
 }
 
+const countWorkspacesByOrganizationPublicIDs = `-- name: CountWorkspacesByOrganizationPublicIDs :many
+SELECT o.public_id AS organization_public_id, COUNT(w.internal_id) AS workspace_count
+FROM organizations AS o
+LEFT JOIN workspaces AS w ON w.organization_id = o.internal_id AND o.closed_at IS NULL
+WHERE o.public_id = ANY($1::text[])
+GROUP BY o.public_id
+`
+
+type CountWorkspacesByOrganizationPublicIDsRow struct {
+	OrganizationPublicID string `json:"organization_public_id"`
+	WorkspaceCount       int64  `json:"workspace_count"`
+}
+
+// Batch workspace counts per organization (organization list
+// expand=workspace_counts): a single GROUP BY replaces per-organization
+// ListWorkspacesByOrganizationID round trips. Closed organizations report
+// zero: their workspaces stay hidden from listing, matching
+// ListWorkspacesForUser visibility.
+func (q *Queries) CountWorkspacesByOrganizationPublicIDs(ctx context.Context, organizationPublicIds []string) ([]CountWorkspacesByOrganizationPublicIDsRow, error) {
+	rows, err := q.db.Query(ctx, countWorkspacesByOrganizationPublicIDs, organizationPublicIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountWorkspacesByOrganizationPublicIDsRow
+	for rows.Next() {
+		var i CountWorkspacesByOrganizationPublicIDsRow
+		if err := rows.Scan(&i.OrganizationPublicID, &i.WorkspaceCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createBillingAccountStub = `-- name: CreateBillingAccountStub :one
 INSERT INTO billing_accounts (public_id, workspace_id, organization_id)
 VALUES ($1, $2, $3)

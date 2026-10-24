@@ -11,6 +11,7 @@ import {
   within,
 } from '../../../../test/render'
 import { expectDomOrder } from '../../../../test/domOrder'
+import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import UserAccountMenu from './UserAccountMenu.vue'
 import { fetchBillingAccount } from '../../session/billing-account/resource'
@@ -69,8 +70,9 @@ const DialogContentStub = defineComponent({
 
 // Member sections ride TanStack Query per workspace row. These menu-level
 // specs cover the workspace row/rename/create flows, not members: stub the
-// section controller (read-only empty roster) so no query client or
-// transport is needed here. Member behavior lives in
+// section controller (read-only empty roster). The dialog's shared roster
+// provider still uses its real query; exact workspace fixtures below answer
+// those reads. Member behavior lives in
 // `WorkspaceMemberSection.component.spec.ts` with the real controller.
 // The usage-limits card is stubbed for the same reason (read-only empty
 // quota/default); limits behavior lives in
@@ -81,7 +83,8 @@ vi.mock('../../session/billing-account/resource', async (load) => ({
   fetchBillingAccount: vi.fn().mockRejectedValue(new Error('no billing account')),
 }))
 vi.mock('./BillingTransferSection.vue', () => ({ default: { template: '<div />' } }))
-vi.mock('./useWorkspaceMemberSection', () => ({
+vi.mock('../../session/workspace-settings', async (load) => ({
+  ...(await load<typeof import('../../session/workspace-settings')>()),
   memberDisplayName: (entry: { userId: string }) => entry.userId,
   useWorkspaceMemberSection: () => ({
     roster: ref([]),
@@ -172,6 +175,7 @@ function workspaceControls(
 }
 
 const profileItems: UserAccountMenuItem[] = [{ key: 'profile', label: 'Account', command: vi.fn() }]
+const rosterRequests: string[] = []
 
 async function openSubmenu(trigger: HTMLElement, firstOptionName: string | RegExp) {
   trigger.dispatchEvent(
@@ -189,6 +193,24 @@ describe('UserAccountMenu', () => {
   beforeEach(() => {
     i18n.global.locale.value = 'en'
     toast = mockAppToast()
+    rosterRequests.length = 0
+    useMswHandlers(
+      ...[
+        'ws_personal1',
+        'ws_team2',
+        'ws_item2',
+        'ws_new4',
+        'ws_3',
+        'ws_new10',
+        'ws_new11',
+        'ws_acme',
+      ].map((workspaceId) =>
+        http.get(`/api/v1/workspaces/${workspaceId}/members`, () => {
+          rosterRequests.push(workspaceId)
+          return HttpResponse.json({ data: [] })
+        }),
+      ),
+    )
     vi.mocked(fetchBillingAccount).mockReset().mockResolvedValue({
       billingAccountId: 'ba_current',
       workspaceId: 'ws_personal1',
@@ -640,6 +662,7 @@ describe('UserAccountMenu', () => {
 
       expect(screen.getByRole('button', { name: 'Team' })).toBeVisible()
       expect(screen.getByRole('button', { name: 'Default' })).toBeVisible()
+      await waitFor(() => expect(rosterRequests).toEqual(['ws_personal1']))
     })
 
     it('opens the naming dialog with a unique default name and creates on confirm', async () => {

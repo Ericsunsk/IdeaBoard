@@ -59,6 +59,7 @@ export type BoardRepositoryCommands = {
 export type BoardRepository = {
   viewModel: BoardRepositoryViewModel
   commands: BoardRepositoryCommands
+  observeDocument(boardId: string): () => void
   dispose(): void
   registerDraftGuard?: (guard: (boardId: string) => boolean) => () => void
 }
@@ -130,8 +131,10 @@ export function createBoardRepository(
   let scopeGeneration = 0
   let serverBoards: BoardMeta[] | null = null
   let stopServer: (() => void) | undefined
-  let shouldObserveDocuments: boolean | undefined
+  let isObservingServer = false
+  let isHydrating = false
   let isDisposed = false
+  const documentObservers = new Map<symbol, string>()
   const draftGuardStops = new Set<() => void>()
 
   function refresh() {
@@ -154,13 +157,16 @@ export function createBoardRepository(
       : cloneBoards(local)
   }
 
-  function observeServer(shouldIncludeDocuments: boolean) {
-    shouldObserveDocuments = shouldIncludeDocuments
+  function observeServer() {
+    if (!isObservingServer || isHydrating || isDisposed) return
     stopServer?.()
-    stopServer = deps.observeServer?.((next) => {
-      serverBoards = next
-      refresh()
-    }, shouldIncludeDocuments)
+    stopServer = deps.observeServer?.(
+      (next) => {
+        serverBoards = next
+        refresh()
+      },
+      [...new Set(documentObservers.values())],
+    )
   }
 
   function enqueue<T>(operation: () => Promise<T>): Promise<T> {
@@ -192,7 +198,9 @@ export function createBoardRepository(
     if (deps.observeServer) mutationTail = Promise.resolve()
     stopServer?.()
     stopServer = undefined
-    shouldObserveDocuments = undefined
+    isObservingServer = false
+    isHydrating = false
+    documentObservers.clear()
     serverBoards = null
     scope.value = nextScope
     refresh()
@@ -205,24 +213,27 @@ export function createBoardRepository(
         if (!isScopeCurrent(token)) {
           return { isOk: false, error: new BoardRepositoryScopeChangedError() }
         }
-        const didObserveDocuments = shouldObserveDocuments
+        isHydrating = true
         stopServer?.()
         stopServer = undefined
         const observeOptions = deps.observeServer
           ? {
               ...options,
-              shouldIncludeDocuments: options.shouldIncludeDocuments ?? true,
+              // Lazy default: Gallery/Canvas start list-only; documents load
+              // per boardId single pull (onlyBoardIds M→1), never full walks.
+              shouldIncludeDocuments: options.shouldIncludeDocuments ?? false,
               shouldForce: options.shouldForce ?? true,
             }
           : options
-        let shouldResumeDocuments = didObserveDocuments
         try {
           const result = await deps.hydrate(observeOptions)
-          if (result.isOk) shouldResumeDocuments = observeOptions.shouldIncludeDocuments !== false
+          if (result.isOk && isScopeCurrent(token)) isObservingServer = true
           return result
         } finally {
-          if (shouldResumeDocuments !== undefined && isScopeCurrent(token) && !isDisposed)
-            observeServer(shouldResumeDocuments)
+          if (isScopeCurrent(token)) {
+            isHydrating = false
+            observeServer()
+          }
         }
       })
     },
@@ -289,8 +300,19 @@ export function createBoardRepository(
       byId,
     },
     commands,
+    observeDocument(boardId) {
+      const normalized = boardId.trim()
+      if (!normalized || !scope.value || isDisposed) return () => {}
+      const token = Symbol(normalized)
+      documentObservers.set(token, normalized)
+      observeServer()
+      return () => {
+        if (documentObservers.delete(token)) observeServer()
+      }
+    },
     dispose() {
       isDisposed = true
+      documentObservers.clear()
       draftGuardStops.forEach((stop) => stop())
       draftGuardStops.clear()
       stopServer?.()

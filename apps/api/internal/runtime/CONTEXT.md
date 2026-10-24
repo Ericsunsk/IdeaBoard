@@ -27,6 +27,14 @@ It is not a business context and must never decay into a wiring package; no busi
 - `App` is the lifecycle-managed application object built by the composition root.
 - `composition` is the sole assembly root and CLI dispatcher; business packages and other runtime subpackages hold no global wiring. Process role (`API_MODE=all|http-only|worker-only`, ADR-0021) only selects which runners start: http-only skips River worker registration and periodic schedules (enqueue-only), worker-only skips all HTTP listeners.
 - `interfaces/http` owns HTTP routing and transport adaptation only.
+  Billing overview delegates to `internal/billingoverview.Reader`: account
+  provisioning precedes the required read-only snapshot; capability/scope
+  projection, pending invite filtering, quota composition, and concurrent
+  Credits/Usage cancellation and joining belong to that read module. HTTP
+  supplies the identity/display adapter and maps aggregate results/errors.
+  Snapshot identity and display reads must keep the ambient context carrier.
+  Wallet and cached Usage reads retain their owning readers and may observe
+  newer facts than the Tenancy/MemberQuotas snapshot.
 - `interfaces/worker` owns queue consumption and provider execution adaptation only.
 - `adapters/billingregistry` owns the Workflow-to-Billing mapping adaptation.
 - `adapters/webdist` owns the embedded frontend SPA asset adaptation.

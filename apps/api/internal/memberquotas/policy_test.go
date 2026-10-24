@@ -15,6 +15,16 @@ func (r policyRoleReader) GetOrganizationRole(_ context.Context, _ string, userI
 	return role, ok, nil
 }
 
+func (r policyRoleReader) GetOrganizationRoles(_ context.Context, _ string, userIDs []int64) (map[int64]string, error) {
+	roles := make(map[int64]string, len(userIDs))
+	for _, id := range userIDs {
+		if role, ok := r.roles[id]; ok {
+			roles[id] = role
+		}
+	}
+	return roles, nil
+}
+
 func TestPolicyCanManageScopes(t *testing.T) {
 	org := Scope{Kind: ScopeOrganization, OrganizationID: "org_1"}
 	personal := Scope{Kind: ScopePersonal}

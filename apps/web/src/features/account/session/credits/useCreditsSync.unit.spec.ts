@@ -1,4 +1,4 @@
-import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import { QueryClient, VueQueryPlugin, type QueryFilters } from '@tanstack/vue-query'
 import { createApp, defineComponent } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { notifyUserCreditsInvalidation } from '../../../../core/query/userCreditsInvalidation'
@@ -32,11 +32,18 @@ describe('useCreditsSync', () => {
     })
 
     expect(invalidateQueries).toHaveBeenCalledTimes(3)
-    expect(invalidateQueries).toHaveBeenNthCalledWith(1, { queryKey: creditsQueryKeys.all })
+    expect(invalidateQueries).toHaveBeenNthCalledWith(1, {
+      queryKey: creditsQueryKeys.all,
+      exact: false,
+    } satisfies QueryFilters)
     expect(invalidateQueries).toHaveBeenNthCalledWith(2, {
       queryKey: billingRecordsQueryKeys.all,
-    })
-    expect(invalidateQueries).toHaveBeenNthCalledWith(3, { queryKey: usageQueryKeys.all })
+      exact: false,
+    } satisfies QueryFilters)
+    expect(invalidateQueries).toHaveBeenNthCalledWith(3, {
+      queryKey: usageQueryKeys.all,
+      exact: false,
+    } satisfies QueryFilters)
 
     app.unmount()
     notifyUserCreditsInvalidation({

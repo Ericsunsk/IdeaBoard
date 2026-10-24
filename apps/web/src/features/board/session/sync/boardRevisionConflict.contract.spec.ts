@@ -216,7 +216,7 @@ describe('board revision conflict', () => {
     // This transport error is distinct from absence in a completed catalog list.
     delete apiState.documentById['board-1']
 
-    await expect(hydrateBoardsFromServer()).resolves.toMatchObject({
+    await expect(hydrateBoardsFromServer({ shouldIncludeDocuments: true })).resolves.toMatchObject({
       isOk: false,
       error: { status: 404, code: 'board_not_found' },
     })
@@ -256,7 +256,7 @@ describe('board revision conflict', () => {
 
       // Preserve-local hydrate keeps the draft and its true base in the
       // store while Query takes ownership of the newer server snapshot.
-      await hydrateBoardsFromServer()
+      await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
       expect(listBoards()[0]).toMatchObject({ revision: 7, name: 'Local Draft' })
       expect(getBoardState('board-1')?.promptNodes[0]?.text).toBe('local-draft')
       expect(
@@ -306,6 +306,7 @@ describe('board revision conflict', () => {
         document: { payload: { promptNodes: [{ text: 'remote-winner' }] } },
       })
       await hydrateBoardsFromServer({
+        shouldIncludeDocuments: true,
         shouldPreserveLocalNewer: false,
         rollbackBoardIds: ['board-1'],
       })

@@ -154,7 +154,7 @@ describe('boardSync', () => {
       state: makeState(1_000, 'remote-older'),
     })
 
-    await hydrateBoardsFromServer()
+    await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     expect(listBoards()[0]?.name).toBe('Local Rename')
     expect(getPromptText('board-1')).toBe('local-newer')
@@ -173,7 +173,7 @@ describe('boardSync', () => {
       observedPromptTexts.push(getPromptText('remote-board'))
     })
 
-    await hydrateBoardsFromServer()
+    await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
     unsubscribe()
 
     expect(observedPromptTexts).toEqual(['remote-ready'])
@@ -190,7 +190,7 @@ describe('boardSync', () => {
       state: makeState(1_500, 'remote-only-state'),
     })
 
-    await hydrateBoardsFromServer()
+    await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     expect(listBoards().map((board) => board.id)).toEqual(['local-only', 'remote-only'])
     expect(getPromptText('local-only')).toBe('local-only-state')
@@ -216,7 +216,7 @@ describe('boardSync', () => {
       state: makeState(1_500, 'remote-only-state'),
     })
 
-    await hydrateBoardsFromServer()
+    await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     expect(listBoards().map((board) => board.id)).toEqual(['remote-only'])
     // The draft rides only on the merged set, so dropping the meta clears it too.
@@ -246,7 +246,7 @@ describe('boardSync', () => {
       state: makeState(1_500, 'remote-only-state'),
     })
 
-    await hydrateBoardsFromServer()
+    await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     expect(listBoards().map((board) => board.id)).toEqual(['offline-new', 'remote-only'])
     expect(getPromptText('offline-new')).toBe('offline-draft')
@@ -312,7 +312,7 @@ describe('boardSync', () => {
       state: makeState(1_000, 'remote-older'),
     })
 
-    await hydrateBoardsFromServer({ shouldPreserveLocalNewer: false })
+    await hydrateBoardsFromServer({ shouldPreserveLocalNewer: false, shouldIncludeDocuments: true })
 
     const boardNames = new Map(listBoards().map((board) => [board.id, board.name]))
     expect(boardNames.get('board-a')).toBe('Remote Winner')
@@ -334,7 +334,7 @@ describe('boardSync', () => {
       state: makeState(1_000, 'remote-winner'),
     })
 
-    await hydrateBoardsFromServer({ shouldPreserveLocalNewer: false })
+    await hydrateBoardsFromServer({ shouldPreserveLocalNewer: false, shouldIncludeDocuments: true })
 
     expect(listBoards()[0]?.name).toBe('Remote Winner')
     expect(getPromptText('board-1')).toBe('remote-winner')
@@ -344,7 +344,7 @@ describe('boardSync', () => {
     replaceBoards([{ id: 'board-1', name: 'Local Board', createdAt: 100, updatedAt: 2_000 }])
     apiState.listError = new Error('network failed')
 
-    const result = await hydrateBoardsFromServer()
+    const result = await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     expect(result.isOk).toBe(false)
     expect(listBoards()[0]?.name).toBe('Local Board')
@@ -354,7 +354,7 @@ describe('boardSync', () => {
     resetWorkspaceSelectionStore()
     getWorkspaceSelectionStore().clear()
 
-    const result = await hydrateBoardsFromServer()
+    const result = await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     expect(result.isOk).toBe(false)
     if (result.isOk) throw new Error('expected hydrate failure')
@@ -373,7 +373,10 @@ describe('boardSync', () => {
       state: makeState(2_000, 'late-ready'),
     })
 
-    const hydrateTask = hydrateBoardsFromServer({ waitForWorkspaceTimeoutMs: 500 })
+    const hydrateTask = hydrateBoardsFromServer({
+      waitForWorkspaceTimeoutMs: 500,
+      shouldIncludeDocuments: true,
+    })
     setTimeout(() => getWorkspaceSelectionStore().select(WORKSPACE_ID), 10)
     const result = await hydrateTask
 
@@ -419,7 +422,7 @@ describe('boardSync', () => {
       updatedAt: 2_000,
       state: makeState(2_000, 'late-user-a'),
     })
-    const hydrateTask = hydrateBoardsFromServer()
+    const hydrateTask = hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     // The catalog walk fails fast without issuing a request when the scope
     // already moved, so the scope must move only after the walk has issued
@@ -460,7 +463,7 @@ describe('boardSync', () => {
       revision: 8,
       state: makeState(1_000, 'late-workspace-a'),
     })
-    const hydrateTask = hydrateBoardsFromServer()
+    const hydrateTask = hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     // See the auth-scope test above: wait until the walk has issued its
     // first page before moving the scope, so the queued late response is
@@ -579,7 +582,7 @@ describe('boardSync', () => {
   it('returns hydrate failure for a rejected list read', async () => {
     apiState.listError = { status: 503, code: 'service_unavailable', msg: '服务暂不可用' }
 
-    const result = await hydrateBoardsFromServer()
+    const result = await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     expect(result).toMatchObject({ isOk: false, error: expect.anything() })
   })
@@ -591,7 +594,7 @@ describe('boardSync', () => {
       updated_at: 'not-a-timestamp',
     })
 
-    const result = await hydrateBoardsFromServer()
+    const result = await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     expect(result).toMatchObject({ isOk: false, error: expect.any(BoardPayloadError) })
     expect(listBoards().map((board) => board.id)).toEqual(['board-1'])
@@ -662,7 +665,7 @@ describe('boardSync', () => {
         updated_at: new Date(1_500).toISOString(),
       }
 
-      const result = await hydrateBoardsFromServer()
+      const result = await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
       expect(result).toMatchObject({
         isOk: false,
@@ -723,7 +726,7 @@ describe('boardSync', () => {
         updated_at: new Date(1_500).toISOString(),
       }
 
-      const result = await hydrateBoardsFromServer()
+      const result = await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
       expect(result).toMatchObject({
         isOk: false,
@@ -919,7 +922,7 @@ describe('boardSync', () => {
       msg: '看板版本已变更，请刷新后重试',
     }
 
-    await hydrateBoardsFromServer()
+    await hydrateBoardsFromServer({ shouldIncludeDocuments: true })
 
     // The newer local timestamp keeps the draft, but must not upgrade its
     // concurrency base to the unseen server revision.
@@ -1012,7 +1015,10 @@ describe('boardSync', () => {
       state: legacyState as never,
     })
 
-    const result = await hydrateBoardsFromServer({ shouldPreserveLocalNewer: false })
+    const result = await hydrateBoardsFromServer({
+      shouldPreserveLocalNewer: false,
+      shouldIncludeDocuments: true,
+    })
 
     expect(result.isOk).toBe(true)
     expect(getPromptText('board-1')).toBe('legacy-content')

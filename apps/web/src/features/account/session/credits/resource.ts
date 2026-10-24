@@ -1,6 +1,5 @@
 import { getWorkspaceCreditsBalance } from '../../../../api/generated-query/public/workspace-billing/workspace-billing'
 import type { WorkspaceCreditsBalance } from '../../../../api/generated-query/public/model'
-import type { BillingWalletReadScope } from '../billing-account/readScope'
 import { i18n } from '../../../../core/i18n'
 import { requireAccountWorkspaceId, resolveWorkspaceBillingData } from '../workspaceBilling'
 
@@ -23,7 +22,10 @@ export type CreditWalletSummary = CreditWallet
 
 export const creditsQueryKeys = {
   all: ['workspace', 'credits'] as const,
-  wallet: (scope: BillingWalletReadScope) => ['workspace', 'credits', 'wallet', scope] as const,
+  // Scalar-only key: workspace + account + identity. Never embed scope
+  // objects so key equality stays referential-stable across renders.
+  wallet: (workspaceId: string, billingAccountId: string, identity: string) =>
+    ['workspace', 'credits', 'wallet', workspaceId, billingAccountId, identity] as const,
 }
 
 export async function fetchCreditWallet(

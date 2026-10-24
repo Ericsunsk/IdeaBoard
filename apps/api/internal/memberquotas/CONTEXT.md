@@ -28,6 +28,12 @@ in Simplified Chinese in the frontend locales.
   errors so HTTP renders 503 and never writes on an unavailable role lookup.
   `NormalizeRead` owns absent-row and Organization Owner normalization,
   including read errors; HTTP only maps the result to its contract.
+- `read.go`: `Reader.Self` / `Reader.Page` own normalized quota readings,
+  one UTC window plan per page, and required batched role/usage reads.
+  There is no per-member fallback for page reads.
+  The overview and individual HTTP reads use this same module; callers pass
+  the ambient snapshot context. `Reader.Read` derives usage for a saved or
+  already normalized cap. Identity and HTTP rendering stay outside.
 - `store.go`: postgres persistence plus the settlement check. The only
   writer of `billing_account_member_quotas`; delegates complete Used Credits
   reads to `consumptionread`. It never writes the Credits Ledger. Owner

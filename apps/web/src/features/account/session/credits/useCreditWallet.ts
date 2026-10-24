@@ -14,9 +14,15 @@ export function useCreditWallet(enabled: MaybeRefOrGetter<boolean> = true) {
   useCreditsSync()
   const billing = useBillingAccount(enabled)
   const query = useQuery({
-    queryKey: computed(() => creditsQueryKeys.wallet(billing.walletScope.value)),
+    queryKey: computed(() =>
+      creditsQueryKeys.wallet(
+        billing.walletScope.value.workspaceId,
+        billing.walletScope.value.billingAccountId,
+        billing.walletScope.value.identity,
+      ),
+    ),
     queryFn: ({ queryKey, signal }) =>
-      fetchCreditWallet(queryKey[3].workspaceId, signal, queryKey[3].billingAccountId),
+      fetchCreditWallet(queryKey[3], signal, queryKey[4]),
     enabled: billing.isReady,
     ...accountScoped(),
   })

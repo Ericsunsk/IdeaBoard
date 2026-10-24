@@ -115,62 +115,65 @@ func (h *contractV1Handler) listWorkspaceMembers(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		page := make([]v1MemberDTO, 0, len(members))
-		for _, m := range members {
-			dto, ok := h.toMemberDTO(c, m)
-			if !ok {
-				return
-			}
-			page = append(page, dto)
+		page, ok := h.toWorkspaceMemberDTOs(c, members)
+		if !ok {
+			return
 		}
-		// Best-effort display enrichment (email + avatar): unknown or
-		// missing facts stay omitted and never fail the list. Only
-		// members of this workspace are enriched, so facts never leak
-		// across workspaces.
-		h.enrichMemberDisplay(c.Request.Context(), members, page)
 		contract.RenderSuccess(c, page)
 	})
 }
 
+// toWorkspaceMemberDTOs builds the member list in three round trips total:
+// the store list (caller) plus one identity batch and one display batch,
+// replacing the per-member GetUserPublicID N+1 loop. Unknown identities
+// fail closed with 503, matching the single-row toMemberDTO; display facts
+// stay best-effort omitted.
+func (h *contractV1Handler) toWorkspaceMemberDTOs(c *gin.Context, members []*tenancy.WorkspaceMember) ([]v1MemberDTO, bool) {
+	userIDs := userIDsOfWorkspaceMembers(members)
+	publicIDs, ok := batchUserPublicIDs(c.Request.Context(), c, h.deps.Users, userIDs)
+	if !ok {
+		return nil, false
+	}
+	display := batchDisplayFacts(c.Request.Context(), h.deps.MemberDisplay, userIDs)
+	page := make([]v1MemberDTO, 0, len(members))
+	for _, m := range members {
+		if m == nil {
+			continue
+		}
+		dto := v1MemberDTO{UserID: publicIDs[m.UserID], Role: m.Role}
+		if created := v1FormatTime(m.CreatedAt); created != "" {
+			dto.CreatedAt = created
+		}
+		if email, avatar := applyDisplayFact(display, m.UserID); email != "" || avatar != "" {
+			dto.Email, dto.Avatar = email, avatar
+		}
+		page = append(page, dto)
+	}
+	return page, true
+}
+
 // enrichMemberDisplay joins workspace-member display facts (Auth-owned
 // email plus avatar public URL) onto the DTOs in place. Single code path
-// for the list and single-member writes: writes pass their one member.
-// It fails closed: a nil provider, lookup error, or missing fact leaves
-// the corresponding field omitted while the request still renders 2xx.
+// for the single-member writes: writes pass their one member. It fails
+// closed: a nil provider, lookup error, or missing fact leaves the
+// corresponding field omitted while the request still renders 2xx.
 // Facts resolve by member userID lookup, never by position; only the
 // passed workspace members are resolved, so facts never leak across
 // workspaces.
 func (h *contractV1Handler) enrichMemberDisplay(ctx context.Context, members []*tenancy.WorkspaceMember, page []v1MemberDTO) {
-	if h.deps.MemberDisplay == nil || len(members) == 0 || len(page) == 0 {
+	if len(members) == 0 || len(page) == 0 {
 		return
 	}
-	ids := make([]int64, 0, len(members))
-	for _, m := range members {
-		if m == nil || m.UserID <= 0 {
-			continue
-		}
-		ids = append(ids, m.UserID)
-	}
-	if len(ids) == 0 {
-		return
-	}
-	display, err := h.deps.MemberDisplay.GetMemberDisplay(ctx, ids)
-	if err != nil || len(display) == 0 {
+	display := batchDisplayFacts(ctx, h.deps.MemberDisplay, userIDsOfWorkspaceMembers(members))
+	if len(display) == 0 {
 		return
 	}
 	for i, m := range members {
 		if m == nil || i >= len(page) {
 			continue
 		}
-		fact, ok := display[m.UserID]
-		if !ok {
-			continue
-		}
-		if email := strings.TrimSpace(fact.Email); email != "" {
-			page[i].Email = email
-		}
-		if avatar := strings.TrimSpace(fact.Avatar); avatar != "" {
-			page[i].Avatar = avatar
+		if email, avatar := applyDisplayFact(display, m.UserID); email != "" || avatar != "" {
+			page[i].Email, page[i].Avatar = email, avatar
 		}
 	}
 }

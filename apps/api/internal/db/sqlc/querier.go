@@ -156,6 +156,12 @@ type Querier interface {
 	// events, so re-running a day never double-counts. The
 	// task_daily_stat_backfills marker still gates rescans.
 	CountWorkspaceTasksByStatus(ctx context.Context, status string) (int64, error)
+	// Batch workspace counts per organization (organization list
+	// expand=workspace_counts): a single GROUP BY replaces per-organization
+	// ListWorkspacesByOrganizationID round trips. Closed organizations report
+	// zero: their workspaces stay hidden from listing, matching
+	// ListWorkspacesForUser visibility.
+	CountWorkspacesByOrganizationPublicIDs(ctx context.Context, organizationPublicIds []string) ([]CountWorkspacesByOrganizationPublicIDsRow, error)
 	// Billing Account owner stub (#801). Full lifecycle belongs to #804.
 	CreateBillingAccountStub(ctx context.Context, arg CreateBillingAccountStubParams) (BillingAccount, error)
 	// Studio handover invitation queries (#948). The invite row is the audit
@@ -515,6 +521,16 @@ type Querier interface {
 	ListOrganizationMembers(ctx context.Context, arg ListOrganizationMembersParams) ([]OrganizationMembership, error)
 	ListOrganizationMembersForSnapshot(ctx context.Context, organizationID int64) ([]ListOrganizationMembersForSnapshotRow, error)
 	ListOrganizationOwners(ctx context.Context, organizationID int64) ([]OrganizationMembership, error)
+	// Batch organization roles for many users inside one organization: a single
+	// ANY lookup replaces per-row GetOrganizationRole round trips (member-quota
+	// list normalization, organization member expansion).
+	ListOrganizationRolesByUserIDs(ctx context.Context, arg ListOrganizationRolesByUserIDsParams) ([]ListOrganizationRolesByUserIDsRow, error)
+	// Permanent Organization closure. Row locks serialize closure with mutations;
+	// the unique closure audit prevents a second close.
+	// Batch organization roles for one user across organizations: a single ANY
+	// lookup replaces per-organization GetOrganizationMembership round trips
+	// (workspace listing fan-out, organization list expand=role).
+	ListOrganizationRolesForUser(ctx context.Context, arg ListOrganizationRolesForUserParams) ([]ListOrganizationRolesForUserRow, error)
 	ListOrganizationWorkspacePublicIDs(ctx context.Context, organizationID pgtype.Int8) ([]string, error)
 	ListOrganizationsByUserID(ctx context.Context, arg ListOrganizationsByUserIDParams) ([]Organization, error)
 	ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg ListPaymentOrdersForCheckoutShutdownParams) ([]PaymentOrder, error)

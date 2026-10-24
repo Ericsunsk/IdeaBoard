@@ -56,6 +56,16 @@ vi.mock('../../session/billing-account/resource', async (load) => ({
   ...(await load<typeof import('../../session/billing-account/resource')>()),
   fetchBillingAccount: vi.fn().mockRejectedValue(new Error('no billing account')),
 }))
+// Dialog-level single roster provider fires one workspace-members read per
+// active workspace; these organization-panel specs stub the member sections,
+// so resolve the roster to empty instead of hitting the network.
+vi.mock('../../session/accountWorkspace', async (load) => ({
+  ...(await load<typeof import('../../session/accountWorkspace')>()),
+  workspaceMembersQueryOptions: (workspaceId: import('vue').MaybeRefOrGetter<string>) => ({
+    queryKey: ['workspace-members', workspaceId],
+    queryFn: vi.fn().mockResolvedValue([]),
+  }),
+}))
 vi.mock('./BillingTransferSection.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./WorkspaceMemberSection.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./WorkspaceLimitsSection.vue', () => ({ default: { template: '<div />' } }))

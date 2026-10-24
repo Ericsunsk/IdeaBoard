@@ -37,6 +37,7 @@ function createHarness(
       duplicate: vi.fn(async () => ({ isOk: true as const, board: makeBoard('copied-board') })),
       delete: vi.fn(async () => ({ isOk: true as const, isRemoteWasMissing: false })),
     },
+    observeDocument: vi.fn(() => vi.fn()),
     dispose: vi.fn(),
   }
   const scenes = {
@@ -316,6 +317,7 @@ describe('createGalleryController', () => {
         duplicate: vi.fn(async () => ({ isOk: true as const, board: makeBoard('b') })),
         delete: vi.fn(async () => ({ isOk: true as const, isRemoteWasMissing: false })),
       },
+      observeDocument: vi.fn(() => vi.fn()),
       dispose: vi.fn(),
     }
 

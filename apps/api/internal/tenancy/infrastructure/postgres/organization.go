@@ -197,6 +197,104 @@ func (s *OrganizationStore) GetOrganizationRole(ctx context.Context, organizatio
 	return row.Role, true, nil
 }
 
+// GetOrganizationRoles resolves one role per user inside an organization in
+// a single ANY lookup, replacing per-row GetOrganizationRole round trips.
+// Unknown organizations read as not found; users holding no membership are
+// omitted (callers read them as non-members).
+func (s *OrganizationStore) GetOrganizationRoles(ctx context.Context, organizationPublicID string, userIDs []int64) (map[int64]string, error) {
+	out := make(map[int64]string, len(userIDs))
+	seen := make(map[int64]struct{}, len(userIDs))
+	deduped := make([]int64, 0, len(userIDs))
+	for _, id := range userIDs {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		deduped = append(deduped, id)
+	}
+	if len(deduped) == 0 {
+		return out, nil
+	}
+	rows, err := s.dbWithContext(ctx).q.ListOrganizationRolesByUserIDs(ctx, dbsqlc.ListOrganizationRolesByUserIDsParams{
+		OrganizationPublicID: strings.TrimSpace(organizationPublicID), UserIds: deduped,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.UserID] = row.Role
+	}
+	return out, nil
+}
+
+// ListOrganizationRolesForUser resolves one user's role per organization in
+// a single ANY lookup, replacing per-organization GetOrganizationRole round
+// trips. Organizations holding no membership are omitted.
+func (s *OrganizationStore) ListOrganizationRolesForUser(ctx context.Context, organizationPublicIDs []string, userID int64) (map[string]string, error) {
+	out := make(map[string]string, len(organizationPublicIDs))
+	seen := make(map[string]struct{}, len(organizationPublicIDs))
+	deduped := make([]string, 0, len(organizationPublicIDs))
+	for _, id := range organizationPublicIDs {
+		trimmed := strings.TrimSpace(id)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		deduped = append(deduped, trimmed)
+	}
+	if len(deduped) == 0 || userID <= 0 {
+		return out, nil
+	}
+	rows, err := s.dbWithContext(ctx).q.ListOrganizationRolesForUser(ctx, dbsqlc.ListOrganizationRolesForUserParams{
+		OrganizationPublicIds: deduped, UserID: userID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.OrganizationPublicID] = row.Role
+	}
+	return out, nil
+}
+
+// ListOrganizationWorkspaceCounts reports visible workspace counts per
+// organization in a single GROUP BY, replacing per-organization
+// ListWorkspacesByOrganizationID round trips. Closed organizations report
+// zero; unknown organizations are omitted (callers read them as zero).
+func (s *OrganizationStore) ListOrganizationWorkspaceCounts(ctx context.Context, organizationPublicIDs []string) (map[string]int64, error) {
+	out := make(map[string]int64, len(organizationPublicIDs))
+	seen := make(map[string]struct{}, len(organizationPublicIDs))
+	deduped := make([]string, 0, len(organizationPublicIDs))
+	for _, id := range organizationPublicIDs {
+		trimmed := strings.TrimSpace(id)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		deduped = append(deduped, trimmed)
+	}
+	if len(deduped) == 0 {
+		return out, nil
+	}
+	rows, err := s.dbWithContext(ctx).q.CountWorkspacesByOrganizationPublicIDs(ctx, deduped)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.OrganizationPublicID] = row.WorkspaceCount
+	}
+	return out, nil
+}
+
 // ListOrganizationWorkspaces lists workspaces owned by an organization.
 func (s *OrganizationStore) ListOrganizationWorkspaces(ctx context.Context, organizationPublicID string) ([]*tenancy.Workspace, error) {
 	organization, err := s.GetOrganization(ctx, organizationPublicID)

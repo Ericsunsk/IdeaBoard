@@ -4,6 +4,7 @@ import {
   initiateWorkspaceBillingTransfer,
   listWorkspaceBillingTransfers,
   listWorkspaceBillingAccountMembers,
+  getListWorkspaceBillingAccountMembersQueryKey,
   rejectWorkspaceBillingTransfer,
 } from '../../../../api/generated-query/public/workspace-billing/workspace-billing'
 import {
@@ -63,8 +64,9 @@ export function isTransferInviteLive(
 
 export const billingTransferQueryKeys = {
   all: ['workspace', 'billing-transfer'] as const,
+  // Reuse the generated endpoint key with per-viewer isolation.
   members: (workspaceId: string, identity: string) =>
-    ['workspace', 'billing-transfer', 'members', workspaceId, identity] as const,
+    [...getListWorkspaceBillingAccountMembersQueryKey(workspaceId), identity] as const,
   list: (workspaceId: string) => ['workspace', 'billing-transfer', 'list', workspaceId] as const,
 }
 

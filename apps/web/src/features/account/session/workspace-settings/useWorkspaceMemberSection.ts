@@ -1,8 +1,9 @@
 import { computed, ref, toValue, type MaybeRefOrGetter } from 'vue'
-import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { workspaceMemberIdempotencyKey } from '../../../../api/idempotencyKey'
 import { useAppToast } from '../../../../core/composables/useAppToast'
+import { useWorkspaceSettingsRoster } from './reads'
 import {
   changeWorkspaceMemberRole,
   classifyWorkspaceMemberError,
@@ -10,16 +11,16 @@ import {
   inviteWorkspaceMember,
   lookupWorkspaceMemberId,
   removeWorkspaceMemberEntry,
-  workspaceMembersQueryOptions,
   type WorkspaceMemberEntry,
   type WorkspaceMemberFailureReason,
   type WorkspaceMemberRole,
-} from '../../session/accountWorkspace'
+} from '../accountWorkspace'
 
 // Member section controller behind one expanded workspace row in the
 // workspace settings dialog. The roster rides TanStack Query on the shared
-// generated workspace-members key (same entry the Share panel reads), gated
-// by expansion so collapsed rows fetch nothing. Writes go through the
+// generated workspace-members key (same entry the Share panel reads).
+// Standalone reads are gated by expansion; the dialog's shared session scope
+// controls shared reads. Writes go through the
 // workspace member adapter with per-attempt idempotency keys and converge
 // by invalidation — never optimistic, so a failed role change rolls back
 // by construction (the controlled select keeps the confirmed value).
@@ -74,13 +75,10 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
   const queryClient = useQueryClient()
 
   const workspaceIdOf = (): string => toValue(options.workspaceId).trim()
-  // Collapsed rows retain the canonical roster query without fetching.
-  const rosterBaseOptions = workspaceMembersQueryOptions(options.workspaceId)
-  const rosterQuery = useQuery({
-    ...rosterBaseOptions,
-    enabled: computed(() => toValue(options.isExpanded) && rosterBaseOptions.enabled.value),
+  const rosterQuery = useWorkspaceSettingsRoster({
+    workspaceId: workspaceIdOf,
+    isEnabled: options.isExpanded,
   })
-
   const roster = computed<WorkspaceMemberEntry[]>(() => rosterQuery.data.value ?? [])
   const myRole = computed<WorkspaceMemberRole | null>(() => {
     const current = toValue(options.currentUserId)?.trim()
@@ -95,7 +93,7 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
   const hasLoadError = computed(() => rosterQuery.isError.value)
 
   function retryRoster(): void {
-    void rosterQuery.refetch()
+    rosterQuery.retry()
   }
 
   function invalidateRoster(): void {

@@ -35,6 +35,7 @@ function createHarness() {
       duplicate: vi.fn(async () => ({ isOk: true as const, board: makeBoard('copy') })),
       delete: vi.fn(async () => ({ isOk: true as const, isRemoteWasMissing: false })),
     },
+    observeDocument: vi.fn(() => vi.fn()),
     dispose: vi.fn(),
   }
   const scenes = {

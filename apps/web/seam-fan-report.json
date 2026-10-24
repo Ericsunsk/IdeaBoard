@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "checkpointSha": "342fb2871b5b6697a93b5fac7f1ec650b77ccaea",
+  "checkpointSha": "b8197cb87a23d75b79fb09df2fcd1db72f22f7c7",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
-  "totals": { "seams": 270, "violations": 0, "boardDeepImports": 0, "shims": 0 },
+  "totals": { "seams": 271, "violations": 0, "boardDeepImports": 0, "shims": 0 },
   "shims": [],
   "undeclaredDeepImports": [],
   "seams": {
@@ -2770,7 +2770,7 @@
         }
       ],
       "fanIn": 23,
-      "fanOut": 297,
+      "fanOut": 304,
       "fanOutTargets": [
         "src/api/generated-query/public/model/acceptWorkspaceBillingTransfer200.ts",
         "src/api/generated-query/public/model/accessIfMatchParameter.ts",
@@ -2861,9 +2861,12 @@
         "src/api/generated-query/public/model/externalLibraryAsset.ts",
         "src/api/generated-query/public/model/externalLibraryAssetSource.ts",
         "src/api/generated-query/public/model/forbiddenResponse.ts",
+        "src/api/generated-query/public/model/getOrganizationParams.ts",
         "src/api/generated-query/public/model/getPublicBrandingLogoParams.ts",
         "src/api/generated-query/public/model/getPublicUserAvatarParams.ts",
         "src/api/generated-query/public/model/getPublicUserAvatarSize.ts",
+        "src/api/generated-query/public/model/getWorkspaceBillingOverviewParams.ts",
+        "src/api/generated-query/public/model/getWorkspaceBillingOverviewRange.ts",
         "src/api/generated-query/public/model/getWorkspaceBillingTransfer200.ts",
         "src/api/generated-query/public/model/getWorkspaceUsageParams.ts",
         "src/api/generated-query/public/model/getWorkspaceUsageRange.ts",
@@ -2881,6 +2884,8 @@
         "src/api/generated-query/public/model/libraryFolderId.ts",
         "src/api/generated-query/public/model/listBoardRevisionsParams.ts",
         "src/api/generated-query/public/model/listBoardsParams.ts",
+        "src/api/generated-query/public/model/listMemberQuotasParams.ts",
+        "src/api/generated-query/public/model/listMemberQuotasScope.ts",
         "src/api/generated-query/public/model/listOrganizationsParams.ts",
         "src/api/generated-query/public/model/listWorkspaceBillingAccountMembers200.ts",
         "src/api/generated-query/public/model/listWorkspaceBillingRecordsParams.ts",
@@ -3029,6 +3034,8 @@
         "src/api/generated-query/public/model/workspaceBillingAccountConsumptionScope.ts",
         "src/api/generated-query/public/model/workspaceBillingAccountEnvelope.ts",
         "src/api/generated-query/public/model/workspaceBillingAccountOwnerType.ts",
+        "src/api/generated-query/public/model/workspaceBillingOverview.ts",
+        "src/api/generated-query/public/model/workspaceBillingOverviewEnvelope.ts",
         "src/api/generated-query/public/model/workspaceBillingQuote.ts",
         "src/api/generated-query/public/model/workspaceBillingQuoteEnvelope.ts",
         "src/api/generated-query/public/model/workspaceCheckoutSession.ts",
@@ -3518,6 +3525,11 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/getOrganizationParams.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/getPublicBrandingLogoParams.ts",
           "kind": "runtime"
         },
@@ -3529,6 +3541,16 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/getPublicUserAvatarSize.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/getWorkspaceBillingOverviewParams.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/getWorkspaceBillingOverviewRange.ts",
           "kind": "runtime"
         },
         {
@@ -3614,6 +3636,16 @@
         {
           "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/listBoardsParams.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/listMemberQuotasParams.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/listMemberQuotasScope.ts",
           "kind": "runtime"
         },
         {
@@ -4358,6 +4390,16 @@
         },
         {
           "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/workspaceBillingOverview.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
+          "to": "src/api/generated-query/public/model/workspaceBillingOverviewEnvelope.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/api/generated-query/public/model/index.ts",
           "to": "src/api/generated-query/public/model/workspaceBillingQuote.ts",
           "kind": "runtime"
         },
@@ -4562,7 +4604,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 23,
-      "targetFanOut": 297,
+      "targetFanOut": 304,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -4680,6 +4722,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/billing-transfer/useBillingTransferSection.ts",
+          "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/billing/resource.ts",
           "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
@@ -4710,7 +4757,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 9,
+      "fanIn": 10,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -4754,7 +4801,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 9,
+      "targetFanIn": 10,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -5091,7 +5138,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
           "to": "src/api/idempotencyKey.ts",
           "kind": "runtime"
         },
@@ -9383,17 +9430,17 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/chrome/WorkspaceCreateDialog.vue",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
-          "to": "src/core/composables/useAppToast.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
@@ -14948,22 +14995,26 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 92,
+      "fanOut": 99,
       "fanOutTargets": [
+        "fs",
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
         "node_modules/@testing-library/vue/dist/index.js",
+        "node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js",
         "node_modules/@vueuse/core/dist/index.js",
         "node_modules/qrcode.vue/dist/qrcode.vue.cjs.js",
         "node_modules/vitest/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue-router/index.cjs",
         "node_modules/vue/index.js",
+        "path",
         "src/api/client.ts",
         "src/api/contractKernel.ts",
         "src/api/generated-query/public/model/index.ts",
         "src/api/generated-query/public/user/user.ts",
         "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
+        "src/api/generated-query/public/workspace-members/workspace-members.ts",
         "src/api/generated-query/public/workspace-rewards/workspace-rewards.ts",
         "src/api/idempotencyKey.ts",
         "src/api/sessionUserType.ts",
@@ -15027,6 +15078,8 @@
         "src/core/utils/workspaceId.ts",
         "src/features/admin/routePaths.ts",
         "src/features/auth/index.ts",
+        "src/features/board/index.ts",
+        "src/features/workspace/index.ts",
         "src/features/workspace/routePaths.ts",
         "src/features/workspace/selection/workspaceContext.ts",
         "src/features/workspace/selection/workspaceMembersResource.ts",
@@ -15041,6 +15094,7 @@
         "src/theme/appOverlayMenu.ts",
         "src/theme/composables/useTheme.ts",
         "src/theme/formControls.ts",
+        "url",
         "vitest/browser"
       ],
       "outboundEdges": [
@@ -15217,6 +15271,11 @@
         {
           "from": "src/features/account/session/billing-transfer/useBillingTransferSection.ts",
           "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/billing-transfer/useBillingTransferSection.ts",
+          "to": "src/api/generated-query/public/workspace-billing/workspace-billing.ts",
           "kind": "runtime"
         },
         {
@@ -15805,6 +15864,41 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/queryKeyRequestBudget.contract.spec.ts",
+          "to": "fs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/queryKeyRequestBudget.contract.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/queryKeyRequestBudget.contract.spec.ts",
+          "to": "path",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/queryKeyRequestBudget.contract.spec.ts",
+          "to": "src/api/generated-query/public/workspace-members/workspace-members.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/queryKeyRequestBudget.contract.spec.ts",
+          "to": "src/features/board/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/queryKeyRequestBudget.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/queryKeyRequestBudget.contract.spec.ts",
+          "to": "url",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/quota/resource.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
@@ -16115,6 +16209,66 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/session/workspace-settings/reads.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "src/api/idempotencyKey.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/session/workspaceBilling.ts",
           "to": "src/api/contractKernel.ts",
           "kind": "runtime"
@@ -16337,6 +16491,11 @@
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
           "to": "src/test/domOrder.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
+          "to": "src/test/msw.ts",
           "kind": "runtime"
         },
         {
@@ -16707,31 +16866,6 @@
         {
           "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
           "to": "src/lib/utils.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
-          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
-          "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
-          "to": "node_modules/vue/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
-          "to": "src/api/idempotencyKey.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/chrome/useWorkspaceMemberSection.ts",
-          "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
         },
         {
@@ -17505,7 +17639,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 92,
+      "targetFanOut": 99,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -17514,6 +17648,157 @@
       },
       "shimCount": 0,
       "ownershipScope": ["src/features/account/"],
+      "impureRuntimePaths": []
+    },
+    "src/features/account/session/workspace-settings/index.ts": {
+      "consumerEdges": [
+        {
+          "from": "src/features/account/session/billing-transfer/useBillingTransferSection.ts",
+          "to": "src/features/account/session/workspace-settings/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/quota/useMemberQuotaSection.ts",
+          "to": "src/features/account/session/workspace-settings/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.component.spec.ts",
+          "to": "src/features/account/session/workspace-settings/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
+          "to": "src/features/account/session/workspace-settings/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/WorkspaceSettingsDialog.vue",
+          "to": "src/features/account/session/workspace-settings/index.ts",
+          "kind": "runtime"
+        }
+      ],
+      "fanIn": 5,
+      "fanOut": 11,
+      "fanOutTargets": [
+        "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+        "node_modules/@testing-library/vue/dist/index.js",
+        "node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js",
+        "node_modules/vitest/dist/index.js",
+        "node_modules/vue-i18n/index.js",
+        "node_modules/vue/index.js",
+        "src/api/idempotencyKey.ts",
+        "src/core/composables/useAppToast.ts",
+        "src/features/account/session/accountWorkspace.ts",
+        "src/features/account/session/billing-account/resource.ts",
+        "src/features/account/session/billing-account/useBillingAccountContext.ts"
+      ],
+      "outboundEdges": [
+        {
+          "from": "src/features/account/session/workspace-settings/reads.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.ts",
+          "to": "src/features/account/session/accountWorkspace.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.ts",
+          "to": "src/features/account/session/billing-account/useBillingAccountContext.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "node_modules/@testing-library/vue/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "node_modules/@vue/test-utils/dist/vue-test-utils.cjs.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "src/features/account/session/accountWorkspace.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "src/features/account/session/accountWorkspace.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/reads.unit.spec.ts",
+          "to": "src/features/account/session/billing-account/resource.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "node_modules/vue-i18n/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "src/api/idempotencyKey.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/session/workspace-settings/useWorkspaceMemberSection.ts",
+          "to": "src/features/account/session/accountWorkspace.ts",
+          "kind": "runtime"
+        }
+      ],
+      "undeclaredConsumers": [],
+      "missingConsumers": [],
+      "undeclaredDeepImports": [],
+      "missingDeepImports": [],
+      "targetFanIn": 5,
+      "targetFanOut": 11,
+      "advisories": {
+        "fanInTargetMismatch": false,
+        "fanOutTargetMismatch": false,
+        "newFanOutTargets": [],
+        "missingFanOutTargets": []
+      },
+      "shimCount": 0,
+      "ownershipScope": ["src/features/account/session/workspace-settings/"],
       "impureRuntimePaths": []
     },
     "src/features/account/ui/chrome/SupportChannelQr.vue": {
@@ -24548,6 +24833,11 @@
     "src/features/board/index.ts": {
       "consumerEdges": [
         {
+          "from": "src/features/account/session/queryKeyRequestBudget.contract.spec.ts",
+          "to": "src/features/board/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/core/graph/canvasGraphGeometry.unit.spec.ts",
           "to": "src/features/board/index.ts",
           "kind": "runtime"
@@ -24803,7 +25093,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 49,
+      "fanIn": 50,
       "fanOut": 68,
       "fanOutTargets": [
         "../api/internal/boards/previewscene/testdata/mixed.json",
@@ -26221,7 +26511,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 49,
+      "targetFanIn": 50,
       "targetFanOut": 68,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -44230,6 +44520,11 @@
     "src/features/workspace/index.ts": {
       "consumerEdges": [
         {
+          "from": "src/features/account/session/queryKeyRequestBudget.contract.spec.ts",
+          "to": "src/features/workspace/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/app/AdminHeaderBar.vue",
           "to": "src/features/workspace/index.ts",
           "kind": "runtime"
@@ -44380,7 +44675,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 30,
+      "fanIn": 31,
       "fanOut": 56,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
@@ -45073,6 +45368,11 @@
         },
         {
           "from": "src/features/workspace/shell/useWorkspaceSwitcher.unit.spec.ts",
+          "to": "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/workspace/shell/useWorkspaceSwitcher.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
@@ -45096,7 +45396,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 30,
+      "targetFanIn": 31,
       "targetFanOut": 56,
       "advisories": {
         "fanInTargetMismatch": false,

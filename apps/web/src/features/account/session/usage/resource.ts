@@ -1,6 +1,5 @@
 import { getWorkspaceUsage } from '../../../../api/generated-query/public/workspace-billing/workspace-billing'
 import type { WorkspaceUsage } from '../../../../api/generated-query/public/model'
-import type { BillingConsumptionReadScope } from '../billing-account/readScope'
 import { i18n } from '../../../../core/i18n'
 import { requireAccountWorkspaceId, resolveWorkspaceBillingData } from '../workspaceBilling'
 
@@ -41,8 +40,16 @@ export const DEFAULT_USAGE_RANGE: UsageRange = '30d'
 
 export const usageQueryKeys = {
   all: ['workspace', 'usage'] as const,
-  current: (scope: BillingConsumptionReadScope, range: UsageRange) =>
-    ['workspace', 'usage', 'current', scope, range] as const,
+  // Scalar-only key: workspace + account + identity + scope + range. Never
+  // embed a scope object so key equality stays referentially stable.
+  current: (
+    workspaceId: string,
+    billingAccountId: string,
+    identity: string,
+    consumptionScope: string,
+    range: UsageRange,
+  ) =>
+    ['workspace', 'usage', 'current', workspaceId, billingAccountId, identity, consumptionScope, range] as const,
 }
 
 export async function fetchUsage(

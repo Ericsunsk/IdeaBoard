@@ -11,8 +11,11 @@ import (
 
 // Queryer executes the projection on a pool or the caller's settlement
 // transaction. Using the transaction includes its own uncommitted reservations.
+// pgx.Tx and *pgxpool.Pool both satisfy it structurally; there are no
+// custom implementations to keep in sync.
 type Queryer interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
+	Query(context.Context, string, ...any) (pgx.Rows, error)
 }
 
 // UsedCreditsForWorkspace reads one Workspace's pending Holds and settled
@@ -36,6 +39,53 @@ func UsedCreditsForMember(ctx context.Context, q Queryer, accountID, userID int6
 	return readUsedCredits(ctx, q, memberUsedCreditsSQL, start, end, accountID, userID)
 }
 
+// UsedCreditsForMembers reads many Users' usage across all Workspaces on
+// one persisted Billing Account in a SINGLE statement (GROUP BY user_id),
+// replacing per-member UsedCreditsForMember round trips (quota list
+// normalization, billing overview fan-out). Unknown or absent users are
+// omitted from the map (callers treat missing as zero); an empty user list
+// returns an empty map without touching the database.
+func UsedCreditsForMembers(ctx context.Context, q Queryer, accountID int64, userIDs []int64, start, end *time.Time) (map[int64]int64, error) {
+	out := make(map[int64]int64, len(userIDs))
+	seen := make(map[int64]struct{}, len(userIDs))
+	deduped := make([]int64, 0, len(userIDs))
+	for _, id := range userIDs {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		deduped = append(deduped, id)
+	}
+	if accountID <= 0 {
+		return out, errors.New("consumptionread: Billing Account ID must be positive")
+	}
+	if len(deduped) == 0 {
+		return out, nil
+	}
+	if start != nil && end != nil && !start.Before(*end) {
+		return out, errors.New("consumptionread: period start must precede end")
+	}
+	rows, err := q.Query(ctx, memberUsedCreditsBatchSQL, start, end, accountID, deduped)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var userID, used int64
+		if err := rows.Scan(&userID, &used); err != nil {
+			return nil, err
+		}
+		out[userID] = used
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func readUsedCredits(ctx context.Context, q Queryer, sql string, start, end *time.Time, ids ...any) (int64, error) {
 	if start != nil && end != nil && !start.Before(*end) {
 		return 0, errors.New("consumptionread: period start must precede end")
@@ -46,21 +96,23 @@ func readUsedCredits(ctx context.Context, q Queryer, sql string, start, end *tim
 	return total, err
 }
 
-// The only two scopes are fixed here, before aggregation, so PostgreSQL can
-// select their indexes. Callers cannot inject predicates or omit scope.
+// Scope predicates are fixed here, before aggregation, so PostgreSQL can
+// select their indexes. Every shape shares the same reservation projection.
 var (
-	workspaceUsedCreditsSQL = fmt.Sprintf(usedCreditsSQL, "snap.workspace_id = $3", "op.workspace_id = $3")
-	memberUsedCreditsSQL    = fmt.Sprintf(usedCreditsSQL, "snap.billing_account_id = $3 AND snap.user_id = $4", "op.billing_account_id = $3 AND op.user_id = $4")
+	workspaceUsedCreditsSQL = "SELECT COALESCE(SUM(used), 0) FROM (" + fmt.Sprintf(usedCreditsRowsSQL,
+		"snap.workspace_id = $3", "op.workspace_id = $3") + ") usage"
+	memberUsedCreditsSQL = "SELECT COALESCE(SUM(used), 0) FROM (" + fmt.Sprintf(usedCreditsRowsSQL,
+		"snap.billing_account_id = $3 AND snap.user_id = $4", "op.billing_account_id = $3 AND op.user_id = $4") + ") usage"
+	memberUsedCreditsBatchSQL = "SELECT user_id, COALESCE(SUM(used), 0) FROM (" + fmt.Sprintf(usedCreditsRowsSQL,
+		"snap.billing_account_id = $3 AND snap.user_id = ANY($4::bigint[])", "op.billing_account_id = $3 AND op.user_id = ANY($4::bigint[])") + ") usage GROUP BY user_id"
 )
 
 // One statement is essential: independent Capture commits must never fall
 // between separate pending and actual reads. This projection intentionally
 // differs from Transactions: it includes reservations and attributes linked
 // refunds to their original reservation window rather than cash-flow time.
-const usedCreditsSQL = `
-SELECT COALESCE(SUM(used), 0)
-FROM (
-  SELECT CASE s.state
+const usedCreditsRowsSQL = `
+  SELECT snap.user_id AS user_id, CASE s.state
            WHEN 'captured' THEN s.captured_credits - COALESCE(ch.refunded_amount, 0)
            ELSE snap.total_credits
          END AS used
@@ -73,7 +125,7 @@ FROM (
     AND ($1::timestamptz IS NULL OR snap.quoted_at >= $1)
     AND ($2::timestamptz IS NULL OR snap.quoted_at < $2)
   UNION ALL
-  SELECT CASE op.status
+  SELECT op.user_id AS user_id, CASE op.status
            WHEN 'succeeded' THEN op.unit_credits - COALESCE(ch.refunded_amount, 0)
            ELSE op.unit_credits
          END AS used
@@ -94,4 +146,4 @@ FROM (
     AND %s
     AND ($1::timestamptz IS NULL OR op.created_at >= $1)
     AND ($2::timestamptz IS NULL OR op.created_at < $2)
-) usage`
+`

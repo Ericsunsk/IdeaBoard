@@ -17,7 +17,8 @@ import {
   type MemberQuotaSummary,
   type UpdateMemberQuotaInput,
 } from './resource'
-import { workspaceMembersQueryOptions, type WorkspaceMemberEntry } from '../accountWorkspace'
+import type { WorkspaceMemberEntry } from '../accountWorkspace'
+import { useWorkspaceSettingsRoster } from '../workspace-settings'
 
 // The account projection supplies the capability using the server quota policy.
 // Consumption visibility and unrelated Organization roles never grant it.
@@ -25,6 +26,9 @@ type MemberQuotaSectionOptions = {
   workspaceId: MaybeRefOrGetter<string>
   canManage: MaybeRefOrGetter<boolean>
   isExpanded: MaybeRefOrGetter<boolean>
+  // Management forms stay behind the local toggle: the list (and its roster
+  // assistance) only load once a manager expands them.
+  isListEnabled?: MaybeRefOrGetter<boolean> | undefined
 }
 
 export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
@@ -43,25 +47,25 @@ export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
     ...noRetry(),
   })
 
+  const isListEnabled = computed(
+    () =>
+      toValue(options.isExpanded) &&
+      canManage.value &&
+      (options.isListEnabled == null || toValue(options.isListEnabled)) &&
+      workspaceIdOf() !== '',
+  )
+
   const listQuery = useQuery({
     queryKey: computed(() => memberQuotaQueryKeys.list(workspaceIdOf())),
     queryFn: ({ signal }) => fetchMemberQuotaList(workspaceIdOf(), signal),
-    enabled: computed(
-      () => toValue(options.isExpanded) && canManage.value && workspaceIdOf() !== '',
-    ),
+    enabled: isListEnabled,
     ...accountScoped(),
     ...noRetry(),
   })
 
-  const rosterBaseOptions = workspaceMembersQueryOptions(options.workspaceId)
-  const rosterQuery = useQuery({
-    ...rosterBaseOptions,
-    enabled: computed(
-      () =>
-        toValue(options.isExpanded) &&
-        canManage.value &&
-        toValue(rosterBaseOptions.enabled ?? true),
-    ),
+  const rosterQuery = useWorkspaceSettingsRoster({
+    workspaceId: workspaceIdOf,
+    isEnabled: isListEnabled,
   })
 
   const selfQuota = computed<MemberQuotaSummary | null>(() => selfQuery.data.value ?? null)
@@ -79,8 +83,14 @@ export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
 
   function invalidateQuotaQueries(): Promise<void> {
     return Promise.all([
-      queryClient.invalidateQueries({ queryKey: memberQuotaQueryKeys.self(workspaceIdOf()) }),
-      queryClient.invalidateQueries({ queryKey: memberQuotaQueryKeys.list(workspaceIdOf()) }),
+      queryClient.invalidateQueries({
+        queryKey: memberQuotaQueryKeys.self(workspaceIdOf()),
+        exact: true,
+      }),
+      queryClient.invalidateQueries({
+        queryKey: memberQuotaQueryKeys.list(workspaceIdOf()),
+        exact: true,
+      }),
     ]).then(() => undefined)
   }
 

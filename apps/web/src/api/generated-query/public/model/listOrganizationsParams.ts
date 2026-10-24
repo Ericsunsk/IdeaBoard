@@ -25,4 +25,8 @@ export type ListOrganizationsParams = {
    * @maximum 100
    */
   page_size?: PageSizeParameter
+  /**
+   * Optional comma-separated expansion (default: none, list shape unchanged). role embeds the caller organization role per row (single batched lookup); workspace_counts embeds the visible workspace count per row (single batched lookup, closed organizations report zero). Unknown values render 400 bad_request. No Idempotency-Key: read-only, safe to retry.
+   */
+  expand?: string
 }

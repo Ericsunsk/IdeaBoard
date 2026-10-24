@@ -336,7 +336,7 @@ import { appOverlayMenuSideOffset } from '../../../../theme/appOverlayMenu'
 import { useUserStore } from '../../../auth'
 import { accountCardPanelClass } from '../shared/ui'
 import { useBillingTransferSection } from '../../session/billing-transfer/useBillingTransferSection'
-import { memberDisplayName, useWorkspaceMemberSection } from './useWorkspaceMemberSection'
+import { memberDisplayName, useWorkspaceMemberSection } from '../../session/workspace-settings'
 import type { WorkspaceMemberRole } from '../../session/accountWorkspace'
 
 const props = defineProps<{

@@ -94,6 +94,16 @@ func (f *fakeMemberQuotas) UsageForPeriod(_ context.Context, billingAccountID, u
 	return f.used[quotaKey{billingAccountID, userID}], nil
 }
 
+func (f *fakeMemberQuotas) UsageForPeriodBatch(_ context.Context, billingAccountID int64, userIDs []int64, _, _ *time.Time) (map[int64]int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	used := make(map[int64]int64, len(userIDs))
+	for _, id := range userIDs {
+		used[id] = f.used[quotaKey{billingAccountID, id}]
+	}
+	return used, nil
+}
+
 func (f *fakeMemberQuotas) setUsed(account, user, used int64) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

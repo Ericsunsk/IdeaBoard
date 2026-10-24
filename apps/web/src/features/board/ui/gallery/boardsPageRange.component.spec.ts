@@ -74,6 +74,7 @@ async function renderRange(initialBoards: BoardMeta[] = [ownBoard(), teamBoard()
         duplicate: vi.fn(),
         delete: vi.fn(),
       },
+      observeDocument: vi.fn(() => vi.fn()),
       dispose: vi.fn(),
     },
     scenes: { sceneMap: ref({}), workspaceId: ref(null) },

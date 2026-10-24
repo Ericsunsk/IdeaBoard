@@ -3,30 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('../../../../../core/composables/useSupportChannels', () => ({
   useSupportChannels: () => ({ channels: [] }),
 }))
-vi.mock('../../../../account/ui/chrome/useWorkspaceMemberSection', () => ({
-  memberDisplayName: (entry: { userId: string }) => entry.userId,
-  useWorkspaceMemberSection: () => ({
-    roster: ref([]),
-    myRole: ref(null),
-    canManage: ref(false),
-    isOwner: ref(false),
-    isDefaultWorkspace: ref(false),
-    isLoading: ref(false),
-    hasLoadError: ref(false),
-    retryRoster: vi.fn(),
-    isPending: () => false,
-    inviteEmail: ref(''),
-    inviteRole: ref('member'),
-    pickInviteRole: vi.fn(),
-    inviteMember: vi.fn(),
-    changeMemberRole: vi.fn(),
-    confirmingRemoveId: ref(null),
-    requestRemove: vi.fn(),
-    cancelRemove: vi.fn(),
-    confirmRemove: vi.fn(),
-  }),
-}))
-import { h, ref } from 'vue'
+import { h } from 'vue'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import type { RenderOptions } from '@testing-library/vue'
 import {

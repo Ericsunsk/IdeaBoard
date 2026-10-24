@@ -99,9 +99,9 @@ type ControlTaskAdmin interface {
 // locate/audit surface (#923): platform-Admin addresses stable ba_
 // accounts directly, independent of any resolving Workspace.
 type ControlBillingAccountStore interface {
-	EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error)
-	GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancypg.BillingAccount, error)
-	GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancypg.BillingAccount, error)
+	EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error)
+	GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancy.BillingAccount, error)
+	GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancy.BillingAccount, error)
 	GetAdminBillingAccountByPublicID(ctx context.Context, publicID string) (tenancypg.AdminBillingAccount, error)
 	ListBillingAccountsForAdmin(ctx context.Context, beforeID int64, ownerScope string, limit int) ([]tenancypg.AdminBillingAccount, error)
 	ListBillingAccountMembersForAdmin(ctx context.Context, billingAccountInternalID int64) ([]tenancy.BillingAccountMember, error)

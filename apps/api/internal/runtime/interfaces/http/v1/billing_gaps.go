@@ -85,7 +85,6 @@ import (
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/tenancy"
-	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/gin-gonic/gin"
@@ -731,17 +730,17 @@ func (h *contractV1BillingHandler) redeemReward(c *gin.Context) {
 // by the Rewards service to its stable ba_ funds identity. Unknown or
 // unmapped accounts fail closed: the edge never names a workspace account
 // as the beneficiary and never omits the field.
-func (h *contractV1BillingHandler) rewardBeneficiaryAccount(c *gin.Context, billingAccountInternalID int64) (tenancypg.BillingAccount, bool) {
+func (h *contractV1BillingHandler) rewardBeneficiaryAccount(c *gin.Context, billingAccountInternalID int64) (tenancy.BillingAccount, bool) {
 	if h.deps.BillingAccounts == nil || billingAccountInternalID <= 0 {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable45)
 		c.Abort()
-		return tenancypg.BillingAccount{}, false
+		return tenancy.BillingAccount{}, false
 	}
 	account, err := h.deps.BillingAccounts.GetBillingAccountByInternalID(c.Request.Context(), billingAccountInternalID)
 	if err != nil || strings.TrimSpace(account.PublicID) == "" {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable45)
 		c.Abort()
-		return tenancypg.BillingAccount{}, false
+		return tenancy.BillingAccount{}, false
 	}
 	return account, true
 }

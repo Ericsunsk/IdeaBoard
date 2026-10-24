@@ -26,4 +26,16 @@ export interface BillingTransferInvite {
   expires_at?: string
   decided_at?: string
   decided_by?: string
+  /** Initiator email for display assistance only; omitted when unavailable. */
+  from_email?: string
+  /** Initiator avatar public URL; omitted when unavailable. */
+  from_avatar?: string
+  /** Recipient email for display assistance only; omitted when unavailable. */
+  to_email?: string
+  /** Recipient avatar public URL; omitted when unavailable. */
+  to_avatar?: string
+  /** Decider email for display assistance only; omitted while undecided or unavailable. */
+  decided_by_email?: string
+  /** Decider avatar public URL; omitted while undecided or unavailable. */
+  decided_by_avatar?: string
 }

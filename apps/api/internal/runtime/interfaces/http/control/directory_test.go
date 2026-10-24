@@ -61,4 +61,19 @@ func (d *staticUserDirectory) GetUserPublicID(ctx context.Context, userID int64)
 	return uuid.Nil, tenancy.ErrNotFound
 }
 
+func (d *staticUserDirectory) GetUserPublicIDs(ctx context.Context, userIDs []int64) (map[int64]uuid.UUID, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	out := make(map[int64]uuid.UUID, len(userIDs))
+	for _, userID := range userIDs {
+		if userID <= 0 {
+			continue
+		}
+		if id, ok := d.byID[userID]; ok {
+			out[userID] = id
+		}
+	}
+	return out, nil
+}
+
 var _ runtimehttp.V1UserDirectory = (*staticUserDirectory)(nil)

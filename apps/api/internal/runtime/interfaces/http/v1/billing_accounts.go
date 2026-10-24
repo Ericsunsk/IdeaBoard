@@ -15,11 +15,13 @@ package v1
 // the Organization Owner/Admin role matrix in memberquotas.Policy.
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/billingoverview"
 	"ideaboard/api/internal/platform/contract"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"ideaboard/api/internal/tenancy"
@@ -32,6 +34,13 @@ type v1BillingMemberDTO struct {
 	UserID    string `json:"user_id"`
 	Role      string `json:"role"`
 	CreatedAt string `json:"created_at,omitempty"`
+	// Email is the manager-visible member email for display assistance.
+	// It is omitted when unavailable and never acts as a write identity.
+	Email string `json:"email,omitempty"`
+	// Avatar is the manager-visible member avatar public URL. It is
+	// omitted when the member has no custom avatar or the provider is
+	// unavailable, and never fails the request.
+	Avatar string `json:"avatar,omitempty"`
 }
 
 type v1AddBillingMemberBody struct {
@@ -47,7 +56,7 @@ type v1UpdateBillingMemberBody struct {
 	} `json:"data"`
 }
 
-func (h *contractV1BillingHandler) toBillingMemberDTO(c *gin.Context, m *tenancy.BillingAccountMember) (v1BillingMemberDTO, bool) {
+func (h *contractV1BillingHandler) toBillingMemberDTO(c *gin.Context, m *tenancy.BillingAccountMember, display map[int64]V1MemberDisplay) (v1BillingMemberDTO, bool) {
 	if h.deps.Users == nil {
 		contract.RenderError(c, http.StatusNotImplemented,
 			contract.CodeContractNotImplemented, "The v1 billing surface is not implemented yet")
@@ -64,7 +73,37 @@ func (h *contractV1BillingHandler) toBillingMemberDTO(c *gin.Context, m *tenancy
 	if !m.CreatedAt.IsZero() {
 		dto.CreatedAt = m.CreatedAt.UTC().Format(time.RFC3339)
 	}
+	if email, avatar := applyDisplayFact(display, m.UserID); email != "" || avatar != "" {
+		dto.Email, dto.Avatar = email, avatar
+	}
 	return dto, true
+}
+
+// toBillingMemberDTOs builds the billing manager list in three round trips
+// total: the store list (caller) plus one identity batch and one display
+// batch, replacing the per-member GetUserPublicID N+1 loop. Unknown
+// identities fail closed with 503, matching the single-row path; display
+// facts stay best-effort omitted.
+func (h *contractV1BillingHandler) toBillingMemberDTOs(ctx context.Context, c *gin.Context, members []tenancy.BillingAccountMember) ([]v1BillingMemberDTO, bool) {
+	people, err := h.readBillingPeople(ctx, userIDsOfBillingMembers(members))
+	if err != nil {
+		renderUserPublicIDsError(c, err)
+		return nil, false
+	}
+	return billingMemberDTOs(members, people), true
+}
+
+func billingMemberDTOs(members []tenancy.BillingAccountMember, people map[int64]billingoverview.Person) []v1BillingMemberDTO {
+	page := make([]v1BillingMemberDTO, 0, len(members))
+	for _, m := range members {
+		dto := v1BillingMemberDTO{UserID: people[m.UserID].PublicID, Role: m.Role}
+		if !m.CreatedAt.IsZero() {
+			dto.CreatedAt = m.CreatedAt.UTC().Format(time.RFC3339)
+		}
+		dto.Email, dto.Avatar = people[m.UserID].Email, people[m.UserID].Avatar
+		page = append(page, dto)
+	}
+	return page
 }
 
 func (h *contractV1BillingHandler) resolveBillingMemberUserID(c *gin.Context, raw string) (int64, bool) {
@@ -112,13 +151,9 @@ func (h *contractV1BillingHandler) listBillingAccountMembers(c *gin.Context) {
 			renderBillingAccountError(c, err)
 			return
 		}
-		page := make([]v1BillingMemberDTO, 0, len(members))
-		for i := range members {
-			dto, ok := h.toBillingMemberDTO(c, &members[i])
-			if !ok {
-				return
-			}
-			page = append(page, dto)
+		page, ok := h.toBillingMemberDTOs(c.Request.Context(), c, members)
+		if !ok {
+			return
 		}
 		contract.RenderSuccess(c, page)
 	})
@@ -177,7 +212,8 @@ func (h *contractV1BillingHandler) addBillingAccountMember(c *gin.Context) {
 			renderBillingAccountError(c, errors.New("billing: member-add type mismatch"))
 			return
 		}
-		dto, ok := h.toBillingMemberDTO(c, added)
+		display := batchDisplayFacts(c.Request.Context(), h.deps.MemberDisplay, []int64{added.UserID})
+		dto, ok := h.toBillingMemberDTO(c, added, display)
 		if !ok {
 			return
 		}
@@ -218,7 +254,8 @@ func (h *contractV1BillingHandler) updateBillingAccountMember(c *gin.Context) {
 			renderBillingAccountError(c, err)
 			return
 		}
-		dto, ok := h.toBillingMemberDTO(c, updated)
+		display := batchDisplayFacts(c.Request.Context(), h.deps.MemberDisplay, []int64{updated.UserID})
+		dto, ok := h.toBillingMemberDTO(c, updated, display)
 		if !ok {
 			return
 		}

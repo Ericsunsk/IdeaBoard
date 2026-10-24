@@ -20,18 +20,18 @@ package v1
 // associated business Workspace.
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
-	"errors"
-
+	"ideaboard/api/internal/billingoverview"
 	"ideaboard/api/internal/platform/contract"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 type v1InitiateTransferInviteBody struct {
@@ -49,14 +49,85 @@ type v1TransferInviteDTO struct {
 	BillingAccountID  string   `json:"billing_account_id"`
 	FromUserID        string   `json:"from_user_id"`
 	ToUserID          string   `json:"to_user_id"`
+	FromEmail         string   `json:"from_email,omitempty"`
+	FromAvatar        string   `json:"from_avatar,omitempty"`
+	ToEmail           string   `json:"to_email,omitempty"`
+	ToAvatar          string   `json:"to_avatar,omitempty"`
 	Status            string   `json:"status"`
 	ScopeWorkspaceIDs []string `json:"scope_workspace_ids"`
 	CreatedAt         string   `json:"created_at,omitempty"`
 	ExpiresAt         string   `json:"expires_at,omitempty"`
 	DecidedAt         string   `json:"decided_at,omitempty"`
 	DecidedBy         string   `json:"decided_by,omitempty"`
+	// DecidedByEmail/DecidedByAvatar mirror the decided_by identity
+	// display; both stay omitted while undecided or unavailable.
+	DecidedByEmail  string `json:"decided_by_email,omitempty"`
+	DecidedByAvatar string `json:"decided_by_avatar,omitempty"`
 }
 
+// toTransferInviteDTOs builds transfer-invite pages in three round trips
+// total: the store page (caller) plus one identity batch and one display
+// batch, replacing the per-invite from/to/decidedBy GetUserPublicID N+1
+// loop. Unknown identities fail closed with 503, matching the previous
+// per-invite behavior; display facts stay best-effort omitted.
+func (h *contractV1BillingHandler) toTransferInviteDTOs(ctx context.Context, c *gin.Context, invites []*tenancy.BillingTransferInvite, accountPublicID string) ([]v1TransferInviteDTO, bool) {
+	userIDs := make([]int64, 0, 3*len(invites))
+	for _, invite := range invites {
+		if invite == nil {
+			continue
+		}
+		userIDs = append(userIDs, invite.FromUserID, invite.ToUserID)
+		if invite.DecidedBy != nil && *invite.DecidedBy > 0 {
+			userIDs = append(userIDs, *invite.DecidedBy)
+		}
+	}
+	people, err := h.readBillingPeople(ctx, userIDs)
+	if err != nil {
+		renderUserPublicIDsError(c, err)
+		return nil, false
+	}
+	return transferInviteDTOs(invites, accountPublicID, people), true
+}
+
+func transferInviteDTOs(invites []*tenancy.BillingTransferInvite, accountPublicID string, people map[int64]billingoverview.Person) []v1TransferInviteDTO {
+	page := make([]v1TransferInviteDTO, 0, len(invites))
+	for _, invite := range invites {
+		if invite == nil {
+			continue
+		}
+		dto := v1TransferInviteDTO{
+			PublicID:          invite.PublicID,
+			BillingAccountID:  accountPublicID,
+			FromUserID:        people[invite.FromUserID].PublicID,
+			ToUserID:          people[invite.ToUserID].PublicID,
+			Status:            invite.Status,
+			ScopeWorkspaceIDs: append([]string(nil), invite.ScopeWorkspacePublicIDs...),
+		}
+		if dto.ScopeWorkspaceIDs == nil {
+			dto.ScopeWorkspaceIDs = []string{}
+		}
+		dto.FromEmail, dto.FromAvatar = people[invite.FromUserID].Email, people[invite.FromUserID].Avatar
+		dto.ToEmail, dto.ToAvatar = people[invite.ToUserID].Email, people[invite.ToUserID].Avatar
+		if !invite.CreatedAt.IsZero() {
+			dto.CreatedAt = invite.CreatedAt.UTC().Format(time.RFC3339)
+		}
+		if !invite.ExpiresAt.IsZero() {
+			dto.ExpiresAt = invite.ExpiresAt.UTC().Format(time.RFC3339)
+		}
+		if invite.DecidedAt != nil && !invite.DecidedAt.IsZero() {
+			dto.DecidedAt = invite.DecidedAt.UTC().Format(time.RFC3339)
+		}
+		if invite.DecidedBy != nil && *invite.DecidedBy > 0 {
+			dto.DecidedBy = people[*invite.DecidedBy].PublicID
+			dto.DecidedByEmail, dto.DecidedByAvatar = people[*invite.DecidedBy].Email, people[*invite.DecidedBy].Avatar
+		}
+		page = append(page, dto)
+	}
+	return page
+}
+
+// toTransferInviteDTO renders one invite through the same batched shape
+// (batch of one, same 501/503 precedence) for the single-invite writes.
 func (h *contractV1BillingHandler) toTransferInviteDTO(c *gin.Context, invite *tenancy.BillingTransferInvite, accountPublicID string) (v1TransferInviteDTO, bool) {
 	if h.deps.Users == nil {
 		contract.RenderError(c, http.StatusNotImplemented,
@@ -64,48 +135,11 @@ func (h *contractV1BillingHandler) toTransferInviteDTO(c *gin.Context, invite *t
 		c.Abort()
 		return v1TransferInviteDTO{}, false
 	}
-	fromPublic, err := h.deps.Users.GetUserPublicID(c.Request.Context(), invite.FromUserID)
-	if err != nil || fromPublic == uuid.Nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-		c.Abort()
+	page, ok := h.toTransferInviteDTOs(c.Request.Context(), c, []*tenancy.BillingTransferInvite{invite}, accountPublicID)
+	if !ok || len(page) != 1 {
 		return v1TransferInviteDTO{}, false
 	}
-	toPublic, err := h.deps.Users.GetUserPublicID(c.Request.Context(), invite.ToUserID)
-	if err != nil || toPublic == uuid.Nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-		c.Abort()
-		return v1TransferInviteDTO{}, false
-	}
-	dto := v1TransferInviteDTO{
-		PublicID:          invite.PublicID,
-		BillingAccountID:  accountPublicID,
-		FromUserID:        tenancy.FormatUserPublicID(fromPublic),
-		ToUserID:          tenancy.FormatUserPublicID(toPublic),
-		Status:            invite.Status,
-		ScopeWorkspaceIDs: append([]string(nil), invite.ScopeWorkspacePublicIDs...),
-	}
-	if dto.ScopeWorkspaceIDs == nil {
-		dto.ScopeWorkspaceIDs = []string{}
-	}
-	if !invite.CreatedAt.IsZero() {
-		dto.CreatedAt = invite.CreatedAt.UTC().Format(time.RFC3339)
-	}
-	if !invite.ExpiresAt.IsZero() {
-		dto.ExpiresAt = invite.ExpiresAt.UTC().Format(time.RFC3339)
-	}
-	if invite.DecidedAt != nil && !invite.DecidedAt.IsZero() {
-		dto.DecidedAt = invite.DecidedAt.UTC().Format(time.RFC3339)
-	}
-	if invite.DecidedBy != nil && *invite.DecidedBy > 0 {
-		decidedPublic, err := h.deps.Users.GetUserPublicID(c.Request.Context(), *invite.DecidedBy)
-		if err != nil || decidedPublic == uuid.Nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-			c.Abort()
-			return v1TransferInviteDTO{}, false
-		}
-		dto.DecidedBy = tenancy.FormatUserPublicID(decidedPublic)
-	}
-	return dto, true
+	return page[0], true
 }
 
 // initiateTransferInvite creates a pending handover invitation. Only the
@@ -187,13 +221,9 @@ func (h *contractV1BillingHandler) listTransferInvites(c *gin.Context) {
 			renderBillingAccountError(c, err)
 			return
 		}
-		page := make([]v1TransferInviteDTO, 0, len(invites))
-		for _, invite := range invites {
-			dto, ok := h.toTransferInviteDTO(c, invite, account.PublicID)
-			if !ok {
-				return
-			}
-			page = append(page, dto)
+		page, ok := h.toTransferInviteDTOs(c.Request.Context(), c, invites, account.PublicID)
+		if !ok {
+			return
 		}
 		contract.RenderSuccess(c, page)
 	})

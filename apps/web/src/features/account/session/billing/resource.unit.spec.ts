@@ -50,7 +50,14 @@ describe('billingResource', () => {
       identity: 'user-1',
       consumptionScope: 'account' as const,
     }
-    expect(billingRecordsQueryKeys.list(scope)).toEqual(['workspace', 'billing', 'records', scope])
+    expect(
+      billingRecordsQueryKeys.list(
+        scope.workspaceId,
+        scope.billingAccountId,
+        scope.identity,
+        scope.consumptionScope,
+      ),
+    ).toEqual(['workspace', 'billing', 'records', WORKSPACE_ID, 'ba_1', 'user-1', 'account'])
   })
 
   it('omits the next cursor when the page is exhausted', async () => {

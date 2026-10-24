@@ -160,9 +160,11 @@ function createPendingOrderActions(
       // pending+history together and this mutation must match it.
       void queryClient.invalidateQueries({
         queryKey: paymentsQueryKeys.pending(toValue(workspaceId) ?? ''),
+        exact: true,
       })
       void queryClient.invalidateQueries({
         queryKey: paymentsQueryKeys.history(toValue(workspaceId) ?? ''),
+        exact: true,
       })
       invalidateUserMoney(queryClient)
       if (action.kind === 'continue' && order.checkout_url) navigateToCheckout(order.checkout_url)
@@ -351,15 +353,18 @@ function handlePaymentEvent(
   } else {
     void queryClient.invalidateQueries({
       queryKey: paymentsQueryKeys.pending(workspaceId),
+      exact: true,
     })
   }
   void queryClient.invalidateQueries({
     queryKey: paymentsQueryKeys.history(workspaceId),
+    exact: true,
   })
   invalidateUserMoney(queryClient)
   if (event.public_token) {
     void queryClient.invalidateQueries({
       queryKey: paymentsQueryKeys.returnStatus(workspaceId, event.public_token),
+      exact: true,
     })
   }
 }

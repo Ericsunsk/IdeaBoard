@@ -91,7 +91,7 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
   }
 
   async function refreshWorkspaceList(): Promise<void> {
-    await queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.list })
+    await queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.list, exact: true })
   }
 
   async function createWorkspaceItem(
@@ -130,7 +130,7 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     name: string,
   ): Promise<OrganizationSummary> {
     const updated = await renameOrganization(organizationId, { name })
-    await queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.organizations })
+    await queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.organizations, exact: true })
     return updated
   }
 

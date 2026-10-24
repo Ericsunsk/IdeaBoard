@@ -172,6 +172,12 @@ func TestUsedCreditsProjectionScopesAndReservationWindows(t *testing.T) {
 	assertUsed(t, 216, func() (int64, error) {
 		return consumptionread.UsedCreditsForMember(t.Context(), e.pool, e.account, e.user, &start, &end)
 	})
+	batch, err := consumptionread.UsedCreditsForMembers(t.Context(), e.pool, e.account,
+		[]int64{e.user, e.otherUser, e.user, 0, -1, 999999}, &start, &end)
+	if err != nil || len(batch) != 2 || batch[e.user] != 216 || batch[e.otherUser] != 59 {
+		t.Fatalf("batch usage = %v, %v; want scoped per-user totals", batch, err)
+	}
+
 	assertUsed(t, 71, func() (int64, error) {
 		return consumptionread.UsedCreditsForMember(t.Context(), e.pool, e.otherAccount, e.user, &start, &end)
 	})

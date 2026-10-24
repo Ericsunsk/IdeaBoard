@@ -519,22 +519,22 @@ func (f *fakeControlPayments) CreatePaymentRefund(_ context.Context, cmd payment
 
 type fakeControlBillingAccounts struct{}
 
-func (fakeControlBillingAccounts) EnsureBillingAccountForWorkspace(_ context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error) {
-	return tenancypg.BillingAccount{
+func (fakeControlBillingAccounts) EnsureBillingAccountForWorkspace(_ context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error) {
+	return tenancy.BillingAccount{
 		WorkspaceInternalID: workspaceInternalID, WorkspacePublicID: workspacePublicID,
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	}, nil
 }
 
-func (fakeControlBillingAccounts) GetBillingAccountByInternalID(_ context.Context, billingAccountInternalID int64) (tenancypg.BillingAccount, error) {
-	return tenancypg.BillingAccount{
+func (fakeControlBillingAccounts) GetBillingAccountByInternalID(_ context.Context, billingAccountInternalID int64) (tenancy.BillingAccount, error) {
+	return tenancy.BillingAccount{
 		InternalID: billingAccountInternalID, PublicID: "ba_testfixture",
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	}, nil
 }
 
-func (fakeControlBillingAccounts) GetBillingAccountByPublicID(_ context.Context, publicID string) (tenancypg.BillingAccount, error) {
-	return tenancypg.BillingAccount{
+func (fakeControlBillingAccounts) GetBillingAccountByPublicID(_ context.Context, publicID string) (tenancy.BillingAccount, error) {
+	return tenancy.BillingAccount{
 		InternalID: 7001, PublicID: publicID,
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	}, nil

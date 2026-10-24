@@ -35,10 +35,12 @@ import type {
   CreateWorkspaceBillingQuoteRequest,
   CreateWorkspaceCheckoutRequest,
   ErrorEnvelope,
+  GetWorkspaceBillingOverviewParams,
   GetWorkspaceBillingTransfer200,
   GetWorkspaceUsageParams,
   InitiateBillingTransferRequest,
   InitiateWorkspaceBillingTransfer201,
+  ListMemberQuotasParams,
   ListWorkspaceBillingAccountMembers200,
   ListWorkspaceBillingRecordsParams,
   ListWorkspaceBillingTransfers200,
@@ -59,6 +61,7 @@ import type {
   UpdateWorkspaceBillingAccountMember200,
   UserId,
   WorkspaceBillingAccountEnvelope,
+  WorkspaceBillingOverviewEnvelope,
   WorkspaceBillingQuoteEnvelope,
   WorkspaceCheckoutSessionEnvelope,
   WorkspaceCreditsBalanceEnvelope,
@@ -1639,26 +1642,168 @@ export function useGetWorkspaceUsage<
   return query
 }
 
-export const getListMemberQuotasUrl = (workspaceId: string) => {
-  return `/workspaces/${encodeURIComponent(String(workspaceId))}/member-quotas`
+export const getGetWorkspaceBillingOverviewUrl = (
+  workspaceId: string,
+  params?: GetWorkspaceBillingOverviewParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/workspaces/${encodeURIComponent(String(workspaceId))}/billing-overview?${stringifiedParams}`
+    : `/workspaces/${encodeURIComponent(String(workspaceId))}/billing-overview`
 }
 
 /**
- * Organization Owner/Admin (org scopes) or the Personal account holder (personal scopes) lists every explicitly set quota on the resolved account with live usage and remaining quota for the current window. Other members render 403 billing_account_forbidden and read their own row via the self endpoint. Quotas cap one member's settled plus pending consumption across every workspace sharing the account (paid Task generations and Vision Search), never a sub-wallet: adjusting the limit never clears usage, unused periodic quota never rolls over, and rejoining never re-issues. New members default to unlimited; invites never gate on a default. Organization Owners always read as unlimited. Hidden workspaces render 404 workspace_not_found.
+ * Aggregation read collapsing the workspace panel fan-out (billing account, balance, usage, self quota, manager quota list, billing managers, member count, pending transfer invites) into one request. Every legacy read stays untouched. The workspace and stable Billing Account resolve once; tenancy-side reads share one read-only snapshot, while balance and usage compose through their owning services. Any workspace member may call it: billing_members appears only for billing managers, quotas only for quota managers, live_invites carries the store recipient scoping (managers see all, others see their own) and only pending invites. Error precedence and codes mirror the single reads, so no client branch changes. Unknown range values render 422 validation_failed. No Idempotency-Key: read-only, safe to retry.
+ * @summary Get the workspace billing panel in one request (members only)
+ */
+export const getWorkspaceBillingOverview = async (
+  workspaceId: string,
+  params?: GetWorkspaceBillingOverviewParams,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspaceBillingOverviewEnvelope> => {
+  return publicMutator<WorkspaceBillingOverviewEnvelope>(
+    getGetWorkspaceBillingOverviewUrl(workspaceId, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getGetWorkspaceBillingOverviewQueryKey = (
+  workspaceId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetWorkspaceBillingOverviewParams>,
+) => {
+  return ['workspaces', workspaceId, 'billing-overview', ...(params ? [params] : [])] as const
+}
+
+export const getGetWorkspaceBillingOverviewQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWorkspaceBillingOverview>>,
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ErrorEnvelope
+    | NotFoundResponse
+    | UnprocessableEntityResponse,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetWorkspaceBillingOverviewParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBillingOverview>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetWorkspaceBillingOverviewQueryKey(workspaceId, params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkspaceBillingOverview>>> = ({
+    signal,
+  }) =>
+    getWorkspaceBillingOverview(toValue(workspaceId), toValue(params), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(workspaceId) !== null && toValue(workspaceId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBillingOverview>>, TError, TData>
+}
+
+export type GetWorkspaceBillingOverviewQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWorkspaceBillingOverview>>
+>
+export type GetWorkspaceBillingOverviewQueryError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ErrorEnvelope
+  | NotFoundResponse
+  | UnprocessableEntityResponse
+
+/**
+ * @summary Get the workspace billing panel in one request (members only)
+ */
+
+export function useGetWorkspaceBillingOverview<
+  TData = Awaited<ReturnType<typeof getWorkspaceBillingOverview>>,
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ErrorEnvelope
+    | NotFoundResponse
+    | UnprocessableEntityResponse,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetWorkspaceBillingOverviewParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBillingOverview>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetWorkspaceBillingOverviewQueryOptions(workspaceId, params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListMemberQuotasUrl = (workspaceId: string, params?: ListMemberQuotasParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/workspaces/${encodeURIComponent(String(workspaceId))}/member-quotas?${stringifiedParams}`
+    : `/workspaces/${encodeURIComponent(String(workspaceId))}/member-quotas`
+}
+
+/**
+ * Organization Owner/Admin (org scopes) or the Personal account holder (personal scopes) lists every explicitly set quota on the resolved account with live usage and remaining quota for the current window. Other members render 403 billing_account_forbidden and read their own row via the self endpoint. Quotas cap one member's settled plus pending consumption across every workspace sharing the account (paid Task generations and Vision Search), never a sub-wallet: adjusting the limit never clears usage, unused periodic quota never rolls over, and rejoining never re-issues. New members default to unlimited; invites never gate on a default. Organization Owners always read as unlimited. Hidden workspaces render 404 workspace_not_found. ?scope=self lets any member read only their own quota through the same list envelope (single-item page) without the manager gate. No Idempotency-Key: read-only, safe to retry.
  * @summary List member cross-workspace quotas with live usage (managers only)
  */
 export const listMemberQuotas = async (
   workspaceId: string,
+  params?: ListMemberQuotasParams,
   options?: Parameters<typeof publicMutator>[1],
 ): Promise<MemberQuotaListEnvelope> => {
-  return publicMutator<MemberQuotaListEnvelope>(getListMemberQuotasUrl(workspaceId), {
+  return publicMutator<MemberQuotaListEnvelope>(getListMemberQuotasUrl(workspaceId, params), {
     ...options,
     method: 'GET',
   })
 }
 
-export const getListMemberQuotasQueryKey = (workspaceId: MaybeRefOrGetter<string>) => {
-  return ['workspaces', workspaceId, 'member-quotas'] as const
+export const getListMemberQuotasQueryKey = (
+  workspaceId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<ListMemberQuotasParams>,
+) => {
+  return ['workspaces', workspaceId, 'member-quotas', ...(params ? [params] : [])] as const
 }
 
 export const getListMemberQuotasQueryOptions = <
@@ -1666,6 +1811,7 @@ export const getListMemberQuotasQueryOptions = <
   TError = UnauthorizedResponse | ErrorEnvelope | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<ListMemberQuotasParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMemberQuotas>>, TError, TData>>
     request?: SecondParameter<typeof publicMutator>
@@ -1673,10 +1819,10 @@ export const getListMemberQuotasQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getListMemberQuotasQueryKey(workspaceId)
+  const queryKey = getListMemberQuotasQueryKey(workspaceId, params)
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listMemberQuotas>>> = ({ signal }) =>
-    listMemberQuotas(toValue(workspaceId), { signal, ...requestOptions })
+    listMemberQuotas(toValue(workspaceId), toValue(params), { signal, ...requestOptions })
 
   return {
     queryKey,
@@ -1698,13 +1844,14 @@ export function useListMemberQuotas<
   TError = UnauthorizedResponse | ErrorEnvelope | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<ListMemberQuotasParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMemberQuotas>>, TError, TData>>
     request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListMemberQuotasQueryOptions(workspaceId, options)
+  const queryOptions = getListMemberQuotasQueryOptions(workspaceId, params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

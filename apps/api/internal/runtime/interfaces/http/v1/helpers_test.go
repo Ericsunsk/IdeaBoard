@@ -75,6 +75,24 @@ func (d *staticUserDirectory) GetUserPublicID(ctx context.Context, userID int64)
 	return uuid.Nil, tenancy.ErrNotFound
 }
 
+func (d *staticUserDirectory) GetUserPublicIDs(ctx context.Context, userIDs []int64) (map[int64]uuid.UUID, error) {
+	if d.failPublicIDLookup.Load() {
+		return nil, tenancy.ErrNotFound
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	out := make(map[int64]uuid.UUID, len(userIDs))
+	for _, userID := range userIDs {
+		if userID <= 0 {
+			continue
+		}
+		if id, ok := d.byID[userID]; ok {
+			out[userID] = id
+		}
+	}
+	return out, nil
+}
+
 func newV1TestEngine(store tenancy.Store, dir *staticUserDirectory) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

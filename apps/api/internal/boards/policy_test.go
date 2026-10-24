@@ -810,6 +810,20 @@ func (testWorkspaceMembers) GetUserPublicID(ctx context.Context, userID int64) (
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(fmt.Sprintf("board-test-user-%d", userID))), nil
 }
 
+func (testWorkspaceMembers) GetUserPublicIDs(ctx context.Context, userIDs []int64) (map[int64]uuid.UUID, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	out := make(map[int64]uuid.UUID, len(userIDs))
+	for _, userID := range userIDs {
+		if userID <= 0 {
+			continue
+		}
+		out[userID] = uuid.NewSHA1(uuid.NameSpaceOID, []byte(fmt.Sprintf("board-test-user-%d", userID)))
+	}
+	return out, nil
+}
+
 func (testWorkspaceMembers) WithWorkspaceMembers(ctx context.Context, _ string, action func(func(int64) string) error) error {
 	if err := ctx.Err(); err != nil {
 		return err

@@ -38,7 +38,14 @@ describe('creditsResource', () => {
       expect.objectContaining({ method: 'GET', signal: controller.signal }),
     )
     const scope = { workspaceId: WORKSPACE_ID, billingAccountId: 'ba_1', identity: 'user-1' }
-    expect(creditsQueryKeys.wallet(scope)).toEqual(['workspace', 'credits', 'wallet', scope])
+    expect(creditsQueryKeys.wallet(scope.workspaceId, scope.billingAccountId, scope.identity)).toEqual([
+      'workspace',
+      'credits',
+      'wallet',
+      WORKSPACE_ID,
+      'ba_1',
+      'user-1',
+    ])
   })
 
   it('fails closed when the response carries a different payer account', async () => {

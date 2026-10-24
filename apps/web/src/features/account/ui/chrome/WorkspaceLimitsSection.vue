@@ -336,16 +336,17 @@ const props = withDefaults(
 
 const { t } = useI18n()
 
-const quota = useMemberQuotaSection({
-  workspaceId: () => props.workspaceId,
-  canManage: () => props.canManage,
-  isExpanded: () => props.isExpanded,
-})
-
 // The management toggle only flips local visibility (never persisted,
 // never optimistic); the gate itself reuses the quota controller's
 // server-resolved canManage capability.
 const isManageOpen = ref(false)
+
+const quota = useMemberQuotaSection({
+  workspaceId: () => props.workspaceId,
+  canManage: () => props.canManage,
+  isExpanded: () => props.isExpanded,
+  isListEnabled: () => isManageOpen.value,
+})
 
 function toggleManage(): void {
   isManageOpen.value = !isManageOpen.value

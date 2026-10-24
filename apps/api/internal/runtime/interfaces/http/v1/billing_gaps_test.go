@@ -303,18 +303,18 @@ type gapsTestFixture struct {
 // fabricated beyond the ba_ pattern.
 type fakeGapBillingAccounts struct {
 	mu       sync.Mutex
-	accounts map[int64]tenancypg.BillingAccount
+	accounts map[int64]tenancy.BillingAccount
 	roles    map[int64]map[int64]string
 	deny     map[int64]bool
 }
 
-func (f *fakeGapBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error) {
+func (f *fakeGapBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if existing, ok := f.accounts[workspaceInternalID]; ok {
 		return existing, nil
 	}
-	account := tenancypg.BillingAccount{
+	account := tenancy.BillingAccount{
 		InternalID:          workspaceInternalID,
 		PublicID:            "ba_gaps_" + workspacePublicID,
 		OwnerType:           tenancypg.BillingOwnerWorkspace,
@@ -322,21 +322,21 @@ func (f *fakeGapBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Co
 		WorkspacePublicID:   workspacePublicID,
 	}
 	if f.accounts == nil {
-		f.accounts = make(map[int64]tenancypg.BillingAccount)
+		f.accounts = make(map[int64]tenancy.BillingAccount)
 	}
 	f.accounts[workspaceInternalID] = account
 	return account, nil
 }
 
-func (f *fakeGapBillingAccounts) GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancypg.BillingAccount, error) {
-	return tenancypg.BillingAccount{}, tenancy.ErrBillingNotFound
+func (f *fakeGapBillingAccounts) GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancy.BillingAccount, error) {
+	return tenancy.BillingAccount{}, tenancy.ErrBillingNotFound
 }
 
-func (f *fakeGapBillingAccounts) GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancypg.BillingAccount, error) {
+func (f *fakeGapBillingAccounts) GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancy.BillingAccount, error) {
 	if billingAccountInternalID <= 0 {
-		return tenancypg.BillingAccount{}, tenancy.ErrBillingNotFound
+		return tenancy.BillingAccount{}, tenancy.ErrBillingNotFound
 	}
-	return tenancypg.BillingAccount{
+	return tenancy.BillingAccount{
 		InternalID: billingAccountInternalID,
 		PublicID:   fmt.Sprintf("ba_beneficiary_%d", billingAccountInternalID),
 		OwnerType:  tenancypg.BillingOwnerWorkspace,
@@ -434,7 +434,7 @@ func gapsWorkspace(t *testing.T, fx *gapsTestFixture) string {
 
 // gapsAccount resolves the stable payer account a gaps test workspace
 // reads through (#919): the same Ensure seam the handlers use.
-func gapsAccount(t *testing.T, fx *gapsTestFixture, wsID string) tenancypg.BillingAccount {
+func gapsAccount(t *testing.T, fx *gapsTestFixture, wsID string) tenancy.BillingAccount {
 	t.Helper()
 	ctx := context.Background()
 	ws, err := fx.store.GetWorkspace(ctx, wsID)

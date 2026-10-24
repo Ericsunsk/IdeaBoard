@@ -678,6 +678,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/PageSize'
+        - name: expand
+          in: query
+          required: false
+          description: >-
+            Optional comma-separated expansion (default: none, list shape
+            unchanged). role embeds the caller organization role per row
+            (single batched lookup); workspace_counts embeds the visible
+            workspace count per row (single batched lookup, closed
+            organizations report zero). Unknown values render 400
+            bad_request. No Idempotency-Key: read-only, safe to retry.
+          schema:
+            type: string
+            example: role,workspace_counts
       responses:
         '200':
           description: Paginated organization list.
@@ -727,8 +740,25 @@ paths:
       tags: [Organizations]
       operationId: getOrganization
       summary: Get an organization by explicit organization context
+      description: >-
+        Optional ?expand= collapses the organization panel into one
+        request: members embeds the member list with email/avatar display
+        facts, workspaces embeds the organization workspace list, role
+        embeds the caller organization role (resolved once, never
+        re-fetched per expansion). Default shape (no expand) is unchanged.
+        Unknown values render 400 bad_request. No Idempotency-Key:
+        read-only, safe to retry.
       parameters:
         - $ref: '#/components/parameters/OrganizationId'
+        - name: expand
+          in: query
+          required: false
+          description: >-
+            Optional comma-separated expansion (default: none, detail
+            shape unchanged). Allowed: members, workspaces, role.
+          schema:
+            type: string
+            example: members,workspaces,role
       responses:
         '200':
           description: Organization detail.
@@ -2362,6 +2392,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/billing-overview:
+    get:
+      tags: [WorkspaceBilling]
+      operationId: getWorkspaceBillingOverview
+      summary: Get the workspace billing panel in one request (members only)
+      description: >-
+        Aggregation read collapsing the workspace panel fan-out (billing
+        account, balance, usage, self quota, manager quota list, billing
+        managers, member count, pending transfer invites) into one request.
+        Every legacy read stays untouched. The workspace and stable Billing
+        Account resolve once; tenancy-side reads share one read-only
+        snapshot, while balance and usage compose through their owning
+        services. Any workspace member may call it: billing_members appears
+        only for billing managers, quotas only for quota managers,
+        live_invites carries the store recipient scoping (managers see all,
+        others see their own) and only pending invites. Error precedence
+        and codes mirror the single reads, so no client branch changes.
+        Unknown range values render 422 validation_failed. No
+        Idempotency-Key: read-only, safe to retry.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: range
+          in: query
+          required: false
+          description: Usage window for the usage section. Defaults to 30d.
+          schema:
+            type: string
+            enum: [7d, 30d, 1y]
+            default: 30d
+      responses:
+        '200':
+          description: Billing panel snapshot.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceBillingOverviewEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Missing financial grant or restricted wallet (billing_account_forbidden, billing_wallet_restricted).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Billing overview unavailable (service_unavailable).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /workspaces/{workspace_id}/member-quotas:
     get:
       tags: [WorkspaceBilling]
@@ -2379,9 +2474,22 @@ paths:
         clears usage, unused periodic quota never rolls over, and rejoining
         never re-issues. New members default to unlimited; invites never
         gate on a default. Organization Owners always read as unlimited.
-        Hidden workspaces render 404 workspace_not_found.
+        Hidden workspaces render 404 workspace_not_found. ?scope=self lets
+        any member read only their own quota through the same list envelope
+        (single-item page) without the manager gate. No Idempotency-Key:
+        read-only, safe to retry.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
+        - name: scope
+          in: query
+          required: false
+          description: >-
+            Optional read scope (default: full manager list). scope=self
+            returns only the caller's quota as a single-item page. Unknown
+            values render 400 bad_request.
+          schema:
+            type: string
+            enum: [self]
       responses:
         '200':
           description: Member quotas with live usage.
@@ -4894,6 +5002,34 @@ components:
           type: string
           format: date-time
           description: RFC3339 UTC timestamp.
+        role:
+          $ref: '#/components/schemas/MembershipRole'
+          description: >-
+            Caller organization role; present only with ?expand=role on the
+            detail endpoint or ?expand=role on the list endpoint.
+        workspace_count:
+          type: integer
+          format: int64
+          minimum: 0
+          description: >-
+            Visible workspace count; present only with
+            ?expand=workspace_counts on the list endpoint. Closed
+            organizations report zero.
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizationMember'
+          description: >-
+            Organization members with email/avatar display facts; present
+            only with ?expand=members on the detail endpoint. Absent reads
+            as empty.
+        workspaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/Workspace'
+          description: >-
+            Organization workspaces; present only with ?expand=workspaces
+            on the detail endpoint. Absent reads as empty.
     OrganizationStatus:
       type: string
       enum: [active, closed]
@@ -5837,6 +5973,17 @@ components:
           type: string
           format: date-time
           description: Omitted when empty.
+        email:
+          type: string
+          format: email
+          description: >-
+            Manager-visible member email for display assistance only.
+            Omitted when unavailable; never used as a write identity.
+        avatar:
+          type: string
+          description: >-
+            Manager-visible member avatar public URL. Omitted when the
+            member has no custom avatar or the value is unavailable.
     AddBillingAccountMemberRequest:
       type: object
       required: [data]
@@ -5911,6 +6058,27 @@ components:
           format: date-time
         decided_by:
           type: string
+        from_email:
+          type: string
+          format: email
+          description: Initiator email for display assistance only; omitted when unavailable.
+        from_avatar:
+          type: string
+          description: Initiator avatar public URL; omitted when unavailable.
+        to_email:
+          type: string
+          format: email
+          description: Recipient email for display assistance only; omitted when unavailable.
+        to_avatar:
+          type: string
+          description: Recipient avatar public URL; omitted when unavailable.
+        decided_by_email:
+          type: string
+          format: email
+          description: Decider email for display assistance only; omitted while undecided or unavailable.
+        decided_by_avatar:
+          type: string
+          description: Decider avatar public URL; omitted while undecided or unavailable.
     WorkspaceBillingAccountEnvelope:
       type: object
       required: [data]
@@ -6130,6 +6298,50 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MemberQuota'
+    WorkspaceBillingOverview:
+      type: object
+      required: [billing_account, balance, usage, quota, members_count]
+      additionalProperties: false
+      properties:
+        billing_account:
+          $ref: '#/components/schemas/WorkspaceBillingAccount'
+          description: Resolved account with the caller consumption scope and quota capability.
+        balance:
+          $ref: '#/components/schemas/WorkspaceCreditsBalance'
+          description: Wallet balance of the resolved account.
+        usage:
+          $ref: '#/components/schemas/WorkspaceUsage'
+          description: Usage snapshot of the resolved account for the requested range.
+        quota:
+          $ref: '#/components/schemas/MemberQuota'
+          description: Caller quota with live usage (always present).
+        quotas:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemberQuota'
+          description: Full manager quota list with live usage; present only for quota managers.
+        billing_members:
+          type: array
+          items:
+            $ref: '#/components/schemas/BillingAccountMember'
+          description: Financial manager list with display facts; present only for billing managers.
+        members_count:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Workspace member count.
+        live_invites:
+          type: array
+          items:
+            $ref: '#/components/schemas/BillingTransferInvite'
+          description: Pending transfer invites with the store recipient scoping.
+    WorkspaceBillingOverviewEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceBillingOverview'
     SetMemberQuotaRequest:
       type: object
       required: [data]

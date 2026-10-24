@@ -16145,7 +16145,7 @@
       "exports": ["BatchGetMediaAssetsResultEnvelope"]
     },
     "src/api/generated-query/public/model/billingAccountMember.ts": {
-      "sha256": "d826f78ed874a758dc80a727445a8cec1cdb4f007b37eef644edb3c014931cc3",
+      "sha256": "9b5f06a35ad70db6d3fa1b15eb944ee1c224d20c5cfb4fef2eaaab9b03f2e080",
       "exports": ["BillingAccountMember"]
     },
     "src/api/generated-query/public/model/billingAccountMemberRole.ts": {
@@ -16161,7 +16161,7 @@
       "exports": ["BillingRecordKind"]
     },
     "src/api/generated-query/public/model/billingTransferInvite.ts": {
-      "sha256": "10ca56f94e8456d68c9d7962ddd51267f85a4ad1e89134112ba638a064ed71f5",
+      "sha256": "3c88bbbc04f5bbce46bbea48dcb01eca72c74e3db12eca85d632d182b40343c3",
       "exports": ["BillingTransferInvite"]
     },
     "src/api/generated-query/public/model/billingTransferInviteStatus.ts": {
@@ -16428,6 +16428,10 @@
       "sha256": "4e1b831ad3ca96250be824b97b54c13d1794aa521cde588135816695e31d308c",
       "exports": ["ForbiddenResponse"]
     },
+    "src/api/generated-query/public/model/getOrganizationParams.ts": {
+      "sha256": "8cb43ecbc8982a0eef795ea11881dd87daeab8be58441464cc99cf997b988061",
+      "exports": ["GetOrganizationParams"]
+    },
     "src/api/generated-query/public/model/getPublicBrandingLogoParams.ts": {
       "sha256": "c46c4332624dba0888ed2d9c0c86af3525088341a0fda2cc5b738ed4ccc0f3a1",
       "exports": ["GetPublicBrandingLogoParams"]
@@ -16439,6 +16443,14 @@
     "src/api/generated-query/public/model/getPublicUserAvatarSize.ts": {
       "sha256": "e7fd58330e37162ebbb77b332fc4317bad930b1b6e19be9cea3932f9ae29c611",
       "exports": ["GetPublicUserAvatarSize"]
+    },
+    "src/api/generated-query/public/model/getWorkspaceBillingOverviewParams.ts": {
+      "sha256": "b1fbacc4a6863f9caf178301445c9823d903c3333659b9fa5a5941444d12780d",
+      "exports": ["GetWorkspaceBillingOverviewParams"]
+    },
+    "src/api/generated-query/public/model/getWorkspaceBillingOverviewRange.ts": {
+      "sha256": "9088767de068fcb6dea52ef160a33b14fb947756ea2155162e8920e9a4649c91",
+      "exports": ["GetWorkspaceBillingOverviewRange"]
     },
     "src/api/generated-query/public/model/getWorkspaceBillingTransfer200.ts": {
       "sha256": "33589a20490187a6a7cc2583b954a5a53b17626e9decff359c7c367bbca7ede1",
@@ -16461,7 +16473,7 @@
       "exports": ["IfMatchParameter"]
     },
     "src/api/generated-query/public/model/index.ts": {
-      "sha256": "6be273c0fa39a324a2491f493ecbaa3835f0b653da14d470b7cb73a7b5d6f074",
+      "sha256": "4dc5f80395325ec24fcd58c07f04ef98738638665d792fcda91cecadace8e043",
       "exports": []
     },
     "src/api/generated-query/public/model/initiateBillingTransferRequest.ts": {
@@ -16512,8 +16524,16 @@
       "sha256": "ec90777c78e2b9971133348158c4869349ed9c7b10de3e26c9da7b3f375a4649",
       "exports": ["ListBoardsParams"]
     },
+    "src/api/generated-query/public/model/listMemberQuotasParams.ts": {
+      "sha256": "22250331c2b261b79433775377a604aaca11cd355193962ebcf65250cea82344",
+      "exports": ["ListMemberQuotasParams"]
+    },
+    "src/api/generated-query/public/model/listMemberQuotasScope.ts": {
+      "sha256": "f60d2f7e159bacb469a7f15521ae750c008bda4dc5cf0663bf2dd6cb14f70c2b",
+      "exports": ["ListMemberQuotasScope"]
+    },
     "src/api/generated-query/public/model/listOrganizationsParams.ts": {
-      "sha256": "a6b253ddec513a78e9b2395744fdd01470ce830d9827bf35007cced6fddff48f",
+      "sha256": "b665704626d68f348d48a9cf32ae68ad008132e655080483d19308cadfb24c6f",
       "exports": ["ListOrganizationsParams"]
     },
     "src/api/generated-query/public/model/listWorkspaceBillingAccountMembers200.ts": {
@@ -16657,7 +16677,7 @@
       "exports": ["NotFoundResponse"]
     },
     "src/api/generated-query/public/model/organization.ts": {
-      "sha256": "31e3d58dda0b5a2470f0495584d358535db9361531c19f4f0bdd26621b5da33d",
+      "sha256": "03dc818f687968b8c36edb5a212508a334823a5a634b7dfb1b481ede04572bb5",
       "exports": ["Organization"]
     },
     "src/api/generated-query/public/model/organizationEnvelope.ts": {
@@ -17104,6 +17124,14 @@
       "sha256": "ba5cd3bbf551011051fe92863297f60a0716ee2fc42d87f2911e66ca20f1da9d",
       "exports": ["WorkspaceBillingAccountOwnerType"]
     },
+    "src/api/generated-query/public/model/workspaceBillingOverview.ts": {
+      "sha256": "d6995e815e56384f7f9e08a7a4f3123252137c442f6573dca071d1988c8391e3",
+      "exports": ["WorkspaceBillingOverview"]
+    },
+    "src/api/generated-query/public/model/workspaceBillingOverviewEnvelope.ts": {
+      "sha256": "7b6e184c7912bef4504db4c9063a6f570b3574b2e5548bdeef35efdc7f6e511a",
+      "exports": ["WorkspaceBillingOverviewEnvelope"]
+    },
     "src/api/generated-query/public/model/workspaceBillingQuote.ts": {
       "sha256": "070394cfa5d548f627f53281412bba7aada7e08339be31a9586d2edebee4d370",
       "exports": ["WorkspaceBillingQuote"]
@@ -17265,7 +17293,7 @@
       "exports": ["WorkspaceVisionQueryStatus"]
     },
     "src/api/generated-query/public/organizations/organizations.ts": {
-      "sha256": "1994e4d5ea6f555b27f29f53945e82d30f9962e06906af4e6a84267ce86f8445",
+      "sha256": "bf83be3d8f82627dc21576c31926c26788fb18a3437c07c297d82d0294cc7a4e",
       "exports": [
         "AddOrganizationMemberMutationBody",
         "AddOrganizationMemberMutationError",
@@ -17411,7 +17439,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-billing/workspace-billing.ts": {
-      "sha256": "7bc57d9190cad49079ea67129090a5701c69377dbf7b57e82bec10ac2c5eec5e",
+      "sha256": "7d2e6ed64a73b6bb1899cffd645a274778f1a7ad61e689f9337724d5feddcd21",
       "exports": [
         "AbandonWorkspacePendingOrderMutationError",
         "AbandonWorkspacePendingOrderMutationResult",
@@ -17441,6 +17469,8 @@
         "GetSelfMemberQuotaQueryResult",
         "GetWorkspaceBillingAccountQueryError",
         "GetWorkspaceBillingAccountQueryResult",
+        "GetWorkspaceBillingOverviewQueryError",
+        "GetWorkspaceBillingOverviewQueryResult",
         "GetWorkspaceBillingTransferQueryError",
         "GetWorkspaceBillingTransferQueryResult",
         "GetWorkspaceCheckoutSessionQueryError",
@@ -17517,6 +17547,9 @@
         "getGetWorkspaceBillingAccountQueryKey",
         "getGetWorkspaceBillingAccountQueryOptions",
         "getGetWorkspaceBillingAccountUrl",
+        "getGetWorkspaceBillingOverviewQueryKey",
+        "getGetWorkspaceBillingOverviewQueryOptions",
+        "getGetWorkspaceBillingOverviewUrl",
         "getGetWorkspaceBillingTransferQueryKey",
         "getGetWorkspaceBillingTransferQueryOptions",
         "getGetWorkspaceBillingTransferUrl",
@@ -17570,6 +17603,7 @@
         "getUpdateWorkspaceBillingAccountMemberMutationOptions",
         "getUpdateWorkspaceBillingAccountMemberUrl",
         "getWorkspaceBillingAccount",
+        "getWorkspaceBillingOverview",
         "getWorkspaceBillingTransfer",
         "getWorkspaceCheckoutSession",
         "getWorkspaceCreditsBalance",
@@ -17596,6 +17630,7 @@
         "useCreateWorkspaceCheckoutSession",
         "useGetSelfMemberQuota",
         "useGetWorkspaceBillingAccount",
+        "useGetWorkspaceBillingOverview",
         "useGetWorkspaceBillingTransfer",
         "useGetWorkspaceCheckoutSession",
         "useGetWorkspaceCreditsBalance",

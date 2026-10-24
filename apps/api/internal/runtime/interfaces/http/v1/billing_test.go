@@ -50,7 +50,7 @@ type fakeBillingAccounts struct {
 	// accounts is keyed by stable billing-account internal ID (the
 	// anchoring workspace's internal ID); byScope maps a scope key to
 	// that account ID so every workspace in one scope resolves one row.
-	accounts  map[int64]tenancypg.BillingAccount
+	accounts  map[int64]tenancy.BillingAccount
 	byScope   map[string]int64
 	byPublic  map[string]int64
 	roles     map[int64]map[int64]string
@@ -82,10 +82,10 @@ func (f *fakeBillingAccounts) billingScopeOf(ctx context.Context, workspacePubli
 	return fmt.Sprintf("personal:%d", *ws.OwnerUserID), tenancypg.BillingOwnerWorkspace, false, nil
 }
 
-func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancypg.BillingAccount, error) {
+func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error) {
 	scope, ownerType, shared, err := f.billingScopeOf(ctx, workspacePublicID)
 	if err != nil {
-		return tenancypg.BillingAccount{}, err
+		return tenancy.BillingAccount{}, err
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -105,7 +105,7 @@ func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Conte
 	}
 	// First touch in this scope anchors the survivor: the stable
 	// identity other workspaces in the scope resolve afterwards.
-	account := tenancypg.BillingAccount{
+	account := tenancy.BillingAccount{
 		InternalID:          workspaceInternalID,
 		PublicID:            "ba_test_" + workspacePublicID,
 		OwnerType:           ownerType,
@@ -116,7 +116,7 @@ func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Conte
 		UpdatedAt:           billingTestNow,
 	}
 	if f.accounts == nil {
-		f.accounts = make(map[int64]tenancypg.BillingAccount)
+		f.accounts = make(map[int64]tenancy.BillingAccount)
 	}
 	if f.byPublic == nil {
 		f.byPublic = make(map[string]int64)
@@ -127,7 +127,7 @@ func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Conte
 	return account, nil
 }
 
-func (f *fakeBillingAccounts) GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancypg.BillingAccount, error) {
+func (f *fakeBillingAccounts) GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancy.BillingAccount, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.byPublic != nil {
@@ -142,16 +142,16 @@ func (f *fakeBillingAccounts) GetBillingAccountByPublicID(ctx context.Context, p
 			return account, nil
 		}
 	}
-	return tenancypg.BillingAccount{}, tenancy.ErrBillingNotFound
+	return tenancy.BillingAccount{}, tenancy.ErrBillingNotFound
 }
 
-func (f *fakeBillingAccounts) GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancypg.BillingAccount, error) {
+func (f *fakeBillingAccounts) GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancy.BillingAccount, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if account, ok := f.accounts[billingAccountInternalID]; ok {
 		return account, nil
 	}
-	return tenancypg.BillingAccount{}, tenancy.ErrBillingNotFound
+	return tenancy.BillingAccount{}, tenancy.ErrBillingNotFound
 }
 
 func (f *fakeBillingAccounts) GetBillingAccountRole(ctx context.Context, billingAccountInternalID, userID int64) (string, bool, error) {
@@ -602,6 +602,7 @@ func newBillingTestFixture() *billingTestFixture {
 		checkout: &fakeWorkspaceCheckout{},
 	}
 	fx.deps = ContractV1BillingDeps{
+		Snapshot:        func(ctx context.Context, read func(context.Context) error) error { return read(ctx) },
 		Tenancy:         fx.store,
 		Users:           fx.dir,
 		BillingAccounts: fx.accounts,

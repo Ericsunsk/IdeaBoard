@@ -183,6 +183,24 @@ type OrganizationStore interface {
 	// Financial history is retained; no automatic refund or Personal transfer occurs.
 	CloseOrganization(ctx context.Context, organizationPublicID string, actorUserID int64, reason string) (*Organization, error)
 	GetOrganizationRole(ctx context.Context, organizationPublicID string, userID int64) (string, bool, error)
+	// GetOrganizationRoles resolves one role per user inside an organization
+	// in a single lookup, replacing per-row GetOrganizationRole round trips
+	// (member-quota list normalization, organization member expansion).
+	// Users holding no membership are omitted (callers read them as
+	// non-members, matching GetOrganizationRole ok=false).
+	GetOrganizationRoles(ctx context.Context, organizationPublicID string, userIDs []int64) (map[int64]string, error)
+	// ListOrganizationRolesForUser resolves one user's role per organization
+	// in a single lookup, replacing per-organization GetOrganizationRole
+	// round trips (workspace listing fan-out, organization list
+	// expand=role). Organizations holding no membership are omitted.
+	ListOrganizationRolesForUser(ctx context.Context, organizationPublicIDs []string, userID int64) (map[string]string, error)
+	// ListOrganizationWorkspaceCounts reports visible workspace counts per
+	// organization in a single lookup, replacing per-organization
+	// ListWorkspacesByOrganizationID round trips (organization list
+	// expand=workspace_counts). Closed organizations report zero: their
+	// workspaces stay hidden from listing, matching ListWorkspacesForUser.
+	// Unknown organizations are omitted (callers read them as zero).
+	ListOrganizationWorkspaceCounts(ctx context.Context, organizationPublicIDs []string) (map[string]int64, error)
 	ListOrganizationWorkspaces(ctx context.Context, organizationPublicID string) ([]*Workspace, error)
 	CreateOrganizationWorkspace(ctx context.Context, organizationPublicID string, ownerUserID int64, name string) (*Workspace, error)
 	ListOrganizationMembers(ctx context.Context, organizationPublicID string) ([]*OrganizationMember, error)

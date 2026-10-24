@@ -48,7 +48,15 @@ export function useShareDialog(options: ShareDialogDeps & { panel: SharePanel })
   const attempts = new Map<string, ShareAttempt>()
   const facts = computed(() => snapshot.value?.facts ?? null)
   const canManage = computed(() => facts.value?.capabilities.manage === true)
-  const enabled = () => options.panel.isOpen.value && snapshot.value !== null && canManage.value
+  // Catalog meta already carries workspaceAccess/accessState: private boards
+  // (workspaceAccess none) render the Off state from facts without an access
+  // GET; the version + member list fetch on first share write via
+  // resolveAttempt. Shared boards still fetch members for selection display.
+  const accessEnabled = () =>
+    options.panel.isOpen.value &&
+    snapshot.value !== null &&
+    canManage.value &&
+    snapshot.value.facts.workspaceAccess !== 'none'
   const accessQuery = useQuery(
     computed(() => ({
       ...shareAccessOptions(
@@ -56,16 +64,23 @@ export function useShareDialog(options: ShareDialogDeps & { panel: SharePanel })
         snapshot.value?.scope.boardId ?? '',
         transport.fetchAccess,
       ),
-      enabled,
+      enabled: accessEnabled,
     })),
   )
-  const workspaceAccess = computed(
-    () => accessQuery.data.value?.workspaceAccess ?? facts.value?.workspaceAccess ?? 'none',
+  // A private catalog fact supersedes access data cached before revocation.
+  // Its query is disabled, so that old data cannot refresh on invalidation.
+  const sharedAccess = computed(() =>
+    facts.value?.workspaceAccess === 'none' ? undefined : accessQuery.data.value,
   )
-  const memberUserIds = computed(() => accessQuery.data.value?.memberUserIds ?? [])
+  const workspaceAccess = computed(
+    () => sharedAccess.value?.workspaceAccess ?? facts.value?.workspaceAccess ?? 'none',
+  )
+  const memberUserIds = computed(() => sharedAccess.value?.memberUserIds ?? [])
+  const rosterEnabled = () =>
+    options.panel.isOpen.value && snapshot.value !== null && canManage.value
   const roster = useShareRoster({
     transport,
-    enabled,
+    enabled: rosterEnabled,
     scope: () => snapshot.value?.scope ?? null,
     creatorId: () => facts.value?.creatorUserId ?? '',
     selectedIds: () => memberUserIds.value,
@@ -74,9 +89,14 @@ export function useShareDialog(options: ShareDialogDeps & { panel: SharePanel })
     () =>
       isOpening.value ||
       isSaving.value ||
-      (enabled() && (accessQuery.isPending.value || roster.query.isPending.value)),
+      (rosterEnabled() && roster.query.isPending.value) ||
+      (accessEnabled() && accessQuery.isPending.value),
   )
-  const hasMembersError = computed(() => accessQuery.isError.value || roster.query.isError.value)
+  const hasMembersError = computed(
+    () =>
+      (accessEnabled() && accessQuery.isError.value) ||
+      (rosterEnabled() && roster.query.isError.value),
+  )
   let openToken = 0
 
   function isSnapshotCurrent(snap: ShareSnapshot): boolean {
@@ -145,7 +165,7 @@ export function useShareDialog(options: ShareDialogDeps & { panel: SharePanel })
     const previous = attempts.get(key)
     if (previous) return previous
     const access =
-      accessQuery.data.value ??
+      (snap.facts.workspaceAccess === 'none' ? undefined : accessQuery.data.value) ??
       (await transport.fetchAccess(snap.scope.workspaceId, snap.scope.boardId))
     return mintShareAttempt(access.accessVersion)
   }
@@ -183,6 +203,11 @@ export function useShareDialog(options: ShareDialogDeps & { panel: SharePanel })
         return
       }
       attempts.delete(key)
+      snap.facts = {
+        ...snap.facts,
+        workspaceAccess: result.access.workspaceAccess,
+        accessState: result.access.accessState,
+      }
       feedback.accessUpdated()
     } catch (error) {
       if (isSnapshotCurrent(snap)) feedback.actionFailed(classifyShareError(error))
@@ -231,7 +256,7 @@ export function useShareDialog(options: ShareDialogDeps & { panel: SharePanel })
     hasMembersError,
     workspaceAccess,
     accessState: computed(
-      () => accessQuery.data.value?.accessState ?? facts.value?.accessState ?? 'private',
+      () => sharedAccess.value?.accessState ?? facts.value?.accessState ?? 'private',
     ),
     memberRows: roster.memberRows,
     setWorkspaceAccess,
@@ -242,8 +267,10 @@ export function useShareDialog(options: ShareDialogDeps & { panel: SharePanel })
       void openPanel()
     },
     retryQueries: () => {
-      void accessQuery.refetch()
-      void roster.query.refetch()
+      // Directed retry: only the failed instance refetches so a roster error
+      // never refires the access GET and vice versa.
+      if (accessEnabled() && accessQuery.isError.value) void accessQuery.refetch()
+      if (rosterEnabled() && roster.query.isError.value) void roster.query.refetch()
     },
   }
 }

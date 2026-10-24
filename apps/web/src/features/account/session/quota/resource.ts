@@ -174,7 +174,7 @@ export async function fetchMemberQuotaList(
 ): Promise<MemberQuotaSummary[]> {
   const id = requireAccountWorkspaceId(workspaceId)
   const fallback = i18n.global.t('workspace.quota.loadFailed')
-  const raw = await resolveWorkspaceBillingData<unknown>(listMemberQuotas(id, { signal }), fallback)
+  const raw = await resolveWorkspaceBillingData<unknown>(listMemberQuotas(id, undefined, { signal }), fallback)
   return parseMemberQuotaList(raw)
 }
 

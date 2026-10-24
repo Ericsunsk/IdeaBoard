@@ -78,6 +78,9 @@ export type HydrateBoardsFromServerOptions = {
   waitForWorkspaceTimeoutMs?: number
   shouldIncludeDocuments?: boolean
   shouldForce?: boolean
+  // Canvas entry hydrates one route board only (M→1): the gallery cover uses
+  // the list meta inline previewScene, so catalog walks stay list-only.
+  onlyBoardIds?: string[]
 }
 
 type ResolvedHydrateBoardsFromServerOptions = {
@@ -338,6 +341,7 @@ async function listRemoteBoards(
   shouldIncludeDocuments: boolean,
   rollbackBoardIds: Set<string>,
   shouldForce: boolean,
+  onlyBoardIds?: string[],
 ): Promise<Array<{ meta: WorkspaceBoardMeta; state: BoardState | null }>> {
   // Hydrate is the explicit visible/recovery freshness path. Query still
   // owns request de-duplication, AbortSignal, cache and revision guards.
@@ -349,8 +353,11 @@ async function listRemoteBoards(
     ...(shouldForce ? { staleTime: 0 } : {}),
   })
   if (!isBoardScopeCurrent(scope)) throw new Error('BOARD_HYDRATE_SCOPE_CHANGED')
+  const onlyIds = onlyBoardIds?.map((id) => id.trim()).filter((id) => id !== '')
+  const onlySet = onlyIds && onlyIds.length > 0 ? new Set(onlyIds) : null
   return Promise.all(
     metas.map(async (meta) => {
+      if (onlySet && !onlySet.has(meta.id)) return { meta, state: null }
       if (!shouldIncludeDocuments && !rollbackBoardIds.has(meta.id)) return { meta, state: null }
       const cached = queryClient.getQueryData<WorkspaceBoardDocument>(
         boardQueryKeys.document(workspaceId, meta.id),
@@ -433,7 +440,12 @@ export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOp
   const workspaceId = scope.workspaceId
   const resolvedOptions = resolveHydrateOptions(options)
   const rollbackKey = [...resolvedOptions.rollbackBoardIds].sort().join(',')
-  const hydrateKey = `${boardScopeKey(scope)}:${scope.residency}:${resolvedOptions.shouldPreserveLocalNewer ? 'preserve' : 'replace'}:${rollbackKey}:${options.shouldIncludeDocuments !== false}:${options.shouldForce !== false}`
+  const onlyKey = [...(options.onlyBoardIds ?? [])]
+    .map((id) => id.trim())
+    .filter((id) => id !== '')
+    .sort()
+    .join(',')
+  const hydrateKey = `${boardScopeKey(scope)}:${scope.residency}:${resolvedOptions.shouldPreserveLocalNewer ? 'preserve' : 'replace'}:${rollbackKey}:${options.shouldIncludeDocuments === true}:${options.shouldForce !== false}:${onlyKey}`
   const inFlight = hydrateInFlight.get(hydrateKey)
   if (inFlight) return inFlight
   const task = (async () => {
@@ -447,9 +459,10 @@ export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOp
       remoteBoards = await listRemoteBoards(
         workspaceId,
         scope,
-        options.shouldIncludeDocuments !== false,
+        options.shouldIncludeDocuments === true,
         resolvedOptions.rollbackBoardIds,
         options.shouldForce !== false,
+        options.onlyBoardIds,
       )
     } finally {
       stopScope()
@@ -483,12 +496,13 @@ export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOp
 /** Scope-bound production observers; server catalog and local draft stay separate. */
 export function observeBoardServerSnapshots(
   onCatalog: (boards: BoardMeta[] | null) => void,
-  shouldIncludeDocuments: boolean,
+  documentBoardIds: readonly string[],
 ): () => void {
   const scope = getBoardScope()
   if (!scope.userScope || !scope.workspaceId) return () => {}
   const workspaceId = scope.workspaceId
   const documents = new Map<string, () => void>()
+  const selectedIds = new Set(documentBoardIds)
   let isDisposed = false
   let metas: WorkspaceBoardMeta[] | undefined
   function projectDocuments() {
@@ -496,9 +510,11 @@ export function observeBoardServerSnapshots(
     try {
       applyRemoteBoardsToLocal(
         metas.map((meta) => {
-          const document = queryClient.getQueryData<WorkspaceBoardDocument>(
-            boardQueryKeys.document(workspaceId, meta.id),
-          )
+          const document = documents.has(meta.id)
+            ? queryClient.getQueryData<WorkspaceBoardDocument>(
+                boardQueryKeys.document(workspaceId, meta.id),
+              )
+            : undefined
           return {
             meta: document
               ? { ...meta, revision: document.revision, updatedAt: document.updatedAt }
@@ -518,25 +534,24 @@ export function observeBoardServerSnapshots(
     if (isDisposed || !next || !isBoardScopeCurrent(scope)) return
     metas = next
     onCatalog(next.map(toLocalMeta).filter((meta): meta is BoardMeta => meta !== null))
-    const ids = new Set(next.map((meta) => meta.id))
+    const selected = next.filter((meta) => selectedIds.has(meta.id) && meta.capabilities.read)
+    const ids = new Set(selected.map((meta) => meta.id))
     documents.forEach((stop, id) => {
       if (!ids.has(id)) {
         stop()
         documents.delete(id)
       }
     })
-    if (shouldIncludeDocuments) {
-      next.forEach((meta) => {
-        if (documents.has(meta.id)) return
-        const observer = new QueryObserver(queryClient, boardDocumentOptions(workspaceId, meta.id))
-        documents.set(
-          meta.id,
-          observer.subscribe((result) => {
-            if (result.isSuccess && !result.isFetching) projectDocuments()
-          }),
-        )
-      })
-    }
+    selected.forEach((meta) => {
+      if (documents.has(meta.id)) return
+      const observer = new QueryObserver(queryClient, boardDocumentOptions(workspaceId, meta.id))
+      documents.set(
+        meta.id,
+        observer.subscribe((result) => {
+          if (result.isSuccess && !result.isFetching) projectDocuments()
+        }),
+      )
+    })
     projectDocuments()
   }
   const stopList = listObserver.subscribe((result) => {
