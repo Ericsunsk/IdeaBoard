@@ -293,6 +293,7 @@ func (f *fakeBillingAccounts) InitiateBillingTransferInvite(ctx context.Context,
 	publicID := "bti_test_" + string(rune('a'+f.inviteSeq%26)) + string(rune('0'+f.inviteSeq%10)) + "00000001"
 	invited := &tenancy.BillingTransferInvite{
 		InternalID: f.inviteSeq, PublicID: publicID,
+		IdempotencyKey:   idempotencyKey,
 		BillingAccountID: billingAccountInternalID,
 		FromUserID:       fromUserID, ToUserID: toUserID,
 		Status: tenancy.BillingTransferPending,
@@ -616,6 +617,9 @@ func newBillingTestFixture() *billingTestFixture {
 }
 
 func (fx *billingTestFixture) engine() *gin.Engine {
+	if fx.deps.Invitations == nil {
+		fx.deps.Invitations = testInvitations(fx.store, fx.deps.BillingAccounts, nil, NewInvitationIdentityReader(nil, nil, fx.dir))
+	}
 	engine := newV1TestEngine(fx.store, fx.dir)
 	RegisterContractV1BillingRoutesOnEngine(engine, runtimehttp.AuthDeps{}, fx.deps)
 	return engine

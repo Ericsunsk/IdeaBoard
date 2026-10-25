@@ -1,18 +1,20 @@
 import { computed, ref, toValue, type MaybeRefOrGetter } from 'vue'
-import { useQueryClient } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import { workspaceMemberIdempotencyKey } from '../../../../api/idempotencyKey'
 import { useAppToast } from '../../../../core/composables/useAppToast'
 import { useWorkspaceSettingsRoster } from './reads'
 import {
+  cancelWorkspaceMemberInvite,
   changeWorkspaceMemberRole,
   classifyWorkspaceMemberError,
+  createWorkspaceMemberInvite,
   invalidateWorkspaceMemberQueries,
-  inviteWorkspaceMember,
-  lookupWorkspaceMemberId,
   removeWorkspaceMemberEntry,
+  workspaceMemberInvitesQueryOptions,
   type WorkspaceMemberEntry,
   type WorkspaceMemberFailureReason,
+  type WorkspaceMemberInvite,
   type WorkspaceMemberRole,
 } from '../accountWorkspace'
 
@@ -55,7 +57,7 @@ function memberFailureCopyKey(
     case 'forbidden':
       return 'workspace.switcher.members.noPermission'
     case 'default-protected':
-      return 'workspace.switcher.members.defaultPrivate'
+      return 'workspace.switcher.members.noPermission'
     case 'last-owner':
       return 'workspace.switcher.members.lastOwner'
     case 'member-limit':
@@ -88,6 +90,23 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
   const canManage = computed(() => myRole.value === 'owner' || myRole.value === 'admin')
   const isOwner = computed(() => myRole.value === 'owner')
   const isDefaultWorkspace = computed(() => toValue(options.isDefaultWorkspace) === true)
+
+  const invitesQuery = useQuery({
+    ...workspaceMemberInvitesQueryOptions(workspaceIdOf),
+    enabled: computed(
+      () =>
+        toValue(options.isExpanded) &&
+        canManage.value &&
+        !isDefaultWorkspace.value &&
+        workspaceIdOf() !== '',
+    ),
+  })
+  const pendingInvites = computed<WorkspaceMemberInvite[]>(() =>
+    (invitesQuery.data.value ?? []).filter((inv) => inv.status === 'pending'),
+  )
+
+  const collaboratorCount = computed(() => roster.value.length + pendingInvites.value.length)
+  const isLimitReached = computed(() => collaboratorCount.value >= 5)
 
   const isLoading = computed(() => rosterQuery.isLoading.value)
   const hasLoadError = computed(() => rosterQuery.isError.value)
@@ -123,6 +142,30 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
 
   const inviteEmail = ref('')
   const inviteRole = ref<WorkspaceMemberRole>('member')
+  const recentInviteTokens = ref<Record<string, string>>({})
+
+  function getInviteClaimUrl(token: string): string {
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    return `${origin}/invite/claim?token=${encodeURIComponent(token)}`
+  }
+
+  function getInviteLink(invite: WorkspaceMemberInvite): string | null {
+    const token = invite.token || recentInviteTokens.value[invite.id]
+    return token ? getInviteClaimUrl(token) : null
+  }
+
+  async function copyInviteLink(invite: WorkspaceMemberInvite): Promise<void> {
+    const link = getInviteLink(invite)
+    if (!link) return
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(link)
+        toast.info(t('workspace.switcher.members.inviteLinkCopied'))
+      }
+    } catch {
+      // ignore clipboard error
+    }
+  }
 
   function pickInviteRole(value: unknown): void {
     if (value === 'owner' || value === 'admin' || value === 'member') {
@@ -132,7 +175,7 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
 
   async function inviteMember(): Promise<void> {
     if (isDefaultWorkspace.value) {
-      toast.error(t('workspace.switcher.members.defaultPrivate'))
+      toast.error(t('workspace.switcher.members.noPermission'))
       return
     }
     const email = inviteEmail.value.trim()
@@ -140,37 +183,78 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
       toast.error(t('workspace.switcher.members.emailEmpty'))
       return
     }
+    if (roster.value.some((entry) => entry.email?.toLowerCase() === email.toLowerCase())) {
+      toast.warning(t('workspace.switcher.members.alreadyMember'))
+      return
+    }
+    if (
+      pendingInvites.value.some((inv) => inv.invitee_email.toLowerCase() === email.toLowerCase())
+    ) {
+      toast.warning(t('workspace.switcher.members.alreadyInvited'))
+      return
+    }
+    if (isLimitReached.value) {
+      toast.warning(t('workspace.switcher.members.memberLimitReached'))
+      return
+    }
     if (isPending('invite')) return
     await trackPending('invite', async () => {
-      let userId: string
+      let invite: WorkspaceMemberInvite
       try {
-        userId = await lookupWorkspaceMemberId(workspaceIdOf(), email)
-      } catch (error) {
-        reportFailure(
-          classifyWorkspaceMemberError(error),
-          'workspace.switcher.members.userNotFound',
-        )
-        return
-      }
-      if (roster.value.some((entry) => entry.userId === userId)) {
-        toast.warning(t('workspace.switcher.members.alreadyMember'))
-        return
-      }
-      try {
-        await inviteWorkspaceMember(
+        invite = await createWorkspaceMemberInvite(
           workspaceIdOf(),
-          { userId, role: inviteRole.value },
+          { email, role: inviteRole.value },
           { idempotencyKey: workspaceMemberIdempotencyKey('invite') },
         )
       } catch (error) {
         const reason = classifyWorkspaceMemberError(error)
         if (reason === 'idempotency-conflict' || reason === 'member-limit') invalidateRoster()
-        reportFailure(reason, 'workspace.switcher.members.userNotFound')
+        reportFailure(reason, 'workspace.switcher.members.actionFailed')
         return
       }
       inviteEmail.value = ''
       inviteRole.value = 'member'
-      toast.success(t('workspace.switcher.members.invited'))
+      if (invite.token) {
+        recentInviteTokens.value = {
+          ...recentInviteTokens.value,
+          [invite.id]: invite.token,
+        }
+      }
+      const claimUrl = invite.token ? getInviteClaimUrl(invite.token) : null
+      if (claimUrl) {
+        toast.success(t('workspace.switcher.members.invited'), {
+          action: {
+            label: t('workspace.switcher.members.copyInviteLink'),
+            onClick: () => {
+              if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                void navigator.clipboard.writeText(claimUrl)
+                toast.info(t('workspace.switcher.members.inviteLinkCopied'))
+              }
+            },
+          },
+        })
+      } else {
+        toast.success(t('workspace.switcher.members.invited'))
+      }
+      // Roster invalidation covers this write: the inviter's view is the
+      // workspace-scoped roster + pending invites. No syncInvite* call is
+      // needed here — those helpers serve the invitee-side accept/decline
+      // paths (session flows + ClaimPage), not the inviter-side create.
+      invalidateRoster()
+    })
+  }
+
+  async function revokeInvite(inviteId: string): Promise<void> {
+    if (isPending(`revoke:${inviteId}`)) return
+    await trackPending(`revoke:${inviteId}`, async () => {
+      try {
+        await cancelWorkspaceMemberInvite(workspaceIdOf(), inviteId)
+        toast.success(t('workspace.switcher.members.revoked'))
+      } catch (error) {
+        const reason = classifyWorkspaceMemberError(error)
+        reportFailure(reason, 'workspace.switcher.members.revokeFailed')
+        return
+      }
       invalidateRoster()
     })
   }
@@ -202,6 +286,7 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
 
   function requestRemove(userId: string): void {
     if (isPending(`remove:${userId}`)) return
+    if (isDefaultWorkspace.value && toValue(options.currentUserId)?.trim() === userId) return
     confirmingRemoveId.value = userId
   }
 
@@ -211,6 +296,7 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
 
   async function confirmRemove(userId: string): Promise<void> {
     if (confirmingRemoveId.value !== userId || isPending(`remove:${userId}`)) return
+    if (isDefaultWorkspace.value && toValue(options.currentUserId)?.trim() === userId) return
     const isSelf = toValue(options.currentUserId)?.trim() === userId
     await trackPending(`remove:${userId}`, async () => {
       try {
@@ -237,6 +323,9 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
 
   return {
     roster,
+    pendingInvites,
+    collaboratorCount,
+    isLimitReached,
     myRole,
     canManage,
     isOwner,
@@ -249,6 +338,9 @@ export function useWorkspaceMemberSection(options: WorkspaceMemberSectionOptions
     inviteRole,
     pickInviteRole,
     inviteMember,
+    revokeInvite,
+    copyInviteLink,
+    getInviteLink,
     changeMemberRole,
     confirmingRemoveId,
     requestRemove,

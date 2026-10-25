@@ -1,4 +1,4 @@
-h1:4QlyVxSMVTNaXtOogzj4zjJB8EXc9ywEUx+58ORiYvA=
+h1:pSsafkvEH5BmfBDCA2EzRPdM6N7M9WxGFn0orDls9eY=
 20261020000000_baseline.sql h1:Fpqe+04wrz22ibGoHfDHz+s0WBq8GSYDkguIesUcWSU=
 20261020000001_board_y_updates.sql h1:fQb6dWRkE+cm22VIddfEVbXDLML9p7QzkjhCIz8bbxQ=
 20261020000002_drop_workspaces_archived_at.sql h1:yZj35gEPGxSzPy+heq9eudveMrB0P+mPYXd9ywJKh3k=
@@ -18,3 +18,6 @@ h1:4QlyVxSMVTNaXtOogzj4zjJB8EXc9ywEUx+58ORiYvA=
 20261104000001_permanent_organization_closure.sql h1:JnOUQXN4nEnZaTu//bJq58fM++Djezxuh5BOBhH+U0M=
 20261104000002_drop_organizations_archived_at.sql h1:jYssuoXv8q7O139wBMJBtMI59y4RPZNEX/VutfdeXLA=
 20261104000003_drop_publish_billing_price.sql h1:96oykTFfA8YtvKDHeKNz7w84hEiAZtDC/eL4TEjmmLM=
+20261104000004_workspace_member_invites.sql h1:1LFG87bOVvtIxJb93YM9N0HQ5Dtk9Wo/eG9W6KfU9eg=
+20261105000000_user_notifications.sql h1:lFAW4uj60lcmOfWvU6DL2AL05J/b6P9puwLD+zx6CQI=
+20261106000000_organization_member_invites.sql h1:kmlighX2MUTZY2naEIGoCgfVWXylHfgFZ2vjpp8yTNU=

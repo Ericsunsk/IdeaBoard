@@ -2,7 +2,7 @@
 
 import type { RouteHandler } from 'fastify';
 
-import type { BanUserData2, BanUserErrors, BanUserResponses, ClearMailConfigData, ClearMailConfigErrors, ClearMailConfigResponses, DeleteUserData2, DeleteUserErrors, DeleteUserResponses, EnsureUserData, EnsureUserErrors, EnsureUserResponses, GetMailConfigErrors, GetMailConfigResponses, GetSocialProviderCapabilitiesErrors, GetSocialProviderCapabilitiesResponses, GetSocialProviderData, GetSocialProviderErrors, GetSocialProviderResponses, GetUserEmailsData2, GetUserEmailsErrors, GetUserEmailsResponses, GetUserStatesData2, GetUserStatesErrors, GetUserStatesResponses, LookupUserByEmailData2, LookupUserByEmailErrors, LookupUserByEmailResponses, RevokeUserSessionsData2, RevokeUserSessionsErrors, RevokeUserSessionsResponses, SendMailConfigTestData, SendMailConfigTestErrors, SendMailConfigTestResponses, SetUserRoleData2, SetUserRoleErrors, SetUserRoleResponses, UnbanUserData2, UnbanUserErrors, UnbanUserResponses, UpdateMailConfigData, UpdateMailConfigErrors, UpdateMailConfigResponses, UpdateSocialProviderData, UpdateSocialProviderErrors, UpdateSocialProviderResponses, ValidateSessionErrors, ValidateSessionResponses } from './types.gen.js';
+import type { BanUserData2, BanUserErrors, BanUserResponses, ClearMailConfigData, ClearMailConfigErrors, ClearMailConfigResponses, DeleteUserData2, DeleteUserErrors, DeleteUserResponses, EnsureUserData, EnsureUserErrors, EnsureUserResponses, GetMailConfigErrors, GetMailConfigResponses, GetSocialProviderCapabilitiesErrors, GetSocialProviderCapabilitiesResponses, GetSocialProviderData, GetSocialProviderErrors, GetSocialProviderResponses, GetUserEmailsData2, GetUserEmailsErrors, GetUserEmailsResponses, GetUserStatesData2, GetUserStatesErrors, GetUserStatesResponses, LookupUserByEmailData2, LookupUserByEmailErrors, LookupUserByEmailResponses, RevokeUserSessionsData2, RevokeUserSessionsErrors, RevokeUserSessionsResponses, SendMailConfigTestData, SendMailConfigTestErrors, SendMailConfigTestResponses, SendWorkspaceInvitationData, SendWorkspaceInvitationErrors, SendWorkspaceInvitationResponses, SetUserRoleData2, SetUserRoleErrors, SetUserRoleResponses, UnbanUserData2, UnbanUserErrors, UnbanUserResponses, UpdateMailConfigData, UpdateMailConfigErrors, UpdateMailConfigResponses, UpdateSocialProviderData, UpdateSocialProviderErrors, UpdateSocialProviderResponses, ValidateSessionErrors, ValidateSessionResponses } from './types.gen.js';
 
 export type RouteHandlers = {
     validateSession: RouteHandler<{
@@ -71,5 +71,9 @@ export type RouteHandlers = {
         Body: UpdateSocialProviderData['body'];
         Params: UpdateSocialProviderData['path'];
         Reply: UpdateSocialProviderErrors & UpdateSocialProviderResponses;
+    }>;
+    sendWorkspaceInvitation: RouteHandler<{
+        Body: SendWorkspaceInvitationData['body'];
+        Reply: SendWorkspaceInvitationErrors & SendWorkspaceInvitationResponses;
     }>;
 };

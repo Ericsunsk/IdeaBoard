@@ -2,6 +2,7 @@ import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { renderWithUser } from '../../../../test/render'
 import type { User } from '../../../../api/sessionUserType'
 import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../routePaths'
@@ -78,6 +79,16 @@ async function renderHeader(props: { sticky?: boolean } = {}) {
 describe('WorkspaceHeader', () => {
   beforeEach(() => {
     currentUser.value = null
+    useMswHandlers(
+      http.get('*/api/v1/user/notifications', () =>
+        HttpResponse.json({ data: { items: [], next_cursor: null } }),
+      ),
+      http.get('*/api/v1/user/notifications/unread-count', () =>
+        HttpResponse.json({ data: { count: 0 } }),
+      ),
+      http.get('*/api/v1/workspaces', () => HttpResponse.json({ data: [] })),
+      http.get('*/api/auth/get-session', () => HttpResponse.json(null)),
+    )
   })
 
   it('renders brand, navigation and account controls by default', async () => {
@@ -93,5 +104,23 @@ describe('WorkspaceHeader', () => {
     const view = await renderHeader({ sticky: false })
     const header = view.container.querySelector('header')
     expect(header).toBeTruthy()
+  })
+
+  it('does not render notification bell when user is guest', async () => {
+    currentUser.value = null
+    const view = await renderHeader()
+    expect(view.container.querySelector('[data-testid="notification-bell-btn"]')).toBeNull()
+  })
+
+  it('renders notification bell when user is authenticated', async () => {
+    currentUser.value = {
+      public_id: 'usr_auth_1',
+      display_name: 'Member',
+      avatar: '',
+      role: 'user',
+    }
+    const view = await renderHeader()
+    const bell = await view.findByTestId('notification-bell-btn')
+    expect(bell).toBeInTheDocument()
   })
 })

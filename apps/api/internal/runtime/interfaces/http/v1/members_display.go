@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"ideaboard/api/internal/identity/users/domain"
 	identityports "ideaboard/api/internal/identity/users/ports"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 )
@@ -69,6 +70,13 @@ func (s *memberDisplayService) GetMemberDisplay(ctx context.Context, userIDs []i
 	if err != nil {
 		return nil, err
 	}
+	return memberDisplayForUsers(ctx, usersByID, s.emails)
+}
+
+// memberDisplayForUsers shares Auth email and public-avatar projection over
+// already-read users, so invitation enrichment needs no second local read.
+func memberDisplayForUsers(ctx context.Context, usersByID map[int64]*domain.User, emails identityports.UserEmailReader) (map[int64]V1MemberDisplay, error) {
+	out := make(map[int64]V1MemberDisplay, len(usersByID))
 	for numeric, user := range usersByID {
 		if user == nil {
 			continue
@@ -96,10 +104,10 @@ func (s *memberDisplayService) GetMemberDisplay(ctx context.Context, userIDs []i
 			authIDs = append(authIDs, authID)
 		}
 	}
-	if len(authIDs) == 0 || s.emails == nil {
+	if len(authIDs) == 0 || emails == nil {
 		return out, nil
 	}
-	identities, err := s.emails.GetUserEmails(ctx, authIDs)
+	identities, err := emails.GetUserEmails(ctx, authIDs)
 	if err != nil {
 		return nil, err
 	}

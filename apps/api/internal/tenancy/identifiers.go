@@ -23,6 +23,15 @@ const (
 	// can never drift; billing_account_transfer_invites.public_id carries
 	// bti_ per #948 (invite-style studio handover).
 	BillingTransferInvitePrefix = contract.PrefixBillingTransferInvite
+	// WorkspaceInvitePrefix aliases the contract kernel so the two can never
+	// drift; workspace_member_invites.public_id carries wsi_ per #957.
+	WorkspaceInvitePrefix = contract.PrefixWorkspaceInvite
+	// NotificationPrefix aliases the contract kernel so the two can never
+	// drift; user_notifications.public_id carries notif_ per #958.
+	NotificationPrefix = contract.PrefixNotification
+	// OrganizationInvitePrefix aliases the contract kernel so the two can never
+	// drift; organization_member_invites.public_id carries osi_ per #957 / ADR-0041.
+	OrganizationInvitePrefix = contract.PrefixOrganizationInvite
 )
 
 // FormatUserPublicID renders the external user identifier. The users table
@@ -71,4 +80,16 @@ func NewBillingAccountPublicID() (string, error) {
 // for a studio handover invitation (#948).
 func NewBillingTransferInvitePublicID() (string, error) {
 	return contract.MintPublicID(BillingTransferInvitePrefix, 12)
+}
+
+// NewWorkspaceInvitePublicID mints an opaque wsi_ public identifier
+// for a workspace member invitation (#957).
+func NewWorkspaceInvitePublicID() (string, error) {
+	return contract.MintPublicID(WorkspaceInvitePrefix, 12)
+}
+
+// NewOrganizationInvitePublicID mints an opaque osi_ public identifier
+// for an organization member invitation (ADR-0041).
+func NewOrganizationInvitePublicID() (string, error) {
+	return contract.MintPublicID(OrganizationInvitePrefix, 12)
 }

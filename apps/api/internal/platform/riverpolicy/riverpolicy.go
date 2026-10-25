@@ -27,6 +27,8 @@ import (
 // set (ideaboard_river_queue_depth{queue}) stays accurate.
 const (
 	RiverQueueDefault = "drawing_default"
+	// Workspace invitation mail is delivered through Auth after transactional enqueue.
+	RiverQueueWorkspaceInvitationMail = "workspace_invitation_mail"
 	// RiverQueueWebhookDeliver carries signed webhook deliveries
 	// (issue #833). The events package owns the worker; this package
 	// owns the queue name and its budget constants.
@@ -62,6 +64,7 @@ const (
 // converging terminally. Deterministic failures never retry.
 const (
 	RiverMaxAttemptsDefault                     = 25
+	RiverMaxAttemptsWorkspaceInvitationMail     = 8
 	RiverMaxAttemptsCreditReconciliation        = 5
 	RiverMaxAttemptsPaymentReconciliation       = 8
 	RiverMaxAttemptsPaymentCheckoutShutdown     = 8
@@ -97,7 +100,8 @@ const (
 	// RiverJobTimeoutFinalFailure covers settlement-only convergence: the
 	// orchestrator caps a converge attempt at 15s internally, so 1 minute
 	// leaves ample margin for the fallback enqueue path. Never calls a provider.
-	RiverJobTimeoutFinalFailure = time.Minute
+	RiverJobTimeoutFinalFailure            = time.Minute
+	RiverJobTimeoutWorkspaceInvitationMail = time.Minute
 	// RiverJobTimeoutCreditReconciliation covers one scheduled reconciliation
 	// run (bounded per-run batch); same class as the payment sweep budget.
 	RiverJobTimeoutCreditReconciliation = 4 * time.Minute

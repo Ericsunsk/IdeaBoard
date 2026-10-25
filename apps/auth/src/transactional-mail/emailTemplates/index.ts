@@ -50,6 +50,15 @@ export type TeamInviteVariables = Readonly<
   } & EmailBrandingVariables
 >
 
+export type WorkspaceInviteVariables = Readonly<
+  {
+    inviterName: string
+    workspaceName: string
+    roleName: string
+    acceptInviteUrl: string
+  } & EmailBrandingVariables
+>
+
 export type SecurityAlertLoginVariables = Readonly<
   {
     userName: string
@@ -238,6 +247,28 @@ export function teamInvite(variables: TeamInviteVariables): RenderedEmail {
       { appName, brandLogoUrl, publicSiteOrigin: variables.publicSiteOrigin },
     ),
     text: `${inviterName} invited you to join the “${boardTitle}” board as ${roleName}. Accept the invitation: ${acceptInviteUrl}`,
+  }
+}
+
+export function workspaceInvite(variables: WorkspaceInviteVariables): RenderedEmail {
+  const inviterName = requiredText(variables.inviterName, 'inviterName')
+  const workspaceName = requiredText(variables.workspaceName, 'workspaceName')
+  const roleName = requiredText(variables.roleName, 'roleName')
+  const acceptInviteUrl = validURL(variables.acceptInviteUrl, 'acceptInviteUrl')
+  const appName = variables.appName?.trim() || APP_NAME
+  return {
+    subject: `${inviterName} invited you to a workspace on ${appName}`,
+    html: renderHTML(
+      'workspace-invite.html',
+      {
+        INVITER_NAME: textVariable(inviterName),
+        WORKSPACE_NAME: textVariable(workspaceName),
+        ROLE_NAME: textVariable(roleName),
+        ACCEPT_INVITE_URL: urlVariable(acceptInviteUrl),
+      },
+      variables,
+    ),
+    text: `${inviterName} invited you to join the “${workspaceName}” workspace as ${roleName}. Review the invitation: ${acceptInviteUrl}. This invitation expires in 7 days.`,
   }
 }
 

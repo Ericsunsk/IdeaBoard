@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -390,6 +391,24 @@ const (
 func (e UnbanUserEnvelopeCode) Valid() bool {
 	switch e {
 	case UnbanUserEnvelopeCodeN0:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceInvitationMailRequestRole.
+const (
+	WorkspaceInvitationAdmin  WorkspaceInvitationMailRequestRole = "admin"
+	WorkspaceInvitationMember WorkspaceInvitationMailRequestRole = "member"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceInvitationMailRequestRole enum.
+func (e WorkspaceInvitationMailRequestRole) Valid() bool {
+	switch e {
+	case WorkspaceInvitationAdmin:
+		return true
+	case WorkspaceInvitationMember:
 		return true
 	default:
 		return false
@@ -780,6 +799,19 @@ type UnbanUserEnvelope struct {
 // UnbanUserEnvelopeCode defines model for UnbanUserEnvelope.Code.
 type UnbanUserEnvelopeCode int
 
+// WorkspaceInvitationMailRequest defines model for WorkspaceInvitationMailRequest.
+type WorkspaceInvitationMailRequest struct {
+	InviteID      string                             `json:"invite_id"`
+	InviterName   string                             `json:"inviter_name"`
+	Recipient     openapi_types.Email                `json:"recipient"`
+	Role          WorkspaceInvitationMailRequestRole `json:"role"`
+	Token         *string                            `json:"token,omitempty"`
+	WorkspaceName string                             `json:"workspace_name"`
+}
+
+// WorkspaceInvitationMailRequestRole defines model for WorkspaceInvitationMailRequest.Role.
+type WorkspaceInvitationMailRequestRole string
+
 // AuthUserID defines model for AuthUserID.
 type AuthUserID = string
 
@@ -827,6 +859,9 @@ type UpdateMailConfigJSONRequestBody = MailConfigRequest
 
 // SendMailConfigTestJSONRequestBody defines body for SendMailConfigTest for application/json ContentType.
 type SendMailConfigTestJSONRequestBody = MailTestRequest
+
+// SendWorkspaceInvitationJSONRequestBody defines body for SendWorkspaceInvitation for application/json ContentType.
+type SendWorkspaceInvitationJSONRequestBody = WorkspaceInvitationMailRequest
 
 // UpdateSocialProviderJSONRequestBody defines body for UpdateSocialProvider for application/json ContentType.
 type UpdateSocialProviderJSONRequestBody = SocialProviderRequest
@@ -945,6 +980,11 @@ type ClientInterface interface {
 	SendMailConfigTestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	SendMailConfigTest(ctx context.Context, body SendMailConfigTestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SendWorkspaceInvitationWithBody request with any body
+	SendWorkspaceInvitationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	SendWorkspaceInvitation(ctx context.Context, body SendWorkspaceInvitationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ValidateSession request
 	ValidateSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1078,6 +1118,30 @@ func (c *Client) SendMailConfigTestWithBody(ctx context.Context, contentType str
 
 func (c *Client) SendMailConfigTest(ctx context.Context, body SendMailConfigTestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSendMailConfigTestRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SendWorkspaceInvitationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSendWorkspaceInvitationRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SendWorkspaceInvitation(ctx context.Context, body SendWorkspaceInvitationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSendWorkspaceInvitationRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1480,6 +1544,46 @@ func NewSendMailConfigTestRequestWithBody(server string, contentType string, bod
 	}
 
 	operationPath := fmt.Sprintf("/internal/mail/config/test")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewSendWorkspaceInvitationRequest calls the generic SendWorkspaceInvitation builder with application/json body
+func NewSendWorkspaceInvitationRequest(server string, body SendWorkspaceInvitationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSendWorkspaceInvitationRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSendWorkspaceInvitationRequestWithBody generates requests for SendWorkspaceInvitation with any type of body
+func NewSendWorkspaceInvitationRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/mail/workspace-invitation")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2056,6 +2160,11 @@ type ClientWithResponsesInterface interface {
 
 	SendMailConfigTestWithResponse(ctx context.Context, body SendMailConfigTestJSONRequestBody, reqEditors ...RequestEditorFn) (*SendMailConfigTestResponse, error)
 
+	// SendWorkspaceInvitationWithBodyWithResponse request with any body
+	SendWorkspaceInvitationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SendWorkspaceInvitationResponse, error)
+
+	SendWorkspaceInvitationWithResponse(ctx context.Context, body SendWorkspaceInvitationJSONRequestBody, reqEditors ...RequestEditorFn) (*SendWorkspaceInvitationResponse, error)
+
 	// ValidateSessionWithResponse request
 	ValidateSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ValidateSessionResponse, error)
 
@@ -2244,6 +2353,41 @@ func (r SendMailConfigTestResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r SendMailConfigTestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SendWorkspaceInvitationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *MailMutationSuccess
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON500      *InternalError
+	JSON502      *ErrorEnvelope
+	JSON503      *ServiceUnavailable
+}
+
+// Status returns HTTPResponse.Status
+func (r SendWorkspaceInvitationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SendWorkspaceInvitationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SendWorkspaceInvitationResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -2755,6 +2899,23 @@ func (c *ClientWithResponses) SendMailConfigTestWithResponse(ctx context.Context
 	return ParseSendMailConfigTestResponse(rsp)
 }
 
+// SendWorkspaceInvitationWithBodyWithResponse request with arbitrary body returning *SendWorkspaceInvitationResponse
+func (c *ClientWithResponses) SendWorkspaceInvitationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SendWorkspaceInvitationResponse, error) {
+	rsp, err := c.SendWorkspaceInvitationWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSendWorkspaceInvitationResponse(rsp)
+}
+
+func (c *ClientWithResponses) SendWorkspaceInvitationWithResponse(ctx context.Context, body SendWorkspaceInvitationJSONRequestBody, reqEditors ...RequestEditorFn) (*SendWorkspaceInvitationResponse, error) {
+	rsp, err := c.SendWorkspaceInvitation(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSendWorkspaceInvitationResponse(rsp)
+}
+
 // ValidateSessionWithResponse request returning *ValidateSessionResponse
 func (c *ClientWithResponses) ValidateSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ValidateSessionResponse, error) {
 	rsp, err := c.ValidateSession(ctx, reqEditors...)
@@ -3147,6 +3308,67 @@ func ParseSendMailConfigTestResponse(rsp *http.Response) (*SendMailConfigTestRes
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSendWorkspaceInvitationResponse parses an HTTP response from a SendWorkspaceInvitationWithResponse call
+func ParseSendWorkspaceInvitationResponse(rsp *http.Response) (*SendWorkspaceInvitationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SendWorkspaceInvitationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MailMutationSuccess
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
 		var dest ServiceUnavailable

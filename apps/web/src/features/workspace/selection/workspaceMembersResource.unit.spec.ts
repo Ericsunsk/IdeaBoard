@@ -4,7 +4,7 @@ import {
   classifyWorkspaceMemberError,
   fetchWorkspaceMembers,
   invalidateWorkspaceMemberQueries,
-  inviteWorkspaceMember,
+  grantOrganizationWorkspaceMember,
   lookupWorkspaceMemberId,
   removeWorkspaceMemberEntry,
   workspaceMembersQueryOptions,
@@ -29,6 +29,8 @@ vi.mock('../../../api/generated-query/public/workspace-members/workspace-members
   removeWorkspaceMember: mocks.removeWorkspaceMember,
   getListWorkspaceMembersQueryKey: (workspaceId: string) =>
     ['workspaces', workspaceId, 'members'] as const,
+  getListWorkspaceMemberInvitesQueryKey: (workspaceId: string) =>
+    ['workspaces', workspaceId, 'invites'] as const,
 }))
 
 function codedError(code: string) {
@@ -124,7 +126,7 @@ describe('workspaceMembersResource writes', () => {
   test('invite carries a per-attempt Idempotency-Key', async () => {
     mocks.addWorkspaceMember.mockResolvedValue({ data: { user_id: 'usr_new', role: 'member' } })
 
-    const entry = await inviteWorkspaceMember(
+    const entry = await grantOrganizationWorkspaceMember(
       WORKSPACE_ID,
       { userId: 'usr_new', role: 'member' },
       { idempotencyKey: 'key-1' },
@@ -142,8 +144,8 @@ describe('workspaceMembersResource writes', () => {
     mocks.addWorkspaceMember.mockClear()
     mocks.addWorkspaceMember.mockResolvedValue({ data: { user_id: 'usr_new', role: 'admin' } })
 
-    await inviteWorkspaceMember(WORKSPACE_ID, { userId: 'usr_new', role: 'admin' })
-    await inviteWorkspaceMember(WORKSPACE_ID, { userId: 'usr_new', role: 'admin' })
+    await grantOrganizationWorkspaceMember(WORKSPACE_ID, { userId: 'usr_new', role: 'admin' })
+    await grantOrganizationWorkspaceMember(WORKSPACE_ID, { userId: 'usr_new', role: 'admin' })
 
     const keys = mocks.addWorkspaceMember.mock.calls.map(
       (call) => (call[2] as { headers: Record<string, string> }).headers['Idempotency-Key'],
@@ -186,10 +188,10 @@ describe('workspaceMembersResource writes', () => {
     mocks.removeWorkspaceMember.mockClear()
 
     await expect(
-      inviteWorkspaceMember(WORKSPACE_ID, { userId: 'nope', role: 'member' }),
+      grantOrganizationWorkspaceMember(WORKSPACE_ID, { userId: 'nope', role: 'member' }),
     ).rejects.toBeInstanceOf(WorkspaceMemberPayloadError)
     await expect(
-      inviteWorkspaceMember(WORKSPACE_ID, { userId: 'usr_x', role: 'super' as 'member' }),
+      grantOrganizationWorkspaceMember(WORKSPACE_ID, { userId: 'usr_x', role: 'super' as 'member' }),
     ).rejects.toBeInstanceOf(WorkspaceMemberPayloadError)
     await expect(
       changeWorkspaceMemberRole(WORKSPACE_ID, 'usr_x', { role: 'owner ' as 'member' }),

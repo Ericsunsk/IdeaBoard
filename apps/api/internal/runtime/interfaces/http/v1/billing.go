@@ -54,6 +54,7 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/invitations"
 	usageapplication "ideaboard/api/internal/usage/application"
 	usagedomain "ideaboard/api/internal/usage/domain"
 	usageports "ideaboard/api/internal/usage/ports"
@@ -223,6 +224,8 @@ type ContractV1BillingDeps struct {
 	// Snapshot is required for overview reads. Production uses a read-only
 	// PostgreSQL snapshot; in-memory fixtures supply an explicit adapter.
 	Snapshot billingoverview.Snapshot
+	// Invitations atomically creates handover notifications with the invite.
+	Invitations *invitations.Service
 }
 
 func (d *ContractV1BillingDeps) normalize() {

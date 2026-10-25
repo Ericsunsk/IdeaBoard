@@ -10,8 +10,8 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { AddOrganizationMemberRequestData } from './addOrganizationMemberRequestData'
+import type { WorkspaceMemberInvite } from './workspaceMemberInvite'
 
-export interface AddOrganizationMemberRequest {
-  data: AddOrganizationMemberRequestData
+export interface WorkspaceMemberInviteEnvelope {
+  data: WorkspaceMemberInvite
 }

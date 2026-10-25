@@ -49,6 +49,7 @@ export function useWorkspaceCreation(options: {
     }
     return [...known.values()]
   })
+  const hasOrganizations = computed(() => createScopeOptions.value.length > 0)
   async function loadOrganizations(): Promise<void> {
     if (!options.onLoadOrganizations) return
     const version = ++organizationLoadVersion
@@ -112,7 +113,11 @@ export function useWorkspaceCreation(options: {
     return t('workspace.switcher.scopePersonalHint')
   })
   function prepare(): void {
-    createScopeId.value = activeWorkspace.value?.organizationId ?? 'personal'
+    if (!hasOrganizations.value) {
+      createScopeId.value = 'personal'
+    } else {
+      createScopeId.value = activeWorkspace.value?.organizationId ?? 'personal'
+    }
     isOrganizationFormOpen.value = false
     organizationError.value = null
     void loadOrganizations()
@@ -126,6 +131,7 @@ export function useWorkspaceCreation(options: {
     createScopeId,
     createOrganizationId,
     createScopeOptions,
+    hasOrganizations,
     isOrganizationsLoading,
     organizationLoadError,
     isOrganizationFormOpen,

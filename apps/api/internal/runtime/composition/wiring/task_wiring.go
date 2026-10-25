@@ -47,12 +47,15 @@ import (
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	taskworker "ideaboard/api/internal/tasking/interfaces/worker"
 	"ideaboard/api/internal/tasking/workspacetasks"
+	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
+	"ideaboard/api/internal/tenancy/invitations"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 )
 
 type AppTaskServices struct {
+	invitationMailQueue *invitations.MailQueue
 	// userEvents and the River queue monitor are owned locally by
 	// NewAppTaskRuntime (user-event fanout + queue RED metrics); HTTP
 	// wiring only consumes the workspace settlement pieces below.
@@ -428,9 +431,11 @@ func NewAppTaskRuntime(
 	// fail loudly as unknown kinds; the workspace_task_execute consumer
 	// and all periodic workers ride this same client. Nil in http-only
 	// mode (see runWorkers above): the client then only enqueues.
+	invitationMailQueue := &invitations.MailQueue{}
 	var registerWorkers func(workers *river.Workers)
 	if runWorkers {
 		registerWorkers = func(workers *river.Workers) {
+			river.AddWorker(workers, &invitations.MailWorker{Store: tenancypg.NewStore(dbs.DB, services.storageService), Sender: services.authServiceClient})
 			river.AddWorker(workers, workerbilling.NewCreditReconciliationWorker(services.creditService))
 			river.AddWorker(workers, workerbilling.NewCreditReconciliationScheduleWorker(services.creditService))
 			river.AddWorker(workers, workerbilling.NewPaymentReconciliationWorker(services.paymentService))
@@ -463,10 +468,11 @@ func NewAppTaskRuntime(
 			QueueName:   riverpolicy.RiverQueueDefault,
 			Concurrency: workerConcurrency,
 			AdditionalQueues: map[string]river.QueueConfig{
-				workerbilling.CreditReconciliationQueue:    {MaxWorkers: 1},
-				workerbilling.PaymentReconciliationQueue:   {MaxWorkers: 1},
-				workerbilling.PaymentCheckoutShutdownQueue: {MaxWorkers: 1},
-				visionbilling.VisionBillingQueue:           {MaxWorkers: 1},
+				riverpolicy.RiverQueueWorkspaceInvitationMail: {MaxWorkers: 1},
+				workerbilling.CreditReconciliationQueue:       {MaxWorkers: 1},
+				workerbilling.PaymentReconciliationQueue:      {MaxWorkers: 1},
+				workerbilling.PaymentCheckoutShutdownQueue:    {MaxWorkers: 1},
+				visionbilling.VisionBillingQueue:              {MaxWorkers: 1},
 				// #833: signed webhook deliveries ride their own queue with
 				// the shared concurrency config (no new infra); serial
 				// workers match the maintenance-queue precedent and the 1m
@@ -501,6 +507,7 @@ func NewAppTaskRuntime(
 	// #809 hard cut: legacy startup recovery was a no-op against the
 	// stub (no legacy running rows left to converge). Workspace recovery
 	// is River redelivery + lease-guarded claim (#825).
+	invitationMailQueue.Client = riverClient
 	riverQueue.SetClient(riverClient)
 	workspaceEnqueuer.SetClient(riverClient)
 	webhookStore.SetEnqueuer(riverClient)
@@ -513,7 +520,7 @@ func NewAppTaskRuntime(
 	}
 
 	return AppTaskServices{
-		// #821 (#809 Phase 4-04): v1 workspace task enqueue rides the
+		invitationMailQueue: invitationMailQueue, // #821 (#809 Phase 4-04): v1 workspace task enqueue rides the
 		// production River client (workspace_task_execute kind); #825
 		// registers the real consumer on the same client above.
 		workspaceTaskQueue:  workspaceEnqueuer,

@@ -191,6 +191,7 @@ describe('Resend transport', () => {
         from: 'IdeaBoard <auth@example.com>',
         to: 'admin@example.com',
         replyTo: 'support@example.com',
+        idempotencyKey: 'workspace-invite:wsi_test',
         content: {
           subject: 'Test',
           html: '<p>Test</p>',
@@ -202,6 +203,10 @@ describe('Resend transport', () => {
 
     assert.equal(request?.url, 'https://api.resend.com/emails')
     assert.equal(new Headers(request?.init?.headers).get('authorization'), 'Bearer re_secret')
+    assert.equal(
+      new Headers(request?.init?.headers).get('idempotency-key'),
+      'workspace-invite:wsi_test',
+    )
     assert.doesNotMatch(String(request?.init?.body), /re_secret/)
     assert.deepEqual(JSON.parse(String(request?.init?.body)), {
       from: 'IdeaBoard <auth@example.com>',

@@ -13,6 +13,7 @@ import {
   effectiveOrganizationWorkspaceAccess,
   fetchAllWorkspaces,
   fetchOrganizationMembers,
+  fetchOrganizationInvites,
   fetchOrganizations,
   inviteOrganizationMember,
   parseOrganizationMember,
@@ -45,13 +46,13 @@ type DeletedConfirmation = { data: { deleted: boolean } }
 const AGREED_PAGE = {
   data: [
     {
-      public_id: 'ws_a1',
+      id: 'ws_a1',
       name: 'Alpha',
       organization_id: null,
       is_default: true,
     },
     {
-      public_id: 'ws_b2',
+      id: 'ws_b2',
       name: 'Beta',
       organization_id: 'org_c3',
       is_default: false,
@@ -83,14 +84,9 @@ describe('workspace list envelope', () => {
     expect(page).toMatchObject({ nextCursor: 'cursor2', hasMore: true })
   })
 
-  it('tolerates the kernel stub shape until the backend slice lands', () => {
-    const page = parseWorkspacePage({
-      data: [{ id: 'ws_stub1', created_at: '2026-09-01T00:00:00Z' }],
-      meta: { next_cursor: null, has_more: false },
-    })
-
-    expect(page.items[0]).toMatchObject({ publicId: 'ws_stub1', name: '' })
-    expect(page).toMatchObject({ nextCursor: null, hasMore: false })
+  it('rejects missing workspace names and obsolete ID aliases', () => {
+    expect(() => parseWorkspaceItem({ id: 'ws_a1' })).toThrow('Invalid workspace name')
+    expect(() => parseWorkspaceItem({ public_id: 'ws_a1', name: 'Alpha' })).toThrow()
   })
 
   it('walks cursor pagination and clamps page size to the agreed bounds', async () => {
@@ -101,7 +97,7 @@ describe('workspace list envelope', () => {
         const cursor = new URL(request.url).searchParams.get('cursor')
         if (cursor === 'cursor2') {
           return HttpResponse.json({
-            data: [{ public_id: 'ws_c3', name: 'Gamma' }],
+            data: [{ id: 'ws_c3', name: 'Gamma' }],
             meta: { next_cursor: null, has_more: false },
           })
         }
@@ -123,14 +119,14 @@ describe('workspace list envelope', () => {
     expect(normalizeWorkspaceListParams({ pageSize: 0 }).page_size).toBe(1)
 
     for (const raw of [
-      { public_id: '123', name: 'Legacy' },
-      { public_id: 'org_c3', name: 'Wrong prefix' },
-      { public_id: 'ws_', name: 'Empty payload' },
+      { id: '123', name: 'Legacy' },
+      { id: 'org_c3', name: 'Wrong prefix' },
+      { id: 'ws_', name: 'Empty payload' },
       { id: 42, name: 'Numeric' },
     ]) {
       expect(() => parseWorkspaceItem(raw)).toThrow()
     }
-    expect(() => parseWorkspacePage({ data: [{ public_id: 'usr_u1' }] })).toThrow()
+    expect(() => parseWorkspacePage({ data: [{ id: 'usr_u1' }] })).toThrow()
     expect(() => parseWorkspacePage({ bogus: true })).toThrow()
   })
 
@@ -218,7 +214,7 @@ describe('workspace creation', () => {
         })
         return HttpResponse.json({
           data: {
-            public_id: 'ws_new1',
+            id: 'ws_new1',
             name: 'New',
             organization_id: null,
             billing_account_id: 'ba_personal_1',
@@ -249,7 +245,7 @@ describe('workspace creation', () => {
       http.post('/api/v1/workspaces', async ({ request }) => {
         seen.push({ body: await request.json() })
         return HttpResponse.json({
-          data: { public_id: 'ws_new2', name: 'Biz', organization_id: null },
+          data: { id: 'ws_new2', name: 'Biz', organization_id: null },
         })
       }),
     )
@@ -282,21 +278,21 @@ describe('workspace creation', () => {
     await expect(provisionWorkspace({ name: 'Ok', organizationId: 'nope' })).rejects.toThrow()
   })
 
-  it('parses the creation-time billing account without breaking legacy payloads', () => {
+  it('parses the optional creation-time billing account', () => {
     expect(
       parseWorkspaceItem({
-        public_id: 'ws_b1',
+        id: 'ws_b1',
         name: 'Biz',
         organization_id: null,
         billing_account_id: 'ba_personal_1',
       }),
     ).toMatchObject({ publicId: 'ws_b1', billingAccountId: 'ba_personal_1' })
-    expect(parseWorkspaceItem({ public_id: 'ws_l1', name: 'Legacy' })).toMatchObject({
+    expect(parseWorkspaceItem({ id: 'ws_l1', name: 'Legacy' })).toMatchObject({
       publicId: 'ws_l1',
     })
     expect(() =>
       parseWorkspaceItem({
-        public_id: 'ws_b2',
+        id: 'ws_b2',
         name: 'Bad',
         billing_account_id: 'nope',
       }),
@@ -312,7 +308,7 @@ describe('workspace rename', () => {
         seen.push({ body: await request.json(), requestId: request.headers.get('request-id') })
         return HttpResponse.json({
           data: {
-            public_id: 'ws_a1',
+            id: 'ws_a1',
             name: 'Renamed',
             organization_id: null,
           },
@@ -402,13 +398,15 @@ describe('organization rename', () => {
 
 describe('workspace default marker', () => {
   it('parses is_default and defaults absent markers to false', () => {
-    expect(
-      parseWorkspaceItem({ public_id: 'ws_d1', name: 'Default', is_default: true }),
-    ).toMatchObject({ publicId: 'ws_d1', isDefault: true })
-    expect(
-      parseWorkspaceItem({ public_id: 'ws_p1', name: 'Plain', is_default: false }),
-    ).toMatchObject({ publicId: 'ws_p1', isDefault: false })
-    expect(parseWorkspaceItem({ public_id: 'ws_l1', name: 'Legacy' })).toMatchObject({
+    expect(parseWorkspaceItem({ id: 'ws_d1', name: 'Default', is_default: true })).toMatchObject({
+      publicId: 'ws_d1',
+      isDefault: true,
+    })
+    expect(parseWorkspaceItem({ id: 'ws_p1', name: 'Plain', is_default: false })).toMatchObject({
+      publicId: 'ws_p1',
+      isDefault: false,
+    })
+    expect(parseWorkspaceItem({ id: 'ws_l1', name: 'Legacy' })).toMatchObject({
       publicId: 'ws_l1',
       isDefault: false,
     })
@@ -503,7 +501,7 @@ describe('principal envelope', () => {
     useMswHandlers(
       http.get('/api/v1/user', () =>
         HttpResponse.json({
-          data: { public_id: 'usr_u1', display_name: 'Ada', avatar: 'https://cdn.example/a.png' },
+          data: { id: 'usr_u1', display_name: 'Ada', avatar: 'https://cdn.example/a.png' },
         }),
       ),
     )
@@ -515,12 +513,13 @@ describe('principal envelope', () => {
     })
   })
 
-  it('tolerates the stub User shape and rejects non-user IDs', () => {
-    expect(parsePrincipal({ data: { id: 'usr_stub9' } })).toEqual({
-      publicId: 'usr_stub9',
+  it('accepts optional principal profile fields and rejects non-user IDs', () => {
+    expect(parsePrincipal({ data: { id: 'usr_profile9' } })).toEqual({
+      publicId: 'usr_profile9',
       displayName: '',
     })
     expect(() => parsePrincipal({ data: { id: 'ws_a1' } })).toThrow()
+    expect(() => parsePrincipal({ data: { public_id: 'usr_profile9' } })).toThrow()
     expect(() => parsePrincipal({ data: null })).toThrow()
   })
 })
@@ -646,24 +645,92 @@ describe('organization membership (951)', () => {
       http.get('/api/v1/organizations/:organizationId/members', () =>
         HttpResponse.json({
           data: [
-            { user_id: 'usr_owner', role: 'owner' },
-            { user_id: 'usr_member', role: 'member' },
+            { user_id: 'usr_owner', role: 'owner', email: 'owner@example.com' },
+            {
+              user_id: 'usr_member',
+              role: 'member',
+              email: 'member@example.com',
+              avatar: 'https://example.com/avatar.png',
+            },
           ],
         }),
       ),
     )
     await expect(fetchOrganizationMembers('org_c3')).resolves.toEqual([
-      { userId: 'usr_owner', role: 'owner' },
-      { userId: 'usr_member', role: 'member' },
+      { userId: 'usr_owner', role: 'owner', email: 'owner@example.com' },
+      {
+        userId: 'usr_member',
+        role: 'member',
+        email: 'member@example.com',
+        avatar_url: 'https://example.com/avatar.png',
+      },
     ])
+  })
+
+  it('rejects malformed organization invite lists instead of inventing empty or pending facts', async () => {
+    for (const data of [{}, [{ id: 'osi_broken' }]]) {
+      useMswHandlers(
+        http.get('/api/v1/organizations/:organizationId/invites', () =>
+          HttpResponse.json({ data }),
+        ),
+      )
+      await expect(fetchOrganizationInvites('org_c3')).rejects.toThrow()
+    }
+  })
+
+  it('invites organization members by email', async () => {
+    useMswHandlers(
+      http.post('/api/v1/organizations/:organizationId/invites', async ({ request }) => {
+        const body = (await request.json()) as { email: string; role: string }
+        return HttpResponse.json(
+          {
+            data: {
+              id: 'osi_inv1',
+              organization_id: 'org_c3',
+              invitee_email: body.email,
+              role: body.role,
+              status: 'pending',
+              expires_at: '2026-11-13T00:00:00Z',
+              created_at: '2026-11-06T00:00:00Z',
+            },
+          },
+          { status: 201 },
+        )
+      }),
+    )
+    await expect(
+      inviteOrganizationMember('org_c3', { email: 'alice@example.com', role: 'member' }),
+    ).resolves.toEqual({
+      id: 'osi_inv1',
+      organizationId: 'org_c3',
+      inviteeEmail: 'alice@example.com',
+      role: 'member',
+      status: 'pending',
+      expiresAt: '2026-11-13T00:00:00Z',
+      createdAt: '2026-11-06T00:00:00Z',
+    })
   })
 
   it('invites, updates, and removes organization members with idempotency keys', async () => {
     const seen: string[] = []
     useMswHandlers(
-      http.post('/api/v1/organizations/:organizationId/members', async ({ request }) => {
+      http.post('/api/v1/organizations/:organizationId/invites', async ({ request }) => {
         seen.push(request.headers.get('Idempotency-Key') ?? '')
-        return HttpResponse.json({ data: { user_id: 'usr_new', role: 'member' } }, { status: 201 })
+        const body = (await request.json()) as { email: string; role: string }
+        return HttpResponse.json(
+          {
+            data: {
+              id: 'osi_inv2',
+              organization_id: 'org_c3',
+              invitee_email: body.email,
+              role: body.role,
+              status: 'pending',
+              expires_at: '2026-11-13T00:00:00Z',
+              created_at: '2026-11-06T00:00:00Z',
+            },
+          },
+          { status: 201 },
+        )
       }),
       http.patch('/api/v1/organizations/:organizationId/members/:memberId', () =>
         HttpResponse.json({ data: { user_id: 'usr_new', role: 'admin' } }),
@@ -674,8 +741,16 @@ describe('organization membership (951)', () => {
       ),
     )
     await expect(
-      inviteOrganizationMember('org_c3', { userId: 'usr_new', role: 'member' }),
-    ).resolves.toEqual({ userId: 'usr_new', role: 'member' })
+      inviteOrganizationMember('org_c3', { email: 'new@example.com', role: 'member' }),
+    ).resolves.toEqual({
+      id: 'osi_inv2',
+      organizationId: 'org_c3',
+      inviteeEmail: 'new@example.com',
+      role: 'member',
+      status: 'pending',
+      expiresAt: '2026-11-13T00:00:00Z',
+      createdAt: '2026-11-06T00:00:00Z',
+    })
     await expect(updateOrganizationMember('org_c3', 'usr_new', { role: 'admin' })).resolves.toEqual(
       { userId: 'usr_new', role: 'admin' },
     )
@@ -685,7 +760,7 @@ describe('organization membership (951)', () => {
 
   it('refuses owner grants client-side (handover only)', async () => {
     await expect(
-      inviteOrganizationMember('org_c3', { userId: 'usr_new', role: 'owner' as never }),
+      inviteOrganizationMember('org_c3', { email: 'boss@example.com', role: 'owner' as never }),
     ).rejects.toThrow()
     await expect(
       updateOrganizationMember('org_c3', 'usr_new', { role: 'owner' as never }),

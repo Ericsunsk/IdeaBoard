@@ -109,7 +109,7 @@ func TestV1MemberListDisplayInMemory(t *testing.T) {
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
 	const owner, member, outsider, stranger = 1, 2, 3, 4
-	ws := v1WorkspaceFixture(t, ctx, store, "member-display", owner)
+	ws := v1OrganizationWorkspaceFixture(t, ctx, store, "member-display", owner, member, outsider, stranger)
 	store.SeedWorkspaceMember(ws.PublicID, member, tenancy.RoleMember)
 	store.SeedWorkspaceMember(ws.PublicID, stranger, tenancy.RoleMember)
 	for _, id := range []int64{owner, member, outsider, stranger} {

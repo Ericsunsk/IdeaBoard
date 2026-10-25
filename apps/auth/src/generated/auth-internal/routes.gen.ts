@@ -103,6 +103,12 @@ export const authInternalRoutes = {
     fastifyPath: "/internal/social-providers/:provider",
     responseStatuses: [200,400,401,404,409,500,503],
   },
+  "sendWorkspaceInvitation": {
+    method: "POST",
+    openapiPath: "/internal/mail/workspace-invitation",
+    fastifyPath: "/internal/mail/workspace-invitation",
+    responseStatuses: [200,400,401,500,502,503],
+  },
 } as const
 
 export type AuthInternalOperationID = keyof typeof authInternalRoutes

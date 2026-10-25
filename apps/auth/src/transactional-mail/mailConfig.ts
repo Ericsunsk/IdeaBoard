@@ -1,4 +1,8 @@
-import { mailConfigurationTest, type RenderedEmail } from './emailTemplates/index.js'
+import {
+  mailConfigurationTest,
+  workspaceInvite,
+  type RenderedEmail,
+} from './emailTemplates/index.js'
 
 export type MailReadiness = 'not_configured' | 'not_tested' | 'ready' | 'unavailable'
 
@@ -45,6 +49,16 @@ export type MailSendInput = {
   content: RenderedEmail
   from?: string
   replyTo?: string
+  idempotencyKey?: string
+}
+
+export type WorkspaceInvitationMailInput = {
+  recipient: string
+  inviteId: string
+  workspaceName: string
+  inviterName: string
+  role: 'admin' | 'member'
+  token: string
 }
 
 export type MailTransport = {
@@ -209,6 +223,42 @@ export class MailConfigService {
     }
   }
 
+  async sendWorkspaceInvitation(input: WorkspaceInvitationMailInput): Promise<void> {
+    const recipient = canonicalEmail(input.recipient)
+    if (
+      !isEmail(recipient) ||
+      !/^wsi_[a-zA-Z0-9_-]{1,128}$/.test(input.inviteId) ||
+      !/^[a-f0-9]{64}$/.test(input.token) ||
+      !['admin', 'member'].includes(input.role) ||
+      !validInvitationName(input.workspaceName) ||
+      !validInvitationName(input.inviterName)
+    ) {
+      throw new MailConfigError('invalid_input', '工作区邀请邮件参数无效')
+    }
+    let invitationURL: URL
+    try {
+      const origin = new URL(this.publicSiteOrigin ?? '')
+      if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password) {
+        throw new Error('invalid public origin')
+      }
+      invitationURL = new URL('/invites/workspace', origin.origin)
+      invitationURL.searchParams.set('token', input.token)
+    } catch {
+      throw new MailConfigError('unavailable', '公开站点地址不可用')
+    }
+    await this.send({
+      to: recipient,
+      idempotencyKey: `workspace-invite:${input.inviteId}`,
+      content: workspaceInvite({
+        inviterName: input.inviterName,
+        workspaceName: input.workspaceName,
+        roleName: input.role,
+        acceptInviteUrl: invitationURL.toString(),
+        publicSiteOrigin: this.publicSiteOrigin,
+      }),
+    })
+  }
+
   async send(input: MailSendInput): Promise<void> {
     const current = await this.repository.get()
     if (current && !current.enabled) {
@@ -291,6 +341,9 @@ function summarize(value: StoredMailConfig): MailConfigSummary {
 
 function canonicalEmail(value: string): string {
   return value.trim().toLowerCase()
+}
+function validInvitationName(value: string): boolean {
+  return value.trim().length > 0 && value.length <= 200 && !/[\u0000-\u001f\u007f]/.test(value)
 }
 function isEmail(value: string): boolean {
   return value.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)

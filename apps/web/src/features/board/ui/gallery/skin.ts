@@ -39,7 +39,8 @@ export const catalogClasses = {
   boardsGrid: 'grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3.5',
   createCard:
     'relative flex h-[244px] w-full flex-col cursor-pointer overflow-hidden rounded-panel border border-border bg-card p-0 text-left transition-[border-color,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-border/80 hover:-translate-y-0.5 hover:scale-[1.006] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-  createPreview: `flex h-[186px] w-full items-center justify-center border-b border-border ${blankBoardPreviewSurfaceClass}`,
+  createPreview:
+    'page-dot-bg flex h-[186px] w-full items-center justify-center border-b border-border',
   createPreviewIcon:
     "relative flex size-[54px] items-center justify-center rounded-panel border border-border bg-card/80 before:absolute before:top-1/2 before:left-1/2 before:h-[25px] before:w-[2.5px] before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-pill before:bg-muted-foreground before:content-[''] after:absolute after:top-1/2 after:left-1/2 after:h-[2.5px] after:w-[25px] after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-pill after:bg-muted-foreground after:content-['']",
   createMeta: 'px-3 pt-2.5 pb-3',

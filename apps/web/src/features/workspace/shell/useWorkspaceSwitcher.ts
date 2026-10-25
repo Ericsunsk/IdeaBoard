@@ -1,4 +1,4 @@
-import { computed } from 'vue'
+import { computed, markRaw, ref } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useUserStore } from '../../auth'
@@ -9,30 +9,22 @@ import type {
   UserAccountMenuWorkspaceCreateInput,
 } from '../../account/ui/chrome/userAccountMenu.types'
 import { USER_BOARDS_PATH } from '../routePaths'
-import { organizationClosureIdempotencyKey } from '../../../api/idempotencyKey'
 import {
   WORKSPACE_NAME_MAX_LENGTH,
-  closeOrganization,
   deleteWorkspace,
-  fetchOrganizationMembers,
   fetchOrganizations,
-  inviteOrganizationMember,
   provisionOrganization,
-  removeOrganizationMember,
   renameWorkspace,
-  renameOrganization,
-  updateOrganizationMember,
   workspaceQueryKeys,
-  type OrganizationSummary,
   type WorkspaceSummary,
 } from '../selection/workspaceResource'
-import { getOrganizationScopeStore } from '../organization/scope'
+import { useOrganizationManagement } from '../organization/session/useManagement'
 import {
   WORKSPACE_URL_PARAM,
   useWorkspaceSelection,
   type WorkspaceSelectionStatus,
 } from '../selection/workspaceContext'
-import OrganizationPanel from '../organization/ui/OrganizationPanel.vue'
+import OverviewPanel from '../organization/ui/OverviewPanel.vue'
 
 // Canvas board identity rides the URL as a literal `boardId` query param (no
 // shared constant); switching workspaces always drops it so the gallery never
@@ -121,19 +113,6 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     return updated
   }
 
-  // Organization rename rides PATCH /organizations/:id (owner/admin only
-  // server-side). Renames are idempotent by value, so retries replay safely
-  // without an Idempotency-Key. Refresh the organization list so the
-  // settings shell re-reads the management surface on its next load.
-  async function renameOrganizationItem(
-    organizationId: string,
-    name: string,
-  ): Promise<OrganizationSummary> {
-    const updated = await renameOrganization(organizationId, { name })
-    await queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.organizations, exact: true })
-    return updated
-  }
-
   // Reuse the selection seam's fallback after deleting the selected workspace.
   async function deleteWorkspaceItem(workspaceId: string): Promise<void> {
     const isSelectedWorkspace = selection.selectedId.value === workspaceId
@@ -149,10 +128,22 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     }
   }
 
+  const isOrganizationManagementEnabled = ref(false)
+  const organizationManagement = useOrganizationManagement({
+    identity: () => userStore.user?.public_id,
+    isEnabled: isOrganizationManagementEnabled,
+    onScopeExit: () => {
+      const currentId = route.query[WORKSPACE_URL_PARAM] ?? selection.selectedId.value
+      if (selection.items.value.some((item) => item.publicId === currentId)) return
+      const fallbackId = selection.selectedId.value
+      if (fallbackId) landOnGalleryWorkspace(fallbackId)
+    },
+  })
+  const organizationPanel = markRaw(OverviewPanel)
+
   const menuProps = computed<UserAccountMenuWorkspace>(() => {
     // Track locale so the load-error copy follows language switches.
     void i18n.global.locale.value
-    const scopeStore = getOrganizationScopeStore()
     return {
       items: selection.items.value,
       selectedId: selection.selectedId.value,
@@ -165,41 +156,18 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
       currentUserId: userStore.user?.public_id ?? null,
       onLoadOrganizations: fetchOrganizations,
       onCreateOrganization: provisionOrganization,
-      // Organization management panel (issue #951): the shell owns the
-      // component and its transport callbacks; the account menu renders it
-      // opaquely so the organization management surface appears as soon as
-      // the caller holds an organization. Self-leave also drops back to the
-      // Personal scope and refreshes the list (access is gone immediately).
       organizationPanel: {
-        component: OrganizationPanel,
-        onLoadMembers: fetchOrganizationMembers,
-        onInviteMember: inviteOrganizationMember,
-        onUpdateMember: updateOrganizationMember,
-        onRemoveMember: removeOrganizationMember,
-        onCloseOrganization: async (
-          organizationId: string,
-          input: { reason?: string | undefined },
-        ) => {
-          const closed = await closeOrganization(organizationId, input, {
-            idempotencyKey: organizationClosureIdempotencyKey(),
-          })
-          // Closure permanently disables every organization workspace: drop
-          // back to the Personal scope and refresh the list (access is
-          // gone immediately, history is retained).
-          scopeStore.selectPersonal()
-          await refreshWorkspaceList()
-          return closed
+        component: organizationPanel,
+        bindings: { management: organizationManagement },
+        name: organizationManagement.organization.value?.name ?? null,
+        setEnabled: (isEnabled) => {
+          isOrganizationManagementEnabled.value = isEnabled
         },
-        onLeaveMember: async (organizationId: string, memberId: string): Promise<void> => {
-          await removeOrganizationMember(organizationId, memberId)
-          scopeStore.selectPersonal()
-          await refreshWorkspaceList()
-        },
+        refresh: organizationManagement.refresh,
       },
       onSelect: switchToGalleryWorkspace,
       onCreate: createWorkspaceItem,
       onRename: renameWorkspaceItem,
-      onRenameOrganization: renameOrganizationItem,
       onDelete: deleteWorkspaceItem,
       onRetry: () => {
         void selection.refetch()
@@ -212,7 +180,6 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
     switchToGalleryWorkspace,
     createWorkspaceItem,
     renameWorkspaceItem,
-    renameOrganizationItem,
     deleteWorkspaceItem,
   }
 }

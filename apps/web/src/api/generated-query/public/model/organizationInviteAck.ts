@@ -10,10 +10,8 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { AssignableOrganizationRole } from './assignableOrganizationRole'
-import type { UserId } from './userId'
 
-export type AddOrganizationMemberRequestData = {
-  user_id: UserId
-  role: AssignableOrganizationRole
+export interface OrganizationInviteAck {
+  declined?: boolean
+  cancelled?: boolean
 }

@@ -278,9 +278,6 @@
         :on-create-organization="props.workspace?.onCreateOrganization"
         :organization-panel="props.workspace?.organizationPanel ?? null"
         :on-rename="handleWorkspaceRename"
-        :on-rename-organization="
-          props.workspace?.onRenameOrganization ? handleOrganizationRename : undefined
-        "
         :on-delete="handleWorkspaceDelete"
         @update:is-open="isWorkspaceSettingsOpen = $event"
       />
@@ -492,12 +489,6 @@ async function handleWorkspaceCreate(input: UserAccountMenuWorkspaceCreateInput)
 
 async function handleWorkspaceRename(workspaceId: string, name: string) {
   return requireWorkspace().onRename(workspaceId, name)
-}
-
-async function handleOrganizationRename(organizationId: string, name: string) {
-  const renameOrganization = requireWorkspace().onRenameOrganization
-  if (!renameOrganization) throw new Error('Organization rename is unavailable')
-  return renameOrganization(organizationId, name)
 }
 
 async function handleWorkspaceDelete(workspaceId: string) {

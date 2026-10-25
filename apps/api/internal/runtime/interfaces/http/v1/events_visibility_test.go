@@ -604,8 +604,8 @@ func TestWorkspaceMemberReaddPreservesBoardGrants(t *testing.T) {
 		status, payload := eventIDEM(t, fx.engine, http.MethodPost,
 			"/api/v1/workspaces/"+fx.ws.PublicID+"/members", 1, key,
 			fmt.Sprintf(`{"data":{"user_id":%q,"role":"admin"}}`, memberPublic), nil)
-		if status != http.StatusCreated {
-			t.Fatalf("re-add = %d %v", status, payload)
+		if status != http.StatusForbidden {
+			t.Fatalf("direct Personal re-add = %d %v, want 403", status, payload)
 		}
 		if role, ok, err := fx.store.GetWorkspaceRole(ctx, fx.ws.PublicID, 4); err != nil || !ok || role != tenancy.RoleMember {
 			t.Fatalf("workspace role = %q, %t, %v", role, ok, err)
@@ -694,13 +694,15 @@ func TestWorkspaceMemberRemovePurgesBoardGrants(t *testing.T) {
 		t.Fatalf("replay moved version to %+v, %v; want still %d", again, err, versionBefore+1)
 	}
 
-	// Rejoining restores workspace membership without a direct board grant.
-	membersPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/members"
-	status, payload = eventIDEM(t, fx.engine, http.MethodPost, membersPath, 1, "evt-purge-rejoin4",
-		fmt.Sprintf(`{"data":{"user_id":%q,"role":"member"}}`, memberPublic), nil)
-	if status != http.StatusCreated {
-		t.Fatalf("member re-add = %d %v, want 201", status, payload)
+	// Rejoining requires an accepted invitation and does not restore board grants.
+	inv, _, err := fx.store.CreateWorkspaceMemberInvite(context.Background(), fx.ws.PublicID, 1, "rejoin@example.com", tenancy.RoleMember, 4)
+	if err != nil {
+		t.Fatal(err)
 	}
+	if _, _, err := fx.store.AcceptWorkspaceInvite(context.Background(), inv.PublicID, 4, "rejoin@example.com"); err != nil {
+		t.Fatal(err)
+	}
+
 	if _, ok, _ := fx.boards.GetBoardRole(context.Background(), fx.ws.PublicID, fx.boardID, 4, tenancy.RoleMember); ok {
 		t.Fatal("rejoin must not resurrect the purged board grant")
 	}

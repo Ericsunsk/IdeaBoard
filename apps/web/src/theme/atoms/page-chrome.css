@@ -20,4 +20,16 @@
   .page-chrome-account > .page-chrome-control {
     flex: none;
   }
+
+  .page-chrome-icon {
+    width: var(--page-chrome-icon-size, 19px);
+    height: var(--page-chrome-icon-size, 19px);
+    flex: none;
+  }
+
+  /* Generic chrome icon-button host shared by gallery header and Canvas
+     chrome; keeps NotificationBell off canvas-specific classes. */
+  .page-chrome-icon-button {
+    position: relative;
+  }
 }

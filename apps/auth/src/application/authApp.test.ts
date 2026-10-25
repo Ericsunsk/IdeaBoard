@@ -141,6 +141,7 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
       update: async () => mailSummary,
       clear: async () => {},
       sendTest: async () => {},
+      sendWorkspaceInvitation: async () => {},
     },
     socialProviderSettingsService: {
       getSummary: async (
@@ -266,6 +267,16 @@ describe('createAuthApp', () => {
       },
       clearMailConfig: { payload: { actor_id: 1 } },
       sendMailConfigTest: { payload: { recipient: 'admin@example.com', actor_id: 1 } },
+      sendWorkspaceInvitation: {
+        payload: {
+          recipient: 'member@example.com',
+          invite_id: 'wsi_test',
+          workspace_name: 'Studio',
+          inviter_name: 'Alice',
+          role: 'member',
+          token: 'a'.repeat(64),
+        },
+      },
       updateSocialProvider: { payload: { enabled: true, client_id: 'client' } },
     } as const
 

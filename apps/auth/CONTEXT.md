@@ -45,7 +45,8 @@ Auth owns login, registration, session, identity-side fields, credentials, trans
 - `application/authApp.ts` `createAuthApp` — Fastify assembly: auth-entry guard, health, internal routes, mail/social routes.
 - `admission/internalKeyGuard.ts` `createInternalKeyPreHandler` / `matchesInternalKey` — shared timing-safe service-to-service guard.
 - `infrastructure/httpResponse.ts` `sendSuccess` / `sendError` — sole `{code,msg}` envelope writers.
-- `transactional-mail/emailTemplates/index.ts` typed renderers (`verificationOtp`, `passwordResetOtp`, `welcomeOnboarding`, `paymentReceipt`, `teamInvite`, `securityAlertLogin`, `mailConfigurationTest`).
+- `transactional-mail/emailTemplates/index.ts` typed renderers (`verificationOtp`, `passwordResetOtp`, `welcomeOnboarding`, `paymentReceipt`, `teamInvite`, `workspaceInvite`, `securityAlertLogin`, `mailConfigurationTest`).
+- `transactional-mail/workspaceInvitationRoutes.ts` — internal-key-protected Workspace invitation delivery. Accepts only invitation facts; derives the link from the configured public origin and forwards the stable `workspace-invite:<invite_id>` provider idempotency key. The API owns durable enqueue/retry and passes the token only over this internal boundary; Auth never persists it.
 
 ## Invariants
 

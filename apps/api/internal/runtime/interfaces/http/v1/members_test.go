@@ -16,7 +16,7 @@ func TestV1WorkspaceMemberLimit(t *testing.T) {
 	ctx := context.Background()
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
-	workspace := v1WorkspaceFixture(t, ctx, store, "member limit", 1)
+	workspace := v1OrganizationWorkspaceFixture(t, ctx, store, "member limit", 1, 2, 3, 4, 5, 6)
 	for id := int64(1); id <= 6; id++ {
 		dir.ensure(id)
 	}
@@ -46,12 +46,8 @@ func TestV1WorkspaceMemberLimit(t *testing.T) {
 	}
 }
 
-// TestV1DefaultWorkspaceInviteProtected proves Personal collaboration
-// (#952) at the HTTP boundary without a database: the Personal Default
-// workspace is private and rejects invites with 403
-// workspace_default_protected (leaving no membership behind), while a
-// non-Default Personal workspace invites freely with no account-default
-// gate (absent quota reads as unlimited).
+// Personal Default cannot invite; other Personal Workspaces require accepted
+// invitations rather than the Organization-only direct authorization endpoint.
 func TestV1DefaultWorkspaceInviteProtected(t *testing.T) {
 	ctx := context.Background()
 	store := tenancy.NewInMemoryStoreForTests()
@@ -88,10 +84,10 @@ func TestV1DefaultWorkspaceInviteProtected(t *testing.T) {
 	}
 
 	plain := v1WorkspaceFixture(t, ctx, store, "plain-collab", owner)
-	if status, payload := invite(plain.PublicID, "plain-invite-1"); status != http.StatusCreated {
-		t.Fatalf("plain invite = %d %v, want 201 (open, no default gate)", status, payload)
+	if status, payload := invite(plain.PublicID, "plain-invite-1"); status != http.StatusForbidden {
+		t.Fatalf("plain invite = %d %v, want 403 (Personal requires recipient confirmation)", status, payload)
 	}
-	if _, member, _ := store.GetWorkspaceRole(ctx, plain.PublicID, target); !member {
-		t.Fatal("open invite must create a membership")
+	if _, member, _ := store.GetWorkspaceRole(ctx, plain.PublicID, target); member {
+		t.Fatal("direct add must not create a Personal membership")
 	}
 }

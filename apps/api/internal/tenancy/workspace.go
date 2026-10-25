@@ -170,6 +170,7 @@ type WorkspaceStore interface {
 	AddWorkspaceMember(ctx context.Context, workspacePublicID string, targetUserID int64, role string) (*WorkspaceMember, error)
 	UpdateWorkspaceMemberRole(ctx context.Context, workspacePublicID string, actorUserID, targetUserID int64, newRole string) (*WorkspaceMember, error)
 	RemoveWorkspaceMember(ctx context.Context, workspacePublicID string, actorUserID, targetUserID int64, grants WorkspaceMemberGrantStore) ([]MemberGrantCleanup, error)
+	WorkspaceInviteStore
 }
 
 // OrganizationStore groups organization and org-scoped workspace reads.
@@ -207,4 +208,5 @@ type OrganizationStore interface {
 	AddOrganizationMember(ctx context.Context, organizationPublicID string, targetUserID int64, role string) (*OrganizationMember, error)
 	UpdateOrganizationMemberRole(ctx context.Context, organizationPublicID string, actorUserID, targetUserID int64, newRole string) (*OrganizationMember, error)
 	RemoveOrganizationMember(ctx context.Context, organizationPublicID string, actorUserID, targetUserID int64) error
+	OrganizationInviteStore
 }

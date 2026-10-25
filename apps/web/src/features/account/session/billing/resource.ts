@@ -41,6 +41,32 @@ export const billingRecordsQueryKeys = {
   // scope object so key equality stays referentially stable across renders.
   list: (workspaceId: string, billingAccountId: string, identity: string, consumptionScope: string) =>
     ['workspace', 'billing', 'records', workspaceId, billingAccountId, identity, consumptionScope] as const,
+};
+
+// Named handover-scope matcher for billing-records keys: the single owner of
+// the ['workspace','billing','records', workspaceId, billingAccountId,
+// identity, ...] shape. Handover invalidation predicates consult this instead
+// of raw queryKey[3..5] subscripts at the call site, so key-shape drift
+// surfaces here (request-count gate: scalar-only keys registered in
+// queryKeyRequestBudget.contract.spec.ts).
+export function isBillingRecordsQueryForHandover(
+  queryKey: readonly unknown[],
+  workspaces: ReadonlySet<string>,
+  billingAccountId: string | undefined,
+  viewer: string,
+): boolean {
+  if (billingAccountId == null || billingAccountId === '') return false
+  if (queryKey.length < 6) return false
+  if (queryKey[0] !== 'workspace' || queryKey[1] !== 'billing' || queryKey[2] !== 'records') {
+    return false
+  }
+  const workspaceId = queryKey[3]
+  return (
+    typeof workspaceId === 'string' &&
+    workspaces.has(workspaceId) &&
+    queryKey[4] === billingAccountId &&
+    queryKey[5] === viewer
+  )
 }
 
 export async function fetchBillingRecords(

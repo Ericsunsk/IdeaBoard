@@ -46,7 +46,7 @@
           class="scene-edge"
           :d="edge.d"
           vector-effect="non-scaling-stroke"
-          stroke-width="1.1"
+          stroke-width="0.5"
         />
       </g>
       <g v-for="node in presentation.nodes" :key="node.id" :data-scene-node="node.id">
@@ -73,49 +73,17 @@
           />
         </g>
         <g v-if="node.kind === 'fusion'">
-          <g v-for="(slot, slotIndex) in node.slots" :key="slotIndex">
-            <rect
-              class="scene-slot"
-              :x="slot.x"
-              :y="slot.y"
-              :width="slot.width"
-              :height="slot.height"
-              :rx="slot.radius"
-              vector-effect="non-scaling-stroke"
-              stroke-width="1"
-            />
-            <g
-              class="scene-glyph"
-              vector-effect="non-scaling-stroke"
-              stroke-width="1"
-              :transform="slot.glyphTransform"
-            >
-              <rect x="-0.5" y="-0.5" width="1" height="1" rx="0.12" />
-              <circle cx="0.22" cy="-0.2" r="0.07" />
-              <path d="M -0.34 0.34 L -0.12 0.1 L 0.04 0.26 L 0.16 0.16 L 0.36 0.34" />
-            </g>
-          </g>
-          <g v-if="node.spokes.length > 0">
-            <line
-              v-for="(spoke, spokeIndex) in node.spokes"
-              :key="spokeIndex"
-              class="scene-spoke"
-              :x1="spoke.x1"
-              :y1="spoke.y1"
-              :x2="spoke.x2"
-              :y2="spoke.y2"
-              vector-effect="non-scaling-stroke"
-              stroke-width="1"
-            />
-          </g>
-          <circle
-            v-if="node.blend"
-            class="scene-blend"
-            :cx="node.blend.x"
-            :cy="node.blend.y"
-            r="0.018"
+          <rect
+            v-for="(slot, slotIndex) in node.slots"
+            :key="slotIndex"
+            class="scene-slot"
+            :x="slot.x"
+            :y="slot.y"
+            :width="slot.width"
+            :height="slot.height"
+            :rx="slot.radius"
             vector-effect="non-scaling-stroke"
-            stroke-width="1.5"
+            stroke-width="0.75"
           />
         </g>
         <g
@@ -247,7 +215,7 @@ onUnmounted(() => {
 .scene-edge {
   fill: none;
   stroke: var(--muted-foreground);
-  opacity: 0.55;
+  opacity: 0.3;
 }
 
 .scene-bar {
@@ -258,23 +226,12 @@ onUnmounted(() => {
 .scene-slot {
   fill: var(--muted);
   stroke: var(--border);
+  opacity: 0.35;
 }
 
 .scene-glyph {
   fill: none;
   stroke: var(--muted-foreground);
   opacity: 0.7;
-}
-
-.scene-spoke {
-  stroke: var(--primary);
-  stroke-dasharray: 2 2;
-  opacity: 0.55;
-  fill: none;
-}
-
-.scene-blend {
-  fill: var(--primary);
-  stroke: var(--card);
 }
 </style>

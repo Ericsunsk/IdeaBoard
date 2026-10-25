@@ -27,18 +27,31 @@ type InMemoryStore struct {
 	orgMembers map[string]map[int64]string
 	// memberSince tracks first-seen timestamps for member projections.
 	memberSince map[string]map[int64]time.Time
-	now         func() time.Time
+	// memberInvites is the unified invitation table for both scopes
+	// (workspace_member_invites / organization_member_invites, keyed by
+	// invite public_id). Scope-specific behavior rides the
+	// MemberInvitePolicy hooks in memory_invites.go.
+	memberInvites map[string]*MemberInvite
+	// memberInviteByHash indexes token_hash -> invite public_id.
+	memberInviteByHash map[string]string
+	// memberInviteByRaw indexes raw token -> invite public_id for
+	// raw-capability lookups that bypass hashing.
+	memberInviteByRaw map[string]string
+	now               func() time.Time
 }
 
 // NewInMemoryStoreForTests builds an empty test-only store.
 func NewInMemoryStoreForTests() *InMemoryStore {
 	return &InMemoryStore{
-		workspaces:    make(map[string]*Workspace),
-		organizations: make(map[string]*Organization),
-		wsMembers:     make(map[string]map[int64]string),
-		orgMembers:    make(map[string]map[int64]string),
-		memberSince:   make(map[string]map[int64]time.Time),
-		now:           time.Now,
+		workspaces:         make(map[string]*Workspace),
+		organizations:      make(map[string]*Organization),
+		wsMembers:          make(map[string]map[int64]string),
+		orgMembers:         make(map[string]map[int64]string),
+		memberSince:        make(map[string]map[int64]time.Time),
+		memberInvites:      make(map[string]*MemberInvite),
+		memberInviteByHash: make(map[string]string),
+		memberInviteByRaw:  make(map[string]string),
+		now:                time.Now,
 	}
 }
 
@@ -384,7 +397,14 @@ func (s *InMemoryStore) AddWorkspaceMember(ctx context.Context, workspacePublicI
 	if existing, ok := s.wsMembers[workspacePublicID][targetUserID]; ok {
 		return &WorkspaceMember{WorkspacePublicID: workspacePublicID, UserID: targetUserID, Role: existing}, nil
 	}
-	if len(s.wsMembers[workspacePublicID]) >= MaxWorkspaceMembers {
+	pending := 0
+	for _, inv := range s.memberInvites {
+		if inv.Scope == InviteScopeWorkspace && inv.ScopePublicID == workspacePublicID &&
+			inv.Status == MemberInviteStatusPending && !MemberInviteExpired(inv.ExpiresAt, s.clock()) {
+			pending++
+		}
+	}
+	if len(s.wsMembers[workspacePublicID])+pending >= MaxWorkspaceMembers {
 		return nil, ErrWorkspaceMemberLimitReached
 	}
 	now := s.clock()

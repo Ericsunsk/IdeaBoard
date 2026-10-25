@@ -161,6 +161,9 @@ describe('contract kernel opaque IDs', () => {
       'evt',
       'ba',
       'bti',
+      'wsi',
+      'osi',
+      'notif',
     ]) {
       expect(isOpaqueId(`${prefix}_abc123`)).toBe(true)
       expect(opaqueIdPrefix(`${prefix}_abc123`)).toBe(prefix)

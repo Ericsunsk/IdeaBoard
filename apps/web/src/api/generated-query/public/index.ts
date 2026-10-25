@@ -1,4 +1,5 @@
 export * from './boards/boards'
+export * from './notifications/notifications'
 export * from './organizations/organizations'
 export * from './user/user'
 export * from './workspace-billing/workspace-billing'

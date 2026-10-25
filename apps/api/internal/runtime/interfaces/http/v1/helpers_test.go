@@ -129,7 +129,7 @@ func newV1TestEngine(store tenancy.Store, dir *staticUserDirectory) *gin.Engine 
 	if membershipScope, ok := store.(boards.WorkspaceMembershipScope); ok {
 		boardStore = boards.NewInMemoryWorkspaceBoardStoreForTests(membershipScope, dir)
 	}
-	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, ContractV1Deps{Store: store, Users: dir, Boards: boardStore})
+	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, ContractV1Deps{Store: store, Users: dir, Boards: boardStore, Invitations: testInvitations(store, nil, nil, NewInvitationIdentityReader(nil, nil, dir))})
 	return router
 }
 
@@ -211,6 +211,29 @@ func v1ErrorCode(t *testing.T, payload map[string]any) string {
 func v1WorkspaceFixture(t *testing.T, ctx context.Context, store *tenancy.InMemoryStore, name string, owner int64) *tenancy.Workspace {
 	t.Helper()
 	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: name, OwnerUserID: owner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ws
+}
+
+// Organization authorization fixtures keep every candidate in the Organization;
+// Workspace visibility still requires its own explicit grant.
+func v1OrganizationWorkspaceFixture(t *testing.T, ctx context.Context, store *tenancy.InMemoryStore, name string, owner int64, candidates ...int64) *tenancy.Workspace {
+	t.Helper()
+	org, err := store.CreateOrganization(ctx, owner, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, userID := range candidates {
+		if userID == owner {
+			continue
+		}
+		if _, err := store.AddOrganizationMember(ctx, org.PublicID, userID, tenancy.RoleMember); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: name, OwnerUserID: owner, OrganizationID: &org.PublicID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,7 +386,7 @@ func TestV1MemberAuthorizationAndTransitions(t *testing.T) {
 	engine := newV1TestEngine(store, dir)
 
 	const owner, admin, member, outsider = 1, 2, 3, 4
-	ws := v1WorkspaceFixture(t, ctx, store, "members", owner)
+	ws := v1OrganizationWorkspaceFixture(t, ctx, store, "members", owner, admin, member, outsider, 5, 6, 7)
 	store.SeedWorkspaceMember(ws.PublicID, admin, tenancy.RoleAdmin)
 	store.SeedWorkspaceMember(ws.PublicID, member, tenancy.RoleMember)
 	// The static directory only resolves ensured users (production resolves
@@ -488,7 +511,7 @@ func TestV1WorkspaceMemberIdempotency(t *testing.T) {
 	engine := newV1TestEngine(store, dir)
 
 	const owner int64 = 1
-	ws := v1WorkspaceFixture(t, ctx, store, "member-idem", owner)
+	ws := v1OrganizationWorkspaceFixture(t, ctx, store, "member-idem", owner, 5, 6, 7)
 	for _, id := range []int64{owner, 5, 6, 7} {
 		dir.ensure(id)
 	}
@@ -1096,6 +1119,7 @@ func TestV1Organizations(t *testing.T) {
 }
 
 func TestV1OrganizationMembers(t *testing.T) {
+	ctx := context.Background()
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
 	engine := newV1TestEngine(store, dir)
@@ -1126,44 +1150,17 @@ func TestV1OrganizationMembers(t *testing.T) {
 		t.Fatalf("second org = %d %v, want 409 organization_limit_reached", status, second)
 	}
 
-	invite := func(actor int64, target string, role string) (int, map[string]any) {
-		status, _, payload := doV1(t, engine, v1Call{method: http.MethodPost, path: memberPath, userID: actor,
-			body:    fmt.Sprintf(`{"data":{"user_id":%q,"role":%q}}`, target, role),
-			headers: key("org", "invite", fmt.Sprint(actor), target, role)})
-		return status, payload
+	// Organization membership can no longer bypass recipient confirmation.
+	status, _, _ = doV1RoundTrip(t, engine, v1Call{method: http.MethodPost, path: memberPath, userID: owner,
+		body: fmt.Sprintf(`{"data":{"user_id":%q,"role":"member"}}`, usr(outsider)), headers: key("retired-add")}, "retired-")
+	if status != http.StatusNotFound {
+		t.Fatalf("direct Organization add = %d, want 404", status)
 	}
-	if status, _ := invite(owner, usr(admin), tenancy.RoleAdmin); status != 201 {
-		t.Fatalf("owner invites admin = %d, want 201", status)
+	if _, err := store.AddOrganizationMember(ctx, orgID, admin, tenancy.RoleAdmin); err != nil {
+		t.Fatal(err)
 	}
-	if status, _ := invite(admin, usr(member), tenancy.RoleMember); status != 201 {
-		t.Fatalf("admin invites member = %d, want 201", status)
-	}
-	// Admins cannot grant admin; members cannot invite; owner grants never
-	// flow through invite (explicit handover only).
-	if status, payload := invite(admin, usr(outsider), tenancy.RoleAdmin); status != 403 ||
-		v1ErrorCode(t, payload) != string(contract.CodeMembershipTransitionForbidden) {
-		t.Fatalf("admin invites admin = %d %v, want 403 membership_transition_forbidden", status, payload)
-	}
-	if status, _ := invite(member, usr(outsider), tenancy.RoleMember); status != 403 {
-		t.Fatalf("member invites = %d, want 403", status)
-	}
-	if status, payload := invite(owner, usr(outsider), tenancy.RoleOwner); status == 201 || status == 200 {
-		t.Fatalf("owner-role invite = %d %v, want failure", status, payload)
-	}
-
-	// Joining a second organization fails closed.
-	status, _, orgB := doV1(t, engine, v1Call{method: http.MethodPost, path: "/api/v1/organizations", userID: outsider,
-		body: `{"data":{"name":"other"}}`, headers: key("org", "create", "b")})
-	if status != 201 {
-		t.Fatalf("outsider creates org = %d %v", status, orgB)
-	}
-	orgBID := orgB["data"].(map[string]any)["id"].(string)
-	status, _, joinPayload := doV1(t, engine, v1Call{method: http.MethodPost,
-		path: "/api/v1/organizations/" + orgBID + "/members", userID: outsider,
-		body:    fmt.Sprintf(`{"data":{"user_id":%q,"role":%q}}`, usr(owner), tenancy.RoleMember),
-		headers: key("org", "invite", "b", "owner")})
-	if status != 409 || v1ErrorCode(t, joinPayload) != string(contract.CodeOrganizationLimitReached) {
-		t.Fatalf("second-org join = %d %v, want 409 organization_limit_reached", status, joinPayload)
+	if _, err := store.AddOrganizationMember(ctx, orgID, member, tenancy.RoleMember); err != nil {
+		t.Fatal(err)
 	}
 
 	// Only owner/admin create organization workspaces on the shared pool.

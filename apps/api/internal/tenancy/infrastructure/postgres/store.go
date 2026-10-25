@@ -1017,20 +1017,36 @@ func rejectClosedOrgWorkspaceInTx(ctx context.Context, q *dbsqlc.Queries, worksp
 	return tenancy.CheckWorkspaceWritable(mapOrganization(organization))
 }
 
-// AddWorkspaceMember grants a membership idempotently: re-adding keeps the
-// existing role (parity with the in-memory Store).
-//
-// Personal collaboration (#952, ADR-0038): the Personal Default workspace
-// is private and rejects invites with ErrDefaultWorkspaceProtected (fail
-// closed, 403 workspace_default_protected). Non-Default Personal
-// workspaces invite freely: Workspace Owner/Admin add and remove
-// collaborators without per-invite account-holder approval, and no quota
-// row is seeded here. Absent quota reads as unlimited everywhere
-// (memberquotas.IsUnlimited); the Personal account holder sets per-member
-// caps later via SetQuota without clearing accrued usage. Multi-space
-// joins and rejoins preserve the existing quota row and immutable
-// consumption history (quota rows are never written or deleted on this
-// path; the old #947 fail-closed default gate is cut, not kept).
+// lockWorkspaceMemberScope serializes grants with Organization membership
+// removal and closure before taking the Workspace lock. Scope ownership is
+// immutable, so the unlocked lookup is used only to establish lock order.
+func lockWorkspaceMemberScope(ctx context.Context, q *dbsqlc.Queries, publicID string) (dbsqlc.Workspace, error) {
+	workspace, err := q.GetWorkspaceByPublicID(ctx, strings.TrimSpace(publicID))
+	if err != nil {
+		return dbsqlc.Workspace{}, notFound(err)
+	}
+	if workspace.OrganizationID.Valid {
+		org, err := q.GetOrganizationByInternalID(ctx, workspace.OrganizationID.Int64)
+		if err != nil {
+			return dbsqlc.Workspace{}, notFound(err)
+		}
+		if _, err := q.LockOrganizationByPublicID(ctx, org.PublicID); err != nil {
+			return dbsqlc.Workspace{}, notFound(err)
+		}
+	}
+	id, err := q.LockWorkspaceMemberships(ctx, workspace.PublicID)
+	if err != nil {
+		return dbsqlc.Workspace{}, notFound(err)
+	}
+	workspace, err = q.GetWorkspaceByInternalID(ctx, id)
+	return workspace, notFound(err)
+}
+
+// AddWorkspaceMember persists an explicit membership idempotently. The public
+// endpoint exposes this only for Organization-internal Workspace grants;
+// Personal collaborators join through the invitation acceptance transaction.
+// Default privacy, active+pending capacity, and Organization membership are
+// enforced here as well. Membership changes never reset quota or usage history.
 func (s *Store) AddWorkspaceMember(ctx context.Context, workspacePublicID string, targetUserID int64, role string) (*tenancy.WorkspaceMember, error) {
 	role = strings.TrimSpace(role)
 	if !tenancy.IsValidRole(role) {
@@ -1038,14 +1054,11 @@ func (s *Store) AddWorkspaceMember(ctx context.Context, workspacePublicID string
 	}
 	var added *tenancy.WorkspaceMember
 	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
-		workspaceID, err := q.LockWorkspaceMemberships(ctx, strings.TrimSpace(workspacePublicID))
+		workspaceRow, err := lockWorkspaceMemberScope(ctx, q, workspacePublicID)
 		if err != nil {
-			return notFound(err)
+			return err
 		}
-		workspaceRow, err := q.GetWorkspaceByInternalID(ctx, workspaceID)
-		if err != nil {
-			return notFound(err)
-		}
+		workspaceID := workspaceRow.InternalID
 		if err := rejectClosedOrgWorkspaceInTx(ctx, q, workspaceID); err != nil {
 			return err
 		}
@@ -1068,7 +1081,11 @@ func (s *Store) AddWorkspaceMember(ctx context.Context, workspacePublicID string
 			if countErr != nil {
 				return countErr
 			}
-			if count >= tenancy.MaxWorkspaceMembers {
+			pending, pendingErr := q.CountPendingWorkspaceMemberInvites(ctx, workspaceID)
+			if pendingErr != nil {
+				return pendingErr
+			}
+			if count+pending >= tenancy.MaxWorkspaceMembers {
 				return tenancy.ErrWorkspaceMemberLimitReached
 			}
 			if _, err := q.InsertWorkspaceMembershipIgnore(ctx, dbsqlc.InsertWorkspaceMembershipIgnoreParams{

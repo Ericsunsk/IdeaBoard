@@ -27,7 +27,7 @@ const MAX_FILE_LINES_THRESHOLD = 1000
  * Remove an entry as soon as its file drops back under the budget — the
  * stale-allowance report below will point at it.
  */
-const grantedLargeFileAllowances = new Map<string, string>([])
+const grantedLargeFileAllowances = new Map<string, string>()
 
 type FileMetric = {
   relativePath: string

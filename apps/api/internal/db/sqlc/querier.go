@@ -16,6 +16,7 @@ type Querier interface {
 	// archives miss (archived_at IS NULL guard); the caller reads back
 	// the stored row so replays converge instead of 404ing.
 	ArchiveMediaAsset(ctx context.Context, arg ArchiveMediaAssetParams) (MediaAsset, error)
+	ArchiveNotification(ctx context.Context, arg ArchiveNotificationParams) (UserNotification, error)
 	ArchiveWorkspaceBoard(ctx context.Context, arg ArchiveWorkspaceBoardParams) (int64, error)
 	// BackfillDailyStatsByCreatedRange freezes one day of terminal workspace
 	// tasks into task_stat_events + task_daily_stats. started_at/ended_at
@@ -27,6 +28,8 @@ type Querier interface {
 	BindPaymentOrderCheckout(ctx context.Context, arg BindPaymentOrderCheckoutParams) (PaymentOrder, error)
 	// Every changed grant advances its Board access version, including archived Boards.
 	BumpWorkspaceMemberBoardsAccess(ctx context.Context, arg BumpWorkspaceMemberBoardsAccessParams) ([]BumpWorkspaceMemberBoardsAccessRow, error)
+	CancelOrganizationMemberInvite(ctx context.Context, arg CancelOrganizationMemberInviteParams) (OrganizationMemberInvite, error)
+	CancelWorkspaceMemberInvite(ctx context.Context, arg CancelWorkspaceMemberInviteParams) (WorkspaceMemberInvite, error)
 	// CancelWorkspaceTask flips a live task to cancelled (chk constraint
 	// requires cancelled_at) and releases the lease. The tasks table carries
 	// no cancel_reason column, so the reason is recorded in the
@@ -109,11 +112,15 @@ type Querier interface {
 	// Counts honor the user/keyword filters but never the status filter, so
 	// the status pills keep their global breakdown while a status is active.
 	CountControlTasks(ctx context.Context, arg CountControlTasksParams) ([]CountControlTasksRow, error)
+	CountNotificationsByUserID(ctx context.Context, arg CountNotificationsByUserIDParams) (int64, error)
 	CountOpenOrgPaymentDisputes(ctx context.Context, billingAccountID pgtype.Int8) (int64, error)
 	CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error)
 	CountOrganizationsByUserID(ctx context.Context, userID int64) (int64, error)
 	CountPendingOrgPaymentRefunds(ctx context.Context, billingAccountID pgtype.Int8) (int64, error)
 	CountPendingOrgTransferInvites(ctx context.Context, billingAccountID int64) (int64, error)
+	CountPendingOrganizationMemberInvites(ctx context.Context, organizationID int64) (int64, error)
+	CountPendingWorkspaceMemberInvites(ctx context.Context, workspaceID int64) (int64, error)
+	CountUnreadNotifications(ctx context.Context, userID int64) (int64, error)
 	CountUnsettledOrgPaymentOrders(ctx context.Context, billingAccountID pgtype.Int8) (int64, error)
 	CountWorkspaceMembers(ctx context.Context, workspaceID int64) (int64, error)
 	CountWorkspaceOwners(ctx context.Context, workspaceID int64) (int64, error)
@@ -213,9 +220,21 @@ type Querier interface {
 	// WHERE NOT NULL. Asset reads LEFT JOIN media_assets for the managed
 	// link identity + dimension projection in one round trip.
 	CreateMediaLibraryAsset(ctx context.Context, arg CreateMediaLibraryAssetParams) (LibraryAsset, error)
+	// User notifications queries (#958, ADR-0040).
+	//
+	// The user_notifications table is the sole source of truth for user in-app alerts.
+	// All user queries are strictly scoped by user_id for tenant isolation.
+	CreateNotification(ctx context.Context, arg CreateNotificationParams) (UserNotification, error)
 	// Organization tenancy queries (#801). Public references use public_id;
 	// internal_id stays database-internal.
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
+	// Organization member invitation queries (#957, ADR-0041).
+	//
+	// The invite row is the audit fact: created/responded timestamps plus decider.
+	// All writes join the caller-owned transaction via the passed Queries,
+	// so acceptance stays atomic with the organization_memberships insertion
+	// and preserves the single-org invariant per user.
+	CreateOrganizationMemberInvite(ctx context.Context, arg CreateOrganizationMemberInviteParams) (OrganizationMemberInvite, error)
 	// Workspace-scoped media queries (#820, Phase 4-03 of #809).
 	//
 	// Upload sessions are durable coordination rows (unlike the pre-#809
@@ -254,6 +273,13 @@ type Querier interface {
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
 	// Workspace-scoped Boards use one common role and explicit selected members.
 	CreateWorkspaceBoard(ctx context.Context, arg CreateWorkspaceBoardParams) (CreateWorkspaceBoardRow, error)
+	// Workspace member invitation queries (#957).
+	//
+	// The invite row is the audit fact: created/responded timestamps plus decider.
+	// All writes join the caller-owned transaction via the passed Queries,
+	// so acceptance stays atomic with the workspace_memberships insertion
+	// and preserves the (active_members + pending_invites) <= 5 invariant.
+	CreateWorkspaceMemberInvite(ctx context.Context, arg CreateWorkspaceMemberInviteParams) (WorkspaceMemberInvite, error)
 	// Workspace-scoped task queries (#819, Phase 4-02). The tasks table is the
 	// workspace-scoped async job resource (public_id LIKE 'task_%'):
 	// lease_token is required when status='running' and empty otherwise
@@ -277,6 +303,7 @@ type Querier interface {
 	DeleteControlIdempotencyRecord(ctx context.Context, arg DeleteControlIdempotencyRecordParams) error
 	DeleteLibraryAsset(ctx context.Context, arg DeleteLibraryAssetParams) (int64, error)
 	DeleteLibraryFolder(ctx context.Context, arg DeleteLibraryFolderParams) (int64, error)
+	DeleteOldNotifications(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error)
 	DeleteOrgWorkspaceMembershipsForUser(ctx context.Context, arg DeleteOrgWorkspaceMembershipsForUserParams) error
 	DeleteOrganizationMembership(ctx context.Context, arg DeleteOrganizationMembershipParams) (int64, error)
 	DeleteServiceModelPoolEntries(ctx context.Context, service string) error
@@ -295,6 +322,7 @@ type Querier interface {
 	EnsureQuickSavesFolder(ctx context.Context, arg EnsureQuickSavesFolderParams) error
 	// ExpireUploadSession lazily expires a live session past its TTL.
 	ExpireUploadSession(ctx context.Context, arg ExpireUploadSessionParams) (UploadSession, error)
+	ExpireWorkspaceMemberInvites(ctx context.Context) ([]ExpireWorkspaceMemberInvitesRow, error)
 	FailLibraryMaterialization(ctx context.Context, arg FailLibraryMaterializationParams) (FailLibraryMaterializationRow, error)
 	// FailUploadSession flips a live session to failed (chk gate carries
 	// no extra columns for failed rows; the reason stays server-side).
@@ -369,8 +397,12 @@ type Querier interface {
 	// Hold/Task/River atomic at the same boundary (one fixed lock order).
 	GetMemberQuota(ctx context.Context, arg GetMemberQuotaParams) (BillingAccountMemberQuota, error)
 	GetMemberQuotaForUpdate(ctx context.Context, arg GetMemberQuotaForUpdateParams) (BillingAccountMemberQuota, error)
+	GetNotificationByPublicID(ctx context.Context, publicID string) (UserNotification, error)
 	GetOrganizationByInternalID(ctx context.Context, internalID int64) (Organization, error)
 	GetOrganizationByPublicID(ctx context.Context, publicID string) (Organization, error)
+	GetOrganizationMemberInviteByPublicID(ctx context.Context, arg GetOrganizationMemberInviteByPublicIDParams) (OrganizationMemberInvite, error)
+	GetOrganizationMemberInviteByPublicIDForUpdate(ctx context.Context, arg GetOrganizationMemberInviteByPublicIDForUpdateParams) (OrganizationMemberInvite, error)
+	GetOrganizationMemberInviteByTokenHash(ctx context.Context, arg GetOrganizationMemberInviteByTokenHashParams) (OrganizationMemberInvite, error)
 	GetOrganizationMembership(ctx context.Context, arg GetOrganizationMembershipParams) (OrganizationMembership, error)
 	GetPaymentCheckoutShutdown(ctx context.Context, id pgtype.UUID) (PaymentCheckoutShutdown, error)
 	// Account Stripe Customer (#919): reused per payer Billing Account, never
@@ -403,6 +435,8 @@ type Querier interface {
 	GetPaymentStripeCredentialForOrderNumber(ctx context.Context, publicOrderNumber string) (PaymentStripeCredential, error)
 	GetPaymentWebhookEvent(ctx context.Context, stripeEventID string) (PaymentWebhookEvent, error)
 	GetPendingBillingTransferForAccount(ctx context.Context, billingAccountID int64) (BillingAccountTransferInvite, error)
+	GetPendingOrganizationMemberInviteByEmail(ctx context.Context, arg GetPendingOrganizationMemberInviteByEmailParams) (OrganizationMemberInvite, error)
+	GetPendingWorkspaceMemberInviteByEmail(ctx context.Context, arg GetPendingWorkspaceMemberInviteByEmailParams) (WorkspaceMemberInvite, error)
 	GetQuickSavesFolder(ctx context.Context, workspaceID int64) (LibraryFolder, error)
 	GetServiceModelPoolVersion(ctx context.Context, service string) (int64, error)
 	GetSystemConfig(ctx context.Context, configKey string) (SystemConfig, error)
@@ -424,6 +458,9 @@ type Querier interface {
 	// id for output association. Minimal lookup only; the full media surface
 	// belongs to #820.
 	GetWorkspaceMediaAssetID(ctx context.Context, arg GetWorkspaceMediaAssetIDParams) (int64, error)
+	GetWorkspaceMemberInviteByPublicID(ctx context.Context, arg GetWorkspaceMemberInviteByPublicIDParams) (WorkspaceMemberInvite, error)
+	GetWorkspaceMemberInviteByPublicIDForUpdate(ctx context.Context, arg GetWorkspaceMemberInviteByPublicIDForUpdateParams) (WorkspaceMemberInvite, error)
+	GetWorkspaceMemberInviteByTokenHash(ctx context.Context, arg GetWorkspaceMemberInviteByTokenHashParams) (WorkspaceMemberInvite, error)
 	GetWorkspaceMembership(ctx context.Context, arg GetWorkspaceMembershipParams) (WorkspaceMembership, error)
 	GetWorkspaceMembershipByIDs(ctx context.Context, arg GetWorkspaceMembershipByIDsParams) (WorkspaceMembership, error)
 	GetWorkspaceTaskByPublicID(ctx context.Context, arg GetWorkspaceTaskByPublicIDParams) (Task, error)
@@ -518,6 +555,8 @@ type Querier interface {
 	// plus recent execution attempts. Attempt buckets stay empty until the
 	// worker records attempts; pending buckets are live immediately.
 	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
+	ListNotificationsByUserID(ctx context.Context, arg ListNotificationsByUserIDParams) ([]UserNotification, error)
+	ListOrganizationMemberInvitesByOrganizationID(ctx context.Context, arg ListOrganizationMemberInvitesByOrganizationIDParams) ([]OrganizationMemberInvite, error)
 	ListOrganizationMembers(ctx context.Context, arg ListOrganizationMembersParams) ([]OrganizationMembership, error)
 	ListOrganizationMembersForSnapshot(ctx context.Context, organizationID int64) ([]ListOrganizationMembersForSnapshotRow, error)
 	ListOrganizationOwners(ctx context.Context, organizationID int64) ([]OrganizationMembership, error)
@@ -536,6 +575,10 @@ type Querier interface {
 	ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg ListPaymentOrdersForCheckoutShutdownParams) ([]PaymentOrder, error)
 	ListPaymentReconciliationAnomalies(ctx context.Context, rowLimit int32) ([]ListPaymentReconciliationAnomaliesRow, error)
 	ListPaymentStripeCredentials(ctx context.Context) ([]PaymentStripeCredential, error)
+	ListPendingOrganizationMemberInvitesByEmail(ctx context.Context, inviteeEmail string) ([]OrganizationMemberInvite, error)
+	ListPendingOrganizationMemberInvitesByInviteeUserID(ctx context.Context, inviteeUserID pgtype.Int8) ([]OrganizationMemberInvite, error)
+	ListPendingWorkspaceMemberInvitesByEmail(ctx context.Context, inviteeEmail string) ([]WorkspaceMemberInvite, error)
+	ListPendingWorkspaceMemberInvitesByInviteeUserID(ctx context.Context, inviteeUserID pgtype.Int8) ([]WorkspaceMemberInvite, error)
 	ListServiceModelPoolEntries(ctx context.Context, service string) ([]ServiceModelPoolEntry, error)
 	ListServiceModelPoolResolutions(ctx context.Context, service string) ([]ServiceModelPoolResolution, error)
 	// ListStalledHeldWorkspaceTasks is the DISCOVERY half of the final-timeout
@@ -608,6 +651,7 @@ type Querier interface {
 	ListWorkspaceBoardMemberships(ctx context.Context, arg ListWorkspaceBoardMembershipsParams) ([]ListWorkspaceBoardMembershipsRow, error)
 	// Every currently readable Board affected by the membership departure.
 	ListWorkspaceMemberBoardGrants(ctx context.Context, arg ListWorkspaceMemberBoardGrantsParams) ([]ListWorkspaceMemberBoardGrantsRow, error)
+	ListWorkspaceMemberInvitesByWorkspaceID(ctx context.Context, arg ListWorkspaceMemberInvitesByWorkspaceIDParams) ([]WorkspaceMemberInvite, error)
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]WorkspaceMembership, error)
 	ListWorkspaceTaskOutputs(ctx context.Context, arg ListWorkspaceTaskOutputsParams) ([]TaskOutput, error)
 	// ListWorkspaceTaskOutputsByTaskIDs batches output reads for list pages
@@ -658,6 +702,13 @@ type Querier interface {
 	// Lock affected Boards in a stable order before removing grants.
 	LockWorkspaceMemberBoards(ctx context.Context, arg LockWorkspaceMemberBoardsParams) ([]LockWorkspaceMemberBoardsRow, error)
 	LockWorkspaceMemberships(ctx context.Context, publicID string) (int64, error)
+	MarkAllNotificationsAsRead(ctx context.Context, userID int64) (int64, error)
+	// Keys 'invite_status'/'invite_id' must match
+	// notifications.PayloadKeyInviteStatus/PayloadKeyInviteID and the frontend
+	// InviteActionPayload interface; see notifications.PayloadKeyTransferInviteID
+	// for why handover rows never match this merge.
+	MarkInviteNotificationResolved(ctx context.Context, arg MarkInviteNotificationResolvedParams) (int64, error)
+	MarkNotificationAsRead(ctx context.Context, arg MarkNotificationAsReadParams) (UserNotification, error)
 	MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
 	// Account abandon (#919): any Billing Owner/Admin of the persisted payer
 	// account may abandon its open Checkout.
@@ -734,6 +785,7 @@ type Querier interface {
 	// UpdateMediaAssetMetadata refreshes dimensions and merges metadata
 	// (read-modify-write merge: unknown keys from other writers survive).
 	UpdateMediaAssetMetadata(ctx context.Context, arg UpdateMediaAssetMetadataParams) (MediaAsset, error)
+	UpdateOrganizationMemberInviteStatus(ctx context.Context, arg UpdateOrganizationMemberInviteStatusParams) (OrganizationMemberInvite, error)
 	UpdateOrganizationName(ctx context.Context, arg UpdateOrganizationNameParams) (int64, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error)
 	UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (int64, error)
@@ -742,6 +794,7 @@ type Querier interface {
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (int64, error)
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (int64, error)
 	UpdateUserStorageUID(ctx context.Context, arg UpdateUserStorageUIDParams) (int64, error)
+	UpdateWorkspaceMemberInviteStatus(ctx context.Context, arg UpdateWorkspaceMemberInviteStatusParams) (WorkspaceMemberInvite, error)
 	UpdateWorkspaceMemberRole(ctx context.Context, arg UpdateWorkspaceMemberRoleParams) (int64, error)
 	UpdateWorkspaceName(ctx context.Context, arg UpdateWorkspaceNameParams) (int64, error)
 	UpsertAdminBrandLogoOverride(ctx context.Context, arg UpsertAdminBrandLogoOverrideParams) (AdminBrandLogoOverride, error)

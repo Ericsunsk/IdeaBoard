@@ -29,15 +29,23 @@ import type { MaybeRefOrGetter } from 'vue'
 import type {
   AvatarUploadResultEnvelope,
   BadRequestResponse,
+  ConflictResponse,
   ErrorEnvelope,
+  ForbiddenResponse,
   GetPublicBrandingLogoParams,
   GetPublicUserAvatarParams,
   NotFoundResponse,
+  OrganizationInviteAckEnvelope,
+  OrganizationMemberEnvelope,
+  OrganizationMemberInviteList,
   SupportChannelsSettingEnvelope,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
   UpdateUserRequest,
   UserEnvelope,
+  WorkspaceInviteAckEnvelope,
+  WorkspaceMemberEnvelope,
+  WorkspaceMemberInviteList,
 } from '../model'
 
 import { publicMutator } from '../../../publicMutator'
@@ -591,4 +599,519 @@ export function useGetPublicBrandingLogo<
   query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
   return query
+}
+
+export const getListUserWorkspaceInvitesUrl = () => {
+  return `/user/invites`
+}
+
+/**
+ * @summary List pending workspace invitations for the current user
+ */
+export const listUserWorkspaceInvites = async (
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspaceMemberInviteList> => {
+  return publicMutator<WorkspaceMemberInviteList>(getListUserWorkspaceInvitesUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListUserWorkspaceInvitesQueryKey = () => {
+  return ['user', 'invites'] as const
+}
+
+export const getListUserWorkspaceInvitesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listUserWorkspaceInvites>>,
+  TError = UnauthorizedResponse,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listUserWorkspaceInvites>>, TError, TData>
+  >
+  request?: SecondParameter<typeof publicMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListUserWorkspaceInvitesQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listUserWorkspaceInvites>>> = ({
+    signal,
+  }) => listUserWorkspaceInvites({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listUserWorkspaceInvites>>,
+    TError,
+    TData
+  >
+}
+
+export type ListUserWorkspaceInvitesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listUserWorkspaceInvites>>
+>
+export type ListUserWorkspaceInvitesQueryError = UnauthorizedResponse
+
+/**
+ * @summary List pending workspace invitations for the current user
+ */
+
+export function useListUserWorkspaceInvites<
+  TData = Awaited<ReturnType<typeof listUserWorkspaceInvites>>,
+  TError = UnauthorizedResponse,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listUserWorkspaceInvites>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListUserWorkspaceInvitesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getAcceptUserWorkspaceInviteUrl = (inviteId: string) => {
+  return `/user/invites/${encodeURIComponent(String(inviteId))}/accept`
+}
+
+/**
+ * Accepts a pending workspace invitation. No Idempotency-Key is required: the invite identifier in the path scopes the decision, and a repeated decision deterministically renders 409 conflict once the invite leaves pending state.
+ * @summary Accept a pending workspace invitation (in-app)
+ */
+export const acceptUserWorkspaceInvite = async (
+  inviteId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspaceMemberEnvelope> => {
+  return publicMutator<WorkspaceMemberEnvelope>(getAcceptUserWorkspaceInviteUrl(inviteId), {
+    ...options,
+    method: 'POST',
+  })
+}
+
+export const getAcceptUserWorkspaceInviteMutationKey = () => ['acceptUserWorkspaceInvite'] as const
+
+export const getAcceptUserWorkspaceInviteMutationOptions = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptUserWorkspaceInvite>>,
+    TError,
+    AcceptUserWorkspaceInviteMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof acceptUserWorkspaceInvite>>,
+  TError,
+  AcceptUserWorkspaceInviteMutationVariables,
+  TContext
+> => {
+  const mutationKey = getAcceptUserWorkspaceInviteMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof acceptUserWorkspaceInvite>>,
+    AcceptUserWorkspaceInviteMutationVariables
+  > = (props) => {
+    const { inviteId } = props ?? {}
+
+    return acceptUserWorkspaceInvite(inviteId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AcceptUserWorkspaceInviteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof acceptUserWorkspaceInvite>>
+>
+
+export type AcceptUserWorkspaceInviteMutationError =
+  UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse
+export type AcceptUserWorkspaceInviteMutationVariables = { inviteId: string }
+
+/**
+ * @summary Accept a pending workspace invitation (in-app)
+ */
+export const useAcceptUserWorkspaceInvite = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof acceptUserWorkspaceInvite>>,
+      TError,
+      AcceptUserWorkspaceInviteMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof acceptUserWorkspaceInvite>>,
+  TError,
+  AcceptUserWorkspaceInviteMutationVariables,
+  TContext
+> => {
+  return useMutation(getAcceptUserWorkspaceInviteMutationOptions(options), queryClient)
+}
+export const getDeclineUserWorkspaceInviteUrl = (inviteId: string) => {
+  return `/user/invites/${encodeURIComponent(String(inviteId))}/decline`
+}
+
+/**
+ * Declines a pending workspace invitation. No Idempotency-Key is required: the invite identifier in the path scopes the decision, and a repeated decision deterministically renders 409 conflict once the invite leaves pending state.
+ * @summary Decline a pending workspace invitation (in-app)
+ */
+export const declineUserWorkspaceInvite = async (
+  inviteId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspaceInviteAckEnvelope> => {
+  return publicMutator<WorkspaceInviteAckEnvelope>(getDeclineUserWorkspaceInviteUrl(inviteId), {
+    ...options,
+    method: 'POST',
+  })
+}
+
+export const getDeclineUserWorkspaceInviteMutationKey = () =>
+  ['declineUserWorkspaceInvite'] as const
+
+export const getDeclineUserWorkspaceInviteMutationOptions = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof declineUserWorkspaceInvite>>,
+    TError,
+    DeclineUserWorkspaceInviteMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof declineUserWorkspaceInvite>>,
+  TError,
+  DeclineUserWorkspaceInviteMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeclineUserWorkspaceInviteMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof declineUserWorkspaceInvite>>,
+    DeclineUserWorkspaceInviteMutationVariables
+  > = (props) => {
+    const { inviteId } = props ?? {}
+
+    return declineUserWorkspaceInvite(inviteId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type DeclineUserWorkspaceInviteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof declineUserWorkspaceInvite>>
+>
+
+export type DeclineUserWorkspaceInviteMutationError =
+  UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse
+export type DeclineUserWorkspaceInviteMutationVariables = { inviteId: string }
+
+/**
+ * @summary Decline a pending workspace invitation (in-app)
+ */
+export const useDeclineUserWorkspaceInvite = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof declineUserWorkspaceInvite>>,
+      TError,
+      DeclineUserWorkspaceInviteMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof declineUserWorkspaceInvite>>,
+  TError,
+  DeclineUserWorkspaceInviteMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeclineUserWorkspaceInviteMutationOptions(options), queryClient)
+}
+export const getListUserOrganizationInvitesUrl = () => {
+  return `/user/organization-invites`
+}
+
+/**
+ * @summary List pending organization invitations for the current user
+ */
+export const listUserOrganizationInvites = async (
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<OrganizationMemberInviteList> => {
+  return publicMutator<OrganizationMemberInviteList>(getListUserOrganizationInvitesUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListUserOrganizationInvitesQueryKey = () => {
+  return ['user', 'organization-invites'] as const
+}
+
+export const getListUserOrganizationInvitesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listUserOrganizationInvites>>,
+  TError = UnauthorizedResponse,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listUserOrganizationInvites>>, TError, TData>
+  >
+  request?: SecondParameter<typeof publicMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListUserOrganizationInvitesQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listUserOrganizationInvites>>> = ({
+    signal,
+  }) => listUserOrganizationInvites({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listUserOrganizationInvites>>,
+    TError,
+    TData
+  >
+}
+
+export type ListUserOrganizationInvitesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listUserOrganizationInvites>>
+>
+export type ListUserOrganizationInvitesQueryError = UnauthorizedResponse
+
+/**
+ * @summary List pending organization invitations for the current user
+ */
+
+export function useListUserOrganizationInvites<
+  TData = Awaited<ReturnType<typeof listUserOrganizationInvites>>,
+  TError = UnauthorizedResponse,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listUserOrganizationInvites>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListUserOrganizationInvitesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getAcceptUserOrganizationInviteUrl = (inviteId: string) => {
+  return `/user/organization-invites/${encodeURIComponent(String(inviteId))}/accept`
+}
+
+/**
+ * Accepts a pending organization invitation. No Idempotency-Key is required: the invite identifier in the path scopes the decision, and a repeated decision deterministically renders 409 conflict once the invite leaves pending state.
+ * @summary Accept a pending organization invitation (in-app)
+ */
+export const acceptUserOrganizationInvite = async (
+  inviteId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<OrganizationMemberEnvelope> => {
+  return publicMutator<OrganizationMemberEnvelope>(getAcceptUserOrganizationInviteUrl(inviteId), {
+    ...options,
+    method: 'POST',
+  })
+}
+
+export const getAcceptUserOrganizationInviteMutationKey = () =>
+  ['acceptUserOrganizationInvite'] as const
+
+export const getAcceptUserOrganizationInviteMutationOptions = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptUserOrganizationInvite>>,
+    TError,
+    AcceptUserOrganizationInviteMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof acceptUserOrganizationInvite>>,
+  TError,
+  AcceptUserOrganizationInviteMutationVariables,
+  TContext
+> => {
+  const mutationKey = getAcceptUserOrganizationInviteMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof acceptUserOrganizationInvite>>,
+    AcceptUserOrganizationInviteMutationVariables
+  > = (props) => {
+    const { inviteId } = props ?? {}
+
+    return acceptUserOrganizationInvite(inviteId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AcceptUserOrganizationInviteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof acceptUserOrganizationInvite>>
+>
+
+export type AcceptUserOrganizationInviteMutationError =
+  UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse
+export type AcceptUserOrganizationInviteMutationVariables = { inviteId: string }
+
+/**
+ * @summary Accept a pending organization invitation (in-app)
+ */
+export const useAcceptUserOrganizationInvite = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof acceptUserOrganizationInvite>>,
+      TError,
+      AcceptUserOrganizationInviteMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof acceptUserOrganizationInvite>>,
+  TError,
+  AcceptUserOrganizationInviteMutationVariables,
+  TContext
+> => {
+  return useMutation(getAcceptUserOrganizationInviteMutationOptions(options), queryClient)
+}
+export const getDeclineUserOrganizationInviteUrl = (inviteId: string) => {
+  return `/user/organization-invites/${encodeURIComponent(String(inviteId))}/decline`
+}
+
+/**
+ * Declines a pending organization invitation. No Idempotency-Key is required: the invite identifier in the path scopes the decision, and a repeated decision deterministically renders 409 conflict once the invite leaves pending state.
+ * @summary Decline a pending organization invitation (in-app)
+ */
+export const declineUserOrganizationInvite = async (
+  inviteId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<OrganizationInviteAckEnvelope> => {
+  return publicMutator<OrganizationInviteAckEnvelope>(
+    getDeclineUserOrganizationInviteUrl(inviteId),
+    {
+      ...options,
+      method: 'POST',
+    },
+  )
+}
+
+export const getDeclineUserOrganizationInviteMutationKey = () =>
+  ['declineUserOrganizationInvite'] as const
+
+export const getDeclineUserOrganizationInviteMutationOptions = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof declineUserOrganizationInvite>>,
+    TError,
+    DeclineUserOrganizationInviteMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof declineUserOrganizationInvite>>,
+  TError,
+  DeclineUserOrganizationInviteMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeclineUserOrganizationInviteMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof declineUserOrganizationInvite>>,
+    DeclineUserOrganizationInviteMutationVariables
+  > = (props) => {
+    const { inviteId } = props ?? {}
+
+    return declineUserOrganizationInvite(inviteId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type DeclineUserOrganizationInviteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof declineUserOrganizationInvite>>
+>
+
+export type DeclineUserOrganizationInviteMutationError =
+  UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse
+export type DeclineUserOrganizationInviteMutationVariables = { inviteId: string }
+
+/**
+ * @summary Decline a pending organization invitation (in-app)
+ */
+export const useDeclineUserOrganizationInvite = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof declineUserOrganizationInvite>>,
+      TError,
+      DeclineUserOrganizationInviteMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof declineUserOrganizationInvite>>,
+  TError,
+  DeclineUserOrganizationInviteMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeclineUserOrganizationInviteMutationOptions(options), queryClient)
 }

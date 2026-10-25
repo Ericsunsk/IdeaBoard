@@ -25,6 +25,7 @@ const BOARD_QUERY_OWNERS = new Set([
 const ALLOWED_ROOTS = [
   'src/features/account/',
   'src/features/admin/',
+  'src/features/notification/',
   'src/features/workspace/',
   'src/shared/',
   'src/core/',

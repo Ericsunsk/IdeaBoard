@@ -36,25 +36,19 @@ type v1DeletedDTO struct {
 
 // toMemberDTO translates a member row to the API shape. Without a user
 // directory (tests always provide one) the handler fails closed with 501
-// instead of leaking numeric database ids.
+// instead of leaking numeric database ids. It delegates to the batched
+// toWorkspaceMemberDTOs core so single and list projections cannot drift.
 func (h *contractV1Handler) toMemberDTO(c *gin.Context, m *tenancy.WorkspaceMember) (v1MemberDTO, bool) {
-	if h.deps.Users == nil {
-		contract.RenderError(c, http.StatusNotImplemented,
-			contract.CodeContractNotImplemented, "The v1 contract surface is not implemented yet")
-		c.Abort()
-		return v1MemberDTO{}, false
-	}
-	publicID, err := h.deps.Users.GetUserPublicID(c.Request.Context(), m.UserID)
-	if err != nil || publicID == uuid.Nil {
+	if m == nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable47)
 		c.Abort()
 		return v1MemberDTO{}, false
 	}
-	dto := v1MemberDTO{UserID: tenancy.FormatUserPublicID(publicID), Role: m.Role}
-	if created := v1FormatTime(m.CreatedAt); created != "" {
-		dto.CreatedAt = created
+	page, ok := h.toWorkspaceMemberDTOs(c, []*tenancy.WorkspaceMember{m})
+	if !ok || len(page) == 0 {
+		return v1MemberDTO{}, false
 	}
-	return dto, true
+	return page[0], true
 }
 
 func (h *contractV1Handler) resolveMemberUserID(c *gin.Context, raw string) (int64, uuid.UUID, bool) {
@@ -205,20 +199,22 @@ func (h *contractV1Handler) workspaceDo(c *gin.Context, userExternalID string, u
 	return result, nil, true
 }
 
-func (h *contractV1Handler) addWorkspaceMember(c *gin.Context) {
+func (h *contractV1Handler) grantOrganizationWorkspaceMember(c *gin.Context) {
 	// Key before bind (board add precedent): a missing key fails closed
 	// with 400 even when the body is also malformed, so this handler
 	// uses withWorkspace plus a manual bind instead of
 	// withV1WorkspaceBody.
 	h.withWorkspace(c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx) {
-		// Personal Default is private (#952): fail closed before any
-		// key or body handling beyond visibility. Non-Default Personal
-		// workspaces invite freely with no per-invite holder approval;
-		// absent collaborator quota reads as unlimited.
+		// This endpoint grants access to an existing Organization member.
+		// Personal collaborators join only through accepted invitations.
 		if wctx.Workspace.IsDefaultWorkspace() {
 			contract.RenderError(c, contract.StatusOf(contract.CodeWorkspaceDefaultProtected),
 				contract.CodeWorkspaceDefaultProtected, runtimehttp.MsgWorkspaceDefaultProtected)
 			c.Abort()
+			return
+		}
+		if wctx.Workspace.OrganizationID == nil {
+			renderMemberTransitionError(c, tenancy.ErrForbidden)
 			return
 		}
 		key, ok := requireV1IdempotencyKey(c)

@@ -51,6 +51,18 @@ const (
 	// Invites carry the invitation for studio handover (owner initiate,
 	// recipient accept/reject, initiator cancel) with idempotent replay.
 	PrefixBillingTransferInvite = "bti_"
+	// Workspace member invite prefix (#957). It matches the
+	// workspace_member_invites public_id CHECK (wsi_%), so the
+	// postgres store passes minted ids through opaquely.
+	PrefixWorkspaceInvite = "wsi_"
+	// User notification prefix (#958, ADR-0040). It matches the
+	// user_notifications public_id CHECK (notif_%), so the postgres
+	// store passes minted ids through opaquely.
+	PrefixNotification = "notif_"
+	// Organization member invite prefix (#957, ADR-0041). It matches the
+	// organization_member_invites public_id CHECK (osi_%), so the
+	// postgres store passes minted ids through opaquely.
+	PrefixOrganizationInvite = "osi_"
 )
 
 // knownPrefixes lists every kernel prefix for PrefixOf.
@@ -71,6 +83,9 @@ var knownPrefixes = []string{
 	PrefixRewardRedemption,
 	PrefixReconciliationRun,
 	PrefixBillingTransferInvite,
+	PrefixWorkspaceInvite,
+	PrefixNotification,
+	PrefixOrganizationInvite,
 }
 
 // IsValidPublicID reports whether id carries prefix with a non-empty

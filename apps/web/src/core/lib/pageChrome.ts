@@ -2,8 +2,9 @@ function joinClassNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ')
 }
 
-const pageChromeClasses = {
+export const pageChromeClasses = {
   roundControl: 'round-control page-chrome-control',
+  icon: 'page-chrome-icon',
 } as const
 
 export const pageChromeAccountMenuClasses = {

@@ -22,17 +22,19 @@ export function useAccountWorkspace(options?: { enabled?: MaybeRefOrGetter<boole
 }
 
 export {
+  cancelWorkspaceMemberInvite,
   changeWorkspaceMemberRole,
   classifyWorkspaceMemberError,
+  createWorkspaceMemberInvite,
   invalidateWorkspaceMemberQueries,
-  inviteWorkspaceMember,
-  lookupWorkspaceMemberId,
   removeWorkspaceMemberEntry,
+  workspaceMemberInvitesQueryOptions,
   workspaceMembersQueryOptions,
 } from '../../workspace/selection/workspaceMembersResource'
 export type {
   WorkspaceMemberEntry,
   WorkspaceMemberFailureReason,
+  WorkspaceMemberInvite,
   WorkspaceMemberRole,
 } from '../../workspace/selection/workspaceMembersResource'
 

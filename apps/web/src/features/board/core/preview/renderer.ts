@@ -62,7 +62,8 @@ function fusionThumbnailSlotRect(
   count: number,
 ): SceneThumbnailRect {
   const slots = Math.max(1, Math.min(4, count))
-  const inset = 0.12
+  const inset = 0.08
+  const gap = frame.width * 0.04
   const inner = {
     x: frame.x + frame.width * inset,
     y: frame.y + frame.height * inset,
@@ -71,27 +72,30 @@ function fusionThumbnailSlotRect(
   }
   if (slots === 1) return inner
   if (slots === 2) {
-    const half = inner.width / 2
-    return index === 0
-      ? { ...inner, width: half }
-      : { x: inner.x + half, y: inner.y, width: inner.width - half, height: inner.height }
-  }
-  if (slots === 3) {
-    const third = inner.width / 3
+    const slotWidth = (inner.width - gap) / 2
     return {
-      x: inner.x + third * Math.min(2, index),
+      x: inner.x + index * (slotWidth + gap),
       y: inner.y,
-      width: third,
+      width: slotWidth,
       height: inner.height,
     }
   }
-  const halfWidth = inner.width / 2
-  const halfHeight = inner.height / 2
+  if (slots === 3) {
+    const slotWidth = (inner.width - gap * 2) / 3
+    return {
+      x: inner.x + Math.min(2, index) * (slotWidth + gap),
+      y: inner.y,
+      width: slotWidth,
+      height: inner.height,
+    }
+  }
+  const slotWidth = (inner.width - gap) / 2
+  const slotHeight = (inner.height - gap) / 2
   return {
-    x: inner.x + halfWidth * (index % 2),
-    y: inner.y + halfHeight * (index < 2 ? 0 : 1),
-    width: halfWidth,
-    height: halfHeight,
+    x: inner.x + (index % 2) * (slotWidth + gap),
+    y: inner.y + (index < 2 ? 0 : 1) * (slotHeight + gap),
+    width: slotWidth,
+    height: slotHeight,
   }
 }
 

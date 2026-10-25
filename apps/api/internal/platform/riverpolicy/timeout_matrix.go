@@ -21,6 +21,7 @@ type QueueTimeoutPolicy struct {
 // constant in riverpolicy.go and a row here, plus a Timeout() method referencing it.
 func RiverTimeoutMatrix() []QueueTimeoutPolicy {
 	return []QueueTimeoutPolicy{
+		{Queue: RiverQueueWorkspaceInvitationMail, Timeout: RiverJobTimeoutWorkspaceInvitationMail, Worker: "WorkspaceInvitationMailWorker", Notes: "one Auth delivery attempt; no business writes"},
 		{
 			Queue:   RiverQueueDefault,
 			Timeout: RiverJobTimeoutDrawing,

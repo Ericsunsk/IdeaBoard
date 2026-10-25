@@ -5,11 +5,22 @@ import {
   REFUND_POLICY_PATH,
   TERMS_PATH,
 } from '../../legal/routePaths'
-import { USER_AUTH_CALLBACK_PATH, USER_BOARDS_PATH, USER_ROOT_PATH } from '../routePaths'
+import {
+  USER_AUTH_CALLBACK_PATH,
+  USER_BOARDS_PATH,
+  USER_ROOT_PATH,
+  WORKSPACE_INVITE_CLAIM_PATH,
+} from '../routePaths'
 
 export const WORKSPACE_DEFAULT_PATH = USER_BOARDS_PATH
 
 export const workspaceRoutes: RouteRecordRaw[] = [
+  {
+    path: WORKSPACE_INVITE_CLAIM_PATH,
+    name: 'InviteClaim',
+    component: () => import('../invite/ui/ClaimPage.vue'),
+    meta: { public: true },
+  },
   {
     path: TERMS_PATH,
     name: 'Terms',

@@ -280,6 +280,23 @@ export type RevokeUserSessionsEnvelope = {
     data: RevokeUserSessionsData;
 };
 
+export type WorkspaceInvitationMailRequest = {
+    recipient: string;
+    invite_id: string;
+    workspace_name: string;
+    inviter_name: string;
+    role: 'admin' | 'member';
+};
+
+export type WorkspaceInvitationMailRequestWritable = {
+    recipient: string;
+    invite_id: string;
+    workspace_name: string;
+    inviter_name: string;
+    role: 'admin' | 'member';
+    token: string;
+};
+
 export type AuthUserId = string;
 
 export type SocialProvider = string;
@@ -932,3 +949,44 @@ export type UpdateSocialProviderResponses = {
 };
 
 export type UpdateSocialProviderResponse = UpdateSocialProviderResponses[keyof UpdateSocialProviderResponses];
+
+export type SendWorkspaceInvitationData = {
+    body: WorkspaceInvitationMailRequestWritable;
+    path?: never;
+    query?: never;
+    url: '/internal/mail/workspace-invitation';
+};
+
+export type SendWorkspaceInvitationErrors = {
+    /**
+     * Invalid request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Internal key or session rejected
+     */
+    401: ErrorEnvelope;
+    /**
+     * Auth dependency or repository failure
+     */
+    500: ErrorEnvelope;
+    /**
+     * Mail provider delivery failed
+     */
+    502: ErrorEnvelope;
+    /**
+     * Auth dependency unavailable
+     */
+    503: ErrorEnvelope;
+};
+
+export type SendWorkspaceInvitationError = SendWorkspaceInvitationErrors[keyof SendWorkspaceInvitationErrors];
+
+export type SendWorkspaceInvitationResponses = {
+    /**
+     * Mail mutation completed
+     */
+    200: MailMutationEnvelope;
+};
+
+export type SendWorkspaceInvitationResponse = SendWorkspaceInvitationResponses[keyof SendWorkspaceInvitationResponses];

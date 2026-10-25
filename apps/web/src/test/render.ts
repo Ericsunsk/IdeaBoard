@@ -1,4 +1,5 @@
 import {
+  fireEvent,
   render as renderBase,
   screen,
   waitFor,
@@ -124,4 +125,4 @@ export function renderWithUser<C>(
   }
 }
 
-export { renderWithI18n as render, screen, userEvent, waitFor, within }
+export { fireEvent, renderWithI18n as render, screen, userEvent, waitFor, within }

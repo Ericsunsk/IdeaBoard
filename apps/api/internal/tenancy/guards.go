@@ -57,6 +57,14 @@ var (
 	// gate (hidden workspaces still converge to workspace_not_found first,
 	// per Baseline 4 anti-enumeration).
 	ErrBillingNotFound = errors.New("tenancy: billing account not found")
+	// ErrWorkspaceInviteExpired reports an expired workspace invite.
+	ErrWorkspaceInviteExpired = errors.New("tenancy: workspace invite has expired")
+	// ErrWorkspaceInviteConflict reports a pending invite already exists for this email.
+	ErrWorkspaceInviteConflict = errors.New("tenancy: active invite already exists for email")
+	// ErrOrganizationInviteExpired reports an expired organization invite.
+	ErrOrganizationInviteExpired = errors.New("tenancy: organization invite has expired")
+	// ErrOrganizationInviteConflict reports a pending invite already exists for this email.
+	ErrOrganizationInviteConflict = errors.New("tenancy: active organization invite already exists for email")
 	// ErrBillingForbidden reports a visible-but-forbidden financial action
 	// (403 billing_account_forbidden): the caller holds Workspace standing
 	// but no Billing Account Owner/Admin grant.

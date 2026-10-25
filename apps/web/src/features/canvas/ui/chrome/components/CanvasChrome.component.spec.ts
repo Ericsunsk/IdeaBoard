@@ -6,6 +6,7 @@ vi.mock('../../../../../core/composables/useSupportChannels', () => ({
 import { h } from 'vue'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import type { RenderOptions } from '@testing-library/vue'
+import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 import {
   render,
   renderWithUser as renderWithUserBase,
@@ -75,6 +76,56 @@ describe('CanvasChrome', () => {
     expect(screen.getByRole('button', { name: 'Zoom Out' })).toBeVisible()
     expect(screen.getByText('100%')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Zoom In' })).toBeVisible()
+  })
+
+  it('renders the notification bell backed by MSW notification endpoints', async () => {
+    // Mirrors WorkspaceHeader: the async bell reads the shared notification
+    // queries, so serve the list + unread-count endpoints via MSW.
+    useMswHandlers(
+      http.get('*/api/v1/user/notifications', () =>
+        HttpResponse.json({ data: { items: [], next_cursor: null } }),
+      ),
+      http.get('*/api/v1/user/notifications/unread-count', () =>
+        HttpResponse.json({ data: { count: 0 } }),
+      ),
+    )
+    renderWithUser(CanvasChrome, {
+      props: {
+        isInert: false,
+        isHidden: false,
+        board: {
+          currentName: 'Untitled',
+          options: [],
+          currentId: null,
+          isMenuOpen: false,
+          isRenaming: false,
+          isRenamePending: false,
+          isReadOnly: false,
+          catalogRecovery: { status: 'idle' },
+          archived: { isArchived: false, isRestoring: false },
+          setNameInputRef: vi.fn(),
+        },
+        account: {
+          balance: {
+            status: 'ready',
+            availableIdeas: 0,
+            displayValue: '0',
+            ariaLabel: 'Idea余额 0 Ideas',
+            command: vi.fn(),
+          },
+          menuItems: [],
+        },
+        tools: {
+          activeTool: 'select',
+          isLibraryMounted: false,
+          isLibraryOpen: false,
+          isMinimapEnabled: false,
+        },
+        status: { isExportDisabled: false, zoomLevel: 100 },
+      },
+    })
+
+    expect(await screen.findByTestId('notification-bell-btn')).toBeVisible()
   })
 
   it('places the credits balance immediately before the share control', () => {

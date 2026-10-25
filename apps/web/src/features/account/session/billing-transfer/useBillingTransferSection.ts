@@ -7,9 +7,9 @@ import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { accountScoped, noRetry } from '../../../../core/query/queryDefaults'
 import { invalidateWorkspaceMemberQueries, workspaceQueryKeys } from '../accountWorkspace'
 import { billingAccountQueryKeys } from '../billing-account/resource'
-import { billingRecordsQueryKeys } from '../billing/resource'
+import { billingRecordsQueryKeys, isBillingRecordsQueryForHandover } from '../billing/resource'
 import { memberQuotaQueryKeys } from '../quota/resource'
-import { usageQueryKeys } from '../usage/resource'
+import { isUsageQueryForHandover, usageQueryKeys } from '../usage/resource'
 import {
   useWorkspaceSettingsBillingAccount,
   useWorkspaceSettingsRoster,
@@ -32,8 +32,12 @@ type Confirmation =
   | { kind: Decision; invite: BillingTransferInviteSummary }
   | { kind: 'invite'; targetUserId: string }
 
-function useTransferQueries(workspaceId: () => string, identity: () => string) {
-  const isEnabled = computed(() => workspaceId() !== '' && identity() !== '')
+function useTransferQueries(
+  workspaceId: () => string,
+  identity: () => string,
+  isEnabledGate: () => boolean,
+) {
+  const isEnabled = computed(() => isEnabledGate() && workspaceId() !== '' && identity() !== '')
   const accountContext = useWorkspaceSettingsBillingAccount({ workspaceId, identity, isEnabled })
   const invitesQuery = useQuery({
     queryKey: computed(() => [...billingTransferQueryKeys.list(workspaceId()), identity()]),
@@ -58,15 +62,18 @@ function useTransferQueries(workspaceId: () => string, identity: () => string) {
 export function useBillingTransferSection(options: {
   workspaceId: MaybeRefOrGetter<string>
   currentUserId: MaybeRefOrGetter<string | null | undefined>
+  isEnabled?: MaybeRefOrGetter<boolean>
 }) {
   const { t } = useI18n()
   const toast = useAppToast()
   const client = useQueryClient()
   const workspaceId = () => toValue(options.workspaceId)
   const identity = () => toValue(options.currentUserId) ?? ''
+  const isEnabledGate = () => (options.isEnabled !== undefined ? toValue(options.isEnabled) : true)
   const { accountContext, invitesQuery, managersQuery, rosterQuery } = useTransferQueries(
     workspaceId,
     identity,
+    isEnabledGate,
   )
   const account = accountContext.account
   const invites = computed(() => invitesQuery.data.value ?? [])
@@ -199,17 +206,28 @@ export function useBillingTransferSection(options: {
       }
     }
     if (operation === 'accept') {
+      // Handover invalidation rides the named key factories: exact keys
+      // where the full key is known, narrow predicates through the
+      // resource-owned handover matchers where scope/range vary. No raw
+      // queryKey[3..5] subscripts at this call site (request-count gate:
+      // scalar-only keys, single factory owner per family).
       refreshes.push(
         client.invalidateQueries({ queryKey: workspaceQueryKeys.list, exact: true }),
-        ...[usageQueryKeys.all, billingRecordsQueryKeys.all].map((queryKey) =>
-          client.invalidateQueries({
-            queryKey,
-            predicate: (query) =>
-              affected.has(String(query.queryKey[3])) &&
-              query.queryKey[4] === changed?.billingAccountId &&
-              query.queryKey[5] === viewer,
-          }),
-        ),
+        client.invalidateQueries({
+          queryKey: billingRecordsQueryKeys.all,
+          predicate: (query) =>
+            isBillingRecordsQueryForHandover(
+              query.queryKey,
+              affected,
+              changed?.billingAccountId,
+              viewer,
+            ),
+        }),
+        client.invalidateQueries({
+          queryKey: usageQueryKeys.all,
+          predicate: (query) =>
+            isUsageQueryForHandover(query.queryKey, affected, changed?.billingAccountId, viewer),
+        }),
       )
     }
     await Promise.all(refreshes)
@@ -272,6 +290,7 @@ export function useBillingTransferSection(options: {
   return {
     account,
     invites,
+    liveInvites,
     managers,
     isLoading,
     hasLoadError,

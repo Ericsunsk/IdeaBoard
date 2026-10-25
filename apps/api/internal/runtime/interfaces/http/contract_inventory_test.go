@@ -286,11 +286,25 @@ func TestOrganizationMemberWriteRolesCannotAssignOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, name := range []string{"AddOrganizationMemberRequest", "UpdateOrganizationMemberRequest"} {
-		t.Run(name, func(t *testing.T) {
-			requestSchema := doc.Components.Schemas[name].Value
-			dataSchema := requestSchema.Properties["data"].Value
-			roleSchema := dataSchema.Properties["role"].Value
+	for _, tc := range []struct {
+		name string
+		path []string
+	}{
+		{name: "CreateOrganizationMemberInviteRequest", path: []string{"role"}},
+		{name: "UpdateOrganizationMemberRequest", path: []string{"data", "role"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ref := doc.Components.Schemas[tc.name]
+			for _, property := range tc.path {
+				if ref == nil || ref.Value == nil {
+					t.Fatalf("%s schema is missing before property %q", tc.name, property)
+				}
+				ref = ref.Value.Properties[property]
+			}
+			if ref == nil || ref.Value == nil {
+				t.Fatalf("%s role schema is missing", tc.name)
+			}
+			roleSchema := ref.Value
 			if got, want := roleSchema.Enum, []any{"admin", "member"}; !reflect.DeepEqual(got, want) {
 				t.Fatalf("role enum = %v, want %v", got, want)
 			}

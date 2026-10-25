@@ -9,6 +9,7 @@ import workspace from './workspace'
 import account from './account'
 import board from './board'
 import admin from './admin'
+import notification from './notification'
 
 export default {
   common,
@@ -22,6 +23,7 @@ export default {
   account,
   board,
   admin,
+  notification,
 } as const
 
 export {
@@ -36,4 +38,5 @@ export {
   account,
   board,
   admin,
+  notification,
 }

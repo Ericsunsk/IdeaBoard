@@ -102,6 +102,7 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 | `payment_reconciliation` / `payment_checkout_shutdown` | 8 | Stripe/DB transient 可自愈；耗尽看 Payments 事故处理 |
 | `vision_billing` | 5 | 快照对账失败看 searchcatalog 计费链路 |
 | `media_reclamation` | 10 | 存储抖动自愈空间最大；持续失败看 storage profile 与对象可达性 |
+| `workspace_invitation_mail` | 8 | 事务内入队的 Workspace 邀请邮件；失败看 Auth 邮件 readiness／Provider；密钥版本不匹配需恢复原主密钥，不能跳过解密检查 |
 | `webhook_deliver` | 8 | 单 delivery 8 次耗尽即进 River `discarded`（即 durable DLQ），`discarded` 行即投递终态；attempt 间隔为 30s 起 doubling + jitter（1h cap） |
 | `task_settlement_sweep` | 5 | 「最终 timeout」收敛 sweep：把 24h 无 worker 触碰、仍持 Credit Hold 的 running/pending 任务收敛为 failed 并 Release。job 失败只可能是 sweep 级故障（DB 不可用/wiring 缺失）；单任务 Release 失败会打 `stalled task settlement convergence failed` 并被隔离，不消耗 job 的 attempt 预算 |
 
@@ -122,6 +123,7 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 | `vision_billing` | VisionBillingReconciliationWorker | 4min | 低于 5min 调度周期；超时看 searchcatalog 计费链路（超时不会堆积到下个周期） |
 | `media_reclamation` | ReclaimWorker | 2min | 低于 5min claim lease；超时看 storage profile 与对象可达性 |
 | `media_reclamation` | ScheduleWorker | 2min | scan（上限 100）+ 入队扇出；超时看 DB 慢查询 |
+| `workspace_invitation_mail` | WorkspaceInvitationMailWorker | 1min | 单次 Auth 邮件投递；队列只存 Token 密文，取消／过期邀请直接收敛，无外发 |
 | `webhook_deliver` | WebhookDeliverWorker | 1min | 单次签名 POST 投递；超时看目标端点可达性 |
 | `task_settlement_sweep` | TaskSettlementSweepWorker | 4min | 单次有界 sweep（发现上限 100 + 逐任务 settle 事务），无 provider 调用；低于 15min 调度周期，超时看 DB 慢查询与 settle 事务锁等待 |
 | `identity_admin_reconciliation` | IdentityReconciliationExecuteWorker | 4min | 有界 identity drift scan 与 finding 写入；超时看 Identity 对账与 DB 慢查询 |

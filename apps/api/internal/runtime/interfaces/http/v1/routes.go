@@ -16,12 +16,14 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	"ideaboard/api/internal/media/derivatives/infrastructure/preview"
+	"ideaboard/api/internal/notifications"
 	"ideaboard/api/internal/platform/applog"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/invitations"
 
 	"github.com/gin-gonic/gin"
 )
@@ -168,6 +170,13 @@ type ContractV1Deps struct {
 	// Explicit billing_account_id/new_billing_account requests with a nil
 	// store fail closed with 503, never silently unlinked.
 	BillingAccounts billingAccountStore
+	// Notifications is the explicitly wired user notifications center store
+	// (#958, ADR-0040). Nil fails the notification endpoints closed with 503.
+	Notifications notifications.Store
+	// InvitationReader owns optional invitation participant enrichment and projection.
+	InvitationReader invitations.Reader
+	// Invitations owns atomic membership decisions, notifications, and mail enqueue.
+	Invitations *invitations.Service
 }
 
 // requireV1IdempotencyKey enforces the shared header-only idempotency contract
@@ -230,6 +239,8 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps runtimehttp.AuthD
 	// placement discipline as the avatar route: before the session
 	// middleware, single serving path for site-asset keys.
 	group.GET("/public/branding/logo", handler.publicBrandingLogo)
+	// Public invitation preview by raw token (no auth required)
+	group.GET("/invites/:token", handler.getWorkspaceInviteByToken)
 	group.Use(runtimehttp.V1AuthMiddleware(authDeps), runtimehttp.ResolvePrincipal())
 	group.GET("/user", handler.getUser)
 	group.PATCH("/user", handler.updateUser)
@@ -239,19 +250,38 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps runtimehttp.AuthD
 	group.PATCH("/workspaces/:workspace_id", handler.updateWorkspace)
 	group.DELETE("/workspaces/:workspace_id", handler.deleteWorkspace)
 	group.GET("/workspaces/:workspace_id/members", handler.listWorkspaceMembers)
-	group.POST("/workspaces/:workspace_id/members", handler.addWorkspaceMember)
+	group.POST("/workspaces/:workspace_id/members", handler.grantOrganizationWorkspaceMember)
 	group.GET("/workspaces/:workspace_id/members/lookup", handler.lookupWorkspaceMemberByEmail)
 	group.PATCH("/workspaces/:workspace_id/members/:member_id", handler.updateWorkspaceMember)
 	group.DELETE("/workspaces/:workspace_id/members/:member_id", handler.removeWorkspaceMember)
+	group.POST("/workspaces/:workspace_id/invites", handler.createWorkspaceInvite)
+	group.GET("/workspaces/:workspace_id/invites", handler.listWorkspaceInvites)
+	group.DELETE("/workspaces/:workspace_id/invites/:invite_id", handler.cancelWorkspaceInvite)
+	group.GET("/user/invites", handler.listUserWorkspaceInvites)
+	group.POST("/user/invites/:invite_id/accept", handler.acceptUserWorkspaceInvite)
+	group.POST("/user/invites/:invite_id/decline", handler.declineUserWorkspaceInvite)
+	group.GET("/user/notifications", handler.listUserNotifications)
+	group.GET("/user/notifications/unread-count", handler.getUserNotificationsUnreadCount)
+	group.POST("/user/notifications/:id/read", handler.markUserNotificationRead)
+	group.POST("/user/notifications/read-all", handler.markAllUserNotificationsRead)
+	group.POST("/user/notifications/:id/archive", handler.archiveUserNotification)
+	group.POST("/invites/:token/accept", handler.acceptWorkspaceInviteByToken)
+	group.POST("/invites/:token/decline", handler.declineWorkspaceInviteByToken)
 	group.GET("/organizations", handler.listOrganizations)
 	group.POST("/organizations", handler.createOrganization)
 	group.GET("/organizations/:organization_id", handler.getOrganization)
 	group.PATCH("/organizations/:organization_id", handler.updateOrganization)
 	group.POST("/organizations/:organization_id/closure", handler.closeOrganization)
 	group.GET("/organizations/:organization_id/members", handler.listOrganizationMembers)
-	group.POST("/organizations/:organization_id/members", handler.addOrganizationMember)
+	group.GET("/organizations/:organization_id/members/lookup", handler.lookupOrganizationMemberByEmail)
 	group.PATCH("/organizations/:organization_id/members/:member_id", handler.updateOrganizationMember)
 	group.DELETE("/organizations/:organization_id/members/:member_id", handler.removeOrganizationMember)
+	group.POST("/organizations/:organization_id/invites", handler.createOrganizationInvite)
+	group.GET("/organizations/:organization_id/invites", handler.listOrganizationInvites)
+	group.DELETE("/organizations/:organization_id/invites/:invite_id", handler.cancelOrganizationInvite)
+	group.GET("/user/organization-invites", handler.listUserOrganizationInvites)
+	group.POST("/user/organization-invites/:invite_id/accept", handler.acceptUserOrganizationInvite)
+	group.POST("/user/organization-invites/:invite_id/decline", handler.declineUserOrganizationInvite)
 	group.GET("/organizations/:organization_id/workspaces", handler.listOrganizationWorkspaces)
 	group.POST("/organizations/:organization_id/workspaces", handler.createOrganizationWorkspace)
 	// Workspace upload sessions + media assets (issue #803, restored

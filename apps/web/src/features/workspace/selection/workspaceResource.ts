@@ -6,21 +6,6 @@
 // `generated-query/public` is wrapped here: never admin/control, never
 // direct fetch (transport stays inside the generated `orvalMutator`).
 //
-// The module codes against the AGREED contract (backend sibling implements
-// the real `/api/v1/*` endpoints in parallel):
-// - `GET /api/v1/user` -> `{ data: { public_id, display_name, avatar? } }`
-// - `GET /api/v1/workspaces?cursor=&page_size=` -> `{ data: [...], meta }`
-// - `POST /api/v1/workspaces` with a required `Idempotency-Key` header
-// - Errors as `{ error: { code, message, details, request_id } }`
-//
-// DRIFT (2026-09-23): the checked-in public stubs still expose kernel-only
-// shapes (`id` instead of `public_id`, no `name`/`archived_at`/`display_name`,
-// transport paths without the `/api/v1` prefix). Parsers below accept both
-// the agreed shape and the stub shape so `npm run api:generate` stays green
-// before the backend slice lands; stub-only defaults are marked inline.
-// When the backend regenerates, stub tolerance narrows without changing the
-// domain types exported here.
-//
 // Billing scope (ADR-0038) is the creation scope and nothing else:
 // omitted organization_id creates a Personal workspace on the caller's
 // Personal account, an organization_id creates an Organization workspace
@@ -35,9 +20,11 @@ import {
   updateWorkspace,
 } from '../../../api/generated-query/public/workspaces/workspaces'
 import {
-  addOrganizationMember as addOrganizationMemberTransport,
+  cancelOrganizationMemberInvite as cancelOrganizationMemberInviteTransport,
   closeOrganization as closeOrganizationTransport,
   createOrganization as createOrganizationTransport,
+  createOrganizationMemberInvite as createOrganizationMemberInviteTransport,
+  listOrganizationMemberInvites as listOrganizationMemberInvitesTransport,
   listOrganizationMembers as listOrganizationMembersTransport,
   listOrganizations,
   removeOrganizationMember as removeOrganizationMemberTransport,
@@ -52,6 +39,7 @@ import {
   newRequestId,
   opaqueIdPrefix,
   requireContractData,
+  type OpaqueIdPrefix,
 } from '../../../api/contractKernel'
 import {
   workspaceCreationIdempotencyKey,
@@ -72,7 +60,7 @@ export type WorkspaceSummary = {
   isDefault: boolean
   createdAt?: string | undefined
   // Stable funds identity (#944): workspaces sharing one account report the
-  // same ba_ value; omitted for legacy payloads without the field.
+  // same ba_ value when the server resolves the billing account.
   billingAccountId?: string | undefined
 }
 
@@ -96,7 +84,7 @@ export const WORKSPACE_PAGE_SIZE_DEFAULT = PAGE_SIZES.standard
 export const WORKSPACE_PAGE_SIZE_MAX = PAGE_SIZES.max
 export const WORKSPACE_NAME_MAX_LENGTH = 120
 
-function requireOpaqueId(value: unknown, prefix: 'usr' | 'org' | 'ws', what: string): string {
+function requireOpaqueId(value: unknown, prefix: OpaqueIdPrefix, what: string): string {
   if (typeof value !== 'string' || !isOpaqueId(value) || opaqueIdPrefix(value) !== prefix) {
     throw new Error(`Invalid ${what} opaque ID`)
   }
@@ -121,14 +109,12 @@ function optionalBillingAccountId(value: unknown): string | undefined {
 
 export function parseWorkspaceItem(raw: unknown): WorkspaceSummary {
   if (!isRecord(raw)) throw new Error('Invalid workspace payload')
-  // Agreed shape carries `public_id`; the kernel stub only has `id`.
-  const publicId = requireOpaqueId(raw.public_id ?? raw.id, 'ws', 'workspace')
-  // Stub workspaces carry no `name` yet; default keeps list rendering stable
-  // until the backend slice lands (agreed shape always has `name`).
-  const name = typeof raw.name === 'string' ? raw.name : ''
+  const publicId = requireOpaqueId(raw.id, 'ws', 'workspace')
+  if (typeof raw.name !== 'string') throw new Error('Invalid workspace name')
+  const name = raw.name
   const organizationId = optionalOpaqueId(raw.organization_id, 'org', 'organization')
   const createdAt = typeof raw.created_at === 'string' ? raw.created_at : undefined
-  const billingAccountId = optionalBillingAccountId(raw.billing_account_id ?? raw.billingAccountId)
+  const billingAccountId = optionalBillingAccountId(raw.billing_account_id)
   return {
     publicId,
     name,
@@ -153,9 +139,7 @@ export function parseWorkspacePage(payload: unknown): WorkspaceListPage {
 export function parsePrincipal(payload: unknown): PrincipalSummary {
   const data = requireContractData<unknown>(payload, 'Invalid principal response')
   if (!isRecord(data)) throw new Error('Invalid principal response')
-  // Agreed shape carries `public_id`/`display_name`; the kernel stub `User`
-  // only has `id` so far.
-  const publicId = requireOpaqueId(data.public_id ?? data.id, 'usr', 'principal')
+  const publicId = requireOpaqueId(data.id, 'usr', 'principal')
   const displayName = typeof data.display_name === 'string' ? data.display_name : ''
   const avatar = asTrimmedString(data.avatar)
   return {
@@ -405,7 +389,7 @@ export const workspaceQueryKeys = {
     ['organizations', organizationId, 'members'] as const,
 }
 
-export type OrganizationStatus = 'active' | 'closed'
+type OrganizationStatus = 'active' | 'closed'
 
 export type OrganizationSummary = {
   publicId: string
@@ -503,6 +487,8 @@ export type OrganizationMemberSummary = {
   userId: string
   role: OrganizationRole
   createdAt?: string | undefined
+  email?: string | undefined
+  avatar_url?: string | null | undefined
 }
 
 function parseOrganizationRole(value: unknown): OrganizationRole {
@@ -512,10 +498,18 @@ function parseOrganizationRole(value: unknown): OrganizationRole {
 
 export function parseOrganizationMember(raw: unknown): OrganizationMemberSummary {
   if (!isRecord(raw)) throw new Error('Invalid organization member payload')
-  const userId = requireOpaqueId(raw.user_id ?? raw.userId, 'usr', 'organization member')
+  const userId = requireOpaqueId(raw.user_id, 'usr', 'organization member')
   const role = parseOrganizationRole(raw.role)
   const createdAt = typeof raw.created_at === 'string' ? raw.created_at : undefined
-  return { userId, role, ...(createdAt === undefined ? {} : { createdAt }) }
+  const email = typeof raw.email === 'string' && raw.email.trim() ? raw.email.trim() : undefined
+  const rawAvatar = asTrimmedString(raw.avatar)
+  return {
+    userId,
+    role,
+    ...(createdAt === undefined ? {} : { createdAt }),
+    ...(email === undefined ? {} : { email }),
+    ...(rawAvatar === undefined ? {} : { avatar_url: rawAvatar }),
+  }
 }
 
 // The organization itself is the management entry (#951): it carries no
@@ -543,18 +537,73 @@ export async function fetchOrganizationMembers(
   return data.map(parseOrganizationMember)
 }
 
+export type OrganizationInviteSummary = {
+  id: string
+  organizationId: string
+  inviteeEmail: string
+  role: 'member' | 'admin'
+  status: string
+  expiresAt: string
+  createdAt: string
+}
+
+function requireInviteString(raw: Record<string, unknown>, field: string): string {
+  const value = raw[field]
+  if (typeof value !== 'string' || !value) {
+    throw new Error(`Invalid organization invite ${field}`)
+  }
+  return value
+}
+
+function parseOrganizationInvite(raw: unknown): OrganizationInviteSummary {
+  if (!isRecord(raw)) throw new Error('Invalid organization invite payload')
+  const role = parseOrganizationRole(raw.role)
+  if (role === 'owner') throw new Error('Invalid organization invite role')
+  return {
+    id: requireOpaqueId(raw.id, 'osi', 'organization invite'),
+    organizationId: requireOpaqueId(raw.organization_id, 'org', 'organization'),
+    inviteeEmail: requireInviteString(raw, 'invitee_email'),
+    role,
+    status: requireInviteString(raw, 'status'),
+    expiresAt: requireInviteString(raw, 'expires_at'),
+    createdAt: requireInviteString(raw, 'created_at'),
+  }
+}
+
+export async function fetchOrganizationInvites(
+  organizationId: string,
+  options?: WorkspaceRequestOptions,
+): Promise<OrganizationInviteSummary[]> {
+  const orgId = requireOpaqueId(organizationId, 'org', 'organization')
+  const response = await listOrganizationMemberInvitesTransport(orgId, toRequestConfig(options))
+  const data = requireContractData<unknown>(response, 'Organization invite list failed')
+  if (!Array.isArray(data)) throw new Error('Invalid organization invite list')
+  return data.map(parseOrganizationInvite)
+}
+
+export async function cancelOrganizationInvite(
+  organizationId: string,
+  inviteId: string,
+  options?: WorkspaceRequestOptions,
+): Promise<void> {
+  const orgId = requireOpaqueId(organizationId, 'org', 'organization')
+  const invId = requireOpaqueId(inviteId, 'osi', 'organization invite')
+  await cancelOrganizationMemberInviteTransport(orgId, invId, toRequestConfig(options))
+}
+
 export async function inviteOrganizationMember(
   organizationId: string,
-  input: { userId: string; role: Exclude<OrganizationRole, 'owner'> },
+  input: { email: string; role: Exclude<OrganizationRole, 'owner'> },
   options?: WorkspaceRequestOptions & { idempotencyKey?: string | undefined },
-): Promise<OrganizationMemberSummary> {
+): Promise<OrganizationInviteSummary> {
   const orgId = requireOpaqueId(organizationId, 'org', 'organization')
-  const userId = requireOpaqueId(input.userId, 'usr', 'organization member')
+  const email = input.email.trim()
+  if (!email) throw new Error('Email is required')
   const role = parseOrganizationRole(input.role)
   if (role === 'owner') throw new Error('Organization owner change requires explicit handover')
-  const response = await addOrganizationMemberTransport(
+  const response = await createOrganizationMemberInviteTransport(
     orgId,
-    { data: { user_id: userId, role } },
+    { email, role },
     {
       ...withSignal(options?.signal),
       headers: buildContractRequestHeaders({
@@ -564,7 +613,7 @@ export async function inviteOrganizationMember(
       ...(options?.authFailure == null ? {} : { authFailure: options.authFailure }),
     },
   )
-  return parseOrganizationMember(
+  return parseOrganizationInvite(
     requireContractData<unknown>(response, 'Organization member invite failed'),
   )
 }

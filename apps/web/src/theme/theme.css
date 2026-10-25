@@ -104,6 +104,8 @@
   --color-page-chrome-color-disabled: var(--color-board-card-text);
   --color-page-chrome-focus-ring: var(--color-board-focus-ring);
   --shadow-page-chrome: none;
+  --page-chrome-icon-size: 19px;
+  --canvas-chrome-icon-size: var(--page-chrome-icon-size);
   --spacing-overlay-gutter: var(--primitive-size-10);
   --color-overlay-bg: var(--popover);
   --color-overlay-border: var(--palette-dark-border);

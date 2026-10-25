@@ -20,6 +20,7 @@ type QueueRetryPolicy struct {
 // fast instead of churning for 25 attempts.
 func RiverRetryMatrix() []QueueRetryPolicy {
 	return []QueueRetryPolicy{
+		{Queue: RiverQueueWorkspaceInvitationMail, MaxAttempts: RiverMaxAttemptsWorkspaceInvitationMail, Worker: "WorkspaceInvitationMailWorker", Notes: "encrypted transactional mail delivery; provider idempotency is stable across retries"},
 		{
 			Queue:       RiverQueueDefault,
 			MaxAttempts: RiverMaxAttemptsDefault,

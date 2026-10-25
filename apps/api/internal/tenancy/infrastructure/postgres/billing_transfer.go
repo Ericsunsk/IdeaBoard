@@ -33,6 +33,7 @@ func mapTransferInvite(row dbsqlc.BillingAccountTransferInvite) *tenancy.Billing
 	}
 	out := &tenancy.BillingTransferInvite{
 		InternalID:              row.InternalID,
+		IdempotencyKey:          row.IdempotencyKey,
 		PublicID:                row.PublicID,
 		BillingAccountID:        row.BillingAccountID,
 		BillingAccountPublicID:  row.BillingAccountPublicID,

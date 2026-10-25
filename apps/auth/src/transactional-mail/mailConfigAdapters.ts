@@ -54,6 +54,7 @@ export function createResendTransport(
           headers: {
             authorization: `Bearer ${apiKey}`,
             'content-type': 'application/json',
+            ...(input.idempotencyKey ? { 'Idempotency-Key': input.idempotencyKey } : {}),
           },
           body: JSON.stringify({
             from: input.from,

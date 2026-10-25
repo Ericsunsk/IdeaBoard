@@ -4,7 +4,7 @@
     :title="t('workspace.switcher.createDialogTitle')"
     :description="t('workspace.switcher.createDialogNameLabel')"
     :size="accountPreset.size"
-    :is-busy="isCreating || isCreatingOrganization"
+    :is-busy="isCreating"
     :has-close="accountPreset.hasClose"
     :close-label="t('common.actions.close')"
     content-class="bg-popover w-[min(420px,calc(100vw-32px))]"
@@ -42,100 +42,48 @@
             {{ createNameError }}
           </p>
         </div>
-        <div v-if="props.onLoadOrganizations" class="mt-5 flex flex-col gap-2">
-          <label
-            for="workspace-create-scope"
-            class="text-admin-content font-medium text-foreground"
-            >{{ t('workspace.switcher.scopeLabel') }}</label
-          >
-          <select
-            id="workspace-create-scope"
-            v-model="createScopeId"
-            class="h-9 rounded-control border border-input bg-background px-3 text-admin-content text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            :disabled="isCreating || isCreatingOrganization"
-          >
-            <option value="personal">
-              {{ t('workspace.switcher.scopePersonalTitle') }}
-            </option>
-            <option
-              v-for="organization in createScopeOptions"
-              :key="organization.publicId"
-              :value="organization.publicId"
-            >
-              {{ organization.name }}
-            </option>
-          </select>
-          <p
-            v-if="isOrganizationsLoading"
-            class="m-0 text-admin-meta text-muted-foreground"
-            role="status"
-          >
-            {{ t('common.actions.loading') }}
-          </p>
-          <div v-if="organizationLoadError" class="flex flex-col gap-2">
-            <p class="m-0 text-admin-meta text-destructive" role="alert">
-              {{ organizationLoadError }}
-            </p>
-            <Button type="button" size="sm" variant="outline" @click="loadOrganizations()">{{
-              t('common.actions.retry')
-            }}</Button>
-          </div>
-          <Button
-            v-if="props.onCreateOrganization && !isOrganizationFormOpen"
-            type="button"
-            size="sm"
-            variant="outline"
-            class="self-start"
-            :is-disabled="isCreating"
-            @click="isOrganizationFormOpen = true"
-            >{{ t('workspace.switcher.organization.new') }}</Button
-          >
-          <div
-            v-if="isOrganizationFormOpen"
-            class="flex flex-col gap-2 rounded-control border border-border p-3"
-          >
-            <label
-              for="workspace-organization-name"
-              class="text-admin-meta font-medium text-foreground"
-              >{{ t('workspace.switcher.organization.name') }}</label
-            >
-            <Input
-              id="workspace-organization-name"
-              v-model="organizationName"
-              :aria-label="t('workspace.switcher.organization.name')"
-              :disabled="isCreatingOrganization"
-              :maxlength="nameFieldMaxLength"
-            />
-            <p class="m-0 text-admin-meta text-muted-foreground">
-              {{ t('workspace.switcher.organization.setupNote') }}
-            </p>
-            <p v-if="organizationError" class="m-0 text-admin-meta text-destructive" role="alert">
-              {{ organizationError }}
-            </p>
-            <div class="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                :is-loading="isCreatingOrganization"
-                :is-disabled="isCreatingOrganization"
-                @click="createOrganization()"
-                >{{ t('workspace.switcher.organization.confirm') }}</Button
-              >
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                :is-disabled="isCreatingOrganization"
-                @click="isOrganizationFormOpen = false"
-                >{{ t('common.actions.cancel') }}</Button
-              >
-            </div>
-          </div>
-        </div>
-        <div class="mt-5 mb-0 flex flex-col gap-2">
+
+        <!-- Scope selector is only shown when the user belongs to at least one organization -->
+        <div v-if="hasOrganizations" class="mt-5 flex flex-col gap-2">
           <span class="text-admin-content font-medium text-foreground">
             {{ t('workspace.switcher.scopeLabel') }}
           </span>
+          <div
+            role="group"
+            :aria-label="t('workspace.switcher.scopeLabel')"
+            class="grid grid-cols-2 gap-1 rounded-control bg-muted p-1"
+          >
+            <button
+              type="button"
+              :aria-pressed="createScopeId === 'personal'"
+              :disabled="isCreating"
+              class="h-8 flex items-center justify-center rounded-control px-3 text-sm font-medium transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer select-none disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              :class="
+                createScopeId === 'personal'
+                  ? 'bg-background text-foreground font-semibold shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              "
+              data-scope="personal"
+              @click="createScopeId = 'personal'"
+            >
+              {{ t('workspace.switcher.scopePersonalTitle') }}
+            </button>
+            <button
+              type="button"
+              :aria-pressed="createScopeId !== 'personal'"
+              :disabled="isCreating"
+              class="h-8 flex items-center justify-center rounded-control px-3 text-sm font-medium transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer select-none disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              :class="
+                createScopeId !== 'personal'
+                  ? 'bg-background text-foreground font-semibold shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              "
+              data-scope="organization"
+              @click="selectOrganizationScope"
+            >
+              <span class="truncate">{{ organizationScopeName }}</span>
+            </button>
+          </div>
           <div class="rounded-control border border-border p-3">
             <span class="block text-admin-content font-medium text-foreground">
               {{
@@ -149,11 +97,12 @@
             </span>
           </div>
         </div>
+
         <div class="mt-6 flex justify-end gap-2">
           <Button
             type="button"
             variant="ghost"
-            :is-disabled="isCreating || isCreatingOrganization"
+            :is-disabled="isCreating"
             class="rounded-pill px-4 py-2 text-admin-content font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
             @click="cancelCreateDialog"
           >
@@ -230,15 +179,8 @@ const {
   createScopeId,
   createOrganizationId,
   createScopeOptions,
-  isOrganizationsLoading,
-  organizationLoadError,
-  isOrganizationFormOpen,
-  organizationName,
-  organizationError,
-  isCreatingOrganization,
+  hasOrganizations,
   canSubmitCreate,
-  loadOrganizations,
-  createOrganization,
   prepare,
   fundingInput,
 } = useWorkspaceCreation({
@@ -247,10 +189,25 @@ const {
   isCreating,
   nameMaxLength: () => props.nameMaxLength,
   onLoadOrganizations: props.onLoadOrganizations,
-  onCreateOrganization: props.onCreateOrganization,
 })
+const organizationScopeName = computed(() => {
+  if (createOrganizationId.value) {
+    const org = createScopeOptions.value.find(
+      (item) => item.publicId === createOrganizationId.value,
+    )
+    if (org?.name) return org.name
+  }
+  return createScopeOptions.value[0]?.name ?? t('workspace.switcher.scopeOrganizationTitle')
+})
+
+function selectOrganizationScope(): void {
+  const target = createScopeOptions.value[0]
+  if (target) {
+    createScopeId.value = target.publicId
+  }
+}
 watch(
-  () => isCreating.value || isCreatingOrganization.value,
+  isCreating,
   (isBusy) => emits('busy', isBusy),
 )
 watch(isCreateDialogOpen, (isOpen) => {
@@ -299,7 +256,7 @@ async function submitCreateFromDialog(): Promise<void> {
   }
 }
 function cancelCreateDialog(): void {
-  if (isCreating.value || isCreatingOrganization.value) return
+  if (isCreating.value) return
   emits('update:isOpen', false)
 }
 function handleCreateOpenUpdate(isOpen: boolean): void {

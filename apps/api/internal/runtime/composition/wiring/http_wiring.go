@@ -34,6 +34,7 @@ import (
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/memberquotas"
+	"ideaboard/api/internal/notifications"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/audit"
@@ -62,7 +63,9 @@ import (
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
 	workspacetasks "ideaboard/api/internal/tasking/workspacetasks"
+	tenancyevents "ideaboard/api/internal/tenancy/events"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
+	"ideaboard/api/internal/tenancy/invitations"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -158,6 +161,16 @@ func NewAppRouter(
 	// ride their own packages (no kernel -> plane import, no cycle).
 	tenancyStore := tenancypg.NewStore(repos.db, services.storageService)
 	userDirectory := runtimehttp.NewUsersRepositoryDirectory(repos.userRepo)
+	notificationsStore := notifications.NewPostgresStore(repos.db)
+	memberDisplay := v1.NewMemberDisplayService(repos.userRepo, services.authServiceClient)
+	memberLookup := v1.NewMemberLookupService(repos.userRepo, services.authServiceClient)
+	billingAccounts := tenancypg.NewBillingAccountStore(repos.db)
+	collaboration := &invitations.Service{
+		Store: tenancyStore, Transfers: billingAccounts,
+		Identities:  v1.NewInvitationIdentityReader(memberDisplay, memberLookup, userDirectory),
+		Events:      tenancyevents.NewCollaborationEventDispatcher(notificationsStore, taskServices.invitationMailQueue),
+		Transaction: invitations.PostgresTransaction(repos.db),
+	}
 	registerHTTPRoutes(router,
 		runtimehttp.Dependencies{
 			PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()}), mediaPreviews),
@@ -179,20 +192,23 @@ func NewAppRouter(
 		},
 		authDeps,
 		v1.ContractV1Deps{
-			SupportChannels: services.runtimeSettings,
-			Store:           tenancyStore,
-			Users:           userDirectory,
+			SupportChannels:  services.runtimeSettings,
+			Store:            tenancyStore,
+			Notifications:    notificationsStore,
+			Invitations:      collaboration,
+			InvitationReader: v1.NewInvitationReader(repos.userRepo, services.authServiceClient),
+			Users:            userDirectory,
 			// #944 creation-time account display and authorization: the same
 			// stable billing-account store the billing surface and task
 			// preflights use, so new workspaces link to an authorized
 			// account in one transaction and responses name the payer.
-			BillingAccounts: tenancypg.NewBillingAccountStore(repos.db),
+			BillingAccounts: billingAccounts,
 			// Workspace-member display facts (email + avatar) reuse the Admin
 			// emailReader join (users -> AuthUserIDs -> Auth emails) plus
 			// the avatar projection off the same rows; members without
 			// facts omit the fields, never fail the request.
-			MemberDisplay: v1.NewMemberDisplayService(repos.userRepo, services.authServiceClient),
-			MemberLookup:  v1.NewMemberLookupService(repos.userRepo, services.authServiceClient),
+			MemberDisplay: memberDisplay,
+			MemberLookup:  memberLookup,
 			AvatarUID:     v1.NewV1AvatarDirectory(repos.userRepo),
 			UserProfile:   runtimehttp.NewV1UserProfileDirectory(repos.userRepo),
 			// Avatar bytes ride the storage abstraction (active
@@ -246,7 +262,7 @@ func NewAppRouter(
 			// gates the same Wallet funds (402 insufficient vs 403
 			// restricted). The store below is the same tenancy seam the
 			// workspace billing reads use, so every surface names one payer.
-			TaskQuoteBillingAccounts: tenancypg.NewBillingAccountStore(repos.db),
+			TaskQuoteBillingAccounts: billingAccounts,
 			TaskQuoteWallets:         services.creditService,
 			// #946: the quote/readiness preflight reports the same
 			// member quota submit enforces (not-ready early).
@@ -287,8 +303,9 @@ func NewAppRouter(
 		// by the billing services.
 		v1.ContractV1BillingDeps{
 			Tenancy:         tenancyStore,
+			Invitations:     collaboration,
 			Users:           runtimehttp.NewUsersRepositoryDirectory(repos.userRepo),
-			BillingAccounts: tenancypg.NewBillingAccountStore(repos.db),
+			BillingAccounts: billingAccounts,
 			Wallets:         services.creditService,
 			Records:         services.billingRecords,
 			Usage:           services.usageService,
@@ -316,7 +333,7 @@ func NewAppRouter(
 			// Member display facts (email + avatar) for billing member
 			// and transfer-invite shapes, same batch seam as the
 			// workspace/org member lists.
-			MemberDisplay: v1.NewMemberDisplayService(repos.userRepo, services.authServiceClient),
+			MemberDisplay: memberDisplay,
 			// Required read-only snapshot for the billing overview fan-out
 			// (REPEATABLE READ with ambient-carrier join).
 			Snapshot: billingoverview.PostgresSnapshot(repos.db),

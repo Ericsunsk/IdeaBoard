@@ -16,6 +16,8 @@ security:
 tags:
   - name: User
     description: Identity-owned profile and preferences of the current principal.
+  - name: Notifications
+    description: User notification center, unread counts, and notification lifecycle.
   - name: Workspaces
     description: Workspace lifecycle and membership.
   - name: Organizations
@@ -322,6 +324,439 @@ paths:
         "503":
           description: Renderer unavailable (plain status).
 
+  /user/invites:
+    get:
+      tags: [User]
+      operationId: listUserWorkspaceInvites
+      summary: List pending workspace invitations for the current user
+      responses:
+        '200':
+          description: Pending invitations for current user.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceMemberInviteList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /user/invites/{invite_id}/accept:
+    post:
+      tags: [User]
+      operationId: acceptUserWorkspaceInvite
+      summary: Accept a pending workspace invitation (in-app)
+      description: >-
+        Accepts a pending workspace invitation. No Idempotency-Key is
+        required: the invite identifier in the path scopes the decision, and
+        a repeated decision deterministically renders 409 conflict once the
+        invite leaves pending state.
+      parameters:
+        - name: invite_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The wsi_ identifier of the invitation.
+      responses:
+        '200':
+          description: Workspace membership created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceMemberEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /user/invites/{invite_id}/decline:
+    post:
+      tags: [User]
+      operationId: declineUserWorkspaceInvite
+      summary: Decline a pending workspace invitation (in-app)
+      description: >-
+        Declines a pending workspace invitation. No Idempotency-Key is
+        required: the invite identifier in the path scopes the decision, and
+        a repeated decision deterministically renders 409 conflict once the
+        invite leaves pending state.
+      parameters:
+        - name: invite_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The wsi_ identifier of the invitation.
+      responses:
+        '200':
+          description: Invitation declined.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceInviteAckEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /user/organization-invites:
+    get:
+      tags: [User]
+      operationId: listUserOrganizationInvites
+      summary: List pending organization invitations for the current user
+      responses:
+        '200':
+          description: Pending organization invitations for current user.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMemberInviteList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /user/organization-invites/{invite_id}/accept:
+    post:
+      tags: [User]
+      operationId: acceptUserOrganizationInvite
+      summary: Accept a pending organization invitation (in-app)
+      description: >-
+        Accepts a pending organization invitation. No Idempotency-Key is
+        required: the invite identifier in the path scopes the decision, and
+        a repeated decision deterministically renders 409 conflict once the
+        invite leaves pending state.
+      parameters:
+        - name: invite_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The osi_ identifier of the invitation.
+      responses:
+        '200':
+          description: Organization membership created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMemberEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /user/organization-invites/{invite_id}/decline:
+    post:
+      tags: [User]
+      operationId: declineUserOrganizationInvite
+      summary: Decline a pending organization invitation (in-app)
+      description: >-
+        Declines a pending organization invitation. No Idempotency-Key is
+        required: the invite identifier in the path scopes the decision, and
+        a repeated decision deterministically renders 409 conflict once the
+        invite leaves pending state.
+      parameters:
+        - name: invite_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The osi_ identifier of the invitation.
+      responses:
+        '200':
+          description: Invitation declined.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationInviteAckEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /user/notifications:
+    get:
+      tags: [Notifications]
+      operationId: listUserNotifications
+      summary: List notifications for the current user
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [unread, read, archived]
+          description: Optional status filter. The default feed excludes archived notifications.
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, invites, billing]
+            default: all
+          description: Filter the notification category before pagination.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: >-
+            Maximum number of notifications to return. Values above 100 are
+            clamped to 100 (no 400); invalid values fall back to 20.
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: >-
+            Alias for limit (same clamp to 100, same default 20). When both
+            are present, limit wins.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+          description: Number of notifications to skip.
+      responses:
+        '200':
+          description: Paginated notification list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /user/notifications/unread-count:
+    get:
+      tags: [Notifications]
+      operationId: getUserNotificationsUnreadCount
+      summary: Get unread notification count for the current user
+      responses:
+        '200':
+          description: Unread notification count.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadCountResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /user/notifications/{id}/read:
+    post:
+      tags: [Notifications]
+      operationId: markUserNotificationRead
+      summary: Mark a notification as read
+      description: >-
+        Marks a notification as read. No Idempotency-Key is required:
+        marking read is naturally idempotent and safe to retry.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The notif_ public identifier of the notification.
+      responses:
+        '200':
+          description: Notification marked as read.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /user/notifications/read-all:
+    post:
+      tags: [Notifications]
+      operationId: markAllUserNotificationsRead
+      summary: Mark all unread notifications as read
+      description: >-
+        Marks all unread notifications as read. No Idempotency-Key is
+        required: the operation is naturally idempotent and safe to retry.
+      responses:
+        '200':
+          description: Number of notifications marked as read.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkAllReadResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /user/notifications/{id}/archive:
+    post:
+      tags: [Notifications]
+      operationId: archiveUserNotification
+      summary: Archive a notification
+      description: >-
+        Archives a notification. No Idempotency-Key is required: archiving
+        is naturally idempotent and safe to retry.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The notif_ public identifier of the notification.
+      responses:
+        '200':
+          description: Notification archived.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /invites/{token}:
+    get:
+      tags: [WorkspaceMembers]
+      operationId: getWorkspaceInviteByToken
+      summary: Preview a workspace invitation by raw token (public)
+      description: >-
+        Unauthenticated preview by unguessable token. The invitee email is
+        intentionally omitted from the preview (PII minimization); it stays
+        in the authenticated invite DTOs.
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The raw 32-byte hex token from the invitation link.
+      responses:
+        '200':
+          description: Public preview of the invitation.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceInvitePreviewEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /invites/{token}/accept:
+    post:
+      tags: [WorkspaceMembers]
+      operationId: acceptWorkspaceInviteByToken
+      summary: Accept a workspace invitation by raw token (authenticated)
+      description: >-
+        Accepts a pending workspace invitation by token. No Idempotency-Key
+        is required: the token in the path scopes the decision, and a
+        repeated decision deterministically renders 409 conflict once the
+        invite leaves pending state.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The raw 32-byte hex token from the invitation link.
+      responses:
+        '200':
+          description: Workspace membership created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceMemberEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /invites/{token}/decline:
+    post:
+      tags: [WorkspaceMembers]
+      operationId: declineWorkspaceInviteByToken
+      summary: Decline a workspace invitation by raw token (authenticated)
+      description: >-
+        Declines a pending workspace invitation by token. No Idempotency-Key
+        is required: the token in the path scopes the decision, and a
+        repeated decision deterministically renders 409 conflict once the
+        invite leaves pending state.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The raw 32-byte hex token from the invitation link.
+      responses:
+        '200':
+          description: Invitation declined.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceInviteAckEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
   /workspaces:
     get:
       tags: [Workspaces]
@@ -512,22 +947,15 @@ paths:
     post:
       tags: [WorkspaceMembers]
       operationId: addWorkspaceMember
-      summary: Add a workspace member (owner/admin only; owner-only promotion)
+      summary: Grant workspace access to an existing organization member (owner/admin only)
       description: >-
-        Requires the Idempotency-Key header. Re-adding an existing member
-        keeps the current role, including when the workspace is full.
-        Workspaces support at most 5 members including owners; exceeding
-        this limit renders 409 workspace_member_limit_reached.
-        The Personal Default workspace is private: invites there render 403
-        workspace_default_protected. Other Personal workspaces invite freely:
-        the Workspace Owner/Admin adds collaborators directly with no
-        per-invite Personal account-holder approval, consumption charges the
-        holder's shared Personal Billing Account with the real operator kept
-        on each record, and an unconfigured collaborator quota reads as
-        unlimited (the holder may set it later without clearing usage).
-        Removing and re-adding a collaborator preserves quota state and
-        historical consumption. Reusing a key with a different request
-        renders 409 workspace_idempotency_conflict.
+        Grants an existing Organization member access to one of its Workspaces.
+        The target must already belong to the owning Organization. This endpoint
+        never joins a user to an Organization and cannot add Personal collaborators;
+        Personal collaboration requires accepted Workspace invitations.
+        Requires Idempotency-Key. Re-adding an existing member preserves its role.
+        Active members plus pending invitations must not exceed 5.
+        Reusing a key with a different request renders 409 workspace_idempotency_conflict.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -573,9 +1001,9 @@ paths:
         indistinguishable from unregistered identities. The email is
         resolved through the Auth identity and never stored; the response
         carries only the usr_ identifier. This is a read-only query: it
-        performs no membership write (invite with POST
-        /workspaces/{workspace_id}/members using the resolved usr_,
-        role, and Idempotency-Key). Abuse is bounded by the existing
+        performs no membership write. Personal collaborators join through
+        POST /workspaces/{workspace_id}/invites; Organization members may
+        receive Workspace access through POST /workspaces/{workspace_id}/members. Abuse is bounded by the existing
         global per-IP rate limiting plus the single-address exact-match
         shape (no batch enumeration).
       parameters:
@@ -662,6 +1090,103 @@ paths:
                 $ref: '#/components/schemas/DeletedEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/invites:
+    get:
+      tags: [WorkspaceMembers]
+      operationId: listWorkspaceMemberInvites
+      summary: List workspace member invitations (owner/admin only)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Workspace member invitation list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceMemberInviteList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [WorkspaceMembers]
+      operationId: createWorkspaceMemberInvite
+      summary: Create a workspace member invitation (owner/admin only)
+      description: >-
+        Requires the Idempotency-Key header. Invites a new collaborator by email.
+        Workspaces support at most 5 members and pending invites combined; exceeding
+        this renders 409 workspace_member_limit_reached. Personal Default workspaces
+        are private and reject invites with 403 workspace_default_protected.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceMemberInviteRequest'
+      responses:
+        '201':
+          description: Invitation created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceMemberInviteEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/invites/{invite_id}:
+    delete:
+      tags: [WorkspaceMembers]
+      operationId: cancelWorkspaceMemberInvite
+      summary: Cancel a pending workspace member invitation (owner/admin only)
+      description: >-
+        Cancels a pending workspace invitation. No Idempotency-Key is
+        required: cancellation is naturally idempotent and safe to retry; a
+        repeated cancel deterministically renders 409 conflict once the
+        invite leaves pending state.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: invite_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The wsi_ identifier of the invitation.
+      responses:
+        '200':
+          description: Invitation cancelled.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -943,33 +1468,29 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-    post:
+  /organizations/{organization_id}/members/lookup:
+    get:
       tags: [Organizations]
-      operationId: addOrganizationMember
-      summary: Invite an organization member (owner/admin only)
+      operationId: lookupOrganizationMemberByEmail
+      summary: Look up a registered user by email (owner/admin only)
       description: >-
-        Requires Idempotency-Key. Only owner may grant admin; owner grants
-        never flow here (explicit handover only). The invitee joining a
-        second organization fails closed with organization_limit_reached.
+        Resolves one registered user to its usr_ identifier by exact email
+        match (trimmed, case-insensitive) for the invite flow. Only
+        organization owners/admins may call it. Unknown emails converge to
+        404 organization_member_not_found.
       parameters:
         - $ref: '#/components/parameters/OrganizationId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AddOrganizationMemberRequest'
+        - $ref: '#/components/parameters/MemberLookupEmail'
       responses:
-        '201':
-          description: Organization member invited.
+        '200':
+          description: User resolved to its public identifier.
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OrganizationMemberEnvelope'
+                $ref: '#/components/schemas/WorkspaceMemberLookupEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -978,10 +1499,6 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
   /organizations/{organization_id}/members/{member_id}:
     patch:
       tags: [Organizations]
@@ -1059,6 +1576,101 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+  /organizations/{organization_id}/invites:
+    get:
+      tags: [Organizations]
+      operationId: listOrganizationMemberInvites
+      summary: List organization member invitations (owner/admin only)
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: Organization member invitation list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMemberInviteList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Organizations]
+      operationId: createOrganizationMemberInvite
+      summary: Create an organization member invitation (owner/admin only)
+      description: >-
+        Requires Idempotency-Key. Invites a user by email. Only owner may grant admin.
+        Accepting requires explicit user confirmation.
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationMemberInviteRequest'
+      responses:
+        '201':
+          description: Invitation created.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMemberInviteEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /organizations/{organization_id}/invites/{invite_id}:
+    delete:
+      tags: [Organizations]
+      operationId: cancelOrganizationMemberInvite
+      summary: Cancel a pending organization member invitation (owner/admin only)
+      description: >-
+        Cancels a pending organization invitation. No Idempotency-Key is
+        required: cancellation is naturally idempotent and safe to retry; a
+        repeated cancel deterministically renders 409 conflict once the
+        invite leaves pending state.
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - name: invite_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The osi_ identifier of the invitation.
+      responses:
+        '200':
+          description: Invitation cancelled.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /workspaces/{workspace_id}/boards:
     get:
       tags: [Boards]
@@ -5087,6 +5699,296 @@ components:
             Workspace-visible member avatar public URL with a content
             version query (members-only visibility). Omitted when the
             member has no custom avatar or the value is unavailable.
+    WorkspaceMemberInvite:
+      type: object
+      required: [id, workspace_id, inviter_user_id, invitee_email, role, status, expires_at, created_at]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        workspace_id:
+          type: string
+        workspace_name:
+          type: string
+        inviter_user_id:
+          type: string
+        inviter_email:
+          type: string
+        inviter_name:
+          type: string
+        inviter_avatar:
+          type: string
+        invitee_email:
+          type: string
+        invitee_user_id:
+          type: string
+        role:
+          type: string
+          enum: [admin, member]
+        status:
+          type: string
+          enum: [pending, accepted, declined, cancelled, expired]
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        responded_at:
+          type: string
+          format: date-time
+        responded_by_user_id:
+          type: string
+        token:
+          type: string
+          description: Raw token only exposed once upon creation.
+    WorkspaceMemberInviteEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceMemberInvite'
+    WorkspaceMemberInviteList:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceMemberInvite'
+    CreateWorkspaceMemberInviteRequest:
+      type: object
+      required: [email]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, member]
+          default: member
+    WorkspaceInvitePreview:
+      type: object
+      required: [workspace_id, workspace_name, role, status, expires_at]
+      additionalProperties: false
+      properties:
+        workspace_id:
+          type: string
+        workspace_name:
+          type: string
+        inviter_name:
+          type: string
+        inviter_avatar:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+    WorkspaceInvitePreviewEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceInvitePreview'
+    WorkspaceInviteAck:
+      type: object
+      additionalProperties: false
+      properties:
+        declined:
+          type: boolean
+        cancelled:
+          type: boolean
+    WorkspaceInviteAckEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/WorkspaceInviteAck'
+    OrganizationMemberInvite:
+      type: object
+      required: [id, organization_id, inviter_user_id, invitee_email, role, status, expires_at, created_at]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        organization_id:
+          type: string
+        organization_name:
+          type: string
+        inviter_user_id:
+          type: string
+        inviter_email:
+          type: string
+        inviter_name:
+          type: string
+        inviter_avatar:
+          type: string
+        invitee_email:
+          type: string
+        invitee_user_id:
+          type: string
+        role:
+          type: string
+          enum: [admin, member]
+        status:
+          type: string
+          enum: [pending, accepted, declined, cancelled, expired]
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        responded_at:
+          type: string
+          format: date-time
+        responded_by_user_id:
+          type: string
+        token:
+          type: string
+          description: Raw token only exposed once upon creation.
+    OrganizationMemberInviteEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/OrganizationMemberInvite'
+    OrganizationMemberInviteList:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizationMemberInvite'
+    CreateOrganizationMemberInviteRequest:
+      type: object
+      required: [email]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, member]
+          default: member
+    OrganizationInviteAck:
+      type: object
+      additionalProperties: false
+      properties:
+        declined:
+          type: boolean
+        cancelled:
+          type: boolean
+    OrganizationInviteAckEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/OrganizationInviteAck'
+    NotificationDTO:
+      type: object
+      required: [id, type, title, body, action_payload, status, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: Opaque public identifier (notif_...).
+        type:
+          type: string
+          description: Semantic category of the notification.
+          enum: [workspace_invite, workspace_member_joined, workspace_invite_declined, organization_invite, organization_member_joined, organization_invite_declined, studio_handover, billing_credit_low, billing_recharge_success]
+        title:
+          type: string
+        body:
+          type: string
+        action_payload:
+          type: object
+          description: >-
+            Contextual action payload. Invite family (workspace_invite,
+            organization_invite and the inviter-side joined/declined notices)
+            carries invite_id/invite_status/role/names keys;
+            studio_handover carries transfer_invite_id (see
+            notifications.PayloadKeyTransferInviteID for why it stays
+            distinct from invite_id) plus workspace/from/billing keys;
+            billing family keys are reserved.
+          additionalProperties: true
+        status:
+          type: string
+          enum: [unread, read, archived]
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    NotificationEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/NotificationDTO'
+    NotificationListResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          additionalProperties: false
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/NotificationDTO'
+            total:
+              type: integer
+            limit:
+              type: integer
+            offset:
+              type: integer
+    UnreadCountResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [count]
+          additionalProperties: false
+          properties:
+            count:
+              type: integer
+    MarkAllReadResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [updated]
+          additionalProperties: false
+          properties:
+            updated:
+              type: integer
     CreateWorkspaceRequest:
       type: object
       required: [data]
@@ -5218,20 +6120,6 @@ components:
               type: string
               minLength: 1
               maxLength: 120
-    AddOrganizationMemberRequest:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          type: object
-          required: [user_id, role]
-          additionalProperties: false
-          properties:
-            user_id:
-              $ref: '#/components/schemas/UserId'
-            role:
-              $ref: '#/components/schemas/AssignableOrganizationRole'
     UpdateOrganizationMemberRequest:
       type: object
       required: [data]

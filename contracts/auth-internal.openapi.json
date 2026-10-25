@@ -504,6 +504,49 @@
           "503": { "$ref": "#/components/responses/ServiceUnavailable" }
         }
       }
+    },
+    "/internal/mail/workspace-invitation": {
+      "post": {
+        "operationId": "sendWorkspaceInvitation",
+        "summary": "Deliver a Workspace invitation using configured transactional mail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceInvitationMailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MailMutationSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "502": {
+            "description": "Mail provider delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1371,6 +1414,56 @@
           },
           "data": {
             "$ref": "#/components/schemas/RevokeUserSessionsData"
+          }
+        }
+      },
+      "WorkspaceInvitationMailRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "recipient",
+          "invite_id",
+          "workspace_name",
+          "inviter_name",
+          "role",
+          "token"
+        ],
+        "properties": {
+          "recipient": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 320
+          },
+          "invite_id": {
+            "type": "string",
+            "pattern": "^wsi_[a-zA-Z0-9_-]{1,128}$",
+            "x-go-name": "InviteID"
+          },
+          "workspace_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "inviter_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "x-enum-varnames": [
+              "WorkspaceInvitationAdmin",
+              "WorkspaceInvitationMember"
+            ]
+          },
+          "token": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "writeOnly": true
           }
         }
       }

@@ -52,6 +52,30 @@ export const usageQueryKeys = {
     ['workspace', 'usage', 'current', workspaceId, billingAccountId, identity, consumptionScope, range] as const,
 }
 
+// Named handover-scope matcher for usage keys: the single owner of the
+// ['workspace','usage','current', workspaceId, billingAccountId, identity,
+// ...] shape. Handover invalidation predicates consult this instead of raw
+// queryKey[3..5] subscripts at the call site, so key-shape drift surfaces
+// here (request-count gate: scalar-only keys registered in
+// queryKeyRequestBudget.contract.spec.ts).
+export function isUsageQueryForHandover(
+  queryKey: readonly unknown[],
+  workspaces: ReadonlySet<string>,
+  billingAccountId: string | undefined,
+  viewer: string,
+): boolean {
+  if (billingAccountId == null || billingAccountId === '') return false
+  if (queryKey.length < 6) return false
+  if (queryKey[0] !== 'workspace' || queryKey[1] !== 'usage') return false
+  const workspaceId = queryKey[3]
+  return (
+    typeof workspaceId === 'string' &&
+    workspaces.has(workspaceId) &&
+    queryKey[4] === billingAccountId &&
+    queryKey[5] === viewer
+  )
+}
+
 export async function fetchUsage(
   workspaceId: string,
   range: UsageRange,

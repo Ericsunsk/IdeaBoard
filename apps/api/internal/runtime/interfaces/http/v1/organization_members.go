@@ -22,23 +22,16 @@ type v1OrganizationMemberDTO struct {
 }
 
 func (h *contractV1Handler) toOrganizationMemberDTO(c *gin.Context, m *tenancy.OrganizationMember) (v1OrganizationMemberDTO, bool) {
-	if h.deps.Users == nil {
-		contract.RenderError(c, http.StatusNotImplemented,
-			contract.CodeContractNotImplemented, "The v1 contract surface is not implemented yet")
+	if m == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable53)
 		c.Abort()
 		return v1OrganizationMemberDTO{}, false
 	}
-	publicID, err := h.deps.Users.GetUserPublicID(c.Request.Context(), m.UserID)
-	if err != nil || publicID == uuid.Nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable47)
-		c.Abort()
+	page, ok := h.toOrganizationMemberDTOs(c, []*tenancy.OrganizationMember{m})
+	if !ok || len(page) == 0 {
 		return v1OrganizationMemberDTO{}, false
 	}
-	dto := v1OrganizationMemberDTO{UserID: tenancy.FormatUserPublicID(publicID), Role: m.Role}
-	if created := v1FormatTime(m.CreatedAt); created != "" {
-		dto.CreatedAt = created
-	}
-	return dto, true
+	return page[0], true
 }
 
 func renderOrganizationMemberError(c *gin.Context, err error) {
@@ -81,6 +74,38 @@ func (h *contractV1Handler) listOrganizationMembers(c *gin.Context) {
 	})
 }
 
+func (h *contractV1Handler) lookupOrganizationMemberByEmail(c *gin.Context) {
+	h.withOrganization(c, v1OrganizationOpts{Allow: func(role string, _ bool) bool {
+		return role == tenancy.RoleOwner || role == tenancy.RoleAdmin
+	}}, func(octx v1OrganizationCtx) {
+		normalized := NormalizeMemberLookupEmail(c.Query("email"))
+		if !IsValidMemberLookupEmail(normalized) {
+			contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
+				runtimehttp.MsgBadRequest35, contract.FieldErrors{Fields: map[string]string{"email": "invalid"}})
+			c.Abort()
+			return
+		}
+		if h.deps.MemberLookup == nil {
+			contract.RenderError(c, http.StatusNotImplemented,
+				contract.CodeContractNotImplemented, "The v1 contract surface is not implemented yet")
+			c.Abort()
+			return
+		}
+		publicID, err := h.deps.MemberLookup.LookupUserPublicID(c.Request.Context(), normalized)
+		if err == nil && publicID != uuid.Nil {
+			contract.RenderSuccess(c, v1MemberLookupDTO{UserID: tenancy.FormatUserPublicID(publicID)})
+			return
+		}
+		if err != nil && !errors.Is(err, tenancy.ErrNotFound) {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable47)
+			c.Abort()
+			return
+		}
+		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationMemberNotFound, runtimehttp.MsgOrganizationMemberNotFound)
+		c.Abort()
+	})
+}
+
 // toOrganizationMemberDTOs builds the organization member list in three
 // round trips total: the store list (caller) plus one identity batch and
 // one display batch, replacing the per-member GetUserPublicID N+1 loop and
@@ -109,75 +134,6 @@ func (h *contractV1Handler) toOrganizationMemberDTOs(c *gin.Context, members []*
 		page = append(page, dto)
 	}
 	return page, true
-}
-
-type v1AddOrganizationMemberBody struct {
-	Data struct {
-		UserID string `json:"user_id"`
-		Role   string `json:"role"`
-	} `json:"data"`
-}
-
-func (h *contractV1Handler) addOrganizationMember(c *gin.Context) {
-	h.withOrganization(c, v1OrganizationOpts{Allow: func(role string, _ bool) bool {
-		return role == tenancy.RoleOwner || role == tenancy.RoleAdmin
-	}}, func(octx v1OrganizationCtx) {
-		identityPrincipal := octx.Principal
-		organization := octx.Organization
-		role := octx.Role
-		key, err := contract.IdempotencyKeyFromHeader(c)
-		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, runtimehttp.MsgIdempotencyKeyRequired2)
-			c.Abort()
-			return
-		}
-		var body v1AddOrganizationMemberBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-			writeV1InputError(c)
-			return
-		}
-		newRole := strings.TrimSpace(body.Data.Role)
-		if !tenancy.IsValidRole(newRole) || newRole == tenancy.RoleOwner {
-			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				runtimehttp.MsgRenderBoardError2, contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
-			c.Abort()
-			return
-		}
-		if err := tenancy.CheckOrganizationMemberAdd(role, newRole); err != nil {
-			renderOrganizationMemberError(c, err)
-			return
-		}
-		targetUserID, _, ok := h.resolveMemberUserID(c, body.Data.UserID)
-		if !ok {
-			return
-		}
-		ctx := c.Request.Context()
-		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-		scope := contract.IdempotencyScope(externalUser, "organization:member-add")
-		hash := contract.HashIdempotencyRequest("organization:member-add", organization.PublicID, body.Data.UserID, newRole)
-		result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
-			return h.deps.Store.AddOrganizationMember(ctx, organization.PublicID, targetUserID, newRole)
-		})
-		if doErr != nil {
-			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeOrganizationIdempotencyConflict, runtimehttp.MsgWorkspaceIdempotencyConflict)
-				c.Abort()
-				return
-			}
-			renderOrganizationMemberError(c, doErr)
-			return
-		}
-		added, ok := result.(*tenancy.OrganizationMember)
-		if !ok || added == nil {
-			renderOrganizationMemberError(c, errors.New("tenancy: organization member-add type mismatch"))
-			return
-		}
-		dto, ok := h.toOrganizationMemberDTO(c, added)
-		if !ok {
-			return
-		}
-		contract.RenderCreated(c, dto)
-	})
 }
 
 type v1UpdateOrganizationMemberBody struct {

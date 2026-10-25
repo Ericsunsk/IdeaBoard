@@ -12,6 +12,7 @@
     {"name": "tasks", "path": "fragments/tasks.sql", "depends_on": ["identity", "media", "billing_accounts"]},
     {"name": "library", "path": "fragments/library.sql", "depends_on": ["identity", "media"]},
     {"name": "events", "path": "fragments/events.sql", "depends_on": ["identity", "workspace"]},
+    {"name": "notifications", "path": "fragments/notifications.sql", "depends_on": ["identity"]},
     {"name": "search", "path": "fragments/search.sql", "depends_on": ["identity", "credits"]},
     {"name": "usage", "path": "fragments/usage.sql", "depends_on": ["tasks"]},
     {"name": "workflow", "path": "fragments/workflow.sql", "depends_on": ["platform"]},

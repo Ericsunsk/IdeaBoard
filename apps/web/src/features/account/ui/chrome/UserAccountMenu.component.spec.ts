@@ -82,7 +82,6 @@ vi.mock('../../session/billing-account/resource', async (load) => ({
   ...(await load<typeof import('../../session/billing-account/resource')>()),
   fetchBillingAccount: vi.fn().mockRejectedValue(new Error('no billing account')),
 }))
-vi.mock('./BillingTransferSection.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('../../session/workspace-settings', async (load) => ({
   ...(await load<typeof import('../../session/workspace-settings')>()),
   memberDisplayName: (entry: { userId: string }) => entry.userId,
@@ -825,7 +824,7 @@ describe('UserAccountMenu', () => {
       // Scope is fixed at creation: Personal renders as a read-only row
       // and no billing radios or More-actions toggle exist.
       const createDialog = await screen.findByRole('dialog', { name: 'New workspace' })
-      expect(within(createDialog).getByText('Personal')).toBeVisible()
+      expect(within(createDialog).getAllByText('Personal').length).toBeGreaterThanOrEqual(1)
       expect(screen.getByText(/New space uses your Personal account/)).toBeVisible()
       expect(screen.queryByRole('radio')).toBeNull()
       expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull()
@@ -855,16 +854,24 @@ describe('UserAccountMenu', () => {
       expect(vi.mocked(fetchBillingAccount)).not.toHaveBeenCalled()
     })
 
-    it('enables creation immediately in personal scope', async () => {
+    it('enables creation immediately in personal scope and hides scope when no organizations', async () => {
       const created = {
         publicId: 'ws_new11',
         name: 'New workspace',
         organizationId: null,
         isDefault: false,
       }
-      const workspace = workspaceControls({ onCreate: vi.fn().mockResolvedValue(created) })
+      const workspace = workspaceControls({
+        items: [
+          { publicId: 'ws_personal1', name: 'Personal 1', organizationId: null, isDefault: true },
+        ],
+        onLoadOrganizations: vi.fn().mockResolvedValue([]),
+        onCreate: vi.fn().mockResolvedValue(created),
+      })
       const view = await openSettingsDialog(workspace)
       await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+      expect(screen.queryByLabelText('Workspace scope')).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Create organization' })).toBeNull()
       const create = screen.getByRole('button', { name: 'Create workspace' })
       expect(create).toBeEnabled()
       await view.user.click(create)
@@ -891,40 +898,44 @@ describe('UserAccountMenu', () => {
       )
     })
 
-    it('creates an organization account explicitly before its first workspace and retains scope on retry', async () => {
-      const onCreateOrganization = vi.fn().mockResolvedValue({ publicId: 'org_new', name: 'Acme' })
-      const workspace = workspaceControls({
-        onLoadOrganizations: vi.fn().mockResolvedValue([]),
-        onCreateOrganization,
-        onCreate: vi.fn().mockRejectedValueOnce(new Error('workspace failed')).mockResolvedValue({
-          publicId: 'ws_acme',
-          name: 'New workspace',
-          organizationId: 'org_new',
-          isDefault: false,
-        }),
-      })
-      const view = await openSettingsDialog(workspace)
-      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
-      await view.user.click(screen.getByRole('button', { name: 'Create organization' }))
-      expect(screen.getByRole('button', { name: 'Create workspace' })).toBeDisabled()
-      await view.user.type(screen.getByLabelText('Organization name'), 'Acme')
-      await view.user.click(screen.getByRole('button', { name: 'Create organization account' }))
-      await waitFor(() => expect(screen.getByLabelText('Workspace scope')).toHaveValue('org_new'))
-      expect(onCreateOrganization).toHaveBeenCalledWith(
-        'Acme',
-        expect.stringContaining('organization-create:'),
-      )
-      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
-      expect(
-        await screen.findByText('Could not create the workspace. Please try again.'),
-      ).toBeVisible()
-      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
-      await waitFor(() => expect(workspace.onCreate).toHaveBeenCalledTimes(2))
-      expect(workspace.onCreate).toHaveBeenLastCalledWith({
+    it('presents scope when user belongs to an organization and omits inline organization creation', async () => {
+      const created = {
+        publicId: 'ws_acme',
         name: 'New workspace',
-        organizationId: 'org_new',
+        organizationId: 'org_c3',
+        isDefault: false,
+      }
+      const workspaceWithOrg = workspaceControls({
+        selectedId: 'ws_team2',
+        onLoadOrganizations: vi.fn().mockResolvedValue([{ publicId: 'org_c3', name: 'Team Org' }]),
+        onCreate: vi.fn().mockResolvedValue(created),
       })
-      expect(onCreateOrganization).toHaveBeenCalledOnce()
+      const view = await openSettingsDialog(workspaceWithOrg)
+      await view.user.click(screen.getByRole('button', { name: 'Add New' }))
+
+      // Workspace scope two-button toggle is visible and create organization button is removed
+      const personalBtn = await screen.findByRole('button', { name: 'Personal' })
+      const orgBtn = await screen.findByRole('button', { name: 'Team Org' })
+      expect(personalBtn).toBeVisible()
+      expect(orgBtn).toBeVisible()
+      expect(screen.queryByRole('button', { name: 'Create organization' })).toBeNull()
+
+      // Can switch between Personal and Organization via buttons
+      await view.user.click(personalBtn)
+      expect(personalBtn).toHaveAttribute('aria-pressed', 'true')
+      expect(orgBtn).toHaveAttribute('aria-pressed', 'false')
+
+      await view.user.click(orgBtn)
+      expect(orgBtn).toHaveAttribute('aria-pressed', 'true')
+      expect(personalBtn).toHaveAttribute('aria-pressed', 'false')
+
+      await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
+      await waitFor(() =>
+        expect(workspaceWithOrg.onCreate).toHaveBeenCalledWith({
+          name: 'New workspace',
+          organizationId: 'org_c3',
+        }),
+      )
     })
 
     it('keeps the naming dialog open with an inline error when creation fails', async () => {

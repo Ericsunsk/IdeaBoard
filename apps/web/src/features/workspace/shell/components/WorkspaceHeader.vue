@@ -25,12 +25,16 @@
         :support-channels="supportChannels"
         :workspace="workspaceSwitcher.menuProps.value"
       >
+        <template #actions>
+          <NotificationBell v-if="Boolean(userStore.user)" />
+        </template>
       </UserAccountMenu>
     </slot>
   </header>
 </template>
 
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import StudioName from '../../../../core/components/StudioName.vue'
 import UserAccountMenu from '../../../account/ui/chrome/UserAccountMenu.vue'
@@ -54,6 +58,10 @@ const props = withDefaults(defineProps<WorkspaceHeaderProps>(), {
   sticky: true,
   navigation: null,
 })
+
+const NotificationBell = defineAsyncComponent(
+  () => import('../../../notification/ui/NotificationBell.vue'),
+)
 
 const router = useRouter()
 const { channels: supportChannels } = useSupportChannels()

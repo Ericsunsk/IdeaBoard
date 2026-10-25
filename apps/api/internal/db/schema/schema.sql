@@ -416,6 +416,50 @@ CREATE TABLE organization_closures (
 -- Each Organization can close only once.
 CREATE UNIQUE INDEX uq_organization_closures_org
   ON organization_closures (organization_id);
+
+-- Organization member invitation confirmation (#957, ADR-0041).
+CREATE TABLE organization_member_invites (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  organization_id BIGINT NOT NULL REFERENCES organizations(internal_id) ON DELETE CASCADE,
+  inviter_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  invitee_email TEXT NOT NULL,
+  invitee_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+  role TEXT NOT NULL DEFAULT 'member',
+  status TEXT NOT NULL DEFAULT 'pending',
+  token_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '7 days'),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  responded_at TIMESTAMPTZ NULL,
+  responded_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT uq_organization_member_invites_public_id UNIQUE (public_id),
+  CONSTRAINT chk_organization_member_invites_public_id CHECK (public_id LIKE 'osi\_%'),
+  CONSTRAINT chk_organization_member_invites_email CHECK (btrim(invitee_email) <> '' AND invitee_email = lower(invitee_email)),
+  CONSTRAINT chk_organization_member_invites_role CHECK (role IN ('admin', 'member')),
+  CONSTRAINT chk_organization_member_invites_status CHECK (status IN ('pending', 'accepted', 'declined', 'cancelled', 'expired')),
+  CONSTRAINT uq_organization_member_invites_token_hash UNIQUE (token_hash),
+  CONSTRAINT chk_organization_member_invites_token_hash CHECK (length(token_hash) = 64),
+  CONSTRAINT chk_organization_member_invites_response_shape CHECK (
+    (status = 'pending' AND responded_at IS NULL AND responded_by_user_id IS NULL)
+    OR (status IN ('accepted', 'declined', 'cancelled') AND responded_at IS NOT NULL)
+    OR (status = 'expired')
+  )
+);
+
+CREATE UNIQUE INDEX uq_organization_member_invites_pending_email
+  ON organization_member_invites (organization_id, invitee_email)
+  WHERE status = 'pending';
+
+CREATE INDEX idx_organization_member_invites_org_status
+  ON organization_member_invites (organization_id, status, created_at DESC);
+
+CREATE INDEX idx_organization_member_invites_email_status
+  ON organization_member_invites (invitee_email, status, created_at DESC);
+
+CREATE INDEX idx_organization_member_invites_invitee_user
+  ON organization_member_invites (invitee_user_id, status, created_at DESC)
+  WHERE invitee_user_id IS NOT NULL;
 -- Workspace tenancy foundation (#801).
 --
 -- A Workspace is owned by a User (personal Workspace, no Organization) or by
@@ -469,6 +513,49 @@ CREATE TABLE workspace_memberships (
 );
 
 CREATE INDEX idx_workspace_memberships_user ON workspace_memberships (user_id, workspace_id);
+
+CREATE TABLE workspace_member_invites (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  inviter_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  invitee_email TEXT NOT NULL,
+  invitee_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+  role TEXT NOT NULL DEFAULT 'member',
+  status TEXT NOT NULL DEFAULT 'pending',
+  token_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '7 days'),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  responded_at TIMESTAMPTZ NULL,
+  responded_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT uq_workspace_member_invites_public_id UNIQUE (public_id),
+  CONSTRAINT chk_workspace_member_invites_public_id CHECK (public_id LIKE 'wsi\_%'),
+  CONSTRAINT chk_workspace_member_invites_email CHECK (btrim(invitee_email) <> '' AND invitee_email = lower(invitee_email)),
+  CONSTRAINT chk_workspace_member_invites_role CHECK (role IN ('admin', 'member')),
+  CONSTRAINT chk_workspace_member_invites_status CHECK (status IN ('pending', 'accepted', 'declined', 'cancelled', 'expired')),
+  CONSTRAINT uq_workspace_member_invites_token_hash UNIQUE (token_hash),
+  CONSTRAINT chk_workspace_member_invites_token_hash CHECK (length(token_hash) = 64),
+  CONSTRAINT chk_workspace_member_invites_response_shape CHECK (
+    (status = 'pending' AND responded_at IS NULL AND responded_by_user_id IS NULL)
+    OR (status IN ('accepted', 'declined', 'cancelled') AND responded_at IS NOT NULL)
+    OR (status = 'expired')
+  )
+);
+
+CREATE UNIQUE INDEX uq_workspace_member_invites_pending_email
+  ON workspace_member_invites (workspace_id, invitee_email)
+  WHERE status = 'pending';
+
+CREATE INDEX idx_workspace_member_invites_ws_status
+  ON workspace_member_invites (workspace_id, status, created_at DESC);
+
+CREATE INDEX idx_workspace_member_invites_email_status
+  ON workspace_member_invites (invitee_email, status, created_at DESC);
+
+CREATE INDEX idx_workspace_member_invites_invitee_user
+  ON workspace_member_invites (invitee_user_id, status, created_at DESC)
+  WHERE invitee_user_id IS NOT NULL;
 -- Billing Account tenancy foundation (#804/#915/#916/#948).
 --
 -- Moved from workspaces.sql: a Billing Account is owned by exactly one
@@ -3285,6 +3372,41 @@ CREATE TABLE event_delivery_attempts (
 
 CREATE INDEX idx_event_delivery_attempts_delivery
   ON event_delivery_attempts (delivery_id, attempt_number DESC);
+-- User notifications center (#958, ADR-0040).
+--
+-- One row is one user notification. Notifications carry in-app alerts for
+-- workspace invitations, studio/billing handover, billing credit low,
+-- recharge success, and workspace member joined.
+--
+-- Status transitions:
+--   unread -> read | archived
+
+CREATE TABLE user_notifications (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  action_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  deduplication_key TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'unread',
+  read_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_user_notifications_public_id UNIQUE (public_id),
+  CONSTRAINT chk_user_notifications_public_id CHECK (public_id LIKE 'notif\_%'),
+  CONSTRAINT chk_user_notifications_status CHECK (status IN ('unread', 'read', 'archived')),
+  CONSTRAINT chk_user_notifications_type CHECK (length(btrim(type)) > 0),
+  CONSTRAINT chk_user_notifications_title CHECK (length(btrim(title)) > 0),
+  CONSTRAINT chk_user_notifications_action_payload CHECK (jsonb_typeof(action_payload) = 'object')
+);
+
+CREATE INDEX idx_user_notifications_user_status ON user_notifications (user_id, status, created_at DESC);
+CREATE INDEX idx_user_notifications_user_created ON user_notifications (user_id, created_at DESC);
+
+-- Durable event identity survives HTTP idempotency cache/process restarts.
+CREATE UNIQUE INDEX uq_user_notifications_deduplication ON user_notifications (user_id, deduplication_key) WHERE deduplication_key <> '';
 CREATE TABLE ai_search_operations (
   operation_id UUID PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

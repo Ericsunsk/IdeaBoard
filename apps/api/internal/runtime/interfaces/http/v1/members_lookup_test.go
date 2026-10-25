@@ -88,7 +88,7 @@ func TestV1MemberLookupByEmailInMemory(t *testing.T) {
 	dir := newStaticUserDirectory()
 	const owner, admin, member, outsider = 1, 2, 3, 4
 	const invitee, otherWSUser = 5, 6
-	ws := v1WorkspaceFixture(t, ctx, store, "member-lookup", owner)
+	ws := v1OrganizationWorkspaceFixture(t, ctx, store, "member-lookup", owner, admin, member, outsider, invitee, otherWSUser)
 	store.SeedWorkspaceMember(ws.PublicID, admin, tenancy.RoleAdmin)
 	store.SeedWorkspaceMember(ws.PublicID, member, tenancy.RoleMember)
 	for _, id := range []int64{owner, admin, member, outsider, invitee, otherWSUser} {
@@ -369,4 +369,38 @@ func TestMemberLookupServiceFailClosed(t *testing.T) {
 			t.Fatalf("invalid-email lookup err = %v, want tenancy.ErrNotFound", err)
 		}
 	})
+}
+
+func TestV1OrganizationMemberLookupByEmail(t *testing.T) {
+	ctx := context.Background()
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	const owner = 1
+	const invitee = 5
+
+	inviteePublic := dir.ensure(invitee)
+	lookup := &fakeMemberLookup{ids: map[string]uuid.UUID{
+		"invitee@example.com": inviteePublic,
+	}}
+
+	org, err := store.CreateOrganization(ctx, owner, "Acme")
+	if err != nil {
+		t.Fatalf("create org: %v", err)
+	}
+
+	engine := newV1MembersLookupEngine(store, dir, lookup)
+
+	path := "/api/v1/organizations/" + org.PublicID + "/members/lookup?email=invitee%40example.com"
+	status, _, payload := doV1(t, engine, v1Call{
+		method: http.MethodGet,
+		path:   path,
+		userID: owner,
+	})
+	if status != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %v", status, payload)
+	}
+	data := v1Data(t, payload).(map[string]any)
+	if data["user_id"] != tenancy.FormatUserPublicID(inviteePublic) {
+		t.Fatalf("got %v, want %s", data["user_id"], tenancy.FormatUserPublicID(inviteePublic))
+	}
 }

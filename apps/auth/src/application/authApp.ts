@@ -12,6 +12,7 @@ import type {
 import { extractErrorMessage } from '../infrastructure/authUtils.js'
 import { registerInternalRoutes } from '../trusted-identity/internalRoutes.js'
 import { registerMailConfigRoutes } from '../transactional-mail/mailConfigRoutes.js'
+import { registerWorkspaceInvitationRoutes } from '../transactional-mail/workspaceInvitationRoutes.js'
 import type { MailConfigService } from '../transactional-mail/mailConfig.js'
 import { getErrorStatus, sendError, sendSuccess } from '../infrastructure/httpResponse.js'
 import {
@@ -34,7 +35,10 @@ export type AuthAppDependencies = {
   authApi: AuthSessionAPI
   internalCommands: AuthInternalCommands
   admissionPolicy: AuthAdmissionPolicy
-  mailConfigService?: Pick<MailConfigService, 'getSummary' | 'update' | 'clear' | 'sendTest'>
+  mailConfigService?: Pick<
+    MailConfigService,
+    'getSummary' | 'update' | 'clear' | 'sendTest' | 'sendWorkspaceInvitation'
+  >
   socialProviderSettingsService?: Pick<
     SocialProviderSettingsService,
     'getSummary' | 'update' | 'getCapabilities'
@@ -85,6 +89,10 @@ export function createAuthApp(deps: AuthAppDependencies): FastifyInstance {
 
   if (deps.mailConfigService) {
     registerMailConfigRoutes(app, {
+      internalKey: deps.config.internalKey,
+      service: deps.mailConfigService,
+    })
+    registerWorkspaceInvitationRoutes(app, {
       internalKey: deps.config.internalKey,
       service: deps.mailConfigService,
     })

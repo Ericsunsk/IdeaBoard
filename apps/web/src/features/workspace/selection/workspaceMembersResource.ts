@@ -2,13 +2,19 @@ import type { QueryClient, QueryKey, UseQueryOptions } from '@tanstack/vue-query
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import {
   addWorkspaceMember as addWorkspaceMemberRequest,
+  cancelWorkspaceMemberInvite as cancelWorkspaceMemberInviteRequest,
+  createWorkspaceMemberInvite as createWorkspaceMemberInviteRequest,
+  getListWorkspaceMemberInvitesQueryKey,
   getListWorkspaceMembersQueryKey,
+  listWorkspaceMemberInvites as listWorkspaceMemberInvitesRequest,
   listWorkspaceMembers as listWorkspaceMembersRequest,
   lookupWorkspaceMemberByEmail as lookupWorkspaceMemberRequest,
   removeWorkspaceMember as removeWorkspaceMemberRequest,
   updateWorkspaceMember as updateWorkspaceMemberRequest,
 } from '../../../api/generated-query/public/workspace-members/workspace-members'
 import type { MembershipRole } from '../../../api/generated-query/public/model/membershipRole'
+import type { WorkspaceMemberInvite } from '../../../api/generated-query/public/model/workspaceMemberInvite'
+import type { CreateWorkspaceMemberInviteRequestRole } from '../../../api/generated-query/public/model/createWorkspaceMemberInviteRequestRole'
 import { workspaceMemberIdempotencyKey } from '../../../api/idempotencyKey'
 import { userErrorCode } from '../../../core/errors/errorCatalog'
 import { accountScoped, noRetry } from '../../../core/query/queryDefaults'
@@ -170,8 +176,8 @@ export async function lookupWorkspaceMemberId(
   return toMemberUserId(envelope.data?.user_id, 'user_id')
 }
 
-/** Invites a member with a workspace role (owner/admin only). */
-export async function inviteWorkspaceMember(
+/** Grants an existing Organization member access to its Workspace. */
+export async function grantOrganizationWorkspaceMember(
   workspaceId: string,
   input: { userId: string; role: WorkspaceMemberRole },
   options: WorkspaceMembersRequestOptions = {},
@@ -224,6 +230,48 @@ export async function removeWorkspaceMemberEntry(
   await removeWorkspaceMemberRequest(workspace, member, writeConfig(options, 'remove'))
 }
 
+export type { WorkspaceMemberInvite }
+
+/** Lists pending invitations for a workspace (owner/admin only). */
+export async function fetchWorkspaceMemberInvites(
+  workspaceId: string,
+  options: WorkspaceMembersRequestOptions = {},
+): Promise<WorkspaceMemberInvite[]> {
+  const workspace = requireWorkspaceId(workspaceId)
+  const response = await listWorkspaceMemberInvitesRequest(workspace, readConfig(options))
+  return response.data ?? []
+}
+
+/** Creates a pending workspace member invitation (owner/admin only). */
+export async function createWorkspaceMemberInvite(
+  workspaceId: string,
+  input: { email: string; role?: WorkspaceMemberRole },
+  options: WorkspaceMembersRequestOptions = {},
+): Promise<WorkspaceMemberInvite> {
+  const workspace = requireWorkspaceId(workspaceId)
+  const email = input.email.trim().toLowerCase()
+  if (!email || !email.includes('@')) throw new WorkspaceMemberPayloadError('email')
+  const role = input.role as CreateWorkspaceMemberInviteRequestRole | undefined
+  const envelope = await createWorkspaceMemberInviteRequest(
+    workspace,
+    { email, ...(role ? { role } : {}) },
+    writeConfig(options, 'invite'),
+  )
+  return envelope.data
+}
+
+/** Cancels a pending workspace member invitation (owner/admin only). */
+export async function cancelWorkspaceMemberInvite(
+  workspaceId: string,
+  inviteId: string,
+  options: WorkspaceMembersRequestOptions = {},
+): Promise<void> {
+  const workspace = requireWorkspaceId(workspaceId)
+  const trimmedInviteId = inviteId.trim()
+  if (!trimmedInviteId) throw new WorkspaceMemberPayloadError('invite_id')
+  await cancelWorkspaceMemberInviteRequest(workspace, trimmedInviteId, readConfig(options))
+}
+
 /** Maps stable backend codes to member failure reasons (never prose). */
 export function classifyWorkspaceMemberError(error: unknown): WorkspaceMemberFailureReason {
   switch (userErrorCode(error)) {
@@ -273,9 +321,29 @@ export function workspaceMembersQueryOptions(
   } satisfies UseQueryOptions<WorkspaceMemberEntry[], Error, WorkspaceMemberEntry[], QueryKey>
 }
 
+/** Fail-fast invites query for one workspace (owner/admin read). */
+export function workspaceMemberInvitesQueryOptions(
+  workspaceId: MaybeRefOrGetter<string>,
+  fetch: typeof fetchWorkspaceMemberInvites = fetchWorkspaceMemberInvites,
+) {
+  type QueryContext = { signal?: AbortSignal }
+  const queryFn = ({ signal }: QueryContext) =>
+    fetch(toValue(workspaceId), { signal: signal ?? null })
+  return {
+    queryKey: getListWorkspaceMemberInvitesQueryKey(workspaceId),
+    queryFn,
+    ...accountScoped(),
+    ...noRetry(),
+    enabled: computed(() => {
+      const current = toValue(workspaceId)
+      return typeof current === 'string' && current.trim().length > 0
+    }),
+  } satisfies UseQueryOptions<WorkspaceMemberInvite[], Error, WorkspaceMemberInvite[], QueryKey>
+}
+
 /**
- * Invalidates one workspace roster after a member write. Failures keep the
- * confirmed state: invalidation only refetches, it never writes facts.
+ * Invalidates one workspace roster and pending invites after a member write.
+ * Failures keep the confirmed state: invalidation only refetches, it never writes facts.
  */
 export function invalidateWorkspaceMemberQueries(
   client: Pick<QueryClient, 'invalidateQueries'>,
@@ -283,6 +351,10 @@ export function invalidateWorkspaceMemberQueries(
 ): void {
   void client.invalidateQueries({
     queryKey: getListWorkspaceMembersQueryKey(workspaceId),
+    exact: true,
+  })
+  void client.invalidateQueries({
+    queryKey: getListWorkspaceMemberInvitesQueryKey(workspaceId),
     exact: true,
   })
 }

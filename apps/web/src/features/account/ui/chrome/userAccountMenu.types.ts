@@ -38,44 +38,14 @@ export type UserAccountMenuOrganizationItem = {
   closedAt?: string | undefined
 }
 
-export type UserAccountMenuOrganizationMember = {
-  userId: string
-  role: 'owner' | 'admin' | 'member'
-  createdAt?: string | undefined
-}
-
-export type UserAccountMenuOrganizationMemberRole = 'member' | 'admin'
-
-// Organization management panel (issue #951): the workspace shell owns the
-// management UI component and its transport callbacks; the account menu only
-// carries them through as an opaque `Component` plus plain functions so the
-// account feature never imports the workspace feature. The settings dialog
-// resolves the caller's single organization and renders the panel, exposing
-// the management surface as soon as the organization exists.
+// Workspace owns all Organization reads, permissions, actions and navigation intent.
+// Account hosts this surface without knowing its management protocol.
 export type UserAccountMenuOrganizationPanel = {
   component: Component
-  onLoadMembers: (organizationId: string) => Promise<UserAccountMenuOrganizationMember[]>
-  onInviteMember: (
-    organizationId: string,
-    input: { userId: string; role: UserAccountMenuOrganizationMemberRole },
-  ) => Promise<UserAccountMenuOrganizationMember>
-  onUpdateMember: (
-    organizationId: string,
-    memberId: string,
-    input: { role: UserAccountMenuOrganizationMemberRole },
-  ) => Promise<UserAccountMenuOrganizationMember>
-  onRemoveMember: (organizationId: string, memberId: string) => Promise<void>
-  // Self-leave also resets the Personal/Organization scope and refreshes the
-  // list (defaults to onRemoveMember when omitted).
-  onLeaveMember?: ((organizationId: string, memberId: string) => Promise<void>) | undefined
-  // Permanent Organization closure (owner only). Access and spending end;
-  // unused balance cannot be restored or transferred to Personal.
-  onCloseOrganization?:
-    | ((
-        organizationId: string,
-        input: { reason?: string | undefined },
-      ) => Promise<UserAccountMenuOrganizationItem>)
-    | undefined
+  bindings: Record<string, unknown>
+  name: string | null
+  setEnabled: (isEnabled: boolean) => void
+  refresh: () => Promise<void>
 }
 
 export type UserAccountMenuWorkspace = {
@@ -95,14 +65,11 @@ export type UserAccountMenuWorkspace = {
   onLoadOrganizations?: (() => Promise<UserAccountMenuOrganizationItem[]>) | undefined
   onCreateOrganization?:
     ((name: string, idempotencyKey: string) => Promise<UserAccountMenuOrganizationItem>) | undefined
-  // Organization management panel (issue #951, opaque component + callbacks).
+  // Opaque Organization management surface.
   organizationPanel?: UserAccountMenuOrganizationPanel | undefined
   onSelect: (workspaceId: string) => void
   onCreate: (input: UserAccountMenuWorkspaceCreateInput) => Promise<UserAccountMenuWorkspaceItem>
   onRename: (workspaceId: string, name: string) => Promise<UserAccountMenuWorkspaceItem>
-  onRenameOrganization?:
-    | ((organizationId: string, name: string) => Promise<UserAccountMenuOrganizationItem>)
-    | undefined
   onDelete: (workspaceId: string) => Promise<void>
   onRetry: () => void
 }

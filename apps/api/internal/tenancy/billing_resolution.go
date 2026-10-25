@@ -53,6 +53,8 @@ const (
 // the 7-day lapse: a pending invite at or past ExpiresAt never moves funds
 // or membership, decisions on it fail closed, and the owner may re-issue.
 type BillingTransferInvite struct {
+	// IdempotencyKey is the persisted lifecycle identity; it is never exposed in DTOs.
+	IdempotencyKey          string
 	InternalID              int64
 	PublicID                string
 	BillingAccountID        int64

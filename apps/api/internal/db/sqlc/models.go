@@ -598,6 +598,23 @@ type OrganizationClosure struct {
 	DispositionDetail  []byte             `json:"disposition_detail"`
 }
 
+type OrganizationMemberInvite struct {
+	InternalID        int64              `json:"internal_id"`
+	PublicID          string             `json:"public_id"`
+	OrganizationID    int64              `json:"organization_id"`
+	InviterUserID     int64              `json:"inviter_user_id"`
+	InviteeEmail      string             `json:"invitee_email"`
+	InviteeUserID     pgtype.Int8        `json:"invitee_user_id"`
+	Role              string             `json:"role"`
+	Status            string             `json:"status"`
+	TokenHash         string             `json:"token_hash"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	RespondedAt       pgtype.Timestamptz `json:"responded_at"`
+	RespondedByUserID pgtype.Int8        `json:"responded_by_user_id"`
+}
+
 type OrganizationMembership struct {
 	OrganizationID int64              `json:"organization_id"`
 	UserID         int64              `json:"user_id"`
@@ -1150,6 +1167,21 @@ type UserDeletionRequest struct {
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 }
 
+type UserNotification struct {
+	InternalID       int64              `json:"internal_id"`
+	PublicID         string             `json:"public_id"`
+	UserID           int64              `json:"user_id"`
+	Type             string             `json:"type"`
+	Title            string             `json:"title"`
+	Body             string             `json:"body"`
+	ActionPayload    []byte             `json:"action_payload"`
+	DeduplicationKey string             `json:"deduplication_key"`
+	Status           string             `json:"status"`
+	ReadAt           pgtype.Timestamptz `json:"read_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
 type UsersUsedUid struct {
 	ID         int64              `json:"id"`
 	StorageUid string             `json:"storage_uid"`
@@ -1184,6 +1216,23 @@ type WorkspaceEvent struct {
 	ResourceID   string             `json:"resource_id"`
 	EventData    []byte             `json:"event_data"`
 	OccurredAt   pgtype.Timestamptz `json:"occurred_at"`
+}
+
+type WorkspaceMemberInvite struct {
+	InternalID        int64              `json:"internal_id"`
+	PublicID          string             `json:"public_id"`
+	WorkspaceID       int64              `json:"workspace_id"`
+	InviterUserID     int64              `json:"inviter_user_id"`
+	InviteeEmail      string             `json:"invitee_email"`
+	InviteeUserID     pgtype.Int8        `json:"invitee_user_id"`
+	Role              string             `json:"role"`
+	Status            string             `json:"status"`
+	TokenHash         string             `json:"token_hash"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	RespondedAt       pgtype.Timestamptz `json:"responded_at"`
+	RespondedByUserID pgtype.Int8        `json:"responded_by_user_id"`
 }
 
 type WorkspaceMembership struct {

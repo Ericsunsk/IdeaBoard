@@ -137,8 +137,6 @@ describe('SceneThumbnail', () => {
     expect(svg?.querySelectorAll('.scene-frame')).toHaveLength(3)
     expect(svg?.querySelectorAll('.scene-bar')).toHaveLength(4)
     expect(svg?.querySelectorAll('.scene-slot')).toHaveLength(2)
-    expect(svg?.querySelectorAll('.scene-spoke')).toHaveLength(2)
-    expect(svg?.querySelectorAll('.scene-blend')).toHaveLength(1)
     expect(svg?.querySelectorAll('.scene-edge')).toHaveLength(2)
     expect(svg?.querySelectorAll('.scene-group')).toHaveLength(1)
   })

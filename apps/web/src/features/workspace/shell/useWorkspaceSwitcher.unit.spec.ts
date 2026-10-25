@@ -5,14 +5,12 @@
 // gallery landing (no stale boardId), creation preserving canvas scope,
 // rename refresh,
 // and menu-prop mapping.
-import type { QueryFilters } from '@tanstack/vue-query'
+import type { InvalidateQueryFilters } from '@tanstack/vue-query'
 import { computed, defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { i18n } from '../../../core/i18n'
 import { render } from '../../../test/render'
 import { USER_BOARDS_PATH, USER_CANVAS_PATH } from '../routePaths'
-import { installOrganizationScopeStore } from '../organization/scope'
-import type { OrganizationScope } from '../organization/scope'
 import { useWorkspaceSwitcher } from './useWorkspaceSwitcher'
 import type { WorkspaceSummary } from '../selection/workspaceResource'
 
@@ -22,10 +20,10 @@ const routeState = vi.hoisted(() => ({
   query: {} as Record<string, string | undefined>,
 }))
 const queryMocks = vi.hoisted(() => ({ invalidateQueries: vi.fn() }))
+const organizationMocks = vi.hoisted(() => ({ useOrganizationManagement: vi.fn() }))
 const selectionMocks = vi.hoisted(() => ({ useWorkspaceSelection: vi.fn() }))
 const resourceMocks = vi.hoisted(() => ({
   renameWorkspace: vi.fn(),
-  renameOrganization: vi.fn(),
   deleteWorkspace: vi.fn(),
 }))
 
@@ -47,6 +45,8 @@ vi.mock('../../auth/session/userSession', () => ({
   }),
 }))
 
+vi.mock('../organization/session/useManagement', () => organizationMocks)
+
 vi.mock('../selection/workspaceContext', () => ({
   WORKSPACE_URL_PARAM: 'workspace',
   useWorkspaceSelection: selectionMocks.useWorkspaceSelection,
@@ -55,13 +55,8 @@ vi.mock('../selection/workspaceContext', () => ({
 vi.mock('../selection/workspaceResource', () => ({
   WORKSPACE_NAME_MAX_LENGTH: 120,
   renameWorkspace: resourceMocks.renameWorkspace,
-  renameOrganization: resourceMocks.renameOrganization,
   deleteWorkspace: resourceMocks.deleteWorkspace,
   fetchOrganizations: vi.fn(),
-  fetchOrganizationMembers: vi.fn(),
-  inviteOrganizationMember: vi.fn(),
-  updateOrganizationMember: vi.fn(),
-  removeOrganizationMember: vi.fn(),
   provisionOrganization: vi.fn(),
   workspaceQueryKeys: { list: ['workspaces'], organizations: ['organizations'] },
 }))
@@ -95,16 +90,6 @@ function stubSelection(overrides: Record<string, unknown> = {}) {
   return selection
 }
 
-function memoryScopePersist(initial: OrganizationScope = { kind: 'personal' }) {
-  let current = initial
-  return {
-    readScope: () => current,
-    writeScope: (scope: OrganizationScope) => {
-      current = scope
-    },
-  }
-}
-
 function renderSwitcher(options?: Parameters<typeof useWorkspaceSwitcher>[0]) {
   let switcher: ReturnType<typeof useWorkspaceSwitcher> | undefined
   const Consumer = defineComponent({
@@ -128,10 +113,13 @@ describe('useWorkspaceSwitcher', () => {
     routerMocks.replace.mockReset()
     queryMocks.invalidateQueries.mockReset()
     resourceMocks.renameWorkspace.mockReset()
-    resourceMocks.renameOrganization.mockReset()
     resourceMocks.deleteWorkspace.mockReset()
+    organizationMocks.useOrganizationManagement.mockReset()
+    organizationMocks.useOrganizationManagement.mockReturnValue({
+      organization: ref(null),
+      refresh: vi.fn(),
+    })
     selectionMocks.useWorkspaceSelection.mockReset()
-    installOrganizationScopeStore({ persist: memoryScopePersist() })
   })
 
   test('lands on the gallery without the stale boardId when switching from canvas', async () => {
@@ -244,7 +232,7 @@ describe('useWorkspaceSwitcher', () => {
     expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['workspaces'],
       exact: true,
-    } satisfies QueryFilters)
+    } satisfies InvalidateQueryFilters)
     expect(beforeWorkspaceChange).not.toHaveBeenCalled()
     expect(selection.selectWorkspace).not.toHaveBeenCalled()
     expect(selection.selectedId.value).toBe(DEFAULT.publicId)
@@ -281,7 +269,7 @@ describe('useWorkspaceSwitcher', () => {
     expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['workspaces'],
       exact: true,
-    } satisfies QueryFilters)
+    } satisfies InvalidateQueryFilters)
     expect(routerMocks.push).not.toHaveBeenCalled()
     expect(routerMocks.replace).not.toHaveBeenCalled()
   })
@@ -295,38 +283,6 @@ describe('useWorkspaceSwitcher', () => {
     })
     expect(resourceMocks.renameWorkspace).not.toHaveBeenCalled()
     expect(queryMocks.invalidateQueries).not.toHaveBeenCalled()
-    expect(routerMocks.push).not.toHaveBeenCalled()
-    expect(routerMocks.replace).not.toHaveBeenCalled()
-  })
-
-  test('renames the organization through PATCH and refreshes the organization list', async () => {
-    const updated = { publicId: 'org_c3', name: 'Renamed', status: 'active' as const }
-    resourceMocks.renameOrganization.mockResolvedValue(updated)
-    stubSelection()
-    const switcher = renderSwitcher()
-
-    await expect(switcher.renameOrganizationItem('org_c3', 'Renamed')).resolves.toEqual(updated)
-
-    expect(resourceMocks.renameOrganization).toHaveBeenCalledWith('org_c3', { name: 'Renamed' })
-    expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['organizations'],
-      exact: true,
-    } satisfies QueryFilters)
-    expect(routerMocks.push).not.toHaveBeenCalled()
-    expect(routerMocks.replace).not.toHaveBeenCalled()
-  })
-
-  test('exposes organization rename through menu props without leaving the route', async () => {
-    const updated = { publicId: 'org_c3', name: 'Renamed', status: 'active' as const }
-    resourceMocks.renameOrganization.mockResolvedValue(updated)
-    stubSelection()
-    const switcher = renderSwitcher()
-
-    await expect(
-      switcher.menuProps.value.onRenameOrganization?.('org_c3', 'Renamed'),
-    ).resolves.toEqual(updated)
-
-    expect(resourceMocks.renameOrganization).toHaveBeenCalledWith('org_c3', { name: 'Renamed' })
     expect(routerMocks.push).not.toHaveBeenCalled()
     expect(routerMocks.replace).not.toHaveBeenCalled()
   })
@@ -390,7 +346,7 @@ describe('useWorkspaceSwitcher', () => {
     expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['workspaces'],
       exact: true,
-    } satisfies QueryFilters)
+    } satisfies InvalidateQueryFilters)
     expect(selectedId.value).toBe(DEFAULT.publicId)
     expect(selection.selectWorkspace).toHaveBeenCalledWith('ws_default1')
     expect(routerMocks.push).toHaveBeenCalledWith({
@@ -410,7 +366,7 @@ describe('useWorkspaceSwitcher', () => {
     expect(queryMocks.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['workspaces'],
       exact: true,
-    } satisfies QueryFilters)
+    } satisfies InvalidateQueryFilters)
     expect(selection.selectWorkspace).not.toHaveBeenCalled()
     expect(routerMocks.push).not.toHaveBeenCalled()
     expect(routerMocks.replace).not.toHaveBeenCalled()
@@ -429,5 +385,28 @@ describe('useWorkspaceSwitcher', () => {
     })
     expect(queryMocks.invalidateQueries).not.toHaveBeenCalled()
     expect(routerMocks.push).not.toHaveBeenCalled()
+  })
+
+  test('hosts opaque management and keeps only the gallery navigation adapter', () => {
+    const items = ref([DEFAULT, TEAM])
+    const selectedId = ref<string | null>(TEAM.publicId)
+    const selection = stubSelection({ items, selectedId })
+    routeState.query = { boardId: 'board_1', workspace: TEAM.publicId }
+    const switcher = renderSwitcher()
+    const options = organizationMocks.useOrganizationManagement.mock.calls[0]?.[0]
+    expect(switcher.menuProps.value.organizationPanel).toMatchObject({
+      name: null,
+      bindings: expect.any(Object),
+      setEnabled: expect.any(Function),
+      refresh: expect.any(Function),
+    })
+    items.value = [DEFAULT]
+    selectedId.value = DEFAULT.publicId
+    options.onScopeExit()
+    expect(selection.selectWorkspace).toHaveBeenCalledWith(DEFAULT.publicId)
+    expect(routerMocks.push).toHaveBeenCalledWith({
+      path: USER_BOARDS_PATH,
+      query: { workspace: DEFAULT.publicId },
+    })
   })
 })

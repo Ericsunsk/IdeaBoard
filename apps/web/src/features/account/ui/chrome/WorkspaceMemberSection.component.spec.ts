@@ -13,7 +13,7 @@ import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import { makeSessionUser } from '../../../../test/factories'
 import { useUserStore } from '../../../auth'
 import WorkspaceSettingsDialog from './WorkspaceSettingsDialog.vue'
-import type { WorkspaceMemberEntry } from '../../session/accountWorkspace'
+import type { WorkspaceMemberEntry, WorkspaceMemberInvite } from '../../session/accountWorkspace'
 import { billingAccountQueryKeys } from '../../session/billing-account/resource'
 import { billingRecordsQueryKeys } from '../../session/billing/resource'
 import { billingTransferQueryKeys } from '../../session/billing-transfer/resource'
@@ -23,7 +23,6 @@ import { usageQueryKeys } from '../../session/usage/resource'
 import { workspaceQueryKeys } from '../../session/accountWorkspace'
 
 vi.mock('../../../../core/composables/useAppToast')
-vi.mock('./BillingTransferSection.vue', () => ({ default: { template: '<div />' } }))
 const handoverTransport = vi.hoisted(() => ({
   account: vi.fn(),
   managers: vi.fn(),
@@ -83,6 +82,7 @@ vi.mock('../../session/quota/useMemberQuotaSection', () => ({
 // convergence are exercised, not stubbed out.
 const fakeMembers = vi.hoisted(() => ({
   rosters: new Map<string, WorkspaceMemberEntry[]>(),
+  invites: new Map<string, WorkspaceMemberInvite[]>(),
   lookup: new Map<string, string>(),
   calls: [] as Array<Record<string, unknown>>,
   failNext: null as { op: string; code: string } | null,
@@ -144,23 +144,50 @@ vi.mock('../../session/accountWorkspace', async (load) => ({
       retry: false,
       enabled: computed(() => toValue(workspaceId).trim().length > 0),
     }) as UseQueryOptions<WorkspaceMemberEntry[], Error, WorkspaceMemberEntry[], QueryKey>,
-  lookupWorkspaceMemberId: (workspaceId: string, email: string) => {
-    maybeFail('lookup')
-    const userId = fakeMembers.lookup.get(email.trim().toLowerCase())
-    if (!userId) throw { code: 'workspace_member_not_found' }
-    return Promise.resolve(userId)
-  },
-  inviteWorkspaceMember: (
+  workspaceMemberInvitesQueryOptions: (workspaceId: MaybeRefOrGetter<string>) =>
+    ({
+      queryKey: computed(() => ['workspaces', toValue(workspaceId), 'invites']),
+      queryFn: () => {
+        maybeFail('invites-list')
+        return Promise.resolve(
+          (fakeMembers.invites.get(toValue(workspaceId).trim()) ?? []).map((i) => ({ ...i })),
+        )
+      },
+      staleTime: 15_000,
+      retry: false,
+      enabled: computed(() => toValue(workspaceId).trim().length > 0),
+    }) as UseQueryOptions<WorkspaceMemberInvite[], Error, WorkspaceMemberInvite[], QueryKey>,
+  createWorkspaceMemberInvite: (
     workspaceId: string,
-    input: { userId: string; role: string },
+    input: { email: string; role?: string },
     options: { idempotencyKey?: string } = {},
   ) => {
     maybeFail('invite')
     fakeMembers.calls.push({ op: 'invite', workspaceId, ...input, ...options })
-    const roster = fakeMembers.rosters.get(workspaceId) ?? []
-    const entry = { userId: input.userId, role: input.role as WorkspaceMemberEntry['role'] }
-    fakeMembers.rosters.set(workspaceId, [...roster, entry])
-    return Promise.resolve(entry)
+    const list = fakeMembers.invites.get(workspaceId) ?? []
+    const invite: WorkspaceMemberInvite = {
+      id: `wsi_${Date.now()}_${Math.random()}`,
+      workspace_id: workspaceId,
+      inviter_user_id: 'usr_me',
+      invitee_email: input.email,
+      role: (input.role as WorkspaceMemberInvite['role']) || 'member',
+      status: 'pending',
+      expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+      created_at: new Date().toISOString(),
+      token: 'tok_test123',
+    }
+    fakeMembers.invites.set(workspaceId, [...list, invite])
+    return Promise.resolve(invite)
+  },
+  cancelWorkspaceMemberInvite: (workspaceId: string, inviteId: string) => {
+    maybeFail('revoke')
+    fakeMembers.calls.push({ op: 'revoke', workspaceId, inviteId })
+    const list = fakeMembers.invites.get(workspaceId) ?? []
+    fakeMembers.invites.set(
+      workspaceId,
+      list.filter((inv) => inv.id !== inviteId),
+    )
+    return Promise.resolve()
   },
   changeWorkspaceMemberRole: (workspaceId: string, memberId: string, input: { role: string }) => {
     maybeFail('role')
@@ -189,6 +216,7 @@ vi.mock('../../session/accountWorkspace', async (load) => ({
     workspaceId: string,
   ) => {
     client.invalidateQueries({ queryKey: fakeKey(workspaceId), exact: true })
+    client.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'invites'], exact: true })
   },
 }))
 
@@ -214,7 +242,7 @@ const HandoverConfirmationStub = defineComponent({
   },
   emits: ['confirm', 'update:isVisible'],
   template:
-    '<div v-if="isVisible" role="dialog" :aria-label="title" :data-intent="intent"><p>{{ message }}</p><button :disabled="isLoading" @click="$emit(\'confirm\')">{{ confirmLabel }}</button><button :disabled="isLoading" @click="$emit(\'update:isVisible\', false)">Dismiss</button></div>',
+    '<div v-if="isVisible" role="dialog" :aria-label="title" :data-intent="intent"><p>{{ message }}</p><button :disabled="isLoading" @click="$emit(\'confirm\')">{{ confirmLabel }}</button><button :disabled="isLoading" @click="$emit(\'update:isVisible\', false)">Cancel</button></div>',
 })
 
 const dialogStubs = {
@@ -230,6 +258,7 @@ const dialogStubs = {
 const ME = 'usr_me'
 
 function seedRosters() {
+  fakeMembers.invites.clear()
   fakeMembers.rosters.set('ws_personal1', [
     { userId: ME, role: 'owner', email: 'me@example.com' },
     { userId: 'usr_a', role: 'member' },
@@ -327,18 +356,19 @@ describe('WorkspaceSettingsDialog members', () => {
     expect(screen.queryByRole('region', { name: 'Members of Team 2' })).not.toBeInTheDocument()
   })
 
-  test('hides the invite bar on the Default workspace and shows the private note', async () => {
+  test('hides the invite bar on the Default workspace without a private note', async () => {
     renderMembersDialog()
 
     // The Default workspace is private (#952): owners see the roster but no
-    // invite bar, only the private-workspace note.
+    // invite bar, no explanatory note, and no Leave button on their own row.
     const section = within(await screen.findByRole('region', { name: 'Members of Default' }))
     expect(await section.findByText('me@example.com')).toBeVisible()
     expect(
-      section.getByText('The Default workspace is private and cannot invite collaborators.'),
-    ).toBeVisible()
+      section.queryByText('The Default workspace is private and cannot invite collaborators.'),
+    ).not.toBeInTheDocument()
     expect(section.queryByRole('button', { name: 'Invite' })).not.toBeInTheDocument()
     expect(section.queryByLabelText('Invite by email')).not.toBeInTheDocument()
+    expect(section.queryByRole('button', { name: 'Leave' })).not.toBeInTheDocument()
     // Role management on the existing roster stays visible.
     expect(section.getByRole('combobox', { name: 'Role for usr_a' })).toBeVisible()
   })
@@ -427,7 +457,36 @@ describe('WorkspaceSettingsDialog members', () => {
     await waitFor(() => expect(screen.queryByText('usr_a')).not.toBeInTheDocument())
   })
 
-  test('invites by email through lookup plus POST with a fresh idempotency key', async () => {
+  test('self-leave uses the leave note instead of the remove board-grant copy', async () => {
+    const { user } = renderMembersDialog()
+
+    // Team 2 is non-Default where ME is admin: the own row offers Leave.
+    await user.click(screen.getByRole('button', { name: 'Team 2' }))
+    const team = within(await screen.findByRole('region', { name: 'Members of Team 2' }))
+    await team.findByText('boss@example.com')
+
+    await user.click(team.getByRole('button', { name: 'Leave' }))
+
+    const leaveNote = await screen.findByText(/remove your access.*Content stays/)
+    expect(leaveNote).toBeVisible()
+    expect(screen.queryByText(/also removes their board permissions/)).not.toBeInTheDocument()
+    expect(fakeMembers.calls.filter((call) => call.op === 'remove')).toHaveLength(0)
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByText(/remove your access.*Content stays/)).not.toBeInTheDocument()
+
+    await user.click(team.getByRole('button', { name: 'Leave' }))
+    await user.click(await screen.findByRole('button', { name: 'Confirm remove' }))
+
+    await waitFor(() =>
+      expect(fakeMembers.calls).toContainEqual(
+        expect.objectContaining({ op: 'remove', workspaceId: 'ws_team2', memberId: 'usr_me' }),
+      ),
+    )
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('You left the workspace.'))
+  })
+
+  test('invites by email creating a pending invite with a fresh idempotency key', async () => {
     const { user } = renderMembersDialog()
 
     // Team 2 is a non-Default workspace where ME is admin: the invite bar
@@ -444,7 +503,7 @@ describe('WorkspaceSettingsDialog members', () => {
         expect.objectContaining({
           op: 'invite',
           workspaceId: 'ws_team2',
-          userId: 'usr_new',
+          email: 'new@example.com',
           role: 'member',
         }),
       ),
@@ -453,8 +512,9 @@ describe('WorkspaceSettingsDialog members', () => {
       idempotencyKey?: string
     }
     expect(invite.idempotencyKey).toMatch(/^workspace:members\.invite:/)
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Member invited.'))
-    expect(await team.findByText('usr_new')).toBeVisible()
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Member invited.', expect.anything()))
+    expect(await team.findByText('new@example.com')).toBeVisible()
+    expect(await team.findByText('Pending invitations')).toBeVisible()
   })
 
   test('empty email toasts instead of rendering inline', async () => {
@@ -467,7 +527,6 @@ describe('WorkspaceSettingsDialog members', () => {
     await user.click(team.getByRole('button', { name: 'Invite' }))
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Email cannot be empty.'))
-    expect(fakeMembers.calls.filter((call) => call.op === 'lookup')).toHaveLength(0)
     expect(fakeMembers.calls.filter((call) => call.op === 'invite')).toHaveLength(0)
   })
 
@@ -495,46 +554,86 @@ describe('WorkspaceSettingsDialog members', () => {
       ),
     )
     expect(await team.findByText('usr_d')).toBeVisible()
-    expect(team.getByLabelText('Invite by email')).toHaveValue('new@example.com')
     expect(toast.success).not.toHaveBeenCalled()
   })
 
-  test('unknown emails toast user-not-found without a POST', async () => {
+  test('warns when inviting an email that already has a pending invite', async () => {
+    fakeMembers.invites.set('ws_team2', [
+      {
+        id: 'wsi_pending1',
+        workspace_id: 'ws_team2',
+        inviter_user_id: 'usr_me',
+        invitee_email: 'pending@example.com',
+        role: 'member',
+        status: 'pending',
+        expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+        created_at: new Date().toISOString(),
+      },
+    ])
     const { user } = renderMembersDialog()
 
     await user.click(screen.getByRole('button', { name: 'Team 2' }))
     const team = within(await screen.findByRole('region', { name: 'Members of Team 2' }))
-    await team.findByText('boss@example.com')
+    await team.findByText('pending@example.com')
 
-    await user.type(team.getByLabelText('Invite by email'), 'ghost@example.com')
+    await user.type(team.getByLabelText('Invite by email'), 'pending@example.com')
     await user.click(team.getByRole('button', { name: 'Invite' }))
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith('No registered user found for this email.'),
+      expect(toast.warning).toHaveBeenCalledWith(
+        'An invitation has already been sent to this email.',
+      ),
     )
     expect(fakeMembers.calls.filter((call) => call.op === 'invite')).toHaveLength(0)
   })
 
-  test('already-member emails warn without a POST', async () => {
+  test('already-member emails warn without calling create invite', async () => {
     const { user } = renderMembersDialog()
 
     await user.click(screen.getByRole('button', { name: 'Team 2' }))
     const team = within(await screen.findByRole('region', { name: 'Members of Team 2' }))
     await team.findByText('boss@example.com')
 
-    // First invite lands, the retry warns client-side without a second POST.
-    await user.type(team.getByLabelText('Invite by email'), 'new@example.com')
-    await user.click(team.getByRole('button', { name: 'Invite' }))
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Member invited.'))
-    const posts = fakeMembers.calls.filter((call) => call.op === 'invite').length
-
-    await user.type(team.getByLabelText('Invite by email'), 'new@example.com')
+    await user.type(team.getByLabelText('Invite by email'), 'boss@example.com')
     await user.click(team.getByRole('button', { name: 'Invite' }))
 
     await waitFor(() =>
       expect(toast.warning).toHaveBeenCalledWith('This user is already a member.'),
     )
-    expect(fakeMembers.calls.filter((call) => call.op === 'invite')).toHaveLength(posts)
+    expect(fakeMembers.calls.filter((call) => call.op === 'invite')).toHaveLength(0)
+  })
+
+  test('revokes a pending member invite', async () => {
+    fakeMembers.invites.set('ws_team2', [
+      {
+        id: 'wsi_revoke_test',
+        workspace_id: 'ws_team2',
+        inviter_user_id: 'usr_me',
+        invitee_email: 'pending@example.com',
+        role: 'member',
+        status: 'pending',
+        expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+        created_at: new Date().toISOString(),
+      },
+    ])
+    const { user } = renderMembersDialog()
+
+    await user.click(screen.getByRole('button', { name: 'Team 2' }))
+    const team = within(await screen.findByRole('region', { name: 'Members of Team 2' }))
+    await team.findByText('pending@example.com')
+
+    await user.click(team.getByRole('button', { name: 'Revoke' }))
+
+    await waitFor(() =>
+      expect(fakeMembers.calls).toContainEqual(
+        expect.objectContaining({
+          op: 'revoke',
+          workspaceId: 'ws_team2',
+          inviteId: 'wsi_revoke_test',
+        }),
+      ),
+    )
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Invitation revoked.'))
   })
 
   test('plain members see a read-only roster without management controls', async () => {
@@ -582,13 +681,15 @@ describe('WorkspaceSettingsDialog members', () => {
 
     await waitFor(() =>
       expect(fakeMembers.calls).toContainEqual(
-        expect.objectContaining({ op: 'invite', workspaceId: 'ws_team2', userId: 'usr_new' }),
+        expect.objectContaining({ op: 'invite', workspaceId: 'ws_team2', email: 'new@example.com' }),
       ),
     )
-    // The Team 2 section converges; the Personal roster is untouched.
-    await waitFor(() => expect(team.getByText('usr_new')).toBeVisible())
+    // The Team 2 section converges; the Personal invites are untouched.
+    await waitFor(() => expect(team.getByText('new@example.com')).toBeVisible())
     expect(
-      fakeMembers.rosters.get('ws_personal1')?.some((entry) => entry.userId === 'usr_new'),
+      Boolean(
+        fakeMembers.invites.get('ws_personal1')?.some((entry) => entry.invitee_email === 'new@example.com'),
+      ),
     ).toBe(false)
     expect(screen.queryByRole('region', { name: 'Members of Default' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Default' }))
@@ -720,26 +821,26 @@ describe('member row handover', () => {
 
     const section = within(sectionByWorkspace('Default'))
     expect(
-      await section.findByRole('button', { name: 'Transfer funds ownership to usr_a' }),
+      await section.findByRole('button', { name: 'Transfer workspace ownership to usr_a' }),
     ).toBeVisible()
     // Never on the own row.
     expect(
-      section.queryByRole('button', { name: 'Transfer funds ownership to me@example.com' }),
+      section.queryByRole('button', { name: 'Transfer workspace ownership to me@example.com' }),
     ).toBeNull()
     expect(section.queryByLabelText('Recipient')).toBeNull()
 
-    await user.click(section.getByRole('button', { name: 'Transfer funds ownership to usr_a' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Transfer' })
+    await user.click(section.getByRole('button', { name: 'Transfer workspace ownership to usr_a' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Transfer ownership' })
     expect(dialog).toHaveAttribute('data-intent', 'danger')
-    expect(within(dialog).getByText(/Hand ba_team1 to usr_a/)).toBeVisible()
-    await user.click(within(dialog).getByRole('button', { name: 'Transfer' }))
+    expect(within(dialog).getByText(/Transfer workspace ownership to usr_a/)).toBeVisible()
+    await user.click(within(dialog).getByRole('button', { name: 'Transfer ownership' }))
 
     await waitFor(() =>
       expect(handoverTransport.initiate).toHaveBeenCalledWith('ws_personal1', 'usr_a', {
         idempotencyKey: expect.stringContaining('billing:transfer-invite:'),
       }),
     )
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Financial management updated.'))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Workspace ownership updated.'))
   })
 
   test('hides the handover action without billing ownership', async () => {
@@ -754,7 +855,7 @@ describe('member row handover', () => {
     await screen.findByText('usr_a')
 
     const section = within(sectionByWorkspace('Default'))
-    expect(section.queryByRole('button', { name: 'Transfer' })).toBeNull()
+    expect(section.queryByRole('button', { name: 'Transfer ownership' })).toBeNull()
     // Content management is untouched by the financial gate.
     expect(section.getByRole('combobox', { name: 'Role for usr_a' })).toBeVisible()
   })
@@ -782,7 +883,7 @@ describe('member row handover', () => {
       await screen.findByText('usr_a')
 
       const section = within(sectionByWorkspace('Default'))
-      const label = decision === 'accept' ? 'Accept handover' : 'Reject invitation'
+      const label = decision === 'accept' ? 'Accept ownership' : 'Decline'
       expect(await section.findByRole('button', { name: label })).toBeVisible()
       // The recipient's own leave and role controls yield to the decision.
       expect(section.queryByRole('button', { name: 'Leave' })).toBeNull()
@@ -833,7 +934,7 @@ describe('member row handover', () => {
       return accepted
     })
     const { user, queryClient } = renderMembersDialog()
-    await screen.findByRole('button', { name: 'Accept handover' })
+    await screen.findByRole('button', { name: 'Accept ownership' })
     const accountKey = billingAccountQueryKeys.detail('ws_personal1', ME)
     expect(queryClient.getQueryData(accountKey)).toMatchObject({
       consumptionScope: 'member',
@@ -859,7 +960,7 @@ describe('member row handover', () => {
     ]
     for (const key of [...affectedKeys, ...untouchedKeys]) queryClient.setQueryData(key, [])
 
-    await confirmHandoverDialog(user, 'Accept handover')
+    await confirmHandoverDialog(user, 'Accept ownership')
     await waitFor(() => expect(toast.success).toHaveBeenCalled())
     expect(queryClient.getQueryData(accountKey)).toMatchObject({
       consumptionScope: 'account',
@@ -888,13 +989,41 @@ describe('member row handover', () => {
     // A lapsed invite moves nothing, so the owner may send again.
     const section = within(sectionByWorkspace('Default'))
     await user.click(
-      await section.findByRole('button', { name: 'Transfer funds ownership to usr_a' }),
+      await section.findByRole('button', { name: 'Transfer workspace ownership to usr_a' }),
     )
-    const dialog = await screen.findByRole('dialog', { name: 'Transfer' })
-    await user.click(within(dialog).getByRole('button', { name: 'Transfer' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Transfer ownership' })
+    await user.click(within(dialog).getByRole('button', { name: 'Transfer ownership' }))
     await waitFor(() =>
       expect(handoverTransport.initiate).toHaveBeenCalledWith('ws_personal1', 'usr_a', {
         idempotencyKey: expect.stringContaining('billing:transfer-invite:'),
+      }),
+    )
+  })
+
+  test('cancels an outgoing ownership transfer invitation from the banner', async () => {
+    ownerAccount()
+    handoverTransport.invites.mockResolvedValue([liveInvite('usr_a', ME)])
+    handoverTransport.cancel.mockImplementation(async () => {
+      handoverTransport.invites.mockResolvedValue([])
+      return { ...liveInvite('usr_a', ME), status: 'cancelled' }
+    })
+    const { user } = renderMembersDialog()
+    await screen.findByText('usr_a')
+
+    const section = within(sectionByWorkspace('Default'))
+    const cancelButton = await section.findByRole('button', { name: 'Withdraw transfer' })
+    await user.click(cancelButton)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Withdraw transfer' })
+    expect(dialog).toHaveAttribute('data-intent', 'danger')
+    expect(
+      within(dialog).getByText(/Withdraw the ownership transfer invitation/),
+    ).toBeVisible()
+    await user.click(within(dialog).getByRole('button', { name: 'Withdraw transfer' }))
+
+    await waitFor(() =>
+      expect(handoverTransport.cancel).toHaveBeenCalledWith('ws_personal1', 'bti_row1', {
+        idempotencyKey: expect.stringContaining('billing:transfer-cancel:'),
       }),
     )
   })

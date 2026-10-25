@@ -82,7 +82,9 @@
                   id="workspace-settings-group-organization"
                   class="mb-2 px-2 text-admin-meta leading-5 font-semibold tracking-normal text-muted-foreground"
                 >
-                  {{ managedOrganization?.name ?? t('workspace.switcher.scopeOrganizationTitle') }}
+                  {{
+                    props.organizationPanel?.name ?? t('workspace.switcher.scopeOrganizationTitle')
+                  }}
                 </p>
                 <div class="space-y-1">
                   <Button
@@ -155,155 +157,12 @@
 
             <!-- Organization settings pane: mutually exclusive with workspace rows -->
             <div v-else-if="isOrganizationSettingsSelected" class="flex flex-col gap-6">
-              <template v-if="!managedOrganization">
-                <header class="flex flex-col gap-2">
-                  <h2
-                    class="m-0 text-admin-modal-title leading-tight font-bold text-foreground truncate"
-                  >
-                    {{ t('workspace.switcher.settingsAction') }}
-                  </h2>
-                  <p class="m-0 mt-1 text-admin-meta text-muted-foreground">
-                    {{ t('workspace.switcher.organization.setupNote') }}
-                  </p>
-                </header>
-                <section
-                  v-if="props.onCreateOrganization"
-                  :class="[accountCardPanelClass, 'flex flex-col gap-2']"
-                  :aria-label="t('workspace.switcher.organization.new')"
-                >
-                  <label
-                    for="workspace-settings-organization-name"
-                    class="text-admin-content font-medium text-foreground"
-                  >
-                    {{ t('workspace.switcher.organization.name') }}
-                  </label>
-                  <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The create input carries its accessible name via aria-label -->
-                    <Input
-                      id="workspace-settings-organization-name"
-                      v-model="settingsOrganizationName"
-                      size="sm"
-                      class="h-9 min-w-0 flex-1 text-admin-content bg-background"
-                      :invalid="settingsOrganizationError !== null"
-                      :disabled="isSettingsCreatingOrganization"
-                      :aria-label="t('workspace.switcher.organization.name')"
-                      :maxlength="nameFieldMaxLength"
-                      @keydown.enter="createOrganizationFromSettings"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      class="h-9 shrink-0"
-                      :is-loading="isSettingsCreatingOrganization"
-                      :is-disabled="isSettingsCreatingOrganization"
-                      @click="createOrganizationFromSettings"
-                    >
-                      {{ t('workspace.switcher.organization.confirm') }}
-                    </Button>
-                  </div>
-                  <p
-                    v-if="settingsOrganizationError"
-                    class="m-0 text-admin-meta leading-normal text-destructive"
-                    role="alert"
-                  >
-                    {{ settingsOrganizationError }}
-                  </p>
-                </section>
-              </template>
-
-              <template v-else>
-                <header class="flex flex-col gap-2">
-                  <div v-if="isRenamingOrganization" class="flex flex-col gap-2">
-                    <div class="flex items-center gap-2">
-                      <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The rename input carries its accessible name via aria-label -->
-                      <Input
-                        ref="organizationRenameInputRef"
-                        v-model="organizationDraftName"
-                        size="sm"
-                        class="h-9 max-w-xs text-admin-content bg-background"
-                        :invalid="organizationRenameError !== null"
-                        :disabled="isRenamingOrganizationBusy"
-                        :aria-label="
-                          t('workspace.switcher.renameAriaLabel', {
-                            name: managedOrganization.name,
-                          })
-                        "
-                        :maxlength="nameFieldMaxLength"
-                        @keydown.enter="commitOrganizationRename"
-                        @keydown.esc.stop.prevent="cancelOrganizationRename"
-                        @keydown.escape.stop.prevent="cancelOrganizationRename"
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        class="h-9 shrink-0"
-                        :is-loading="isRenamingOrganizationBusy"
-                        :is-disabled="isRenamingOrganizationBusy"
-                        @click="commitOrganizationRename"
-                      >
-                        {{ t('common.actions.save') }}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        class="h-9 shrink-0"
-                        :is-disabled="isRenamingOrganizationBusy"
-                        @click="cancelOrganizationRename"
-                      >
-                        {{ t('common.actions.cancel') }}
-                      </Button>
-                    </div>
-                    <p
-                      v-if="organizationRenameError"
-                      class="m-0 text-admin-meta leading-normal text-destructive"
-                      role="alert"
-                    >
-                      {{ organizationRenameError }}
-                    </p>
-                  </div>
-                  <div v-else class="flex items-center justify-between">
-                    <div class="min-w-0 flex-1">
-                      <div class="flex items-center gap-2">
-                        <h2
-                          class="m-0 text-admin-modal-title leading-tight font-bold text-foreground truncate"
-                        >
-                          {{ managedOrganization.name }}
-                        </h2>
-                        <Button
-                          v-if="canRenameOrganization"
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          class="size-7 text-muted-foreground hover:text-foreground"
-                          :title="
-                            t('workspace.switcher.renameAriaLabel', {
-                              name: managedOrganization.name,
-                            })
-                          "
-                          :aria-label="
-                            t('workspace.switcher.renameAriaLabel', {
-                              name: managedOrganization.name,
-                            })
-                          "
-                          @click="startOrganizationRename"
-                        >
-                          <EditPencil class="size-3.5" aria-hidden="true" />
-                        </Button>
-                      </div>
-                      <p class="m-0 mt-1 text-admin-meta text-muted-foreground font-mono">
-                        ID: {{ managedOrganization.id }}
-                      </p>
-                    </div>
-                  </div>
-                </header>
-                <component
-                  :is="props.organizationPanel!.component"
-                  v-if="organizationPanelProps"
-                  :key="`org-${managedOrganization.id}`"
-                  v-bind="organizationPanelProps"
-                />
-              </template>
+              <component
+                :is="props.organizationPanel.component"
+                v-if="props.organizationPanel"
+                v-bind="props.organizationPanel.bindings"
+                @dismiss="dismissOrganizationPanel"
+              />
             </div>
 
             <!-- Active Workspace Detail (per-workspace pane; the scope-level
@@ -370,7 +229,7 @@
                           {{ workspaceItemName(activeWorkspace) }}
                         </h2>
                         <Button
-                          v-if="!isDefaultWorkspaceItem(activeWorkspace)"
+                          v-if="activeCapabilities.canRename"
                           type="button"
                           variant="ghost"
                           size="icon"
@@ -407,12 +266,6 @@
                   :is-default-workspace="isDefaultWorkspaceItem(activeWorkspace)"
                 />
 
-                <BillingTransferSection
-                  :key="`transfer-${activeWorkspace.publicId}`"
-                  :workspace-id="activeWorkspace.publicId"
-                  :current-user-id="props.currentUserId"
-                />
-
                 <!-- Quota management uses the account's server-resolved capability. -->
                 <WorkspaceLimitsSection
                   :key="`limits-${activeWorkspace.publicId}`"
@@ -423,7 +276,7 @@
 
                 <!-- Delete row: hidden for the Default workspace (never deleted). -->
                 <section
-                  v-if="!isDefaultWorkspaceItem(activeWorkspace)"
+                  v-if="activeCapabilities.canDelete"
                   class="flex flex-col gap-2 rounded-control border border-border p-3"
                   :aria-label="t('workspace.switcher.archiveSectionLabel')"
                 >
@@ -505,7 +358,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { EditPencil, Plus, Xmark } from '@iconoir/vue'
 import {
@@ -526,20 +379,16 @@ import { userErrorCode } from '../../../../core/errors/errorCatalog'
 import type {
   UserAccountMenuWorkspaceCreateInput,
   UserAccountMenuOrganizationItem,
-  UserAccountMenuOrganizationMember,
   UserAccountMenuOrganizationPanel,
   UserAccountMenuWorkspaceItem,
 } from './userAccountMenu.types'
 import WorkspaceCreateDialog from './WorkspaceCreateDialog.vue'
 import { provideWorkspaceSettingsReads } from '../../session/workspace-settings'
-import { useWorkspaceCreation } from '../../session/useWorkspaceCreation'
 import { isDefaultWorkspaceItem } from './workspaceMenu'
 import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
 import WorkspaceLimitsSection from './WorkspaceLimitsSection.vue'
-import BillingTransferSection from './BillingTransferSection.vue'
 import WorkspaceMemberSection from './WorkspaceMemberSection.vue'
 import {
-  accountCardPanelClass,
   accountCloseButtonClass,
   accountContentPaneClass,
   accountDialogContentClass,
@@ -565,9 +414,6 @@ const props = withDefaults(
     onRetry: () => void
     onCreate: (input: UserAccountMenuWorkspaceCreateInput) => Promise<UserAccountMenuWorkspaceItem>
     onRename: (workspaceId: string, name: string) => Promise<UserAccountMenuWorkspaceItem>
-    onRenameOrganization?:
-      | ((organizationId: string, name: string) => Promise<UserAccountMenuOrganizationItem>)
-      | undefined
     onDelete: (workspaceId: string) => Promise<void>
   }>(),
   {
@@ -578,7 +424,6 @@ const props = withDefaults(
     currentUserId: null,
     onLoadOrganizations: undefined,
     onCreateOrganization: undefined,
-    onRenameOrganization: undefined,
     organizationPanel: null,
   },
 )
@@ -602,6 +447,7 @@ const organizationWorkspaces = computed(() =>
 
 // Settings selection stays independent from the workspace selection.
 const isOrganizationSettingsSelected = ref(false)
+onBeforeUnmount(() => props.organizationPanel?.setEnabled(false))
 
 function isWorkspaceActive(item: UserAccountMenuWorkspaceItem): boolean {
   return !isOrganizationSettingsSelected.value && item.publicId === activeWorkspaceId.value
@@ -632,6 +478,26 @@ const activeWorkspace = computed(() => {
   return workspaceItems.value.find((item) => item.publicId === activeWorkspaceId.value) ?? null
 })
 
+interface WorkspaceCapabilities {
+  canRename: boolean
+  canDelete: boolean
+}
+
+const activeCapabilities = computed<WorkspaceCapabilities>(() => {
+  const item = activeWorkspace.value
+  if (!item) {
+    return {
+      canRename: false,
+      canDelete: false,
+    }
+  }
+  const isDefault = isDefaultWorkspaceItem(item)
+  return {
+    canRename: !isDefault,
+    canDelete: !isDefault,
+  }
+})
+
 const billingAccount = provideWorkspaceSettingsReads({
   workspaceId: activeWorkspaceId,
   identity: () => props.currentUserId,
@@ -639,158 +505,16 @@ const billingAccount = provideWorkspaceSettingsReads({
     props.isOpen && !isOrganizationSettingsSelected.value && activeWorkspaceId.value !== '',
 })
 
-// Scope-level organization resolved from the caller's single organization.
-const managedOrganization = ref<{
-  id: string
-  name: string
-  status: 'active' | 'closed'
-  closedAt?: string | undefined
-} | null>(null)
-const managedOrganizationRole = ref<'owner' | 'admin' | 'member' | null>(null)
-
-// In-flight dedupe: the isOpen / organizationPanel / create-dialog watchers
-// converge on one load so rapid toggles never fire parallel list+member walks.
-let managedOrganizationLoad: Promise<void> | null = null
-let managedOrganizationGeneration = 0
-
-async function loadManagedOrganization(): Promise<void> {
-  if (managedOrganizationLoad) return managedOrganizationLoad
-  const generation = ++managedOrganizationGeneration
-  managedOrganizationLoad = runManagedOrganizationLoad(generation).finally(() => {
-    if (managedOrganizationGeneration === generation) managedOrganizationLoad = null
-  })
-  return managedOrganizationLoad
-}
-
-function resolveHintOrganizationId(): string | null {
-  return (
-    organizationWorkspaces.value[0]?.organizationId ??
-    workspaceItems.value.find((item) => item.organizationId != null)?.organizationId ??
-    null
-  )
-}
-
-function applyManagedOrganization(first: UserAccountMenuOrganizationItem): void {
-  managedOrganization.value = {
-    id: first.publicId,
-    name: first.name,
-    status: first.status === 'closed' ? 'closed' : 'active',
-    ...(first.closedAt === undefined ? {} : { closedAt: first.closedAt }),
-  }
-}
-
-async function resolveManagedOrganizationRole(
-  panel: UserAccountMenuOrganizationPanel,
-  first: UserAccountMenuOrganizationItem,
-  hintOrganizationId: string | null,
-  hintMembersPromise: Promise<UserAccountMenuOrganizationMember[] | null> | null,
-  generation: number,
-): Promise<void> {
-  if (!props.currentUserId) {
-    managedOrganizationRole.value = null
-    return
-  }
-  const hinted =
-    hintMembersPromise && first.publicId === hintOrganizationId ? await hintMembersPromise : null
-  const members = hinted ?? (await panel.onLoadMembers(first.publicId).catch(() => null))
-  if (managedOrganizationGeneration !== generation) return
-  managedOrganizationRole.value =
-    members?.find((member) => member.userId === props.currentUserId)?.role ?? null
-}
-
-async function runManagedOrganizationLoad(generation: number): Promise<void> {
-  const panel = props.organizationPanel
-  if (!props.isOpen || !panel || !props.onLoadOrganizations) return
-  // Hint the organization from the workspace list so the member read can
-  // start in parallel with the organization list instead of serially after it.
-  const hintOrganizationId = resolveHintOrganizationId()
-  const organizationsPromise = props.onLoadOrganizations()
-  const hintMembersPromise =
-    hintOrganizationId && props.currentUserId
-      ? panel.onLoadMembers(hintOrganizationId).catch(() => null)
-      : null
-  let first: UserAccountMenuOrganizationItem | undefined
-  try {
-    first = (await organizationsPromise)[0]
-  } catch {
-    return
-  }
-  if (managedOrganizationGeneration !== generation) return
-  if (!first) {
-    managedOrganization.value = null
-    managedOrganizationRole.value = null
-    return
-  }
-  applyManagedOrganization(first)
-  try {
-    await resolveManagedOrganizationRole(
-      panel,
-      first,
-      hintOrganizationId,
-      hintMembersPromise,
-      generation,
-    )
-  } catch {
-    if (managedOrganizationGeneration !== generation) return
-    managedOrganizationRole.value = null
-  }
-}
-
-const organizationPanelProps = computed(() => {
-  const panel = props.organizationPanel
-  const org = managedOrganization.value
-  if (!panel || !org) return null
-  const role = managedOrganizationRole.value
-  const leave =
-    panel.onLeaveMember == null
-      ? undefined
-      : async (organizationId: string, memberId: string): Promise<void> => {
-          await panel.onLeaveMember?.(organizationId, memberId)
-          managedOrganization.value = null
-          managedOrganizationRole.value = null
-        }
-  return {
-    organizationId: org.id,
-    organizationName: org.name,
-    organizationStatus: org.status,
-    ...(org.closedAt === undefined ? {} : { closedAt: org.closedAt }),
-    actorRole: role,
-    currentUserId: props.currentUserId,
-    canManage: role === 'owner' || role === 'admin',
-    canLeave: role !== null,
-    onLoadMembers: panel.onLoadMembers,
-    onInviteMember: panel.onInviteMember,
-    onUpdateMember: panel.onUpdateMember,
-    onRemoveMember: panel.onRemoveMember,
-    ...(leave === undefined ? {} : { onLeave: leave }),
-    ...(panel.onCloseOrganization === undefined
-      ? {}
-      : {
-          onCloseOrganization: async (
-            organizationId: string,
-            input: { reason?: string | undefined },
-          ) => {
-            const closed = await panel.onCloseOrganization?.(organizationId, input)
-            if (closed && managedOrganization.value?.id === organizationId) {
-              managedOrganization.value = {
-                ...managedOrganization.value,
-                status: 'closed',
-                ...(closed.closedAt === undefined ? {} : { closedAt: closed.closedAt }),
-              }
-            }
-            return closed
-          },
-        }),
-  }
-})
-
 watch(
   [() => props.isOpen, () => props.organizationPanel],
-  ([isNowOpen]) => {
-    if (isNowOpen) void loadManagedOrganization()
-  },
+  ([isOpen, panel]) => panel?.setEnabled(isOpen),
   { immediate: true },
 )
+
+function dismissOrganizationPanel(): void {
+  isOrganizationSettingsSelected.value = false
+  emits('update:isOpen', false)
+}
 
 function workspaceItemName(item: UserAccountMenuWorkspaceItem): string {
   return isDefaultWorkspaceItem(item) ? t('workspace.switcher.defaultBadge') : item.name
@@ -798,9 +522,6 @@ function workspaceItemName(item: UserAccountMenuWorkspaceItem): string {
 
 function selectWorkspace(item: UserAccountMenuWorkspaceItem) {
   isOrganizationSettingsSelected.value = false
-  if (isRenamingOrganization.value) {
-    cancelOrganizationRename()
-  }
   if (editingId.value && editingId.value !== item.publicId) {
     cancelRename()
   }
@@ -914,7 +635,7 @@ watch(workspaceItems, (items) => {
 
 // Reload the management surface after the create dialog closes.
 watch(isCreateDialogOpen, (isNowOpen) => {
-  if (!isNowOpen && props.isOpen) void loadManagedOrganization()
+  if (!isNowOpen && props.isOpen) void props.organizationPanel?.refresh()
 })
 
 function focusRenameInput(host: unknown): void {
@@ -976,106 +697,6 @@ const isDeleting = ref(false)
 const deleteError = ref<string | null>(null)
 const isDeleteDialogVisible = computed(() => pendingDeleteItem.value !== null)
 const pendingDeleteName = computed(() => pendingDeleteItem.value?.name ?? '')
-
-// Organization rename: inline error only; the name converges after PATCH succeeds.
-const isRenamingOrganization = ref(false)
-const organizationDraftName = ref('')
-const isRenamingOrganizationBusy = ref(false)
-const organizationRenameError = ref<string | null>(null)
-const organizationRenameInputRef = useTemplateRef('organizationRenameInputRef')
-
-const canRenameOrganization = computed(
-  () =>
-    props.onRenameOrganization != null &&
-    (organizationPanelProps.value?.canManage ?? false) &&
-    (managedOrganization.value?.status ?? 'active') !== 'closed',
-)
-
-function validateOrganizationName(raw: string): string | null {
-  const next = raw.trim()
-  if (!next || next.length > props.nameMaxLength) {
-    return t('workspace.switcher.organization.invalidName', { max: props.nameMaxLength })
-  }
-  return null
-}
-
-function startOrganizationRename(): void {
-  const org = managedOrganization.value
-  if (!org || !canRenameOrganization.value) return
-  isRenamingOrganization.value = true
-  organizationDraftName.value = org.name
-  organizationRenameError.value = null
-  void nextTick(() => {
-    focusRenameInput(organizationRenameInputRef.value)
-  })
-}
-
-function cancelOrganizationRename(): void {
-  isRenamingOrganization.value = false
-  organizationRenameError.value = null
-}
-
-async function commitOrganizationRename(): Promise<void> {
-  const org = managedOrganization.value
-  if (!org || !isRenamingOrganization.value || isRenamingOrganizationBusy.value) return
-  const next = organizationDraftName.value.trim()
-  if (next === org.name) {
-    cancelOrganizationRename()
-    return
-  }
-  const violation = validateOrganizationName(organizationDraftName.value)
-  if (violation) {
-    organizationRenameError.value = violation
-    return
-  }
-  if (!props.onRenameOrganization) {
-    cancelOrganizationRename()
-    return
-  }
-  isRenamingOrganizationBusy.value = true
-  organizationRenameError.value = null
-  try {
-    const updated = await props.onRenameOrganization(org.id, next)
-    managedOrganization.value = {
-      ...org,
-      name: updated.name,
-      status: updated.status === 'closed' ? 'closed' : 'active',
-      ...(updated.closedAt === undefined ? {} : { closedAt: updated.closedAt }),
-    }
-    isRenamingOrganization.value = false
-  } catch {
-    organizationRenameError.value = t('workspace.switcher.organization.renameFailed')
-  } finally {
-    isRenamingOrganizationBusy.value = false
-  }
-}
-
-// Organization creation inside the Settings pane reuses the shared creation composable.
-const settingsCreation = useWorkspaceCreation({
-  workspaces: workspaceItems,
-  activeWorkspaceId,
-  isCreating,
-  nameMaxLength: () => props.nameMaxLength,
-  onLoadOrganizations: props.onLoadOrganizations,
-  onCreateOrganization: props.onCreateOrganization,
-})
-const settingsOrganizationName = settingsCreation.organizationName
-const settingsOrganizationError = computed(() => settingsCreation.organizationError.value)
-const isSettingsCreatingOrganization = computed(() => settingsCreation.isCreatingOrganization.value)
-
-async function createOrganizationFromSettings(): Promise<void> {
-  await settingsCreation.createOrganization()
-  if (settingsCreation.createOrganizationId.value == null) return
-  props.onRetry()
-  await loadManagedOrganization()
-  const firstOrgWorkspace = organizationWorkspaces.value[0]
-  if (firstOrgWorkspace) {
-    isOrganizationSettingsSelected.value = false
-    activeWorkspaceId.value = firstOrgWorkspace.publicId
-    pendingCreateFocusId.value = firstOrgWorkspace.publicId
-    focusNewWorkspaceRow(firstOrgWorkspace.publicId)
-  }
-}
 
 function requestDelete(item: UserAccountMenuWorkspaceItem) {
   if (isDefaultWorkspaceItem(item) || isDeleting.value) return

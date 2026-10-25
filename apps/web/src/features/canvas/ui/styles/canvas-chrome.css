@@ -4,7 +4,7 @@
   --canvas-chrome-control-gap: 12px;
   --canvas-chrome-minimap-height: 134px;
   --canvas-chrome-library-clearance: 20px;
-  --canvas-chrome-icon-size: 19px;
+  --canvas-chrome-icon-size: var(--page-chrome-icon-size, 19px);
   --canvas-chrome-z-index: 100;
   z-index: var(--canvas-chrome-z-index);
 }
@@ -265,8 +265,8 @@
 }
 
 .canvas-chrome-icon {
-  width: var(--canvas-chrome-icon-size);
-  height: var(--canvas-chrome-icon-size);
+  width: var(--canvas-chrome-icon-size, var(--page-chrome-icon-size, 19px));
+  height: var(--canvas-chrome-icon-size, var(--page-chrome-icon-size, 19px));
 }
 
 .canvas-chrome-status-control {

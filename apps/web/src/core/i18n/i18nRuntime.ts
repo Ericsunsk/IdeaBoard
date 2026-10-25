@@ -11,6 +11,7 @@ import {
   account,
   board,
   admin,
+  notification,
 } from './locales/en/index'
 import type { SupportedLocale } from './localeCore'
 
@@ -26,6 +27,7 @@ export const englishMessages = {
   account,
   board,
   admin,
+  notification,
 } as const
 
 export const i18n = createI18n({

@@ -5027,18 +5027,6 @@
         "evidence": [
           "docs/frontend-seam-inventory.md: src/features/account/ui/chrome/userAccountMenu.types.ts#UserIdeaBalanceControl"
         ]
-      },
-      "UserAccountMenuOrganizationMember": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/account/ui/chrome/userAccountMenu.types.ts#UserAccountMenuOrganizationMember"
-        ]
-      },
-      "UserAccountMenuOrganizationMemberRole": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/account/ui/chrome/userAccountMenu.types.ts#UserAccountMenuOrganizationMemberRole"
-        ]
       }
     },
     "src/features/account/ui/shared/tabRegistry.ts": {
@@ -14041,6 +14029,14 @@
       "WorkspaceMemberPayloadError": {
         "kind": "test-contract",
         "evidence": ["src/features/workspace/selection/workspaceMembersResource.unit.spec.ts"]
+      },
+      "lookupWorkspaceMemberId": {
+        "kind": "test-contract",
+        "evidence": ["src/features/workspace/selection/workspaceMembersResource.unit.spec.ts"]
+      },
+      "grantOrganizationWorkspaceMember": {
+        "kind": "test-contract",
+        "evidence": ["src/features/workspace/selection/workspaceMembersResource.unit.spec.ts"]
       }
     },
     "src/features/workspace/selection/workspaceResource.ts": {
@@ -14401,6 +14397,24 @@
       "OrganizationScope": {
         "kind": "canonical-origin",
         "evidence": ["src/features/workspace/index.ts#OrganizationScope"]
+      }
+    },
+    "src/features/notification/session/notificationActionRegistry.ts": {
+      "registerNotificationActionResolver": {
+        "kind": "test-contract",
+        "evidence": ["src/features/notification/session/notificationActionRegistry.unit.spec.ts"]
+      }
+    },
+    "src/components/ui/tabs/tabsVariants.ts": {
+      "tabsContentVariants": {
+        "kind": "test-contract",
+        "evidence": ["src/components/ui/tabs/TabsContent.vue"]
+      }
+    },
+    "src/features/account/session/billing-transfer/resource.ts": {
+      "isTransferInviteLapsed": {
+        "kind": "test-contract",
+        "evidence": ["src/features/account/session/billing-transfer/resource.unit.spec.ts"]
       }
     }
   },
@@ -15365,6 +15379,14 @@
       "sha256": "17747e46fa97247a221b3cdab5128b40f93f07780d3981b56998d9f8a440ad36",
       "exports": ["ControlBillingOwnerScopeParameter"]
     },
+    "src/api/generated-query/control/model/controlBrandingLogoUpload.ts": {
+      "sha256": "4a0cac2ce6b3e37e9929535a00a092ae87467d4b20d5cb1dfcf5c1fbf6c15da9",
+      "exports": ["ControlBrandingLogoUpload"]
+    },
+    "src/api/generated-query/control/model/controlBrandingLogoUploadEnvelope.ts": {
+      "sha256": "92f06868726a7aa202449a0e5a07c9a97c765cec35606c47c2e4e10a4f638bd7",
+      "exports": ["ControlBrandingLogoUploadEnvelope"]
+    },
     "src/api/generated-query/control/model/controlBrandLogoOverride.ts": {
       "sha256": "6549b8b122a6240844d2ef153624605c740832df867719e92542b610ac469e09",
       "exports": ["ControlBrandLogoOverride"]
@@ -15376,14 +15398,6 @@
     "src/api/generated-query/control/model/controlBrandLogoOverrideScope.ts": {
       "sha256": "7ca1dd5444ecebcd679b4d7de227dba781da7e1fdf9083633cf9c6072001e860",
       "exports": ["ControlBrandLogoOverrideScope"]
-    },
-    "src/api/generated-query/control/model/controlBrandingLogoUpload.ts": {
-      "sha256": "4a0cac2ce6b3e37e9929535a00a092ae87467d4b20d5cb1dfcf5c1fbf6c15da9",
-      "exports": ["ControlBrandingLogoUpload"]
-    },
-    "src/api/generated-query/control/model/controlBrandingLogoUploadEnvelope.ts": {
-      "sha256": "92f06868726a7aa202449a0e5a07c9a97c765cec35606c47c2e4e10a4f638bd7",
-      "exports": ["ControlBrandingLogoUploadEnvelope"]
     },
     "src/api/generated-query/control/model/controlCatalogEnvelope.ts": {
       "sha256": "9c76b7de33005665354275b20de4ca7535547866325b98681ca01847c2a3a534",
@@ -16069,7 +16083,7 @@
       ]
     },
     "src/api/generated-query/public/index.ts": {
-      "sha256": "2383b9206ab51dcfcb0088f473d22e6ca2bd1115d957a3ae236bd420ebf58eda",
+      "sha256": "fc475cc6b7e6e57d06e7d0c61c6b304eb5291d4e15887cf3bf9f9d795e2c7dde",
       "exports": []
     },
     "src/api/generated-query/public/model/acceptWorkspaceBillingTransfer200.ts": {
@@ -16091,14 +16105,6 @@
     "src/api/generated-query/public/model/addBillingAccountMemberRequestDataRole.ts": {
       "sha256": "989a465737eab4034b91beb41cc6d7543e84188b08963bc175bf6968d20eeb0b",
       "exports": ["AddBillingAccountMemberRequestDataRole"]
-    },
-    "src/api/generated-query/public/model/addOrganizationMemberRequest.ts": {
-      "sha256": "d8ecb67c3b7f87b4d8bd9300de440ab1e90c21459e1871930fb1f96c45ca6b73",
-      "exports": ["AddOrganizationMemberRequest"]
-    },
-    "src/api/generated-query/public/model/addOrganizationMemberRequestData.ts": {
-      "sha256": "0b5516c6a1cc756c0227fda079da74743c7d760df67180de788ee94c2bbef250",
-      "exports": ["AddOrganizationMemberRequestData"]
     },
     "src/api/generated-query/public/model/addWorkspaceBillingAccountMember201.ts": {
       "sha256": "63ef7c43a9299506d808160ed9fd78ad3f8b927c73974cac2f3d056c2fe009fd",
@@ -16296,6 +16302,14 @@
       "sha256": "e0dd97812e616c1de7e019ee8ef30db5765e9d04b0ea50bb3c8c3a7952186cb3",
       "exports": ["CreateLibraryFolderRequestData"]
     },
+    "src/api/generated-query/public/model/createOrganizationMemberInviteRequest.ts": {
+      "sha256": "7b9409d925dfd2d2ac5ff403882d7813a73a2927354fa877f3bec176ecbb2a7c",
+      "exports": ["CreateOrganizationMemberInviteRequest"]
+    },
+    "src/api/generated-query/public/model/createOrganizationMemberInviteRequestRole.ts": {
+      "sha256": "debd4f4b1121c0e7101052318c8b27776814d4a0cb04cad9d775dae6105de7e5",
+      "exports": ["CreateOrganizationMemberInviteRequestRole"]
+    },
     "src/api/generated-query/public/model/createOrganizationRequest.ts": {
       "sha256": "3f216565ffc91b288ef957b1893de2e1ed202081e76c95c48fc45b5236c94f50",
       "exports": ["CreateOrganizationRequest"]
@@ -16343,6 +16357,14 @@
     "src/api/generated-query/public/model/createWorkspaceCheckoutRequestData.ts": {
       "sha256": "71303f32b33aa429e0e1568b468633bca35eda0e65462448305f51c5c9f87ce1",
       "exports": ["CreateWorkspaceCheckoutRequestData"]
+    },
+    "src/api/generated-query/public/model/createWorkspaceMemberInviteRequest.ts": {
+      "sha256": "7e00dc30da94ab76f24ea570c2a7acf3fa9e2902c15563a58675d2826e0dbf78",
+      "exports": ["CreateWorkspaceMemberInviteRequest"]
+    },
+    "src/api/generated-query/public/model/createWorkspaceMemberInviteRequestRole.ts": {
+      "sha256": "bb8a320604dee1d52ce0189e9a6296b1283b2776f2c934eadcdb73749e474e7b",
+      "exports": ["CreateWorkspaceMemberInviteRequestRole"]
     },
     "src/api/generated-query/public/model/createWorkspaceRequest.ts": {
       "sha256": "094ee2b4dfea1c5e2b992377556e510c66aba71dd5959b6333e8da839560a9bc",
@@ -16473,7 +16495,7 @@
       "exports": ["IfMatchParameter"]
     },
     "src/api/generated-query/public/model/index.ts": {
-      "sha256": "4dc5f80395325ec24fcd58c07f04ef98738638665d792fcda91cecadace8e043",
+      "sha256": "256fca3e7bc1856f0d3cca7c38ec9a01ff0890a36215ec85131fb7175a2f2dbc",
       "exports": []
     },
     "src/api/generated-query/public/model/initiateBillingTransferRequest.ts": {
@@ -16536,6 +16558,18 @@
       "sha256": "b665704626d68f348d48a9cf32ae68ad008132e655080483d19308cadfb24c6f",
       "exports": ["ListOrganizationsParams"]
     },
+    "src/api/generated-query/public/model/listUserNotificationsCategory.ts": {
+      "sha256": "7838c07059313726283159df67da5303367baf18bc51350b648146553106cfe0",
+      "exports": ["ListUserNotificationsCategory"]
+    },
+    "src/api/generated-query/public/model/listUserNotificationsParams.ts": {
+      "sha256": "ea35d3b927d77b05faa1a6149e39ed840f852063005ad375f38f3063702c77ce",
+      "exports": ["ListUserNotificationsParams"]
+    },
+    "src/api/generated-query/public/model/listUserNotificationsStatus.ts": {
+      "sha256": "a1befb047978185d4f713894756ea867148f8b109f3bb1356f36cd36cdeef5d7",
+      "exports": ["ListUserNotificationsStatus"]
+    },
     "src/api/generated-query/public/model/listWorkspaceBillingAccountMembers200.ts": {
       "sha256": "f4ce56f9de8810cf9194f658026c06158a2668b1f9fe43b8e228c84e299f2491",
       "exports": ["ListWorkspaceBillingAccountMembers200"]
@@ -16572,17 +16606,29 @@
       "sha256": "99c8332e3546b40f93ba82920fde3f51b4d7eac929a2cf13255de43d81237469",
       "exports": ["ListWorkspaceRewardRedemptionsParams"]
     },
-    "src/api/generated-query/public/model/listWorkspaceTasksParams.ts": {
-      "sha256": "9f98b3560780a06017e0f7a8978ca9021529a8e709e9fb1c55de7aabf247d09e",
-      "exports": ["ListWorkspaceTasksParams"]
-    },
     "src/api/generated-query/public/model/listWorkspacesParams.ts": {
       "sha256": "8c834b661c1d01ab7339d167f133911c8dce58f6717866621f04d9d220c98aec",
       "exports": ["ListWorkspacesParams"]
     },
+    "src/api/generated-query/public/model/listWorkspaceTasksParams.ts": {
+      "sha256": "9f98b3560780a06017e0f7a8978ca9021529a8e709e9fb1c55de7aabf247d09e",
+      "exports": ["ListWorkspaceTasksParams"]
+    },
+    "src/api/generated-query/public/model/lookupOrganizationMemberByEmailParams.ts": {
+      "sha256": "5e5ee7d3828d1b5490b26ae7fe0f33ce98c4fb282d3e11903f94a3070404bc35",
+      "exports": ["LookupOrganizationMemberByEmailParams"]
+    },
     "src/api/generated-query/public/model/lookupWorkspaceMemberByEmailParams.ts": {
       "sha256": "eb1b629398ee4de6fc567a4b61c48b0518fa553bbdc33b96ecf877358a089f41",
       "exports": ["LookupWorkspaceMemberByEmailParams"]
+    },
+    "src/api/generated-query/public/model/markAllReadResponse.ts": {
+      "sha256": "a51ca67d9350a383ee3fe817304d7a1b36a66c6dfd685b519135e8a39a4a4b63",
+      "exports": ["MarkAllReadResponse"]
+    },
+    "src/api/generated-query/public/model/markAllReadResponseData.ts": {
+      "sha256": "de3209fa572659c1d4fe38350445302a0f1718ebafa71414bc5de7a025bd1e36",
+      "exports": ["MarkAllReadResponseData"]
     },
     "src/api/generated-query/public/model/mediaAsset.ts": {
       "sha256": "f8743fb1099b7d28244a8f003094cb34f5ac0251ec060a23e58e4a404d38a806",
@@ -16676,6 +16722,34 @@
       "sha256": "20cb28e9c0f5afe9eade92473f79d8197138c409d00149b1410d90ffdf0713a5",
       "exports": ["NotFoundResponse"]
     },
+    "src/api/generated-query/public/model/notificationDTO.ts": {
+      "sha256": "dd56d9f49744306880fd598464146cf9fc7be9d9137fc3c9fc9c3e0b4e8a38f4",
+      "exports": ["NotificationDTO"]
+    },
+    "src/api/generated-query/public/model/notificationDTOActionPayload.ts": {
+      "sha256": "60780f1efc65b00188704cee6f37c0cf8a4a907dc2f4e2da452e2d3e2c66168a",
+      "exports": ["NotificationDTOActionPayload"]
+    },
+    "src/api/generated-query/public/model/notificationDTOStatus.ts": {
+      "sha256": "a3a3f5bae62c40e30726bd1ad95e48312dd3ac55d203cc468a3078a465659b53",
+      "exports": ["NotificationDTOStatus"]
+    },
+    "src/api/generated-query/public/model/notificationDTOType.ts": {
+      "sha256": "bed93087c7bd0fabb690cf45491243390f0456a80eacb4e984b80a45bdd3d2f8",
+      "exports": ["NotificationDTOType"]
+    },
+    "src/api/generated-query/public/model/notificationEnvelope.ts": {
+      "sha256": "2a8c767f8ae37bfe1cf4a17bfbc4b48fe2c5637848a12ba74d18ca8549304763",
+      "exports": ["NotificationEnvelope"]
+    },
+    "src/api/generated-query/public/model/notificationListResponse.ts": {
+      "sha256": "a5fb105d27d45b5f6109a805eb5991f22bc81acb997ee584010f66969a30d92c",
+      "exports": ["NotificationListResponse"]
+    },
+    "src/api/generated-query/public/model/notificationListResponseData.ts": {
+      "sha256": "74abafa5eb9f86ab20bb3033fefa13b6a7dd82acbf21594da8096ca735d70c05",
+      "exports": ["NotificationListResponseData"]
+    },
     "src/api/generated-query/public/model/organization.ts": {
       "sha256": "03dc818f687968b8c36edb5a212508a334823a5a634b7dfb1b481ede04572bb5",
       "exports": ["Organization"]
@@ -16688,6 +16762,14 @@
       "sha256": "b92fb19691df31eaad1f00461af26e8799b2b8a55cbed589d3a32d9f5b4ea294",
       "exports": ["OrganizationId"]
     },
+    "src/api/generated-query/public/model/organizationInviteAck.ts": {
+      "sha256": "1f44a267d86c56f069b91bbbedc527bc606e471ce160d99ae9a40f24c1d566cd",
+      "exports": ["OrganizationInviteAck"]
+    },
+    "src/api/generated-query/public/model/organizationInviteAckEnvelope.ts": {
+      "sha256": "3f0f93fccdb3d4417a8a7420ebb6cdb3cf9209b5a0ea0d5b8bf4172261b1aa73",
+      "exports": ["OrganizationInviteAckEnvelope"]
+    },
     "src/api/generated-query/public/model/organizationMember.ts": {
       "sha256": "bd79faf26746ca34d75c0a000e4f1f02ed02a744430efd368e82d9c2c86962df",
       "exports": ["OrganizationMember"]
@@ -16695,6 +16777,26 @@
     "src/api/generated-query/public/model/organizationMemberEnvelope.ts": {
       "sha256": "2d0c25b8dddd2d290ab8b9fb390d55ccd5bc82f0c179db1e67439058964ffa9a",
       "exports": ["OrganizationMemberEnvelope"]
+    },
+    "src/api/generated-query/public/model/organizationMemberInvite.ts": {
+      "sha256": "6a3eb5deb73396d8577dcf40c5d20353a3f15fd38dd161dacd67353b1efbd0e4",
+      "exports": ["OrganizationMemberInvite"]
+    },
+    "src/api/generated-query/public/model/organizationMemberInviteEnvelope.ts": {
+      "sha256": "29d777fa01d26f076c9d9531c5e62ccbb3bb1ae58ac3becf1f8113e95f835960",
+      "exports": ["OrganizationMemberInviteEnvelope"]
+    },
+    "src/api/generated-query/public/model/organizationMemberInviteList.ts": {
+      "sha256": "27942785773a6bfc814f196ee57122d0ed452cc9a026ebdd2603a947e50ee791",
+      "exports": ["OrganizationMemberInviteList"]
+    },
+    "src/api/generated-query/public/model/organizationMemberInviteRole.ts": {
+      "sha256": "341fa8d556c7f45b51400d4565ddd26ec745322c126807e1dcb204dacc232e24",
+      "exports": ["OrganizationMemberInviteRole"]
+    },
+    "src/api/generated-query/public/model/organizationMemberInviteStatus.ts": {
+      "sha256": "17f497fc18ebdff046669ae50e68535e5e8787e626980b6a80da359fb65cc098",
+      "exports": ["OrganizationMemberInviteStatus"]
     },
     "src/api/generated-query/public/model/organizationMemberList.ts": {
       "sha256": "7a200499f970bff7bbabc3f0f372c613af0008788df432c209b422163d41d3c5",
@@ -16748,6 +16850,10 @@
       "sha256": "b623e263c7e742229443c991054278d5b392ed2bdfe7f8ac8d802cadf44d2424",
       "exports": ["PaginatedWorkspaceRewardRedemptions"]
     },
+    "src/api/generated-query/public/model/paginatedWorkspaces.ts": {
+      "sha256": "11107918c30d283a099781f7f64750ad4b8729bca52896b085f15b46eea651d0",
+      "exports": ["PaginatedWorkspaces"]
+    },
     "src/api/generated-query/public/model/paginatedWorkspaceSearchResults.ts": {
       "sha256": "ff75045f7a15b2f11417c3b3852c902723522bf06d4dafd44289bcdce66aaef4",
       "exports": ["PaginatedWorkspaceSearchResults"]
@@ -16755,10 +16861,6 @@
     "src/api/generated-query/public/model/paginatedWorkspaceTasks.ts": {
       "sha256": "a6035429da0584102e531a7ef169e43a7adcf9f37ca412beb84b3d75ae1319eb",
       "exports": ["PaginatedWorkspaceTasks"]
-    },
-    "src/api/generated-query/public/model/paginatedWorkspaces.ts": {
-      "sha256": "11107918c30d283a099781f7f64750ad4b8729bca52896b085f15b46eea651d0",
-      "exports": ["PaginatedWorkspaces"]
     },
     "src/api/generated-query/public/model/paginationMeta.ts": {
       "sha256": "149a281a793714a2495b18fe01be7fcc37d66992c98b4a05cb53e09bef730a4e",
@@ -16980,6 +17082,14 @@
       "sha256": "f8e5afde2a5706d4c4945a9e686a6de7052a6c064e9f8ea362aa2e42fcbffe7a",
       "exports": ["UnprocessableEntityResponse"]
     },
+    "src/api/generated-query/public/model/unreadCountResponse.ts": {
+      "sha256": "7d752e21caca1a316a3830766585e031541f907364b9bcfdeb47058fe616b563",
+      "exports": ["UnreadCountResponse"]
+    },
+    "src/api/generated-query/public/model/unreadCountResponseData.ts": {
+      "sha256": "011b376a2ddbcb0b8d595ebe67c2e2b3bc8741d5a807d321dc01477ba679aee2",
+      "exports": ["UnreadCountResponseData"]
+    },
     "src/api/generated-query/public/model/updateBillingAccountMemberRequest.ts": {
       "sha256": "83bc5d4dfcd605e54f6b5400f11426691e89ad95868502c5d7e03019fa773209",
       "exports": ["UpdateBillingAccountMemberRequest"]
@@ -17168,6 +17278,22 @@
       "sha256": "6e99ce2dfb2524029c22d32ea854dcd4bb12759db032f34c2c0ae25d198fad25",
       "exports": ["WorkspaceId"]
     },
+    "src/api/generated-query/public/model/workspaceInviteAck.ts": {
+      "sha256": "eb5400dbdfd570a46fe5c7b57dbe940a44d026f7442cd20fb615475244138dec",
+      "exports": ["WorkspaceInviteAck"]
+    },
+    "src/api/generated-query/public/model/workspaceInviteAckEnvelope.ts": {
+      "sha256": "a0135160b9af464b1d6283ccabf3afb1fa7d654f8a3561b0b556581a6ad20c90",
+      "exports": ["WorkspaceInviteAckEnvelope"]
+    },
+    "src/api/generated-query/public/model/workspaceInvitePreview.ts": {
+      "sha256": "b13a0816922181988eb30726de8cc204d012c77919add66d70bcb8f1daa8e4e0",
+      "exports": ["WorkspaceInvitePreview"]
+    },
+    "src/api/generated-query/public/model/workspaceInvitePreviewEnvelope.ts": {
+      "sha256": "c5b8d52578865389415fae0004d3a0af29a334d574c30b7c20021fdf60c041c6",
+      "exports": ["WorkspaceInvitePreviewEnvelope"]
+    },
     "src/api/generated-query/public/model/workspaceList.ts": {
       "sha256": "0fa4677c8eea174a7c9c9b321248a35b38c4d6bd29229aa712f7c5df7203914f",
       "exports": ["WorkspaceList"]
@@ -17179,6 +17305,26 @@
     "src/api/generated-query/public/model/workspaceMemberEnvelope.ts": {
       "sha256": "1b03be7b1a9a85fdd759d9a8b58516b3f4eb1190e7ae9defe158236f21419bbc",
       "exports": ["WorkspaceMemberEnvelope"]
+    },
+    "src/api/generated-query/public/model/workspaceMemberInvite.ts": {
+      "sha256": "ac7601ec17c452cfcade172f2461ee0661f2dfb810ba4079fbe6e157d7cb7ba4",
+      "exports": ["WorkspaceMemberInvite"]
+    },
+    "src/api/generated-query/public/model/workspaceMemberInviteEnvelope.ts": {
+      "sha256": "1fffcb0fd54ce82aef8e33495839e0eda93f571149a44110237359f3c352edda",
+      "exports": ["WorkspaceMemberInviteEnvelope"]
+    },
+    "src/api/generated-query/public/model/workspaceMemberInviteList.ts": {
+      "sha256": "4347d1f7238ef057d4399451f0f3738f4b58fda6c2844bb9be852083bd064b32",
+      "exports": ["WorkspaceMemberInviteList"]
+    },
+    "src/api/generated-query/public/model/workspaceMemberInviteRole.ts": {
+      "sha256": "822bbf2167d5ebb2279c2f15bfaa12b620e7608ba0c159d43124a0655cda31e8",
+      "exports": ["WorkspaceMemberInviteRole"]
+    },
+    "src/api/generated-query/public/model/workspaceMemberInviteStatus.ts": {
+      "sha256": "9de9e99fc6980f2c71b8224984207f79a869d33b97149809f1e09020cd664524",
+      "exports": ["WorkspaceMemberInviteStatus"]
     },
     "src/api/generated-query/public/model/workspaceMemberList.ts": {
       "sha256": "a43fd00af154fb3a38fa668614a15429e40c082e08c325c1b822bfd8d2c48b39",
@@ -17292,17 +17438,62 @@
       "sha256": "f52462c8abb9ff8f335dd005ec1a373a8627ed5299138d82f1fd33d87734c8f8",
       "exports": ["WorkspaceVisionQueryStatus"]
     },
-    "src/api/generated-query/public/organizations/organizations.ts": {
-      "sha256": "bf83be3d8f82627dc21576c31926c26788fb18a3437c07c297d82d0294cc7a4e",
+    "src/api/generated-query/public/notifications/notifications.ts": {
+      "sha256": "3a2a9f770b4cc9825228c3218239b6edf088b0697b1829b61619ea738375b2d1",
       "exports": [
-        "AddOrganizationMemberMutationBody",
-        "AddOrganizationMemberMutationError",
-        "AddOrganizationMemberMutationResult",
-        "AddOrganizationMemberMutationVariables",
+        "ArchiveUserNotificationMutationError",
+        "ArchiveUserNotificationMutationResult",
+        "ArchiveUserNotificationMutationVariables",
+        "GetUserNotificationsUnreadCountQueryError",
+        "GetUserNotificationsUnreadCountQueryResult",
+        "ListUserNotificationsQueryError",
+        "ListUserNotificationsQueryResult",
+        "MarkAllUserNotificationsReadMutationError",
+        "MarkAllUserNotificationsReadMutationResult",
+        "MarkUserNotificationReadMutationError",
+        "MarkUserNotificationReadMutationResult",
+        "MarkUserNotificationReadMutationVariables",
+        "archiveUserNotification",
+        "getArchiveUserNotificationMutationKey",
+        "getArchiveUserNotificationMutationOptions",
+        "getArchiveUserNotificationUrl",
+        "getGetUserNotificationsUnreadCountQueryKey",
+        "getGetUserNotificationsUnreadCountQueryOptions",
+        "getGetUserNotificationsUnreadCountUrl",
+        "getListUserNotificationsQueryKey",
+        "getListUserNotificationsQueryOptions",
+        "getListUserNotificationsUrl",
+        "getMarkAllUserNotificationsReadMutationKey",
+        "getMarkAllUserNotificationsReadMutationOptions",
+        "getMarkAllUserNotificationsReadUrl",
+        "getMarkUserNotificationReadMutationKey",
+        "getMarkUserNotificationReadMutationOptions",
+        "getMarkUserNotificationReadUrl",
+        "getUserNotificationsUnreadCount",
+        "listUserNotifications",
+        "markAllUserNotificationsRead",
+        "markUserNotificationRead",
+        "useArchiveUserNotification",
+        "useGetUserNotificationsUnreadCount",
+        "useListUserNotifications",
+        "useMarkAllUserNotificationsRead",
+        "useMarkUserNotificationRead"
+      ]
+    },
+    "src/api/generated-query/public/organizations/organizations.ts": {
+      "sha256": "920b99c5965532bf5551fe226e2a85a61aae9dfb2b38f09527a5aa449446847b",
+      "exports": [
+        "CancelOrganizationMemberInviteMutationError",
+        "CancelOrganizationMemberInviteMutationResult",
+        "CancelOrganizationMemberInviteMutationVariables",
         "CloseOrganizationMutationBody",
         "CloseOrganizationMutationError",
         "CloseOrganizationMutationResult",
         "CloseOrganizationMutationVariables",
+        "CreateOrganizationMemberInviteMutationBody",
+        "CreateOrganizationMemberInviteMutationError",
+        "CreateOrganizationMemberInviteMutationResult",
+        "CreateOrganizationMemberInviteMutationVariables",
         "CreateOrganizationMutationBody",
         "CreateOrganizationMutationError",
         "CreateOrganizationMutationResult",
@@ -17313,12 +17504,16 @@
         "CreateOrganizationWorkspaceMutationVariables",
         "GetOrganizationQueryError",
         "GetOrganizationQueryResult",
+        "ListOrganizationMemberInvitesQueryError",
+        "ListOrganizationMemberInvitesQueryResult",
         "ListOrganizationMembersQueryError",
         "ListOrganizationMembersQueryResult",
         "ListOrganizationWorkspacesQueryError",
         "ListOrganizationWorkspacesQueryResult",
         "ListOrganizationsQueryError",
         "ListOrganizationsQueryResult",
+        "LookupOrganizationMemberByEmailQueryError",
+        "LookupOrganizationMemberByEmailQueryResult",
         "RemoveOrganizationMemberMutationError",
         "RemoveOrganizationMemberMutationResult",
         "RemoveOrganizationMemberMutationVariables",
@@ -17330,16 +17525,20 @@
         "UpdateOrganizationMutationError",
         "UpdateOrganizationMutationResult",
         "UpdateOrganizationMutationVariables",
-        "addOrganizationMember",
+        "cancelOrganizationMemberInvite",
         "closeOrganization",
         "createOrganization",
+        "createOrganizationMemberInvite",
         "createOrganizationWorkspace",
-        "getAddOrganizationMemberMutationKey",
-        "getAddOrganizationMemberMutationOptions",
-        "getAddOrganizationMemberUrl",
+        "getCancelOrganizationMemberInviteMutationKey",
+        "getCancelOrganizationMemberInviteMutationOptions",
+        "getCancelOrganizationMemberInviteUrl",
         "getCloseOrganizationMutationKey",
         "getCloseOrganizationMutationOptions",
         "getCloseOrganizationUrl",
+        "getCreateOrganizationMemberInviteMutationKey",
+        "getCreateOrganizationMemberInviteMutationOptions",
+        "getCreateOrganizationMemberInviteUrl",
         "getCreateOrganizationMutationKey",
         "getCreateOrganizationMutationOptions",
         "getCreateOrganizationUrl",
@@ -17349,6 +17548,9 @@
         "getGetOrganizationQueryKey",
         "getGetOrganizationQueryOptions",
         "getGetOrganizationUrl",
+        "getListOrganizationMemberInvitesQueryKey",
+        "getListOrganizationMemberInvitesQueryOptions",
+        "getListOrganizationMemberInvitesUrl",
         "getListOrganizationMembersQueryKey",
         "getListOrganizationMembersQueryOptions",
         "getListOrganizationMembersUrl",
@@ -17358,6 +17560,9 @@
         "getListOrganizationsQueryKey",
         "getListOrganizationsQueryOptions",
         "getListOrganizationsUrl",
+        "getLookupOrganizationMemberByEmailQueryKey",
+        "getLookupOrganizationMemberByEmailQueryOptions",
+        "getLookupOrganizationMemberByEmailUrl",
         "getOrganization",
         "getRemoveOrganizationMemberMutationKey",
         "getRemoveOrganizationMemberMutationOptions",
@@ -17368,28 +17573,45 @@
         "getUpdateOrganizationMutationKey",
         "getUpdateOrganizationMutationOptions",
         "getUpdateOrganizationUrl",
+        "listOrganizationMemberInvites",
         "listOrganizationMembers",
         "listOrganizationWorkspaces",
         "listOrganizations",
+        "lookupOrganizationMemberByEmail",
         "removeOrganizationMember",
         "updateOrganization",
         "updateOrganizationMember",
-        "useAddOrganizationMember",
+        "useCancelOrganizationMemberInvite",
         "useCloseOrganization",
         "useCreateOrganization",
+        "useCreateOrganizationMemberInvite",
         "useCreateOrganizationWorkspace",
         "useGetOrganization",
+        "useListOrganizationMemberInvites",
         "useListOrganizationMembers",
         "useListOrganizationWorkspaces",
         "useListOrganizations",
+        "useLookupOrganizationMemberByEmail",
         "useRemoveOrganizationMember",
         "useUpdateOrganization",
         "useUpdateOrganizationMember"
       ]
     },
     "src/api/generated-query/public/user/user.ts": {
-      "sha256": "edc865f99ae711f4459052379d02c97fe7ad99adfa0e9b34ad40d422fde2363d",
+      "sha256": "57bbe7ca3e916b4e77c4cf492896bd2635e12370b916fe69022ae6d94ecf6af4",
       "exports": [
+        "AcceptUserOrganizationInviteMutationError",
+        "AcceptUserOrganizationInviteMutationResult",
+        "AcceptUserOrganizationInviteMutationVariables",
+        "AcceptUserWorkspaceInviteMutationError",
+        "AcceptUserWorkspaceInviteMutationResult",
+        "AcceptUserWorkspaceInviteMutationVariables",
+        "DeclineUserOrganizationInviteMutationError",
+        "DeclineUserOrganizationInviteMutationResult",
+        "DeclineUserOrganizationInviteMutationVariables",
+        "DeclineUserWorkspaceInviteMutationError",
+        "DeclineUserWorkspaceInviteMutationResult",
+        "DeclineUserWorkspaceInviteMutationVariables",
         "GetPublicBrandingLogoQueryError",
         "GetPublicBrandingLogoQueryResult",
         "GetPublicUserAvatarQueryError",
@@ -17398,6 +17620,10 @@
         "GetSupportChannelsQueryResult",
         "GetUserQueryError",
         "GetUserQueryResult",
+        "ListUserOrganizationInvitesQueryError",
+        "ListUserOrganizationInvitesQueryResult",
+        "ListUserWorkspaceInvitesQueryError",
+        "ListUserWorkspaceInvitesQueryResult",
         "UpdateUserMutationBody",
         "UpdateUserMutationError",
         "UpdateUserMutationResult",
@@ -17406,6 +17632,22 @@
         "UploadAvatarMutationError",
         "UploadAvatarMutationResult",
         "UploadAvatarMutationVariables",
+        "acceptUserOrganizationInvite",
+        "acceptUserWorkspaceInvite",
+        "declineUserOrganizationInvite",
+        "declineUserWorkspaceInvite",
+        "getAcceptUserOrganizationInviteMutationKey",
+        "getAcceptUserOrganizationInviteMutationOptions",
+        "getAcceptUserOrganizationInviteUrl",
+        "getAcceptUserWorkspaceInviteMutationKey",
+        "getAcceptUserWorkspaceInviteMutationOptions",
+        "getAcceptUserWorkspaceInviteUrl",
+        "getDeclineUserOrganizationInviteMutationKey",
+        "getDeclineUserOrganizationInviteMutationOptions",
+        "getDeclineUserOrganizationInviteUrl",
+        "getDeclineUserWorkspaceInviteMutationKey",
+        "getDeclineUserWorkspaceInviteMutationOptions",
+        "getDeclineUserWorkspaceInviteUrl",
         "getGetPublicBrandingLogoQueryKey",
         "getGetPublicBrandingLogoQueryOptions",
         "getGetPublicBrandingLogoUrl",
@@ -17418,6 +17660,12 @@
         "getGetUserQueryKey",
         "getGetUserQueryOptions",
         "getGetUserUrl",
+        "getListUserOrganizationInvitesQueryKey",
+        "getListUserOrganizationInvitesQueryOptions",
+        "getListUserOrganizationInvitesUrl",
+        "getListUserWorkspaceInvitesQueryKey",
+        "getListUserWorkspaceInvitesQueryOptions",
+        "getListUserWorkspaceInvitesUrl",
         "getPublicBrandingLogo",
         "getPublicUserAvatar",
         "getSupportChannels",
@@ -17428,12 +17676,20 @@
         "getUploadAvatarMutationOptions",
         "getUploadAvatarUrl",
         "getUser",
+        "listUserOrganizationInvites",
+        "listUserWorkspaceInvites",
         "updateUser",
         "uploadAvatar",
+        "useAcceptUserOrganizationInvite",
+        "useAcceptUserWorkspaceInvite",
+        "useDeclineUserOrganizationInvite",
+        "useDeclineUserWorkspaceInvite",
         "useGetPublicBrandingLogo",
         "useGetPublicUserAvatar",
         "useGetSupportChannels",
         "useGetUser",
+        "useListUserOrganizationInvites",
+        "useListUserWorkspaceInvites",
         "useUpdateUser",
         "useUploadAvatar"
       ]
@@ -17822,12 +18078,29 @@
       ]
     },
     "src/api/generated-query/public/workspace-members/workspace-members.ts": {
-      "sha256": "6809628cf0b78c87de86fa41704519169d6a4be79d6b6e0f87633bc1cbc1ddca",
+      "sha256": "2e9af29714e05232ff842969441e38639c3b88ce4f7e56cc25bca00f98089e62",
       "exports": [
+        "AcceptWorkspaceInviteByTokenMutationError",
+        "AcceptWorkspaceInviteByTokenMutationResult",
+        "AcceptWorkspaceInviteByTokenMutationVariables",
         "AddWorkspaceMemberMutationBody",
         "AddWorkspaceMemberMutationError",
         "AddWorkspaceMemberMutationResult",
         "AddWorkspaceMemberMutationVariables",
+        "CancelWorkspaceMemberInviteMutationError",
+        "CancelWorkspaceMemberInviteMutationResult",
+        "CancelWorkspaceMemberInviteMutationVariables",
+        "CreateWorkspaceMemberInviteMutationBody",
+        "CreateWorkspaceMemberInviteMutationError",
+        "CreateWorkspaceMemberInviteMutationResult",
+        "CreateWorkspaceMemberInviteMutationVariables",
+        "DeclineWorkspaceInviteByTokenMutationError",
+        "DeclineWorkspaceInviteByTokenMutationResult",
+        "DeclineWorkspaceInviteByTokenMutationVariables",
+        "GetWorkspaceInviteByTokenQueryError",
+        "GetWorkspaceInviteByTokenQueryResult",
+        "ListWorkspaceMemberInvitesQueryError",
+        "ListWorkspaceMemberInvitesQueryResult",
         "ListWorkspaceMembersQueryError",
         "ListWorkspaceMembersQueryResult",
         "LookupWorkspaceMemberByEmailQueryError",
@@ -17839,10 +18112,32 @@
         "UpdateWorkspaceMemberMutationError",
         "UpdateWorkspaceMemberMutationResult",
         "UpdateWorkspaceMemberMutationVariables",
+        "acceptWorkspaceInviteByToken",
         "addWorkspaceMember",
+        "cancelWorkspaceMemberInvite",
+        "createWorkspaceMemberInvite",
+        "declineWorkspaceInviteByToken",
+        "getAcceptWorkspaceInviteByTokenMutationKey",
+        "getAcceptWorkspaceInviteByTokenMutationOptions",
+        "getAcceptWorkspaceInviteByTokenUrl",
         "getAddWorkspaceMemberMutationKey",
         "getAddWorkspaceMemberMutationOptions",
         "getAddWorkspaceMemberUrl",
+        "getCancelWorkspaceMemberInviteMutationKey",
+        "getCancelWorkspaceMemberInviteMutationOptions",
+        "getCancelWorkspaceMemberInviteUrl",
+        "getCreateWorkspaceMemberInviteMutationKey",
+        "getCreateWorkspaceMemberInviteMutationOptions",
+        "getCreateWorkspaceMemberInviteUrl",
+        "getDeclineWorkspaceInviteByTokenMutationKey",
+        "getDeclineWorkspaceInviteByTokenMutationOptions",
+        "getDeclineWorkspaceInviteByTokenUrl",
+        "getGetWorkspaceInviteByTokenQueryKey",
+        "getGetWorkspaceInviteByTokenQueryOptions",
+        "getGetWorkspaceInviteByTokenUrl",
+        "getListWorkspaceMemberInvitesQueryKey",
+        "getListWorkspaceMemberInvitesQueryOptions",
+        "getListWorkspaceMemberInvitesUrl",
         "getListWorkspaceMembersQueryKey",
         "getListWorkspaceMembersQueryOptions",
         "getListWorkspaceMembersUrl",
@@ -17855,11 +18150,19 @@
         "getUpdateWorkspaceMemberMutationKey",
         "getUpdateWorkspaceMemberMutationOptions",
         "getUpdateWorkspaceMemberUrl",
+        "getWorkspaceInviteByToken",
+        "listWorkspaceMemberInvites",
         "listWorkspaceMembers",
         "lookupWorkspaceMemberByEmail",
         "removeWorkspaceMember",
         "updateWorkspaceMember",
+        "useAcceptWorkspaceInviteByToken",
         "useAddWorkspaceMember",
+        "useCancelWorkspaceMemberInvite",
+        "useCreateWorkspaceMemberInvite",
+        "useDeclineWorkspaceInviteByToken",
+        "useGetWorkspaceInviteByToken",
+        "useListWorkspaceMemberInvites",
         "useListWorkspaceMembers",
         "useLookupWorkspaceMemberByEmail",
         "useRemoveWorkspaceMember",
@@ -18260,6 +18563,14 @@
         "src/core/media/mediaDisplay.unit.spec.ts",
         "src/features/library/ui/LibraryAssetGallery.unit.spec.ts",
         "src/features/search/ui/components/SearchResultCard.component.spec.ts"
+      ]
+    },
+    "src/test/notificationFacts.ts": {
+      "kind": "test-support",
+      "evidence": [
+        "src/features/notification/ui/NotificationBell.component.spec.ts",
+        "src/features/notification/ui/NotificationCenterDialog.component.spec.ts",
+        "src/features/notification/ui/NotificationPopover.component.spec.ts"
       ]
     },
     "src/test/msw.ts": {

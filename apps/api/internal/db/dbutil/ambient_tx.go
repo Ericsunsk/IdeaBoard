@@ -44,9 +44,9 @@ import (
 // mutation. It is private so no other package can mint a competing key.
 type ambientTxContextKey struct{}
 
-// ContextWithAmbientTx returns ctx carrying tx for the current guarded
-// mutation. The guard scope is the only production caller; tests use it
-// to stage a transaction without a pool.
+// ContextWithAmbientTx returns ctx carrying the caller-owned transaction.
+// Control guards and atomic collaboration services own the outer transaction;
+// participating repositories borrow it without changing its lifecycle.
 func ContextWithAmbientTx(ctx context.Context, tx pgx.Tx) context.Context {
 	if ctx == nil {
 		ctx = context.Background()

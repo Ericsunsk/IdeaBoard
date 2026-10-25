@@ -43,7 +43,7 @@ import AdminSwitch from './AdminSwitch.vue'
 
 export type AdminSwitchRowPillSize = 'small' | 'medium'
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     /** Status 文案；undefined 时渲染同宽空占位（加载中/加载失败开关不动）。 */
     pill?: string | undefined

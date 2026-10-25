@@ -53,6 +53,7 @@
         >
           <Download class="canvas-chrome-icon" />
         </button>
+        <NotificationBell />
       </template>
     </UserAccountMenu>
   </header>
@@ -148,6 +149,7 @@
 </template>
 
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Bookmark,
@@ -202,6 +204,10 @@ const emit = defineEmits<{
   'zoom-out': []
   'zoom-in': []
 }>()
+
+const NotificationBell = defineAsyncComponent(
+  () => import('../../../../notification/ui/NotificationBell.vue'),
+)
 
 const { t } = useI18n()
 const { channels: supportChannels } = useSupportChannels()

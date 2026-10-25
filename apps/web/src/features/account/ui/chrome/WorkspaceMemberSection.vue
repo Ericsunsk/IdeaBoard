@@ -26,34 +26,37 @@
 
     <!-- Loaded Content: Invite Bar & Roster List -->
     <template v-else>
-      <!-- Personal Default is private (#952): no invite bar, only the
-        private note. Other Personal workspaces invite freely; consumption
-        charges the holder's shared Personal account. -->
-      <p
-        v-if="section.isDefaultWorkspace.value"
-        class="m-0 rounded-control border border-border bg-muted/40 p-3 text-admin-meta leading-normal text-muted-foreground"
-        aria-live="polite"
-      >
-        {{ t('workspace.switcher.members.defaultPrivate') }}
-      </p>
-
+      <!-- Personal Default is private (#952): no invite bar. Other Personal
+        workspaces invite freely; consumption charges the holder's shared
+        Personal account. -->
       <!-- Invite Member Card (when canManage, never on Default) -->
       <section
         v-if="section.canManage.value && !section.isDefaultWorkspace.value"
         :class="accountCardPanelClass"
-        aria-label="Invite Member"
+        :aria-label="t('workspace.switcher.members.inviteTitle')"
       >
         <div class="flex flex-col gap-3">
-          <span class="text-admin-body font-semibold text-muted-foreground">
-            {{ t('workspace.switcher.members.inviteAction') }}
-          </span>
+          <div class="flex items-center justify-between">
+            <span class="text-admin-body font-semibold text-muted-foreground">
+              {{ t('workspace.switcher.members.inviteTitle') }}
+            </span>
+            <span class="text-xs text-muted-foreground font-medium">
+              {{ section.collaboratorCount.value }} / 5
+            </span>
+          </div>
+          <p
+            v-if="section.isLimitReached.value"
+            class="m-0 text-xs text-muted-foreground"
+          >
+            {{ t('workspace.switcher.members.memberLimitReached') }}
+          </p>
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -- The invite input carries its accessible name via aria-label; the rule cannot see through the Input primitive. -->
             <Input
               v-model="section.inviteEmail.value"
               size="sm"
               class="min-w-0 flex-1 h-9 text-xs bg-background"
-              :disabled="section.isPending('invite')"
+              :disabled="section.isPending('invite') || section.isLimitReached.value"
               :aria-label="t('workspace.switcher.members.emailLabel')"
               :placeholder="t('workspace.switcher.members.emailPlaceholder')"
               inputmode="email"
@@ -65,7 +68,7 @@
               size="sm"
               class="h-9 shrink-0 px-4"
               :is-loading="section.isPending('invite')"
-              :is-disabled="section.isPending('invite')"
+              :is-disabled="section.isPending('invite') || section.isLimitReached.value"
               @click="section.inviteMember()"
             >
               <SendMail class="size-4" aria-hidden="true" />
@@ -78,6 +81,61 @@
           </div>
         </div>
       </section>
+
+      <!-- Ownership Transfer Active Banners (only rendered when there is a live pending invite) -->
+      <div
+        v-if="handover.addressedInvite.value"
+        class="flex items-center gap-2.5 rounded-control border border-primary/30 bg-primary/10 p-3 text-xs"
+        role="status"
+      >
+        <Crown class="size-4 shrink-0 text-primary" aria-hidden="true" />
+        <div class="min-w-0">
+          <p class="m-0 font-medium text-foreground">
+            {{ t('workspace.switcher.handover.recipientNotice') }}
+          </p>
+          <p class="m-0 mt-0.5 text-muted-foreground truncate">
+            {{
+              t('workspace.switcher.handover.inviteParties', {
+                from: handover.memberName(handover.addressedInvite.value.fromUserId),
+                to: handover.memberName(handover.addressedInvite.value.toUserId),
+              })
+            }}
+          </p>
+        </div>
+      </div>
+
+      <div
+        v-else-if="outgoingLiveInvite"
+        class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-control border border-border bg-muted/40 p-3 text-xs"
+        role="status"
+      >
+        <div class="flex items-center gap-2.5 min-w-0">
+          <Crown class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div class="min-w-0">
+            <p class="m-0 font-medium text-foreground">
+              {{
+                t('workspace.switcher.handover.inviteParties', {
+                  from: handover.memberName(outgoingLiveInvite.fromUserId),
+                  to: handover.memberName(outgoingLiveInvite.toUserId),
+                })
+              }}
+            </p>
+            <p class="m-0 mt-0.5 text-muted-foreground">
+              {{ t('workspace.switcher.handover.expiresNote') }}
+            </p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          class="h-7 px-2.5 text-xs shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          :is-disabled="handover.isSaving.value"
+          @click="handover.requestDecision(outgoingLiveInvite, 'cancel')"
+        >
+          {{ t('workspace.switcher.handover.cancel') }}
+        </Button>
+      </div>
 
       <!-- Member Roster Card -->
       <section :class="accountCardPanelClass" aria-labelledby="member-roster-title">
@@ -210,14 +268,21 @@
                     {{ roleLabel(entry.role) }}
                   </span>
 
-                  <!-- Funds handover: billing owners start a transfer from a
+                  <!-- Ownership transfer: workspace owners start a transfer from a
                   member row (never the own row); the backend still enforces
                   owner-only initiation. -->
-                  <button
+                  <Button
                     v-if="handover.canHandOverTo(entry.userId)"
                     type="button"
-                    class="h-8 px-2.5 rounded-control text-admin-meta font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="handover.isSaving.value"
+                    variant="ghost"
+                    size="icon"
+                    class="size-8 text-muted-foreground hover:text-foreground"
+                    :is-disabled="handover.isSaving.value"
+                    :title="
+                      t('workspace.switcher.handover.handOverTo', {
+                        name: memberDisplayName(entry),
+                      })
+                    "
                     :aria-label="
                       t('workspace.switcher.handover.handOverTo', {
                         name: memberDisplayName(entry),
@@ -225,62 +290,44 @@
                     "
                     @click="handover.requestHandOver(entry.userId)"
                   >
-                    {{ t('workspace.switcher.handover.handOver') }}
-                  </button>
+                    <Crown class="size-4 shrink-0" aria-hidden="true" />
+                  </Button>
 
-                  <!-- Independent Leave/Remove text button at the row end -->
-                  <button
+                  <!-- Independent Leave/Remove icon button at the row end (never on Default workspace for current user) -->
+                  <Button
                     v-if="
-                      section.canManage.value && section.confirmingRemoveId.value !== entry.userId
+                      section.canManage.value &&
+                      !(section.isDefaultWorkspace.value && entry.userId === props.currentUserId)
                     "
                     type="button"
-                    class="h-8 px-2.5 rounded-control text-admin-meta font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="section.isPending(`remove:${entry.userId}`)"
-                    @click="section.requestRemove(entry.userId)"
-                  >
-                    {{
+                    variant="ghost"
+                    size="icon"
+                    class="size-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    :is-disabled="section.isPending(`remove:${entry.userId}`)"
+                    :title="
                       entry.userId === props.currentUserId
                         ? t('workspace.switcher.members.leaveAction')
                         : t('workspace.switcher.members.removeAction')
-                    }}
-                  </button>
+                    "
+                    :aria-label="
+                      entry.userId === props.currentUserId
+                        ? t('workspace.switcher.members.leaveAction')
+                        : t('workspace.switcher.members.removeAction')
+                    "
+                    @click="section.requestRemove(entry.userId)"
+                  >
+                    <LogOut
+                      v-if="entry.userId === props.currentUserId"
+                      class="size-4 shrink-0"
+                      aria-hidden="true"
+                    />
+                    <Trash
+                      v-else
+                      class="size-4 shrink-0"
+                      aria-hidden="true"
+                    />
+                  </Button>
                 </template>
-              </div>
-            </div>
-
-            <!-- Inline Remove Confirmation Box -->
-            <div
-              v-if="section.confirmingRemoveId.value === entry.userId"
-              class="mt-1 flex flex-col gap-2 rounded-control border border-destructive/30 bg-destructive/10 p-3"
-            >
-              <p class="m-0 text-xs leading-normal text-foreground">
-                {{
-                  t('workspace.switcher.members.removeConfirmNote', {
-                    name: memberDisplayName(entry),
-                  })
-                }}
-              </p>
-              <div class="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  class="h-7 px-3 text-xs"
-                  :is-loading="section.isPending(`remove:${entry.userId}`)"
-                  :is-disabled="section.isPending(`remove:${entry.userId}`)"
-                  @click="section.confirmRemove(entry.userId)"
-                >
-                  {{ t('workspace.switcher.members.removeConfirmAction') }}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  class="h-7 px-3 text-xs"
-                  @click="section.cancelRemove()"
-                >
-                  {{ t('workspace.switcher.members.removeCancel') }}
-                </Button>
               </div>
             </div>
           </li>
@@ -294,9 +341,80 @@
           {{ t('workspace.switcher.members.empty') }}
         </p>
       </section>
+
+      <!-- Pending Member Invites Card (when canManage && pendingInvites > 0) -->
+      <section
+        v-if="section.canManage.value && section.pendingInvites.value.length > 0"
+        :class="accountCardPanelClass"
+        aria-labelledby="pending-invites-title"
+      >
+        <div class="flex items-center justify-between mb-3">
+          <h3 id="pending-invites-title" class="m-0 text-admin-body font-semibold text-foreground">
+            {{ t('workspace.switcher.members.pendingTitle') }}
+          </h3>
+          <span class="text-xs text-muted-foreground font-medium">
+            {{ section.pendingInvites.value.length }}
+          </span>
+        </div>
+
+        <ul class="m-0 flex flex-col gap-2 list-none p-0">
+          <li
+            v-for="invite in section.pendingInvites.value"
+            :key="invite.id"
+            class="flex items-center justify-between gap-3 rounded-control p-2 hover:bg-muted/40 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+          >
+            <!-- Invitee Email & Expires -->
+            <div class="flex flex-col min-w-0 flex-1">
+              <span
+                class="text-xs font-semibold text-foreground truncate"
+                :title="invite.invitee_email"
+              >
+                {{ invite.invitee_email }}
+              </span>
+              <span class="text-admin-caption text-muted-foreground">
+                {{ formatExpires(invite.expires_at) }}
+              </span>
+            </div>
+
+            <!-- Role badge & Action buttons -->
+            <div class="flex items-center gap-2 shrink-0">
+              <span
+                class="shrink-0 rounded-pill px-2.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground"
+              >
+                {{ roleLabel(invite.role) }}
+              </span>
+
+              <Button
+                v-if="section.getInviteLink(invite)"
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="h-8 px-2 text-xs"
+                :title="t('workspace.switcher.members.copyInviteLink')"
+                @click="section.copyInviteLink(invite)"
+              >
+                <LinkIcon class="size-3.5 mr-1" aria-hidden="true" />
+                {{ t('workspace.switcher.members.copyInviteLink') }}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                class="h-8 px-2.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                :is-loading="section.isPending(`revoke:${invite.id}`)"
+                :is-disabled="section.isPending(`revoke:${invite.id}`)"
+                @click="section.revokeInvite(invite.id)"
+              >
+                {{ t('workspace.switcher.members.revokeAction') }}
+              </Button>
+            </div>
+          </li>
+        </ul>
+      </section>
     </template>
   </section>
-  <!-- Funds handover confirmation: ordinary danger confirm (no typing) for
+  <!-- Ownership transfer confirmation: ordinary danger confirm (no typing) for
     initiation, primary for acceptance. Backend still enforces owner-only
     initiation and recipient-only decisions. -->
   <UserConfirmDialog
@@ -309,12 +427,30 @@
     @update:is-visible="handover.dismissConfirmation()"
     @confirm="handover.confirm()"
   />
+
+  <!-- Member removal confirmation modal dialog -->
+  <UserConfirmDialog
+    :is-visible="section.confirmingRemoveId.value != null"
+    :title="removeDialogTitle"
+    :message="removeDialogMessage"
+    :confirm-label="t('workspace.switcher.members.removeConfirmAction')"
+    intent="danger"
+    :is-loading="
+      section.confirmingRemoveId.value != null &&
+      section.isPending(`remove:${section.confirmingRemoveId.value}`)
+    "
+    @update:is-visible="section.cancelRemove()"
+    @confirm="
+      section.confirmingRemoveId.value &&
+        section.confirmRemove(section.confirmingRemoveId.value)
+    "
+  />
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NavArrowDown, SendMail } from '@iconoir/vue'
+import { Crown, Link as LinkIcon, LogOut, NavArrowDown, SendMail, Trash } from '@iconoir/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -364,6 +500,10 @@ const handover = useBillingTransferSection({
   currentUserId: () => props.currentUserId,
 })
 
+const outgoingLiveInvite = computed(() =>
+  handover.liveInvites.value.find((invite) => handover.canDecide(invite, 'cancel')) ?? null,
+)
+
 const handoverTitle = computed(() => {
   const pending = handover.confirmation.value
   if (pending?.kind === 'invite') return t('workspace.switcher.handover.handOver')
@@ -371,19 +511,43 @@ const handoverTitle = computed(() => {
 })
 const handoverMessage = computed(() => {
   const pending = handover.confirmation.value
-  if (pending?.kind === 'invite') {
+  if (!pending) return ''
+  if (pending.kind === 'invite') {
     const target = section.roster.value.find((entry) => entry.userId === pending.targetUserId)
     return t('workspace.switcher.handover.initiateConfirm', {
-      account: handover.account.value?.billingAccountId ?? '',
       to: target ? memberDisplayName(target) : pending.targetUserId,
     })
   }
-  return t(`workspace.switcher.handover.${pending?.kind ?? 'accept'}Confirm`, {
-    account: handover.account.value?.billingAccountId ?? '',
-  })
+  if (pending.kind === 'cancel') {
+    const target = section.roster.value.find((entry) => entry.userId === pending.invite.toUserId)
+    return t('workspace.switcher.handover.cancelConfirm', {
+      to: target ? memberDisplayName(target) : pending.invite.toUserId,
+    })
+  }
+  return t(`workspace.switcher.handover.${pending.kind}Confirm`)
 })
 
-function roleLabel(role: WorkspaceMemberRole): string {
+const targetRemoveMember = computed(() => {
+  const id = section.confirmingRemoveId.value
+  return id ? section.roster.value.find((entry) => entry.userId === id) ?? null : null
+})
+
+const removeDialogTitle = computed(() =>
+  section.confirmingRemoveId.value === props.currentUserId
+    ? t('workspace.switcher.members.leaveAction')
+    : t('workspace.switcher.members.removeAction'),
+)
+
+const removeDialogMessage = computed(() => {
+  if (section.confirmingRemoveId.value != null && section.confirmingRemoveId.value === props.currentUserId) {
+    return t('workspace.switcher.members.leaveConfirmNote')
+  }
+  const target = targetRemoveMember.value
+  const name = target ? memberDisplayName(target) : (section.confirmingRemoveId.value ?? '')
+  return t('workspace.switcher.members.removeConfirmNote', { name })
+})
+
+function roleLabel(role: WorkspaceMemberRole | string): string {
   switch (role) {
     case 'owner':
       return t('workspace.switcher.members.roleOwner')
@@ -391,6 +555,19 @@ function roleLabel(role: WorkspaceMemberRole): string {
       return t('workspace.switcher.members.roleAdmin')
     default:
       return t('workspace.switcher.members.roleMember')
+  }
+}
+
+function formatExpires(expiresAt: string): string {
+  try {
+    const target = new Date(expiresAt).getTime()
+    const now = Date.now()
+    const diff = target - now
+    if (diff <= 0) return t('workspace.switcher.handover.status.expired')
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
+    return t('workspace.switcher.members.expiresInDays', { count: days })
+  } catch {
+    return ''
   }
 }
 

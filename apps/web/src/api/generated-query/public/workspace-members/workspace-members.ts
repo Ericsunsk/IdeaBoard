@@ -30,6 +30,7 @@ import type {
   AddWorkspaceMemberRequest,
   BadRequestResponse,
   ConflictResponse,
+  CreateWorkspaceMemberInviteRequest,
   DeletedEnvelope,
   ForbiddenResponse,
   LookupWorkspaceMemberByEmailParams,
@@ -37,7 +38,11 @@ import type {
   UnauthorizedResponse,
   UnprocessableEntityResponse,
   UpdateWorkspaceMemberRequest,
+  WorkspaceInviteAckEnvelope,
+  WorkspaceInvitePreviewEnvelope,
   WorkspaceMemberEnvelope,
+  WorkspaceMemberInviteEnvelope,
+  WorkspaceMemberInviteList,
   WorkspaceMemberList,
   WorkspaceMemberLookupEnvelope,
 } from '../model'
@@ -46,6 +51,269 @@ import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
+export const getGetWorkspaceInviteByTokenUrl = (token: string) => {
+  return `/invites/${encodeURIComponent(String(token))}`
+}
+
+/**
+ * Unauthenticated preview by unguessable token. The invitee email is intentionally omitted from the preview (PII minimization); it stays in the authenticated invite DTOs.
+ * @summary Preview a workspace invitation by raw token (public)
+ */
+export const getWorkspaceInviteByToken = async (
+  token: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspaceInvitePreviewEnvelope> => {
+  return publicMutator<WorkspaceInvitePreviewEnvelope>(getGetWorkspaceInviteByTokenUrl(token), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetWorkspaceInviteByTokenQueryKey = (token: MaybeRefOrGetter<string>) => {
+  return ['invites', token] as const
+}
+
+export const getGetWorkspaceInviteByTokenQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWorkspaceInviteByToken>>,
+  TError = NotFoundResponse,
+>(
+  token: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceInviteByToken>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetWorkspaceInviteByTokenQueryKey(token)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkspaceInviteByToken>>> = ({
+    signal,
+  }) => getWorkspaceInviteByToken(toValue(token), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(token) !== null && toValue(token) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceInviteByToken>>, TError, TData>
+}
+
+export type GetWorkspaceInviteByTokenQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWorkspaceInviteByToken>>
+>
+export type GetWorkspaceInviteByTokenQueryError = NotFoundResponse
+
+/**
+ * @summary Preview a workspace invitation by raw token (public)
+ */
+
+export function useGetWorkspaceInviteByToken<
+  TData = Awaited<ReturnType<typeof getWorkspaceInviteByToken>>,
+  TError = NotFoundResponse,
+>(
+  token: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceInviteByToken>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetWorkspaceInviteByTokenQueryOptions(token, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getAcceptWorkspaceInviteByTokenUrl = (token: string) => {
+  return `/invites/${encodeURIComponent(String(token))}/accept`
+}
+
+/**
+ * Accepts a pending workspace invitation by token. No Idempotency-Key is required: the token in the path scopes the decision, and a repeated decision deterministically renders 409 conflict once the invite leaves pending state.
+ * @summary Accept a workspace invitation by raw token (authenticated)
+ */
+export const acceptWorkspaceInviteByToken = async (
+  token: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspaceMemberEnvelope> => {
+  return publicMutator<WorkspaceMemberEnvelope>(getAcceptWorkspaceInviteByTokenUrl(token), {
+    ...options,
+    method: 'POST',
+  })
+}
+
+export const getAcceptWorkspaceInviteByTokenMutationKey = () =>
+  ['acceptWorkspaceInviteByToken'] as const
+
+export const getAcceptWorkspaceInviteByTokenMutationOptions = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptWorkspaceInviteByToken>>,
+    TError,
+    AcceptWorkspaceInviteByTokenMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof acceptWorkspaceInviteByToken>>,
+  TError,
+  AcceptWorkspaceInviteByTokenMutationVariables,
+  TContext
+> => {
+  const mutationKey = getAcceptWorkspaceInviteByTokenMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof acceptWorkspaceInviteByToken>>,
+    AcceptWorkspaceInviteByTokenMutationVariables
+  > = (props) => {
+    const { token } = props ?? {}
+
+    return acceptWorkspaceInviteByToken(token, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AcceptWorkspaceInviteByTokenMutationResult = NonNullable<
+  Awaited<ReturnType<typeof acceptWorkspaceInviteByToken>>
+>
+
+export type AcceptWorkspaceInviteByTokenMutationError =
+  UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse
+export type AcceptWorkspaceInviteByTokenMutationVariables = { token: string }
+
+/**
+ * @summary Accept a workspace invitation by raw token (authenticated)
+ */
+export const useAcceptWorkspaceInviteByToken = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof acceptWorkspaceInviteByToken>>,
+      TError,
+      AcceptWorkspaceInviteByTokenMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof acceptWorkspaceInviteByToken>>,
+  TError,
+  AcceptWorkspaceInviteByTokenMutationVariables,
+  TContext
+> => {
+  return useMutation(getAcceptWorkspaceInviteByTokenMutationOptions(options), queryClient)
+}
+export const getDeclineWorkspaceInviteByTokenUrl = (token: string) => {
+  return `/invites/${encodeURIComponent(String(token))}/decline`
+}
+
+/**
+ * Declines a pending workspace invitation by token. No Idempotency-Key is required: the token in the path scopes the decision, and a repeated decision deterministically renders 409 conflict once the invite leaves pending state.
+ * @summary Decline a workspace invitation by raw token (authenticated)
+ */
+export const declineWorkspaceInviteByToken = async (
+  token: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspaceInviteAckEnvelope> => {
+  return publicMutator<WorkspaceInviteAckEnvelope>(getDeclineWorkspaceInviteByTokenUrl(token), {
+    ...options,
+    method: 'POST',
+  })
+}
+
+export const getDeclineWorkspaceInviteByTokenMutationKey = () =>
+  ['declineWorkspaceInviteByToken'] as const
+
+export const getDeclineWorkspaceInviteByTokenMutationOptions = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof declineWorkspaceInviteByToken>>,
+    TError,
+    DeclineWorkspaceInviteByTokenMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof declineWorkspaceInviteByToken>>,
+  TError,
+  DeclineWorkspaceInviteByTokenMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeclineWorkspaceInviteByTokenMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof declineWorkspaceInviteByToken>>,
+    DeclineWorkspaceInviteByTokenMutationVariables
+  > = (props) => {
+    const { token } = props ?? {}
+
+    return declineWorkspaceInviteByToken(token, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type DeclineWorkspaceInviteByTokenMutationResult = NonNullable<
+  Awaited<ReturnType<typeof declineWorkspaceInviteByToken>>
+>
+
+export type DeclineWorkspaceInviteByTokenMutationError =
+  UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse
+export type DeclineWorkspaceInviteByTokenMutationVariables = { token: string }
+
+/**
+ * @summary Decline a workspace invitation by raw token (authenticated)
+ */
+export const useDeclineWorkspaceInviteByToken = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof declineWorkspaceInviteByToken>>,
+      TError,
+      DeclineWorkspaceInviteByTokenMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof declineWorkspaceInviteByToken>>,
+  TError,
+  DeclineWorkspaceInviteByTokenMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeclineWorkspaceInviteByTokenMutationOptions(options), queryClient)
+}
 export const getListWorkspaceMembersUrl = (workspaceId: string) => {
   return `/workspaces/${encodeURIComponent(String(workspaceId))}/members`
 }
@@ -132,8 +400,8 @@ export const getAddWorkspaceMemberUrl = (workspaceId: string) => {
 }
 
 /**
- * Requires the Idempotency-Key header. Re-adding an existing member keeps the current role, including when the workspace is full. Workspaces support at most 5 members including owners; exceeding this limit renders 409 workspace_member_limit_reached. The Personal Default workspace is private: invites there render 403 workspace_default_protected. Other Personal workspaces invite freely: the Workspace Owner/Admin adds collaborators directly with no per-invite Personal account-holder approval, consumption charges the holder's shared Personal Billing Account with the real operator kept on each record, and an unconfigured collaborator quota reads as unlimited (the holder may set it later without clearing usage). Removing and re-adding a collaborator preserves quota state and historical consumption. Reusing a key with a different request renders 409 workspace_idempotency_conflict.
- * @summary Add a workspace member (owner/admin only; owner-only promotion)
+ * Grants an existing Organization member access to one of its Workspaces. The target must already belong to the owning Organization. This endpoint never joins a user to an Organization and cannot add Personal collaborators; Personal collaboration requires accepted Workspace invitations. Requires Idempotency-Key. Re-adding an existing member preserves its role. Active members plus pending invitations must not exceed 5. Reusing a key with a different request renders 409 workspace_idempotency_conflict.
+ * @summary Grant workspace access to an existing organization member (owner/admin only)
  */
 export const addWorkspaceMember = async (
   workspaceId: string,
@@ -228,7 +496,7 @@ export type AddWorkspaceMemberMutationVariables = {
 }
 
 /**
- * @summary Add a workspace member (owner/admin only; owner-only promotion)
+ * @summary Grant workspace access to an existing organization member (owner/admin only)
  */
 export const useAddWorkspaceMember = <
   TError =
@@ -278,7 +546,7 @@ export const getLookupWorkspaceMemberByEmailUrl = (
 }
 
 /**
- * Resolves one registered user to its usr_ identifier by exact email match (trimmed, case-insensitive) for the invite flow. Only workspace owners/admins may call it: non-members converge to 404 workspace_not_found, visible members without the capability render 403. Unknown emails converge to 404 workspace_member_not_found, indistinguishable from unregistered identities. The email is resolved through the Auth identity and never stored; the response carries only the usr_ identifier. This is a read-only query: it performs no membership write (invite with POST /workspaces/{workspace_id}/members using the resolved usr_, role, and Idempotency-Key). Abuse is bounded by the existing global per-IP rate limiting plus the single-address exact-match shape (no batch enumeration).
+ * Resolves one registered user to its usr_ identifier by exact email match (trimmed, case-insensitive) for the invite flow. Only workspace owners/admins may call it: non-members converge to 404 workspace_not_found, visible members without the capability render 403. Unknown emails converge to 404 workspace_member_not_found, indistinguishable from unregistered identities. The email is resolved through the Auth identity and never stored; the response carries only the usr_ identifier. This is a read-only query: it performs no membership write. Personal collaborators join through POST /workspaces/{workspace_id}/invites; Organization members may receive Workspace access through POST /workspaces/{workspace_id}/members. Abuse is bounded by the existing global per-IP rate limiting plus the single-address exact-match shape (no batch enumeration).
  * @summary Look up a registered user by email (owner/admin only)
  */
 export const lookupWorkspaceMemberByEmail = async (
@@ -606,4 +874,310 @@ export const useRemoveWorkspaceMember = <
   TContext
 > => {
   return useMutation(getRemoveWorkspaceMemberMutationOptions(options), queryClient)
+}
+export const getListWorkspaceMemberInvitesUrl = (workspaceId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/invites`
+}
+
+/**
+ * @summary List workspace member invitations (owner/admin only)
+ */
+export const listWorkspaceMemberInvites = async (
+  workspaceId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspaceMemberInviteList> => {
+  return publicMutator<WorkspaceMemberInviteList>(getListWorkspaceMemberInvitesUrl(workspaceId), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListWorkspaceMemberInvitesQueryKey = (workspaceId: MaybeRefOrGetter<string>) => {
+  return ['workspaces', workspaceId, 'invites'] as const
+}
+
+export const getListWorkspaceMemberInvitesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listWorkspaceMemberInvites>>,
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceMemberInvites>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListWorkspaceMemberInvitesQueryKey(workspaceId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkspaceMemberInvites>>> = ({
+    signal,
+  }) => listWorkspaceMemberInvites(toValue(workspaceId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(workspaceId) !== null && toValue(workspaceId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceMemberInvites>>, TError, TData>
+}
+
+export type ListWorkspaceMemberInvitesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listWorkspaceMemberInvites>>
+>
+export type ListWorkspaceMemberInvitesQueryError =
+  UnauthorizedResponse | ForbiddenResponse | NotFoundResponse
+
+/**
+ * @summary List workspace member invitations (owner/admin only)
+ */
+
+export function useListWorkspaceMemberInvites<
+  TData = Awaited<ReturnType<typeof listWorkspaceMemberInvites>>,
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceMemberInvites>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListWorkspaceMemberInvitesQueryOptions(workspaceId, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getCreateWorkspaceMemberInviteUrl = (workspaceId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/invites`
+}
+
+/**
+ * Requires the Idempotency-Key header. Invites a new collaborator by email. Workspaces support at most 5 members and pending invites combined; exceeding this renders 409 workspace_member_limit_reached. Personal Default workspaces are private and reject invites with 403 workspace_default_protected.
+ * @summary Create a workspace member invitation (owner/admin only)
+ */
+export const createWorkspaceMemberInvite = async (
+  workspaceId: string,
+  createWorkspaceMemberInviteRequest: CreateWorkspaceMemberInviteRequest,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspaceMemberInviteEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return publicMutator<WorkspaceMemberInviteEnvelope>(
+    getCreateWorkspaceMemberInviteUrl(workspaceId),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(createWorkspaceMemberInviteRequest),
+    },
+  )
+}
+
+export const getCreateWorkspaceMemberInviteMutationKey = () =>
+  ['createWorkspaceMemberInvite'] as const
+
+export const getCreateWorkspaceMemberInviteMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createWorkspaceMemberInvite>>,
+    TError,
+    CreateWorkspaceMemberInviteMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createWorkspaceMemberInvite>>,
+  TError,
+  CreateWorkspaceMemberInviteMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateWorkspaceMemberInviteMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createWorkspaceMemberInvite>>,
+    CreateWorkspaceMemberInviteMutationVariables
+  > = (props) => {
+    const { workspaceId, data } = props ?? {}
+
+    return createWorkspaceMemberInvite(workspaceId, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type CreateWorkspaceMemberInviteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createWorkspaceMemberInvite>>
+>
+export type CreateWorkspaceMemberInviteMutationBody = CreateWorkspaceMemberInviteRequest
+export type CreateWorkspaceMemberInviteMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | NotFoundResponse
+  | ConflictResponse
+export type CreateWorkspaceMemberInviteMutationVariables = {
+  workspaceId: string
+  data: CreateWorkspaceMemberInviteRequest
+}
+
+/**
+ * @summary Create a workspace member invitation (owner/admin only)
+ */
+export const useCreateWorkspaceMemberInvite = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createWorkspaceMemberInvite>>,
+      TError,
+      CreateWorkspaceMemberInviteMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof createWorkspaceMemberInvite>>,
+  TError,
+  CreateWorkspaceMemberInviteMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateWorkspaceMemberInviteMutationOptions(options), queryClient)
+}
+export const getCancelWorkspaceMemberInviteUrl = (workspaceId: string, inviteId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/invites/${encodeURIComponent(String(inviteId))}`
+}
+
+/**
+ * Cancels a pending workspace invitation. No Idempotency-Key is required: cancellation is naturally idempotent and safe to retry; a repeated cancel deterministically renders 409 conflict once the invite leaves pending state.
+ * @summary Cancel a pending workspace member invitation (owner/admin only)
+ */
+export const cancelWorkspaceMemberInvite = async (
+  workspaceId: string,
+  inviteId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<DeletedEnvelope> => {
+  return publicMutator<DeletedEnvelope>(getCancelWorkspaceMemberInviteUrl(workspaceId, inviteId), {
+    ...options,
+    method: 'DELETE',
+  })
+}
+
+export const getCancelWorkspaceMemberInviteMutationKey = () =>
+  ['cancelWorkspaceMemberInvite'] as const
+
+export const getCancelWorkspaceMemberInviteMutationOptions = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelWorkspaceMemberInvite>>,
+    TError,
+    CancelWorkspaceMemberInviteMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelWorkspaceMemberInvite>>,
+  TError,
+  CancelWorkspaceMemberInviteMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCancelWorkspaceMemberInviteMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelWorkspaceMemberInvite>>,
+    CancelWorkspaceMemberInviteMutationVariables
+  > = (props) => {
+    const { workspaceId, inviteId } = props ?? {}
+
+    return cancelWorkspaceMemberInvite(workspaceId, inviteId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type CancelWorkspaceMemberInviteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelWorkspaceMemberInvite>>
+>
+
+export type CancelWorkspaceMemberInviteMutationError =
+  UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse
+export type CancelWorkspaceMemberInviteMutationVariables = { workspaceId: string; inviteId: string }
+
+/**
+ * @summary Cancel a pending workspace member invitation (owner/admin only)
+ */
+export const useCancelWorkspaceMemberInvite = <
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof cancelWorkspaceMemberInvite>>,
+      TError,
+      CancelWorkspaceMemberInviteMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof cancelWorkspaceMemberInvite>>,
+  TError,
+  CancelWorkspaceMemberInviteMutationVariables,
+  TContext
+> => {
+  return useMutation(getCancelWorkspaceMemberInviteMutationOptions(options), queryClient)
 }

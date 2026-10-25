@@ -176,8 +176,14 @@ func (h *contractV1BillingHandler) initiateTransferInvite(c *gin.Context) {
 		externalUser := tenancy.FormatUserPublicID(wctx.Principal.PublicID())
 		hash := contract.HashIdempotencyRequest("billing.account.transfer-invite", wctx.Workspace.PublicID, body.Data.NewOwnerUserID)
 		result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), contract.IdempotencyScope(externalUser, "billing.account.transfer-invite"), wctx.Principal.UserID(), key, hash, func() (any, error) {
-			return h.deps.BillingAccounts.InitiateBillingTransferInvite(
-				c.Request.Context(), account.InternalID, wctx.Principal.UserID(), newOwnerID, key)
+			return h.deps.Invitations.InitiateTransferInvite(
+				c.Request.Context(), account.InternalID, wctx.Principal.UserID(), newOwnerID, key,
+				tenancy.BillingTransferInitiatedParams{
+					FromUserPublicID:       tenancy.FormatUserPublicID(wctx.Principal.PublicID()),
+					WorkspacePublicID:      wctx.Workspace.PublicID,
+					WorkspaceName:          wctx.Workspace.Name,
+					BillingAccountPublicID: account.PublicID,
+				})
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
@@ -193,6 +199,7 @@ func (h *contractV1BillingHandler) initiateTransferInvite(c *gin.Context) {
 			renderBillingAccountError(c, errors.New("billing: transfer-invite type mismatch"))
 			return
 		}
+
 		dto, ok := h.toTransferInviteDTO(c, invited, account.PublicID)
 		if !ok {
 			return
