@@ -7,6 +7,7 @@ import (
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/tasking/workspacetasks"
+	"ideaboard/api/internal/tenancy/workspacefacts"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -38,7 +39,7 @@ func (a *TaskSubmissionAuthorizer) AuthorizeSubmission(ctx context.Context, tx p
 	// transaction fails closed even if the HTTP prelude was bypassed.
 	// Terminal Capture/Release on row-pinned accounts still converge
 	// (they never pass this gate), so history survives closure.
-	if closed, err := isOrganizationClosedForWorkspace(ctx, q, workspaceID); err != nil {
+	if closed, err := workspacefacts.IsOrganizationClosed(ctx, q, workspaceID); err != nil {
 		return binding, err
 	} else if closed {
 		return binding, workspacetasks.ErrForbidden
@@ -91,16 +92,6 @@ func (a *TaskSubmissionAuthorizer) AuthorizeSubmission(ctx context.Context, tx p
 		}
 	}
 	return binding, nil
-}
-
-// merged from internal/media/workspacemedia/taskassets.go (structural consolidation; symbols unchanged).
-// isOrganizationClosedForWorkspace reports whether the workspace belongs
-// to a closed Organization (#955). Personal scopes are open; unknown states
-// return errors and cannot grant access. It delegates
-// to the canonical dbutil seam so media cannot drift from tasking, boards,
-// and vision.
-func isOrganizationClosedForWorkspace(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string) (bool, error) {
-	return dbutil.IsOrganizationClosedForWorkspace(ctx, q, workspacePublicID)
 }
 
 // TaskAssetAdapter supplies readiness facts for worker execution of accepted

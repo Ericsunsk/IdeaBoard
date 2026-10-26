@@ -8,6 +8,7 @@ import (
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/tenancy/workspacefacts"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -85,7 +86,7 @@ func (db serviceQueryer) queries() (*dbsqlc.Queries, error) {
 // internal id. Unknown workspaces report errWorkspaceNotFound so
 // callers converge to their operation's not-found error.
 func resolveWorkspaceInternal(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string) (int64, error) {
-	internalID, err := dbutil.ResolveWorkspaceInternalID(ctx, q, workspacePublicID)
+	internalID, err := workspacefacts.ResolveInternalID(ctx, q, workspacePublicID)
 	if database.IsNotFound(err) {
 		return 0, errWorkspaceNotFound
 	}

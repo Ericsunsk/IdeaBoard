@@ -22,10 +22,10 @@ import (
 	"context"
 	"strings"
 
-	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy/funds"
+	"ideaboard/api/internal/tenancy/workspacefacts"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -75,7 +75,7 @@ func (visionBillingAccountResolver) ResolveVisionSettlementInTx(ctx context.Cont
 	// transaction fails closed even if the HTTP prelude was bypassed.
 	// Terminal Capture/Release on row-pinned accounts never pass this
 	// gate, so history survives closure.
-	if closed, err := dbutil.IsOrganizationClosedForWorkspace(ctx, queries, workspacePublicID); err != nil {
+	if closed, err := workspacefacts.IsOrganizationClosed(ctx, queries, workspacePublicID); err != nil {
 		return VisionSettlementIdentity{}, err
 	} else if closed {
 		return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
@@ -108,14 +108,14 @@ func (visionBillingAccountResolver) ResolveVisionSettlementInTx(ctx context.Cont
 
 // ResolveWorkspaceInternalID maps a ws_ public id to its internal id
 // without any membership gate (capture/release scope verification only).
-// It delegates to the canonical dbutil seam so the vision path cannot
+// It delegates to the Tenancy workspacefacts seam so the vision path cannot
 // drift from tasking/media/library resolution.
 func (visionBillingAccountResolver) ResolveWorkspaceInternalID(ctx context.Context, tx pgx.Tx, workspacePublicID string) (int64, error) {
 	workspacePublicID = strings.TrimSpace(workspacePublicID)
 	if tx == nil || !contract.IsWorkspaceID(workspacePublicID) {
 		return 0, ErrVisionWorkspaceNotFound
 	}
-	internalID, err := dbutil.ResolveWorkspaceInternalID(ctx, dbsqlc.New(tx), workspacePublicID)
+	internalID, err := workspacefacts.ResolveInternalID(ctx, dbsqlc.New(tx), workspacePublicID)
 	if err != nil {
 		return 0, ErrVisionWorkspaceNotFound
 	}

@@ -15,51 +15,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func TestValidateMigrationChangesAllowsAppendOnlyHistory(t *testing.T) {
-	if err := validateMigrationChanges("A\tinternal/db/migrations/20260811000000_add_example.sql\n"); err != nil {
-		t.Fatalf("append-only migration rejected: %v", err)
-	}
-	if err := validateMigrationChanges(""); err != nil {
-		t.Fatalf("unchanged migration history rejected: %v", err)
-	}
-}
-
-func TestValidateMigrationChangesAllowsAtomicCleanBreakRebaseline(t *testing.T) {
-	changes := strings.Join([]string{
-		"D\tinternal/db/migrations/20260810000000_baseline.sql",
-		"D\tinternal/db/migrations/20260813000000_add_example.sql",
-		"A\tinternal/db/migrations/20260814000000_baseline.sql",
-	}, "\n")
-	if err := validateMigrationChanges(changes); err != nil {
-		t.Fatalf("atomic clean-break rebaseline rejected: %v", err)
-	}
-}
-
-func TestValidateMigrationChangesRejectsNonAdvancingRebaseline(t *testing.T) {
-	changes := strings.Join([]string{
-		"D\tinternal/db/migrations/20260810000000_baseline.sql",
-		"A\tinternal/db/migrations/20260809000000_baseline.sql",
-	}, "\n")
-	if err := validateMigrationChanges(changes); err == nil {
-		t.Fatal("non-advancing rebaseline unexpectedly accepted")
-	}
-}
-
-func TestValidateMigrationChangesRejectsPublishedHistoryMutation(t *testing.T) {
-	for name, change := range map[string]string{
-		"modified": "M\tinternal/db/migrations/20260814000000_baseline.sql\n",
-		"deleted":  "D\tinternal/db/migrations/20260810001000_align_schema_contract.sql\n",
-		"renamed":  "R100\tinternal/db/migrations/old.sql\tinternal/db/migrations/new.sql\n",
-	} {
-		t.Run(name, func(t *testing.T) {
-			err := validateMigrationChanges(change)
-			if err == nil || !strings.Contains(err.Error(), "append-only") {
-				t.Fatalf("migration mutation error = %v", err)
-			}
-		})
-	}
-}
-
 func TestCompareTreesReportsGeneratedDrift(t *testing.T) {
 	expected := filepath.Join(t.TempDir(), "expected")
 	actual := filepath.Join(t.TempDir(), "actual")

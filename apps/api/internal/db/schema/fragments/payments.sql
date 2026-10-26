@@ -504,376 +504,139 @@ CREATE TRIGGER initialize_payment_order_reconciliation
 AFTER INSERT ON payment_orders
 FOR EACH ROW EXECUTE FUNCTION initialize_payment_order_reconciliation();
 
-CREATE FUNCTION execute_credit_purchase_v2(
-  p_billing_account_id BIGINT,
-  p_amount BIGINT,
-  p_idempotency_key TEXT,
-  p_actor_type TEXT,
-  p_actor_id TEXT,
-  p_source TEXT,
-  p_reason TEXT,
-  p_business_reference_type TEXT,
-  p_business_reference_id TEXT
-)
-RETURNS TABLE (
-  transaction_id VARCHAR(64), command_type VARCHAR(24), command_amount BIGINT,
-  billing_account_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
-  replayed BOOLEAN, created_at TIMESTAMPTZ(3)
-)
-AS $$
-DECLARE
-  v_payload JSONB;
-  v_hash TEXT;
-  v_existing_hash TEXT;
-  v_transaction_id VARCHAR(64);
-  v_available_id BIGINT;
-  v_reserved_id BIGINT;
-  v_issuance_id BIGINT;
-  v_available_balance BIGINT;
-  v_reserved_balance BIGINT;
-  v_shard_key VARCHAR(128);
+ALTER TABLE payment_webhook_events ADD CONSTRAINT payment_webhook_events_payment_order_id_fkey FOREIGN KEY (payment_order_id) REFERENCES payment_orders(id) ON DELETE RESTRICT;
+
+CREATE TABLE payment_disputes (
+  id UUID PRIMARY KEY,
+  payment_order_id UUID NOT NULL REFERENCES payment_orders(id) ON DELETE RESTRICT,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  stripe_dispute_id TEXT NOT NULL UNIQUE,
+  stripe_charge_id TEXT NOT NULL,
+  stripe_payment_intent_id TEXT NOT NULL DEFAULT '',
+  provider_status TEXT NOT NULL,
+  status TEXT NOT NULL,
+  amount_minor BIGINT NOT NULL,
+  currency TEXT NOT NULL,
+  target_idea_quantity BIGINT NOT NULL,
+  debited_idea_quantity BIGINT NOT NULL,
+  unrecovered_credits BIGINT NOT NULL,
+  restriction_id UUID REFERENCES credit_wallet_restrictions(restriction_id) ON DELETE RESTRICT,
+  debit_transaction_id TEXT UNIQUE REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
+  restore_transaction_id TEXT UNIQUE REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
+  opened_at TIMESTAMPTZ NOT NULL,
+  closed_at TIMESTAMPTZ,
+  next_reconciliation_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT ck_payment_dispute_provider_ids CHECK (
+    char_length(stripe_dispute_id) BETWEEN 1 AND 255
+    AND char_length(stripe_charge_id) BETWEEN 1 AND 255
+    AND char_length(stripe_payment_intent_id) <= 255
+  ),
+  CONSTRAINT ck_payment_dispute_status CHECK (status IN ('open', 'won', 'lost')),
+  CONSTRAINT ck_payment_dispute_amount CHECK (amount_minor > 0 AND currency ~ '^[a-z]{3}$'),
+  CONSTRAINT ck_payment_dispute_recovery CHECK (
+    target_idea_quantity >= 0
+    AND debited_idea_quantity BETWEEN 0 AND target_idea_quantity
+    AND ((status = 'won' AND unrecovered_credits = 0)
+      OR (status IN ('open', 'lost') AND unrecovered_credits = target_idea_quantity - debited_idea_quantity))
+    AND ((debited_idea_quantity = 0 AND debit_transaction_id IS NULL)
+      OR (debited_idea_quantity > 0 AND debit_transaction_id IS NOT NULL))
+    AND (restore_transaction_id IS NULL OR status = 'won')
+  ),
+  CONSTRAINT ck_payment_dispute_restriction CHECK (
+    (status IN ('open', 'lost') AND restriction_id IS NOT NULL)
+    OR status = 'won'
+  ),
+  CONSTRAINT ck_payment_dispute_lifecycle CHECK (
+    (status = 'open' AND closed_at IS NULL)
+    OR (status IN ('won', 'lost') AND closed_at IS NOT NULL AND closed_at >= opened_at)
+  )
+);
+
+CREATE INDEX idx_payment_disputes_order
+  ON payment_disputes (payment_order_id, opened_at, id);
+
+CREATE INDEX idx_payment_disputes_reconciliation
+  ON payment_disputes (next_reconciliation_at, id)
+  WHERE status IN ('open', 'lost');
+
+CREATE FUNCTION guard_payment_dispute_lifecycle()
+RETURNS TRIGGER AS $$
 BEGIN
-  p_idempotency_key := btrim(p_idempotency_key);
-  p_actor_type := btrim(p_actor_type);
-  p_actor_id := btrim(p_actor_id);
-  p_source := btrim(p_source);
-  p_reason := btrim(p_reason);
-  p_business_reference_type := btrim(p_business_reference_type);
-  p_business_reference_id := btrim(p_business_reference_id);
-  IF p_billing_account_id <= 0 OR p_amount <= 0 OR p_amount > 9000000000000000
-     OR p_idempotency_key = '' OR length(p_idempotency_key) > 160
-     OR p_actor_type <> 'service' OR p_actor_id <> 'payments'
-     OR p_source <> 'stripe_purchase' OR p_reason = ''
-     OR p_business_reference_type <> 'payment_order'
-     OR p_business_reference_id = '' OR length(p_business_reference_id) > 160 THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit purchase command';
+  IF OLD.id <> NEW.id
+     OR OLD.payment_order_id <> NEW.payment_order_id
+     OR OLD.user_id <> NEW.user_id
+     OR OLD.stripe_dispute_id <> NEW.stripe_dispute_id
+     OR OLD.stripe_charge_id <> NEW.stripe_charge_id
+     OR OLD.stripe_payment_intent_id <> NEW.stripe_payment_intent_id
+     OR OLD.amount_minor <> NEW.amount_minor
+     OR OLD.currency <> NEW.currency
+     OR OLD.target_idea_quantity <> NEW.target_idea_quantity
+     OR OLD.debited_idea_quantity <> NEW.debited_idea_quantity
+     OR OLD.restriction_id IS DISTINCT FROM NEW.restriction_id
+     OR OLD.debit_transaction_id IS DISTINCT FROM NEW.debit_transaction_id
+     OR OLD.opened_at <> NEW.opened_at
+     OR OLD.created_at <> NEW.created_at THEN
+    RAISE EXCEPTION 'Payment Dispute recovery identity is immutable';
   END IF;
-  v_payload := jsonb_build_object(
-    'command_type', 'purchase_credit', 'billing_account_id', p_billing_account_id, 'amount', p_amount,
-    'related_transaction_id', '',
-    'actor', jsonb_build_object('type', p_actor_type, 'id', p_actor_id),
-    'source', p_source, 'reason', p_reason,
-    'business_reference', jsonb_build_object('type', p_business_reference_type, 'id', p_business_reference_id)
-  );
-  v_hash := encode(sha256(convert_to(v_payload::TEXT, 'UTF8')), 'hex');
-  PERFORM pg_advisory_xact_lock(hashtextextended(p_idempotency_key, 5283921922134398276));
-  SELECT existing.request_hash INTO v_existing_hash
-  FROM credit_transactions existing
-  WHERE existing.idempotency_key = p_idempotency_key;
-  IF FOUND THEN
-    IF v_existing_hash <> v_hash THEN
-      RAISE EXCEPTION USING ERRCODE = 'IB001', MESSAGE = 'credit idempotency conflict';
-    END IF;
-    RETURN QUERY
-    SELECT existing.transaction_id, existing.command_type, existing.command_amount,
-      existing.billing_account_id, existing.available_balance_after, existing.reserved_balance_after,
-      TRUE, existing.created_at
-    FROM credit_transactions existing
-    WHERE existing.idempotency_key = p_idempotency_key;
-    RETURN;
+  IF OLD.restore_transaction_id IS NOT NULL
+     AND OLD.restore_transaction_id IS DISTINCT FROM NEW.restore_transaction_id THEN
+    RAISE EXCEPTION 'Payment Dispute restore identity is immutable';
   END IF;
-  PERFORM 1 FROM credit_wallets wallets WHERE wallets.billing_account_id = p_billing_account_id FOR UPDATE;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
+  IF OLD.unrecovered_credits <> NEW.unrecovered_credits
+     AND NOT (NEW.status = 'won' AND NEW.unrecovered_credits = 0) THEN
+    RAISE EXCEPTION 'Payment Dispute unrecovered amount is immutable before win';
   END IF;
-  v_shard_key := 'billing-account:' || p_billing_account_id::TEXT;
-  PERFORM accounts.id
-  FROM credit_accounts accounts
-  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_issuance')
-  ORDER BY accounts.id FOR UPDATE;
-  SELECT
-    MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_available'),
-    MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_reserved'),
-    MAX(accounts.id) FILTER (WHERE accounts.account_role = 'system_issuance'),
-    MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_available'),
-    MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
-  INTO v_available_id, v_reserved_id, v_issuance_id, v_available_balance, v_reserved_balance
-  FROM credit_accounts accounts
-  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_issuance');
-  IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_issuance_id IS NULL THEN
-    RAISE EXCEPTION 'credit wallet account set is incomplete';
-  END IF;
-  v_transaction_id := 'ctx_' || substr(encode(sha256(convert_to(
-    clock_timestamp()::TEXT || random()::TEXT || p_idempotency_key, 'UTF8'
-  )), 'hex'), 1, 32);
-  INSERT INTO credit_transactions (
-    transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
-    actor_type, actor_id, source, reason, business_reference_type, business_reference_id,
-    command_amount, posting_count, available_balance_after, reserved_balance_after
-  ) VALUES (
-    v_transaction_id, p_billing_account_id, 'purchase_credit', p_idempotency_key, v_hash,
-    p_actor_type, p_actor_id, p_source, p_reason, p_business_reference_type, p_business_reference_id,
-    p_amount, 2, v_available_balance + p_amount, v_reserved_balance
-  );
-  INSERT INTO credit_postings (transaction_id, account_id, amount)
-  VALUES (v_transaction_id, v_issuance_id, -p_amount), (v_transaction_id, v_available_id, p_amount);
-  RETURN QUERY
-  SELECT created.transaction_id, created.command_type, created.command_amount,
-    created.billing_account_id, created.available_balance_after, created.reserved_balance_after,
-    FALSE, created.created_at
-  FROM credit_transactions created
-  WHERE created.transaction_id = v_transaction_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
-
-DO $$
-DECLARE trusted_schema TEXT := current_schema();
-BEGIN
-  EXECUTE format(
-    'ALTER FUNCTION %I.execute_credit_purchase_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
-    trusted_schema,
-    trusted_schema
-  );
-END;
-$$;
-
-REVOKE ALL ON FUNCTION execute_credit_purchase_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
-
-CREATE FUNCTION execute_credit_purchase_refund_hold_v2(
-  p_billing_account_id BIGINT,
-  p_amount BIGINT,
-  p_idempotency_key TEXT,
-  p_actor_type TEXT,
-  p_actor_id TEXT,
-  p_source TEXT,
-  p_reason TEXT,
-  p_business_reference_type TEXT,
-  p_business_reference_id TEXT
-)
-RETURNS TABLE (
-  transaction_id VARCHAR(64), command_type VARCHAR(24), command_amount BIGINT,
-  billing_account_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
-  replayed BOOLEAN, created_at TIMESTAMPTZ(3)
-)
-AS $$
-DECLARE
-  v_payload JSONB;
-  v_hash TEXT;
-  v_existing_hash TEXT;
-  v_transaction_id VARCHAR(64);
-  v_wallet_status VARCHAR(20);
-  v_available_id BIGINT;
-  v_reserved_id BIGINT;
-  v_available_balance BIGINT;
-  v_reserved_balance BIGINT;
-BEGIN
-  p_idempotency_key := btrim(p_idempotency_key);
-  p_actor_type := btrim(p_actor_type);
-  p_actor_id := btrim(p_actor_id);
-  p_source := btrim(p_source);
-  p_reason := btrim(p_reason);
-  p_business_reference_type := btrim(p_business_reference_type);
-  p_business_reference_id := btrim(p_business_reference_id);
-  IF p_billing_account_id <= 0 OR p_amount <= 0 OR p_amount > 9000000000000000
-     OR p_idempotency_key = '' OR length(p_idempotency_key) > 160
-     OR p_actor_type <> 'service' OR p_actor_id <> 'payments'
-     OR p_source <> 'stripe_refund_hold' OR p_reason = ''
-     OR p_business_reference_type <> 'payment_refund'
-     OR p_business_reference_id = '' OR length(p_business_reference_id) > 160 THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit purchase refund hold command';
-  END IF;
-
-  v_payload := jsonb_build_object(
-    'command_type', 'hold', 'billing_account_id', p_billing_account_id, 'amount', p_amount,
-    'related_transaction_id', '',
-    'actor', jsonb_build_object('type', p_actor_type, 'id', p_actor_id),
-    'source', p_source, 'reason', p_reason,
-    'business_reference', jsonb_build_object('type', p_business_reference_type, 'id', p_business_reference_id)
-  );
-  v_hash := encode(sha256(convert_to(v_payload::TEXT, 'UTF8')), 'hex');
-  PERFORM pg_advisory_xact_lock(hashtextextended(p_idempotency_key, 5283921922134398276));
-  SELECT request_hash INTO v_existing_hash
-  FROM credit_transactions
-  WHERE idempotency_key = p_idempotency_key;
-  IF FOUND THEN
-    IF v_existing_hash <> v_hash THEN
-      RAISE EXCEPTION USING ERRCODE = 'IB001', MESSAGE = 'credit idempotency conflict';
-    END IF;
-    RETURN QUERY SELECT existing.transaction_id, existing.command_type, existing.command_amount,
-      existing.billing_account_id, existing.available_balance_after, existing.reserved_balance_after,
-      TRUE, existing.created_at
-    FROM credit_transactions existing
-    WHERE existing.idempotency_key = p_idempotency_key;
-    RETURN;
-  END IF;
-
-  SELECT wallets.status INTO v_wallet_status
-  FROM credit_wallets wallets
-  WHERE wallets.billing_account_id = p_billing_account_id
-  FOR UPDATE;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
-  END IF;
-  -- Permanent Organization closure forbids spending, but does not cancel
-  -- legal or purchase-promise refund duties on the original payer account.
-  -- Only this Payments-typed reservation may use that closed pool; other
-  -- frozen Wallets retain their lifecycle gate.
-  IF v_wallet_status <> 'active' AND NOT EXISTS (
-    SELECT 1 FROM billing_accounts accounts
-    JOIN organizations org ON org.internal_id = accounts.organization_id
-    WHERE accounts.internal_id = p_billing_account_id AND org.closed_at IS NOT NULL
+  IF OLD.status <> NEW.status AND NOT (
+    (OLD.status = 'open' AND NEW.status IN ('won', 'lost'))
+    OR (OLD.status = 'lost' AND NEW.status = 'won')
   ) THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB003', MESSAGE = 'credit wallet frozen';
+    RAISE EXCEPTION 'invalid Payment Dispute state transition: % -> %', OLD.status, NEW.status;
   END IF;
-
-  PERFORM accounts.id
-  FROM credit_accounts accounts
-  WHERE accounts.billing_account_id = p_billing_account_id
-    AND accounts.account_role IN ('user_available', 'user_reserved')
-  ORDER BY accounts.id
-  FOR UPDATE;
-  SELECT MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_available'),
-         MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_reserved'),
-         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_available'),
-         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
-  INTO v_available_id, v_reserved_id, v_available_balance, v_reserved_balance
-  FROM credit_accounts accounts
-  WHERE accounts.billing_account_id = p_billing_account_id
-    AND accounts.account_role IN ('user_available', 'user_reserved');
-  IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_available_balance < p_amount THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB004', MESSAGE = 'insufficient credits';
-  END IF;
-
-  v_transaction_id := 'ctx_' || substr(encode(sha256(convert_to(
-    clock_timestamp()::TEXT || random()::TEXT || p_idempotency_key, 'UTF8'
-  )), 'hex'), 1, 32);
-  INSERT INTO credit_transactions (
-    transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
-    actor_type, actor_id, source, reason, business_reference_type, business_reference_id,
-    command_amount, posting_count, available_balance_after, reserved_balance_after
-  ) VALUES (
-    v_transaction_id, p_billing_account_id, 'hold', p_idempotency_key, v_hash,
-    p_actor_type, p_actor_id, p_source, p_reason, p_business_reference_type, p_business_reference_id,
-    p_amount, 2, v_available_balance - p_amount, v_reserved_balance + p_amount
-  );
-  INSERT INTO credit_postings (transaction_id, account_id, amount)
-  VALUES (v_transaction_id, v_available_id, -p_amount), (v_transaction_id, v_reserved_id, p_amount);
-  INSERT INTO credit_holds (hold_transaction_id, billing_account_id, amount)
-  VALUES (v_transaction_id, p_billing_account_id, p_amount);
-
-  RETURN QUERY SELECT created.transaction_id, created.command_type, created.command_amount,
-    created.billing_account_id, created.available_balance_after, created.reserved_balance_after,
-    FALSE, created.created_at
-  FROM credit_transactions created
-  WHERE created.transaction_id = v_transaction_id;
+  RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
+$$ LANGUAGE plpgsql;
 
-DO $$
-DECLARE trusted_schema TEXT := current_schema();
-BEGIN
-  EXECUTE format(
-    'ALTER FUNCTION %I.execute_credit_purchase_refund_hold_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
-    trusted_schema, trusted_schema
-  );
-END;
-$$;
+CREATE TRIGGER guard_payment_disputes
+BEFORE UPDATE ON payment_disputes
+FOR EACH ROW EXECUTE FUNCTION guard_payment_dispute_lifecycle();
 
-REVOKE ALL ON FUNCTION execute_credit_purchase_refund_hold_v2(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+CREATE TRIGGER set_payment_disputes_updated_at
+BEFORE UPDATE ON payment_disputes
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE FUNCTION execute_credit_purchase_refund_v2(
-  p_billing_account_id BIGINT, p_hold_transaction_id TEXT, p_idempotency_key TEXT,
-  p_actor_type TEXT, p_actor_id TEXT, p_source TEXT, p_reason TEXT,
-  p_business_reference_type TEXT, p_business_reference_id TEXT
-)
-RETURNS TABLE (
-  transaction_id VARCHAR(64), command_type VARCHAR(24), command_amount BIGINT,
-  billing_account_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
-  replayed BOOLEAN, created_at TIMESTAMPTZ(3)
-)
+-- Identity deletion calls this read-only Payments-owned seam inside its
+-- deletion transaction, keeping payment state ownership out of Identity SQL.
+CREATE FUNCTION has_unsettled_payment_state(p_user_id BIGINT)
+RETURNS BOOLEAN
 AS $$
-DECLARE
-  v_payload JSONB; v_hash TEXT; v_existing_hash TEXT; v_transaction_id VARCHAR(64);
-  v_amount BIGINT; v_hold_status VARCHAR(20); v_available_id BIGINT; v_reserved_id BIGINT;
-  v_issuance_id BIGINT; v_available_balance BIGINT; v_reserved_balance BIGINT; v_shard_key VARCHAR(128);
 BEGIN
-  p_hold_transaction_id := btrim(p_hold_transaction_id); p_idempotency_key := btrim(p_idempotency_key);
-  p_actor_type := btrim(p_actor_type); p_actor_id := btrim(p_actor_id); p_source := btrim(p_source);
-  p_reason := btrim(p_reason); p_business_reference_type := btrim(p_business_reference_type);
-  p_business_reference_id := btrim(p_business_reference_id);
-  IF p_billing_account_id <= 0 OR p_hold_transaction_id = '' OR length(p_hold_transaction_id) > 64
-     OR p_idempotency_key = '' OR length(p_idempotency_key) > 160
-     OR p_actor_type <> 'service' OR p_actor_id <> 'payments' OR p_source <> 'stripe_refund'
-     OR p_reason = '' OR p_business_reference_type <> 'payment_refund'
-     OR p_business_reference_id = '' OR length(p_business_reference_id) > 160 THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit purchase refund command';
-  END IF;
-  v_payload := jsonb_build_object(
-    'command_type', 'purchase_refund', 'billing_account_id', p_billing_account_id,
-    'related_transaction_id', p_hold_transaction_id,
-    'actor', jsonb_build_object('type', p_actor_type, 'id', p_actor_id),
-    'source', p_source, 'reason', p_reason,
-    'business_reference', jsonb_build_object('type', p_business_reference_type, 'id', p_business_reference_id)
+  RETURN EXISTS (
+    SELECT 1 FROM payment_orders
+    WHERE user_id = p_user_id
+      AND status IN ('creating', 'checkout_open', 'async_payment_pending', 'paid_pending_credit')
+    UNION ALL
+    SELECT 1 FROM payment_refunds
+    WHERE user_id = p_user_id
+      AND status IN ('pending', 'anomaly')
+    UNION ALL
+    SELECT 1 FROM payment_disputes
+    WHERE user_id = p_user_id
+      AND status IN ('open', 'lost')
   );
-  v_hash := encode(sha256(convert_to(v_payload::TEXT, 'UTF8')), 'hex');
-  PERFORM pg_advisory_xact_lock(hashtextextended(p_idempotency_key, 5283921922134398276));
-  SELECT request_hash INTO v_existing_hash FROM credit_transactions WHERE idempotency_key = p_idempotency_key;
-  IF FOUND THEN
-    IF v_existing_hash <> v_hash THEN RAISE EXCEPTION USING ERRCODE = 'IB001', MESSAGE = 'credit idempotency conflict'; END IF;
-    RETURN QUERY SELECT existing.transaction_id, existing.command_type, existing.command_amount,
-      existing.billing_account_id, existing.available_balance_after, existing.reserved_balance_after, TRUE, existing.created_at
-    FROM credit_transactions existing WHERE existing.idempotency_key = p_idempotency_key;
-    RETURN;
-  END IF;
-  SELECT holds.amount, holds.status INTO v_amount, v_hold_status FROM credit_holds holds
-  WHERE holds.hold_transaction_id = p_hold_transaction_id AND holds.billing_account_id = p_billing_account_id FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = 'IB005', MESSAGE = 'credit hold not found'; END IF;
-  IF v_hold_status <> 'held' THEN RAISE EXCEPTION USING ERRCODE = 'IB006', MESSAGE = 'credit hold already settled'; END IF;
-  PERFORM 1 FROM credit_wallets wallets WHERE wallets.billing_account_id = p_billing_account_id FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found'; END IF;
-  v_shard_key := 'billing-account:' || p_billing_account_id::TEXT;
-  PERFORM accounts.id FROM credit_accounts accounts
-  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_issuance')
-  ORDER BY accounts.id FOR UPDATE;
-  SELECT MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_available'),
-         MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_reserved'),
-         MAX(accounts.id) FILTER (WHERE accounts.account_role = 'system_issuance'),
-         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_available'),
-         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
-  INTO v_available_id, v_reserved_id, v_issuance_id, v_available_balance, v_reserved_balance
-  FROM credit_accounts accounts
-  WHERE (accounts.billing_account_id = p_billing_account_id AND accounts.account_role IN ('user_available', 'user_reserved'))
-     OR (accounts.billing_account_id IS NULL AND accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_issuance');
-  IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_issuance_id IS NULL OR v_reserved_balance < v_amount THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB004', MESSAGE = 'insufficient credits';
-  END IF;
-  v_transaction_id := 'ctx_' || substr(encode(sha256(convert_to(
-    clock_timestamp()::TEXT || random()::TEXT || p_idempotency_key, 'UTF8'
-  )), 'hex'), 1, 32);
-  INSERT INTO credit_transactions (
-    transaction_id, billing_account_id, command_type, idempotency_key, request_hash,
-    actor_type, actor_id, source, reason, business_reference_type, business_reference_id,
-    related_transaction_id, command_amount, posting_count, available_balance_after, reserved_balance_after
-  ) VALUES (
-    v_transaction_id, p_billing_account_id, 'purchase_refund', p_idempotency_key, v_hash,
-    p_actor_type, p_actor_id, p_source, p_reason, p_business_reference_type, p_business_reference_id,
-    p_hold_transaction_id, v_amount, 2, v_available_balance, v_reserved_balance - v_amount
-  );
-  INSERT INTO credit_postings (transaction_id, account_id, amount)
-  VALUES (v_transaction_id, v_reserved_id, -v_amount), (v_transaction_id, v_issuance_id, v_amount);
-  UPDATE credit_holds
-  SET status = 'captured',
-      captured_amount = captured_amount + v_amount,
-      capture_transaction_id = v_transaction_id,
-      settled_at = now()
-  WHERE hold_transaction_id = p_hold_transaction_id;
-  RETURN QUERY SELECT created.transaction_id, created.command_type, created.command_amount,
-    created.billing_account_id, created.available_balance_after, created.reserved_balance_after, FALSE, created.created_at
-  FROM credit_transactions created WHERE created.transaction_id = v_transaction_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog;
 
+REVOKE ALL ON FUNCTION has_unsettled_payment_state(BIGINT) FROM PUBLIC;
+
+-- Bind the SECURITY DEFINER function to the Payments schema that owns its tables.
 DO $$
 DECLARE trusted_schema TEXT := current_schema();
 BEGIN
   EXECUTE format(
-    'ALTER FUNCTION %I.execute_credit_purchase_refund_v2(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
+    'ALTER FUNCTION %I.has_unsettled_payment_state(BIGINT) SET search_path TO %I, pg_catalog, pg_temp',
     trusted_schema, trusted_schema
   );
 END;
 $$;
-
-REVOKE ALL ON FUNCTION execute_credit_purchase_refund_v2(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;

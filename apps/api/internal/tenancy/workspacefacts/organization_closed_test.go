@@ -1,4 +1,4 @@
-package dbutil
+package workspacefacts
 
 import (
 	"context"
@@ -42,7 +42,7 @@ func TestOrganizationClosedLookupPropagatesReadFailures(t *testing.T) {
 					rows = append([]pgx.Row{workspaceClosureRow(pgtype.Int8{Int64: 42, Valid: true})}, rows...)
 				}
 				q := dbsqlc.New(&closureLookupDB{rows: rows})
-				if _, err := IsOrganizationClosedForWorkspace(t.Context(), q, "ws_lookup"); !errors.Is(err, failure) {
+				if _, err := IsOrganizationClosed(t.Context(), q, "ws_lookup"); !errors.Is(err, failure) {
 					t.Fatalf("lookup error = %v, want %v; an unknown closure state must not authorize access", err, failure)
 				}
 			})
@@ -69,7 +69,7 @@ func TestOrganizationClosedLookupKnownScopes(t *testing.T) {
 				}))
 			}
 			q := dbsqlc.New(&closureLookupDB{rows: rows})
-			closed, err := IsOrganizationClosedForWorkspace(t.Context(), q, "ws_lookup")
+			closed, err := IsOrganizationClosed(t.Context(), q, "ws_lookup")
 			if err != nil || closed != tc.closed {
 				t.Fatalf("closed = %v, error = %v; want %v, nil", closed, err, tc.closed)
 			}

@@ -197,7 +197,7 @@ func checkMigrationGate(root string) {
 	// intentionally not a CI dependency). The checker owns the destructive
 	// pattern with the `-- destructive: approved` + ATLAS_ALLOW_DESTRUCTIVE
 	// escape hatch, the no-bypass risky patterns, the --dev-url Fresh replay,
-	// and the linear-history conflict detection.
+	// and linear-version checks. History policy is delegated to the Go owner.
 	checkerBytes, err := os.ReadFile(filepath.Join(root, "scripts", "atlas-migration-check.sh"))
 	failIf(err)
 	checkerText := string(checkerBytes)
@@ -209,12 +209,19 @@ func checkMigrationGate(root string) {
 		"column type change is blocked",
 		"SET NOT NULL is blocked",
 		"NOT NULL without DEFAULT is blocked",
-		"history is immutable",
+		"go run ./cmd/migrationhistory",
+		"history --list-changed",
+		"check_migration_conflicts() {\n  history\n",
 		"duplicate migration version",
 		"does not sort after base max",
 		"atlas.sum is missing entry",
 	} {
 		requireContains(checkerText, required, "Atlas migration checker contract is missing "+required)
+	}
+	historyCommandBytes, err := os.ReadFile(filepath.Join(root, "apps", "api", "cmd", "migrationhistory", "main.go"))
+	failIf(err)
+	for _, required := range []string{"migrationhistory.Inspect(", "history.Validate()"} {
+		requireContains(string(historyCommandBytes), required, "Migration history command must delegate to the Go policy: "+required)
 	}
 
 	// The pinned Atlas version is derived from apps/api/Dockerfile everywhere

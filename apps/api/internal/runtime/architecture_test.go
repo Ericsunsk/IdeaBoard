@@ -116,6 +116,12 @@ func TestRuntimeLayerAndAdapterIsolation(t *testing.T) {
 		"ideaboard/api/internal/runtime/composition",
 	})
 
+	// Migration owns execution; composition supplies queue adapters and policies.
+	checkPackageForbiddenImports(t, "infrastructure/migration", []string{
+		"ideaboard/api/internal/runtime/interfaces",
+		"ideaboard/api/internal/runtime/composition",
+	})
+
 	// Adapters must not depend on interfaces or composition.
 	checkPackageForbiddenImports(t, "adapters/billingregistry", []string{
 		"ideaboard/api/internal/runtime/interfaces",

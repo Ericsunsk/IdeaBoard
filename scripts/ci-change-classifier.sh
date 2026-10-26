@@ -19,6 +19,7 @@ while IFS= read -r changed_path; do
     apps/api/openapi.public.yaml | apps/api/openapi.control.yaml | apps/api/openapi.events.yaml) web=true; api=true; has_non_docs_change=true ;;
     apps/api/atlas.hcl) api=true; migration_integration=true; has_non_docs_change=true ;;
     apps/api/internal/db/migrations/*.sql | apps/api/internal/db/migrations/atlas.sum | apps/api/internal/db/schema/*) api=true; migration_integration=true; has_non_docs_change=true ;;
+    apps/api/cmd/migrator/* | apps/api/cmd/migrationhistory/* | apps/api/cmd/schemarelease/* | apps/api/internal/runtime/infrastructure/migration/* | apps/api/internal/runtime/composition/wiring/migration.go | apps/api/internal/db/migrationhistory/* | apps/api/internal/db/schemaassembly/* | apps/api/internal/db/schemacontract/* | apps/api/internal/db/schemarelease/*) api=true; migration_integration=true; has_non_docs_change=true ;;
     apps/auth/src/migrate.ts | apps/auth/src/infrastructure/*[mM]igration* | apps/auth/Dockerfile) auth=true; docker=true; migration_integration=true; has_non_docs_change=true ;;
     docker/postgres/* | docker/compose*.yml | docker/.env | docker/.env.example | docker/images.env.example | docker/migration.env.example) ops=true; migration_integration=true; has_non_docs_change=true ;;
     apps/api/internal/platform/config/* | apps/api/.env.example) api=true; ops=true; has_non_docs_change=true ;;

@@ -11,7 +11,7 @@ It is not a business context and must never decay into a wiring package; no busi
 - `application/lifecycle`: state-machine-driven lifecycle coordination (`Coordinator`) with shutdown-budget management and drain.
 - `application/orchestration`: dependency-graph startup plan (`ExecuteStartup`). Interrupted task recovery is owned by River redelivery and the tasking Worker lease fence.
 - `composition`: the process-wide sole dependency assembly root and CLI command dispatcher; loads config, builds the database pool and services, and constructs the lifecycle-managed `App`.
-- `infrastructure`: PostgreSQL and River, NATS, HTTP, config, and RED metrics adapters under `config/`, `database/`, `http/`, `metrics/`, and `nats/`.
+- `infrastructure`: PostgreSQL and River, NATS, HTTP, config, and RED metrics adapters under `config/`, `database/`, `http/`, `metrics/`, `nats/`, and `migration/`.
 - `interfaces/http`: HTTP REST transport adapter with route registration, Session and Auth middleware, rate limiting, and authenticated or public media response adaptation.
 - `interfaces/worker`: external AI Provider adapters and background periodic reconciliation tasks. Workspace task queue consumption lives in `internal/tasking/interfaces/worker`.
 - `adapters/billingregistry`: runtime assembly mapping from Workflow capabilities to Billing item definitions.
@@ -26,6 +26,7 @@ It is not a business context and must never decay into a wiring package; no busi
 - `ExecuteStartup` owns the dependency-graph startup plan.
 - `App` is the lifecycle-managed application object built by the composition root.
 - `composition` is the sole assembly root and CLI dispatcher; business packages and other runtime subpackages hold no global wiring. Process role (`API_MODE=all|http-only|worker-only`, ADR-0021) only selects which runners start: http-only skips River worker registration and periodic schedules (enqueue-only), worker-only skips all HTTP listeners.
+- `infrastructure/migration.Runner` owns Atlas revision reconciliation and execution, then River schema migration and runtime privilege finalization. Composition supplies the River adapter and context-owned privilege policies; owner credentials never enter runtime pools. Retired media object layouts have no migration path; the current baseline and writers use canonical object keys only.
 - `interfaces/http` owns HTTP routing and transport adaptation only.
   Billing overview delegates to `internal/billingoverview.Reader`: account
   provisioning precedes the required read-only snapshot; capability/scope

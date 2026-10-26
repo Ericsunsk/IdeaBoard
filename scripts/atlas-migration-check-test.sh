@@ -4,6 +4,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 fixture_dir="$(mktemp -d)"
+trap 'rm -rf "${fixture_dir}"' EXIT
 
 mkdir -p "${fixture_dir}/apps/api/internal/db/migrations" "${fixture_dir}/bin"
 cat >"${fixture_dir}/apps/api/internal/db/migrations/atlas.sum" <<'EOF'

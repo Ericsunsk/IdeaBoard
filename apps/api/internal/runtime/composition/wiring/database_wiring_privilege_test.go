@@ -270,7 +270,7 @@ func newStartupDatabaseFixture(t *testing.T) startupDatabaseFixture {
 	t.Helper()
 	pool := testdb.Open(t)
 	ctx := t.Context()
-	if err := workerriver.Migrate(ctx, pool); err != nil {
+	if err := workerriver.MigrateRiver(ctx, pool); err != nil {
 		t.Fatalf("migrate River schema: %v", err)
 	}
 

@@ -1,4 +1,4 @@
-package wiring
+package migration
 
 import (
 	"context"
@@ -505,11 +505,5 @@ func TestCleanBreakOptInPropagatesResetFailure(t *testing.T) {
 	err := reconcileCleanBreak(t.Context(), db, cleanBreakMigrationConfig(), dir, true)
 	if err == nil || !strings.Contains(err.Error(), "reset clean break schema") {
 		t.Fatalf("reconcileCleanBreak() error = %v, want reset failure", err)
-	}
-}
-
-func TestMigrateRejectsNilConfigBeforeCleanBreak(t *testing.T) {
-	if err := Migrate(t.Context(), nil, "atlas", "file://internal/db/migrations"); err == nil {
-		t.Fatal("Migrate(nil) error = nil, want an error")
 	}
 }

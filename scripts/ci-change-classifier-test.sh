@@ -196,6 +196,26 @@ assert_output_line "${schema_output}" 'web=false'
 assert_output_line "${schema_output}" 'realtime=false'
 assert_output_line "${schema_output}" 'docs_only=false'
 
+for migration_path in \
+  apps/api/cmd/migrator/main.go \
+  apps/api/cmd/migrationhistory/main.go \
+  apps/api/cmd/schemarelease/main.go \
+  apps/api/internal/runtime/infrastructure/migration/runner.go \
+  apps/api/internal/runtime/composition/wiring/migration.go \
+  apps/api/internal/db/migrationhistory/history.go \
+  apps/api/internal/db/schemaassembly/assembly.go \
+  apps/api/internal/db/schemacontract/contract.go \
+  apps/api/internal/db/schemarelease/release.go; do
+  migration_tooling_output="$(printf '%s\n' "${migration_path}" | "${classifier}")"
+  assert_output_line "${migration_tooling_output}" 'api=true'
+  assert_output_line "${migration_tooling_output}" 'migration_integration=true'
+  assert_output_line "${migration_tooling_output}" 'web=false'
+  assert_output_line "${migration_tooling_output}" 'auth=false'
+  assert_output_line "${migration_tooling_output}" 'realtime=false'
+  assert_output_line "${migration_tooling_output}" 'docker=false'
+  assert_output_line "${migration_tooling_output}" 'docs_only=false'
+done
+
 auth_migration_output="$(printf '%s\n' apps/auth/src/infrastructure/authMigration.ts | "${classifier}")"
 
 assert_output_line "${auth_migration_output}" 'auth=true'
@@ -209,6 +229,7 @@ assert_output_line "${auth_migration_output}" 'docs_only=false'
 queries_output="$(printf '%s\n' apps/api/internal/db/queries/users.sql | "${classifier}")"
 
 assert_output_line "${queries_output}" 'api=true'
+assert_output_line "${queries_output}" 'migration_integration=false'
 assert_output_line "${queries_output}" 'web=false'
 assert_output_line "${queries_output}" 'realtime=false'
 assert_output_line "${queries_output}" 'docs_only=false'

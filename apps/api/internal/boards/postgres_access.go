@@ -14,6 +14,7 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/workspacefacts"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -27,7 +28,7 @@ func organizationWorkspaceOpenTx(ctx context.Context, q *dbsqlc.Queries, workspa
 	if !workspace.OrganizationID.Valid {
 		return true, nil
 	}
-	closed, err := dbutil.IsOrganizationClosedForWorkspace(ctx, q, workspace.PublicID)
+	closed, err := workspacefacts.IsOrganizationClosed(ctx, q, workspace.PublicID)
 	if err != nil {
 		return false, err
 	}

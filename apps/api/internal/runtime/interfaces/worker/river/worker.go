@@ -127,8 +127,6 @@ func MigrateRiver(ctx context.Context, dbPool *pgxpool.Pool) error {
 	return err
 }
 
-var Migrate = MigrateRiver
-
 func currentRiverSchema(ctx context.Context, dbPool *pgxpool.Pool) (string, error) {
 	var schema string
 	if err := dbPool.QueryRow(ctx, `SELECT current_schema()`).Scan(&schema); err != nil {

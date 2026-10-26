@@ -86,7 +86,7 @@ func TestCanRefundTransitionMirrorsSQLGuards(t *testing.T) {
 
 // TestCanDisputeTransitionMirrorsSQLGuards pins the durable dispute
 // transition table to guard_payment_dispute_lifecycle in
-// internal/db/schema/fragments/integrity.sql.
+// internal/db/schema/fragments/payments.sql.
 func TestCanDisputeTransitionMirrorsSQLGuards(t *testing.T) {
 	allowed := [][2]domain.PaymentDisputeStatus{
 		{domain.PaymentDisputeOpen, domain.PaymentDisputeWon},

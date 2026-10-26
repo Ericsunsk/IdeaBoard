@@ -1,4 +1,4 @@
-package wiring
+package migration
 
 import (
 	"strings"
@@ -33,5 +33,11 @@ func TestSeparatedMigrationDatabaseConfigRequiresDistinctOwnerCredentials(t *tes
 	}
 	if result.User != "owner" || result.Password != "owner-secret" {
 		t.Fatalf("migration config = %+v", result)
+	}
+}
+
+func TestMigrateRejectsNilConfigBeforeCleanBreak(t *testing.T) {
+	if err := (&Runner{}).Migrate(t.Context(), nil, "atlas", "file://internal/db/migrations"); err == nil {
+		t.Fatal("Migrate(nil) error = nil, want an error")
 	}
 }

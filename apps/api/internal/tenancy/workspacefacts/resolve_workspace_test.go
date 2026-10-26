@@ -1,4 +1,4 @@
-package dbutil
+package workspacefacts
 
 import (
 	"context"
@@ -21,11 +21,11 @@ type stubDBTX struct {
 }
 
 func (s *stubDBTX) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
-	return pgconn.CommandTag{}, errors.New("dbutil stub: Exec not implemented")
+	return pgconn.CommandTag{}, errors.New("workspacefacts stub: Exec not implemented")
 }
 
 func (s *stubDBTX) Query(context.Context, string, ...any) (pgx.Rows, error) {
-	return nil, errors.New("dbutil stub: Query not implemented")
+	return nil, errors.New("workspacefacts stub: Query not implemented")
 }
 
 func (s *stubDBTX) QueryRow(_ context.Context, _ string, args ...any) pgx.Row {
@@ -52,25 +52,25 @@ func (r stubRow) Scan(dest ...any) error {
 	return nil
 }
 
-func TestResolveWorkspaceInternalIDTrimsAndMaps(t *testing.T) {
+func TestResolveInternalIDTrimsAndMaps(t *testing.T) {
 	stub := &stubDBTX{internalID: 42}
 	q := dbsqlc.New(stub)
-	got, err := ResolveWorkspaceInternalID(context.Background(), q, "  ws_abc123  ")
+	got, err := ResolveInternalID(context.Background(), q, "  ws_abc123  ")
 	if err != nil {
-		t.Fatalf("ResolveWorkspaceInternalID error = %v", err)
+		t.Fatalf("ResolveInternalID error = %v", err)
 	}
 	if got != 42 {
-		t.Fatalf("ResolveWorkspaceInternalID = %d, want 42", got)
+		t.Fatalf("ResolveInternalID = %d, want 42", got)
 	}
 	if stub.gotPublicID != "ws_abc123" {
 		t.Fatalf("looked-up public id = %q, want trimmed %q", stub.gotPublicID, "ws_abc123")
 	}
 }
 
-func TestResolveWorkspaceInternalIDPassesQueryErrorThrough(t *testing.T) {
+func TestResolveInternalIDPassesQueryErrorThrough(t *testing.T) {
 	stub := &stubDBTX{scanErr: pgx.ErrNoRows}
 	q := dbsqlc.New(stub)
-	if _, err := ResolveWorkspaceInternalID(context.Background(), q, "ws_missing"); !errors.Is(err, pgx.ErrNoRows) {
-		t.Fatalf("ResolveWorkspaceInternalID error = %v, want pgx.ErrNoRows unchanged (callers map it to their own sentinel)", err)
+	if _, err := ResolveInternalID(context.Background(), q, "ws_missing"); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("ResolveInternalID error = %v, want pgx.ErrNoRows unchanged (callers map it to their own sentinel)", err)
 	}
 }

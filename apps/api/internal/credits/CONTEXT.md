@@ -279,3 +279,12 @@ A Refund reverses a Capture; a Purchase Refund settles an external-payment refun
 - The million-row harness is opt-in by the migration owner/test DSN
   via `CREDITS_LOAD_TEST=1`; commands and baselines live
   in `docs/benchmarks/credits-million.md`.
+
+### Schema ownership
+
+`schema/fragments/credits.sql` owns the core Ledger.
+`schema/fragments/credit_payment_settlement.sql` owns the Payments-typed Credit
+commands (purchase, refund reservation/settlement, dispute debit/restore) and
+the dispute-debit idempotency records. Payments calls these commands; it does
+not own their posting logic. `integrity.sql` contains only cross-domain late
+bindings, not Credit commands.

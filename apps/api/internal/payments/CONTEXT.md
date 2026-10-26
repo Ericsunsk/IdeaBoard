@@ -67,3 +67,11 @@ The shared PostgreSQL repository owns `GetPaymentOrderPayerAccount`: Refund, Web
 - The Admin order read model strictly validates the canonical public order number, bounded user and status filters, and opaque cursors; it never returns public tokens, idempotency or request hashes, return base URLs, Secrets, or raw provider payloads.
 - Fiat-to-Idea recharge uses the fixed 500~500,000 Idea schedule at 100 Ideas per USD and stays outside the Billing SKU Catalog, which prices only Idea-to-service consumption; user-visible prices are unchanged by this boundary.
 - Payments changes no task-infrastructure ownership: River plus PostgreSQL stays the task queue and state fact source, NATS JetStream stays only the event layer.
+
+### Schema ownership
+
+`schema/fragments/payments.sql` owns Orders, Refunds, Disputes, their lifecycle
+guards, the Webhook-to-Order foreign key and the read-only
+`has_unsettled_payment_state` seam. Payments-typed Ledger commands and their
+idempotency facts live in the Credits-owned `credit_payment_settlement.sql`
+fragment; all remain in the same assembled schema and transaction boundary.

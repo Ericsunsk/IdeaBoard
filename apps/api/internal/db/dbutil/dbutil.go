@@ -64,45 +64,6 @@ func WithTxDBTX(ctx context.Context, pool *pgxpool.Pool, fn func(*dbsqlc.Queries
 	})
 }
 
-// ResolveWorkspaceInternalID maps an opaque workspace public id to its
-// internal id. The input is trimmed before lookup; the query error returns
-// unchanged so callers map "not found" to their own operation-scoped
-// sentinel (hidden workspaces must never leak a distinct status). Callers
-// that fail closed on malformed ids keep their own shape pre-check.
-//
-// It is the single canonical public-id -> internal-id seam: settlement,
-// media, library, tasking, and vision resolvers all converge here instead
-// of re-issuing GetWorkspaceByPublicID inline.
-func ResolveWorkspaceInternalID(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string) (int64, error) {
-	row, err := q.GetWorkspaceByPublicID(ctx, strings.TrimSpace(workspacePublicID))
-	if err != nil {
-		return 0, err
-	}
-	return row.InternalID, nil
-}
-
-// IsOrganizationClosedForWorkspace reports whether the workspace belongs
-// to a closed Organization (#955). Personal scopes are open; missing rows
-// and query failures propagate so an unknown state never grants access.
-// It is the single shared lookup behind the tasking, media, boards, and
-// vision closed-org gates: every settlement/accept path converges here
-// instead of re-reading ClosedAt inline, and the domain decision itself
-// stays in tenancy.CheckWorkspaceWritable.
-func IsOrganizationClosedForWorkspace(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string) (bool, error) {
-	row, err := q.GetWorkspaceByPublicID(ctx, strings.TrimSpace(workspacePublicID))
-	if err != nil {
-		return false, err
-	}
-	if !row.OrganizationID.Valid {
-		return false, nil
-	}
-	org, err := q.GetOrganizationByInternalID(ctx, row.OrganizationID.Int64)
-	if err != nil {
-		return false, err
-	}
-	return org.ClosedAt.Valid, nil
-}
-
 func NullTime(value *time.Time) pgtype.Timestamptz {
 	if value == nil {
 		return pgtype.Timestamptz{}

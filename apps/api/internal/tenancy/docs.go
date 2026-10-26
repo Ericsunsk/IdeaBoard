@@ -5,6 +5,10 @@
 // Repository methods take context.Context first. The PostgreSQL adapters
 // use dbWithContext(ctx) so reads and writes join the caller transaction.
 //
+// The workspacefacts package owns shared transaction-bound Workspace identity
+// and Organization closure reads. It leaves authorization, payer resolution,
+// and lifecycle decisions with their owning modules.
+//
 // Billing Account model (ADR-0038): the stable funds identity holds the
 // unified balance; one Personal account exists per user and one shared
 // account per Organization. Workspace scope is fixed at creation and

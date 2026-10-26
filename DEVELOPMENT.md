@@ -201,6 +201,8 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 
 Schema Release 的 `BASE_SHA` 按场景取值，不要混用：本地生成用 `BASE_SHA=HEAD`，只比 working tree 与 `HEAD` 的差集，避免把未合入的历史误判为 release 变更；CI/release check 用 `BASE_SHA="$(git merge-base HEAD origin/main)"`，比 PR 已合入范围加 working tree。`--base-sha` 缺省读 `BASE_SHA` env，`--head-sha` 缺省为 `HEAD`，`api.yml` 传 `--base-sha "${ATLAS_BASE_SHA:-HEAD}"` 与上述语义一致；`API_TEST_DATABASE_DSN` 必填，缺失即 fail-closed。`--write-artifact` 仍先跑完全部只读校验再发布 `schema.sql`，不是跳检直写。
 
+`internal/db/migrationhistory` 是 Git migration discovery、append-only 与原子 clean-break rebaseline 判定的唯一实现；Schema Release 直接使用，Atlas Shell gate 经 `cmd/migrationhistory` 调用。两者都覆盖 commit range、working tree 与 untracked SQL；风险 SQL lint、版本冲突、checksum 和 Fresh replay 门禁继续独立生效。
+
 ### Frontend 工具与治理规则
 
 Formatter 使用 Prettier（`singleQuote`、无分号、`printWidth: 100`），通过 `npm run format:check` 检查。i18n 四 locale（`en`、`zh-CN`、`es`、`ko`）parity 由 `apps/web/scripts/checkLocaleParity.ts`（`npm run lint:locale-parity`）与 `localeParity.unit.spec.ts` 锁定，CI 通过 governance 与 unit jobs 执行同一校验；交互与样式行为通过 Playwright browser specs 验证。请求数硬约束见 [api CONTEXT](./apps/web/src/api/CONTEXT.md)（单 provider + 标量 key、最小化 invalidate、懒加载 + 聚合读优先）；新增 query key 工厂必须在 `queryKeyRequestBudget.contract.spec.ts` 登记，同屏 distinct GET 超 4 个必须走聚合读或懒加载。

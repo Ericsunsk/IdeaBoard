@@ -9,10 +9,9 @@ package wiring
 import (
 	"context"
 	"fmt"
-	creditpostgres "ideaboard/api/internal/credits/infrastructure/postgres"
-	"strings"
 
 	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
+	creditpostgres "ideaboard/api/internal/credits/infrastructure/postgres"
 	generationcatalog "ideaboard/api/internal/generation/catalog"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	storagepostgres "ideaboard/api/internal/media/storage/infrastructure/postgres"
@@ -31,7 +30,6 @@ import (
 	searchinfra "ideaboard/api/internal/searchcatalog/infrastructure"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -121,47 +119,6 @@ func closeStartupDatabase(db *pgxpool.Pool) {
 	}
 }
 
-func FinalizeAppDatabases(ctx context.Context, cfg *config.Config) error {
-	if cfg == nil {
-		return fmt.Errorf("database config is nil")
-	}
-	migrationConfig, err := separatedMigrationDatabaseConfig(cfg.Database)
-	if err != nil {
-		return err
-	}
-	migrationDB, err := database.NewPostgres(ctx, migrationConfig)
-	if err != nil {
-		return fmt.Errorf("failed to connect migration database: %w", err)
-	}
-	defer migrationDB.Close()
-	migrationPool, err := workerriver.NewRiverPgxPool(ctx, database.PostgresDSN(migrationConfig))
-	if err != nil {
-		return fmt.Errorf("failed to connect River migration pool: %w", err)
-	}
-	defer migrationPool.Close()
-	if err := workerriver.MigrateRiver(ctx, migrationPool); err != nil {
-		return fmt.Errorf("failed to migrate River schema: %w", err)
-	}
-	privilegeTx, err := migrationDB.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return fmt.Errorf("begin runtime privilege transaction: %w", err)
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = privilegeTx.Rollback(ctx)
-		}
-	}()
-	if err := dbprivileges.Configure(ctx, privilegeTx, cfg.Database.User, runtimePrivilegePolicies()...); err != nil {
-		return err
-	}
-	if err := privilegeTx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit runtime privileges: %w", err)
-	}
-	committed = true
-	return nil
-}
-
 func runtimePrivilegePolicies() []dbprivileges.Policy {
 	return []dbprivileges.Policy{
 		dbprivileges.RuntimePrivilegePolicy(),
@@ -177,20 +134,6 @@ func runtimePrivilegePolicies() []dbprivileges.Policy {
 
 func verifyRuntimePrivileges(ctx context.Context, db dbprivileges.DBTX) error {
 	return dbprivileges.Verify(ctx, db, runtimePrivilegePolicies()...)
-}
-
-func separatedMigrationDatabaseConfig(runtimeConfig config.DatabaseConfig) (config.DatabaseConfig, error) {
-	migrationUser := strings.TrimSpace(runtimeConfig.MigrationUser)
-	if migrationUser == "" || runtimeConfig.MigrationPassword == "" {
-		return config.DatabaseConfig{}, fmt.Errorf("PG_MIGRATION_USER and PG_MIGRATION_PASSWORD are required for migrations")
-	}
-	if migrationUser == strings.TrimSpace(runtimeConfig.User) {
-		return config.DatabaseConfig{}, fmt.Errorf("PG_MIGRATION_USER must differ from API_PG_USER so runtime cannot own schema objects")
-	}
-	migrationConfig := runtimeConfig
-	migrationConfig.User = migrationUser
-	migrationConfig.Password = runtimeConfig.MigrationPassword
-	return migrationConfig, nil
 }
 
 func NewAppRepositories(ctx context.Context, db *pgxpool.Pool) (AppRepositories, error) {

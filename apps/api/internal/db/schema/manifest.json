@@ -7,6 +7,7 @@
     {"name": "workspace", "path": "fragments/workspaces.sql", "depends_on": ["identity", "organization"]},
     {"name": "billing_accounts", "path": "fragments/billing_accounts.sql", "depends_on": ["identity", "organization", "workspace"]},
     {"name": "credits", "path": "fragments/credits.sql", "depends_on": ["identity", "billing_accounts"]},
+    {"name": "credit_payment_settlement", "path": "fragments/credit_payment_settlement.sql", "depends_on": ["credits"]},
     {"name": "platform", "path": "fragments/platform.sql", "depends_on": ["identity"]},
     {"name": "media", "path": "fragments/media.sql", "depends_on": ["identity"]},
     {"name": "tasks", "path": "fragments/tasks.sql", "depends_on": ["identity", "media", "billing_accounts"]},
@@ -22,7 +23,7 @@
     {"name": "billing", "path": "fragments/billing.sql", "depends_on": ["credits"]},
     {"name": "payments", "path": "fragments/payments.sql", "depends_on": ["identity", "credits", "billing"]},
     {"name": "control_audit", "path": "fragments/control_audit.sql", "depends_on": ["identity"]},
-    {"name": "integrity", "path": "fragments/integrity.sql", "depends_on": ["identity", "boards", "media", "tasks", "credits", "payments"]},
+    {"name": "integrity", "path": "fragments/integrity.sql", "depends_on": ["identity", "boards", "media", "tasks", "platform"]},
     {"name": "bootstrap", "path": "fragments/bootstrap.sql", "depends_on": ["platform", "integrity"]}
   ]
 }

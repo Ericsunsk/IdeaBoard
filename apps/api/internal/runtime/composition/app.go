@@ -67,7 +67,7 @@ func runServe(applyMode func(*config.Config)) {
 func runMigrate() {
 	cfg := loadMigrationConfigOrFatal()
 	configureRuntimeLogging(cfg)
-	if err := wiring.Migrate(context.Background(), cfg, config.DefaultAtlasBinary, config.DefaultMigrationDirectory); err != nil {
+	if err := wiring.NewDatabaseMigrator().Migrate(context.Background(), cfg, config.DefaultAtlasBinary, config.DefaultMigrationDirectory); err != nil {
 		fatal("failed to migrate database schema", "err", err)
 	}
 	slog.Info("database migration completed")
@@ -118,7 +118,7 @@ func runInitCreditWallets(args []string) {
 func runFinalizeMigrate() {
 	cfg := loadMigrationConfigOrFatal()
 	configureRuntimeLogging(cfg)
-	if err := wiring.FinalizeAppDatabases(context.Background(), cfg); err != nil {
+	if err := wiring.NewDatabaseMigrator().Finalize(context.Background(), cfg); err != nil {
 		fatal("failed to finalize database migration", "err", err)
 	}
 	slog.Info("database migration finalization completed")

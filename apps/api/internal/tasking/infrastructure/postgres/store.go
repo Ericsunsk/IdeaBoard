@@ -19,6 +19,7 @@ import (
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
+	"ideaboard/api/internal/tenancy/workspacefacts"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -228,7 +229,7 @@ func resolveWorkspace(ctx context.Context, q *dbsqlc.Queries, workspacePublicID 
 	if !contract.IsValidPublicID(contract.PrefixWorkspace, workspacePublicID) {
 		return 0, workspacetasks.ErrNotFound
 	}
-	internalID, err := dbutil.ResolveWorkspaceInternalID(ctx, q, workspacePublicID)
+	internalID, err := workspacefacts.ResolveInternalID(ctx, q, workspacePublicID)
 	if err != nil {
 		return 0, notFound(err)
 	}
@@ -272,7 +273,7 @@ func (s *Store) ResolveBillingAccountInTx(ctx context.Context, tx pgx.Tx, worksp
 		return 0, err
 	}
 	if workspace.OrganizationID.Valid {
-		closed, err := dbutil.IsOrganizationClosedForWorkspace(ctx, q, workspacePublicID)
+		closed, err := workspacefacts.IsOrganizationClosed(ctx, q, workspacePublicID)
 		if err != nil {
 			return 0, err
 		}

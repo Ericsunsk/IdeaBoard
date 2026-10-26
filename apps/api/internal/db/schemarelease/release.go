@@ -15,11 +15,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"ideaboard/api/internal/db/migrationhistory"
 	"ideaboard/api/internal/db/schemaassembly"
 	"ideaboard/api/internal/db/schemacontract"
 
@@ -43,11 +43,6 @@ const (
 	// DefaultAtlasBinary is the Atlas executable used when Options.AtlasBinary is empty.
 	DefaultAtlasBinary = "atlas"
 )
-
-type migrationChange struct {
-	status string
-	path   string
-}
 
 type commandRunner interface {
 	Run(context.Context, string, string, ...string) ([]byte, error)
@@ -103,7 +98,14 @@ func check(ctx context.Context, options Options, runner commandRunner) error {
 			return fmt.Errorf("schema release artifact drift: %s does not match manifest assembly", outputPath)
 		}
 	}
-	if err := checkMigrationImmutability(ctx, runner, apiRoot, options.BaseSHA, options.HeadSHA); err != nil {
+	history, err := migrationhistory.Inspect(ctx, migrationhistory.Options{
+		RepositoryRoot: apiRoot, MigrationsDir: filepath.Join(apiRoot, "internal/db/migrations"),
+		BaseSHA: options.BaseSHA, HeadSHA: options.HeadSHA,
+	})
+	if err != nil {
+		return fmt.Errorf("schema release migration discovery: %w", err)
+	}
+	if err := history.Validate(); err != nil {
 		return fmt.Errorf("schema release migration immutability: %w", err)
 	}
 	if err := checkSQLCGeneration(ctx, runner, apiRoot, assembled); err != nil {
@@ -161,96 +163,6 @@ func resolvePath(root, value, fallback string) string {
 		return filepath.Clean(value)
 	}
 	return filepath.Join(root, filepath.Clean(value))
-}
-
-func checkMigrationImmutability(ctx context.Context, runner commandRunner, apiRoot, baseSHA, headSHA string) error {
-	baseSHA = strings.TrimSpace(baseSHA)
-	headSHA = strings.TrimSpace(headSHA)
-	if headSHA == "" {
-		headSHA = "HEAD"
-	}
-	pathspec := "internal/db/migrations/*.sql"
-	committed, err := runner.Run(ctx, apiRoot, "git", "diff", "--no-renames", "--name-status", baseSHA, headSHA, "--", pathspec)
-	if err != nil {
-		return fmt.Errorf("compare %s to %s: %w", baseSHA, headSHA, err)
-	}
-	working, err := runner.Run(ctx, apiRoot, "git", "diff", "--no-renames", "--name-status", headSHA, "--", pathspec)
-	if err != nil {
-		return fmt.Errorf("compare working tree to %s: %w", headSHA, err)
-	}
-	return validateMigrationChanges(string(committed) + string(working))
-}
-
-func validateMigrationChanges(raw string) error {
-	changes := make([]migrationChange, 0)
-	violations := make([]string, 0)
-	for _, line := range strings.Split(raw, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			violations = append(violations, line)
-			continue
-		}
-		changes = append(changes, migrationChange{status: fields[0], path: fields[1]})
-	}
-	if len(violations) == 0 && isCleanBreakRebaseline(changes) {
-		return nil
-	}
-	for _, change := range changes {
-		if change.status != "A" {
-			violations = append(violations, change.status+"\t"+change.path)
-		}
-	}
-	if len(violations) > 0 {
-		sort.Strings(violations)
-		return fmt.Errorf("released migrations are append-only; invalid changes: %s", strings.Join(violations, ", "))
-	}
-	return nil
-}
-
-func isCleanBreakRebaseline(changes []migrationChange) bool {
-	var addedBaselineVersion int64
-	var deletedBaselineVersions []int64
-	for _, change := range changes {
-		switch change.status {
-		case "A":
-			version, ok := baselineVersion(change.path)
-			if !ok || addedBaselineVersion != 0 {
-				return false
-			}
-			addedBaselineVersion = version
-		case "D":
-			if version, ok := baselineVersion(change.path); ok {
-				deletedBaselineVersions = append(deletedBaselineVersions, version)
-			}
-		default:
-			return false
-		}
-	}
-	if addedBaselineVersion == 0 || len(deletedBaselineVersions) != 1 {
-		return false
-	}
-	return addedBaselineVersion > deletedBaselineVersions[0]
-}
-
-func baselineVersion(path string) (int64, bool) {
-	const suffix = "_baseline.sql"
-	name := filepath.Base(path)
-	if !strings.HasSuffix(name, suffix) {
-		return 0, false
-	}
-	versionText := strings.TrimSuffix(name, suffix)
-	if len(versionText) != 14 {
-		return 0, false
-	}
-	version, err := strconv.ParseInt(versionText, 10, 64)
-	if err != nil {
-		return 0, false
-	}
-	return version, true
 }
 
 func checkSQLCGeneration(ctx context.Context, runner commandRunner, apiRoot string, assembled []byte) error {
