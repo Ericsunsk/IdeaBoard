@@ -112,11 +112,7 @@ func (s *catalogFactReaderStub) SetAvailability(context.Context, string, bool, i
 	return AvailabilityInfo{}, s.err
 }
 
-func (s *catalogFactReaderStub) QuoteAtResolution(context.Context, string, OutputResolution, int64) (Quote, error) {
-	return Quote{}, s.err
-}
-
-func (s *catalogFactReaderStub) QuoteAtResolutionInTx(context.Context, pgx.Tx, string, OutputResolution, int64) (Quote, error) {
+func (s *catalogFactReaderStub) Quote(context.Context, pgx.Tx, string, OutputResolution, int64) (Quote, error) {
 	return Quote{}, s.err
 }
 

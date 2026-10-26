@@ -1,3 +1,5 @@
+// Package schemacontract compares PostgreSQL catalog semantics between
+// the assembled schema snapshot and the migration history.
 package schemacontract
 
 import (

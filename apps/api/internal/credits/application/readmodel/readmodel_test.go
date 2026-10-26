@@ -38,14 +38,14 @@ func TestReadModelReturnsCommittedWalletAndBalances(t *testing.T) {
 	service := credits.NewService(pool)
 	ctx := t.Context()
 
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94),
 		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata:         testhelpers.TestMetadata("readmodel:grant:94", "readmodel-grant-94"),
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 95),
 		Amount:           testhelpers.MustCreditAmount(t, 40),
 		Metadata:         testhelpers.TestMetadata("readmodel:grant:95", "readmodel-grant-95"),
@@ -85,14 +85,14 @@ func TestReadModelListsLedgerNewestFirstWithKeysetPagination(t *testing.T) {
 	service := credits.NewService(pool)
 	ctx := t.Context()
 
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94),
 		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata:         testhelpers.TestMetadata("readmodel:ledger:grant", "readmodel-ledger-grant"),
 	}); err != nil {
 		t.Fatal(err)
 	}
-	hold, err := service.Hold(ctx, ports.HoldCommand{
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94),
 		Amount:           testhelpers.MustCreditAmount(t, 30),
 		Metadata:         testhelpers.TestMetadata("readmodel:ledger:hold", "readmodel-ledger-hold"),
@@ -100,7 +100,7 @@ func TestReadModelListsLedgerNewestFirstWithKeysetPagination(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Release(ctx, ports.ReleaseCommand{
+	if _, err := service.Settlement().Release(ctx, ports.ReleaseCommand{
 		BillingAccountID:  testhelpers.MustBillingAccount(t, pool, 94),
 		HoldTransactionID: hold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 30),

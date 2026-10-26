@@ -93,7 +93,7 @@ func TestSetUserStatusJoinsAmbientCarrierTx(t *testing.T) {
 	if got := readCarrierUserStatus(t, ctx, pool, userID); got != StatusBanned {
 		t.Fatalf("user status after carrier commit = %d, want banned", got)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, userID, "carrier:ban-frozen")); !errors.Is(err, domain.ErrWalletFrozen) {
+	if _, err := creditService.Settlement().Hold(ctx, lifecycleHold(t, creditService, userID, "carrier:ban-frozen")); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Hold(frozen wallet) error = %v, want ErrWalletFrozen", err)
 	}
 }
@@ -122,7 +122,7 @@ func TestSetUserStatusRollsBackWithAmbientCarrier(t *testing.T) {
 	if got := readCarrierUserStatus(t, ctx, pool, userID); got != StatusActive {
 		t.Fatalf("user status after carrier rollback = %d, want active", got)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, userID, "carrier:rollback-active")); err != nil {
+	if _, err := creditService.Settlement().Hold(ctx, lifecycleHold(t, creditService, userID, "carrier:rollback-active")); err != nil {
 		t.Fatalf("Hold(after carrier rollback) error = %v, want success (wallet unfrozen)", err)
 	}
 }

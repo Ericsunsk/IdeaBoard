@@ -64,7 +64,7 @@ func TestGrantJoinsAmbientCarrierTx(t *testing.T) {
 	testhelpers.EnsureAdminOperationUser(t, pool, 4201)
 
 	tx, carrier := beginCarrier(t, ctx, pool)
-	result, err := service.Grant(carrier, ports.GrantCommand{
+	result, err := service.Administrative().Grant(carrier, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 4201),
 		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata:         testhelpers.TestMetadata("carrier-grant-commit", "carrier-grant-commit"),
@@ -104,7 +104,7 @@ func TestGrantRollsBackWithAmbientCarrier(t *testing.T) {
 	testhelpers.EnsureAdminOperationUser(t, pool, 4202)
 
 	tx, carrier := beginCarrier(t, ctx, pool)
-	result, err := service.Grant(carrier, ports.GrantCommand{
+	result, err := service.Administrative().Grant(carrier, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 4202),
 		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata:         testhelpers.TestMetadata("carrier-grant-rollback", "carrier-grant-rollback"),
@@ -139,7 +139,7 @@ func TestRestrictWalletJoinsAmbientCarrierTx(t *testing.T) {
 	ctx := context.Background()
 	const userID = 4203
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
 		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata:         testhelpers.TestMetadata("carrier-restrict:grant", "carrier-restrict-grant"),
@@ -190,7 +190,7 @@ func TestReleaseWalletRestrictionRollsBackWithAmbientCarrier(t *testing.T) {
 	ctx := context.Background()
 	const userID = 4204
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
 		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata:         testhelpers.TestMetadata("carrier-release:grant", "carrier-release-grant"),

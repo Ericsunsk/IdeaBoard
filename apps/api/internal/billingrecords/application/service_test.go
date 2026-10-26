@@ -190,7 +190,7 @@ func accountOf(t *testing.T, ctx context.Context, service *credits.Service, user
 func grant(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, commandMetadata domain.CommandMetadata) ports.CommandResult {
 	t.Helper()
 	creditAmount, _ := domain.NewCreditAmount(amount)
-	result, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: accountOf(t, ctx, service, userID), Amount: creditAmount, Metadata: commandMetadata})
+	result, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: accountOf(t, ctx, service, userID), Amount: creditAmount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func grant(t *testing.T, ctx context.Context, service *credits.Service, userID, 
 func deduct(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, commandMetadata domain.CommandMetadata) ports.CommandResult {
 	t.Helper()
 	creditAmount, _ := domain.NewCreditAmount(amount)
-	result, err := service.Deduct(ctx, ports.DeductionCommand{BillingAccountID: accountOf(t, ctx, service, userID), Amount: creditAmount, Metadata: commandMetadata})
+	result, err := service.Administrative().Deduct(ctx, ports.DeductionCommand{BillingAccountID: accountOf(t, ctx, service, userID), Amount: creditAmount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func deduct(t *testing.T, ctx context.Context, service *credits.Service, userID,
 func hold(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, commandMetadata domain.CommandMetadata) ports.CommandResult {
 	t.Helper()
 	creditAmount, _ := domain.NewCreditAmount(amount)
-	result, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: accountOf(t, ctx, service, userID), Amount: creditAmount, Metadata: commandMetadata})
+	result, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: accountOf(t, ctx, service, userID), Amount: creditAmount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +223,7 @@ func capture(t *testing.T, ctx context.Context, service *credits.Service, userID
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := service.Capture(ctx, ports.CaptureCommand{BillingAccountID: accountOf(t, ctx, service, userID), HoldTransactionID: holdID, Amount: amount, Metadata: commandMetadata})
+	result, err := service.Settlement().Capture(ctx, ports.CaptureCommand{BillingAccountID: accountOf(t, ctx, service, userID), HoldTransactionID: holdID, Amount: amount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func capture(t *testing.T, ctx context.Context, service *credits.Service, userID
 func refund(t *testing.T, ctx context.Context, service *credits.Service, userID int64, captureID string, amount int64, commandMetadata domain.CommandMetadata) ports.CommandResult {
 	t.Helper()
 	creditAmount, _ := domain.NewCreditAmount(amount)
-	result, err := service.Refund(ctx, ports.RefundCommand{BillingAccountID: accountOf(t, ctx, service, userID), ChargeTransactionID: captureID, Amount: creditAmount, Metadata: commandMetadata})
+	result, err := service.Administrative().Refund(ctx, ports.RefundCommand{BillingAccountID: accountOf(t, ctx, service, userID), ChargeTransactionID: captureID, Amount: creditAmount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func refund(t *testing.T, ctx context.Context, service *credits.Service, userID 
 func correct(t *testing.T, ctx context.Context, service *credits.Service, userID int64, originalID string, amount int64, commandMetadata domain.CommandMetadata) ports.CommandResult {
 	t.Helper()
 	creditAmount, _ := domain.NewCreditAmount(amount)
-	result, err := service.Correct(ctx, ports.CorrectionCommand{BillingAccountID: accountOf(t, ctx, service, userID), OriginalTransactionID: originalID, Amount: creditAmount, Metadata: commandMetadata})
+	result, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{BillingAccountID: accountOf(t, ctx, service, userID), OriginalTransactionID: originalID, Amount: creditAmount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}

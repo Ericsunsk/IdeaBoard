@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/memberquotas"
+	"ideaboard/api/internal/tasking/settlement"
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
 
@@ -66,7 +67,7 @@ func TestQuotaExhaustedBlocksSubmitWithoutResidue(t *testing.T) {
 	if got := taskCount(t, env); got != 0 {
 		t.Fatalf("task rows = %d, want 0 (no residue)", got)
 	}
-	if got := env.ledgerCount(t, `idempotency_key = $1`, workspacetasks.TaskSubmitHoldKey(env.ws, key)); got != 0 {
+	if got := env.ledgerCount(t, `idempotency_key = $1`, settlement.TaskHoldKey(env.ws, key)); got != 0 {
 		t.Fatalf("hold ledger rows = %d, want 0 (no residue)", got)
 	}
 	if available, reserved := env.wallet(t); available != 1000 || reserved != 0 {

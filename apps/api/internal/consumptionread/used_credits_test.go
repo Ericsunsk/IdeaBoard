@@ -36,7 +36,7 @@ func openUsageFacts(t *testing.T) *usageFacts {
 	e.row(t, `INSERT INTO billing_accounts (public_id,workspace_id) VALUES ('ba_projection',$1) RETURNING internal_id`, &e.account, e.workspace)
 	e.row(t, `INSERT INTO billing_accounts (public_id,workspace_id) VALUES ('ba_projection2',$1) RETURNING internal_id`, &e.otherAccount, e.otherWorkspace)
 	for _, account := range []int64{e.account, e.otherAccount} {
-		_, err := e.credits.Grant(t.Context(), cp.GrantCommand{BillingAccountID: account, Amount: amount(t, 100000), Metadata: e.meta("test", "seed", e.user)})
+		_, err := e.credits.Administrative().Grant(t.Context(), cp.GrantCommand{BillingAccountID: account, Amount: amount(t, 100000), Metadata: e.meta("test", "seed", e.user)})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -71,7 +71,7 @@ func (e *usageFacts) meta(kind, id string, user int64) cd.CommandMetadata {
 }
 func (e *usageFacts) hold(t *testing.T, account, user int64, kind, id string, n int64) string {
 	t.Helper()
-	r, err := e.credits.Hold(t.Context(), cp.HoldCommand{BillingAccountID: account, Amount: amount(t, n), Metadata: e.meta(kind, id, user)})
+	r, err := e.credits.Settlement().Hold(t.Context(), cp.HoldCommand{BillingAccountID: account, Amount: amount(t, n), Metadata: e.meta(kind, id, user)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func (e *usageFacts) hold(t *testing.T, account, user int64, kind, id string, n 
 }
 func (e *usageFacts) capture(t *testing.T, account, user int64, hold, kind, id string, n int64) string {
 	t.Helper()
-	r, err := e.credits.Capture(t.Context(), cp.CaptureCommand{BillingAccountID: account, HoldTransactionID: hold, Amount: amount(t, n), Metadata: e.meta(kind, id, user)})
+	r, err := e.credits.Settlement().Capture(t.Context(), cp.CaptureCommand{BillingAccountID: account, HoldTransactionID: hold, Amount: amount(t, n), Metadata: e.meta(kind, id, user)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func (e *usageFacts) refund(t *testing.T, account, user int64, capture string, n
 	t.Helper()
 	m := e.meta("test", "refund", user)
 	m.Actor = cd.Actor{Type: cd.ActorAdmin, ID: fmt.Sprint(user)}
-	_, err := e.credits.Refund(t.Context(), cp.RefundCommand{BillingAccountID: account, ChargeTransactionID: capture, Amount: amount(t, n), Metadata: m})
+	_, err := e.credits.Administrative().Refund(t.Context(), cp.RefundCommand{BillingAccountID: account, ChargeTransactionID: capture, Amount: amount(t, n), Metadata: m})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func (e *usageFacts) vision(t *testing.T, q interface {
 		t.Fatal(err)
 	}
 	if status == "failed" {
-		_, err := e.credits.Release(t.Context(), cp.ReleaseCommand{BillingAccountID: account, HoldTransactionID: hold, Amount: amount(t, n), Metadata: e.meta("ai_search_operation", id, user)})
+		_, err := e.credits.Settlement().Release(t.Context(), cp.ReleaseCommand{BillingAccountID: account, HoldTransactionID: hold, Amount: amount(t, n), Metadata: e.meta("ai_search_operation", id, user)})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -207,7 +207,7 @@ func TestUsedCreditsProjectionIncludesLocalTransactionAndSettledActuals(t *testi
 	var hold string
 	e.row(t, `SELECT hold_transaction_id FROM task_billing_snapshots WHERE task_id=$1`, &hold, id)
 	capture := e.capture(t, e.account, e.user, hold, "task", id, 60)
-	released, err := e.credits.Release(t.Context(), cp.ReleaseCommand{BillingAccountID: e.account, HoldTransactionID: hold, Amount: amount(t, 40), Metadata: e.meta("task", id, e.user)})
+	released, err := e.credits.Settlement().Release(t.Context(), cp.ReleaseCommand{BillingAccountID: e.account, HoldTransactionID: hold, Amount: amount(t, 40), Metadata: e.meta("task", id, e.user)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestUsedCreditsProjectionIncludesLocalTransactionAndSettledActuals(t *testi
 	e.refund(t, e.account, e.user, capture, 10)
 	id = e.task(t, e.pool, e.account, e.workspace, e.user, at, 70)
 	e.row(t, `SELECT hold_transaction_id FROM task_billing_snapshots WHERE task_id=$1`, &hold, id)
-	released, err = e.credits.Release(t.Context(), cp.ReleaseCommand{BillingAccountID: e.account, HoldTransactionID: hold, Amount: amount(t, 70), Metadata: e.meta("task", id, e.user)})
+	released, err = e.credits.Settlement().Release(t.Context(), cp.ReleaseCommand{BillingAccountID: e.account, HoldTransactionID: hold, Amount: amount(t, 70), Metadata: e.meta("task", id, e.user)})
 	if err != nil {
 		t.Fatal(err)
 	}

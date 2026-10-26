@@ -47,9 +47,11 @@ A Refund reverses a Capture; a Purchase Refund settles an external-payment refun
 
 ## Public Seams
 
-- `Commands`: sole application write entrypoint for Grant, Deduct, Hold,
-  Capture, Release, Refund, Purchase, PurchaseRefundHold, PurchaseRefund,
-  PaymentDisputeDebit, and PaymentDisputeRestore. Every Command addresses
+- `Commands` is the union face for generic carriers; production callers
+  depend on the narrow role faces in the same package
+  (`AdministrativeCommands` for Control fund repair, `SettlementCommands`
+  for workspace-scoped spending, `PaymentCommands` for Payments-owned
+  external-money convergence, `Granter` for Rewards). Every Command addresses
   one Billing Account (`BillingAccountID`, the Wallet identity) with the
   real operator on `Metadata.Actor` (user/service/admin/system); funds
   identity and operator are never conflated. Workspace-scoped spenders
@@ -59,7 +61,11 @@ A Refund reverses a Capture; a Purchase Refund settles an external-payment refun
   account. There is no user-wallet fallback and no dual settlement.
   External-payment commands use independent typed `SECURITY DEFINER` routines;
   all other commands go through `execute_credit_command_v3`.
-- `Service.InTx(pgx.Tx)` / `CommandsInTx(pgx.Tx)` / `ResolvePersonalAccountInTx(pgx.Tx)`: caller-owned transaction
+- `Service.Administrative()` / `Service.Settlement()` / `Service.Payment()`
+  (pool-owned role faces) and `Service.SettlementInTx(pgx.Tx)` /
+  `Service.AdministrativeInTx(pgx.Tx)` / `Service.GrantsInTx(pgx.Tx)` /
+  `Service.PaymentInTx(pgx.Tx)` / `CommandsInTx(pgx.Tx)` (caller-owned
+  transaction views): caller-owned transaction
   adapters over the same account contract.
   Task/River submission and task terminal convergence both use pgx;
   there is no `database/sql` Credit Command path.

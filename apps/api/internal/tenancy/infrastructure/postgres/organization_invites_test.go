@@ -3,11 +3,51 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
 	"ideaboard/api/internal/tenancy"
 )
+
+func TestOrganizationInviteRoleGrants(t *testing.T) {
+	db := newTenancyTestDB(t)
+	store := NewStore(db, nil)
+	ctx := t.Context()
+	owner, admin, member := createTenancyTestUser(t, db), createTenancyTestUser(t, db), createTenancyTestUser(t, db)
+	org, err := store.CreateOrganization(ctx, owner, "invite roles")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for userID, role := range map[int64]string{admin: tenancy.RoleAdmin, member: tenancy.RoleMember} {
+		if _, err := store.AddOrganizationMember(ctx, org.PublicID, userID, role); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i, tc := range []struct {
+		name    string
+		actor   int64
+		grant   string
+		allowed bool
+	}{
+		{"owner invites member", owner, tenancy.RoleMember, true},
+		{"owner invites admin", owner, tenancy.RoleAdmin, true},
+		{"admin invites member", admin, tenancy.RoleMember, true},
+		{"admin cannot invite admin", admin, tenancy.RoleAdmin, false},
+		{"member cannot invite member", member, tenancy.RoleMember, false},
+		{"member cannot invite admin", member, tenancy.RoleAdmin, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := store.CreateOrganizationMemberInvite(ctx, org.PublicID, tc.actor, fmt.Sprintf("invite-%d@example.com", i), tc.grant, 0)
+			if tc.allowed && err != nil {
+				t.Fatal(err)
+			}
+			if !tc.allowed && !errors.Is(err, tenancy.ErrForbidden) {
+				t.Fatalf("invite error = %v, want ErrForbidden", err)
+			}
+		})
+	}
+}
 
 func TestOrganizationMemberInvitesPostgresLifecycle(t *testing.T) {
 	db := newTenancyTestDB(t)

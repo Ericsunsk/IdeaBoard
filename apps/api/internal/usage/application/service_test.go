@@ -13,7 +13,6 @@ import (
 	"ideaboard/api/internal/testdb"
 	usagedomain "ideaboard/api/internal/usage/domain"
 	usageports "ideaboard/api/internal/usage/ports"
-	"ideaboard/api/internal/workflow"
 	"math"
 	"strings"
 	"testing"
@@ -236,7 +235,7 @@ func TestServiceGetCurrentReportsDurableLogicalTasks(t *testing.T) {
 	firstCapture := captureUsageCredits(t, ctx, creditService, userID, 20, "usage-capture-1")
 	latestCapture := captureUsageCredits(t, ctx, creditService, userID, 100, "usage-capture-2")
 	_ = captureUsageCredits(t, ctx, creditService, 902, 10, "usage-other-user-capture")
-	if _, err := creditService.Refund(ctx, ports.RefundCommand{
+	if _, err := creditService.Administrative().Refund(ctx, ports.RefundCommand{
 		BillingAccountID:    usageAccountOf(t, ctx, creditService, userID),
 		ChargeTransactionID: firstCapture.TransactionID,
 		Amount:              mustUsageCreditAmount(t, 20),
@@ -251,9 +250,11 @@ func TestServiceGetCurrentReportsDurableLogicalTasks(t *testing.T) {
 		"usage-free-cancelled",
 		"usage-free-pending",
 	}
-	billingWriter, request := newDurableUsageBilling(t, ctx, pool, creditService)
-	seedDurableUsageSnapshots(t, ctx, pool, billingWriter, request, userID, taskIDs)
-	seedDurableUsageSnapshots(t, ctx, pool, billingWriter, request, 902, []string{"usage-other-user"})
+	if _, err := billingpostgres.NewStore(pool).PublishPrice(ctx, usagePriceInput("ai-image:generation", "Usage Free", 0)); err != nil {
+		t.Fatalf("publish usage price: %v", err)
+	}
+	seedDurableUsageSnapshots(t, ctx, pool, userID, taskIDs)
+	seedDurableUsageSnapshots(t, ctx, pool, 902, []string{"usage-other-user"})
 
 	newUsageService := func() *Service {
 		return NewService(creditService, taskbilling.NewUsageStore(pool), ServiceOptions{Now: func() time.Time {
@@ -309,14 +310,14 @@ func usageAccountOf(t *testing.T, ctx context.Context, service *credits.Service,
 func captureUsageCredits(t *testing.T, ctx context.Context, service *credits.Service, userID, amount int64, key string) ports.CommandResult {
 	t.Helper()
 	accountID := usageAccountOf(t, ctx, service, userID)
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: accountID,
 		Amount:           mustUsageCreditAmount(t, amount),
 		Metadata:         usageCreditMetadata("usage-grant-" + key),
 	}); err != nil {
 		t.Fatalf("grant user %d: %v", userID, err)
 	}
-	hold, err := service.Hold(ctx, ports.HoldCommand{
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{
 		BillingAccountID: accountID,
 		Amount:           mustUsageCreditAmount(t, amount),
 		Metadata:         usageCreditMetadata("usage-hold-" + key),
@@ -324,7 +325,7 @@ func captureUsageCredits(t *testing.T, ctx context.Context, service *credits.Ser
 	if err != nil {
 		t.Fatalf("hold user %d: %v", userID, err)
 	}
-	capture, err := service.Capture(ctx, ports.CaptureCommand{
+	capture, err := service.Settlement().Capture(ctx, ports.CaptureCommand{
 		BillingAccountID:  accountID,
 		HoldTransactionID: hold.TransactionID,
 		Amount:            mustUsageCreditAmount(t, amount),
@@ -358,55 +359,31 @@ func usageCreditMetadata(key string) domain.CommandMetadata {
 	}
 }
 
-func seedDurableUsageSnapshots(
-	t *testing.T,
-	ctx context.Context,
-	pool *pgxpool.Pool,
-	billingWriter *taskbilling.Service,
-	request taskbilling.Request,
-	userID int64,
-	taskIDs []string,
-) {
+// Read-model fixtures need immutable facts, not a second submission orchestrator.
+func seedDurableUsageSnapshots(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID int64, taskIDs []string) {
 	t.Helper()
-	var snapshotAccountID int64
-	if err := pool.QueryRow(ctx, `SELECT ensure_personal_billing_account_for_user($1)`, userID).Scan(&snapshotAccountID); err != nil {
+	var accountID int64
+	if err := pool.QueryRow(ctx, `SELECT ensure_personal_billing_account_for_user($1)`, userID).Scan(&accountID); err != nil {
 		t.Fatalf("resolve snapshot billing account: %v", err)
 	}
-	for _, taskID := range taskIDs {
-		tx, err := pool.Begin(ctx)
-		if err != nil {
-			t.Fatalf("begin task billing fixture: %v", err)
-		}
-		if _, err := billingWriter.HoldAndPersist(ctx, tx, taskbilling.HoldCommand{TaskID: taskID, BillingAccountID: snapshotAccountID, ActorUserID: userID, Billing: request}); err != nil {
-			_ = tx.Rollback(ctx)
-			t.Fatalf("persist task billing snapshot %s: %v", taskID, err)
-		}
-		if err := tx.Commit(ctx); err != nil {
-			t.Fatalf("commit task billing snapshot %s: %v", taskID, err)
-		}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO task_billing_snapshots (
+  task_id, user_id, billing_account_id, service, sku, display_name, price_version_id, price_version,
+  unit_credits, quantity, total_credits, quoted_at
+)
+SELECT fixture.task_id, $1, $2, 'generation', price.sku, skus.display_name,
+       price.price_version_id, price.version, 0, 1, 0, clock_timestamp()
+FROM billing_price_versions price
+JOIN billing_skus skus USING (sku)
+CROSS JOIN unnest($3::text[]) AS fixture(task_id)
+WHERE price.sku = 'ai-image:generation' AND price.version = 1`, userID, accountID, taskIDs); err != nil {
+		t.Fatalf("seed task billing snapshots: %v", err)
 	}
-}
-
-func newDurableUsageBilling(
-	t *testing.T,
-	ctx context.Context,
-	pool *pgxpool.Pool,
-	creditService *credits.Service,
-) (*taskbilling.Service, taskbilling.Request) {
-	t.Helper()
-	billingService := billingpostgres.NewStore(pool)
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugGeneration, "1k", 1)
-	if err != nil {
-		t.Fatalf("build task billing request: %v", err)
+	if _, err := pool.Exec(ctx, `
+INSERT INTO task_billing_settlements (task_id, state, settled_at)
+SELECT task_id, 'free', clock_timestamp() FROM unnest($1::text[]) AS fixture(task_id)`, taskIDs); err != nil {
+		t.Fatalf("seed task billing settlements: %v", err)
 	}
-	sku, err := taskbilling.ResolveSKU(request)
-	if err != nil {
-		t.Fatalf("resolve usage SKU: %v", err)
-	}
-	if _, err := billingService.PublishPrice(ctx, usagePriceInput(sku, "Usage Free", 0)); err != nil {
-		t.Fatalf("publish usage price: %v", err)
-	}
-	return taskbilling.NewService(billingService, creditService), request
 }
 
 func usagePriceInput(sku billing.SKU, displayName string, unitCredits int64) billing.PublishPriceInput {

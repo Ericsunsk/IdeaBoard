@@ -85,7 +85,7 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 	pool := testdb.Open(t)
 	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
 	ctx := t.Context()
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 500), Metadata: testhelpers.TestMetadata("matrix:grant", "matrix-grant")}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 500), Metadata: testhelpers.TestMetadata("matrix:grant", "matrix-grant")}); err != nil {
 		t.Fatal(err)
 	}
 	var priceID, priceVersion int64
@@ -94,7 +94,7 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 	}
 
 	releasedHold := createReconciliationTaskFixture(t, pool, service, "task_reconcile_running_released", "pending", "", 93, priceID, priceVersion)
-	release, err := service.Release(ctx, ports.ReleaseCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), HoldTransactionID: releasedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("release:running", "task_reconcile_running_released")})
+	release, err := service.Settlement().Release(ctx, ports.ReleaseCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), HoldTransactionID: releasedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("release:running", "task_reconcile_running_released")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,15 +105,15 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 	createReconciliationTaskFixture(t, pool, service, "task_reconcile_failed_held", "failed", "provider failed", 93, priceID, priceVersion)
 
 	missingTaskMetadata := taskReconciliationMetadata("hold:missing-task:1", "reconcile-missing-task")
-	if _, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 5), Metadata: missingTaskMetadata}); err != nil {
+	if _, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 5), Metadata: missingTaskMetadata}); err != nil {
 		t.Fatal(err)
 	}
 	missingTaskMetadata.IdempotencyKey = "hold:missing-task:2"
-	if _, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 5), Metadata: missingTaskMetadata}); err != nil {
+	if _, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 5), Metadata: missingTaskMetadata}); err != nil {
 		t.Fatal(err)
 	}
 
-	illegal, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("matrix:illegal", "matrix-illegal")})
+	illegal, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("matrix:illegal", "matrix-illegal")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,11 +124,11 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 		t.Fatal(err)
 	}
 
-	hold, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("matrix:capture-hold", "matrix-capture-hold")})
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("matrix:capture-hold", "matrix-capture-hold")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	capture, err := service.Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("matrix:capture", "matrix-capture")})
+	capture, err := service.Settlement().Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("matrix:capture", "matrix-capture")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 		t.Fatal(err)
 	}
 
-	badHold, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata("matrix:bad-hold", "matrix-bad-hold")})
+	badHold, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata("matrix:bad-hold", "matrix-bad-hold")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ WHERE task_id = 'task_reconcile_completed_held'`); err != nil {
 		t.Fatal(err)
 	}
 
-	adminGrant, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 4), Metadata: domain.CommandMetadata{IdempotencyKey: "matrix:admin-grant", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "1"}, Source: "test", Reason: "admin grant", BusinessReference: domain.BusinessReference{Type: "admin_adjustment", ID: "matrix-admin-grant"}}})
+	adminGrant, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 4), Metadata: domain.CommandMetadata{IdempotencyKey: "matrix:admin-grant", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "1"}, Source: "test", Reason: "admin grant", BusinessReference: domain.BusinessReference{Type: "admin_adjustment", ID: "matrix-admin-grant"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,11 +206,11 @@ VALUES ('ctx_over_correction',(SELECT ensure_personal_billing_account_for_user(9
 	}
 	duplicate := testhelpers.TestMetadata("matrix:duplicate-nontask", "duplicate-nontask")
 	duplicate.BusinessReference = domain.BusinessReference{Type: "external_order", ID: "order-1"}
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: duplicate}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: duplicate}); err != nil {
 		t.Fatal(err)
 	}
 	duplicate.IdempotencyKey = "matrix:duplicate-nontask-2"
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: duplicate}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: duplicate}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, `UPDATE credit_holds SET status = 'captured' WHERE hold_transaction_id = $1`, badHold.TransactionID); err != nil {
@@ -281,7 +281,7 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 	pool := testdb.Open(t)
 	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
 	ctx := t.Context()
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 50), Metadata: testhelpers.TestMetadata("active-held:grant", "active-held-grant")}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), Amount: testhelpers.MustCreditAmount(t, 50), Metadata: testhelpers.TestMetadata("active-held:grant", "active-held-grant")}); err != nil {
 		t.Fatal(err)
 	}
 	var priceID, priceVersion int64
@@ -290,7 +290,7 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 	}
 
 	capturedHold := createReconciliationTaskFixture(t, pool, service, "task_active_captured", "pending", "", 93, priceID, priceVersion)
-	capture, err := service.Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), HoldTransactionID: capturedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("capture:active", "task_active_captured")})
+	capture, err := service.Settlement().Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 93), HoldTransactionID: capturedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("capture:active", "task_active_captured")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +340,7 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 func TestReconciliationScanDoesNotWaitOnNormalWalletHotRows(t *testing.T) {
 	pool := testdb.Open(t)
 	service := credits.NewService(pool)
-	if _, err := service.Grant(t.Context(), ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 99), Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("nonblock:grant", "nonblock-grant")}); err != nil {
+	if _, err := service.Administrative().Grant(t.Context(), ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 99), Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("nonblock:grant", "nonblock-grant")}); err != nil {
 		t.Fatal(err)
 	}
 	tx, err := pool.Begin(t.Context())

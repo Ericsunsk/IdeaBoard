@@ -28,6 +28,7 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/domain"
 	identityports "ideaboard/api/internal/identity/users/ports"
+	"ideaboard/api/internal/tenancy/funds"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	"ideaboard/api/internal/platform/adminbranding"
@@ -55,18 +56,13 @@ type ControlUserService interface {
 	GetByPublicID(ctx context.Context, publicID string) (*domain.User, error)
 }
 
-// ControlCreditCommands is the Control-side subset of the credits.Commands
-// seam. Only Credits owns ledger writes; control performs NO direct
-// ledger writes and issues no other command kinds.
+// ControlCreditCommands is the Control-side administrative command face.
+// Only Credits owns ledger writes; control performs NO direct ledger
+// writes and issues no other command kinds. It embeds the narrow
+// ports.AdministrativeCommands face so any widening is a build error;
+// account resolution rides the read seam (ControlCreditReads).
 type ControlCreditCommands interface {
-	Grant(ctx context.Context, command creditsports.GrantCommand) (creditsports.CommandResult, error)
-	Deduct(ctx context.Context, command creditsports.DeductionCommand) (creditsports.CommandResult, error)
-	Correct(ctx context.Context, command creditsports.CorrectionCommand) (creditsports.CommandResult, error)
-	Refund(ctx context.Context, command creditsports.RefundCommand) (creditsports.CommandResult, error)
-	// ResolvePersonalAccount returns the target user's deterministic initial
-	// personal Billing Account (#916): control fund operations address the
-	// account, never a user wallet.
-	ResolvePersonalAccount(ctx context.Context, userID int64) (int64, error)
+	creditsports.AdministrativeCommands
 }
 
 // ControlCreditReads is the Credits read side for the Control Plane.
@@ -99,7 +95,7 @@ type ControlTaskAdmin interface {
 // locate/audit surface (#923): platform-Admin addresses stable ba_
 // accounts directly, independent of any resolving Workspace.
 type ControlBillingAccountStore interface {
-	EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error)
+	ResolveFunds(ctx context.Context, workspacePublicID string) (funds.Identity, error)
 	GetBillingAccountByInternalID(ctx context.Context, billingAccountInternalID int64) (tenancy.BillingAccount, error)
 	GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancy.BillingAccount, error)
 	GetAdminBillingAccountByPublicID(ctx context.Context, publicID string) (tenancypg.AdminBillingAccount, error)

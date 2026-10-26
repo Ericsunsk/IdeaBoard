@@ -19,9 +19,9 @@ import (
 func TestTaskBillingUsageUsesUserCreatedIndexWithNormalPlanner(t *testing.T) {
 	pool := testdb.Open(t)
 	ctx := context.Background()
-	request, sku := seedTaskBillingUsageProduct(t, ctx, pool)
-	seedTaskBillingUsageSnapshots(t, ctx, pool, 81, 32, "usage_plan_target", request, sku)
-	seedTaskBillingUsageSnapshots(t, ctx, pool, 82, 4000, "usage_plan_other", request, sku)
+	sku := seedTaskBillingUsageProduct(t, ctx, pool)
+	seedTaskBillingUsageSnapshots(t, ctx, pool, 81, 32, "usage_plan_target", sku)
+	seedTaskBillingUsageSnapshots(t, ctx, pool, 82, 4000, "usage_plan_other", sku)
 	if _, err := pool.Exec(ctx, "ANALYZE task_billing_snapshots"); err != nil {
 		t.Fatalf("analyze task billing snapshots: %v", err)
 	}
@@ -73,12 +73,12 @@ WHERE billing_account_id = $1`, explainAccountID, location.String())
 func TestTaskUsageAggregationUsesShanghaiDayBoundary(t *testing.T) {
 	pool := testdb.Open(t)
 	ctx := context.Background()
-	request, sku := seedTaskBillingUsageProduct(t, ctx, pool)
+	sku := seedTaskBillingUsageProduct(t, ctx, pool)
 	const (
 		userID = int64(83)
 		prefix = "usage_shanghai_boundary"
 	)
-	seedTaskBillingUsageBoundarySnapshots(t, ctx, pool, userID, prefix, request, sku)
+	seedTaskBillingUsageBoundarySnapshots(t, ctx, pool, userID, prefix, sku)
 
 	location, err := time.LoadLocation("Asia/Shanghai")
 	if err != nil {
@@ -103,7 +103,6 @@ func seedTaskBillingUsageBoundarySnapshots(
 	pool *pgxpool.Pool,
 	userID int64,
 	prefix string,
-	request Request,
 	sku billing.SKU,
 ) {
 	t.Helper()
@@ -145,7 +144,7 @@ FROM (
 CROSS JOIN (
   VALUES ($4::varchar, $5::timestamptz), ($6::varchar, $7::timestamptz)
 ) AS fixture(task_id, created_at)`,
-		userID, request.Service, string(sku),
+		userID, workflow.FeatureSlugGeneration, string(sku),
 		beforeTaskID, beforeBoundary, afterTaskID, afterBoundary, boundaryAccountID,
 	); err != nil {
 		t.Fatalf("seed task snapshots around Shanghai day boundary: %v", err)
@@ -163,21 +162,18 @@ func seedTaskBillingUsageProduct(
 	t *testing.T,
 	ctx context.Context,
 	pool *pgxpool.Pool,
-) (Request, billing.SKU) {
+) billing.SKU {
 	t.Helper()
-	request, err := AIImageRequest(workflow.FeatureSlugGeneration, "1k", 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sku, err := ResolveSKU(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	service := billingpostgres.NewStore(pool)
-	if _, err := service.PublishPrice(ctx, featurePriceInput(sku, "Usage Index", 0)); err != nil {
+	sku := billing.SKU("ai-image:" + workflow.FeatureSlugGeneration)
+	if _, err := billingpostgres.NewStore(pool).PublishPrice(ctx, billing.PublishPriceInput{
+		Definition: billing.BillableItemDefinition{
+			SKU: sku, Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "Usage Index",
+		},
+		UnitCredits: 0, ActorID: 1,
+	}); err != nil {
 		t.Fatalf("publish usage index price: %v", err)
 	}
-	return request, sku
+	return sku
 }
 
 func seedTaskBillingUsageSnapshots(
@@ -187,7 +183,6 @@ func seedTaskBillingUsageSnapshots(
 	userID int64,
 	count int,
 	prefix string,
-	request Request,
 	sku billing.SKU,
 ) {
 	t.Helper()
@@ -223,7 +218,7 @@ FROM (
   LIMIT 1
 ) AS price
 CROSS JOIN generate_series(1, $2::integer) AS series`,
-		userID, count, prefix, request.Service, string(sku), seriesAccountID); err != nil {
+		userID, count, prefix, workflow.FeatureSlugGeneration, string(sku), seriesAccountID); err != nil {
 		t.Fatalf("seed task billing snapshots: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `

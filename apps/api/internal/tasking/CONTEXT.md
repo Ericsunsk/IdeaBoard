@@ -102,5 +102,7 @@ Keep SQL, River types, provider SDKs, and Gin handlers out of `domain`.
 
 Terminal billing settlement belongs to the PostgreSQL adapter because it must
 share the caller-owned SQL transaction and lock order with terminal Task facts.
-The application billing service owns quote/hold orchestration only; durable
-settlement facts and errors live under `ports/billing`.
+`workspacetasks.Service.Create` is the sole Task acceptance seam: authorization,
+submission claim, payer resolution, Quote, quota, Hold, Task insert, routing
+snapshot and enqueue share one transaction. Durable settlement facts and errors
+live under `ports/billing`; `application/billing` only reads durable usage facts.

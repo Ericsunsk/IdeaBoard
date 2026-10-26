@@ -71,7 +71,7 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 	if _, err := tx.Exec(ctx, `SET LOCAL ROLE `+roleSQL); err != nil {
 		t.Fatalf("SET ROLE(command) error = %v", err)
 	}
-	result, err := service.InTx(tx).Grant(ctx, ports.GrantCommand{
+	result, err := service.GrantsInTx(tx).Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42),
 		Amount:           testhelpers.MustCreditAmount(t, 25),
 		Metadata:         testhelpers.TestMetadata("runtime-role:grant", "runtime-role-grant"),
@@ -103,7 +103,7 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 		_ = tx.Rollback(ctx)
 		t.Fatalf("runtime role ReleaseWalletRestriction() error = %v", err)
 	}
-	purchase, err := service.InTx(tx).Purchase(ctx, ports.PurchaseCommand{
+	purchase, err := service.PaymentInTx(tx).Purchase(ctx, ports.PurchaseCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42), Amount: testhelpers.MustCreditAmount(t, 5),
 		Metadata: testhelpers.PurchaseMetadata("runtime-role:purchase", "runtime-role-payment-order"),
 	})
@@ -329,7 +329,7 @@ func assertTemporaryCreditTablesCannotShadowLedger(
 			t.Fatalf("create temp shadow table %s error = %v", tableName, err)
 		}
 	}
-	result, err := credits.NewService(pool).InTx(tx).Grant(ctx, ports.GrantCommand{
+	result, err := credits.NewService(pool).GrantsInTx(tx).Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42),
 		Amount:           testhelpers.MustCreditAmount(t, 7),
 		Metadata:         testhelpers.TestMetadata("runtime-role:temp-shadow", "runtime-role-temp-shadow"),

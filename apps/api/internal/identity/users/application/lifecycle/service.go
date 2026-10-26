@@ -35,23 +35,17 @@ func (s *Service) SetUserStatus(ctx context.Context, userID int64, status int16)
 	if s == nil || s.pool == nil || s.credits == nil || userID <= 0 || (status != domain.StatusBanned && status != domain.StatusActive) {
 		return fmt.Errorf("invalid user status lifecycle command")
 	}
-	// Ambient guard transaction (control audit atomicity, step 3): the
-	// status flip plus the wallet freeze join the borrowed guard
-	// transaction. The guard began it and the guard commits or rolls it
-	// back, so this path never commits or rolls back. With no carrier
-	// the legacy owned-transaction path below runs unchanged.
-	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		return s.setUserStatusTx(ctx, ambient, userID, status)
-	}
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	scope, err := dbutil.Begin(ctx, s.pool, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("begin user status transaction: %w", err)
 	}
-	defer rollbackIdentityTransaction(ctx, tx, "user status")
-	if err := s.setUserStatusTx(ctx, tx, userID, status); err != nil {
+	if scope.Owned() {
+		defer rollbackIdentityTransaction(ctx, scope.Tx(), "user status")
+	}
+	if err := s.setUserStatusTx(ctx, scope.Tx(), userID, status); err != nil {
 		return err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := scope.Commit(ctx); err != nil {
 		return fmt.Errorf("commit user status transaction: %w", err)
 	}
 	return nil

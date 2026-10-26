@@ -170,11 +170,12 @@ func (d *ContractControlDeps) resolveControlBillingAccountForWorkspace(c *gin.Co
 		writeControlTenancyError(c, err, runtimehttp.MsgListControlBillingAccounts)
 		return
 	}
-	account, err := d.BillingAccounts.EnsureBillingAccountForWorkspace(c.Request.Context(), workspace.InternalID, workspace.PublicID)
+	identity, err := d.BillingAccounts.ResolveFunds(c.Request.Context(), workspace.PublicID)
 	if err != nil {
 		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable2)
 		return
 	}
+	account := identity.ToBillingAccount()
 	items := []controlBillingAccountItem{{
 		BillingAccountID: account.PublicID,
 		OwnerType:        account.OwnerType,

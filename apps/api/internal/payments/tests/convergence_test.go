@@ -21,7 +21,7 @@ func TestPaidPaymentOrderAndPurchaseCreditConvergeAtomicallyOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	account42 := paymentAccount(t, creditService, 42)
-	if _, err := creditService.Grant(t.Context(), ports.GrantCommand{
+	if _, err := creditService.Administrative().Grant(t.Context(), ports.GrantCommand{
 		BillingAccountID: account42, Amount: seedAmount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "payment-convergence-seed", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "42"},
@@ -89,7 +89,7 @@ func TestPaidPaymentOrderFactConflictRollsBackWithoutCredit(t *testing.T) {
 	creditService := credits.NewService(db)
 	seedAmount, _ := domain.NewCreditAmount(1)
 	account42 := paymentAccount(t, creditService, 42)
-	if _, err := creditService.Grant(t.Context(), ports.GrantCommand{
+	if _, err := creditService.Administrative().Grant(t.Context(), ports.GrantCommand{
 		BillingAccountID: account42, Amount: seedAmount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "payment-conflict-seed", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "42"},

@@ -23,7 +23,7 @@ func TestAdminCanGrantCreditsAndReadWalletLedger(t *testing.T) {
 	service := credits.NewService(pool)
 	ctx := context.Background()
 
-	result, err := service.Grant(ctx, ports.GrantCommand{
+	result, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42),
 		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata: domain.CommandMetadata{
@@ -95,11 +95,11 @@ func TestCreditCommandIdempotencyReturnsOriginalResultAndRejectsHashConflict(t *
 		Metadata:         testhelpers.TestMetadata("credit-command:idempotent", "idempotent-grant"),
 	}
 
-	first, err := service.Grant(ctx, command)
+	first, err := service.Administrative().Grant(ctx, command)
 	if err != nil {
 		t.Fatalf("first Grant() error = %v", err)
 	}
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 42),
 		Amount:           testhelpers.MustCreditAmount(t, 25),
 		Metadata:         testhelpers.TestMetadata("credit-command:second", "second-grant"),
@@ -107,7 +107,7 @@ func TestCreditCommandIdempotencyReturnsOriginalResultAndRejectsHashConflict(t *
 		t.Fatalf("second independent Grant() error = %v", err)
 	}
 
-	replay, err := service.Grant(ctx, command)
+	replay, err := service.Administrative().Grant(ctx, command)
 	if err != nil {
 		t.Fatalf("replayed Grant() error = %v", err)
 	}
@@ -120,10 +120,10 @@ func TestCreditCommandIdempotencyReturnsOriginalResultAndRejectsHashConflict(t *
 
 	conflicting := command
 	conflicting.Amount = testhelpers.MustCreditAmount(t, 101)
-	if _, err := service.Grant(ctx, conflicting); !errors.Is(err, domain.ErrIdempotencyConflict) {
+	if _, err := service.Administrative().Grant(ctx, conflicting); !errors.Is(err, domain.ErrIdempotencyConflict) {
 		t.Fatalf("conflicting Grant() error = %v, want domain.ErrIdempotencyConflict", err)
 	}
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 88),
 		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata:         command.Metadata,
@@ -138,14 +138,14 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(88)
 
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
 		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata:         testhelpers.TestMetadata("lifecycle:grant", "lifecycle-grant"),
 	}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	hold, err := service.Hold(ctx, ports.HoldCommand{
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
 		Amount:           testhelpers.MustCreditAmount(t, 80),
 		Metadata:         testhelpers.TestMetadata("lifecycle:hold:capture", "lifecycle-hold-capture"),
@@ -156,7 +156,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	if hold.Wallet.Available != 20 || hold.Wallet.Reserved != 80 {
 		t.Fatalf("hold wallet = %+v", hold.Wallet)
 	}
-	capture, err := service.Capture(ctx, ports.CaptureCommand{
+	capture, err := service.Settlement().Capture(ctx, ports.CaptureCommand{
 		BillingAccountID:  testhelpers.MustBillingAccount(t, pool, userID),
 		HoldTransactionID: hold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 80),
@@ -168,7 +168,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	if capture.Wallet.Available != 20 || capture.Wallet.Reserved != 0 || capture.Amount != 80 {
 		t.Fatalf("capture result = %+v", capture)
 	}
-	if _, err := service.Release(ctx, ports.ReleaseCommand{
+	if _, err := service.Settlement().Release(ctx, ports.ReleaseCommand{
 		BillingAccountID:  testhelpers.MustBillingAccount(t, pool, userID),
 		HoldTransactionID: hold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 1),
@@ -176,7 +176,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	}); !errors.Is(err, domain.ErrHoldSettled) {
 		t.Fatalf("Release(settled hold) error = %v, want domain.ErrHoldSettled", err)
 	}
-	refund, err := service.Refund(ctx, ports.RefundCommand{
+	refund, err := service.Administrative().Refund(ctx, ports.RefundCommand{
 		BillingAccountID:    testhelpers.MustBillingAccount(t, pool, userID),
 		ChargeTransactionID: capture.TransactionID,
 		Amount:              testhelpers.MustCreditAmount(t, 30),
@@ -188,7 +188,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	if refund.Wallet.Available != 50 || refund.Wallet.Reserved != 0 {
 		t.Fatalf("refund wallet = %+v", refund.Wallet)
 	}
-	if _, err := service.Refund(ctx, ports.RefundCommand{
+	if _, err := service.Administrative().Refund(ctx, ports.RefundCommand{
 		BillingAccountID:    testhelpers.MustBillingAccount(t, pool, userID),
 		ChargeTransactionID: capture.TransactionID,
 		Amount:              testhelpers.MustCreditAmount(t, 51),
@@ -197,7 +197,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 		t.Fatalf("Refund(over charge) error = %v, want domain.ErrRefundExceedsCharge", err)
 	}
 
-	releasedHold, err := service.Hold(ctx, ports.HoldCommand{
+	releasedHold, err := service.Settlement().Hold(ctx, ports.HoldCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
 		Amount:           testhelpers.MustCreditAmount(t, 10),
 		Metadata:         testhelpers.TestMetadata("lifecycle:hold:release", "lifecycle-hold-release"),
@@ -205,7 +205,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second Hold() error = %v", err)
 	}
-	release, err := service.Release(ctx, ports.ReleaseCommand{
+	release, err := service.Settlement().Release(ctx, ports.ReleaseCommand{
 		BillingAccountID:  testhelpers.MustBillingAccount(t, pool, userID),
 		HoldTransactionID: releasedHold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 10),
@@ -217,7 +217,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	if release.Wallet.Available != 50 || release.Wallet.Reserved != 0 {
 		t.Fatalf("release wallet = %+v", release.Wallet)
 	}
-	if _, err := service.Hold(ctx, ports.HoldCommand{
+	if _, err := service.Settlement().Hold(ctx, ports.HoldCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
 		Amount:           testhelpers.MustCreditAmount(t, 51),
 		Metadata:         testhelpers.TestMetadata("lifecycle:insufficient", "lifecycle-insufficient"),
@@ -241,21 +241,21 @@ func TestCreditHoldSupportsOneCaptureAndOneReleaseWithStableTotals(t *testing.T)
 	const userID int64 = 889
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
 
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 4), Metadata: testhelpers.TestMetadata("partial:grant", "partial-grant")}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 4), Metadata: testhelpers.TestMetadata("partial:grant", "partial-grant")}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	hold, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 4), Metadata: testhelpers.TestMetadata("partial:hold", "partial-hold")})
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 4), Metadata: testhelpers.TestMetadata("partial:hold", "partial-hold")})
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	capture, err := service.Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata("partial:capture", "partial-capture")})
+	capture, err := service.Settlement().Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata("partial:capture", "partial-capture")})
 	if err != nil {
 		t.Fatalf("partial Capture() error = %v", err)
 	}
 	if capture.Amount != 2 || capture.Wallet.Reserved != 2 {
 		t.Fatalf("partial capture = %+v", capture)
 	}
-	release, err := service.Release(ctx, ports.ReleaseCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata("partial:release", "partial-release")})
+	release, err := service.Settlement().Release(ctx, ports.ReleaseCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata("partial:release", "partial-release")})
 	if err != nil {
 		t.Fatalf("partial Release() error = %v", err)
 	}
@@ -277,7 +277,7 @@ func TestConcurrentHoldsCannotOverspendOneWallet(t *testing.T) {
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	userID := int64(90)
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
 		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata:         testhelpers.TestMetadata("concurrent-holds:grant", "concurrent-holds-grant"),
@@ -293,7 +293,7 @@ func TestConcurrentHoldsCannotOverspendOneWallet(t *testing.T) {
 		attempt := attempt
 		go func() {
 			defer wait.Done()
-			_, err := service.Hold(ctx, ports.HoldCommand{
+			_, err := service.Settlement().Hold(ctx, ports.HoldCommand{
 				BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
 				Amount:           testhelpers.MustCreditAmount(t, 10),
 				Metadata: testhelpers.TestMetadata(
@@ -340,7 +340,7 @@ func TestDifferentWalletsDoNotShareASystemAccountLock(t *testing.T) {
 		t.Fatalf("Begin() error = %v", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	commands := service.InTx(tx)
+	commands := service.GrantsInTx(tx)
 	if _, err := commands.Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 91),
 		Amount:           testhelpers.MustCreditAmount(t, 10),
@@ -351,7 +351,7 @@ func TestDifferentWalletsDoNotShareASystemAccountLock(t *testing.T) {
 
 	result := make(chan error, 1)
 	go func() {
-		_, err := service.Grant(ctx, ports.GrantCommand{
+		_, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 			BillingAccountID: testhelpers.MustBillingAccount(t, pool, 92),
 			Amount:           testhelpers.MustCreditAmount(t, 10),
 			Metadata:         testhelpers.TestMetadata("parallel-wallets:second", "parallel-wallets-second"),
@@ -373,7 +373,7 @@ func TestPostgresEnforcesBalancedImmutableLedgerAndProjectionWrites(t *testing.T
 	service := credits.NewService(pool)
 	ctx := context.Background()
 	userID := int64(93)
-	grant, err := service.Grant(ctx, ports.GrantCommand{
+	grant, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID),
 		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata:         testhelpers.TestMetadata("ledger-invariants:grant", "ledger-invariants-grant"),

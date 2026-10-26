@@ -112,7 +112,7 @@ func (h *controlTxHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, billingAcc
 	if err != nil {
 		return "", err
 	}
-	result, err := h.credits.InTx(tx).Release(ctx, creditsports.ReleaseCommand{
+	result, err := h.credits.SettlementInTx(tx).Release(ctx, creditsports.ReleaseCommand{
 		BillingAccountID: billingAccountID, HoldTransactionID: holdID, Amount: creditAmount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey:    "control-cancel-release:" + taskID,
@@ -196,7 +196,7 @@ func (e *controlCancelEnv) creditServiceFor(t *testing.T) *credits.Service {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("grant amount: %v", err)
 	}
-	if _, err := service.InTx(tx).Grant(ctx, creditsports.GrantCommand{
+	if _, err := service.GrantsInTx(tx).Grant(ctx, creditsports.GrantCommand{
 		BillingAccountID: e.billingID, Amount: grant,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "control-cancel-grant-" + randomControlHex(t, 6),
@@ -224,7 +224,7 @@ func (e *controlCancelEnv) holdForTask(t *testing.T, service *credits.Service, t
 	if err != nil {
 		t.Fatalf("hold amount: %v", err)
 	}
-	result, err := service.Hold(ctx, creditsports.HoldCommand{
+	result, err := service.Settlement().Hold(ctx, creditsports.HoldCommand{
 		BillingAccountID: e.billingID, Amount: hold,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "control-cancel-hold-" + randomControlHex(t, 6),

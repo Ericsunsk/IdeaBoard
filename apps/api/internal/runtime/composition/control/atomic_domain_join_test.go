@@ -84,7 +84,7 @@ func TestControlGuardDomainAuditShareOneTransaction(t *testing.T) {
 		scope.Rollback(txCtx)
 		t.Fatalf("ResolvePersonalAccount() error = %v", err)
 	}
-	result, err := creditService.Grant(txCtx, ports.GrantCommand{
+	result, err := creditService.Administrative().Grant(txCtx, ports.GrantCommand{
 		BillingAccountID: joinAccountID,
 		Amount:           testhelpers.MustCreditAmount(t, 50),
 		Metadata:         testhelpers.TestMetadata("control-join-grant", "control-join-grant"),
@@ -162,7 +162,7 @@ func TestControlGuardRollbackRemovesDomainAndAudit(t *testing.T) {
 		scope.Rollback(txCtx)
 		t.Fatalf("ResolvePersonalAccount() error = %v", err)
 	}
-	result, err := creditService.Grant(txCtx, ports.GrantCommand{
+	result, err := creditService.Administrative().Grant(txCtx, ports.GrantCommand{
 		BillingAccountID: joinAccountID,
 		Amount:           testhelpers.MustCreditAmount(t, 50),
 		Metadata:         testhelpers.TestMetadata("control-join-rollback", "control-join-rollback"),

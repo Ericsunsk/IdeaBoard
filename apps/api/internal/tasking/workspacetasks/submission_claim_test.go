@@ -11,6 +11,7 @@ import (
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/tasking/settlement"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
@@ -66,7 +67,7 @@ func (e *atomicEnv) claimCount(t *testing.T, key string) int {
 
 func (e *atomicEnv) holdCount(t *testing.T, key string) int {
 	t.Helper()
-	return e.ledgerCount(t, `idempotency_key = $1`, workspacetasks.TaskSubmitHoldKey(e.ws, key))
+	return e.ledgerCount(t, `idempotency_key = $1`, settlement.TaskHoldKey(e.ws, key))
 }
 
 func (e *atomicEnv) submit(t *testing.T, key string, input workspacetasks.CreateInput) (*workspacetasks.WorkspaceTask, error) {
@@ -282,16 +283,16 @@ func TestSubmitEmptyKeyFailsClosed(t *testing.T) {
 // task id (which is exactly what made a retry un-fenceable).
 func TestSubmitHoldKeyIsDurableNotTaskScoped(t *testing.T) {
 	key := TaskSubmitKeyFixture()
-	first := workspacetasks.TaskSubmitHoldKey("ws_alpha", key)
-	second := workspacetasks.TaskSubmitHoldKey("ws_alpha", key)
+	first := settlement.TaskHoldKey("ws_alpha", key)
+	second := settlement.TaskHoldKey("ws_alpha", key)
 
 	if first != second {
 		t.Fatalf("hold key is not stable for one client key: %q vs %q", first, second)
 	}
-	if other := workspacetasks.TaskSubmitHoldKey("ws_beta", key); other == first {
+	if other := settlement.TaskHoldKey("ws_beta", key); other == first {
 		t.Fatal("hold key must be workspace-scoped: two workspaces shared a ledger key")
 	}
-	if other := workspacetasks.TaskSubmitHoldKey("ws_alpha", key+"-other"); other == first {
+	if other := settlement.TaskHoldKey("ws_alpha", key+"-other"); other == first {
 		t.Fatal("hold key must vary with the client key")
 	}
 	// Must stay inside the ledger's 160-char bound.

@@ -14,7 +14,6 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -52,9 +51,13 @@ func mapOrganizationMemberInvite(row dbsqlc.OrganizationMemberInvite, organizati
 }
 
 // organizationInviteTx binds the unified lifecycle to the organization scope.
+// policy supplies shared rules; the four hooks below are the retained
+// Tx/lock-order-sensitive parts (active-org locks + membership grant)
+// documented in member_invites.go. Table dispatch lives in the core switch.
 func organizationInviteTx(orgStore *OrganizationStore) postgresInviteTx {
 	return postgresInviteTx{
-		policy: tenancy.OrganizationInvitePolicy(),
+		policy:   tenancy.OrganizationInvitePolicy(),
+		orgStore: orgStore,
 		lockScopeForCreate: func(ctx context.Context, q *dbsqlc.Queries, scopePublicID string) (int64, string, string, error) {
 			organization, err := lockActiveOrganization(ctx, q, scopePublicID)
 			if err != nil {
@@ -62,113 +65,12 @@ func organizationInviteTx(orgStore *OrganizationStore) postgresInviteTx {
 			}
 			return organization.InternalID, organization.PublicID, organization.Name, nil
 		},
-		checkInviterRole: func(ctx context.Context, q *dbsqlc.Queries, scopeInternalID, inviterUserID int64, role string) error {
-			actorRole, _, err := orgStore.orgMutationContext(ctx, q, scopeInternalID, inviterUserID)
-			if err != nil {
-				return err
-			}
-			if actorRole != tenancy.RoleOwner && actorRole != tenancy.RoleAdmin {
-				return tenancy.ErrForbidden
-			}
-			if role == tenancy.RoleAdmin && actorRole != tenancy.RoleOwner {
-				return tenancy.ErrForbidden
-			}
-			return nil
-		},
-		checkCapacity: nil,
-		findPendingByEmail: func(ctx context.Context, q *dbsqlc.Queries, scopeInternalID int64, email string) (string, time.Time, bool, error) {
-			existing, err := q.GetPendingOrganizationMemberInviteByEmail(ctx, dbsqlc.GetPendingOrganizationMemberInviteByEmailParams{
-				OrganizationID: scopeInternalID,
-				InviteeEmail:   email,
-			})
-			if err != nil {
-				if database.IsNotFound(err) {
-					return "", time.Time{}, false, nil
-				}
-				return "", time.Time{}, false, err
-			}
-			return existing.PublicID, existing.ExpiresAt.Time, true, nil
-		},
-		markExpired: func(ctx context.Context, q *dbsqlc.Queries, scopeInternalID int64, publicID string) error {
-			_, err := q.UpdateOrganizationMemberInviteStatus(ctx, dbsqlc.UpdateOrganizationMemberInviteStatusParams{
-				PublicID:       publicID,
-				OrganizationID: scopeInternalID,
-				Status:         tenancy.MemberInviteStatusExpired,
-			})
-			return err
-		},
-		insertInvite: func(ctx context.Context, q *dbsqlc.Queries, scopeInternalID int64, displayPublicID, displayName string, inviterUserID int64, email, role, tokenHash string, inviteeUserID int64, expiresAt time.Time, publicID string) (*tenancy.MemberInvite, error) {
-			row, err := q.CreateOrganizationMemberInvite(ctx, dbsqlc.CreateOrganizationMemberInviteParams{
-				PublicID:       publicID,
-				OrganizationID: scopeInternalID,
-				InviterUserID:  inviterUserID,
-				InviteeEmail:   email,
-				InviteeUserID:  pgtype.Int8{Int64: inviteeUserID, Valid: inviteeUserID > 0},
-				Role:           role,
-				TokenHash:      tokenHash,
-				ExpiresAt:      pgtype.Timestamptz{Time: expiresAt, Valid: true},
-			})
-			if err != nil {
-				if database.IsDuplicateConstraintError(err) {
-					return nil, tenancy.ErrConflict
-				}
-				return nil, err
-			}
-			return tenancy.MemberInviteFromOrganization(mapOrganizationMemberInvite(row, displayPublicID, displayName)), nil
-		},
 		lockScopeForCancel: func(ctx context.Context, q *dbsqlc.Queries, scopePublicID string) (int64, error) {
 			organization, err := lockActiveOrganization(ctx, q, scopePublicID)
 			if err != nil {
 				return 0, err
 			}
 			return organization.InternalID, nil
-		},
-		getForUpdate: func(ctx context.Context, q *dbsqlc.Queries, publicID string, scopeInternalID int64) (*tenancy.MemberInvite, error) {
-			invite, err := q.GetOrganizationMemberInviteByPublicIDForUpdate(ctx, dbsqlc.GetOrganizationMemberInviteByPublicIDForUpdateParams{
-				PublicID:       publicID,
-				OrganizationID: pgtype.Int8{Int64: scopeInternalID, Valid: true},
-			})
-			if err != nil {
-				return nil, notFound(err)
-			}
-			org, orgErr := q.GetOrganizationByInternalID(ctx, invite.OrganizationID)
-			orgPublicID, orgName := "", ""
-			if orgErr == nil {
-				orgPublicID, orgName = org.PublicID, org.Name
-			}
-			return tenancy.MemberInviteFromOrganization(mapOrganizationMemberInvite(invite, orgPublicID, orgName)), nil
-		},
-		cancelInvite: func(ctx context.Context, q *dbsqlc.Queries, scopeInternalID int64, publicID string, callerUserID int64) error {
-			_, err := q.CancelOrganizationMemberInvite(ctx, dbsqlc.CancelOrganizationMemberInviteParams{
-				CallerUserID:   pgtype.Int8{Int64: callerUserID, Valid: callerUserID > 0},
-				PublicID:       publicID,
-				OrganizationID: scopeInternalID,
-			})
-			return err
-		},
-		resolveForDecision: func(ctx context.Context, q *dbsqlc.Queries, ref string) (*tenancy.MemberInvite, error) {
-			var invite dbsqlc.OrganizationMemberInvite
-			var err error
-			if tenancy.IsMemberInviteRef(ref, tenancy.OrganizationInvitePrefix) {
-				invite, err = q.GetOrganizationMemberInviteByPublicID(ctx, dbsqlc.GetOrganizationMemberInviteByPublicIDParams{
-					PublicID:       ref,
-					OrganizationID: pgtype.Int8{},
-				})
-			} else {
-				invite, err = q.GetOrganizationMemberInviteByTokenHash(ctx, dbsqlc.GetOrganizationMemberInviteByTokenHashParams{
-					TokenHash:      tenancy.MemberInviteTokenHash(ref),
-					OrganizationID: pgtype.Int8{},
-				})
-			}
-			if err != nil {
-				return nil, notFound(err)
-			}
-			org, orgErr := q.GetOrganizationByInternalID(ctx, invite.OrganizationID)
-			orgPublicID, orgName := "", ""
-			if orgErr == nil {
-				orgPublicID, orgName = org.PublicID, org.Name
-			}
-			return tenancy.MemberInviteFromOrganization(mapOrganizationMemberInvite(invite, orgPublicID, orgName)), nil
 		},
 		checkAcceptScope: func(ctx context.Context, q *dbsqlc.Queries, inv *tenancy.MemberInvite) error {
 			orgRow, err := q.GetOrganizationByInternalID(ctx, inv.ScopeInternalID)
@@ -221,15 +123,6 @@ func organizationInviteTx(orgStore *OrganizationStore) postgresInviteTx {
 				Role:                 memRow.Role,
 				CreatedAt:            dbutil.TimeValue(memRow.CreatedAt),
 			}, nil
-		},
-		markDecided: func(ctx context.Context, q *dbsqlc.Queries, inv *tenancy.MemberInvite, status string, recipientUserID int64) error {
-			_, err := q.UpdateOrganizationMemberInviteStatus(ctx, dbsqlc.UpdateOrganizationMemberInviteStatusParams{
-				PublicID:          inv.PublicID,
-				OrganizationID:    inv.ScopeInternalID,
-				Status:            status,
-				RespondedByUserID: pgtype.Int8{Int64: recipientUserID, Valid: true},
-			})
-			return err
 		},
 	}
 }

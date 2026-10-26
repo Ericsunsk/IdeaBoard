@@ -172,7 +172,7 @@ assert_output_line "${atlas_hcl_output}" 'web=false'
 assert_output_line "${atlas_hcl_output}" 'realtime=false'
 assert_output_line "${atlas_hcl_output}" 'docs_only=false'
 
-migration_sql_output="$(printf '%s\n' apps/api/internal/db/migrations/20261020000001_board_y_updates.sql | "${classifier}")"
+migration_sql_output="$(printf '%s\n' apps/api/internal/db/migrations/20261108000000_baseline.sql | "${classifier}")"
 
 assert_output_line "${migration_sql_output}" 'api=true'
 assert_output_line "${migration_sql_output}" 'migration_integration=true'

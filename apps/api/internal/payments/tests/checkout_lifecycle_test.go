@@ -623,7 +623,7 @@ func seedCheckoutLifecycleWallet(t *testing.T, wallets *credits.Service, userID 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := wallets.Grant(t.Context(), ports.GrantCommand{
+	if _, err := wallets.Administrative().Grant(t.Context(), ports.GrantCommand{
 		BillingAccountID: accountID, Amount: amount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: fmt.Sprintf("checkout-lifecycle-wallet-%d", userID),

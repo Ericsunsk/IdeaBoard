@@ -43,17 +43,13 @@ func (s *stubTaskCatalogStore) DeleteArchived(context.Context, string, int64) (b
 	return billing.ArchivedItemDeleteResult{}, errors.New("stub: no delete")
 }
 
-func (s *stubTaskCatalogStore) QuoteAtResolution(_ context.Context, sku string, resolution billing.OutputResolution, quantity int64) (billing.Quote, error) {
+func (s *stubTaskCatalogStore) Quote(_ context.Context, _ pgx.Tx, sku string, resolution billing.OutputResolution, quantity int64) (billing.Quote, error) {
 	if s.err != nil {
 		return billing.Quote{}, s.err
 	}
 	quote := s.quote
 	quote.Quantity = quantity
 	return quote, nil
-}
-
-func (s *stubTaskCatalogStore) QuoteAtResolutionInTx(context.Context, pgx.Tx, string, billing.OutputResolution, int64) (billing.Quote, error) {
-	return billing.Quote{}, errors.New("stub: no tx quote")
 }
 
 func testTaskCatalog(amount int64, err error) *billingapplication.BillableItemCatalog {

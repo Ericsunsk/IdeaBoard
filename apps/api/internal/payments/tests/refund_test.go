@@ -332,7 +332,7 @@ func TestExternalDashboardRefundInsufficientIdeasSurfacesRecoverableError(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := credits.NewService(pool).Deduct(t.Context(), ports.DeductionCommand{BillingAccountID: paymentAccount(t, credits.NewService(pool), 42), Amount: spendAmount, Metadata: domain.CommandMetadata{
+	if _, err := credits.NewService(pool).Administrative().Deduct(t.Context(), ports.DeductionCommand{BillingAccountID: paymentAccount(t, credits.NewService(pool), 42), Amount: spendAmount, Metadata: domain.CommandMetadata{
 		IdempotencyKey: "refund-external-shortage-spend", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "42"}, Source: "admin", Reason: "consume Ideas", BusinessReference: domain.BusinessReference{Type: "test", ID: "shortage"},
 	}}); err != nil {
 		t.Fatalf("spend Ideas: %v", err)

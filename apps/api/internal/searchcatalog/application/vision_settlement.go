@@ -6,7 +6,7 @@
 //
 // Settlement never calls the vision provider; the executor (vision.go /
 // vision_provider.go) owns provider I/O. Every Credits write funnels through
-// the typed credits.Commands seam via InTx; this package never touches the
+// the typed settlement face (SettlementInTx) via credits.Service; this package never touches the
 // Ledger or balance projections directly.
 //
 // Settlement identity (#918): every operation persists the triple
@@ -28,7 +28,9 @@ import (
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/tasking/settlement"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -51,11 +53,22 @@ func (s *VisionBillingService) reserve(ctx context.Context, workspacePublicID st
 	if workspacePublicID == "" || userID <= 0 {
 		return visionReservation{}, ErrVisionWorkspaceNotFound
 	}
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	// Borrow-or-begin on the dbutil interface: the reservation unit joins
+	// the ambient guard transaction when one is staged, or opens its own
+	// settlement transaction otherwise. With no carrier the owned path
+	// below commits and rolls back exactly like the historical
+	// pool.BeginTx leg it replaces.
+	scope, err := dbutil.Begin(ctx, s.pool, pgx.TxOptions{})
 	if err != nil {
 		return visionReservation{}, fmt.Errorf("begin vision billing transaction: %w", err)
 	}
-	defer tx.Rollback(context.Background())
+	tx := scope.Tx()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = scope.Rollback(ctx)
+		}
+	}()
 	// Settlement-triple resolution joins this transaction (membership gate
 	// + stable #915 account). Hidden workspaces and non-members fail here
 	// with workspace_not_found before any catalog or ledger read, so no
@@ -95,7 +108,7 @@ func (s *VisionBillingService) reserve(ctx context.Context, workspacePublicID st
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return visionReservation{}, fmt.Errorf("load vision operation: %w", err)
 	}
-	quote, err := s.catalog.QuoteAtResolutionInTx(ctx, tx, visionSearchSKU, billing.OutputResolution1K, 1)
+	quote, err := s.catalog.Quote(ctx, tx, visionSearchSKU, billing.OutputResolution1K, 1)
 	if err != nil || quote.TotalCredits <= 0 {
 		if err != nil {
 			if reason, ok := visionBillingDeferredReason(err); ok {
@@ -132,10 +145,10 @@ func (s *VisionBillingService) reserve(ctx context.Context, workspacePublicID st
 		}
 	}
 	operationID := uuid.NewString()
-	hold, err := s.credits.InTx(tx).Hold(ctx, ports.HoldCommand{
+	hold, err := s.credits.SettlementInTx(tx).Hold(ctx, ports.HoldCommand{
 		BillingAccountID: identity.BillingAccountID, Amount: amount,
 		Metadata: domain.CommandMetadata{
-			IdempotencyKey:    "ai-search:" + operationID + ":hold",
+			IdempotencyKey:    settlement.VisionHoldKey(operationID),
 			Actor:             domain.Actor{Type: domain.ActorUser, ID: fmt.Sprintf("%d", userID)},
 			Source:            "ai_search_vision",
 			Reason:            "vision search hold",
@@ -154,12 +167,13 @@ func (s *VisionBillingService) reserve(ctx context.Context, workspacePublicID st
 		}
 		return visionReservation{}, fmt.Errorf("insert vision operation: %w", err)
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := scope.Commit(ctx); err != nil {
 		if database.IsDuplicateConstraintError(err) {
 			return visionReservation{}, ErrVisionIdempotencyConflict
 		}
 		return visionReservation{}, fmt.Errorf("commit vision billing reservation: %w", err)
 	}
+	committed = true
 	return visionReservation{result: VisionBillingResult{OperationID: operationID, Status: string(VisionOperationPending)}, execute: true}, nil
 }
 
@@ -169,11 +183,17 @@ func (s *VisionBillingService) reserve(ctx context.Context, workspacePublicID st
 // membership re-gate, no account re-resolution), so post-Hold handovers
 // cannot divert the capture.
 func (s *VisionBillingService) capture(ctx context.Context, operationID, workspacePublicID string, userID int64, query string) error {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	scope, err := dbutil.Begin(ctx, s.pool, pgx.TxOptions{})
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(context.Background())
+	tx := scope.Tx()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = scope.Rollback(ctx)
+		}
+	}()
 	var holdID string
 	var amount int64
 	var accountID, workspaceID, submitter int64
@@ -187,10 +207,10 @@ func (s *VisionBillingService) capture(ctx context.Context, operationID, workspa
 	if err != nil {
 		return err
 	}
-	if _, err := s.credits.InTx(tx).Capture(ctx, ports.CaptureCommand{
+	if _, err := s.credits.SettlementInTx(tx).Capture(ctx, ports.CaptureCommand{
 		BillingAccountID: accountID, HoldTransactionID: holdID, Amount: creditAmount,
 		Metadata: domain.CommandMetadata{
-			IdempotencyKey: "ai-search:" + operationID + ":capture",
+			IdempotencyKey: settlement.VisionCaptureKey(operationID),
 			Actor:          domain.Actor{Type: domain.ActorUser, ID: fmt.Sprintf("%d", userID)},
 			Source:         "ai_search_vision", Reason: "vision search completed",
 			BusinessReference: domain.BusinessReference{Type: "ai_search_operation", ID: operationID},
@@ -201,18 +221,28 @@ func (s *VisionBillingService) capture(ctx context.Context, operationID, workspa
 	if _, err := tx.Exec(ctx, `UPDATE ai_search_operations SET status = 'succeeded', query = $2, updated_at = now(), settled_at = now() WHERE operation_id = $1::uuid`, operationID, query); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	if err := scope.Commit(ctx); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }
 
 // release settles a deterministically failed extraction: Credits Release
 // plus the durable failed marker commit atomically. Same stored-payer
 // rule as capture.
 func (s *VisionBillingService) release(ctx context.Context, operationID, workspacePublicID string, userID int64, code, message string) error {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	scope, err := dbutil.Begin(ctx, s.pool, pgx.TxOptions{})
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(context.Background())
+	tx := scope.Tx()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = scope.Rollback(ctx)
+		}
+	}()
 	var holdID string
 	var amount int64
 	var accountID, workspaceID, submitter int64
@@ -226,10 +256,10 @@ func (s *VisionBillingService) release(ctx context.Context, operationID, workspa
 	if err != nil {
 		return err
 	}
-	if _, err := s.credits.InTx(tx).Release(ctx, ports.ReleaseCommand{
+	if _, err := s.credits.SettlementInTx(tx).Release(ctx, ports.ReleaseCommand{
 		BillingAccountID: accountID, HoldTransactionID: holdID, Amount: creditAmount,
 		Metadata: domain.CommandMetadata{
-			IdempotencyKey: "ai-search:" + operationID + ":release",
+			IdempotencyKey: settlement.VisionReleaseKey(operationID),
 			Actor:          domain.Actor{Type: domain.ActorUser, ID: fmt.Sprintf("%d", userID)},
 			Source:         "ai_search_vision", Reason: "vision search failed",
 			BusinessReference: domain.BusinessReference{Type: "ai_search_operation", ID: operationID},
@@ -240,7 +270,11 @@ func (s *VisionBillingService) release(ctx context.Context, operationID, workspa
 	if _, err := tx.Exec(ctx, `UPDATE ai_search_operations SET status = 'failed', error_code = $2, error_message = $3, updated_at = now(), settled_at = now() WHERE operation_id = $1::uuid`, operationID, code, message); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	if err := scope.Commit(ctx); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }
 
 // verifyVisionWorkspace binds the settlement to its resource scope without

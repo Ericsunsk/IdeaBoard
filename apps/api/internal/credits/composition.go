@@ -207,23 +207,52 @@ func NewServiceWithReconciliation(pool *pgxpool.Pool, dispatcher ports.Reconcili
 	return buildService(pool, dispatcher)
 }
 
-// InTx lets Tasking compose Credits commands into its existing PostgreSQL
-// transaction. The caller owns commit and rollback. Callers without an
-// application-lifetime Service (notably the Payments repositories) use the
-// package-level CommandsInTx instead; both share NewTransactionCommands and
-// the default postgres backend set.
-func (s *Service) InTx(tx pgx.Tx) ports.Commands {
+// commandsInTx is the shared caller-owned-transaction view over the
+// default postgres backend set. The caller owns commit and rollback.
+// Narrow role faces below expose it per settlement role; the wide
+// ports.Commands value is only the carrier that each face narrows.
+func (s *Service) commandsInTx(tx pgx.Tx) ports.Commands {
 	if s == nil || s.commands == nil {
 		return commands.NewTransactionCommands(tx, commands.Backend{})
 	}
 	return commands.NewTransactionCommands(tx, s.commandBackend)
 }
 
-// CommandsInTx composes Credits commands into an existing pgx transaction
-// without requiring an application-lifetime Service. It is the canonical
-// seam for standalone repositories; Service owners keep using (s *Service).InTx.
-// The caller owns commit and rollback.
-func CommandsInTx(tx pgx.Tx) (ports.Commands, error) {
+// SettlementInTx lets workspace-scoped spenders (Tasking, Vision Search)
+// compose Hold/Capture/Release into the caller-owned PostgreSQL
+// transaction. The caller owns commit and rollback.
+func (s *Service) SettlementInTx(tx pgx.Tx) ports.SettlementCommands {
+	return s.commandsInTx(tx)
+}
+
+// AdministrativeInTx is the transaction-scoped Control fund-repair face
+// (Grant/Deduct/Correct/Refund). The caller owns commit and rollback.
+func (s *Service) AdministrativeInTx(tx pgx.Tx) ports.AdministrativeCommands {
+	return s.commandsInTx(tx)
+}
+
+// GrantsInTx is the transaction-scoped Grant-only face (notably Rewards,
+// which must not see Deduct/Correct/Refund). The caller owns commit and
+// rollback.
+func (s *Service) GrantsInTx(tx pgx.Tx) ports.Granter {
+	return s.commandsInTx(tx)
+}
+
+// PaymentInTx is the transaction-scoped Payments face
+// (Purchase/PurchaseRefundHold/PurchaseRefund/Release/dispute pair) for
+// Service owners. Standalone repositories without an
+// application-lifetime Service use the package-level CommandsInTx
+// instead. The caller owns commit and rollback.
+func (s *Service) PaymentInTx(tx pgx.Tx) ports.PaymentCommands {
+	return s.commandsInTx(tx)
+}
+
+// CommandsInTx composes Payments-owned Commands into an existing pgx
+// transaction without requiring an application-lifetime Service. It is
+// the canonical seam for the standalone Payments repositories; Service
+// owners use (s *Service).PaymentInTx instead. The caller owns commit
+// and rollback.
+func CommandsInTx(tx pgx.Tx) (ports.PaymentCommands, error) {
 	if tx == nil {
 		return nil, fmt.Errorf("credits: transaction is nil")
 	}
@@ -284,100 +313,191 @@ func RestrictionsInTx(tx pgx.Tx) ports.WalletRestrictionCommands {
 	return appwallet.NewRestrictionTransaction(tx, defaultPostgresBackends.wallet)
 }
 
-func (s *Service) Grant(ctx context.Context, command ports.GrantCommand) (ports.CommandResult, error) {
-	service, err := s.requireCommands()
+var (
+	_ ports.AdministrativeCommands = managedAdministrativeCommands{}
+	_ ports.SettlementCommands     = managedSettlementCommands{}
+	_ ports.PaymentCommands        = managedPaymentCommands{}
+)
+
+// managedAdministrativeCommands is the pool-owned Control fund-repair
+// view. Each call resolves the command service and runs inside one
+// managed (or ambient guard-carried) transaction through the single
+// commands.Service.ManagedCommands runner. Misconfigured services fail
+// at call time with the same service-unavailable error the previous
+// per-Command pass-throughs returned.
+type managedAdministrativeCommands struct {
+	service *Service
+}
+
+func (m managedAdministrativeCommands) Grant(ctx context.Context, command ports.GrantCommand) (ports.CommandResult, error) {
+	svc, err := m.service.requireCommands()
 	if err != nil {
 		return ports.CommandResult{}, err
 	}
-	return service.Grant(ctx, command)
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.CommandResult, error) {
+		return commands.Grant(ctx, command)
+	})
 }
 
-func (s *Service) Purchase(ctx context.Context, command ports.PurchaseCommand) (ports.CommandResult, error) {
-	service, err := s.requireCommands()
+func (m managedAdministrativeCommands) Deduct(ctx context.Context, command ports.DeductionCommand) (ports.CommandResult, error) {
+	svc, err := m.service.requireCommands()
 	if err != nil {
 		return ports.CommandResult{}, err
 	}
-	return service.Purchase(ctx, command)
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.CommandResult, error) {
+		return commands.Deduct(ctx, command)
+	})
 }
 
-func (s *Service) PurchaseRefundHold(ctx context.Context, command ports.PurchaseRefundHoldCommand) (ports.CommandResult, error) {
-	service, err := s.requireCommands()
+func (m managedAdministrativeCommands) Correct(ctx context.Context, command ports.CorrectionCommand) (ports.CommandResult, error) {
+	svc, err := m.service.requireCommands()
 	if err != nil {
 		return ports.CommandResult{}, err
 	}
-	return service.PurchaseRefundHold(ctx, command)
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.CommandResult, error) {
+		return commands.Correct(ctx, command)
+	})
 }
 
-func (s *Service) PurchaseRefund(ctx context.Context, command ports.PurchaseRefundCommand) (ports.CommandResult, error) {
-	service, err := s.requireCommands()
+func (m managedAdministrativeCommands) Refund(ctx context.Context, command ports.RefundCommand) (ports.CommandResult, error) {
+	svc, err := m.service.requireCommands()
 	if err != nil {
 		return ports.CommandResult{}, err
 	}
-	return service.PurchaseRefund(ctx, command)
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.CommandResult, error) {
+		return commands.Refund(ctx, command)
+	})
 }
 
-func (s *Service) PaymentDisputeDebit(ctx context.Context, command ports.PaymentDisputeDebitCommand) (ports.PaymentDisputeDebitResult, error) {
-	service, err := s.requireCommands()
+// managedSettlementCommands is the pool-owned workspace-spending view
+// (Hold/Capture/Release outside a caller transaction). Terminal
+// settlement prefers the transaction-scoped SettlementInTx face; this
+// view serves non-transactional holders.
+type managedSettlementCommands struct {
+	service *Service
+}
+
+func (m managedSettlementCommands) Hold(ctx context.Context, command ports.HoldCommand) (ports.CommandResult, error) {
+	svc, err := m.service.requireCommands()
+	if err != nil {
+		return ports.CommandResult{}, err
+	}
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.CommandResult, error) {
+		return commands.Hold(ctx, command)
+	})
+}
+
+func (m managedSettlementCommands) Capture(ctx context.Context, command ports.CaptureCommand) (ports.CommandResult, error) {
+	svc, err := m.service.requireCommands()
+	if err != nil {
+		return ports.CommandResult{}, err
+	}
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.CommandResult, error) {
+		return commands.Capture(ctx, command)
+	})
+}
+
+func (m managedSettlementCommands) Release(ctx context.Context, command ports.ReleaseCommand) (ports.CommandResult, error) {
+	svc, err := m.service.requireCommands()
+	if err != nil {
+		return ports.CommandResult{}, err
+	}
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.CommandResult, error) {
+		return commands.Release(ctx, command)
+	})
+}
+
+// Administrative returns the pool-owned Control fund-repair face
+// (Grant/Deduct/Correct/Refund). It never returns nil: a misconfigured
+// service yields a view whose calls fail with the service-unavailable
+// error, matching the previous pass-through behavior.
+func (s *Service) Administrative() ports.AdministrativeCommands {
+	return managedAdministrativeCommands{service: s}
+}
+
+// managedPaymentCommands is the pool-owned Payments view
+// (Purchase/PurchaseRefundHold/PurchaseRefund/Release/dispute pair).
+// Production Payments paths prefer the transaction-scoped PaymentInTx
+// face; this view serves non-transactional validation and tests.
+type managedPaymentCommands struct {
+	service *Service
+}
+
+func (m managedPaymentCommands) Purchase(ctx context.Context, command ports.PurchaseCommand) (ports.CommandResult, error) {
+	svc, err := m.service.requireCommands()
+	if err != nil {
+		return ports.CommandResult{}, err
+	}
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.CommandResult, error) {
+		return commands.Purchase(ctx, command)
+	})
+}
+
+func (m managedPaymentCommands) PurchaseRefundHold(ctx context.Context, command ports.PurchaseRefundHoldCommand) (ports.CommandResult, error) {
+	svc, err := m.service.requireCommands()
+	if err != nil {
+		return ports.CommandResult{}, err
+	}
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.CommandResult, error) {
+		return commands.PurchaseRefundHold(ctx, command)
+	})
+}
+
+func (m managedPaymentCommands) PurchaseRefund(ctx context.Context, command ports.PurchaseRefundCommand) (ports.CommandResult, error) {
+	svc, err := m.service.requireCommands()
+	if err != nil {
+		return ports.CommandResult{}, err
+	}
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.CommandResult, error) {
+		return commands.PurchaseRefund(ctx, command)
+	})
+}
+
+func (m managedPaymentCommands) Release(ctx context.Context, command ports.ReleaseCommand) (ports.CommandResult, error) {
+	svc, err := m.service.requireCommands()
+	if err != nil {
+		return ports.CommandResult{}, err
+	}
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.CommandResult, error) {
+		return commands.Release(ctx, command)
+	})
+}
+
+func (m managedPaymentCommands) PaymentDisputeDebit(ctx context.Context, command ports.PaymentDisputeDebitCommand) (ports.PaymentDisputeDebitResult, error) {
+	svc, err := m.service.requireCommands()
 	if err != nil {
 		return ports.PaymentDisputeDebitResult{}, err
 	}
-	return service.PaymentDisputeDebit(ctx, command)
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.PaymentDisputeDebitResult, error) {
+		return commands.PaymentDisputeDebit(ctx, command)
+	})
 }
 
-func (s *Service) PaymentDisputeRestore(ctx context.Context, command ports.PaymentDisputeRestoreCommand) (ports.CommandResult, error) {
-	service, err := s.requireCommands()
+func (m managedPaymentCommands) PaymentDisputeRestore(ctx context.Context, command ports.PaymentDisputeRestoreCommand) (ports.CommandResult, error) {
+	svc, err := m.service.requireCommands()
 	if err != nil {
 		return ports.CommandResult{}, err
 	}
-	return service.PaymentDisputeRestore(ctx, command)
+	return commands.ManagedCommands(ctx, svc, func(commands ports.Commands) (ports.CommandResult, error) {
+		return commands.PaymentDisputeRestore(ctx, command)
+	})
 }
 
-func (s *Service) Deduct(ctx context.Context, command ports.DeductionCommand) (ports.CommandResult, error) {
-	service, err := s.requireCommands()
-	if err != nil {
-		return ports.CommandResult{}, err
-	}
-	return service.Deduct(ctx, command)
+// Payment returns the pool-owned Payments face
+// (Purchase/PurchaseRefundHold/PurchaseRefund/Release/dispute pair). It
+// never returns nil: a misconfigured service yields a view whose calls
+// fail with the service-unavailable error, matching the previous
+// pass-through behavior.
+func (s *Service) Payment() ports.PaymentCommands {
+	return managedPaymentCommands{service: s}
 }
 
-func (s *Service) Correct(ctx context.Context, command ports.CorrectionCommand) (ports.CommandResult, error) {
-	service, err := s.requireCommands()
-	if err != nil {
-		return ports.CommandResult{}, err
-	}
-	return service.Correct(ctx, command)
-}
-
-func (s *Service) Hold(ctx context.Context, command ports.HoldCommand) (ports.CommandResult, error) {
-	service, err := s.requireCommands()
-	if err != nil {
-		return ports.CommandResult{}, err
-	}
-	return service.Hold(ctx, command)
-}
-
-func (s *Service) Capture(ctx context.Context, command ports.CaptureCommand) (ports.CommandResult, error) {
-	service, err := s.requireCommands()
-	if err != nil {
-		return ports.CommandResult{}, err
-	}
-	return service.Capture(ctx, command)
-}
-
-func (s *Service) Release(ctx context.Context, command ports.ReleaseCommand) (ports.CommandResult, error) {
-	service, err := s.requireCommands()
-	if err != nil {
-		return ports.CommandResult{}, err
-	}
-	return service.Release(ctx, command)
-}
-
-func (s *Service) Refund(ctx context.Context, command ports.RefundCommand) (ports.CommandResult, error) {
-	service, err := s.requireCommands()
-	if err != nil {
-		return ports.CommandResult{}, err
-	}
-	return service.Refund(ctx, command)
+// Settlement returns the pool-owned workspace-spending face
+// (Hold/Capture/Release). It never returns nil: a misconfigured service
+// yields a view whose calls fail with the service-unavailable error,
+// matching the previous pass-through behavior.
+func (s *Service) Settlement() ports.SettlementCommands {
+	return managedSettlementCommands{service: s}
 }
 
 func (s *Service) RestrictWallet(

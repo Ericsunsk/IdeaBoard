@@ -27,6 +27,7 @@ import (
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	usageapplication "ideaboard/api/internal/usage/application"
 	usagedomain "ideaboard/api/internal/usage/domain"
@@ -82,11 +83,16 @@ func (f *fakeBillingAccounts) billingScopeOf(ctx context.Context, workspacePubli
 	return fmt.Sprintf("personal:%d", *ws.OwnerUserID), tenancypg.BillingOwnerWorkspace, false, nil
 }
 
-func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error) {
+func (f *fakeBillingAccounts) ResolveFunds(ctx context.Context, workspacePublicID string) (funds.Identity, error) {
 	scope, ownerType, shared, err := f.billingScopeOf(ctx, workspacePublicID)
 	if err != nil {
-		return tenancy.BillingAccount{}, err
+		return funds.Identity{}, err
 	}
+	ws, err := f.store.GetWorkspace(ctx, workspacePublicID)
+	if err != nil {
+		return funds.Identity{}, tenancy.ErrBillingWorkspaceInvalid
+	}
+	workspaceInternalID := ws.InternalID
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls++
@@ -100,7 +106,16 @@ func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Conte
 			// tenancy, so only the resolving location is refreshed.
 			existing.WorkspaceInternalID = workspaceInternalID
 			existing.WorkspacePublicID = workspacePublicID
-			return existing, nil
+			return funds.Identity{
+				WorkspaceInternalID:    workspaceInternalID,
+				WorkspacePublicID:      workspacePublicID,
+				BillingAccountID:       existing.InternalID,
+				BillingAccountPublicID: existing.PublicID,
+				Shared:                 existing.Shared,
+				OwnerType:              existing.OwnerType,
+				CreatedAt:              existing.CreatedAt,
+				UpdatedAt:              existing.UpdatedAt,
+			}, nil
 		}
 	}
 	// First touch in this scope anchors the survivor: the stable
@@ -124,7 +139,16 @@ func (f *fakeBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Conte
 	f.accounts[account.InternalID] = account
 	f.byScope[scope] = account.InternalID
 	f.byPublic[account.PublicID] = account.InternalID
-	return account, nil
+	return funds.Identity{
+		WorkspaceInternalID:    workspaceInternalID,
+		WorkspacePublicID:      workspacePublicID,
+		BillingAccountID:       account.InternalID,
+		BillingAccountPublicID: account.PublicID,
+		Shared:                 account.Shared,
+		OwnerType:              account.OwnerType,
+		CreatedAt:              account.CreatedAt,
+		UpdatedAt:              account.UpdatedAt,
+	}, nil
 }
 
 func (f *fakeBillingAccounts) GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancy.BillingAccount, error) {
@@ -636,11 +660,11 @@ func (fx *billingTestFixture) seedWallet(billingAccountID int64, available, rese
 // reads seed the account wallet, never a user wallet (#916).
 func (fx *billingTestFixture) mustAccount(t *testing.T, ctx context.Context, ws *tenancy.Workspace) int64 {
 	t.Helper()
-	account, err := fx.accounts.EnsureBillingAccountForWorkspace(ctx, ws.InternalID, ws.PublicID)
+	identity, err := fx.accounts.ResolveFunds(ctx, ws.PublicID)
 	if err != nil {
 		t.Fatalf("resolve fixture billing account: %v", err)
 	}
-	return account.InternalID
+	return identity.BillingAccountID
 }
 
 func billingCheckoutBody(quantity int64) string {

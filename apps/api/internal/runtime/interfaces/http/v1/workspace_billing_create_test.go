@@ -13,6 +13,7 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testsupport"
 
@@ -66,14 +67,16 @@ func newStubBillingAccounts() *stubBillingAccounts {
 	}}
 }
 
-func (f *stubBillingAccounts) EnsureBillingAccountForWorkspace(_ context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error) {
+func (f *stubBillingAccounts) ResolveFunds(_ context.Context, workspacePublicID string) (funds.Identity, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	out := f.personal
-	out.WorkspaceInternalID = workspaceInternalID
-	out.WorkspacePublicID = workspacePublicID
-	out.Shared = workspacePublicID != ""
-	return out, nil
+	return funds.Identity{
+		WorkspacePublicID:      workspacePublicID,
+		BillingAccountID:       f.personal.InternalID,
+		BillingAccountPublicID: f.personal.PublicID,
+		Shared:                 workspacePublicID != "",
+		OwnerType:              f.personal.OwnerType,
+	}, nil
 }
 
 func (f *stubBillingAccounts) GetBillingAccountByPublicID(_ context.Context, publicID string) (tenancy.BillingAccount, error) {

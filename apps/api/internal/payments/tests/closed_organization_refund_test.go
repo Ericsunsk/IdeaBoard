@@ -101,7 +101,7 @@ func TestClosedOrganizationExceptionRefund(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err := service.Hold(t.Context(), ports.HoldCommand{BillingAccountID: accountID, Amount: amount, Metadata: domain.CommandMetadata{
+				if _, err := service.Settlement().Hold(t.Context(), ports.HoldCommand{BillingAccountID: accountID, Amount: amount, Metadata: domain.CommandMetadata{
 					IdempotencyKey: "closed-org-spending", Actor: domain.Actor{Type: domain.ActorService, ID: "test"}, Source: "test", Reason: "spending remains forbidden", BusinessReference: domain.BusinessReference{Type: "test", ID: "closed-org"},
 				}}); !errors.Is(err, domain.ErrWalletFrozen) {
 					t.Fatalf("spending on closed pool = %v, want frozen", err)

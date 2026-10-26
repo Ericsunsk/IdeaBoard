@@ -47,7 +47,7 @@ func newReconciliationService(
 
 func createReconciliationTaskFixture(t *testing.T, db *pgxpool.Pool, service *credits.Service, taskID, status, errorMessage string, userID, priceID, priceVersion int64) string {
 	t.Helper()
-	hold, err := service.Hold(t.Context(), ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, db, userID), Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("hold:"+taskID, taskID)})
+	hold, err := service.Settlement().Hold(t.Context(), ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, db, userID), Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("hold:"+taskID, taskID)})
 	if err != nil {
 		t.Fatal(err)
 	}

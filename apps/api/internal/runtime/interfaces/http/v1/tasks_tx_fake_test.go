@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync"
 
+	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
@@ -77,8 +78,8 @@ func newV1TxTaskStore(store *workspacetasks.InMemoryStore) *v1TxTaskStore {
 	return &v1TxTaskStore{InMemoryStore: store, claims: make(map[string]*workspacetasks.SubmissionClaim)}
 }
 
-func (s *v1TxTaskStore) BeginSettlementTx(context.Context) (pgx.Tx, error) {
-	return &v1FakeTx{}, nil
+func (s *v1TxTaskStore) BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error) {
+	return dbutil.ScopeForTest(ctx, &v1FakeTx{}, true), nil
 }
 
 func (s *v1TxTaskStore) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error) {

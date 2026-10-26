@@ -5,7 +5,7 @@
 // concrete implementations. The runtime composition root wires them:
 //
 //   - WorkspaceTaskQuoter adapts the billing catalog (server-derived SKU,
-//     QuoteAtResolution/QuoteAtResolutionInTx).
+//     single Quote entry with the caller's transaction or nil).
 //   - WorkspaceTaskHolder adapts credits.Commands, the sole ledger writer.
 //   - WorkspaceTaskEnqueuer adapts the River client, joining the ambient
 //     settlement transaction via InsertTx.

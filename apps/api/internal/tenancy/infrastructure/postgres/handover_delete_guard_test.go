@@ -61,10 +61,10 @@ func handoverGrantAndHold(t *testing.T, ctx context.Context, db *pgxpool.Pool, s
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.InTx(tx).Grant(ctx, creditports.GrantCommand{BillingAccountID: billingAccountID, Amount: amount, Metadata: metadata(tag + "-grant")}); err != nil {
+	if _, err := service.GrantsInTx(tx).Grant(ctx, creditports.GrantCommand{BillingAccountID: billingAccountID, Amount: amount, Metadata: metadata(tag + "-grant")}); err != nil {
 		t.Fatalf("grant failed: %v", err)
 	}
-	hold, err := service.InTx(tx).Hold(ctx, creditports.HoldCommand{BillingAccountID: billingAccountID, Amount: amount, Metadata: metadata(tag + "-hold")})
+	hold, err := service.SettlementInTx(tx).Hold(ctx, creditports.HoldCommand{BillingAccountID: billingAccountID, Amount: amount, Metadata: metadata(tag + "-hold")})
 	if err != nil {
 		t.Fatalf("hold failed: %v", err)
 	}

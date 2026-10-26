@@ -22,14 +22,19 @@ fail() {
 
 resolve_added_migrations() {
   local migration_prefix="${migrations_dir#"${repo_root}"}"
+  local relative_glob="${migration_prefix#/}"'/*.sql'
+  # NOTE: --diff-filter includes R so a staged rename (git reports status R,
+  # not A) still surfaces its new path for the destructive/type/NOT-NULL
+  # lint. --name-status is required because --name-only hides the rename
+  # target distinction; field 3 is the new path for R, field 2 otherwise.
   if [[ -n "${base_sha}" ]]; then
-    git -C "${repo_root}" diff --diff-filter=A --name-only "${base_sha}" "${head_sha}" -- \
-      "${migration_prefix#/}"'/*.sql' || true
+    git -C "${repo_root}" diff --diff-filter=AMR --name-status "${base_sha}" "${head_sha}" -- \
+      "${relative_glob}" | awk -F'\t' '{ print ($1 ~ /^R/ ? $3 : $2) }' || true
   fi
-  git -C "${repo_root}" diff --diff-filter=A --name-only "${head_sha}" -- \
-    "${migration_prefix#/}"'/*.sql' || true
+  git -C "${repo_root}" diff --diff-filter=AMR --name-status "${head_sha}" -- \
+    "${relative_glob}" | awk -F'\t' '{ print ($1 ~ /^R/ ? $3 : $2) }' || true
   git -C "${repo_root}" ls-files --others --exclude-standard -- \
-    "${migration_prefix#/}"'/*.sql' || true
+    "${relative_glob}" || true
 }
 
 # Resolve one consistent added-file set for every gate.
@@ -38,6 +43,16 @@ if [[ -n "${base_sha}" ]]; then
     fail "ATLAS_BASE_SHA is not a commit: ${base_sha}"
 fi
 added_migrations="$(resolve_added_migrations | sort -u)"
+# A file added between base and head but renamed in the worktree appears
+# under both its old and new names; the old name no longer exists on disk
+# and is not a migration to lint. Drop rename sources so the freshness
+# check below does not fail on a path the rename itself removed.
+migration_prefix="${migrations_dir#"${repo_root}"}"
+renamed_sources="$(git -C "${repo_root}" diff --name-status "${head_sha}" -- \
+  "${migration_prefix#/}"'/*.sql' | awk -F'\t' '$1 ~ /^R/ { print $2 }' || true)"
+if [[ -n "${renamed_sources}" ]]; then
+  added_migrations="$(printf '%s\n' "${added_migrations}" | grep -Fxv -f <(printf '%s\n' "${renamed_sources}") || true)"
+fi
 while IFS= read -r relative_path; do
   [[ -n "${relative_path}" ]] || continue
   [[ -f "${repo_root}/${relative_path}" ]] || fail "new migration disappeared: ${relative_path}"
@@ -168,6 +183,72 @@ check_risky_changes() {
 
 check_risky_changes
 
+# Clean-break rebaseline exemption for the history (M/D) gate only. Mirrors
+# schemarelease.isCleanBreakRebaseline: exactly one added *_baseline.sql with
+# a higher version than the single deleted *_baseline.sql, no M/R entries and
+# no non-baseline additions. Deletions of the squashed non-baseline chain are
+# expected and allowed. Anything else fails closed (no exemption). The
+# destructive/type/NOT-NULL lint, duplicate/base-max/atlas.sum checks, and
+# `migrate validate` below are NOT exempted.
+baseline_version_of() {
+  local name version
+  name="$(basename "$1")"
+  case "${name}" in
+    *_baseline.sql) version="${name%_baseline.sql}" ;;
+    *) return 1 ;;
+  esac
+  [[ "${version}" =~ ^[0-9]{14}$ ]] || return 1
+  printf '%s' "${version}"
+}
+
+is_clean_break_rebaseline() {
+  local migration_prefix="${migrations_dir#"${repo_root}"}"
+  local relative_prefix="${migration_prefix#/}"
+  local raw status path version
+  local added_version="" deleted_version=""
+  local added_count=0 deleted_count=0
+  if [[ -n "${base_sha}" ]]; then
+    raw="$( { git -C "${repo_root}" diff --no-renames --name-status "${base_sha}" "${head_sha}" -- "${relative_prefix}/"
+      git -C "${repo_root}" diff --no-renames --name-status "${head_sha}" -- "${relative_prefix}/"; } || true)"
+  else
+    raw="$(git -C "${repo_root}" diff --no-renames --name-status "${head_sha}" -- "${relative_prefix}/" || true)"
+  fi
+  # Untracked migration files are invisible to `git diff`; count them as
+  # additions so a stray new migration cannot hide behind the exemption.
+  raw="${raw}"$'\n'"$(git -C "${repo_root}" ls-files --others --exclude-standard -- "${relative_prefix}/*.sql" 2>/dev/null | awk '{print "A\t" $0}' || true)"
+  while IFS= read -r line; do
+    [[ -n "${line}" ]] || continue
+    status="${line%%$'\t'*}"
+    path="${line#*$'\t'}"
+    case "${path}" in
+      "${relative_prefix}/atlas.sum") continue ;;
+    esac
+    case "${path}" in
+      *.sql) ;;
+      *) continue ;;
+    esac
+    case "${status}" in
+      A)
+        version="$(baseline_version_of "${path}")" || return 1
+        [[ "${added_count}" -eq 0 ]] || return 1
+        added_version="${version}"
+        added_count=1
+        ;;
+      D)
+        if version="$(baseline_version_of "${path}")"; then
+          [[ "${deleted_count}" -eq 0 ]] || return 1
+          deleted_version="${version}"
+          deleted_count=1
+        fi
+        ;;
+      *) return 1 ;;
+    esac
+  done <<<"${raw}"
+  [[ "${added_count}" -eq 1 && "${deleted_count}" -eq 1 ]] || return 1
+  [[ 10#"${added_version}" -gt 10#"${deleted_version}" ]] || return 1
+  return 0
+}
+
 # Conflict detection: migration history is linear. Edited/deleted *.sql files,
 # duplicate version prefixes, versions that do not sort after the base max
 # (stale branch, needs rebase), and added files missing from atlas.sum
@@ -186,6 +267,9 @@ check_migration_conflicts() {
   else
     changed="$(git -C "${repo_root}" diff --diff-filter=MD --name-only "${head_sha}" -- "${relative_prefix}/" || true)"
   fi
+  if is_clean_break_rebaseline; then
+    printf 'atlas-migration-check: clean-break rebaseline detected, skipping history immutability gate\n' >&2
+  else
   while IFS= read -r entry; do
     [[ -n "${entry}" ]] || continue
     case "${entry}" in
@@ -197,6 +281,7 @@ check_migration_conflicts() {
         ;;
     esac
   done <<<"${changed}"
+  fi
 
   local filename seen_versions duplicate
   seen_versions="$(for filename in "${migrations_dir}"/*.sql; do

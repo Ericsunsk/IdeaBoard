@@ -105,7 +105,7 @@ func openQuotaEnv(t *testing.T) *quotaEnv {
 		if err != nil {
 			t.Fatalf("quota grant amount: %v", err)
 		}
-		if _, err := creditService.Grant(ctx, creditsports.GrantCommand{BillingAccountID: accountID, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
+		if _, err := creditService.Administrative().Grant(ctx, creditsports.GrantCommand{BillingAccountID: accountID, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
 			IdempotencyKey: key,
 			Actor:          creditsdomain.Actor{Type: creditsdomain.ActorSystem, ID: "test"},
 			Source:         "test", Reason: "quota seed",
@@ -137,14 +137,14 @@ func (e *quotaEnv) hold(t *testing.T, tx pgx.Tx, accountID int64, taskID string,
 	}
 	var res creditsports.CommandResult
 	if tx != nil {
-		res, err = e.credits.InTx(tx).Hold(ctx, creditsports.HoldCommand{BillingAccountID: accountID, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
+		res, err = e.credits.SettlementInTx(tx).Hold(ctx, creditsports.HoldCommand{BillingAccountID: accountID, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
 			IdempotencyKey: key,
 			Actor:          creditsdomain.Actor{Type: creditsdomain.ActorUser, ID: fmt.Sprintf("%d", userID)},
 			Source:         "test", Reason: "quota hold",
 			BusinessReference: creditsdomain.BusinessReference{Type: "task", ID: taskID},
 		}})
 	} else {
-		res, err = e.credits.Hold(ctx, creditsports.HoldCommand{BillingAccountID: accountID, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
+		res, err = e.credits.Settlement().Hold(ctx, creditsports.HoldCommand{BillingAccountID: accountID, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
 			IdempotencyKey: key,
 			Actor:          creditsdomain.Actor{Type: creditsdomain.ActorUser, ID: fmt.Sprintf("%d", userID)},
 			Source:         "test", Reason: "quota hold",
@@ -163,7 +163,7 @@ func (e *quotaEnv) capture(t *testing.T, holdTxID string, userID, amount int64, 
 	if err != nil {
 		t.Fatalf("quota capture amount: %v", err)
 	}
-	res, err := e.credits.Capture(context.Background(), creditsports.CaptureCommand{BillingAccountID: e.account, HoldTransactionID: holdTxID, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
+	res, err := e.credits.Settlement().Capture(context.Background(), creditsports.CaptureCommand{BillingAccountID: e.account, HoldTransactionID: holdTxID, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
 		IdempotencyKey: key,
 		Actor:          creditsdomain.Actor{Type: creditsdomain.ActorUser, ID: fmt.Sprintf("%d", userID)},
 		Source:         "test", Reason: "quota capture",
@@ -181,7 +181,7 @@ func (e *quotaEnv) release(t *testing.T, holdTxID string, userID, amount int64, 
 	if err != nil {
 		t.Fatalf("quota release amount: %v", err)
 	}
-	res, err := e.credits.Release(context.Background(), creditsports.ReleaseCommand{BillingAccountID: e.account, HoldTransactionID: holdTxID, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
+	res, err := e.credits.Settlement().Release(context.Background(), creditsports.ReleaseCommand{BillingAccountID: e.account, HoldTransactionID: holdTxID, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
 		IdempotencyKey: key,
 		Actor:          creditsdomain.Actor{Type: creditsdomain.ActorUser, ID: fmt.Sprintf("%d", userID)},
 		Source:         "test", Reason: "quota release",
@@ -199,7 +199,7 @@ func (e *quotaEnv) refund(t *testing.T, captureTxID string, amount int64, key, r
 	if err != nil {
 		t.Fatalf("quota refund amount: %v", err)
 	}
-	if _, err := e.credits.Refund(context.Background(), creditsports.RefundCommand{BillingAccountID: e.account, ChargeTransactionID: captureTxID, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
+	if _, err := e.credits.Administrative().Refund(context.Background(), creditsports.RefundCommand{BillingAccountID: e.account, ChargeTransactionID: captureTxID, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
 		IdempotencyKey: key,
 		Actor:          creditsdomain.Actor{Type: creditsdomain.ActorAdmin, ID: "7"},
 		Source:         "test", Reason: "quota linked refund",
@@ -403,7 +403,7 @@ func TestQuotaCrossAccountIsolation(t *testing.T) {
 		if err != nil {
 			return "", err
 		}
-		res, err := e.credits.Hold(context.Background(), creditsports.HoldCommand{BillingAccountID: e.account2, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
+		res, err := e.credits.Settlement().Hold(context.Background(), creditsports.HoldCommand{BillingAccountID: e.account2, Amount: creditAmount, Metadata: creditsdomain.CommandMetadata{
 			IdempotencyKey: "quota-hold-iso1",
 			Actor:          creditsdomain.Actor{Type: creditsdomain.ActorUser, ID: fmt.Sprintf("%d", e.userA)},
 			Source:         "test", Reason: "quota isolation hold",
@@ -437,7 +437,7 @@ func TestQuotaTaskVisionMix(t *testing.T) {
 	holdA := e.hold(t, nil, e.account, "task_quotaM0001", e.userA, 30, "quota-hold-m1")
 	e.insertTaskSnapshot(t, e.pool, e.account, e.wsID, "task_quotaM0001", e.userA, now, holdA, 30)
 	// Vision pending hold in the second space (same member, same account).
-	visionHold, err := e.credits.Hold(context.Background(), creditsports.HoldCommand{BillingAccountID: e.account, Amount: mustQuotaAmount(t, 20), Metadata: visionQuotaHoldMetadata(t, e.userA, "quota-vision-h1", "vision-op-mix-1")})
+	visionHold, err := e.credits.Settlement().Hold(context.Background(), creditsports.HoldCommand{BillingAccountID: e.account, Amount: mustQuotaAmount(t, 20), Metadata: visionQuotaHoldMetadata(t, e.userA, "quota-vision-h1", "vision-op-mix-1")})
 	if err != nil {
 		t.Fatalf("vision hold: %v", err)
 	}
@@ -770,7 +770,7 @@ func TestConcurrentCaptureCannotHideUsage(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer terminal.Rollback(ctx)
-		capture, err := e.credits.InTx(terminal).Capture(ctx, creditsports.CaptureCommand{
+		capture, err := e.credits.SettlementInTx(terminal).Capture(ctx, creditsports.CaptureCommand{
 			BillingAccountID: e.account, HoldTransactionID: holdID, Amount: mustQuotaAmount(t, 100),
 			Metadata: creditsdomain.CommandMetadata{
 				IdempotencyKey: "capture-race-capture",

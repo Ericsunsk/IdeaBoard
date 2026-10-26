@@ -46,26 +46,17 @@ func (s *Service) VerifyWelcomeIdentityKey(ctx context.Context) error {
 	if s == nil || s.pool == nil || s.credits == nil || len(s.welcomeIdentityKey) != 32 {
 		return fmt.Errorf("identity lifecycle dependencies and a 32-byte Welcome Grant key are required")
 	}
-	// Ambient guard transaction (control audit atomicity, step 3): the
-	// verification write joins the borrowed guard transaction. The guard
-	// began it and the guard commits or rolls it back, so this path
-	// never commits or rolls back. With no carrier the legacy
-	// owned-transaction path below runs unchanged.
-	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		if err := s.credits.LifecycleInTx(ambient).BindWelcomeIdentityKey(ctx, s.welcomeKeyFingerprint); err != nil {
-			return fmt.Errorf("verify permanently bound Welcome identity key: %w", err)
-		}
-		return nil
-	}
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	scope, err := dbutil.Begin(ctx, s.pool, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("begin Welcome identity key verification: %w", err)
 	}
-	defer rollbackIdentityTransaction(ctx, tx, "Welcome identity key verification")
-	if err := s.credits.LifecycleInTx(tx).BindWelcomeIdentityKey(ctx, s.welcomeKeyFingerprint); err != nil {
+	if scope.Owned() {
+		defer rollbackIdentityTransaction(ctx, scope.Tx(), "Welcome identity key verification")
+	}
+	if err := s.credits.LifecycleInTx(scope.Tx()).BindWelcomeIdentityKey(ctx, s.welcomeKeyFingerprint); err != nil {
 		return fmt.Errorf("verify permanently bound Welcome identity key: %w", err)
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := scope.Commit(ctx); err != nil {
 		return fmt.Errorf("commit Welcome identity key verification: %w", err)
 	}
 	return nil
@@ -83,27 +74,22 @@ func (s *Service) ProvisionIdentity(ctx context.Context, identity ports.Verified
 		return nil, fmt.Errorf("identity lifecycle dependencies are not configured")
 	}
 
-	// Ambient guard transaction (control audit atomicity, step 3): the
-	// whole provisioning unit (identity row, wallet, welcome grant,
-	// freeze alignment) joins the borrowed guard transaction. The guard
-	// began it and the guard commits or rolls it back, so this path
-	// never commits or rolls back. With no carrier the legacy
-	// owned-transaction path below runs unchanged.
-	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		user, grant, granted, err := s.provisionIdentityTx(ctx, ambient, identity, fingerprint)
+	scope, err := dbutil.Begin(ctx, s.pool, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin identity lifecycle transaction: %w", err)
+	}
+	if !scope.Owned() {
+		user, grant, granted, err := s.provisionIdentityTx(ctx, scope.Tx(), identity, fingerprint)
 		if err != nil {
 			return nil, err
 		}
 		if granted {
 			return &ports.ProvisionResult{User: *user, Wallet: grant, WelcomeGranted: true}, nil
 		}
-		return s.provisionResultWithoutGrant(ctx, ambient, user)
+		return s.provisionResultWithoutGrant(ctx, scope.Tx(), user)
 	}
 
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("begin identity lifecycle transaction: %w", err)
-	}
+	tx := scope.Tx()
 	defer func() {
 		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()

@@ -2,13 +2,9 @@ package tenancy
 
 // Unified in-memory invitation lifecycle (test double only).
 //
-// Both scopes share one memberInvites table keyed by invite public_id, with
-// token_hash and raw-token indexes. Scope differences ride the
-// memoryInviteScope hooks: Default protection (workspace only), closure +
-// inviter gates (organization), capacity (workspace 5-member cap vs
-// organization single-org limit at accept), and the member-write target.
-// The public methods below are thin delegators preserving the
-// WorkspaceInviteStore / OrganizationInviteStore signatures.
+// Both scopes share one memberInvites table and the lifecycle policy's
+// inviter/capacity rules. Scope state checks stay beside the in-memory
+// maps they read; PostgreSQL owns its corresponding lock/write hooks.
 
 import (
 	"context"
@@ -17,56 +13,118 @@ import (
 )
 
 // memoryInviteScope parameterizes the unified in-memory lifecycle.
-// All hooks run under the store mutex.
+// policy supplies shared rules; grantMember is the write-target hook
+// (different member maps, mirroring the postgres write targets).
 type memoryInviteScope struct {
 	policy MemberInvitePolicy
-	// resolveScope maps a scope public_id to its identity.
-	resolveScope func(scopePublicID string) (internalID int64, publicID, name string, err error)
-	// checkCreateGate enforces create-time scope rules (Default
-	// protection for workspace; closure + inviter role gates for org).
-	checkCreateGate func(scopePublicID string, inviterUserID int64, role string) error
-	// activeCount counts current members for capacity checks.
-	activeCount func(scopePublicID string) int
-	// checkCapacity enforces create-time capacity (nil = no cap).
-	checkCapacity func(active, pending int) error
-	// isMember reports existing membership (accept fast-path).
-	isMember func(scopePublicID string, userID int64) bool
 	// grantMember writes the membership row.
 	grantMember func(scopePublicID string, userID int64, role string)
-	// checkAcceptGate enforces accept-time scope rules (Default/closure/
-	// single-org limit). Runs after recipient attribution.
-	checkAcceptGate func(scopePublicID string, recipientUserID int64) error
+}
+
+// resolveMemberScope maps a scope public_id to its identity.
+func resolveMemberScope(s *InMemoryStore, scope InviteScope, scopePublicID string) (internalID int64, publicID, name string, err error) {
+	switch scope {
+	case InviteScopeWorkspace:
+		w, ok := s.workspaces[scopePublicID]
+		if !ok {
+			return 0, "", "", ErrNotFound
+		}
+		return w.InternalID, w.PublicID, w.Name, nil
+	case InviteScopeOrganization:
+		org, ok := s.organizations[scopePublicID]
+		if !ok {
+			return 0, "", "", ErrNotFound
+		}
+		return org.InternalID, org.PublicID, org.Name, nil
+	default:
+		return 0, "", "", ErrNotFound
+	}
+}
+
+func checkMemberCreateGate(s *InMemoryStore, policy MemberInvitePolicy, scopePublicID string, inviterUserID int64, role string) error {
+	switch policy.Scope {
+	case InviteScopeWorkspace:
+		if w, ok := s.workspaces[scopePublicID]; ok && w.IsDefaultWorkspace() {
+			return ErrDefaultWorkspaceProtected
+		}
+		return nil
+	case InviteScopeOrganization:
+		org, ok := s.organizations[scopePublicID]
+		if !ok {
+			return ErrNotFound
+		}
+		if org.IsClosed() {
+			return ErrOrganizationClosed
+		}
+		return policy.CheckInviterRole(s.orgMembers[scopePublicID][inviterUserID], role)
+	default:
+		return ErrNotFound
+	}
+}
+
+func memberActiveCount(s *InMemoryStore, scope InviteScope, scopePublicID string) int64 {
+	if scope == InviteScopeWorkspace {
+		return int64(len(s.wsMembers[scopePublicID]))
+	}
+	return 0
+}
+
+func isScopeMember(s *InMemoryStore, scope InviteScope, scopePublicID string, userID int64) bool {
+	switch scope {
+	case InviteScopeWorkspace:
+		_, ok := s.wsMembers[scopePublicID][userID]
+		return ok
+	case InviteScopeOrganization:
+		_, ok := s.orgMembers[scopePublicID][userID]
+		return ok
+	default:
+		return false
+	}
+}
+
+func checkMemberAcceptGate(s *InMemoryStore, scope InviteScope, scopePublicID string, recipientUserID int64) error {
+	switch scope {
+	case InviteScopeWorkspace:
+		w, ok := s.workspaces[scopePublicID]
+		if !ok {
+			return ErrNotFound
+		}
+		if w.IsDefaultWorkspace() {
+			return ErrDefaultWorkspaceProtected
+		}
+		if w.OrganizationID != nil {
+			if org := s.organizations[*w.OrganizationID]; org != nil && org.IsClosed() {
+				return ErrOrganizationClosed
+			}
+			if _, member := s.orgMembers[*w.OrganizationID][recipientUserID]; !member {
+				return ErrNotFound
+			}
+		}
+		return nil
+	case InviteScopeOrganization:
+		if org, ok := s.organizations[scopePublicID]; ok && org.IsClosed() {
+			return ErrOrganizationClosed
+		}
+		for orgID, members := range s.orgMembers {
+			if orgID == scopePublicID {
+				continue
+			}
+			if _, member := members[recipientUserID]; member {
+				if org, ok := s.organizations[orgID]; ok && org.IsClosed() {
+					continue
+				}
+				return ErrOrganizationLimitReached
+			}
+		}
+		return nil
+	default:
+		return ErrNotFound
+	}
 }
 
 func workspaceMemoryScope(s *InMemoryStore) memoryInviteScope {
 	return memoryInviteScope{
 		policy: WorkspaceInvitePolicy(),
-		resolveScope: func(scopePublicID string) (int64, string, string, error) {
-			w, ok := s.workspaces[scopePublicID]
-			if !ok {
-				return 0, "", "", ErrNotFound
-			}
-			return w.InternalID, w.PublicID, w.Name, nil
-		},
-		checkCreateGate: func(scopePublicID string, _ int64, _ string) error {
-			if w, ok := s.workspaces[scopePublicID]; ok && w.IsDefaultWorkspace() {
-				return ErrDefaultWorkspaceProtected
-			}
-			return nil
-		},
-		activeCount: func(scopePublicID string) int {
-			return len(s.wsMembers[scopePublicID])
-		},
-		checkCapacity: func(active, pending int) error {
-			if active+pending >= MaxWorkspaceMembers {
-				return ErrWorkspaceMemberLimitReached
-			}
-			return nil
-		},
-		isMember: func(scopePublicID string, userID int64) bool {
-			_, ok := s.wsMembers[scopePublicID][userID]
-			return ok
-		},
 		grantMember: func(scopePublicID string, userID int64, role string) {
 			now := s.clock()
 			if members := s.wsMembers[scopePublicID]; members != nil {
@@ -76,85 +134,17 @@ func workspaceMemoryScope(s *InMemoryStore) memoryInviteScope {
 			}
 			s.grantWorkspaceMemberLocked(scopePublicID, userID, role, now)
 		},
-		checkAcceptGate: func(scopePublicID string, recipientUserID int64) error {
-			w, ok := s.workspaces[scopePublicID]
-			if !ok {
-				return ErrNotFound
-			}
-			if w.IsDefaultWorkspace() {
-				return ErrDefaultWorkspaceProtected
-			}
-			if w.OrganizationID != nil {
-				if org := s.organizations[*w.OrganizationID]; org != nil && org.IsClosed() {
-					return ErrOrganizationClosed
-				}
-				if _, member := s.orgMembers[*w.OrganizationID][recipientUserID]; !member {
-					return ErrNotFound
-				}
-			}
-			return nil
-		},
 	}
 }
 
 func organizationMemoryScope(s *InMemoryStore) memoryInviteScope {
 	return memoryInviteScope{
 		policy: OrganizationInvitePolicy(),
-		resolveScope: func(scopePublicID string) (int64, string, string, error) {
-			org, ok := s.organizations[scopePublicID]
-			if !ok {
-				return 0, "", "", ErrNotFound
-			}
-			return org.InternalID, org.PublicID, org.Name, nil
-		},
-		checkCreateGate: func(scopePublicID string, inviterUserID int64, role string) error {
-			org, ok := s.organizations[scopePublicID]
-			if !ok {
-				return ErrNotFound
-			}
-			if org.IsClosed() {
-				return ErrOrganizationClosed
-			}
-			// Fidelity with postgres lockActiveOrganization + actor gate:
-			// only owner/admin may invite, and only owner may grant admin.
-			actorRole := s.orgMembers[scopePublicID][inviterUserID]
-			if actorRole != RoleOwner && actorRole != RoleAdmin {
-				return ErrForbidden
-			}
-			if role == RoleAdmin && actorRole != RoleOwner {
-				return ErrForbidden
-			}
-			return nil
-		},
-		activeCount:   func(_ string) int { return 0 },
-		checkCapacity: nil,
-		isMember: func(scopePublicID string, userID int64) bool {
-			_, ok := s.orgMembers[scopePublicID][userID]
-			return ok
-		},
 		grantMember: func(scopePublicID string, userID int64, role string) {
 			if s.orgMembers[scopePublicID] == nil {
 				s.orgMembers[scopePublicID] = make(map[int64]string)
 			}
 			s.orgMembers[scopePublicID][userID] = role
-		},
-		checkAcceptGate: func(scopePublicID string, recipientUserID int64) error {
-			if org, ok := s.organizations[scopePublicID]; ok && org.IsClosed() {
-				return ErrOrganizationClosed
-			}
-			// Live single-organization limit (closed orgs excluded).
-			for orgID, members := range s.orgMembers {
-				if orgID == scopePublicID {
-					continue
-				}
-				if _, member := members[recipientUserID]; member {
-					if org, ok := s.organizations[orgID]; ok && org.IsClosed() {
-						continue
-					}
-					return ErrOrganizationLimitReached
-				}
-			}
-			return nil
 		},
 	}
 }
@@ -185,7 +175,7 @@ func (s *InMemoryStore) resolveMemberInviteLocked(policy MemberInvitePolicy, ref
 func (s *InMemoryStore) createMemberInviteLocked(scope memoryInviteScope, scopePublicID string, inviterUserID int64, email, role string, inviteeUserID int64) (*MemberInvite, string, error) {
 	policy := scope.policy
 	scopePublicID = strings.TrimSpace(scopePublicID)
-	internalID, publicID, name, err := scope.resolveScope(scopePublicID)
+	internalID, publicID, name, err := resolveMemberScope(s, scope.policy.Scope, scopePublicID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -193,7 +183,7 @@ func (s *InMemoryStore) createMemberInviteLocked(scope memoryInviteScope, scopeP
 	if err != nil {
 		return nil, "", err
 	}
-	if err := scope.checkCreateGate(scopePublicID, inviterUserID, role); err != nil {
+	if err := checkMemberCreateGate(s, scope.policy, scopePublicID, inviterUserID, role); err != nil {
 		return nil, "", err
 	}
 	now := s.clock()
@@ -211,10 +201,8 @@ func (s *InMemoryStore) createMemberInviteLocked(scope memoryInviteScope, scopeP
 			return nil, "", policy.ConflictErr
 		}
 	}
-	if scope.checkCapacity != nil {
-		if err := scope.checkCapacity(scope.activeCount(scopePublicID), pending); err != nil {
-			return nil, "", err
-		}
+	if err := policy.CheckCreateCapacity(memberActiveCount(s, policy.Scope, scopePublicID), int64(pending)); err != nil {
+		return nil, "", err
 	}
 	rawToken, tokenHash, err := MintMemberInviteToken()
 	if err != nil {
@@ -253,7 +241,7 @@ func (s *InMemoryStore) createMemberInviteLocked(scope memoryInviteScope, scopeP
 func (s *InMemoryStore) listMemberInvitesLocked(scope memoryInviteScope, scopePublicID string) ([]*MemberInvite, error) {
 	policy := scope.policy
 	scopePublicID = strings.TrimSpace(scopePublicID)
-	if _, _, _, err := scope.resolveScope(scopePublicID); err != nil {
+	if _, _, _, err := resolveMemberScope(s, scope.policy.Scope, scopePublicID); err != nil {
 		return nil, err
 	}
 	now := s.clock()
@@ -373,14 +361,12 @@ func (s *InMemoryStore) acceptMemberInviteLocked(scope memoryInviteScope, ref st
 	if err := CheckMemberInviteRecipient(inv.InviteeEmail, inv.InviteeUserID, recipientUserID, recipientEmail); err != nil {
 		return nil, err
 	}
-	if err := scope.checkAcceptGate(inv.ScopePublicID, recipientUserID); err != nil {
+	if err := checkMemberAcceptGate(s, scope.policy.Scope, inv.ScopePublicID, recipientUserID); err != nil {
 		return nil, err
 	}
-	if scope.policy.Scope == InviteScopeWorkspace && !scope.isMember(inv.ScopePublicID, recipientUserID) {
-		if scope.checkCapacity != nil {
-			if err := scope.checkCapacity(scope.activeCount(inv.ScopePublicID), 0); err != nil {
-				return nil, err
-			}
+	if scope.policy.Scope == InviteScopeWorkspace && !isScopeMember(s, scope.policy.Scope, inv.ScopePublicID, recipientUserID) {
+		if err := policy.CheckCreateCapacity(memberActiveCount(s, policy.Scope, inv.ScopePublicID), 0); err != nil {
+			return nil, err
 		}
 	}
 	scope.grantMember(inv.ScopePublicID, recipientUserID, inv.Role)

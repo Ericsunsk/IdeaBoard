@@ -25,9 +25,11 @@ import (
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/media/workspacemedia"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
+	"ideaboard/api/internal/tasking/settlement"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/workflow"
 	"reflect"
 	"strings"
 	"sync"
@@ -105,7 +107,7 @@ type atomicQuoter struct {
 }
 
 func (q *atomicQuoter) Quote(ctx context.Context, kind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
-	quote, err := q.catalog.QuoteAtResolution(ctx, "ai-image:"+kind, billing.OutputResolution(resolution), quantity)
+	quote, err := q.catalog.Quote(ctx, nil, "ai-image:"+kind, billing.OutputResolution(resolution), quantity)
 	if err != nil {
 		return workspacetasks.BillingSnapshot{}, err
 	}
@@ -113,7 +115,7 @@ func (q *atomicQuoter) Quote(ctx context.Context, kind, resolution string, quant
 }
 
 func (q *atomicQuoter) QuoteInTx(ctx context.Context, tx pgx.Tx, kind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
-	quote, err := q.catalog.QuoteAtResolutionInTx(ctx, tx, "ai-image:"+kind, billing.OutputResolution(resolution), quantity)
+	quote, err := q.catalog.Quote(ctx, tx, "ai-image:"+kind, billing.OutputResolution(resolution), quantity)
 	if err != nil {
 		return workspacetasks.BillingSnapshot{}, err
 	}
@@ -183,7 +185,7 @@ func (h *atomicHolder) Hold(ctx context.Context, billingAccountID, actorUserID i
 	if err != nil {
 		return "", err
 	}
-	result, err := h.credits.Hold(ctx, ports.HoldCommand{BillingAccountID: billingAccountID, Amount: creditAmount, Metadata: atomicMetadata(key, taskID, actorUserID)})
+	result, err := h.credits.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: billingAccountID, Amount: creditAmount, Metadata: atomicMetadata(key, taskID, actorUserID)})
 	if err != nil {
 		return "", err
 	}
@@ -206,7 +208,7 @@ func (h *atomicHolder) HoldInTx(ctx context.Context, tx pgx.Tx, billingAccountID
 	if err != nil {
 		return "", err
 	}
-	result, err := h.credits.InTx(tx).Hold(ctx, ports.HoldCommand{BillingAccountID: billingAccountID, Amount: creditAmount, Metadata: atomicMetadata(key, taskID, actorUserID)})
+	result, err := h.credits.SettlementInTx(tx).Hold(ctx, ports.HoldCommand{BillingAccountID: billingAccountID, Amount: creditAmount, Metadata: atomicMetadata(key, taskID, actorUserID)})
 	if err != nil {
 		return "", err
 	}
@@ -221,7 +223,7 @@ func (h *atomicHolder) CaptureInTx(ctx context.Context, tx pgx.Tx, billingAccoun
 	if err != nil {
 		return "", err
 	}
-	result, err := h.credits.InTx(tx).Capture(ctx, ports.CaptureCommand{
+	result, err := h.credits.SettlementInTx(tx).Capture(ctx, ports.CaptureCommand{
 		BillingAccountID: billingAccountID, HoldTransactionID: holdID, Amount: creditAmount,
 		Metadata: atomicMetadata("task-capture:"+taskID, taskID, actorUserID),
 	})
@@ -239,7 +241,7 @@ func (h *atomicHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, billingAccoun
 	if err != nil {
 		return "", err
 	}
-	result, err := h.credits.InTx(tx).Release(ctx, ports.ReleaseCommand{
+	result, err := h.credits.SettlementInTx(tx).Release(ctx, ports.ReleaseCommand{
 		BillingAccountID: billingAccountID, HoldTransactionID: holdID, Amount: creditAmount,
 		Metadata: atomicMetadata("task-release:"+taskID, taskID, actorUserID),
 	})
@@ -294,6 +296,7 @@ type atomicEnv struct {
 	pool        *pgxpool.Pool
 	store       *taskpostgres.Store
 	credits     *credits.Service
+	catalog     *billingapplication.BillableItemCatalog
 	holder      *atomicHolder
 	queue       *atomicQueue
 	service     *workspacetasks.Service
@@ -301,10 +304,15 @@ type atomicEnv struct {
 	ws          string
 	userID      int64
 	accountID   int64
-	unitCost    int64
 }
 
 func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
+	t.Helper()
+	return openAtomicEnvWithPrice(t, workflow.FeatureSlugRender, &unitCost)
+}
+
+// A nil price leaves a registered feature unpriced.
+func openAtomicEnvWithPrice(t *testing.T, feature string, unitCost *int64) *atomicEnv {
 	t.Helper()
 	ctx := context.Background()
 	pool := testdb.Open(t)
@@ -360,7 +368,7 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 		_ = tx.Rollback(ctx)
 		t.Fatal(err)
 	}
-	if _, err := creditService.InTx(tx).Grant(ctx, ports.GrantCommand{BillingAccountID: accountID, Amount: grantAmount, Metadata: domain.CommandMetadata{
+	if _, err := creditService.GrantsInTx(tx).Grant(ctx, ports.GrantCommand{BillingAccountID: accountID, Amount: grantAmount, Metadata: domain.CommandMetadata{
 		IdempotencyKey: "atomic-settle-seed-" + randomAtomicHex(t, 4),
 		Actor:          domain.Actor{Type: domain.ActorSystem, ID: "test"},
 		Source:         "test", Reason: "atomic settlement seed",
@@ -375,7 +383,7 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 
 	billingStore := billingpostgres.NewStore(pool)
 	definition := billing.BillableItemDefinition{
-		SKU: "ai-image:render", Namespace: "ai-image", ProductKind: "workflow-feature",
+		SKU: billing.SKU("ai-image:" + feature), Namespace: "ai-image", ProductKind: "workflow-feature",
 		DisplayName: "Render", PricingVariants: []billing.OutputResolution{billing.OutputResolution1K},
 	}
 	registry, err := billing.NewBillableItemRegistry([]billing.BillableItemDefinition{definition})
@@ -383,8 +391,10 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 		t.Fatal(err)
 	}
 	billingCatalog := billingapplication.NewBillableItemCatalog(registry, billingStore)
-	if _, err := billingStore.PublishPrice(ctx, billing.PublishPriceInput{Definition: definition, UnitCredits: unitCost, ActorID: userID}); err != nil {
-		t.Fatalf("publish atomic settle price: %v", err)
+	if unitCost != nil {
+		if _, err := billingStore.PublishPrice(ctx, billing.PublishPriceInput{Definition: definition, UnitCredits: *unitCost, ActorID: userID}); err != nil {
+			t.Fatalf("publish atomic settle price: %v", err)
+		}
 	}
 
 	store := taskpostgres.NewStore(pool)
@@ -400,7 +410,7 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 		Acceptance: acceptance, TaskRead: store, TaskLifecycle: store, TaskBilling: store, Quoter: &atomicQuoter{catalog: billingCatalog}, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(), SnapshotSaver: snapshotSaver,
 	}
 	service := workspacetasks.NewService(deps)
-	return &atomicEnv{pool: pool, store: store, credits: creditService, holder: holder, queue: queue, service: service, serviceDeps: deps, ws: ws, userID: userID, accountID: accountID, unitCost: unitCost}
+	return &atomicEnv{pool: pool, store: store, credits: creditService, catalog: billingCatalog, holder: holder, queue: queue, service: service, serviceDeps: deps, ws: ws, userID: userID, accountID: accountID}
 }
 
 func (e *atomicEnv) wallet(t *testing.T) (available, reserved int64) {
@@ -484,7 +494,7 @@ func TestAtomicCreateSettlesHoldInsertEnqueue(t *testing.T) {
 	// The hold key is derived from the DURABLE submit identity
 	// (workspace + operation + key), never from the freshly minted task id:
 	// a task-id-derived key differs on every retry and cannot fence anything.
-	if env.ledgerCount(t, `idempotency_key = $1`, workspacetasks.TaskSubmitHoldKey(env.ws, key)) != 1 {
+	if env.ledgerCount(t, `idempotency_key = $1`, settlement.TaskHoldKey(env.ws, key)) != 1 {
 		t.Fatal("hold ledger row missing after atomic Create")
 	}
 	if available, reserved := env.wallet(t); available != 990 || reserved != 10 {
@@ -919,7 +929,7 @@ func TestAtomicRoutingSnapshotSurvivesPoolEdits(t *testing.T) {
 //     terminal write is a real INSERT on the carrier transaction,
 //     readable from the still-open carrier and invisible on the pool,
 //     then durable after the carrier commits. The store's own
-//     BeginSettlementTx is never called (no nested transaction).
+//     BeginSettlementScope is never called (no nested transaction).
 //   - A carrier rollback leaves no settlement artifact behind (the
 //     step-2 gap: the settlement commit used to survive on its own).
 //   - With no carrier the settlement-transactor path runs unchanged
@@ -938,7 +948,7 @@ type carrierSettleStore struct {
 	cancelledTaskIDs []string
 }
 
-func (f *carrierSettleStore) BeginSettlementTx(context.Context) (pgx.Tx, error) {
+func (f *carrierSettleStore) BeginSettlementScope(context.Context) (*dbutil.Scope, error) {
 	f.beginCalled = true
 	return nil, fmt.Errorf("carrier settle store: settlement must join the carrier, never begin its own transaction")
 }
@@ -1467,17 +1477,17 @@ type probeSettlementStore struct {
 	tx                *probeSettlementTx
 }
 
-func (s *probeSettlementStore) BeginSettlementTx(ctx context.Context) (pgx.Tx, error) {
-	tx, err := s.Store.BeginSettlementTx(ctx)
+func (s *probeSettlementStore) BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error) {
+	scope, err := s.Store.BeginSettlementScope(ctx)
 	if err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
 	s.steps = append(s.steps, "begin")
-	s.tx = &probeSettlementTx{Tx: tx, store: s, failCommit: s.pendingFailCommit}
+	s.tx = &probeSettlementTx{Tx: scope.Tx(), store: s, failCommit: s.pendingFailCommit}
 	s.pendingFailCommit = nil
 	s.mu.Unlock()
-	return s.tx, nil
+	return dbutil.ScopeForTest(ctx, s.tx, true), nil
 }
 
 func (s *probeSettlementStore) record(step string) {

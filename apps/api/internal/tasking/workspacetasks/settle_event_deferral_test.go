@@ -110,4 +110,20 @@ func TestBorrowedTerminalSettlementsDeferEventsUntilPostCommit(t *testing.T) {
 			t.Fatalf("staged after post-commit = %+v, want one cancelled", staged)
 		}
 	})
+
+	t.Run("retry", func(t *testing.T) {
+		env, created := newLiveTask(t)
+		ctx := borrowCtx(context.Background())
+		if _, err := env.service.Retry(ctx, "ws_abc", created.ID, true); err != nil {
+			t.Fatalf("borrowed Retry: %v", err)
+		}
+		if staged := env.service.StagedEvents(); len(staged) != 0 {
+			t.Fatalf("staged %d events before post-commit, want 0", len(staged))
+		}
+		dbutil.RunAmbientPostCommit(ctx)
+		staged := env.service.StagedEvents()
+		if len(staged) != 1 || staged[0].Status != StatusPending {
+			t.Fatalf("staged after post-commit = %+v, want one pending", staged)
+		}
+	})
 }

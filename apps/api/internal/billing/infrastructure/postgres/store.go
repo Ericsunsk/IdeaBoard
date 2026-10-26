@@ -13,6 +13,7 @@ import (
 
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/db/dbutil"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 )
 
 type Store struct {
@@ -36,22 +37,14 @@ func (s *Store) PublishPrice(ctx context.Context, input billing.PublishPriceInpu
 	return prices[variants[0]], err
 }
 
-// billingWriteQuerier is satisfied by both pgx.Tx (guard-owned ambient
-// transaction participant) and *pgxpool.Pool (self-contained write).
-type billingWriteQuerier interface {
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-}
-
 // writeQuerier returns the guard-owned ambient transaction when the
-// Control Plane guard staged one in ctx, or the pool otherwise. A
-// returned ambient transaction is BORROWED: callers run statements on
-// it and never commit or roll it back.
-func (s *Store) writeQuerier(ctx context.Context) billingWriteQuerier {
-	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		return ambient
-	}
-	return s.pool
+// Control Plane guard staged one in ctx, or the pool otherwise. The
+// borrow decision lives in the deep Tx module (dbutil.BorrowOrPool);
+// this method is a thin adapter. A returned ambient transaction is
+// BORROWED: callers run statements on it and never commit or roll it
+// back (the statement surface exposes no lifecycle).
+func (s *Store) writeQuerier(ctx context.Context) dbsqlc.DBTX {
+	return dbutil.BorrowOrPool(ctx, s.pool)
 }
 
 func (s *Store) PublishPrices(ctx context.Context, input billing.PublishPricesInput) (map[billing.OutputResolution]billing.PriceInfo, error) {
@@ -185,18 +178,27 @@ FROM set_billing_item_availability($1, $2, $3)`, sku, enabled, actorID).Scan(
 	return info, nil
 }
 
-func (s *Store) QuoteAtResolution(ctx context.Context, rawSKU string, resolution billing.OutputResolution, quantity int64) (billing.Quote, error) {
+// Quote is the single transaction-aware quote entry: callers pass the
+// transaction they hold (nil when they hold none) and the module decides
+// borrow vs. pool internally, so callers never remember "am I in a tx".
+// An explicit tx wins (settlement snapshot: the price read shares the
+// settlement transaction's snapshot with the Hold that follows); with a
+// nil tx the guard-owned ambient transaction joins when staged
+// (read-your-write with the catalog mutation in the same guarded unit),
+// otherwise the self-contained pool read runs unchanged. Quote never
+// begins, commits, or rolls back: boundaries, isolation, and lifecycle
+// ownership are exactly the caller's as before.
+func (s *Store) Quote(ctx context.Context, tx pgx.Tx, rawSKU string, resolution billing.OutputResolution, quantity int64) (billing.Quote, error) {
 	if err := s.requirePool(); err != nil {
 		return billing.Quote{}, err
 	}
-	return s.quote(ctx, s.pool, rawSKU, resolution, quantity)
-}
-
-func (s *Store) QuoteAtResolutionInTx(ctx context.Context, tx pgx.Tx, rawSKU string, resolution billing.OutputResolution, quantity int64) (billing.Quote, error) {
-	if tx == nil {
-		return billing.Quote{}, billing.ErrServiceUnavailable
+	if tx != nil {
+		return s.quote(ctx, tx, rawSKU, resolution, quantity)
 	}
-	return s.quote(ctx, tx, rawSKU, resolution, quantity)
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		return s.quote(ctx, ambient, rawSKU, resolution, quantity)
+	}
+	return s.quote(ctx, s.pool, rawSKU, resolution, quantity)
 }
 
 type quoteQuerier interface {

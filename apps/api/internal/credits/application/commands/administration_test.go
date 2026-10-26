@@ -25,25 +25,25 @@ func TestAdminDeductionOnlyConsumesAvailableCredits(t *testing.T) {
 	const userID int64 = 401
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
 
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("admin-deduction:grant", "admin-deduction-grant")}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("admin-deduction:grant", "admin-deduction-grant")}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	if _, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 70), Metadata: testhelpers.TestMetadata("admin-deduction:hold", "admin-deduction-hold")}); err != nil {
+	if _, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 70), Metadata: testhelpers.TestMetadata("admin-deduction:hold", "admin-deduction-hold")}); err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	result, err := service.Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 30), Metadata: testhelpers.TestMetadata("admin-deduction:deduct", "admin-deduction-deduct")})
+	result, err := service.Administrative().Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 30), Metadata: testhelpers.TestMetadata("admin-deduction:deduct", "admin-deduction-deduct")})
 	if err != nil {
 		t.Fatalf("Deduct() error = %v", err)
 	}
 	if result.Wallet.Available != 0 || result.Wallet.Reserved != 70 {
 		t.Fatalf("deduction wallet = %+v, want available=0 reserved=70", result.Wallet)
 	}
-	if _, err := service.Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("admin-deduction:insufficient", "admin-deduction-insufficient")}); !errors.Is(err, domain.ErrInsufficientCredits) {
+	if _, err := service.Administrative().Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("admin-deduction:insufficient", "admin-deduction-insufficient")}); !errors.Is(err, domain.ErrInsufficientCredits) {
 		t.Fatalf("Deduct(insufficient) error = %v, want domain.ErrInsufficientCredits", err)
 	}
 	metadata := testhelpers.TestMetadata("admin-deduction:non-admin", "admin-deduction-non-admin")
 	metadata.Actor.Type = domain.ActorSystem
-	if _, err := service.Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: metadata}); !errors.Is(err, domain.ErrInvalidCommand) {
+	if _, err := service.Administrative().Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: metadata}); !errors.Is(err, domain.ErrInvalidCommand) {
 		t.Fatalf("Deduct(non-admin) error = %v, want domain.ErrInvalidCommand", err)
 	}
 }
@@ -54,26 +54,26 @@ func TestAdminDeductionIsIdempotentAndConcurrentBounded(t *testing.T) {
 	ctx := context.Background()
 	const userID int64 = 405
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 110), Metadata: testhelpers.TestMetadata("admin-deduction-idempotent:grant", "admin-deduction-idempotent-grant")}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 110), Metadata: testhelpers.TestMetadata("admin-deduction-idempotent:grant", "admin-deduction-idempotent-grant")}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
 	command := ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("admin-deduction-idempotent:deduct", "admin-deduction-idempotent-deduct")}
-	first, err := service.Deduct(ctx, command)
+	first, err := service.Administrative().Deduct(ctx, command)
 	if err != nil {
 		t.Fatalf("first Deduct() error = %v", err)
 	}
-	replay, err := service.Deduct(ctx, command)
+	replay, err := service.Administrative().Deduct(ctx, command)
 	if err != nil || !replay.Replayed || replay.TransactionID != first.TransactionID {
 		t.Fatalf("Deduct() replay=%+v error=%v first=%+v", replay, err, first)
 	}
 	conflict := command
 	conflict.Amount = testhelpers.MustCreditAmount(t, 11)
-	if _, err := service.Deduct(ctx, conflict); !errors.Is(err, domain.ErrIdempotencyConflict) {
+	if _, err := service.Administrative().Deduct(ctx, conflict); !errors.Is(err, domain.ErrIdempotencyConflict) {
 		t.Fatalf("Deduct(conflict) error = %v, want domain.ErrIdempotencyConflict", err)
 	}
 	conflict = command
 	conflict.Metadata.BusinessReference.ID = "admin-deduction-idempotent-other-reference"
-	if _, err := service.Deduct(ctx, conflict); !errors.Is(err, domain.ErrIdempotencyConflict) {
+	if _, err := service.Administrative().Deduct(ctx, conflict); !errors.Is(err, domain.ErrIdempotencyConflict) {
 		t.Fatalf("Deduct(reference conflict) error = %v, want domain.ErrIdempotencyConflict", err)
 	}
 
@@ -84,7 +84,7 @@ func TestAdminDeductionIsIdempotentAndConcurrentBounded(t *testing.T) {
 		wait.Add(1)
 		go func(i int) {
 			defer wait.Done()
-			_, err := service.Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 25), Metadata: testhelpers.TestMetadata(fmt.Sprintf("admin-deduction-concurrent:%d", i), fmt.Sprintf("admin-deduction-concurrent-%d", i))})
+			_, err := service.Administrative().Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 25), Metadata: testhelpers.TestMetadata(fmt.Sprintf("admin-deduction-concurrent:%d", i), fmt.Sprintf("admin-deduction-concurrent-%d", i))})
 			results <- err
 		}(i)
 	}
@@ -118,34 +118,34 @@ func TestAdminRefundIsIdempotentAndDoesNotDoubleRefund(t *testing.T) {
 	ctx := context.Background()
 	const userID int64 = 406
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 40), Metadata: testhelpers.TestMetadata("admin-refund-idempotent:grant", "admin-refund-idempotent-grant")}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 40), Metadata: testhelpers.TestMetadata("admin-refund-idempotent:grant", "admin-refund-idempotent-grant")}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	hold, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 40), Metadata: testhelpers.TestMetadata("admin-refund-idempotent:hold", "admin-refund-idempotent-hold")})
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 40), Metadata: testhelpers.TestMetadata("admin-refund-idempotent:hold", "admin-refund-idempotent-hold")})
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	capture, err := service.Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 30), Metadata: testhelpers.TestMetadata("admin-refund-idempotent:capture", "admin-refund-idempotent-capture")})
+	capture, err := service.Settlement().Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 30), Metadata: testhelpers.TestMetadata("admin-refund-idempotent:capture", "admin-refund-idempotent-capture")})
 	if err != nil {
 		t.Fatalf("Capture() error = %v", err)
 	}
 	command := ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 15), Metadata: testhelpers.TestMetadata("admin-refund-idempotent:refund", "admin-refund-idempotent-refund")}
-	first, err := service.Refund(ctx, command)
+	first, err := service.Administrative().Refund(ctx, command)
 	if err != nil {
 		t.Fatalf("first Refund() error = %v", err)
 	}
-	replay, err := service.Refund(ctx, command)
+	replay, err := service.Administrative().Refund(ctx, command)
 	if err != nil || !replay.Replayed || replay.TransactionID != first.TransactionID {
 		t.Fatalf("Refund() replay=%+v error=%v first=%+v", replay, err, first)
 	}
 	conflict := command
 	conflict.Amount = testhelpers.MustCreditAmount(t, 16)
-	if _, err := service.Refund(ctx, conflict); !errors.Is(err, domain.ErrIdempotencyConflict) {
+	if _, err := service.Administrative().Refund(ctx, conflict); !errors.Is(err, domain.ErrIdempotencyConflict) {
 		t.Fatalf("Refund(conflict) error = %v, want domain.ErrIdempotencyConflict", err)
 	}
 	conflict = command
 	conflict.Metadata.BusinessReference.ID = "admin-refund-idempotent-other-reference"
-	if _, err := service.Refund(ctx, conflict); !errors.Is(err, domain.ErrIdempotencyConflict) {
+	if _, err := service.Administrative().Refund(ctx, conflict); !errors.Is(err, domain.ErrIdempotencyConflict) {
 		t.Fatalf("Refund(reference conflict) error = %v, want domain.ErrIdempotencyConflict", err)
 	}
 	page, err := service.ListLedger(ctx, domain.ListLedgerInput{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Limit: 1})
@@ -163,11 +163,11 @@ func TestAdminCorrectionReversesOriginalTransactionWithConcurrentCap(t *testing.
 	ctx := context.Background()
 	const userID int64 = 407
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
-	grant, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 40), Metadata: testhelpers.TestMetadata("admin-correction:grant", "admin-correction-grant")})
+	grant, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 40), Metadata: testhelpers.TestMetadata("admin-correction:grant", "admin-correction-grant")})
 	if err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	first, err := service.Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), OriginalTransactionID: grant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("admin-correction:first", "admin-correction-first")})
+	first, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), OriginalTransactionID: grant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("admin-correction:first", "admin-correction-first")})
 	if err != nil {
 		t.Fatalf("Correct() error = %v", err)
 	}
@@ -186,7 +186,7 @@ func TestAdminCorrectionReversesOriginalTransactionWithConcurrentCap(t *testing.
 		wait.Add(1)
 		go func(i int) {
 			defer wait.Done()
-			_, err := service.Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), OriginalTransactionID: grant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 15), Metadata: testhelpers.TestMetadata(fmt.Sprintf("admin-correction:concurrent:%d", i), fmt.Sprintf("admin-correction-concurrent-%d", i))})
+			_, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), OriginalTransactionID: grant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 15), Metadata: testhelpers.TestMetadata(fmt.Sprintf("admin-correction:concurrent:%d", i), fmt.Sprintf("admin-correction-concurrent-%d", i))})
 			results <- err
 		}(i)
 	}
@@ -223,13 +223,13 @@ func TestAdminCorrectionAllowsRewardRedemptionGrantButRejectsOtherUserGrants(t *
 	rewardMetadata.Actor = domain.Actor{Type: domain.ActorUser, ID: "410"}
 	rewardMetadata.Source = "reward_redemption"
 	rewardMetadata.BusinessReference = domain.BusinessReference{Type: "reward_redemption", ID: "910"}
-	rewardGrant, err := service.Grant(ctx, ports.GrantCommand{
+	rewardGrant, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, rewardUserID), Amount: testhelpers.MustCreditAmount(t, 30), Metadata: rewardMetadata,
 	})
 	if err != nil {
 		t.Fatalf("reward Grant() error = %v", err)
 	}
-	corrected, err := service.Correct(ctx, ports.CorrectionCommand{
+	corrected, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, rewardUserID), OriginalTransactionID: rewardGrant.TransactionID,
 		Amount:   testhelpers.MustCreditAmount(t, 30),
 		Metadata: testhelpers.TestMetadata("reward-correction:correct", "reward-correction-correct"),
@@ -244,13 +244,13 @@ func TestAdminCorrectionAllowsRewardRedemptionGrantButRejectsOtherUserGrants(t *
 	otherMetadata := testhelpers.TestMetadata("user-grant-correction:grant", "user-grant-correction-grant")
 	otherMetadata.Actor = domain.Actor{Type: domain.ActorUser, ID: "411"}
 	otherMetadata.Source = "manual_user_grant"
-	otherGrant, err := service.Grant(ctx, ports.GrantCommand{
+	otherGrant, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, otherUserID), Amount: testhelpers.MustCreditAmount(t, 10), Metadata: otherMetadata,
 	})
 	if err != nil {
 		t.Fatalf("other user Grant() error = %v", err)
 	}
-	_, err = service.Correct(ctx, ports.CorrectionCommand{
+	_, err = service.Administrative().Correct(ctx, ports.CorrectionCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, otherUserID), OriginalTransactionID: otherGrant.TransactionID,
 		Amount:   testhelpers.MustCreditAmount(t, 10),
 		Metadata: testhelpers.TestMetadata("user-grant-correction:correct", "user-grant-correction-correct"),
@@ -266,18 +266,18 @@ func TestAdminCorrectionSupportsDeductionAndRefundDirectionsAndRejectsInvalidOri
 	ctx := context.Background()
 	const userID int64 = 408
 	testhelpers.EnsureAdminOperationUser(t, pool, userID, 409)
-	grant, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("correction-directions:grant", "correction-directions-grant")})
+	grant, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("correction-directions:grant", "correction-directions-grant")})
 	if err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	deduction, err := service.Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 4), Metadata: testhelpers.TestMetadata("correction-directions:deduction", "correction-directions-deduction")})
+	deduction, err := service.Administrative().Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 4), Metadata: testhelpers.TestMetadata("correction-directions:deduction", "correction-directions-deduction")})
 	if err != nil {
 		t.Fatalf("Deduct() error = %v", err)
 	}
-	if result, err := service.Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), OriginalTransactionID: deduction.TransactionID, Amount: testhelpers.MustCreditAmount(t, 4), Metadata: testhelpers.TestMetadata("correction-directions:deduction-correction", "correction-directions-deduction-correction")}); err != nil || result.Wallet.Available != 10 {
+	if result, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), OriginalTransactionID: deduction.TransactionID, Amount: testhelpers.MustCreditAmount(t, 4), Metadata: testhelpers.TestMetadata("correction-directions:deduction-correction", "correction-directions-deduction-correction")}); err != nil || result.Wallet.Available != 10 {
 		t.Fatalf("Correct(deduction) result=%+v error=%v", result, err)
 	}
-	if _, err := service.Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), OriginalTransactionID: grant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("correction-directions:wrong-wallet", "correction-directions-wrong-wallet")}); err != nil {
+	if _, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), OriginalTransactionID: grant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("correction-directions:wrong-wallet", "correction-directions-wrong-wallet")}); err != nil {
 		t.Fatalf("Correct(grant) error = %v", err)
 	}
 	page, _ := service.ListLedger(ctx, domain.ListLedgerInput{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Limit: 1})
@@ -285,41 +285,41 @@ func TestAdminCorrectionSupportsDeductionAndRefundDirectionsAndRejectsInvalidOri
 		t.Fatalf("deduction correction ledger=%+v", page)
 	}
 	correctionID := page.Transactions[0].TransactionID
-	if _, err := service.Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), OriginalTransactionID: correctionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("correction-directions:correction-origin", "correction-directions-correction-origin")}); !errors.Is(err, domain.ErrInvalidCommand) {
+	if _, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), OriginalTransactionID: correctionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("correction-directions:correction-origin", "correction-directions-correction-origin")}); !errors.Is(err, domain.ErrInvalidCommand) {
 		t.Fatalf("Correct(correction) error=%v, want domain.ErrInvalidCommand", err)
 	}
-	if _, err := service.Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID+1), OriginalTransactionID: grant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("correction-directions:wrong-wallet-other", "correction-directions-wrong-wallet")}); !errors.Is(err, domain.ErrInvalidCommand) {
+	if _, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID+1), OriginalTransactionID: grant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("correction-directions:wrong-wallet-other", "correction-directions-wrong-wallet")}); !errors.Is(err, domain.ErrInvalidCommand) {
 		t.Fatalf("Correct(wrong wallet) error=%v, want domain.ErrInvalidCommand", err)
 	}
 	metadata := testhelpers.TestMetadata("correction-directions:system-grant", "correction-directions-system-grant")
 	metadata.Actor.Type = domain.ActorSystem
-	systemGrant, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), Amount: testhelpers.MustCreditAmount(t, 10), Metadata: metadata})
+	systemGrant, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), Amount: testhelpers.MustCreditAmount(t, 10), Metadata: metadata})
 	if err != nil {
 		t.Fatalf("system Grant() error=%v", err)
 	}
-	if _, err := service.Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), OriginalTransactionID: systemGrant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("correction-directions:system-origin", "correction-directions-system-origin")}); !errors.Is(err, domain.ErrInvalidCommand) {
+	if _, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), OriginalTransactionID: systemGrant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("correction-directions:system-origin", "correction-directions-system-origin")}); !errors.Is(err, domain.ErrInvalidCommand) {
 		t.Fatalf("Correct(system grant) error=%v, want domain.ErrInvalidCommand", err)
 	}
-	hold, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("correction-directions:hold", "correction-directions-hold")})
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("correction-directions:hold", "correction-directions-hold")})
 	if err != nil {
 		t.Fatalf("Hold() error=%v", err)
 	}
-	capture, err := service.Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("correction-directions:capture", "correction-directions-capture")})
+	capture, err := service.Settlement().Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 10), Metadata: testhelpers.TestMetadata("correction-directions:capture", "correction-directions-capture")})
 	if err != nil {
 		t.Fatalf("Capture() error=%v", err)
 	}
-	refund, err := service.Refund(ctx, ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 3), Metadata: testhelpers.TestMetadata("correction-directions:refund", "correction-directions-refund")})
+	refund, err := service.Administrative().Refund(ctx, ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 3), Metadata: testhelpers.TestMetadata("correction-directions:refund", "correction-directions-refund")})
 	if err != nil {
 		t.Fatalf("Refund() error=%v", err)
 	}
-	if result, err := service.Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), OriginalTransactionID: refund.TransactionID, Amount: testhelpers.MustCreditAmount(t, 3), Metadata: testhelpers.TestMetadata("correction-directions:refund-correction", "correction-directions-refund-correction")}); err != nil || result.Wallet.Available != 0 {
+	if result, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), OriginalTransactionID: refund.TransactionID, Amount: testhelpers.MustCreditAmount(t, 3), Metadata: testhelpers.TestMetadata("correction-directions:refund-correction", "correction-directions-refund-correction")}); err != nil || result.Wallet.Available != 0 {
 		t.Fatalf("Correct(refund) result=%+v error=%v", result, err)
 	}
 	page, err = service.ListLedger(ctx, domain.ListLedgerInput{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), Limit: 1})
 	if err != nil || len(page.Transactions) != 1 || page.Transactions[0].Charge == nil || page.Transactions[0].Charge.RefundedAmount != 0 || page.Transactions[0].Charge.RemainingRefundable != 10 {
 		t.Fatalf("refund correction charge reference page=%+v error=%v", page, err)
 	}
-	if _, err := service.Refund(ctx, ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 3), Metadata: testhelpers.TestMetadata("correction-directions:refund-after-correction", "correction-directions-refund-after-correction")}); err != nil {
+	if _, err := service.Administrative().Refund(ctx, ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, 409), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 3), Metadata: testhelpers.TestMetadata("correction-directions:refund-after-correction", "correction-directions-refund-after-correction")}); err != nil {
 		t.Fatalf("Refund(after correction) error=%v", err)
 	}
 }
@@ -331,26 +331,26 @@ func TestAdminRefundsAreConcurrentBoundedAndAllowedForFrozenWallet(t *testing.T)
 	const userID int64 = 402
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
 
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("admin-refund:grant", "admin-refund-grant")}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("admin-refund:grant", "admin-refund-grant")}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	hold, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("admin-refund:hold", "admin-refund-hold")})
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("admin-refund:hold", "admin-refund-hold")})
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	capture, err := service.Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("admin-refund:capture", "admin-refund-capture")})
+	capture, err := service.Settlement().Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata("admin-refund:capture", "admin-refund-capture")})
 	if err != nil {
 		t.Fatalf("Capture() error = %v", err)
 	}
 	if err := freezeWalletForTest(ctx, service, pool, userID); err != nil {
 		t.Fatalf("freeze wallet error = %v", err)
 	}
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("admin-refund:frozen-grant", "admin-refund-frozen-grant")}); !errors.Is(err, domain.ErrWalletFrozen) {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("admin-refund:frozen-grant", "admin-refund-frozen-grant")}); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Grant(frozen) error = %v, want domain.ErrWalletFrozen", err)
 	}
 	nonAdminRefund := testhelpers.TestMetadata("admin-refund:frozen-system", "admin-refund-frozen-system")
 	nonAdminRefund.Actor.Type = domain.ActorSystem
-	if _, err := service.Refund(ctx, ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: nonAdminRefund}); !errors.Is(err, domain.ErrWalletFrozen) {
+	if _, err := service.Administrative().Refund(ctx, ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: nonAdminRefund}); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Refund(frozen, system actor) error = %v, want domain.ErrWalletFrozen", err)
 	}
 
@@ -361,7 +361,7 @@ func TestAdminRefundsAreConcurrentBoundedAndAllowedForFrozenWallet(t *testing.T)
 		wait.Add(1)
 		go func(i int) {
 			defer wait.Done()
-			_, err := service.Refund(ctx, ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 25), Metadata: testhelpers.TestMetadata(fmt.Sprintf("admin-refund:%d", i), fmt.Sprintf("admin-refund-%d", i))})
+			_, err := service.Administrative().Refund(ctx, ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 25), Metadata: testhelpers.TestMetadata(fmt.Sprintf("admin-refund:%d", i), fmt.Sprintf("admin-refund-%d", i))})
 			results <- err
 		}(i)
 	}
@@ -396,14 +396,14 @@ func TestAdminLedgerPageExposesCrossPageHoldAndChargeReferences(t *testing.T) {
 	ctx := context.Background()
 	const userID int64 = 403
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 50), Metadata: testhelpers.TestMetadata("admin-reference:grant", "admin-reference-grant")}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 50), Metadata: testhelpers.TestMetadata("admin-reference:grant", "admin-reference-grant")}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	hold, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 50), Metadata: testhelpers.TestMetadata("admin-reference:hold", "admin-reference-hold")})
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 50), Metadata: testhelpers.TestMetadata("admin-reference:hold", "admin-reference-hold")})
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	capture, err := service.Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 50), Metadata: testhelpers.TestMetadata("admin-reference:capture", "admin-reference-capture")})
+	capture, err := service.Settlement().Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 50), Metadata: testhelpers.TestMetadata("admin-reference:capture", "admin-reference-capture")})
 	if err != nil {
 		t.Fatalf("Capture() error = %v", err)
 	}
@@ -418,7 +418,7 @@ func TestAdminLedgerPageExposesCrossPageHoldAndChargeReferences(t *testing.T) {
 	if transaction.Hold.Status != "captured" || transaction.Hold.Amount != 50 || transaction.Hold.CaptureTransactionID != capture.TransactionID || transaction.Charge.RemainingRefundable != 50 {
 		t.Fatalf("capture reference details = %+v", transaction)
 	}
-	refund, err := service.Refund(ctx, ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("admin-reference:refund", "admin-reference-refund")})
+	refund, err := service.Administrative().Refund(ctx, ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("admin-reference:refund", "admin-reference-refund")})
 	if err != nil {
 		t.Fatalf("Refund() error = %v", err)
 	}
@@ -441,14 +441,14 @@ func TestAnonymizedTombstoneRetainsAdminLedgerReadAndLinkedRefundOnly(t *testing
 	ctx := context.Background()
 	const userID int64 = 404
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("anonymized:grant", "anonymized-grant")}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("anonymized:grant", "anonymized-grant")}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	hold, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("anonymized:hold", "anonymized-hold")})
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("anonymized:hold", "anonymized-hold")})
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	capture, err := service.Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("anonymized:capture", "anonymized-capture")})
+	capture, err := service.Settlement().Capture(ctx, ports.CaptureCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("anonymized:capture", "anonymized-capture")})
 	if err != nil {
 		t.Fatalf("Capture() error = %v", err)
 	}
@@ -489,17 +489,17 @@ WHERE users.id = $1`, userID).Scan(&displayName, &authUserID, &phase); err != ni
 	if err != nil || len(page.Transactions) != 1 || page.Transactions[0].Charge == nil || page.Transactions[0].Hold == nil {
 		t.Fatalf("anonymized ledger page=%+v error=%v", page, err)
 	}
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("anonymized:blocked-grant", "anonymized-blocked-grant")}); !errors.Is(err, domain.ErrWalletFrozen) {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("anonymized:blocked-grant", "anonymized-blocked-grant")}); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Grant(anonymized) error = %v, want domain.ErrWalletFrozen", err)
 	}
-	if _, err := service.Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("anonymized:blocked-deduction", "anonymized-blocked-deduction")}); !errors.Is(err, domain.ErrWalletFrozen) {
+	if _, err := service.Administrative().Deduct(ctx, ports.DeductionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("anonymized:blocked-deduction", "anonymized-blocked-deduction")}); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Deduct(anonymized) error = %v, want domain.ErrWalletFrozen", err)
 	}
-	refund, err := service.Refund(ctx, ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: testhelpers.TestMetadata("anonymized:refund", "anonymized-refund")})
+	refund, err := service.Administrative().Refund(ctx, ports.RefundCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: testhelpers.TestMetadata("anonymized:refund", "anonymized-refund")})
 	if err != nil {
 		t.Fatalf("Refund(anonymized) error = %v", err)
 	}
-	if _, err := service.Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), OriginalTransactionID: refund.TransactionID, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: testhelpers.TestMetadata("anonymized:refund-correction", "anonymized-refund-correction")}); err != nil {
+	if _, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), OriginalTransactionID: refund.TransactionID, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: testhelpers.TestMetadata("anonymized:refund-correction", "anonymized-refund-correction")}); err != nil {
 		t.Fatalf("Correct(anonymized refund) error = %v", err)
 	}
 	wallet, err = service.GetWallet(ctx, testhelpers.MustBillingAccount(t, pool, userID))

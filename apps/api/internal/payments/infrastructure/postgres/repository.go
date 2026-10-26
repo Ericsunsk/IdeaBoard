@@ -89,26 +89,27 @@ func (db ContextDB) Executor() dbsqlc.DBTX {
 	return db.executor
 }
 
-// BeginTx opens the write transaction for one repository unit, or reuses
+// BeginTx opens the write transaction for one repository unit, or borrows
 // the ambient guard transaction staged in the context (control audit
 // atomicity, step 3). The bool reports ownership: true means the caller
 // opened the transaction and must commit or roll it back; false means
 // the transaction is BORROWED from the guard, which alone commits or
-// rolls it back, so the caller must do neither. With no carrier the
-// starter path below runs unchanged (including the advisory-lock session
-// starter when one is staged).
+// rolls it back, so the caller must do neither. The borrow-or-begin
+// decision and the borrowed handle live in the deep Tx module
+// (dbutil.BeginOn): the returned borrowed handle refuses Commit and
+// Rollback with dbutil.ErrBorrowedTxLifecycle, so the "never touch a
+// borrowed lifecycle" rule is enforced by the module instead of by this
+// comment. With no carrier the starter path below runs unchanged
+// (including the advisory-lock session starter when one is staged).
 func (db ContextDB) BeginTx() (pgx.Tx, bool, error) {
-	if ambient, ok := dbutil.AmbientTxFromContext(db.ctx); ok {
-		return ambient, false, nil
-	}
-	if db.transactionStarter == nil {
+	if _, ok := dbutil.AmbientTxFromContext(db.ctx); !ok && db.transactionStarter == nil {
 		return nil, false, fmt.Errorf("payments repository: database unavailable")
 	}
-	tx, err := db.transactionStarter.BeginTx(db.ctx, pgx.TxOptions{})
+	scope, err := dbutil.BeginOn(db.ctx, db.transactionStarter, pgx.TxOptions{})
 	if err != nil {
 		return nil, false, fmt.Errorf("begin payments transaction: %w", err)
 	}
-	return tx, true, nil
+	return scope.Tx(), scope.Owned(), nil
 }
 
 // BeginDirectTx opens a write transaction for refund/dispute persistence, or
@@ -122,17 +123,24 @@ func (db ContextDB) BeginTx() (pgx.Tx, bool, error) {
 // BeginCommittedRefundTx instead because Stripe I/O sits between their
 // transaction boundaries.
 func (r *Repository) BeginDirectTx(ctx context.Context) (pgx.Tx, bool, error) {
-	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		return ambient, false, nil
+	// Borrow-or-begin lives in the deep Tx module (dbutil.BeginOn); the
+	// branch shape and every error below stay exactly as before,
+	// including the nil-receiver borrow (ambient first, r untouched).
+	if _, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		scope, err := dbutil.BeginOn(ctx, nil, pgx.TxOptions{})
+		if err != nil {
+			return nil, false, err
+		}
+		return scope.Tx(), false, nil
 	}
 	if r == nil || r.db == nil {
 		return nil, false, fmt.Errorf("payments repository: database unavailable")
 	}
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	scope, err := dbutil.BeginOn(ctx, r.db, pgx.TxOptions{})
 	if err != nil {
 		return nil, false, err
 	}
-	return tx, true, nil
+	return scope.Tx(), true, nil
 }
 
 // BeginCommittedRefundTx starts a transaction whose commit is part of the
@@ -146,11 +154,13 @@ func (r *Repository) BeginCommittedRefundTx(ctx context.Context) (pgx.Tx, bool, 
 	if r == nil || r.db == nil {
 		return nil, false, fmt.Errorf("payments repository: database unavailable")
 	}
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	// BeginOwned (never borrows): the no-borrow rule above is now enforced
+	// by the module, not by avoiding the carrier check.
+	scope, err := dbutil.BeginOwned(ctx, r.db, pgx.TxOptions{})
 	if err != nil {
 		return nil, false, err
 	}
-	return tx, true, nil
+	return scope.Tx(), true, nil
 }
 
 // commitIfOwned commits an owned transaction and is a no-op for a

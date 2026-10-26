@@ -13,17 +13,18 @@ import (
 	"ideaboard/api/internal/billing"
 )
 
-// CatalogStore is the persistence seam for catalog orchestration. The tx
-// scoped quote keeps the submission single-transaction boundary (see
-// tasking/application/billing); callers pass their own pgx.Tx per house
-// convention.
+// CatalogStore is the persistence seam for catalog orchestration. Quote
+// is the single transaction-aware quote entry: callers pass the
+// transaction they hold (nil when they hold none) and the store decides
+// borrow vs. pool internally, so the submission single-transaction
+// boundary (see tasking/workspacetasks) keeps its snapshot without
+// callers remembering "am I in a tx".
 type CatalogStore interface {
 	ListCatalogFacts(context.Context) ([]billing.CatalogItem, error)
 	PublishPrices(context.Context, billing.PublishPricesInput) (map[billing.OutputResolution]billing.PriceInfo, error)
 	SetAvailability(context.Context, string, bool, int64) (billing.AvailabilityInfo, error)
 	DeleteArchived(context.Context, string, int64) (billing.ArchivedItemDeleteResult, error)
-	QuoteAtResolution(context.Context, string, billing.OutputResolution, int64) (billing.Quote, error)
-	QuoteAtResolutionInTx(context.Context, pgx.Tx, string, billing.OutputResolution, int64) (billing.Quote, error)
+	Quote(context.Context, pgx.Tx, string, billing.OutputResolution, int64) (billing.Quote, error)
 }
 
 // BillableItemCatalogCard is the admin projection merging one registry
@@ -94,18 +95,15 @@ func (c *BillableItemCatalog) DeleteArchived(ctx context.Context, rawSKU string,
 }
 
 func (c *BillableItemCatalog) QuoteAtResolution(ctx context.Context, rawSKU string, resolution billing.OutputResolution, quantity int64) (billing.Quote, error) {
-	definition, err := c.registeredDefinition(rawSKU)
-	if err != nil {
-		return billing.Quote{}, err
-	}
-	if err := billing.ValidatePricingVariant(definition, resolution); err != nil {
-		return billing.Quote{}, err
-	}
-	quote, err := c.store.QuoteAtResolution(ctx, rawSKU, resolution, quantity)
-	return quote, normalizeCatalogQuoteError(err)
+	return c.Quote(ctx, nil, rawSKU, resolution, quantity)
 }
 
-func (c *BillableItemCatalog) QuoteAtResolutionInTx(ctx context.Context, tx pgx.Tx, rawSKU string, resolution billing.OutputResolution, quantity int64) (billing.Quote, error) {
+// Quote is the single transaction-aware quote entry: tx is the caller's
+// transaction when it holds one (settlement), nil otherwise (preflight
+// and admin reads borrow the ambient carrier or pool inside the store).
+// Validation stays above the seam so every entry shares one registry
+// gate and one error normalization.
+func (c *BillableItemCatalog) Quote(ctx context.Context, tx pgx.Tx, rawSKU string, resolution billing.OutputResolution, quantity int64) (billing.Quote, error) {
 	definition, err := c.registeredDefinition(rawSKU)
 	if err != nil {
 		return billing.Quote{}, err
@@ -113,7 +111,7 @@ func (c *BillableItemCatalog) QuoteAtResolutionInTx(ctx context.Context, tx pgx.
 	if err := billing.ValidatePricingVariant(definition, resolution); err != nil {
 		return billing.Quote{}, err
 	}
-	quote, err := c.store.QuoteAtResolutionInTx(ctx, tx, rawSKU, resolution, quantity)
+	quote, err := c.store.Quote(ctx, tx, rawSKU, resolution, quantity)
 	return quote, normalizeCatalogQuoteError(err)
 }
 

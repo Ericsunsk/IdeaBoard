@@ -25,7 +25,7 @@ func TestPaymentDisputeDebitsAvailableIdeasAndRestoresOnLateWin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := creditService.Deduct(t.Context(), ports.DeductionCommand{
+	if _, err := creditService.Administrative().Deduct(t.Context(), ports.DeductionCommand{
 		BillingAccountID: paymentAccount(t, creditService, 42), Amount: spendAmount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "dispute-preexisting-spend", Actor: domain.Actor{Type: domain.ActorAdmin, ID: "42"},
@@ -193,7 +193,7 @@ func TestPaymentDisputeSerializesWithConcurrentConsumption(t *testing.T) {
 	}, 1)
 	go func() {
 		<-start
-		_, holdErr := creditService.Hold(t.Context(), ports.HoldCommand{
+		_, holdErr := creditService.Settlement().Hold(t.Context(), ports.HoldCommand{
 			BillingAccountID: paymentAccount(t, creditService, 42), Amount: holdAmount,
 			Metadata: domain.CommandMetadata{
 				IdempotencyKey: "dispute-concurrent-hold", Actor: domain.Actor{Type: domain.ActorUser, ID: "42"},

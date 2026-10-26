@@ -99,7 +99,7 @@ func TestOrganizationPermanentClosure(t *testing.T) {
 		IdempotencyKey: "closure-credit-grant", Actor: creditdomain.Actor{Type: creditdomain.ActorSystem, ID: "test"},
 		Source: "test", Reason: "closure balance", BusinessReference: creditdomain.BusinessReference{Type: "organization", ID: org.PublicID},
 	}
-	if _, err := creditService.InTx(tx).Grant(ctx, creditports.GrantCommand{BillingAccountID: accountID, Amount: amount, Metadata: metadata}); err != nil {
+	if _, err := creditService.GrantsInTx(tx).Grant(ctx, creditports.GrantCommand{BillingAccountID: accountID, Amount: amount, Metadata: metadata}); err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ WHERE def.owner_user_id = $1 AND def.organization_id IS NULL AND def.is_default 
 		t.Fatal(err)
 	}
 	metadata.IdempotencyKey = "closure-credit-hold"
-	_, holdErr := creditService.InTx(tx).Hold(ctx, creditports.HoldCommand{BillingAccountID: accountID, Amount: amount, Metadata: metadata})
+	_, holdErr := creditService.SettlementInTx(tx).Hold(ctx, creditports.HoldCommand{BillingAccountID: accountID, Amount: amount, Metadata: metadata})
 	_ = tx.Rollback(ctx)
 	if !errors.Is(holdErr, creditdomain.ErrWalletFrozen) {
 		t.Fatalf("closed wallet hold = %v, want frozen", holdErr)

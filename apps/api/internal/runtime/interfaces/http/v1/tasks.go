@@ -20,6 +20,7 @@ import (
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	"ideaboard/api/internal/workflow"
 	"ideaboard/api/internal/workflow/paramkeys"
 
@@ -44,10 +45,9 @@ type (
 // taskQuoteBillingAccountReader resolves the stable funds identity for the
 // quote/readiness preflight without a settlement transaction (#917: Quote,
 // readiness, and submit spend the same account). Production adapts the
-// tenancy billing-account store (the same Ensure seam the workspace
-// billing reads use); tests stub it. Nil fails the preflight closed.
+// funds seam (ws_ only); tests stub it. Nil fails the preflight closed.
 type taskQuoteBillingAccountReader interface {
-	EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error)
+	ResolveFunds(ctx context.Context, workspacePublicID string) (funds.Identity, error)
 }
 
 // taskQuoteWalletReader reads the account Wallet for the preflight funds
@@ -850,11 +850,12 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		account, err := h.deps.TaskQuoteBillingAccounts.EnsureBillingAccountForWorkspace(c.Request.Context(), workspace.InternalID, workspace.PublicID)
+		account, err := h.deps.TaskQuoteBillingAccounts.ResolveFunds(c.Request.Context(), workspace.PublicID)
 		if err != nil {
 			renderBillingAccountError(c, err)
 			return
 		}
+		accountID := account.BillingAccountID
 		service := h.taskService()
 		snapshot, err := service.Quote(c.Request.Context(), workspacetasks.QuoteParams{
 			Service: strings.TrimSpace(body.Data.Service), Quantity: quantity, Resolution: resolution,
@@ -867,7 +868,7 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 		// workspacetasks.CheckFundsGate): active restrictions deny first,
 		// then sufficiency. Frozen and missing wallets pass through
 		// exactly as the submit Hold maps them (no second mapping to drift).
-		wallet, err := h.deps.TaskQuoteWallets.GetWallet(c.Request.Context(), account.InternalID)
+		wallet, err := h.deps.TaskQuoteWallets.GetWallet(c.Request.Context(), accountID)
 		if err != nil {
 			if errors.Is(err, domain.ErrWalletRestricted) {
 				renderTaskError(c, workspacetasks.ErrWalletRestricted)
@@ -885,7 +886,7 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 		// no quota row) passes through; over-cap renders 403
 		// member_quota_exhausted via renderTaskError.
 		if h.deps.TaskQuoteQuotas != nil && snapshot.TotalCredits > 0 {
-			if err := h.deps.TaskQuoteQuotas.CheckQuotaForQuote(c.Request.Context(), account.InternalID, identityPrincipal.UserID(), snapshot.TotalCredits, snapshot.QuotedAt); err != nil {
+			if err := h.deps.TaskQuoteQuotas.CheckQuotaForQuote(c.Request.Context(), accountID, identityPrincipal.UserID(), snapshot.TotalCredits, snapshot.QuotedAt); err != nil {
 				renderTaskError(c, err)
 				return
 			}

@@ -39,7 +39,7 @@ func TestCreditMillionTransactionDataset(t *testing.T) {
 	defer cancel()
 	userID := int64(95)
 	accountID := testhelpers.MustBillingAccount(t, pool, userID)
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: accountID,
 		Amount:           testhelpers.MustCreditAmount(t, 1),
 		Metadata:         testhelpers.TestMetadata("load:bootstrap", "load-bootstrap"),
@@ -243,7 +243,7 @@ func runCreditLoadContention(t *testing.T, ctx context.Context, service *credits
 		worker := worker
 		go func() {
 			defer wait.Done()
-			_, err := service.Hold(ctx, ports.HoldCommand{
+			_, err := service.Settlement().Hold(ctx, ports.HoldCommand{
 				BillingAccountID: accountID,
 				Amount:           amount,
 				Metadata: testhelpers.TestMetadata(
@@ -270,7 +270,7 @@ func runCreditLoadParallelWallets(t *testing.T, ctx context.Context, service *cr
 		t.Fatalf("parallel wallet Begin() error = %v", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := service.InTx(tx).Grant(ctx, ports.GrantCommand{
+	if _, err := service.GrantsInTx(tx).Grant(ctx, ports.GrantCommand{
 		BillingAccountID: account99,
 		Amount:           testhelpers.MustCreditAmount(t, 1),
 		Metadata:         testhelpers.TestMetadata("load:parallel:first", "load-parallel-first"),
@@ -279,7 +279,7 @@ func runCreditLoadParallelWallets(t *testing.T, ctx context.Context, service *cr
 	}
 	finished := make(chan error, 1)
 	go func() {
-		_, err := service.Grant(ctx, ports.GrantCommand{
+		_, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 			BillingAccountID: account101,
 			Amount:           testhelpers.MustCreditAmount(t, 1),
 			Metadata:         testhelpers.TestMetadata("load:parallel:second", "load-parallel-second"),
@@ -312,7 +312,7 @@ FROM generate_series(1, $1::BIGINT) series ON CONFLICT (id) DO NOTHING`, command
 		if resolveErr != nil {
 			t.Fatalf("resolve throughput account %d error = %v", userID, resolveErr)
 		}
-		if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: throughputAccountID, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata(
+		if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: throughputAccountID, Amount: testhelpers.MustCreditAmount(t, 2), Metadata: testhelpers.TestMetadata(
 			fmt.Sprintf("load:throughput:grant:%d", userID), fmt.Sprintf("load-throughput-grant-%d", userID),
 		)}); err != nil {
 			t.Fatalf("seed throughput wallet %d error = %v", userID, err)
@@ -337,7 +337,7 @@ FROM generate_series(1, $1::BIGINT) series ON CONFLICT (id) DO NOTHING`, command
 					errorsCh <- resolveErr
 					return
 				}
-				_, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: throughputAccountID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata(
+				_, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: throughputAccountID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata(
 					fmt.Sprintf("load:throughput:hold:%d", userID), fmt.Sprintf("load-throughput-hold-%d", userID),
 				)})
 				if err != nil {

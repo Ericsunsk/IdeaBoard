@@ -57,84 +57,14 @@ func NewTransactionCommands(tx pgx.Tx, backend Backend) ports.Commands {
 	return &transactionCommands{tx: tx, backend: backend}
 }
 
-func (s *Service) Grant(ctx context.Context, command ports.GrantCommand) (ports.CommandResult, error) {
-	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (ports.CommandResult, error) {
-		return commands.Grant(ctx, command)
+// ManagedCommands is the single pool-owned entry point for Command
+// execution. It runs run inside one managed (or ambient guard-carried)
+// transaction and returns its result. Role faces in ports select which
+// methods callers may use; this runner carries no per-Command knowledge.
+func ManagedCommands[T any](ctx context.Context, s *Service, run func(ports.Commands) (T, error)) (T, error) {
+	return withManagedTransactionResult(ctx, s, func(commands *transactionCommands) (T, error) {
+		return run(commands)
 	})
-}
-
-func (s *Service) Purchase(ctx context.Context, command ports.PurchaseCommand) (ports.CommandResult, error) {
-	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (ports.CommandResult, error) {
-		return commands.Purchase(ctx, command)
-	})
-}
-
-func (s *Service) PurchaseRefundHold(ctx context.Context, command ports.PurchaseRefundHoldCommand) (ports.CommandResult, error) {
-	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (ports.CommandResult, error) {
-		return commands.PurchaseRefundHold(ctx, command)
-	})
-}
-
-func (s *Service) PurchaseRefund(ctx context.Context, command ports.PurchaseRefundCommand) (ports.CommandResult, error) {
-	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (ports.CommandResult, error) {
-		return commands.PurchaseRefund(ctx, command)
-	})
-}
-
-func (s *Service) PaymentDisputeDebit(ctx context.Context, command ports.PaymentDisputeDebitCommand) (ports.PaymentDisputeDebitResult, error) {
-	return withManagedTransactionResult(ctx, s, func(commands *transactionCommands) (ports.PaymentDisputeDebitResult, error) {
-		return commands.PaymentDisputeDebit(ctx, command)
-	})
-}
-
-func (s *Service) PaymentDisputeRestore(ctx context.Context, command ports.PaymentDisputeRestoreCommand) (ports.CommandResult, error) {
-	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (ports.CommandResult, error) {
-		return commands.PaymentDisputeRestore(ctx, command)
-	})
-}
-
-func (s *Service) Deduct(ctx context.Context, command ports.DeductionCommand) (ports.CommandResult, error) {
-	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (ports.CommandResult, error) {
-		return commands.Deduct(ctx, command)
-	})
-}
-
-func (s *Service) Correct(ctx context.Context, command ports.CorrectionCommand) (ports.CommandResult, error) {
-	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (ports.CommandResult, error) {
-		return commands.Correct(ctx, command)
-	})
-}
-
-func (s *Service) Hold(ctx context.Context, command ports.HoldCommand) (ports.CommandResult, error) {
-	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (ports.CommandResult, error) {
-		return commands.Hold(ctx, command)
-	})
-}
-
-func (s *Service) Capture(ctx context.Context, command ports.CaptureCommand) (ports.CommandResult, error) {
-	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (ports.CommandResult, error) {
-		return commands.Capture(ctx, command)
-	})
-}
-
-func (s *Service) Release(ctx context.Context, command ports.ReleaseCommand) (ports.CommandResult, error) {
-	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (ports.CommandResult, error) {
-		return commands.Release(ctx, command)
-	})
-}
-
-func (s *Service) Refund(ctx context.Context, command ports.RefundCommand) (ports.CommandResult, error) {
-	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (ports.CommandResult, error) {
-		return commands.Refund(ctx, command)
-	})
-}
-
-func withManagedTransaction(
-	ctx context.Context,
-	service *Service,
-	run func(*transactionCommands) (ports.CommandResult, error),
-) (ports.CommandResult, error) {
-	return withManagedTransactionResult(ctx, service, run)
 }
 
 func withManagedTransactionResult[T any](

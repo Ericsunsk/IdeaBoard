@@ -67,11 +67,7 @@ func NewPostgresWorkspaceBoardStore(db *pgxpool.Pool, validateDocumentAssets Doc
 }
 
 func (s *PostgresWorkspaceBoardStore) dbWithContext(ctx context.Context) postgresBoardQueryer {
-	q := s.q
-	if tx, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		q = dbsqlc.New(tx)
-	}
-	return postgresBoardQueryer{ctx: ctx, db: s.db, q: q}
+	return postgresBoardQueryer{ctx: ctx, db: s.db, q: dbutil.BorrowedQueries(ctx, s.q)}
 }
 
 func (db postgresBoardQueryer) withTx(run func(*dbsqlc.Queries) error) error {

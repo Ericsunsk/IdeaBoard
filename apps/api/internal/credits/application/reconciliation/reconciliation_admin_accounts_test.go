@@ -136,7 +136,7 @@ func TestReconciliationIsolatesAnomalousOrgAccountOnly(t *testing.T) {
 	orgAccount := ensureOrgPoolAccount(t, pool, "org_admin923iso", "ba_admin923orgiso", ownerUserID)
 
 	for account, key := range map[int64]string{orgAccount: "iso:org", ownerPersonal: "iso:owner", otherPersonal: "iso:other"} {
-		if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata(key+":grant", key+"-grant")}); err != nil {
+		if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 100), Metadata: testhelpers.TestMetadata(key+":grant", key+"-grant")}); err != nil {
 			t.Fatalf("Grant(%d) error = %v", account, err)
 		}
 	}
@@ -181,11 +181,11 @@ func TestReconciliationIsolatesAnomalousOrgAccountOnly(t *testing.T) {
 		if got := activeRestrictionCount(t, pool, account); got != 0 {
 			t.Fatalf("account %d active restrictions = %d, want 0", account, got)
 		}
-		if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata(key+":grant", key+"-grant")}); err != nil {
+		if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata(key+":grant", key+"-grant")}); err != nil {
 			t.Fatalf("Grant(%d) after org anomaly error = %v, want nil", account, err)
 		}
 	}
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: orgAccount, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("iso:org-blocked", "iso-org-blocked")}); !errors.Is(err, domain.ErrWalletRestricted) {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: orgAccount, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("iso:org-blocked", "iso-org-blocked")}); !errors.Is(err, domain.ErrWalletRestricted) {
 		t.Fatalf("Grant(org) error = %v, want domain.ErrWalletRestricted", err)
 	}
 
@@ -209,7 +209,7 @@ func TestReconciliationIsolatesAnomalousOrgAccountOnly(t *testing.T) {
 	if got := activeRestrictionCount(t, pool, orgAccount); got != 0 {
 		t.Fatalf("org active restrictions after repair = %d, want 0", got)
 	}
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: orgAccount, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("iso:org-recovered", "iso-org-recovered")}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: orgAccount, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("iso:org-recovered", "iso-org-recovered")}); err != nil {
 		t.Fatalf("Grant(org) after repair error = %v", err)
 	}
 }
@@ -221,15 +221,15 @@ func TestAdminLinkedRepairOnRestrictedAccount(t *testing.T) {
 
 	const userID int64 = 203
 	account := testhelpers.MustBillingAccount(t, pool, userID)
-	grant, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 50), Metadata: testhelpers.TestMetadata("repair:grant", "repair-grant")})
+	grant, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 50), Metadata: testhelpers.TestMetadata("repair:grant", "repair-grant")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	hold, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("repair:hold", "repair-hold")})
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("repair:hold", "repair-hold")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	capture, err := service.Capture(ctx, ports.CaptureCommand{BillingAccountID: account, HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("repair:capture", "repair-capture")})
+	capture, err := service.Settlement().Capture(ctx, ports.CaptureCommand{BillingAccountID: account, HoldTransactionID: hold.TransactionID, Amount: testhelpers.MustCreditAmount(t, 20), Metadata: testhelpers.TestMetadata("repair:capture", "repair-capture")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,15 +250,15 @@ func TestAdminLinkedRepairOnRestrictedAccount(t *testing.T) {
 	}
 
 	// New spending stays blocked on the restricted account.
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("repair:blocked-grant", "repair-blocked-grant")}); !errors.Is(err, domain.ErrWalletRestricted) {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("repair:blocked-grant", "repair-blocked-grant")}); !errors.Is(err, domain.ErrWalletRestricted) {
 		t.Fatalf("Grant() error = %v, want domain.ErrWalletRestricted", err)
 	}
 	deductMetadata := testhelpers.TestMetadata("repair:blocked-deduct", "repair-blocked-deduct")
 	deductMetadata.Actor = domain.Actor{Type: domain.ActorAdmin, ID: "11"}
-	if _, err := service.Deduct(ctx, ports.DeductionCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: deductMetadata}); !errors.Is(err, domain.ErrWalletRestricted) {
+	if _, err := service.Administrative().Deduct(ctx, ports.DeductionCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: deductMetadata}); !errors.Is(err, domain.ErrWalletRestricted) {
 		t.Fatalf("Deduct() error = %v, want domain.ErrWalletRestricted", err)
 	}
-	if _, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("repair:blocked-hold", "repair-blocked-hold")}); !errors.Is(err, domain.ErrWalletRestricted) {
+	if _, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("repair:blocked-hold", "repair-blocked-hold")}); !errors.Is(err, domain.ErrWalletRestricted) {
 		t.Fatalf("Hold() error = %v, want domain.ErrWalletRestricted", err)
 	}
 
@@ -267,7 +267,7 @@ func TestAdminLinkedRepairOnRestrictedAccount(t *testing.T) {
 	// policy (amounts stay bounded by their linked facts).
 	refundMetadata := testhelpers.TestMetadata("repair:refund", "repair-refund")
 	refundMetadata.Actor = domain.Actor{Type: domain.ActorAdmin, ID: "11"}
-	refund, err := service.Refund(ctx, ports.RefundCommand{BillingAccountID: account, ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: refundMetadata})
+	refund, err := service.Administrative().Refund(ctx, ports.RefundCommand{BillingAccountID: account, ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: refundMetadata})
 	if err != nil {
 		t.Fatalf("Refund() on restricted account error = %v", err)
 	}
@@ -276,7 +276,7 @@ func TestAdminLinkedRepairOnRestrictedAccount(t *testing.T) {
 	}
 	correctMetadata := testhelpers.TestMetadata("repair:correct", "repair-correct")
 	correctMetadata.Actor = domain.Actor{Type: domain.ActorAdmin, ID: "11"}
-	if _, err := service.Correct(ctx, ports.CorrectionCommand{BillingAccountID: account, OriginalTransactionID: grant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: correctMetadata}); err != nil {
+	if _, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{BillingAccountID: account, OriginalTransactionID: grant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: correctMetadata}); err != nil {
 		t.Fatalf("Correct() on restricted account error = %v", err)
 	}
 
@@ -287,14 +287,14 @@ func TestAdminLinkedRepairOnRestrictedAccount(t *testing.T) {
 	otherAccount := testhelpers.MustBillingAccount(t, pool, otherUserID)
 	crossRefundMetadata := testhelpers.TestMetadata("repair:cross-refund", "repair-cross-refund")
 	crossRefundMetadata.Actor = domain.Actor{Type: domain.ActorAdmin, ID: "11"}
-	if _, err := service.Refund(ctx, ports.RefundCommand{BillingAccountID: otherAccount, ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: crossRefundMetadata}); err == nil {
+	if _, err := service.Administrative().Refund(ctx, ports.RefundCommand{BillingAccountID: otherAccount, ChargeTransactionID: capture.TransactionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: crossRefundMetadata}); err == nil {
 		t.Fatal("cross-account Refund() succeeded, want failure")
 	} else if !errors.Is(err, domain.ErrChargeNotFound) && !errors.Is(err, domain.ErrInvalidCommand) {
 		t.Fatalf("cross-account Refund() error = %v, want charge-not-found/invalid", err)
 	}
 	crossCorrectMetadata := testhelpers.TestMetadata("repair:cross-correct", "repair-cross-correct")
 	crossCorrectMetadata.Actor = domain.Actor{Type: domain.ActorAdmin, ID: "11"}
-	if _, err := service.Correct(ctx, ports.CorrectionCommand{BillingAccountID: otherAccount, OriginalTransactionID: grant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: crossCorrectMetadata}); err == nil {
+	if _, err := service.Administrative().Correct(ctx, ports.CorrectionCommand{BillingAccountID: otherAccount, OriginalTransactionID: grant.TransactionID, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: crossCorrectMetadata}); err == nil {
 		t.Fatal("cross-account Correct() succeeded, want failure")
 	} else if !errors.Is(err, domain.ErrInvalidCommand) && !errors.Is(err, domain.ErrChargeNotFound) {
 		t.Fatalf("cross-account Correct() error = %v, want invalid/charge-not-found", err)
@@ -311,7 +311,7 @@ func TestAdminLinkedRepairOnRestrictedAccount(t *testing.T) {
 	if release.RestrictionID != restriction.RestrictionID {
 		t.Fatalf("released = %q, want %q", release.RestrictionID, restriction.RestrictionID)
 	}
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("repair:recovered", "repair-recovered")}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: account, Amount: testhelpers.MustCreditAmount(t, 1), Metadata: testhelpers.TestMetadata("repair:recovered", "repair-recovered")}); err != nil {
 		t.Fatalf("Grant() after release error = %v", err)
 	}
 }

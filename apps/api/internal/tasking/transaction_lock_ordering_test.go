@@ -177,10 +177,10 @@ func TestTransactionLockOrdering(t *testing.T) {
 
 	t.Run("credits commands take advisory lock then wallet then accounts in id order", func(t *testing.T) {
 		body := sliceBetween(t, baselineFile, baseline,
-			"CREATE FUNCTION execute_credit_command_v2(", "$$ LANGUAGE plpgsql")
-		assertCallOrder(t, baselineFile+":execute_credit_command_v2", body, []string{
+			"CREATE FUNCTION execute_credit_command_v3(", "$$ LANGUAGE plpgsql")
+		assertCallOrder(t, baselineFile+":execute_credit_command_v3", body, []string{
 			"pg_advisory_xact_lock(hashtextextended(p_idempotency_key",
-			"FROM credit_wallets WHERE user_id = p_user_id FOR UPDATE",
+			"FROM credit_wallets wallets WHERE wallets.billing_account_id = p_billing_account_id FOR UPDATE",
 			"ORDER BY accounts.id FOR UPDATE",
 		})
 	})
@@ -197,8 +197,8 @@ func TestTransactionLockOrdering(t *testing.T) {
 	})
 
 	t.Run("billing quote stays lock free inside the settlement transaction", func(t *testing.T) {
-		if !strings.Contains(billing, "func (s *Store) QuoteAtResolutionInTx") {
-			t.Fatal("billing store.go: QuoteAtResolutionInTx seam missing (code moved; update doc+test)")
+		if !strings.Contains(billing, "func (s *Store) Quote(ctx context.Context, tx pgx.Tx,") {
+			t.Fatal("billing store.go: Quote seam missing (code moved; update doc+test)")
 		}
 		if strings.Contains(billing, "FOR UPDATE") {
 			t.Fatal("billing store.go: Quote path must stay a lock-free SELECT; FOR UPDATE would serialize every settlement on the catalog")

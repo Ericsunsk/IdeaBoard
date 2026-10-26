@@ -346,7 +346,7 @@ func NewAppRouter(
 			Users:          services.userService,
 			Identity:       administration.NewIdentityAdminCommands(services.userService, services.authServiceClient, authsync.NewStore(repos.db)),
 			Impersonator:   services.authServiceClient,
-			Credits:        services.creditService,
+			Credits:        services.creditService.Administrative(),
 			CreditUsers:    creditUserResolver,
 			CreditReads:    services.creditService,
 			Restrictions:   services.creditService,

@@ -309,7 +309,7 @@ func (e *atomicEnv) seedSecondWorkspaceWithFundedOwner(t *testing.T) (workspaceI
 		_ = tx.Rollback(ctx)
 		t.Fatal(err)
 	}
-	if _, err := e.credits.InTx(tx).Grant(ctx, ports.GrantCommand{BillingAccountID: secondAccount.InternalID, Amount: grant, Metadata: domain.CommandMetadata{
+	if _, err := e.credits.GrantsInTx(tx).Grant(ctx, ports.GrantCommand{BillingAccountID: secondAccount.InternalID, Amount: grant, Metadata: domain.CommandMetadata{
 		IdempotencyKey: "stalled-other-seed-" + randomAtomicHex(t, 4),
 		Actor:          domain.Actor{Type: domain.ActorSystem, ID: "test"},
 		Source:         "test", Reason: "stalled sweep seed",

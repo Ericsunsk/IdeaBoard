@@ -72,11 +72,14 @@ type BillingTransferInvite struct {
 // Expired reports whether a pending invite has lapsed at now. Only pending
 // invites lapse; terminal invites carry their decided outcome regardless of
 // ExpiresAt. A zero ExpiresAt (predates the expiry column) never lapses.
+// The 7-day lapse reuses the unified lifecycle value object
+// (TransferInviteLapsed, same MemberInviteTTL family as member invites);
+// the inclusive at-or-past boundary is transfer-specific and preserved.
 func (invite *BillingTransferInvite) Expired(now time.Time) bool {
 	if invite == nil || invite.Status != BillingTransferPending || invite.ExpiresAt.IsZero() {
 		return false
 	}
-	return !now.Before(invite.ExpiresAt)
+	return TransferInviteLapsed(invite.ExpiresAt, now)
 }
 
 // IsValidBillingTransferStatus reports whether status is a known invite state.

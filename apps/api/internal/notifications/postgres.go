@@ -42,10 +42,7 @@ func (s *PostgresStore) dbWithContext(ctx context.Context) repositoryQueryer {
 }
 
 func newRepositoryQueryer(ctx context.Context, pool *pgxpool.Pool, q *dbsqlc.Queries) repositoryQueryer {
-	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		q = dbsqlc.New(ambient)
-	}
-	return repositoryQueryer{ctx: ctx, db: pool, q: q}
+	return repositoryQueryer{ctx: ctx, db: pool, q: dbutil.BorrowedQueries(ctx, q)}
 }
 
 func (s *PostgresStore) CreateNotification(ctx context.Context, input CreateNotificationInput) (*Notification, error) {

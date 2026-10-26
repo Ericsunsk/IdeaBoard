@@ -54,6 +54,7 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	runtimehttp "ideaboard/api/internal/runtime/interfaces/http"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	"ideaboard/api/internal/tenancy/invitations"
 	usageapplication "ideaboard/api/internal/usage/application"
 	usagedomain "ideaboard/api/internal/usage/domain"
@@ -93,12 +94,14 @@ func renderBillingPricingUnavailable(c *gin.Context, err error) bool {
 	return true
 }
 
-// billingAccountStore provisions and resolves stable billing accounts.
-// Production uses tenancypg.BillingAccountStore; tests stub this interface.
-// Resolution joins the caller transaction inside the store; handlers only
-// pass workspace scope plus the authenticated principal.
+// billingAccountStore resolves the stable funds identity plus financial
+// management. Production uses tenancypg.BillingAccountStore via the deep
+// funds kernel; tests stub this interface.
+// Resolution joins the caller transaction inside the deep module (funds
+// borrow-or-begin); handlers pass only the ws_ public id and receive the
+// ba_ identity, never branching on the workspace/org mapping.
 type billingAccountStore interface {
-	EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error)
+	ResolveFunds(ctx context.Context, workspacePublicID string) (funds.Identity, error)
 	GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancy.BillingAccount, error)
 	// GetBillingAccountByInternalID resolves the stable ba_ funds identity
 	// for a beneficiary account (#921): reward redemption credits the
@@ -320,22 +323,32 @@ func (h *contractV1BillingHandler) billingWorkspaceContext(c *gin.Context, p pri
 }
 
 // billingAccountForWorkspace resolves the stable funds identity backing
-// workspace reads (#915 resolution, #916 funds identity). There is no
-// owner-wallet fallback: every read addresses the resolved Billing Account,
-// so sharing a Workspace never exposes another wallet.
+// workspace reads (#915 resolution, #916 funds identity) through the deep
+// funds kernel. There is no owner-wallet fallback: every read addresses the
+// resolved Billing Account, so sharing a Workspace never exposes another
+// wallet. The handler passes only the ws_ public id and receives the ba_
+// identity; the workspace/org mapping and the InternalID join handle stay
+// inside funds (the handler renders ba_ on the wire and forwards the
+// InternalID opaquely to downstream joins without interpreting it).
 func (h *contractV1BillingHandler) billingAccountForWorkspace(c *gin.Context, workspace *tenancy.Workspace) (tenancy.BillingAccount, bool) {
 	if h.deps.BillingAccounts == nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable41)
 		c.Abort()
 		return tenancy.BillingAccount{}, false
 	}
-	account, err := h.deps.BillingAccounts.EnsureBillingAccountForWorkspace(
-		c.Request.Context(), workspace.InternalID, workspace.PublicID)
+	identity, err := h.deps.BillingAccounts.ResolveFunds(
+		c.Request.Context(), workspace.PublicID)
 	if err != nil {
 		renderBillingAccountError(c, err)
 		return tenancy.BillingAccount{}, false
 	}
-	return account, true
+	if identity.BillingAccountID <= 0 || identity.BA() == "" {
+		// Creation path without a funds identity fails closed here (never
+		// a zero join handle to downstream stores).
+		renderBillingAccountError(c, tenancy.ErrBillingNotFound)
+		return tenancy.BillingAccount{}, false
+	}
+	return identity.ToBillingAccount(), true
 }
 
 // consumptionReadScope is shared by summary and itemized reads. Workspace

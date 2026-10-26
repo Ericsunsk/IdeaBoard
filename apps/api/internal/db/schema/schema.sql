@@ -4942,11 +4942,6 @@ CREATE TRIGGER set_payment_stripe_configurations_updated_at
 BEFORE UPDATE ON payment_stripe_configurations
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-ALTER TABLE credit_transactions
-  DROP CONSTRAINT ck_credit_transactions_command_type,
-  ADD CONSTRAINT ck_credit_transactions_command_type
-    CHECK (command_type IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction', 'purchase_credit', 'purchase_refund', 'payment_dispute_debit', 'payment_dispute_restore'));
-
 CREATE TABLE payment_customers (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   -- Payer funds identity (#919): the Billing Account that owns the unified
@@ -5806,15 +5801,6 @@ CREATE TRIGGER set_feature_prompts_updated_at BEFORE UPDATE ON feature_prompts F
 CREATE TRIGGER set_boards_updated_at BEFORE UPDATE ON boards FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_board_memberships_updated_at BEFORE UPDATE ON board_memberships FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 ALTER TABLE payment_webhook_events ADD CONSTRAINT payment_webhook_events_payment_order_id_fkey FOREIGN KEY (payment_order_id) REFERENCES payment_orders(id) ON DELETE RESTRICT;
-
-ALTER TABLE credit_transactions
-  DROP CONSTRAINT ck_credit_transactions_command_type,
-  ADD CONSTRAINT ck_credit_transactions_command_type CHECK (
-    command_type IN (
-      'grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction',
-      'purchase_credit', 'purchase_refund', 'payment_dispute_debit', 'payment_dispute_restore'
-    )
-  );
 
 -- This records a signed Dispute debit request that could not create a Ledger
 -- transaction because the Wallet had no available Ideas to recover.

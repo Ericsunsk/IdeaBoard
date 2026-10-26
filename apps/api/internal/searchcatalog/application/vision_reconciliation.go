@@ -14,6 +14,8 @@ import (
 
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/tasking/settlement"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -62,11 +64,17 @@ func (s *VisionBillingService) ReconcilePending(ctx context.Context) error {
 // reconcileOne releases one unsettled operation's hold and marks it failed.
 // Missing rows (already converged) are acknowledged without error.
 func (s *VisionBillingService) reconcileOne(ctx context.Context, operationID string) error {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	scope, err := dbutil.Begin(ctx, s.pool, pgx.TxOptions{})
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(context.Background())
+	tx := scope.Tx()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = scope.Rollback(ctx)
+		}
+	}()
 	var userID int64
 	var holdID string
 	var amount int64
@@ -81,10 +89,10 @@ func (s *VisionBillingService) reconcileOne(ctx context.Context, operationID str
 	if err != nil {
 		return err
 	}
-	if _, err := s.credits.InTx(tx).Release(ctx, ports.ReleaseCommand{
+	if _, err := s.credits.SettlementInTx(tx).Release(ctx, ports.ReleaseCommand{
 		BillingAccountID: accountID, HoldTransactionID: holdID, Amount: creditAmount,
 		Metadata: domain.CommandMetadata{
-			IdempotencyKey: "ai-search:" + operationID + ":reconcile-release",
+			IdempotencyKey: settlement.VisionReconcileReleaseKey(operationID),
 			Actor:          domain.Actor{Type: domain.ActorSystem, ID: "vision-reconciliation"},
 			Source:         "ai_search_vision", Reason: "vision search reconciliation timeout",
 			BusinessReference: domain.BusinessReference{Type: "ai_search_operation", ID: operationID},
@@ -95,5 +103,9 @@ func (s *VisionBillingService) reconcileOne(ctx context.Context, operationID str
 	if _, err := tx.Exec(ctx, `UPDATE ai_search_operations SET status = 'failed', error_code = 'vision_search_reconciliation_timeout', error_message = '视觉搜索超时，请重试', updated_at = now(), settled_at = now() WHERE operation_id = $1::uuid`, operationID); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	if err := scope.Commit(ctx); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }

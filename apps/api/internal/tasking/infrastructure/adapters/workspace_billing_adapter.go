@@ -51,7 +51,7 @@ func (q *WorkspaceTaskQuoter) Quote(ctx context.Context, service, resolution str
 		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: invalid output resolution: %w", err)
 	}
 	sku := "ai-image:" + canonical
-	quote, err := q.Catalog.QuoteAtResolution(ctx, sku, outputResolution, quantity)
+	quote, err := q.Catalog.Quote(ctx, nil, sku, outputResolution, quantity)
 	if err != nil {
 		// Preserve the underlying billing cause alongside the
 		// quote-unavailable identity (multi-%w): pricing failures
@@ -96,7 +96,7 @@ func (q *WorkspaceTaskQuoter) QuoteInTx(ctx context.Context, tx pgx.Tx, service,
 		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: invalid output resolution: %w", err)
 	}
 	sku := "ai-image:" + canonical
-	quote, err := q.Catalog.QuoteAtResolutionInTx(ctx, tx, sku, outputResolution, quantity)
+	quote, err := q.Catalog.Quote(ctx, tx, sku, outputResolution, quantity)
 	if err != nil {
 		// Same multi-%w preservation as Quote: the price read shares
 		// the repeatable-read snapshot with the Hold that follows, and

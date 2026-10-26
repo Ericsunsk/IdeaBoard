@@ -58,17 +58,10 @@ type repositoryContextDB struct {
 }
 
 func (db repositoryContextDB) queries() *dbsqlc.Queries {
-	// Ambient guard transaction (control audit atomicity): when the
-	// guard staged its mutation transaction in the context, the
-	// brand-logo writes join it as participants instead of committing
-	// in their own pool statements. The transaction is BORROWED (the
-	// guard commits or rolls it back with the Control audit row), so
-	// this path never begins, commits, or rolls back. With no carrier
-	// the self-contained pool queries run unchanged.
-	if ambient, ok := dbutil.AmbientTxFromContext(db.ctx); ok {
-		return dbsqlc.New(ambient)
-	}
-	return dbsqlc.New(db.db)
+	// Thin adapter on the deep Tx module: the carrier-vs-pool borrow
+	// decision lives in dbutil.BorrowedQueries. With no carrier the
+	// self-contained pool queries run unchanged.
+	return dbutil.BorrowedQueries(db.ctx, dbsqlc.New(db.db))
 }
 
 func NewRepository(db *pgxpool.Pool) *Repository { return &Repository{db: db} }

@@ -21,7 +21,7 @@ func TestBillingAccountWalletHoldsSpendsAndConvergesWithSeparatedActor(t *testin
 	accountID := testhelpers.MustBillingAccount(t, pool, 91601)
 	const operatorID = "91601"
 
-	grant, err := service.Grant(ctx, ports.GrantCommand{
+	grant, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: accountID,
 		Amount:           testhelpers.MustCreditAmount(t, 100),
 		Metadata:         testhelpers.TestMetadata("ba-separation:grant", "ba-separation-grant"),
@@ -33,7 +33,7 @@ func TestBillingAccountWalletHoldsSpendsAndConvergesWithSeparatedActor(t *testin
 		t.Fatalf("Grant() wallet account = %d, want %d", grant.Wallet.BillingAccountID, accountID)
 	}
 
-	hold, err := service.Hold(ctx, ports.HoldCommand{
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{
 		BillingAccountID: accountID,
 		Amount:           testhelpers.MustCreditAmount(t, 60),
 		Metadata: domain.CommandMetadata{
@@ -51,7 +51,7 @@ func TestBillingAccountWalletHoldsSpendsAndConvergesWithSeparatedActor(t *testin
 		t.Fatalf("Hold() wallet = %+v, want available=40 reserved=60", hold.Wallet)
 	}
 
-	capture, err := service.Capture(ctx, ports.CaptureCommand{
+	capture, err := service.Settlement().Capture(ctx, ports.CaptureCommand{
 		BillingAccountID:  accountID,
 		HoldTransactionID: hold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 25),
@@ -70,7 +70,7 @@ func TestBillingAccountWalletHoldsSpendsAndConvergesWithSeparatedActor(t *testin
 		t.Fatalf("Capture() wallet = %+v, want available=40 reserved=35", capture.Wallet)
 	}
 
-	release, err := service.Release(ctx, ports.ReleaseCommand{
+	release, err := service.Settlement().Release(ctx, ports.ReleaseCommand{
 		BillingAccountID:  accountID,
 		HoldTransactionID: hold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 35),
@@ -117,14 +117,14 @@ func TestBillingAccountHoldConvergesAfterServiceRestart(t *testing.T) {
 	ctx := t.Context()
 	accountID := testhelpers.MustBillingAccount(t, pool, 91602)
 
-	if _, err := first.Grant(ctx, ports.GrantCommand{
+	if _, err := first.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: accountID,
 		Amount:           testhelpers.MustCreditAmount(t, 50),
 		Metadata:         testhelpers.TestMetadata("ba-restart:grant", "ba-restart-grant"),
 	}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	hold, err := first.Hold(ctx, ports.HoldCommand{
+	hold, err := first.Settlement().Hold(ctx, ports.HoldCommand{
 		BillingAccountID: accountID,
 		Amount:           testhelpers.MustCreditAmount(t, 50),
 		Metadata:         testhelpers.TestMetadata("ba-restart:hold", "ba-restart-hold"),
@@ -134,7 +134,7 @@ func TestBillingAccountHoldConvergesAfterServiceRestart(t *testing.T) {
 	}
 
 	restarted := credits.NewService(pool)
-	capture, err := restarted.Capture(ctx, ports.CaptureCommand{
+	capture, err := restarted.Settlement().Capture(ctx, ports.CaptureCommand{
 		BillingAccountID:  accountID,
 		HoldTransactionID: hold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 50),
@@ -163,11 +163,11 @@ func TestBillingAccountCommandsReplayIdempotentlyAndDetectConflicts(t *testing.T
 	otherAccountID := testhelpers.MustBillingAccount(t, pool, 91604)
 
 	metadata := testhelpers.TestMetadata("ba-idem:grant", "ba-idem-grant")
-	first, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: accountID, Amount: testhelpers.MustCreditAmount(t, 30), Metadata: metadata})
+	first, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: accountID, Amount: testhelpers.MustCreditAmount(t, 30), Metadata: metadata})
 	if err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	replay, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: accountID, Amount: testhelpers.MustCreditAmount(t, 30), Metadata: metadata})
+	replay, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: accountID, Amount: testhelpers.MustCreditAmount(t, 30), Metadata: metadata})
 	if err != nil {
 		t.Fatalf("Grant(replay) error = %v", err)
 	}
@@ -176,11 +176,11 @@ func TestBillingAccountCommandsReplayIdempotentlyAndDetectConflicts(t *testing.T
 	}
 	conflictMetadata := testhelpers.TestMetadata("ba-idem:grant", "ba-idem-grant")
 	conflictMetadata.Source = "different-source"
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: accountID, Amount: testhelpers.MustCreditAmount(t, 30), Metadata: conflictMetadata}); err == nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: accountID, Amount: testhelpers.MustCreditAmount(t, 30), Metadata: conflictMetadata}); err == nil {
 		t.Fatal("Grant(conflicting hash) succeeded, want idempotency conflict")
 	}
 
-	hold, err := service.Hold(ctx, ports.HoldCommand{
+	hold, err := service.Settlement().Hold(ctx, ports.HoldCommand{
 		BillingAccountID: accountID,
 		Amount:           testhelpers.MustCreditAmount(t, 10),
 		Metadata:         testhelpers.TestMetadata("ba-idem:hold", "ba-idem-hold"),
@@ -188,7 +188,7 @@ func TestBillingAccountCommandsReplayIdempotentlyAndDetectConflicts(t *testing.T
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	if _, err := service.Release(ctx, ports.ReleaseCommand{
+	if _, err := service.Settlement().Release(ctx, ports.ReleaseCommand{
 		BillingAccountID:  otherAccountID,
 		HoldTransactionID: hold.TransactionID,
 		Amount:            testhelpers.MustCreditAmount(t, 10),

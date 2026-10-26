@@ -3,7 +3,6 @@ package dbutil
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -29,6 +28,9 @@ const RollbackTimeout = 5 * time.Second
 // borrowed transaction is never committed or rolled back here; the
 // guard owns its lifecycle. With no carrier the legacy owned-transaction
 // path runs unchanged.
+//
+// Implemented on the deep Tx module (Do): the borrow-or-begin decision
+// and the ownership tracking live in Scope, not here.
 func WithTx(ctx context.Context, pool *pgxpool.Pool, fn func(*dbsqlc.Queries) error) error {
 	if fn == nil {
 		return errors.New("dbutil: tx function is nil")
@@ -48,42 +50,18 @@ func WithTx(ctx context.Context, pool *pgxpool.Pool, fn func(*dbsqlc.Queries) er
 // error this branch deliberately does NOT roll back: the transaction
 // is not ours, and only the guard may decide its fate. With no carrier
 // the legacy owned-transaction path below runs byte for byte as before.
+//
+// Implemented on the deep Tx module (Do): fn receives a Scope whose
+// handle refuses Commit/Rollback with ErrBorrowedTxLifecycle when
+// borrowed, so the "never touch a borrowed lifecycle" rule is enforced
+// by the module instead of by these comments.
 func WithTxDBTX(ctx context.Context, pool *pgxpool.Pool, fn func(*dbsqlc.Queries, pgx.Tx) error) error {
 	if fn == nil {
 		return errors.New("dbutil: tx function is nil")
 	}
-	if ambient, ok := AmbientTxFromContext(ctx); ok {
-		// dbsqlc.New(ambient) binds Queries to the carrier without
-		// touching pool, so this path needs no pool connection of its
-		// own (and never acquires one).
-		return fn(dbsqlc.New(ambient), ambient)
-	}
-	if pool == nil {
-		return errors.New("dbutil: database is nil")
-	}
-	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return err
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			rollbackCtx, cancel := context.WithTimeout(context.Background(), RollbackTimeout)
-			defer cancel()
-			if rollbackErr := tx.Rollback(rollbackCtx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-				slog.Warn("failed to roll back database transaction", "err", rollbackErr)
-			}
-		}
-	}()
-
-	if err := fn(dbsqlc.New(pool).WithTx(tx), tx); err != nil {
-		return err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return err
-	}
-	committed = true
-	return nil
+	return Do(ctx, pool, pgx.TxOptions{}, func(scope *Scope) error {
+		return fn(scope.Queries(), scope.Tx())
+	})
 }
 
 // ResolveWorkspaceInternalID maps an opaque workspace public id to its

@@ -707,7 +707,7 @@ func seedRechargeableWallet(t *testing.T, pool *pgxpool.Pool, userID int64) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = credits.NewService(pool).Grant(t.Context(), creditsports.GrantCommand{
+	_, err = credits.NewService(pool).Administrative().Grant(t.Context(), creditsports.GrantCommand{
 		BillingAccountID: paymentAccount(t, credits.NewService(pool), userID), Amount: amount,
 		Metadata: domain.CommandMetadata{
 			IdempotencyKey: "payment-wallet-seed-" + strconv.FormatInt(userID, 10),

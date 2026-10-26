@@ -26,6 +26,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -80,6 +81,60 @@ type MemberInvitePolicy struct {
 	ConflictErr    error
 	ExpiredErr     error
 	NewPublicID    func() (string, error)
+}
+
+// CheckInviterRole applies the organization inviter rules. Workspace
+// authorization is enforced by its HTTP/application boundary.
+func (p MemberInvitePolicy) CheckInviterRole(actorRole, grantedRole string) error {
+	if p.Scope != InviteScopeOrganization {
+		return nil
+	}
+	if actorRole != RoleOwner && actorRole != RoleAdmin {
+		return ErrForbidden
+	}
+	if grantedRole == RoleAdmin && actorRole != RoleOwner {
+		return ErrForbidden
+	}
+	return nil
+}
+
+// CheckCreateCapacity reserves workspace capacity for active members and
+// pending invitations. Organization membership has no create-time cap.
+func (p MemberInvitePolicy) CheckCreateCapacity(active, pending int64) error {
+	if p.Scope == InviteScopeWorkspace && active+pending >= MaxWorkspaceMembers {
+		return ErrWorkspaceMemberLimitReached
+	}
+	return nil
+}
+
+// TransferInviteLapsed reports the transfer 7-day lapse (inclusive): a
+// pending invite at or past ExpiresAt never moves funds or membership.
+// Member invites use MemberInviteExpired (strict After); the boundary
+// differs by one instant and is preserved here, so this helper must not
+// replace MemberInviteExpired for member scopes.
+func TransferInviteLapsed(expiresAt, now time.Time) bool {
+	if expiresAt.IsZero() {
+		return false
+	}
+	return !now.Before(expiresAt)
+}
+
+// ValidateTransferDecisionInput validates transfer accept/reject/cancel
+// inputs with the same shape as ValidateMemberInviteDecisionInput (trimmed
+// ref + positive actor) but maps to the billing error domain
+// (ErrBillingWorkspaceInvalid, not ErrForbidden).
+func ValidateTransferDecisionInput(billingAccountInternalID int64, invitePublicID string, actorUserID int64) error {
+	if billingAccountInternalID <= 0 || strings.TrimSpace(invitePublicID) == "" || actorUserID <= 0 {
+		return ErrBillingWorkspaceInvalid
+	}
+	return nil
+}
+
+// TransferNotificationKey builds the durable handover dedup key. It reuses
+// the invite-notification value-object shape (invite public id + stable
+// lifecycle identity) so reissues and retries collapse to one notification.
+func TransferNotificationKey(transferPublicID, idempotencyKey string) string {
+	return fmt.Sprintf("handover:%s:%x", transferPublicID, sha256.Sum256([]byte(idempotencyKey)))
 }
 
 // WorkspaceInvitePolicy returns the workspace-scope lifecycle policy.

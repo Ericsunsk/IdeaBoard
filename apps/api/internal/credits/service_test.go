@@ -34,7 +34,7 @@ func TestNewServiceNilPoolFailsClosed(t *testing.T) {
 	if service == nil {
 		t.Fatal("NewService(nil) returned nil; existing callers require a non-nil facade")
 	}
-	if _, err := service.Grant(context.Background(), ports.GrantCommand{}); err == nil || !strings.Contains(err.Error(), "database pool not configured") {
+	if _, err := service.Administrative().Grant(context.Background(), ports.GrantCommand{}); err == nil || !strings.Contains(err.Error(), "database pool not configured") {
 		t.Fatalf("Grant() error = %v, want service-unavailable failure", err)
 	}
 	if _, err := service.GetWallet(context.Background(), 1); err == nil || !strings.Contains(err.Error(), "database pool not configured") {
@@ -48,7 +48,7 @@ func TestNewServiceNilPoolFailsClosed(t *testing.T) {
 func TestNilServiceFailsClosed(t *testing.T) {
 	var service *credits.Service
 	requireServiceUnavailable(t, func() error {
-		_, err := service.Grant(context.Background(), ports.GrantCommand{})
+		_, err := service.Administrative().Grant(context.Background(), ports.GrantCommand{})
 		return err
 	}(), "nil Service Grant()")
 }

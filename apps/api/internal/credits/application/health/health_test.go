@@ -55,7 +55,7 @@ RETURNING id`, scheduledFor).Scan(&activeRunID); err != nil {
 		t.Fatalf("active run health = %+v, err = %v", creditHealth, err)
 	}
 
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 94),
 		Amount:           testhelpers.MustCreditAmount(t, 10),
 		Metadata:         testhelpers.TestMetadata("health:grant:94", "health-grant-94"),
@@ -88,7 +88,7 @@ RETURNING id`, strings.Repeat("a", 64), runID).Scan(&warningFindingID); err != n
 		t.Fatal(err)
 	}
 
-	if _, err := service.Grant(ctx, ports.GrantCommand{
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: testhelpers.MustBillingAccount(t, pool, 95),
 		Amount:           testhelpers.MustCreditAmount(t, 10),
 		Metadata:         testhelpers.TestMetadata("health:grant:95", "health-grant-95"),

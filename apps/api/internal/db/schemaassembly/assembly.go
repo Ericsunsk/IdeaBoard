@@ -1,3 +1,5 @@
+// Package schemaassembly validates the schema manifest and deterministically
+// assembles its ordered fragments into the generated schema artifact.
 package schemaassembly
 
 import (

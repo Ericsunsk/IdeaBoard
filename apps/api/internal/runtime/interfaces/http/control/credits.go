@@ -1,7 +1,8 @@
 package control
 
-// Control financial operations delegate to credits.Commands (Grant, Deduct,
-// Correct, Refund), never direct ledger writes. The header Idempotency-Key is
+// Control financial operations delegate to the narrow
+// ports.AdministrativeCommands face (Grant, Deduct, Correct, Refund),
+// never direct ledger writes. The header Idempotency-Key is
 // also the durable ledger key. Metadata records the admin actor's public ID
 // and a control_* source.
 
@@ -203,11 +204,11 @@ func (d *ContractControlDeps) resolveControlCreditTarget(c *gin.Context, rawUser
 	if !resolved {
 		return nil, false
 	}
-	if d == nil || d.Credits == nil {
+	if d == nil || d.CreditReads == nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable8)
 		return nil, false
 	}
-	accountID, err := d.Credits.ResolvePersonalAccount(c.Request.Context(), userID)
+	accountID, err := d.CreditReads.ResolvePersonalAccount(c.Request.Context(), userID)
 	if err != nil {
 		writeControlCreditError(c, err)
 		return nil, false

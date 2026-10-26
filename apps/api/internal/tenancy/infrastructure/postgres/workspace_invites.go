@@ -51,9 +51,13 @@ func mapWorkspaceMemberInvite(row dbsqlc.WorkspaceMemberInvite, workspacePublicI
 }
 
 // workspaceInviteTx binds the unified lifecycle to the workspace scope.
+// policy supplies shared rules; the four hooks below are the retained
+// Tx/lock-order-sensitive parts (scope locks + membership grant) documented
+// in member_invites.go. Table dispatch lives in the unified core switch.
 func workspaceInviteTx() postgresInviteTx {
 	return postgresInviteTx{
-		policy: tenancy.WorkspaceInvitePolicy(),
+		policy:   tenancy.WorkspaceInvitePolicy(),
+		orgStore: nil,
 		lockScopeForCreate: func(ctx context.Context, q *dbsqlc.Queries, scopePublicID string) (int64, string, string, error) {
 			workspaceRow, err := lockWorkspaceMemberScope(ctx, q, scopePublicID)
 			if err != nil {
@@ -69,109 +73,9 @@ func workspaceInviteTx() postgresInviteTx {
 			}
 			return workspaceID, workspaceRow.PublicID, workspaceRow.Name, nil
 		},
-		checkInviterRole: nil,
-		checkCapacity: func(ctx context.Context, q *dbsqlc.Queries, scopeInternalID int64) error {
-			activeCount, err := q.CountWorkspaceMembers(ctx, scopeInternalID)
-			if err != nil {
-				return err
-			}
-			pendingCount, err := q.CountPendingWorkspaceMemberInvites(ctx, scopeInternalID)
-			if err != nil {
-				return err
-			}
-			// Invariant: active_members + pending_invites <= 5.
-			if activeCount+pendingCount >= tenancy.MaxWorkspaceMembers {
-				return tenancy.ErrWorkspaceMemberLimitReached
-			}
-			return nil
-		},
-		findPendingByEmail: func(ctx context.Context, q *dbsqlc.Queries, scopeInternalID int64, email string) (string, time.Time, bool, error) {
-			existing, err := q.GetPendingWorkspaceMemberInviteByEmail(ctx, dbsqlc.GetPendingWorkspaceMemberInviteByEmailParams{
-				WorkspaceID:  scopeInternalID,
-				InviteeEmail: email,
-			})
-			if err != nil {
-				return "", time.Time{}, false, nil
-			}
-			return existing.PublicID, existing.ExpiresAt.Time, true, nil
-		},
-		markExpired: func(ctx context.Context, q *dbsqlc.Queries, scopeInternalID int64, publicID string) error {
-			_, err := q.UpdateWorkspaceMemberInviteStatus(ctx, dbsqlc.UpdateWorkspaceMemberInviteStatusParams{
-				PublicID:    publicID,
-				WorkspaceID: scopeInternalID,
-				Status:      tenancy.MemberInviteStatusExpired,
-			})
-			return err
-		},
-		insertInvite: func(ctx context.Context, q *dbsqlc.Queries, scopeInternalID int64, displayPublicID, displayName string, inviterUserID int64, email, role, tokenHash string, inviteeUserID int64, expiresAt time.Time, publicID string) (*tenancy.MemberInvite, error) {
-			row, err := q.CreateWorkspaceMemberInvite(ctx, dbsqlc.CreateWorkspaceMemberInviteParams{
-				PublicID:      publicID,
-				WorkspaceID:   scopeInternalID,
-				InviterUserID: inviterUserID,
-				InviteeEmail:  email,
-				InviteeUserID: pgtype.Int8{Int64: inviteeUserID, Valid: inviteeUserID > 0},
-				Role:          role,
-				TokenHash:     tokenHash,
-				ExpiresAt:     pgtype.Timestamptz{Time: expiresAt, Valid: true},
-			})
-			if err != nil {
-				if database.IsDuplicateConstraintError(err) {
-					return nil, tenancy.ErrConflict
-				}
-				return nil, err
-			}
-			return tenancy.MemberInviteFromWorkspace(mapWorkspaceMemberInvite(row, displayPublicID, displayName)), nil
-		},
 		lockScopeForCancel: func(ctx context.Context, q *dbsqlc.Queries, scopePublicID string) (int64, error) {
 			workspace, err := lockWorkspaceMemberScope(ctx, q, scopePublicID)
 			return workspace.InternalID, err
-		},
-		getForUpdate: func(ctx context.Context, q *dbsqlc.Queries, publicID string, scopeInternalID int64) (*tenancy.MemberInvite, error) {
-			invite, err := q.GetWorkspaceMemberInviteByPublicIDForUpdate(ctx, dbsqlc.GetWorkspaceMemberInviteByPublicIDForUpdateParams{
-				PublicID:    publicID,
-				WorkspaceID: pgtype.Int8{Int64: scopeInternalID, Valid: true},
-			})
-			if err != nil {
-				return nil, notFound(err)
-			}
-			ws, wsErr := q.GetWorkspaceByInternalID(ctx, invite.WorkspaceID)
-			publicIDDisplay, name := "", ""
-			if wsErr == nil {
-				publicIDDisplay, name = ws.PublicID, ws.Name
-			}
-			return tenancy.MemberInviteFromWorkspace(mapWorkspaceMemberInvite(invite, publicIDDisplay, name)), nil
-		},
-		cancelInvite: func(ctx context.Context, q *dbsqlc.Queries, scopeInternalID int64, publicID string, callerUserID int64) error {
-			_, err := q.CancelWorkspaceMemberInvite(ctx, dbsqlc.CancelWorkspaceMemberInviteParams{
-				CancelledByUserID: pgtype.Int8{Int64: callerUserID, Valid: callerUserID > 0},
-				PublicID:          publicID,
-				WorkspaceID:       scopeInternalID,
-			})
-			return err
-		},
-		resolveForDecision: func(ctx context.Context, q *dbsqlc.Queries, ref string) (*tenancy.MemberInvite, error) {
-			var invite dbsqlc.WorkspaceMemberInvite
-			var err error
-			if tenancy.IsMemberInviteRef(ref, tenancy.WorkspaceInvitePrefix) {
-				invite, err = q.GetWorkspaceMemberInviteByPublicID(ctx, dbsqlc.GetWorkspaceMemberInviteByPublicIDParams{
-					PublicID:    ref,
-					WorkspaceID: pgtype.Int8{},
-				})
-			} else {
-				invite, err = q.GetWorkspaceMemberInviteByTokenHash(ctx, dbsqlc.GetWorkspaceMemberInviteByTokenHashParams{
-					TokenHash:   tenancy.MemberInviteTokenHash(ref),
-					WorkspaceID: pgtype.Int8{},
-				})
-			}
-			if err != nil {
-				return nil, notFound(err)
-			}
-			ws, wsErr := q.GetWorkspaceByInternalID(ctx, invite.WorkspaceID)
-			publicIDDisplay, name := "", ""
-			if wsErr == nil {
-				publicIDDisplay, name = ws.PublicID, ws.Name
-			}
-			return tenancy.MemberInviteFromWorkspace(mapWorkspaceMemberInvite(invite, publicIDDisplay, name)), nil
 		},
 		checkAcceptScope: func(ctx context.Context, q *dbsqlc.Queries, inv *tenancy.MemberInvite) error {
 			workspaceRow, err := lockWorkspaceMemberScope(ctx, q, inv.ScopePublicID)
@@ -234,15 +138,6 @@ func workspaceInviteTx() postgresInviteTx {
 				displayPublicID = inv.ScopePublicID
 			}
 			return mapWorkspaceMember(displayPublicID, row, externalIDs), nil
-		},
-		markDecided: func(ctx context.Context, q *dbsqlc.Queries, inv *tenancy.MemberInvite, status string, recipientUserID int64) error {
-			_, err := q.UpdateWorkspaceMemberInviteStatus(ctx, dbsqlc.UpdateWorkspaceMemberInviteStatusParams{
-				PublicID:          inv.PublicID,
-				WorkspaceID:       inv.ScopeInternalID,
-				Status:            status,
-				RespondedByUserID: pgtype.Int8{Int64: recipientUserID, Valid: true},
-			})
-			return err
 		},
 	}
 }

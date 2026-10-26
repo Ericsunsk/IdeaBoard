@@ -10,6 +10,11 @@ var (
 	ErrIntegrity          = errors.New("task billing integrity error")
 )
 
+// SettlementState is the durable task-billing settlement vocabulary. The
+// validation home is the deep settlement kernel
+// (internal/tasking/settlement: IsInitialState/IsTerminalState and the
+// Validate* errors); this type only names the words so handler and store
+// code never re-spells the literals.
 type SettlementState string
 
 const (

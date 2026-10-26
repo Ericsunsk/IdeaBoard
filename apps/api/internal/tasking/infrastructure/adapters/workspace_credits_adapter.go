@@ -7,7 +7,7 @@ package adapters
 //
 // Both Holder variants receive the stable Billing Account and actual actor.
 // Transactional commands join the task settlement transaction through
-// credits.Service.InTx(tx); terminal commands use the persisted Task facts.
+// credits.Service.SettlementInTx(tx); terminal commands use the persisted Task facts.
 // Credits sentinels already match the task boundary, so errors propagate
 // unchanged without a second mapping.
 
@@ -19,6 +19,7 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/tasking/settlement"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
 	"github.com/jackc/pgx/v5"
@@ -57,7 +58,7 @@ func (h *WorkspaceTaskHolder) Hold(ctx context.Context, billingAccountID, actorU
 	if err != nil {
 		return "", fmt.Errorf("workspace task holder: %w", workspacetasks.ErrQuoteUnavailable)
 	}
-	result, err := h.credits.Hold(ctx, ports.HoldCommand{
+	result, err := h.credits.Settlement().Hold(ctx, ports.HoldCommand{
 		BillingAccountID: billingAccountID,
 		Amount:           creditAmount,
 		Metadata:         taskCommandMetadata(idempotencyKey, taskID, actorUserID),
@@ -79,11 +80,11 @@ func (h *WorkspaceTaskHolder) Capture(ctx context.Context, billingAccountID, act
 	if err != nil {
 		return fmt.Errorf("workspace task holder: %w", workspacetasks.ErrQuoteUnavailable)
 	}
-	_, err = h.credits.Capture(ctx, ports.CaptureCommand{
+	_, err = h.credits.Settlement().Capture(ctx, ports.CaptureCommand{
 		BillingAccountID:  billingAccountID,
 		HoldTransactionID: holdTransactionID,
 		Amount:            creditAmount,
-		Metadata:          taskCommandMetadata("task-capture:"+taskID, taskID, actorUserID),
+		Metadata:          taskCommandMetadata(settlement.TaskCaptureKey(taskID), taskID, actorUserID),
 	})
 	return err
 }
@@ -99,11 +100,11 @@ func (h *WorkspaceTaskHolder) Release(ctx context.Context, billingAccountID, act
 	if err != nil {
 		return fmt.Errorf("workspace task holder: %w", workspacetasks.ErrQuoteUnavailable)
 	}
-	_, err = h.credits.Release(ctx, ports.ReleaseCommand{
+	_, err = h.credits.Settlement().Release(ctx, ports.ReleaseCommand{
 		BillingAccountID:  billingAccountID,
 		HoldTransactionID: holdTransactionID,
 		Amount:            creditAmount,
-		Metadata:          taskCommandMetadata("task-release:"+taskID, taskID, actorUserID),
+		Metadata:          taskCommandMetadata(settlement.TaskReleaseKey(taskID), taskID, actorUserID),
 	})
 	return err
 }
@@ -125,7 +126,7 @@ func (h *WorkspaceTaskHolder) HoldInTx(ctx context.Context, tx pgx.Tx, billingAc
 	if err != nil {
 		return "", fmt.Errorf("workspace task holder: %w", workspacetasks.ErrQuoteUnavailable)
 	}
-	result, err := h.credits.InTx(tx).Hold(ctx, ports.HoldCommand{
+	result, err := h.credits.SettlementInTx(tx).Hold(ctx, ports.HoldCommand{
 		BillingAccountID: billingAccountID,
 		Amount:           creditAmount,
 		Metadata:         taskCommandMetadata(idempotencyKey, taskID, actorUserID),
@@ -156,11 +157,11 @@ func (h *WorkspaceTaskHolder) CaptureInTx(ctx context.Context, tx pgx.Tx, billin
 	if err != nil {
 		return "", fmt.Errorf("workspace task holder: %w", workspacetasks.ErrQuoteUnavailable)
 	}
-	result, err := h.credits.InTx(tx).Capture(ctx, ports.CaptureCommand{
+	result, err := h.credits.SettlementInTx(tx).Capture(ctx, ports.CaptureCommand{
 		BillingAccountID:  billingAccountID,
 		HoldTransactionID: holdTransactionID,
 		Amount:            creditAmount,
-		Metadata:          taskCommandMetadata("task-capture:"+taskID, taskID, actorUserID),
+		Metadata:          taskCommandMetadata(settlement.TaskCaptureKey(taskID), taskID, actorUserID),
 	})
 	if err != nil {
 		return "", err
@@ -187,11 +188,11 @@ func (h *WorkspaceTaskHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, billin
 	if err != nil {
 		return "", fmt.Errorf("workspace task holder: %w", workspacetasks.ErrQuoteUnavailable)
 	}
-	result, err := h.credits.InTx(tx).Release(ctx, ports.ReleaseCommand{
+	result, err := h.credits.SettlementInTx(tx).Release(ctx, ports.ReleaseCommand{
 		BillingAccountID:  billingAccountID,
 		HoldTransactionID: holdTransactionID,
 		Amount:            creditAmount,
-		Metadata:          taskCommandMetadata("task-release:"+taskID, taskID, actorUserID),
+		Metadata:          taskCommandMetadata(settlement.TaskReleaseKey(taskID), taskID, actorUserID),
 	})
 	if err != nil {
 		return "", err

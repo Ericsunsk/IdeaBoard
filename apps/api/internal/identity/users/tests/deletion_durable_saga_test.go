@@ -157,7 +157,7 @@ func TestDeletionFullSagaSurvivesGuardRollback(t *testing.T) {
 	if wallet.Status != domain.WalletStatusFrozen {
 		t.Fatalf("tombstone wallet status = %q, want frozen", wallet.Status)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, provisioned.User.ID, "durable-full:frozen")); !errors.Is(err, domain.ErrWalletFrozen) {
+	if _, err := creditService.Settlement().Hold(ctx, lifecycleHold(t, creditService, provisioned.User.ID, "durable-full:frozen")); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Hold(tombstone wallet) error = %v, want ErrWalletFrozen", err)
 	}
 	// Idempotent retry after the guard failure does not touch externals again.

@@ -63,7 +63,7 @@ func openOrgQuotaFixture(t *testing.T) *orgQuotaFixture {
 	if err != nil {
 		t.Fatalf("quota org grant amount: %v", err)
 	}
-	if _, err := e.credits.Grant(ctx, creditsports.GrantCommand{BillingAccountID: account, Amount: grant, Metadata: creditsdomain.CommandMetadata{
+	if _, err := e.credits.Administrative().Grant(ctx, creditsports.GrantCommand{BillingAccountID: account, Amount: grant, Metadata: creditsdomain.CommandMetadata{
 		IdempotencyKey: fmt.Sprintf("quota-org-seed-%d", quotaTestSeq),
 		Actor:          creditsdomain.Actor{Type: creditsdomain.ActorSystem, ID: "test"},
 		Source:         "test", Reason: "quota org seed",

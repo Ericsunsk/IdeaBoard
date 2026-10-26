@@ -33,6 +33,7 @@ import (
 	"strings"
 	"sync"
 
+	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/generation/routing"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"ideaboard/api/internal/tasking/workspacetasks"
@@ -110,12 +111,12 @@ func newTxWorkerStore(store *attemptClaimStore) *txWorkerStore {
 	return &txWorkerStore{attemptClaimStore: store, claims: make(map[string]*workspacetasks.SubmissionClaim)}
 }
 
-func (s *txWorkerStore) BeginSettlementTx(context.Context) (pgx.Tx, error) {
+func (s *txWorkerStore) BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error) {
 	tx := &workerFakeTx{}
 	s.mu.Lock()
 	s.lastTx = tx
 	s.mu.Unlock()
-	return tx, nil
+	return dbutil.ScopeForTest(ctx, tx, true), nil
 }
 
 func (s *txWorkerStore) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error) {
@@ -184,12 +185,12 @@ func newTxPGServiceStore(store *taskpostgres.Store) *txPGServiceStore {
 	return &txPGServiceStore{Store: store, claims: make(map[string]*workspacetasks.SubmissionClaim)}
 }
 
-func (s *txPGServiceStore) BeginSettlementTx(ctx context.Context) (pgx.Tx, error) {
-	tx, err := s.Store.BeginSettlementTx(ctx)
+func (s *txPGServiceStore) BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error) {
+	scope, err := s.Store.BeginSettlementScope(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &workerShimTx{Tx: tx}, nil
+	return dbutil.ScopeForTest(ctx, &workerShimTx{Tx: scope.Tx()}, true), nil
 }
 
 func (s *txPGServiceStore) ClaimSubmissionInTx(_ context.Context, tx pgx.Tx, claim workspacetasks.SubmissionClaim) (*workspacetasks.SubmissionClaim, bool, error) {

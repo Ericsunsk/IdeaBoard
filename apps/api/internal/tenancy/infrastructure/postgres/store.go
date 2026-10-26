@@ -19,6 +19,7 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -78,11 +79,11 @@ func (s *Store) dbWithContext(ctx context.Context) repositoryQueryer {
 
 // Bind reads as well as writes to the caller-owned transaction. Lifecycle
 // adapters share this constructor so composed repositories see staged state.
+// The borrow decision itself lives in the deep Tx module
+// (dbutil.BorrowedQueries): this constructor is a thin adapter that only
+// carries the call context, pool, and base queries.
 func newRepositoryQueryer(ctx context.Context, pool *pgxpool.Pool, q *dbsqlc.Queries) repositoryQueryer {
-	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		q = dbsqlc.New(ambient)
-	}
-	return repositoryQueryer{ctx: ctx, db: pool, q: q}
+	return repositoryQueryer{ctx: ctx, db: pool, q: dbutil.BorrowedQueries(ctx, q)}
 }
 
 func (db repositoryQueryer) withTx(run func(*dbsqlc.Queries) error) error {
@@ -435,48 +436,11 @@ func createBillingInTx(ctx context.Context, q *dbsqlc.Queries, row dbsqlc.Worksp
 
 // ensureWorkspaceAccountWithQueries Get-or-Creates the per-workspace
 // account for a freshly minted workspace plus the creator billing-owner
-// grant. The wallet row follows via the account-insert trigger. Only the
-// Default workspace row owns such an anchor (the Personal survivor);
-// business workspaces never call this. Internal-only: this is the Personal
-// counterpart to ensureOrganizationBillingAccountInTx; both resolve through
-// CreateBillingAccountStub, the sole billing_accounts insert primitive.
+// grant. Delegates to the funds kernel (the sole billing_accounts insert
+// path alongside the Organization pool); creation without a funds identity
+// fails closed at the caller.
 func ensureWorkspaceAccountWithQueries(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID, ownerUserID int64) error {
-	if workspaceInternalID <= 0 {
-		return tenancy.ErrBillingWorkspaceInvalid
-	}
-	if _, err := q.GetBillingAccountByWorkspaceID(ctx, pgtype.Int8{Int64: workspaceInternalID, Valid: true}); err == nil {
-		return nil
-	} else if !database.IsNotFound(err) {
-		return err
-	}
-	for attempt := 0; attempt < mintAttempts; attempt++ {
-		publicID, err := tenancy.NewBillingAccountPublicID()
-		if err != nil {
-			return err
-		}
-		account, err := q.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
-			PublicID:       publicID,
-			WorkspaceID:    pgtype.Int8{Int64: workspaceInternalID, Valid: true},
-			OrganizationID: pgtype.Int8{},
-		})
-		if err != nil {
-			if database.IsDuplicateConstraintError(err) {
-				if _, readErr := q.GetBillingAccountByWorkspaceID(ctx, pgtype.Int8{Int64: workspaceInternalID, Valid: true}); readErr == nil {
-					return nil
-				}
-				continue
-			}
-			return err
-		}
-		if ownerUserID <= 0 {
-			return tenancy.ErrWorkspaceOwnerRequired
-		}
-		_, err = q.UpsertBillingAccountMember(ctx, dbsqlc.UpsertBillingAccountMemberParams{
-			BillingAccountID: account.InternalID, UserID: ownerUserID, Role: tenancy.BillingRoleOwner,
-		})
-		return err
-	}
-	return tenancy.ErrConflict
+	return funds.EnsureWorkspaceAccountWithQueries(ctx, q, workspaceInternalID, ownerUserID)
 }
 
 // UpdateWorkspace renames an existing workspace; missing rows read
@@ -842,43 +806,10 @@ func (s *Store) cleanupWorkspaceObjects(ctx context.Context, keys []string) {
 
 // ensureDefaultWorkspaceWithQueries idempotently provisions the user's
 // Default workspace plus its owner membership through the caller's
-// queries (INSERT ... ON CONFLICT DO NOTHING plus read-back, so
-// concurrent callers converge to a single Default row). The Personal
-// survivor account follows via ensureWorkspaceAccountWithQueries at the
-// call sites that need funds identity.
+// queries. Delegates to the funds kernel so resolution and creation share
+// one Default-anchor implementation.
 func ensureDefaultWorkspaceWithQueries(ctx context.Context, q *dbsqlc.Queries, userID int64) (dbsqlc.Workspace, error) {
-	if userID <= 0 {
-		return dbsqlc.Workspace{}, tenancy.ErrPersonalWorkspaceUserRequired
-	}
-	for attempt := 0; attempt < mintAttempts; attempt++ {
-		publicID, err := tenancy.NewWorkspacePublicID()
-		if err != nil {
-			return dbsqlc.Workspace{}, err
-		}
-		if _, insertErr := q.InsertDefaultWorkspaceIgnore(ctx, dbsqlc.InsertDefaultWorkspaceIgnoreParams{
-			PublicID:    publicID,
-			OwnerUserID: pgtype.Int8{Int64: userID, Valid: true},
-			Name:        "My Workspace",
-		}); insertErr != nil {
-			if isPublicIDConflict(insertErr) {
-				continue
-			}
-			return dbsqlc.Workspace{}, insertErr
-		}
-		selected, selectErr := q.GetDefaultWorkspaceByOwner(ctx, pgtype.Int8{Int64: userID, Valid: true})
-		if selectErr != nil {
-			return dbsqlc.Workspace{}, selectErr
-		}
-		if err := q.UpsertWorkspaceMembership(ctx, dbsqlc.UpsertWorkspaceMembershipParams{
-			WorkspaceID: selected.InternalID,
-			UserID:      userID,
-			Role:        tenancy.RoleOwner,
-		}); err != nil {
-			return dbsqlc.Workspace{}, err
-		}
-		return selected, nil
-	}
-	return dbsqlc.Workspace{}, tenancy.ErrConflict
+	return funds.EnsureDefaultWorkspaceWithQueries(ctx, q, userID)
 }
 
 // EnsureDefaultWorkspace idempotently provisions the user's Default

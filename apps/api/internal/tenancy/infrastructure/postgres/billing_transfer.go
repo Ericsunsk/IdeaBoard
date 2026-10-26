@@ -173,12 +173,14 @@ func (s *BillingAccountStore) InitiateBillingTransferInvite(ctx context.Context,
 
 // GetBillingTransferInvite fetches one invite by its bti_ public id.
 // Hidden ids converge to ErrBillingNotFound (never workspace existence).
+// The prefix reuses the unified lifecycle value object
+// (tenancy.BillingTransferInvitePrefix, same family as wsi_/osi_).
 func (s *BillingAccountStore) GetBillingTransferInvite(ctx context.Context, publicID string) (*tenancy.BillingTransferInvite, error) {
 	if s == nil || s.q == nil {
 		return nil, tenancy.ErrBillingStoreNotConfigured
 	}
 	trimmed := strings.TrimSpace(publicID)
-	if trimmed == "" || !strings.HasPrefix(trimmed, "bti_") {
+	if trimmed == "" || !strings.HasPrefix(trimmed, tenancy.BillingTransferInvitePrefix) {
 		return nil, tenancy.ErrBillingNotFound
 	}
 	row, err := s.dbWithContext(ctx).q.GetBillingTransferInviteByPublicID(ctx, trimmed)
@@ -239,6 +241,10 @@ func (s *BillingAccountStore) ListBillingTransferInvitesForAccount(ctx context.C
 
 // lockPendingBillingTransferInTx pins account scope and invitation state before
 // a decision. Every decision takes locks in account -> invitation order.
+// This is the transfer adapter's scope-lock step in the unified lifecycle:
+// it reuses the transfer lapse value object (TransferInviteLapsed, same
+// MemberInviteTTL family) and the anti-enumeration shape (scope mismatch
+// converges to ErrBillingNotFound, re-decision to ErrBillingConflict).
 func lockPendingBillingTransferInTx(ctx context.Context, q *dbsqlc.Queries, accountID int64, invitePublicID string) (dbsqlc.BillingAccountTransferInvite, error) {
 	if _, err := lockBillingAccountInTx(ctx, q, accountID); err != nil {
 		return dbsqlc.BillingAccountTransferInvite{}, err
@@ -259,10 +265,52 @@ func lockPendingBillingTransferInTx(ctx context.Context, q *dbsqlc.Queries, acco
 	// A lapsed invite never moves funds or membership: every decision
 	// fails closed with conflict, and the row stays pending-lapsed so the
 	// owner may re-issue it.
-	if expiresAt := dbutil.TimeValue(invite.ExpiresAt); !expiresAt.IsZero() && !time.Now().Before(expiresAt) {
+	if tenancy.TransferInviteLapsed(dbutil.TimeValue(invite.ExpiresAt), time.Now()) {
 		return invite, tenancy.ErrBillingConflict
 	}
 	return invite, nil
+}
+
+// checkTransferRecipient enforces recipient-only decisions. Transfer invites
+// are user-ID-addressed (no email capability), so a mismatch converges to
+// ErrBillingForbidden (not the member-invite ErrNotFound anti-enumeration):
+// the addressed recipient is public, the existence of the invite is not
+// leaked via email enumeration.
+func checkTransferRecipient(invite dbsqlc.BillingAccountTransferInvite, recipientUserID int64) error {
+	if invite.ToUserID != recipientUserID {
+		return tenancy.ErrBillingForbidden
+	}
+	return nil
+}
+
+// checkTransferInitiator enforces initiator-only cancellation.
+func checkTransferInitiator(invite dbsqlc.BillingAccountTransferInvite, initiatorUserID int64) error {
+	if invite.FromUserID != initiatorUserID {
+		return tenancy.ErrBillingForbidden
+	}
+	return nil
+}
+
+// decideTransferInviteTx persists a terminal transfer decision without
+// moving funds or membership (reject/cancel path). Accept uses the same
+// lock + lapse sequencing but adds the fund-guard grants before calling
+// Decide directly with the handover scope, so the grant order
+// (recipient Owner first, initiator demote, workspace Owner grants) stays
+// explicit in AcceptBillingTransferInvite.
+func decideTransferInviteTx(ctx context.Context, q *dbsqlc.Queries, invitePublicID, status string, decidedBy int64) (*tenancy.BillingTransferInvite, error) {
+	row, err := q.DecideBillingTransferInvite(ctx, dbsqlc.DecideBillingTransferInviteParams{
+		PublicID:                invitePublicID,
+		Status:                  status,
+		DecidedBy:               pgtype.Int8{Int64: decidedBy, Valid: true},
+		ScopeWorkspacePublicIds: []string{},
+	})
+	if err != nil {
+		if database.IsNotFound(err) {
+			return nil, tenancy.ErrBillingConflict
+		}
+		return nil, err
+	}
+	return mapTransferInvite(row), nil
 }
 
 // AcceptBillingTransferInvite completes the handover: only the recipient
@@ -275,18 +323,20 @@ func (s *BillingAccountStore) AcceptBillingTransferInvite(ctx context.Context, b
 	if s == nil || s.db == nil {
 		return nil, tenancy.ErrBillingStoreNotConfigured
 	}
-	trimmed := strings.TrimSpace(invitePublicID)
-	if billingAccountInternalID <= 0 || trimmed == "" || recipientUserID <= 0 {
-		return nil, tenancy.ErrBillingWorkspaceInvalid
+	// Transfer adapter reuses the unified decision-input shape
+	// (trimmed ref + positive actor), mapped to the billing error domain.
+	if err := tenancy.ValidateTransferDecisionInput(billingAccountInternalID, invitePublicID, recipientUserID); err != nil {
+		return nil, err
 	}
+	trimmed := strings.TrimSpace(invitePublicID)
 	var decided *tenancy.BillingTransferInvite
 	err := dbutil.WithTx(ctx, s.db, func(q *dbsqlc.Queries) error {
 		invite, err := lockPendingBillingTransferInTx(ctx, q, billingAccountInternalID, trimmed)
 		if err != nil {
 			return err
 		}
-		if invite.ToUserID != recipientUserID {
-			return tenancy.ErrBillingForbidden
+		if err := checkTransferRecipient(invite, recipientUserID); err != nil {
+			return err
 		}
 		// The initiator must still hold Billing Owner: concurrent
 		// management changes fail the handover closed instead of
@@ -362,33 +412,21 @@ func (s *BillingAccountStore) RejectBillingTransferInvite(ctx context.Context, b
 	if s == nil || s.db == nil {
 		return nil, tenancy.ErrBillingStoreNotConfigured
 	}
-	trimmed := strings.TrimSpace(invitePublicID)
-	if billingAccountInternalID <= 0 || trimmed == "" || recipientUserID <= 0 {
-		return nil, tenancy.ErrBillingWorkspaceInvalid
+	if err := tenancy.ValidateTransferDecisionInput(billingAccountInternalID, invitePublicID, recipientUserID); err != nil {
+		return nil, err
 	}
+	trimmed := strings.TrimSpace(invitePublicID)
 	var decided *tenancy.BillingTransferInvite
 	err := dbutil.WithTx(ctx, s.db, func(q *dbsqlc.Queries) error {
 		invite, err := lockPendingBillingTransferInTx(ctx, q, billingAccountInternalID, trimmed)
 		if err != nil {
 			return err
 		}
-		if invite.ToUserID != recipientUserID {
-			return tenancy.ErrBillingForbidden
-		}
-		row, err := q.DecideBillingTransferInvite(ctx, dbsqlc.DecideBillingTransferInviteParams{
-			PublicID:                trimmed,
-			Status:                  tenancy.BillingTransferRejected,
-			DecidedBy:               pgtype.Int8{Int64: recipientUserID, Valid: true},
-			ScopeWorkspacePublicIds: []string{},
-		})
-		if err != nil {
-			if database.IsNotFound(err) {
-				return tenancy.ErrBillingConflict
-			}
+		if err := checkTransferRecipient(invite, recipientUserID); err != nil {
 			return err
 		}
-		decided = mapTransferInvite(row)
-		return nil
+		decided, err = decideTransferInviteTx(ctx, q, trimmed, tenancy.BillingTransferRejected, recipientUserID)
+		return err
 	})
 	return decided, err
 }
@@ -399,33 +437,21 @@ func (s *BillingAccountStore) CancelBillingTransferInvite(ctx context.Context, b
 	if s == nil || s.db == nil {
 		return nil, tenancy.ErrBillingStoreNotConfigured
 	}
-	trimmed := strings.TrimSpace(invitePublicID)
-	if billingAccountInternalID <= 0 || trimmed == "" || initiatorUserID <= 0 {
-		return nil, tenancy.ErrBillingWorkspaceInvalid
+	if err := tenancy.ValidateTransferDecisionInput(billingAccountInternalID, invitePublicID, initiatorUserID); err != nil {
+		return nil, err
 	}
+	trimmed := strings.TrimSpace(invitePublicID)
 	var decided *tenancy.BillingTransferInvite
 	err := dbutil.WithTx(ctx, s.db, func(q *dbsqlc.Queries) error {
 		invite, err := lockPendingBillingTransferInTx(ctx, q, billingAccountInternalID, trimmed)
 		if err != nil {
 			return err
 		}
-		if invite.FromUserID != initiatorUserID {
-			return tenancy.ErrBillingForbidden
-		}
-		row, err := q.DecideBillingTransferInvite(ctx, dbsqlc.DecideBillingTransferInviteParams{
-			PublicID:                trimmed,
-			Status:                  tenancy.BillingTransferCancelled,
-			DecidedBy:               pgtype.Int8{Int64: initiatorUserID, Valid: true},
-			ScopeWorkspacePublicIds: []string{},
-		})
-		if err != nil {
-			if database.IsNotFound(err) {
-				return tenancy.ErrBillingConflict
-			}
+		if err := checkTransferInitiator(invite, initiatorUserID); err != nil {
 			return err
 		}
-		decided = mapTransferInvite(row)
-		return nil
+		decided, err = decideTransferInviteTx(ctx, q, trimmed, tenancy.BillingTransferCancelled, initiatorUserID)
+		return err
 	})
 	return decided, err
 }

@@ -245,7 +245,7 @@ func TestSetUserStatusFreezesAndRestoresWalletAtomically(t *testing.T) {
 	if err := service.SetUserStatus(ctx, result.User.ID, 0); err != nil {
 		t.Fatalf("SetUserStatus(banned) error = %v", err)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, result.User.ID, "status:frozen")); !errors.Is(err, domain.ErrWalletFrozen) {
+	if _, err := creditService.Settlement().Hold(ctx, lifecycleHold(t, creditService, result.User.ID, "status:frozen")); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Hold(frozen wallet) error = %v, want ErrWalletFrozen", err)
 	}
 	var userStatus int16
@@ -270,7 +270,7 @@ WHERE users.id = $1`, result.User.ID).Scan(&userStatus, &walletStatus); err != n
 	if wallet.Status != domain.WalletStatusActive || len(wallet.ActiveRestrictions) != 1 || wallet.ActiveRestrictions[0].RestrictionID != restriction.RestrictionID {
 		t.Fatalf("restored lifecycle cleared independent restriction: %+v", wallet)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, result.User.ID, "status:active-restricted")); !errors.Is(err, domain.ErrWalletRestricted) {
+	if _, err := creditService.Settlement().Hold(ctx, lifecycleHold(t, creditService, result.User.ID, "status:active-restricted")); !errors.Is(err, domain.ErrWalletRestricted) {
 		t.Fatalf("Hold(restored but restricted Wallet) error = %v, want ErrWalletRestricted", err)
 	}
 	if _, err := creditService.ReleaseWalletRestriction(ctx, ports.ReleaseWalletRestrictionCommand{
@@ -280,7 +280,7 @@ WHERE users.id = $1`, result.User.ID).Scan(&userStatus, &walletStatus); err != n
 	}); err != nil {
 		t.Fatalf("ReleaseWalletRestriction() error = %v", err)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, result.User.ID, "status:active")); err != nil {
+	if _, err := creditService.Settlement().Hold(ctx, lifecycleHold(t, creditService, result.User.ID, "status:active")); err != nil {
 		t.Fatalf("Hold(after explicit restriction release) error = %v", err)
 	}
 }
@@ -439,7 +439,7 @@ RETURNING id`, authUserID).Scan(&userID); err != nil {
 	if len(results) != 1 || !results[0].WelcomeGranted || results[0].Wallet.Available != 100 {
 		t.Fatalf("initializer results = %+v", results)
 	}
-	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, userID, "initializer:banned")); !errors.Is(err, domain.ErrWalletFrozen) {
+	if _, err := creditService.Settlement().Hold(ctx, lifecycleHold(t, creditService, userID, "initializer:banned")); !errors.Is(err, domain.ErrWalletFrozen) {
 		t.Fatalf("Hold(initialized banned wallet) error = %v, want ErrWalletFrozen", err)
 	}
 }

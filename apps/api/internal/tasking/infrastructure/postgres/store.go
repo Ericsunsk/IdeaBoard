@@ -14,7 +14,10 @@ import (
 	eventoutbox "ideaboard/api/internal/events/outbox"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/tasking/settlement"
 	"ideaboard/api/internal/tasking/workspacetasks"
+	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 
 	"github.com/jackc/pgx/v5"
@@ -55,19 +58,23 @@ func (s *Store) dbWithContext(ctx context.Context) repositoryQueryer {
 	return repositoryQueryer{ctx: ctx, db: s.db, q: s.q}
 }
 
-// BeginSettlementTx opens the caller-owned settlement transaction for the
-// workspacetasks single-transaction boundary (task flip + Credits
+// BeginSettlementScope opens the caller-owned settlement transaction for
+// the workspacetasks single-transaction boundary (task flip + Credits
 // Capture/Release + River enqueue commit atomically). It satisfies
-// workspacetasks.SettlementTransactor; the Service owns commit/rollback.
-func (s *Store) BeginSettlementTx(ctx context.Context) (pgx.Tx, error) {
+// workspacetasks.SettlementTransactor; the Service owns commit/rollback
+// via the returned Scope.
+// BeginOwned (never borrows): the settlement owner borrows the guard
+// carrier one layer up (settlement.BorrowOrBeginScope) and calls this only for its
+// owned leg, so this leg must not join a carrier on its own.
+func (s *Store) BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error) {
 	if s == nil || s.db == nil {
 		return nil, fmt.Errorf("tasking postgres: database pool not configured")
 	}
-	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	scope, err := dbutil.BeginOwned(ctx, s.db, pgx.TxOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("tasking postgres: begin settlement tx: %w", err)
+		return nil, fmt.Errorf("tasking postgres: begin settlement scope: %w", err)
 	}
-	return tx, nil
+	return scope, nil
 }
 
 // Compile-time convergence with the settlement tx seam.
@@ -243,7 +250,11 @@ func resolveBillingAccount(ctx context.Context, q *dbsqlc.Queries, workspaceInte
 // ResolveBillingAccountInTx resolves the stable funds identity inside the
 // caller's settlement transaction (#915 resolution, #916 funds identity).
 // It satisfies workspacetasks.TxBillingAccountResolver so submit-time Holds
-// spend the resolved account instead of an owner wallet.
+// spend the resolved account instead of an owner wallet. The fixed
+// creation-scope order lives in tenancy/funds (single order
+// implementation); this stays a thin adapter that applies the
+// closed-organization gate and maps funds errors onto the tasking
+// not-found sentinel.
 func (s *Store) ResolveBillingAccountInTx(ctx context.Context, tx pgx.Tx, workspacePublicID string) (int64, error) {
 	if tx == nil {
 		return 0, fmt.Errorf("tasking postgres: settlement transaction is nil")
@@ -269,7 +280,17 @@ func (s *Store) ResolveBillingAccountInTx(ctx context.Context, tx pgx.Tx, worksp
 			return 0, workspacetasks.ErrNotFound
 		}
 	}
-	return resolveBillingAccount(ctx, q, workspace.InternalID)
+	identity, err := funds.ResolveByPublicIDWithQueries(ctx, dbsqlc.New(tx), workspacePublicID)
+	if err != nil {
+		if errors.Is(err, tenancy.ErrBillingWorkspaceInvalid) || errors.Is(err, tenancy.ErrBillingNotFound) {
+			return 0, workspacetasks.ErrNotFound
+		}
+		return 0, err
+	}
+	if identity.BillingAccountID <= 0 {
+		return 0, workspacetasks.ErrNotFound
+	}
+	return identity.BillingAccountID, nil
 }
 
 // loadOutputs reads ordered output refs for one task row.
@@ -380,7 +401,7 @@ INSERT INTO task_billing_snapshots (
 		nilIfEmpty(snapshot.HoldTransactionID), task.WorkspaceID); err != nil {
 		return fmt.Errorf("insert task billing snapshot: %w", err)
 	}
-	if snapshot.SettlementState != "held" && snapshot.SettlementState != "free" {
+	if !settlement.IsInitialState(snapshot.SettlementState) {
 		return fmt.Errorf("insert task billing settlement: invalid initial state %q", snapshot.SettlementState)
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO task_billing_settlements (task_id, state, settled_at) VALUES ($1,$2,$3)`, task.ID, snapshot.SettlementState, settledAtForInitialState(snapshot.SettlementState)); err != nil {
@@ -456,7 +477,7 @@ func (s *Store) SetBillingSettlementInTx(ctx context.Context, tx pgx.Tx, taskID,
 	if tx == nil {
 		return fmt.Errorf("tasking postgres: billing settlement transaction is nil")
 	}
-	if state != "captured" && state != "released" {
+	if !settlement.IsTerminalState(state) {
 		return fmt.Errorf("update task billing settlement: invalid terminal state %q", state)
 	}
 	var settledAt *time.Time

@@ -10,12 +10,13 @@ import (
 	creditsdomain "ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/memberquotas"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	usageapplication "ideaboard/api/internal/usage/application"
 	usagedomain "ideaboard/api/internal/usage/domain"
 )
 
 type AccountReader interface {
-	EnsureBillingAccountForWorkspace(context.Context, int64, string) (tenancy.BillingAccount, error)
+	ResolveFunds(context.Context, string) (funds.Identity, error)
 	GetBillingAccountRole(context.Context, int64, int64) (string, bool, error)
 	ListBillingAccountMembers(context.Context, int64, int64) ([]tenancy.BillingAccountMember, error)
 	ListBillingTransferInvitesForAccount(context.Context, int64, int64, int64, int) ([]*tenancy.BillingTransferInvite, error)
@@ -109,10 +110,14 @@ func (r Reader) Read(ctx context.Context, input Input) (Result, error) {
 		return result, failed(SnapshotRead, errors.New("snapshot reader is not configured"))
 	}
 	// First-touch provisioning must precede the read-only transaction.
-	account, err := r.Accounts.EnsureBillingAccountForWorkspace(ctx, input.Workspace.InternalID, input.Workspace.PublicID)
+	identity, err := r.Accounts.ResolveFunds(ctx, input.Workspace.PublicID)
 	if err != nil {
 		return result, failed(Account, err)
 	}
+	if identity.BillingAccountID <= 0 || identity.BA() == "" {
+		return result, failed(Account, tenancy.ErrBillingNotFound)
+	}
+	account := identity.ToBillingAccount()
 	result.Account = account
 	role, member, err := r.Accounts.GetBillingAccountRole(ctx, account.InternalID, input.ActorUserID)
 	if err != nil {

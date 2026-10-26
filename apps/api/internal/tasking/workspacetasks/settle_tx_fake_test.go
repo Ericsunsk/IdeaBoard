@@ -22,6 +22,7 @@ import (
 	"sync"
 	"testing"
 
+	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/generation/routing"
 
 	"github.com/jackc/pgx/v5"
@@ -75,12 +76,12 @@ func claimScopeKey(workspaceID, operation, key string) string {
 	return strings.TrimSpace(workspaceID) + "\x00" + strings.TrimSpace(operation) + "\x00" + strings.TrimSpace(key)
 }
 
-func (s *txTestStore) BeginSettlementTx(context.Context) (pgx.Tx, error) {
+func (s *txTestStore) BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error) {
 	tx := &fakeTx{}
 	s.mu.Lock()
 	s.lastTx = tx
 	s.mu.Unlock()
-	return tx, nil
+	return dbutil.ScopeForTest(ctx, tx, true), nil
 }
 
 func (s *txTestStore) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *WorkspaceTask) (*WorkspaceTask, error) {

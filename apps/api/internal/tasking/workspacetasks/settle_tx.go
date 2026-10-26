@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/generation/routing"
+	"ideaboard/api/internal/tasking/settlement"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -17,18 +18,18 @@ import (
 // workspace task Store implements it over its pool. In-memory stores are
 // test fixtures and are intentionally outside this production seam.
 //
-// The transaction is opened on the task store's pool, but every participant
+// The Scope is opened on the task store's pool, but every participant
 // shares the same PostgreSQL database (tasks, credits ledger, billing
-// catalog, river_job), so Credits InTx(tx), catalog QuoteAtResolutionInTx,
-// and River InsertTx all join the ambient tx. The caller owns commit and
-// rollback.
+// catalog, river_job), so Credits SettlementInTx(tx), catalog QuoteInTx,
+// and River InsertTx all join the scope's transaction. Ownership travels
+// with the Scope: the caller ends it with scope.Commit/scope.Rollback.
 type SettlementTransactor interface {
-	BeginSettlementTx(ctx context.Context) (pgx.Tx, error)
+	BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error)
 }
 
 // TxQuoter pins the immutable price and authoritative reservation timestamp
 // inside the settlement transaction before the cap checks and Hold.
-// Production adapts the Billing catalog QuoteAtResolutionInTx.
+// Production adapts the Billing catalog Quote with the settlement transaction.
 type TxQuoter interface {
 	QuoteInTx(ctx context.Context, tx pgx.Tx, service, resolution string, quantity int64) (BillingSnapshot, error)
 }
@@ -187,93 +188,22 @@ func (s *Service) terminalSeams() (SettlementTransactor, TxHolder, TxTaskLifecyc
 	return transactor, txHolder, txStore, true
 }
 
-func beginSettlementTx(ctx context.Context, transactor SettlementTransactor) (pgx.Tx, bool, error) {
-	// Ambient guard transaction (control audit atomicity, step 3): when
-	// the guard staged its mutation transaction in the context, the
-	// whole settlement unit (claim/quote/hold/task/enqueue, or the
-	// terminal capture/release flips) joins it INSTEAD of opening the
-	// store's own settlement transaction. The bool reports ownership:
-	// true means the caller opened the transaction and must commit or
-	// roll it back; false means the transaction is BORROWED from the
-	// guard, which alone commits or rolls it back, so the caller must do
-	// neither. Nesting depth is 1: a staged carrier is reused as-is
-	// (pgx has no true nested transactions and savepoints are not
-	// needed, because settlement and audit share one flat unit of
-	// commit). With no carrier the settlement transactor path below
-	// runs unchanged.
-	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		return ambient, false, nil
-	}
-	if transactor == nil {
-		return nil, false, errors.New("workspacetasks: settlement transactor is nil")
-	}
-	tx, err := transactor.BeginSettlementTx(ctx)
-	if err != nil {
-		return nil, false, fmt.Errorf("workspacetasks: begin settlement tx: %w", err)
-	}
-	if tx == nil {
-		return nil, false, errors.New("workspacetasks: begin settlement tx returned nil")
-	}
-	return tx, true, nil
-}
-
-func rollbackSettlementTx(ctx context.Context, tx pgx.Tx) {
-	if tx == nil {
-		return
-	}
-	rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), dbutil.RollbackTimeout)
-	defer cancel()
-	_ = tx.Rollback(rollbackCtx)
-}
-
-func commitSettlementTx(ctx context.Context, tx pgx.Tx) error {
-	if tx == nil {
-		return errors.New("workspacetasks: commit settlement tx is nil")
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("workspacetasks: commit settlement tx: %w", err)
-	}
-	return nil
-}
-
 // stageSettlementEvent stages one status event after its settlement unit is
-// durable (#917: events publish only after commit). An owned transaction
-// commits here, so the event stages synchronously for the caller to flush.
-// A borrowed guard transaction commits later at the guard, so the stage is
-// registered as a post-commit hook instead: it runs only after the guard's
-// commit, timestamped then, and never on rollback. Without a registry (raw
-// carriers outside the guard) the legacy synchronous stage is kept so the
-// caller can flush after the commit it owns.
+// durable. The owned/borrowed deferral lives in the deep settlement kernel
+// (settlement.StageOrDefer on the dbutil post-commit interface); this stays
+// a thin adapter binding the service's staging closure.
 func (s *Service) stageSettlementEvent(ctx context.Context, owned bool, taskID, workspaceID string, status Status, executionToken string, occurredAt time.Time) {
-	if owned {
+	settlement.StageOrDefer(ctx, owned, func(context.Context) {
 		s.stageWithTokenAt(taskID, workspaceID, status, executionToken, occurredAt)
-		return
-	}
-	stage := func(context.Context) {
-		s.stageWithTokenAt(taskID, workspaceID, status, executionToken, occurredAt)
-	}
-	if !dbutil.DeferAmbientPostCommit(ctx, stage) {
-		s.stageWithTokenAt(taskID, workspaceID, status, executionToken, occurredAt)
-	}
+	})
 }
 
 // captureSplit derives the per-output unit billing capped at the held
 // total, with the remainder released. Both legs run in the same tx.
+// Owned by the deep settlement kernel; this stays a thin adapter so the
+// terminal paths keep their shape.
 func captureSplit(completed *WorkspaceTask, outputCount int) (capture, release int64) {
-	total := completed.BillingSnapshot.TotalCredits
-	unit := completed.BillingSnapshot.UnitCredits
-	capture = int64(outputCount) * unit
-	if capture > total {
-		capture = total
-	}
-	if capture < 0 {
-		capture = 0
-	}
-	release = total - capture
-	if release < 0 {
-		release = 0
-	}
-	return capture, release
+	return settlement.CaptureSplit(completed.BillingSnapshot.TotalCredits, completed.BillingSnapshot.UnitCredits, outputCount)
 }
 
 func (s *Service) holderSettles(holdID string, total int64) bool {
@@ -305,14 +235,16 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	if s.saveSnapshot == nil {
 		return nil, true, errors.New("workspacetasks: routing snapshot saver is required for atomic settlement")
 	}
-	tx, owned, err := beginSettlementTx(ctx, transactor)
+	scope, err := settlement.BorrowOrBeginScope(ctx, transactor)
 	if err != nil {
 		return nil, true, err
 	}
+	tx := scope.Tx()
+	owned := scope.Owned()
 	committed := false
 	defer func() {
-		if !committed && owned {
-			rollbackSettlementTx(ctx, tx)
+		if !committed {
+			_ = scope.Rollback(ctx)
 		}
 	}()
 	// The submission gate runs before the claim (see the lock-order note
@@ -342,13 +274,12 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 		}
 		// Owned read-only transaction: commit so the replayed task is
 		// read from a consistent snapshot and no write is left open. A
-		// borrowed guard transaction stays open for the guard to commit.
-		if owned {
-			if err := commitSettlementTx(ctx, tx); err != nil {
-				return nil, true, err
-			}
-			committed = true
+		// borrowed guard transaction stays open for the guard to commit
+		// (Scope.Commit is a safe no-op when borrowed).
+		if err := scope.Commit(ctx); err != nil {
+			return nil, true, err
 		}
+		committed = true
 		// No event is staged on replay: the winning submit already emitted
 		// task.created for this exact task.
 		return replayed, true, nil
@@ -399,7 +330,7 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 		// ledger for the same key, so the ledger's own replay path fences a
 		// duplicate hold even if the claim were somehow bypassed.
 		holdTxID, err = txHolder.HoldInTx(ctx, tx, billingAccountID, input.OwnerUserID, snapshot.TotalCredits,
-			TaskSubmitHoldKey(claim.WorkspaceID, claim.IdempotencyKey), taskID)
+			settlement.TaskHoldKey(claim.WorkspaceID, claim.IdempotencyKey), taskID)
 		if err != nil {
 			return nil, true, err
 		}
@@ -432,12 +363,10 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	// a borrowed guard transaction commits later at the guard. The event
 	// stages after the successful unit either way (never inside a failed
 	// one), and the caller flushes it only after the commit it can see.
-	if owned {
-		if err := commitSettlementTx(ctx, tx); err != nil {
-			return nil, true, err
-		}
-		committed = true
+	if err := scope.Commit(ctx); err != nil {
+		return nil, true, err
 	}
+	committed = true
 	s.stageSettlementEvent(ctx, owned, created.ID, created.WorkspaceID, StatusPending, created.ExecutionToken, created.UpdatedAt)
 	return created, true, nil
 }
@@ -487,14 +416,16 @@ func (s *Service) completeInTx(ctx context.Context, workspaceID, taskID string, 
 	if !ok {
 		return nil, false, nil
 	}
-	tx, owned, err := beginSettlementTx(ctx, transactor)
+	scope, err := settlement.BorrowOrBeginScope(ctx, transactor)
 	if err != nil {
 		return nil, true, err
 	}
+	tx := scope.Tx()
+	owned := scope.Owned()
 	committed := false
 	defer func() {
-		if !committed && owned {
-			rollbackSettlementTx(ctx, tx)
+		if !committed {
+			_ = scope.Rollback(ctx)
 		}
 	}()
 	completed, err := txStore.CompleteTaskInTx(ctx, tx, workspaceID, taskID, outputs)
@@ -529,12 +460,10 @@ func (s *Service) completeInTx(ctx context.Context, workspaceID, taskID string, 
 			}
 		}
 	}
-	if owned {
-		if err := commitSettlementTx(ctx, tx); err != nil {
-			return nil, true, err
-		}
-		committed = true
+	if err := scope.Commit(ctx); err != nil {
+		return nil, true, err
 	}
+	committed = true
 	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusCompleted, completed.ExecutionToken, completed.UpdatedAt)
 	return completed, true, nil
 }
@@ -545,14 +474,16 @@ func (s *Service) failInTx(ctx context.Context, workspaceID, taskID, errorMsg st
 	if !ok {
 		return nil, false, nil
 	}
-	tx, owned, err := beginSettlementTx(ctx, transactor)
+	scope, err := settlement.BorrowOrBeginScope(ctx, transactor)
 	if err != nil {
 		return nil, true, err
 	}
+	tx := scope.Tx()
+	owned := scope.Owned()
 	committed := false
 	defer func() {
-		if !committed && owned {
-			rollbackSettlementTx(ctx, tx)
+		if !committed {
+			_ = scope.Rollback(ctx)
 		}
 	}()
 	failed, err := txStore.FailTaskInTx(ctx, tx, workspaceID, taskID, errorMsg)
@@ -571,12 +502,10 @@ func (s *Service) failInTx(ctx context.Context, workspaceID, taskID, errorMsg st
 			}
 		}
 	}
-	if owned {
-		if err := commitSettlementTx(ctx, tx); err != nil {
-			return nil, true, err
-		}
-		committed = true
+	if err := scope.Commit(ctx); err != nil {
+		return nil, true, err
 	}
+	committed = true
 	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusFailed, failed.ExecutionToken, failed.UpdatedAt)
 	return failed, true, nil
 }
@@ -588,14 +517,16 @@ func (s *Service) cancelInTx(ctx context.Context, workspaceID, taskID string, ac
 	if !ok {
 		return nil, false, false, nil
 	}
-	tx, owned, err := beginSettlementTx(ctx, transactor)
+	scope, err := settlement.BorrowOrBeginScope(ctx, transactor)
 	if err != nil {
 		return nil, false, true, err
 	}
+	tx := scope.Tx()
+	owned := scope.Owned()
 	committed := false
 	defer func() {
-		if !committed && owned {
-			rollbackSettlementTx(ctx, tx)
+		if !committed {
+			_ = scope.Rollback(ctx)
 		}
 	}()
 	flipped, already, err := txStore.CancelTaskInTx(ctx, tx, workspaceID, taskID, actorUserID, reason)
@@ -618,7 +549,7 @@ func (s *Service) cancelInTx(ctx context.Context, workspaceID, taskID string, ac
 		}
 	}
 	if owned {
-		if err := commitSettlementTx(ctx, tx); err != nil {
+		if err := scope.Commit(ctx); err != nil {
 			return nil, false, true, err
 		}
 		committed = true
@@ -652,14 +583,16 @@ func (s *Service) retryInTx(ctx context.Context, workspaceID, taskID, newToken s
 	if !ok {
 		return nil, false, nil
 	}
-	tx, owned, err := beginSettlementTx(ctx, transactor)
+	scope, err := settlement.BorrowOrBeginScope(ctx, transactor)
 	if err != nil {
 		return nil, true, err
 	}
+	tx := scope.Tx()
+	owned := scope.Owned()
 	committed := false
 	defer func() {
-		if !committed && owned {
-			rollbackSettlementTx(ctx, tx)
+		if !committed {
+			_ = scope.Rollback(ctx)
 		}
 	}()
 	retried, err := txStore.TransitionForRetryInTx(ctx, tx, workspaceID, taskID, newToken)
@@ -669,19 +602,17 @@ func (s *Service) retryInTx(ctx context.Context, workspaceID, taskID, newToken s
 	if err := txQueue.EnqueueInTx(ctx, tx, retried); err != nil {
 		return nil, true, fmt.Errorf("workspacetasks: requeue: %w", err)
 	}
-	if owned {
-		if err := commitSettlementTx(ctx, tx); err != nil {
-			return nil, true, err
-		}
-		committed = true
+	if err := scope.Commit(ctx); err != nil {
+		return nil, true, err
 	}
+	committed = true
 	// running -> pending is a real status transition, so it needs an event
 	// like every other flip (this was the one settlement that staged
 	// nothing: a requeued task went dark on the event channel because the
 	// UI had no pending signal to re-render against). Staged AFTER the
-	// commit, for the same reason as the terminal settlements above: a
-	// staged event means a committed fact, and publishing it is the
-	// caller's post-commit job (never inside this transaction).
-	s.stageWithTokenAt(taskID, workspaceID, StatusPending, retried.ExecutionToken, retried.UpdatedAt)
+	// commit, through the same owned/borrowed deferral every other flip
+	// uses: a staged event means a committed fact, and publishing it is
+	// the caller's post-commit job (never inside this transaction).
+	s.stageSettlementEvent(ctx, owned, taskID, workspaceID, StatusPending, retried.ExecutionToken, retried.UpdatedAt)
 	return retried, true, nil
 }

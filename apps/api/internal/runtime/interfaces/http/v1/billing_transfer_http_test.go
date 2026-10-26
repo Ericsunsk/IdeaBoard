@@ -200,7 +200,8 @@ func TestV1TransferInviteVisibilityIncludesOnlyAddressedRecipient(t *testing.T) 
 	fx, ws := handoverHTTPFixture(t, ctx, 7, 8)
 	fx.store.SeedWorkspaceMember(ws.PublicID, 9, tenancy.RoleMember)
 	fx.dir.ensure(9)
-	account, err := fx.accounts.EnsureBillingAccountForWorkspace(ctx, ws.InternalID, ws.PublicID)
+	identity, err := fx.accounts.ResolveFunds(ctx, ws.PublicID)
+	account := identity.ToBillingAccount()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +250,8 @@ func TestV1TransferInviteCrossAccountDecisionsHaveNoEffects(t *testing.T) {
 			// an explicit workspace member.
 			unrelated := v1WorkspaceFixture(t, ctx, fx.store, "unrelated", 9)
 			fx.store.SeedWorkspaceMember(unrelated.PublicID, actor, tenancy.RoleMember)
-			account, err := fx.accounts.EnsureBillingAccountForWorkspace(ctx, source.InternalID, source.PublicID)
+			identity, err := fx.accounts.ResolveFunds(ctx, source.PublicID)
+			account := identity.ToBillingAccount()
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -656,8 +656,8 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 	}
 	dto := toWorkspaceDTO(created)
 	if h.deps.BillingAccounts != nil {
-		if account, resErr := h.deps.BillingAccounts.EnsureBillingAccountForWorkspace(ctx, created.InternalID, created.PublicID); resErr == nil {
-			dto = withWorkspaceBillingAccount(dto, account.PublicID)
+		if identity, resErr := h.deps.BillingAccounts.ResolveFunds(ctx, created.PublicID); resErr == nil && identity.BA() != "" {
+			dto = withWorkspaceBillingAccount(dto, identity.BA())
 		}
 	}
 	contract.RenderCreated(c, dto)

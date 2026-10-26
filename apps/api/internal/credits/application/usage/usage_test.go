@@ -155,10 +155,10 @@ func seedCaptureUsageWallet(
 	t.Helper()
 	testhelpers.EnsureAdminOperationUser(t, pool, userID)
 	service := credits.NewService(pool)
-	if _, err := service.Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, amount), Metadata: testhelpers.TestMetadata("usage:"+key+":grant", "usage-"+key+"-grant")}); err != nil {
+	if _, err := service.Administrative().Grant(ctx, ports.GrantCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, amount), Metadata: testhelpers.TestMetadata("usage:"+key+":grant", "usage-"+key+"-grant")}); err != nil {
 		t.Fatalf("grant usage wallet %d: %v", userID, err)
 	}
-	if _, err := service.Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, amount), Metadata: testhelpers.TestMetadata("usage:"+key+":hold", "usage-"+key+"-hold")}); err != nil {
+	if _, err := service.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: testhelpers.MustBillingAccount(t, pool, userID), Amount: testhelpers.MustCreditAmount(t, amount), Metadata: testhelpers.TestMetadata("usage:"+key+":hold", "usage-"+key+"-hold")}); err != nil {
 		t.Fatalf("hold usage wallet %d: %v", userID, err)
 	}
 	if _, err := pool.Exec(ctx, `

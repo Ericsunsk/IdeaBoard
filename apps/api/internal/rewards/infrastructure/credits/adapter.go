@@ -51,7 +51,7 @@ func (a *Adapter) Grant(ctx context.Context, tx pgx.Tx, request redemptions.Cred
 	if err != nil {
 		return redemptions.CreditGrantResult{}, err
 	}
-	result, err := a.service.InTx(tx).Grant(ctx, creditsports.GrantCommand{
+	result, err := a.service.GrantsInTx(tx).Grant(ctx, creditsports.GrantCommand{
 		BillingAccountID: accountID,
 		Amount:           amount,
 		Metadata: creditsdomain.CommandMetadata{

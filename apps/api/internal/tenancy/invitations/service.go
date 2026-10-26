@@ -4,9 +4,7 @@ package invitations
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
-	"fmt"
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
@@ -197,7 +195,9 @@ func (s *Service) InitiateTransferInvite(ctx context.Context, accountID, fromID,
 		if invite.IdempotencyKey == "" {
 			return errors.New("invitations: handover lifecycle identity missing")
 		}
-		params.NotificationKey = fmt.Sprintf("handover:%s:%x", invite.PublicID, sha256.Sum256([]byte(invite.IdempotencyKey)))
+		// Reuses the unified notification value object so reissues and
+		// retries collapse to one durable notification.
+		params.NotificationKey = tenancy.TransferNotificationKey(invite.PublicID, invite.IdempotencyKey)
 		return s.Events.OnBillingTransferInitiated(ctx, invite, params)
 	})
 	if err != nil {

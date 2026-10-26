@@ -15,15 +15,6 @@ CREATE TRIGGER set_boards_updated_at BEFORE UPDATE ON boards FOR EACH ROW EXECUT
 CREATE TRIGGER set_board_memberships_updated_at BEFORE UPDATE ON board_memberships FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 ALTER TABLE payment_webhook_events ADD CONSTRAINT payment_webhook_events_payment_order_id_fkey FOREIGN KEY (payment_order_id) REFERENCES payment_orders(id) ON DELETE RESTRICT;
 
-ALTER TABLE credit_transactions
-  DROP CONSTRAINT ck_credit_transactions_command_type,
-  ADD CONSTRAINT ck_credit_transactions_command_type CHECK (
-    command_type IN (
-      'grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction',
-      'purchase_credit', 'purchase_refund', 'payment_dispute_debit', 'payment_dispute_restore'
-    )
-  );
-
 -- This records a signed Dispute debit request that could not create a Ledger
 -- transaction because the Wallet had no available Ideas to recover.
 CREATE TABLE payment_dispute_debit_requests (

@@ -21,6 +21,7 @@ import (
 	taskapp "ideaboard/api/internal/tasking/application/task"
 	tasksdomain "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testsupport"
 	"net/http"
@@ -301,6 +302,11 @@ func (f *fakeImpersonator) ImpersonateUser(_ context.Context, _ string, _ string
 }
 
 // fakeControlCredits counts commands, captures metadata, and can force
+// domain failures for error-mapping tests. It satisfies the Control-side
+// administrative face, so widening ControlCreditCommands is a build error.
+var _ ControlCreditCommands = (*fakeControlCredits)(nil)
+
+// fakeControlCredits counts commands, captures metadata, and can force
 // domain failures for error-mapping tests.
 type fakeControlCredits struct {
 	mu                   sync.Mutex
@@ -519,10 +525,15 @@ func (f *fakeControlPayments) CreatePaymentRefund(_ context.Context, cmd payment
 
 type fakeControlBillingAccounts struct{}
 
-func (fakeControlBillingAccounts) EnsureBillingAccountForWorkspace(_ context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error) {
-	return tenancy.BillingAccount{
-		WorkspaceInternalID: workspaceInternalID, WorkspacePublicID: workspacePublicID,
-		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+func (fakeControlBillingAccounts) ResolveFunds(_ context.Context, workspacePublicID string) (funds.Identity, error) {
+	return funds.Identity{
+		WorkspaceInternalID:    7001,
+		WorkspacePublicID:      workspacePublicID,
+		BillingAccountID:       7001,
+		BillingAccountPublicID: "ba_testfixture",
+		OwnerType:              funds.OwnerTypeWorkspace,
+		CreatedAt:              time.Now().UTC(),
+		UpdatedAt:              time.Now().UTC(),
 	}, nil
 }
 

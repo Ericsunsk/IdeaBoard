@@ -66,7 +66,7 @@ func TestBanFreezesOnlySoleOwnedAccountsAndKeepsSharedFundsMoving(t *testing.T) 
 	if _, err := pool.Exec(ctx, `INSERT INTO billing_account_members (billing_account_id, user_id, role) VALUES ($1, $2, 'owner'), ($1, $3, 'owner')`, orgAccountID, banned.User.ID, other.User.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := creditService.Grant(ctx, ports.GrantCommand{
+	if _, err := creditService.Administrative().Grant(ctx, ports.GrantCommand{
 		BillingAccountID: orgAccountID,
 		Amount:           domain.CreditAmount(500),
 		Metadata: domain.CommandMetadata{
@@ -81,7 +81,7 @@ func TestBanFreezesOnlySoleOwnedAccountsAndKeepsSharedFundsMoving(t *testing.T) 
 
 	// A pre-existing Hold on the banned user's own account must still
 	// converge after the ban (payment obligations survive the freeze).
-	hold, err := creditService.Hold(ctx, ports.HoldCommand{
+	hold, err := creditService.Settlement().Hold(ctx, ports.HoldCommand{
 		BillingAccountID: bannedAccount,
 		Amount:           domain.CreditAmount(20),
 		Metadata: domain.CommandMetadata{
@@ -113,11 +113,11 @@ func TestBanFreezesOnlySoleOwnedAccountsAndKeepsSharedFundsMoving(t *testing.T) 
 		t.Fatalf("org wallet = %+v err = %v, want active with 500", org, err)
 	}
 	// New spending on the frozen personal account is rejected...
-	if _, err := creditService.Hold(ctx, lifecycleHold(t, creditService, banned.User.ID, "freeze-iso:post-ban")); err == nil {
+	if _, err := creditService.Settlement().Hold(ctx, lifecycleHold(t, creditService, banned.User.ID, "freeze-iso:post-ban")); err == nil {
 		t.Fatal("Hold(frozen personal account) succeeded, want rejection")
 	}
 	// ...while the pre-existing Hold still converges...
-	if _, err := creditService.Release(ctx, ports.ReleaseCommand{
+	if _, err := creditService.Settlement().Release(ctx, ports.ReleaseCommand{
 		BillingAccountID:  bannedAccount,
 		HoldTransactionID: hold.TransactionID,
 		Amount:            domain.CreditAmount(20),
@@ -132,7 +132,7 @@ func TestBanFreezesOnlySoleOwnedAccountsAndKeepsSharedFundsMoving(t *testing.T) 
 		t.Fatalf("Release(pre-ban hold) error = %v", err)
 	}
 	// ...and shared funds keep moving under the other manager.
-	if _, err := creditService.Hold(ctx, ports.HoldCommand{
+	if _, err := creditService.Settlement().Hold(ctx, ports.HoldCommand{
 		BillingAccountID: orgAccountID,
 		Amount:           domain.CreditAmount(50),
 		Metadata: domain.CommandMetadata{

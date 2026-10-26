@@ -239,7 +239,7 @@ func (e *visionWorkspaceEnv) fundAccount(t *testing.T, accountID int64, amount i
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.credits.InTx(tx).Grant(ctx, creditsports.GrantCommand{BillingAccountID: accountID, Amount: grantAmount, Metadata: creditsdomain.CommandMetadata{
+	if _, err := e.credits.GrantsInTx(tx).Grant(ctx, creditsports.GrantCommand{BillingAccountID: accountID, Amount: grantAmount, Metadata: creditsdomain.CommandMetadata{
 		IdempotencyKey: fmt.Sprintf("vision-seed-%d-%d", accountID, timeNowUnixNano()%1000000),
 		Actor:          creditsdomain.Actor{Type: creditsdomain.ActorSystem, ID: "test"},
 		Source:         "test", Reason: "vision settlement seed",

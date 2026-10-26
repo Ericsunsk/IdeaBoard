@@ -71,14 +71,11 @@ func TestV1BillingAdminCanCheckout(t *testing.T) {
 	fx := newBillingTestFixture()
 	ws := v1WorkspaceFixture(t, ctx, fx.store, "billing-admin", 7)
 	fx.store.SeedWorkspaceMember(ws.PublicID, 9, tenancy.RoleMember)
-	wsRow, err := fx.store.GetWorkspace(ctx, ws.PublicID)
-	if err != nil {
-		t.Fatalf("get workspace failed: %v", err)
-	}
-	real, err := fx.accounts.EnsureBillingAccountForWorkspace(ctx, wsRow.InternalID, ws.PublicID)
+	realIdentity, err := fx.accounts.ResolveFunds(ctx, ws.PublicID)
 	if err != nil {
 		t.Fatalf("ensure failed: %v", err)
 	}
+	real := realIdentity.ToBillingAccount()
 	// Caller 9 is a plain Workspace Member but an explicit Billing Admin:
 	// financial management never grants Board access, and workspace rank
 	// alone never grants financial management — the billing grant decides.

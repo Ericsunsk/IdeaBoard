@@ -14,6 +14,7 @@ import (
 	tasksdomain "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/workflow/paramkeys"
@@ -93,11 +94,17 @@ func (v1FakeBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ pgx.
 	return 7001, nil
 }
 
-// EnsureBillingAccountForWorkspace serves the quote-preflight resolution
-// from the same fixed fixture account submit holds (#917: one payer for
-// quote, readiness, and submit in these fixtures).
-func (v1FakeBillingAccounts) EnsureBillingAccountForWorkspace(_ context.Context, _ int64, _ string) (tenancy.BillingAccount, error) {
-	return tenancy.BillingAccount{InternalID: 7001, PublicID: "ba_quote0000001", OwnerType: tenancypg.BillingOwnerWorkspace}, nil
+// ResolveFunds serves the quote-preflight resolution from the same fixed
+// fixture account submit holds (#917: one payer for quote, readiness,
+// and submit in these fixtures).
+func (v1FakeBillingAccounts) ResolveFunds(_ context.Context, workspacePublicID string) (funds.Identity, error) {
+	return funds.Identity{
+		WorkspaceInternalID:    7001,
+		WorkspacePublicID:      workspacePublicID,
+		BillingAccountID:       7001,
+		BillingAccountPublicID: "ba_quote0000001",
+		OwnerType:              tenancypg.BillingOwnerWorkspace,
+	}, nil
 }
 
 // v1FakeQuoteWallets serves the quote-preflight funds gate from a

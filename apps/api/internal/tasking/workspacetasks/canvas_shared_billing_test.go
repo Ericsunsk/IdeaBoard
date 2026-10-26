@@ -32,6 +32,7 @@ import (
 	"sync"
 	"testing"
 
+	"ideaboard/api/internal/tasking/settlement"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
@@ -183,7 +184,7 @@ func TestCanvasSubmitIdempotencyReplaySingleHold(t *testing.T) {
 	if n := len(env.service.StagedEvents()); n != 0 {
 		t.Fatalf("replay staged %d events, want 0 (the winner already emitted)", n)
 	}
-	if got := env.ledgerCount(t, `idempotency_key = $1`, workspacetasks.TaskSubmitHoldKey(env.ws, key)); got != 1 {
+	if got := env.ledgerCount(t, `idempotency_key = $1`, settlement.TaskHoldKey(env.ws, key)); got != 1 {
 		t.Fatalf("hold ledger rows = %d, want exactly 1", got)
 	}
 

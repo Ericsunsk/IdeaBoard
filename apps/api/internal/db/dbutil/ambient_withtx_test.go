@@ -231,12 +231,23 @@ func TestWithTxDBTXAmbientStubNeverTouchesLifecycle(t *testing.T) {
 	stub := &ambientTxStub{}
 	carrier := ContextWithAmbientTx(ctx, stub)
 
-	// Success: fn runs, no pool needed, lifecycle untouched.
+	// Success: fn runs, no pool needed, lifecycle untouched. fn now
+	// receives the module's lifecycle-refusing handle instead of the
+	// raw carrier: statements delegate, but Commit/Rollback refuse.
 	ran := false
 	if err := WithTxDBTX(carrier, nil, func(_ *dbsqlc.Queries, raw pgx.Tx) error {
 		ran = true
-		if raw != stub {
-			t.Error("WithTxDBTX did not hand the carrier tx to fn")
+		if raw == nil {
+			t.Error("WithTxDBTX carrier tx handle is nil")
+		}
+		if !BorrowedTx(raw) {
+			t.Error("WithTxDBTX did not hand a lifecycle-refusing handle to fn")
+		}
+		if err := raw.Commit(carrier); !errors.Is(err, ErrBorrowedTxLifecycle) {
+			t.Errorf("borrowed handle Commit = %v, want refusal", err)
+		}
+		if err := raw.Rollback(carrier); !errors.Is(err, ErrBorrowedTxLifecycle) {
+			t.Errorf("borrowed handle Rollback = %v, want refusal", err)
 		}
 		return nil
 	}); err != nil {

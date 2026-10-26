@@ -147,29 +147,25 @@ func (s *Store) clock() time.Time {
 	return s.now()
 }
 
-// Transact runs fn inside the ambient carrier transaction when one is
-// staged (guarded control path: the guard owns commit/rollback and the
-// audit row joins the same unit), or inside a store-owned transaction
-// otherwise (legacy admin path and tests). fn must only use statements:
-// committing or rolling back the carrier is the guard's job.
+// Transact joins the ambient transaction or owns a new one. fn must
+// only use statements; the scope owner controls commit and rollback.
 func (s *Store) Transact(ctx context.Context, fn func(ctx context.Context) error) error {
 	if s == nil || s.db == nil {
 		return fmt.Errorf("identity auth sync store is not configured")
 	}
-	if _, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		return fn(ctx)
-	}
-	tx, err := s.db.Begin(ctx)
+	scope, err := dbutil.Begin(ctx, s.db, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("identity auth sync: begin transaction: %w", err)
 	}
-	defer func() {
-		_ = tx.Rollback(ctx)
-	}()
-	if err := fn(dbutil.ContextWithAmbientTx(ctx, tx)); err != nil {
+	if scope.Owned() {
+		defer func() { _ = scope.Tx().Rollback(ctx) }()
+	}
+	// Stage the borrowed handle as well, so downstream statements cannot
+	// commit or roll back the guard's transaction.
+	if err := fn(dbutil.ContextWithAmbientTx(ctx, scope.Tx())); err != nil {
 		return err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := scope.Commit(ctx); err != nil {
 		return fmt.Errorf("identity auth sync: commit transaction: %w", err)
 	}
 	return nil
@@ -185,10 +181,10 @@ type statementTarget interface {
 }
 
 func (s *Store) executor(ctx context.Context) statementTarget {
-	if tx, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		return tx
-	}
-	return s.db
+	// Thin adapter on the deep Tx module: the carrier-vs-pool borrow
+	// decision lives in dbutil.BorrowOrPool. The statement-only shape
+	// exposes no lifecycle, so a borrowed carrier cannot be ended here.
+	return dbutil.BorrowOrPool(ctx, s.db)
 }
 
 // LockUser serializes the caller's unit with every other same-user lane

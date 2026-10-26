@@ -115,24 +115,3 @@ func TaskSubmitRequestHash(workspaceID, kind string, mediaAssetIDs []string, pro
 	}, "\x00")))
 	return hex.EncodeToString(sum[:])
 }
-
-// TaskSubmitHoldKey derives the Credit Hold ledger key from the durable
-// submit identity rather than from the per-call task id.
-//
-// The task id is minted inside the request, so it differs on every retry and
-// cannot fence anything. The (workspace, operation, key) tuple is stable
-// across processes and restarts, so a retried submit asks the ledger for the
-// SAME key and the ledger replays instead of double-charging. The task id is
-// deliberately NOT part of this key: it is the thing that varies per attempt.
-//
-// Length stays within the ledger's 160-char bound: the prefix and operation
-// are fixed and the digest is 64 hex characters.
-func TaskSubmitHoldKey(workspaceID, idempotencyKey string) string {
-	sum := sha256.Sum256([]byte(strings.Join([]string{
-		"task-hold",
-		TaskSubmitOperation,
-		strings.TrimSpace(workspaceID),
-		strings.TrimSpace(idempotencyKey),
-	}, "\x00")))
-	return "task-hold:" + TaskSubmitOperation + ":" + hex.EncodeToString(sum[:])
-}

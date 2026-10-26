@@ -1,3 +1,5 @@
+// Package schemarelease checks schema assembly, artifact drift, migration
+// immutability, sqlc generation and PostgreSQL catalog semantics.
 package schemarelease
 
 import (

@@ -10,6 +10,7 @@ import (
 	creditsdomain "ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/memberquotas"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	usageapplication "ideaboard/api/internal/usage/application"
 	usagedomain "ideaboard/api/internal/usage/domain"
 )
@@ -22,9 +23,15 @@ type accountFixture struct {
 	roleCalls int
 }
 
-func (a *accountFixture) EnsureBillingAccountForWorkspace(ctx context.Context, _ int64, _ string) (tenancy.BillingAccount, error) {
+func (a *accountFixture) ResolveFunds(ctx context.Context, workspacePublicID string) (funds.Identity, error) {
 	a.check(ctx, false)
-	return tenancy.BillingAccount{InternalID: 77, PublicID: "ba_test"}, nil
+	return funds.Identity{
+		WorkspaceInternalID:    1,
+		WorkspacePublicID:      workspacePublicID,
+		BillingAccountID:       77,
+		BillingAccountPublicID: "ba_test",
+		OwnerType:              funds.OwnerTypeWorkspace,
+	}, nil
 }
 func (a *accountFixture) GetBillingAccountRole(ctx context.Context, _, _ int64) (string, bool, error) {
 	a.check(ctx, false)

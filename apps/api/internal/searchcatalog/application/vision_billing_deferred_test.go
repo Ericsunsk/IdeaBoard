@@ -50,14 +50,7 @@ func (s *deferredCatalogStub) DeleteArchived(context.Context, string, int64) (bi
 	return billing.ArchivedItemDeleteResult{}, s.err
 }
 
-func (s *deferredCatalogStub) QuoteAtResolution(context.Context, string, billing.OutputResolution, int64) (billing.Quote, error) {
-	if s.err != nil {
-		return billing.Quote{}, s.err
-	}
-	return s.quote, nil
-}
-
-func (s *deferredCatalogStub) QuoteAtResolutionInTx(context.Context, pgx.Tx, string, billing.OutputResolution, int64) (billing.Quote, error) {
+func (s *deferredCatalogStub) Quote(context.Context, pgx.Tx, string, billing.OutputResolution, int64) (billing.Quote, error) {
 	if s.err != nil {
 		return billing.Quote{}, s.err
 	}

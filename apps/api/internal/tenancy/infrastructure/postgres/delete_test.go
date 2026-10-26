@@ -425,10 +425,10 @@ func TestDeleteWorkspaceRejectsActiveTasksWithoutChangingGraph(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := service.InTx(tx).Grant(ctx, creditports.GrantCommand{BillingAccountID: deleteGuardAccountID, Amount: amount, Metadata: metadata("delete-guard-grant")}); err != nil {
+			if _, err := service.GrantsInTx(tx).Grant(ctx, creditports.GrantCommand{BillingAccountID: deleteGuardAccountID, Amount: amount, Metadata: metadata("delete-guard-grant")}); err != nil {
 				t.Fatal(err)
 			}
-			hold, err := service.InTx(tx).Hold(ctx, creditports.HoldCommand{BillingAccountID: deleteGuardAccountID, Amount: amount, Metadata: metadata("delete-guard-hold")})
+			hold, err := service.SettlementInTx(tx).Hold(ctx, creditports.HoldCommand{BillingAccountID: deleteGuardAccountID, Amount: amount, Metadata: metadata("delete-guard-hold")})
 			if err != nil {
 				t.Fatal(err)
 			}

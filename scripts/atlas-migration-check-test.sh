@@ -249,4 +249,137 @@ if check >"${fixture_dir}/staged.out" 2>&1; then
 fi
 grep -Fq 'destructive SQL is blocked' "${fixture_dir}/staged.out"
 
+# 13. Clean-break rebaseline (D old baseline + D old chain + A higher baseline)
+# passes the history gate via the narrow exemption.
+git -C "${fixture_dir}" reset -q -- apps/api/internal/db/migrations/20260818070000_staged.sql
+rm "${fixture_dir}/apps/api/internal/db/migrations/20260818070000_staged.sql"
+git -C "${fixture_dir}" add -A apps/api/internal/db/migrations
+git -C "${fixture_dir}" commit -qm 'fixture history for clean-break tests'
+cat >"${fixture_dir}/apps/api/internal/db/migrations/20260818050000_baseline.sql" <<'EOF'
+CREATE TABLE cb_old (id integer PRIMARY KEY);
+EOF
+cat >"${fixture_dir}/apps/api/internal/db/migrations/20260818060000_chain.sql" <<'EOF'
+ALTER TABLE cb_old ADD COLUMN label text;
+EOF
+printf '%s\n' '20260818050000_baseline.sql h1:fakeoldbaseline' >>"${fixture_dir}/apps/api/internal/db/migrations/atlas.sum"
+printf '%s\n' '20260818060000_chain.sql h1:fakechain' >>"${fixture_dir}/apps/api/internal/db/migrations/atlas.sum"
+git -C "${fixture_dir}" add -A apps/api/internal/db/migrations
+git -C "${fixture_dir}" commit -qm 'old baseline and chain'
+base_sha="$(git -C "${fixture_dir}" rev-parse HEAD)"
+git -C "${fixture_dir}" rm -q apps/api/internal/db/migrations/20260818050000_baseline.sql \
+  apps/api/internal/db/migrations/20260818060000_chain.sql
+cat >"${fixture_dir}/apps/api/internal/db/migrations/20260819000000_baseline.sql" <<'EOF'
+CREATE TABLE cb_new (id integer PRIMARY KEY);
+EOF
+git -C "${fixture_dir}" add apps/api/internal/db/migrations/20260819000000_baseline.sql
+sed -i.bak '/20260818050000_baseline.sql/d; /20260818060000_chain.sql/d' "${fixture_dir}/apps/api/internal/db/migrations/atlas.sum"
+rm "${fixture_dir}/apps/api/internal/db/migrations/atlas.sum.bak"
+printf '%s\n' '20260819000000_baseline.sql h1:fakenewbaseline' >>"${fixture_dir}/apps/api/internal/db/migrations/atlas.sum"
+check >"${fixture_dir}/cleanbreak.out" 2>&1
+grep -Fq 'clean-break rebaseline detected' "${fixture_dir}/cleanbreak.out"
+
+# 14. The exemption is narrow: destructive DDL in the new baseline is still
+# blocked without marker + env, even during a clean break.
+cat >"${fixture_dir}/apps/api/internal/db/migrations/20260819000000_baseline.sql" <<'EOF'
+DROP TABLE cb_new;
+EOF
+if check >"${fixture_dir}/cleanbreak-destructive.out" 2>&1; then
+  echo 'destructive clean-break baseline unexpectedly passed' >&2
+  exit 1
+fi
+grep -Fq 'destructive SQL is blocked' "${fixture_dir}/cleanbreak-destructive.out"
+cat >"${fixture_dir}/apps/api/internal/db/migrations/20260819000000_baseline.sql" <<'EOF'
+-- destructive: approved
+DROP TABLE cb_new;
+EOF
+if check >"${fixture_dir}/cleanbreak-unapproved.out" 2>&1; then
+  echo 'unapproved destructive clean-break baseline unexpectedly passed' >&2
+  exit 1
+fi
+grep -Fq 'destructive SQL is blocked' "${fixture_dir}/cleanbreak-unapproved.out"
+ATLAS_ALLOW_DESTRUCTIVE=1 check >"${fixture_dir}/cleanbreak-approved.out" 2>&1
+grep -Fq 'clean-break rebaseline detected' "${fixture_dir}/cleanbreak-approved.out"
+cat >"${fixture_dir}/apps/api/internal/db/migrations/20260819000000_baseline.sql" <<'EOF'
+CREATE TABLE cb_new (id integer PRIMARY KEY);
+EOF
+
+# 15. A second added baseline voids the exemption.
+cat >"${fixture_dir}/apps/api/internal/db/migrations/20260819010000_baseline.sql" <<'EOF'
+CREATE TABLE cb_extra (id integer PRIMARY KEY);
+EOF
+if check >"${fixture_dir}/cleanbreak-second.out" 2>&1; then
+  echo 'second added baseline unexpectedly passed' >&2
+  exit 1
+fi
+grep -Fq 'history is immutable' "${fixture_dir}/cleanbreak-second.out"
+rm "${fixture_dir}/apps/api/internal/db/migrations/20260819010000_baseline.sql"
+
+# 16. An added baseline that does not sort after the deleted baseline voids
+# the exemption.
+git -C "${fixture_dir}" rm -q --cached apps/api/internal/db/migrations/20260819000000_baseline.sql
+mv "${fixture_dir}/apps/api/internal/db/migrations/20260819000000_baseline.sql" \
+  "${fixture_dir}/apps/api/internal/db/migrations/20260818040000_baseline.sql"
+sed -i.bak 's/20260819000000_baseline.sql/20260818040000_baseline.sql/' "${fixture_dir}/apps/api/internal/db/migrations/atlas.sum"
+rm "${fixture_dir}/apps/api/internal/db/migrations/atlas.sum.bak"
+if check >"${fixture_dir}/cleanbreak-lower.out" 2>&1; then
+  echo 'lower-version baseline unexpectedly passed' >&2
+  exit 1
+fi
+grep -Fq 'history is immutable' "${fixture_dir}/cleanbreak-lower.out"
+mv "${fixture_dir}/apps/api/internal/db/migrations/20260818040000_baseline.sql" \
+  "${fixture_dir}/apps/api/internal/db/migrations/20260819000000_baseline.sql"
+sed -i.bak 's/20260818040000_baseline.sql/20260819000000_baseline.sql/' "${fixture_dir}/apps/api/internal/db/migrations/atlas.sum"
+rm "${fixture_dir}/apps/api/internal/db/migrations/atlas.sum.bak"
+git -C "${fixture_dir}" add apps/api/internal/db/migrations/20260819000000_baseline.sql
+
+# 17. A modified tracked migration alongside the rebaseline voids the exemption.
+printf '%s\n' '-- edited' >>"${fixture_dir}/apps/api/internal/db/migrations/20260818000000_initial.sql"
+if check >"${fixture_dir}/cleanbreak-modified.out" 2>&1; then
+  echo 'modified history alongside clean break unexpectedly passed' >&2
+  exit 1
+fi
+grep -Fq 'history is immutable' "${fixture_dir}/cleanbreak-modified.out"
+git -C "${fixture_dir}" checkout -q -- apps/api/internal/db/migrations/20260818000000_initial.sql
+
+# 18. An added non-baseline migration alongside the rebaseline voids the exemption.
+cat >"${fixture_dir}/apps/api/internal/db/migrations/20260819020000_extra.sql" <<'EOF'
+ALTER TABLE cb_new ADD COLUMN extra text;
+EOF
+if check >"${fixture_dir}/cleanbreak-extra.out" 2>&1; then
+  echo 'non-baseline addition alongside clean break unexpectedly passed' >&2
+  exit 1
+fi
+grep -Fq 'history is immutable' "${fixture_dir}/cleanbreak-extra.out"
+rm "${fixture_dir}/apps/api/internal/db/migrations/20260819020000_extra.sql"
+
+# 19. Rename blind spot: a staged rename reports status R (not A), so a
+# --diff-filter=A scan would miss the new path entirely. The destructive
+# gate must still block a renamed migration without marker + env.
+cat >"${fixture_dir}/apps/api/internal/db/migrations/20260819030000_rename_me.sql" <<'EOF'
+-- rename-me fixture: keep enough stable bytes so git detects the rename.
+-- rename-me fixture: keep enough stable bytes so git detects the rename.
+ALTER TABLE cb_new ADD COLUMN rename_me text;
+EOF
+printf '%s\n' '20260819030000_rename_me.sql h1:fakerenameme' >>"${fixture_dir}/apps/api/internal/db/migrations/atlas.sum"
+git -C "${fixture_dir}" add -A apps/api/internal/db/migrations
+git -C "${fixture_dir}" commit -qm 'rename-me fixture'
+git -C "${fixture_dir}" mv apps/api/internal/db/migrations/20260819030000_rename_me.sql \
+  apps/api/internal/db/migrations/20260819040000_renamed.sql
+cat >"${fixture_dir}/apps/api/internal/db/migrations/20260819040000_renamed.sql" <<'EOF'
+-- rename-me fixture: keep enough stable bytes so git detects the rename.
+-- rename-me fixture: keep enough stable bytes so git detects the rename.
+ALTER TABLE cb_new ADD COLUMN rename_me text;
+DROP TABLE cb_new;
+EOF
+git -C "${fixture_dir}" add apps/api/internal/db/migrations/20260819040000_renamed.sql
+git -C "${fixture_dir}" diff --name-status HEAD -- apps/api/internal/db/migrations/ | grep -q '^R' || {
+  echo 'fixture did not produce a rename status' >&2
+  exit 1
+}
+if check >"${fixture_dir}/rename-destructive.out" 2>&1; then
+  echo 'renamed destructive migration unexpectedly passed' >&2
+  exit 1
+fi
+grep -Fq 'destructive SQL is blocked' "${fixture_dir}/rename-destructive.out"
+
 echo 'Atlas migration check tests passed'

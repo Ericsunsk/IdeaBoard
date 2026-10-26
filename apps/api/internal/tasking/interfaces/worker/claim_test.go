@@ -79,7 +79,7 @@ func (s *attemptClaimStore) claimCount() int {
 }
 
 // faultingSettler reproduces a settlement-layer infrastructure fault:
-// Complete fails the way beginSettlementTx fails (DB restart, pool
+// Complete fails the way settlement scope creation fails (DB restart, pool
 // exhaustion, or a cancelled execution context), before any state flip.
 type faultingSettler struct {
 	inner        WorkspaceTaskWorkerSettler

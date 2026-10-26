@@ -25,7 +25,7 @@ import (
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/contract"
-	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
+	"ideaboard/api/internal/tenancy/funds"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -93,16 +93,16 @@ func (visionBillingAccountResolver) ResolveVisionSettlementInTx(ctx context.Cont
 			return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
 		}
 	}
-	account, err := tenancypg.EnsureBillingAccountForWorkspaceWithQueries(ctx, queries, workspace.InternalID)
+	account, err := funds.ResolveByPublicIDWithQueries(ctx, queries, workspacePublicID)
 	if err != nil {
-		return VisionSettlementIdentity{}, err
+		return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
 	}
-	if account.InternalID <= 0 {
+	if account.BillingAccountID <= 0 || account.WorkspaceInternalID <= 0 {
 		return VisionSettlementIdentity{}, ErrVisionWorkspaceNotFound
 	}
 	return VisionSettlementIdentity{
-		WorkspaceInternalID: workspace.InternalID,
-		BillingAccountID:    account.InternalID,
+		WorkspaceInternalID: account.WorkspaceInternalID,
+		BillingAccountID:    account.BillingAccountID,
 	}, nil
 }
 

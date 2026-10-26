@@ -28,6 +28,7 @@ import (
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 
 	"github.com/gin-gonic/gin"
@@ -308,24 +309,44 @@ type fakeGapBillingAccounts struct {
 	deny     map[int64]bool
 }
 
-func (f *fakeGapBillingAccounts) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (tenancy.BillingAccount, error) {
+func (f *fakeGapBillingAccounts) ResolveFunds(ctx context.Context, workspacePublicID string) (funds.Identity, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if existing, ok := f.accounts[workspaceInternalID]; ok {
-		return existing, nil
+	for _, account := range f.accounts {
+		if account.WorkspacePublicID == workspacePublicID {
+			return funds.Identity{
+				WorkspaceInternalID:    account.WorkspaceInternalID,
+				WorkspacePublicID:      account.WorkspacePublicID,
+				BillingAccountID:       account.InternalID,
+				BillingAccountPublicID: account.PublicID,
+				Shared:                 account.Shared,
+				OwnerType:              account.OwnerType,
+			}, nil
+		}
+	}
+	synthetic := int64(len(f.accounts) + 1001)
+	if synthetic <= 0 {
+		synthetic = 1001
 	}
 	account := tenancy.BillingAccount{
-		InternalID:          workspaceInternalID,
+		InternalID:          synthetic,
 		PublicID:            "ba_gaps_" + workspacePublicID,
 		OwnerType:           tenancypg.BillingOwnerWorkspace,
-		WorkspaceInternalID: workspaceInternalID,
+		WorkspaceInternalID: synthetic,
 		WorkspacePublicID:   workspacePublicID,
 	}
 	if f.accounts == nil {
 		f.accounts = make(map[int64]tenancy.BillingAccount)
 	}
-	f.accounts[workspaceInternalID] = account
-	return account, nil
+	f.accounts[synthetic] = account
+	return funds.Identity{
+		WorkspaceInternalID:    account.WorkspaceInternalID,
+		WorkspacePublicID:      account.WorkspacePublicID,
+		BillingAccountID:       account.InternalID,
+		BillingAccountPublicID: account.PublicID,
+		Shared:                 account.Shared,
+		OwnerType:              account.OwnerType,
+	}, nil
 }
 
 func (f *fakeGapBillingAccounts) GetBillingAccountByPublicID(ctx context.Context, publicID string) (tenancy.BillingAccount, error) {
@@ -433,19 +454,18 @@ func gapsWorkspace(t *testing.T, fx *gapsTestFixture) string {
 }
 
 // gapsAccount resolves the stable payer account a gaps test workspace
-// reads through (#919): the same Ensure seam the handlers use.
+// reads through (#919): the same ResolveFunds seam the handlers use.
 func gapsAccount(t *testing.T, fx *gapsTestFixture, wsID string) tenancy.BillingAccount {
 	t.Helper()
 	ctx := context.Background()
-	ws, err := fx.store.GetWorkspace(ctx, wsID)
-	if err != nil {
+	if _, err := fx.store.GetWorkspace(ctx, wsID); err != nil {
 		t.Fatalf("gaps workspace: %v", err)
 	}
-	account, err := fx.accounts.EnsureBillingAccountForWorkspace(ctx, ws.InternalID, wsID)
+	identity, err := fx.accounts.ResolveFunds(ctx, wsID)
 	if err != nil {
 		t.Fatalf("gaps billing account: %v", err)
 	}
-	return account
+	return identity.ToBillingAccount()
 }
 
 func TestV1GapsPurchaseOptions(t *testing.T) {
