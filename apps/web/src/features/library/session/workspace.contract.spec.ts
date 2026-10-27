@@ -263,6 +263,48 @@ describe('unified library source mapping', () => {
   })
 })
 
+describe('unified library source mixed-list transport', () => {
+  it('reads a mixed external + managed (known + unknown) page without failing the whole list', async () => {
+    const fixtures = (
+      await import('../../../../../../contracts/library/library-source.fixtures.json')
+    ).default as {
+      mixed_list: {
+        data: Record<string, unknown>[]
+        meta: { next_cursor: string; has_more: boolean }
+      }
+    }
+    useMswHandlers(
+      http.get('/api/v1/workspaces/:workspaceId/library/assets', () => {
+        return HttpResponse.json({
+          data: fixtures.mixed_list.data,
+          meta: fixtures.mixed_list.meta,
+        })
+      }),
+    )
+    const page = await workspaceLibraryApi.listAssets(WORKSPACE_ID)
+    expect(page.items).toHaveLength(3)
+    expect(page.items.map((item) => item.source)).toEqual(['external', 'media', 'media'])
+    const [external, known, unknown] = page.items
+    if (external?.source !== 'external') throw new Error('unreachable')
+    expect(external.provider).toBe('unsplash')
+    expect([external.width, external.height]).toEqual([2400, 1600])
+    expect(external).not.toHaveProperty('media_asset_id')
+    if (known?.source !== 'media' || unknown?.source !== 'media') {
+      throw new Error('unreachable')
+    }
+    expect(known.mediaAssetId).toBe(fixtures.mixed_list.data[1]?.media_asset_id)
+    expect([known.width, known.height]).toEqual([1600, 900])
+    expect([unknown.width, unknown.height]).toEqual([null, null])
+    for (const item of [known, unknown]) {
+      expect(item).not.toHaveProperty('provider')
+      expect(item).not.toHaveProperty('source_id')
+    }
+    // Cards render the inline display renditions, never external URLs.
+    for (const item of page.items) expect(item.display).toBeDefined()
+    expect(page.hasMore).toBe(false)
+  })
+})
+
 describe('workspace library pagination and replay headers', () => {
   it('reads cursor meta and forwards replay headers', async () => {
     let seenIdempotencyKey: string | null = null

@@ -349,3 +349,283 @@ func TestAutomaticPublicationRequiresPersistedOutputPostgres(t *testing.T) {
 		t.Fatalf("exact completed output not accepted: %v,%v", created, err)
 	}
 }
+
+// Issue #931 repro: the canonical managed-save use case must verify Task
+// lineage with the automatic (task) rules no matter which entry claims it.
+// A manual managed-save carrying unverified Task provenance (pending task,
+// unknown task, or output index the task never persisted) must fail closed
+// instead of persisting forged lineage under the manual readability rules.
+func TestUnifiedSaveVerifiesTaskLineagePostgres(t *testing.T) {
+	env := openWorkspaceIntegrationEnv(t)
+	ctx := t.Context()
+	service, _, _ := newWorkerIntegrationService(env)
+	output := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "lineage-verify.png")
+	pending, err := service.Create(ctx, workspacetasks.CreateInput{
+		WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1,
+	}, "lineage-pending-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := service.Create(ctx, workspacetasks.CreateInput{
+		WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1,
+	}, "lineage-completed-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Complete(ctx, env.wsA, completed.ID, []workspacetasks.OutputRef{
+		{Kind: workspacetasks.OutputKindAsset, AssetID: output.ID, Role: "result", ResultIndex: 0},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name    string
+		lineage *librarydomain.TaskLineage
+	}{
+		{"pending task", &librarydomain.TaskLineage{TaskID: pending.ID, ResultIndex: 0}},
+		{"unknown task", &librarydomain.TaskLineage{TaskID: "task_bbbbbbbbbbbbbbbbbbbbbbbb", ResultIndex: 0}},
+		{"unpersisted index", &librarydomain.TaskLineage{TaskID: completed.ID, ResultIndex: 1}},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			publicID, err := librarydomain.NewV1AssetPublicID()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := env.lib.SaveManagedMediaAsset(ctx, env.wsA, librarydomain.V1SaveManagedAssetInput{
+				MediaAssetID: output.ID, Title: "forged", OperatorUserID: env.userA, Lineage: tt.lineage,
+			}, publicID); !errors.Is(err, librarydomain.ErrV1AssetNotFound) {
+				t.Fatalf("unverified lineage save err = %v, want %v", err, librarydomain.ErrV1AssetNotFound)
+			}
+		})
+	}
+	if assets, err := env.lib.ListAssets(ctx, env.wsA); err != nil || len(assets) != 0 {
+		t.Fatalf("unverified lineage published rows: %d,%v", len(assets), err)
+	}
+}
+
+// Issue #931: the automatic and manual entries for one Media asset converge
+// on one row through the canonical managed-save use case, in both orders.
+// Repeats return the existing record without touching its folder, display
+// metadata, Task lineage, or server-side operator; the browser-supplied
+// author stays display-only and never becomes the operator identity.
+func TestUnifiedSaveAutoManualConvergePostgres(t *testing.T) {
+	for _, order := range []string{"auto-first", "manual-first"} {
+		t.Run(order, func(t *testing.T) {
+			env := openWorkspaceIntegrationEnv(t)
+			ctx := t.Context()
+			service, _, _ := newWorkerIntegrationService(env)
+			media := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "converge-"+order+".png")
+			autoSaver := taskruntime.NewWorkspaceTaskLibrarySaver(env.lib)
+			folderPublicID, err := librarydomain.NewV1FolderPublicID()
+			if err != nil {
+				t.Fatal(err)
+			}
+			folder, err := env.lib.CreateFolder(ctx, env.wsA, "Converge "+order, folderPublicID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			mint := func() string {
+				t.Helper()
+				id, err := librarydomain.NewV1AssetPublicID()
+				if err != nil {
+					t.Fatal(err)
+				}
+				return id
+			}
+			task, err := service.Create(ctx, workspacetasks.CreateInput{
+				WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1,
+			}, "converge-"+order)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := service.Complete(ctx, env.wsA, task.ID, []workspacetasks.OutputRef{
+				{Kind: workspacetasks.OutputKindAsset, AssetID: media.ID, Role: "result", ResultIndex: 0},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			autoInput := taskruntime.TaskOutputSaveInput{
+				TaskID: task.ID, ResultIndex: 0, MediaAssetID: media.ID, OperatorUserID: env.userA,
+			}
+			manualInput := func() librarydomain.V1SaveManagedAssetInput {
+				return librarydomain.V1SaveManagedAssetInput{
+					FolderPublicID: folder.PublicID, MediaAssetID: media.ID,
+					Title: "mine", Author: "External Artist", OperatorUserID: env.userA,
+				}
+			}
+			var first, second *librarydomain.V1Asset
+			var secondCreated bool
+			if order == "manual-first" {
+				var firstCreated bool
+				first, firstCreated, err = env.lib.SaveManagedMediaAsset(ctx, env.wsA, manualInput(), mint())
+				if err != nil || !firstCreated {
+					t.Fatalf("manual save = %v, %v; want created", first, err)
+				}
+				second, secondCreated, err = autoSaver.SaveTaskOutputAsset(ctx, env.wsA, autoInput)
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				var firstCreated bool
+				first, firstCreated, err = autoSaver.SaveTaskOutputAsset(ctx, env.wsA, autoInput)
+				if err != nil || !firstCreated {
+					t.Fatalf("auto save = %v, %v; want created", first, err)
+				}
+				second, secondCreated, err = env.lib.SaveManagedMediaAsset(ctx, env.wsA, manualInput(), mint())
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if secondCreated {
+				t.Fatal("cross-path re-save created a second row, want the existing one")
+			}
+			if second.PublicID != first.PublicID {
+				t.Fatalf("converged ids diverged: %q vs %q", second.PublicID, first.PublicID)
+			}
+			if second.FolderPublicID != first.FolderPublicID {
+				t.Fatalf("repeat moved folder to %q, want original %q", second.FolderPublicID, first.FolderPublicID)
+			}
+			if second.Title != first.Title || second.Author != first.Author {
+				t.Fatalf("repeat metadata = %q/%q, want original %q/%q", second.Title, second.Author, first.Title, first.Author)
+			}
+			if (second.Lineage == nil) != (first.Lineage == nil) ||
+				(second.Lineage != nil && *second.Lineage != *first.Lineage) {
+				t.Fatalf("repeat lineage = %+v, want original %+v", second.Lineage, first.Lineage)
+			}
+			var count int
+			if err := env.pool.QueryRow(ctx, `SELECT count(*) FROM library_assets WHERE workspace_id = (SELECT internal_id FROM workspaces WHERE public_id = $1)`, env.wsA).Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+			if count != 1 {
+				t.Fatalf("rows = %d, want 1", count)
+			}
+			var savedBy int64
+			var author string
+			if err := env.pool.QueryRow(ctx, `SELECT saved_by_user_id, author FROM library_assets WHERE public_id = $1`, first.PublicID).Scan(&savedBy, &author); err != nil {
+				t.Fatal(err)
+			}
+			if savedBy != env.userA {
+				t.Fatalf("saved_by = %d, want server-side operator %d", savedBy, env.userA)
+			}
+			if order == "manual-first" && author != "External Artist" {
+				t.Fatalf("author = %q, want the display attribution kept", author)
+			}
+		})
+	}
+}
+
+// Issue #931: concurrent automatic and manual saves of one Media asset
+// converge on one row via the database backstop: exactly one caller
+// creates, every caller sees the same identity.
+func TestUnifiedSaveConcurrentAutoManualPostgres(t *testing.T) {
+	env := openWorkspaceIntegrationEnv(t)
+	ctx := t.Context()
+	service, _, _ := newWorkerIntegrationService(env)
+	media := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "concurrent-unified.png")
+	task, err := service.Create(ctx, workspacetasks.CreateInput{
+		WorkspaceID: env.wsA, OwnerUserID: env.userA, Service: "render", Quantity: 1,
+	}, "concurrent-unified-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Complete(ctx, env.wsA, task.ID, []workspacetasks.OutputRef{
+		{Kind: workspacetasks.OutputKindAsset, AssetID: media.ID, Role: "result", ResultIndex: 0},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	autoSaver := taskruntime.NewWorkspaceTaskLibrarySaver(env.lib)
+	const callers = 12
+	ids := make([]string, callers)
+	created := make([]bool, callers)
+	var wg sync.WaitGroup
+	for i := range ids {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			publicID, err := librarydomain.NewV1AssetPublicID()
+			if err != nil {
+				t.Errorf("mint: %v", err)
+				return
+			}
+			var saved *librarydomain.V1Asset
+			var wasCreated bool
+			if i%2 == 0 {
+				saved, wasCreated, err = autoSaver.SaveTaskOutputAsset(ctx, env.wsA, taskruntime.TaskOutputSaveInput{
+					TaskID: task.ID, ResultIndex: 0, MediaAssetID: media.ID, OperatorUserID: env.userA,
+				})
+			} else {
+				saved, wasCreated, err = env.lib.SaveManagedMediaAsset(ctx, env.wsA, librarydomain.V1SaveManagedAssetInput{
+					MediaAssetID: media.ID, OperatorUserID: env.userA,
+				}, publicID)
+			}
+			if err != nil {
+				t.Errorf("concurrent unified save %d: %v", i, err)
+				return
+			}
+			ids[i], created[i] = saved.PublicID, wasCreated
+		}(i)
+	}
+	wg.Wait()
+	winners := 0
+	for i := range ids {
+		if ids[i] == "" {
+			t.Fatal("concurrent unified save returned no id")
+		}
+		if ids[i] != ids[0] {
+			t.Fatalf("ids diverged: %q vs %q", ids[i], ids[0])
+		}
+		if created[i] {
+			winners++
+		}
+	}
+	if winners != 1 {
+		t.Fatalf("created winners = %d, want 1", winners)
+	}
+	var count int
+	if err := env.pool.QueryRow(ctx, `SELECT count(*) FROM library_assets`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("rows = %d, want 1", count)
+	}
+}
+
+// Issue #931: every entry validates Media ownership, validity, and folder
+// binding through the canonical use case; cross-workspace, archived, and
+// missing Media fail closed with no row, on the manual and automatic paths.
+func TestUnifiedSaveForbiddenMediaPostgres(t *testing.T) {
+	env := openWorkspaceIntegrationEnv(t)
+	ctx := t.Context()
+	foreign := completeUploadForIntegration(t, ctx, env.media, env.wsB, env.userB, "unified-foreign.png")
+	archived := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "unified-archived.png")
+	if _, err := env.pool.Exec(ctx, `UPDATE media_assets SET archived_at = now() WHERE public_id = $1`, archived.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name  string
+		ws    string
+		media string
+	}{
+		{"cross-workspace", env.wsA, foreign.ID},
+		{"archived", env.wsA, archived.ID},
+		{"missing", env.wsA, "asset_missing000000000001"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			publicID, err := librarydomain.NewV1AssetPublicID()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := env.lib.SaveManagedMediaAsset(ctx, tt.ws, librarydomain.V1SaveManagedAssetInput{
+				MediaAssetID: tt.media, OperatorUserID: env.userA,
+			}, publicID); !errors.Is(err, librarydomain.ErrV1AssetNotFound) {
+				t.Fatalf("save err = %v, want %v", err, librarydomain.ErrV1AssetNotFound)
+			}
+		})
+	}
+	var count int
+	if err := env.pool.QueryRow(ctx, `SELECT count(*) FROM library_assets`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("rows = %d after forbidden saves, want 0", count)
+	}
+}

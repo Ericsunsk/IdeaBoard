@@ -101,6 +101,8 @@ type CanvasWorkspaceRuntimeCommands = {
       commit: () => void
       /** Save-to-library outcome: ends the drag with no position commit. */
       finishAsLibrarySave: () => readonly string[] | null
+      /** Abort path for unmount and Board/Workspace switches: no commit, no save. */
+      cancel: () => void
       isActive: () => boolean
     }
   }

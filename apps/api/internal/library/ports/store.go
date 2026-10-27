@@ -22,10 +22,9 @@ type WorkspaceLibraryStore interface {
 	RenameFolder(ctx context.Context, workspacePublicID, folderPublicID, name string) (*domain.V1Folder, error)
 	DeleteFolder(ctx context.Context, workspacePublicID, folderPublicID string) error
 	SaveAsset(ctx context.Context, workspacePublicID string, input domain.V1SaveAssetInput, publicID string) (*domain.V1Asset, bool, error)
-	// SaveManagedMediaAsset explicitly publishes readable Media into Workspace Library.
+	// SaveManagedMediaAsset publishes readable Media or a lineage-verified Task output.
+	// Both dedup by (workspace, media_asset_id), preserving existing Folder and metadata.
 	SaveManagedMediaAsset(ctx context.Context, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error)
-	// SaveTaskOutput accepts an automatic publication of a persisted Task output.
-	SaveTaskOutput(ctx context.Context, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error)
 	ListAssets(ctx context.Context, workspacePublicID string) ([]*domain.V1Asset, error)
 	GetAsset(ctx context.Context, workspacePublicID, assetPublicID string) (*domain.V1Asset, error)
 	MoveAsset(ctx context.Context, workspacePublicID, assetPublicID, folderPublicID string) (*domain.V1Asset, error)
@@ -44,8 +43,6 @@ type WorkspaceLibraryStore interface {
 // assets, ResolveAssets. Search only needs GetAsset (subset, covered).
 //
 // Excluded with reason:
-//   - SaveTaskOutput: production caller is the task auto-saver
-//     (tasking/application/runtime), retained on the in-memory double.
 //   - CreateMaterialization/GetMaterialization: NO production caller
 //     (production claims via ClaimMaterialization); deleted from the
 //     in-memory double, retained on postgres (big seam unchanged).

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BoardState } from '../../core/document/nodes'
 import { BOARD_STATE_SCHEMA_VERSION } from '../../core/document/nodes'
+import { InvalidBoardStateError } from '../../core/document/latestBoardState'
 import {
   createMockWorkspaceBoardApiRequest,
   createMockWorkspaceBoardApiState,
@@ -999,30 +1000,33 @@ describe('boardSync', () => {
     expect(payload.data?.payload).not.toHaveProperty('previewSnapshotVersion')
   })
 
-  it('hydrates server documents that still carry the retired preview cache', async () => {
+  it('fails hydrate closed when a server document still carries the retired preview cache', async () => {
     replaceBoards([{ id: 'board-1', name: 'Legacy Board', createdAt: 100, updatedAt: 1_000 }])
+    replaceBoardStateMap({ 'board-1': makeState(2_000, 'local-draft') })
     const legacyState = {
       ...makeState(1_000, 'legacy-content'),
       previewSnapshotDataUrl: 'data:image/webp;base64,preview',
       previewSnapshotUpdatedAt: 1_001,
       previewSnapshotVersion: 4,
-    }
+    } as unknown as BoardState
     addRemoteBoard({
       id: 'board-1',
       name: 'Legacy Board',
       createdAt: 100,
       updatedAt: 1_000,
-      state: legacyState as never,
+      state: legacyState,
     })
 
+    // Strict cutover: retired fields are never repaired. The hydrate fails
+    // closed with the validation error and the local draft stays untouched.
     const result = await hydrateBoardsFromServer({
       shouldPreserveLocalNewer: false,
       shouldIncludeDocuments: true,
     })
-
-    expect(result.isOk).toBe(true)
-    expect(getPromptText('board-1')).toBe('legacy-content')
-    expect(getBoardState('board-1')).not.toHaveProperty('previewSnapshotDataUrl')
+    expect(result.isOk).toBe(false)
+    if (result.isOk) return
+    expect(result.error).toBeInstanceOf(InvalidBoardStateError)
+    expect(getPromptText('board-1')).toBe('local-draft')
   })
 
   it('archives the board on the v1 delete path', async () => {

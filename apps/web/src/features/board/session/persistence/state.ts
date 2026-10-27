@@ -1,7 +1,6 @@
 import { InvalidBoardStateError } from '../../core/document/latestBoardState'
 import {
   BOARD_STATE_SCHEMA_VERSION,
-  stripLegacyBoardPreviewFields,
   type BoardSnapshot,
   type BoardState,
 } from '../../core/document/nodes'
@@ -26,10 +25,12 @@ function toValidBoardState(
   boundary: string,
   options: { throwOnInvalid?: boolean; boardId?: string } = {},
 ): BoardState | null {
-  // One-way cleanup: drafts persisted by old clients still carry the retired
-  // preview cache. Strip it before strict validation so content survives;
-  // the cache itself is never read back (see `stripLegacyBoardPreviewFields`).
-  const result = normalizeBoardState(stripLegacyBoardPreviewFields(item), {
+  // Strict cutover: unknown fields (including the retired preview cache)
+  // fail validation. Undecodable bytes are rejected and dropped: reads skip
+  // them, writes only emit validated content, and any leftover is discarded
+  // by the next write. Explicit deletion of valid entries goes through
+  // `deleteBoardState`.
+  const result = normalizeBoardState(item, {
     mode: 'result',
     boundary,
   })
@@ -70,7 +71,9 @@ function readRawStateMap(
   }
 }
 
-function tryWriteRawStateMap(stateMap: Record<string, BoardState>): boolean {
+function writeStateMap(stateMap: Record<string, BoardState>): boolean {
+  // Strict-only write: only validated content is emitted. Entries absent
+  // from the next map — including undecodable leftovers — are dropped.
   if (typeof window === 'undefined') return true
   const scopedKey = getScopedStorageKey()
   if (!scopedKey) return true
@@ -85,10 +88,6 @@ function tryWriteRawStateMap(stateMap: Record<string, BoardState>): boolean {
   }
 }
 
-function writeRawStateMap(stateMap: Record<string, BoardState>): boolean {
-  return tryWriteRawStateMap(stateMap)
-}
-
 export function replaceBoardStateMap(stateMap: Record<string, BoardState>) {
   const normalized: Record<string, BoardState> = {}
   Object.entries(stateMap).forEach(([boardId, state]) => {
@@ -96,7 +95,7 @@ export function replaceBoardStateMap(stateMap: Record<string, BoardState>) {
     if (!validState) return
     normalized[normalizeBoardId(boardId)] = validState
   })
-  writeRawStateMap(normalized)
+  writeStateMap(normalized)
 }
 
 function normalizeBoardId(boardId: string): string {
@@ -146,7 +145,7 @@ export function setBoardState(boardId: string, state: BoardSnapshot): BoardState
   // Gallery previews no longer ride the document: without the retired base64
   // cache, a quota failure has nothing left to shed, so it fails closed and
   // the caller surfaces the write error instead of persisting silently.
-  if (!writeRawStateMap(stateMap)) return null
+  if (!writeStateMap(stateMap)) return null
   return validState
 }
 
@@ -154,10 +153,9 @@ export function deleteBoardState(boardId: string): boolean {
   const id = normalizeBoardId(boardId)
   if (!id) return false
   const stateMap = readRawStateMap()
-  if (!stateMap[id]) return false
+  if (!(id in stateMap)) return false
   delete stateMap[id]
-  writeRawStateMap(stateMap)
-  return true
+  return writeStateMap(stateMap)
 }
 
 export function duplicateBoardState(sourceBoardId: string, targetBoardId: string): boolean {
@@ -177,6 +175,6 @@ export function duplicateBoardState(sourceBoardId: string, targetBoardId: string
   )
   if (!copiedState) return false
   stateMap[targetId] = copiedState
-  writeRawStateMap(stateMap)
+  writeStateMap(stateMap)
   return true
 }

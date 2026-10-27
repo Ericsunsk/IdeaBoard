@@ -94,9 +94,20 @@ vi.mock('./useCanvasLeaveGuard', () => ({
 }))
 
 vi.mock('./useFlowNodeDragInteractions', () => ({
-  useFlowNodeDragInteractions: () => ({
-    onNodeDragStart: () => mocks.dragEvents.push('drag:start'),
-    onNodeDragStop: () => mocks.dragEvents.push('drag:stop'),
+  useFlowNodeDragInteractions: (options?: {
+    onDragBegin?: () => void
+    onDragEnd?: () => void
+  }) => ({
+    onNodeDragStart: () => {
+      options?.onDragBegin?.()
+      mocks.dragEvents.push('drag:start')
+    },
+    onNodeDragStop: () => {
+      mocks.dragEvents.push('drag:stop')
+      options?.onDragEnd?.()
+    },
+    cancelActiveDrag: () => {},
+    isActive: () => false,
   }),
 }))
 

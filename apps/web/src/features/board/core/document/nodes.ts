@@ -216,23 +216,6 @@ export interface BoardState extends BoardSnapshot {
   updatedAt: number
 }
 
-const LEGACY_BOARD_PREVIEW_KEYS = [
-  'previewSnapshotDataUrl',
-  'previewSnapshotUpdatedAt',
-  'previewSnapshotVersion',
-] as const
-
-export function stripLegacyBoardPreviewFields(stateLike: unknown): unknown {
-  if (!stateLike || typeof stateLike !== 'object' || Array.isArray(stateLike)) return stateLike
-  const record = stateLike as Record<string, unknown>
-  if (!LEGACY_BOARD_PREVIEW_KEYS.some((key) => Object.prototype.hasOwnProperty.call(record, key))) {
-    return stateLike
-  }
-  const cleaned = { ...record }
-  for (const key of LEGACY_BOARD_PREVIEW_KEYS) delete cleaned[key]
-  return cleaned
-}
-
 export function createEmptyBoardSnapshot(): BoardSnapshot {
   return {
     schemaVersion: BOARD_STATE_SCHEMA_VERSION,

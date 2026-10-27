@@ -14,7 +14,6 @@ import type { CanvasCollaborationSession } from '../../../session/collaboration'
 import type { CanvasWorkspaceRuntime } from '../../../session/workspace'
 import { useCanvasNodeContextMenu } from '../useCanvasNodeContextMenu'
 import type { useFlowActiveNodePanels } from '../useFlowActiveNodePanels'
-import { useCanvasNodeLibrarySaveRouter } from './useCanvasNodeLibrarySaveRouter'
 import type { LibraryDropHit, LibrarySaveModule } from '../../../../library'
 
 type ActivePanels = ReturnType<typeof useFlowActiveNodePanels>
@@ -162,74 +161,46 @@ function useScreenNodeDragInteractions(
   const { commands, viewModel } = options.workspace
   const tools = viewModel.imageWorkflow.tools
   const isNodeDragLocked = () => tools.locks.isCanvasLocked.value || tools.retouch.isApplying.value
-  const librarySaveRouter = options.librarySave
-    ? useCanvasNodeLibrarySaveRouter({
-        nodes: viewModel.flowPane.nodes,
-        isNodeDragActive: commands.flowPane.nodeDragTransactions.isActive,
-        isNodeDragLocked,
-        isIslandAvailable: options.librarySave.isIslandOpen,
-        setIslandHover: options.librarySave.setIslandHover,
-        getSelectedFolderKey: options.librarySave.getSelectedFolderKey,
-        isFolderKnown: options.librarySave.isFolderKnown,
-        saveModule: options.librarySave.saveModule,
-        notifyError: options.librarySave.notifyError,
-      })
-    : null
   const dragInteractions = useFlowNodeDragInteractions({
-    beginNodeDragTransaction: (nodeIds) => {
-      commands.flowPane.nodeDragTransactions.begin(nodeIds)
-      if (commands.flowPane.nodeDragTransactions.isActive()) options.activity?.begin('nodeDrag')
+    beginNodeDragTransaction: commands.flowPane.nodeDragTransactions.begin,
+    commitNodeDragTransaction: commands.flowPane.nodeDragTransactions.commit,
+    finishNodeDragAsLibrarySave: commands.flowPane.nodeDragTransactions.finishAsLibrarySave,
+    cancelNodeDragTransaction: commands.flowPane.nodeDragTransactions.cancel,
+    onDragBegin: () => {
+      commands.viewportControls.onNodeDragStart()
+      options.activity?.begin('nodeDrag')
     },
-    commitNodeDragTransaction: () => {
-      try {
-        commands.flowPane.nodeDragTransactions.commit()
-      } finally {
-        options.activity?.end('nodeDrag')
-      }
-    },
-    finishNodeDragAsLibrarySave: () => {
-      try {
-        commands.flowPane.nodeDragTransactions.finishAsLibrarySave()
-      } finally {
-        options.activity?.end('nodeDrag')
-      }
+    onDragEnd: () => {
+      commands.viewportControls.onNodeDragStop()
+      options.activity?.end('nodeDrag')
     },
     isDuplicateModifierPressed: options.isDuplicateModifierPressed,
     beginFlowNodeDragDuplicateTracking: commands.graphEditing.beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking: commands.graphEditing.finishFlowNodeDragDuplicateTracking,
     dismissTransientCanvasUi,
     isNodeDragLocked,
+    librarySave: options.librarySave
+      ? {
+          nodes: viewModel.flowPane.nodes,
+          isIslandAvailable: options.librarySave.isIslandOpen,
+          setIslandHover: options.librarySave.setIslandHover,
+          getSelectedFolderKey: options.librarySave.getSelectedFolderKey,
+          isFolderKnown: options.librarySave.isFolderKnown,
+          saveModule: options.librarySave.saveModule,
+          notifyError: options.librarySave.notifyError,
+        }
+      : undefined,
   })
 
   function onNodeDragStart(payload: NodeDragEvent) {
-    commands.viewportControls.onNodeDragStart()
-    try {
-      dragInteractions.onNodeDragStart(payload.nodes.map((node) => node.id))
-      librarySaveRouter?.start(payload.nodes.map((node) => node.id))
-    } catch (error) {
-      commands.viewportControls.onNodeDragStop()
-      throw error
-    }
+    dragInteractions.onNodeDragStart(payload.nodes.map((node) => node.id))
   }
 
-  function onNodeDragStop() {
-    const saveDecision = librarySaveRouter?.evaluateStop()
-    try {
-      if (saveDecision?.kind === 'save') {
-        dragInteractions.onNodeDragStopAsLibrarySave(() => {
-          // Fire-and-forget: the position transaction already ended with no
-          // commit, and the save module owns retries plus notifications.
-          void librarySaveRouter?.finishSave(saveDecision)
-        })
-      } else {
-        dragInteractions.onNodeDragStop()
-      }
-    } finally {
-      commands.viewportControls.onNodeDragStop()
-    }
+  return {
+    onNodeDragStart,
+    onNodeDragStop: dragInteractions.onNodeDragStop,
+    cancelActiveNodeDrag: dragInteractions.cancelActiveDrag,
   }
-
-  return { onNodeDragStart, onNodeDragStop }
 }
 
 function createScreenBackgroundNavigation(
@@ -341,7 +312,7 @@ export function useCanvasScreenSurfaceInteractions(options: CanvasScreenSurfaceI
     isCanvasGroupInteractionEnabled,
   )
 
-  const { onNodeDragStart, onNodeDragStop } = useScreenNodeDragInteractions(
+  const { onNodeDragStart, onNodeDragStop, cancelActiveNodeDrag } = useScreenNodeDragInteractions(
     options,
     dismissTransientCanvasUi,
   )
@@ -415,6 +386,7 @@ export function useCanvasScreenSurfaceInteractions(options: CanvasScreenSurfaceI
     onFlowNodeClick,
     onDeleteInlineSelection,
     onNodeDragStop,
+    cancelActiveNodeDrag,
     onFlowMove,
     onNodesChange,
     handleNodeContextMenuCreate,

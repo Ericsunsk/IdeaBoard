@@ -65,20 +65,16 @@ func (s *workspaceTaskAutoSaver) SaveCompletedTask(ctx context.Context, task *wo
 
 // --- postgres library saver (from library_saver.go) ---
 
-// workspaceTaskLibrarySaver persists Task outputs through the managed-save
-// use case, keeping Task lineage separate from collection identity.
+// workspaceTaskLibrarySaver publishes Task outputs with verified lineage.
 type workspaceTaskLibrarySaver struct {
 	store TaskOutputStore
 }
 
 var _ TaskOutputLibrarySaver = (*workspaceTaskLibrarySaver)(nil)
 
-// TaskOutputStore is the narrow library seam for the task auto-saver:
-// only SaveTaskOutput. The postgres Service satisfies it via the full
-// WorkspaceLibraryStore; the in-memory double retains this method
-// (production caller: SaveTaskOutputAsset below).
+// TaskOutputStore is the Library publication seam consumed by the task auto-saver.
 type TaskOutputStore interface {
-	SaveTaskOutput(ctx context.Context, workspacePublicID string, input librarydomain.V1SaveManagedAssetInput, publicID string) (*librarydomain.V1Asset, bool, error)
+	SaveManagedMediaAsset(ctx context.Context, workspacePublicID string, input librarydomain.V1SaveManagedAssetInput, publicID string) (*librarydomain.V1Asset, bool, error)
 }
 
 func NewWorkspaceTaskLibrarySaver(store TaskOutputStore) TaskOutputLibrarySaver {
@@ -96,7 +92,7 @@ func (s *workspaceTaskLibrarySaver) SaveTaskOutputAsset(ctx context.Context, wor
 	if err != nil {
 		return nil, false, err
 	}
-	return s.store.SaveTaskOutput(ctx, workspacePublicID, librarydomain.V1SaveManagedAssetInput{
+	return s.store.SaveManagedMediaAsset(ctx, workspacePublicID, librarydomain.V1SaveManagedAssetInput{
 		MediaAssetID: input.MediaAssetID,
 		Lineage: &librarydomain.TaskLineage{
 			TaskID:      input.TaskID,

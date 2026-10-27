@@ -38,11 +38,7 @@ import {
   InvalidBoardStateError,
   type BoardStateValidationErrorContext,
 } from '../../core/document/latestBoardState'
-import {
-  createEmptyBoardState,
-  stripLegacyBoardPreviewFields,
-  type BoardState,
-} from '../../core/document/nodes'
+import { createEmptyBoardState, type BoardState } from '../../core/document/nodes'
 import { queryClient } from '../../../../core/query/queryClient'
 import { QueryObserver } from '@tanstack/vue-query'
 import { workspaceQueryKeys as defaultWorkspaceQueryKeys } from '../../../workspace'
@@ -150,10 +146,14 @@ function toLocalState(boardId: string, document: WorkspaceBoardDocument): BoardS
     schemaVersion: document.schemaVersion,
     updatedAt: document.updatedAt,
   }
-  const result = normalizeBoardState(stripLegacyBoardPreviewFields(payload), {
+  const result = normalizeBoardState(payload, {
     mode: 'result',
     boundary: 'server-hydration',
   })
+  // Strict cutover: server documents carrying retired fields (for example the
+  // old preview cache) fail validation and abort the hydrate with
+  // RemoteBoardStateError instead of being silently repaired; local drafts
+  // stay untouched on that path.
   if (result.isOk) return result.value
   console.warn('[boards] invalid remote board state rejected', boardId, result.error)
   throw new RemoteBoardStateError(boardId, result.error)

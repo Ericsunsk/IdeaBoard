@@ -101,25 +101,9 @@ func (s *Service) SaveAsset(ctx context.Context, workspacePublicID string, input
 	return nil, false, errors.New("library: asset public id mint collision, retry the request")
 }
 
-// SaveManagedMediaAsset atomically authorizes and publishes readable Media.
+// SaveManagedMediaAsset authorizes and publishes Media in one transaction.
+// Lineage selects automatic Task authorization; other saves require manual readability.
 func (s *Service) SaveManagedMediaAsset(ctx context.Context, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error) {
-	return s.acceptPublication(ctx, workspacePublicID, input, publicID, s.authorizeManual)
-}
-
-// SaveTaskOutput accepts one automatic publication from a completed Task.
-func (s *Service) SaveTaskOutput(ctx context.Context, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error) {
-	return s.acceptPublication(ctx, workspacePublicID, input, publicID, s.authorizeAutomatic)
-}
-
-func (s *Service) authorizeManual(ctx context.Context, tx pgx.Tx, workspaceID string, input domain.V1SaveManagedAssetInput) (bool, error) {
-	return true, s.publication.AuthorizeManual(ctx, tx, workspaceID, input)
-}
-
-func (s *Service) authorizeAutomatic(ctx context.Context, tx pgx.Tx, workspaceID string, input domain.V1SaveManagedAssetInput) (bool, error) {
-	return s.publication.AuthorizeAutomatic(ctx, tx, workspaceID, input)
-}
-
-func (s *Service) acceptPublication(ctx context.Context, workspaceID string, input domain.V1SaveManagedAssetInput, publicID string, authorize func(context.Context, pgx.Tx, string, domain.V1SaveManagedAssetInput) (bool, error)) (*domain.V1Asset, bool, error) {
 	if s.publication == nil {
 		return nil, false, ErrNotConfigured
 	}
@@ -127,11 +111,16 @@ func (s *Service) acceptPublication(ctx context.Context, workspaceID string, inp
 	var created bool
 	err := s.dbWithContext(ctx).withTxDBTX(func(q *dbsqlc.Queries, tx pgx.Tx) error {
 		ctx := dbutil.ContextWithAmbientTx(ctx, tx)
-		allowed, err := authorize(ctx, tx, workspaceID, input)
-		if err != nil || !allowed {
-			return err
+		if input.Lineage != nil {
+			allowed, authErr := s.publication.AuthorizeAutomatic(ctx, tx, workspacePublicID, input)
+			if authErr != nil || !allowed {
+				return authErr
+			}
+		} else if authErr := s.publication.AuthorizeManual(ctx, tx, workspacePublicID, input); authErr != nil {
+			return authErr
 		}
-		asset, created, err = s.saveManagedMediaAsset(ctx, q, workspaceID, input, publicID)
+		var err error
+		asset, created, err = s.saveManagedMediaAsset(ctx, q, workspacePublicID, input, publicID)
 		return err
 	})
 	return asset, created, err

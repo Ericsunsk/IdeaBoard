@@ -76,6 +76,36 @@ Enforcement 保持 Snapshot 顺序：
 - Full-layout bounds 不变；被省略节点的 media 计入 `omitted.media_refs`。
 - 包括固定字段在内的完整 JSON 必须满足 byte cap，否则不发布 Scene。
 
+## Scale budgets（#928 实测，2026-10-28）
+
+Image 节点（source + output media）链式连接的增长曲线（服务端实测，
+`gallery_scale_budget_test.go` 固定）：
+
+| 输入节点 | envelope bytes | scene bytes | scene 节点 | truncated |
+| -------: | -------------: | ----------: | ---------: | --------- |
+|       10 |          4,648 |       5,616 |         10 | false     |
+|      100 |         46,995 |      54,893 |        100 | false     |
+|      500 |        238,488 |      65,393 |        119 | true      |
+|    2,000 |        964,580 |      65,475 |        119 | true      |
+|    5,000 |      2,424,705 |      65,469 |        119 | true      |
+
+Byte cap（64 KiB）先于 count caps 对 media-rich board 生效，
+Scene 随文档规模收敛而非增长；同形大 Board 仅在全布局 bounds、
+content identity 与 omission 计数上变化（1 KiB 内）。
+
+Gallery 整屏开销由此线性封顶（`galleryScaleBudget.contract.spec.ts`
+与 `thumbnailMedia.unit.spec.ts` 固定）：
+
+- 列表中的 Scene JSON 总量 ≤ 卡片数 × 65,536 bytes（分页 100 卡 ≤ 6.25 MiB，
+  授权集合上限 500 卡）；典型卡（`mixed` fixture 约 2 KiB）远低于上限。
+- 单卡投影 ≤ 1 raster / image 节点（latest-output-wins，从不按 media 全量加载），
+  SVG 绘制元素随节点/连线线性增长；零尺寸卡无 raster、无 media 读取。
+- 可见性门控：卡片离屏（IntersectionObserver，200px 预载边距）、
+  tab 隐藏、resize 后不可见均不启动 media 读取，离屏中止在途工作；
+  重复素材按 `workspace:asset` 去重为一次 transport 读取，图片并发 ≤ 4。
+- 超限语义：`truncated: true` + `omitted` 计数显式标记省略；
+  bounds/extent 恒为截断前完整布局，换 theme 不重投影、不写文档。
+
 Extraction 不等待 media 下载，不授予 media 权限，也不改变 GC rules。
 Media readiness、binary decode 与恢复由 Gallery media loader 负责。
 

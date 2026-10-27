@@ -501,3 +501,122 @@ func TestV1LibraryAssetSaveMediaBranch(t *testing.T) {
 		t.Fatalf("unknown media = %d %v, want 404 library_asset_not_found", status, missing)
 	}
 }
+
+// TestV1LibraryMixedListTransportSeam pins the #930 regression through
+// the HTTP transport: an external row plus managed rows (known and
+// unknown dimensions) save and read back in one list with their
+// per-source wire shapes. Media rows carry the Media identity with no
+// provider/URL keys (never empty-string placeholders); unknown
+// dimensions read back as explicit null (never a 503); every row
+// carries an inline display rendition; refresh re-reads converge.
+func TestV1LibraryMixedListTransportSeam(t *testing.T) {
+	fx := newV1LibraryFixture(t, ContractV1LibraryDeps{})
+	knownW, knownH := int32(1600), int32(900)
+	fx.lib.RegisterManagedMediaForTests(fx.ws.PublicID, "asset_httpmedia0000001", &knownW, &knownH, false)
+	fx.lib.RegisterManagedMediaForTests(fx.ws.PublicID, "asset_httpmedia0000002", nil, nil, false)
+
+	save := func(key, body string) (int, map[string]any) {
+		status, _, payload := doV1(t, fx.engine, v1Call{method: http.MethodPost, path: fx.assetsPath(), userID: fx.owner, body: body,
+			headers: map[string]string{contract.IdempotencyKeyHeader: key}})
+		return status, payload
+	}
+	if status, payload := save("mix-ext-1", v1SaveAssetBody("mix-photo-1", "")); status != http.StatusCreated {
+		t.Fatalf("save external = %d %v, want 201", status, payload)
+	}
+	if status, payload := save("mix-known-1", `{"data":{"source":"media","media_asset_id":"asset_httpmedia0000001","title":"hero"}}`); status != http.StatusCreated {
+		t.Fatalf("save managed known = %d %v, want 201", status, payload)
+	}
+	if status, payload := save("mix-unknown-1", `{"data":{"source":"media","media_asset_id":"asset_httpmedia0000002"}}`); status != http.StatusCreated {
+		t.Fatalf("save managed unknown = %d %v, want 201 (unknown dims must not 503)", status, payload)
+	}
+
+	readList := func() []any {
+		t.Helper()
+		status, _, payload := doV1(t, fx.engine, v1Call{method: http.MethodGet, path: fx.assetsPath(), userID: fx.member})
+		if status != http.StatusOK {
+			t.Fatalf("list = %d %v, want 200", status, payload)
+		}
+		items, ok := v1Data(t, payload).([]any)
+		if !ok || len(items) != 3 {
+			t.Fatalf("list has %v items, want 3", v1Data(t, payload))
+		}
+		return items
+	}
+	assertMixedWireShapes(t, readList())
+	// Refresh re-read converges on the same per-source shapes.
+	assertMixedWireShapes(t, readList())
+}
+
+func assertMixedWireShapes(t *testing.T, items []any) {
+	t.Helper()
+	bySource := map[string]map[string]any{}
+	for _, item := range items {
+		row, ok := item.(map[string]any)
+		if !ok {
+			t.Fatalf("list item = %T, want object", item)
+		}
+		source, _ := row["source"].(string)
+		if source == "" {
+			t.Fatalf("list item lacks source discriminator: %v", row)
+		}
+		bySource[source] = row
+		if row["display"] == nil {
+			t.Fatalf("list item %v lacks inline display rendition", row["id"])
+		}
+	}
+	external, ok := bySource["external"]
+	if !ok {
+		t.Fatalf("mixed list lacks external row: %v", items)
+	}
+	for _, key := range []string{"provider", "source_id", "source_url", "preview_url", "original_url"} {
+		if value, _ := external[key].(string); value == "" {
+			t.Fatalf("external %q is empty, want real provider identity/metadata", key)
+		}
+	}
+	if _, present := external["media_asset_id"]; present {
+		t.Fatalf("external row carries media_asset_id: %v", external)
+	}
+	assertPositiveDims(t, "external", external)
+	// Both media rows share the shape; tell them apart by dimensions.
+	var knownRow, unknownRow map[string]any
+	for _, item := range items {
+		row := item.(map[string]any)
+		if row["source"] != "media" {
+			continue
+		}
+		if row["width"] == nil && row["height"] == nil {
+			unknownRow = row
+		} else {
+			knownRow = row
+		}
+	}
+	if knownRow == nil || unknownRow == nil {
+		t.Fatalf("mixed list lacks known + unknown media rows: %v", items)
+	}
+	for _, row := range []map[string]any{knownRow, unknownRow} {
+		for _, key := range []string{"provider", "source_id", "source_url", "preview_url", "original_url"} {
+			if _, present := row[key]; present {
+				t.Fatalf("media row carries %q, want no provider/URL keys: %v", key, row)
+			}
+		}
+		if link, _ := row["media_asset_id"].(string); link == "" {
+			t.Fatalf("media row lacks media_asset_id: %v", row)
+		}
+	}
+	assertPositiveDims(t, "media known", knownRow)
+	if width, present := unknownRow["width"]; !present || width != nil {
+		t.Fatalf("media unknown width = %v (present=%v), want explicit null", width, present)
+	}
+	if height, present := unknownRow["height"]; !present || height != nil {
+		t.Fatalf("media unknown height = %v (present=%v), want explicit null", height, present)
+	}
+}
+
+func assertPositiveDims(t *testing.T, what string, row map[string]any) {
+	t.Helper()
+	width, wok := row["width"].(float64)
+	height, hok := row["height"].(float64)
+	if !wok || !hok || width <= 0 || height <= 0 {
+		t.Fatalf("%s dims = %v x %v, want complete positive pair", what, row["width"], row["height"])
+	}
+}

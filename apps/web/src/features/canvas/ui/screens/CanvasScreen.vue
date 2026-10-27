@@ -126,6 +126,7 @@ import '../styles/canvas-surface-skin.css'
 import '../styles/canvas-vue-flow-adapter-skin.css'
 import '../styles/canvas-style-contracts.css'
 import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue'
+import { stringParam } from '../../../../core/router/queryParams'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { uploadApi } from '../../../../api/upload.ts'
 import { USER_BOARDS_PATH } from '../../../workspace/routePaths.ts'
@@ -528,6 +529,7 @@ const {
   onFlowNodeClick,
   onDeleteInlineSelection,
   onNodeDragStop,
+  cancelActiveNodeDrag,
   onFlowMove,
   onNodesChange,
   handleNodeContextMenuCreate,
@@ -564,6 +566,12 @@ const {
 const isCanvasShortcutSuppressed = computed(
   () => canvasLibrary.view.isFocusWithin.value || isNodePresentationShortcutSuppressed.value,
 )
+// Board or Workspace switches replace the graph mid-drag: abort the single
+// node-drag lifecycle so transaction, hover and telemetry resolve exactly once.
+const activeBoardId = computed(() => stringParam(route.query.boardId))
+watch([canvasWorkspaceId, activeBoardId], () => {
+  cancelActiveNodeDrag()
+})
 const onCanvasDrop = commands.graphEditing.onCanvasDrop
 const onExportSelectedImages = commands.graphEditing.onExportSelectedImages
 

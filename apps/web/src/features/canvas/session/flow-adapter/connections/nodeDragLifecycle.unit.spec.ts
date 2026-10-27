@@ -357,6 +357,28 @@ describe('createCanvasNodeDragLifecycle', () => {
     expect(harness.lifecycle.finishAsLibrarySave()).toBeNull()
   })
 
+  it('keeps commit and cancel safe no-ops after a library save terminal', () => {
+    const harness = createHarness()
+
+    harness.lifecycle.begin(['prompt-1'])
+    harness.lifecycle.handleChanges([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 440, y: 80 },
+        from: { x: 40, y: 40 },
+        dragging: true,
+      },
+    ])
+    expect(harness.lifecycle.finishAsLibrarySave()).toEqual(['prompt-1'])
+
+    expect(() => harness.lifecycle.commit()).not.toThrow()
+    expect(() => harness.lifecycle.cancel()).not.toThrow()
+    expect(harness.lifecycle.isActive()).toBe(false)
+    expect(harness.committedMembershipChanges).toEqual([])
+    expect(harness.store.getNode('prompt-1')).toMatchObject({ snapshot: { x: 40, y: 40 } })
+  })
+
   it('keeps cancel distinct from the save terminal (both discard, only save reports)', () => {
     const harness = createHarness()
 

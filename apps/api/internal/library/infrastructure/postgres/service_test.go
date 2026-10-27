@@ -1366,11 +1366,12 @@ func TestManagedPublicationRequiresPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := domain.V1SaveManagedAssetInput{MediaAssetID: "asset_untrusted", OperatorUserID: env.userID, Lineage: &domain.TaskLineage{TaskID: "task_untrusted", ResultIndex: 0}}
+	input := domain.V1SaveManagedAssetInput{MediaAssetID: "asset_untrusted", OperatorUserID: env.userID}
 	if _, _, err := svc.SaveManagedMediaAsset(t.Context(), env.wsA, input, id); !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("manual publication without policy: %v", err)
 	}
-	if _, _, err := svc.SaveTaskOutput(t.Context(), env.wsA, input, id); !errors.Is(err, ErrNotConfigured) {
+	input.Lineage = &domain.TaskLineage{TaskID: "task_untrusted", ResultIndex: 0}
+	if _, _, err := svc.SaveManagedMediaAsset(t.Context(), env.wsA, input, id); !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("automatic publication without policy: %v", err)
 	}
 }

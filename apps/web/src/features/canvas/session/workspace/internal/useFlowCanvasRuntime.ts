@@ -532,6 +532,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
         begin: nodeDragLifecycle.begin,
         commit: () => commitStagedNodeDrag(nodeDragLifecycle, renderNodes, renderEdgesRef),
         finishAsLibrarySave: nodeDragLifecycle.finishAsLibrarySave,
+        cancel: nodeDragLifecycle.cancel,
         isActive: nodeDragLifecycle.isActive,
       },
     },

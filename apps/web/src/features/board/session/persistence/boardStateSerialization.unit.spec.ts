@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeBoardState } from '../../testing'
-import {
-  BOARD_STATE_SCHEMA_VERSION,
-  stripLegacyBoardPreviewFields,
-} from '../../core/document/nodes'
+import { BOARD_STATE_SCHEMA_VERSION } from '../../core/document/nodes'
 import {
   deserializeRemoteBoardStateEnvelope,
   normalizeBoardState,
@@ -11,7 +8,7 @@ import {
 } from './boardStateSerialization'
 
 describe('boardStateSerialization', () => {
-  it('strips the retired preview cache while preserving document content', () => {
+  it('rejects the retired preview cache instead of repairing it', () => {
     const legacy = {
       ...makeBoardState({ updatedAt: 200 }),
       previewSnapshotDataUrl: 'data:image/webp;base64,preview',
@@ -19,17 +16,12 @@ describe('boardStateSerialization', () => {
       previewSnapshotVersion: 3,
     }
 
-    // The strict schema rejects the legacy envelope outright...
+    // Strict cutover: unknown fields fail validation in every mode. The
+    // retired cache is never read back and never stripped back into shape;
+    // undecodable local bytes are rejected here and dropped by storage
+    // writes, not resurrected.
     expect(normalizeBoardState(legacy)).toBeNull()
-
-    // ...so storage boundaries strip it first; content survives, the cache
-    // never reads back.
-    const cleaned = stripLegacyBoardPreviewFields(legacy)
-    expect(cleaned).not.toHaveProperty('previewSnapshotDataUrl')
-    expect(cleaned).not.toHaveProperty('previewSnapshotUpdatedAt')
-    expect(cleaned).not.toHaveProperty('previewSnapshotVersion')
-    const normalized = normalizeBoardState(cleaned)
-    expect(normalized?.updatedAt).toBe(200)
+    expect(normalizeBoardState(legacy, { mode: 'result', boundary: 'unit-test' }).isOk).toBe(false)
   })
 
   it('serializes a board session snapshot without local metadata', () => {

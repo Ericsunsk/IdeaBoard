@@ -57,6 +57,7 @@ func (s *InMemoryWorkspaceLibraryStore) SaveAsset(ctx context.Context, workspace
 }
 
 // SaveManagedMediaAsset publishes a test-registered readable Media row.
+// Repeated saves preserve the existing Folder and metadata.
 func (s *InMemoryWorkspaceLibraryStore) SaveManagedMediaAsset(ctx context.Context, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, false, err
@@ -104,14 +105,6 @@ func (s *InMemoryWorkspaceLibraryStore) SaveManagedMediaAsset(ctx context.Contex
 	s.assets[workspacePublicID][publicID] = asset
 	s.mediaIndex[v1LibraryManagedDedupKey(workspacePublicID, normalized.MediaAssetID)] = publicID
 	return copyV1Asset(asset), true, nil
-}
-
-// SaveTaskOutput publishes a test-registered output with explicit Task lineage.
-func (s *InMemoryWorkspaceLibraryStore) SaveTaskOutput(ctx context.Context, workspacePublicID string, input domain.V1SaveManagedAssetInput, publicID string) (*domain.V1Asset, bool, error) {
-	if input.Lineage == nil {
-		return nil, false, domain.ErrV1AssetNotFound
-	}
-	return s.SaveManagedMediaAsset(ctx, workspacePublicID, input, publicID)
 }
 
 // ListAssets returns every workspace asset in creation order; the
