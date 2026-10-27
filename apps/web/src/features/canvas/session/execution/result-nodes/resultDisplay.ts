@@ -3,10 +3,13 @@ import {
   normalizeTaskImageResults,
   type TaskImageResult,
 } from '../../../../../core/query/taskResult'
-import { getMediaAssetMetadata } from '../../../../../api/mediaAssetDelivery'
+import {
+  getWorkspaceMediaAssetMetadata,
+  resolveWorkspaceMediaAssetDerivativeURL,
+} from '../../../../../api/mediaAssetDelivery'
 import { i18n } from '../../../../../core/i18n'
 import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
-import { buildMediaBrowserURL, type MediaRef } from '../../../../../core/media/mediaRef'
+import type { MediaRef } from '../../../../../core/media/mediaRef'
 import { normalizeNaturalSize } from '../../../../../core/media/imageDimensions'
 import { sleep } from '../../../../../core/utils/polling'
 
@@ -15,7 +18,11 @@ type ImageSize = {
   height: number
 }
 
-export type ImageSizeLoader = (url: string) => Promise<ImageSize | null>
+export type ImageSizeLoader = (
+  url: string,
+  timeoutMs?: number,
+  signal?: AbortSignal,
+) => Promise<ImageSize | null>
 
 export type { ResolvedTaskImageResult }
 
@@ -30,14 +37,20 @@ const RECEIPT_DERIVATIVE_POLL_MS = 500
  * asset pipeline. Always resolves (never hangs): on timeout the display
  * layer's own delivery retry takes over.
  */
-async function awaitReceiptDerivativeReady(assetId: string): Promise<void> {
+async function awaitReceiptDerivativeReady(
+  workspaceId: string,
+  assetId: string,
+  signal?: AbortSignal,
+): Promise<void> {
   const startedAt = Date.now()
   while (Date.now() - startedAt < RECEIPT_DERIVATIVE_WAIT_MS) {
     try {
-      const metadata = await getMediaAssetMetadata(assetId)
+      signal?.throwIfAborted()
+      const metadata = await getWorkspaceMediaAssetMetadata(workspaceId, assetId, { signal })
       const status = metadata.derivatives.preview?.status ?? metadata.status
       if (status === 'ready' || status === 'failed') return
     } catch (error) {
+      signal?.throwIfAborted()
       console.warn('[canvas] failed to await receipt derivative readiness', {
         assetId,
         operation: 'awaitReceiptDerivativeReady',
@@ -45,7 +58,7 @@ async function awaitReceiptDerivativeReady(assetId: string): Promise<void> {
       })
       return
     }
-    await sleep(RECEIPT_DERIVATIVE_POLL_MS)
+    await sleep(RECEIPT_DERIVATIVE_POLL_MS, signal)
   }
 }
 
@@ -61,10 +74,11 @@ export async function resolveFirstTaskImageResultDisplay(
   results: TaskImageResult[],
   fallbackRatio: number,
   loadImageSize: ImageSizeLoader,
+  signal?: AbortSignal,
 ): Promise<ResolvedTaskImageResult> {
   const result = pickFirstValidImageResult(results)
   if (!result) throw new Error(noImageMessage())
-  const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSize)
+  const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSize, signal)
   if (!resolved) throw new Error(noImageMessage())
   return resolved
 }
@@ -74,11 +88,12 @@ export async function resolveTaskImageResultAtIndexDisplay(
   resultIndex: number,
   fallbackRatio: number,
   loadImageSize: ImageSizeLoader,
+  signal?: AbortSignal,
 ): Promise<ResolvedTaskImageResult> {
   const normalized = normalizeTaskImageResults(results)
   const result = normalized.find((candidate) => candidate.resultIndex === resultIndex)
   if (!result) throw new Error(i18n.global.t('canvas.execution.taskCompletedNoImageAtIndex'))
-  const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSize)
+  const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSize, signal)
   if (!resolved) throw new Error(i18n.global.t('canvas.execution.taskCompletedNoImageAtIndex'))
   return { ...resolved, resultIndex }
 }
@@ -87,29 +102,36 @@ export async function resolveTaskImageResultDisplay(
   result: TaskImageResult,
   fallbackRatio: number,
   loadImageSize: ImageSizeLoader,
+  signal?: AbortSignal,
 ): Promise<ResolvedTaskImageResult | null> {
+  signal?.throwIfAborted()
   const normalized = normalizeTaskImageResult(result)
   if (!normalized) return null
 
-  if (normalized.assetId) await awaitReceiptDerivativeReady(normalized.assetId)
+  const url = resolveWorkspaceMediaAssetDerivativeURL(
+    normalized.workspaceId,
+    normalized.assetId,
+    'preview',
+  )
+  await awaitReceiptDerivativeReady(normalized.workspaceId, normalized.assetId, signal)
 
   let size = normalizeNaturalSize(Number(normalized.width), Number(normalized.height))
   if (!size) {
     try {
-      size = await loadImageSize(normalized.url)
+      size = await loadImageSize(url, undefined, signal)
     } catch (error) {
+      signal?.throwIfAborted()
       console.warn('[canvas] failed to probe task image size', error)
     }
   }
 
+  signal?.throwIfAborted()
   const ratio = size ? size.height / size.width : fallbackRatio > 0 ? fallbackRatio : 1
-  const mediaRef: MediaRef | undefined = normalized.assetId
-    ? { assetId: normalized.assetId, derivativeTier: 'preview' }
-    : undefined
+  const mediaRef: MediaRef = { assetId: normalized.assetId, derivativeTier: 'preview' }
   return {
-    url: mediaRef ? buildMediaBrowserURL(mediaRef) : normalized.url,
+    url,
     ratio,
-    ...(mediaRef ? { mediaRef } : {}),
+    mediaRef,
     ...(size ? { width: size.width, height: size.height } : {}),
     ...(normalized.mimeType ? { mimeType: normalized.mimeType } : {}),
   }

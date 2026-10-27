@@ -75,7 +75,8 @@ export {
   buildInpaintReadinessRequest,
   buildOutpaintReadinessRequest,
 } from './commands/imageTaskRequests'
-export { waitExistingOrLiveTaskImageResults } from './task-runner/imageDirectActionExecutor'
+export { waitCanvasWorkspaceTaskImageOutcome } from './workspace/canvasTaskWaiting'
+export type { TaskImageOutcomeWaiter } from './task-runner/taskImageOutcome'
 export {
   CANVAS_WORKSPACE_REQUIRED_MESSAGE,
   cancelCanvasWorkspaceTask,

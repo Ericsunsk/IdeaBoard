@@ -18,19 +18,9 @@ import (
 )
 
 type stubWorkspaceRiverClient struct {
-	insertArgs   river.JobArgs
 	insertTxArgs river.JobArgs
 	insertTx     pgx.Tx
-	insertErr    error
 	insertTxErr  error
-}
-
-func (s *stubWorkspaceRiverClient) Insert(_ context.Context, args river.JobArgs, _ *river.InsertOpts) (*rivertype.JobInsertResult, error) {
-	s.insertArgs = args
-	if s.insertErr != nil {
-		return nil, s.insertErr
-	}
-	return &rivertype.JobInsertResult{}, nil
 }
 
 func (s *stubWorkspaceRiverClient) InsertTx(_ context.Context, tx pgx.Tx, args river.JobArgs, _ *river.InsertOpts) (*rivertype.JobInsertResult, error) {
@@ -40,29 +30,6 @@ func (s *stubWorkspaceRiverClient) InsertTx(_ context.Context, tx pgx.Tx, args r
 		return nil, s.insertTxErr
 	}
 	return &rivertype.JobInsertResult{}, nil
-}
-
-func TestWorkspaceTaskEnqueuerForwardsAmbientTx(t *testing.T) {
-	ctx := context.Background()
-	stub := &stubWorkspaceRiverClient{}
-	enqueuer := taskadapters.NewWorkspaceTaskEnqueuer(stub, "drawing_default", 25)
-	task := &workspacetasks.WorkspaceTask{
-		ID: "task_txforward1", WorkspaceID: "ws_txforward1",
-		Service: "render", ExecutionToken: "exec_txforward1",
-	}
-
-	if err := enqueuer.Enqueue(ctx, task); err != nil {
-		t.Fatalf("Enqueue: %v", err)
-	}
-	if stub.insertArgs == nil {
-		t.Fatal("Enqueue must call client.Insert")
-	}
-	if stub.insertTxArgs != nil {
-		t.Fatal("Enqueue must not touch InsertTx")
-	}
-	if _, ok := stub.insertArgs.(workspacetasks.WorkspaceTaskArgs); !ok {
-		t.Fatalf("enqueued args = %T, want workspacetasks.WorkspaceTaskArgs", stub.insertArgs)
-	}
 }
 
 func TestWorkspaceTaskEnqueueInTxJoinsRiverTx(t *testing.T) {
@@ -133,7 +100,5 @@ func TestWorkspaceTaskEnqueueInTxFailsClosedWithoutClient(t *testing.T) {
 	if err := enqueuer.EnqueueInTx(ctx, tx, task); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
 		t.Fatalf("clientless EnqueueInTx = %v, want quote unavailable", err)
 	}
-	if err := enqueuer.Enqueue(ctx, task); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
-		t.Fatalf("clientless Enqueue = %v, want quote unavailable", err)
-	}
+
 }

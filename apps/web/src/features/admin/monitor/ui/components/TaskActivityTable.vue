@@ -23,9 +23,11 @@
               class="size-4 shrink-0 text-muted-foreground"
             />
             <FastArrowRight v-else class="size-3.5 text-warning shrink-0" />
-            <span class="truncate text-foreground" :title="emptyPlaceholder(getTaskRowView(data).serviceSlug)">{{
-              emptyPlaceholder(getTaskRowView(data).serviceSlug)
-            }}</span>
+            <span
+              class="truncate text-foreground"
+              :title="emptyPlaceholder(getTaskRowView(data).serviceSlug)"
+              >{{ emptyPlaceholder(getTaskRowView(data).serviceSlug) }}</span
+            >
             <span
               v-if="getTaskServiceResolution(data)"
               class="shrink-0 rounded-control border border-border bg-muted px-1 font-mono text-admin-caption text-muted-foreground"
@@ -99,11 +101,11 @@
         </template>
         <template #body="{ data }">
           <AdminMono as="div" class="flex items-center gap-2 text-xs tabular-nums">
-            <!-- 竖直状态指示条（metric 语义 dot 色；未知状态回退中性 token，不用 raw 调色板） -->
+            <!-- 竖直状态指示条（状态 Pill 语义 dot 色，与 Status 列同源；未知状态回退中性 token，不用 raw 调色板） -->
             <span
               :class="[
                 'h-3.5 w-[3px] shrink-0 rounded-pill',
-                getTaskRowView(data).metric?.dotClass || 'bg-muted-foreground',
+                getTaskStatusDefinition(data.status).dotClass || 'bg-muted-foreground',
               ]"
             />
             <!-- 精确时间戳 2026-09-17 12:18:35 -->
@@ -207,6 +209,7 @@ import {
   getTaskRowView,
   getTaskServiceResolution,
 } from '../columns'
+import { getTaskStatusDefinition } from '../../core/status'
 import { formatTaskDuration } from '../../core/taskResultPresentation'
 import type { AdminTaskRow } from '../../session/useAdminTaskList'
 

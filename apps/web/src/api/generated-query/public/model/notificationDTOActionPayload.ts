@@ -12,6 +12,6 @@
  */
 
 /**
- * Contextual action payload. Invite family (workspace_invite, organization_invite and the inviter-side joined/declined notices) carries invite_id/invite_status/role/names keys; studio_handover carries transfer_invite_id (see notifications.PayloadKeyTransferInviteID for why it stays distinct from invite_id) plus workspace/from/billing keys; billing family keys are reserved.
+ * Contextual action payload. Invite family (workspace_invite, organization_invite and the inviter-side joined/declined notices) carries invite_id/invite_status/role/names keys; studio_handover carries transfer_invite_id (see notifications.PayloadKeyTransferInviteID for why it stays distinct from invite_id) plus workspace/from keys; billing family keys are reserved.
  */
 export type NotificationDTOActionPayload = { [key: string]: unknown }

@@ -31,37 +31,29 @@ type Route struct {
 
 // Resolve routes one provider/model target in full. pathOverride wins over
 // every default. customParamsJSON participates in the model-image chat
-// judgment (explicit type/protocol/modalities win); pipeline operations
-// (cutout/upscale) keep the legacy empty-params judgment for dialect
-// selection, and their paths stay provider-agnostic by design.
+// judgment (explicit type/protocol/modalities win). Pipeline operations
+// (cutout/upscale) reject custom params fail-closed: they never shaped or
+// decoded them, so silent acceptance would drop operator intent.
 func Resolve(operation workflow.RuntimeOperation, provider, model, pathOverride, customParamsJSON string) (Route, error) {
 	adapter, err := adapterForOperation(operation)
 	if err != nil {
 		return Route{}, err
 	}
 	switch adapter {
-	case providerdomain.ProviderRuntimeAdapterCutout:
+	case providerdomain.ProviderRuntimeAdapterCutout, providerdomain.ProviderRuntimeAdapterUpscale:
+		if trimmed := strings.TrimSpace(customParamsJSON); trimmed != "" && trimmed != "{}" {
+			return Route{}, fmt.Errorf("pipeline operation %q does not accept custom params", string(operation))
+		}
+		defaultPath := map[providerdomain.ProviderRuntimeAdapter]string{
+			providerdomain.ProviderRuntimeAdapterCutout:  "v1/images/cutout",
+			providerdomain.ProviderRuntimeAdapterUpscale: "v1/images/upscale",
+		}[adapter]
 		path := strings.Trim(strings.TrimSpace(pathOverride), "/")
 		source := workflow.GatewayPathSourceOverride
 		if path == "" {
-			path = "v1/images/cutout"
+			path = defaultPath
 			// Pipeline defaults bypass InferGatewayPathSource: no override
 			// rule produced them, and routing never branches on Source.
-			source = ""
-		}
-		return Route{
-			Adapter:   adapter,
-			Namespace: workflow.GatewayProviderPath(provider),
-			Path:      path,
-			Source:    source,
-			IsChat:    workflow.IsChatModel(provider, model, ""),
-			Dialect:   dialectFromJudgment(workflow.IsChatModel(provider, model, ""), provider),
-		}, nil
-	case providerdomain.ProviderRuntimeAdapterUpscale:
-		path := strings.Trim(strings.TrimSpace(pathOverride), "/")
-		source := workflow.GatewayPathSourceOverride
-		if path == "" {
-			path = "v1/images/upscale"
 			source = ""
 		}
 		return Route{

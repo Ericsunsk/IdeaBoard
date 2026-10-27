@@ -4908,8 +4908,13 @@ BEGIN
     END IF;
     RETURN NEW;
   END IF;
+  -- Terminal transitions converge held AND free origins (paid tasks
+  -- capture/release their hold; free tasks converge with zero amounts and
+  -- NULL transaction ids so the read model never forks on the initial
+  -- state). The amount correspondence below forces zeros for free
+  -- snapshots (total 0, unit 0), so no extra free-only guard is needed.
   IF NEW.task_id <> OLD.task_id
-     OR OLD.state <> 'held'
+     OR OLD.state NOT IN ('held', 'free')
      OR NEW.state NOT IN ('captured', 'released')
      OR NEW.actual_output_count < 0
      OR NEW.actual_output_count > snapshot_quantity

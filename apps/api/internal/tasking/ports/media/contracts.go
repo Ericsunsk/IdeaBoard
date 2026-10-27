@@ -34,7 +34,6 @@ type TaskInputManifestBuilder interface {
 
 type ResultMaterializer interface {
 	MaterializeRemoteResults(ctx context.Context, userID int64, taskID string, sourceURLs []string, opts ResultMaterializeOptions) (MaterializedResults, error)
-	MaterializeBytesResult(ctx context.Context, userID int64, taskID string, filename string, sourceURL string, data []byte, opts ResultMaterializeOptions) (MaterializedResults, error)
 }
 
 // GenerationMediaPreparer materializes external or temporary inputs before

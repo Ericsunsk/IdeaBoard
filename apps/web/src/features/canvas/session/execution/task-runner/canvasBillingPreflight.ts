@@ -22,14 +22,8 @@ export function insufficientCreditsPreflightError(): CanvasBillingPreflightError
 }
 
 function preflightErrorForCode(code: unknown): CanvasBillingPreflightError | null {
-  // Legacy user-plane codes (`insufficient_credits`, `pricing_unavailable`)
-  // plus workspace v1 codes (`task_insufficient_credits` 402,
-  // `billing_quote_unavailable` 503, `service_resolution_unavailable` 422).
-  // Both transports converge here so the feedback boundary keeps one copy
-  // per kind.
-  if (code === 'insufficient_credits' || code === 'task_insufficient_credits')
-    return insufficientCreditsPreflightError()
-  if (code === 'pricing_unavailable' || code === 'billing_quote_unavailable') {
+  if (code === 'task_insufficient_credits') return insufficientCreditsPreflightError()
+  if (code === 'billing_quote_unavailable') {
     return new CanvasBillingPreflightError(
       'pricing-unavailable',
       i18n.global.t('errorCodes.pricing_unavailable'),
@@ -37,7 +31,7 @@ function preflightErrorForCode(code: unknown): CanvasBillingPreflightError | nul
   }
   // Empty Service Model Pool at submit (HTTP 422): the backend guarantees
   // no task and no billing hold on this path, so the client maps it to a
-  // clear user toast and performs no retry (only `network` retries).
+  // clear user toast; this deterministic failure is not retryable.
   if (code === 'service_resolution_unavailable') {
     return new CanvasBillingPreflightError(
       'resolution-unavailable',
@@ -48,6 +42,7 @@ function preflightErrorForCode(code: unknown): CanvasBillingPreflightError | nul
 }
 
 export function mapCanvasBillingRequestError(error: unknown): Error {
+  if (error instanceof CanvasBillingPreflightError) return error
   const mapped = preflightErrorForCode((error as ApiClientError)?.code)
   if (mapped) return mapped
   const apiError = error as ApiClientError
@@ -67,4 +62,21 @@ export function isCanvasBillingPreflightError(
   kind?: CanvasBillingPreflightFailureKind,
 ): error is CanvasBillingPreflightError {
   return error instanceof CanvasBillingPreflightError && (kind === undefined || error.kind === kind)
+}
+
+/**
+ * 可重试判定 (#P1-4): 与 submit 共用重试预算（单次重试）。
+ * - `network`（传输未完成）与 `pricing-unavailable`（503
+ *   billing_quote_unavailable 瞬态）可重试；
+ * - `resolution-unavailable`（空 Service Model Pool，422 确定性无 hold）
+ *   与 `insufficient-credits` 不可重试；
+ * - 未映射的原始传输错误按 status 判定：503/429/422 瞬态可重试，其余
+ *   直接冒泡（调用方保留手动重提入口）。
+ */
+export function isRetryableCanvasTaskRequestError(error: unknown): boolean {
+  if (error instanceof CanvasBillingPreflightError) {
+    return error.kind === 'network' || error.kind === 'pricing-unavailable'
+  }
+  const status = (error as { status?: unknown } | null)?.status
+  return status === 503 || status === 429 || status === 422
 }

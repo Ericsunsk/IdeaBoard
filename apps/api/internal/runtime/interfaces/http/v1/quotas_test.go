@@ -415,7 +415,7 @@ func newQuotaTaskEngine(fx *v1TaskFixture, quotas *stubTaskQuotas) *gin.Engine {
 	v1 := router.Group(runtimehttp.ContractV1GroupPath)
 	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, ContractV1Deps{
 		Store: fx.store, Users: fx.dir,
-		Tasks: fx.txTasks, TaskLifecycle: fx.txTasks,
+		Tasks: fx.txTasks, TaskLifecycle: fx.txTasks, TaskSubmissionClaims: fx.txTasks,
 		TaskQuoter: fx.quoter, TaskHolder: fx.holder, TaskQueue: fx.queue, TaskAssets: fx.assets,
 		TaskRouter:               allowTestPoolResolver(),
 		TaskSnapshotSaver:        v1TxSnapshotSaver(fx.saved),

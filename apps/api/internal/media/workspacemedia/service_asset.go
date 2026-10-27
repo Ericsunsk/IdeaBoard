@@ -142,6 +142,40 @@ func (s *Service) ArchiveAsset(ctx context.Context, workspaceID, assetID string)
 	return assetFromRow(trimmedWorkspace, row), nil
 }
 
+// ArchiveUnreferencedAsset locks before checking links, so an in-flight output
+// association holding a media lock commits before the reference check runs.
+func (s *Service) ArchiveUnreferencedAsset(ctx context.Context, workspaceID, assetID string) (*Asset, error) {
+	if !contract.IsAssetID(strings.TrimSpace(assetID)) {
+		return nil, ErrNotFound
+	}
+	var archived *Asset
+	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
+		id, err := q.LockMediaAssetForCompensation(ctx, dbsqlc.LockMediaAssetForCompensationParams{
+			PublicID: strings.TrimSpace(assetID), WorkspacePublicID: strings.TrimSpace(workspaceID),
+		})
+		if database.IsNotFound(err) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		count, err := q.ArchiveUnreferencedMediaAsset(ctx, id)
+		if err != nil {
+			return err
+		}
+		if count != 1 {
+			return ErrStateConflict
+		}
+		row, err := getSessionRowAsset(ctx, q, workspaceID, assetID)
+		if err != nil {
+			return err
+		}
+		archived = assetFromRow(workspaceID, row)
+		return nil
+	})
+	return archived, err
+}
+
 func getSessionRowAsset(ctx context.Context, q *dbsqlc.Queries, workspacePublicID, assetID string) (dbsqlc.MediaAsset, error) {
 	row, err := q.GetMediaAssetByPublicID(ctx, dbsqlc.GetMediaAssetByPublicIDParams{
 		PublicID:          strings.TrimSpace(assetID),

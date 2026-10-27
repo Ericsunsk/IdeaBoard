@@ -78,7 +78,7 @@ export {
 } from './canvasTaskReadiness'
 export {
   extractWorkspaceTaskImageResults,
-  waitCanvasWorkspaceTaskImageResults,
+  waitCanvasWorkspaceTaskImageOutcome,
 } from './canvasTaskWaiting'
 
 export async function submitCanvasWorkspaceTask(

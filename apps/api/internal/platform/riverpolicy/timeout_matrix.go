@@ -26,7 +26,7 @@ func RiverTimeoutMatrix() []QueueTimeoutPolicy {
 			Queue:   RiverQueueDefault,
 			Timeout: RiverJobTimeoutDrawing,
 			Worker:  "TaskWorker (drawing_generate)",
-			Notes:   "owns the global budget (15min MaxTimeout + 2min overhead); pinned explicitly instead of inheriting the client default",
+			Notes:   "outer River job budget; provider sends share a separate 360s execution context, preserving settlement time",
 		},
 		{
 			Queue:   RiverQueueDefault,

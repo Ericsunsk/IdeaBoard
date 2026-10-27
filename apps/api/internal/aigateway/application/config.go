@@ -101,7 +101,8 @@ func (r *ConfigRepository) GetSummary(ctx context.Context) (GatewaySummary, erro
 		GatewayID:       gatewayID,
 		TokenConfigured: strings.TrimSpace(values[configKeyTokenCiphertext]) != "",
 	}
-	// 身份派生归后端：沿用包内网关 URL 正则，自定义网关恒为 false。
+	// Gateway identity derives from the stored Cloudflare URL: the sole
+	// egress is pinned, so a configured gateway is always first-party.
 	if accountID, gatewayID := extractGatewayIdentity(baseURL); accountID != "" && gatewayID != "" {
 		summary.IsFirstParty = true
 	}
@@ -179,6 +180,11 @@ func validateUpdateInput(input UpdateInput, actorID int64) (baseURL, accountID, 
 		if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 			return "", "", "", "", false, errors.New(errorrender.MsgValidateUpdateInput4)
 		}
+		// Sole egress: only the Cloudflare AI Gateway host is accepted.
+		// Any other host fails closed; there is no custom-egress path.
+		if !strings.EqualFold(strings.TrimSuffix(strings.TrimSpace(parsed.Hostname()), "."), "gateway.ai.cloudflare.com") {
+			return "", "", "", "", false, errors.New(errorrender.MsgValidateUpdateInput3)
+		}
 		parts := strings.Split(strings.TrimPrefix(parsed.Path, "/"), "/")
 		if len(parts) >= 3 && parts[0] == "v1" {
 			if accountID == "" && gatewayAccountIDPattern.MatchString(parts[1]) {
@@ -188,20 +194,14 @@ func validateUpdateInput(input UpdateInput, actorID int64) (baseURL, accountID, 
 				gatewayID = parts[2]
 			}
 		}
-		if gatewayID == "" {
-			// 自定义 egress 没有网关身份：只有符合网关 ID 形态的 hostname
-			// 才回填，避免带点主机名污染后续的身份匹配。
-			if gatewayIDPattern.MatchString(parsed.Hostname()) {
-				gatewayID = strings.ToLower(parsed.Hostname())
-			}
-		}
-	} else {
-		if !gatewayAccountIDPattern.MatchString(accountID) {
-			return "", "", "", "", false, errors.New(errorrender.MsgValidateUpdateInput)
-		}
-		if !gatewayIDPattern.MatchString(gatewayID) {
-			return "", "", "", "", false, errors.New(errorrender.MsgValidateUpdateInput2)
-		}
+	}
+	if !gatewayAccountIDPattern.MatchString(accountID) {
+		return "", "", "", "", false, errors.New(errorrender.MsgValidateUpdateInput)
+	}
+	if !gatewayIDPattern.MatchString(gatewayID) {
+		return "", "", "", "", false, errors.New(errorrender.MsgValidateUpdateInput2)
+	}
+	if baseURL == "" {
 		baseURL = gatewayBaseURL(accountID, gatewayID)
 	}
 
@@ -218,14 +218,15 @@ func validateUpdateInput(input UpdateInput, actorID int64) (baseURL, accountID, 
 // Update validates and persists gateway configuration atomically with its
 // admin audit record. Validation errors are safe to display.
 //
-// Merge rule: an empty base_url keeps the stored one (the Card form only
-// edits CF identity), so switching egress flavor requires an explicit
-// base_url through the dialog form. Token rotates only when provided.
+// Merge rule: an empty base_url plus empty identity keeps the stored URL
+// (token-only rotation). Explicit account/gateway IDs rebuild the
+// Cloudflare URL; switching hosts is rejected (sole egress). Token rotates
+// only when provided.
 func (r *ConfigRepository) Update(ctx context.Context, input UpdateInput, actorID int64) error {
 	if r == nil || r.settings == nil {
 		return errors.New("AI gateway config repository is unavailable")
 	}
-	if strings.TrimSpace(input.BaseURL) == "" {
+	if strings.TrimSpace(input.BaseURL) == "" && strings.TrimSpace(input.AccountID) == "" && strings.TrimSpace(input.GatewayID) == "" {
 		stored, err := r.GetSummary(ctx)
 		if err != nil {
 			return fmt.Errorf("load existing AI gateway config: %w", err)

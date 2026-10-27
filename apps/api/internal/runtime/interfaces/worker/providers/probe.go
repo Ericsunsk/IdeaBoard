@@ -49,14 +49,12 @@ func ProbeModel(
 	}
 	resp, err := client.Do(ctx, runtimeports.GatewayRequest{
 		Endpoint: runtimeports.GatewayEndpoint{
-			Kind:     runtimeports.GatewayEndpointProviderNative,
 			Provider: workflow.GatewayProviderPath(strings.TrimSpace(provider)),
 			Path:     path,
 		},
 		Model:       strings.TrimSpace(model),
 		Feature:     "probe",
 		Method:      "GET",
-		Cache:       runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip},
 		MaxAttempts: 1,
 		Timeout:     timeout,
 	})

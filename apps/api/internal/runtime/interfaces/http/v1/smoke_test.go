@@ -101,10 +101,10 @@ func newPhase4Fixture(t *testing.T) *phase4Fixture {
 		// with 503 while metadata keeps working. The production task worker
 		// has its own renderer; this HTTP fixture does not exercise it.
 		Tasks:         txTasks,
-		TaskLifecycle: txTasks,
-		TaskQuoter:    quoter,
-		TaskHolder:    holder,
-		TaskQueue:     queue,
+		TaskLifecycle: txTasks, TaskSubmissionClaims: txTasks,
+		TaskQuoter: quoter,
+		TaskHolder: holder,
+		TaskQueue:  queue,
 		// Production-shaped asset gate: the real adapter over the
 		// media store, so task input/output verification runs the
 		// same ready/archived/invisible mapping as production.

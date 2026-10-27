@@ -58,10 +58,6 @@ func (w *WorkspaceTaskWorker) loadDispatchableTask(ctx context.Context, args wor
 		slog.Info("workspace task already terminal; dropping dirty job", "task_id", taskID, "status", task.Status)
 		return nil, nil
 	}
-	if task.Status == workspacetasks.StatusCancelled {
-		slog.Info("workspace task cancelled; dropping job", "task_id", taskID)
-		return nil, nil
-	}
 	if token := strings.TrimSpace(args.ExecutionToken); token != "" && task.ExecutionToken != token {
 		slog.Info("workspace task job carries a stale execution token; dropping",
 			"task_id", taskID, "job_token", redactToken(token), "task_token", redactToken(task.ExecutionToken))
@@ -156,11 +152,10 @@ func (w *WorkspaceTaskWorker) claim(
 ) (*workspacetasks.WorkspaceTask, *workspaceSend, error) {
 	lease := strings.TrimSpace(args.ExecutionToken)
 	if lease == "" {
-		fresh, err := workspacetasks.NewExecutionToken()
-		if err != nil {
-			return nil, nil, fmt.Errorf("workspace task mint lease: %w", err)
-		}
-		lease = fresh
+		// Fail closed: Create/Retry always mint the lease, so an empty
+		// lease only arrives on a hand-made job. Minting silently here
+		// would execute a second send the submit path never fenced.
+		return nil, nil, fmt.Errorf("workspace task job carries no execution token: %w", errEmptyLease)
 	}
 	claimed, started, err := w.claims.ClaimTaskWithAttempt(ctx, task.WorkspaceID, task.ID, lease, workspacetasks.AttemptStart{
 		TaskID:         task.ID,
@@ -181,7 +176,7 @@ func (w *WorkspaceTaskWorker) claim(
 				}
 				return nil, nil, fmt.Errorf("workspace task reload after claim conflict: %w", getErr)
 			}
-			if current.IsTerminal() || current.Status == workspacetasks.StatusCancelled {
+			if current.IsTerminal() {
 				slog.Info("workspace task converged before claim; dropping", "task_id", task.ID, "status", current.Status)
 				return nil, nil, nil
 			}
@@ -212,6 +207,11 @@ func redactToken(token string) string {
 // pin). The hold is released and no retry budget burns, mirroring the
 // #847 interim behavior.
 var errWorkspaceRoutingSnapshotMissing = errors.New(errorrender.MsgSnapshotMissing)
+
+// errEmptyLease fails a hand-made job closed: Create/Retry always mint
+// the execution token, so an empty lease never arrives on a submit-fenced
+// job and must never mint silently.
+var errEmptyLease = errors.New("workspace task job carries no execution token")
 
 // errWorkspaceRoutingSnapshotCorrupt fails a task closed when the pinned
 // snapshot exists but no longer replays (tampered or malformed). Like a

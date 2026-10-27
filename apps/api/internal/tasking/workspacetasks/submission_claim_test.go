@@ -184,7 +184,7 @@ func TestSubmitReplaySurvivesLostProcessCache(t *testing.T) {
 	// brand-new Service over the same database. A cache-backed fix would
 	// miss here; the durable claim must not.
 	restarted := workspacetasks.NewService(workspacetasks.ServiceDeps{
-		TaskRead: env.store, TaskLifecycle: env.store, TaskBilling: env.store,
+		TaskRead: env.store, TaskLifecycle: env.store, SubmissionClaims: env.store, BillingAccounts: env.store, TaskBilling: env.store,
 		Quoter: env.serviceDeps.Quoter, Holder: env.holder, Queue: env.queue,
 		Resolver: allowTestPoolResolver(), SnapshotSaver: env.serviceDeps.SnapshotSaver, Acceptance: env.serviceDeps.Acceptance,
 	})

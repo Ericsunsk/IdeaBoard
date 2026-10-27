@@ -276,13 +276,10 @@ type WorkspaceTask struct {
 }
 
 // IsTerminal reports whether the task accepts no further transitions.
+// Single source: delegates to IsTerminalStatus so adding a state only
+// touches the status predicate below.
 func (t *WorkspaceTask) IsTerminal() bool {
-	switch t.Status {
-	case StatusCompleted, StatusFailed, StatusCancelled:
-		return true
-	default:
-		return false
-	}
+	return IsTerminalStatus(t.Status)
 }
 
 // TaskEvent is one staged status event. Events emit ONLY after commit
@@ -316,25 +313,7 @@ type QuoteParams struct {
 // the Billing catalog; tests stub this interface.
 type Quoter interface {
 	Quote(ctx context.Context, service, resolution string, quantity int64) (BillingSnapshot, error)
-}
-
-// Holder reserves Ideas via Credits Commands (never direct ledger
-// writes). Production adapts credits.Commands; tests stub it.
-//
-// billingAccountID is the funds identity (#916, resolved via the #915
-// stable resolution); actorUserID is the real operator recorded on the
-// Command. The two are never conflated: sharing a Workspace never spends
-// the operator's personal funds.
-type Holder interface {
-	Hold(ctx context.Context, billingAccountID, actorUserID int64, amount int64, idempotencyKey, taskID string) (string, error)
-	Capture(ctx context.Context, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) error
-	Release(ctx context.Context, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) error
-}
-
-// Enqueuer carries the River payload. Production adapts the River queue;
-// tests stub it (including forced failures for rollback proof).
-type Enqueuer interface {
-	Enqueue(ctx context.Context, task *WorkspaceTask) error
+	QuoteInTx(ctx context.Context, tx pgx.Tx, service, resolution string, quantity int64) (BillingSnapshot, error)
 }
 
 // AssetInfo is the minimal ready-gate projection over the #803 seam.

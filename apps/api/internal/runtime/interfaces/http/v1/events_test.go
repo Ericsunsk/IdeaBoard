@@ -163,7 +163,7 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 	v1 := router.Group(runtimehttp.ContractV1GroupPath)
 	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
-		Tasks: txTasks, TaskLifecycle: txTasks,
+		Tasks: txTasks, TaskLifecycle: txTasks, TaskSubmissionClaims: txTasks,
 		TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: taskAssets,
 		TaskRouter:          allowTestPoolResolver(),
 		TaskSnapshotSaver:   v1TxSnapshotSaver(saved),

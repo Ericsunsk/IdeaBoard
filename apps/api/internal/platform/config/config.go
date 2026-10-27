@@ -151,6 +151,10 @@ func (c PublicOriginsConfig) APIParsedURL() *url.URL {
 
 type WorkerConfig struct {
 	Concurrency int
+	// Gateway carries the AI Gateway resilience knobs. Secrets and
+	// gateway identity stay in Admin settings (no env); these knobs only
+	// tune the per-model guards (fail-closed defaults).
+	Gateway GatewayConfig
 }
 
 const (
@@ -165,6 +169,33 @@ func (c WorkerConfig) EffectiveConcurrency() int {
 	}
 	return c.Concurrency
 }
+
+// GatewayConfig carries the AI Gateway resilience knobs (env-only,
+// fail-closed defaults). The gateway token and gateway identity stay in
+// Admin settings; these knobs never carry secrets.
+type GatewayConfig struct {
+	// PerModelLimit caps concurrent in-flight gateway sends per model.
+	// Default conservative; range 1-64.
+	PerModelLimit int
+	// BreakerCooldownSeconds bounds how long an open per-model breaker
+	// rejects sends before a half-open probe. Default 30; range 5-300.
+	BreakerCooldownSeconds int
+	// BreakerFailureRatePercent is the windowed failure/slow-call rate
+	// (1-100) that opens the per-model breaker. Default 50.
+	BreakerFailureRatePercent int
+}
+
+const (
+	DefaultGatewayPerModelLimit             = 8
+	minGatewayPerModelLimit                 = 1
+	maxGatewayPerModelLimit                 = 64
+	DefaultGatewayBreakerCooldownSeconds    = 30
+	minGatewayBreakerCooldownSeconds        = 5
+	maxGatewayBreakerCooldownSeconds        = 300
+	DefaultGatewayBreakerFailureRatePercent = 50
+	minGatewayBreakerFailureRatePercent     = 1
+	maxGatewayBreakerFailureRatePercent     = 100
+)
 
 // ProcessMode selects the runtime role of the API process (ADR-0021). It is
 // deploy-level topology, not business policy: the same binary and database
@@ -294,6 +325,9 @@ type envConfig struct {
 	RealtimeTicketSecret      string `env:"RT_TICKET_SECRET"`
 	ImgproxyKeyHex            string `env:"IMGPROXY_KEY"`
 	ImgproxySaltHex           string `env:"IMGPROXY_SALT"`
+	GatewayPerModelLimit      string `env:"AI_GATEWAY_PER_MODEL_LIMIT"`
+	GatewayBreakerCooldown    string `env:"AI_GATEWAY_BREAKER_COOLDOWN_SECONDS"`
+	GatewayBreakerFailureRate string `env:"AI_GATEWAY_BREAKER_FAILURE_RATE"`
 
 	InitAdminEmail       string `env:"INIT_ADMIN_EMAIL"`
 	InitAdminPassword    string `env:"INIT_ADMIN_PASSWORD"`
@@ -373,6 +407,23 @@ func Load() *Config {
 		invalidEnv = append(invalidEnv, "RT_TICKET_SECRET")
 		slog.Warn("realtime ticket secret is not set; the realtime-ticket endpoint stays fail-closed with 500", "key", "RT_TICKET_SECRET")
 	}
+	// AI gateway resilience knobs (fail-closed defaults; invalid
+	// values fall back and are reported like every other typed knob).
+	perModelLimit, perModelValid := boundedIntEnv(raw.GatewayPerModelLimit, DefaultGatewayPerModelLimit, minGatewayPerModelLimit, maxGatewayPerModelLimit)
+	if !perModelValid {
+		invalidEnv = append(invalidEnv, "AI_GATEWAY_PER_MODEL_LIMIT")
+		slog.Warn("invalid integer env; fallback to default", "key", "AI_GATEWAY_PER_MODEL_LIMIT", "value", strings.TrimSpace(raw.GatewayPerModelLimit), "default", DefaultGatewayPerModelLimit)
+	}
+	breakerCooldown, breakerCooldownValid := boundedIntEnv(raw.GatewayBreakerCooldown, DefaultGatewayBreakerCooldownSeconds, minGatewayBreakerCooldownSeconds, maxGatewayBreakerCooldownSeconds)
+	if !breakerCooldownValid {
+		invalidEnv = append(invalidEnv, "AI_GATEWAY_BREAKER_COOLDOWN_SECONDS")
+		slog.Warn("invalid integer env; fallback to default", "key", "AI_GATEWAY_BREAKER_COOLDOWN_SECONDS", "value", strings.TrimSpace(raw.GatewayBreakerCooldown), "default", DefaultGatewayBreakerCooldownSeconds)
+	}
+	breakerFailureRate, breakerFailureRateValid := boundedIntEnv(raw.GatewayBreakerFailureRate, DefaultGatewayBreakerFailureRatePercent, minGatewayBreakerFailureRatePercent, maxGatewayBreakerFailureRatePercent)
+	if !breakerFailureRateValid {
+		invalidEnv = append(invalidEnv, "AI_GATEWAY_BREAKER_FAILURE_RATE")
+		slog.Warn("invalid integer env; fallback to default", "key", "AI_GATEWAY_BREAKER_FAILURE_RATE", "value", strings.TrimSpace(raw.GatewayBreakerFailureRate), "default", DefaultGatewayBreakerFailureRatePercent)
+	}
 
 	return &Config{
 		Database: DatabaseConfig{
@@ -400,7 +451,14 @@ func Load() *Config {
 			InternalAPIKey: strings.TrimSpace(raw.AuthServiceInternalAPIKey),
 			TimeoutSeconds: DefaultAuthServiceTimeoutSeconds,
 		},
-		Worker:   WorkerConfig{Concurrency: workerConcurrency},
+		Worker: WorkerConfig{
+			Concurrency: workerConcurrency,
+			Gateway: GatewayConfig{
+				PerModelLimit:             perModelLimit,
+				BreakerCooldownSeconds:    breakerCooldown,
+				BreakerFailureRatePercent: breakerFailureRate,
+			},
+		},
 		Credits:  CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
 		Rewards:  RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
 		Realtime: RealtimeConfig{TicketSecret: realtimeTicketSecret},

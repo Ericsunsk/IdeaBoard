@@ -45,6 +45,13 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
   const feedback = useCanvasFeedback(options.openRecharge)
   const taskLifecycle = createCanvasTaskLifecycle({
     cancel: (taskId) => cancelCanvasWorkspaceTask(taskId),
+    // 取消最终失败不断言静默 (#P1-3): toast 明确告知远端可能仍在跑
+    // （留档 taskId 随下次取消捎带重提，`retryPendingCancels` 可手动
+    // 重试；任务终态经重 attach/轮询对账，结果到达仍会上画布）。
+    onFinalFailure: ({ taskId, error }) => {
+      console.warn('[canvas] failed to cancel task', { taskId, error })
+      feedback.taskExecution.cancelExhausted()
+    },
   })
   const executionCore = createPendingImageExecutionCore()
   let hydratePendingImageLeases = (_snapshot?: BoardSnapshot) => 0

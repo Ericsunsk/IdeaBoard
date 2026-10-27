@@ -28,7 +28,7 @@ import {
   TASK_POLL_MAX_DELAY_MS,
 } from '../core/config/timing'
 import { subscribeWorkspaceEvent } from './workspaceEventStream'
-import { withSignal } from '../core/utils/request'
+import { runWithDeadline } from '../core/utils/request'
 
 const WORKSPACE_TASK_WAIT_TYPES = [
   'task.created',
@@ -44,6 +44,7 @@ const WORKSPACE_TASK_POLL_MAX_DELAY_MS = TASK_POLL_MAX_DELAY_MS
 const WORKSPACE_TASK_POLL_BACKOFF_FACTOR = TASK_POLL_BACKOFF_FACTOR
 
 export type WaitWorkspaceTaskOptions = {
+  deadlineAt?: number | undefined
   timeoutMs?: number | undefined
   pollInitialDelayMs?: number | undefined
   pollMaxDelayMs?: number | undefined
@@ -66,19 +67,29 @@ export function waitWorkspaceTaskTerminal(
   const workspace = assertWorkspaceTaskWorkspaceId(workspaceId)
   const task = assertWorkspaceTaskId(taskId)
   const timeoutMs = options?.timeoutMs ?? WORKSPACE_TASK_WAIT_TIMEOUT_MS
-  const deadlineAt = Date.now() + timeoutMs
+  const deadlineAt = options?.deadlineAt ?? Date.now() + timeoutMs
   const pollOptions = {
     initialDelayMs: options?.pollInitialDelayMs ?? WORKSPACE_TASK_POLL_INITIAL_DELAY_MS,
     maxDelayMs: options?.pollMaxDelayMs ?? WORKSPACE_TASK_POLL_MAX_DELAY_MS,
   }
-  const readOptions = {
-    ...(options?.requestId == null ? {} : { requestId: options.requestId }),
-    ...withSignal(options?.signal),
-  }
-  if (typeof EventSource === 'undefined') {
-    return pollWorkspaceTaskTerminal(workspace, task, deadlineAt, pollOptions, readOptions)
-  }
-  return waitWorkspaceTaskWithStream(workspace, task, deadlineAt, pollOptions, readOptions)
+  return runWithDeadline(deadlineAt, options?.signal, async (signal) => {
+    const readOptions = {
+      ...(options?.requestId == null ? {} : { requestId: options.requestId }),
+      signal,
+    }
+    // The initial GET, stream refreshes and polling share one deadline.
+    try {
+      const item = await getWorkspaceTask(workspace, task, readOptions)
+      if (isWorkspaceTaskTerminal(item.status)) return item
+    } catch (error) {
+      if (isWorkspaceTaskGoneError(error)) throw error
+      signal.throwIfAborted()
+    }
+    if (typeof EventSource === 'undefined') {
+      return pollWorkspaceTaskTerminal(workspace, task, deadlineAt, pollOptions, readOptions)
+    }
+    return waitWorkspaceTaskWithStream(workspace, task, deadlineAt, pollOptions, readOptions)
+  })
 }
 
 function waitWorkspaceTaskWithStream(
@@ -90,12 +101,10 @@ function waitWorkspaceTaskWithStream(
 ): Promise<WorkspaceTaskItem> {
   return new Promise((resolve, reject) => {
     let settled = false
-    let timeout = 0
     let refreshing = false
     let unsubscribe: () => void = () => undefined
 
     const cleanup = () => {
-      window.clearTimeout(timeout)
       readOptions.signal?.removeEventListener('abort', onAbort)
       unsubscribe()
     }
@@ -121,16 +130,9 @@ function waitWorkspaceTaskWithStream(
       )
     }
     const onAbort = () => {
-      settleReject(new Error('Workspace task wait aborted'))
+      settleReject(readOptions.signal?.reason ?? new Error('Workspace task wait aborted'))
     }
     readOptions.signal?.addEventListener('abort', onAbort, { once: true })
-
-    timeout = window.setTimeout(
-      () => {
-        settleReject(new Error('Workspace task wait timed out'))
-      },
-      Math.max(0, deadlineAt - Date.now()),
-    )
 
     const refreshTask = async () => {
       if (settled || refreshing) return
@@ -186,7 +188,7 @@ async function pollWorkspaceTaskTerminal(
     if (item && isWorkspaceTaskTerminal(item.status)) return item
     const remainingMs = deadlineAt - Date.now()
     if (remainingMs <= 0) break
-    await sleep(Math.min(nextDelay.next(), remainingMs))
+    await sleep(Math.min(nextDelay.next(), remainingMs), readOptions.signal ?? undefined)
   }
   throw new Error('Workspace task wait timed out')
 }

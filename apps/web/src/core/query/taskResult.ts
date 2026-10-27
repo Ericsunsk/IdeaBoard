@@ -1,33 +1,25 @@
-import { buildMediaBrowserURL } from '../media/mediaRef'
-
-export type TaskImageResult = {
-  url: string
-  assetId?: string
+type TaskAssetImageResult = {
+  workspaceId: string
+  assetId: string
+  url?: never
   width?: number
   height?: number
   mimeType?: string
   resultIndex?: number
 }
 
+// Remote refs remain transport facts; Canvas materializes managed assets only.
+export type TaskImageResult =
+  TaskAssetImageResult | { url: string; workspaceId?: never; assetId?: never; resultIndex?: number }
+
 type TaskImageResultInput = {
+  workspaceId?: unknown
+  assetId?: unknown
+  url?: unknown
   width?: unknown
   height?: unknown
   mimeType?: unknown
-  assetId?: unknown
-  asset_id?: unknown
-  result_index?: unknown
   resultIndex?: unknown
-}
-
-export type TaskResultPayloadLike = {
-  outputs?: Array<{
-    role?: string
-    width?: unknown
-    height?: unknown
-    mime_type?: unknown
-    asset_id?: unknown
-    result_index?: unknown
-  }>
 }
 
 function toPositiveNumber(value: unknown): number | undefined {
@@ -35,60 +27,29 @@ function toPositiveNumber(value: unknown): number | undefined {
   return Number.isFinite(num) && num > 0 ? num : undefined
 }
 
-function resolveResultDimensions(result: TaskImageResultInput): {
-  width?: number
-  height?: number
-} {
-  const width = toPositiveNumber(result?.width)
-  const height = toPositiveNumber(result?.height)
+/** Normalize asset facts without reading Workspace selection or deriving URLs. */
+export function normalizeTaskImageResult(
+  result: TaskImageResultInput,
+): TaskAssetImageResult | null {
+  const workspaceId = typeof result.workspaceId === 'string' ? result.workspaceId.trim() : ''
+  const assetId = typeof result.assetId === 'string' ? result.assetId.trim() : ''
+  if (!workspaceId || !assetId) return null
+  const width = toPositiveNumber(result.width)
+  const height = toPositiveNumber(result.height)
+  const mimeType = typeof result.mimeType === 'string' ? result.mimeType.trim() : ''
+  const resultIndex = Number(result.resultIndex)
   return {
+    workspaceId,
+    assetId,
     ...(width ? { width } : {}),
     ...(height ? { height } : {}),
-  }
-}
-
-function resolveResultIndexValue(result: TaskImageResultInput): number | undefined {
-  const resultIndex = Number(result?.result_index ?? result?.resultIndex)
-  return Number.isInteger(resultIndex) && resultIndex >= 0 ? resultIndex : undefined
-}
-
-export function normalizeTaskImageResult(result: TaskImageResultInput): TaskImageResult | null {
-  const assetId = `${result?.assetId ?? result?.asset_id ?? ''}`.trim()
-  if (!assetId) return null
-  const url = buildMediaBrowserURL({ assetId, derivativeTier: 'preview' })
-  const mimeType = `${result?.mimeType ?? ''}`.trim()
-  const resultIndex = resolveResultIndexValue(result)
-  return {
-    url,
-    assetId,
-    ...resolveResultDimensions(result),
     ...(mimeType ? { mimeType } : {}),
-    ...(resultIndex === undefined ? {} : { resultIndex }),
+    ...(Number.isInteger(resultIndex) && resultIndex >= 0 ? { resultIndex } : {}),
   }
 }
 
-export function normalizeTaskImageResults(results: TaskImageResultInput[]): TaskImageResult[] {
+export function normalizeTaskImageResults(results: TaskImageResultInput[]): TaskAssetImageResult[] {
   return results
     .map(normalizeTaskImageResult)
-    .filter((result): result is TaskImageResult => result !== null)
-}
-
-export function extractImageResultsFromTaskPayload(task: TaskResultPayloadLike): TaskImageResult[] {
-  const outputResults = Array.isArray(task.outputs)
-    ? task.outputs
-        .filter((output) => output?.role === 'image')
-        .map((output) =>
-          normalizeTaskImageResult({
-            width: output.width,
-            height: output.height,
-            mimeType: output.mime_type,
-            asset_id: output.asset_id,
-            result_index: output.result_index,
-          }),
-        )
-        .filter((result): result is TaskImageResult => result !== null)
-    : []
-  if (outputResults.length > 0) return outputResults
-  // Raw provider result JSON is intentionally not a browser Media contract.
-  return []
+    .filter((result): result is TaskAssetImageResult => result !== null)
 }

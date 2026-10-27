@@ -5,7 +5,7 @@
 </p>
 
 > [!NOTE]
-> 本手册覆盖 [backend-hardening] 01（RED 最小指标集）。指标由 Prometheus `/metrics` 端点暴露（本地宿主监听 `127.0.0.1:9091`；production 容器监听 `0.0.0.0:9091`，经 Compose 映射至宿主 `127.0.0.1:9091`），label 保持封闭集合：`route` 为 Gin 路由模板（未匹配记 `unmatched`）、`status` 为数字状态码、`feature` 为 workflow feature slug、`queue` 为 River 队列名。不记录 user ID、task ID、URL 或错误文本。
+> 本手册覆盖 [backend-hardening] 01（RED 最小指标集）。指标由 Prometheus `/metrics` 端点暴露（本地宿主监听 `127.0.0.1:9091`；production 容器监听 `0.0.0.0:9091`，经 Compose 映射至宿主 `127.0.0.1:9091`），label 保持封闭集合：`route` 为 Gin 路由模板（未匹配记 `unmatched`）、`status` 为数字状态码、`service` 为 workflow feature slug、`queue` 为 River 队列名。不记录 user ID、task ID、URL 或错误文本。
 
 ## 指标清单
 
@@ -13,8 +13,10 @@
 |------|------|--------|------|
 | `ideaboard_http_requests_total` | Counter | `method, route, status` | HTTP 请求计数，按路由与状态码打标 |
 | `ideaboard_http_request_duration_seconds` | Histogram | `method, route, status` | HTTP 请求延迟分布 |
-| `ideaboard_gateway_requests_total` | Counter | `feature, outcome` | 网关调用计数，`outcome=success/error` |
-| `ideaboard_gateway_retries_total` | Counter | `feature` | 网关内部重试耗尽后的 worker 层整任务重投计数 |
+| `ideaboard_gateway_requests_total` | Counter | `service, outcome` | 网关调用计数，`outcome=success/error` |
+| `ideaboard_gateway_retries_total` | Counter | `service` | transient 网关失败后的 worker 层整任务重投计数 |
+| `ideaboard_gateway_per_model_limited_total` | Counter | `model, reason` | 网关出口前 per-model 拦截计数，`reason=concurrency_limited/breaker_open`（限流/熔断，均以 429 重试语义重投） |
+| `ideaboard_gateway_breaker_open` | Gauge | `model` | per-model 熔断器状态（1=open，0=closed）；阈值走 `AI_GATEWAY_*` 配置 |
 | `ideaboard_model_fallback_total` | Counter | `service, outcome` | 有界模型兜底发送计数（快照 retry candidate，单任务至多一次），`outcome=success/error` 为兜底发送结果 |
 | `ideaboard_river_queue_depth` | Gauge | `queue` | 等待执行的 River job 数（available/scheduled/retryable），15s 刷新 |
 | `ideaboard_river_queue_lag_seconds` | Gauge | `queue` | 最老等待 job 的年龄（秒），15s 刷新 |
@@ -43,14 +45,14 @@ ideaboard_river_queue_lag_seconds{queue="drawing_default"}
 ideaboard_river_queue_depth{queue=~"credit_reconciliation|payment_.*|vision_billing|media_reclamation|task_settlement_sweep"}
 
 # 4. 网关失败与 worker 重投速率
-sum by (feature) (rate(ideaboard_gateway_requests_total{outcome="error"}[5m]))
-sum by (feature) (rate(ideaboard_gateway_retries_total[5m]))
+sum by (service) (rate(ideaboard_gateway_requests_total{outcome="error"}[5m]))
+sum by (service) (rate(ideaboard_gateway_retries_total[5m]))
 
 # 4b. 模型兜底发送速率与结果（单任务至多一次；error 涨而 gateway error
 # 不涨时，检查兜底候选池是否系统性不可用）
 sum by (service, outcome) (rate(ideaboard_model_fallback_total[5m]))
 
-# 5. 网关 client 侧重试原因（与 #4 交叉验证）
+# 5. 本地 Gateway transport 应为 single-shot；非零值表示重试策略偏离
 sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 ```
 
@@ -79,21 +81,21 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 
 ### D. `ideaboard_gateway_requests_total{outcome="error"}` 上升
 
-1. 按 `feature` 定位受影响能力；用 `outbound_retries_total{target="ai-gateway"}` 的 `reason` 区分 429/5xx/超时/传输失败。
-2. 429 集中：上游限流——检查对应 provider/model 映射的调用量，考虑降 concurrency；用户侧表现为可重试失败。
+1. 按 `service` 定位受影响能力；用 worker 日志中的 HTTP status／错误分类区分 429、5xx、超时和传输失败。本地 Gateway transport 不重发，不能用 `outbound_retries_total` 的 `reason` 统计这些失败。
+2. 429 集中：先检查 `ideaboard_gateway_per_model_limited_total`，区分本地并发／熔断拦截和上游限流；结合对应 provider/model 映射的调用量决定是否调整 concurrency。
 3. 5xx/超时集中：上游故障——查看网关 CacheStatus 与 LogID（receipt 头），必要时切换模型映射（价格不受模型影响，见 ADR-0010）。
-4. 4xx 集中：配置或输入问题——检查 AI Gateway 凭据、模型映射、`feature` 参数校验；4xx 不重试，直接终态。
+4. 其余确定性 4xx 集中：配置或输入问题——检查 AI Gateway 凭据、模型映射、workflow 参数校验；确定性失败不重投。
 
 ### E. `ideaboard_gateway_retries_total` 上升
 
-1. 该计数 = 网关内部 5 次重试耗尽后、transient 失败的 worker 层重投（上限 2 次，以 `tasks.retry_count` 为界）。
+1. 该计数 = transient 网关失败后的 worker 层重投（上限 2 次，以 `tasks.retry_count` 为界），不表示已观测到 Cloudflare 内部重试次数。
 2. 偶发少量：正常韧性行为，无需处理。
 3. 持续上升：同 D（上游持续 transient），且注意重投会放大调用量——与 D 联动判断是否需要降级或切换模型。
 4. 若 retries 涨但 gateway error 不涨：检查 worker 是否存在非网关触发的重投路径回归（当前仅 provider 失败路径计数）。
 
 ## River 重试矩阵（[backend-hardening] 08）
 
-重试/超时 policy 由 Worker 代码持有（`internal/platform/riverpolicy.RiverRetryMatrix` 为事实源，insert 点引用同包常量）。attempt 间隔为 River 默认指数 backoff + jitter；网关内部 sends 默认 3 次（hard 上限 5，backoff 500ms→5s，仅 408/429/5xx 重试），Cloudflare 侧 `MaxFailCount=5`，worker 层 transient 整任务重投最多 2 次（`tasks.retry_count` 为界）。
+重试/超时 policy 由 Worker 代码持有（`internal/platform/riverpolicy.RiverRetryMatrix` 为事实源，insert 点引用同包常量）。attempt 间隔为 River 默认指数 backoff + jitter；本地 Gateway transport 每次调用只发送一次，不对结果不明的请求重发。Provider 重试由 Cloudflare policy 管理（`MaxFailCount=5`，probe 显式 `MaxAttempts=1`）；worker 层 transient 整任务重投最多 2 次（`tasks.retry_count` 为界）。
 
 | Queue | MaxAttempts | 排障含义 |
 |-------|-------------|----------|
@@ -106,15 +108,15 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 | `webhook_deliver` | 8 | 单 delivery 8 次耗尽即进 River `discarded`（即 durable DLQ），`discarded` 行即投递终态；attempt 间隔为 30s 起 doubling + jitter（1h cap） |
 | `task_settlement_sweep` | 5 | 「最终 timeout」收敛 sweep：把 24h 无 worker 触碰、仍持 Credit Hold 的 running/pending 任务收敛为 failed 并 Release。job 失败只可能是 sweep 级故障（DB 不可用/wiring 缺失）；单任务 Release 失败会打 `stalled task settlement convergence failed` 并被隔离，不消耗 job 的 attempt 预算 |
 
-`ideaboard_gateway_retries_total` 只统计 `drawing_default` 的 worker 层重投（网关 5 次内部重试耗尽后的整任务重投），维护队列不计入该指标。
+`ideaboard_gateway_retries_total` 只统计 `drawing_default` 的 worker 层重投，维护队列不计入该指标；Cloudflare 内部 attempts 不由本地 outbound retry 指标观测。
 
 ## River 超时矩阵（#783）
 
-超时 policy 由 Worker 代码持有（`internal/platform/riverpolicy.RiverTimeoutMatrix` 为事实源，每个 worker 的 `Timeout()` 引用同包常量）。未显式声明 `Timeout()` 的 worker 会继承 client 级 `JobTimeout`（即 drawing 17min 全局预算）——当前无此情况：所有生产 worker 全部显式 pin，下表即名单证明。client 级 `JobTimeout` 仅作为未注册/test worker 的 fallback。
+超时 policy 由 Worker 代码持有（`internal/platform/riverpolicy.RiverTimeoutMatrix` 为事实源，每个 worker 的 `Timeout()` 引用同包常量）。Drawing Worker 的 River `Timeout()` 固定为 17min；`Work` 内通过 `WorkspaceExecutionBudget()` 单独限制 provider execution 为 360s，Complete／Fail／Retry 继续使用外层 context。River 的 worker `Timeout()` 会覆盖 client `JobTimeout`，两者不会叠加。
 
 | Queue | Worker | Timeout | 排障含义 |
 |-------|--------|---------|----------|
-| `drawing_default` | TaskWorker | 17min | 拥有全局预算（15min MaxTimeout + 2min 开销）；执行超时先看网关 P95 与 C 节 |
+| `drawing_default` | TaskWorker | 17min | 内部 provider execution 单独限制为 360s（含主模型和 fallback），网关单次请求为 300s；执行超时先看网关 P95 与 C 节 |
 | `drawing_default` | FinalFailureWorker | 1min | settlement-only，无 provider 调用；超时看终态收敛 DB 写入 |
 | `credit_reconciliation` | CreditReconciliationWorker | 4min | 单次对账 Run；超时看 credits 对账链路 |
 | `credit_reconciliation` | CreditReconciliationScheduleWorker | 1min | 单次 schedule 写；超时基本可判为 DB 故障 |
@@ -137,7 +139,7 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 | 路由 P95 | 提交路由 `> 2s` 持续 10m |
 | River depth | `> 100` 持续 5m |
 | River lag | `> 300s` 持续 5m |
-| 网关 error率 | 按 feature `> 5%` 持续 5m |
+| 网关 error率 | 按 service `> 5%` 持续 5m |
 | 网关 retries | 突增（环比 3 倍）持续 10m |
 
 ## 相关文档

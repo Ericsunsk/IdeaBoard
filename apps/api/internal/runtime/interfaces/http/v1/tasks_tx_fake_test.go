@@ -3,8 +3,8 @@ package v1
 // In-memory single-transaction settlement harness for the v1 HTTP fixtures.
 //
 // It mirrors workspacetasks/settle_tx_fake_test.go: every seam the
-// transactional settlement requires is present, so settlementSeams()
-// reports handled=true and no compensating fallback can fire:
+// transactional settlement requires is declared explicitly; every write
+// joins the same transaction:
 //
 //   - v1TxTaskStore wraps the task InMemoryStore with the
 //     settlement-transaction seams. Task rows are written immediately

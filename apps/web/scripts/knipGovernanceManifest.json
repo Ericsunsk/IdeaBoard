@@ -16723,11 +16723,11 @@
       "exports": ["NotFoundResponse"]
     },
     "src/api/generated-query/public/model/notificationDTO.ts": {
-      "sha256": "dd56d9f49744306880fd598464146cf9fc7be9d9137fc3c9fc9c3e0b4e8a38f4",
+      "sha256": "72453d41aeb95e09aa7b459fb56dc72b6f7aecf640d61e987199ea6a260dc481",
       "exports": ["NotificationDTO"]
     },
     "src/api/generated-query/public/model/notificationDTOActionPayload.ts": {
-      "sha256": "60780f1efc65b00188704cee6f37c0cf8a4a907dc2f4e2da452e2d3e2c66168a",
+      "sha256": "930bd3078ba9d319358d763f345c97e89f73e9a6e868ffbe8b704b67f1ba0a7d",
       "exports": ["NotificationDTOActionPayload"]
     },
     "src/api/generated-query/public/model/notificationDTOStatus.ts": {

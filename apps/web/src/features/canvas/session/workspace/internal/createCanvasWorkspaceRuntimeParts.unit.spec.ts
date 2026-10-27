@@ -48,6 +48,7 @@ const mocks = vi.hoisted(() => ({
       succeeded: vi.fn(),
       warning: vi.fn(),
       insufficientCredits: vi.fn(),
+      cancelExhausted: vi.fn(),
     },
     imageTools: {
       succeeded: vi.fn(),
@@ -548,7 +549,14 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     )
     expect(mocks.createCanvasTaskLifecycle).toHaveBeenCalledWith({
       cancel: expect.any(Function),
+      onFinalFailure: expect.any(Function),
     })
+    // 取消最终失败不断言静默 (#P1-3): toast 明确告知远端可能仍在跑
+    mocks.createCanvasTaskLifecycle.mock.calls[0]?.[0].onFinalFailure?.({
+      taskId: 'task-1',
+      error: new Error('down'),
+    })
+    expect(mocks.feedback.taskExecution.cancelExhausted).toHaveBeenCalledOnce()
     expect(mocks.useCanvasViewportRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         getUserUid: expect.any(Function),

@@ -4,12 +4,11 @@ import type { CanvasGraphStore } from '../../../core/graph'
 import type { CanvasRendererMetricsPort } from '../../../session/flow-adapter'
 import type { BoardSnapshot } from '../../../../board/ports/canvas'
 import {
-  buildImageActionReadinessRequest,
   buildImageExecutionTaskRequest,
   buildPreparedImageInpaintTaskRequest,
 } from '../commands/imageTaskRequests'
 import { prepareInpaintMaskAsset } from '../media/inpaintMask'
-import { loadImageSizeFromUrl } from '../media/imageSize'
+import { readImageNaturalSize } from '../../../../../core/media/imageDimensions'
 import { requireCanvasWorkspaceId } from '../workspace/canvasWorkspaceTaskAdapter'
 import {
   prepareFusionExecutionPlan,
@@ -21,7 +20,7 @@ import {
   type GenerationExecutionPlan,
 } from '../planning/imageExecutionPlan'
 import type { BoardAttachment } from '../board-attachment'
-import type { TaskImageResult } from '../../../../../core/query/taskResult'
+import type { TaskImageOutcomeWaiter } from '../task-runner/taskImageOutcome'
 import { type CanvasExecutionWorkspace } from '../workspace/useCanvasExecutionWorkspace'
 import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRunner'
 import { assemblePendingImageWorkflow } from './pendingWorkflowAssembly'
@@ -46,7 +45,7 @@ export type UseImageWorkflowExecutionOptions = {
   /** Shared task-result waiter. Defaults to the canonical waiter so every
    * execution path reconciles completion through the same seam instead of
    * fragmenting wait logic per workflow entrypoint (issue #676). */
-  waitTaskImageResults?: (taskId: string) => Promise<TaskImageResult[]>
+  waitTaskImageOutcome?: TaskImageOutcomeWaiter
 }
 
 export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOptions) {
@@ -62,7 +61,7 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
     executionCore,
     isNodeExecutionActive: executionWorkspace.state.isNodeRunning,
     taskTransport: options.taskTransport,
-    waitTaskImageResults: options.waitTaskImageResults,
+    waitTaskImageOutcome: options.waitTaskImageOutcome,
     cancelTasks: options.cancelTasks,
     onSuccess: options.onSuccess,
     onWarning: options.onWarning,
@@ -96,7 +95,7 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
     const source = await resolveExecutionSource(plan.source)
     const taskRequest = buildImageExecutionTaskRequest(
       { ...plan, source },
-      await loadImageSizeFromUrl(source.url),
+      await readImageNaturalSize(source.url),
     )
     await workflowRunner.execute({
       source,
@@ -105,7 +104,12 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
       attachment,
       outputCount: plan.outputCount,
       taskRequest,
-      readinessRequest: buildImageActionReadinessRequest(plan.action),
+      // 口径统一 (#P1-1): readiness 直接使用完整 taskRequest。quote
+      // 传输本就只取 service/quantity/resolution/board 做价格预检，媒体
+      // 与 prompt 不上网；用完整请求可使 quote 阶段的媒体预检与 submit
+      // 同规则（不通过即 not-ready，不再闪现 pending 节点），且计费
+      // quantity/resolution 与实际提交完全一致。
+      readinessRequest: taskRequest,
       fallbackRatio: source.ratio,
     })
   }
@@ -117,7 +121,7 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
     const source = await resolveExecutionSource(plan.source)
     const taskRequest = buildImageExecutionTaskRequest(
       { ...plan, source },
-      await loadImageSizeFromUrl(source.url),
+      await readImageNaturalSize(source.url),
     )
     await workflowRunner.execute({
       source,
@@ -141,7 +145,7 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
     // the upload-session flow first, then submits with mask_asset_id.
     const [maskAssetId, imageSize] = await Promise.all([
       prepareInpaintMaskAsset(plan.rawMaskDataUrl, workspaceId),
-      loadImageSizeFromUrl(source.url),
+      readImageNaturalSize(source.url),
     ])
     const taskRequest = buildPreparedImageInpaintTaskRequest({
       plan: { ...plan, source },
@@ -180,7 +184,7 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
       source: await resolveExecutionSource(plan.source),
     }
     const imageSizes = await Promise.all(
-      resolvedInputs.map((input) => loadImageSizeFromUrl(input.url)),
+      resolvedInputs.map((input) => readImageNaturalSize(input.url)),
     )
     const preparedPlan = prepareFusionExecutionPlan(resolvedPlan, imageSizes)
     const taskRequest = buildImageExecutionTaskRequest(preparedPlan)

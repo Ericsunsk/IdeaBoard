@@ -29,6 +29,7 @@ func (c *Executor) callGatewayModelImage(
 	route dialects.Route,
 	providerReq providerRequest,
 	operation workflow.RuntimeOperation,
+	executionToken string,
 	timeout time.Duration,
 ) (providerCallResult, error) {
 	// Routing arrives pre-resolved from dialects.Resolve (shared with
@@ -53,12 +54,12 @@ func (c *Executor) callGatewayModelImage(
 	if body, err = dialects.InjectCustomParams(body, customParams, provider, model); err != nil {
 		return providerCallResult{}, err
 	}
-	resp, err := doGatewayImageCall(ctx, c, taskID, feature, provider, model, route.Namespace, route.Path, body, "application/json", timeout, errorrender.MsgCallGatewayModelImage)
+	resp, err := doGatewayImageCall(ctx, c, taskID, feature, provider, model, route.Namespace, route.Path, body, "application/json", executionToken, timeout, errorrender.MsgCallGatewayModelImage)
 	if err != nil {
 		return providerCallResult{Receipt: resp.Receipt}, err
 	}
 	respBody := resp.Body
-	imageURLs, err = decodeGatewayImageResponse(dialect, respBody)
+	imageURLs, err = decodeGatewayImageResponse(respBody)
 	if err != nil {
 		return providerCallResult{
 			Model:            model,
@@ -97,13 +98,13 @@ func resolveDialectImageURLs(c *Executor, providerReq providerRequest) ([]string
 }
 
 // decodeGatewayImageResponse extracts image URLs from one gateway response:
-// binary streams sniff first (vendor-agnostic), otherwise the dialect's
-// JSON decode (shared universal recall across dialects).
-func decodeGatewayImageResponse(dialect dialects.Dialect, respBody []byte) ([]string, error) {
+// binary streams sniff first (vendor-agnostic), otherwise the shared
+// package-level Decode (universal recall, single implementation).
+func decodeGatewayImageResponse(respBody []byte) ([]string, error) {
 	if dataURL, ok := dialects.SniffImageStream(respBody); ok {
 		return []string{dataURL}, nil
 	}
-	return dialect.Decode(respBody)
+	return dialects.Decode(respBody)
 }
 
 func buildUpscaleGatewayPayload(c *Executor, providerReq providerRequest) (map[string]interface{}, error) {
@@ -135,10 +136,10 @@ func buildCutoutGatewayPayload(c *Executor, providerReq providerRequest) (map[st
 
 // callGatewayImageBytes posts one JSON payload to an image pipeline
 // route (cutout/upscale). Pipeline payloads are provider-agnostic by design
-// and stay outside dialect shaping; responses decode through the resolved
-// dialect (universal recall) with the shared binary sniff first. The route
-// arrives pre-resolved from dialects.Resolve: no path or dialect
-// re-derivation here.
+// and stay outside dialect shaping; responses decode through the shared
+// package-level Decode (universal recall) with the binary sniff first. The
+// route arrives pre-resolved from dialects.Resolve: no path re-derivation
+// here. Pipeline rejects custom params fail-closed in Resolve.
 func (c *Executor) callGatewayImageBytes(
 	ctx context.Context,
 	taskID, feature string,
@@ -146,18 +147,19 @@ func (c *Executor) callGatewayImageBytes(
 	route dialects.Route,
 	payload map[string]interface{},
 	label string,
+	executionToken string,
 	timeout time.Duration,
 ) (providerCallResult, error) {
 	bodyJSON, err := json.Marshal(payload)
 	if err != nil {
 		return providerCallResult{}, fmt.Errorf(errorrender.MsgCallGatewayImageBytes, label, err)
 	}
-	resp, err := doGatewayImageCall(ctx, c, taskID, feature, provider, model, route.Namespace, route.Path, bodyJSON, "application/json", timeout, label)
+	resp, err := doGatewayImageCall(ctx, c, taskID, feature, provider, model, route.Namespace, route.Path, bodyJSON, "application/json", executionToken, timeout, label)
 	if err != nil {
 		return providerCallResult{Receipt: resp.Receipt}, err
 	}
 	respBody := resp.Body
-	imageURLs, err := decodeGatewayImageResponse(route.Dialect, respBody)
+	imageURLs, err := decodeGatewayImageResponse(respBody)
 	if err != nil {
 		return providerCallResult{
 			Model:            model,
@@ -186,6 +188,7 @@ func doGatewayImageCall(
 	taskID, feature, provider, model, namespace, path string,
 	body []byte,
 	contentType string,
+	executionToken string,
 	timeout time.Duration,
 	label string,
 ) (runtimeports.GatewayResponse, error) {
@@ -198,17 +201,16 @@ func doGatewayImageCall(
 	}
 	resp, err := client.Do(ctx, runtimeports.GatewayRequest{
 		Endpoint: runtimeports.GatewayEndpoint{
-			Kind:     runtimeports.GatewayEndpointProviderNative,
 			Provider: namespace,
 			Path:     path,
 		},
-		Model:       provider + "/" + model,
-		TaskID:      taskID,
-		Feature:     feature,
-		Body:        body,
-		ContentType: contentType,
-		Cache:       runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip},
-		Timeout:     timeout,
+		Model:          provider + "/" + model,
+		TaskID:         taskID,
+		Feature:        feature,
+		Body:           body,
+		ContentType:    contentType,
+		ExecutionToken: executionToken,
+		Timeout:        timeout,
 	})
 	if err != nil {
 		if errors.Is(err, context.Canceled) {

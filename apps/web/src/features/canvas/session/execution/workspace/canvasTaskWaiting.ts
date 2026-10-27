@@ -1,27 +1,23 @@
 // Canvas task SSE/poll waiting seam (issue #859).
 //
-// Wait mapping split out of the workspace task port: workspace task
-// terminal -> `TaskImageResult[]`. Fast-path read first (terminal
-// settlement errors propagate; only live tasks continue to the shared
-// terminal waiter); waiter transport rejections map to the timeout pending
-// kind while settlement errors (failure/cancelled/no-image) propagate
-// unwrapped. Asset refs resolve through the media browser URL with explicit
-// workspace binding; remote refs resolve direct. No readiness, no cancel,
-// no Vue: the Vue lifecycle binds through the execution workspace assembly.
+// Maps the canonical terminal waiter into typed completed/cancelled results.
+// Transport failures remain pending; terminal task failures propagate.
+// Asset refs retain explicit workspace binding. Lifecycle and feedback stay
+// in the execution workspace assembly.
 
-import {
-  getWorkspaceTask,
-  isWorkspaceTaskGoneError,
-} from '../../../../../api/workspaceTaskTransport'
+import { isWorkspaceTaskGoneError } from '../../../../../api/workspaceTaskTransport'
 import { waitWorkspaceTaskTerminal } from '../../../../../api/workspaceTaskWaiter'
-import type { WorkspaceTaskItem } from '../../../../../api/workspaceTaskContract'
+import {
+  isWorkspaceTaskTerminal,
+  type WorkspaceTaskItem,
+} from '../../../../../api/workspaceTaskContract'
 import type { WorkspaceTaskOutputRef } from '../../../../../api/workspaceTaskContract'
 import { i18n } from '../../../../../core/i18n'
-import { resolveWorkspaceMediaAssetDerivativeURL } from '../../../../../api/mediaAssetDelivery'
 import { notifyUserCreditsInvalidation } from '../../../../../core/query/userCreditsInvalidation'
 import type { TaskImageResult } from '../../../../../core/query/taskResult'
+import type { WaitWorkspaceTaskOptions } from '../../../../../api/workspaceTaskWaiter'
+import type { TaskImageOutcome } from '../task-runner/taskImageOutcome'
 import {
-  createTaskCancelledError,
   createTaskResultFailureError,
   TaskResultPendingError,
 } from '../task-runner/taskResultErrors'
@@ -45,7 +41,7 @@ function toWorkspaceImageResults(
       // that differs from the current selection (registry path), so the
       // delivery URL must not resolve the workspace implicitly.
       results.push({
-        url: resolveWorkspaceMediaAssetDerivativeURL(workspaceId, assetId, 'preview'),
+        workspaceId,
         assetId,
         ...(Number.isInteger(ref.result_index) && ref.result_index >= 0
           ? { resultIndex: ref.result_index }
@@ -74,79 +70,52 @@ export function extractWorkspaceTaskImageResults(
   workspaceId: string,
   outputs: readonly WorkspaceTaskOutputRef[] | undefined,
 ): TaskImageResult[] {
-  // Role parity with the legacy extractor (`role === 'image'`), relaxed to
-  // accept blank roles: v1 output_refs are image outputs by construction of
-  // the canvas flows, and several carry no role fact.
-  const imageRefs = (outputs ?? []).filter((ref) => !ref.role?.trim() || ref.role === 'image')
+  // Only image-role facts may become image results.
+  const imageRefs = (outputs ?? []).filter((ref) => ref.role === 'image')
   return toWorkspaceImageResults(workspaceId, imageRefs)
 }
 
-function settleWorkspaceTaskItem(
-  taskId: string,
-  item: WorkspaceTaskItem,
-): TaskImageResult[] | null {
+function settleWorkspaceTaskItem(taskId: string, item: WorkspaceTaskItem): TaskImageOutcome | null {
+  // Single terminal source: live tasks return null; every terminal status
+  // below notifies exactly once through the shared settlement event.
+  if (!isWorkspaceTaskTerminal(item.status)) return null
+  notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: item.status })
   const workspaceId = item.workspace_id
   if (item.status === 'completed') {
     const results = extractWorkspaceTaskImageResults(workspaceId, item.output_refs)
-    notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'completed' })
-    if (results.length > 0) return results
+    if (results.length > 0) return { kind: 'completed', results }
     throw new Error(i18n.global.t('canvas.execution.taskCompletedNoImage'))
   }
   if (item.status === 'failed') {
-    notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'failed' })
-    // v1 tasks carry no execution_metrics: the legacy finalize-failure
-    // pending detection is unavailable, so finalize failures surface as
-    // failed immediately (documented residual).
     throw createTaskResultFailureError({ error_msg: item.error_msg })
   }
   if (item.status === 'cancelled') {
-    const results = extractWorkspaceTaskImageResults(workspaceId, item.output_refs)
-    notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
-    // cancelled_with_results converges to cancelled on the v1 surface with
-    // outputs carrying the results (legacy #676 behavior preserved).
-    if (results.length > 0) return results
-    throw createTaskCancelledError({
-      cancel_reason: item.cancel_reason,
-      error_msg: item.error_msg,
-    })
+    return {
+      kind: 'cancelled',
+      results: extractWorkspaceTaskImageResults(workspaceId, item.output_refs),
+    }
   }
-  return null
+  throw new Error(`Unknown workspace task status: ${String(item.status)}`)
 }
 
 function resolveWaitWorkspaceId(taskId: string): string {
   return resolveBoundCanvasTaskWorkspaceId(taskId) ?? requireCanvasWorkspaceId()
 }
 
-export async function waitCanvasWorkspaceTaskImageResults(
+export async function waitCanvasWorkspaceTaskImageOutcome(
   taskId: string,
-  options?: { timeoutMs?: number | undefined },
-): Promise<TaskImageResult[]> {
+  options?: WaitWorkspaceTaskOptions,
+): Promise<TaskImageOutcome> {
   const workspaceId = resolveWaitWorkspaceId(taskId)
-  const readOptions = options?.timeoutMs == null ? {} : { timeoutMs: options.timeoutMs }
-  let fast: WorkspaceTaskItem | undefined
-  try {
-    fast = await getWorkspaceTask(workspaceId, taskId)
-  } catch (error) {
-    if (isWorkspaceTaskGoneError(error)) throw error
-    // Non-404 fast-path read failures fall through to the terminal wait
-    // (parity with the legacy fast path, which fell back to SSE wait).
-  }
-  if (fast) {
-    // Terminal settlement errors propagate; only live tasks continue below.
-    const settled = settleWorkspaceTaskItem(taskId, fast)
-    if (settled) return settled
-  }
   let item: WorkspaceTaskItem
   try {
-    item = await waitWorkspaceTaskTerminal(workspaceId, taskId, readOptions)
+    item = await waitWorkspaceTaskTerminal(workspaceId, taskId, options)
   } catch (error) {
-    if (isWorkspaceTaskGoneError(error)) throw error
+    if (isWorkspaceTaskGoneError(error) || options?.signal?.aborted) throw error
     if (error instanceof TaskResultPendingError) throw error
     throw new TaskResultPendingError('timeout', error instanceof Error ? error.message : '')
   }
-  // Settlement errors (failure/cancelled/no-image) propagate unwrapped: only
-  // waiter transport rejections map to the timeout pending kind above.
-  const settled = settleWorkspaceTaskItem(taskId, item)
-  if (settled) return settled
+  const outcome = settleWorkspaceTaskItem(taskId, item)
+  if (outcome) return outcome
   throw new TaskResultPendingError('timeout')
 }

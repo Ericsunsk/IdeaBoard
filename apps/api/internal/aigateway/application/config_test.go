@@ -29,23 +29,18 @@ func TestValidateUpdateInput(t *testing.T) {
 		t.Fatal("token rotation not detected")
 	}
 
-	// Test with BaseURL directly (custom domain)
-	cBaseURL, cAccountID, cGatewayID, _, _, err := validateUpdateInput(UpdateInput{
-		BaseURL: "https://my-gateway.example.com/",
-		Token:   &token,
-	}, 7)
-	if err != nil {
-		t.Fatalf("validateUpdateInput(BaseURL) error = %v", err)
-	}
-	if cBaseURL != "https://my-gateway.example.com" {
-		t.Fatalf("cBaseURL = %q, want stripped slash", cBaseURL)
-	}
-	if cAccountID != "" {
-		t.Fatalf("cAccountID = %q, want empty", cAccountID)
-	}
-	// 带点 hostname 不是合法网关身份：不回填，自定义 egress 保持无身份。
-	if cGatewayID != "" {
-		t.Fatalf("cGatewayID = %q, want empty", cGatewayID)
+	// Non-Cloudflare hosts fail closed: there is no custom-egress path.
+	for _, customURL := range []string{
+		"https://my-gateway.example.com/",
+		"https://gateway.myorg.internal",
+		"http://127.0.0.1:8080/v1/a/g",
+	} {
+		if _, _, _, _, _, err := validateUpdateInput(UpdateInput{
+			BaseURL: customURL,
+			Token:   &token,
+		}, 7); err == nil {
+			t.Fatalf("validateUpdateInput(%q) accepted, want sole-egress rejection", customURL)
+		}
 	}
 
 	// Test with standard Cloudflare BaseURL auto-extracting Account and Gateway
@@ -138,26 +133,18 @@ func TestConfigRepositoryRoundTrip(t *testing.T) {
 		t.Fatalf("resolved leaks or misbuilds: %+v", resolved.BaseURL)
 	}
 
-	// Update with only BaseURL (custom domain) and verify Resolve works
-	customBaseURL := "https://gateway.myorg.internal"
+	// Custom BaseURLs fail closed on update: sole egress pins Cloudflare.
 	if err := repo.Update(ctx, UpdateInput{
-		BaseURL: customBaseURL,
-	}, 42); err != nil {
-		t.Fatalf("Update() with custom BaseURL error = %v", err)
+		BaseURL: "https://gateway.myorg.internal",
+	}, 42); err == nil {
+		t.Fatal("Update() with custom BaseURL succeeded, want sole-egress rejection")
 	}
-	customResolved, err := repo.Resolve(ctx)
+	keptCustom, err := repo.Resolve(ctx)
 	if err != nil {
-		t.Fatalf("Resolve() after custom BaseURL error = %v", err)
+		t.Fatalf("Resolve() after rejected custom BaseURL error = %v", err)
 	}
-	if customResolved.BaseURL != customBaseURL || customResolved.Token != token {
-		t.Fatalf("customResolved = %+v, want BaseURL=%s and kept Token", customResolved, customBaseURL)
-	}
-	customSummary, err := repo.GetSummary(ctx)
-	if err != nil {
-		t.Fatalf("GetSummary() after custom BaseURL error = %v", err)
-	}
-	if customSummary.IsFirstParty {
-		t.Fatalf("custom summary IsFirstParty = true, want false: %+v", customSummary)
+	if keptCustom.BaseURL == "https://gateway.myorg.internal" {
+		t.Fatalf("custom BaseURL persisted despite rejection: %+v", keptCustom)
 	}
 
 	if err := repo.Update(ctx, UpdateInput{
@@ -173,8 +160,8 @@ func TestConfigRepositoryRoundTrip(t *testing.T) {
 	if kept.Token != token || kept.GatewayID != "prod-v2" {
 		t.Fatalf("token not preserved across update: %+v", kept)
 	}
-	if kept.BaseURL != customBaseURL {
-		t.Fatalf("custom BaseURL overwritten by identity-only update: %+v", kept.BaseURL)
+	if kept.BaseURL != "https://gateway.ai.cloudflare.com/v1/abcdef0123456789abcdef0123456789/prod-v2" {
+		t.Fatalf("identity-only update did not rebuild CF BaseURL: %+v", kept.BaseURL)
 	}
 }
 

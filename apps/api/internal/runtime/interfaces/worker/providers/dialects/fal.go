@@ -29,7 +29,3 @@ func (FalDialect) Encode(req Request) ([]byte, error) {
 	}
 	return encoded, nil
 }
-
-func (FalDialect) Decode(body []byte) ([]string, error) {
-	return decodeWithPaths(body)
-}

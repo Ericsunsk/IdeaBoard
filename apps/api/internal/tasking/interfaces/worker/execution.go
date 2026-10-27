@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/telemetry"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/workflow/paramkeys"
@@ -82,7 +81,11 @@ func (w *WorkspaceTaskWorker) completeExecution(
 		rendered, renderErr := w.renderer.RenderOutputs(ctx, claimed, outputs)
 		if renderErr != nil {
 			send.finishFailed(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, workspaceFailureMessage(renderErr))
-			return w.failTerminal(ctx, claimed, workspaceFailureMessage(renderErr))
+			failed := w.convergeUnsettledSend(claimed, workspaceFailureMessage(renderErr))
+			if failed != nil {
+				w.compensateUnsettledOutputs(ctx, failed, outputs)
+			}
+			return nil
 		}
 		outputs = rendered
 	}
@@ -93,19 +96,16 @@ func (w *WorkspaceTaskWorker) completeExecution(
 			slog.Info("workspace task converged during completion; dropping", "task_id", taskID, "err", err)
 			return nil
 		}
-		// The provider already returned, so this send is billed, but the
-		// settlement transaction did not commit. Returning the error would
-		// hand River a retryable outcome, and its redelivery re-opens the
-		// SAME lease through the claim's same-token branch and calls the
-		// provider again: one submission could produce up to
-		// RiverMaxAttemptsDefault (25) billed sends. The send is therefore
-		// terminal here (defect 2): it converges through the terminal
-		// settlement path instead of re-entering the provider, and it does
-		// NOT spend the whole-task retry budget, because ADR-0010 rule 5
-		// scopes tasks.retry_count to transient PROVIDER failures only.
-		slog.Warn("workspace task settlement failed after a billed send; converging terminally",
+		// A COMMIT acknowledgement can be lost after the task and Capture are
+		// durable. Win a terminal failure before compensating; an ambiguous
+		// outcome or a conflicting completion must keep every asset live.
+		slog.Warn("workspace task settlement outcome unknown after a billed send; converging terminally",
 			"task_id", taskID, "model", model, "retry_layer", send.layer, "err", err)
-		return w.convergeUnsettledSend(claimed, workspaceFailureMessage(fmt.Errorf("settlement failed after provider send: %w", err)))
+		failed := w.convergeUnsettledSend(claimed, workspaceFailureMessage(fmt.Errorf("settlement failed after provider send: %w", err)))
+		if failed != nil {
+			w.compensateUnsettledOutputs(ctx, failed, outputs)
+		}
+		return nil
 	}
 	// Save managed references after the atomic Complete commit. The
 	// task is complete regardless of the outcome; trigger failures
@@ -123,10 +123,10 @@ func (w *WorkspaceTaskWorker) completeExecution(
 const workspaceSettlementCleanupTimeout = 5 * time.Second
 
 // convergeUnsettledSend terminally converges a task whose provider send
-// already succeeded but whose settlement could not commit.
+// already succeeded but whose settlement outcome could not be confirmed.
 //
 // It runs on a DETACHED bounded context because the dominant cause is the
-// River execution context being cancelled at its timeout (or a pool blip), and
+// caller context being cancelled (or a pool blip), and
 // reusing that dead context would throw away the only chance to release the
 // hold. It retries the terminal write a few times inside that budget.
 //
@@ -136,7 +136,7 @@ const workspaceSettlementCleanupTimeout = 5 * time.Second
 // claim token, its durable attempt fact, and its Credit hold, so the state is
 // fully attributable and an operator can settle it. Returning nil here is
 // what caps one submission at ONE billed send.
-func (w *WorkspaceTaskWorker) convergeUnsettledSend(task *workspacetasks.WorkspaceTask, reason string) error {
+func (w *WorkspaceTaskWorker) convergeUnsettledSend(task *workspacetasks.WorkspaceTask, reason string) *workspacetasks.WorkspaceTask {
 	if task == nil {
 		return nil
 	}
@@ -158,9 +158,13 @@ func (w *WorkspaceTaskWorker) convergeUnsettledSend(task *workspacetasks.Workspa
 			}
 		}
 		tried = i
-		if _, err = w.settler.Fail(cleanupCtx, task.WorkspaceID, task.ID, reason); err == nil {
+		var failed *workspacetasks.WorkspaceTask
+		if failed, err = w.settler.Fail(cleanupCtx, task.WorkspaceID, task.ID, reason); err == nil {
 			slog.Warn("workspace task terminally failed after an unsettled billed send",
 				"task_id", task.ID, "reason", reason, "attempts", tried)
+			if failed != nil && failed.Status == workspacetasks.StatusFailed {
+				return failed
+			}
 			return nil
 		}
 		if errors.Is(err, workspacetasks.ErrStateConflict) || errors.Is(err, workspacetasks.ErrNotFound) {
@@ -171,13 +175,26 @@ func (w *WorkspaceTaskWorker) convergeUnsettledSend(task *workspacetasks.Workspa
 		slog.Warn("workspace task terminal convergence after an unsettled billed send failed",
 			"task_id", task.ID, "attempt", tried, "of", attempts, "err", err)
 	}
-	// The task stays running with its claim token, its attempt fact, and its
-	// hold. No retry_count is spent: the whole-task retry budget belongs to
+	// The durable outcome remains unknown; keep assets live. No retry_count
+	// is spent: the whole-task retry budget belongs to
 	// transient provider failures (ADR-0010 rule 5), and requeueing here
 	// would only re-enter the provider.
-	slog.Error("workspace task stays running: provider send succeeded but neither settlement nor terminal convergence committed",
+	slog.Error("workspace task settlement outcome remains unknown after a billed send; assets stay live",
 		"task_id", task.ID, "reason", reason, "attempts", tried, "err", err)
 	return nil
+}
+
+// compensateUnsettledOutputs runs only after Fail returned a committed terminal
+// task. The renderer restricts cleanup to this execution's ingestion receipts.
+// Unknown outcomes keep assets live instead of risking a committed reference.
+func (w *WorkspaceTaskWorker) compensateUnsettledOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) {
+	if w.renderer == nil {
+		return
+	}
+	if err := w.renderer.CompensateRenderedOutputs(ctx, task, outputs); err != nil {
+		slog.Warn("workspace task result compensation failed; assets stay live",
+			"task_id", task.ID, "err", err)
+	}
 }
 
 // saveCompletedTask saves managed references after commit. The Task is
@@ -239,16 +256,12 @@ func (p *workspaceGatewayProvider) Generate(ctx context.Context, task *workspace
 	if model == "" {
 		return nil, errors.New(errorrender.MsgGenerate5)
 	}
-	legacy, err := workspaceBridgeTaskPayload(task)
+	payload, err := workspaceBridgeTaskPayload(task)
 	if err != nil {
 		return nil, err
 	}
-	// Scope the call for the workspace result materializer (executor
-	// passes ctx through to it): the materializer needs the workspace
-	// identity that the legacy materialize signature does not carry.
-	ctx = taskruntime.WithWorkspaceTaskScope(ctx, strings.TrimSpace(task.WorkspaceID))
 	output, err := p.caller.CallGatewayAPI(ctx, WorkspaceGatewayCallInput{
-		Task:           legacy,
+		Task:           payload,
 		Model:          model,
 		ExecutionToken: strings.TrimSpace(task.ExecutionToken),
 	})
@@ -304,32 +317,16 @@ func workspaceBridgePrompt(typed *tasks.WorkflowTaskParams) string {
 	return ""
 }
 
-// mapWorkspaceProviderOutputs projects legacy provider outputs onto the
-// workspace output contract. Asset refs pass through by public id; remote
-// refs pass through only when they satisfy the explicit remote contract
-// (URL + checksum, no storage internals). Anything else is a deterministic
-// finalize failure. Remote refs flow into the #827 WorkspaceTaskRenderer,
-// which ingests their bytes into workspace media assets before the atomic
-// Complete; asset refs are re-verified there.
+// mapWorkspaceProviderOutputs accepts only asset outputs ingested by the executor.
 func mapWorkspaceProviderOutputs(outputs []tasks.TaskOutput) ([]workspacetasks.OutputRef, error) {
 	refs := make([]workspacetasks.OutputRef, 0, len(outputs))
 	for _, out := range outputs {
-		var ref workspacetasks.OutputRef
-		switch {
-		case strings.TrimSpace(out.AssetID) != "":
-			ref = workspacetasks.OutputRef{
-				Kind: workspacetasks.OutputKindAsset, AssetID: strings.TrimSpace(out.AssetID),
-				Role: strings.TrimSpace(out.Role), ResultIndex: out.ResultIndex,
-			}
-		case strings.TrimSpace(out.URL) != "" || strings.TrimSpace(out.SourceURL) != "":
-			url := firstNonEmptyWorkspaceURL(out.URL, out.SourceURL)
-			ref = workspacetasks.OutputRef{
-				Kind: workspacetasks.OutputKindRemote, URL: url,
-				ChecksumSHA256: strings.TrimSpace(out.ChecksumSHA256),
-				Role:           strings.TrimSpace(out.Role), ResultIndex: out.ResultIndex,
-			}
-		default:
+		if strings.TrimSpace(out.AssetID) == "" {
 			return nil, errors.New(errorrender.MsgMapWorkspaceProviderOutputs)
+		}
+		ref := workspacetasks.OutputRef{
+			Kind: workspacetasks.OutputKindAsset, AssetID: strings.TrimSpace(out.AssetID),
+			Role: strings.TrimSpace(out.Role), ResultIndex: out.ResultIndex,
 		}
 		if err := workspacetasks.ValidateOutputRef(ref); err != nil {
 			return nil, fmt.Errorf(errorrender.MsgMapWorkspaceProviderOutputs2, err)
@@ -337,13 +334,4 @@ func mapWorkspaceProviderOutputs(outputs []tasks.TaskOutput) ([]workspacetasks.O
 		refs = append(refs, ref)
 	}
 	return refs, nil
-}
-
-func firstNonEmptyWorkspaceURL(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return strings.TrimSpace(value)
-		}
-	}
-	return ""
 }

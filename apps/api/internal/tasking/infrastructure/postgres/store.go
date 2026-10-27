@@ -79,7 +79,7 @@ func (s *Store) BeginSettlementScope(ctx context.Context) (*dbutil.Scope, error)
 }
 
 // Compile-time convergence with the settlement tx seam.
-var _ workspacetasks.TxTaskLifecycleStore = (*Store)(nil)
+var _ workspacetasks.TaskSettlementStore = (*Store)(nil)
 
 // Compile-time convergence with the durable submit idempotency claim seam.
 var _ workspacetasks.TxSubmissionClaimStore = (*Store)(nil)
@@ -460,7 +460,7 @@ func taskOutboxRecord(task *workspacetasks.WorkspaceTask, status workspacetasks.
 
 func (s *Store) insertTaskOutboxTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask, status workspacetasks.Status, eventType string, data any) error {
 	if s == nil || s.outbox == nil {
-		return nil
+		return fmt.Errorf("tasking postgres: task outbox is not configured (fail-closed: settlement must not commit without its delivery fact): %w", workspacetasks.ErrSettlementUnavailable)
 	}
 	record, err := taskOutboxRecord(task, status, eventType, data)
 	if err != nil {
@@ -474,6 +474,12 @@ func (s *Store) insertTaskOutboxTx(ctx context.Context, tx pgx.Tx, task *workspa
 
 // SetBillingSettlementInTx updates only the mutable settlement read model.
 // The snapshot itself remains immutable by database trigger contract.
+//
+// The update joins the caller's terminal settlement transaction: a failed
+// read-model write rolls the state flip and the ledger Capture/Release
+// back with it, so funds are never lost to a half-committed terminal.
+//
+// Missing settlement rows fail closed: submit writes snapshot and settlement atomically.
 func (s *Store) SetBillingSettlementInTx(ctx context.Context, tx pgx.Tx, taskID, state string, outputCount, captured, released int64, captureTransactionID, releaseTransactionID string) error {
 	if tx == nil {
 		return fmt.Errorf("tasking postgres: billing settlement transaction is nil")

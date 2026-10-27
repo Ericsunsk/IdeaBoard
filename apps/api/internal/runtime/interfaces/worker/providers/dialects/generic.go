@@ -45,7 +45,3 @@ func (GenericDialect) Encode(req Request) ([]byte, error) {
 	}
 	return encoded, nil
 }
-
-func (GenericDialect) Decode(body []byte) ([]string, error) {
-	return decodeWithPaths(body)
-}

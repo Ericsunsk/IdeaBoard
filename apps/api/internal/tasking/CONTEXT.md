@@ -56,6 +56,26 @@ An Execution Plan belongs to Canvas and may produce multiple Tasks. A Routing Sn
   the hold atomically with the task transition. Events stage only after the
   settlement unit is durable: synchronously for owned transactions, via a
   post-commit hook for guard-borrowed ones, never on rollback.
+- Terminal settlement never forks on free tasks: free tasks (zero total, no
+  hold) converge to captured (completed) or released (failed/cancelled)
+  with zero amounts and NULL transaction ids in the same terminal
+  transaction. Zero-amount Capture/Release legs are ledger no-ops that
+  write no ledger row and no idempotency key.
+- Provider result materialization is the sole remote/data image ingestion path;
+  the Worker bridge accepts only asset refs and the renderer only verifies
+  ready, unarchived Workspace assets. One claim-scoped context snapshots the
+  Workspace, Task, owner, and execution token and records ingestion receipts;
+  primary and fallback sends share it. Identity mismatches fail closed.
+- Media result ingestion runs outside the settlement transaction, so it
+  cannot commit atomically with the task/ledger unit. Partial-ingest
+  failures archive the assets already ingested by that call, and a
+  terminal settlement error first converges the Task to a committed failure.
+  Only then may compensation archive this execution's ingestion receipts,
+  refusing assets with durable task, Board, or Library references; unknown
+  commit outcomes keep assets live. Archived assets are invisible to output
+  association. A crash between ingestion and Complete leaves the hold to
+  the stalled-settlement sweep and the assets without task linkage
+  (accepted residual risk).
 - Member-quota checks join the settlement transaction after Quote and before
   Hold, using the resolved Billing Account and actual submitting User. Holds,
   Capture, and Release settle against the submission-time quota window.
@@ -104,5 +124,9 @@ Terminal billing settlement belongs to the PostgreSQL adapter because it must
 share the caller-owned SQL transaction and lock order with terminal Task facts.
 `workspacetasks.Service.Create` is the sole Task acceptance seam: authorization,
 submission claim, payer resolution, Quote, quota, Hold, Task insert, routing
-snapshot and enqueue share one transaction. Durable settlement facts and errors
+snapshot and enqueue share one transaction. Settlement dependencies declare
+transaction capabilities explicitly; missing dependencies fail closed without a
+non-transactional write path. Claims and payer resolvers are wired explicitly,
+while cancel-only callers need only lifecycle, holder, and billing projection.
+Durable settlement facts and errors
 live under `ports/billing`; `application/billing` only reads durable usage facts.

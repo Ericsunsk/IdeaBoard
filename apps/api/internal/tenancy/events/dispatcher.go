@@ -241,9 +241,6 @@ func (d *collaborationEventDispatcher) OnBillingTransferInitiated(ctx context.Co
 		WorkspaceName:    wsName,
 		FromUserID:       params.FromUserPublicID,
 	}
-	if params.BillingAccountPublicID != "" {
-		payload.BillingAccountID = params.BillingAccountPublicID
-	}
 	_, err := d.notifications.CreateNotification(ctx, notifications.CreateNotificationInput{
 		UserID:           transfer.ToUserID,
 		DeduplicationKey: params.NotificationKey,

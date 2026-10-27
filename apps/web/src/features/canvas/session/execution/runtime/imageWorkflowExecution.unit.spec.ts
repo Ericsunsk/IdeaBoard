@@ -1,4 +1,4 @@
-import { ref, shallowRef } from 'vue'
+import { effectScope, ref, shallowRef } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { TaskCancelledError } from '../task-runner/taskResultErrors'
@@ -15,9 +15,10 @@ import { BoardGraphSession } from '../pending-execution/boardGraphSession'
 import { createPendingImageExecutionCore } from '../pending-execution/core'
 import { useImageWorkflowExecution } from './imageWorkflowExecution'
 import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRunner'
+import { assemblePendingImageWorkflow } from './pendingWorkflowAssembly'
 
-vi.mock('../media/imageSize', () => ({
-  loadImageSizeFromUrl: vi.fn(async () => ({ width: 1200, height: 800 })),
+vi.mock('../../../../../core/media/imageDimensions', () => ({
+  readImageNaturalSize: vi.fn(async () => ({ width: 1200, height: 800 })),
 }))
 vi.mock('../media/inpaintMask', () => ({
   prepareInpaintMask: vi.fn(async () => 'https://example.com/mask.png'),
@@ -127,11 +128,48 @@ function createPublicHarness(transport: PendingImageWorkflowTaskTransport) {
 }
 
 describe('useImageWorkflowExecution', () => {
+  it('does not show a stale save warning when the scope is disposed during a pending flush', async () => {
+    const scope = effectScope()
+    const graphSession = CanvasGraphSession.hydrate('board-a', createEmptyBoardSnapshot())
+    let rejectFlush!: (error: unknown) => void
+    const onWarning = vi.fn()
+    const assembly = scope.run(() =>
+      assemblePendingImageWorkflow({
+        nodes: ref([]),
+        edges: ref([]),
+        readCanvasGraphStore: () => graphSession.store,
+        rendererMetrics,
+        executionCore: createPendingImageExecutionCore(),
+        isNodeExecutionActive: () => false,
+        cancelTasks: vi.fn(),
+        onSuccess: vi.fn(),
+        onWarning,
+        flushAutosave: () =>
+          new Promise((_, reject) => {
+            rejectFlush = reject
+          }),
+      }),
+    )
+    if (!assembly) throw new Error('Expected active assembly scope')
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const flushing = assembly.flushPendingTaskSnapshot()
+    scope.stop()
+    rejectFlush(new Error('save response lost'))
+    await flushing
+    expect(onWarning).not.toHaveBeenCalled()
+    log.mockRestore()
+  })
+
   it('materializes through Graph Session projection and marks the board dirty for autosave', async () => {
     const harness = createPublicHarness({
       assertReady: async () => undefined,
       submit: async () => ({ taskId: 'task-1' }),
-      resolve: async () => ({ url: 'https://example.com/result.png', ratio: 1 }),
+      observe: async () => ({
+        resolve: async () => ({
+          kind: 'completed',
+          result: { url: 'https://example.com/result.png', ratio: 1 },
+        }),
+      }),
     })
     await harness.execution.executeImageWorkflow(imageActionPlan())
     expect(
@@ -147,7 +185,9 @@ describe('useImageWorkflowExecution', () => {
       submit: async () => {
         throw new TaskCancelledError()
       },
-      resolve: async () => ({ url: '', ratio: 1 }),
+      observe: async () => ({
+        resolve: async () => ({ kind: 'completed', result: { url: '', ratio: 1 } }),
+      }),
     })
     await harness.execution.executeImageWorkflow(imageActionPlan())
     expect(harness.nodes.value.map((node) => node.id)).toEqual(['image-1'])
@@ -161,7 +201,9 @@ describe('useImageWorkflowExecution', () => {
         await new Promise((resolve) => {
           resolveSubmit = resolve
         }),
-      resolve: async () => ({ url: '', ratio: 1 }),
+      observe: async () => ({
+        resolve: async () => ({ kind: 'completed', result: { url: '', ratio: 1 } }),
+      }),
     })
     const running = harness.execution.executeImageWorkflow(imageActionPlan())
     await vi.waitFor(() => expect(harness.nodes.value).toHaveLength(2))
@@ -208,7 +250,7 @@ describe('useImageWorkflowExecution', () => {
       cancelTasks: vi.fn(),
       onSuccess: vi.fn(),
       onWarning: vi.fn(),
-      taskTransport: { assertReady, submit: vi.fn(), resolve: vi.fn() },
+      taskTransport: { assertReady, submit: vi.fn(), observe: vi.fn() },
     })
     await execution.executeImageWorkflow({
       kind: 'image-action',
@@ -234,7 +276,12 @@ describe('useImageWorkflowExecution', () => {
     const harness = createPublicHarness({
       assertReady,
       submit,
-      resolve: async () => ({ url: 'https://example.com/extended.png', ratio: 0.75 }),
+      observe: async () => ({
+        resolve: async () => ({
+          kind: 'completed',
+          result: { url: 'https://example.com/extended.png', ratio: 0.75 },
+        }),
+      }),
     })
 
     await harness.execution.executeImageWorkflow({
@@ -280,7 +327,12 @@ describe('useImageWorkflowExecution', () => {
     const harness = createPublicHarness({
       assertReady,
       submit,
-      resolve: async () => ({ url: 'https://example.com/inpainted.png', ratio: 1 }),
+      observe: async () => ({
+        resolve: async () => ({
+          kind: 'completed',
+          result: { url: 'https://example.com/inpainted.png', ratio: 1 },
+        }),
+      }),
     })
 
     await harness.execution.executeImageWorkflow({
@@ -339,7 +391,7 @@ describe('useImageWorkflowExecution', () => {
       cancelTasks: vi.fn(),
       onSuccess: vi.fn(),
       onWarning: vi.fn(),
-      taskTransport: { assertReady: vi.fn(), submit: vi.fn(), resolve: vi.fn() },
+      taskTransport: { assertReady: vi.fn(), submit: vi.fn(), observe: vi.fn() },
     })
     const plan = {
       kind: 'generation',

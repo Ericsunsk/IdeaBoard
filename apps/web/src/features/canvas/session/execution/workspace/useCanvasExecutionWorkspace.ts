@@ -1,24 +1,20 @@
 import type { Edge, Node } from '@vue-flow/core'
-import type { Ref } from 'vue'
+import { getCurrentScope, onScopeDispose, type Ref } from 'vue'
 import type { BoardSnapshot } from '../../../../board/ports/canvas'
-import type { TaskImageResult } from '../../../../../core/query/taskResult'
+import type { TaskImageOutcomeWaiter } from '../task-runner/taskImageOutcome'
 import type { CanvasGraphStore } from '../../../core/graph'
 import type { CanvasRendererMetricsPort } from '../../../session/flow-adapter'
-import { loadImageSizeFromUrl } from '../media/imageSize'
+import { readImageNaturalSize } from '../../../../../core/media/imageDimensions'
 import type { ActivatedImageExecutionPlan } from '../planning/imageExecutionPlan'
-import {
-  resolveFirstTaskImageResultDisplay,
-  resolveTaskImageResultAtIndexDisplay,
-  type ImageSizeLoader,
-} from '../result-nodes/resultDisplay'
+import { type ImageSizeLoader } from '../result-nodes/resultDisplay'
 import type { PendingImageResultExecution } from '../result-nodes/usePendingImageResultExecution.ts'
-import { waitExistingOrLiveTaskImageResults } from '../task-runner/imageDirectActionExecutor'
+import { waitCanvasWorkspaceTaskImageOutcome } from './canvasTaskWaiting'
 import type { ClientActionIdFactory } from '../task-runner/taskClientActionIds'
 import { buildImageExecutionTaskRequest } from '../commands/imageTaskRequests'
 import type { PendingImageExecutionCore } from '../pending-execution/core'
 import { createCanvasExecutionRecoveryCoordinator } from '../application/canvasExecutionRecoveryCoordinator'
-import { type CanvasTaskSubmissionAdapter } from './canvasTaskSubmissionAdapter'
 import { assemblePendingImageWorkflow } from '../runtime/pendingWorkflowAssembly'
+import { createTaskImageObserver } from '../task-runner/taskImageOutcome'
 import { resolveMediaAssetProcessingURL } from '../../../../../api/mediaAssetDelivery'
 
 type CanvasExecutionWorkspaceState = {
@@ -46,8 +42,7 @@ export type UseCanvasExecutionWorkspaceOptions = {
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { isSilent?: boolean }) => Promise<void>
   pendingResults?: PendingImageResultExecution
-  taskAdapter?: CanvasTaskSubmissionAdapter
-  waitTaskImageResults?: (taskId: string) => Promise<TaskImageResult[]>
+  waitTaskImageOutcome?: TaskImageOutcomeWaiter
   loadImageSize?: ImageSizeLoader
   createClientActionId?: ClientActionIdFactory
   executionCore: PendingImageExecutionCore
@@ -60,6 +55,10 @@ export type UseCanvasExecutionWorkspaceOptions = {
 export function useCanvasExecutionWorkspace(
   options: UseCanvasExecutionWorkspaceOptions,
 ): CanvasExecutionWorkspace {
+  // 单层默认：调用方在此显式解析后透传给装配（装配仅保留直接调用方的回退），
+  // 不再与装配内各持一份 `??` 默认。
+  const waitTaskImageOutcome = options.waitTaskImageOutcome ?? waitCanvasWorkspaceTaskImageOutcome
+  const loadImageSize = options.loadImageSize ?? readImageNaturalSize
   const { workflowRunner, flushPendingTaskSnapshot } = assemblePendingImageWorkflow({
     nodes: options.nodes,
     edges: options.edges,
@@ -71,9 +70,8 @@ export function useCanvasExecutionWorkspace(
     executionCore: options.executionCore,
     isNodeExecutionActive: (nodeId) =>
       options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0,
-    taskAdapter: options.taskAdapter,
-    waitTaskImageResults: options.waitTaskImageResults,
-    loadImageSize: options.loadImageSize,
+    waitTaskImageOutcome,
+    loadImageSize,
     createClientActionId: options.createClientActionId,
     cancelTasks: options.cancelTasks,
     onSuccess: options.onSuccess,
@@ -84,9 +82,6 @@ export function useCanvasExecutionWorkspace(
   function isNodeRunning(nodeId: string): boolean {
     return options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0
   }
-
-  const waitTaskImageResults = options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
-  const loadImageSize = options.loadImageSize ?? loadImageSizeFromUrl
 
   function requireAttachment() {
     const attachment = options.executionCore.currentAttachment()
@@ -125,22 +120,14 @@ export function useCanvasExecutionWorkspace(
   const recovery = createCanvasExecutionRecoveryCoordinator({
     executionCore: options.executionCore,
     readBoardSnapshot: () => options.boardBaseSnapshot.value,
-    resolveResult: async ({ taskId, resultIndex, fallbackRatio }) => {
-      const results = await waitTaskImageResults(taskId)
-      return resultIndex === undefined
-        ? await resolveFirstTaskImageResultDisplay(results, fallbackRatio, loadImageSize)
-        : await resolveTaskImageResultAtIndexDisplay(
-            results,
-            resultIndex,
-            fallbackRatio,
-            loadImageSize,
-          )
-    },
+    observeTask: createTaskImageObserver(waitTaskImageOutcome, loadImageSize),
     flushAutosave: flushPendingTaskSnapshot,
     cancelTasks: options.cancelTasks,
     onError: options.onError,
     onWarning: options.onWarning,
   })
+
+  if (getCurrentScope()) onScopeDispose(recovery.dispose)
 
   return {
     state: { executionCore: options.executionCore, isNodeRunning },

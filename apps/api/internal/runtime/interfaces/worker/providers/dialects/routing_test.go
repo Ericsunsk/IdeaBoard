@@ -63,12 +63,10 @@ func TestResolvePipelineDefaultsAndOverrides(t *testing.T) {
 	assert.Equal(t, "custom/upscale/v2", route.Path)
 	assert.Equal(t, workflow.GatewayPathSourceOverride, route.Source)
 
-	// Pipeline dialect keeps the legacy empty-params judgment: a chat
-	// customParams flips model-image shaping but never pipeline decoding.
-	modelImage, err := Resolve(workflow.RuntimeOperationGeneration, "openai", "dall-e-3", "", `{"type":"chat"}`)
-	require.NoError(t, err)
-	assert.IsType(t, &ChatDialect{}, modelImage.Dialect)
-	pipeline, err := Resolve(workflow.RuntimeOperationCutout, "openai", "dall-e-3", "", `{"type":"chat"}`)
-	require.NoError(t, err)
-	assert.IsType(t, &GenericDialect{}, pipeline.Dialect)
+	// Pipeline rejects customParams fail-closed: no silent drop.
+	_, err = Resolve(workflow.RuntimeOperationCutout, "openai", "dall-e-3", "", `{"type":"chat"}`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not accept custom params")
+	_, err = Resolve(workflow.RuntimeOperationUpscale, "fal", "aura-sr", "", `{"type":"image"}`)
+	require.Error(t, err)
 }

@@ -65,7 +65,7 @@ func (a *liveDispatchGatewayCallerAdapter) CallGatewayAPI(ctx context.Context, i
 
 func liveDispatchGatewayFactory(serverURL string) runtimeports.GatewayClientFactory {
 	return func(context.Context) (runtimeports.GatewayClient, error) {
-		return providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{
+		return providerinfra.NewGatewayClientForTest(providerinfra.GatewayClientConfig{
 			BaseURL: serverURL, Token: "test-token",
 		})
 	}
@@ -130,7 +130,7 @@ func (e *liveDispatchEnv) liveWorker(t *testing.T, factory runtimeports.GatewayC
 	executor := providers.NewExecutor(nil, materializer, config.PublicOriginsConfig{}, factory, nil)
 	assets := &workspacemedia.TaskAssetAdapter{Store: e.media}
 	renderer, err := taskruntime.NewWorkspaceTaskRenderer(taskruntime.WorkspaceTaskRendererDeps{
-		Media: e.media, Assets: assets, Objects: e.objects,
+		Media: e.media, Assets: assets,
 	})
 	if err != nil {
 		t.Fatalf("taskruntime.NewWorkspaceTaskRenderer: %v", err)

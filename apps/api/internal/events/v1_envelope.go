@@ -47,6 +47,8 @@ const (
 	EventV1BoardDocumentReplaced = "board.document_replaced"
 	EventV1BoardAccessChanged    = "board.access_changed"
 	EventV1BillingSettled        = "billing.settled"
+	EventV1NotificationCreated   = "notification.created"
+	EventV1NotificationUpdated   = "notification.updated"
 )
 
 // v1EventVersions freezes the data schema version per event type.
@@ -61,6 +63,8 @@ var v1EventVersions = map[string]int{
 	EventV1BoardDocumentReplaced: 1,
 	EventV1BoardAccessChanged:    1,
 	EventV1BillingSettled:        1,
+	EventV1NotificationCreated:   1,
+	EventV1NotificationUpdated:   1,
 }
 
 // V1EventVersion reports the frozen data schema version for typ.
@@ -82,6 +86,7 @@ func V1EventTypes() []string {
 		EventV1TaskFailed, EventV1TaskCancelled,
 		EventV1MediaAssetReady, EventV1MediaAssetArchived,
 		EventV1BoardDocumentReplaced, EventV1BoardAccessChanged, EventV1BillingSettled,
+		EventV1NotificationCreated, EventV1NotificationUpdated,
 	}
 }
 
@@ -97,12 +102,16 @@ const (
 // settled entity (task); checkout_session is
 // reserved for the #809 Stripe-convergence mapping and is never emitted
 // today (Stripe inbound webhooks stay distinct integrations that emit
-// internal user events only).
+// internal user events only). invite carries a member-invite identity
+// (wsi_, osi_, or bti_): notification hints are about an invitation, so
+// the invite is their subject; the notification row itself (notif_) stays
+// a server-side read fact, never a delivery identity.
 const (
 	V1ResourceTask            = "task"
 	V1ResourceBoard           = "board"
 	V1ResourceMediaAsset      = "media_asset"
 	V1ResourceCheckoutSession = "checkout_session"
+	V1ResourceInvite          = "invite"
 )
 
 // V1Actor identifies who caused the event. User ids are usr_ opaque
@@ -191,6 +200,17 @@ type V1BillingSettledData struct {
 	HoldTransactionID string `json:"hold_transaction_id,omitempty"`
 }
 
+// V1NotificationData is the refs-only hint carried by notification.created
+// and notification.updated. It names the invitation subject (invite_id)
+// plus the notification domain type that changed (notification_type), so
+// browsers know which inbox to GET. Titles, bodies, roles, emails, and the
+// notif_ row identity never cross this envelope: clients treat the frame
+// as a "refetch now" prompt and read facts from the notifications endpoints.
+type V1NotificationData struct {
+	InviteID         string `json:"invite_id"`
+	NotificationType string `json:"notification_type"`
+}
+
 // MintV1Envelope mints an envelope with an evt_ id (via
 // contract.MintPublicID), UTC occurred_at, and the frozen version for
 // typ. Unknown types fail closed.
@@ -270,7 +290,7 @@ func ValidateV1Envelope(envelope V1Envelope) error {
 	}
 	switch strings.TrimSpace(envelope.Resource.Type) {
 	case V1ResourceTask, V1ResourceBoard, V1ResourceMediaAsset,
-		V1ResourceCheckoutSession:
+		V1ResourceCheckoutSession, V1ResourceInvite:
 	default:
 		return fmt.Errorf("events: unknown resource type %q", envelope.Resource.Type)
 	}
@@ -290,7 +310,35 @@ func ValidateV1Envelope(envelope V1Envelope) error {
 	if err := json.Unmarshal(envelope.Data, &probe); err != nil {
 		return fmt.Errorf("events: data must be a JSON object: %w", err)
 	}
-	return validateV1Data(envelope.Type, envelope.Data)
+	if err := validateV1Data(envelope.Type, envelope.Data); err != nil {
+		return err
+	}
+	return validateV1IdentityAgreement(envelope)
+}
+
+// validateV1IdentityAgreement enforces that invite-subject notifications
+// name the same invite as their resource identity, mirroring the task
+// refs-only discipline: the envelope subject and its typed data must agree
+// so producers cannot smuggle a mismatched identity through the hint.
+func validateV1IdentityAgreement(envelope V1Envelope) error {
+	switch envelope.Type {
+	case EventV1NotificationCreated, EventV1NotificationUpdated:
+	default:
+		return nil
+	}
+	var data struct {
+		InviteID string `json:"invite_id"`
+	}
+	if err := json.Unmarshal(envelope.Data, &data); err != nil {
+		return fmt.Errorf("events: %s data must decode: %w", envelope.Type, err)
+	}
+	if strings.TrimSpace(data.InviteID) != strings.TrimSpace(envelope.Resource.ID) {
+		return fmt.Errorf("events: %s invite_id must match the invite resource id", envelope.Type)
+	}
+	if strings.TrimSpace(envelope.Resource.Type) != V1ResourceInvite {
+		return fmt.Errorf("events: %s resource type must be invite", envelope.Type)
+	}
+	return nil
 }
 
 func validateV1ResourceID(resourceType, id string) error {
@@ -311,8 +359,21 @@ func validateV1ResourceID(resourceType, id string) error {
 		if id == "" {
 			return fmt.Errorf("events: checkout_session resource id is required")
 		}
+	case V1ResourceInvite:
+		if !isInviteResourceID(id) {
+			return fmt.Errorf("events: invite resource id must be wsi_, osi_, or bti_ opaque")
+		}
 	}
 	return nil
+}
+
+// isInviteResourceID reports whether id is a member-invite identity the
+// notification hints may name: workspace (wsi_), organization (osi_), or
+// billing-transfer (bti_) invites.
+func isInviteResourceID(id string) bool {
+	return contract.IsValidPublicID(contract.PrefixWorkspaceInvite, id) ||
+		contract.IsValidPublicID(contract.PrefixOrganizationInvite, id) ||
+		contract.IsValidPublicID(contract.PrefixBillingTransferInvite, id)
 }
 
 func validateV1Data(typ string, raw json.RawMessage) error {
@@ -425,6 +486,13 @@ func validateV1Data(typ string, raw json.RawMessage) error {
 		case "quoted", "free", "held", "captured", "released":
 		default:
 			return fmt.Errorf("events: billing.settled settlement_state must be quoted|free|held|captured|released")
+		}
+	case EventV1NotificationCreated, EventV1NotificationUpdated:
+		if err := require(fields, "invite_id", "notification_type"); err != nil {
+			return err
+		}
+		if !isInviteResourceID(stringField("invite_id")) {
+			return fmt.Errorf("events: %s invite_id must be wsi_, osi_, or bti_ opaque", typ)
 		}
 	}
 	return nil

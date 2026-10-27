@@ -12,7 +12,7 @@ package adapters
 //
 // QuoteInTx mints the same snapshot through the settlement transaction so
 // the price read shares the repeatable-read snapshot with the Hold that
-// follows (workspacetasks.TxQuoter).
+// follows (workspacetasks.Quoter).
 
 import (
 	"context"
@@ -33,7 +33,6 @@ type WorkspaceTaskQuoter struct {
 }
 
 var _ workspacetasks.Quoter = (*WorkspaceTaskQuoter)(nil)
-var _ workspacetasks.TxQuoter = (*WorkspaceTaskQuoter)(nil)
 
 func (q *WorkspaceTaskQuoter) Quote(ctx context.Context, service, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
 	if q == nil || q.Catalog == nil {
@@ -76,7 +75,7 @@ func (q *WorkspaceTaskQuoter) Quote(ctx context.Context, service, resolution str
 
 // QuoteInTx mints the same snapshot through the settlement transaction so
 // the price read shares the repeatable-read snapshot with the Hold that
-// follows. It satisfies workspacetasks.TxQuoter.
+// follows. It satisfies workspacetasks.Quoter.
 func (q *WorkspaceTaskQuoter) QuoteInTx(ctx context.Context, tx pgx.Tx, service, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
 	if q == nil || q.Catalog == nil {
 		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter is not configured: %w", workspacetasks.ErrQuoteUnavailable)

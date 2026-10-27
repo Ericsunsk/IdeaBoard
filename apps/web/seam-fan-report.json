@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "209242cc17417134c630d1835f1aaea47df31019",
+  "checkpointSha": "95582f8d0906476068309a5e4172dda5367c8b12",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -2848,9 +2848,14 @@
           "from": "src/features/workspace/selection/workspaceResource.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/test/notificationFacts.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
         }
       ],
-      "fanIn": 38,
+      "fanIn": 39,
       "fanOut": 337,
       "fanOutTargets": [
         "src/api/generated-query/public/model/acceptWorkspaceBillingTransfer200.ts",
@@ -4882,7 +4887,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 38,
+      "targetFanIn": 39,
       "targetFanOut": 337,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -5520,11 +5525,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/core/query/taskResult.contract.spec.ts",
-          "to": "src/api/mediaAssetDelivery.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/auth/session/identityCacheReset.contract.spec.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
@@ -5555,7 +5555,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/execution/workspace/canvasTaskWaiting.ts",
+          "from": "src/features/canvas/session/execution/task-runner/taskImageOutcome.unit.spec.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
@@ -5630,7 +5630,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 26,
+      "fanIn": 25,
       "fanOut": 4,
       "fanOutTargets": [
         "src/api/mediaAssetMetadata.ts",
@@ -5664,7 +5664,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 26,
+      "targetFanIn": 25,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -6139,9 +6139,19 @@
           "from": "src/features/board/session/sync/boardSseMapping.contract.spec.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/reads.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/notification/session/useNotifications.contract.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 11,
+      "fanIn": 13,
       "fanOut": 4,
       "fanOutTargets": [
         "src/api/contractKernel.ts",
@@ -6175,7 +6185,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 11,
+      "targetFanIn": 13,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -6200,7 +6210,27 @@
           "kind": "runtime"
         },
         {
+          "from": "src/api/workspaceTaskWaiter.unit.spec.ts",
+          "to": "src/api/workspaceTaskContract.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/api/workspaceTasks.contract.spec.ts",
+          "to": "src/api/workspaceTaskContract.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/api/workspaceTasks.ts",
+          "to": "src/api/workspaceTaskContract.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/core/taskMetricTokens.ts",
+          "to": "src/api/workspaceTaskContract.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/admin/shared/core/taskMetricTokens.unit.spec.ts",
           "to": "src/api/workspaceTaskContract.ts",
           "kind": "runtime"
         },
@@ -6212,10 +6242,15 @@
         {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskWaiting.ts",
           "to": "src/api/workspaceTaskContract.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/canvasTaskWaiting.ts",
+          "to": "src/api/workspaceTaskContract.ts",
           "kind": "type-only"
         }
       ],
-      "fanIn": 5,
+      "fanIn": 9,
       "fanOut": 2,
       "fanOutTargets": ["src/api/contractKernel.ts", "src/core/utils/opaqueIds.ts"],
       "outboundEdges": [
@@ -6234,7 +6269,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 5,
+      "targetFanIn": 9,
       "targetFanOut": 2,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -6345,17 +6380,32 @@
     "src/api/workspaceTaskWaiter.ts": {
       "consumerEdges": [
         {
+          "from": "src/api/workspaceTaskWaiter.unit.spec.ts",
+          "to": "src/api/workspaceTaskWaiter.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/api/workspaceTasks.ts",
+          "to": "src/api/workspaceTaskWaiter.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/task-runner/taskImageOutcome.ts",
+          "to": "src/api/workspaceTaskWaiter.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/canvasTaskWaiting.ts",
           "to": "src/api/workspaceTaskWaiter.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskWaiting.ts",
           "to": "src/api/workspaceTaskWaiter.ts",
-          "kind": "runtime"
+          "kind": "type-only"
         }
       ],
-      "fanIn": 2,
+      "fanIn": 4,
       "fanOut": 6,
       "fanOutTargets": [
         "src/api/workspaceEventStream.ts",
@@ -6401,7 +6451,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 2,
+      "targetFanIn": 4,
       "targetFanOut": 6,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -11277,6 +11327,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/execution/runtime/pendingImageWorkflowRunner.ts",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskReadiness.ts",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
@@ -11367,7 +11422,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 42,
+      "fanIn": 43,
       "fanOut": 1,
       "fanOutTargets": ["src/core/i18n/index.ts"],
       "outboundEdges": [
@@ -11381,7 +11436,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 42,
+      "targetFanIn": 43,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -11876,16 +11931,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/execution/task-runner/imageDirectActionExecutor.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/execution/task-runner/taskReadiness.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/execution/task-runner/taskResultErrors.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -11897,6 +11942,11 @@
         },
         {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskReadiness.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -12237,7 +12287,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 146,
+      "fanIn": 145,
       "fanOut": 7,
       "fanOutTargets": [
         "fs",
@@ -12334,7 +12384,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 146,
+      "targetFanIn": 145,
       "targetFanOut": 7,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13373,12 +13423,22 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/execution/media/imageSize.ts",
+          "from": "src/features/canvas/session/execution/result-nodes/resultDisplay.ts",
           "to": "src/core/media/imageDimensions.ts",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/execution/result-nodes/resultDisplay.ts",
+          "from": "src/features/canvas/session/execution/runtime/imageWorkflowExecution.ts",
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/runtime/pendingWorkflowAssembly.ts",
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/useCanvasExecutionWorkspace.ts",
           "to": "src/core/media/imageDimensions.ts",
           "kind": "runtime"
         },
@@ -13398,7 +13458,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 8,
+      "fanIn": 10,
       "fanOut": 1,
       "fanOutTargets": ["src/core/media/mediaReadScheduler.ts"],
       "outboundEdges": [
@@ -13412,7 +13472,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 8,
+      "targetFanIn": 10,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -13428,11 +13488,6 @@
       "consumerEdges": [
         {
           "from": "src/core/media/mediaRef.unit.spec.ts",
-          "to": "src/core/media/mediaRef.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/core/query/taskResult.ts",
           "to": "src/core/media/mediaRef.ts",
           "kind": "runtime"
         },
@@ -13459,7 +13514,7 @@
         {
           "from": "src/features/canvas/session/execution/result-nodes/resultDisplay.ts",
           "to": "src/core/media/mediaRef.ts",
-          "kind": "runtime"
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/flow-adapter/projection/flowImageNodeSelectors.ts",
@@ -13487,7 +13542,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 12,
+      "fanIn": 11,
       "fanOut": 1,
       "fanOutTargets": ["src/api/mediaAssetDelivery.ts"],
       "outboundEdges": [
@@ -13501,7 +13556,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 12,
+      "targetFanIn": 11,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -14083,52 +14138,26 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/execution/runtime/imageWorkflowExecution.ts",
+          "from": "src/features/canvas/session/execution/task-runner/taskImageOutcome.ts",
           "to": "src/core/query/taskResult.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/session/execution/runtime/pendingWorkflowAssembly.ts",
-          "to": "src/core/query/taskResult.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/session/execution/task-runner/imageDirectActionExecutor.ts",
-          "to": "src/core/query/taskResult.ts",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskWaiting.ts",
           "to": "src/core/query/taskResult.ts",
           "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/session/execution/workspace/useCanvasExecutionWorkspace.ts",
-          "to": "src/core/query/taskResult.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/session/image-workflow/useImageWorkflowExecution.ts",
-          "to": "src/core/query/taskResult.ts",
-          "kind": "type-only"
         }
       ],
-      "fanIn": 8,
-      "fanOut": 1,
-      "fanOutTargets": ["src/core/media/mediaRef.ts"],
-      "outboundEdges": [
-        {
-          "from": "src/core/query/taskResult.ts",
-          "to": "src/core/media/mediaRef.ts",
-          "kind": "runtime"
-        }
-      ],
+      "fanIn": 4,
+      "fanOut": 0,
+      "fanOutTargets": [],
+      "outboundEdges": [],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 8,
-      "targetFanOut": 1,
+      "targetFanIn": 4,
+      "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -14721,17 +14750,17 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/execution/task-runner/taskReadiness.ts",
-          "to": "src/core/utils/errorMessages.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/canvas/session/execution/task-runner/taskResultErrors.ts",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskCancellation.ts",
+          "to": "src/core/utils/errorMessages.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.ts",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
         }
@@ -19023,15 +19052,21 @@
         }
       ],
       "fanIn": 3,
-      "fanOut": 0,
-      "fanOutTargets": [],
-      "outboundEdges": [],
+      "fanOut": 1,
+      "fanOutTargets": ["src/api/workspaceTaskContract.ts"],
+      "outboundEdges": [
+        {
+          "from": "src/features/admin/shared/core/taskMetricTokens.ts",
+          "to": "src/api/workspaceTaskContract.ts",
+          "kind": "type-only"
+        }
+      ],
       "undeclaredConsumers": [],
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 3,
-      "targetFanOut": 0,
+      "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -19829,7 +19864,7 @@
         }
       ],
       "fanIn": 123,
-      "fanOut": 57,
+      "fanOut": 58,
       "fanOutTargets": [
         "fs",
         "node_modules/@iconoir/vue/dist/index.js",
@@ -19850,6 +19885,7 @@
         "scripts/checkTokenGraph.ts",
         "src/api/contractKernel.ts",
         "src/api/generated-query/control/control-platform/control-platform.ts",
+        "src/api/workspaceTaskContract.ts",
         "src/components/ui/badge/index.ts",
         "src/components/ui/button/index.ts",
         "src/components/ui/input/index.ts",
@@ -19956,8 +19992,18 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/shared/core/taskMetricTokens.ts",
+          "to": "src/api/workspaceTaskContract.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/admin/shared/core/taskMetricTokens.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/core/taskMetricTokens.unit.spec.ts",
+          "to": "src/api/workspaceTaskContract.ts",
           "kind": "runtime"
         },
         {
@@ -21146,7 +21192,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 123,
-      "targetFanOut": 57,
+      "targetFanOut": 58,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -32171,7 +32217,7 @@
         }
       ],
       "fanIn": 31,
-      "fanOut": 47,
+      "fanOut": 48,
       "fanOutTargets": [
         "fs",
         "fs/promises",
@@ -32201,6 +32247,7 @@
         "src/core/utils/errorMessages.ts",
         "src/core/utils/ids.ts",
         "src/core/utils/polling.ts",
+        "src/core/utils/request.ts",
         "src/core/utils/workspaceId.ts",
         "src/features/board/index.ts",
         "src/features/board/ports/canvas.ts",
@@ -32225,6 +32272,11 @@
         {
           "from": "src/features/canvas/session/execution/application/canvasExecutionRecoveryCoordinator.ts",
           "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/application/canvasExecutionRecoveryCoordinator.ts",
+          "to": "src/core/utils/request.ts",
           "kind": "runtime"
         },
         {
@@ -32323,6 +32375,11 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/canvas/session/execution/canvasBudgets.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/commands/imageTaskRequests.ts",
           "to": "src/core/contracts/generationContract.ts",
           "kind": "runtime"
@@ -32405,11 +32462,6 @@
         {
           "from": "src/features/canvas/session/execution/index.ts",
           "to": "src/features/canvas/core/execution/imageActionExecution.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/execution/media/imageSize.ts",
-          "to": "src/core/media/imageDimensions.ts",
           "kind": "runtime"
         },
         {
@@ -32625,7 +32677,7 @@
         {
           "from": "src/features/canvas/session/execution/result-nodes/resultDisplay.ts",
           "to": "src/core/media/mediaRef.ts",
-          "kind": "runtime"
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/execution/result-nodes/resultDisplay.ts",
@@ -32799,8 +32851,8 @@
         },
         {
           "from": "src/features/canvas/session/execution/runtime/imageWorkflowExecution.ts",
-          "to": "src/core/query/taskResult.ts",
-          "kind": "type-only"
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/runtime/imageWorkflowExecution.ts",
@@ -32849,7 +32901,17 @@
         },
         {
           "from": "src/features/canvas/session/execution/runtime/pendingImageWorkflowRunner.ts",
+          "to": "src/core/errors/errorCatalog.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/runtime/pendingImageWorkflowRunner.ts",
           "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/runtime/pendingImageWorkflowRunner.ts",
+          "to": "src/core/utils/request.ts",
           "kind": "runtime"
         },
         {
@@ -32890,7 +32952,7 @@
         {
           "from": "src/features/canvas/session/execution/runtime/pendingWorkflowAssembly.ts",
           "to": "node_modules/vue/index.js",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/runtime/pendingWorkflowAssembly.ts",
@@ -32899,8 +32961,8 @@
         },
         {
           "from": "src/features/canvas/session/execution/runtime/pendingWorkflowAssembly.ts",
-          "to": "src/core/query/taskResult.ts",
-          "kind": "type-only"
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/runtime/pendingWorkflowAssembly.ts",
@@ -32933,31 +32995,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/execution/task-runner/imageDirectActionExecutor.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/execution/task-runner/imageDirectActionExecutor.ts",
-          "to": "src/core/query/taskResult.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/session/execution/task-runner/imageDirectActionExecutor.ts",
-          "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/session/execution/task-runner/imageDirectActionExecutor.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/execution/task-runner/imageDirectActionExecutor.unit.spec.ts",
-          "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/canvas/session/execution/task-runner/taskClientActionIds.ts",
           "to": "src/core/utils/ids.ts",
           "kind": "runtime"
@@ -32978,28 +33015,23 @@
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/session/execution/task-runner/taskReadiness.ts",
-          "to": "src/core/i18n/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/execution/task-runner/taskReadiness.ts",
-          "to": "src/core/utils/errorMessages.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/canvas/session/execution/task-runner/taskReadiness.ts",
-          "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
+          "from": "src/features/canvas/session/execution/task-runner/taskImageOutcome.ts",
+          "to": "src/api/workspaceTaskWaiter.ts",
           "kind": "type-only"
         },
         {
-          "from": "src/features/canvas/session/execution/task-runner/taskReadiness.unit.spec.ts",
+          "from": "src/features/canvas/session/execution/task-runner/taskImageOutcome.ts",
+          "to": "src/core/query/taskResult.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/task-runner/taskImageOutcome.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
-          "from": "src/features/canvas/session/execution/task-runner/taskReadiness.unit.spec.ts",
-          "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
+          "from": "src/features/canvas/session/execution/task-runner/taskImageOutcome.unit.spec.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
         },
         {
@@ -33099,12 +33131,32 @@
         },
         {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.ts",
+          "to": "src/core/utils/errorMessages.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.ts",
+          "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
+          "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/canvasTaskSubmissionAdapter.unit.spec.ts",
           "to": "src/features/canvas/core/execution/canvasTaskRequest.ts",
           "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskWaiting.ts",
-          "to": "src/api/mediaAssetDelivery.ts",
+          "to": "src/api/workspaceTaskContract.ts",
           "kind": "runtime"
         },
         {
@@ -33121,6 +33173,11 @@
           "from": "src/features/canvas/session/execution/workspace/canvasTaskWaiting.ts",
           "to": "src/api/workspaceTaskWaiter.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/workspace/canvasTaskWaiting.ts",
+          "to": "src/api/workspaceTaskWaiter.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/session/execution/workspace/canvasTaskWaiting.ts",
@@ -33190,7 +33247,7 @@
         {
           "from": "src/features/canvas/session/execution/workspace/useCanvasExecutionWorkspace.ts",
           "to": "node_modules/vue/index.js",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/workspace/useCanvasExecutionWorkspace.ts",
@@ -33199,8 +33256,8 @@
         },
         {
           "from": "src/features/canvas/session/execution/workspace/useCanvasExecutionWorkspace.ts",
-          "to": "src/core/query/taskResult.ts",
-          "kind": "type-only"
+          "to": "src/core/media/imageDimensions.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/workspace/useCanvasExecutionWorkspace.ts",
@@ -33253,7 +33310,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 31,
-      "targetFanOut": 47,
+      "targetFanOut": 48,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -33304,7 +33361,7 @@
         {
           "from": "src/features/canvas/session/execution/runtime/pendingImageWorkflowRunner.ts",
           "to": "src/features/canvas/session/execution/pending-execution/core.ts",
-          "kind": "type-only"
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/runtime/pendingImageWorkflowRunner.unit.spec.ts",
@@ -33338,9 +33395,10 @@
         }
       ],
       "fanIn": 14,
-      "fanOut": 7,
+      "fanOut": 8,
       "fanOutTargets": [
         "src/features/canvas/session/execution/board-attachment/index.ts",
+        "src/features/canvas/session/execution/canvasBudgets.ts",
         "src/features/canvas/session/execution/pending-execution/boardGraphSession.ts",
         "src/features/canvas/session/execution/pending-execution/materialization.ts",
         "src/features/canvas/session/execution/pending-execution/publisher.ts",
@@ -33353,6 +33411,11 @@
           "from": "src/features/canvas/session/execution/pending-execution/core.ts",
           "to": "src/features/canvas/session/execution/board-attachment/index.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/execution/pending-execution/core.ts",
+          "to": "src/features/canvas/session/execution/canvasBudgets.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/pending-execution/core.ts",
@@ -33390,7 +33453,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 14,
-      "targetFanOut": 7,
+      "targetFanOut": 8,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -35994,7 +36057,7 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 22,
+      "fanOut": 21,
       "fanOutTargets": [
         "node_modules/@vue-flow/core/dist/vue-flow-core.js",
         "node_modules/@vueuse/core/dist/index.js",
@@ -36003,7 +36066,6 @@
         "src/api/mediaAssetDelivery.ts",
         "src/core/i18n/index.ts",
         "src/core/media/mediaRef.ts",
-        "src/core/query/taskResult.ts",
         "src/features/board/ports/canvas.ts",
         "src/features/canvas/core/graph/index.ts",
         "src/features/canvas/core/nodes/imageActionRegistry.ts",
@@ -36227,11 +36289,6 @@
         },
         {
           "from": "src/features/canvas/session/image-workflow/useImageWorkflowExecution.ts",
-          "to": "src/core/query/taskResult.ts",
-          "kind": "type-only"
-        },
-        {
-          "from": "src/features/canvas/session/image-workflow/useImageWorkflowExecution.ts",
           "to": "src/features/board/ports/canvas.ts",
           "kind": "type-only"
         },
@@ -36291,7 +36348,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 22,
+      "targetFanOut": 21,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

@@ -23,6 +23,11 @@ export type CanvasFeedback = {
     succeeded: (message: string) => void
     warning: (message: string) => void
     insufficientCredits: () => void
+    /**
+     * 取消最终失败对账 (#P1-3): 明确告知远端可能仍在跑，结果到达后仍
+     * 会上画布（留档 taskId 随下次取消捎带重提，可手动重试）。
+     */
+    cancelExhausted: () => void
   }
   imageTools: {
     succeeded: (message: string) => void
@@ -72,6 +77,11 @@ export function createCanvasFeedback(
     succeeded: success,
     warning,
     insufficientCredits,
+    cancelExhausted: () => {
+      warning(
+        `${i18n.global.t('common.errors.taskCancelFailed')} ${i18n.global.t('canvas.execution.tasksInProgress')}`,
+      )
+    },
   }
   const imageTools = {
     succeeded: success,

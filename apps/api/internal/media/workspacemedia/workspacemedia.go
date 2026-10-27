@@ -358,6 +358,9 @@ type AssetStore interface {
 	// ArchiveAsset stamps the archive lifecycle marker. Repeat
 	// archives converge on the stored row (idempotent per asset).
 	ArchiveAsset(ctx context.Context, workspaceID, assetID string) (*Asset, error)
+	// ArchiveUnreferencedAsset is compensation-only: it refuses assets with
+	// durable task, Board, or Library references.
+	ArchiveUnreferencedAsset(ctx context.Context, workspaceID, assetID string) (*Asset, error)
 	// UpdateAssetMetadata refreshes dimensions and merges metadata.
 	UpdateAssetMetadata(ctx context.Context, workspaceID, assetID string, params UpdateMetadataParams) (*Asset, error)
 	// ListTaskAssets queries media by task via task_outputs

@@ -73,4 +73,7 @@ subscriptions, expiries, and payer switches are out of scope.
 
 ## Status
 
-Accepted
+Accepted. Vision Search is temporarily unavailable: production wires the
+vision seam as nil, so `Extract` fails closed with
+`vision_search_unavailable`. The settlement triple and `vision` slug
+reservation stay; re-enable by injecting a real `VisionGatewayClient`.

@@ -179,10 +179,9 @@ func (h *contractV1BillingHandler) initiateTransferInvite(c *gin.Context) {
 			return h.deps.Invitations.InitiateTransferInvite(
 				c.Request.Context(), account.InternalID, wctx.Principal.UserID(), newOwnerID, key,
 				tenancy.BillingTransferInitiatedParams{
-					FromUserPublicID:       tenancy.FormatUserPublicID(wctx.Principal.PublicID()),
-					WorkspacePublicID:      wctx.Workspace.PublicID,
-					WorkspaceName:          wctx.Workspace.Name,
-					BillingAccountPublicID: account.PublicID,
+					FromUserPublicID:  tenancy.FormatUserPublicID(wctx.Principal.PublicID()),
+					WorkspacePublicID: wctx.Workspace.PublicID,
+					WorkspaceName:     wctx.Workspace.Name,
 				})
 		})
 		if doErr != nil {

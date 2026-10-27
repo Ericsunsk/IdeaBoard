@@ -250,29 +250,56 @@ func (q *Queries) ListNotificationsByUserID(ctx context.Context, arg ListNotific
 	return items, nil
 }
 
-const markAllNotificationsAsRead = `-- name: MarkAllNotificationsAsRead :execrows
+const markAllNotificationsAsRead = `-- name: MarkAllNotificationsAsRead :many
 UPDATE user_notifications
 SET status = 'read',
     read_at = COALESCE(read_at, now()),
     updated_at = now()
 WHERE user_id = $1
   AND status = 'unread'
+RETURNING internal_id, public_id, user_id, type, title, body, action_payload, deduplication_key, status, read_at, created_at, updated_at
 `
 
-func (q *Queries) MarkAllNotificationsAsRead(ctx context.Context, userID int64) (int64, error) {
-	result, err := q.db.Exec(ctx, markAllNotificationsAsRead, userID)
+func (q *Queries) MarkAllNotificationsAsRead(ctx context.Context, userID int64) ([]UserNotification, error) {
+	rows, err := q.db.Query(ctx, markAllNotificationsAsRead, userID)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	var items []UserNotification
+	for rows.Next() {
+		var i UserNotification
+		if err := rows.Scan(
+			&i.InternalID,
+			&i.PublicID,
+			&i.UserID,
+			&i.Type,
+			&i.Title,
+			&i.Body,
+			&i.ActionPayload,
+			&i.DeduplicationKey,
+			&i.Status,
+			&i.ReadAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-const markInviteNotificationResolved = `-- name: MarkInviteNotificationResolved :execrows
+const markInviteNotificationResolved = `-- name: MarkInviteNotificationResolved :many
 UPDATE user_notifications
 SET action_payload = COALESCE(action_payload, '{}'::jsonb) || jsonb_build_object('invite_status', $1::TEXT),
     updated_at = now()
 WHERE action_payload ->> 'invite_id' = $2::TEXT
   AND type IN ('workspace_invite', 'organization_invite')
+RETURNING internal_id, public_id, user_id, type, title, body, action_payload, deduplication_key, status, read_at, created_at, updated_at
 `
 
 type MarkInviteNotificationResolvedParams struct {
@@ -284,12 +311,37 @@ type MarkInviteNotificationResolvedParams struct {
 // notifications.PayloadKeyInviteStatus/PayloadKeyInviteID and the frontend
 // InviteActionPayload interface; see notifications.PayloadKeyTransferInviteID
 // for why handover rows never match this merge.
-func (q *Queries) MarkInviteNotificationResolved(ctx context.Context, arg MarkInviteNotificationResolvedParams) (int64, error) {
-	result, err := q.db.Exec(ctx, markInviteNotificationResolved, arg.InviteStatus, arg.InviteID)
+func (q *Queries) MarkInviteNotificationResolved(ctx context.Context, arg MarkInviteNotificationResolvedParams) ([]UserNotification, error) {
+	rows, err := q.db.Query(ctx, markInviteNotificationResolved, arg.InviteStatus, arg.InviteID)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	var items []UserNotification
+	for rows.Next() {
+		var i UserNotification
+		if err := rows.Scan(
+			&i.InternalID,
+			&i.PublicID,
+			&i.UserID,
+			&i.Type,
+			&i.Title,
+			&i.Body,
+			&i.ActionPayload,
+			&i.DeduplicationKey,
+			&i.Status,
+			&i.ReadAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const markNotificationAsRead = `-- name: MarkNotificationAsRead :one

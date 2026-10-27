@@ -52,9 +52,9 @@ describe('createCanvasTaskLifecycle', () => {
     const lifecycle = createCanvasTaskLifecycle({ cancel, scheduleRetry, onFinalFailure })
 
     lifecycle.cancelTasks(['task-1'])
-    await flushRejection()
-    await flushRejection()
-    await flushRejection()
+    for (let index = 0; index < CANVAS_TASK_CANCEL_RETRY_DELAYS_MS.length + 1; index += 1) {
+      await flushRejection()
+    }
 
     expect(cancel).toHaveBeenCalledTimes(CANVAS_TASK_CANCEL_RETRY_DELAYS_MS.length + 1)
     expect(scheduleRetry).toHaveBeenNthCalledWith(
@@ -79,14 +79,62 @@ describe('createCanvasTaskLifecycle', () => {
     })
 
     lifecycle.cancelTasks(['task-1'])
-    await flushRejection()
-    await flushRejection()
-    await flushRejection()
+    for (let index = 0; index < CANVAS_TASK_CANCEL_RETRY_DELAYS_MS.length + 1; index += 1) {
+      await flushRejection()
+    }
 
     expect(warning).toHaveBeenCalledWith('[canvas] failed to cancel task', {
       taskId: 'task-1',
       error,
     })
     warning.mockRestore()
+  })
+
+  it('keeps exhausted cancellations pending and retries them on demand', async () => {
+    const error = new Error('permanent')
+    const cancel = vi.fn<(taskId: string) => Promise<void>>().mockRejectedValue(error)
+    const lifecycle = createCanvasTaskLifecycle({
+      cancel,
+      scheduleRetry: (callback) => callback(),
+      onFinalFailure: () => undefined,
+    })
+
+    lifecycle.cancelTasks(['task-1'])
+    for (let index = 0; index < CANVAS_TASK_CANCEL_RETRY_DELAYS_MS.length + 1; index += 1) {
+      await flushRejection()
+    }
+
+    // 留档：远端可能仍在跑，最终失败不止于 warn
+    expect(lifecycle.pendingCancelTaskIds()).toEqual(['task-1'])
+    const settled = cancel.mock.calls.length
+    cancel.mockResolvedValueOnce(undefined)
+    lifecycle.retryPendingCancels()
+    await flushRejection()
+    expect(cancel).toHaveBeenCalledTimes(settled + 1)
+    expect(lifecycle.pendingCancelTaskIds()).toEqual([])
+  })
+
+  it('piggybacks pending cancellations onto the next cancel call', async () => {
+    const error = new Error('permanent')
+    const cancel = vi.fn<(taskId: string) => Promise<void>>().mockRejectedValue(error)
+    const lifecycle = createCanvasTaskLifecycle({
+      cancel,
+      scheduleRetry: (callback) => callback(),
+      onFinalFailure: () => undefined,
+    })
+
+    lifecycle.cancelTasks(['task-1'])
+    for (let index = 0; index < CANVAS_TASK_CANCEL_RETRY_DELAYS_MS.length + 1; index += 1) {
+      await flushRejection()
+    }
+    expect(lifecycle.pendingCancelTaskIds()).toEqual(['task-1'])
+
+    cancel.mockResolvedValue(undefined)
+    lifecycle.cancelTasks(['task-2'])
+    await flushRejection()
+    await flushRejection()
+    expect(cancel).toHaveBeenCalledWith('task-1')
+    expect(cancel).toHaveBeenCalledWith('task-2')
+    expect(lifecycle.pendingCancelTaskIds()).toEqual([])
   })
 })

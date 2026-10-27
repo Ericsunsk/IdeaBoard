@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/platform/riverpolicy"
@@ -688,8 +689,8 @@ func TestNewWorkspaceTaskWorkerRequiresSeams(t *testing.T) {
 	}
 }
 
-// The worker reuses the drawing execution budget (existing River/concurrency
-// config; no new infra).
+// River retains its 17min outer budget so the separate 360s execution
+// timeout leaves a live parent context for terminal settlement and retry.
 func TestWorkspaceTaskWorkerTimeout(t *testing.T) {
 	env := newWorkerTestEnv()
 	worker := env.newWorker(nil, nil)
@@ -698,30 +699,25 @@ func TestWorkspaceTaskWorkerTimeout(t *testing.T) {
 	}
 }
 
-// Bridge mapping: asset refs pass through, remote refs pass through only
-// with the explicit contract, anything else fails deterministically.
+// Bridge mapping accepts only executor-ingested asset ids.
 func TestMapWorkspaceProviderOutputs(t *testing.T) {
 	refs, err := mapWorkspaceProviderOutputs([]tasks.TaskOutput{
 		{AssetID: "asset_1234567890ab", Role: "result", ResultIndex: 0},
-		{URL: "https://cdn.example.com/r.png", ChecksumSHA256: workerTestRemoteChecksum, Role: "result", ResultIndex: 1},
 	})
 	if err != nil {
 		t.Fatalf("map: %v", err)
 	}
-	if len(refs) != 2 {
-		t.Fatalf("refs = %+v, want 2", refs)
+	if len(refs) != 1 || refs[0].Kind != workspacetasks.OutputKindAsset || refs[0].AssetID != "asset_1234567890ab" {
+		t.Fatalf("refs = %+v, want the asset passthrough", refs)
 	}
-	if refs[0].Kind != workspacetasks.OutputKindAsset || refs[0].AssetID != "asset_1234567890ab" {
-		t.Fatalf("refs[0] = %+v, want the asset passthrough", refs[0])
-	}
-	if refs[1].Kind != workspacetasks.OutputKindRemote || refs[1].URL != "https://cdn.example.com/r.png" {
-		t.Fatalf("refs[1] = %+v, want the remote passthrough", refs[1])
-	}
-	if _, err := mapWorkspaceProviderOutputs([]tasks.TaskOutput{{URL: "https://cdn.example.com/no-checksum.png"}}); err == nil {
-		t.Fatal("remote without checksum = nil, want contract error")
-	}
-	if _, err := mapWorkspaceProviderOutputs([]tasks.TaskOutput{{}}); err == nil {
-		t.Fatal("empty output = nil, want error")
+	for _, output := range []tasks.TaskOutput{
+		{URL: "https://cdn.example.com/r.png", ChecksumSHA256: workerTestRemoteChecksum},
+		{SourceURL: "https://cdn.example.com/r.png", ChecksumSHA256: workerTestRemoteChecksum},
+		{},
+	} {
+		if _, err := mapWorkspaceProviderOutputs([]tasks.TaskOutput{output}); err == nil {
+			t.Fatalf("output %+v: want ingestion contract error", output)
+		}
 	}
 }
 
@@ -755,5 +751,41 @@ func TestWorkspaceBridgeTaskPayloadRequiresIdentity(t *testing.T) {
 	}
 	if got, _ := typed.Extra["__workspace_id"].(string); got != "ws_test" {
 		t.Fatalf("workspace scope=%q, want ws_test", got)
+	}
+}
+
+// River derives Work's parent from Timeout(); provider sends must get a
+// shorter child while Retry/Fail keep the still-live parent.
+func TestWorkerExecutionDeadlineLeavesSettlementBudget(t *testing.T) {
+	env := newWorkerTestEnv()
+	created := env.submit(t, nil)
+	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
+	var parent context.Context
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, _ *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+		parentDeadline, parentOK := parent.Deadline()
+		executionDeadline, executionOK := ctx.Deadline()
+		if !parentOK || !executionOK || parentDeadline.Sub(executionDeadline) < 10*time.Minute {
+			t.Fatalf("parent %s must outlive execution %s by settlement margin", parentDeadline, executionDeadline)
+		}
+		if remaining := time.Until(executionDeadline); remaining <= 0 || remaining > riverpolicy.WorkspaceExecutionBudget() {
+			t.Fatalf("execution remaining = %s", remaining)
+		}
+		return nil, context.DeadlineExceeded
+	}), nil)
+	var cancel context.CancelFunc
+	parent, cancel = context.WithTimeout(context.Background(), worker.Timeout(nil))
+	defer cancel()
+	if err := worker.Work(parent, workerJobFor(created)); err != nil {
+		t.Fatal(err)
+	}
+	if err := parent.Err(); err != nil {
+		t.Fatalf("settlement parent expired: %v", err)
+	}
+	task, err := env.store.GetTask(parent, created.WorkspaceID, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.Status != workspacetasks.StatusPending || task.RetryCount != 1 || task.ExecutionToken == created.ExecutionToken {
+		t.Fatalf("timeout failed to requeue with fresh token: %+v", task)
 	}
 }

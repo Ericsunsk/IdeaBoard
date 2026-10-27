@@ -149,7 +149,6 @@ describe('notificationActionRegistry', () => {
         workspace_id: 'ws_1',
         workspace_name: 'Studio',
         from_user_id: 'usr_1',
-        billing_account_id: 'bac_1',
       },
       status: 'unread',
       read_at: null,

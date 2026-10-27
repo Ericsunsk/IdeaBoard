@@ -2004,7 +2004,9 @@
   ],
   "src/api/userSession.ts": ["fetchCurrentUserInfo", "toSessionUser"],
   "src/api/workspaceEventStream.ts": [
+    "NOTIFICATION_EVENT_TYPES",
     "SubscribeWorkspaceEventsOptions",
+    "UserNotificationEventsQuery",
     "WORKSPACE_EVENT_TYPES",
     "WaitWorkspaceEnvelopeOptions",
     "WorkspaceEventActor",
@@ -2019,14 +2021,18 @@
     "parseWorkspaceEventEnvelope",
     "resetWorkspaceEventStreams",
     "resetWorkspaceEventStreamsForTests",
+    "subscribeUserNotificationEvents",
     "subscribeWorkspaceEvent",
     "subscribeWorkspaceMediaInvalidation",
+    "userNotificationEventsSuffix",
+    "userNotificationEventsUrl",
     "waitForWorkspaceEnvelope",
     "workspaceEventsSuffix",
     "workspaceEventsUrl"
   ],
   "src/api/workspaceTaskContract.ts": [
     "CreateWorkspaceTaskInput",
+    "WORKSPACE_TASK_STATUSES",
     "WorkspaceTaskBillingSnapshot",
     "WorkspaceTaskItem",
     "WorkspaceTaskOutputRef",
@@ -2533,8 +2539,6 @@
   ],
   "src/core/query/taskResult.ts": [
     "TaskImageResult",
-    "TaskResultPayloadLike",
-    "extractImageResultsFromTaskPayload",
     "normalizeTaskImageResult",
     "normalizeTaskImageResults"
   ],
@@ -3804,6 +3808,7 @@
     "PendingImageResultLookup",
     "PendingImageResultNodeId",
     "PendingImageSupersededExecution",
+    "TaskImageOutcomeWaiter",
     "buildFusionBillingReadinessRequest",
     "buildGenerationTaskRequest",
     "buildImageActionReadinessRequest",
@@ -3828,7 +3833,7 @@
     "useCanvasBillingReadinessStore",
     "useCanvasExecutionWorkspace",
     "useImageWorkflowExecution",
-    "waitExistingOrLiveTaskImageResults"
+    "waitCanvasWorkspaceTaskImageOutcome"
   ],
   "src/features/canvas/session/execution/pending-execution/core.ts": [
     "PendingImageExecutionCore",

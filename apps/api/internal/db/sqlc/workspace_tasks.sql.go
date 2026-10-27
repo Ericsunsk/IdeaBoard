@@ -540,6 +540,7 @@ FROM media_assets AS m
 INNER JOIN workspaces AS w ON w.internal_id = m.workspace_id
 WHERE m.public_id = $1 AND w.public_id = $2 AND m.archived_at IS NULL
 LIMIT 1
+FOR KEY SHARE OF m
 `
 
 type GetWorkspaceMediaAssetIDParams struct {

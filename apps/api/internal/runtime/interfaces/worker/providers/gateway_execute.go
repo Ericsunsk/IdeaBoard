@@ -19,12 +19,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-const (
-	// defaultGatewayCallTimeout bounds one gateway attempt for ops whose
-	// provider latency is unknown but historically interactive.
-	defaultGatewayCallTimeout = 300 * time.Second
-)
-
 // CallGatewayAPI executes one drawing operation through the sole AI egress.
 // Transport, auth, and retries live inside the gateway; this method owns
 // parameter validation, media resolution, dialect shaping/parsing, and
@@ -102,7 +96,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	if params.Canonical != nil {
 		gatewayFeature = strings.TrimSpace(params.Canonical.Service)
 	}
-	callResult, err := c.callGatewayAdapter(ctx, task.TaskID, gatewayFeature, route, provider, modelName, customParams, providerReq, operation)
+	callResult, err := c.callGatewayAdapter(ctx, task.TaskID, gatewayFeature, route, provider, modelName, customParams, providerReq, operation, input.ExecutionToken)
 	providerFinishedAt := time.Now()
 	output.Timeline.ProviderFinishedAt = &providerFinishedAt
 	applyGatewayReceipt(&output, callResult.Receipt, model)
@@ -203,11 +197,6 @@ func baseGatewayTaskResult(task *tasks.TaskPayload, model string, callResult pro
 	return result
 }
 
-// gatewayCallTimeout bounds one gateway attempt per adapter family.
-func gatewayCallTimeout(_ providerdomain.ProviderRuntimeAdapter) time.Duration {
-	return defaultGatewayCallTimeout
-}
-
 // providerFailureCategory maps one provider call error to its failure
 // category. It inlines the former errors.go helper verbatim: timeout first,
 // then HTTP status mapping, provider error fallback.
@@ -253,23 +242,26 @@ func (c *Executor) callGatewayAdapter(
 	provider, model, customParams string,
 	providerReq providerRequest,
 	operation workflow.RuntimeOperation,
+	executionToken string,
 ) (providerCallResult, error) {
-	timeout := gatewayCallTimeout(route.Adapter)
+	// Single 300s budget shared with the gateway client default
+	// (runtimeports.GatewayDefaultTimeout, ADR-0010).
+	timeout := runtimeports.GatewayDefaultTimeout
 	switch route.Adapter {
 	case providerdomain.ProviderRuntimeAdapterModelImage:
-		return c.callGatewayModelImage(ctx, taskID, feature, provider, model, customParams, route, providerReq, operation, timeout)
+		return c.callGatewayModelImage(ctx, taskID, feature, provider, model, customParams, route, providerReq, operation, executionToken, timeout)
 	case providerdomain.ProviderRuntimeAdapterCutout:
 		payload, err := buildCutoutGatewayPayload(c, providerReq)
 		if err != nil {
 			return providerCallResult{}, err
 		}
-		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, errorrender.MsgBuildCutoutGatewayPayload, timeout)
+		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, errorrender.MsgBuildCutoutGatewayPayload, executionToken, timeout)
 	case providerdomain.ProviderRuntimeAdapterUpscale:
 		payload, err := buildUpscaleGatewayPayload(c, providerReq)
 		if err != nil {
 			return providerCallResult{}, err
 		}
-		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, errorrender.MsgBuildUpscaleGatewayPayload2, timeout)
+		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, errorrender.MsgBuildUpscaleGatewayPayload2, executionToken, timeout)
 	default:
 		return providerCallResult{}, fmt.Errorf("unsupported provider runtime adapter %d", route.Adapter)
 	}

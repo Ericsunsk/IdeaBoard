@@ -25,6 +25,9 @@ import {
 import { subscribeAuthStateReset } from '../core/utils/auth'
 import { isOpaqueId, opaqueIdPrefix } from './contractKernel'
 
+/** Ref-only inbox hints trigger REST refetches, never cache writes. */
+export const NOTIFICATION_EVENT_TYPES = ['notification.created', 'notification.updated'] as const
+
 export const WORKSPACE_EVENT_TYPES = [
   'task.created',
   'task.running',
@@ -36,6 +39,7 @@ export const WORKSPACE_EVENT_TYPES = [
   'board.document_replaced',
   'board.access_changed',
   'billing.settled',
+  ...NOTIFICATION_EVENT_TYPES,
 ] as const
 
 export type WorkspaceEventType = (typeof WORKSPACE_EVENT_TYPES)[number]
@@ -52,7 +56,7 @@ export type WorkspaceEventActor = {
 }
 
 export type WorkspaceEventResource = {
-  type: 'task' | 'board' | 'media_asset' | 'checkout_session'
+  type: 'task' | 'board' | 'media_asset' | 'checkout_session' | 'invite'
   id: string
 }
 
@@ -190,6 +194,34 @@ export function workspaceEventsUrl(workspaceId: string, query?: WorkspaceEventsQ
   return resolveApiUrl(workspaceEventsSuffix(workspaceId, query))
 }
 
+/**
+ * Per-user notification hint stream (`GET /api/v1/user/notifications/events`).
+ * Same versioned envelopes and same frozen registry as the workspace stream,
+ * but recipient-addressed: the server only delivers hints for the
+ * authenticated user's own inbox, so pending invitees (no membership yet)
+ * converge here. Unknown cursors resume with a `gap` notice exactly like
+ * the workspace transport; unknown types fail closed before delivery.
+ */
+export type UserNotificationEventsQuery = {
+  types?: readonly string[] | undefined
+  lastEventId?: string | undefined
+}
+
+export function userNotificationEventsSuffix(query?: UserNotificationEventsQuery): string {
+  const search = new URLSearchParams()
+  const types = normalizeWorkspaceEventTypesFilter(query?.types)
+  if (types.length > 0) search.set('types', types.join(','))
+  const cursor = query?.lastEventId?.trim() ?? ''
+  if (cursor.length > 0) search.set('last_event_id', assertEvtId(cursor, 'cursor'))
+  const suffix = '/v1/user/notifications/events'
+  const serialized = search.toString()
+  return serialized.length > 0 ? `${suffix}?${serialized}` : suffix
+}
+
+export function userNotificationEventsUrl(query?: UserNotificationEventsQuery): string {
+  return resolveApiUrl(userNotificationEventsSuffix(query))
+}
+
 export type WorkspaceEventListener = (envelope: WorkspaceEventEnvelope) => void
 export type WorkspaceEventGapListener = (info: { lastEventId: string }) => void
 
@@ -204,8 +236,10 @@ const RECONNECT_INITIAL_DELAY_MS = EVENT_STREAM_RECONNECT_INITIAL_DELAY_MS
 const RECONNECT_MAX_DELAY_MS = EVENT_STREAM_RECONNECT_MAX_DELAY_MS
 const RECONNECT_BACKOFF_FACTOR = EVENT_STREAM_RECONNECT_BACKOFF_FACTOR
 
+type StreamTarget = { kind: 'workspace'; workspaceId: string } | { kind: 'user' }
+
 type WorkspaceStreamEntry = {
-  workspaceId: string
+  target: StreamTarget
   types: string[]
   source: EventSource | null
   listeners: Set<WorkspaceEventListener>
@@ -214,13 +248,23 @@ type WorkspaceStreamEntry = {
   lastEventId: string
   reconnectDelayMs: number
   reconnectTimer: ReturnType<typeof setTimeout> | null
-  closed: boolean
+  isClosed: boolean
 }
 
 const streams = new Map<string, WorkspaceStreamEntry>()
 
-function streamKey(workspaceId: string, types: readonly string[]): string {
-  return types.length === 0 ? workspaceId : `${workspaceId}|${types.join(',')}`
+function streamKey(target: StreamTarget, types: readonly string[]): string {
+  const scope = target.kind === 'user' ? 'user' : target.workspaceId
+  return types.length === 0 ? scope : `${scope}|${types.join(',')}`
+}
+
+function entryUrl(entry: WorkspaceStreamEntry): string {
+  const query = {
+    ...(entry.types.length > 0 ? { types: entry.types } : {}),
+    ...(entry.lastEventId.length > 0 ? { lastEventId: entry.lastEventId } : {}),
+  }
+  if (entry.target.kind === 'user') return userNotificationEventsUrl(query)
+  return workspaceEventsUrl(entry.target.workspaceId, query)
 }
 
 function transportTypes(entry: WorkspaceStreamEntry): readonly string[] {
@@ -235,7 +279,7 @@ function clearReconnectTimer(entry: WorkspaceStreamEntry): void {
 }
 
 function closeEntry(entry: WorkspaceStreamEntry): void {
-  entry.closed = true
+  entry.isClosed = true
   clearReconnectTimer(entry)
   if (entry.source) {
     entry.source.close()
@@ -248,7 +292,7 @@ function closeWhenIdle(entry: WorkspaceStreamEntry): void {
     return
   }
   closeEntry(entry)
-  const key = streamKey(entry.workspaceId, entry.types)
+  const key = streamKey(entry.target, entry.types)
   // A reset can close this generation and a new subscriber can immediately
   // create a replacement under the same key. Never let the old disposer
   // delete that replacement.
@@ -256,12 +300,12 @@ function closeWhenIdle(entry: WorkspaceStreamEntry): void {
 }
 
 function scheduleReconnect(entry: WorkspaceStreamEntry): void {
-  if (entry.closed || entry.reconnectTimer !== null) return
+  if (entry.isClosed || entry.reconnectTimer !== null) return
   const delay = entry.reconnectDelayMs
   entry.reconnectDelayMs = Math.min(delay * RECONNECT_BACKOFF_FACTOR, RECONNECT_MAX_DELAY_MS)
   entry.reconnectTimer = setTimeout(() => {
     entry.reconnectTimer = null
-    if (entry.closed) return
+    if (entry.isClosed) return
     openTransport(entry)
   }, delay)
 }
@@ -273,22 +317,24 @@ function handleEnvelopeFrame(entry: WorkspaceStreamEntry, raw: string): void {
   } catch {
     return
   }
-  if (envelope.workspace_id !== entry.workspaceId) return
+  // Workspace frames are audience-checked (one transport per workspace);
+  // user-stream frames are server-addressed to this inbox and carry no
+  // membership to check.
+  if (entry.target.kind === 'workspace' && envelope.workspace_id !== entry.target.workspaceId) {
+    return
+  }
   entry.lastEventId = envelope.id
   entry.reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS
   for (const listener of entry.listeners) listener(envelope)
 }
 
 function openTransport(entry: WorkspaceStreamEntry): void {
-  if (entry.closed || typeof EventSource === 'undefined') return
+  if (entry.isClosed || typeof EventSource === 'undefined') return
   if (entry.source) {
     entry.source.close()
     entry.source = null
   }
-  const url = workspaceEventsUrl(entry.workspaceId, {
-    ...(entry.types.length > 0 ? { types: entry.types } : {}),
-    ...(entry.lastEventId.length > 0 ? { lastEventId: entry.lastEventId } : {}),
-  })
+  const url = entryUrl(entry)
   const source = new EventSource(url, { withCredentials: true })
   entry.source = source
   for (const type of transportTypes(entry)) {
@@ -306,7 +352,7 @@ function openTransport(entry: WorkspaceStreamEntry): void {
     // transport abandoned by its last consumer would otherwise schedule
     // reconnects forever with nobody reading the stream (zombie SSE).
     closeWhenIdle(entry)
-    if (entry.closed) return
+    if (entry.isClosed) return
     scheduleReconnect(entry)
   }
 }
@@ -325,13 +371,36 @@ export function subscribeWorkspaceEvent(
   options?: SubscribeWorkspaceEventsOptions,
 ): () => void {
   const workspace = assertWorkspaceId(workspaceId.trim())
+  return subscribeStream({ kind: 'workspace', workspaceId: workspace }, listener, options)
+}
+
+/**
+ * Subscribe to the per-user notification hint stream. Shares the workspace
+ * stream's connection management, gap replay, types filtering, and `onGap`
+ * full-pull contract (same implementation, different outlet): the server
+ * addresses frames to this inbox, so no membership applies. Hints are a
+ * "refetch now" prompt; listeners must invalidate and GET, never write
+ * payloads into the cache.
+ */
+export function subscribeUserNotificationEvents(
+  listener: WorkspaceEventListener,
+  options?: SubscribeWorkspaceEventsOptions,
+): () => void {
+  return subscribeStream({ kind: 'user' }, listener, options)
+}
+
+function subscribeStream(
+  target: StreamTarget,
+  listener: WorkspaceEventListener,
+  options?: SubscribeWorkspaceEventsOptions,
+): () => void {
   const types = normalizeWorkspaceEventTypesFilter(options?.types)
-  const key = streamKey(workspace, types)
+  const key = streamKey(target, types)
   let entry = streams.get(key)
   let isNewEntry = false
-  if (!entry || entry.closed) {
+  if (!entry || entry.isClosed) {
     entry = {
-      workspaceId: workspace,
+      target,
       types,
       source: null,
       listeners: new Set(),
@@ -340,7 +409,7 @@ export function subscribeWorkspaceEvent(
       lastEventId: options?.lastEventId?.trim() ?? '',
       reconnectDelayMs: RECONNECT_INITIAL_DELAY_MS,
       reconnectTimer: null,
-      closed: false,
+      isClosed: false,
     }
     if (entry.lastEventId.length > 0) assertEvtId(entry.lastEventId, 'cursor')
     streams.set(key, entry)

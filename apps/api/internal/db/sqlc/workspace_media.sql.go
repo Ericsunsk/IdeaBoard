@@ -54,6 +54,25 @@ func (q *Queries) ArchiveMediaAsset(ctx context.Context, arg ArchiveMediaAssetPa
 	return i, err
 }
 
+const archiveUnreferencedMediaAsset = `-- name: ArchiveUnreferencedMediaAsset :execrows
+UPDATE media_assets AS m
+SET archived_at = COALESCE(m.archived_at, now())
+WHERE m.internal_id = $1
+AND NOT EXISTS (SELECT 1 FROM task_outputs AS o WHERE o.media_asset_id = m.internal_id)
+AND NOT EXISTS (SELECT 1 FROM media_asset_task_origins AS o WHERE o.media_asset_id = m.internal_id)
+AND NOT EXISTS (SELECT 1 FROM board_document_media_refs AS r WHERE r.media_asset_id = m.internal_id)
+AND NOT EXISTS (SELECT 1 FROM library_assets AS l WHERE l.media_asset_id = m.internal_id)
+AND NOT EXISTS (SELECT 1 FROM library_materializations AS l WHERE l.media_asset_id = m.internal_id)
+`
+
+func (q *Queries) ArchiveUnreferencedMediaAsset(ctx context.Context, internalID int64) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveUnreferencedMediaAsset, internalID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const completeUploadSession = `-- name: CompleteUploadSession :one
 UPDATE upload_sessions AS u
 SET status = 'completed', storage_key = $1, completed_at = now()
@@ -593,6 +612,28 @@ func (q *Queries) ListTaskMediaAssets(ctx context.Context, arg ListTaskMediaAsse
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockMediaAssetForCompensation = `-- name: LockMediaAssetForCompensation :one
+SELECT m.internal_id
+FROM media_assets AS m
+INNER JOIN workspaces AS w ON w.internal_id = m.workspace_id
+WHERE m.public_id = $1 AND w.public_id = $2
+FOR UPDATE OF m
+`
+
+type LockMediaAssetForCompensationParams struct {
+	PublicID          string `json:"public_id"`
+	WorkspacePublicID string `json:"workspace_public_id"`
+}
+
+// Compensation locks the asset before checking durable reference facts.
+// The second statement gets a fresh snapshot after an in-flight writer commits.
+func (q *Queries) LockMediaAssetForCompensation(ctx context.Context, arg LockMediaAssetForCompensationParams) (int64, error) {
+	row := q.db.QueryRow(ctx, lockMediaAssetForCompensation, arg.PublicID, arg.WorkspacePublicID)
+	var internal_id int64
+	err := row.Scan(&internal_id)
+	return internal_id, err
 }
 
 const markUploadSessionTransferring = `-- name: MarkUploadSessionTransferring :one

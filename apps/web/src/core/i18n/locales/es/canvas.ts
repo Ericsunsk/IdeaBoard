@@ -34,6 +34,7 @@ export default {
   task: {
     stillProcessing: 'Aún se está procesando; vuelva a comprobarlo en un momento.',
     cancelled: 'Tarea cancelada',
+    cancelledWithPartialResults: 'Tarea cancelada — resultados parciales conservados en el lienzo.',
     progressTimeout: 'Esto está tardando más de lo esperado. Vuelva a comprobarlo en un momento.',
     progressDataInvalid:
       'Los datos de progreso de la tarea no parecen válidos. Inténtelo de nuevo.',

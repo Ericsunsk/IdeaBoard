@@ -428,6 +428,28 @@ describe('PendingImageExecutionCore', () => {
     expect(core.factFor(imageNodeId(2))).toMatchObject({ status: 'failed' })
   })
 
+  it('retries transient graph write failures in place before failing', async () => {
+    const store = createPendingResultStore(['task-1'])
+    const core = createPendingImageExecutionCore()
+    const beginTransaction = vi.spyOn(store.store, 'beginTransaction')
+    const transient = new Error('transient revision conflict')
+    beginTransaction.mockImplementationOnce(() => {
+      throw transient
+    })
+    const attachment = core.attachBoard(
+      BoardGraphSession.create('board-a', { graphSession: store }),
+    )
+    const lease = requireLease(hydrateLease(core, attachment, imageNodeId(1), 'task-1'))
+
+    const completion = core.materializeBatch([
+      { lease, result: { url: 'https://example.com/1.png', ratio: 1 } },
+    ])
+
+    expect(beginTransaction).toHaveBeenCalledTimes(2)
+    expect(completion.outcomes).toEqual([{ resultNodeId: imageNodeId(1), kind: 'materialized' }])
+    expect(core.factFor(imageNodeId(1))).toMatchObject({ status: 'succeeded' })
+  })
+
   it.each(mutationContractViolations)(
     'fails closed when the mutation port returns $name',
     ({ result }) => {

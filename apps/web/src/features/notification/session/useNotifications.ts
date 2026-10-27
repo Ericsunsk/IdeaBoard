@@ -32,7 +32,7 @@ import {
   notificationFeedParams,
   type NotificationCenterTab,
 } from './readFilters'
-import { useNotificationReads } from './reads'
+import { invalidateNotificationQueries, useNotificationReads } from './reads'
 
 export interface UseNotificationsOptions {
   enabled?: MaybeRefOrGetter<boolean>
@@ -44,8 +44,10 @@ export interface UseNotificationsOptions {
  * Notification query invalidation sets. Three sets exist and each flow
  * converges on exactly one of them (never a mix):
  *
- * - Notification pair (`invalidateNotificationQueries`): list + unread
- *   count. Authoritative for read/archive paths only.
+ * - Notification pair (`invalidateNotificationQueries`, owned by
+ *   `reads.ts`): list + unread count. Authoritative for read/archive
+ *   paths and for realtime hints (push frames and gap notices invalidate;
+ *   payloads never write the cache).
  * - Invite-acceptance set (`syncInviteAcceptanceQueries`): membership
  *   scopes (workspaces/organizations) + user invite lists + notification
  *   pair. Authoritative for every invite-accept path (session accept flows
@@ -58,13 +60,6 @@ export interface UseNotificationsOptions {
  * read mutation performs its own notification sync and cannot gate membership
  * convergence or change the business decision outcome.
  */
-async function invalidateNotificationQueries(queryClient: QueryClient): Promise<void> {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: getListUserNotificationsQueryKey() }),
-    queryClient.invalidateQueries({ queryKey: getGetUserNotificationsUnreadCountQueryKey() }),
-  ])
-}
-
 /**
  * Shared invite-acceptance invalidation: membership scopes, invite lists,
  * and notification queries. Used by session accept flows and the workspace

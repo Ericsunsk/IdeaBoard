@@ -42,7 +42,3 @@ func (ChatDialect) Encode(req Request) ([]byte, error) {
 	}
 	return encoded, nil
 }
-
-func (ChatDialect) Decode(body []byte) ([]string, error) {
-	return decodeWithPaths(body)
-}

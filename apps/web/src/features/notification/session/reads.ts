@@ -1,4 +1,4 @@
-import { computed, type Ref } from 'vue'
+import { computed, watch, type Ref } from 'vue'
 import { useInfiniteQuery, type QueryClient } from '@tanstack/vue-query'
 import {
   getGetUserNotificationsUnreadCountQueryKey,
@@ -6,9 +6,26 @@ import {
   listUserNotifications,
   useGetUserNotificationsUnreadCount,
 } from '@/api/generated-query/public/notifications/notifications'
+import {
+  NOTIFICATION_EVENT_TYPES,
+  subscribeUserNotificationEvents,
+} from '@/api/workspaceEventStream'
 import type { ListUserNotificationsParams } from '@/api/generated-query/public/model'
 
 const NOTIFICATION_POLL_INTERVAL_MS = 30_000
+
+/**
+ * Notification pair invalidation: list + unread count. Authoritative for
+ * read/archive paths and for realtime hints alike: a push frame only says
+ * "something changed, GET again", it never writes payloads into the cache.
+ * Queries also refetch every 30 seconds while active to close missed-hint gaps.
+ */
+export async function invalidateNotificationQueries(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: getListUserNotificationsQueryKey() }),
+    queryClient.invalidateQueries({ queryKey: getGetUserNotificationsUnreadCountQueryKey() }),
+  ])
+}
 
 /** Identity-scoped, bounded REST facts shared by the bell and open views. */
 export function useNotificationReads(options: {
@@ -60,5 +77,27 @@ export function useNotificationReads(options: {
     },
     queryClient,
   )
+
+  // Recipient hints do not require Workspace membership: pending invitees
+  // receive the same invalidation through the user stream. REST remains the
+  // fact source and polling closes gaps when realtime is unavailable.
+  watch(
+    [isEnabled, identity],
+    ([isPushEnabled, id], _previous, onCleanup) => {
+      if (!isPushEnabled || id == null) return
+      const invalidate = (): void => {
+        void invalidateNotificationQueries(queryClient)
+      }
+      onCleanup(
+        subscribeUserNotificationEvents(invalidate, {
+          types: [...NOTIFICATION_EVENT_TYPES],
+          onGap: invalidate,
+        }),
+      )
+      invalidate()
+    },
+    { immediate: true },
+  )
+
   return { notificationsQuery, unreadCountQuery }
 }

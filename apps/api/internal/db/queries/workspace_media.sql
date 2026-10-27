@@ -124,6 +124,25 @@ AND w.public_id = sqlc.arg(workspace_public_id)
 AND m.archived_at IS NULL
 RETURNING m.internal_id, m.public_id, m.workspace_id, m.upload_session_id, m.owner_user_id, m.storage_key, m.mime_type, m.size_bytes, m.checksum, m.media_kind, m.width, m.height, m.duration_ms, m.metadata, m.created_at, m.archived_at;
 
+-- Compensation locks the asset before checking durable reference facts.
+-- The second statement gets a fresh snapshot after an in-flight writer commits.
+-- name: LockMediaAssetForCompensation :one
+SELECT m.internal_id
+FROM media_assets AS m
+INNER JOIN workspaces AS w ON w.internal_id = m.workspace_id
+WHERE m.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id)
+FOR UPDATE OF m;
+
+-- name: ArchiveUnreferencedMediaAsset :execrows
+UPDATE media_assets AS m
+SET archived_at = COALESCE(m.archived_at, now())
+WHERE m.internal_id = sqlc.arg(internal_id)
+AND NOT EXISTS (SELECT 1 FROM task_outputs AS o WHERE o.media_asset_id = m.internal_id)
+AND NOT EXISTS (SELECT 1 FROM media_asset_task_origins AS o WHERE o.media_asset_id = m.internal_id)
+AND NOT EXISTS (SELECT 1 FROM board_document_media_refs AS r WHERE r.media_asset_id = m.internal_id)
+AND NOT EXISTS (SELECT 1 FROM library_assets AS l WHERE l.media_asset_id = m.internal_id)
+AND NOT EXISTS (SELECT 1 FROM library_materializations AS l WHERE l.media_asset_id = m.internal_id);
+
 -- UpdateMediaAssetMetadata refreshes dimensions and merges metadata
 -- (read-modify-write merge: unknown keys from other writers survive).
 -- name: UpdateMediaAssetMetadata :one

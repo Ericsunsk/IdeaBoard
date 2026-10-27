@@ -4,8 +4,8 @@ package workspacetasks
 //
 // The board suite below runs Service.Create through createInTx (the
 // single-PostgreSQL-transaction path): every seam createInTx requires is
-// present here as an in-memory fake, so settlementSeams() reports
-// handled=true. Production fail-closed direction is unchanged: a nil seam
+// present here as an in-memory fake. Transaction capabilities are explicit;
+// production still fails closed when a required dependency is nil. A nil seam
 // still fails closed (ErrSettlementUnavailable), it is the TEST wiring
 // that now supplies every seam.
 //
@@ -57,6 +57,24 @@ func fakeTxFrom(tx pgx.Tx) *fakeTx {
 	return fake
 }
 
+// restoreOnRollback registers the pre-image of one task row on the fake
+// transaction so a settlement rollback restores it. Production rolls the
+// state flip back when the settlement unit fails (Capture error,
+// settlement write error); the immediate in-memory write above restores
+// its pre-image on rollback so the fake keeps that atomicity instead of
+// leaking a flipped task.
+func restoreOnRollback(fake *fakeTx, store *InMemoryStore, workspaceID, taskID string, before *WorkspaceTask) {
+	if fake == nil || store == nil || before == nil {
+		return
+	}
+	snapshot := *before
+	fake.onRollback = append(fake.onRollback, func() {
+		store.mu.Lock()
+		defer store.mu.Unlock()
+		store.tasks[taskKey(workspaceID, taskID)] = &snapshot
+	})
+}
+
 // txTestStore wraps the InMemoryStore with the settlement-transaction
 // seams. Task rows are written immediately (same-tx read-your-write), and
 // every durable write registers its undo on the fake transaction so a
@@ -102,16 +120,34 @@ func (s *txTestStore) GetTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, ta
 	return s.GetTask(ctx, workspaceID, taskID)
 }
 
-func (s *txTestStore) CompleteTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID string, outputs []OutputRef) (*WorkspaceTask, error) {
-	return s.CompleteTask(ctx, workspaceID, taskID, outputs)
+func (s *txTestStore) CompleteTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, outputs []OutputRef) (*WorkspaceTask, error) {
+	before, _ := s.GetTask(ctx, workspaceID, taskID)
+	completed, err := s.CompleteTask(ctx, workspaceID, taskID, outputs)
+	if err != nil {
+		return nil, err
+	}
+	restoreOnRollback(fakeTxFrom(tx), s.InMemoryStore, workspaceID, taskID, before)
+	return completed, nil
 }
 
-func (s *txTestStore) FailTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID, errorMsg string) (*WorkspaceTask, error) {
-	return s.FailTask(ctx, workspaceID, taskID, errorMsg)
+func (s *txTestStore) FailTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID, errorMsg string) (*WorkspaceTask, error) {
+	before, _ := s.GetTask(ctx, workspaceID, taskID)
+	failed, err := s.FailTask(ctx, workspaceID, taskID, errorMsg)
+	if err != nil {
+		return nil, err
+	}
+	restoreOnRollback(fakeTxFrom(tx), s.InMemoryStore, workspaceID, taskID, before)
+	return failed, nil
 }
 
-func (s *txTestStore) CancelTaskInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID string, actorUserID int64, reason string) (*WorkspaceTask, bool, error) {
-	return s.CancelTask(ctx, workspaceID, taskID, actorUserID, reason)
+func (s *txTestStore) CancelTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, actorUserID int64, reason string) (*WorkspaceTask, bool, error) {
+	before, _ := s.GetTask(ctx, workspaceID, taskID)
+	cancelled, already, err := s.CancelTask(ctx, workspaceID, taskID, actorUserID, reason)
+	if err != nil || already {
+		return cancelled, already, err
+	}
+	restoreOnRollback(fakeTxFrom(tx), s.InMemoryStore, workspaceID, taskID, before)
+	return cancelled, already, nil
 }
 
 func (s *txTestStore) TransitionForRetryInTx(ctx context.Context, _ pgx.Tx, workspaceID, taskID, newToken string) (*WorkspaceTask, error) {
@@ -294,7 +330,7 @@ func newTxBoardTestEnv(boards BoardAuthorizer) *txBoardTestEnv {
 	env.store = env.txStore.InMemoryStore
 	saved := env.saved
 	env.service = NewService(ServiceDeps{
-		TaskRead: env.store, TaskLifecycle: env.txStore,
+		TaskRead: env.store, TaskLifecycle: env.txStore, SubmissionClaims: env.txStore, BillingAccounts: env.txStore,
 		Quoter: env.quoter, Holder: env.holder, Queue: env.queue,
 		Resolver: allowTestPoolResolverInTx(),
 		SnapshotSaver: func(_ context.Context, _ pgx.Tx, taskID string, snap routing.RoutingSnapshot) error {

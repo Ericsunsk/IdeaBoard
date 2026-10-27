@@ -38,7 +38,7 @@ func newWorkerIntegrationService(env *workspaceIntegrationEnv) (*workspacetasks.
 	// TaskBilling stays nil and the claim fence is in-memory: the fixture
 	// schema carries neither billing fact table (see integration_test.go).
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
-		TaskRead: env.tasks, TaskLifecycle: txStore, Quoter: &integrationQuoter{}, Holder: holder, Queue: queue,
+		TaskRead: env.tasks, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: &integrationQuoter{}, Holder: holder, Queue: queue,
 		Assets: assets, Resolver: allowTestPoolResolver(),
 		SnapshotSaver: workerNoopSnapshotSaver,
 		Acceptance:    &workerTestAcceptance{assets: assets},

@@ -1,26 +1,21 @@
 package dbutil
 
-// Ambient guard transaction carrier (control audit atomicity, step 3).
-//
-// Step 2 stages exactly one pgx transaction per guarded Control Plane
-// mutation at the guard (the single choke point every guarded mutation
-// flows through) and the audit row joins it before commit. Step 3 closes
-// the remaining crash window by letting the domain-owned business writes
-// join that SAME transaction instead of committing in their own.
+// Ambient transaction carrier shared by transaction owners and participants.
+// Control guards and Invitations own outer transactions; domain writes join
+// the same transaction so their facts commit atomically.
 //
 // LIFECYCLE OWNERSHIP (load-bearing, read before touching):
-//   - The GUARD begins the transaction (one per guarded mutation) and is
-//     the ONLY owner of Commit and Rollback.
+//   - The scope that begins the transaction is its ONLY owner of Commit
+//     and Rollback.
 //   - A domain participant that finds a carrier via AmbientTxFromContext
 //     MUST run its statements on it and MUST NEVER Commit or Rollback it.
-//     Committing a borrowed transaction would double-commit the guard's
-//     unit; rolling it back would discard the guard's audit row and every
-//     sibling participant's writes.
+//     Committing a borrowed transaction would double-commit the owner's
+//     unit; rolling it back would discard every participant's writes.
 //   - Nesting depth is 1: a carrier already in context is reused as-is.
 //     pgx has no true nested transactions and savepoints are not needed
 //     here, because every participant shares one flat unit of commit.
-//   - With no carrier in context the caller keeps its legacy behavior
-//     (begin/commit/rollback its own transaction), byte for byte.
+//   - With no carrier in context the caller manages its own persistence
+//     scope, including any required transaction and post-commit registry.
 //
 // WHY THIS LIVES IN DBUTIL
 // The carrier must be readable from both the Control Plane guard and the
@@ -40,8 +35,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ambientTxContextKey carries the guard-owned transaction for one guarded
-// mutation. It is private so no other package can mint a competing key.
+// ambientTxContextKey carries the owner-managed transaction for one mutation.
+// It is private so no other package can mint a competing key.
 type ambientTxContextKey struct{}
 
 // ContextWithAmbientTx returns ctx carrying the caller-owned transaction.
@@ -54,10 +49,9 @@ func ContextWithAmbientTx(ctx context.Context, tx pgx.Tx) context.Context {
 	return context.WithValue(ctx, ambientTxContextKey{}, tx)
 }
 
-// AmbientTxFromContext extracts the guard-owned transaction, if any. The
-// second return is false when the call runs outside a guard scope (legacy
-// path: the caller manages its own transaction) or when the staged value
-// is nil. A returned transaction is BORROWED: the caller must use it for
+// AmbientTxFromContext extracts the owner-managed transaction, if any. The
+// second return is false when no transaction is carried or the value is nil.
+// A returned transaction is BORROWED: the caller must use it for
 // statements only and must never commit or roll it back.
 func AmbientTxFromContext(ctx context.Context) (pgx.Tx, bool) {
 	if ctx == nil {
@@ -70,22 +64,19 @@ func AmbientTxFromContext(ctx context.Context) (pgx.Tx, bool) {
 	return tx, true
 }
 
-// ambientPostCommitKey carries the post-commit hook registry for one
-// guarded mutation (#889). It is separate from ambientTxContextKey on
-// purpose: the transaction carrier predates post-commit announcements
-// and is constructed by scopes the guard does not control in tests, so
-// the registry rides its own key and is simply absent there.
+// ambientPostCommitKey carries the post-commit hook registry independently
+// from the transaction carrier. Owners install both when participants need
+// deferred publication; a transaction carrier alone does not imply a registry.
 type ambientPostCommitKey struct{}
 
-// AmbientPostCommit buffers post-commit callbacks for one guarded
-// mutation (#889: task cancel transitions).
+// AmbientPostCommit buffers post-commit callbacks for one transaction.
 //
 // POST-COMMIT SEMANTICS (load-bearing):
-//   - Hooks run ONLY after the guard-owned transaction commits. The
-//     guard runs them exactly once, synchronously, right after its
+//   - Hooks run ONLY after the owner-managed transaction commits. The
+//     owner runs them exactly once, synchronously, right after its
 //     successful Commit.
 //   - Hooks NEVER run on rollback, audit failure, or commit failure:
-//     the guard returns before the run line on those paths, so the
+//     the owner returns before the run line on those paths, so the
 //     registered callbacks are dropped with the context and publish
 //     nothing. There is no explicit discard call.
 //   - Hooks run OUTSIDE the transaction (it already committed), so they
@@ -101,9 +92,9 @@ type AmbientPostCommit struct {
 }
 
 // ContextWithAmbientPostCommit returns ctx carrying an empty post-commit
-// hook registry for the current guarded mutation. The guard is the only
-// production caller (right after its TxScope.Begin); tests attach it to
-// a carrier to prove deferral without the guard.
+// hook registry for the current transaction. Control guards and Invitations
+// transaction owners install it after beginning their transaction; tests
+// may attach it to a carrier to prove deferral.
 func ContextWithAmbientPostCommit(ctx context.Context) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
@@ -111,11 +102,10 @@ func ContextWithAmbientPostCommit(ctx context.Context) context.Context {
 	return context.WithValue(ctx, ambientPostCommitKey{}, &AmbientPostCommit{})
 }
 
-// DeferAmbientPostCommit registers fn to run after the guard-owned
-// transaction commits. It reports false (and registers nothing) when
-// ctx carries no registry — raw carriers outside the guard, legacy
-// callers — so participants can fall back to their legacy behavior.
-// A nil fn is rejected the same way.
+// DeferAmbientPostCommit registers fn to run after the outer transaction
+// commits. It reports false without registering when the registry is absent
+// or already run, or fn is nil. Participants must enforce their own contract:
+// Notifications rejects ambient writes before persistence if registration fails.
 func DeferAmbientPostCommit(ctx context.Context, fn func(context.Context)) bool {
 	if ctx == nil || fn == nil {
 		return false
@@ -136,7 +126,7 @@ func DeferAmbientPostCommit(ctx context.Context, fn func(context.Context)) bool 
 // RunAmbientPostCommit runs the registered hooks in registration order.
 // It is a no-op without a registry, with no hooks, or when called twice:
 // exactly-once execution is enforced here so a repeated call can never
-// double-publish. The guard calls this once, immediately after its
+// double-publish. The transaction owner calls this once, immediately after its
 // successful Commit; hook errors are the hooks' own concern (announcers
 // warn-log and never fail the already-committed settlement).
 func RunAmbientPostCommit(ctx context.Context) {

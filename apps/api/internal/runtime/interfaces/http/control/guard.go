@@ -28,7 +28,6 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/domain"
 	identityports "ideaboard/api/internal/identity/users/ports"
-	"ideaboard/api/internal/tenancy/funds"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	"ideaboard/api/internal/platform/adminbranding"
@@ -43,6 +42,7 @@ import (
 	tasksdomain "ideaboard/api/internal/tasking/domain"
 	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/tenancy/funds"
 	tenancypg "ideaboard/api/internal/tenancy/infrastructure/postgres"
 
 	"github.com/gin-gonic/gin"

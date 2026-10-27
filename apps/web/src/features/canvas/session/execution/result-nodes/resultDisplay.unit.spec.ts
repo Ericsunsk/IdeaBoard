@@ -4,17 +4,17 @@ import {
   resolveTaskImageResultDisplay,
 } from './resultDisplay'
 import {
-  getMediaAssetMetadata,
+  getWorkspaceMediaAssetMetadata,
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
 } from '../../../../../api/mediaAssetDelivery'
 
 vi.mock('../../../../../api/mediaAssetDelivery', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../../api/mediaAssetDelivery')>()
-  return { ...original, getMediaAssetMetadata: vi.fn() }
+  return { ...original, getWorkspaceMediaAssetMetadata: vi.fn() }
 })
 
-const metadataMock = vi.mocked(getMediaAssetMetadata)
+const metadataMock = vi.mocked(getWorkspaceMediaAssetMetadata)
 
 function readyMetadata(assetId = 'asset_1') {
   return {
@@ -47,7 +47,7 @@ describe('resultDisplay', () => {
 
     await expect(
       resolveTaskImageResultDisplay(
-        { url: 'https://example.com/output.png', assetId: 'asset_1' },
+        { workspaceId: 'ws_test123', assetId: 'asset_1' },
         1,
         loadImageSize,
       ),
@@ -55,7 +55,7 @@ describe('resultDisplay', () => {
       url: '/api/v1/workspaces/ws_test123/media-assets/asset_1/derivatives/preview',
       ratio: 0.5,
     })
-    expect(metadataMock).toHaveBeenCalledWith('asset_1')
+    expect(metadataMock).toHaveBeenCalledWith('ws_test123', 'asset_1', { signal: undefined })
     expect(loadImageSize).toHaveBeenCalled()
   })
 
@@ -66,7 +66,7 @@ describe('resultDisplay', () => {
 
     await expect(
       resolveTaskImageResultDisplay(
-        { url: 'https://example.com/output.png', assetId: 'asset_1' },
+        { workspaceId: 'ws_test123', assetId: 'asset_1' },
         1,
         vi.fn(async () => ({ width: 400, height: 200 })),
       ),
@@ -85,7 +85,7 @@ describe('resultDisplay', () => {
 
     await expect(
       resolveTaskImageResultDisplay(
-        { url: ' https://example.com/output.png ', assetId: 'asset_1', width: 400, height: 200 },
+        { workspaceId: 'ws_test123', assetId: 'asset_1', width: 400, height: 200 },
         1,
         loadImageSize,
       ),
@@ -104,7 +104,7 @@ describe('resultDisplay', () => {
 
     await expect(
       resolveTaskImageResultDisplay(
-        { url: 'https://example.com/output.png', width: 400, height: 200, assetId: 'asset_42' },
+        { workspaceId: 'ws_test123', width: 400, height: 200, assetId: 'asset_42' },
         1,
         loadImageSize,
       ),
@@ -119,7 +119,7 @@ describe('resultDisplay', () => {
 
     await expect(
       resolveTaskImageResultDisplay(
-        { url: 'https://example.com/output.png', assetId: 'asset_1' },
+        { workspaceId: 'ws_test123', assetId: 'asset_1' },
         1.25,
         loadImageSize,
       ),
@@ -130,6 +130,8 @@ describe('resultDisplay', () => {
     })
     expect(loadImageSize).toHaveBeenCalledWith(
       '/api/v1/workspaces/ws_test123/media-assets/asset_1/derivatives/preview',
+      undefined,
+      undefined,
     )
   })
 
@@ -137,8 +139,8 @@ describe('resultDisplay', () => {
     await expect(
       resolveTaskImageResultAtIndexDisplay(
         [
-          { url: 'https://example.com/second.png', assetId: 'asset_2', resultIndex: 1 },
-          { url: 'https://example.com/first.png', assetId: 'asset_1', resultIndex: 0 },
+          { workspaceId: 'ws_test123', assetId: 'asset_2', resultIndex: 1 },
+          { workspaceId: 'ws_test123', assetId: 'asset_1', resultIndex: 0 },
         ],
         0,
         1,

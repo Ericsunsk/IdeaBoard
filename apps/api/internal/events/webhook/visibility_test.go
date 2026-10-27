@@ -68,6 +68,9 @@ func protectedWebhookEnvelope(t *testing.T, typ string) events.V1Envelope {
 	case events.EventV1BoardAccessChanged:
 		resource = events.V1Resource{Type: events.V1ResourceBoard, ID: "board_1"}
 		data = map[string]any{"board_id": "board_1", "member_id": "usr_1", "access_version": 1}
+	case events.EventV1NotificationCreated, events.EventV1NotificationUpdated:
+		resource = events.V1Resource{Type: events.V1ResourceInvite, ID: "wsi_1"}
+		data = map[string]any{"invite_id": "wsi_1", "notification_type": "workspace_invite"}
 	}
 	envelope, err := events.MintV1Envelope(typ, "ws_1", events.V1Actor{Type: events.V1ActorSystem, ID: "system"}, resource, data)
 	if err != nil {

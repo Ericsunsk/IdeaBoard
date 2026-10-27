@@ -2,10 +2,10 @@ package adapters
 
 // Workspace task credits bridge (#821, Phase 4-04 of #809).
 //
-// This holder adapts credits.Commands to workspacetasks.Holder. Only
+// This holder adapts credits.Commands to workspacetasks.TxHolder. Only
 // Credits owns ledger writes; this seam performs none directly.
 //
-// Both Holder variants receive the stable Billing Account and actual actor.
+// Commands receive the stable Billing Account and actual actor.
 // Transactional commands join the task settlement transaction through
 // credits.Service.SettlementInTx(tx); terminal commands use the persisted Task facts.
 // Credits sentinels already match the task boundary, so errors propagate
@@ -25,12 +25,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// WorkspaceTaskHolder adapts credits.Commands to workspacetasks.Holder.
+// WorkspaceTaskHolder adapts credits.Commands to workspacetasks.TxHolder.
 type WorkspaceTaskHolder struct {
 	credits *credits.Service
 }
 
-var _ workspacetasks.Holder = (*WorkspaceTaskHolder)(nil)
 var _ workspacetasks.TxHolder = (*WorkspaceTaskHolder)(nil)
 
 func NewWorkspaceTaskHolder(creditService *credits.Service) *WorkspaceTaskHolder {
@@ -45,68 +44,6 @@ func taskCommandMetadata(idempotencyKey, taskID string, actorUserID int64) domai
 		Reason:            errorrender.MsgTaskCommandMetadata,
 		BusinessReference: domain.BusinessReference{Type: "task", ID: taskID},
 	}
-}
-
-func (h *WorkspaceTaskHolder) Hold(ctx context.Context, billingAccountID, actorUserID int64, amount int64, idempotencyKey, taskID string) (string, error) {
-	if h == nil || h.credits == nil {
-		return "", fmt.Errorf("workspace task holder is not configured: %w", workspacetasks.ErrQuoteUnavailable)
-	}
-	if billingAccountID <= 0 {
-		return "", fmt.Errorf("workspace task holder: billing account required: %w", workspacetasks.ErrWalletRestricted)
-	}
-	creditAmount, err := domain.NewCreditAmount(amount)
-	if err != nil {
-		return "", fmt.Errorf("workspace task holder: %w", workspacetasks.ErrQuoteUnavailable)
-	}
-	result, err := h.credits.Settlement().Hold(ctx, ports.HoldCommand{
-		BillingAccountID: billingAccountID,
-		Amount:           creditAmount,
-		Metadata:         taskCommandMetadata(idempotencyKey, taskID, actorUserID),
-	})
-	if err != nil {
-		return "", err
-	}
-	return result.TransactionID, nil
-}
-
-func (h *WorkspaceTaskHolder) Capture(ctx context.Context, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) error {
-	if h == nil || h.credits == nil {
-		return fmt.Errorf("workspace task holder is not configured: %w", workspacetasks.ErrQuoteUnavailable)
-	}
-	if amount <= 0 {
-		return nil
-	}
-	creditAmount, err := domain.NewCreditAmount(amount)
-	if err != nil {
-		return fmt.Errorf("workspace task holder: %w", workspacetasks.ErrQuoteUnavailable)
-	}
-	_, err = h.credits.Settlement().Capture(ctx, ports.CaptureCommand{
-		BillingAccountID:  billingAccountID,
-		HoldTransactionID: holdTransactionID,
-		Amount:            creditAmount,
-		Metadata:          taskCommandMetadata(settlement.TaskCaptureKey(taskID), taskID, actorUserID),
-	})
-	return err
-}
-
-func (h *WorkspaceTaskHolder) Release(ctx context.Context, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) error {
-	if h == nil || h.credits == nil {
-		return fmt.Errorf("workspace task holder is not configured: %w", workspacetasks.ErrQuoteUnavailable)
-	}
-	if amount <= 0 {
-		return nil
-	}
-	creditAmount, err := domain.NewCreditAmount(amount)
-	if err != nil {
-		return fmt.Errorf("workspace task holder: %w", workspacetasks.ErrQuoteUnavailable)
-	}
-	_, err = h.credits.Settlement().Release(ctx, ports.ReleaseCommand{
-		BillingAccountID:  billingAccountID,
-		HoldTransactionID: holdTransactionID,
-		Amount:            creditAmount,
-		Metadata:          taskCommandMetadata(settlement.TaskReleaseKey(taskID), taskID, actorUserID),
-	})
-	return err
 }
 
 // HoldInTx reserves Ideas inside the settlement transaction through the
@@ -140,6 +77,13 @@ func (h *WorkspaceTaskHolder) HoldInTx(ctx context.Context, tx pgx.Tx, billingAc
 // CaptureInTx converges a hold to revenue inside the settlement
 // transaction using the persisted Task attribution. It satisfies
 // workspacetasks.TxHolder.
+//
+// A non-positive amount is a no-op returning ("", nil): the Credits
+// ledger rejects non-positive commands, so no ledger row and no
+// idempotency key are ever written for the zero leg. Terminal settlement
+// records the zero leg with a NULL transaction id (see
+// settleFreeTerminal); the tx-id/amount correspondence in the settlement
+// trigger treats NULL as the only valid zero-leg marker.
 func (h *WorkspaceTaskHolder) CaptureInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) (string, error) {
 	if h == nil || h.credits == nil {
 		return "", fmt.Errorf("workspace task holder is not configured: %w", workspacetasks.ErrQuoteUnavailable)
@@ -171,6 +115,13 @@ func (h *WorkspaceTaskHolder) CaptureInTx(ctx context.Context, tx pgx.Tx, billin
 
 // ReleaseInTx returns reserved Ideas inside the settlement transaction. It
 // satisfies workspacetasks.TxHolder.
+//
+// A non-positive amount is a no-op returning ("", nil): the Credits
+// ledger rejects non-positive commands, so no ledger row and no
+// idempotency key are ever written for the zero leg. Terminal settlement
+// records the zero leg with a NULL transaction id (see
+// settleFreeTerminal); the tx-id/amount correspondence in the settlement
+// trigger treats NULL as the only valid zero-leg marker.
 func (h *WorkspaceTaskHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, holdTransactionID string, amount int64, taskID string) (string, error) {
 	if h == nil || h.credits == nil {
 		return "", fmt.Errorf("workspace task holder is not configured: %w", workspacetasks.ErrQuoteUnavailable)

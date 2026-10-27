@@ -11,11 +11,13 @@ import { createPendingImageExecutionPublisher } from './publisher'
 import {
   assertPendingImageMutationContract,
   mapPendingImageMaterializationOutcomes,
+  PendingImageMutationContractError,
   preparePendingImageMaterialization,
   type PendingImageMaterializationSlot,
 } from './materialization'
 import { releasePendingImageExecutions, type PendingImageExecutionReleaseContext } from './release'
 import { attachmentRejection, isAttachmentCurrent, leaseRejection } from './validation'
+import { PENDING_IMAGE_MATERIALIZATION_ATTEMPTS } from '../canvasBudgets'
 
 export type {
   PendingImageExecutionStatus,
@@ -60,6 +62,13 @@ export class PendingImageMaterializationError extends Error {
 export { PendingImageMutationContractError } from './materialization'
 
 const ACTIVE_STATUSES: ReadonlySet<PendingImageExecutionStatus> = new Set(['submitting', 'running'])
+
+/**
+ * Board 落子有界重试 (#P1-5): 图写失败（revision 冲突等瞬态）在 facts
+ * 仍 active 时原地重试；契约违例是确定性实现错误，不重试直接进入
+ * 失败面。最终失败仍标记 failed、保留节点待重 attach 回收。
+ * 数值见 `../canvasBudgets`（冻结预算表，零变更收敛）。
+ */
 
 function requireIdentity(
   value: string,
@@ -395,11 +404,34 @@ export function createPendingImageExecutionCore(
       })
     }
 
-    let mutationResult: PendingImageDomainMutationResult
-    try {
-      mutationResult = mutationPort.materializeBatch(candidates.map(({ input }) => input))
-      assertPendingImageMutationContract(candidates, mutationResult)
-    } catch (cause) {
+    let mutationResult: PendingImageDomainMutationResult | undefined
+    let lastCause: unknown
+    let hasPendingCause = false
+    for (let attempt = 0; attempt < PENDING_IMAGE_MATERIALIZATION_ATTEMPTS; attempt += 1) {
+      try {
+        const candidate = mutationPort.materializeBatch(candidates.map(({ input }) => input))
+        assertPendingImageMutationContract(candidates, candidate)
+        if (hasPendingCause) {
+          // 前一次尝试已抛出：若重放发现全部 rejected（上次提交实际已
+          // 落盘、失败来自提交后的投影钩子），保留原始失败，不以重放
+          // 的 rejected 掩盖；若重放成功（含钩子）则视为 transient 恢复。
+          const didReplayLand = candidate.outcomes.every((outcome) => outcome.kind === 'rejected')
+          if (didReplayLand) break
+        }
+        mutationResult = candidate
+        break
+      } catch (cause) {
+        // 契约违例是确定性实现错误：不消耗重试预算，直接进入失败面
+        if (cause instanceof PendingImageMutationContractError) {
+          lastCause = cause
+          break
+        }
+        lastCause = cause
+        hasPendingCause = true
+      }
+    }
+    if (!mutationResult) {
+      const cause = lastCause
       candidates.forEach(({ index, lease }) => {
         const current = factsByNodeId.get(lease.resultNodeId)
         applyFact(

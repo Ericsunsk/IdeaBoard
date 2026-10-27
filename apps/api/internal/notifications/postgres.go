@@ -138,9 +138,10 @@ func (s *PostgresStore) MarkRead(ctx context.Context, userID int64, publicID str
 	return toDomainNotification(row), nil
 }
 
-func (s *PostgresStore) MarkAllRead(ctx context.Context, userID int64) (int64, error) {
+func (s *PostgresStore) MarkAllRead(ctx context.Context, userID int64) ([]*Notification, error) {
 	db := s.dbWithContext(ctx)
-	return db.q.MarkAllNotificationsAsRead(ctx, userID)
+	rows, err := db.q.MarkAllNotificationsAsRead(ctx, userID)
+	return toDomainNotifications(rows), err
 }
 
 func (s *PostgresStore) Archive(ctx context.Context, userID int64, publicID string) (*Notification, error) {
@@ -160,13 +161,14 @@ func (s *PostgresStore) Archive(ctx context.Context, userID int64, publicID stri
 	return toDomainNotification(row), nil
 }
 
-func (s *PostgresStore) MarkInviteResolved(ctx context.Context, inviteID string, status string) (int64, error) {
+func (s *PostgresStore) MarkInviteResolved(ctx context.Context, inviteID string, status string) ([]*Notification, error) {
 	db := s.dbWithContext(ctx)
 
-	return db.q.MarkInviteNotificationResolved(ctx, dbsqlc.MarkInviteNotificationResolvedParams{
+	rows, err := db.q.MarkInviteNotificationResolved(ctx, dbsqlc.MarkInviteNotificationResolvedParams{
 		InviteStatus: status,
 		InviteID:     inviteID,
 	})
+	return toDomainNotifications(rows), err
 }
 
 func toDomainNotification(row dbsqlc.UserNotification) *Notification {
@@ -193,4 +195,12 @@ func toDomainNotification(row dbsqlc.UserNotification) *Notification {
 	}
 
 	return notif
+}
+
+func toDomainNotifications(rows []dbsqlc.UserNotification) []*Notification {
+	items := make([]*Notification, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, toDomainNotification(row))
+	}
+	return items
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { WORKSPACE_TASK_STATUSES, isWorkspaceTaskTerminal } from '@/api/workspaceTaskContract'
 import {
   getTaskMetricByStatus,
   taskMetricDefinitions,
@@ -8,6 +9,35 @@ import {
 } from './taskMetricTokens'
 
 describe('taskMetricTokens', () => {
+  it('stays identical to the v1 task status contract (single source)', () => {
+    // Guard: the admin metric keys reuse the project contract tokens only
+    // (`@/api/workspaceTaskContract`: WORKSPACE_TASK_STATUSES); no parallel
+    // vocabulary lives here. The backend gate
+    // (`apps/api/internal/tasking/workspacetasks/status_parity_test.go`)
+    // reads both this file and the contract from disk, so a new backend
+    // status without a contract + token update fails there.
+    expect([...WORKSPACE_TASK_STATUSES]).toEqual([
+      'pending',
+      'running',
+      'completed',
+      'failed',
+      'cancelled',
+    ])
+    expect(Object.values(TaskStatus).sort()).toEqual([...WORKSPACE_TASK_STATUSES].sort())
+    expect(taskMetricDefinitions.map((item) => item.key)).toEqual([
+      'all',
+      ...WORKSPACE_TASK_STATUSES,
+    ])
+    expect(
+      taskMetricDefinitions.filter((item) => item.key !== 'all').map((item) => item.status),
+    ).toEqual([...WORKSPACE_TASK_STATUSES])
+    for (const status of WORKSPACE_TASK_STATUSES) {
+      const isTerminal = status === 'completed' || status === 'failed' || status === 'cancelled'
+      expect(isWorkspaceTaskTerminal(status)).toBe(isTerminal)
+      expect(getTaskMetricByStatus(status)?.key).toBe(status)
+    }
+  })
+
   it('defines the 6 core observability metrics in canonical lifecycle order', () => {
     const keys = taskMetricDefinitions.map((item) => item.key)
     expect(keys).toEqual(['all', 'pending', 'running', 'completed', 'failed', 'cancelled'])

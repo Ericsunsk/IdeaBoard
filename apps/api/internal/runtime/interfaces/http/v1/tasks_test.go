@@ -306,7 +306,7 @@ func newV1TaskFixture(t *testing.T, pools ...map[string]routing.Pool) *v1TaskFix
 	}
 	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
-		Tasks: txTasks, TaskLifecycle: txTasks,
+		Tasks: txTasks, TaskLifecycle: txTasks, TaskSubmissionClaims: txTasks,
 		TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets,
 		TaskRouter:          resolver,
 		TaskSnapshotSaver:   v1TxSnapshotSaver(saved),
@@ -862,7 +862,7 @@ func newV1PromptMaskFixture(t *testing.T) *v1PromptMaskFixture {
 	v1 := router.Group(runtimehttp.ContractV1GroupPath)
 	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
-		Tasks: txTasks, TaskLifecycle: txTasks,
+		Tasks: txTasks, TaskLifecycle: txTasks, TaskSubmissionClaims: txTasks,
 		TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets,
 		TaskCanonicalCompiler:    taskservice.CompileWorkspaceParams,
 		TaskRouter:               allowTestPoolResolver(),
@@ -1048,7 +1048,7 @@ func newV1TaskRoutingFixture(t *testing.T, pools map[string]routing.Pool) *v1Rou
 	v1 := router.Group(runtimehttp.ContractV1GroupPath)
 	RegisterContractV1Routes(v1, runtimehttp.AuthDeps{}, ContractV1Deps{
 		Store: base.store, Users: base.dir,
-		Tasks: base.txTasks, TaskLifecycle: base.txTasks,
+		Tasks: base.txTasks, TaskLifecycle: base.txTasks, TaskSubmissionClaims: base.txTasks,
 		TaskQuoter: base.quoter, TaskHolder: base.holder, TaskQueue: base.queue, TaskAssets: base.assets,
 		TaskRouter: resolver,
 		TaskSnapshotSaver: func(_ context.Context, _ pgx.Tx, taskID string, snap routing.RoutingSnapshot) error {

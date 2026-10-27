@@ -1,13 +1,16 @@
 package ports
 
-// These headers are part of the gateway's admin/probe HTTP contract. Runtime
-// execution owns a separate port contract; keeping this small set local avoids
-// making the business package depend on the runtime composition layer.
+import runtimeports "ideaboard/api/internal/runtime/ports"
+
+// The admin/probe HTTP contract aliases the runtime gateway header
+// contract (runtime/ports is canonical). Keeping this small set local
+// avoids making the business package depend on the runtime composition
+// layer at import time, but spellings stay pinned in one place.
 const (
-	GatewayHeaderAuthorization = "cf-aig-authorization"
-	GatewayHeaderMaxAttempts   = "cf-aig-max-attempts"
-	GatewayHeaderSkipCache     = "cf-aig-skip-cache"
-	GatewayHeaderModel         = "cf-aig-model"
+	GatewayHeaderAuthorization = runtimeports.GatewayHeaderAuthorization
+	GatewayHeaderMaxAttempts   = runtimeports.GatewayHeaderMaxAttempts
+	GatewayHeaderSkipCache     = runtimeports.GatewayHeaderSkipCache
+	GatewayHeaderModel         = runtimeports.GatewayHeaderModel
 	// HeaderAuthorization is the standard HTTP Authorization carrier for
 	// Cloudflare control-plane calls. Kept beside the cf-aig-* contract so
 	// probes and control-plane fetches share one spelling.

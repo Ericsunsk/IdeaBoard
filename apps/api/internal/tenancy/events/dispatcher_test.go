@@ -247,10 +247,9 @@ func TestCollaborationEventDispatcher_BillingTransferInitiated(t *testing.T) {
 	}
 
 	err := dispatcher.OnBillingTransferInitiated(ctx, transfer, tenancy.BillingTransferInitiatedParams{
-		FromUserPublicID:       "usr_owner10",
-		WorkspacePublicID:      "ws_main",
-		WorkspaceName:          "Main Studio",
-		BillingAccountPublicID: "bac_100",
+		FromUserPublicID:  "usr_owner10",
+		WorkspacePublicID: "ws_main",
+		WorkspaceName:     "Main Studio",
 	})
 	if err != nil {
 		t.Fatalf("OnBillingTransferInitiated error: %v", err)
@@ -269,9 +268,6 @@ func TestCollaborationEventDispatcher_BillingTransferInitiated(t *testing.T) {
 	}
 	if n.ActionPayload[notifications.PayloadKeyTransferInviteID] != "bti_trans1" {
 		t.Fatalf("expected transfer_invite_id bti_trans1, got %v", n.ActionPayload[notifications.PayloadKeyTransferInviteID])
-	}
-	if n.ActionPayload[notifications.PayloadKeyBillingAccountID] != "bac_100" {
-		t.Fatalf("expected billing_account_id bac_100, got %v", n.ActionPayload[notifications.PayloadKeyBillingAccountID])
 	}
 	if n.ActionPayload[notifications.PayloadKeyFromUserID] != "usr_owner10" {
 		t.Fatalf("expected from_user_id usr_owner10, got %v", n.ActionPayload[notifications.PayloadKeyFromUserID])

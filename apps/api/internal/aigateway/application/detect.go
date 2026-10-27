@@ -155,9 +155,8 @@ func extractGatewayIdentity(baseURL string) (accountID, gatewayID string) {
 	return "", ""
 }
 
-// resolveControlPlaneIdentity prefers the stored account/gateway IDs
-// (custom egress BaseURLs carry no parseable identity); URL parsing is
-// only a fallback. Pure for testability: no network.
+// resolveControlPlaneIdentity prefers the stored account/gateway IDs;
+// URL parsing is only a fallback. Pure for testability: no network.
 func resolveControlPlaneIdentity(gateway ResolvedGateway) (accountID, gatewayID string, err error) {
 	accountID = strings.TrimSpace(gateway.AccountID)
 	gatewayID = strings.TrimSpace(gateway.GatewayID)
@@ -199,9 +198,9 @@ func fetchHTTPBody(ctx context.Context, rawURL string, headers map[string]string
 	resp, err := detectOutbound.Do(ctx, httpReq, safehttp.RequestOptions{
 		Timeout:     timeout,
 		MaxAttempts: maxAttempts,
-		// Never authorize the URL's host implicitly. Control-plane,
-		// community-catalog, and custom-gateway egress must all be present
-		// in the operator-managed outbound policy.
+		// Never authorize the URL's host implicitly. Control-plane and
+		// community-catalog egress must all be present in the
+		// operator-managed outbound policy.
 		AllowHosts: safehttp.AllowHosts(ctx),
 		Target:     target,
 	})

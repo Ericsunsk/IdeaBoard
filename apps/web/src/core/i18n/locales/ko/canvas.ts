@@ -35,6 +35,7 @@ export default {
   task: {
     stillProcessing: '아직 처리 중입니다 — 잠시 후 다시 확인해 주세요.',
     cancelled: '작업이 취소되었습니다',
+    cancelledWithPartialResults: '작업이 취소되었습니다 — 부분 결과가 캔버스에 유지됩니다.',
     progressTimeout: '예상보다 오래 걸리고 있습니다. 잠시 후 다시 확인해 주세요.',
     progressDataInvalid: '작업 진행 데이터가 올바르지 않습니다. 다시 시도해 주세요.',
     failedGeneric: '이미지 생성에 실패했습니다. 다시 시도해 주세요.',

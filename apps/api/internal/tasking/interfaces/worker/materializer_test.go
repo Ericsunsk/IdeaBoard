@@ -28,8 +28,10 @@ func materializerTestDeps(media *workspacemedia.InMemoryWorkspaceMediaStore, obj
 	}
 }
 
-func materializerTestScope(ctx context.Context) context.Context {
-	return taskruntime.WithWorkspaceTaskScope(ctx, "ws_test")
+func materializerTestScope(ctx context.Context, taskID string) context.Context {
+	task := rendererTestTask()
+	task.ID = taskID
+	return taskruntime.WithResultIngestionScope(ctx, task)
 }
 
 func TestNewWorkspaceProviderResultMaterializerRequiresSeams(t *testing.T) {
@@ -67,13 +69,10 @@ func TestWorkspaceProviderMaterializerMissingScopeFailsClosed(t *testing.T) {
 	if _, err := materializer.MaterializeRemoteResults(context.Background(), 7, "task_noscope", []string{dataURL}, taskmedia.ResultMaterializeOptions{}); err == nil {
 		t.Fatal("missing scope = nil, want fail-closed")
 	}
-	if _, err := materializer.MaterializeBytesResult(context.Background(), 7, "task_noscope", "f.png", "", png, taskmedia.ResultMaterializeOptions{}); err == nil {
-		t.Fatal("missing scope (bytes) = nil, want fail-closed")
-	}
 }
 
 func TestWorkspaceProviderMaterializerIngestsInlineData(t *testing.T) {
-	ctx := materializerTestScope(context.Background())
+	ctx := materializerTestScope(context.Background(), "task_inline1")
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
 	objects := &fakeRendererObjects{}
 	materializer, err := taskruntime.NewWorkspaceProviderResultMaterializer(materializerTestDeps(media, objects))
@@ -114,12 +113,14 @@ func TestWorkspaceProviderMaterializerIngestsInlineData(t *testing.T) {
 }
 
 func TestWorkspaceProviderMaterializerDownloadsRemote(t *testing.T) {
-	ctx := materializerTestScope(context.Background())
+	ctx := materializerTestScope(context.Background(), "task_remote1")
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
 	objects := &fakeRendererObjects{}
 	png := fixturePNGBytes(t)
+	calls := 0
 	deps := materializerTestDeps(media, objects)
 	deps.Fetcher = taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, task *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef) ([]byte, error) {
+		calls++
 		if ref.URL != "https://cdn.example.com/fake-provider.png" {
 			return nil, errors.New("fake: unexpected fetch URL")
 		}
@@ -140,10 +141,27 @@ func TestWorkspaceProviderMaterializerDownloadsRemote(t *testing.T) {
 	if _, err := media.GetAsset(ctx, "ws_test", results.Items[0].Output.AssetID); err != nil {
 		t.Fatalf("ingested asset missing: %v", err)
 	}
+	renderer, err := taskruntime.NewWorkspaceTaskRenderer(taskruntime.WorkspaceTaskRendererDeps{Media: media, Assets: &workspacemedia.TaskAssetAdapter{Store: media}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	refs, err := mapWorkspaceProviderOutputs(results.Outputs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	task := rendererTestTask()
+	task.ID = "task_remote1"
+	if _, err := renderer.RenderOutputs(ctx, task, refs); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || len(objects.objects) != 1 {
+		t.Fatalf("fetches/ingests = %d/%d, want 1/1", calls, len(objects.objects))
+	}
+
 }
 
 func TestWorkspaceProviderMaterializerPassesAllowHostsToFetcher(t *testing.T) {
-	ctx := materializerTestScope(context.Background())
+	ctx := materializerTestScope(context.Background(), "task_hosts1")
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
 	objects := &fakeRendererObjects{}
 	png := fixturePNGBytes(t)
@@ -166,7 +184,7 @@ func TestWorkspaceProviderMaterializerPassesAllowHostsToFetcher(t *testing.T) {
 }
 
 func TestWorkspaceProviderMaterializerRejectsBadBytes(t *testing.T) {
-	ctx := materializerTestScope(context.Background())
+	ctx := materializerTestScope(context.Background(), "task_bad1")
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
 	materializer, err := taskruntime.NewWorkspaceProviderResultMaterializer(materializerTestDeps(media, &fakeRendererObjects{}))
 	if err != nil {
@@ -177,31 +195,62 @@ func TestWorkspaceProviderMaterializerRejectsBadBytes(t *testing.T) {
 		[]string{"data:image/png;base64," + badPayload}, taskmedia.ResultMaterializeOptions{}); err == nil {
 		t.Fatal("non-image inline = nil, want imageformat failure")
 	}
-	if _, err := materializer.MaterializeRemoteResults(ctx, 7, "task_bad2",
+	if _, err := materializer.MaterializeRemoteResults(ctx, 7, "task_bad1",
 		[]string{"data:image/png;base64,!!!not-base64!!!"}, taskmedia.ResultMaterializeOptions{}); err == nil {
 		t.Fatal("malformed inline = nil, want decode failure")
 	} else if strings.Contains(err.Error(), "!!!not-base64!!!") {
 		t.Fatalf("error echoes payload: %v", err)
 	}
-	if _, err := materializer.MaterializeRemoteResults(ctx, 7, "task_bad3",
+	if _, err := materializer.MaterializeRemoteResults(ctx, 7, "task_bad1",
 		[]string{}, taskmedia.ResultMaterializeOptions{}); err == nil {
 		t.Fatal("empty sources = nil, want error")
 	}
 }
 
-func TestWorkspaceProviderMaterializerBytesResult(t *testing.T) {
-	ctx := materializerTestScope(context.Background())
-	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
-	materializer, err := taskruntime.NewWorkspaceProviderResultMaterializer(materializerTestDeps(media, &fakeRendererObjects{}))
-	if err != nil {
-		t.Fatalf("New: %v", err)
+func TestWorkspaceProviderMaterializerRejectsInvalidExecutionIdentity(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*workspacetasks.WorkspaceTask)
+		userID int64
+		taskID string
+	}{
+		{name: "wrong task", userID: 7, taskID: "task_other"},
+		{name: "wrong owner", userID: 8, taskID: "task_render1"},
+		{name: "missing token", mutate: func(task *workspacetasks.WorkspaceTask) { task.ExecutionToken = "" }, userID: 7, taskID: "task_render1"},
+		{name: "missing workspace", mutate: func(task *workspacetasks.WorkspaceTask) { task.WorkspaceID = "" }, userID: 7, taskID: "task_render1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env := newRendererTestEnv(t)
+			task := rendererTestTask()
+			if tc.mutate != nil {
+				tc.mutate(task)
+			}
+			ctx := taskruntime.WithResultIngestionScope(context.Background(), task)
+			m, err := taskruntime.NewWorkspaceProviderResultMaterializer(materializerTestDeps(env.media, env.objects))
+			if err != nil {
+				t.Fatal(err)
+			}
+			dataURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(env.pegged)
+			if _, err := m.MaterializeRemoteResults(ctx, tc.userID, tc.taskID, []string{dataURL}, taskmedia.ResultMaterializeOptions{}); err == nil {
+				t.Fatal("invalid execution identity permitted ingestion")
+			}
+			if len(env.objects.objects) != 0 {
+				t.Fatal("invalid scope persisted bytes")
+			}
+		})
 	}
-	png := fixturePNGBytes(t)
-	results, err := materializer.MaterializeBytesResult(ctx, 7, "task_bytes1", "result.png", "", png, taskmedia.ResultMaterializeOptions{})
-	if err != nil {
-		t.Fatalf("MaterializeBytesResult: %v", err)
+}
+
+func TestResultIngestionScopeSnapshotsClaimIdentity(t *testing.T) {
+	env := newRendererTestEnv(t)
+	claimed := rendererTestTask()
+	ctx := taskruntime.WithResultIngestionScope(context.Background(), claimed)
+	claimed.ID, claimed.WorkspaceID, claimed.OwnerUserID, claimed.ExecutionToken = "task_mutated", "ws_other", 99, "token_other"
+	refs := env.materialize(t, ctx, rendererTestTask())
+	if len(refs) != 1 {
+		t.Fatalf("refs = %+v", refs)
 	}
-	if len(results.Items) != 1 || results.Items[0].Output.AssetID == "" {
-		t.Fatalf("items = %+v, want one asset-kind output", results.Items)
+	if _, err := env.media.GetAsset(ctx, "ws_test", refs[0].AssetID); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -1,30 +1,25 @@
 import type { Edge, Node } from '@vue-flow/core'
-import type { Ref } from 'vue'
+import { getCurrentScope, onScopeDispose, type Ref } from 'vue'
 import { i18n } from '../../../../../core/i18n'
 import type { CanvasTaskRequestData } from '../../../core/execution/canvasTaskRequest'
-import type { TaskImageResult } from '../../../../../core/query/taskResult'
+import type { TaskImageOutcomeWaiter } from '../task-runner/taskImageOutcome'
 import type { CanvasGraphStore } from '../../../core/graph'
 import type { CanvasRendererMetricsPort } from '../../../session/flow-adapter'
-import { loadImageSizeFromUrl } from '../media/imageSize'
+import { readImageNaturalSize } from '../../../../../core/media/imageDimensions'
 import type { PendingImageExecutionCore } from '../pending-execution/core'
-import {
-  resolveTaskImageResultAtIndexDisplay,
-  type ImageSizeLoader,
-} from '../result-nodes/resultDisplay'
+import { type ImageSizeLoader } from '../result-nodes/resultDisplay'
 import {
   usePendingImageResultExecution,
   type PendingImageResultExecution,
 } from '../result-nodes/usePendingImageResultExecution.ts'
-import { waitExistingOrLiveTaskImageResults } from '../task-runner/imageDirectActionExecutor'
+import { waitCanvasWorkspaceTaskImageOutcome } from '../workspace/canvasTaskWaiting'
+import { createTaskImageObserver } from '../task-runner/taskImageOutcome'
 import {
   createCanvasTaskClientActionId,
   type ClientActionIdFactory,
   withTaskClientActionId,
 } from '../task-runner/taskClientActionIds'
-import {
-  defaultCanvasTaskSubmissionAdapter,
-  type CanvasTaskSubmissionAdapter,
-} from '../workspace/canvasTaskSubmissionAdapter'
+import { assertTaskRequestReady, submitTaskRequest } from '../workspace/canvasTaskSubmissionAdapter'
 import {
   createPendingImageWorkflowRunner,
   type PendingImageWorkflowRunner,
@@ -41,16 +36,17 @@ export type PendingWorkflowAssemblyOptions = {
   pendingResults?: PendingImageResultExecution | undefined
   executionCore: PendingImageExecutionCore
   isNodeExecutionActive: (nodeId: string) => boolean
-  taskAdapter?: CanvasTaskSubmissionAdapter | undefined
   /** Test seam: replaces the default submission transport. */
   taskTransport?: PendingImageWorkflowTaskTransport | undefined
-  waitTaskImageResults?: ((taskId: string) => Promise<TaskImageResult[]>) | undefined
+  waitTaskImageOutcome?: TaskImageOutcomeWaiter | undefined
   loadImageSize?: ImageSizeLoader | undefined
   createClientActionId?: ClientActionIdFactory | undefined
   cancelTasks: (taskIds: readonly string[]) => void
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
   onError?: ((error: unknown) => boolean) | undefined
+  /** Test seam: background continuation scheduler (defaults to setTimeout). */
+  scheduleContinuation?: ((callback: () => void, delayMs: number) => () => void) | undefined
 }
 
 export type PendingWorkflowAssembly = {
@@ -85,9 +81,9 @@ function withExecutionBoardId(
 export function assemblePendingImageWorkflow(
   options: PendingWorkflowAssemblyOptions,
 ): PendingWorkflowAssembly {
-  const waitTaskImageResults = options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
-  const loadImageSize = options.loadImageSize ?? loadImageSizeFromUrl
-  const taskAdapter = options.taskAdapter ?? defaultCanvasTaskSubmissionAdapter
+  const scope = getCurrentScope()
+  const waitTaskImageOutcome = options.waitTaskImageOutcome ?? waitCanvasWorkspaceTaskImageOutcome
+  const loadImageSize = options.loadImageSize ?? readImageNaturalSize
   const pendingResults =
     options.pendingResults ??
     usePendingImageResultExecution({
@@ -107,7 +103,8 @@ export function assemblePendingImageWorkflow(
       await options.flushAutosave?.({ isSilent: true })
     } catch (error) {
       console.warn('[canvas] flush pending task snapshot failed', error)
-      options.onWarning(i18n.global.t('canvas.execution.canvasSaveFailedProgressLost'))
+      if (!scope || scope.active)
+        options.onWarning(i18n.global.t('canvas.execution.canvasSaveFailedProgressLost'))
     }
   }
 
@@ -117,34 +114,26 @@ export function assemblePendingImageWorkflow(
     taskTransport:
       options.taskTransport ??
       ({
-        assertReady: (request, fallbackMessage) =>
-          taskAdapter.assertTaskRequestReady(
-            withTaskClientActionId(request, createCanvasTaskClientActionId()),
-            fallbackMessage,
-          ),
-        submit: (request, clientActionId, fallbackMessage) =>
-          taskAdapter.submitTaskRequest(
+        assertReady: (request) =>
+          assertTaskRequestReady(withTaskClientActionId(request, createCanvasTaskClientActionId())),
+        submit: (request, clientActionId) =>
+          submitTaskRequest(
             withTaskClientActionId(
               withExecutionBoardId(options.executionCore, request),
               clientActionId,
             ),
-            fallbackMessage,
           ),
-        resolve: async (taskId, resultIndex, fallbackRatio) =>
-          resolveTaskImageResultAtIndexDisplay(
-            await waitTaskImageResults(taskId),
-            resultIndex,
-            fallbackRatio,
-            loadImageSize,
-          ),
+        observe: createTaskImageObserver(waitTaskImageOutcome, loadImageSize),
       } satisfies PendingImageWorkflowTaskTransport),
     cancelTasks: options.cancelTasks,
     afterTaskIdAttached: flushPendingTaskSnapshot,
     createClientActionId: options.createClientActionId,
+    scheduleContinuation: options.scheduleContinuation,
     onSuccess: options.onSuccess,
     onWarning: options.onWarning,
     onError: options.onError,
   })
 
+  if (scope) onScopeDispose(workflowRunner.dispose)
   return { pendingResults, workflowRunner, flushPendingTaskSnapshot }
 }

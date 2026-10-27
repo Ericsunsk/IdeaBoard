@@ -62,8 +62,8 @@ func (r *recordingControlTaskEvents) snapshot() ([]ControlTaskStatusEvent, []Con
 		append([]ControlTaskStatusEvent(nil), r.envelopes...)
 }
 
-// controlTxHolder adapts the real Credits service to both settlement
-// seams and can fail ReleaseInTx on demand to prove a rolled-back cancel
+// controlTxHolder adapts transactional Credits settlement and can fail
+// ReleaseInTx on demand to prove a rolled-back cancel
 // announces nothing.
 type controlTxHolder struct {
 	credits     *credits.Service
@@ -71,29 +71,12 @@ type controlTxHolder struct {
 	failRelease error
 }
 
-var (
-	_ workspacetasks.Holder   = (*controlTxHolder)(nil)
-	_ workspacetasks.TxHolder = (*controlTxHolder)(nil)
-)
+var _ workspacetasks.TxHolder = (*controlTxHolder)(nil)
 
 func (h *controlTxHolder) releaseFailure() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.failRelease
-}
-
-// Hold/Capture/Release must never run: the production store exposes the
-// PostgreSQL settlement seams, so cancel settles inside one transaction.
-func (h *controlTxHolder) Hold(context.Context, int64, int64, int64, string, string) (string, error) {
-	return "", errors.New("controlTxHolder.Hold must not run on the single-tx path")
-}
-
-func (h *controlTxHolder) Capture(context.Context, int64, int64, string, int64, string) error {
-	return errors.New("controlTxHolder.Capture must not run on the single-tx path")
-}
-
-func (h *controlTxHolder) Release(context.Context, int64, int64, string, int64, string) error {
-	return errors.New("controlTxHolder.Release must not run on the single-tx path")
 }
 
 func (h *controlTxHolder) HoldInTx(context.Context, pgx.Tx, int64, int64, int64, string, string) (string, error) {
@@ -285,7 +268,7 @@ func (e *controlCancelEnv) taskStatus(t *testing.T, taskID string) string {
 	return status
 }
 
-func (e *controlCancelEnv) adapter(holder workspacetasks.Holder, users ControlCreditDirectory, events ControlTaskEventPort) *workspaceControlTaskAdapter {
+func (e *controlCancelEnv) adapter(holder workspacetasks.TxHolder, users ControlCreditDirectory, events ControlTaskEventPort) *workspaceControlTaskAdapter {
 	return NewWorkspaceControlTasks(e.pool, taskpostgres.NewStore(e.pool), holder, users, events)
 }
 

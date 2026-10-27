@@ -83,19 +83,18 @@ const (
 // River timeout budgets (issue #783). These constants are the single source
 // of truth for per-worker River Timeout. Every worker's Timeout() method
 // must reference them instead of repeating literals, so no worker silently
-// falls back to the client-level JobTimeout (the drawing 17min global
-// budget) and the runbook table (docs/runbooks/backend-metrics.md) stays
+// falls back to the client-level JobTimeout and the runbook table
+// (docs/runbooks/backend-metrics.md) stays
 // accurate.
 //
 // River semantics: a worker without an explicit Timeout() inherits the
-// client JobTimeout. That inheritance is the bug this matrix closes: only
-// the drawing worker legitimately needs the full 17min budget, so it now
-// pins the same value explicitly instead of inheriting it.
+// client JobTimeout. That inheritance is the bug this matrix closes: the
+// drawing worker pins RiverJobTimeoutDrawing for its outer job context,
+// then bounds provider execution separately with WorkspaceExecutionBudget.
 const (
 	// RiverJobTimeoutDrawing owns the global budget: the longest supported
 	// task execution (accountlimits.MaxTimeoutSeconds) plus worker overhead.
-	// The River client default references this constant as a pure fallback
-	// for unregistered/test workers.
+	// The drawing worker and the River client default share this outer bound.
 	RiverJobTimeoutDrawing = time.Duration(accountlimits.MaxTimeoutSeconds)*time.Second + 2*time.Minute
 	// RiverJobTimeoutFinalFailure covers settlement-only convergence: the
 	// orchestrator caps a converge attempt at 15s internally, so 1 minute
@@ -139,3 +138,37 @@ const (
 	// schedule/catch-up write and transactional enqueue.
 	RiverJobTimeoutIdentityAdminReconciliationSchedule = time.Minute
 )
+
+// Timeout layering for drawing execution (ADR-0010 rule 4): one gateway
+// attempt is bounded by the gateway 300s total budget, one worker execution
+// (all provider sends in a single claim, including the bounded model
+// fallback) is bounded by WorkspaceExecutionBudget (360s), and the River job
+// stays bounded by RiverJobTimeoutDrawing (17min). The 360s middle layer is
+// the slow-task cap: a provider send that outlives it converges as a
+// retryable timeout (worker requeue with backoff, bounded by the retry
+// budget) instead of holding the worker slot until the River timeout.
+// Settlement after a billed send never depends on the execution budget: it
+// runs on the parent (River) context or a detached bounded context.
+//
+// Frozen budget table (values frozen, converge + assert only, never retune
+// here without syncing the mirrors):
+//
+// | Layer | Owner | Budget | Notes |
+// | --- | --- | --- | --- |
+// | Gateway single attempt | runtime/ports GatewayDefaultTimeout | 300s | nests inside the 360s execution budget |
+// | Worker single execution | WorkspaceExecutionBudget() | 360s = min(360s, drawing) | slow-task cap; clamped never above the River drawing budget |
+// | River job outer bound | RiverJobTimeoutDrawing | 17min = 900s MaxTimeoutSeconds + 2min overhead | global bound + client fallback for unregistered/test workers |
+// | Frontend quote/submit shared retry | canvas canvasBudgets SHARED_TASK_REQUEST_ATTEMPTS | 2 attempts | assert + submit each; retryable errors only (mirror, owned by web) |
+// | Frontend background continuation | canvas canvasBudgets BACKGROUND_* | 8 rounds, 5s init exp backoff capped at 60s, total 315s after the 6min waiter (~675s end-to-end < 17min River) | terminal state materializes inline; exhaustion ends with progressTimeout (mirror, owned by web) |
+// | Frontend board materialization | canvas canvasBudgets PENDING_IMAGE_MATERIALIZATION_ATTEMPTS | 3 attempts | in-place retry of transient graph writes; contract violations fail fast (mirror, owned by web) |
+const WorkspaceSlowTaskBudget = 6 * time.Minute
+
+// WorkspaceExecutionBudget returns the effective per-execution provider cap:
+// the 360s slow-task budget, clamped never above the River drawing budget so
+// a future drawing shrink cannot leave execution unbounded.
+func WorkspaceExecutionBudget() time.Duration {
+	if RiverJobTimeoutDrawing < WorkspaceSlowTaskBudget {
+		return RiverJobTimeoutDrawing
+	}
+	return WorkspaceSlowTaskBudget
+}

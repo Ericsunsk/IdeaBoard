@@ -117,13 +117,14 @@ func (p InviteActionPayload) ToActionPayload() ActionPayload {
 
 // HandoverActionPayload is the typed studio-handover payload
 // (studio_handover). See PayloadKeyTransferInviteID for why the handover
-// key stays distinct from the member invite_id family.
+// key stays distinct from the member invite_id family. It carries only
+// the invite identity plus workspace/from context (ADR-0040 §5.2); the
+// funds identity is never denormalized here because no reader consumes it.
 type HandoverActionPayload struct {
 	TransferInviteID string `json:"transfer_invite_id"`
 	WorkspaceID      string `json:"workspace_id,omitempty"`
 	WorkspaceName    string `json:"workspace_name,omitempty"`
 	FromUserID       string `json:"from_user_id,omitempty"`
-	BillingAccountID string `json:"billing_account_id,omitempty"`
 }
 
 // ToActionPayload converts the typed handover value to the wire map.
@@ -137,9 +138,6 @@ func (p HandoverActionPayload) ToActionPayload() ActionPayload {
 	}
 	if p.FromUserID != "" {
 		out[PayloadKeyFromUserID] = p.FromUserID
-	}
-	if p.BillingAccountID != "" {
-		out[PayloadKeyBillingAccountID] = p.BillingAccountID
 	}
 	return out
 }

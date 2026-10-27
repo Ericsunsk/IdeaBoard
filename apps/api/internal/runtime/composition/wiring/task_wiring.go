@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	aigatewayapplication "ideaboard/api/internal/aigateway/application"
 	"ideaboard/api/internal/boards"
@@ -60,7 +61,7 @@ type AppTaskServices struct {
 	// NewAppTaskRuntime (user-event fanout + queue RED metrics); HTTP
 	// wiring only consumes the workspace settlement pieces below.
 	// workspaceTaskQueue carries the River client for the v1 workspace
-	// task surface (workspacetasks.Enqueuer). Built here where the
+	// task surface (workspacetasks.TxEnqueuer). Built here where the
 	// riverClient exists; consumed by http_wiring.go. Nil only when the
 	// River client failed to build (startup already failed then).
 	workspaceTaskQueue *taskadapters.WorkspaceTaskEnqueuer
@@ -92,6 +93,11 @@ type AppTaskServices struct {
 	// exposed to the Control Plane adapter so admin transitions fan out across
 	// instances through the same bus as user/worker transitions.
 	workspaceEventBus *eventnats.NATSJetStreamEventBus
+	// userEvents is the process-local recipient-keyed fanout consumed by the
+	// per-user notification SSE stream and the payments hint publisher. It
+	// is built HERE (not lazily) so HTTP emission and the NATS remote
+	// fanout share one hub instance.
+	userEvents *events.UserEventHub
 	// taskStatusPublisher is the ONE publisher wired to the task status
 	// channel (local hubs + NATS JetStream), built by
 	// eventinterfaces.NewTaskStatusEventPublisher above. The Control Plane
@@ -241,15 +247,25 @@ func NewAppTaskRuntime(
 	riverQueue := taskqueue.NewRiverQueue(nil, dbs.DB, riverpolicy.RiverMaxAttemptsDefault)
 	aiGatewayRepo := aigatewayapplication.NewConfigRepository(repos.systemConfigRepo)
 	modelRoutes := aiGatewayModelRouteReader{repo: aiGatewayRepo}
+	// Process-shared per-model guards: one breaker/concurrency window set
+	// across all executions so fuses actually trip (per-client instances
+	// would reset on every task). Thresholds come from env-backed config;
+	// unset fields fall back to the code-owned conservative defaults.
+	gatewayResilience := providerinfra.NewGatewayResilience(providerinfra.GatewayResilienceConfig{
+		MaxConcurrentPerModel: cfg.Worker.Gateway.PerModelLimit,
+		Cooldown:              time.Duration(cfg.Worker.Gateway.BreakerCooldownSeconds) * time.Second,
+		FailureRate:           float64(cfg.Worker.Gateway.BreakerFailureRatePercent) / 100,
+	}, redMetrics)
 	gatewayFactory := func(ctx context.Context) (runtimeports.GatewayClient, error) {
 		resolved, err := aiGatewayRepo.Resolve(ctx)
 		if err != nil {
 			return nil, err
 		}
 		return providerinfra.NewGatewayClient(providerinfra.GatewayClientConfig{
-			BaseURL: resolved.BaseURL,
-			Token:   resolved.Token,
-			Metrics: redMetrics,
+			BaseURL:    resolved.BaseURL,
+			Token:      resolved.Token,
+			Metrics:    redMetrics,
+			Resilience: gatewayResilience,
 		})
 	}
 	// #825 (#809 Phase 4b-01): the workspace settlement pieces are built
@@ -266,8 +282,8 @@ func NewAppTaskRuntime(
 	workspaceRouter := routing.NewRoutingResolver(catalog.NewRepository(dbs.DB))
 	workspaceSettler := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		TaskRead: workspaceStore, TaskLifecycle: workspaceStore,
-		TaskBilling: workspaceStore,
-		Quoter:      workspaceQuoter, Holder: workspaceHolder,
+		TaskBilling: workspaceStore, SubmissionClaims: workspaceStore, BillingAccounts: workspaceStore,
+		Quoter: workspaceQuoter, Holder: workspaceHolder,
 		Queue: workspaceEnqueuer, Assets: workspaceAssets, Resolver: workspaceRouter,
 		// #946: the member cross-workspace consumption quota joins the
 		// settlement transaction after Quote and before Hold.
@@ -309,15 +325,10 @@ func NewAppTaskRuntime(
 		return AppTaskServices{}, AppWorkerRuntime{}, fmt.Errorf("failed to initialize workspace provider result materializer: %w", err)
 	}
 	workspaceGateway := providers.NewExecutor(workspaceMediaResolver, workspaceProviderMaterializer, cfg.PublicOrigins, gatewayFactory, modelRoutes)
-	// #827 (#809 Phase 4b-03): result renderer ingests provider outputs
-	// into workspace-scoped media assets before the atomic Complete. The
-	// byte seam is the production implementation: remote downloads retain
-	// the outbound allowlist/timeout/size policy.
+	// Provider ingestion is complete; the renderer verifies workspace assets
+	// before settlement and owns reference-safe compensation after confirmed Fail.
 	workspaceRenderer, err := taskruntime.NewWorkspaceTaskRenderer(taskruntime.WorkspaceTaskRendererDeps{
-		Media:   workspaceMedia,
-		Assets:  workspaceAssets,
-		Objects: services.storageService,
-		Fetcher: taskruntime.WorkspaceTaskResultBytesFetcher{},
+		Media: workspaceMedia, Assets: workspaceAssets,
 	})
 	if err != nil {
 		return AppTaskServices{}, AppWorkerRuntime{}, fmt.Errorf("failed to initialize workspace task renderer: %w", err)
@@ -533,6 +544,7 @@ func NewAppTaskRuntime(
 		webhooks:            webhookStore,
 		workspaceEvents:     workspaceEvents,
 		workspaceEventBus:   eventBus,
+		userEvents:          userEventHub,
 		taskStatusPublisher: taskStatusPublisher,
 	}, AppWorkerRuntime{
 		riverClient:  riverClient,

@@ -142,7 +142,7 @@ func atomicMetadata(key, taskID string, userID int64) domain.CommandMetadata {
 	}
 }
 
-// atomicHolder adapts the real Credits service to both settlement seams.
+// atomicHolder adapts the real Credits service to transactional settlement.
 // failCapture/failRelease inject billing-side failures to prove the task
 // flip rolls back with them.
 type atomicHolder struct {
@@ -175,29 +175,6 @@ func (h *atomicHolder) releaseFailure() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.failRelease
-}
-
-func (h *atomicHolder) Hold(ctx context.Context, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
-	if err := h.holdFailure(); err != nil {
-		return "", err
-	}
-	creditAmount, err := domain.NewCreditAmount(amount)
-	if err != nil {
-		return "", err
-	}
-	result, err := h.credits.Settlement().Hold(ctx, ports.HoldCommand{BillingAccountID: billingAccountID, Amount: creditAmount, Metadata: atomicMetadata(key, taskID, actorUserID)})
-	if err != nil {
-		return "", err
-	}
-	return result.TransactionID, nil
-}
-
-func (h *atomicHolder) Capture(ctx context.Context, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) error {
-	return errors.New("atomicHolder.Capture must not run on the single-tx path")
-}
-
-func (h *atomicHolder) Release(ctx context.Context, billingAccountID, actorUserID int64, holdID string, amount int64, taskID string) error {
-	return errors.New("atomicHolder.Release must not run on the single-tx path")
 }
 
 func (h *atomicHolder) HoldInTx(ctx context.Context, tx pgx.Tx, billingAccountID, actorUserID int64, amount int64, key, taskID string) (string, error) {
@@ -259,13 +236,6 @@ type atomicQueue struct {
 	pool     *pgxpool.Pool
 	failNext error
 	calls    int
-}
-
-func (q *atomicQueue) Enqueue(ctx context.Context, task *workspacetasks.WorkspaceTask) error {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	q.calls++
-	return errors.New("atomicQueue.Enqueue must not run on the single-tx path")
 }
 
 func (q *atomicQueue) EnqueueInTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask) error {
@@ -407,7 +377,7 @@ func openAtomicEnvWithPrice(t *testing.T, feature string, unitCost *int64) *atom
 		return catalog.SaveRoutingSnapshot(ctx, dbsqlc.New(tx), taskID, snap)
 	}
 	deps := workspacetasks.ServiceDeps{
-		Acceptance: acceptance, TaskRead: store, TaskLifecycle: store, TaskBilling: store, Quoter: &atomicQuoter{catalog: billingCatalog}, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(), SnapshotSaver: snapshotSaver,
+		Acceptance: acceptance, TaskRead: store, TaskLifecycle: store, SubmissionClaims: store, BillingAccounts: store, TaskBilling: store, Quoter: &atomicQuoter{catalog: billingCatalog}, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(), SnapshotSaver: snapshotSaver,
 	}
 	service := workspacetasks.NewService(deps)
 	return &atomicEnv{pool: pool, store: store, credits: creditService, catalog: billingCatalog, holder: holder, queue: queue, service: service, serviceDeps: deps, ws: ws, userID: userID, accountID: accountID}
@@ -754,11 +724,86 @@ func TestAtomicFreeTaskSettlesWithoutLedger(t *testing.T) {
 	if completed.Status != workspacetasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", completed.Status)
 	}
+	if completed.BillingSnapshot.SettlementState != "captured" {
+		t.Fatalf("settlement = %q, want captured", completed.BillingSnapshot.SettlementState)
+	}
 	if count := env.ledgerCount(t, `billing_account_id = $1`, env.accountID); count != 1 {
 		t.Fatalf("ledger rows = %d, want only the seed grant (no hold/capture/release)", count)
 	}
 	if available, reserved := env.wallet(t); available != 1000 || reserved != 0 {
 		t.Fatalf("wallet = (%d, %d), want untouched (1000, 0)", available, reserved)
+	}
+	// The settlement read model converges instead of forking on the
+	// initial state: free terminal rows carry zero amounts and NULL
+	// transaction ids (zero legs write no ledger row by construction).
+	var state string
+	var outputCount, captured, released int64
+	var captureTxID, releaseTxID *string
+	var settledAt *time.Time
+	if err := env.pool.QueryRow(context.Background(), `SELECT state, actual_output_count, captured_credits, released_credits, capture_transaction_id, release_transaction_id, settled_at FROM task_billing_settlements WHERE task_id = $1`, created.ID).Scan(&state, &outputCount, &captured, &released, &captureTxID, &releaseTxID, &settledAt); err != nil {
+		t.Fatalf("read free settlement row: %v", err)
+	}
+	if state != "captured" || outputCount != 1 || captured != 0 || released != 0 || captureTxID != nil || releaseTxID != nil || settledAt == nil {
+		t.Fatalf("free settlement = (%q, %d, %d, %d, %v, %v, %v), want captured(1,0,0,NULL,NULL,settled)", state, outputCount, captured, released, captureTxID, releaseTxID, settledAt != nil)
+	}
+}
+
+// TestAtomicFreeTaskFailWritesReleasedSettlement proves the fail leg
+// converges free tasks to released(0,0) with no ledger writes.
+func TestAtomicFreeTaskFailWritesReleasedSettlement(t *testing.T) {
+	env := openAtomicEnv(t, 0)
+	created, err := env.service.Create(context.Background(), workspacetasks.CreateInput{
+		WorkspaceID: env.ws, OwnerUserID: env.userID,
+		Service: "render", Quantity: 1, Resolution: "1k",
+	}, "atomic-free-fail-"+randomAtomicHex(t, 4))
+	if err != nil {
+		t.Fatalf("free Create: %v", err)
+	}
+	_ = env.service.StagedEvents()
+	env.claimTask(t, created.ID, created.ExecutionToken)
+	failed, err := env.service.Fail(context.Background(), env.ws, created.ID, "provider exploded")
+	if err != nil {
+		t.Fatalf("free Fail: %v", err)
+	}
+	if failed.BillingSnapshot.SettlementState != "released" {
+		t.Fatalf("settlement = %q, want released", failed.BillingSnapshot.SettlementState)
+	}
+	if count := env.ledgerCount(t, `billing_account_id = $1`, env.accountID); count != 1 {
+		t.Fatalf("ledger rows = %d, want only the seed grant", count)
+	}
+	var state string
+	var outputCount, captured, released int64
+	var captureTxID, releaseTxID *string
+	if err := env.pool.QueryRow(context.Background(), `SELECT state, actual_output_count, captured_credits, released_credits, capture_transaction_id, release_transaction_id FROM task_billing_settlements WHERE task_id = $1`, created.ID).Scan(&state, &outputCount, &captured, &released, &captureTxID, &releaseTxID); err != nil {
+		t.Fatalf("read free settlement row: %v", err)
+	}
+	if state != "released" || outputCount != 0 || captured != 0 || released != 0 || captureTxID != nil || releaseTxID != nil {
+		t.Fatalf("free settlement = (%q, %d, %d, %d, %v, %v), want released(0,0,0,NULL,NULL)", state, outputCount, captured, released, captureTxID, releaseTxID)
+	}
+}
+
+// TestAtomicFreeTerminalSettlementTriggerRejectsMoneyMovement proves the
+// relaxed state machine still fails closed on value: a free snapshot can
+// only converge with zero amounts.
+func TestAtomicFreeTerminalSettlementTriggerRejectsMoneyMovement(t *testing.T) {
+	env := openAtomicEnv(t, 0)
+	created, err := env.service.Create(context.Background(), workspacetasks.CreateInput{
+		WorkspaceID: env.ws, OwnerUserID: env.userID,
+		Service: "render", Quantity: 1, Resolution: "1k",
+	}, "atomic-free-trigger-"+randomAtomicHex(t, 4))
+	if err != nil {
+		t.Fatalf("free Create: %v", err)
+	}
+	_ = env.service.StagedEvents()
+	ctx := context.Background()
+	for _, statement := range []string{
+		`UPDATE task_billing_settlements SET state = 'captured', actual_output_count = 1, captured_credits = 5, settled_at = now() WHERE task_id = $1`,
+		`UPDATE task_billing_settlements SET state = 'released', actual_output_count = 0, released_credits = 5, settled_at = now() WHERE task_id = $1`,
+		`UPDATE task_billing_settlements SET state = 'held', settled_at = NULL WHERE task_id = $1`,
+	} {
+		if _, err := env.pool.Exec(ctx, statement, created.ID); err == nil {
+			t.Fatalf("statement unexpectedly succeeded: %.80s", statement)
+		}
 	}
 }
 
@@ -802,7 +847,7 @@ func openRoutingAtomicEnv(t *testing.T) *atomicEnv {
 		t.Fatal(err)
 	}
 	env.service = workspacetasks.NewService(workspacetasks.ServiceDeps{
-		TaskRead: env.store, TaskLifecycle: env.store, TaskBilling: env.store, Quoter: &atomicQuoter{catalog: billingapplication.NewBillableItemCatalog(registry, billingStore)},
+		TaskRead: env.store, TaskLifecycle: env.store, SubmissionClaims: env.store, BillingAccounts: env.store, TaskBilling: env.store, Quoter: &atomicQuoter{catalog: billingapplication.NewBillableItemCatalog(registry, billingStore)},
 		Holder: env.holder, Queue: env.queue,
 		Resolver: poolResolver, SnapshotSaver: poolSaver, Acceptance: env.serviceDeps.Acceptance,
 	})
@@ -1004,15 +1049,15 @@ func (f *carrierSettleStore) CancelTaskInTx(ctx context.Context, tx pgx.Tx, work
 }
 
 func (f *carrierSettleStore) CompleteTaskInTx(_ context.Context, _ pgx.Tx, _, _ string, _ []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
-	return nil, nil
+	return nil, fmt.Errorf("carrier settle store: CompleteTaskInTx must not run in the cancel-carrier proof")
 }
 
 func (f *carrierSettleStore) FailTaskInTx(_ context.Context, _ pgx.Tx, _, _, _ string) (*workspacetasks.WorkspaceTask, error) {
-	return nil, nil
+	return nil, fmt.Errorf("carrier settle store: FailTaskInTx must not run in the cancel-carrier proof")
 }
 
 func (f *carrierSettleStore) TransitionForRetryInTx(_ context.Context, _ pgx.Tx, _, _, _ string) (*workspacetasks.WorkspaceTask, error) {
-	return nil, nil
+	return nil, fmt.Errorf("carrier settle store: TransitionForRetryInTx must not run in the cancel-carrier proof")
 }
 
 func (f *carrierSettleStore) CreateTaskInTx(_ context.Context, _ pgx.Tx, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error) {
@@ -1027,18 +1072,6 @@ func (f *carrierSettleStore) GetTaskInTx(_ context.Context, _ pgx.Tx, workspaceI
 // ledger: the fabricated task carries no hold, so the holder is never
 // called in this proof.
 type carrierSettleHolder struct{}
-
-func (carrierSettleHolder) Hold(_ context.Context, _ int64, _ int64, _ int64, _, _ string) (string, error) {
-	return "", nil
-}
-
-func (carrierSettleHolder) Capture(_ context.Context, _ int64, _ int64, _ string, _ int64, _ string) error {
-	return nil
-}
-
-func (carrierSettleHolder) Release(_ context.Context, _ int64, _ int64, _ string, _ int64, _ string) error {
-	return nil
-}
 
 func (carrierSettleHolder) HoldInTx(_ context.Context, _ pgx.Tx, _ int64, _ int64, _ int64, _, _ string) (string, error) {
 	return "", nil

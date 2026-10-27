@@ -1,6 +1,6 @@
 package runtime
 
-// Task result rendering completes media ingestion before terminal settlement.
+// Provider result materialization owns ingestion; rendering verifies assets before settlement.
 // The worker owns task state, output references, and billing in its settlement transaction.
 
 import (
@@ -10,6 +10,8 @@ import (
 	"ideaboard/api/internal/platform/errorrender"
 	"log/slog"
 	"strings"
+	"sync"
+	"time"
 
 	"ideaboard/api/internal/media/egress"
 	"ideaboard/api/internal/media/fetch"
@@ -21,17 +23,16 @@ import (
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
 
-// WorkspaceTaskRenderer materializes provider output refs into asset-kind
-// refs before terminal settlement. The worker calls it between Generate
-// and Complete.
+// WorkspaceTaskRenderer verifies ingested asset refs and compensates execution-owned
+// assets only after a confirmed terminal failure. Unknown outcomes keep assets live.
 type WorkspaceTaskRenderer interface {
 	RenderOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) ([]workspacetasks.OutputRef, error)
+	CompensateRenderedOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) error
 }
 
 // WorkspaceResultBytesFetcher downloads the bytes behind one remote output
 // ref. Implementations own allowlisting, timeouts, and size caps; tests
-// inject canned fixture bytes. A nil fetcher fails every remote ref
-// closed with an explicit message (fail-loud, never stranded).
+// inject canned fixture bytes. The materializer requires a fetcher at construction.
 type WorkspaceResultBytesFetcher interface {
 	FetchResultBytes(ctx context.Context, task *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef) ([]byte, error)
 }
@@ -44,33 +45,19 @@ func (f WorkspaceResultBytesFetchFunc) FetchResultBytes(ctx context.Context, tas
 	return f(ctx, task, ref)
 }
 
-// WorkspaceTaskRendererDeps wires the renderer. Media and Assets are
-// required (fail fast); Objects and Fetcher are optional with
-// fail-loud semantics documented above.
+// WorkspaceTaskRendererDeps wires asset verification and reference-safe cleanup.
 type WorkspaceTaskRendererDeps struct {
 	Media  workspacemedia.WorkspaceMediaStore
 	Assets workspacetasks.AssetReader
-	// Objects carries result bytes (PUT) for the session-flow ingest.
-	// Nil fails every remote ingest closed at render time.
-	Objects workspacemedia.MediaObjects
-	// Fetcher downloads remote output bytes. Nil fails every remote
-	// ingest closed at render time.
-	Fetcher WorkspaceResultBytesFetcher
 }
 
-// workspaceTaskRenderer is the production WorkspaceTaskRenderer.
 type workspaceTaskRenderer struct {
-	media   workspacemedia.WorkspaceMediaStore
-	assets  workspacetasks.AssetReader
-	objects workspacemedia.MediaObjects
-	fetcher WorkspaceResultBytesFetcher
+	media  workspacemedia.WorkspaceMediaStore
+	assets workspacetasks.AssetReader
 }
 
 var _ WorkspaceTaskRenderer = (*workspaceTaskRenderer)(nil)
 
-// NewWorkspaceTaskRenderer builds the result renderer. Nil media/assets
-// fail fast: a renderer that cannot verify or persist must never claim to
-// render.
 func NewWorkspaceTaskRenderer(deps WorkspaceTaskRendererDeps) (WorkspaceTaskRenderer, error) {
 	if deps.Media == nil {
 		return nil, errors.New("workspace task renderer: media store is required")
@@ -78,18 +65,32 @@ func NewWorkspaceTaskRenderer(deps WorkspaceTaskRendererDeps) (WorkspaceTaskRend
 	if deps.Assets == nil {
 		return nil, errors.New("workspace task renderer: asset reader is required")
 	}
-	return &workspaceTaskRenderer{
-		media: deps.Media, assets: deps.Assets,
-		objects: deps.Objects, fetcher: deps.Fetcher,
-	}, nil
+	return &workspaceTaskRenderer{media: deps.Media, assets: deps.Assets}, nil
 }
 
-// RenderOutputs transforms provider output refs into settlement-ready
-// asset-kind refs. Asset refs are verified in-workspace; remote refs are
-// ingested into new workspace media assets (validated via imageformat).
-// The returned refs satisfy ValidateOutputRef and resolve to existing
-// asset rows, so the atomic Complete path persists them without further
-// checks.
+// compensateIngestedResultAssets is the single cleanup entry for partial
+// ingestion failures and confirmed terminal failures. It uses a bounded
+// detached context and refuses durable references; cleanup errors keep assets
+// live and never change settlement.
+func compensateIngestedResultAssets(ctx context.Context, media workspacemedia.WorkspaceMediaStore, task *workspacetasks.WorkspaceTask, assetIDs []string) {
+	if media == nil || task == nil || len(assetIDs) == 0 {
+		return
+	}
+	compensationCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	for _, assetID := range assetIDs {
+		assetID = strings.TrimSpace(assetID)
+		if assetID == "" {
+			continue
+		}
+		if _, err := media.ArchiveUnreferencedAsset(compensationCtx, task.WorkspaceID, assetID); err != nil {
+			slog.Warn("workspace task result compensation failed; asset stays live",
+				"task_id", task.ID, "asset_id", assetID, "err", err)
+		}
+	}
+}
+
+// RenderOutputs verifies settlement-ready assets without downloading or ingesting.
 func (r *workspaceTaskRenderer) RenderOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) ([]workspacetasks.OutputRef, error) {
 	if r == nil || r.media == nil || r.assets == nil {
 		return nil, errors.New(errorrender.MsgRenderOutputs)
@@ -101,28 +102,46 @@ func (r *workspaceTaskRenderer) RenderOutputs(ctx context.Context, task *workspa
 		return nil, fmt.Errorf(errorrender.MsgRenderOutputs3, workspacetasks.MaxOutputsPerTask)
 	}
 	rendered := make([]workspacetasks.OutputRef, 0, len(outputs))
-	for index, ref := range outputs {
+	for _, ref := range outputs {
 		if err := workspacetasks.ValidateOutputRef(ref); err != nil {
 			return nil, fmt.Errorf(errorrender.MsgRenderOutputs4, err)
 		}
-		switch ref.Kind {
-		case workspacetasks.OutputKindAsset:
-			verified, err := r.passthroughAsset(ctx, task, ref)
-			if err != nil {
-				return nil, err
-			}
-			rendered = append(rendered, verified)
-		case workspacetasks.OutputKindRemote:
-			ingested, err := r.ingestRemote(ctx, task, ref, index)
-			if err != nil {
-				return nil, err
-			}
-			rendered = append(rendered, ingested)
-		default:
-			return nil, fmt.Errorf(errorrender.MsgRenderOutputs5, ref.Kind)
+		if ref.Kind != workspacetasks.OutputKindAsset {
+			return nil, errors.New("workspace task renderer requires ingested asset outputs")
 		}
+		verified, err := r.passthroughAsset(ctx, task, ref)
+		if err != nil {
+			return nil, err
+		}
+		rendered = append(rendered, verified)
 	}
 	return rendered, nil
+}
+
+// CompensateRenderedOutputs uses attempt-local ingestion receipts, never the
+// presence of an asset-kind ref, as proof that this execution owns cleanup.
+func (r *workspaceTaskRenderer) CompensateRenderedOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) error {
+	if r == nil || r.media == nil {
+		return errors.New(errorrender.MsgRenderOutputs)
+	}
+	if task == nil || strings.TrimSpace(task.ID) == "" || strings.TrimSpace(task.WorkspaceID) == "" {
+		return errors.New(errorrender.MsgRenderOutputs2)
+	}
+	if task.Status != workspacetasks.StatusFailed {
+		return errors.New("result compensation requires a committed failed task")
+	}
+	scope, _ := ctx.Value(resultIngestionScopeKey{}).(*resultIngestionScope)
+	if !scope.matches(task) {
+		return errors.New("result compensation requires the matching execution scope")
+	}
+	assetIDs := make([]string, 0, len(outputs))
+	for _, ref := range outputs {
+		if ref.Kind == workspacetasks.OutputKindAsset && scope.owns(ref.AssetID) {
+			assetIDs = append(assetIDs, ref.AssetID)
+		}
+	}
+	compensateIngestedResultAssets(ctx, r.media, task, assetIDs)
+	return nil
 }
 
 // passthroughAsset verifies an asset-kind ref resolves in-workspace
@@ -146,76 +165,74 @@ func (r *workspaceTaskRenderer) passthroughAsset(ctx context.Context, task *work
 	return verified, nil
 }
 
-// ingestRemote fetches one remote output's bytes and persists them as a
-// new workspace-scoped media asset via the shared session-flow ingest,
-// returning the settlement-ready asset-kind ref.
-func (r *workspaceTaskRenderer) ingestRemote(ctx context.Context, task *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef, index int) (workspacetasks.OutputRef, error) {
-	if r.fetcher == nil {
-		return workspacetasks.OutputRef{}, errors.New(errorrender.MsgIngestRemote)
-	}
-	if r.objects == nil {
-		return workspacetasks.OutputRef{}, errors.New(errorrender.MsgIngestRemote2)
-	}
-	data, err := r.fetcher.FetchResultBytes(ctx, task, ref)
-	if err != nil {
-		return workspacetasks.OutputRef{}, fmt.Errorf(errorrender.MsgIngestRemote3, err)
-	}
-	asset, err := persistWorkspaceTaskResultAsset(ctx, r.media, r.objects, task, data, index, strings.TrimSpace(ref.ChecksumSHA256))
-	if err != nil {
-		return workspacetasks.OutputRef{}, err
-	}
-	rendered := workspacetasks.OutputRef{
-		Kind: workspacetasks.OutputKindAsset, AssetID: asset.ID,
-		Role: strings.TrimSpace(ref.Role), ResultIndex: ref.ResultIndex,
-	}
-	if err := workspacetasks.ValidateOutputRef(rendered); err != nil {
-		return workspacetasks.OutputRef{}, fmt.Errorf(errorrender.MsgPassthroughAsset3, err)
-	}
-	return rendered, nil
-}
-
 // persistWorkspaceTaskResultAsset applies Task provenance to managed image ingestion.
-func persistWorkspaceTaskResultAsset(ctx context.Context, media workspacemedia.WorkspaceMediaStore, objects workspacemedia.MediaObjects, task *workspacetasks.WorkspaceTask, data []byte, index int, expectChecksum string) (*workspacemedia.Asset, error) {
+func persistWorkspaceTaskResultAsset(ctx context.Context, media workspacemedia.WorkspaceMediaStore, objects workspacemedia.MediaObjects, task *workspacetasks.WorkspaceTask, data []byte, index int) (*workspacemedia.Asset, error) {
 	if media == nil || objects == nil {
 		return nil, errors.New(errorrender.MsgIngestRemote)
 	}
 	if task == nil || strings.TrimSpace(task.ID) == "" || strings.TrimSpace(task.WorkspaceID) == "" {
 		return nil, errors.New(errorrender.MsgRenderOutputs2)
 	}
+	scope, _ := ctx.Value(resultIngestionScopeKey{}).(*resultIngestionScope)
+	if !scope.matches(task) {
+		return nil, errors.New("result ingestion requires the matching execution scope")
+	}
 	asset, err := workspacemedia.IngestImage(ctx, media, objects, workspacemedia.IngestImageParams{
 		WorkspaceID: task.WorkspaceID, OwnerUserID: task.OwnerUserID,
 		FilenameStem: fmt.Sprintf("task-result-%d", index), Data: data,
-		ExpectedChecksumSHA256: expectChecksum,
 	})
 	if err != nil {
 		return nil, fmt.Errorf(errorrender.MsgPersistWorkspaceTaskResultAsset, err)
 	}
+	scope.record(asset.ID)
 	slog.Info("workspace task result ingested as media asset",
 		"task_id", task.ID, "asset_id", asset.ID, "mime", asset.MIMEType,
 		"width", asset.Width, "height", asset.Height, "bytes", asset.SizeBytes)
 	return asset, nil
 }
 
-// --- (from provider_materializer.go) ---
+// resultIngestionScope snapshots one claimed execution's immutable identity and
+// records only assets it ingests. Fallback sends reuse this scope.
+type resultIngestionScopeKey struct{}
 
-// workspaceTaskScopeKey carries the workspace identity for one provider
-// result materialization. Unexported: only the gateway bridge sets it and
-// only this materializer reads it (same package, executor passes ctx
-// through).
-type workspaceTaskScopeKey struct{}
-
-// WithWorkspaceTaskScope stamps the workspace identity for the materializer.
-func WithWorkspaceTaskScope(ctx context.Context, workspaceID string) context.Context {
-	return context.WithValue(ctx, workspaceTaskScopeKey{}, strings.TrimSpace(workspaceID))
+type resultIngestionScope struct {
+	workspaceID    string
+	taskID         string
+	ownerUserID    int64
+	executionToken string
+	mu             sync.Mutex
+	assets         map[string]struct{}
 }
 
-// workspaceTaskScopeFromCtx reads the stamped workspace identity.
-func workspaceTaskScopeFromCtx(ctx context.Context) string {
-	if ctx == nil {
-		return ""
+// WithResultIngestionScope starts the ownership scope after a successful claim.
+func WithResultIngestionScope(ctx context.Context, claimed *workspacetasks.WorkspaceTask) context.Context {
+	scope := &resultIngestionScope{assets: make(map[string]struct{})}
+	if claimed != nil {
+		scope.workspaceID = strings.TrimSpace(claimed.WorkspaceID)
+		scope.taskID = strings.TrimSpace(claimed.ID)
+		scope.ownerUserID = claimed.OwnerUserID
+		scope.executionToken = strings.TrimSpace(claimed.ExecutionToken)
 	}
-	workspaceID, _ := ctx.Value(workspaceTaskScopeKey{}).(string)
-	return strings.TrimSpace(workspaceID)
+	return context.WithValue(ctx, resultIngestionScopeKey{}, scope)
+}
+
+func (s *resultIngestionScope) matches(task *workspacetasks.WorkspaceTask) bool {
+	return s != nil && task != nil && s.workspaceID != "" && s.taskID != "" && s.ownerUserID > 0 && s.executionToken != "" &&
+		s.workspaceID == strings.TrimSpace(task.WorkspaceID) && s.taskID == strings.TrimSpace(task.ID) &&
+		s.ownerUserID == task.OwnerUserID && s.executionToken == strings.TrimSpace(task.ExecutionToken)
+}
+
+func (s *resultIngestionScope) record(assetID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.assets[strings.TrimSpace(assetID)] = struct{}{}
+}
+
+func (s *resultIngestionScope) owns(assetID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, owned := s.assets[strings.TrimSpace(assetID)]
+	return owned
 }
 
 // WorkspaceProviderResultRole is the output role for live-ingested provider
@@ -266,76 +283,55 @@ func NewWorkspaceProviderResultMaterializer(deps WorkspaceProviderResultMaterial
 // workspace media asset and returns asset-kind outputs (one per source,
 // dense result indexes). Any failure is terminal for the attempt (the
 // worker converges it deterministically, no retry-budget consumption).
+//
+// A later-item failure archives the assets this call already ingested
+// (partial-success orphan compensation) before returning the error, so a
+// failed attempt never leaves ingested-but-unreferenced assets behind.
 func (m *workspaceProviderResultMaterializer) MaterializeRemoteResults(ctx context.Context, userID int64, taskID string, sourceURLs []string, opts taskmedia.ResultMaterializeOptions) (taskmedia.MaterializedResults, error) {
 	if m == nil || m.media == nil || m.objects == nil || m.fetcher == nil {
 		return taskmedia.MaterializedResults{}, errors.New("workspace provider result materializer is not configured")
 	}
-	workspaceID := workspaceTaskScopeFromCtx(ctx)
-	if workspaceID == "" {
-		return taskmedia.MaterializedResults{}, errors.New("workspace provider result materializer: workspace scope is missing")
+	scope, _ := ctx.Value(resultIngestionScopeKey{}).(*resultIngestionScope)
+	if scope == nil {
+		return taskmedia.MaterializedResults{}, errors.New("workspace provider result materializer: execution scope is missing")
 	}
-	taskID = strings.TrimSpace(taskID)
-	if taskID == "" {
-		return taskmedia.MaterializedResults{}, errors.New("workspace provider result materializer: task identity is required")
+	task := &workspacetasks.WorkspaceTask{
+		ID: strings.TrimSpace(taskID), WorkspaceID: scope.workspaceID,
+		OwnerUserID: userID, ExecutionToken: scope.executionToken,
+	}
+	if !scope.matches(task) {
+		return taskmedia.MaterializedResults{}, errors.New("workspace provider result materializer: execution identity mismatch")
 	}
 	if len(sourceURLs) == 0 {
 		return taskmedia.MaterializedResults{}, errors.New("workspace provider result materializer: no provider results")
 	}
-	task := &workspacetasks.WorkspaceTask{ID: taskID, WorkspaceID: workspaceID, OwnerUserID: userID}
 	items := make([]taskmedia.MaterializedResult, 0, len(sourceURLs))
+	ingested := make([]string, 0, len(sourceURLs))
 	for index, raw := range sourceURLs {
 		data, err := m.sourceBytes(ctx, task, raw, opts.AllowHosts)
 		if err != nil {
+			compensateIngestedResultAssets(ctx, m.media, task, ingested)
 			return taskmedia.MaterializedResults{}, err
 		}
-		asset, err := persistWorkspaceTaskResultAsset(ctx, m.media, m.objects, task, data, index, "")
+		asset, err := persistWorkspaceTaskResultAsset(ctx, m.media, m.objects, task, data, index)
 		if err != nil {
+			compensateIngestedResultAssets(ctx, m.media, task, ingested)
 			return taskmedia.MaterializedResults{}, err
 		}
 		// Asset-kind output: the finalize validation accepts it without
 		// a URL round-trip, and the bridge maps it to a workspace asset
 		// ref (ImageURL carries the asset id for the dropped result
 		// envelope only; nothing persists it).
+		ingested = append(ingested, asset.ID)
 		items = append(items, taskmedia.MaterializedResult{
 			ImageURL: asset.ID,
 			Output: tasks.TaskOutput{
-				TaskID: taskID, AssetID: asset.ID,
+				TaskID: task.ID, AssetID: asset.ID,
 				Role: WorkspaceProviderResultRole, ResultIndex: index,
 			},
 		})
 	}
 	return taskmedia.MaterializedResults{Items: items}, nil
-}
-
-// MaterializeBytesResult ingests caller-provided bytes directly (no
-// source download). The executor never calls it today (all provider
-// results arrive as URLs through MaterializeRemoteResults); it exists so
-// the interface is fully workspace-scoped. The filename is informational
-// only: slot naming stays deterministic inside the shared ingest.
-func (m *workspaceProviderResultMaterializer) MaterializeBytesResult(ctx context.Context, userID int64, taskID, filename, sourceURL string, data []byte, _ taskmedia.ResultMaterializeOptions) (taskmedia.MaterializedResults, error) {
-	if m == nil || m.media == nil || m.objects == nil {
-		return taskmedia.MaterializedResults{}, errors.New("workspace provider result materializer is not configured")
-	}
-	workspaceID := workspaceTaskScopeFromCtx(ctx)
-	if workspaceID == "" {
-		return taskmedia.MaterializedResults{}, errors.New("workspace provider result materializer: workspace scope is missing")
-	}
-	taskID = strings.TrimSpace(taskID)
-	if taskID == "" {
-		return taskmedia.MaterializedResults{}, errors.New("workspace provider result materializer: task identity is required")
-	}
-	task := &workspacetasks.WorkspaceTask{ID: taskID, WorkspaceID: workspaceID, OwnerUserID: userID}
-	asset, err := persistWorkspaceTaskResultAsset(ctx, m.media, m.objects, task, data, 0, "")
-	if err != nil {
-		return taskmedia.MaterializedResults{}, err
-	}
-	return taskmedia.MaterializedResults{Items: []taskmedia.MaterializedResult{{
-		ImageURL: asset.ID,
-		Output: tasks.TaskOutput{
-			TaskID: taskID, AssetID: asset.ID,
-			Role: WorkspaceProviderResultRole, ResultIndex: 0,
-		},
-	}}}, nil
 }
 
 // sourceBytes resolves one provider result URL to bytes. Inline data:

@@ -20,9 +20,9 @@ import (
 
 // Service orchestrates the workspace task settlement boundary:
 //
-//	Quote snapshot -> Credits Hold (via Holder, never direct ledger
+//	Quote snapshot -> Credits Hold (via TxHolder, never direct ledger
 //	writes) -> Task insert (pending, retry_count, execution_token,
-//	output_refs, billing_snapshot) -> River enqueue (via Enqueuer).
+//	output_refs, billing_snapshot) -> River enqueue (via TxEnqueuer).
 //
 // Production settlement commits in ONE shared PostgreSQL transaction: a
 // billing failure rolls the state flip back and a state-guard failure rolls
@@ -33,11 +33,11 @@ import (
 // fixtures for exercising the service contract.
 type Service struct {
 	taskRead      TaskReadStore
-	taskLifecycle TaskLifecycleStore
+	taskLifecycle TaskSettlementStore
 	taskBilling   TaskBillingStore
 	quoter        Quoter
-	holder        Holder
-	queue         Enqueuer
+	holder        TxHolder
+	queue         TxEnqueuer
 	assets        AssetReader
 	acceptance    SubmissionAuthorizer
 	// resolver is the authoritative Service Model Pool decision point
@@ -67,11 +67,11 @@ type Service struct {
 // RoutingSnapshot pins in this transaction instead.)
 type ServiceDeps struct {
 	TaskRead      TaskReadStore
-	TaskLifecycle TaskLifecycleStore
+	TaskLifecycle TaskSettlementStore
 	TaskBilling   TaskBillingStore
 	Quoter        Quoter
-	Holder        Holder
-	Queue         Enqueuer
+	Holder        TxHolder
+	Queue         TxEnqueuer
 	Assets        AssetReader
 	// Resolver is the shared RoutingResolver quote/submit/readiness
 	// consume (same instance, never an independent lookup). Nil fails
@@ -87,12 +87,9 @@ type ServiceDeps struct {
 	// of degrading into an unfenced create.
 	SubmissionClaims TxSubmissionClaimStore
 	Acceptance       SubmissionAuthorizer
-	// BillingAccounts resolves the stable funds identity inside the
-	// settlement transaction (#915 resolution, #916 funds identity). When
-	// nil, production falls back to the taskLifecycle store when it
-	// implements TxBillingAccountResolver (the postgres Store does); a
-	// store that cannot resolve fails closed (no seam ->
-	// ErrSettlementUnavailable) rather than spending an owner wallet.
+	// BillingAccounts resolves the stable funds identity inside the same
+	// settlement transaction. Create requires explicit wiring; it never
+	// infers an account resolver or falls back to an owner wallet.
 	BillingAccounts TxBillingAccountResolver
 	// Quotas enforces the member cross-workspace consumption quota
 	// inside the settlement transaction (#946: after Quote, before Hold,
@@ -301,10 +298,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 		IdempotencyKey: key, TaskPublicID: taskID,
 		RequestHash: s.submitRequestHash(input, kind, resolution, quantity),
 	}
-	if created, handled, err := s.createInTx(ctx, input, kind, resolution, quantity, taskID, token, claim); handled {
-		return created, err
-	}
-	return nil, ErrSettlementUnavailable
+	return s.createInTx(ctx, input, kind, resolution, quantity, taskID, token, claim)
 }
 
 // pendingTaskWithBinding captures the accepted inputs and Board binding for
@@ -372,10 +366,7 @@ func (s *Service) Cancel(ctx context.Context, workspaceID, taskID string, actorU
 	if s.taskRead == nil || s.taskLifecycle == nil {
 		return nil, false, ErrNotFound
 	}
-	if flipped, already, handled, err := s.cancelInTx(ctx, workspaceID, taskID, actorUserID, reason); handled {
-		return flipped, already, err
-	}
-	return nil, false, ErrSettlementUnavailable
+	return s.cancelInTx(ctx, workspaceID, taskID, actorUserID, reason)
 }
 
 // Complete flips running to completed atomically with Capture. Outputs
@@ -394,10 +385,7 @@ func (s *Service) Complete(ctx context.Context, workspaceID, taskID string, outp
 	if err := s.verifyOutputAssets(ctx, workspaceID, outputs); err != nil {
 		return nil, err
 	}
-	if completed, handled, err := s.completeInTx(ctx, workspaceID, taskID, outputs); handled {
-		return completed, err
-	}
-	return nil, ErrSettlementUnavailable
+	return s.completeInTx(ctx, workspaceID, taskID, outputs)
 }
 
 // Fail flips running/pending to failed atomically with Release.
@@ -407,10 +395,7 @@ func (s *Service) Fail(ctx context.Context, workspaceID, taskID, errorMsg string
 	if s.taskLifecycle == nil {
 		return nil, ErrNotFound
 	}
-	if failed, handled, err := s.failInTx(ctx, workspaceID, taskID, errorMsg); handled {
-		return failed, err
-	}
-	return nil, ErrSettlementUnavailable
+	return s.failInTx(ctx, workspaceID, taskID, errorMsg)
 }
 
 // Retry consumes one retry budget entry (reset + new execution token,
@@ -436,10 +421,7 @@ func (s *Service) Retry(ctx context.Context, workspaceID, taskID string, retryab
 	if err != nil {
 		return nil, err
 	}
-	if retried, handled, err := s.retryInTx(ctx, workspaceID, taskID, token); handled {
-		return retried, err
-	}
-	return nil, ErrSettlementUnavailable
+	return s.retryInTx(ctx, workspaceID, taskID, token)
 }
 
 func (s *Service) verifyOutputAssets(ctx context.Context, workspaceID string, outputs []OutputRef) error {

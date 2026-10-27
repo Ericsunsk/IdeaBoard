@@ -76,12 +76,10 @@ type ContractV1Deps struct {
 	// TaskSnapshotSaver pins the Resolve snapshot. Production wiring must
 	// provide it; atomic settlement fails closed when it is absent.
 	TaskSnapshotSaver WorkspaceTaskSnapshotSaver
-	// TaskBillingAccounts resolves the stable funds identity inside the
-	// settlement transaction (#915 resolution, #916 funds identity). Nil
-	// falls back to TaskLifecycle when it implements
-	// workspacetasks.TxBillingAccountResolver (the postgres store does);
-	// in-memory HTTP fixtures inject their test double instead.
-	TaskBillingAccounts workspacetasks.TxBillingAccountResolver
+	// TaskBillingAccounts explicitly resolves stable funds in the submit
+	// transaction. Missing wiring fails closed before settlement writes.
+	TaskBillingAccounts  workspacetasks.TxBillingAccountResolver
+	TaskSubmissionClaims workspacetasks.TxSubmissionClaimStore
 	// TaskQuotas enforces the member cross-workspace consumption quota
 	// inside the submit settlement transaction (#946: after Quote,
 	// before Hold, same snapshot). Production wires the
@@ -170,9 +168,11 @@ type ContractV1Deps struct {
 	// Explicit billing_account_id/new_billing_account requests with a nil
 	// store fail closed with 503, never silently unlinked.
 	BillingAccounts billingAccountStore
-	// Notifications is the explicitly wired user notifications center store
+	// Notifications is the explicitly wired user notification command boundary
 	// (#958, ADR-0040). Nil fails the notification endpoints closed with 503.
 	Notifications notifications.Store
+	// UserEvents serves the recipient-addressed SSE subscription.
+	UserEvents *events.UserEventHub
 	// InvitationReader owns optional invitation participant enrichment and projection.
 	InvitationReader invitations.Reader
 	// Invitations owns atomic membership decisions, notifications, and mail enqueue.
@@ -198,18 +198,6 @@ func requireV1IdempotencyKey(c *gin.Context) (string, bool) {
 // so v1 and control share them without a control -> v1 edge.
 
 func (d *ContractV1Deps) normalize() {
-	if d.Tasks != nil {
-		if d.TaskLifecycle == nil {
-			if store, ok := d.Tasks.(workspacetasks.TaskLifecycleStore); ok {
-				d.TaskLifecycle = store
-			}
-		}
-		if d.TaskBilling == nil {
-			if store, ok := d.Tasks.(workspacetasks.TaskBillingStore); ok {
-				d.TaskBilling = store
-			}
-		}
-	}
 	if d.Idempotency == nil {
 		d.Idempotency = contract.NewIdempotencyStore(contract.DefaultIdempotencyStoreOptions())
 	}
@@ -261,6 +249,7 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps runtimehttp.AuthD
 	group.POST("/user/invites/:invite_id/accept", handler.acceptUserWorkspaceInvite)
 	group.POST("/user/invites/:invite_id/decline", handler.declineUserWorkspaceInvite)
 	group.GET("/user/notifications", handler.listUserNotifications)
+	group.GET("/user/notifications/events", handler.streamUserNotificationEvents)
 	group.GET("/user/notifications/unread-count", handler.getUserNotificationsUnreadCount)
 	group.POST("/user/notifications/:id/read", handler.markUserNotificationRead)
 	group.POST("/user/notifications/read-all", handler.markAllUserNotificationsRead)
@@ -324,6 +313,7 @@ func v1RequestPrincipal(c *gin.Context) (principal.Principal, bool) {
 		c.Abort()
 		return principal.Principal{}, false
 	}
+	c.Request = c.Request.WithContext(notifications.ContextWithActor(c.Request.Context(), tenancy.FormatUserPublicID(identityPrincipal.PublicID())))
 	return identityPrincipal, true
 }
 

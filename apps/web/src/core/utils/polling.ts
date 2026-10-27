@@ -47,8 +47,20 @@ export function createPollDelay(policy: PollDelayPolicy): PollDelayIterator {
   }
 }
 
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    globalThis.setTimeout(resolve, Math.max(0, ms))
+export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted()
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      globalThis.clearTimeout(timer)
+      reject(signal?.reason)
+    }
+    const timer = globalThis.setTimeout(
+      () => {
+        signal?.removeEventListener('abort', onAbort)
+        resolve()
+      },
+      Math.max(0, ms),
+    )
+    signal?.addEventListener('abort', onAbort, { once: true })
   })
 }

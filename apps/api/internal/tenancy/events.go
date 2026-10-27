@@ -3,16 +3,15 @@ package tenancy
 import "context"
 
 // BillingTransferInitiatedParams is the fixed handover context for
-// OnBillingTransferInitiated. BillingAccountPublicID carries the ba_ funds
-// identity snapshot (omitempty on the wire); empty means the dispatcher
-// omits billing_account_id instead of emitting an empty key.
+// OnBillingTransferInitiated. The notification payload carries only the
+// invite identity plus workspace/from context (ADR-0040 §5.2); the funds
+// identity stays out of the payload because no reader consumes it.
 type BillingTransferInitiatedParams struct {
 	// NotificationKey identifies one durable initiate request, including reissues.
-	NotificationKey        string
-	FromUserPublicID       string
-	WorkspacePublicID      string
-	WorkspaceName          string
-	BillingAccountPublicID string
+	NotificationKey   string
+	FromUserPublicID  string
+	WorkspacePublicID string
+	WorkspaceName     string
 }
 
 // CollaborationEventDispatcher coordinates domain lifecycle side-effects

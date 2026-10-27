@@ -115,8 +115,8 @@ func TestMemoryStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MarkAllRead failed: %v", err)
 	}
-	if marked != 1 {
-		t.Fatalf("expected 1 marked read, got %d", marked)
+	if len(marked) != 1 {
+		t.Fatalf("expected 1 marked read, got %d", len(marked))
 	}
 
 	unread, err = store.CountUnread(ctx, userID)
@@ -149,7 +149,7 @@ func TestMemoryStore(t *testing.T) {
 		t.Fatalf("expected pending invite_status, got %v", invNotif.ActionPayload[notifications.PayloadKeyInviteStatus])
 	}
 	affected, err := store.MarkInviteResolved(ctx, "wsi_status1", "accepted")
-	if err != nil || affected != 1 {
-		t.Fatalf("expected 1 row resolved, got %d, err: %v", affected, err)
+	if err != nil || len(affected) != 1 {
+		t.Fatalf("expected 1 row resolved, got %d, err: %v", len(affected), err)
 	}
 }

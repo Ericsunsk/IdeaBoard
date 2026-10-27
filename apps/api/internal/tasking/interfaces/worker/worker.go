@@ -169,7 +169,7 @@ type ModelFallbackObserver interface {
 
 // WorkspaceTaskWorker consumes WorkspaceTaskArgs jobs. It rides the existing
 // drawing_default queue and worker concurrency (no new queues, pools, or
-// periodic jobs); Timeout reuses the drawing execution budget.
+// periodic jobs); Timeout pins the River drawing budget.
 type WorkspaceTaskWorker struct {
 	river.WorkerDefaults[workspacetasks.WorkspaceTaskArgs]
 	store        WorkspaceTaskWorkerStore
@@ -210,7 +210,8 @@ func NewWorkspaceTaskWorker(deps WorkspaceTaskWorkerDeps) (*WorkspaceTaskWorker,
 	}, nil
 }
 
-// Timeout bounds one workspace execution with the existing drawing budget.
+// Timeout pins the outer River job budget. Provider sends share the shorter
+// execution context created by Work, leaving the parent alive for settlement.
 func (w *WorkspaceTaskWorker) Timeout(*river.Job[workspacetasks.WorkspaceTaskArgs]) time.Duration {
 	return riverpolicy.RiverJobTimeoutDrawing
 }
@@ -287,14 +288,21 @@ func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[workspace
 	// so stamping is what keeps execution snapshot-only. The legacy
 	// envelope value is ignored even when set.
 	claimed.ResolvedModel = model
-	outputs, genErr := w.generate(ctx, claimed, send.layer, send.attemptNo)
+	ctx = taskruntime.WithResultIngestionScope(ctx, claimed)
+	// The execution budget bounds every provider send in this claim
+	// (primary + at most one bounded fallback) without touching settlement:
+	// an over-budget send converges as a retryable timeout, while Complete,
+	// Fail, and Retry below keep the parent (River) context.
+	execCtx, cancel := context.WithTimeout(ctx, riverpolicy.WorkspaceExecutionBudget())
+	defer cancel()
+	outputs, genErr := w.generate(execCtx, claimed, send.layer, send.attemptNo)
 	if genErr == nil {
 		return w.completeExecution(ctx, send, claimed, outputs, model)
 	}
 
 	failure := routing.ClassifyError(genErr)
 	if failure.Retryable() && allowFallback {
-		if result, done := w.executeModelFallback(ctx, tracker, send, snap, claimed, model, genErr); done {
+		if result, done := w.executeModelFallback(ctx, execCtx, tracker, send, snap, claimed, model, genErr); done {
 			return result
 		}
 		// The fallback row could not be persisted: at-most-once cannot

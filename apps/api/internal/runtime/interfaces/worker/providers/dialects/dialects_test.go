@@ -116,61 +116,58 @@ func TestGenericEncode(t *testing.T) {
 }
 
 func TestDecodeShapes(t *testing.T) {
-	g := NewGenericDialect()
+	// Single decode implementation: package-level Decode serves every
+	// dialect (Encode stays per-dialect, Decode is never overridden).
 	t.Run("OpenAI data url", func(t *testing.T) {
-		urls, err := g.Decode([]byte(`{"created":1234,"data":[{"url":"https://api.openai.com/v1/images/123.png"}]}`))
+		urls, err := Decode([]byte(`{"created":1234,"data":[{"url":"https://api.openai.com/v1/images/123.png"}]}`))
 		require.NoError(t, err)
 		assert.Equal(t, []string{"https://api.openai.com/v1/images/123.png"}, urls)
 	})
 	t.Run("OpenAI b64_json converts with image prefix", func(t *testing.T) {
 		b64 := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
-		urls, err := g.Decode([]byte(`{"data":[{"b64_json":"` + b64 + `"}]}`))
+		urls, err := Decode([]byte(`{"data":[{"b64_json":"` + b64 + `"}]}`))
 		require.NoError(t, err)
 		require.Len(t, urls, 1)
 		assert.True(t, strings.HasPrefix(urls[0], "data:image/png;base64,"))
 	})
 	t.Run("plain text is not an image", func(t *testing.T) {
-		_, err := g.Decode([]byte(`{"output":["this is just a status message for humans"]}`))
+		_, err := Decode([]byte(`{"output":["this is just a status message for humans"]}`))
 		require.Error(t, err)
 	})
 	t.Run("fal images array", func(t *testing.T) {
-		f := NewFalDialect()
-		urls, err := f.Decode([]byte(`{"images":[{"url":"https://fal.media/files/monkey/sample.png"}]}`))
+		urls, err := Decode([]byte(`{"images":[{"url":"https://fal.media/files/monkey/sample.png"}]}`))
 		require.NoError(t, err)
 		assert.Equal(t, []string{"https://fal.media/files/monkey/sample.png"}, urls)
 	})
 	t.Run("fal single image object", func(t *testing.T) {
-		f := NewFalDialect()
-		urls, err := f.Decode([]byte(`{"image":{"url":"https://fal.media/files/single.webp"}}`))
+		urls, err := Decode([]byte(`{"image":{"url":"https://fal.media/files/single.webp"}}`))
 		require.NoError(t, err)
 		assert.Equal(t, []string{"https://fal.media/files/single.webp"}, urls)
 	})
 	t.Run("chat message images", func(t *testing.T) {
-		c := NewChatDialect()
-		urls, err := c.Decode([]byte(`{"choices":[{"message":{"images":[{"url":"https://openrouter.ai/gen/img1.png"}]}}]}`))
+		urls, err := Decode([]byte(`{"choices":[{"message":{"images":[{"url":"https://openrouter.ai/gen/img1.png"}]}}]}`))
 		require.NoError(t, err)
 		assert.Equal(t, []string{"https://openrouter.ai/gen/img1.png"}, urls)
 	})
 	t.Run("chat content parts", func(t *testing.T) {
-		c := NewChatDialect()
-		urls, err := c.Decode([]byte(`{"choices":[{"message":{"content":[{"type":"text","text":"generated image:"},{"type":"image_url","image_url":{"url":"https://cdn.ai/part.jpg"}}]}}]}`))
+		urls, err := Decode([]byte(`{"choices":[{"message":{"content":[{"type":"text","text":"generated image:"},{"type":"image_url","image_url":{"url":"https://cdn.ai/part.jpg"}}]}}]}`))
 		require.NoError(t, err)
 		assert.Equal(t, []string{"https://cdn.ai/part.jpg"}, urls)
 	})
 	t.Run("stability artifacts base64", func(t *testing.T) {
 		b64 := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-		urls, err := g.Decode([]byte(`{"artifacts":[{"base64":"` + b64 + `"}]}`))
+		urls, err := Decode([]byte(`{"artifacts":[{"base64":"` + b64 + `"}]}`))
 		require.NoError(t, err)
 		require.Len(t, urls, 1)
 		assert.True(t, strings.HasPrefix(urls[0], "data:image/png;base64,"))
 	})
 	t.Run("vendor error surfaces", func(t *testing.T) {
-		_, err := g.Decode([]byte(`{"error":{"message":"Quota exceeded for model dall-e-3"}}`))
+		_, err := Decode([]byte(`{"error":{"message":"Quota exceeded for model dall-e-3"}}`))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "Quota exceeded for model dall-e-3")
 	})
 	t.Run("unknown structure lists keys", func(t *testing.T) {
-		_, err := g.Decode([]byte(`{"task_id":"abc-123","status":"queued","progress":0.5}`))
+		_, err := Decode([]byte(`{"task_id":"abc-123","status":"queued","progress":0.5}`))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "返回字段")
 		assert.Contains(t, err.Error(), "task_id")

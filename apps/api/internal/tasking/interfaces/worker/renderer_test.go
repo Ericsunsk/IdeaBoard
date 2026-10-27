@@ -1,10 +1,7 @@
 package worker
 
-// Renderer unit tests (#827, Phase 4b-03 of #809): remote ingest ->
-// asset row -> settlement-ready refs over the in-memory media store
-// (no DB). The fixture-DB twin lives in
-// renderer_integration_test.go (SKIPs without
-// API_TEST_DATABASE_DSN).
+// Asset verification and provider ingestion ordering over in-memory media.
+// The PostgreSQL twin skips without API_TEST_DATABASE_DSN.
 
 import (
 	"context"
@@ -12,12 +9,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"strings"
 	"testing"
 
 	"ideaboard/api/internal/media/workspacemedia"
-	"ideaboard/api/internal/platform/contract"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	taskmedia "ideaboard/api/internal/tasking/ports/media"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
 	storageports "ideaboard/api/internal/media/storage/ports"
@@ -87,12 +83,8 @@ func newRendererTestEnv(t *testing.T) *rendererTestEnv {
 func (e *rendererTestEnv) renderer(t *testing.T, mutate func(*taskruntime.WorkspaceTaskRendererDeps)) taskruntime.WorkspaceTaskRenderer {
 	t.Helper()
 	deps := taskruntime.WorkspaceTaskRendererDeps{
-		Media:   e.media,
-		Assets:  &workspacemedia.TaskAssetAdapter{Store: e.media},
-		Objects: e.objects,
-		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask, _ workspacetasks.OutputRef) ([]byte, error) {
-			return append([]byte(nil), e.pegged...), nil
-		}),
+		Media:  e.media,
+		Assets: &workspacemedia.TaskAssetAdapter{Store: e.media},
 	}
 	if mutate != nil {
 		mutate(&deps)
@@ -107,7 +99,7 @@ func (e *rendererTestEnv) renderer(t *testing.T, mutate func(*taskruntime.Worksp
 func rendererTestTask() *workspacetasks.WorkspaceTask {
 	return &workspacetasks.WorkspaceTask{
 		ID: "task_render1", WorkspaceID: "ws_test", OwnerUserID: 7,
-		Service: "render", Status: workspacetasks.StatusRunning,
+		Service: "render", Status: workspacetasks.StatusRunning, ExecutionToken: "execution_render1",
 	}
 }
 
@@ -118,88 +110,43 @@ func rendererRemoteRef(sum string) workspacetasks.OutputRef {
 	}
 }
 
-// Remote ingest: bytes -> validated asset row -> settlement-ready asset
-// ref. Completion records no derivative rows: display tiers resolve on
-// demand through signed imgproxy URLs (ADR-0007 pull model).
-func TestWorkspaceTaskRendererRemoteToAsset(t *testing.T) {
-	env := newRendererTestEnv(t)
-	ctx := context.Background()
-	r := env.renderer(t, nil)
-
-	refs, err := r.RenderOutputs(ctx, rendererTestTask(), []workspacetasks.OutputRef{rendererRemoteRef(env.peggedSum)})
+// The executor owns ingestion; its worker-facing result contains asset ids only.
+func materializingProvider(t *testing.T, media workspacemedia.WorkspaceMediaStore, objects workspacemedia.MediaObjects, png []byte) WorkspaceTaskGenerateFunc {
+	t.Helper()
+	m, err := taskruntime.NewWorkspaceProviderResultMaterializer(taskruntime.WorkspaceProviderResultMaterializerDeps{
+		Media: media, Objects: objects,
+		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(context.Context, *workspacetasks.WorkspaceTask, workspacetasks.OutputRef) ([]byte, error) {
+			return nil, errors.New("inline fixture must not download")
+		}),
+	})
 	if err != nil {
-		t.Fatalf("RenderOutputs: %v", err)
+		t.Fatal(err)
 	}
-	if len(refs) != 1 || refs[0].Kind != workspacetasks.OutputKindAsset {
-		t.Fatalf("refs = %+v, want one asset ref", refs)
+	return func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+		results, err := m.MaterializeRemoteResults(ctx, task.OwnerUserID, task.ID, []string{"data:image/png;base64," + base64.StdEncoding.EncodeToString(png)}, taskmedia.ResultMaterializeOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return mapWorkspaceProviderOutputs(results.Outputs())
 	}
-	if !contract.IsAssetID(refs[0].AssetID) {
-		t.Fatalf("asset id = %q, want asset_ shape", refs[0].AssetID)
-	}
-	if refs[0].Role != "result" || refs[0].ResultIndex != 0 {
-		t.Fatalf("ref = %+v, want role/result_index carried over", refs[0])
-	}
-	asset, err := env.media.GetAsset(ctx, "ws_test", refs[0].AssetID)
+}
+
+func (e *rendererTestEnv) materialize(t *testing.T, ctx context.Context, task *workspacetasks.WorkspaceTask) []workspacetasks.OutputRef {
+	t.Helper()
+	refs, err := materializingProvider(t, e.media, e.objects, e.pegged)(ctx, task)
 	if err != nil {
-		t.Fatalf("GetAsset: %v", err)
+		t.Fatal(err)
 	}
-	if asset.MIMEType != "image/png" || asset.Width != 1 || asset.Height != 1 {
-		t.Fatalf("asset = %+v, want validated png facts", asset)
-	}
-	if asset.ChecksumSHA256 != env.peggedSum || asset.SizeBytes != int64(len(env.pegged)) {
-		t.Fatalf("asset = %+v, want byte facts echoed", asset)
-	}
-	// Bytes landed at the reserved slot through the storage seam.
-	stored := env.objects.objects[asset.StorageKey]
-	if len(stored) != len(env.pegged) {
-		t.Fatalf("stored bytes = %d, want %d at the asset slot", len(stored), len(env.pegged))
-	}
+	return refs
 }
 
-// Checksum mismatch fails closed: fetched bytes do not match the
-// provider-declared checksum.
-func TestWorkspaceTaskRendererChecksumMismatch(t *testing.T) {
+func TestWorkspaceTaskRendererRejectsRemoteOutputs(t *testing.T) {
 	env := newRendererTestEnv(t)
-	r := env.renderer(t, nil)
-	_, err := r.RenderOutputs(context.Background(), rendererTestTask(),
-		[]workspacetasks.OutputRef{rendererRemoteRef(strings.Repeat("b", 64))})
-	if err == nil || !strings.Contains(err.Error(), "校验失败") {
-		t.Fatalf("err = %v, want checksum fail-loud", err)
+	if _, err := env.renderer(t, nil).RenderOutputs(context.Background(), rendererTestTask(), []workspacetasks.OutputRef{rendererRemoteRef(env.peggedSum)}); err == nil {
+		t.Fatal("remote output must fail before any ingestion")
 	}
-}
-
-// Non-image bytes fail the imageformat gate deterministically.
-func TestWorkspaceTaskRendererInvalidBytes(t *testing.T) {
-	env := newRendererTestEnv(t)
-	env.pegged = []byte("not-an-image-at-all")
-	r := env.renderer(t, nil)
-	_, err := r.RenderOutputs(context.Background(), rendererTestTask(),
-		[]workspacetasks.OutputRef{rendererRemoteRef(fixtureChecksum(env.pegged))})
-	if err == nil {
-		t.Fatal("invalid bytes = nil, want imageformat failure")
-	}
-}
-
-// Nil fetcher fails remote ingest closed with an explicit message
-// (a renderer without a download seam ingests nothing).
-func TestWorkspaceTaskRendererNilFetcherFailsLoud(t *testing.T) {
-	env := newRendererTestEnv(t)
-	r := env.renderer(t, func(d *taskruntime.WorkspaceTaskRendererDeps) { d.Fetcher = nil })
-	_, err := r.RenderOutputs(context.Background(), rendererTestTask(),
-		[]workspacetasks.OutputRef{rendererRemoteRef(env.peggedSum)})
-	if err == nil || !strings.Contains(err.Error(), "转存未配置") {
-		t.Fatalf("err = %v, want fail-loud ingestion message", err)
-	}
-}
-
-// Nil objects fail remote ingest closed (bytes have nowhere to land).
-func TestWorkspaceTaskRendererNilObjectsFailsLoud(t *testing.T) {
-	env := newRendererTestEnv(t)
-	r := env.renderer(t, func(d *taskruntime.WorkspaceTaskRendererDeps) { d.Objects = nil })
-	_, err := r.RenderOutputs(context.Background(), rendererTestTask(),
-		[]workspacetasks.OutputRef{rendererRemoteRef(env.peggedSum)})
-	if err == nil || !strings.Contains(err.Error(), "转存未配置") {
-		t.Fatalf("err = %v, want fail-loud storage message", err)
+	if len(env.objects.objects) != 0 {
+		t.Fatal("renderer ingested remote bytes")
 	}
 }
 
@@ -258,7 +205,7 @@ func TestNewWorkspaceTaskRendererRequiresSeams(t *testing.T) {
 }
 
 // Worker ordering: generate -> render -> atomic Complete. The provider
-// yields a remote ref; settlement persists the rendered asset ref. The
+// ingests provider bytes; settlement persists the verified asset ref. The
 // settlement Service shares the renderer's media store (as production
 // does via the single TaskAssetAdapter instance), so the settle-time
 // output-asset gate (settle.go) resolves the freshly ingested asset.
@@ -281,23 +228,17 @@ func TestWorkspaceTaskWorkerRendersBeforeComplete(t *testing.T) {
 	}
 	created = pinWorkerSnapshot(t, store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 	png := fixturePNGBytes(t)
-	sum := fixtureChecksum(png)
 	objects := &fakeRendererObjects{}
 	renderer, err := taskruntime.NewWorkspaceTaskRenderer(taskruntime.WorkspaceTaskRendererDeps{
-		Media: media, Assets: &workspacemedia.TaskAssetAdapter{Store: media}, Objects: objects,
-		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask, _ workspacetasks.OutputRef) ([]byte, error) {
-			return append([]byte(nil), png...), nil
-		}),
+		Media: media, Assets: &workspacemedia.TaskAssetAdapter{Store: media},
 	})
 	if err != nil {
 		t.Fatalf("taskruntime.NewWorkspaceTaskRenderer: %v", err)
 	}
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: store, Settler: service,
-		Assets: &workspacemedia.TaskAssetAdapter{Store: media},
-		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
-			return []workspacetasks.OutputRef{rendererRemoteRef(sum)}, nil
-		}),
+		Assets:   &workspacemedia.TaskAssetAdapter{Store: media},
+		Provider: materializingProvider(t, media, objects, png),
 		Renderer: renderer,
 	})
 	if err != nil {
@@ -332,8 +273,6 @@ func TestWorkspaceTaskWorkerRenderFailureFailsTerminal(t *testing.T) {
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
 	renderer, err := taskruntime.NewWorkspaceTaskRenderer(taskruntime.WorkspaceTaskRendererDeps{
 		Media: media, Assets: &workspacemedia.TaskAssetAdapter{Store: media},
-		Objects: &fakeRendererObjects{},
-		// No fetcher: remote ingest fails closed.
 	})
 	if err != nil {
 		t.Fatalf("taskruntime.NewWorkspaceTaskRenderer: %v", err)
@@ -342,7 +281,7 @@ func TestWorkspaceTaskWorkerRenderFailureFailsTerminal(t *testing.T) {
 		Store: env.store, Settler: env.service,
 		Assets: &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
 		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
-			return workerTestRemoteOutput(), nil
+			return []workspacetasks.OutputRef{{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_missing0001", Role: "result"}}, nil
 		}),
 		Renderer: renderer,
 	})

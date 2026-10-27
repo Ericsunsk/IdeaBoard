@@ -37,7 +37,10 @@ type ProviderCallOutput struct {
 
 // GatewayCallInput carries one gateway execution's resolved inputs. The
 // model comes from the admin mapping (read at execution time); the token
-// fences terminal writes so stale workers lose.
+// fences terminal writes so stale workers lose. The token is additionally
+// forwarded upstream as a best-effort idempotency key (ignored by upstreams
+// that do not understand it); local settlement never depends on upstream
+// dedup.
 type GatewayCallInput struct {
 	Task           *tasks.TaskPayload
 	Model          string

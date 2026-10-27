@@ -205,7 +205,7 @@ func TestCreateAtomicityRollbackOnEnqueueFailure(t *testing.T) {
 	holder := newFakeHolder()
 	queue := &fakeEnqueuer{failNext: errors.New("river down")}
 	service := NewService(ServiceDeps{
-		TaskRead: store, TaskLifecycle: txStore, Quoter: &fakeQuoter{snapshot: testSnapshot()},
+		TaskRead: store, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: &fakeQuoter{snapshot: testSnapshot()},
 		Holder: &txTestHolder{fakeHolder: holder}, Queue: &txTestEnqueuer{fakeEnqueuer: queue},
 		Resolver: allowTestPoolResolverInTx(), SnapshotSaver: noopSnapshotSaver,
 		Acceptance: &fakeSubmissionAcceptance{},
@@ -234,7 +234,7 @@ func TestCreateAtomicityRollbackOnHoldFailure(t *testing.T) {
 	holder.holdErr = ErrInsufficientCredits
 	queue := &fakeEnqueuer{}
 	service := NewService(ServiceDeps{
-		TaskRead: store, TaskLifecycle: txStore, Quoter: &fakeQuoter{snapshot: testSnapshot()},
+		TaskRead: store, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: &fakeQuoter{snapshot: testSnapshot()},
 		Holder: &txTestHolder{fakeHolder: holder}, Queue: &txTestEnqueuer{fakeEnqueuer: queue},
 		Resolver: allowTestPoolResolverInTx(), SnapshotSaver: noopSnapshotSaver,
 		Acceptance: &fakeSubmissionAcceptance{},
@@ -259,7 +259,7 @@ func TestCancelTerminalSettleReleases(t *testing.T) {
 	holder := newFakeHolder()
 	queue := &fakeEnqueuer{}
 	service := NewService(ServiceDeps{
-		TaskRead: store, TaskLifecycle: txStore, Quoter: &fakeQuoter{snapshot: testSnapshot()},
+		TaskRead: store, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: &fakeQuoter{snapshot: testSnapshot()},
 		Holder: &txTestHolder{fakeHolder: holder}, Queue: &txTestEnqueuer{fakeEnqueuer: queue},
 		Resolver: allowTestPoolResolverInTx(), SnapshotSaver: noopSnapshotSaver,
 		Acceptance: &fakeSubmissionAcceptance{},
@@ -340,7 +340,7 @@ func TestInputAssetsRequireReady(t *testing.T) {
 		"ws_abc\x00asset_pending": {ID: "asset_pending", WorkspaceID: "ws_abc", Status: "pending"},
 	}}
 	service := NewService(ServiceDeps{
-		TaskRead: store, TaskLifecycle: txStore, Quoter: &fakeQuoter{snapshot: testSnapshot()},
+		TaskRead: store, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: &fakeQuoter{snapshot: testSnapshot()},
 		Holder: &txTestHolder{fakeHolder: newFakeHolder()}, Queue: &txTestEnqueuer{fakeEnqueuer: &fakeEnqueuer{}},
 		Assets: assets, Resolver: allowTestPoolResolverInTx(), SnapshotSaver: noopSnapshotSaver,
 		Acceptance: &fakeSubmissionAcceptance{assets: assets},
@@ -415,7 +415,7 @@ func newRoutingTestEnv(pools map[string]routing.Pool) *routingTestEnv {
 	resolver := routing.NewRoutingResolver(&stubPoolStore{pools: pools},
 		routing.WithSeedGenerator(func() (routing.SelectionSeed, error) { return seed, nil }))
 	env.service = NewService(ServiceDeps{
-		TaskRead: env.store, TaskLifecycle: env.txStore, Quoter: env.quoter,
+		TaskRead: env.store, TaskLifecycle: env.txStore, SubmissionClaims: env.txStore, BillingAccounts: env.txStore, Quoter: env.quoter,
 		Holder: &txTestHolder{fakeHolder: env.holder}, Queue: &txTestEnqueuer{fakeEnqueuer: env.queue},
 		Resolver: resolver,
 		SnapshotSaver: func(_ context.Context, _ pgx.Tx, taskID string, snap routing.RoutingSnapshot) error {
@@ -646,7 +646,7 @@ func planTestService() (*InMemoryStore, *fakeHolder, *fakeEnqueuer, *Service) {
 	holder := newFakeHolder()
 	queue := &fakeEnqueuer{}
 	service := NewService(ServiceDeps{
-		TaskRead: store, TaskLifecycle: txStore, Quoter: &fakeQuoter{snapshot: testSnapshot()},
+		TaskRead: store, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: &fakeQuoter{snapshot: testSnapshot()},
 		Holder: &txTestHolder{fakeHolder: holder}, Queue: &txTestEnqueuer{fakeEnqueuer: queue},
 		Resolver: allowTestPoolResolverInTx(), SnapshotSaver: noopSnapshotSaver,
 		Acceptance: &fakeSubmissionAcceptance{},
@@ -709,7 +709,7 @@ func TestCreateRejectsBeforeHoldWhenRoutingIsUnavailable(t *testing.T) {
 	// unavailable sentinel before any quote, hold, task, or enqueue
 	// work.
 	service := NewService(ServiceDeps{
-		TaskRead: store, TaskLifecycle: txStore, Quoter: quoter,
+		TaskRead: store, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: quoter,
 		Holder: &txTestHolder{fakeHolder: holder}, Queue: &txTestEnqueuer{fakeEnqueuer: queue},
 		SnapshotSaver: noopSnapshotSaver, Acceptance: &fakeSubmissionAcceptance{},
 	})
@@ -828,7 +828,7 @@ func TestCreateVerifiesMaskAsset(t *testing.T) {
 			"ws_abc\x00asset_old":     {ID: "asset_old", WorkspaceID: "ws_abc", Status: "ready", Archived: true},
 		}}
 		service := NewService(ServiceDeps{
-			TaskRead: store, TaskLifecycle: txStore, Quoter: &fakeQuoter{snapshot: testSnapshot()},
+			TaskRead: store, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: &fakeQuoter{snapshot: testSnapshot()},
 			Holder: &txTestHolder{fakeHolder: newFakeHolder()}, Queue: &txTestEnqueuer{fakeEnqueuer: &fakeEnqueuer{}},
 			Resolver: allowTestPoolResolverInTx(), SnapshotSaver: noopSnapshotSaver,
 			Acceptance: &fakeSubmissionAcceptance{assets: assets},
@@ -1015,7 +1015,7 @@ func newAvailabilityTestEnv(quoter Quoter, pools map[string]routing.Pool) *avail
 	resolver := routing.NewRoutingResolver(&stubPoolStore{pools: pools},
 		routing.WithSeedGenerator(func() (routing.SelectionSeed, error) { return seed, nil }))
 	env.service = NewService(ServiceDeps{
-		TaskRead: env.store, TaskLifecycle: env.txStore, Quoter: quoter,
+		TaskRead: env.store, TaskLifecycle: env.txStore, SubmissionClaims: env.txStore, BillingAccounts: env.txStore, Quoter: quoter,
 		Holder: &txTestHolder{fakeHolder: env.holder}, Queue: &txTestEnqueuer{fakeEnqueuer: env.queue},
 		Resolver: resolver,
 		SnapshotSaver: func(_ context.Context, _ pgx.Tx, taskID string, snap routing.RoutingSnapshot) error {

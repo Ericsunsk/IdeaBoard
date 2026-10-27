@@ -36,32 +36,61 @@ func TestMain(m *testing.M) {
 func TestNewGatewayClientRejectsBadConfig(t *testing.T) {
 	for _, cfg := range []GatewayClientConfig{
 		{},
-		{BaseURL: "https://gateway.example.com/v1/a/g"},
+		{BaseURL: "https://gateway.ai.cloudflare.com/v1/a/g"},
 		{Token: "token"},
-		{BaseURL: "ftp://gateway.example.com/v1/a/g", Token: "token"},
+		{BaseURL: "ftp://gateway.ai.cloudflare.com/v1/a/g", Token: "token"},
 		{BaseURL: "https:///v1/a/g", Token: "token"},
+		// Sole-egress pin: any non-Cloudflare host is a startup error.
+		{BaseURL: "https://gateway.example.com/v1/a/g", Token: "token"},
+		{BaseURL: "http://127.0.0.1:8080/v1/a/g", Token: "token"},
 	} {
 		if _, err := NewGatewayClient(cfg); err == nil {
 			t.Fatalf("NewGatewayClient(%+v) succeeded, want error", cfg)
 		}
 	}
+	if _, err := NewGatewayClient(GatewayClientConfig{
+		BaseURL: "https://gateway.ai.cloudflare.com/v1/a/g",
+		Token:   "token",
+	}); err != nil {
+		t.Fatalf("NewGatewayClient(CF host) error = %v, want nil", err)
+	}
+	if _, err := NewGatewayClientForTest(GatewayClientConfig{
+		BaseURL: "http://127.0.0.1:8080/v1/a/g",
+		Token:   "token",
+	}); err != nil {
+		t.Fatalf("NewGatewayClientForTest(loopback) error = %v, want nil", err)
+	}
+	if _, err := NewGatewayClientForTest(GatewayClientConfig{
+		BaseURL: "https://gateway.example.com/v1/a/g",
+		Token:   "token",
+	}); err == nil {
+		t.Fatal("NewGatewayClientForTest(non-loopback non-CF) succeeded, want error")
+	}
 }
 
 func TestGatewayRequestValidation(t *testing.T) {
 	valid := runtimeports.GatewayRequest{
-		Endpoint: runtimeports.GatewayEndpoint{Kind: runtimeports.GatewayEndpointCompatChat},
-		Body:     []byte(`{"model":"openai/gpt-4o-mini"}`),
+		Endpoint: runtimeports.GatewayEndpoint{
+			Provider: "openai",
+			Path:     "v1/chat/completions",
+		},
+		Body: []byte(`{"model":"openai/gpt-4o-mini"}`),
 	}
 	if err := valid.Validate(); err != nil {
 		t.Fatalf("valid request rejected: %v", err)
 	}
-	native := valid
-	native.Endpoint = runtimeports.GatewayEndpoint{Kind: runtimeports.GatewayEndpointProviderNative}
-	if err := native.Validate(); err == nil {
-		t.Fatal("native endpoint without provider/path accepted")
+	emptyProvider := valid
+	emptyProvider.Endpoint.Provider = "  "
+	if err := emptyProvider.Validate(); err == nil {
+		t.Fatal("empty provider accepted")
 	}
+	emptyPath := valid
+	emptyPath.Endpoint.Path = ""
+	if err := emptyPath.Validate(); err == nil {
+		t.Fatal("empty path accepted")
+	}
+	native := valid
 	native.Endpoint = runtimeports.GatewayEndpoint{
-		Kind:     runtimeports.GatewayEndpointProviderNative,
 		Provider: "openai",
 		Path:     "v1/images/generations",
 	}
@@ -72,12 +101,6 @@ func TestGatewayRequestValidation(t *testing.T) {
 		func(r *runtimeports.GatewayRequest) { r.Body = nil },
 		func(r *runtimeports.GatewayRequest) { r.MaxAttempts = 6 },
 		func(r *runtimeports.GatewayRequest) { r.MaxAttempts = -1 },
-		func(r *runtimeports.GatewayRequest) {
-			r.Cache = runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheTTL, TTLSeconds: 30}
-		},
-		func(r *runtimeports.GatewayRequest) {
-			r.Cache = runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip, Key: "x"}
-		},
 	} {
 		req := valid
 		mutate(&req)
@@ -85,8 +108,10 @@ func TestGatewayRequestValidation(t *testing.T) {
 			t.Fatalf("invalid request accepted: %+v", req)
 		}
 	}
-	if err := (runtimeports.GatewayEndpoint{}).Validate(); err == nil {
-		t.Fatal("empty endpoint kind accepted")
+	empty := valid
+	empty.Endpoint = runtimeports.GatewayEndpoint{}
+	if err := empty.Validate(); err == nil {
+		t.Fatal("empty endpoint accepted")
 	}
 }
 
@@ -100,15 +125,21 @@ func TestGatewayClientUsesRequestTimeAllowlistWithoutAppendingTarget(t *testing.
 	defer restore()
 
 	if _, err := client.Do(context.Background(), runtimeports.GatewayRequest{
-		Endpoint: runtimeports.GatewayEndpoint{Kind: runtimeports.GatewayEndpointCompatChat},
-		Body:     []byte(`{}`),
+		Endpoint: runtimeports.GatewayEndpoint{
+			Provider: "openai",
+			Path:     "v1/chat/completions",
+		},
+		Body: []byte(`{}`),
 	}); err != nil {
 		t.Fatalf("authorized gateway request failed: %v", err)
 	}
 	policy.hosts = []string{"gateway.example.invalid"}
 	if _, err := client.Do(context.Background(), runtimeports.GatewayRequest{
-		Endpoint: runtimeports.GatewayEndpoint{Kind: runtimeports.GatewayEndpointCompatChat},
-		Body:     []byte(`{}`),
+		Endpoint: runtimeports.GatewayEndpoint{
+			Provider: "openai",
+			Path:     "v1/chat/completions",
+		},
+		Body: []byte(`{}`),
 	}); err == nil {
 		t.Fatal("gateway request succeeded after request-time allowlist revoked")
 	}
@@ -153,31 +184,43 @@ func newGatewayCaptureServer(t *testing.T, capture *gatewayCapture, status int, 
 
 func newGatewayTestClient(t *testing.T, server *httptest.Server) *GatewayClient {
 	t.Helper()
-	client, err := NewGatewayClient(GatewayClientConfig{BaseURL: server.URL, Token: "test-token"})
-	if err != nil {
-		t.Fatalf("NewGatewayClient() error = %v", err)
+	// Unit paths bypass NewGatewayClient's sole-egress pin (production
+	// always constructs through it): the httptest server is loopback by
+	// design, so the client is built directly to exercise Do() shaping,
+	// headers, and receipt parsing without dialing Cloudflare.
+	return &GatewayClient{
+		baseURL:  strings.TrimRight(strings.TrimSpace(server.URL), "/"),
+		token:    "test-token",
+		timeout:  runtimeports.GatewayDefaultTimeout,
+		maxBytes: defaultGatewayMaxResponseBytes,
+		outbound: safehttp.NewClient(safehttp.Config{
+			Timeout:     runtimeports.GatewayDefaultTimeout,
+			MaxTimeout:  runtimeports.GatewayDefaultTimeout,
+			MaxAttempts: 1,
+		}),
+		target:     defaultGatewayOutboundTarget,
+		resilience: NewGatewayResilience(DefaultGatewayResilienceConfig(), nil),
 	}
-	return client
 }
 
 // newGatewayFastRetryClient keeps retry semantics but skips real waiting so
 // exhaustion tests stay fast.
 func newGatewayFastRetryClient(t *testing.T, server *httptest.Server) *GatewayClient {
 	t.Helper()
-	client, err := NewGatewayClient(GatewayClientConfig{
-		BaseURL: server.URL,
-		Token:   "test-token",
-		Outbound: safehttp.NewClient(safehttp.Config{
+	return &GatewayClient{
+		baseURL:  strings.TrimRight(strings.TrimSpace(server.URL), "/"),
+		token:    "test-token",
+		timeout:  runtimeports.GatewayDefaultTimeout,
+		maxBytes: defaultGatewayMaxResponseBytes,
+		outbound: safehttp.NewClient(safehttp.Config{
 			MaxAttempts:       3,
 			MaxRetryAfterWait: time.Second,
 			Sleep:             func(context.Context, time.Duration) error { return nil },
 			Metrics:           safehttp.NewMetrics(prometheus.NewRegistry()),
 		}),
-	})
-	if err != nil {
-		t.Fatalf("NewGatewayClient() error = %v", err)
+		target:     defaultGatewayOutboundTarget,
+		resilience: NewGatewayResilience(DefaultGatewayResilienceConfig(), nil),
 	}
-	return client
 }
 
 func assertGatewayBaseHeaders(t *testing.T, capture *gatewayCapture, taskID, feature string) {
@@ -200,6 +243,41 @@ func assertGatewayBaseHeaders(t *testing.T, capture *gatewayCapture, taskID, fea
 	}
 }
 
+func TestGatewayClientForwardsExecutionTokenAsIdempotencyKey(t *testing.T) {
+	var capture gatewayCapture
+	server := newGatewayCaptureServer(t, &capture, http.StatusOK, nil, `{}`)
+	defer server.Close()
+
+	_, err := newGatewayTestClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
+		Endpoint: runtimeports.GatewayEndpoint{
+			Provider: "openai",
+			Path:     "v1/chat/completions",
+		},
+		Body:           []byte(`{}`),
+		ExecutionToken: "exec-123",
+	})
+	if err != nil {
+		t.Fatalf("Do() error = %v", err)
+	}
+	if got := capture.header.Get(runtimeports.GatewayHeaderIdempotencyKey); got != "exec-123" {
+		t.Fatalf("idempotency key = %q, want exec-123", got)
+	}
+
+	_, err = newGatewayTestClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
+		Endpoint: runtimeports.GatewayEndpoint{
+			Provider: "openai",
+			Path:     "v1/chat/completions",
+		},
+		Body: []byte(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("Do() error = %v", err)
+	}
+	if got := capture.header.Get(runtimeports.GatewayHeaderIdempotencyKey); got != "" {
+		t.Fatalf("idempotency key = %q, want empty when no execution token", got)
+	}
+}
+
 func TestGatewayClientImageRequestSkipsCache(t *testing.T) {
 	var capture gatewayCapture
 	server := newGatewayCaptureServer(t, &capture, http.StatusOK,
@@ -208,7 +286,6 @@ func TestGatewayClientImageRequestSkipsCache(t *testing.T) {
 
 	resp, err := newGatewayTestClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
 		Endpoint: runtimeports.GatewayEndpoint{
-			Kind:     runtimeports.GatewayEndpointProviderNative,
 			Provider: "openai",
 			Path:     "v1/images/generations",
 		},
@@ -216,7 +293,6 @@ func TestGatewayClientImageRequestSkipsCache(t *testing.T) {
 		TaskID:  "task-1",
 		Feature: "render",
 		Body:    []byte(`{"prompt":"a cat"}`),
-		Cache:   runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip},
 	})
 	if err != nil {
 		t.Fatalf("Do() error = %v", err)
@@ -228,56 +304,11 @@ func TestGatewayClientImageRequestSkipsCache(t *testing.T) {
 	if got := capture.header.Get(runtimeports.GatewayHeaderSkipCache); got != "true" {
 		t.Fatalf("skip-cache = %q, want true", got)
 	}
-	if got := capture.header.Get(runtimeports.GatewayHeaderCacheTTL); got != "" {
-		t.Fatalf("cache-ttl = %q, want empty on skip", got)
-	}
 	if resp.Receipt.CacheHit {
 		t.Fatal("MISS response reported as cache hit")
 	}
 	if string(resp.Body) != `{"ok":true}` {
 		t.Fatalf("body = %q", resp.Body)
-	}
-}
-
-func TestGatewayClientTextRequestOptsIntoCache(t *testing.T) {
-	var capture gatewayCapture
-	server := newGatewayCaptureServer(t, &capture, http.StatusOK,
-		map[string]string{
-			runtimeports.GatewayHeaderCacheStatus: "HIT",
-			runtimeports.GatewayHeaderModel:       "openai/gpt-4o-mini",
-			runtimeports.GatewayHeaderProvider:    "openai",
-			runtimeports.GatewayHeaderLogID:       "log-1",
-			runtimeports.GatewayHeaderEventID:     "evt-1",
-			runtimeports.GatewayHeaderStep:        "0",
-		}, `{}`)
-	defer server.Close()
-
-	resp, err := newGatewayTestClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
-		Endpoint: runtimeports.GatewayEndpoint{Kind: runtimeports.GatewayEndpointCompatChat},
-		TaskID:   "task-2",
-		Feature:  "variations",
-		Body:     []byte(`{"model":"openai/gpt-4o-mini"}`),
-		Cache:    runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheTTL, TTLSeconds: 3600, Key: "feature:variations:abc"},
-	})
-	if err != nil {
-		t.Fatalf("Do() error = %v", err)
-	}
-	if capture.path != "/compat/chat/completions" {
-		t.Fatalf("path = %q, want /compat/chat/completions", capture.path)
-	}
-	if got := capture.header.Get(runtimeports.GatewayHeaderCacheKey); got != "feature:variations:abc" {
-		t.Fatalf("cache-key = %q", got)
-	}
-	if got := capture.header.Get(runtimeports.GatewayHeaderCacheTTL); got != "3600" {
-		t.Fatalf("cache-ttl = %q, want 3600", got)
-	}
-	if got := capture.header.Get(runtimeports.GatewayHeaderSkipCache); got != "" {
-		t.Fatalf("skip-cache = %q, want empty on ttl", got)
-	}
-	if !resp.Receipt.CacheHit || resp.Receipt.Model != "openai/gpt-4o-mini" ||
-		resp.Receipt.Provider != "openai" || resp.Receipt.LogID != "log-1" ||
-		resp.Receipt.EventID != "evt-1" || resp.Receipt.Step != "0" {
-		t.Fatalf("receipt = %+v, want parsed HIT receipt", resp.Receipt)
 	}
 }
 
@@ -288,13 +319,11 @@ func TestGatewayClientProbeIsSingleShot(t *testing.T) {
 
 	_, err := newGatewayTestClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
 		Endpoint: runtimeports.GatewayEndpoint{
-			Kind:     runtimeports.GatewayEndpointProviderNative,
 			Provider: "openai",
 			Path:     "v1/models",
 		},
 		TaskID:      "probe-1",
-		Body:        []byte(`{}`),
-		Cache:       runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip},
+		Method:      http.MethodGet,
 		MaxAttempts: 1,
 		Timeout:     5 * time.Second,
 	})
@@ -304,6 +333,12 @@ func TestGatewayClientProbeIsSingleShot(t *testing.T) {
 	if got := capture.header.Get(runtimeports.GatewayHeaderMaxAttempts); got != "1" {
 		t.Fatalf("max-attempts = %q, want 1", got)
 	}
+	if capture.method != http.MethodGet || capture.path != "/openai/v1/models" {
+		t.Fatalf("request = %s %s, want GET /openai/v1/models", capture.method, capture.path)
+	}
+	if got := capture.header.Get(runtimeports.GatewayHeaderSkipCache); got != "true" {
+		t.Fatalf("skip-cache = %q, want true", got)
+	}
 }
 
 func TestGatewayClientSurfacesUpstreamErrors(t *testing.T) {
@@ -312,8 +347,11 @@ func TestGatewayClientSurfacesUpstreamErrors(t *testing.T) {
 	defer server.Close()
 
 	_, err := newGatewayTestClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
-		Endpoint: runtimeports.GatewayEndpoint{Kind: runtimeports.GatewayEndpointCompatChat},
-		Body:     []byte(`{}`),
+		Endpoint: runtimeports.GatewayEndpoint{
+			Provider: "openai",
+			Path:     "v1/chat/completions",
+		},
+		Body: []byte(`{}`),
 	})
 	if err == nil {
 		t.Fatal("Do() succeeded on 429, want UpstreamHTTPError")
@@ -338,13 +376,11 @@ func TestGatewayClientDoesNotRetryGatewayRequestsAfter503(t *testing.T) {
 
 	_, err := newGatewayTestClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
 		Endpoint: runtimeports.GatewayEndpoint{
-			Kind:     runtimeports.GatewayEndpointProviderNative,
 			Provider: "openai",
 			Path:     "v1/images/generations",
 		},
 		Model: "openai/gpt-image-1",
 		Body:  []byte(`{"prompt":"a cat"}`),
-		Cache: runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip},
 	})
 	var upstreamErr *runtimeports.UpstreamHTTPError
 	if !errors.As(err, &upstreamErr) || upstreamErr.StatusCode != http.StatusServiceUnavailable {
@@ -366,8 +402,11 @@ func TestGatewayClientPreservesRetryAfterForWorkerRetry(t *testing.T) {
 	defer server.Close()
 
 	_, err := newGatewayFastRetryClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
-		Endpoint: runtimeports.GatewayEndpoint{Kind: runtimeports.GatewayEndpointCompatChat},
-		Body:     []byte(`{}`),
+		Endpoint: runtimeports.GatewayEndpoint{
+			Provider: "openai",
+			Path:     "v1/chat/completions",
+		},
+		Body: []byte(`{}`),
 	})
 	if err == nil {
 		t.Fatal("Do() succeeded on persistent 429, want UpstreamHTTPError")
@@ -394,12 +433,10 @@ func TestGatewayClientProbeStaysSingleShot(t *testing.T) {
 
 	_, err := newGatewayTestClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
 		Endpoint: runtimeports.GatewayEndpoint{
-			Kind:     runtimeports.GatewayEndpointProviderNative,
 			Provider: "openai",
 			Path:     "v1/models",
 		},
 		Body:        []byte(`{}`),
-		Cache:       runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip},
 		MaxAttempts: 1,
 		Timeout:     5 * time.Second,
 	})
@@ -420,15 +457,25 @@ func TestGatewayClientCapsResponseBody(t *testing.T) {
 	server := newGatewayCaptureServer(t, &capture, http.StatusOK, nil, strings.Repeat("x", 64))
 	defer server.Close()
 
-	client, err := NewGatewayClient(GatewayClientConfig{
-		BaseURL: server.URL, Token: "test-token", MaxResponseBytes: 16,
-	})
-	if err != nil {
-		t.Fatalf("NewGatewayClient() error = %v", err)
+	client := &GatewayClient{
+		baseURL:  strings.TrimRight(strings.TrimSpace(server.URL), "/"),
+		token:    "test-token",
+		timeout:  runtimeports.GatewayDefaultTimeout,
+		maxBytes: 16,
+		outbound: safehttp.NewClient(safehttp.Config{
+			Timeout:     runtimeports.GatewayDefaultTimeout,
+			MaxTimeout:  runtimeports.GatewayDefaultTimeout,
+			MaxAttempts: 1,
+		}),
+		target:     defaultGatewayOutboundTarget,
+		resilience: NewGatewayResilience(DefaultGatewayResilienceConfig(), nil),
 	}
-	_, err = client.Do(context.Background(), runtimeports.GatewayRequest{
-		Endpoint: runtimeports.GatewayEndpoint{Kind: runtimeports.GatewayEndpointCompatChat},
-		Body:     []byte(`{}`),
+	_, err := client.Do(context.Background(), runtimeports.GatewayRequest{
+		Endpoint: runtimeports.GatewayEndpoint{
+			Provider: "openai",
+			Path:     "v1/chat/completions",
+		},
+		Body: []byte(`{}`),
 	})
 	if err == nil || !strings.Contains(err.Error(), "exceeds") {
 		t.Fatalf("err = %v, want body cap error", err)
@@ -446,12 +493,14 @@ func TestGatewayLiveSmoke(t *testing.T) {
 		t.Fatalf("NewGatewayClient() error = %v", err)
 	}
 	resp, err := client.Do(context.Background(), runtimeports.GatewayRequest{
-		Endpoint: runtimeports.GatewayEndpoint{Kind: runtimeports.GatewayEndpointCompatChat},
-		TaskID:   "smoke",
-		Feature:  "smoke",
-		Body:     []byte(`{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":8}`),
-		Cache:    runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip},
-		Timeout:  60 * time.Second,
+		Endpoint: runtimeports.GatewayEndpoint{
+			Provider: "openai",
+			Path:     "v1/chat/completions",
+		},
+		TaskID:  "smoke",
+		Feature: "smoke",
+		Body:    []byte(`{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":8}`),
+		Timeout: 60 * time.Second,
 	})
 	if err != nil {
 		t.Fatalf("Do() error = %v", err)

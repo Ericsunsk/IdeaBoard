@@ -1,11 +1,14 @@
 import { isTaskResultPendingError, TaskCancelledError } from '../task-runner/taskResultErrors'
 import { i18n } from '../../../../../core/i18n'
 import type { BoardSnapshot } from '../../../../board/ports/canvas'
-import { type PendingImageResolvedResult } from '../pending-execution/boardGraphSession'
+import type { TaskImageObserver } from '../task-runner/taskImageOutcome'
+import { runWithDeadline } from '../../../../../core/utils/request'
+import { CANVAS_FOREGROUND_WAIT_MS } from '../canvasBudgets'
 import {
   PendingImageMaterializationError,
   type PendingImageExecutionCore,
   type PendingImageMaterializationResult,
+  type PendingImageExecutionLease,
 } from '../pending-execution/core'
 import {
   collectPendingImageTasks,
@@ -24,7 +27,7 @@ export type CanvasExecutionRecoveryResult = Readonly<{
 export type CanvasExecutionRecoveryCoordinatorOptions = Readonly<{
   executionCore: PendingImageExecutionCore
   readBoardSnapshot: () => BoardSnapshot
-  resolveResult: (pending: PendingImageTaskSnapshot) => Promise<PendingImageResolvedResult>
+  observeTask: TaskImageObserver
   flushAutosave: () => Promise<void>
   cancelTasks: (taskIds: readonly string[]) => void
   onError?: ((error: unknown) => boolean) | undefined
@@ -34,6 +37,7 @@ export type CanvasExecutionRecoveryCoordinatorOptions = Readonly<{
 export type CanvasExecutionRecoveryCoordinator = Readonly<{
   hydratePendingLeases: (snapshot?: BoardSnapshot) => number
   recover: () => Promise<CanvasExecutionRecoveryResult | null>
+  dispose: () => void
 }>
 
 function attachmentKey(attachment: { boardId: string; epoch: number }): string {
@@ -58,9 +62,18 @@ function readRejectedNodeIds(result: PendingImageMaterializationResult): readonl
   )
 }
 
+function isRecoveryPending(error: unknown): boolean {
+  return (
+    isTaskResultPendingError(error) ||
+    (error instanceof DOMException && error.name === 'TimeoutError')
+  )
+}
+
 export function createCanvasExecutionRecoveryCoordinator(
   options: CanvasExecutionRecoveryCoordinatorOptions,
 ): CanvasExecutionRecoveryCoordinator {
+  const activeReads = new Set<AbortController>()
+  let isDisposed = false
   const hydratedAttachments = new Set<string>()
   const activeRecoveries = new Map<string, Promise<CanvasExecutionRecoveryResult | null>>()
 
@@ -71,7 +84,7 @@ export function createCanvasExecutionRecoveryCoordinator(
 
   function hydratePendingLeases(snapshot?: BoardSnapshot): number {
     const attachment = options.executionCore.currentAttachment()
-    if (!attachment) return 0
+    if (isDisposed || !attachment) return 0
     const pending = collectPendingImageTasks(snapshot ?? options.readBoardSnapshot())
     const key = attachmentKey(attachment)
     if (hydratedAttachments.has(key)) return 0
@@ -89,6 +102,23 @@ export function createCanvasExecutionRecoveryCoordinator(
     return hydratedCount
   }
 
+  type RecoverySlot = { task: PendingImageTaskSnapshot; lease: PendingImageExecutionLease }
+
+  function claimPendingTaskGroups(
+    attachment: NonNullable<ReturnType<PendingImageExecutionCore['currentAttachment']>>,
+    pending: readonly PendingImageTaskSnapshot[],
+  ): Map<string, RecoverySlot[]> {
+    const groups = new Map<string, RecoverySlot[]>()
+    for (const task of pending) {
+      const lease = options.executionCore.claimHydratedLease(attachment, task)
+      if (!lease) continue
+      const slots = groups.get(task.taskId) ?? []
+      slots.push({ task, lease })
+      groups.set(task.taskId, slots)
+    }
+    return groups
+  }
+
   async function recoverForAttachment(
     attachment: NonNullable<ReturnType<PendingImageExecutionCore['currentAttachment']>>,
   ): Promise<CanvasExecutionRecoveryResult> {
@@ -100,51 +130,111 @@ export function createCanvasExecutionRecoveryCoordinator(
     const rejectedNodeIds: string[] = []
     const recoveryErrors: unknown[] = []
     let shouldFlushAutosave = false
+    let cancelledCount = 0
+
+    const groups = claimPendingTaskGroups(attachment, pending)
+
+    function recordSlotError({ task, lease }: RecoverySlot, error: unknown): void {
+      if (isDisposed || !options.executionCore.isAttachmentCurrent(attachment)) return
+      if (
+        !options.executionCore.isCurrent(lease, task.taskId) &&
+        !(error instanceof PendingImageMaterializationError)
+      )
+        return
+      if (isRecoveryPending(error)) {
+        pendingNodeIds.push(task.resultNodeId)
+      } else if (error instanceof TaskCancelledError) {
+        const cancelled = options.executionCore.cancel([lease])
+        options.cancelTasks(releasedTaskIds(cancelled))
+      } else {
+        failedNodeIds.push(task.resultNodeId)
+        if (!(error instanceof PendingImageMaterializationError)) options.executionCore.fail(lease)
+        recoveryErrors.push(error)
+      }
+    }
 
     await Promise.all(
-      pending.map(async (task) => {
-        const lease = options.executionCore.claimHydratedLease(attachment, task)
-        if (!lease) return
+      [...groups].map(async ([taskId, slots]) => {
+        const controller = new AbortController()
+        activeReads.add(controller)
+        const stop = options.executionCore.subscribe(() => {
+          if (!slots.some(({ lease }) => options.executionCore.isCurrent(lease, taskId)))
+            controller.abort()
+        })
+        const deadlineAt = Date.now() + CANVAS_FOREGROUND_WAIT_MS
         try {
-          const result = await options.resolveResult(task)
-          if (!options.executionCore.isCurrent(lease, task.taskId)) return
-          const materialized = options.executionCore.materializeBatch([{ lease, result }])
-          const materializedIds = materializedNodeIds(materialized)
-          const rejectedIds = readRejectedNodeIds(materialized)
-          recoveredNodeIds.push(...materializedIds)
-          rejectedNodeIds.push(...rejectedIds)
-          if (materializedIds.length > 0) shouldFlushAutosave = true
+          const observation = await runWithDeadline(deadlineAt, controller.signal, (signal) =>
+            options.observeTask(taskId, { deadlineAt, signal }),
+          )
+          await Promise.all(
+            slots.map(async (slot) => {
+              const { task, lease } = slot
+              if (!options.executionCore.isCurrent(lease, taskId)) return
+              try {
+                const outcome = await runWithDeadline(deadlineAt, controller.signal, (signal) =>
+                  observation.resolve(task.resultIndex, task.fallbackRatio, { deadlineAt, signal }),
+                )
+                if (isDisposed || !options.executionCore.isCurrent(lease, taskId)) return
+                if (outcome.kind === 'cancelled') cancelledCount += 1
+                if (!outcome.result) {
+                  options.executionCore.cancel([lease])
+                  return
+                }
+                const materialized = options.executionCore.materializeBatch([
+                  { lease, result: outcome.result },
+                ])
+                const materializedIds = materializedNodeIds(materialized)
+                recoveredNodeIds.push(...materializedIds)
+                rejectedNodeIds.push(...readRejectedNodeIds(materialized))
+                if (materializedIds.length > 0) shouldFlushAutosave = true
+              } catch (error) {
+                recordSlotError(slot, error)
+              }
+            }),
+          )
         } catch (error) {
-          if (isTaskResultPendingError(error)) {
-            pendingNodeIds.push(task.resultNodeId)
-            return
-          }
-          if (error instanceof TaskCancelledError) {
-            const cancelled = options.executionCore.cancel([lease])
-            options.cancelTasks(releasedTaskIds(cancelled))
-            return
-          }
-          failedNodeIds.push(task.resultNodeId)
-          if (!(error instanceof PendingImageMaterializationError)) {
-            options.executionCore.fail(lease)
-          }
-          recoveryErrors.push(error)
+          slots.forEach((slot) => recordSlotError(slot, error))
+        } finally {
+          stop()
+          controller.abort()
+          activeReads.delete(controller)
         }
       }),
     )
 
-    if (shouldFlushAutosave) {
+    if (
+      !isDisposed &&
+      shouldFlushAutosave &&
+      options.executionCore.isAttachmentCurrent(attachment)
+    ) {
       try {
         await options.flushAutosave()
       } catch (error) {
         recoveryErrors.push(error)
       }
     }
-    if (recoveryErrors.length > 0) {
+    if (
+      !isDisposed &&
+      recoveryErrors.length > 0 &&
+      options.executionCore.isAttachmentCurrent(attachment)
+    ) {
       reportError(
         recoveryErrors.length === 1
           ? recoveryErrors[0]
           : new AggregateError(recoveryErrors, 'Canvas execution recovery failed'),
+      )
+    }
+    if (
+      !isDisposed &&
+      cancelledCount > 0 &&
+      options.executionCore.isAttachmentCurrent(attachment)
+    ) {
+      options.onWarning(
+        i18n.global.t(
+          recoveredNodeIds.length > 0
+            ? 'canvas.task.cancelledWithPartialResults'
+            : 'canvas.task.cancelled',
+        ),
       )
     }
     return Object.freeze({
@@ -159,7 +249,7 @@ export function createCanvasExecutionRecoveryCoordinator(
 
   function recover(): Promise<CanvasExecutionRecoveryResult | null> {
     const attachment = options.executionCore.currentAttachment()
-    if (!attachment) return Promise.resolve(null)
+    if (isDisposed || !attachment) return Promise.resolve(null)
     const key = attachmentKey(attachment)
     const current = activeRecoveries.get(key)
     if (current) return current
@@ -173,5 +263,9 @@ export function createCanvasExecutionRecoveryCoordinator(
   return {
     hydratePendingLeases,
     recover,
+    dispose() {
+      isDisposed = true
+      for (const controller of activeReads) controller.abort()
+    },
   }
 }

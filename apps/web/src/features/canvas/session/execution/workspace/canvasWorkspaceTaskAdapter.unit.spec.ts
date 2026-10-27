@@ -21,7 +21,7 @@ import {
   toSubmitTaskReadiness,
   toWorkspaceCreateInput,
   toWorkspaceQuoteInput,
-  waitCanvasWorkspaceTaskImageResults,
+  waitCanvasWorkspaceTaskImageOutcome,
 } from './canvasWorkspaceTaskAdapter'
 
 const mocks = vi.hoisted(() => ({
@@ -792,6 +792,90 @@ describe('canvas workspace task transport', () => {
     >)
   })
 
+  it('marks submit-unmappable media not-ready at quote time without network', async () => {
+    // Submit/quote 口径统一 (#P1-1): image_urls、numeric ids、storage
+    // URL、data-URL mask 与 submit 同规则，quote 阶段即标 not-ready。
+    const cases: Array<{ name: string; request: Parameters<typeof toWorkspaceCreateInput>[0] }> = [
+      {
+        name: 'image_urls',
+        request: { prompt: '', service: 'generation', image_urls: ['https://cdn.example/a.png'] },
+      },
+      {
+        name: 'numeric ids',
+        request: { prompt: '', service: 'generation', image_asset_ids: [12] },
+      },
+      {
+        name: 'storage URL param',
+        request: {
+          prompt: '',
+          service: 'render',
+          params: { fusion: { mode: 'weighted_reference', note: 's3://bucket/x' } },
+        },
+      },
+      {
+        name: 'data-URL mask',
+        request: {
+          prompt: 'redraw',
+          service: 'inpaint',
+          params: {
+            mask_asset_id: 'data:image/png;base64,AAA',
+          } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams,
+        },
+      },
+    ]
+    for (const { request } of cases) {
+      mocks.quoteWorkspaceTask.mockClear()
+      await expect(fetchCanvasWorkspaceTaskReadiness(request)).resolves.toMatchObject({
+        ready: false,
+        error_code: 'validation_failed',
+      } satisfies Partial<
+        import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+      >)
+      expect(mocks.quoteWorkspaceTask).not.toHaveBeenCalled()
+    }
+  })
+
+  it('marks full inpaint submits without a mask not-ready with explicit guidance', async () => {
+    mocks.quoteWorkspaceTask.mockClear()
+    await expect(
+      fetchCanvasWorkspaceTaskReadiness({
+        prompt: 'redraw',
+        service: 'inpaint',
+        media_asset_ids: ['asset_aaa1'],
+        params: {
+          use_mask: true,
+        } satisfies import('../../../core/execution/canvasTaskRequest').CanvasTaskParams,
+      }),
+    ).resolves.toMatchObject({
+      ready: false,
+      error_code: 'validation_failed',
+      message: 'Mark the area to inpaint first.',
+    } satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >)
+    expect(mocks.quoteWorkspaceTask).not.toHaveBeenCalled()
+  })
+
+  it('keeps generic inpaint price probes quotable without mask context', async () => {
+    // 纯价格探针（无 mask 上下文）不受 mask 检查影响，仍走 quote 网络。
+    mocks.quoteWorkspaceTask.mockResolvedValueOnce({
+      unit_credits: 6,
+      total_credits: 6,
+      price_version_id: 2,
+      price_version: 2,
+      quantity: 1,
+    })
+    await expect(
+      fetchCanvasWorkspaceTaskReadiness({
+        prompt: '[inpaint] submit readiness',
+        service: 'inpaint',
+      }),
+    ).resolves.toMatchObject({ ready: true, service: 'inpaint' } satisfies Partial<
+      import('../../../core/execution/canvasTaskRequest').SubmitTaskReadinessData
+    >)
+    expect(mocks.quoteWorkspaceTask).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps restricted funds and Board denials not-ready with their codes (#917)', async () => {
     mocks.quoteWorkspaceTask.mockRejectedValueOnce(
       Object.assign(new Error('restricted'), { status: 403, code: 'billing_wallet_restricted' }),
@@ -896,21 +980,22 @@ describe('canvas workspace task transport', () => {
 })
 
 describe('extractWorkspaceTaskImageResults', () => {
-  it('resolves asset refs through the media browser URL', () => {
+  it('retains Workspace identity for asset refs', () => {
     expect(
       extractWorkspaceTaskImageResults(WORKSPACE_ID, [
         { kind: 'asset', asset_id: 'asset_aaa1', role: 'image', result_index: 0 },
       ]),
     ).toEqual([
       {
-        url: '/api/v1/workspaces/ws_test123/media-assets/asset_aaa1/derivatives/preview',
+        workspaceId: WORKSPACE_ID,
         assetId: 'asset_aaa1',
         resultIndex: 0,
       },
     ])
   })
 
-  it('accepts blank roles and resolves remote refs direct', () => {
+  it('resolves only strict image roles, dropping blank roles (core/query parity)', () => {
+    // 空 role 不再放行 (#P1-7): 无 role 事实的输出引用按“无图像”处理。
     expect(
       extractWorkspaceTaskImageResults(WORKSPACE_ID, [
         {
@@ -920,125 +1005,116 @@ describe('extractWorkspaceTaskImageResults', () => {
           result_index: 1,
         },
       ]),
+    ).toEqual([])
+    expect(
+      extractWorkspaceTaskImageResults(WORKSPACE_ID, [
+        {
+          kind: 'remote',
+          url: 'https://cdn.example/out.png',
+          checksum_sha256: 'a'.repeat(64),
+          role: 'image',
+          result_index: 1,
+        },
+      ]),
     ).toEqual([{ url: 'https://cdn.example/out.png', resultIndex: 1 }])
   })
 
   it('drops storage-internal remote URLs', () => {
     expect(
       extractWorkspaceTaskImageResults(WORKSPACE_ID, [
-        { kind: 'remote', url: 'https://cdn.example/ws-uploads/x.png', result_index: 0 },
+        {
+          kind: 'remote',
+          url: 'https://cdn.example/ws-uploads/x.png',
+          role: 'image',
+          result_index: 0,
+        },
       ]),
     ).toEqual([])
   })
 })
 
-describe('waitCanvasWorkspaceTaskImageResults', () => {
+describe('waitCanvasWorkspaceTaskImageOutcome', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.selectedId.value = WORKSPACE_ID
     resetCanvasWorkspaceTaskRegistryForTests()
   })
 
-  it('settles completed and cancelled-with-results fast paths', async () => {
-    mocks.getWorkspaceTask.mockResolvedValueOnce(
-      taskItem({
-        status: 'completed',
-        output_refs: [{ kind: 'asset', asset_id: 'asset_aaa1', role: 'image', result_index: 0 }],
-      }),
-    )
-    await expect(waitCanvasWorkspaceTaskImageResults('task_aaa111')).resolves.toEqual([
-      {
-        url: '/api/v1/workspaces/ws_test123/media-assets/asset_aaa1/derivatives/preview',
-        assetId: 'asset_aaa1',
-        resultIndex: 0,
-      },
-    ])
+  it.each(['completed', 'cancelled'] as const)(
+    'returns typed %s outcomes with available results',
+    async (status) => {
+      mocks.waitWorkspaceTaskTerminal.mockResolvedValueOnce(
+        taskItem({
+          status,
+          output_refs: [{ kind: 'asset', asset_id: 'asset_aaa1', role: 'image', result_index: 0 }],
+        }),
+      )
+      await expect(waitCanvasWorkspaceTaskImageOutcome('task_aaa111')).resolves.toEqual({
+        kind: status,
+        results: [
+          {
+            workspaceId: WORKSPACE_ID,
+            assetId: 'asset_aaa1',
+            resultIndex: 0,
+          },
+        ],
+      })
+      expect(mocks.getWorkspaceTask).not.toHaveBeenCalled()
+    },
+  )
 
-    mocks.getWorkspaceTask.mockResolvedValueOnce(
-      taskItem({
-        status: 'cancelled',
-        cancel_reason: '用户取消',
-        output_refs: [{ kind: 'asset', asset_id: 'asset_bbb2', role: 'image', result_index: 0 }],
-      }),
+  it('returns cancelled without results as a terminal outcome', async () => {
+    mocks.waitWorkspaceTaskTerminal.mockResolvedValueOnce(
+      taskItem({ status: 'cancelled', output_refs: [] }),
     )
-    await expect(waitCanvasWorkspaceTaskImageResults('task_aaa111')).resolves.toMatchObject([
-      { assetId: 'asset_bbb2' },
-    ])
-    expect(mocks.waitWorkspaceTaskTerminal).not.toHaveBeenCalled()
+    await expect(waitCanvasWorkspaceTaskImageOutcome('task_aaa111')).resolves.toEqual({
+      kind: 'cancelled',
+      results: [],
+    })
   })
 
-  it('throws terminal failures and propagates 404', async () => {
-    mocks.getWorkspaceTask.mockResolvedValueOnce(
+  it('surfaces terminal failure and gone errors unchanged', async () => {
+    mocks.waitWorkspaceTaskTerminal.mockResolvedValueOnce(
       taskItem({ status: 'failed', error_msg: '上游超时' }),
     )
-    await expect(waitCanvasWorkspaceTaskImageResults('task_aaa111')).rejects.toThrow('上游超时')
-
-    mocks.getWorkspaceTask.mockRejectedValueOnce(
+    await expect(waitCanvasWorkspaceTaskImageOutcome('task_aaa111')).rejects.toThrow('上游超时')
+    mocks.waitWorkspaceTaskTerminal.mockRejectedValueOnce(
       Object.assign(new Error('gone'), { status: 404, code: 'task_not_found' }),
     )
-    await expect(waitCanvasWorkspaceTaskImageResults('task_aaa111')).rejects.toMatchObject({
+    await expect(waitCanvasWorkspaceTaskImageOutcome('task_aaa111')).rejects.toMatchObject({
       code: 'task_not_found',
     })
   })
 
-  it('waits terminal when the fast path is live and maps timeouts', async () => {
-    mocks.getWorkspaceTask.mockResolvedValueOnce(taskItem({ status: 'running' }))
-    mocks.waitWorkspaceTaskTerminal.mockResolvedValueOnce(
-      taskItem({
-        status: 'completed',
-        output_refs: [{ kind: 'asset', asset_id: 'asset_ccc3', role: 'image', result_index: 0 }],
-      }),
-    )
-    await expect(waitCanvasWorkspaceTaskImageResults('task_aaa111')).resolves.toMatchObject([
-      { assetId: 'asset_ccc3' },
-    ])
-
-    mocks.getWorkspaceTask.mockResolvedValueOnce(taskItem({ status: 'running' }))
+  it('maps waiter deadline failures to pending without wrapping terminal failures', async () => {
     mocks.waitWorkspaceTaskTerminal.mockRejectedValueOnce(
       new Error('Workspace task wait timed out'),
     )
-    await expect(waitCanvasWorkspaceTaskImageResults('task_aaa111')).rejects.toMatchObject({
+    await expect(waitCanvasWorkspaceTaskImageOutcome('task_aaa111')).rejects.toMatchObject({
       name: 'TaskResultPendingError',
       kind: 'timeout',
     })
+  })
+
+  it('passes the absolute deadline and signal through to the single waiter', async () => {
+    const signal = new AbortController().signal
+    const options = { deadlineAt: Date.now() + 500, signal }
+    mocks.waitWorkspaceTaskTerminal.mockResolvedValueOnce(taskItem({ status: 'cancelled' }))
+    await waitCanvasWorkspaceTaskImageOutcome('task_aaa111', options)
+    expect(mocks.waitWorkspaceTaskTerminal).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      'task_aaa111',
+      options,
+    )
   })
 
   it('fails closed without a workspace selection before any network call', async () => {
     mocks.selectedId.value = null
-
-    await expect(waitCanvasWorkspaceTaskImageResults('task_aaa111')).rejects.toMatchObject({
+    await expect(waitCanvasWorkspaceTaskImageOutcome('task_aaa111')).rejects.toMatchObject({
       name: 'CanvasWorkspaceUnavailableError',
       message: CANVAS_WORKSPACE_REQUIRED_MESSAGE,
     })
-    expect(mocks.getWorkspaceTask).not.toHaveBeenCalled()
     expect(mocks.waitWorkspaceTaskTerminal).not.toHaveBeenCalled()
-  })
-
-  it('maps waiter-terminal cancelled without results to cancellation', async () => {
-    mocks.getWorkspaceTask.mockResolvedValueOnce(taskItem({ status: 'running' }))
-    mocks.waitWorkspaceTaskTerminal.mockResolvedValueOnce(
-      taskItem({ status: 'cancelled', cancel_reason: '用户取消', output_refs: [] }),
-    )
-    await expect(waitCanvasWorkspaceTaskImageResults('task_aaa111')).rejects.toMatchObject({
-      name: 'TaskCancelledError',
-    })
-  })
-
-  it('maps waiter aborts to the timeout pending kind', async () => {
-    mocks.getWorkspaceTask.mockResolvedValueOnce(taskItem({ status: 'running' }))
-    mocks.waitWorkspaceTaskTerminal.mockRejectedValueOnce(new Error('Workspace task wait aborted'))
-    await expect(waitCanvasWorkspaceTaskImageResults('task_aaa111')).rejects.toMatchObject({
-      name: 'TaskResultPendingError',
-      kind: 'timeout',
-    })
-  })
-
-  it('surfaces waiter-terminal failures unwrapped instead of as timeouts', async () => {
-    mocks.getWorkspaceTask.mockResolvedValueOnce(taskItem({ status: 'running' }))
-    mocks.waitWorkspaceTaskTerminal.mockResolvedValueOnce(
-      taskItem({ status: 'failed', error_msg: '上游失败' }),
-    )
-    await expect(waitCanvasWorkspaceTaskImageResults('task_aaa111')).rejects.toThrow('上游失败')
   })
 })
 

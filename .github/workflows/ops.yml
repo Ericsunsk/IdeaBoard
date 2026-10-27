@@ -74,6 +74,8 @@ jobs:
           bash -n scripts/handbook-version-contract-test.sh
           bash -n scripts/sql-workspace-scope-check.sh
           bash -n scripts/sql-workspace-scope-check-test.sh
+          bash -n scripts/tasking-settlement-seam-check.sh
+          bash -n scripts/tasking-settlement-seam-check-test.sh
           bash -n scripts/openapi-pattern-check.sh
           bash -n scripts/openapi-pattern-check-test.sh
           bash -n scripts/adr-template-check.sh
@@ -142,6 +144,8 @@ jobs:
             scripts/handbook-version-contract-test.sh \
             scripts/sql-workspace-scope-check.sh \
             scripts/sql-workspace-scope-check-test.sh \
+            scripts/tasking-settlement-seam-check.sh \
+            scripts/tasking-settlement-seam-check-test.sh \
             scripts/openapi-pattern-check.sh \
             scripts/openapi-pattern-check-test.sh \
             scripts/adr-template-check.sh \

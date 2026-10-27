@@ -17,6 +17,7 @@ type Querier interface {
 	// the stored row so replays converge instead of 404ing.
 	ArchiveMediaAsset(ctx context.Context, arg ArchiveMediaAssetParams) (MediaAsset, error)
 	ArchiveNotification(ctx context.Context, arg ArchiveNotificationParams) (UserNotification, error)
+	ArchiveUnreferencedMediaAsset(ctx context.Context, internalID int64) (int64, error)
 	ArchiveWorkspaceBoard(ctx context.Context, arg ArchiveWorkspaceBoardParams) (int64, error)
 	// BackfillDailyStatsByCreatedRange freezes one day of terminal workspace
 	// tasks into task_stat_events + task_daily_stats. started_at/ended_at
@@ -672,6 +673,9 @@ type Querier interface {
 	// while the durable CHECK stores pending/processing/completed/failed.
 	// Scope guard: scripts/sql-workspace-scope-check.sh enforces one workspace_id key per query.
 	LockLibraryMaterializationAsset(ctx context.Context, arg LockLibraryMaterializationAssetParams) error
+	// Compensation locks the asset before checking durable reference facts.
+	// The second statement gets a fresh snapshot after an in-flight writer commits.
+	LockMediaAssetForCompensation(ctx context.Context, arg LockMediaAssetForCompensationParams) (int64, error)
 	// Organization closure guards (split from organizations.sql).
 	// Permanent Organization closure (#955). Row locks serialize closure with mutations;
 	// the unique closure audit prevents a second close.
@@ -702,12 +706,12 @@ type Querier interface {
 	// Lock affected Boards in a stable order before removing grants.
 	LockWorkspaceMemberBoards(ctx context.Context, arg LockWorkspaceMemberBoardsParams) ([]LockWorkspaceMemberBoardsRow, error)
 	LockWorkspaceMemberships(ctx context.Context, publicID string) (int64, error)
-	MarkAllNotificationsAsRead(ctx context.Context, userID int64) (int64, error)
+	MarkAllNotificationsAsRead(ctx context.Context, userID int64) ([]UserNotification, error)
 	// Keys 'invite_status'/'invite_id' must match
 	// notifications.PayloadKeyInviteStatus/PayloadKeyInviteID and the frontend
 	// InviteActionPayload interface; see notifications.PayloadKeyTransferInviteID
 	// for why handover rows never match this merge.
-	MarkInviteNotificationResolved(ctx context.Context, arg MarkInviteNotificationResolvedParams) (int64, error)
+	MarkInviteNotificationResolved(ctx context.Context, arg MarkInviteNotificationResolvedParams) ([]UserNotification, error)
 	MarkNotificationAsRead(ctx context.Context, arg MarkNotificationAsReadParams) (UserNotification, error)
 	MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
 	// Account abandon (#919): any Billing Owner/Admin of the persisted payer

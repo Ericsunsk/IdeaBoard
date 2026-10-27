@@ -35,6 +35,7 @@ export default {
   task: {
     stillProcessing: 'Still processing — check back in a moment.',
     cancelled: 'Task cancelled',
+    cancelledWithPartialResults: 'Task cancelled — partial results kept on the canvas.',
     progressTimeout: 'This is taking longer than expected. Check back in a moment.',
     progressDataInvalid: 'Task progress data looks invalid. Please retry.',
     failedGeneric: 'Image generation failed. Please try again.',

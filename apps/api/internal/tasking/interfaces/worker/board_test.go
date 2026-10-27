@@ -115,8 +115,9 @@ func TestBoardCompletionNeverPublishesPostgres(t *testing.T) {
 	service, _, _ := newWorkerIntegrationService(env)
 	_ = service
 	assets := &workspacemedia.TaskAssetAdapter{Store: env.media}
+	boundStore := newTxPGServiceStore(env.tasks)
 	boundService := workspacetasks.NewService(workspacetasks.ServiceDeps{
-		TaskRead: env.tasks, TaskLifecycle: newTxPGServiceStore(env.tasks),
+		TaskRead: env.tasks, TaskLifecycle: boundStore, SubmissionClaims: boundStore, BillingAccounts: boundStore,
 		Quoter: &integrationQuoter{}, Holder: newIntegrationHolder(), Queue: &integrationQueue{},
 		Assets:        assets,
 		Resolver:      allowTestPoolResolver(),

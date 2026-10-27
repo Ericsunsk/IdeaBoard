@@ -179,15 +179,6 @@ type captureResultMaterializer struct {
 	remoteOpts       taskmedia.ResultMaterializeOptions
 	remoteResult     taskmedia.MaterializedResults
 	remoteErr        error
-
-	bytesUserID    int64
-	bytesTaskID    string
-	bytesFilename  string
-	bytesSourceURL string
-	bytesData      []byte
-	bytesOpts      taskmedia.ResultMaterializeOptions
-	bytesResult    taskmedia.MaterializedResults
-	bytesErr       error
 }
 
 func (m *captureResultMaterializer) MaterializeRemoteResults(ctx context.Context, userID int64, taskID string, sourceURLs []string, opts taskmedia.ResultMaterializeOptions) (taskmedia.MaterializedResults, error) {
@@ -200,19 +191,6 @@ func (m *captureResultMaterializer) MaterializeRemoteResults(ctx context.Context
 		return taskmedia.MaterializedResults{}, m.remoteErr
 	}
 	return cloneMaterializedResults(m.remoteResult), nil
-}
-
-func (m *captureResultMaterializer) MaterializeBytesResult(ctx context.Context, userID int64, taskID string, filename string, sourceURL string, data []byte, opts taskmedia.ResultMaterializeOptions) (taskmedia.MaterializedResults, error) {
-	m.bytesUserID = userID
-	m.bytesTaskID = taskID
-	m.bytesFilename = filename
-	m.bytesSourceURL = sourceURL
-	m.bytesData = append([]byte(nil), data...)
-	m.bytesOpts = opts
-	if m.bytesErr != nil {
-		return taskmedia.MaterializedResults{}, m.bytesErr
-	}
-	return cloneMaterializedResults(m.bytesResult), nil
 }
 
 func cloneMaterializedResults(result taskmedia.MaterializedResults) taskmedia.MaterializedResults {

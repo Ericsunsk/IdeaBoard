@@ -9,8 +9,8 @@ package worker
 //
 // What this proves end to end: a fake gateway result (remote URL +
 // checksum, standing in for provider bytes without credentials) flows
-// through request shaping + result mapping + the #827 renderer into a NEW
-// media_assets row (bytes via the objects seam, format validated via
+// through the provider materializer into a NEW
+// media_assets row verified by the renderer (bytes via objects, validated via
 // imageformat) and the Complete persists the asset ref through task_outputs
 // (ListTaskAssets reads it back). Completion records no derivative rows:
 // display tiers resolve on demand through signed imgproxy URLs (ADR-0007
@@ -44,7 +44,7 @@ func rendererIntegrationPNG(t *testing.T) ([]byte, string) {
 }
 
 // Success: submit -> worker claims -> fake gateway yields a remote ref ->
-// renderer ingests a new asset -> completed with the asset ref mapped
+// provider materializer ingests a new asset -> renderer verifies -> completed, mapped
 // through task_outputs.
 func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 	env := openWorkspaceIntegrationEnv(t)
@@ -63,24 +63,17 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 	png, sum := rendererIntegrationPNG(t)
 	objects := &fakeRendererObjects{}
 	renderer, err := taskruntime.NewWorkspaceTaskRenderer(taskruntime.WorkspaceTaskRendererDeps{
-		Media: env.media, Assets: &workspacemedia.TaskAssetAdapter{Store: env.media}, Objects: objects,
-		Fetcher: taskruntime.WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask, _ workspacetasks.OutputRef) ([]byte, error) {
-			return append([]byte(nil), png...), nil
-		}),
+		Media: env.media, Assets: &workspacemedia.TaskAssetAdapter{Store: env.media},
 	})
 	if err != nil {
 		t.Fatalf("taskruntime.NewWorkspaceTaskRenderer: %v", err)
 	}
 	worker := newWorkerIntegrationWorker(env, service, WorkspaceTaskGenerateFunc(
-		func(_ context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+		func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
 			if task.Status != workspacetasks.StatusRunning {
 				t.Errorf("provider saw status %q, want running (claimed)", task.Status)
 			}
-			return []workspacetasks.OutputRef{{
-				Kind:           workspacetasks.OutputKindRemote,
-				URL:            "https://cdn.example.com/fake-gateway-result.png",
-				ChecksumSHA256: sum, Role: "result", ResultIndex: 0,
-			}}, nil
+			return materializingProvider(t, env.media, objects, png)(ctx, task)
 		}))
 	// The shared test worker carries no renderer; rebuild with the #827
 	// renderer so the loop exercises the production ordering

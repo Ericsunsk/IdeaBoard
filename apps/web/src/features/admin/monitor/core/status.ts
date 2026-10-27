@@ -1,6 +1,8 @@
 import { TaskStatus, type TaskStatus as TaskStatusValue } from '../../shared'
 
 // Pill 直连：与 StatusBadge `tone` 同构，domain 内自有定义以免反向依赖组件层。
+// 状态字面量经 shared/single-source 指向 v1 contract（见 taskMetricTokens），
+// monitor 与 metric 不再各持一份。
 type TaskStatusTone = 'success' | 'danger' | 'warning' | 'neutral' | 'info'
 
 export interface TaskStatusDefinition {

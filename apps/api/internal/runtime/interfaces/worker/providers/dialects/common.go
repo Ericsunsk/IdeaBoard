@@ -192,7 +192,7 @@ func topLevelKeysError(parsed gjson.Result) error {
 	return errors.New(errorrender.MsgTopLevelKeysError2)
 }
 
-// universalResponsePaths is the legacy extraction order, shared by every
+// universalResponsePaths is the extraction order shared by every
 // dialect: standard shapes first, vendor leaves after, chat content via the
 // hook, deep-leaf scan last. Per-dialect decode specialization waits for
 // vendor evidence; today the dialects differ in Encode only.
@@ -238,10 +238,12 @@ func collectChatParts(parts []gjson.Result, collect *candidateCollector) {
 	}
 }
 
-// decodeWithPaths runs the shared JSON decode skeleton: error envelope,
+// Decode runs the shared JSON decode skeleton: error envelope,
 // ordered vendor paths, chat content parts, deep-leaf fallback,
-// transparent failure. Stage order mirrors the legacy extractor exactly.
-func decodeWithPaths(body []byte) ([]string, error) {
+// transparent failure.
+// It is the single decode implementation for every dialect: Decode stays a
+// package function, never a per-dialect override.
+func Decode(body []byte) ([]string, error) {
 	if len(strings.TrimSpace(string(body))) == 0 {
 		return nil, errors.New(errorrender.MsgDecodeWithPaths)
 	}

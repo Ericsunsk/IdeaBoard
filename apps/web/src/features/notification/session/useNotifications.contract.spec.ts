@@ -5,6 +5,10 @@ import { render, waitFor, fireEvent, screen, within } from '@/test/render'
 import { mockAppToast } from '@/test/toast'
 import { http, HttpResponse, server } from '@/test/msw'
 import type { NotificationDTO } from '@/api/generated-query/public/model'
+import {
+  NOTIFICATION_EVENT_TYPES,
+  resetWorkspaceEventStreamsForTests,
+} from '@/api/workspaceEventStream'
 import { useNotifications } from './useNotifications'
 import type { NotificationCenterTab } from './readFilters'
 import NotificationPopover from '../ui/NotificationPopover.vue'
@@ -262,5 +266,163 @@ describe('notification session facts and mutations', () => {
     expect(session.unreadCount.value).toBe(199)
     finish!()
     await pending
+  })
+})
+
+/**
+ * Realtime push: hint frames and gap notices travel the recipient user
+ * SSE transport and converge on the same invalidate path the 30s poll uses.
+ * Frames are only a "refetch now" prompt: the suite asserts new server rows
+ * appear after a refetch, never that payloads write the cache.
+ */
+describe('notification realtime push', () => {
+  class MockEventSource {
+    static instances: MockEventSource[] = []
+
+    readonly url: string
+    private listeners: Record<string, EventListener[]> = {}
+
+    constructor(url: string) {
+      this.url = url
+      MockEventSource.instances.push(this)
+    }
+
+    addEventListener(type: string, listener: EventListenerOrEventListenerObject) {
+      const eventListener: EventListener =
+        typeof listener === 'function' ? listener : listener.handleEvent.bind(listener)
+      this.listeners[type] = [...(this.listeners[type] ?? []), eventListener]
+    }
+
+    removeEventListener() {}
+
+    close = vi.fn()
+
+    emit(type: string, data: unknown) {
+      const event = new MessageEvent(type, {
+        data: typeof data === 'string' ? data : JSON.stringify(data),
+      })
+      ;(this.listeners[type] ?? []).forEach((listener) => listener(event))
+    }
+  }
+
+  function hintFrame(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      id: 'evt_push111',
+      type: 'notification.created',
+      version: 1,
+      occurred_at: new Date().toISOString(),
+      actor: { type: 'user', id: 'usr_a' },
+      resource: { type: 'invite', id: 'wsi_push123' },
+      workspace_id: 'ws_push123',
+      data: { invite_id: 'wsi_push123', notification_type: 'workspace_invite' },
+      ...overrides,
+    }
+  }
+
+  function userStream() {
+    const found = MockEventSource.instances.find((instance) =>
+      instance.url.includes('/api/v1/user/notifications/events'),
+    )
+    if (!found) throw new Error('user notification stream was not opened')
+    return found
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('EventSource', MockEventSource)
+  })
+
+  afterEach(() => {
+    resetWorkspaceEventStreamsForTests()
+    vi.unstubAllGlobals()
+    MockEventSource.instances = []
+  })
+
+  it('refetches the inbox when a hint frame arrives on the user stream', async () => {
+    mountSession()
+    await waitFor(() => expect(session.notifications.value[0]?.id).toBe('notif_first'))
+    const fetched = requests.length
+    items = [item('notif_push')]
+    userStream().emit('notification.created', hintFrame())
+    await waitFor(() => expect(session.notifications.value[0]?.id).toBe('notif_push'))
+    expect(requests.length).toBeGreaterThan(fetched)
+    expect(session.unreadCount.value).toBe(1)
+  })
+
+  it('refetches on gap notices with the same read path', async () => {
+    mountSession()
+    await waitFor(() => expect(session.notifications.value[0]?.id).toBe('notif_first'))
+    const fetched = requests.length
+    items = [item('notif_gap')]
+    userStream().emit('gap', {})
+    await waitFor(() => expect(session.notifications.value[0]?.id).toBe('notif_gap'))
+    expect(requests.length).toBeGreaterThan(fetched)
+  })
+
+  it('uses only the user stream for pending invites and historical workspace facts', async () => {
+    items = [
+      item('notif_pending', {
+        action_payload: {
+          invite_id: 'wsi_pending',
+          invite_status: 'pending',
+          workspace_id: 'ws_notjoined',
+        },
+      }),
+      item('notif_history', {
+        action_payload: {
+          invite_id: 'wsi_history',
+          invite_status: 'accepted',
+          workspace_id: 'ws_history',
+        },
+      }),
+    ]
+    mountSession()
+    await waitFor(() => expect(session.notifications.value).toHaveLength(2))
+    expect(MockEventSource.instances).toHaveLength(1)
+    const source = userStream()
+    const streamUrl = new URL(source.url, 'https://example.test')
+    expect(streamUrl.searchParams.get('types')).toBe([...NOTIFICATION_EVENT_TYPES].sort().join(','))
+    isVisible.value = false
+    items = [...items, item('notif_hidden')]
+    const fetched = requests.length
+    source.emit('notification.updated', hintFrame({ type: 'notification.updated' }))
+    await waitFor(() => expect(session.unreadCount.value).toBe(3))
+    expect(source.close).not.toHaveBeenCalled()
+    isVisible.value = true
+    items = [item('notif_new_workspace', { action_payload: { workspace_id: 'ws_new' } })]
+    source.emit('notification.created', hintFrame())
+    await waitFor(() => expect(session.notifications.value[0]?.id).toBe('notif_new_workspace'))
+    expect(requests.length).toBeGreaterThan(fetched)
+    expect(MockEventSource.instances).toHaveLength(1)
+  })
+
+  it('releases the old stream on identity changes, logout and scope disposal', async () => {
+    const view = mountSession()
+    await waitFor(() => expect(session.notifications.value).toHaveLength(1))
+    const first = userStream()
+    auth.user = { public_id: 'usr_b' }
+    await waitFor(() => expect(first.close).toHaveBeenCalledOnce())
+    expect(MockEventSource.instances).toHaveLength(2)
+    const second = MockEventSource.instances[1]!
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+    first.emit('notification.created', hintFrame())
+    expect(invalidate).not.toHaveBeenCalled()
+    auth.user = null
+    await waitFor(() => expect(second.close).toHaveBeenCalledOnce())
+    expect(MockEventSource.instances).toHaveLength(2)
+    auth.user = { public_id: 'usr_c' }
+    await waitFor(() => expect(MockEventSource.instances).toHaveLength(3))
+    const third = MockEventSource.instances[2]!
+    view.unmount()
+    expect(third.close).toHaveBeenCalledOnce()
+  })
+
+  it('drops malformed frames without refetching', async () => {
+    mountSession()
+    await waitFor(() => expect(session.notifications.value[0]?.id).toBe('notif_first'))
+    const fetched = requests.length
+    userStream().emit('notification.created', 'not-json{')
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(requests.length).toBe(fetched)
+    expect(session.notifications.value[0]?.id).toBe('notif_first')
   })
 })

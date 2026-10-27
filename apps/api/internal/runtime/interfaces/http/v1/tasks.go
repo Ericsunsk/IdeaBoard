@@ -31,11 +31,11 @@ import (
 // package without import cycles in dependents).
 type (
 	WorkspaceTaskReadStore      = workspacetasks.TaskReadStore
-	WorkspaceTaskLifecycleStore = workspacetasks.TaskLifecycleStore
+	WorkspaceTaskLifecycleStore = workspacetasks.TaskSettlementStore
 	WorkspaceTaskBillingStore   = workspacetasks.TaskBillingStore
 	WorkspaceTaskQuoter         = workspacetasks.Quoter
-	WorkspaceTaskHolder         = workspacetasks.Holder
-	WorkspaceTaskEnqueuer       = workspacetasks.Enqueuer
+	WorkspaceTaskHolder         = workspacetasks.TxHolder
+	WorkspaceTaskEnqueuer       = workspacetasks.TxEnqueuer
 	WorkspaceTaskAssetReader    = workspacetasks.AssetReader
 	// WorkspaceTaskSnapshotSaver pins the submit-time RoutingSnapshot
 	// (catalog.SaveRoutingSnapshot in production, capture fakes in tests).
@@ -142,9 +142,9 @@ func (h *contractV1Handler) taskWorkspaceContext(c *gin.Context, identityPrincip
 func (h *contractV1Handler) taskService() *workspacetasks.Service {
 	deps := workspacetasks.ServiceDeps{
 		TaskRead: h.deps.Tasks, TaskLifecycle: h.deps.TaskLifecycle,
-		TaskBilling: h.deps.TaskBilling,
-		Quoter:      h.deps.TaskQuoter,
-		Holder:      h.deps.TaskHolder, Queue: h.deps.TaskQueue, Assets: h.deps.TaskAssets,
+		TaskBilling: h.deps.TaskBilling, SubmissionClaims: h.deps.TaskSubmissionClaims,
+		Quoter: h.deps.TaskQuoter,
+		Holder: h.deps.TaskHolder, Queue: h.deps.TaskQueue, Assets: h.deps.TaskAssets,
 		Resolver: h.deps.TaskRouter, SnapshotSaver: h.deps.TaskSnapshotSaver,
 		Acceptance:      h.taskSubmissionAcceptance(),
 		BillingAccounts: h.deps.TaskBillingAccounts,

@@ -33,7 +33,7 @@ import (
 // concrete postgres store.
 type WorkspaceControlTaskStores interface {
 	workspacetasks.TaskReadStore
-	workspacetasks.TaskLifecycleStore
+	workspacetasks.TaskSettlementStore
 	workspacetasks.TaskBillingStore
 }
 
@@ -43,7 +43,7 @@ type workspaceControlTaskAdapter struct {
 	db     *pgxpool.Pool
 	q      *dbsqlc.Queries
 	store  WorkspaceControlTaskStores
-	holder workspacetasks.Holder
+	holder workspacetasks.TxHolder
 	users  ControlCreditDirectory
 	// events is the neutral ControlTaskEventPort the adapter announces
 	// settled transitions through (see control/tasks_events.go for
@@ -56,7 +56,7 @@ type workspaceControlTaskAdapter struct {
 // NewWorkspaceControlTasks builds the control task read model. A nil db
 // keeps every method fail-closed (the handlers converge to 503), matching
 // the nil-dep convention of the other control seams.
-func NewWorkspaceControlTasks(db *pgxpool.Pool, store WorkspaceControlTaskStores, holder workspacetasks.Holder, users ControlCreditDirectory, events ControlTaskEventPort) *workspaceControlTaskAdapter {
+func NewWorkspaceControlTasks(db *pgxpool.Pool, store WorkspaceControlTaskStores, holder workspacetasks.TxHolder, users ControlCreditDirectory, events ControlTaskEventPort) *workspaceControlTaskAdapter {
 	if db == nil {
 		return &workspaceControlTaskAdapter{store: store, holder: holder, users: users, events: events}
 	}

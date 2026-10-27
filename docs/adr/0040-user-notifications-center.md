@@ -118,7 +118,8 @@ Issue #958 明确要求建立统一的站内通知中心系统。为满足高性
 
 1. **事实源唯一性**：PostgreSQL 的 `user_notifications` 是状态与通知列表的唯一事实源（Source of Truth）。
    邀请 create/accept/decline/cancel 的业务变更、可操作通知状态回写及决议通知由 `tenancy/invitations.Service` 在同一 ambient transaction 内完成；任何通知写入失败都回滚整个变更。Studio Handover 创建也使用同一事务，通知幂等键源于持久请求标识，因此 HTTP 缓存过期、进程重启与 in-place reissue 均不依赖进程内 first-execution flag。邮件仅在该事务内入 River，不在持锁事务内外发。
-2. **轻量信号唤醒**：Realtime 通道（SSE / NATS JetStream / Realtime 服务）仅下发轻量 Ping 信号（如 `{"event": "notification.created", "user_id": "usr_..."}`），不依赖实时连接承载长消息体或执行状态同步。这确保了在断线重连、弱网或未开启实时连接的情况下，客户端通过首屏 REST API 依然能获得完整准确的通知列表与未读数。
+2. **轻量信号唤醒**：Realtime 通道（SSE / NATS JetStream / Realtime 服务）仅下发轻量 Ping 信号（如 `{"event": "notification.created", "user_id": "usr_..."}`），不依赖实时连接承载长消息体或执行状态同步。这确保了在断线重连、弱网或未开启实时连接的情况下，客户端通过首屏 REST API 依然能获得完整准确的通知列表与未读数。V1 envelope 的 `workspace_id` 必须为 `ws_`（见 `ValidateV1Envelope`），无 `ws_` 归属的组织/账单通知在本轮仍走 30s 轮询，不新增 envelope 形态。
+   所有通知写入统一经 `notifications.Service`，以 persistence 返回的实际通知行为准派生收件人、Workspace 和引用；批量已读与邀请决议更新也返回受影响行。HTTP 不重新拼接 hint。无事务的单条写入成功后直接发布；有 ambient transaction 时必须在写入前注册 post-commit hook，由 transaction owner 成功提交后运行，borrower 不提交也不发布，缺少有效 registry 时拒绝写入。Hints 只做 best-effort fanout，使用有时限的 detached context；回滚或提交失败不发布，不新增 outbox 或可靠投递承诺。事件 ID 包含通知行身份，更新事件再包含持久化状态，以区分不同收件人以及已读、归档、邀请决议。Actor 来自请求 principal，系统调用使用 system actor；不把 recipient 当作 actor。
 3. **接口契约**：
    - `GET /v1/user/notifications`：分页获取当前登录用户的通知列表，支持 `status` 和 `category=all|invites|billing` 筛选，均在分页前生效。默认排除已归档通知，归档页显式指定 `status=archived`；响应包含 `items/total/limit/offset`。
    - `GET /v1/user/notifications/unread-count`：获取当前未读通知总数，用于顶部导航栏 Red Dot 徽标。

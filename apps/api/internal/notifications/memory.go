@@ -155,11 +155,11 @@ func (m *MemoryStore) MarkRead(ctx context.Context, userID int64, publicID strin
 	return nil, ErrNotFound
 }
 
-func (m *MemoryStore) MarkAllRead(ctx context.Context, userID int64) (int64, error) {
+func (m *MemoryStore) MarkAllRead(ctx context.Context, userID int64) ([]*Notification, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var count int64
+	var rows []*Notification
 	now := time.Now()
 	for _, n := range m.items {
 		if n.UserID == userID && n.Status == StatusUnread {
@@ -168,11 +168,11 @@ func (m *MemoryStore) MarkAllRead(ctx context.Context, userID int64) (int64, err
 				n.ReadAt = &now
 			}
 			n.UpdatedAt = now
-			count++
+			rows = append(rows, cloneNotification(n))
 		}
 	}
 
-	return count, nil
+	return rows, nil
 }
 
 func (m *MemoryStore) Archive(ctx context.Context, userID int64, publicID string) (*Notification, error) {
@@ -191,14 +191,14 @@ func (m *MemoryStore) Archive(ctx context.Context, userID int64, publicID string
 	return nil, ErrNotFound
 }
 
-func (m *MemoryStore) MarkInviteResolved(ctx context.Context, inviteID string, status string) (int64, error) {
+func (m *MemoryStore) MarkInviteResolved(ctx context.Context, inviteID string, status string) ([]*Notification, error) {
 	if inviteID == "" || status == "" {
-		return 0, nil
+		return nil, nil
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var count int64
+	var rows []*Notification
 	now := time.Now()
 	for _, n := range m.items {
 		if n.Type != TypeWorkspaceInvite && n.Type != TypeOrganizationInvite {
@@ -220,9 +220,9 @@ func (m *MemoryStore) MarkInviteResolved(ctx context.Context, inviteID string, s
 		}
 		n.ActionPayload[PayloadKeyInviteStatus] = status
 		n.UpdatedAt = now
-		count++
+		rows = append(rows, cloneNotification(n))
 	}
-	return count, nil
+	return rows, nil
 }
 
 func cloneNotification(n *Notification) *Notification {

@@ -33,6 +33,7 @@ import {
   getQuoteWorkspaceTaskUrl,
 } from './generated-query/public/workspace-tasks/workspace-tasks'
 import { workspaceTaskIdempotencyKey } from './idempotencyKey'
+import { WORKSPACE_TASK_STATUSES } from './workspaceTaskContract'
 
 const WORKSPACE_ID = 'ws_abc123'
 const TASK_ID = 'task_def456'
@@ -100,6 +101,15 @@ describe('workspace task paths', () => {
 
 describe('workspace task union validation mapping', () => {
   it('maps every terminal state and converges cancelled_with_results', () => {
+    // Single source: the contract status list owns the vocabulary; the
+    // terminal predicate and admin metric/monitor definitions derive from it.
+    expect([...WORKSPACE_TASK_STATUSES]).toEqual([
+      'pending',
+      'running',
+      'completed',
+      'failed',
+      'cancelled',
+    ])
     for (const status of ['pending', 'running', 'completed', 'failed', 'cancelled']) {
       expect(mapWorkspaceTaskStatus(status)).toBe(status)
     }
@@ -111,6 +121,22 @@ describe('workspace task union validation mapping', () => {
     expect(isWorkspaceTaskTerminal('cancelled')).toBe(true)
     expect(isWorkspaceTaskTerminal('pending')).toBe(false)
     expect(isWorkspaceTaskTerminal('running')).toBe(false)
+  })
+
+  it('pins the terminal set shared with the backend and admin tokens', () => {
+    // Single source: WORKSPACE_TASK_STATUSES owns the vocabulary; the
+    // terminal subset must match the backend predicate
+    // (`apps/api/internal/tasking/workspacetasks/tasks.go`:
+    // `IsTerminalStatus`) and the admin metric keys
+    // (`src/features/admin/shared/core/taskMetricTokens.ts`). The backend
+    // `status_parity_test.go` gate reads this file and the admin tokens from
+    // disk; the admin `taskMetricTokens.unit.spec.ts` gate imports this
+    // module directly — a new status without all three places fails there.
+    expect(WORKSPACE_TASK_STATUSES.filter(isWorkspaceTaskTerminal)).toEqual([
+      'completed',
+      'failed',
+      'cancelled',
+    ])
   })
 
   it('parses task payloads and guards opaque ids', () => {

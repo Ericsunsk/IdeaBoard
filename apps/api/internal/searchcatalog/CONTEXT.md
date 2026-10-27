@@ -2,6 +2,12 @@
 
 SearchCatalog is the image-search context with two subdomains: web image search (Unsplash/Pexels provider key lifecycle) and vision AI search (gateway-backed image understanding plus independent billing). Layout follows the split: `domain` (shared vocabulary and types), `application` (search, vision and settlement services), `infrastructure` (settings repository, supplier HTTP adapters), `interfaces/http` (routes and multipart input), `ports` (gateway and testing contracts). The River reconciliation worker lives in `runtime/interfaces/worker/visionbilling`.
 
+> Vision Search is temporarily unavailable: production wires the vision
+> seam as nil (`NewVisionBillingService(..., nil)`), so `Extract` fails
+> closed with `vision_search_unavailable`. The code, billing seam, and
+> `vision` slug reservation stay; only the docs mark the pause. Re-enable
+> by injecting a real `VisionGatewayClient` and removing this note.
+
 ## Domain Language
 
 | Term             | Meaning                                                                                                                      |

@@ -16,9 +16,11 @@ import (
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
 
-// A job carrying no execution token still claims (the claim phase mints a
-// fresh lease) and executes to completion.
-func TestWorkspaceTaskClaimMintsLeaseWhenJobTokenEmpty(t *testing.T) {
+// A job carrying no execution token fails closed (errors for River
+// backoff, provider never runs, task stays pending): Create/Retry always
+// mint the lease, so an empty lease only arrives on a hand-made job and
+// must never mint silently.
+func TestWorkspaceTaskClaimFailsClosedWhenJobTokenEmpty(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
 	created := env.submit(t, nil)
@@ -32,18 +34,21 @@ func TestWorkspaceTaskClaimMintsLeaseWhenJobTokenEmpty(t *testing.T) {
 
 	job := workerJobFor(created)
 	job.Args.ExecutionToken = ""
-	if err := worker.Work(ctx, job); err != nil {
-		t.Fatalf("Work: %v", err)
+	if err := worker.Work(ctx, job); err == nil {
+		t.Fatal("Work returned nil, want the missing-lease error surfaced for River backoff")
 	}
-	if !called {
-		t.Fatal("provider not called, want claim with a minted lease to proceed")
+	if called {
+		t.Fatal("provider called, want no execution without a fenced lease")
 	}
 	got, err := env.store.GetTask(ctx, "ws_test", created.ID)
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.Status != workspacetasks.StatusCompleted {
-		t.Fatalf("status = %q, want completed", got.Status)
+	if got.Status != workspacetasks.StatusPending {
+		t.Fatalf("status = %q, want pending (unclaimed, hold untouched)", got.Status)
+	}
+	if n := env.queue.count(); n != 1 {
+		t.Fatalf("enqueues = %d, want 1 (submit only, no requeue)", n)
 	}
 }
 

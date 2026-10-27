@@ -7,7 +7,6 @@ import (
 	"errors"
 
 	"ideaboard/api/internal/db/dbutil"
-	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/jackc/pgx/v5"
@@ -18,9 +17,25 @@ type Transaction func(context.Context, func(context.Context) error) error
 
 func PostgresTransaction(pool *pgxpool.Pool) Transaction {
 	return func(ctx context.Context, fn func(context.Context) error) error {
-		return dbutil.WithTxDBTX(ctx, pool, func(_ *dbsqlc.Queries, tx pgx.Tx) error {
-			return fn(dbutil.ContextWithAmbientTx(ctx, tx))
-		})
+		scope, err := dbutil.Begin(ctx, pool, pgx.TxOptions{})
+		if err != nil {
+			return err
+		}
+		defer scope.Rollback(ctx)
+		txCtx := dbutil.ContextWithAmbientTx(scope.Context(), scope.Tx())
+		if scope.Owned() {
+			txCtx = dbutil.ContextWithAmbientPostCommit(txCtx)
+		}
+		if err := fn(txCtx); err != nil {
+			return err
+		}
+		if err := scope.Commit(ctx); err != nil {
+			return err
+		}
+		if scope.Owned() {
+			dbutil.RunAmbientPostCommit(txCtx)
+		}
+		return nil
 	}
 }
 
@@ -33,8 +48,8 @@ type TransferStore interface {
 	InitiateBillingTransferInvite(context.Context, int64, int64, int64, string) (*tenancy.BillingTransferInvite, error)
 }
 
-// Service never publishes a notification after commit: every dispatcher write
-// and mail enqueue must join Transaction through its ambient transaction carrier.
+// Service commits invitation, notification facts, and mail enqueue atomically.
+// Notification hints run only after the transaction owner commits.
 type Service struct {
 	Store       Store
 	Identities  IdentityReader

@@ -161,14 +161,16 @@ func NewAppRouter(
 	// ride their own packages (no kernel -> plane import, no cycle).
 	tenancyStore := tenancypg.NewStore(repos.db, services.storageService)
 	userDirectory := runtimehttp.NewUsersRepositoryDirectory(repos.userRepo)
-	notificationsStore := notifications.NewPostgresStore(repos.db)
+	notificationCommands := notifications.NewService(notifications.NewPostgresStore(repos.db), &notifications.EventPublisher{
+		Log: taskServices.workspaceEvents, Bus: taskServices.workspaceEventBus, Hub: taskServices.userEvents,
+	})
 	memberDisplay := v1.NewMemberDisplayService(repos.userRepo, services.authServiceClient)
 	memberLookup := v1.NewMemberLookupService(repos.userRepo, services.authServiceClient)
 	billingAccounts := tenancypg.NewBillingAccountStore(repos.db)
 	collaboration := &invitations.Service{
 		Store: tenancyStore, Transfers: billingAccounts,
 		Identities:  v1.NewInvitationIdentityReader(memberDisplay, memberLookup, userDirectory),
-		Events:      tenancyevents.NewCollaborationEventDispatcher(notificationsStore, taskServices.invitationMailQueue),
+		Events:      tenancyevents.NewCollaborationEventDispatcher(notificationCommands, taskServices.invitationMailQueue),
 		Transaction: invitations.PostgresTransaction(repos.db),
 	}
 	registerHTTPRoutes(router,
@@ -194,7 +196,7 @@ func NewAppRouter(
 		v1.ContractV1Deps{
 			SupportChannels:  services.runtimeSettings,
 			Store:            tenancyStore,
-			Notifications:    notificationsStore,
+			Notifications:    notificationCommands,
 			Invitations:      collaboration,
 			InvitationReader: v1.NewInvitationReader(repos.userRepo, services.authServiceClient),
 			Users:            userDirectory,
@@ -250,13 +252,16 @@ func NewAppRouter(
 			// settles through the same holder/Service); settlement is
 			// transaction-first (Quote->Hold->Insert->Enqueue and
 			// terminal Capture/Release each commit in ONE shared PG
-			// transaction via the Tx seams, compensating only for
-			// backends without them; see workspace_task_adapters.go).
-			Tasks:      taskServices.workspaceTaskStore,
-			TaskQuoter: taskServices.workspaceTaskQuoter,
-			TaskHolder: taskServices.workspaceTaskHolder,
-			TaskQueue:  taskServices.workspaceTaskQueue,
-			TaskAssets: taskServices.workspaceTaskAssets,
+			// transaction via the required Tx interfaces).
+			Tasks:                taskServices.workspaceTaskStore,
+			TaskLifecycle:        taskServices.workspaceTaskStore,
+			TaskBilling:          taskServices.workspaceTaskStore,
+			TaskSubmissionClaims: taskServices.workspaceTaskStore,
+			TaskBillingAccounts:  taskServices.workspaceTaskStore,
+			TaskQuoter:           taskServices.workspaceTaskQuoter,
+			TaskHolder:           taskServices.workspaceTaskHolder,
+			TaskQueue:            taskServices.workspaceTaskQueue,
+			TaskAssets:           taskServices.workspaceTaskAssets,
 			// #917: the quote/readiness preflight resolves the same stable
 			// Billing Account submit holds (no owner-wallet fallback) and
 			// gates the same Wallet funds (402 insufficient vs 403
@@ -292,6 +297,8 @@ func NewAppRouter(
 			// Use the same workspace-envelope bus for user and worker events;
 			// control-plane wiring below shares this instance as well.
 			EventBus: taskServices.workspaceEventBus,
+			// The SSE handler subscribes to the same recipient hub used by Notifications.
+			UserEvents: taskServices.userEvents,
 		},
 		// Workspace billing surface (issue #804). Reads compose the
 		// Credits ledger, billing records, and usage through their owning

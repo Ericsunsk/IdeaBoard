@@ -13,8 +13,8 @@ func testActor() V1Actor {
 
 func TestV1RegistryIsFrozen(t *testing.T) {
 	types := V1EventTypes()
-	if len(types) != 10 {
-		t.Fatalf("registry has %d types, want 10", len(types))
+	if len(types) != 12 {
+		t.Fatalf("registry has %d types, want 12", len(types))
 	}
 	for _, typ := range types {
 		version, ok := V1EventVersion(typ)
@@ -118,6 +118,74 @@ func TestValidateV1BillingSettledCarriesRefsNotAmounts(t *testing.T) {
 	for _, banned := range []string{"unit_credits", "total_credits", "amount", "quantity"} {
 		if _, ok := decoded[banned]; ok {
 			t.Fatalf("billing.settled must not carry %q", banned)
+		}
+	}
+}
+
+func TestV1NotificationHintCarriesRefsOnly(t *testing.T) {
+	for _, typ := range []string{EventV1NotificationCreated, EventV1NotificationUpdated} {
+		envelope, err := MintV1Envelope(typ, "ws_abc123", testActor(),
+			V1Resource{Type: V1ResourceInvite, ID: "wsi_def456"},
+			V1NotificationData{InviteID: "wsi_def456", NotificationType: "workspace_invite"})
+		if err != nil {
+			t.Fatalf("mint %s: %v", typ, err)
+		}
+		if err := ValidateV1Envelope(envelope); err != nil {
+			t.Fatalf("minted %s invalid: %v", typ, err)
+		}
+		var decoded map[string]any
+		if err := json.Unmarshal(envelope.Data, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		if len(decoded) != 2 {
+			t.Fatalf("%s data keys=%v, want refs only (invite_id + notification_type)", typ, decoded)
+		}
+		for _, banned := range []string{"title", "body", "email", "role", "token"} {
+			if _, ok := decoded[banned]; ok {
+				t.Fatalf("%s must not carry %q", typ, banned)
+			}
+		}
+	}
+}
+
+func TestV1NotificationHintRejectsMismatchedIdentity(t *testing.T) {
+	cases := []struct {
+		name     string
+		typ      string
+		resource V1Resource
+		data     V1NotificationData
+	}{
+		{"mismatched invite", EventV1NotificationCreated,
+			V1Resource{Type: V1ResourceInvite, ID: "wsi_aaa111"},
+			V1NotificationData{InviteID: "wsi_bbb222", NotificationType: "workspace_invite"}},
+		{"wrong resource type", EventV1NotificationUpdated,
+			V1Resource{Type: V1ResourceTask, ID: "task_abc123"},
+			V1NotificationData{InviteID: "task_abc123", NotificationType: "workspace_invite"}},
+		{"bare numeric invite", EventV1NotificationCreated,
+			V1Resource{Type: V1ResourceInvite, ID: "42"},
+			V1NotificationData{InviteID: "42", NotificationType: "workspace_invite"}},
+		{"empty notification type", EventV1NotificationUpdated,
+			V1Resource{Type: V1ResourceInvite, ID: "wsi_aaa111"},
+			V1NotificationData{InviteID: "wsi_aaa111"}},
+		{"organization invite accepted", EventV1NotificationCreated,
+			V1Resource{Type: V1ResourceInvite, ID: "osi_aaa111"},
+			V1NotificationData{InviteID: "osi_aaa111", NotificationType: "organization_invite"}},
+	}
+	for _, tc := range cases {
+		envelope, err := MintV1Envelope(tc.typ, "ws_abc123", testActor(), tc.resource, tc.data)
+		if tc.name == "organization invite accepted" {
+			if err != nil {
+				t.Fatalf("osi_ invite must mint: %v", err)
+			}
+			if err := ValidateV1Envelope(envelope); err != nil {
+				t.Fatalf("osi_ invite must validate: %v", err)
+			}
+			continue
+		}
+		if err == nil {
+			if validateErr := ValidateV1Envelope(envelope); validateErr == nil {
+				t.Fatalf("%s must fail closed", tc.name)
+			}
 		}
 	}
 }

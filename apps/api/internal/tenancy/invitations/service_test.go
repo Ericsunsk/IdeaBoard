@@ -32,9 +32,9 @@ func (s notificationFailure) CreateNotification(ctx context.Context, input notif
 	}
 	return s.Store.CreateNotification(ctx, input)
 }
-func (s notificationFailure) MarkInviteResolved(ctx context.Context, id, status string) (int64, error) {
+func (s notificationFailure) MarkInviteResolved(ctx context.Context, id, status string) ([]*notifications.Notification, error) {
 	if s.errorResolve != nil {
-		return 0, s.errorResolve
+		return nil, s.errorResolve
 	}
 	return s.Store.MarkInviteResolved(ctx, id, status)
 }
@@ -275,7 +275,7 @@ func TestHandoverNotificationIsAtomicAndDurablyDeduplicated(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.service.Transfers = accounts
-	params := tenancy.BillingTransferInitiatedParams{WorkspacePublicID: f.workspace.PublicID, WorkspaceName: f.workspace.Name, BillingAccountPublicID: account.PublicID}
+	params := tenancy.BillingTransferInitiatedParams{WorkspacePublicID: f.workspace.PublicID, WorkspaceName: f.workspace.Name}
 	failure := errors.New("notification unavailable")
 	f.service.Events = tenancyevents.NewCollaborationEventDispatcher(notificationFailure{Store: f.notifications, createErr: failure}, testMailSender{})
 	if _, err := f.service.InitiateTransferInvite(t.Context(), account.InternalID, f.owner, f.target, "stable-key", params); !errors.Is(err, failure) {

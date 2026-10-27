@@ -16,16 +16,14 @@ type Request struct {
 	Images    []string
 }
 
-// Dialect shapes one vendor payload family and parses its responses. It is
-// stateless and network-free: routing lives in Resolve (the single
-// resolve-then-shape seam shared by execution and preview), egress lives in
-// the gateway client, custom-params merge happens in the worker after Encode.
+// Dialect shapes one vendor payload family. It is stateless and
+// network-free: routing lives in Resolve (the single resolve-then-shape
+// seam shared by execution and preview), egress lives in the gateway
+// client, custom-params merge happens in the worker after Encode.
 // CustomParamsJSON never enters here: the chat judgment already consumed it
-// during dispatch.
+// during dispatch. Response parsing stays unified in the package-level
+// Decode (do not reimplement per dialect).
 type Dialect interface {
 	// Encode renders the vendor JSON body for req.
 	Encode(Request) ([]byte, error)
-	// Decode extracts image URLs or base64 payloads from one raw response
-	// body, including vendor error envelopes as errors.
-	Decode([]byte) ([]string, error)
 }

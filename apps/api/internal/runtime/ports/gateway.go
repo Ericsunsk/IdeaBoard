@@ -17,15 +17,18 @@ const (
 	GatewayHeaderMetadata          = "cf-aig-metadata"
 	GatewayHeaderCollectLogPayload = "cf-aig-collect-log-payload"
 	GatewayHeaderSkipCache         = "cf-aig-skip-cache"
-	GatewayHeaderCacheTTL          = "cf-aig-cache-ttl"
-	GatewayHeaderCacheKey          = "cf-aig-cache-key"
 	GatewayHeaderMaxAttempts       = "cf-aig-max-attempts"
-	GatewayHeaderModel             = "cf-aig-model"
-	GatewayHeaderProvider          = "cf-aig-provider"
-	GatewayHeaderStep              = "cf-aig-step"
-	GatewayHeaderCacheStatus       = "cf-aig-cache-status"
-	GatewayHeaderLogID             = "cf-aig-log-id"
-	GatewayHeaderEventID           = "cf-aig-event-id"
+	// GatewayHeaderIdempotencyKey carries the execution token upstream as a
+	// best-effort idempotency key: upstreams that understand it dedup
+	// retried sends, others ignore the header. Local settlement semantics
+	// never depend on it (the claim token fences terminal writes).
+	GatewayHeaderIdempotencyKey = "Idempotency-Key"
+	GatewayHeaderModel          = "cf-aig-model"
+	GatewayHeaderProvider       = "cf-aig-provider"
+	GatewayHeaderStep           = "cf-aig-step"
+	GatewayHeaderCacheStatus    = "cf-aig-cache-status"
+	GatewayHeaderLogID          = "cf-aig-log-id"
+	GatewayHeaderEventID        = "cf-aig-event-id"
 )
 
 // Gateway metadata keys attached to every request. The gateway keeps at most
@@ -35,105 +38,28 @@ const (
 	GatewayMetadataFeature = "feature"
 )
 
-// Gateway cache TTL bounds enforced by Cloudflare (60 seconds to one month).
-const (
-	GatewayMinCacheTTLSeconds = 60
-	GatewayMaxCacheTTLSeconds = 31 * 24 * 60 * 60
-)
-
 // GatewayMaxAttempts caps per-request attempts (Cloudflare allows at most five tries).
 const GatewayMaxAttempts = 5
 
-// GatewayEndpointKind selects the Cloudflare gateway surface for one call.
-// The unified schema only covers text; images stay provider-native.
-type GatewayEndpointKind string
+// GatewayDefaultTimeout bounds one gateway attempt. It nests inside the
+// worker 360s execution budget, which nests inside the River 17min job
+// timeout (ADR-0010). Single source for the 300s budget: gateway client
+// default and provider execution share it.
+const GatewayDefaultTimeout = 300 * time.Second
 
-const (
-	// GatewayEndpointCompatChat is the OpenAI-compatible surface for
-	// supported text/vision routes.
-	GatewayEndpointCompatChat GatewayEndpointKind = "compat-chat"
-	// GatewayEndpointProviderNative passes the provider-native dialect
-	// through untouched (required for image generation).
-	GatewayEndpointProviderNative GatewayEndpointKind = "provider-native"
-)
-
-// GatewayEndpoint is one resolved gateway surface.
+// GatewayEndpoint is one resolved provider-native gateway surface, e.g.
+// Provider "openai", Path "v1/images/generations". The sole AI egress has
+// no other surface (no OpenAI-compatible rewrite); chat judgment only
+// drives dialect shaping, never endpoint selection.
 type GatewayEndpoint struct {
-	Kind GatewayEndpointKind
-	// Provider and Path serve provider-native calls only, e.g. Provider
-	// "openai", Path "v1/images/generations".
 	Provider string
 	Path     string
 }
 
-// Validate rejects unknown surfaces and incomplete native endpoints.
-func (e GatewayEndpoint) Validate() error {
-	switch e.Kind {
-	case GatewayEndpointCompatChat:
-		return nil
-	case GatewayEndpointProviderNative:
-		if strings.TrimSpace(e.Provider) == "" || strings.TrimSpace(e.Path) == "" {
-			return fmt.Errorf("provider-native gateway endpoint requires provider and path")
-		}
-		return nil
-	default:
-		return fmt.Errorf("unknown gateway endpoint kind %q", string(e.Kind))
-	}
-}
-
 // RequestPath renders the URL path appended to the gateway base URL.
 func (e GatewayEndpoint) RequestPath() string {
-	if e.Kind == GatewayEndpointProviderNative {
-		return "/" + strings.Trim(strings.TrimSpace(e.Provider), "/") +
-			"/" + strings.Trim(strings.TrimSpace(e.Path), "/")
-	}
-	return "/compat/chat/completions"
-}
-
-// GatewayCacheMode selects per-request caching. The gateway-global switch
-// stays off; every cached request is an explicit opt-in.
-type GatewayCacheMode string
-
-const (
-	// GatewayCacheInherit sends no cache headers.
-	GatewayCacheInherit GatewayCacheMode = ""
-	// GatewayCacheSkip bypasses cache for this request (images, probes).
-	GatewayCacheSkip GatewayCacheMode = "skip"
-	// GatewayCacheTTL opts the request into caching (deterministic text only).
-	GatewayCacheTTL GatewayCacheMode = "ttl"
-)
-
-// GatewayCachePolicy is the per-request cache contract.
-type GatewayCachePolicy struct {
-	Mode GatewayCacheMode
-	// TTLSeconds applies to TTL mode only (60 seconds to one month).
-	TTLSeconds int
-	// Key overrides the default exact-match key. Requests sharing a key
-	// share cached responses — only group equivalent requests.
-	Key string
-}
-
-// Validate rejects incoherent policies fail-fast.
-func (p GatewayCachePolicy) Validate() error {
-	switch p.Mode {
-	case GatewayCacheInherit:
-		if p.TTLSeconds != 0 || strings.TrimSpace(p.Key) != "" {
-			return fmt.Errorf("gateway cache ttl/key require ttl mode")
-		}
-		return nil
-	case GatewayCacheSkip:
-		if p.TTLSeconds != 0 || strings.TrimSpace(p.Key) != "" {
-			return fmt.Errorf("gateway cache skip accepts no ttl/key")
-		}
-		return nil
-	case GatewayCacheTTL:
-		if p.TTLSeconds != 0 && (p.TTLSeconds < GatewayMinCacheTTLSeconds || p.TTLSeconds > GatewayMaxCacheTTLSeconds) {
-			return fmt.Errorf("gateway cache ttl %d out of range [%d, %d]", p.TTLSeconds, GatewayMinCacheTTLSeconds, GatewayMaxCacheTTLSeconds)
-		}
-		return nil
-	default:
-		return fmt.Errorf("unknown gateway cache mode %q", string(p.Mode))
-	}
+	return "/" + strings.Trim(strings.TrimSpace(e.Provider), "/") +
+		"/" + strings.Trim(strings.TrimSpace(e.Path), "/")
 }
 
 // GatewayRequest is one call through the sole AI egress.
@@ -152,10 +78,14 @@ type GatewayRequest struct {
 	Body        []byte
 	ContentType string
 	Method      string
-	Cache       GatewayCachePolicy
 	// MaxAttempts overrides gateway retries: 0 keeps the gateway default,
 	// 1 forces single-shot (probes). Above the gateway maximum is rejected.
 	MaxAttempts int
+	// ExecutionToken is the claim's execution token, forwarded upstream as a
+	// best-effort idempotency key (Idempotency-Key header). Empty keeps the
+	// previous behavior (no header). Local settlement never depends on
+	// upstream dedup: the claim token still fences terminal writes.
+	ExecutionToken string
 	// Timeout bounds this call; zero keeps the client default.
 	Timeout time.Duration
 }
@@ -170,11 +100,8 @@ func (r GatewayRequest) HTTPMethod() string {
 
 // Validate rejects unusable requests before any network I/O.
 func (r GatewayRequest) Validate() error {
-	if err := r.Endpoint.Validate(); err != nil {
-		return err
-	}
-	if err := r.Cache.Validate(); err != nil {
-		return err
+	if strings.TrimSpace(r.Endpoint.Provider) == "" || strings.TrimSpace(r.Endpoint.Path) == "" {
+		return fmt.Errorf("provider-native gateway endpoint requires provider and path")
 	}
 	if r.HTTPMethod() == http.MethodGet && len(r.Body) != 0 {
 		return fmt.Errorf("gateway GET requests carry no body")

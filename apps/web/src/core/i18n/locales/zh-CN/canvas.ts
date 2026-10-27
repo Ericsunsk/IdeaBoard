@@ -34,6 +34,7 @@ export default {
   task: {
     stillProcessing: '仍在此处理中 — 请稍后查看。',
     cancelled: '任务已取消',
+    cancelledWithPartialResults: '任务已取消（有部分结果，已保留在画布上）。',
     progressTimeout: '耗时超出预期，请稍后查看。',
     progressDataInvalid: '任务进度数据异常，请重试。',
     failedGeneric: '图像生成失败，请重试。',

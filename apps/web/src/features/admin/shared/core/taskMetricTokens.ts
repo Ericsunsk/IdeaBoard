@@ -1,9 +1,15 @@
 // Task status filter vocabulary (issue #809, moved under the Admin shared
-// boundary by #863). The legacy generated `TaskStatus` enum is
-// gone; the Control Plane types the status filter as a plain string, so this
-// Admin-owned domain module owns the frozen value set. Feature code imports
-// it from here, never generated code, and generic `shared` modules must not
-// depend on it.
+// boundary by #863). The value set is sourced from the v1 contract
+// (`@/api/workspaceTaskContract`): the Control Plane types the status
+// filter as a plain string, so this Admin-owned domain module owns the
+// runtime map, but the strings must stay identical to the contract — adding
+// a contract state fails the `satisfies` check below until the map follows.
+// Feature code imports it from here, never generated code, and generic
+// `shared` modules must not depend on it.
+
+import type { WorkspaceTaskStatus } from '@/api/workspaceTaskContract'
+
+export type TaskStatus = WorkspaceTaskStatus
 
 export const TaskStatus = {
   pending: 'pending',
@@ -11,9 +17,7 @@ export const TaskStatus = {
   completed: 'completed',
   failed: 'failed',
   cancelled: 'cancelled',
-} as const
-
-export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus]
+} as const satisfies Record<TaskStatus, TaskStatus>
 
 export type TaskMetricKey = 'all' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
 

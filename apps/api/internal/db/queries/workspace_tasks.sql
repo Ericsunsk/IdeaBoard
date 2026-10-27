@@ -254,7 +254,8 @@ SELECT m.internal_id
 FROM media_assets AS m
 INNER JOIN workspaces AS w ON w.internal_id = m.workspace_id
 WHERE m.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id) AND m.archived_at IS NULL
-LIMIT 1;
+LIMIT 1
+FOR KEY SHARE OF m;
 
 -- Control Plane global task read model (#809-close). Operators see every
 -- workspace (no membership gating at the repository; the control guard

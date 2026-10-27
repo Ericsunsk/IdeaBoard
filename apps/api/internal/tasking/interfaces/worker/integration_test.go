@@ -901,7 +901,7 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 	// workspacetasks/settle_test.go); the claim fence is in-memory for the
 	// same reason.
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
-		TaskRead: env.tasks, TaskLifecycle: txStore, Quoter: quoter, Holder: holder, Queue: queue,
+		TaskRead: env.tasks, TaskLifecycle: txStore, SubmissionClaims: txStore, BillingAccounts: txStore, Quoter: quoter, Holder: holder, Queue: queue,
 		Assets: assets, Resolver: allowTestPoolResolver(),
 		SnapshotSaver: workerNoopSnapshotSaver,
 		Acceptance:    &workerTestAcceptance{assets: assets},
@@ -982,14 +982,14 @@ func TestWorkspaceTaskAdaptersFailClosed(t *testing.T) {
 		t.Fatalf("nil quoter = %v, want quote unavailable", err)
 	}
 	var holder *taskadapters.WorkspaceTaskHolder
-	if _, err := holder.Hold(ctx, 1, 7, 10, "k", "task_x"); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if _, err := holder.HoldInTx(ctx, nil, 1, 7, 10, "k", "task_x"); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil holder Hold = %v, want quote unavailable", err)
 	}
-	if err := holder.Release(ctx, 1, 7, "hold_x", 10, "task_x"); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if _, err := holder.ReleaseInTx(ctx, nil, 1, 7, "hold_x", 10, "task_x"); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil holder Release = %v, want quote unavailable", err)
 	}
 	var queue *taskadapters.WorkspaceTaskEnqueuer
-	if err := queue.Enqueue(ctx, &workspacetasks.WorkspaceTask{ID: "task_x"}); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if err := queue.EnqueueInTx(ctx, nil, &workspacetasks.WorkspaceTask{ID: "task_x"}); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil queue = %v, want quote unavailable", err)
 	}
 	if got := (workspacetasks.WorkspaceTaskArgs{}).Kind(); got != "workspace_task_execute" {

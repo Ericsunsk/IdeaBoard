@@ -34,6 +34,9 @@ var configEnvKeys = []string{
 	"INIT_ADMIN_DISPLAY_NAME",
 	"ATLAS_CLEAN_BREAK_ALLOW_RESET",
 	"APP_SECRETS_ENCRYPTION_KEY",
+	"AI_GATEWAY_PER_MODEL_LIMIT",
+	"AI_GATEWAY_BREAKER_COOLDOWN_SECONDS",
+	"AI_GATEWAY_BREAKER_FAILURE_RATE",
 }
 
 func TestPublicOriginsValidateAndResolveCanonicalURLs(t *testing.T) {
@@ -168,6 +171,49 @@ func TestLoadRiverWorkerConcurrency(t *testing.T) {
 		t.Setenv("RIVER_WORKER_CONCURRENCY", invalid)
 		if got := Load().Worker.Concurrency; got != 5 {
 			t.Fatalf("invalid %q worker concurrency = %d, want 5", invalid, got)
+		}
+	}
+}
+
+func TestLoadGatewaySafetySwitches(t *testing.T) {
+	resetConfigEnv(t)
+	got := Load().Worker.Gateway
+	if got.PerModelLimit != DefaultGatewayPerModelLimit {
+		t.Fatalf("default PerModelLimit = %d, want %d", got.PerModelLimit, DefaultGatewayPerModelLimit)
+	}
+	if got.BreakerCooldownSeconds != DefaultGatewayBreakerCooldownSeconds {
+		t.Fatalf("default BreakerCooldownSeconds = %d, want %d", got.BreakerCooldownSeconds, DefaultGatewayBreakerCooldownSeconds)
+	}
+	if got.BreakerFailureRatePercent != DefaultGatewayBreakerFailureRatePercent {
+		t.Fatalf("default BreakerFailureRatePercent = %d, want %d", got.BreakerFailureRatePercent, DefaultGatewayBreakerFailureRatePercent)
+	}
+
+	resetConfigEnv(t)
+	t.Setenv("AI_GATEWAY_PER_MODEL_LIMIT", "4")
+	t.Setenv("AI_GATEWAY_BREAKER_COOLDOWN_SECONDS", "60")
+	t.Setenv("AI_GATEWAY_BREAKER_FAILURE_RATE", "25")
+	got = Load().Worker.Gateway
+	if got.PerModelLimit != 4 || got.BreakerCooldownSeconds != 60 || got.BreakerFailureRatePercent != 25 {
+		t.Fatalf("configured gateway switches = %+v, want opt-in values", got)
+	}
+
+	for _, env := range []string{"AI_GATEWAY_PER_MODEL_LIMIT", "AI_GATEWAY_BREAKER_COOLDOWN_SECONDS", "AI_GATEWAY_BREAKER_FAILURE_RATE"} {
+		resetConfigEnv(t)
+		t.Setenv(env, "bogus")
+		cfg := Load()
+		if cfg.Worker.Gateway.PerModelLimit != DefaultGatewayPerModelLimit ||
+			cfg.Worker.Gateway.BreakerCooldownSeconds != DefaultGatewayBreakerCooldownSeconds ||
+			cfg.Worker.Gateway.BreakerFailureRatePercent != DefaultGatewayBreakerFailureRatePercent {
+			t.Fatalf("invalid %s did not fall back to defaults: %+v", env, cfg.Worker.Gateway)
+		}
+		found := false
+		for _, key := range cfg.InvalidEnv {
+			if key == env {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("invalid %s missing from InvalidEnv: %v", env, cfg.InvalidEnv)
 		}
 	}
 }

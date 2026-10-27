@@ -59,6 +59,7 @@ import (
 // one goes terminal directly, never further.
 func (w *WorkspaceTaskWorker) executeModelFallback(
 	ctx context.Context,
+	execCtx context.Context,
 	tracker *workspaceSendTracker,
 	first *workspaceSend,
 	snap routing.RoutingSnapshot,
@@ -77,7 +78,9 @@ func (w *WorkspaceTaskWorker) executeModelFallback(
 	slog.Info("workspace task trying model fallback",
 		"task_id", claimed.ID, "from_model", model, "to_model", snap.RetryCandidate)
 	claimed.ResolvedModel = snap.RetryCandidate
-	outputs, genErr := w.generate(ctx, claimed, fallback.layer, fallback.attemptNo)
+	// The fallback send shares the claim's remaining execution budget;
+	// settlement below keeps the parent (River) context.
+	outputs, genErr := w.generate(execCtx, claimed, fallback.layer, fallback.attemptNo)
 	// The fallback observation fires at send completion when the
 	// outcome is known (#852): decided-but-unrecorded fallbacks (the
 	// ok=false branch above) never inflate the counter. Nil metrics

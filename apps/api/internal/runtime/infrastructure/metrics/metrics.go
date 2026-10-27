@@ -49,6 +49,14 @@ type Set struct {
 	httpRequestTime   *prometheus.HistogramVec
 	gatewayRequests   *prometheus.CounterVec
 	gatewayRetries    *prometheus.CounterVec
+	// gatewayPerModelLimited counts sends rejected before egress by the
+	// per-model guards (reason=concurrency_limited|breaker_open). Rejections
+	// surface as retryable 429s so the worker requeues with backoff.
+	gatewayPerModelLimited *prometheus.CounterVec
+	// gatewayBreakerOpen reports the per-model breaker state (1=open,
+	// 0=closed/half-open probe admitted). Model labels stay bounded: models
+	// come from the admin catalog/mapping, never from user input.
+	gatewayBreakerOpen *prometheus.GaugeVec
 	// modelFallbacks counts bounded model-fallback sends (#852,
 	// ADR-0012 rule 6): exactly one retry-candidate send per task after
 	// a retryable upstream failure. Labels mirror gatewayRequests
@@ -82,6 +90,14 @@ func NewSet(reg prometheus.Registerer) *Set {
 			Name: "ideaboard_gateway_retries_total",
 			Help: "Worker-level task requeues after retryable gateway failures, by service.",
 		}, []string{"service"}),
+		gatewayPerModelLimited: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "ideaboard_gateway_per_model_limited_total",
+			Help: "Gateway sends rejected before egress by per-model guards, by model and reason (concurrency_limited|breaker_open).",
+		}, []string{"model", "reason"}),
+		gatewayBreakerOpen: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "ideaboard_gateway_breaker_open",
+			Help: "Per-model gateway breaker state by model (1=open, 0=closed).",
+		}, []string{"model"}),
 		modelFallbacks: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "ideaboard_model_fallback_total",
 			Help: "Bounded model-fallback sends to the snapshot retry candidate, by service and fallback-send outcome (success/error).",
@@ -100,6 +116,8 @@ func NewSet(reg prometheus.Registerer) *Set {
 		s.httpRequestTime = registerHistogramVec(reg, s.httpRequestTime)
 		s.gatewayRequests = registerCounterVec(reg, s.gatewayRequests)
 		s.gatewayRetries = registerCounterVec(reg, s.gatewayRetries)
+		s.gatewayPerModelLimited = registerCounterVec(reg, s.gatewayPerModelLimited)
+		s.gatewayBreakerOpen = registerGaugeVec(reg, s.gatewayBreakerOpen)
 		s.modelFallbacks = registerCounterVec(reg, s.modelFallbacks)
 		s.riverQueueDepth = registerGaugeVec(reg, s.riverQueueDepth)
 		s.riverQueueLag = registerGaugeVec(reg, s.riverQueueLag)
@@ -204,13 +222,54 @@ func (s *Set) ObserveGatewayRequest(service string, err error) {
 }
 
 // IncGatewayRetry records one worker-level requeue after a retryable
-// gateway failure (gateway-internal retries exhausted, whole task requeued
-// under River backoff).
+// gateway failure under River backoff.
 func (s *Set) IncGatewayRetry(service string) {
 	if s == nil {
 		return
 	}
 	s.gatewayRetries.WithLabelValues(normalizeService(service)).Inc()
+}
+
+// Gateway per-model guard rejection reasons (closed label set).
+const (
+	GatewayLimitedConcurrency = "concurrency_limited"
+	GatewayLimitedBreakerOpen = "breaker_open"
+)
+
+// normalizeGatewayModel keeps the breaker/limiter model label closed to
+// admin-controlled values: empty reads as unknown, case folds.
+func normalizeGatewayModel(model string) string {
+	if trimmed := strings.ToLower(strings.TrimSpace(model)); trimmed != "" {
+		return trimmed
+	}
+	return UnknownService
+}
+
+// IncGatewayPerModelLimited records one send rejected before egress by the
+// per-model guards. A nil Set is a no-op. Reason must be one of the
+// GatewayLimited* constants; anything else reads as concurrency_limited so
+// the label set stays closed.
+func (s *Set) IncGatewayPerModelLimited(model, reason string) {
+	if s == nil {
+		return
+	}
+	if reason != GatewayLimitedConcurrency && reason != GatewayLimitedBreakerOpen {
+		reason = GatewayLimitedConcurrency
+	}
+	s.gatewayPerModelLimited.WithLabelValues(normalizeGatewayModel(model), reason).Inc()
+}
+
+// SetGatewayBreakerOpen publishes the per-model breaker state (1=open,
+// 0=closed). A nil Set is a no-op.
+func (s *Set) SetGatewayBreakerOpen(model string, open bool) {
+	if s == nil {
+		return
+	}
+	value := 0.0
+	if open {
+		value = 1.0
+	}
+	s.gatewayBreakerOpen.WithLabelValues(normalizeGatewayModel(model)).Set(value)
 }
 
 // IncModelFallback records one bounded model-fallback send to the

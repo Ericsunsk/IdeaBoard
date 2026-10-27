@@ -11,7 +11,10 @@ import { assertOpaqueId } from '../core/utils/opaqueIds'
 
 export type WorkspaceTaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
 
-const WORKSPACE_TASK_STATUSES: readonly WorkspaceTaskStatus[] = [
+// Single source for the v1 task status vocabulary: admin monitor/metric
+// definitions and the terminal waiter all derive from this list, so adding
+// a state only touches this module.
+export const WORKSPACE_TASK_STATUSES: readonly WorkspaceTaskStatus[] = [
   'pending',
   'running',
   'completed',
@@ -31,7 +34,9 @@ export function mapWorkspaceTaskStatus(value: unknown): WorkspaceTaskStatus {
   throw new Error(`Unknown workspace task status: ${String(value)}`)
 }
 
-export function isWorkspaceTaskTerminal(status: WorkspaceTaskStatus): boolean {
+export function isWorkspaceTaskTerminal(
+  status: WorkspaceTaskStatus,
+): status is 'completed' | 'failed' | 'cancelled' {
   return status === 'completed' || status === 'failed' || status === 'cancelled'
 }
 

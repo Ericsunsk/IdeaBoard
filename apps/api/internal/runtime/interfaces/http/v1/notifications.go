@@ -224,7 +224,7 @@ func (h *contractV1Handler) markAllUserNotificationsRead(c *gin.Context) {
 		return
 	}
 
-	contract.RenderSuccess(c, v1MarkAllReadDTO{Updated: updated})
+	contract.RenderSuccess(c, v1MarkAllReadDTO{Updated: int64(len(updated))})
 }
 
 // archiveUserNotification archives a notification (POST /api/v1/user/notifications/:id/archive).

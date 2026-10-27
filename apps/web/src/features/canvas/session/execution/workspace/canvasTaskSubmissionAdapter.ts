@@ -1,24 +1,45 @@
-import type { CanvasTaskRequestData } from '../../../core/execution/canvasTaskRequest'
-import { submitTaskRequest } from '../task-runner/imageDirectActionExecutor'
-import { assertTaskSubmitReady } from '../task-runner/taskReadiness'
+import type {
+  CanvasTaskRequestData,
+  SubmitTaskReadinessData,
+} from '../../../core/execution/canvasTaskRequest'
+import { i18n } from '../../../../../core/i18n'
+import { sanitizeApiErrorMessage } from '../../../../../core/utils/errorMessages'
+import { publishCanvasTaskReadiness } from '../billing/taskReadinessEvents'
+import {
+  insufficientCreditsPreflightError,
+  mapCanvasBillingRequestError,
+} from '../task-runner/canvasBillingPreflight'
+import {
+  fetchCanvasWorkspaceTaskReadiness,
+  submitCanvasWorkspaceTask,
+} from './canvasWorkspaceTaskAdapter'
 
-type CanvasTaskSubmission = {
-  taskId: string
+export async function assertTaskRequestReady(request: CanvasTaskRequestData): Promise<void> {
+  let readiness: SubmitTaskReadinessData
+  try {
+    readiness = await fetchCanvasWorkspaceTaskReadiness(request)
+  } catch (error) {
+    throw mapCanvasBillingRequestError(error)
+  }
+  // Publish the authoritative Quote even when it blocks this submission.
+  publishCanvasTaskReadiness(readiness)
+  if (readiness.billing && !readiness.billing.sufficient) {
+    throw insufficientCreditsPreflightError()
+  }
+  if (!readiness.ready) {
+    throw new Error(
+      sanitizeApiErrorMessage(readiness.message, i18n.global.t('common.errors.taskSubmitFailed')),
+    )
+  }
 }
 
-export type CanvasTaskSubmissionAdapter = {
-  assertTaskRequestReady: (
-    request: CanvasTaskRequestData,
-    fallbackMessage?: string,
-  ) => Promise<void>
-  submitTaskRequest: (
-    request: CanvasTaskRequestData,
-    fallbackMessage?: string,
-  ) => Promise<CanvasTaskSubmission>
-}
-
-export const defaultCanvasTaskSubmissionAdapter: CanvasTaskSubmissionAdapter = {
-  assertTaskRequestReady: (request, fallbackMessage) =>
-    assertTaskSubmitReady(request, fallbackMessage).then(() => undefined),
-  submitTaskRequest: (request, fallbackMessage) => submitTaskRequest(request, fallbackMessage),
+export async function submitTaskRequest(
+  request: CanvasTaskRequestData,
+): Promise<{ taskId: string }> {
+  try {
+    const submission = await submitCanvasWorkspaceTask(request)
+    return { taskId: submission.taskId }
+  } catch (error) {
+    throw mapCanvasBillingRequestError(error)
+  }
 }

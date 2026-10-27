@@ -5922,7 +5922,7 @@ components:
             carries invite_id/invite_status/role/names keys;
             studio_handover carries transfer_invite_id (see
             notifications.PayloadKeyTransferInviteID for why it stays
-            distinct from invite_id) plus workspace/from/billing keys;
+            distinct from invite_id) plus workspace/from keys;
             billing family keys are reserved.
           additionalProperties: true
         status:

@@ -23,6 +23,13 @@ package events
 //   - task.*: delivered to the current submitter or readable Board audience.
 //   - media.*: delivered only while canonical Media authorization allows read.
 //   - billing.settled: Workspace membership gates delivery.
+//   - notification.* (created/updated) carry refs only (invite_id +
+//     notification_type, never titles/bodies/emails): workspace SSE
+//     delivery is membership-gated like billing.settled, while the
+//     per-user notifications stream addresses them by recipient (no
+//     membership required, so pending invitees converge too). They never
+//     ride webhooks: inbox hints are principal-scoped, not
+//     workspace-wide.
 //   - Workspace webhooks carry checkout-session billing.settled only; Task-linked
 //     settlements and protected principal-scoped
 //     Task, Media and Board frames are rejected at enqueue and delivery.

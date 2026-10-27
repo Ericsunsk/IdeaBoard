@@ -69,13 +69,14 @@ WHERE public_id = sqlc.arg(public_id)
 RETURNING internal_id, public_id, user_id, type, title, body, action_payload, deduplication_key,
   status, read_at, created_at, updated_at;
 
--- name: MarkAllNotificationsAsRead :execrows
+-- name: MarkAllNotificationsAsRead :many
 UPDATE user_notifications
 SET status = 'read',
     read_at = COALESCE(read_at, now()),
     updated_at = now()
 WHERE user_id = sqlc.arg(user_id)
-  AND status = 'unread';
+  AND status = 'unread'
+RETURNING *;
 
 -- name: ArchiveNotification :one
 UPDATE user_notifications
@@ -86,7 +87,7 @@ WHERE public_id = sqlc.arg(public_id)
 RETURNING internal_id, public_id, user_id, type, title, body, action_payload, deduplication_key,
   status, read_at, created_at, updated_at;
 
--- name: MarkInviteNotificationResolved :execrows
+-- name: MarkInviteNotificationResolved :many
 -- Keys 'invite_status'/'invite_id' must match
 -- notifications.PayloadKeyInviteStatus/PayloadKeyInviteID and the frontend
 -- InviteActionPayload interface; see notifications.PayloadKeyTransferInviteID
@@ -95,7 +96,8 @@ UPDATE user_notifications
 SET action_payload = COALESCE(action_payload, '{}'::jsonb) || jsonb_build_object('invite_status', sqlc.arg(invite_status)::TEXT),
     updated_at = now()
 WHERE action_payload ->> 'invite_id' = sqlc.arg(invite_id)::TEXT
-  AND type IN ('workspace_invite', 'organization_invite');
+  AND type IN ('workspace_invite', 'organization_invite')
+RETURNING *;
 
 -- name: DeleteOldNotifications :execrows
 DELETE FROM user_notifications

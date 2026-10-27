@@ -3,8 +3,8 @@ package worker
 // In-memory single-transaction settlement harness for the worker loop tests.
 //
 // It mirrors workspacetasks/settle_tx_fake_test.go: every seam the
-// transactional settlement requires is present, so settlementSeams()
-// reports handled=true and no compensating fallback can fire:
+// transactional settlement requires is declared explicitly; every write
+// joins the same transaction:
 //
 //   - txWorkerStore wraps the merged claim+attempt adapter with the
 //     settlement-transaction seams. Task rows are written immediately
@@ -281,7 +281,7 @@ func (workerTestBillingAccounts) ResolveBillingAccountInTx(_ context.Context, _ 
 // the database-free worker loop tests.
 func newTxWorkerService(txStore *txWorkerStore, holder *workerTestHolder, queue *workerTestQueue, assets workspacetasks.AssetReader, boards workspacetasks.BoardAuthorizer) *workspacetasks.Service {
 	return workspacetasks.NewService(workspacetasks.ServiceDeps{
-		TaskRead: txStore, TaskLifecycle: txStore,
+		TaskRead: txStore, TaskLifecycle: txStore, SubmissionClaims: txStore,
 		Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
 		Assets: assets, Resolver: allowTestPoolResolver(),
 		SnapshotSaver:   workerNoopSnapshotSaver,

@@ -10,14 +10,14 @@ import {
   useCanvasExecutionWorkspace,
   useImageWorkflowExecution as useRuntimeImageWorkflowExecution,
   type PendingImageExecutionCore,
-  waitExistingOrLiveTaskImageResults,
+  type TaskImageOutcomeWaiter,
+  waitCanvasWorkspaceTaskImageOutcome,
   CANVAS_WORKSPACE_REQUIRED_MESSAGE,
 } from '../execution'
 import type { BoardSnapshot } from '../../../board/ports/canvas'
 import type { CanvasGraphStore } from '../../core/graph'
 import type { CanvasRendererMetricsPort } from '../../session/flow-adapter'
 import type { CanvasFeedback } from '../workspace/useCanvasFeedback.ts'
-import type { TaskImageResult } from '../../../../core/query/taskResult'
 
 type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
 
@@ -32,7 +32,7 @@ export type UseImageWorkflowExecutionOptions = {
   feedback: CanvasTaskExecutionFeedback
   executionCore: PendingImageExecutionCore
   cancelTasks: (taskIds: readonly string[]) => void
-  waitTaskImageResults?: (taskId: string) => Promise<TaskImageResult[]>
+  waitTaskImageOutcome?: TaskImageOutcomeWaiter
   /**
    * Workspace gate (fail-closed): canvas task actions stay disabled without
    * a selection. Injected from the screen seam; no store import here so the
@@ -79,7 +79,7 @@ export function useImageWorkflowExecution(
   // Single task-result waiter shared by the execution workspace and the
   // workflow entrypoint, so completion reconciliation cannot fragment (issue
   // #676). Test doubles inject through the same option on both seams.
-  const waitTaskImageResults = options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
+  const waitTaskImageOutcome = options.waitTaskImageOutcome ?? waitCanvasWorkspaceTaskImageOutcome
 
   // Workspace gate (fail-closed): without a selected workspace every canvas
   // task action stays disabled with guidance; the adapter throws the same
@@ -134,7 +134,7 @@ export function useImageWorkflowExecution(
     refreshNodeInternals: options.refreshNodeInternals,
     executionCore: options.executionCore,
     cancelTasks: options.cancelTasks,
-    waitTaskImageResults,
+    waitTaskImageOutcome,
     onSuccess: options.feedback.succeeded,
     onWarning: handleWorkflowWarning,
     onError: handleWorkflowError,
@@ -152,7 +152,7 @@ export function useImageWorkflowExecution(
     onError: handleWorkflowError,
     executionWorkspace,
     cancelTasks: options.cancelTasks,
-    waitTaskImageResults,
+    waitTaskImageOutcome,
   })
 
   const commands = createImageWorkflowCommands({

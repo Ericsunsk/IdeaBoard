@@ -351,6 +351,35 @@ func (s *InMemoryWorkspaceMediaStore) ArchiveAsset(ctx context.Context, workspac
 	return copyAsset(asset), nil
 }
 
+// ArchiveUnreferencedAsset preserves assets already accepted by another owner.
+func (s *InMemoryWorkspaceMediaStore) ArchiveUnreferencedAsset(ctx context.Context, workspaceID, assetID string) (*Asset, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := mediaKey(workspaceID, assetID)
+	asset := s.assets[key]
+	if asset == nil {
+		return nil, ErrNotFound
+	}
+	if _, linked := s.libraryLinks[key]; linked {
+		return nil, ErrStateConflict
+	}
+	for _, outputs := range s.taskAssets {
+		for _, output := range outputs {
+			if output.Asset != nil && output.Asset.ID == assetID && output.Asset.WorkspaceID == workspaceID {
+				return nil, ErrStateConflict
+			}
+		}
+	}
+	if asset.ArchivedAt == nil {
+		now := s.clock()
+		asset.ArchivedAt = &now
+	}
+	return copyAsset(asset), nil
+}
+
 // UpdateAssetMetadata refreshes dimensions and merges metadata
 // (metadata has no durable test projection beyond acceptance).
 func (s *InMemoryWorkspaceMediaStore) UpdateAssetMetadata(ctx context.Context, workspaceID, assetID string, params UpdateMetadataParams) (*Asset, error) {

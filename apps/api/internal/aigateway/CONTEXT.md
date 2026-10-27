@@ -2,6 +2,10 @@
 
 AIGateway is the operating context for the sole AI egress: gateway connection, model catalog, Vision mapping, route preview, and probing. It owns no Wallet, Ledger, prices, task execution, Service Model Pool, or provider SDKs.
 
+> Vision Search is temporarily unavailable: production passes nil for the
+> vision gateway seam, so vision extraction fails closed. The `vision`
+> mapping key reservation and billing SKU remain.
+
 ## Domain Language
 
 | Term                | Meaning                                                                                                                                                                                                                                                                                                |
@@ -15,7 +19,7 @@ AIGateway is the operating context for the sole AI egress: gateway connection, m
 | Model Detection     | Union of control-plane configured providers with the LiteLLM community catalog and the models.dev catalog over one shared attribution; same keys dedupe with models.dev winning metadata, relay partitions never match; LiteLLM failure stays fail-closed, models.dev failure degrades to LiteLLM-only |
 | Configured Provider | Control-plane-attested provider slug; Workers AI carries no key so it never appears there — availability probing admits it when alive                                                                                                                                                                  |
 | Receipt             | Gateway acknowledgement headers (model, provider, step, cache status, log/event ID); operations observability and attempt facts only, never billing snapshots                                                                                                                                          |
-| Cache Policy        | Gateway-global cache stays off; per-request explicit declarations only (opt-in TTL for deterministic text, skip for images)                                                                                                                                                                            |
+| Cache Bypass        | Gateway-global cache stays off; Gateway transport always sends `cf-aig-skip-cache: true`. Callers cannot opt into caching; cache receipt fields remain observability only.                                                                                                                             |
 
 ## Public Seams
 
@@ -32,7 +36,7 @@ AIGateway is the operating context for the sole AI egress: gateway connection, m
 - Provider keys live in Cloudflare (BYOK); this repo holds only the gateway token; payloads never persist in gateway logs (`collect-log-payload: false`); metadata carries only `task_id` + `feature` (2 of the 5 allowed entries).
 - Community catalog IDs and display names stay verbatim; deprecated and malformed entries are skipped.
 - Unknown provider slugs synthesize a default display (community guess + `custom-` namespace) instead of silently vanishing.
-- Compat endpoints serve only supported OpenAI-compatible text/vision routes; images stay provider-native and are never rewritten into chat.
+- All gateway calls use the provider-native surface with an explicit path; there is no OpenAI-compatible rewrite (chat-shaped payloads ride provider-native too, `IsChat` only drives dialect shaping).
 - Probes bypass the fallback topology; single-shot semantics verified empirically at implementation time.
 - Control-plane lists cache per token hash with short TTL and a bound; the catalog caches 24h; every failure surfaces.
 

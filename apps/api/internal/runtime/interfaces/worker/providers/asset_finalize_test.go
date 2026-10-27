@@ -41,10 +41,6 @@ func (m *assetKindResultMaterializer) MaterializeRemoteResults(_ context.Context
 	return taskmedia.MaterializedResults{Items: items}, nil
 }
 
-func (m *assetKindResultMaterializer) MaterializeBytesResult(_ context.Context, _ int64, taskID, _ string, _ string, _ []byte, _ taskmedia.ResultMaterializeOptions) (taskmedia.MaterializedResults, error) {
-	return m.MaterializeRemoteResults(context.Background(), 0, taskID, []string{"data:image/png;base64,drop"}, taskmedia.ResultMaterializeOptions{})
-}
-
 func TestCallGatewayAPIAcceptsAssetKindOutputs(t *testing.T) {
 	rawImagePayload := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
