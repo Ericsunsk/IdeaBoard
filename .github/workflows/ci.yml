@@ -5,17 +5,30 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      force_full:
+        type: boolean
+        default: true
+      source_commit:
+        required: true
+        type: string
+      preview_images:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ inputs.source_commit || 'event' }}
   cancel-in-progress: true
 
 jobs:
   changes:
     name: Classify Changes
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     outputs:
       web: ${{ steps.classify.outputs.web }}
@@ -30,27 +43,34 @@ jobs:
       auth_audit: ${{ steps.classify.outputs.auth_audit }}
       realtime_audit: ${{ steps.classify.outputs.realtime_audit }}
       docs_only: ${{ steps.classify.outputs.docs_only }}
+      base_sha: ${{ steps.baseline.outputs.base_sha }}
+      head_sha: ${{ steps.baseline.outputs.head_sha }}
+      force_full: ${{ steps.baseline.outputs.force_full }}
+      api_tests: ${{ steps.classify.outputs.api_tests }}
+      api_sqlc: ${{ steps.classify.outputs.api_sqlc }}
+      api_migrations: ${{ steps.classify.outputs.api_migrations }}
+      api_build: ${{ steps.classify.outputs.api_build }}
+      api_images: ${{ steps.classify.outputs.api_images }}
+      browser_smoke: ${{ steps.classify.outputs.browser_smoke }}
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
+          ref: ${{ inputs.source_commit || github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Select verified ancestor baseline
+        id: baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.base_ref || github.event.repository.default_branch }}
+          FORCE_FULL: ${{ (github.event_name == 'workflow_dispatch' || inputs.force_full) && 'true' || 'false' }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: ./scripts/ci-baseline.sh "${RUNNER_TEMP}/changed-paths.txt" | tee -a "${GITHUB_OUTPUT}"
       - name: Classify changed contexts
         id: classify
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
-            printf '%s\n' .github/workflows/ci.yml > "${RUNNER_TEMP}/changed-paths.txt"
-          elif [[ -z "${BASE_SHA}" || "${BASE_SHA}" =~ ^0+$ ]]; then
-            git ls-files > "${RUNNER_TEMP}/changed-paths.txt"
-          else
-            git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > "${RUNNER_TEMP}/changed-paths.txt"
-          fi
-          ./scripts/ci-change-classifier.sh < "${RUNNER_TEMP}/changed-paths.txt" | tee -a "${GITHUB_OUTPUT}"
+        run: ./scripts/ci-change-classifier.sh < "${RUNNER_TEMP}/changed-paths.txt" | tee -a "${GITHUB_OUTPUT}"
+
   web:
     name: Web Verification
     permissions:
@@ -60,6 +80,9 @@ jobs:
     needs: [changes]
     uses: ./.github/workflows/web.yml
     with:
+      base_sha: ${{ needs.changes.outputs.base_sha }}
+      head_sha: ${{ needs.changes.outputs.head_sha }}
+      force_full: ${{ needs.changes.outputs.force_full == 'true' }}
       audit_dependencies: ${{ needs.changes.outputs.web_audit == 'true' }}
   api:
     name: API Verification
@@ -67,7 +90,14 @@ jobs:
     needs: [changes]
     uses: ./.github/workflows/api.yml
     with:
-      build_images: ${{ needs.changes.outputs.docker == 'true' }}
+      base_sha: ${{ needs.changes.outputs.base_sha }}
+      head_sha: ${{ needs.changes.outputs.head_sha }}
+      force_full: ${{ needs.changes.outputs.force_full == 'true' }}
+      run_tests: ${{ needs.changes.outputs.api_tests == 'true' }}
+      run_sqlc: ${{ needs.changes.outputs.api_sqlc == 'true' }}
+      run_migrations: ${{ needs.changes.outputs.api_migrations == 'true' }}
+      build_api: ${{ needs.changes.outputs.api_build == 'true' }}
+      build_images: ${{ needs.changes.outputs.api_images == 'true' && (inputs.preview_images || !inputs.source_commit) }}
       audit_dependencies: ${{ needs.changes.outputs.api_audit == 'true' }}
   auth:
     name: Auth Verification
@@ -75,7 +105,8 @@ jobs:
     needs: [changes]
     uses: ./.github/workflows/auth.yml
     with:
-      build_images: ${{ needs.changes.outputs.docker == 'true' }}
+      source_commit: ${{ needs.changes.outputs.head_sha }}
+      build_images: ${{ needs.changes.outputs.docker == 'true' && (inputs.preview_images || !inputs.source_commit) }}
       audit_dependencies: ${{ needs.changes.outputs.auth_audit == 'true' }}
   realtime:
     name: Realtime Verification
@@ -83,7 +114,8 @@ jobs:
     needs: [changes]
     uses: ./.github/workflows/realtime.yml
     with:
-      build_images: ${{ needs.changes.outputs.docker == 'true' }}
+      source_commit: ${{ needs.changes.outputs.head_sha }}
+      build_images: ${{ needs.changes.outputs.docker == 'true' && (inputs.preview_images || !inputs.source_commit) }}
       audit_dependencies: ${{ needs.changes.outputs.realtime_audit == 'true' }}
   migration-integration:
     name: Migration Integration
@@ -91,11 +123,12 @@ jobs:
     needs: [changes]
     uses: ./.github/workflows/migration-integration.yml
     with:
-      base_sha: ${{ github.event.pull_request.base.sha || github.event.before }}
-      head_sha: ${{ github.event.pull_request.head.sha || github.sha }}
+      source_commit: ${{ needs.changes.outputs.head_sha }}
+      base_sha: ${{ needs.changes.outputs.base_sha }}
+      head_sha: ${{ needs.changes.outputs.head_sha }}
   backend-browser-smoke:
     name: Backend Browser Smoke
-    if: ${{ needs.changes.outputs.web != 'true' && (needs.changes.outputs.api == 'true' || needs.changes.outputs.auth == 'true' || needs.changes.outputs.realtime == 'true' || needs.changes.outputs.docker == 'true') }}
+    if: ${{ needs.changes.outputs.web != 'true' && needs.changes.outputs.browser_smoke == 'true' }}
     needs: [changes]
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.62.1-noble
@@ -103,6 +136,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
+          ref: ${{ inputs.source_commit || github.sha }}
           persist-credentials: false
       - name: Set up Node.js
         uses: ./.github/actions/setup-node
@@ -121,6 +155,8 @@ jobs:
     if: needs.changes.outputs.ops == 'true'
     needs: [changes]
     uses: ./.github/workflows/ops.yml
+    with:
+      source_commit: ${{ needs.changes.outputs.head_sha }}
   media-contract:
     # Issue #661 / #667 contract gate. This always runs so the
     # required CI Gate cannot silently accept a skipped media
@@ -132,6 +168,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
+          ref: ${{ inputs.source_commit || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Run media package boundary gate
@@ -149,6 +186,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
+          ref: ${{ inputs.source_commit || github.sha }}
           persist-credentials: false
       - name: Run handbook version and link contract
         run: ./scripts/handbook-version-contract.sh
@@ -162,6 +200,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
+          ref: ${{ inputs.source_commit || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Run PR size guard
@@ -170,7 +209,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [[ "${EVENT_NAME}" == "push" ]]; then
+          if [[ "${EVENT_NAME}" != "pull_request" ]]; then
             echo 'pr-size-guard: skipped (the size gate applies to pull requests, not pushes)'
             exit 0
           fi
@@ -191,6 +230,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
+          ref: ${{ inputs.source_commit || github.sha }}
           persist-credentials: false
       - name: Summarize and verify required lanes
         if: always()
@@ -206,7 +246,7 @@ jobs:
           REALTIME_RESULT: ${{ needs.realtime.result }}
           MIGRATION_REQUIRED: ${{ needs.changes.outputs.migration_integration }}
           MIGRATION_RESULT: ${{ needs.migration-integration.result }}
-          DOCKER_REQUIRED: ${{ needs.changes.outputs.docker }}
+          BROWSER_SMOKE_REQUIRED: ${{ needs.changes.outputs.browser_smoke }}
           BROWSER_SMOKE_RESULT: ${{ needs.backend-browser-smoke.result }}
           OPS_REQUIRED: ${{ needs.changes.outputs.ops }}
           OPS_RESULT: ${{ needs.ops.result }}

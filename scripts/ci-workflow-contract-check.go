@@ -126,10 +126,32 @@ func checkCI(ci workflow) {
 	triggers := object(ci, "on")
 	requireKey(triggers, "pull_request", "CI must run on pull_request")
 	requireKey(triggers, "workflow_dispatch", "CI must support workflow_dispatch")
+	callInputs := object(object(triggers, "workflow_call"), "inputs")
+	requireEqual(object(callInputs, "force_full")["default"], true, "Reusable CI must default to full verification")
+	requireEqual(object(callInputs, "source_commit")["required"], true, "Reusable CI must verify an explicit source commit")
+	requireEqual(object(callInputs, "preview_images")["default"], false, "Release verification must not duplicate preview image builds")
 	requireStringIn(object(triggers, "push"), "branches", "main", "CI push trigger must include main")
 	rejectKey(triggers, "merge_group", "CI must not expose merge_group")
 
 	jobs := object(ci, "jobs")
+	changes := object(jobs, "changes")
+	baseline := requireStep(changes, "Select verified ancestor baseline")
+	requireEqual(baseline["run"], `./scripts/ci-baseline.sh "${RUNNER_TEMP}/changed-paths.txt" | tee -a "${GITHUB_OUTPUT}"`, "Incremental CI must use the trusted ancestor resolver")
+	requireEqual(object(baseline, "env")["SOURCE_COMMIT"], "${{ inputs.source_commit }}", "Baseline must validate the requested release source")
+	requireContains(stringValue(object(baseline, "env")["FORCE_FULL"]), "inputs.force_full", "CI must preserve explicit full verification")
+	for _, lane := range []string{"api", "web"} {
+		inputs := object(object(jobs, lane), "with")
+		for _, name := range []string{"base_sha", "head_sha"} {
+			requireEqual(inputs[name], "${{ needs.changes.outputs."+name+" }}", lane+" must consume the verified commit range")
+		}
+		requireEqual(inputs["force_full"], "${{ needs.changes.outputs.force_full == 'true' }}", lane+" must consume full fallback")
+	}
+	for _, lane := range []string{"auth", "realtime", "ops", "migration-integration"} {
+		requireEqual(object(object(jobs, lane), "with")["source_commit"], "${{ needs.changes.outputs.head_sha }}", lane+" must verify the same selected source")
+	}
+	for input, output := range map[string]string{"run_tests": "api_tests", "run_sqlc": "api_sqlc", "run_migrations": "api_migrations", "build_api": "api_build"} {
+		requireEqual(object(object(jobs, "api"), "with")[input], "${{ needs.changes.outputs."+output+" == 'true' }}", "API must consume its precise check requirement")
+	}
 	requireEqual(object(jobs, "web")["uses"], "./.github/workflows/web.yml", "Web job must call web.yml")
 	requireEqual(object(jobs, "api")["uses"], "./.github/workflows/api.yml", "API job must call api.yml")
 	requireEqual(object(jobs, "auth")["uses"], "./.github/workflows/auth.yml", "Auth job must call auth.yml")
@@ -157,6 +179,7 @@ func checkCI(ci workflow) {
 	requireEqual(gateStep["run"], "./scripts/ci-gate.sh", "CI Gate must use the lane policy module")
 	requireEqual(gateStep["if"], "always()", "CI Gate policy must run after failed or skipped lanes")
 	gateEnv := object(gateStep, "env")
+	requireEqual(gateEnv["BROWSER_SMOKE_REQUIRED"], "${{ needs.changes.outputs.browser_smoke }}", "Browser smoke must use the explicit runtime-impact flag")
 	requireEqual(gateEnv["API_REQUIRED"], "${{ needs.changes.outputs.api }}", "CI Gate must receive the API required flag")
 	requireEqual(gateEnv["API_RESULT"], "${{ needs.api.result }}", "CI Gate must receive the aggregate API result")
 	requireEqual(gateEnv["MEDIA_CONTRACT_REQUIRED"], "true", "Media contract must always be a required CI lane")
@@ -170,6 +193,21 @@ func checkReusableWorkflows(root string) {
 		parsed := loadWorkflow(root, name)
 		triggers := object(parsed, "on")
 		requireKey(triggers, "workflow_call", name+" must expose workflow_call")
+		checkoutRef := "${{ inputs.source_commit || github.sha }}"
+		if name == "api.yml" || name == "web.yml" {
+			checkoutRef = "${{ inputs.head_sha || github.sha }}"
+		}
+		for _, rawJob := range object(parsed, "jobs") {
+			job, ok := rawJob.(map[string]any)
+			if !ok {
+				continue
+			}
+			for _, step := range steps(job) {
+				if strings.HasPrefix(stringValue(step["uses"]), "actions/checkout@") {
+					requireEqual(object(step, "with")["ref"], checkoutRef, name+" must checkout the exact verified source")
+				}
+			}
+		}
 		for _, forbidden := range []string{"pull_request", "push", "merge_group"} {
 			rejectKey(triggers, forbidden, name+" must not expose event trigger "+forbidden)
 		}
@@ -179,9 +217,34 @@ func checkReusableWorkflows(root string) {
 	rejectKey(object(api, "jobs"), "schema", "Schema semantics must run once in the migration gate")
 	rejectKey(object(object(object(api, "on"), "workflow_call"), "inputs"), "run_schema", "Schema verification must not require an optional input")
 	requireEqual(object(api, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "API workflow must not upload Docker build records")
+	apiInputs := object(object(object(api, "on"), "workflow_call"), "inputs")
+	for _, name := range []string{"force_full", "run_tests", "run_sqlc", "run_migrations", "build_api"} {
+		requireEqual(object(apiInputs, name)["default"], true, "Standalone API checks must safely default to full coverage")
+	}
+	for _, name := range []string{"sqlc-diff", "sqlc-vet"} {
+		requireEqual(object(object(api, "jobs"), name)["if"], "inputs.run_sqlc", "SQL checks must follow SQL inputs")
+	}
 	checkAPITestMatrix(api)
 	migrationGate := object(object(api, "jobs"), "migration-gate")
-	rejectKey(migrationGate, "if", "API migration verification must run on every invocation")
+	requireEqual(migrationGate["if"], "inputs.run_migrations", "Migration verification must run when its inputs change")
+	migrationEnv := object(migrationGate, "env")
+	requireEqual(migrationEnv["ATLAS_BASE_SHA"], "${{ inputs.base_sha }}", "Migration review must use the cumulative verified baseline")
+	requireEqual(migrationEnv["ATLAS_HEAD_SHA"], "${{ inputs.head_sha || github.sha }}", "Migration review must bind the selected source")
+	migrationRange := requireStep(migrationGate, "Verify trusted migration review range")
+	for _, required := range []string{`[[ "${ATLAS_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]`, `git rev-parse HEAD`, `git merge-base --is-ancestor "${ATLAS_BASE_SHA}" "${ATLAS_HEAD_SHA}"`, "exit 1"} {
+		requireContains(stringValue(migrationRange["run"]), required, "Migration review must reject missing or invalid comparison history")
+	}
+	rejectKey(migrationRange, "continue-on-error", "Invalid migration history must fail verification")
+	rejectKey(migrationRange, "if", "Migration history validation must not be skipped")
+	openapiRange := requireStep(object(object(api, "jobs"), "openapi-breaking"), "Check for breaking OpenAPI changes")
+	requireEqual(object(openapiRange, "env")["BASE_SHA"], "${{ inputs.base_sha }}", "OpenAPI review must use the cumulative verified baseline")
+	requireEqual(object(openapiRange, "env")["HEAD_SHA"], "${{ inputs.head_sha || github.sha }}", "OpenAPI review must bind the selected source")
+	for _, required := range []string{`[[ "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]`, `git rev-parse HEAD`, `git merge-base --is-ancestor "${BASE_SHA}" "${HEAD_SHA}"`, "exit 1", `./scripts/openapi-breaking-check.sh "${BASE_SHA}"`} {
+		requireContains(stringValue(openapiRange["run"]), required, "OpenAPI review must reject missing or invalid comparison history")
+	}
+	rejectKey(openapiRange, "continue-on-error", "Invalid OpenAPI history must fail verification")
+	rejectKey(openapiRange, "if", "OpenAPI history validation must not be skipped")
+	reject(strings.Contains(scalarText(api), "github.event.before"), "API review cannot narrow to the last potentially failed commit")
 	installAPIAtlas := requireStep(migrationGate, "Install Atlas")
 	installAPIAtlasRun := stringValue(installAPIAtlas["run"])
 	requireContains(installAPIAtlasRun, "apps/api/Dockerfile", "API migration gate must derive Atlas from the Dockerfile pin")
@@ -189,7 +252,7 @@ func checkReusableWorkflows(root string) {
 	reject(strings.Contains(installAPIAtlasRun, "v1.3.2"), "API migration gate must not hardcode the Atlas version")
 	semanticCheck := requireStep(migrationGate, "Compare migration replay with schema snapshot")
 	requireEqual(semanticCheck["working-directory"], "apps/api", "Migration semantics must use the API project root")
-	requireContains(stringValue(semanticCheck["run"]), `go run ./cmd/schemarelease --base-sha "${ATLAS_BASE_SHA:-HEAD}"`, "Migration gate must compare migration replay and snapshot semantics")
+	requireContains(stringValue(semanticCheck["run"]), `go run ./cmd/schemarelease --base-sha "${ATLAS_BASE_SHA}"`, "Migration gate must compare migration replay and snapshot semantics")
 	requireStep(migrationGate, "Check destructive migrations and validate the chain")
 	requireStep(migrationGate, "Apply API migrations up")
 	requireStep(migrationGate, "Finalize migration (River schema and runtime privileges)")
@@ -254,9 +317,17 @@ func checkReusableWorkflows(root string) {
 func checkAPITestMatrix(api workflow) {
 	jobs := object(api, "jobs")
 	rejectKey(jobs, "standard-tests", "API test modes must share one matrix")
+	plan := object(jobs, "test-plan")
+	requireEqual(plan["if"], "inputs.run_tests", "API planning must follow the selected test requirement")
+	planStep := requireStep(plan, "Select impacted API packages and source contracts")
+	planEnv := object(planStep, "env")
+	requireEqual(planEnv["BASE_SHA"], "${{ inputs.base_sha }}", "API planner must use the trusted baseline")
+	requireEqual(planEnv["HEAD_SHA"], "${{ inputs.head_sha || github.sha }}", "API planner must bind the checkout")
+	requireEqual(planEnv["FORCE_FULL"], "${{ inputs.force_full }}", "API planner must preserve full-release mode")
+	rejectKey(planStep, "continue-on-error", "API planning failures must fail verification")
 	job := object(jobs, "tests")
-	rejectKey(job, "needs", "API tests must run independently")
-	rejectKey(job, "if", "API tests must always run")
+	requireStringIn(job, "needs", "test-plan", "API shards must use one canonical test plan")
+	requireContains(stringValue(job["if"]), "inputs.run_tests", "API tests must follow the explicit test requirement")
 	rejectKey(job, "continue-on-error", "API test failures must fail verification")
 	requireEqual(job["timeout-minutes"], "${{ matrix.mode == 'race' && 30 || 20 }}", "API tests must preserve the standard and race deadlines")
 	strategy := object(job, "strategy")
@@ -287,6 +358,7 @@ func checkAPITestMatrix(api workflow) {
 	rejectKey(step, "if", "API tests must execute every shard")
 	rejectKey(step, "continue-on-error", "API tests must propagate shard failures")
 	testEnv := object(step, "env")
+	requireEqual(testEnv["API_TEST_PLAN"], "${{ runner.temp }}/api-test-plan/api-test-plan.json", "API shards must consume the single verified plan")
 	requireEqual(testEnv["TEST_MODE"], "${{ matrix.mode }}", "API tests must select their matrix mode")
 	requireEqual(testEnv["TEST_SHARD"], "${{ matrix.shard }}", "API tests must select their matrix shard")
 	requireEqual(testEnv["TEST_SHARD_COUNT"], "2", "API tests must partition each mode into two shards")
@@ -367,6 +439,16 @@ func checkWebVerification(root string, web workflow) {
 	caller := object(object(ci, "jobs"), "web")
 	requireEqual(object(caller, "permissions")["pull-requests"], "write", "Web caller must authorize bundle comment permissions")
 	jobs := object(web, "jobs")
+	planStep := requireStep(object(jobs, "unit-plan"), "Plan unit tests")
+	requireEqual(planStep["run"], "node scripts/ciUnitPlan.mjs", "Web must use the native Vitest plan boundary")
+	planEnv := object(planStep, "env")
+	requireEqual(planEnv["CI_BASE_SHA"], "${{ inputs.base_sha }}", "Web planner must consume the trusted baseline")
+	requireEqual(planEnv["CI_FORCE_FULL"], "${{ inputs.force_full }}", "Web planner must preserve full-release mode")
+	rejectKey(planStep, "continue-on-error", "Web planning failures must fail verification")
+	unit := object(jobs, "unit")
+	requireStringIn(unit, "needs", "unit-plan", "Web unit shards must depend on the canonical plan")
+	requireEqual(requireStep(unit, "Unit tests (shard)")["run"], "node scripts/ciUnitPlan.mjs run", "Full and related Web tests must share one runner")
+
 	comment := object(jobs, "bundle-comment")
 	requireContains(stringValue(comment["if"]), "github.event.pull_request.head.repo.full_name == github.repository", "Bundle comments must skip read-only fork PRs")
 	for _, name := range []string{"unit", "browser"} {
@@ -382,6 +464,17 @@ func checkRelease(root string, release workflow) {
 	preflight := object(jobs, "preflight")
 	requireEqual(object(preflight, "permissions")["checks"], "read", "Release preflight must read CI checks")
 	requireStringIn(object(jobs, "publish-images"), "needs", "preflight", "Image publication must depend on preflight")
+	requireStringIn(object(jobs, "publish-images"), "needs", "verify-source", "Publishing must wait for full source verification")
+	verify := object(jobs, "verify-source")
+	requireStringIn(verify, "needs", "preflight", "Full verification must wait for source validation")
+	requireEqual(verify["uses"], "./.github/workflows/ci.yml", "Release must reuse the canonical CI implementation")
+	verifyInputs := object(verify, "with")
+	requireEqual(verifyInputs["source_commit"], "${{ needs.preflight.outputs.source_commit }}", "Full verification must bind the exact eligible source")
+	requireEqual(verifyInputs["force_full"], true, "An incremental CI pass cannot authorize publishing")
+	requireEqual(verifyInputs["preview_images"], false, "Release verification must not duplicate image builds")
+	rejectKey(verify, "continue-on-error", "Full source verification must block publication on failure")
+	rejectKey(verify, "if", "Full release verification cannot be conditionally skipped")
+	rejectKey(object(jobs, "publish-images"), "if", "Publication must retain default success-only dependency gating")
 
 	build := requireStep(object(jobs, "publish-images"), "Build and push image")
 	requireEqual(build["uses"], "docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8", "Image build action must remain pinned")

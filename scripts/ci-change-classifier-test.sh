@@ -266,7 +266,7 @@ assert_output_line "${parity_output}" 'web=true'
 assert_output_line "${parity_output}" 'api=true'
 assert_output_line "${parity_output}" 'auth=true'
 assert_output_line "${parity_output}" 'realtime=true'
-assert_output_line "${parity_output}" 'docker=false'
+assert_output_line "${parity_output}" 'docker=true'
 assert_output_line "${parity_output}" 'ops=true'
 
 migration_integration_output="$(printf '%s\n' scripts/ci-migration-integration.sh | "${classifier}")"
@@ -306,10 +306,10 @@ assert_output_line "${gate_output}" 'ops=true'
 runtime_output="$(printf '%s\n' .node-version | "${classifier}")"
 
 assert_output_line "${runtime_output}" 'web=true'
-assert_output_line "${runtime_output}" 'api=true'
+assert_output_line "${runtime_output}" 'api=false'
 assert_output_line "${runtime_output}" 'auth=true'
 assert_output_line "${runtime_output}" 'realtime=true'
-assert_output_line "${runtime_output}" 'docker=true'
+assert_output_line "${runtime_output}" 'docker=false'
 assert_output_line "${runtime_output}" 'ops=true'
 assert_output_line "${runtime_output}" 'migration_integration=true'
 
@@ -345,4 +345,63 @@ assert_output_line "${env_surface_output}" 'realtime=true'
 assert_output_line "${env_surface_output}" 'ops=true'
 assert_output_line "${env_surface_output}" 'docs_only=false'
 
+for app_doc in apps/api/internal/identity/CONTEXT.md apps/web/src/features/canvas/README.md; do
+  doc_output="$(printf '%s\n' "${app_doc}" | "${classifier}")"
+  assert_output_line "${doc_output}" 'docs_only=true'
+  assert_output_line "${doc_output}" 'api=false'
+  assert_output_line "${doc_output}" 'web=false'
+done
+assert_output_line "${services_output}" 'api_tests=true'
+assert_output_line "${services_output}" 'api_sqlc=false'
+assert_output_line "${services_output}" 'api_migrations=false'
+assert_output_line "${services_output}" 'api_build=true'
+assert_output_line "${services_output}" 'api_images=false'
+assert_output_line "${queries_output}" 'api_sqlc=true'
+assert_output_line "${queries_output}" 'api_migrations=false'
+assert_output_line "${schema_output}" 'api_migrations=true'
+assert_output_line "${schema_output}" 'api_sqlc=true'
+test_output="$(printf '%s\n' apps/api/internal/tasking/service_test.go | "${classifier}")"
+assert_output_line "${test_output}" 'api_tests=true'
+assert_output_line "${test_output}" 'api_build=false'
+assert_output_line "${test_output}" 'api_images=false'
+assert_output_line "${test_output}" 'browser_smoke=false'
+for action in deploy-production setup-grype; do
+  action_output="$(printf '%s\n' ".github/actions/${action}/action.yml" | "${classifier}")"
+  assert_output_line "${action_output}" 'ops=true'
+  assert_output_line "${action_output}" 'api=false'
+  assert_output_line "${action_output}" 'web=false'
+  assert_output_line "${action_output}" 'browser_smoke=false'
+done
+go_action_output="$(printf '%s\n' .github/actions/setup-go/action.yml | "${classifier}")"
+assert_output_line "${go_action_output}" 'api=true'
+assert_output_line "${go_action_output}" 'web=false'
+assert_output_line "${go_action_output}" 'migration_integration=true'
+for action in setup-node npm-ci; do
+  node_action_output="$(printf '%s\n' ".github/actions/${action}/action.yml" | "${classifier}")"
+  assert_output_line "${node_action_output}" 'api=false'
+  assert_output_line "${node_action_output}" 'web=true'
+  assert_output_line "${node_action_output}" 'auth=true'
+  assert_output_line "${node_action_output}" 'realtime=true'
+  assert_output_line "${node_action_output}" 'migration_integration=true'
+done
+new_action_output="$(printf '%s\n' .github/actions/new-action/action.yml | "${classifier}")"
+assert_output_line "${new_action_output}" 'api=true'
+assert_output_line "${new_action_output}" 'api_migrations=true'
+assert_output_line "${new_action_output}" 'web=true'
+cross_contract_output="$(printf '%s\n' apps/web/src/core/contracts/generationContract.ts | "${classifier}")"
+assert_output_line "${cross_contract_output}" 'api=true'
+assert_output_line "${cross_contract_output}" 'api_tests=true'
+assert_output_line "${cross_contract_output}" 'web=true'
+assert_output_line "${cross_contract_output}" 'api_migrations=false'
+for cross_path in \
+  apps/web/src/api/workspaceTaskContract.ts \
+  apps/web/src/features/admin/shared/core/taskMetricTokens.ts \
+  contracts/library/library-source.fixtures.json \
+  apps/api/internal/boards/previewscene/testdata/mixed.json; do
+  owner_output="$(printf '%s\n' "${cross_path}" | "${classifier}")"
+  assert_output_line "${owner_output}" 'web=true'
+  assert_output_line "${owner_output}" 'api=true'
+  assert_output_line "${owner_output}" 'api_tests=true'
+  assert_output_line "${owner_output}" 'api_migrations=false'
+done
 echo 'CI change classifier contract tests passed'

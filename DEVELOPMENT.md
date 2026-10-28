@@ -199,7 +199,7 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | Credits million dataset          | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' CREDITS_LOAD_TEST=1 go test ./internal/credits/application/commands -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
 | Usage million dataset            | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v`                         |
 
-Schema Release 的 `BASE_SHA` 按场景取值，不要混用：本地生成用 `BASE_SHA=HEAD`，只比 working tree 与 `HEAD` 的差集，避免把未合入的历史误判为 release 变更；CI/release check 用 `BASE_SHA="$(git merge-base HEAD origin/main)"`，比 PR 已合入范围加 working tree。`--base-sha` 缺省读 `BASE_SHA` env，`--head-sha` 缺省为 `HEAD`，`api.yml` 传 `--base-sha "${ATLAS_BASE_SHA:-HEAD}"` 与上述语义一致；`API_TEST_DATABASE_DSN` 必填，缺失即 fail-closed。`--write-artifact` 仍先跑完全部只读校验再发布 `schema.sql`，不是跳检直写。
+Schema Release 的 `BASE_SHA` 按场景取值，不要混用：本地生成用 `BASE_SHA=HEAD`，只比 working tree 与 `HEAD` 的差集，避免把未合入的历史误判为 release 变更；CI/release check 使用 `scripts/ci-baseline.sh` 给出的已成功 CI 祖先，累计覆盖尚未通过验证的提交；不能自行改成 `event.before` 或当前 `origin/main` 的 merge-base。`--base-sha` 缺省读 `BASE_SHA` env，`--head-sha` 缺省为 `HEAD`，`api.yml` 传可信的累计成功祖先 `--base-sha "${ATLAS_BASE_SHA}"`，并在执行前校验 SHA、checkout 与 ancestry；`API_TEST_DATABASE_DSN` 必填，缺失即 fail-closed。`--write-artifact` 仍先跑完全部只读校验再发布 `schema.sql`，不是跳检直写。
 
 `internal/db/migrationhistory` 是 Git migration discovery、append-only 与原子 clean-break rebaseline 判定的唯一实现；Schema Release 直接使用，Atlas Shell gate 经 `cmd/migrationhistory` 调用。两者都覆盖 commit range、working tree 与 untracked SQL；风险 SQL lint、版本冲突、checksum 和 Fresh replay 门禁继续独立生效。Clean-break 要求以更高版本替换一个 baseline，允许删除旧 chain；合并后的 CI 区间可附带严格高于新 baseline 的新增尾迁移，仍只走 Fresh 重放，拒绝第二 baseline、低版本新增和已有文件的修改或重命名。
 
@@ -254,7 +254,11 @@ go install "golang.org/x/tools/cmd/deadcode@$(go list -m -f '{{.Version}}' golan
 
 Frontend 函数长度检查使用 `governance/function-length`：每个函数最多 100 行自身代码，空行和纯注释不计，嵌套函数体由各自的检查负责。仅 `.spec.ts` 中从 Vitest 导入的 `describe` 分组回调豁免；`it`、hooks、测试 helper 和生产函数仍接受检查。`complexity ≤ 15`、`max-depth ≤ 4` 保持独立约束。完整组件/工厂体积仍通过 `npm run audit:complexity` 报告，避免把单函数检查误当作整个模块的复杂度指标。
 
-GitHub 只暴露一个稳定的 required check：`CI Gate`。它在 PR、`main` push 和手动运行上始终创建，先把改动分类为 Web、API、Auth、Schema、Migration Integration、Docker 与 Ops，再只调用受影响的 reusable workflows；docs-only 改动会明确成功。Dependency audit 由 Web/Auth quality 与 API quality 各自负责，周一 schedule 的 `security.yml` 做全量 audit。未知路径采用 fail-safe 分类，执行全部 context，避免新增目录静默绕过 CI。
+GitHub 只暴露一个稳定的 required check：`CI Gate`。PR 与 `main` push 基于当前 checkout 的已成功 CI 祖先计算累计变更，覆盖失败提交遗留的改动；找不到可信祖先、历史不完整或 GitHub API 不可用时回退全量。手动 CI 与发布前验证始终使用全量模式，同时解析同一可信比较基线；全量决定测试范围，不跳过 OpenAPI/migration risk 的历史审查。若无法取得可信祖先，测试仍执行全量，所选历史审查门禁明确失败，不能以 `HEAD`、上一失败提交或空比较绕过。已成功验证的当前 source commit 可作为全量重验的比较基线。未知路径采用 fail-safe 分类，执行全部 context，避免新增目录静默绕过 CI。
+
+普通 Go 改动分别触发 API 测试与 build，不无条件重跑 sqlc 和 migration；queries/generated SQL 与 schema/migration 则选中对应门禁。API tests 使用 Go import、test import 的传递反向依赖选择受影响包，并保留源码扫描的 architecture/ownership/cross-stack contracts；无法可靠识别输入时回退完整 API suite。新增源码扫描测试应使用 `architecture_test.go` / `*boundary_test.go` 命名，其他跨模块输入必须登记在 canonical `scripts/ci-api-test-plan.go` 的 source contract ownership，跨应用输入同时更新 classifier 的消费方，并补正反例。Web 局部改动使用现有 Vitest 的依赖选择能力，额外保留 source contract specs 与文件系统读取方的测试；unit 按选中集合分片，browser、lint、typecheck、build 与 smoke 保留。配置、tokens、公共契约等影响不明的变更回退完整验证。所选测试继续使用同一 runner、Standard/Race 与真实 PostgreSQL/NATS，未增加另一套执行实现。
+
+Repo-local actions 按实际调用方分类；例如部署 action 只触发 Ops/部署契约检查，Node setup 不触发完整 API tests。日常源代码变更不额外构建 preview images；Dockerfile、依赖等 packaging 输入变化仍验证镜像构建。正式发布在镜像构建、签名与发布之前，复用同一 `ci.yml` 对 preflight 固定的 source commit 执行完整验证，不能以增量 green 替代。Dependency audit 由各应用门禁负责，周一 `security.yml` 继续执行全量 dependency audits。
 
 `CI Gate` 的 Step Summary 会列出本次实际选中的 verification lanes 及结果；耗时以 GitHub Actions 原生 job timing 为事实源。优化 CI 前先对最近多次相同改动类型的运行取基线，重点比较 API race shards、Web Quality 与 Browser Smoke，不以单次 cache hit 或总时长推断收益。
 
@@ -262,6 +266,7 @@ GitHub 只暴露一个稳定的 required check：`CI Gate`。它在 PR、`main` 
 
 ```bash
 bash scripts/ci-change-classifier-test.sh
+bash scripts/ci-baseline-test.sh
 bash scripts/ci-gate-test.sh
 bash scripts/ci-workflow-contract-test.sh
 bash scripts/handbook-version-contract-test.sh

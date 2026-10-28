@@ -58,10 +58,24 @@ jobs:
           [[ "${successful_gate_count}" -ge 1 ]]
           echo "source_commit=${source_commit}" >> "${GITHUB_OUTPUT}"
 
+  verify-source:
+    name: Full Source Verification
+    needs: [preflight]
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    uses: ./.github/workflows/ci.yml
+    with:
+      source_commit: ${{ needs.preflight.outputs.source_commit }}
+      force_full: true
+      preview_images: false
+
   publish-images:
     name: Publish ${{ matrix.image.display }} Image
     needs:
       - preflight
+      - verify-source
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:

@@ -7,6 +7,27 @@ name: API
 on:
   workflow_call:
     inputs:
+      base_sha:
+        type: string
+        default: ''
+      head_sha:
+        type: string
+        default: ''
+      force_full:
+        type: boolean
+        default: true
+      run_tests:
+        type: boolean
+        default: true
+      run_sqlc:
+        type: boolean
+        default: true
+      run_migrations:
+        type: boolean
+        default: true
+      build_api:
+        type: boolean
+        default: true
       build_images:
         required: false
         type: boolean
@@ -25,12 +46,14 @@ env:
 jobs:
   lint:
     name: API Lint
+    if: inputs.build_api || inputs.run_tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-go
         with:
           cache-dependency-path: apps/api/go.sum
@@ -44,6 +67,7 @@ jobs:
 
   quality:
     name: API Quality
+    if: inputs.run_tests || inputs.build_api || inputs.audit_dependencies
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -64,12 +88,18 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-go
         with:
           cache-dependency-path: apps/api/go.sum
       - name: Test CI parity entrypoint
+        if: inputs.run_tests
         run: bash scripts/ci-parity-test.sh
+      - name: Test API impact planner
+        if: inputs.run_tests
+        run: go test scripts/ci-api-test-plan.go scripts/ci-api-test-plan_test.go
       - name: Test nested test infrastructure modules
+        if: inputs.run_tests
         working-directory: apps/api
         run: |
           (cd internal/testdb && go test ./...)
@@ -79,13 +109,46 @@ jobs:
         working-directory: apps/api
         run: go tool govulncheck ./...
       - name: Production compile
+        if: inputs.build_api
         working-directory: apps/api
         env:
           CGO_ENABLED: "0"
         run: go build ./...
 
+  test-plan:
+    name: API Test Plan
+    if: inputs.run_tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-dependency-path: apps/api/go.sum
+      - name: Select impacted API packages and source contracts
+        env:
+          BASE_SHA: ${{ inputs.base_sha }}
+          HEAD_SHA: ${{ inputs.head_sha || github.sha }}
+          FORCE_FULL: ${{ inputs.force_full }}
+        run: |
+          go run scripts/ci-api-test-plan.go -root . -base "${BASE_SHA}" -head "${HEAD_SHA}" \
+            -full="${FORCE_FULL}" -output "${RUNNER_TEMP}/api-test-plan.json"
+          cat "${RUNNER_TEMP}/api-test-plan.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: api-test-plan
+          path: ${{ runner.temp }}/api-test-plan.json
+          if-no-files-found: error
+          retention-days: 3
+
   tests:
     name: API Test (${{ matrix.mode }}, ${{ matrix.shard }})
+    needs: [test-plan]
+    if: inputs.run_tests
     runs-on: ubuntu-latest
     timeout-minutes: ${{ matrix.mode == 'race' && 30 || 20 }}
     strategy:
@@ -113,6 +176,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-go
         with:
           cache-dependency-path: apps/api/go.sum
@@ -130,8 +194,13 @@ jobs:
             sleep 1
           done
           [[ "${nats_ready}" == 1 ]] || { echo 'NATS JetStream did not become ready' >&2; exit 1; }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: api-test-plan
+          path: ${{ runner.temp }}/api-test-plan
       - name: Test API shard
         env:
+          API_TEST_PLAN: ${{ runner.temp }}/api-test-plan/api-test-plan.json
           TEST_MODE: "${{ matrix.mode }}"
           TEST_SHARD: "${{ matrix.shard }}"
           TEST_SHARD_COUNT: "2"
@@ -142,12 +211,14 @@ jobs:
 
   sqlc-diff:
     name: sqlc Drift
+    if: inputs.run_sqlc
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-go
         with:
           cache-dependency-path: apps/api/go.sum
@@ -158,6 +229,7 @@ jobs:
 
   sqlc-vet:
     name: sqlc Vet
+    if: inputs.run_sqlc
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
@@ -177,6 +249,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-go
         with:
           cache-dependency-path: apps/api/go.sum
@@ -209,6 +282,7 @@ jobs:
 
   migration-gate:
     name: Migration Gate
+    if: inputs.run_migrations
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -224,14 +298,20 @@ jobs:
           --health-interval 10s --health-timeout 5s --health-retries 10
     env:
       API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
-      # Destructive-DDL review needs the added-migration diff; passed through
-      # job env (never interpolated into shell source).
-      ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      # The same verified cumulative range owns migration risk and immutability.
+      ATLAS_BASE_SHA: ${{ inputs.base_sha }}
+      ATLAS_HEAD_SHA: ${{ inputs.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
+      - name: Verify trusted migration review range
+        run: |
+          [[ "${ATLAS_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo 'A verified ancestor base SHA is required for migration review' >&2; exit 1; }
+          [[ "$(git rev-parse HEAD)" == "${ATLAS_HEAD_SHA}" ]] || { echo 'Migration review head does not match checkout' >&2; exit 1; }
+          git merge-base --is-ancestor "${ATLAS_BASE_SHA}" "${ATLAS_HEAD_SHA}" || { echo 'Migration review base is not a checkout ancestor' >&2; exit 1; }
       - uses: ./.github/actions/setup-go
         with:
           cache-dependency-path: apps/api/go.sum
@@ -280,12 +360,6 @@ jobs:
             "${postgres_container}" \
             psql -v ON_ERROR_STOP=1 -U ideaboard -d ideaboard_test \
             -c "CREATE DATABASE ${validation_db}"
-          # Branch-creation pushes (repository bootstrap) carry an all-zero
-          # base SHA; the checker then diffs against the working tree, which
-          # is the correct review scope on CI.
-          if [[ ! "${ATLAS_BASE_SHA}" =~ ^[0-9a-f]{40}$ || "${ATLAS_BASE_SHA}" =~ ^0+$ ]]; then
-            echo "ATLAS_BASE_SHA=" >> "${GITHUB_ENV}"
-          fi
           {
             printf 'ATLAS_DEV_URL=postgres://ideaboard:ideaboard_test@127.0.0.1:5432/%s?sslmode=disable\n' "${validation_db}"
             printf 'MIGRATION_VALIDATION_DB=%s\n' "${validation_db}"
@@ -295,7 +369,7 @@ jobs:
         run: bash scripts/atlas-migration-check.sh
       - name: Compare migration replay with schema snapshot
         working-directory: apps/api
-        run: go run ./cmd/schemarelease --base-sha "${ATLAS_BASE_SHA:-HEAD}"
+        run: go run ./cmd/schemarelease --base-sha "${ATLAS_BASE_SHA}" --head-sha "${ATLAS_HEAD_SHA}"
       - name: Apply API migrations up
         run: |
           /tmp/atlas migrate apply \
@@ -343,14 +417,20 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-go
         with:
           cache-dependency-path: apps/api/go.sum
       - name: Check for breaking OpenAPI changes
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ inputs.base_sha }}
+          HEAD_SHA: ${{ inputs.head_sha || github.sha }}
           OPENAPI_BREAKING_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-        run: ./scripts/openapi-breaking-check.sh "${BASE_SHA}"
+        run: |
+          [[ "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo 'A verified ancestor base SHA is required for OpenAPI review' >&2; exit 1; }
+          [[ "$(git rev-parse HEAD)" == "${HEAD_SHA}" ]] || { echo 'OpenAPI review head does not match checkout' >&2; exit 1; }
+          git merge-base --is-ancestor "${BASE_SHA}" "${HEAD_SHA}" || { echo 'OpenAPI review base is not a checkout ancestor' >&2; exit 1; }
+          ./scripts/openapi-breaking-check.sh "${BASE_SHA}"
 
   static-contracts:
     name: API Static Contracts
@@ -360,6 +440,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - name: Check workspace SQL scope predicates
         run: bash scripts/sql-workspace-scope-check.sh
 
@@ -370,13 +451,14 @@ jobs:
 
   image:
     name: API PR Image
-    if: inputs.build_images
-    needs: [quality, tests]
+    if: ${{ always() && inputs.build_images && !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    needs: [quality, test-plan, tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         with:

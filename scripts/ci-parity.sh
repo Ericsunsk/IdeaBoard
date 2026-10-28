@@ -65,7 +65,13 @@ run_api_tests() {
   local started_at
   local elapsed_seconds
   local test_exit_code=0
+  local inventory
+  local plan_rows
+  local kind
+  local filter
+  local contract_run=""
   local -a packages=()
+  local -a contract_packages=()
 
   [[ -n "${API_TEST_DATABASE_DSN:-}" ]] || \
     fail 'API_TEST_DATABASE_DSN is required for parity API tests; integration tests must not be skipped'
@@ -80,17 +86,30 @@ run_api_tests() {
   require_command go
   started_at="${SECONDS}"
 
-  while IFS= read -r package; do
-    [[ -n "${package}" ]] && packages+=("${package}")
-  done < <(
-    cd "${repo_root}/apps/api"
-    go list ./... | awk \
-      -v shard="${shard}" \
-      -v total="${shard_count}" \
-      '((NR - 1) % total) == shard'
-  )
-
-  ((${#packages[@]} > 0)) || fail "API shard ${shard}/${shard_count} selected no packages"
+  if [[ -n "${API_TEST_PLAN:-}" ]]; then
+    plan_rows="$(cd "${repo_root}" && go run scripts/ci-api-test-plan.go \
+      -root "${repo_root}" -read "${API_TEST_PLAN}" -shard "${shard}" -shards "${shard_count}")" || \
+      fail 'unable to validate API test plan'
+    while IFS=$'\t' read -r kind package filter; do
+      [[ -n "${kind}" ]] || continue
+      case "${kind}" in
+        test) packages+=("${package}") ;;
+        contract) contract_packages+=("${package}"); contract_run="${filter}" ;;
+        *) fail 'invalid API test plan row' ;;
+      esac
+    done <<<"${plan_rows}"
+    if ((${#packages[@]} == 0 && ${#contract_packages[@]} == 0)); then
+      printf 'ci-parity: planned empty API shard %s/%s; no impacted packages\n' "${shard}" "${shard_count}"
+      record_api_test_timing "${mode}" "${shard}" "${shard_count}" 0 passed
+      return 0
+    fi
+  else
+    inventory="$(cd "${repo_root}/apps/api" && go list ./...)" || fail 'unable to list API packages'
+    while IFS= read -r package; do
+      [[ -n "${package}" ]] && packages+=("${package}")
+    done < <(printf '%s\n' "${inventory}" | awk -v shard="${shard}" -v total="${shard_count}" '((NR - 1) % total) == shard')
+    ((${#packages[@]} > 0)) || fail "API shard ${shard}/${shard_count} selected no packages"
+  fi
   # Snapshot-backed fixtures initialize quickly enough to exhaust PostgreSQL's
   # lock table when Go starts every package at once. Keep package concurrency
   # bounded at the test-runner boundary; each CI shard still runs independently.
@@ -98,18 +117,14 @@ run_api_tests() {
     "${mode}" "${shard}" "${shard_count}" "${#packages[@]}"
 
   export API_TEST_DATABASE_REQUIRED=1
-  if [[ "${mode}" == "race" ]]; then
-    if (cd "${repo_root}/apps/api" && go test -race -p=4 -count=1 "${packages[@]}"); then
-      :
-    else
-      test_exit_code=$?
-    fi
-  else
-    if (cd "${repo_root}/apps/api" && go test -p=4 -count=1 "${packages[@]}"); then
-      :
-    else
-      test_exit_code=$?
-    fi
+  local -a test_flags=(-p=4 -count=1)
+  [[ "${mode}" != race ]] || test_flags=(-race "${test_flags[@]}")
+  if ((${#packages[@]} > 0)); then
+    (cd "${repo_root}/apps/api" && go test "${test_flags[@]}" "${packages[@]}") || test_exit_code=$?
+  fi
+  if ((${#contract_packages[@]} > 0)); then
+    printf 'ci-parity: retaining source contracts packages=%s\n' "${#contract_packages[@]}"
+    (cd "${repo_root}/apps/api" && go test "${test_flags[@]}" -run "${contract_run}" "${contract_packages[@]}") || test_exit_code=$?
   fi
 
   elapsed_seconds="$((SECONDS - started_at))"

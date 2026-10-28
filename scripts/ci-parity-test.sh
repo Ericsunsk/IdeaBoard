@@ -17,6 +17,10 @@ set -euo pipefail
 printf 'go' >>"${CI_PARITY_TEST_LOG}"
 printf ' %q' "$@" >>"${CI_PARITY_TEST_LOG}"
 printf '\n' >>"${CI_PARITY_TEST_LOG}"
+if [[ "${1:-}" == "run" ]]; then
+  [[ "${CI_PARITY_TEST_PLAN_FAIL:-0}" != 1 ]] || exit 17
+  [[ -z "${CI_PARITY_TEST_PLAN_ROWS:-}" ]] || cat "${CI_PARITY_TEST_PLAN_ROWS}"
+fi
 if [[ "${1:-}" == "list" ]]; then
   printf '%s\n' example.test/pkg0 example.test/pkg1 example.test/pkg2 example.test/pkg3
 fi
@@ -175,3 +179,42 @@ assert_file_contains "${summary_file}" "- Shard: \`0/1\`"
 assert_file_contains "${summary_file}" '- Elapsed: `'
 
 echo 'ci-parity contract tests passed'
+
+# A validated impact plan can legitimately leave a shard empty, unlike an
+# invalid full-suite shard. No test invocation should occur for that shard.
+: >"${log_file}"
+API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \
+  API_TEST_PLAN="${fixture_dir}/plan.json" TEST_SHARD=1 TEST_SHARD_COUNT=2 \
+  run_parity api-test >"${fixture_dir}/empty-plan.out"
+assert_file_contains "${fixture_dir}/empty-plan.out" 'planned empty API shard 1/2'
+if grep -q '^go test ' "${log_file}"; then
+  echo 'empty affected shard unexpectedly executed tests' >&2; exit 1
+fi
+
+# Plan validation errors are never interpreted as an empty impacted set.
+if API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \
+  API_TEST_PLAN="${fixture_dir}/plan.json" CI_PARITY_TEST_PLAN_FAIL=1 \
+  run_parity api-test >"${fixture_dir}/failed-plan.out" 2>&1; then
+  echo 'invalid impact plan unexpectedly passed' >&2; exit 1
+fi
+assert_file_contains "${fixture_dir}/failed-plan.out" 'unable to validate API test plan'
+
+# Regular tests and pure source contracts use the same engine and mode flags.
+printf 'test\texample.test/pkg1\t\ncontract\texample.test/pkg3\t^(TestPolicy)$\n' >"${fixture_dir}/plan-rows"
+for mode in standard race; do
+  : >"${log_file}"
+  API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \
+    API_TEST_PLAN="${fixture_dir}/plan.json" CI_PARITY_TEST_PLAN_ROWS="${fixture_dir}/plan-rows" \
+    TEST_MODE="${mode}" TEST_SHARD_COUNT=1 run_parity api-test >"${fixture_dir}/impact-${mode}.out"
+  flags='-p=4 -count=1'; [[ "${mode}" != race ]] || flags="-race ${flags}"
+  assert_contains "go test ${flags} example.test/pkg1"
+  assert_contains "go test ${flags} -run \\^\\(TestPolicy\\)\\$ example.test/pkg3"
+done
+
+if API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \
+  API_TEST_PLAN="${fixture_dir}/plan.json" CI_PARITY_TEST_PLAN_ROWS="${fixture_dir}/plan-rows" \
+  CI_PARITY_TEST_GO_EXIT=23 TEST_SHARD_COUNT=1 \
+  run_parity api-test >"${fixture_dir}/failed-impact.out" 2>&1; then
+  echo 'impact tests unexpectedly hid a failure' >&2; exit 1
+fi
+assert_file_contains "${fixture_dir}/failed-impact.out" 'ci-parity: api-test failed'

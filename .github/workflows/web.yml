@@ -3,6 +3,18 @@ name: Web
 on:
   workflow_call:
     inputs:
+      base_sha:
+        type: string
+        required: false
+        default: ""
+      head_sha:
+        type: string
+        required: false
+        default: ""
+      force_full:
+        type: boolean
+        required: false
+        default: true
       audit_dependencies:
         required: false
         type: boolean
@@ -27,6 +39,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -55,6 +68,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -73,6 +87,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -101,6 +116,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -129,6 +145,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -139,19 +156,51 @@ jobs:
         working-directory: apps/web
         run: npm run lint:governance
 
+  unit-plan:
+    name: Web Unit Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      filters: ${{ steps.plan.outputs.filters }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
+      - name: Test unit selection
+        working-directory: apps/web
+        run: node --test scripts/ciUnitPlan.spec.mjs
+      - name: Plan unit tests
+        id: plan
+        working-directory: apps/web
+        env:
+          CI_BASE_SHA: ${{ inputs.base_sha }}
+          CI_HEAD_SHA: ${{ inputs.head_sha }}
+          CI_FORCE_FULL: ${{ inputs.force_full }}
+        run: node scripts/ciUnitPlan.mjs
+
   unit:
-    name: Web Unit (${{ matrix.shard }}/4)
+    name: Web Unit (${{ matrix.shard }}/${{ matrix.shard_count }})
+    needs: [unit-plan]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       max-parallel: 4
-      matrix:
-        shard: [1, 2, 3, 4]
+      matrix: ${{ fromJSON(needs.unit-plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -160,12 +209,16 @@ jobs:
           working-directory: apps/web
       - name: Unit tests (shard)
         working-directory: apps/web
-        run: npm run test:run -- --shard="${{ matrix.shard }}/4" --reporter=blob --reporter=default "--outputFile.blob=./.vitest-reports/blob-shard-${{ matrix.shard }}.json"
+        env:
+          TEST_FILTERS: ${{ needs.unit-plan.outputs.filters }}
+          TEST_SHARD: ${{ matrix.shard }}
+          TEST_SHARD_COUNT: ${{ matrix.shard_count }}
+        run: node scripts/ciUnitPlan.mjs run
       - name: Upload shard blob report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: vitest-blob-unit-${{ matrix.shard }}-of-4
+          name: vitest-blob-unit-${{ matrix.shard }}-of-${{ matrix.shard_count }}
           path: apps/web/.vitest-reports
           include-hidden-files: true
           if-no-files-found: error
@@ -181,6 +234,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -190,7 +244,7 @@ jobs:
       - name: Download shard blob reports
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          pattern: vitest-blob-unit-*-of-4
+          pattern: vitest-blob-unit-*-of-*
           path: apps/web/.vitest-merge/unit
           merge-multiple: true
       - name: Merge shard reports
@@ -211,6 +265,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -242,6 +297,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -266,6 +322,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -346,6 +403,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
@@ -365,6 +423,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_sha || github.sha }}
       - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
