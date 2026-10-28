@@ -14,13 +14,10 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { primeAuthenticatedWorkspace } from '../../testing'
+import { describe, expect, test } from 'vitest'
 import { parsePreviewScene, type PreviewScene } from '../../core/preview/scene'
 import { composeSceneThumbnail } from '../../core/preview/renderer'
-import { fetchWorkspaceBoards } from '../../session/adapters/boardsResource'
 
-const WORKSPACE_ID = 'ws_test123'
 const VIEWPORT = { width: 240, height: 180 }
 
 /** Server per-card scene byte cap (CatalogMaxSceneBytes); change both sides together. */
@@ -77,39 +74,6 @@ function largeImageScene(nodes: number, assetOf: (index: number) => string): Pre
   }
 }
 
-const boardMocks = vi.hoisted(() => ({ listBoards: vi.fn(), getBoardDocument: vi.fn() }))
-
-vi.mock('../../../../api/generated-query/public/boards/boards', () => ({
-  listBoards: boardMocks.listBoards,
-  getBoardDocument: boardMocks.getBoardDocument,
-}))
-
-function boardDto(id: string, wireScene: unknown) {
-  return {
-    id,
-    workspace_id: WORKSPACE_ID,
-    name: `Board ${id}`,
-    revision: 1,
-    schema_version: 4,
-    creator_user_id: 'usr_creator',
-    archived_at: null,
-    created_at: new Date(100).toISOString(),
-    updated_at: new Date(200).toISOString(),
-    content_version: 'cv-scale',
-    preview_scene: wireScene,
-  }
-}
-
-function loadWireScene(name: string): unknown {
-  const raw = readFileSync(join(FIXTURE_DIR, `${name}.json`), 'utf8')
-  return (JSON.parse(raw) as { scene: unknown }).scene
-}
-
-beforeEach(() => {
-  vi.clearAllMocks()
-  primeAuthenticatedWorkspace(WORKSPACE_ID)
-})
-
 describe('gallery scale budgets', () => {
   test('every canonical scene fits the per-card payload budget', () => {
     for (const name of [
@@ -153,17 +117,5 @@ describe('gallery scale budgets', () => {
     const composed = composeSceneThumbnail(scene, { width: 0, height: 0 })
     expect(composed.nodes).toHaveLength(50)
     expect(composed.nodes.flatMap((node) => node.rasters)).toEqual([])
-  })
-
-  test('multi-card hydration stays list-only without per-card document reads', async () => {
-    const wireScene = loadWireScene('mixed')
-    const cards = Array.from({ length: 50 }, (_, index) => boardDto(`board-${index}`, wireScene))
-    boardMocks.listBoards.mockResolvedValue({ data: cards, meta: { has_more: false } })
-    const metas = await fetchWorkspaceBoards(WORKSPACE_ID)
-    expect(metas).toHaveLength(50)
-    expect(metas.every((meta) => meta.previewScene !== null)).toBe(true)
-    expect(boardMocks.getBoardDocument).not.toHaveBeenCalled()
-    // One bounded page serves all 50 cards: no cursor walk per card.
-    expect(boardMocks.listBoards).toHaveBeenCalledTimes(1)
   })
 })

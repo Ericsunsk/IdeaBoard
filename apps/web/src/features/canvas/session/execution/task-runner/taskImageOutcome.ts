@@ -15,7 +15,7 @@ export type TaskImageOutcome = {
   results: TaskImageResult[]
 }
 
-export type TaskImageWaitOptions = { deadlineAt: number; signal: AbortSignal }
+type TaskImageWaitOptions = { deadlineAt: number; signal: AbortSignal }
 
 export type TaskImageOutcomeWaiter = (
   taskId: string,

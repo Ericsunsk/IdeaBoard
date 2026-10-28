@@ -37,7 +37,7 @@ type AdminMonitorExecutionSnapshot = {
   gateway_step: string
 }
 
-export type AdminTaskBillingSnapshot = {
+type AdminTaskBillingSnapshot = {
   sku: string
   output_resolution: string
   display_name: string

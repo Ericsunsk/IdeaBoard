@@ -343,18 +343,5 @@ describe('NotificationPopover', () => {
       expect(await screen.findByTestId('notification-empty')).toBeInTheDocument()
       expect(requests).toBe(2)
     })
-
-    it('keeps the expand button on the full 32px hit-target floor', async () => {
-      seedNotificationFacts([])
-      renderView({
-        props: {
-          isOpen: true,
-        },
-      })
-
-      const expandBtn = await screen.findByTestId('expand-notifications-btn')
-      expect(expandBtn.classList.contains('hit-target-32')).toBe(true)
-      expect(expandBtn.classList.contains('hit-target-32-inline')).toBe(false)
-    })
   })
 })

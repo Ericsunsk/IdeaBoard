@@ -779,6 +779,14 @@
         "evidence": [
           "docs/frontend-seam-inventory.md: src/api/workspaceEventStream.ts#workspaceEventsUrl"
         ]
+      },
+      "userNotificationEventsSuffix": {
+        "kind": "test-contract",
+        "evidence": ["src/api/workspaceEventStream.contract.spec.ts"]
+      },
+      "userNotificationEventsUrl": {
+        "kind": "test-contract",
+        "evidence": ["src/api/workspaceEventStream.contract.spec.ts"]
       }
     },
     "src/api/workspaceTaskContract.ts": {
@@ -865,6 +873,10 @@
         "evidence": [
           "docs/frontend-seam-inventory.md: src/api/workspaceTaskContract.ts#workspaceTaskLocation"
         ]
+      },
+      "WORKSPACE_TASK_STATUSES": {
+        "kind": "test-contract",
+        "evidence": ["src/api/workspaceTasks.contract.spec.ts"]
       }
     },
     "src/api/workspaceTaskTransport.ts": {
@@ -3324,18 +3336,6 @@
         "kind": "canonical-public",
         "evidence": [
           "docs/frontend-seam-inventory.md: src/core/query/taskResult.ts#TaskImageResult"
-        ]
-      },
-      "TaskResultPayloadLike": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/core/query/taskResult.ts#TaskResultPayloadLike"
-        ]
-      },
-      "extractImageResultsFromTaskPayload": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/core/query/taskResult.ts#extractImageResultsFromTaskPayload"
         ]
       },
       "normalizeTaskImageResult": {
@@ -14415,6 +14415,20 @@
       "isTransferInviteLapsed": {
         "kind": "test-contract",
         "evidence": ["src/features/account/session/billing-transfer/resource.unit.spec.ts"]
+      }
+    },
+    "src/features/canvas/session/execution/canvasBudgets.ts": {
+      "BACKGROUND_CONTINUATION_INITIAL_DELAY_MS": {
+        "kind": "test-contract",
+        "evidence": ["src/features/canvas/session/execution/canvasBudgets.unit.spec.ts"]
+      },
+      "BACKGROUND_CONTINUATION_MAX_DELAY_MS": {
+        "kind": "test-contract",
+        "evidence": ["src/features/canvas/session/execution/canvasBudgets.unit.spec.ts"]
+      },
+      "backgroundContinuationTotalMs": {
+        "kind": "test-contract",
+        "evidence": ["src/features/canvas/session/execution/canvasBudgets.unit.spec.ts"]
       }
     }
   },

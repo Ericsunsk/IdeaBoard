@@ -25,7 +25,7 @@ import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
  * shared Library save module) or cancel (abort with no commit and no save).
  * Telemetry (`onDragBegin`/`onDragEnd`) fires exactly once per began drag.
  */
-export type FlowNodeDragLibrarySave = {
+type FlowNodeDragLibrarySave = {
   nodes: Ref<Node[]>
   isIslandAvailable: () => boolean
   setIslandHover: (hit: LibraryDropHit | null) => void

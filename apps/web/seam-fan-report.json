@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "8d910dec74c0b1f2862e76ce2cf24d7d1eb45302",
+  "checkpointSha": "6bb1827be4c395a9165c40ee700d0b1c9d9afa1a",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -2815,6 +2815,11 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/notification/ui/NotificationCenterDialog.browser.spec.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/notification/ui/NotificationCenterDialog.component.spec.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
@@ -2855,7 +2860,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 39,
+      "fanIn": 40,
       "fanOut": 337,
       "fanOutTargets": [
         "src/api/generated-query/public/model/acceptWorkspaceBillingTransfer200.ts",
@@ -4887,7 +4892,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 39,
+      "targetFanIn": 40,
       "targetFanOut": 337,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -12221,6 +12226,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/notification/ui/NotificationCenterDialog.browser.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/search/searchChromeStyle.browser.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -12287,7 +12297,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 145,
+      "fanIn": 146,
       "fanOut": 7,
       "fanOutTargets": [
         "fs",
@@ -12384,7 +12394,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 145,
+      "targetFanIn": 146,
       "targetFanOut": 7,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -30591,11 +30601,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/ui/gallery/galleryScaleBudget.contract.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/board/ui/gallery/range.unit.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
@@ -30616,7 +30621,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 33,
+      "fanIn": 32,
       "fanOut": 5,
       "fanOutTargets": [
         "src/core/utils/auth.ts",
@@ -30661,7 +30666,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 33,
+      "targetFanIn": 32,
       "targetFanOut": 5,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -36553,6 +36558,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+          "to": "src/features/canvas/session/workspace/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/ui/screens/internal/createCanvasScreenNodePresentation.ts",
           "to": "src/features/canvas/session/workspace/index.ts",
           "kind": "type-only"
@@ -36568,7 +36578,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 4,
+      "fanIn": 5,
       "fanOut": 26,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -37069,7 +37079,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 26,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -42126,6 +42136,11 @@
           "from": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+          "to": "src/features/canvas/session/workspace/index.ts",
+          "kind": "type-only"
         },
         {
           "from": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",

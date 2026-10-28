@@ -101,6 +101,21 @@ describe('boardsResource catalog scenes', () => {
     expect(mocks.getBoardDocument).not.toHaveBeenCalled()
   })
 
+  test('multi-card hydration stays list-only without per-card document reads', async () => {
+    const scene = loadFixtureScene('mixed')
+    const cards = Array.from({ length: 50 }, (_, index) =>
+      boardDto({ id: `board-${index}`, preview_scene: scene, content_version: 'cv-scale' }),
+    )
+    mocks.listBoards.mockResolvedValue({ data: cards, meta: { has_more: false } })
+
+    const metas = await fetchWorkspaceBoards(WORKSPACE_ID)
+
+    expect(metas).toHaveLength(50)
+    expect(metas.every((meta) => meta.previewScene !== null)).toBe(true)
+    expect(mocks.getBoardDocument).not.toHaveBeenCalled()
+    expect(mocks.listBoards).toHaveBeenCalledTimes(1)
+  })
+
   test('omitted scenes stay null with an empty content version', async () => {
     mocks.listBoards.mockResolvedValue({ data: [boardDto()], meta: { has_more: false } })
 

@@ -27,11 +27,12 @@ import '@testing-library/jest-dom/vitest'
 
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, ref, type PropType } from 'vue'
+import { computed, defineComponent, h, nextTick, ref, type PropType } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { VueFlow } from '@vue-flow/core'
 import { render } from '../../../../test/render'
 import CanvasScreen from './CanvasScreen.vue'
+import type { CanvasWorkspaceRuntime } from '../../session/workspace'
 import '../../../../app/style.css'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -220,17 +221,18 @@ function createRuntimeViewModel({ nodes, renderEdges }: ReturnType<typeof create
   return {
     flowPane: { nodes, edges: renderEdges, renderEdges },
     boardChrome: {
-      currentBoardId: ref('board-a'),
+      currentBoardId: computed(() => 'board-a'),
       isBoardMenuOpen: ref(false),
       isRenamingBoard: ref(false),
       boardNameDraft: ref('Board A'),
       isRenamePending: ref(false),
       catalogRecovery: ref({ status: 'idle' }),
       isBoardArchived: ref(false),
+      isBoardReadOnly: computed(() => false),
       isRestoringArchivedBoard: ref(false),
-      currentBoardName: ref('Board A'),
-      boardOptions: ref([]),
-    },
+      currentBoardName: computed(() => 'Board A'),
+      boardOptions: computed(() => []),
+    } satisfies CanvasWorkspaceRuntime['viewModel']['boardChrome'],
     persistence: { history: { undo: vi.fn(), redo: vi.fn() } },
     viewportControls: {
       zoomLevel: ref(100),
@@ -384,6 +386,7 @@ function renderScreen() {
     global: {
       stubs: {
         CanvasChrome: ChromeStub,
+        ShareDialog: true,
         VueFlow,
         CanvasGroupPresentation: GroupStub,
         FlowCanvasNode: NodeStub,
@@ -541,6 +544,7 @@ describe('Canvas immutable connection endpoints browser contract', () => {
       global: {
         stubs: {
           CanvasChrome: ChromeStub,
+          ShareDialog: true,
           VueFlow: PropsProbe,
           CanvasGroupPresentation: GroupStub,
           FlowCanvasNode: NodeStub,

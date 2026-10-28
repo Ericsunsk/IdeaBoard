@@ -756,47 +756,5 @@ describe('NotificationCenterDialog', () => {
       expect(unreadTab.textContent).toContain('Unread')
       expect(unreadTab.textContent).toContain('2')
     })
-
-    it('keeps the tab rail scrollable at 360px with non-shrinking triggers', async () => {
-      seedNotificationFacts(sampleNotifications)
-      renderView({
-        props: {
-          isOpen: true,
-        },
-      })
-
-      expect(await screen.findByRole('dialog')).toBeInTheDocument()
-      const tabUnread = screen.getByTestId('tab-unread')
-      const tabsList = tabUnread.parentElement!
-      expect(tabsList.parentElement!.className).toContain('overflow-x-auto')
-      for (const testId of [
-        'tab-all',
-        'tab-unread',
-        'tab-invites',
-        'tab-billing',
-        'tab-archived',
-      ]) {
-        const trigger = screen.getByTestId(testId)
-        expect(trigger.classList.contains('shrink-0')).toBe(true)
-        expect(trigger.classList.contains('hit-target-32-inline')).toBe(true)
-      }
-    })
-
-    it('keeps the header actions on the inline 32px touch-target floor', async () => {
-      seedNotificationFacts(sampleNotifications)
-      renderView({
-        props: {
-          isOpen: true,
-        },
-      })
-
-      expect(await screen.findByRole('dialog')).toBeInTheDocument()
-      expect(
-        screen.getByTestId('mark-all-read-btn').classList.contains('hit-target-32-inline'),
-      ).toBe(true)
-      expect(screen.getByTestId('clear-read-btn').classList.contains('hit-target-32-inline')).toBe(
-        true,
-      )
-    })
   })
 })

@@ -202,7 +202,7 @@ export function workspaceEventsUrl(workspaceId: string, query?: WorkspaceEventsQ
  * converge here. Unknown cursors resume with a `gap` notice exactly like
  * the workspace transport; unknown types fail closed before delivery.
  */
-export type UserNotificationEventsQuery = {
+type UserNotificationEventsQuery = {
   types?: readonly string[] | undefined
   lastEventId?: string | undefined
 }

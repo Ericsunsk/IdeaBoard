@@ -6,10 +6,7 @@ import {
 import { ref, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import type { LibraryDropHit, LibrarySaveModule, LibrarySaveSubmitResult } from '../../../library'
-import {
-  useFlowNodeDragInteractions,
-  type FlowNodeDragLibrarySave,
-} from './useFlowNodeDragInteractions'
+import { useFlowNodeDragInteractions } from './useFlowNodeDragInteractions'
 import { i18n } from '../../../../core/i18n'
 
 function imageNode(id: string, x: number, y: number): Node {
@@ -64,17 +61,18 @@ function createHarness(
     clear: vi.fn(),
     dispose: vi.fn(),
   }
-  const librarySave: FlowNodeDragLibrarySave = {
-    nodes,
-    isIslandAvailable: vi.fn(() => options.isIslandAvailable ?? true),
-    setIslandHover: vi.fn((hit: LibraryDropHit | null) => {
-      islandHover.push(hit)
-    }),
-    getSelectedFolderKey: (): string => 'all',
-    isFolderKnown: (key: string): boolean => key === 'lfolder_folder0007',
-    saveModule,
-    notifyError,
-  }
+  const librarySave: NonNullable<Parameters<typeof useFlowNodeDragInteractions>[0]['librarySave']> =
+    {
+      nodes,
+      isIslandAvailable: vi.fn(() => options.isIslandAvailable ?? true),
+      setIslandHover: vi.fn((hit: LibraryDropHit | null) => {
+        islandHover.push(hit)
+      }),
+      getSelectedFolderKey: (): string => 'all',
+      isFolderKnown: (key: string): boolean => key === 'lfolder_folder0007',
+      saveModule,
+      notifyError,
+    }
 
   const interactions = useFlowNodeDragInteractions({
     beginNodeDragTransaction,

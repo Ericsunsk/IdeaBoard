@@ -76,10 +76,7 @@ export {
   fetchCanvasWorkspaceTaskReadinessMatrix,
   toSubmitTaskReadiness,
 } from './canvasTaskReadiness'
-export {
-  extractWorkspaceTaskImageResults,
-  waitCanvasWorkspaceTaskImageOutcome,
-} from './canvasTaskWaiting'
+export { extractWorkspaceTaskImageResults } from './canvasTaskWaiting'
 
 export async function submitCanvasWorkspaceTask(
   request: CanvasTaskRequestData,

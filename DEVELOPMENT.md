@@ -371,7 +371,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | [store.go](./apps/api/internal/billing/infrastructure/postgres/store.go) | 全局 SKU Catalog、versioned pricing 与 Quote seam                                                |
 | [CONTEXT.md](./apps/api/internal/billing/CONTEXT.md)                     | Billing domain language、SKU namespace 与 snapshot invariants                                    |
-| [service.go](./apps/api/internal/tasking/application/billing/service.go) | AI Image Workflow SKU resolver、Readiness、Submit Hold 与 terminal Capture/Release orchestration |
+| [settle.go](./apps/api/internal/tasking/workspacetasks/settle.go) | Task Quote、Readiness、Submit Hold 与 terminal settlement 编排 |
 
 Workflow feature、Task payload 和媒体输入的 canonical contract 见 [DESIGN.md](./DESIGN.md) §2；新增或修改能力时同步前端 execution contract、OpenAPI、Go workflow validation、Admin prompt config 和 runbook。
 

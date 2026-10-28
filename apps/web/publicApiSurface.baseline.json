@@ -2006,7 +2006,6 @@
   "src/api/workspaceEventStream.ts": [
     "NOTIFICATION_EVENT_TYPES",
     "SubscribeWorkspaceEventsOptions",
-    "UserNotificationEventsQuery",
     "WORKSPACE_EVENT_TYPES",
     "WaitWorkspaceEnvelopeOptions",
     "WorkspaceEventActor",

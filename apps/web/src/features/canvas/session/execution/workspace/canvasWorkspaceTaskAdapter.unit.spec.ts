@@ -21,8 +21,8 @@ import {
   toSubmitTaskReadiness,
   toWorkspaceCreateInput,
   toWorkspaceQuoteInput,
-  waitCanvasWorkspaceTaskImageOutcome,
 } from './canvasWorkspaceTaskAdapter'
+import { waitCanvasWorkspaceTaskImageOutcome } from './canvasTaskWaiting'
 
 const mocks = vi.hoisted(() => ({
   createWorkspaceTask: vi.fn(),

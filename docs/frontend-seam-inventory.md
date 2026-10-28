@@ -3994,6 +3994,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
+          "from": "src/features/notification/ui/NotificationCenterDialog.browser.spec.ts",
+          "to": "src/api/generated-query/public/model/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/notification/ui/NotificationCenterDialog.component.spec.ts",
           "to": "src/api/generated-query/public/model/index.ts",
           "kind": "type-only"
@@ -4034,9 +4039,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 39,
+      "measuredFanIn": 40,
       "measuredFanOut": 337,
-      "targetFanIn": 39,
+      "targetFanIn": 40,
       "targetFanOut": 337,
       "ownershipScope": [
         "src/api/generated-query/public/model/index.ts"
@@ -6232,7 +6237,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       "publicExports": [
         "NOTIFICATION_EVENT_TYPES",
         "SubscribeWorkspaceEventsOptions",
-        "UserNotificationEventsQuery",
         "WORKSPACE_EVENT_TYPES",
         "WaitWorkspaceEnvelopeOptions",
         "WorkspaceEventActor",
@@ -10986,6 +10990,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/notification/ui/NotificationCenterDialog.browser.spec.ts",
+          "to": "src/core/i18n/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/search/searchChromeStyle.browser.spec.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
@@ -11056,9 +11065,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 145,
+      "measuredFanIn": 146,
       "measuredFanOut": 7,
-      "targetFanIn": 145,
+      "targetFanIn": 146,
       "targetFanOut": 7,
       "ownershipScope": [
         "src/core/i18n/"
@@ -20081,11 +20090,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/board/ui/gallery/galleryScaleBudget.contract.spec.ts",
-          "to": "src/features/board/testing/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/board/ui/gallery/range.unit.spec.ts",
           "to": "src/features/board/testing/index.ts",
           "kind": "runtime"
@@ -20106,9 +20110,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 33,
+      "measuredFanIn": 32,
       "measuredFanOut": 5,
-      "targetFanIn": 33,
+      "targetFanIn": 32,
       "targetFanOut": 5,
       "ownershipScope": [
         "src/features/board/testing/"
@@ -22306,6 +22310,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/screens/canvasImmutableConnectionEndpoints.browser.spec.ts",
+          "to": "src/features/canvas/session/workspace/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/canvas/ui/screens/internal/createCanvasScreenNodePresentation.ts",
           "to": "src/features/canvas/session/workspace/index.ts",
           "kind": "type-only"
@@ -22321,9 +22330,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 4,
+      "measuredFanIn": 5,
       "measuredFanOut": 26,
-      "targetFanIn": 4,
+      "targetFanIn": 5,
       "targetFanOut": 26,
       "ownershipScope": [
         "src/features/canvas/session/workspace/"
@@ -25445,7 +25454,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/generated-query/public/index.ts` | cascading | api | 610 | 0 → 0 | 12 → 12 |
 | `src/api/generated-query/public/model/board.ts` | canonical | api | 1 | 4 → 4 | 7 → 7 |
 | `src/api/generated-query/public/model/boardDocument.ts` | canonical | api | 1 | 3 → 3 | 3 → 3 |
-| `src/api/generated-query/public/model/index.ts` | canonical | api | 337 | 39 → 39 | 337 → 337 |
+| `src/api/generated-query/public/model/index.ts` | canonical | api | 337 | 40 → 40 | 337 → 337 |
 | `src/api/generated-query/public/user/user.ts` | canonical | api | 92 | 7 → 7 | 4 → 4 |
 | `src/api/generated-query/public/workspace-billing/workspace-billing.ts` | canonical | api | 207 | 9 → 9 | 4 → 4 |
 | `src/api/generated-query/public/workspace-library/workspace-library.ts` | canonical | api | 82 | 3 → 3 | 4 → 4 |
@@ -25515,7 +25524,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/contracts/imageServices.ts` | canonical | core | 3 | 30 → 30 | 0 → 0 |
 | `src/core/errors/errorCatalog.ts` | canonical | core | 5 | 43 → 43 | 1 → 1 |
 | `src/core/i18n/formatters.ts` | canonical | core | 5 | 21 → 21 | 2 → 2 |
-| `src/core/i18n/index.ts` | canonical | core | 7 | 145 → 145 | 7 → 7 |
+| `src/core/i18n/index.ts` | canonical | core | 7 | 146 → 146 | 7 → 7 |
 | `src/core/i18n/localeCore.ts` | canonical | core | 5 | 5 → 5 | 0 → 0 |
 | `src/core/i18n/localeManifest.ts` | canonical | core | 2 | 5 → 5 | 5 → 5 |
 | `src/core/i18n/locales/en/index.ts` | canonical | core | 13 | 4 → 4 | 0 → 0 |
@@ -25637,7 +25646,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/board/ports/canvas.ts` | canonical | board | 66 | 99 → 99 | 68 → 68 |
 | `src/features/board/ports/canvasSession.ts` | canonical | board | 27 | 11 → 11 | 68 → 68 |
 | `src/features/board/ports/testing.ts` | canonical | board | 2 | 6 → 6 | 1 → 1 |
-| `src/features/board/testing/index.ts` | canonical | board | 12 | 33 → 33 | 5 → 5 |
+| `src/features/board/testing/index.ts` | canonical | board | 12 | 32 → 32 | 5 → 5 |
 | `src/features/canvas/core/graph/canvasGraphStoreWriter.ts` | canonical | canvas | 1 | 3 → 3 | 2 → 2 |
 | `src/features/canvas/core/graph/canvasGraphValueEquality.ts` | canonical | canvas | 1 | 2 → 2 | 0 → 0 |
 | `src/features/canvas/core/graph/canvasGroupGeometry.ts` | canonical | canvas | 18 | 11 → 11 | 3 → 3 |
@@ -25655,7 +25664,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/session/image-workflow/index.ts` | canonical | canvas | 3 | 4 → 4 | 21 → 21 |
 | `src/features/canvas/session/media/preloadImage.ts` | canonical | canvas | 1 | 2 → 2 | 0 → 0 |
 | `src/features/canvas/session/media/serviceImageActionText.ts` | canonical | canvas | 2 | 2 → 2 | 3 → 3 |
-| `src/features/canvas/session/workspace/index.ts` | canonical | canvas | 2 | 4 → 4 | 26 → 26 |
+| `src/features/canvas/session/workspace/index.ts` | canonical | canvas | 2 | 5 → 5 | 26 → 26 |
 | `src/features/canvas/session/workspace/useCanvasFeedback.ts` | canonical | canvas | 3 | 10 → 10 | 2 → 2 |
 | `src/features/canvas/tools/image-tools/core/index.ts` | canonical | canvas | 1 | 1 → 1 | 1 → 1 |
 | `src/features/canvas/tools/image-tools/index.ts` | canonical | canvas | 13 | 10 → 10 | 20 → 20 |

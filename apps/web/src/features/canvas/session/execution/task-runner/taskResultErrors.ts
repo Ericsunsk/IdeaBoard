@@ -66,11 +66,3 @@ export function createTaskResultFailureError(
   const msg = task.error_msg?.trim() || fallbackMessage
   return new Error(sanitizeApiErrorMessage(msg, fallbackMessage))
 }
-
-export function createTaskCancelledError(
-  task?: Pick<TaskFailurePayload, 'error_msg'> & { cancel_reason?: string | undefined },
-): TaskCancelledError {
-  const detail = task?.cancel_reason?.trim() || task?.error_msg?.trim() || ''
-  // Backend reason text stays as debug detail; the feedback boundary shows copy for kind='cancelled'.
-  return new TaskCancelledError(sanitizeApiErrorMessage(detail, ''))
-}
