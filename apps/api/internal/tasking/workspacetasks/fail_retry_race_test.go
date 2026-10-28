@@ -11,7 +11,7 @@ import (
 
 // TestFailRetryRaceKeepsTerminalClosed pins P1-4: Fail (running/pending ->
 // failed + Release) and Retry (live -> pending + requeue) race on the same
-// row lock; exactly one wins and the loser observes ErrStateConflict.
+// row lock; Retry can commit before Fail, or lose with ErrStateConflict.
 // A released task never revives to pending.
 func TestFailRetryRaceKeepsTerminalClosed(t *testing.T) {
 	env := openAtomicEnv(t, 10)
@@ -22,31 +22,48 @@ func TestFailRetryRaceKeepsTerminalClosed(t *testing.T) {
 	env.claimTask(t, created.ID, created.ExecutionToken)
 	_ = env.service.StagedEvents()
 
+	// Each concurrent caller owns its staged-event buffer; both services
+	// still contend on the same task row and settlement dependencies.
+	failService := workspacetasks.NewService(env.serviceDeps)
+	retryService := workspacetasks.NewService(env.serviceDeps)
+	start := make(chan struct{})
 	var wg sync.WaitGroup
 	var failErr, retryErr error
-	var failedTask, retriedTask *workspacetasks.WorkspaceTask
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		failedTask, failErr = env.service.Fail(ctx, env.ws, created.ID, "race fail")
+		<-start
+		_, failErr = failService.Fail(ctx, env.ws, created.ID, "race fail")
 	}()
 	go func() {
 		defer wg.Done()
-		retriedTask, retryErr = env.service.Retry(ctx, env.ws, created.ID, true)
+		<-start
+		_, retryErr = retryService.Retry(ctx, env.ws, created.ID, true)
 	}()
+	close(start)
 	wg.Wait()
-	_ = env.service.StagedEvents()
 
 	wins := 0
-	if failErr == nil {
-		wins++
-	} else if !errors.Is(failErr, workspacetasks.ErrStateConflict) {
-		t.Fatalf("Fail race err = %v, want nil or ErrStateConflict", failErr)
-	}
-	if retryErr == nil {
-		wins++
-	} else if !errors.Is(retryErr, workspacetasks.ErrStateConflict) {
-		t.Fatalf("Retry race err = %v, want nil or ErrStateConflict", retryErr)
+	for _, operation := range []struct {
+		name    string
+		service *workspacetasks.Service
+		err     error
+		status  workspacetasks.Status
+	}{
+		{"Fail", failService, failErr, workspacetasks.StatusFailed},
+		{"Retry", retryService, retryErr, workspacetasks.StatusPending},
+	} {
+		if operation.err == nil {
+			wins++
+			assertSingleStagedStatus(t, operation.service, env, created.ID, operation.status)
+			continue
+		}
+		if !errors.Is(operation.err, workspacetasks.ErrStateConflict) {
+			t.Fatalf("%s race err = %v, want nil or ErrStateConflict", operation.name, operation.err)
+		}
+		if staged := operation.service.StagedEvents(); len(staged) != 0 {
+			t.Fatalf("conflicting %s staged events: %+v", operation.name, staged)
+		}
 	}
 	// Both orders converge to failed without revival:
 	// - Retry first (running->pending) then Fail (pending->failed): wins=2.
@@ -56,9 +73,6 @@ func TestFailRetryRaceKeepsTerminalClosed(t *testing.T) {
 	if wins < 1 || wins > 2 {
 		t.Fatalf("race wins = %d, want 1 or 2", wins)
 	}
-	_ = failedTask
-	_ = retriedTask
-
 	stored, err := env.store.GetTask(ctx, env.ws, created.ID)
 	if err != nil {
 		t.Fatalf("GetTask after race: %v", err)

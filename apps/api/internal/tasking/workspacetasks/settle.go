@@ -31,6 +31,8 @@ import (
 // settlement and flush ONLY after commit; staging never publishes inside the
 // txn (NATS fanout itself is #807). In-memory implementations are test-only
 // fixtures for exercising the service contract.
+// Each concurrent caller needs its own Service, or must serialize the
+// settlement call and StagedEvents drain together to keep events attributable.
 type Service struct {
 	taskRead      TaskReadStore
 	taskLifecycle TaskSettlementStore
