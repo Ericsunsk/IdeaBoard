@@ -26,8 +26,6 @@ import '@testing-library/jest-dom/vitest'
 //   nodes from the minimap token.
 // - adapter ownership negatives (L88-89): edge paint does NOT follow the
 //   page-chrome tokens when they move.
-// - node running ring (L91-92): the running ::before layer animates by
-//   default and stops under reduced motion.
 // - output-count active/disabled (L93-94): active paints the accent pair;
 //   disabled waits at reduced opacity.
 // - stage-frame states (L95-100): loading and connection-drop-target raise
@@ -276,10 +274,9 @@ describe('Canvas surface states browser contract', () => {
     }
   })
 
-  it('keeps the node running ring, output-count states and stage-frame states', async () => {
+  it('keeps the output-count states and stage-frame states', async () => {
     const nodes = mountApp(() =>
       h('div', [
-        h('div', { class: 'workflow-node running', style: 'position: relative;' }),
         h('button', { class: 'node-tool-output-count active', type: 'button' }, '4'),
         h(
           'button',
@@ -296,12 +293,6 @@ describe('Canvas surface states browser contract', () => {
       ]),
     )
     try {
-      const running = nodes.query('.workflow-node.running')!
-      expect(window.getComputedStyle(running, '::before').animationName).not.toBe('none')
-      await setMotion(true)
-      expect(window.getComputedStyle(running, '::before').animationName).toBe('none')
-      await setMotion(false)
-
       const activeCount = nodes.query('.node-tool-output-count.active')!
       const accentProbe = document.createElement('div')
       accentProbe.style.backgroundColor = 'var(--canvas-node-accent-soft)'
@@ -321,18 +312,20 @@ describe('Canvas surface states browser contract', () => {
       const frames = nodes.queryAll('.node-stage-frame')
       expect(frames).toHaveLength(3)
       const [loading, dropTarget, active] = frames as HTMLElement[]
-      // Loading keeps the resting shadow; connection targets use a stronger
-      // glow derived from the theme accent (violet in light, white in dark).
+      // Loading and connection-drop-target share one emphasis glow derived
+      // from the theme accent (violet in light, white in dark).
       const emphasisProbe = document.createElement('div')
-      emphasisProbe.style.color = 'var(--canvas-accent-shadow)'
       nodes.root.append(emphasisProbe)
       try {
-        const emphasis = styleOf(emphasisProbe).color
-        expect(styleOf(loading!).boxShadow).toContain(emphasis)
         emphasisProbe.style.color = 'color-mix(in srgb, var(--canvas-accent) 45%, transparent)'
-        expect(styleOf(dropTarget!).boxShadow).toContain(styleOf(emphasisProbe).color)
+        const primary = styleOf(emphasisProbe).color
         emphasisProbe.style.color = 'color-mix(in srgb, var(--canvas-accent) 25%, transparent)'
-        expect(styleOf(dropTarget!).boxShadow).toContain(styleOf(emphasisProbe).color)
+        const secondary = styleOf(emphasisProbe).color
+        expect(styleOf(loading!).boxShadow).toContain(primary)
+        expect(styleOf(loading!).boxShadow).toContain(secondary)
+        expect(styleOf(dropTarget!).boxShadow).toContain(primary)
+        expect(styleOf(dropTarget!).boxShadow).toContain(secondary)
+        expect(styleOf(loading!).boxShadow).toBe(styleOf(dropTarget!).boxShadow)
       } finally {
         emphasisProbe.remove()
       }

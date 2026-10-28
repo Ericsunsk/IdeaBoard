@@ -16,9 +16,9 @@ import '@testing-library/jest-dom/vitest'
 //   control/enter/exit/feedback durations land on probes through the live
 //   motion tokens (moving a token moves the paint; a hardcoded value or a
 //   legacy `--canvas-motion-*` indirection cannot satisfy this).
-// - reduced-motion stops (scenario 2, `computed-style/d05c9530`, 2 IDs):
-//   the running border cycle and the fusion apply ray animate by default
-//   and stop when reduced motion is preferred.
+// - reduced-motion stops (scenario 2, `computed-style/d05c9530`, 1 ID):
+//   the fusion apply ray animates by default
+//   and stops when reduced motion is preferred.
 // - precision cursors (scenario 3, `computed-style/86d199c8`, 1 ID):
 //   the inpaint brush cursor never rides a transform transition.
 
@@ -196,28 +196,7 @@ describe('Canvas Node and editor motion browser contract', () => {
     }
   })
 
-  it('stops continuous running and apply motion when reduced motion is requested', async () => {
-    const running = mountHost(
-      '<div class="workflow-node running" style="position: relative"></div>',
-    )
-    try {
-      const node = running.query('.workflow-node.running')!
-      expect(window.getComputedStyle(node, '::before').animationName).toBe(
-        'node-running-border-flow',
-      )
-
-      await setMotion(true)
-      expect(matchMedia('(prefers-reduced-motion: reduce)').matches).toBe(true)
-      // The app motion policy zeroes every interaction token under reduce.
-      expect(
-        styleOf(document.documentElement).getPropertyValue('--motion-control-duration').trim(),
-      ).toBe('0ms')
-      expect(window.getComputedStyle(node, '::before').animationName).toBe('none')
-    } finally {
-      running.unmount()
-    }
-    await setMotion(false)
-
+  it('stops continuous apply motion when reduced motion is requested', async () => {
     const fusion = mountApp(() =>
       h(FusionStage, {
         isActive: true,

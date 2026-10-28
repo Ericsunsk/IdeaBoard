@@ -244,12 +244,6 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Canvas node thumbnail chrome uses canvas drawing constants.',
   },
-  'src/features/canvas/ui/styles/node-shared.css': {
-    counts: {
-      'hex-color': 2,
-    },
-    reason: 'Canvas node chrome uses canvas drawing constants.',
-  },
   'src/features/canvas/ui/styles/editing-controls.css': {
     counts: {
       'hex-color': 9,

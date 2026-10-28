@@ -35,8 +35,6 @@
     --color-canvas-text-inverse: var(--color-text-inverse);
     --color-canvas-tooltip-bg: var(--color-tooltip-bg);
     --color-canvas-tooltip-text: var(--color-tooltip-foreground);
-    --color-canvas-running-from: var(--color-progress-from);
-    --color-canvas-running-to: var(--color-progress-to);
     --color-canvas-glass-bg: var(--color-tool-glass);
     --color-canvas-minimap-node: var(--color-workspace-preview-node);
     --color-canvas-minimap-viewport: var(--color-workspace-preview-viewport);

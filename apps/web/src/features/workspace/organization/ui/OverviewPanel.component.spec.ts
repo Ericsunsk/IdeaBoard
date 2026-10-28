@@ -3,7 +3,7 @@ import { defineComponent, h } from 'vue'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import OverviewPanel from './OverviewPanel.vue'
-import { useOrganizationManagement } from '../session/useManagement'
+import { useManagement } from '../session/useManagement'
 
 const resource = vi.hoisted(() => ({
   fetchOrganizations: vi.fn(),
@@ -31,7 +31,7 @@ function renderManagement(identity = 'usr_owner') {
   const view = renderWithUser(
     defineComponent({
       setup() {
-        const management = useOrganizationManagement({
+        const management = useManagement({
           identity,
           isEnabled: true,
           onScopeExit: vi.fn(),

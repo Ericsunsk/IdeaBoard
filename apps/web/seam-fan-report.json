@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "96d2a121ac22b75f9d62eff4d4483fccf95f6421",
+  "checkpointSha": "8d910dec74c0b1f2862e76ce2cf24d7d1eb45302",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -14239,16 +14239,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.vue",
-          "to": "src/core/router/queryParams.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/ui/pages/AdminMonitorPage.vue",
-          "to": "src/core/router/queryParams.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/auth/components/UserAuthModals.vue",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
@@ -14299,7 +14289,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 14,
+      "fanIn": 12,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/vue-router/index.cjs"],
       "outboundEdges": [
@@ -14313,7 +14303,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 14,
+      "targetFanIn": 12,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -19493,11 +19483,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/session/demoData.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/monitor/session/useAdminMonitor.contract.spec.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -19526,16 +19511,6 @@
           "from": "src/features/admin/monitor/session/useAdminTaskRuntimeSnapshot.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/session/useMonitorDemo.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/session/useMonitorDemo.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
         },
         {
           "from": "src/features/admin/monitor/session/useMonitorTimeline.ts",
@@ -19873,7 +19848,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 123,
+      "fanIn": 121,
       "fanOut": 58,
       "fanOutTargets": [
         "fs",
@@ -21201,7 +21176,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 123,
+      "targetFanIn": 121,
       "targetFanOut": 58,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -39353,7 +39328,7 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 40,
+      "fanOut": 41,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@testing-library/jest-dom/vitest.js",
@@ -39394,6 +39369,7 @@
         "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
         "src/features/canvas/ui/overlays/index.ts",
         "src/test/render.ts",
+        "src/theme/composables/useTheme.ts",
         "vitest/browser"
       ],
       "outboundEdges": [
@@ -40229,6 +40205,11 @@
         },
         {
           "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.component.spec.ts",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.component.spec.ts",
           "to": "src/test/render.ts",
           "kind": "runtime"
         },
@@ -40240,6 +40221,11 @@
         {
           "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.vue",
           "to": "src/core/motion/motionPolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.vue",
+          "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
         {
@@ -40518,7 +40504,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 40,
+      "targetFanOut": 41,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -41064,7 +41050,7 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 25,
+      "fanOut": 26,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@testing-library/vue/dist/index.js",
@@ -41090,7 +41076,8 @@
         "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
         "src/features/canvas/ui/nodes/home/ImageActionMenu.vue",
         "src/features/canvas/ui/nodes/primitives/index.ts",
-        "src/test/render.ts"
+        "src/test/render.ts",
+        "src/theme/composables/useTheme.ts"
       ],
       "outboundEdges": [
         {
@@ -41101,6 +41088,11 @@
         {
           "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.component.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.component.spec.ts",
+          "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
@@ -41116,6 +41108,11 @@
         {
           "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.vue",
           "to": "src/core/motion/motionPolicy.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.vue",
+          "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
         },
         {
@@ -41424,7 +41421,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 25,
+      "targetFanOut": 26,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -46817,6 +46814,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.vue",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/test/chartTheme.browser.spec.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
@@ -46832,7 +46834,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 9,
+      "fanIn": 10,
       "fanOut": 3,
       "fanOutTargets": [
         "node_modules/@vueuse/core/dist/index.js",
@@ -46860,7 +46862,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 9,
+      "targetFanIn": 10,
       "targetFanOut": 3,
       "advisories": {
         "fanInTargetMismatch": false,

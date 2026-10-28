@@ -21,12 +21,8 @@ function parseResultImageUrl(rawUrl: string): URL | null {
 // gateway: .../media-assets/{asset}/content and
 // .../media-assets/{asset}/derivatives/{variant}. Nothing else under
 // /api/ is renderable here (JSON envelopes must never bind to <img>).
-// Strict grammar lives in core/media/mediaAssetPath; this module only adds
-// the demo-fixture prefix.
+// Strict grammar lives in core/media/mediaAssetPath.
 function hasTrustedDeliveryPath(pathname: string): boolean {
-  // Frontend-bundled demo fixtures ship with the app shell, never through
-  // the upload pipeline.
-  if (pathname === '/demo' || pathname.startsWith('/demo/')) return true
   return isMediaAssetDeliveryPath(pathname)
 }
 

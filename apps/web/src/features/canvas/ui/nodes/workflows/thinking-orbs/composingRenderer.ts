@@ -82,13 +82,13 @@ function resolveRadiusScale(size: number): number {
   return (size / 300) ** composingOptions.radiusScalePower
 }
 
-function paintDots(context: CanvasRenderingContext2D, dots: Dot[]) {
+function paintDots(context: CanvasRenderingContext2D, dots: Dot[], isDark: boolean) {
   dots.sort((left, right) => left.z - right.z)
 
   for (const dot of dots) {
     if (dot.alpha < 0.02) continue
     const ink = Math.min(1, Math.max(0, dot.white))
-    const gray = Math.round(ink * 255)
+    const gray = Math.round((isDark ? 1 - ink : ink) * 255)
     context.fillStyle = `rgba(${gray},${gray},${gray},${dot.alpha})`
     context.beginPath()
     context.arc(dot.x, dot.y, Math.max(composingOptions.radiusMinimum, dot.r), 0, Math.PI * 2)
@@ -100,6 +100,7 @@ export function drawComposingOrb(
   context: CanvasRenderingContext2D,
   size: number,
   timeSeconds: number,
+  isDark: boolean,
 ) {
   const centerX = size / 2
   const centerY = size / 2
@@ -163,5 +164,5 @@ export function drawComposingOrb(
   }
 
   for (let index = 0; index < dots.length; index += 1) paintOrder[index] = dots[index]!
-  paintDots(context, paintOrder)
+  paintDots(context, paintOrder, isDark)
 }

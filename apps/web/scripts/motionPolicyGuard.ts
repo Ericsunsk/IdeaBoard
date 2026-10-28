@@ -20,12 +20,6 @@ const localMotionAllowances: Record<string, LocalMotionAllowance> = {
     properties: ['--canvas-tool-tooltip-delay'],
     reason: 'Canvas tooltips need a dwell delay, which is not a transition duration.',
   },
-  'src/features/canvas/ui/styles/node-shared.css': {
-    properties: ['--node-running-border-cycle'],
-    animationEasingCount: 1,
-    reason:
-      'The running border is continuous execution feedback with a reduced-motion static fallback.',
-  },
   'src/features/canvas/ui/nodes/workflows/FusionStage.vue': {
     animationEasingCount: 1,
     reason:

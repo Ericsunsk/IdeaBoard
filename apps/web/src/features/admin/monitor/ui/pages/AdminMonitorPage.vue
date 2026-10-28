@@ -40,14 +40,14 @@
       />
     </template>
 
-    <AdminAlert v-if="isTaskListErrorActive" severity="error">
+    <AdminAlert v-if="isTaskListError" severity="error">
       {{ taskListErrorMessage }}
     </AdminAlert>
 
     <TaskActivityTable
       v-else
       :tasks="tasks"
-      :loading="loading"
+      :loading="isTaskListLoading"
       :total-count="metricStatsSnapshot.total"
       :current-page="currentPage"
       :total-pages="totalPages"
@@ -63,10 +63,10 @@
 
     <AdminTaskResultDialog
       v-model:visible="detailModalVisible"
-      :task-id="isDemoMode ? (demoDetailTask?.task_id ?? '') : selectedDetailTaskID"
-      :task="isDemoMode ? demoDetailTask : detailTask"
-      :loading="isDemoMode ? false : isDetailLoading"
-      :error-message="isDemoMode ? '' : detailErrorMessage"
+      :task-id="selectedDetailTaskID"
+      :task="detailTask"
+      :loading="isDetailLoading"
+      :error-message="detailErrorMessage"
       @retry="retryTaskDetail"
     />
   </div>
@@ -74,7 +74,6 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
 import { formatDisplayErrorMessage } from '@/core/utils/errorMessages'
 import { useAdminTaskCancellationFeedback } from '../../session/useAdminMonitorFeedback'
 import AdminTaskResultDialog from '../AdminTaskResultDialog.vue'
@@ -98,34 +97,26 @@ import {
   ADMIN_MONITOR_CHART_PAGE_SIZE,
   ADMIN_MONITOR_REFRESH_INTERVAL_MS,
 } from '../../core/displayPolicy'
-import { DEMO_MODE_QUERY_VALUE, createDemoTaskDetail } from '../../session/demoData'
-import { useMonitorDemo } from '../../session/useMonitorDemo'
 import { useMonitorTimeline } from '../../session/useMonitorTimeline'
 import { monitorChartSpecs, type TaskMetricStatsSnapshot } from '../../../shared'
-import { stringParam } from '@/core/router/queryParams'
 import { MONITOR_MESSAGES } from './messages'
 
 const adminConfirm = useAdminConfirm()
 const taskCancellationFeedback = useAdminTaskCancellationFeedback()
-const { isCancellableTask, isCancellingTask, requestCancelTask } = useAdminTaskCancel({
+const {
+  isCancellableTask: canCancelTask,
+  isCancellingTask,
+  requestCancelTask,
+} = useAdminTaskCancel({
   confirm: adminConfirm,
   feedback: taskCancellationFeedback,
 })
-
-const route = useRoute()
-
-// 显式演示模式：仅当 URL 携带 ?demo=1 时生效，默认关闭。
-// 演示数据只做界面预览，取消等写操作与真实请求一律禁用；详情用本地数据预览。
-// 注意：必须位于所有传给 resource/query 的 computed 之前，避免 setup 求值期 TDZ。
-const isDemoMode = computed(() => stringParam(route.query.demo) === DEMO_MODE_QUERY_VALUE)
 
 const detailModalVisible = ref(false)
 const selectedDetailTaskID = ref('')
 const detailQuery = useAdminTaskDetailResource(selectedDetailTaskID, {
   query: {
-    enabled: computed(
-      () => !isDemoMode.value && detailModalVisible.value && selectedDetailTaskID.value.length > 0,
-    ),
+    enabled: computed(() => detailModalVisible.value && selectedDetailTaskID.value.length > 0),
   },
 })
 const detailTask = computed(() => {
@@ -142,18 +133,18 @@ const detailErrorMessage = computed(() =>
 )
 
 const {
-  tasks: rawTasks,
+  tasks,
   total,
-  loading: rawLoading,
+  loading: isTaskListLoading,
   isError: isTaskListError,
   error: taskListError,
   pagination,
-  taskStats: rawTaskStats,
+  taskStats,
   filterStatus,
   searchKeyword,
   appliedSearchKeyword,
   loadTasks,
-  handleSearch: applyTaskSearch,
+  handleSearch: handleTaskSearch,
 } = useAdminTaskList()
 
 // 图表专用全量行：与表格同过滤语义（status + 已应用 keyword），
@@ -168,7 +159,6 @@ const chartListParams = computed(() =>
 )
 const chartListQuery = useAdminTaskListResource(chartListParams, {
   query: {
-    enabled: computed(() => !isDemoMode.value),
     refetchInterval: ADMIN_MONITOR_REFRESH_INTERVAL_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
@@ -184,39 +174,12 @@ const {
   timelineChartOptions,
   adminChartPlugins,
 } = useMonitorTimeline({
-  isDemoMode,
-  demoRows: () => demoFiltered.value,
   chartRows,
   filterStatus,
 })
 
-const {
-  demoTasks,
-  demoStats,
-  demoFiltered,
-  demoSource,
-  demoPagination,
-  demoDetailTask,
-  resetDemoPage,
-} = useMonitorDemo({
-  filterStatus,
-  appliedSearchKeyword,
-  isDemoMode,
-  selectedPreset,
-})
-
-// 真实模式以服务端筛选为准（status/keyword 经 query key 下发），
-// 本地不再二次过滤，避免“翻页丢结果”与 pill 计数对不上。
-const tasks = computed(() => (isDemoMode.value ? demoTasks.value : rawTasks.value))
-
-const loading = computed(() => (isDemoMode.value ? false : rawLoading.value))
-
-const isTaskListErrorActive = computed(() => !isDemoMode.value && isTaskListError.value)
-
-const taskStats = computed(() => (isDemoMode.value ? demoStats.value : rawTaskStats.value))
-
 const metricStatsSnapshot = computed<TaskMetricStatsSnapshot>(() => ({
-  total: isDemoMode.value ? demoSource.value.length : total.value,
+  total: total.value,
   pending: taskStats.value.pending,
   running: taskStats.value.running,
   completed: taskStats.value.completed,
@@ -224,43 +187,19 @@ const metricStatsSnapshot = computed<TaskMetricStatsSnapshot>(() => ({
   cancelled: taskStats.value.cancelled,
 }))
 
-const activePagination = computed(() =>
-  isDemoMode.value
-    ? {
-        currentPage: demoPagination.currentPage.value,
-        totalPages: demoPagination.totalPages.value,
-        canPrevious: demoPagination.canPrevious.value,
-        canNext: demoPagination.canNext.value,
-        previous: demoPagination.previous,
-        next: demoPagination.next,
-      }
-    : {
-        currentPage: pagination.currentPage.value,
-        totalPages: pagination.totalPages.value,
-        canPrevious: pagination.canPrevious.value,
-        canNext: pagination.canNext.value,
-        previous: pagination.previous,
-        next: pagination.next,
-      },
-)
-
-// 演示模式禁用触达真实后端的行级写操作（取消）；详情弹窗用本地数据预览。
-const canCancelTask = (row: AdminTaskRow) => !isDemoMode.value && isCancellableTask(row)
+const {
+  currentPage,
+  totalPages,
+  canPrevious,
+  canNext,
+  previous: goPreviousPage,
+  next: goNextPage,
+} = pagination
 
 function handleMetricPillClick(status: string | null) {
   toggleFilterStatus(status as typeof filterStatus.value)
 }
 
-const currentPage = computed(() => activePagination.value.currentPage)
-const totalPages = computed(() => activePagination.value.totalPages)
-const canPrevious = computed(() => activePagination.value.canPrevious)
-const canNext = computed(() => activePagination.value.canNext)
-function goPreviousPage() {
-  activePagination.value.previous()
-}
-function goNextPage() {
-  activePagination.value.next()
-}
 const {
   isStale: isMonitorStale,
   isError: isMonitorError,
@@ -274,11 +213,6 @@ const taskListErrorMessage = computed(() =>
 const monitorErrorMessage = computed(() =>
   formatDisplayErrorMessage(monitorError.value, MONITOR_MESSAGES.snapshotLoadFailed),
 )
-function handleTaskSearch() {
-  resetDemoPage()
-  applyTaskSearch()
-}
-
 const chartsCollapsed = ref(false)
 
 function toggleFilterStatus(status: typeof filterStatus.value) {
@@ -290,15 +224,7 @@ function toggleFilterStatus(status: typeof filterStatus.value) {
 }
 
 function showDetail(task: AdminTaskRow) {
-  if (isDemoMode.value) {
-    // 演示模式用行内数据本地拼装详情，不请求真实接口；
-    // 同时清空残留真实 ID，避免后台误触发真实详情请求。
-    selectedDetailTaskID.value = ''
-    demoDetailTask.value = createDemoTaskDetail(task)
-  } else {
-    demoDetailTask.value = null
-    selectedDetailTaskID.value = task.task_id
-  }
+  selectedDetailTaskID.value = task.task_id
   detailModalVisible.value = true
 }
 

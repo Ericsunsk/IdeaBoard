@@ -86,8 +86,6 @@ describe('useMonitorTimeline', () => {
 
   describe('useMonitorTimeline composable', () => {
     it('constructs dynamic y scale based on data rows', () => {
-      const isDemoMode = ref(false)
-      const demoRows = ref<AdminTaskRow[]>([])
       const chartRows = ref<AdminTaskRow[]>([
         {
           task_id: '1',
@@ -98,8 +96,6 @@ describe('useMonitorTimeline', () => {
       const filterStatus = ref(null)
 
       const timeline = useMonitorTimeline({
-        isDemoMode,
-        demoRows,
         chartRows,
         filterStatus,
       })

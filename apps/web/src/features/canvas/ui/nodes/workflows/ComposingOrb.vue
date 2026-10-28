@@ -3,14 +3,15 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getMotionPreference } from '../../../../../core/motion/motionPolicy'
+import { useTheme } from '../../../../../theme/composables/useTheme'
 import { COMPOSING_ORB_BASE_SPEED, drawComposingOrb } from './thinking-orbs/composingRenderer'
 
 const ORB_SIZE = 171
-const ORB_SPEED = 1.2
 const STATIC_FRAME_SECONDS = 0.6
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const { isDark } = useTheme()
 
 let animationFrameId: number | null = null
 let context: CanvasRenderingContext2D | null = null
@@ -24,7 +25,7 @@ function drawFrame(timeSeconds: number) {
   const pixelRatio = Math.min(2, window.devicePixelRatio || 1)
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
   context.clearRect(0, 0, ORB_SIZE, ORB_SIZE)
-  drawComposingOrb(context, ORB_SIZE, timeSeconds)
+  drawComposingOrb(context, ORB_SIZE, timeSeconds, isDark.value)
 }
 
 function stopAnimation() {
@@ -34,7 +35,7 @@ function stopAnimation() {
 }
 
 function animationLoop(timestamp: number) {
-  drawFrame((timestamp / 1000) * COMPOSING_ORB_BASE_SPEED * ORB_SPEED)
+  drawFrame((timestamp / 1000) * COMPOSING_ORB_BASE_SPEED)
   animationFrameId = requestAnimationFrame(animationLoop)
 }
 
@@ -66,6 +67,10 @@ function handleMotionPreferenceChange(event: MediaQueryListEvent) {
   if (isReducedMotionPreferred) drawFrame(STATIC_FRAME_SECONDS)
   reconcileAnimation()
 }
+
+watch(isDark, () => {
+  if (isReducedMotionPreferred) drawFrame(STATIC_FRAME_SECONDS)
+})
 
 onMounted(() => {
   const canvas = canvasRef.value
@@ -106,6 +111,5 @@ onBeforeUnmount(() => {
   flex: 0 0 171px;
   width: 171px;
   height: 171px;
-  opacity: 0.4;
 }
 </style>

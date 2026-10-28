@@ -18,7 +18,7 @@ import {
   workspaceQueryKeys,
   type WorkspaceSummary,
 } from '../selection/workspaceResource'
-import { useOrganizationManagement } from '../organization/session/useManagement'
+import { useManagement } from '../organization/session/useManagement'
 import {
   WORKSPACE_URL_PARAM,
   useWorkspaceSelection,
@@ -129,7 +129,7 @@ export function useWorkspaceSwitcher(options?: { beforeWorkspaceChange?: () => P
   }
 
   const isOrganizationManagementEnabled = ref(false)
-  const organizationManagement = useOrganizationManagement({
+  const organizationManagement = useManagement({
     identity: () => userStore.user?.public_id,
     isEnabled: isOrganizationManagementEnabled,
     onScopeExit: () => {

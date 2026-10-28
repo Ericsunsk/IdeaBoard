@@ -13,17 +13,8 @@
           />
         </div>
 
-        <!-- 右侧：刷新同步按钮与演示模式切换 -->
-        <div class="flex shrink-0 items-center gap-2">
-          <AdminButton
-            v-if="isDev || isDemoMode"
-            variant="outline"
-            size="sm"
-            :class="isDemoMode ? 'border-primary-line-emphasis text-primary bg-primary-faint' : ''"
-            @click="toggleDemoMode"
-          >
-            {{ isDemoMode ? '退出演示' : '演示数据' }}
-          </AdminButton>
+        <!-- 右侧：刷新同步按钮 -->
+        <div class="shrink-0">
           <AdminRefreshButton
             :loading="isLoading"
             :aria-label="BILLING_PRICING_MESSAGES.refresh"
@@ -123,8 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { Coins, Refresh, Search, Xmark } from '@iconoir/vue'
 import { AdminButton } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
@@ -161,36 +151,6 @@ import { BILLING_PRICING_MESSAGES } from './messages'
 // 组合保存 toast 文案收口在此（不改 messages.ts 公共文件）：旧文案“请根据提示重试”
 // 已无 inline 提示可指，自洽文案只说“请重试”，失败明细直接拼在 toast 后缀里。
 const COMBINED_SAVE_FAILED_PREFIX = '部分配置保存失败，请重试'
-import { stringParam } from '@/core/router/queryParams'
-import {
-  DEMO_MODE_QUERY_VALUE,
-  createDemoBillingItems,
-  createDemoModelPools,
-  createDemoCatalogModels,
-  createDemoPricesUpdate,
-} from '../../core/pricing/demoData'
-
-const route = useRoute()
-const router = useRouter()
-const isDemoMode = computed(() =>
-  route?.query ? stringParam(route.query.demo) === DEMO_MODE_QUERY_VALUE : false,
-)
-const isDev = import.meta.env.DEV
-
-function toggleDemoMode() {
-  if (!router || !route) return
-  const query = { ...route.query }
-  if (isDemoMode.value) {
-    delete query.demo
-  } else {
-    query.demo = DEMO_MODE_QUERY_VALUE
-  }
-  void router.replace({ query })
-}
-
-watch(isDemoMode, () => {
-  void loadCatalog()
-})
 
 const resource = createAdminBillableCatalogResource()
 const poolResource = createAdminModelPoolResource()
@@ -274,16 +234,6 @@ const pricedSections = computed(() => {
 async function loadCatalog() {
   isLoading.value = true
   errorMessage.value = ''
-  if (isDemoMode.value) {
-    items.value = createDemoBillingItems()
-    poolBySku.value = createDemoModelPools()
-    poolCatalogModels.value = createDemoCatalogModels()
-    Object.keys(poolBySku.value).forEach((sku) => {
-      poolFailed[sku] = false
-    })
-    isLoading.value = false
-    return
-  }
   try {
     items.value = await resource.list()
     await loadModelPools()
@@ -313,10 +263,6 @@ async function loadModelPools() {
 
 async function loadPoolCatalog() {
   if (poolCatalogLoading.value) return
-  if (isDemoMode.value) {
-    poolCatalogModels.value = createDemoCatalogModels()
-    return
-  }
   poolCatalogLoading.value = true
   poolCatalogError.value = ''
   try {
@@ -336,22 +282,6 @@ async function reloadPool() {
   poolSavePending.value = true
   poolSaveError.value = ''
   poolSaveStale.value = false
-  if (isDemoMode.value) {
-    const pool: AdminModelPool = poolBySku.value[item.sku] ?? {
-      service: serviceOfSku(item.sku) ?? 'generation',
-      sku: item.sku,
-      version: 1,
-      entries: [],
-    }
-    poolBySku.value[item.sku] = pool
-    poolFailed[item.sku] = false
-    poolEditVersion.value = pool.version
-    poolEditEntries.value = clonePoolEntries(pool.entries)
-    savedPoolEntries.value = clonePoolEntries(pool.entries)
-    poolEditReady.value = true
-    poolSavePending.value = false
-    return
-  }
   try {
     const pool = await poolResource.get(item.sku)
     poolBySku.value[item.sku] = pool
@@ -400,19 +330,6 @@ async function savePool(entries: AdminModelPoolEntry[]) {
   poolSavePending.value = true
   poolSaveError.value = ''
   poolSaveStale.value = false
-  if (isDemoMode.value) {
-    const saved: AdminModelPool = {
-      service: serviceOfSku(item.sku) ?? 'generation',
-      sku: item.sku,
-      version: poolEditVersion.value + 1,
-      entries: clonePoolEntries(entries),
-    }
-    applyPoolReplaceSuccess(item, saved)
-    priceDialogVisible.value = false
-    toast.success(BILLING_PRICING_MESSAGES.poolSaved)
-    poolSavePending.value = false
-    return
-  }
   try {
     const saved = await poolResource.replace(item.sku, { version: poolEditVersion.value, entries })
     applyPoolReplaceSuccess(item, saved)
@@ -459,12 +376,6 @@ async function confirmArchivedDelete(item: AdminBillableItemCard) {
 async function deleteArchived(item: AdminBillableItemCard) {
   if (deletePending[item.sku]) return
   deletePending[item.sku] = true
-  if (isDemoMode.value) {
-    items.value = items.value.filter((candidate) => candidate.sku !== item.sku)
-    toast.success(BILLING_PRICING_MESSAGES.deleted)
-    deletePending[item.sku] = false
-    return
-  }
   try {
     await resource.deleteArchived(item.sku)
     items.value = items.value.filter((candidate) => candidate.sku !== item.sku)
@@ -497,14 +408,6 @@ async function publishPrice(prices: Record<PricingVariant, number | undefined>) 
   if (!isConfirmed) return
   publishPending.value = true
   publishError.value = ''
-  if (isDemoMode.value) {
-    const published = createDemoPricesUpdate(item.currentPrices, prices)
-    applyPricePublishSuccess(item, published)
-    priceDialogVisible.value = false
-    toast.success(BILLING_PRICING_MESSAGES.published)
-    publishPending.value = false
-    return
-  }
   try {
     const published = await resource.publishPrices(item.sku, prices)
     applyPricePublishSuccess(item, published)
@@ -564,27 +467,6 @@ async function saveCombinedSettings(
   publishError.value = ''
   poolSaveError.value = ''
   poolSaveStale.value = false
-
-  if (isDemoMode.value) {
-    const published = createDemoPricesUpdate(item.currentPrices, prices)
-    applyPricePublishSuccess(item, published)
-    const saved: AdminModelPool = {
-      service: serviceOfSku(item.sku) ?? 'generation',
-      sku: item.sku,
-      version: poolEditVersion.value + 1,
-      entries: entries.map((e) => ({
-        modelId: e.modelId,
-        enabled: e.enabled,
-        resolutions: [...e.resolutions],
-      })),
-    }
-    applyPoolReplaceSuccess(item, saved)
-    publishPending.value = false
-    poolSavePending.value = false
-    priceDialogVisible.value = false
-    toast.success(BILLING_PRICING_MESSAGES.saveAllSuccess)
-    return
-  }
 
   const pricingChanged = isPricingChanged(item, prices)
   const poolChanged = isPoolChanged(savedPoolEntries.value, entries)
@@ -685,15 +567,6 @@ async function setAvailability(item: AdminBillableItemCard, enabled: boolean) {
   }
 
   availabilityPending[item.sku] = true
-  if (isDemoMode.value) {
-    item.status = enabled ? 'active' : 'disabled'
-    item.updatedAt = new Date().toISOString()
-    toast.success(
-      enabled ? BILLING_PRICING_MESSAGES.enabledToast : BILLING_PRICING_MESSAGES.disabledToast,
-    )
-    availabilityPending[item.sku] = false
-    return
-  }
   try {
     const availability = await resource.setAvailability(item.sku, enabled)
     item.status = availability.status

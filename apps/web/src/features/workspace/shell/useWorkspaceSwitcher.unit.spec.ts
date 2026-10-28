@@ -20,7 +20,7 @@ const routeState = vi.hoisted(() => ({
   query: {} as Record<string, string | undefined>,
 }))
 const queryMocks = vi.hoisted(() => ({ invalidateQueries: vi.fn() }))
-const organizationMocks = vi.hoisted(() => ({ useOrganizationManagement: vi.fn() }))
+const organizationMocks = vi.hoisted(() => ({ useManagement: vi.fn() }))
 const selectionMocks = vi.hoisted(() => ({ useWorkspaceSelection: vi.fn() }))
 const resourceMocks = vi.hoisted(() => ({
   renameWorkspace: vi.fn(),
@@ -114,8 +114,8 @@ describe('useWorkspaceSwitcher', () => {
     queryMocks.invalidateQueries.mockReset()
     resourceMocks.renameWorkspace.mockReset()
     resourceMocks.deleteWorkspace.mockReset()
-    organizationMocks.useOrganizationManagement.mockReset()
-    organizationMocks.useOrganizationManagement.mockReturnValue({
+    organizationMocks.useManagement.mockReset()
+    organizationMocks.useManagement.mockReturnValue({
       organization: ref(null),
       refresh: vi.fn(),
     })
@@ -393,7 +393,7 @@ describe('useWorkspaceSwitcher', () => {
     const selection = stubSelection({ items, selectedId })
     routeState.query = { boardId: 'board_1', workspace: TEAM.publicId }
     const switcher = renderSwitcher()
-    const options = organizationMocks.useOrganizationManagement.mock.calls[0]?.[0]
+    const options = organizationMocks.useManagement.mock.calls[0]?.[0]
     expect(switcher.menuProps.value.organizationPanel).toMatchObject({
       name: null,
       bindings: expect.any(Object),

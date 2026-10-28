@@ -29,7 +29,6 @@ describe('task result image URL validation', () => {
       '/api/v1/workspaces/ws_test123/media-assets/asset_123/content',
       window.location.origin,
     ).toString(),
-    '/demo/demo-render.svg',
   ])('allows %s', (url) => {
     expect(getSafeResultImageUrl(url)).not.toBe('')
   })

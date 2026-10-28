@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { render, waitFor } from '../../../../test/render'
-import { useOrganizationManagement } from './useManagement'
+import { useManagement } from './useManagement'
 import { getOrganizationScopeStore, installOrganizationScopeStore } from '../scope'
 import {
   workspaceQueryKeys,
@@ -49,11 +49,11 @@ function harness() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
-  let management: ReturnType<typeof useOrganizationManagement> | undefined
+  let management: ReturnType<typeof useManagement> | undefined
   render(
     defineComponent({
       setup() {
-        management = useOrganizationManagement({ identity, isEnabled, onScopeExit })
+        management = useManagement({ identity, isEnabled, onScopeExit })
         return () => h('div')
       },
     }),
@@ -64,7 +64,7 @@ function harness() {
   if (!management) throw new Error('Management harness did not mount')
   return { management, identity, isEnabled, onScopeExit, queryClient }
 }
-async function ready(management: ReturnType<typeof useOrganizationManagement>) {
+async function ready(management: ReturnType<typeof useManagement>) {
   await waitFor(() => expect(management.members.value).toHaveLength(2))
 }
 

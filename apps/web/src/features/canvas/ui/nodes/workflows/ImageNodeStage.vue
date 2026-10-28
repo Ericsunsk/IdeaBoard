@@ -496,7 +496,7 @@ function submitOutpaint(prompt: string) {
 }
 
 .image-node-stage-empty.is-loading {
-  background: color-mix(in srgb, white 56%, transparent);
+  background: transparent;
   color: var(--canvas-text-subtle);
   cursor: default;
 }

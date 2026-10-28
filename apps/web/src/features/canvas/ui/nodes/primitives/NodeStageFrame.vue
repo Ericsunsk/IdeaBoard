@@ -128,12 +128,6 @@ defineExpose({ stageElement })
 
 .node-stage-frame.is-loading,
 .node-stage-frame.is-connection-drop-target {
-  box-shadow:
-    0 0 30px var(--node-stage-frame-emphasis-shadow-primary),
-    0 0 48px var(--node-stage-frame-emphasis-shadow-secondary);
-}
-
-.node-stage-frame.is-connection-drop-target {
   --node-stage-frame-emphasis-shadow-primary: color-mix(
     in srgb,
     var(--canvas-accent) 45%,
@@ -144,5 +138,8 @@ defineExpose({ stageElement })
     var(--canvas-accent) 25%,
     transparent
   );
+  box-shadow:
+    0 0 30px var(--node-stage-frame-emphasis-shadow-primary),
+    0 0 48px var(--node-stage-frame-emphasis-shadow-secondary);
 }
 </style>

@@ -1,4 +1,4 @@
-import { computed, ref, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 import type { ChartDataset } from 'chart.js'
 import { adminChartPlugins, adminChartTheme, defineAdminChartTooltip } from '../../shared'
 import { formatLocaleNumber } from '@/core/i18n/formatters'
@@ -14,8 +14,6 @@ import type { AdminTaskRow } from './useAdminTaskList'
 import type { TaskStatus } from '../../shared'
 
 type MonitorTimelineOptions = {
-  isDemoMode: Ref<boolean>
-  demoRows: MaybeRefOrGetter<readonly AdminTaskRow[]>
   chartRows: Ref<readonly AdminTaskRow[]>
   filterStatus: Ref<TaskStatus | null>
 }
@@ -90,7 +88,7 @@ export function calculateTimelineYScale(maxCount: number): { max: number; stepSi
 }
 
 export function useMonitorTimeline(options: MonitorTimelineOptions) {
-  const { isDemoMode, demoRows, chartRows, filterStatus } = options
+  const { chartRows, filterStatus } = options
 
   const selectedTimeRangeKey = ref<TimeRangePresetKey>('1h')
 
@@ -125,10 +123,10 @@ export function useMonitorTimeline(options: MonitorTimelineOptions) {
       labels.push(formatXAxisTime(time, durationMs))
     }
 
-    // 真实走图表专用全量行（最近 100），演示走演示全量，均按所选区间分桶。
+    // 图表走图表专用全量行（最近 100），按所选区间分桶。
     // 区间外的旧行直接丢弃（不钳制到首桶，避免切小区间时出现虚假尖峰）；
     // 非法日期同样丢弃。
-    const dataSource = isDemoMode.value ? toValue(demoRows) : chartRows.value
+    const dataSource = chartRows.value
 
     for (const t of dataSource) {
       const taskTime = t.created_at ? new Date(t.created_at).getTime() : Number.NaN

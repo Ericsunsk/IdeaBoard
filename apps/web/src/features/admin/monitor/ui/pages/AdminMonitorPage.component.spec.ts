@@ -7,23 +7,6 @@ const mocks = vi.hoisted(() => ({
   requestCancelTask: vi.fn(),
 }))
 
-const routerMocks = vi.hoisted(() => ({
-  replace: vi.fn(),
-  route: {
-    path: '/admin/monitor',
-    query: {} as Record<string, string | undefined>,
-  },
-}))
-
-vi.mock('vue-router', async (importOriginal) => {
-  const original = await importOriginal<typeof import('vue-router')>()
-  return {
-    ...original,
-    useRoute: () => routerMocks.route,
-    useRouter: () => ({ push: vi.fn(), replace: routerMocks.replace }),
-  }
-})
-
 const mockFilterStatus = ref<string | null>(null)
 
 const task = {
@@ -162,8 +145,6 @@ describe('AdminMonitorPage', () => {
   beforeEach(() => {
     mockFilterStatus.value = null
     mockTasks.value = [task]
-    routerMocks.route.query = {}
-    routerMocks.replace.mockClear()
     mocks.requestCancelTask.mockClear()
   })
 
@@ -356,7 +337,7 @@ describe('AdminMonitorPage', () => {
     expect(screen.getByText(/共 \d+ 条记录/)).toBeInTheDocument()
   })
 
-  it('renders the empty state without demo data when the task list is empty', async () => {
+  it('renders the empty state when the task list is empty', async () => {
     mockTasks.value = []
     renderWithUser(AdminMonitorPage, {
       global: {
@@ -383,44 +364,5 @@ describe('AdminMonitorPage', () => {
     })
 
     expect(screen.getByText('暂无事件日志')).toBeInTheDocument()
-    expect(screen.queryByText('退出演示')).not.toBeInTheDocument()
-    expect(screen.queryByText(/产品主图草图成图/)).not.toBeInTheDocument()
-  })
-
-  it('shows demo data with disabled actions only when ?demo=1 is present', async () => {
-    mockTasks.value = []
-    routerMocks.route.query = { demo: '1' }
-    renderWithUser(AdminMonitorPage, {
-      global: {
-        stubs: {
-          AdminChartCard: SlotStub,
-          AdminFilterPopover: SlotStub,
-          AdminPagerControls: SlotStub,
-          AdminResourceToolbar: ToolbarStub,
-          AdminSummaryCard: SlotStub,
-          AdminTablePanel: TablePanelStub,
-          AdminTaskResultDialog: SlotStub,
-          AdminToolbarSearch: SlotStub,
-          Button: ButtonStub,
-          Chart: SlotStub,
-          Column: ColumnStub,
-          DataTableFrame: DataTableStub,
-          Eye: SlotStub,
-          InputNumber: SlotStub,
-          Message: SlotStub,
-          Refresh: SlotStub,
-          Tag: SlotStub,
-        },
-      },
-    })
-
-    expect(screen.getByText(/共 42 条记录/)).toBeInTheDocument()
-    expect(screen.getAllByText(/产品主图草图成图/).length).toBeGreaterThan(0)
-    // Service 列展示 service slug
-    expect(screen.getAllByText('render').length).toBeGreaterThan(0)
-    expect(screen.queryByText('暂无事件日志')).not.toBeInTheDocument()
-    // 写操作在演示模式下禁用：无取消按钮；More 详情可用本地预览
-    expect(screen.queryByLabelText('取消任务')).not.toBeInTheDocument()
-    expect(screen.getAllByLabelText('更多任务详情').length).toBeGreaterThan(0)
   })
 })

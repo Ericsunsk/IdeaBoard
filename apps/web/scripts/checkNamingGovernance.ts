@@ -177,12 +177,8 @@ const keptGenericOwnership: Record<string, string> = {
 const keptRoleSuffixOwnership: Record<string, string> = {
   'features/admin/statistics/session/useUsageStatisticsData.ts':
     'admin: usage statistics data composable (pre-existing; new *Data modules banned)',
-  'features/admin/monitor/session/demoData.ts':
-    'admin: monitor demo fixture (pre-existing; new *Data modules banned)',
   'features/admin/models/core/catalogData.ts':
     'admin: model catalog reference data (pre-existing; new *Data modules banned)',
-  'features/admin/credits/core/pricing/demoData.ts':
-    'admin: pricing demo fixture (pre-existing; new *Data modules banned)',
 }
 
 /** Permanent documented keeps: pre-existing `image/avatar` URL fields (rule 16, warn-only). */

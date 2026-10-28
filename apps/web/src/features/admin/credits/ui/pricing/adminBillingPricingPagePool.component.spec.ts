@@ -10,21 +10,6 @@ import {
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
-const routerMocks = vi.hoisted(() => ({
-  route: { query: {} as Record<string, string>, path: '/admin/credits/pricing' },
-  push: vi.fn(),
-  replace: vi.fn(),
-}))
-
-vi.mock('vue-router', async (importOriginal) => {
-  const original = await importOriginal<typeof import('vue-router')>()
-  return {
-    ...original,
-    useRoute: () => routerMocks.route,
-    useRouter: () => ({ push: routerMocks.push, replace: routerMocks.replace }),
-  }
-})
-
 vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({
   useAdminConfirm: () => ({
     confirm: confirmMock,
@@ -83,9 +68,6 @@ function poolHandlers(failSkus: string[] = []) {
 
 describe('AdminBillingPricingPage model pools', () => {
   beforeEach(() => {
-    routerMocks.route.query = {}
-    routerMocks.push.mockReset()
-    routerMocks.replace.mockReset()
     confirmMock.mockReset()
     confirmMock.mockResolvedValue(true)
     toast.success.mockReset()

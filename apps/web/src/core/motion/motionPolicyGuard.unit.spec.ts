@@ -98,23 +98,6 @@ describe('Motion Policy style guard', () => {
     ).toEqual([])
   })
 
-  it('allows registered Canvas continuous motion with a local semantic and fallback', () => {
-    expect(
-      findMotionPolicyViolations(
-        'src/features/canvas/ui/styles/node-shared.css',
-        `
-          .workflow-node.running {
-            --node-running-border-cycle: 2.4s;
-            animation: node-running-border-flow var(--node-running-border-cycle) linear infinite;
-          }
-          @media (prefers-reduced-motion: reduce) {
-            .workflow-node.running { animation: none; }
-          }
-        `,
-      ),
-    ).toEqual([])
-  })
-
   it('rejects unregistered local raw timing aliases', () => {
     expect(
       findMotionPolicyViolations(

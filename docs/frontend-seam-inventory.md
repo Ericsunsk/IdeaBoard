@@ -12836,16 +12836,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.vue",
-          "to": "src/core/router/queryParams.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/ui/pages/AdminMonitorPage.vue",
-          "to": "src/core/router/queryParams.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/auth/components/UserAuthModals.vue",
           "to": "src/core/router/queryParams.ts",
           "kind": "runtime"
@@ -12896,9 +12886,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 14,
+      "measuredFanIn": 12,
       "measuredFanOut": 1,
-      "targetFanIn": 14,
+      "targetFanIn": 12,
       "targetFanOut": 1,
       "ownershipScope": [
         "src/core/router/queryParams.ts"
@@ -15491,11 +15481,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/session/demoData.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/monitor/session/useAdminMonitor.contract.spec.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -15524,16 +15509,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "from": "src/features/admin/monitor/session/useAdminTaskRuntimeSnapshot.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/session/useMonitorDemo.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/session/useMonitorDemo.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
         },
         {
           "from": "src/features/admin/monitor/session/useMonitorTimeline.ts",
@@ -15871,9 +15846,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 123,
+      "measuredFanIn": 121,
       "measuredFanOut": 58,
-      "targetFanIn": 123,
+      "targetFanIn": 121,
       "targetFanOut": 58,
       "ownershipScope": [
         "src/features/admin/shared/core/",
@@ -23084,9 +23059,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 4,
-      "measuredFanOut": 40,
+      "measuredFanOut": 41,
       "targetFanIn": 4,
-      "targetFanOut": 40,
+      "targetFanOut": 41,
       "ownershipScope": [
         "src/features/canvas/ui/nodes/"
       ],
@@ -23142,6 +23117,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
         "src/features/canvas/ui/overlays/index.ts",
         "src/test/render.ts",
+        "src/theme/composables/useTheme.ts",
         "vitest/browser"
       ],
       "notes": ""
@@ -23332,9 +23308,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 2,
-      "measuredFanOut": 25,
+      "measuredFanOut": 26,
       "targetFanIn": 2,
-      "targetFanOut": 25,
+      "targetFanOut": 26,
       "ownershipScope": [
         "src/features/canvas/ui/nodes/workflows/"
       ],
@@ -23372,7 +23348,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/features/canvas/tools/outpaint/ui/ImageOutpaintOverlay.vue",
         "src/features/canvas/ui/nodes/home/ImageActionMenu.vue",
         "src/features/canvas/ui/nodes/primitives/index.ts",
-        "src/test/render.ts"
+        "src/test/render.ts",
+        "src/theme/composables/useTheme.ts"
       ],
       "notes": "declared entry surface; single intra-canvas consumer today."
     },
@@ -25290,6 +25267,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/ui/nodes/workflows/ComposingOrb.vue",
+          "to": "src/theme/composables/useTheme.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/test/chartTheme.browser.spec.ts",
           "to": "src/theme/composables/useTheme.ts",
           "kind": "runtime"
@@ -25305,9 +25287,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 9,
+      "measuredFanIn": 10,
       "measuredFanOut": 3,
-      "targetFanIn": 9,
+      "targetFanIn": 10,
       "targetFanOut": 3,
       "ownershipScope": [
         "src/theme/composables/useTheme.ts"
@@ -25560,7 +25542,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/query/queryDefaults.ts` | canonical | core | 5 | 25 → 25 | 0 → 0 |
 | `src/core/query/taskResult.ts` | canonical | core | 3 | 4 → 4 | 0 → 0 |
 | `src/core/query/userCreditsInvalidation.ts` | canonical | core | 4 | 7 → 7 | 0 → 0 |
-| `src/core/router/queryParams.ts` | canonical | core | 3 | 14 → 14 | 1 → 1 |
+| `src/core/router/queryParams.ts` | canonical | core | 3 | 12 → 12 | 1 → 1 |
 | `src/core/seo/routeSeo.ts` | canonical | core | 12 | 4 → 4 | 0 → 0 |
 | `src/core/seo/seoStaticHtml.ts` | canonical | core | 1 | 1 → 1 | 1 → 1 |
 | `src/core/utils/auth.ts` | canonical | core | 16 | 33 → 33 | 4 → 4 |
@@ -25595,7 +25577,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/core/tableColumns.ts` | canonical | admin | 2 | 2 → 2 | 0 → 0 |
 | `src/features/admin/shared/core/taskMetricTokens.ts` | canonical | admin | 7 | 3 → 3 | 1 → 1 |
 | `src/features/admin/shared/core/uiClasses.ts` | canonical | admin | 40 | 17 → 17 | 0 → 0 |
-| `src/features/admin/shared/index.ts` | canonical | admin | 236 | 123 → 123 | 58 → 58 |
+| `src/features/admin/shared/index.ts` | canonical | admin | 236 | 121 → 121 | 58 → 58 |
 | `src/features/admin/shared/session/anomalyRules.ts` | canonical | admin | 4 | 3 → 3 | 3 → 3 |
 | `src/features/admin/shared/session/brand/brandLogos.ts` | canonical | admin | 14 | 6 → 6 | 14 → 14 |
 | `src/features/admin/shared/session/brand/useBrandLogoOverrides.ts` | canonical | admin | 1 | 1 → 1 | 5 → 5 |
@@ -25684,10 +25666,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/tools/retouch/testing/browser.ts` | canonical | canvas | 2 | 1 → 1 | 4 → 4 |
 | `src/features/canvas/ui/chrome/components/index.ts` | canonical | canvas | 6 | 1 → 1 | 16 → 16 |
 | `src/features/canvas/ui/nodes/groups/index.ts` | canonical | canvas | 4 | 4 → 4 | 8 → 8 |
-| `src/features/canvas/ui/nodes/index.ts` | canonical | canvas | 10 | 4 → 4 | 40 → 40 |
+| `src/features/canvas/ui/nodes/index.ts` | canonical | canvas | 10 | 4 → 4 | 41 → 41 |
 | `src/features/canvas/ui/nodes/primitives/index.ts` | canonical | canvas | 21 | 14 → 14 | 20 → 20 |
 | `src/features/canvas/ui/nodes/useFlowNodeUiState.ts` | canonical | canvas | 1 | 2 → 2 | 6 → 6 |
-| `src/features/canvas/ui/nodes/workflows/index.ts` | canonical | canvas | 7 | 2 → 2 | 25 → 25 |
+| `src/features/canvas/ui/nodes/workflows/index.ts` | canonical | canvas | 7 | 2 → 2 | 26 → 26 |
 | `src/features/canvas/ui/overlays/index.ts` | canonical | canvas | 5 | 9 → 9 | 14 → 14 |
 | `src/features/canvas/ui/pages/CanvasLandingPage.vue` | canonical | canvas | 1 | 3 → 3 | 10 → 10 |
 | `src/features/canvas/ui/pages/CanvasPage.vue` | canonical | canvas | 1 | 3 → 3 | 4 → 4 |
@@ -25710,7 +25692,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/test/factories/index.ts` | canonical | test | 12 | 19 → 19 | 1 → 1 |
 | `src/theme/appOverlayMenu.ts` | canonical | design-system | 5 | 8 → 8 | 0 → 0 |
 | `src/theme/composables/themeMode.ts` | canonical | design-system | 4 | 2 → 2 | 0 → 0 |
-| `src/theme/composables/useTheme.ts` | canonical | design-system | 4 | 9 → 9 | 3 → 3 |
+| `src/theme/composables/useTheme.ts` | canonical | design-system | 4 | 10 → 10 | 3 → 3 |
 | `src/theme/formControls.ts` | canonical | design-system | 4 | 10 → 10 | 0 → 0 |
 | `src/theme/lightboxScrim.ts` | canonical | design-system | 3 | 3 → 3 | 0 → 0 |
 <!-- SEAM_TABLE_END -->

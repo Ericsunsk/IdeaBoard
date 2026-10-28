@@ -21,8 +21,6 @@ describe('Admin chart runtime palette', () => {
     const app = createApp({
       setup() {
         const monitor = useMonitorTimeline({
-          isDemoMode: ref(false),
-          demoRows: [],
           chartRows: ref([]),
           filterStatus: ref(null),
         })

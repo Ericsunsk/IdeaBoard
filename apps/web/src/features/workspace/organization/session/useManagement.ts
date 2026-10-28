@@ -113,7 +113,7 @@ interface OrganizationManagementOptions {
 }
 
 /** Organization facts and actions belong to Workspace; hosts only control visibility. */
-export function useOrganizationManagement(options: OrganizationManagementOptions) {
+export function useManagement(options: OrganizationManagementOptions) {
   const { t } = useI18n()
   const toast = useAppToast()
   const identity = computed(() => toValue(options.identity)?.trim() ?? '')
@@ -489,4 +489,4 @@ export function useOrganizationManagement(options: OrganizationManagementOptions
   }
 }
 
-export type OrganizationManagement = ReturnType<typeof useOrganizationManagement>
+export type OrganizationManagement = ReturnType<typeof useManagement>

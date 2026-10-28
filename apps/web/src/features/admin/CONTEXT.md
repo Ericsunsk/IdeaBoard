@@ -33,7 +33,7 @@ It does NOT own user-facing pages, domain ledger semantics (backend Credits Ledg
 - `createAdminStorageResource` / `createAdminStorageWorkspace` — OSS provider/profile config, test, bucket domain in `settings/session/storage`; pages assemble via `useAdminStorageContext`; card-view normalization lives in workspace.
 - `useSettings` / `useSettingsLifecycle` / `useOutboundPolicyResource` — branding/access/mediaUpload plus mail/outbound cards in `settings`; dirty-check/validation/cache-sync live in lifecycle, not cards.
 - `useAdminStatisticsResource` plus `useUsageStatisticsData` — 7d/30d/1y trends and quality/health charts in `statistics`; shared query when range matches; assembly in `usageStatistics*Charts.ts`.
-- `useAdminTaskListResource` plus query-key generators / `useAdminTaskList` / `useAdminTaskCancel` / `useAdminMonitorStream` — task list/detail/cancel, SSE snapshot, runtime snapshot in `monitor`; explicit demo mode (`?demo=1`, see `session/demoData.ts`) with banner, local pagination, write-disabled cancel/detail, off by default.
+- `useAdminTaskListResource` plus query-key generators / `useAdminTaskList` / `useAdminTaskCancel` / `useAdminMonitorStream` — task list/detail/cancel, SSE snapshot, runtime snapshot in `monitor`.
 - `createAdminPromptConfigResource` / `createAdminPromptConfigWorkspace` — current prompt-template read/update by Service slug with dirty-draft retention in `prompts`.
 - `createAdminGatewayResource` — model-library catalog/connection with generated client plus snake-to-camel normalization in `models`.
 
