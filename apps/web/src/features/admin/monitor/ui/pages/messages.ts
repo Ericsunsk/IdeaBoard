@@ -14,9 +14,6 @@
 export const MONITOR_MESSAGES = {
   staleNotice: '任务监控连接不稳定，当前显示上次成功数据。',
   retryConnection: '重试连接',
-  detailLoadFailed: '加载任务详情失败',
-  listLoadFailed: '加载任务列表失败',
-  snapshotLoadFailed: '加载任务运行监控失败',
   retry: '重试',
   // Task result dialog.
   detailAria: '任务详情控制台',

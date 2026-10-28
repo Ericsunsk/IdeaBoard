@@ -162,8 +162,7 @@ export function useMemberQuotaSection(options: MemberQuotaSectionOptions) {
       await invalidateQuotaQueries()
       toast.success(t('workspace.quota.saved'))
     } catch (error) {
-      saveError.value = describeSaveError(error)
-      toast.error(saveError.value)
+      toast.error(describeSaveError(error))
     } finally {
       isSaving.value = false
     }

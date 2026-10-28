@@ -745,14 +745,18 @@ describe('WorkspaceSettingsDialog members', () => {
     }
   })
 
-  test('roster failures render retry and converge on retry', async () => {
+  test('roster failures toast and converge on retry', async () => {
     const { user } = renderMembersDialog()
     fakeMembers.failNext = { op: 'list', code: 'workspace_forbidden' }
 
     await user.click(screen.getByRole('button', { name: 'Team 2' }))
 
     const team = within(sectionByWorkspace('Team 2'))
-    expect(await team.findByText('Members could not be loaded.')).toBeVisible()
+    // 名单初载失败只走 toast；中性重试按钮即恢复入口。
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Members could not be loaded.'),
+    )
+    expect(team.queryByText('Members could not be loaded.')).not.toBeInTheDocument()
     await user.click(team.getByRole('button', { name: 'Retry' }))
 
     await waitFor(() => expect(team.getByText('boss@example.com')).toBeVisible())

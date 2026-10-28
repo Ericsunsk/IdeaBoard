@@ -4,7 +4,7 @@ import { i18n } from '@/core/i18n'
 import { loadLocaleMessages } from '@/core/i18n/userLocale'
 import { http, HttpResponse, useMswHandlers } from '@/test/msw'
 import { makeControlUserPayload } from '@/test/factories'
-import { mockAppToast, type AppToastMocks } from '@/test/toast'
+import { mockAppToast, expectToastFeedback, type AppToastMocks } from '@/test/toast'
 import { renderWithUser, screen, waitFor, within } from '@/test/render'
 import { expectDomOrder } from '@/test/domOrder'
 import AdminUsersPage from './AdminUsersPage.vue'
@@ -684,9 +684,10 @@ describe('AdminUsersPage', () => {
     )
     const dialog = await screen.findByRole('dialog', { name: 'admin_balance_user 的Idea账户' })
     // Toast-only contract: load failures surface via toast, never an inline alert.
-    await waitFor(() => expect(toastMocks.error).toHaveBeenCalled())
-    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
-    expect(within(dialog).queryByText('账户或流水加载失败。请刷新后重试。')).not.toBeInTheDocument()
+    // 透传的 API 安全文案（'down'）即 toast 内容，行内锚点已删除。
+    await expectToastFeedback(toastMocks, 'down', within(dialog), [
+      '账户或流水加载失败。请刷新后重试。',
+    ])
 
     shouldFail = false
     await user.click(within(dialog).getByRole('button', { name: '刷新' }))

@@ -42,13 +42,21 @@
       </span>
     </div>
 
-    <LoadErrorPanel
+    <div
       v-else-if="quota.hasSelfError.value"
-      class="mt-3"
-      :message="t('workspace.quota.loadFailed')"
-      :retry-label="t('common.actions.retry')"
-      @retry="quota.retrySelf()"
-    />
+      class="mt-3 flex min-h-24 flex-col items-center justify-center gap-2"
+      aria-live="polite"
+    >
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        class="h-8 shrink-0 px-3"
+        @click="quota.retrySelf()"
+      >
+        {{ t('common.actions.retry') }}
+      </Button>
+    </div>
 
     <div v-else-if="quota.selfQuota.value" class="mt-3 flex min-w-0 flex-col gap-3">
       <div class="flex items-center justify-between gap-2">
@@ -114,12 +122,21 @@
           <Spinner class="size-5 text-primary" />
         </div>
 
-        <LoadErrorPanel
+        <div
           v-else-if="quota.hasListError.value"
-          :message="t('workspace.quota.loadFailed')"
-          :retry-label="t('common.actions.retry')"
-          @retry="quota.retryList()"
-        />
+          class="flex min-h-16 flex-col items-center justify-center gap-2"
+          aria-live="polite"
+        >
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="h-8 shrink-0 px-3"
+            @click="quota.retryList()"
+          >
+            {{ t('common.actions.retry') }}
+          </Button>
+        </div>
 
         <div v-else class="flex flex-col gap-2">
           <p
@@ -286,6 +303,8 @@
               </Button>
             </div>
           </div>
+          <!-- 客户端字段级校验（未选成员/配额非法）仍行内提示；服务端持久化
+            失败只走 toast（见 useMemberQuotaSection.persistQuota）。 -->
           <p
             v-if="quota.saveError.value"
             class="m-0 text-admin-meta leading-normal text-destructive"
@@ -316,7 +335,7 @@ import {
   SelectViewport,
 } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
+import { useFailureToast } from '../../../../core/composables/useFailureToast'
 import { appOverlayMenuSideOffset } from '../../../../theme/appOverlayMenu'
 import { useMemberQuotaSection } from '../../session/quota/useMemberQuotaSection'
 import { quotaPeriodLabelKey, type MemberQuotaPeriod } from '../../session/quota/resource'
@@ -347,6 +366,15 @@ const quota = useMemberQuotaSection({
   isExpanded: () => props.isExpanded,
   isListEnabled: () => isManageOpen.value,
 })
+
+useFailureToast(
+  () => quota.hasSelfError.value,
+  () => t('workspace.quota.loadFailed'),
+)
+useFailureToast(
+  () => quota.hasListError.value,
+  () => t('workspace.quota.loadFailed'),
+)
 
 function toggleManage(): void {
   isManageOpen.value = !isManageOpen.value

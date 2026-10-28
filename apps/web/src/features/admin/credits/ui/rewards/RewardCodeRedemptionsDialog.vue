@@ -42,21 +42,6 @@
         </AdminResourceToolbar>
       </template>
 
-      <AdminAlert v-if="initialError" severity="error">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>{{ REWARD_CODES_MESSAGES.redemptionsLoadFailed }}</span>
-          <AdminButton
-            variant="ghost"
-            size="sm"
-            :class="adminTextButtonClass"
-            :loading="loading"
-            @click="refreshRedemptions"
-          >
-            {{ REWARD_CODES_MESSAGES.redemptionsReload }}
-          </AdminButton>
-        </div>
-      </AdminAlert>
-
       <AdminAlert v-if="backgroundError" severity="secondary">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ REWARD_CODES_MESSAGES.redemptionsStaleNotice }}</span>
@@ -127,23 +112,6 @@
                 :aria-label="REWARD_CODES_MESSAGES.redemptionsDetailLoadingAria"
               />
             </div>
-            <AdminAlert
-              v-else-if="detailError && selectedRedemptionId === data.id"
-              severity="error"
-            >
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <span>{{ REWARD_CODES_MESSAGES.redemptionsDetailLoadFailed }}</span>
-                <AdminButton
-                  variant="ghost"
-                  size="sm"
-                  :class="adminTextButtonClass"
-                  :loading="detailLoading"
-                  @click="loadRedemptionDetail(data.id)"
-                >
-                  {{ REWARD_CODES_MESSAGES.redemptionsDetailRetry }}
-                </AdminButton>
-              </div>
-            </AdminAlert>
             <dl
               v-else-if="selectedDetail?.id === data.id"
               class="grid gap-x-6 gap-y-4 sm:grid-cols-3"
@@ -202,6 +170,8 @@ import { AdminSpinner } from '../../../shared'
 import { AdminTable } from '../../../shared'
 import { formatIdeaAmount } from '@/core/i18n/userIdeaCurrency'
 import { AdminDialogShell } from '../../../shared'
+import { useRewardCodesFeedback } from '../../session/rewards/useRewardCodesFeedback'
+import { useFailureToast } from '@/core/composables/useFailureToast'
 import { AdminPagerControls } from '../../../shared'
 import { AdminResourceToolbar } from '../../../shared'
 import { AdminTablePanel } from '../../../shared'
@@ -226,11 +196,11 @@ const emit = defineEmits<{
 }>()
 
 const resource = createRewardCodeRedemptionResource()
+const feedback = useRewardCodesFeedback()
 const expandedRows = ref<Record<string, boolean>>({})
 const selectedRedemptionId = ref<number | null>(null)
 const selectedDetail = ref<RewardCodeRedemptionDetail | null>(null)
 const detailLoading = ref(false)
-const detailError = ref(false)
 let activeDetailRequest: AbortController | undefined
 let detailRequestEpoch = 0
 // 游标集合生命周期收敛于 useAdminCursorCollection，query 挂载前保持 disabled，
@@ -245,6 +215,7 @@ const {
   initialError,
   backgroundError,
   refresh: refreshRedemptionList,
+  query: redemptionListQuery,
   pagination,
 } = useAdminCursorCollection({
   buildKey: (beforeId) => [...REDEMPTION_LIST_QUERY_ROOT, props.rewardCode.id, beforeId] as const,
@@ -257,6 +228,12 @@ const {
   getNextCursor: (page) => page.nextBeforeId,
 })
 const redemptions = computed(() => redemptionPage.value?.redemptions ?? [])
+
+// 列表初载失败只走 toast（空态表格 + 工具栏刷新即重试入口）。
+useFailureToast(initialError, feedback.redemptionsLoadFailed, {
+  shouldFireOnMount: false,
+  resolveError: () => redemptionListQuery.error.value,
+})
 
 watch([() => props.visible, () => props.rewardCode.id], ([visible]) => {
   pagination.reset()
@@ -301,7 +278,6 @@ async function loadRedemptionDetail(redemptionId: number) {
   const controller = new AbortController()
   activeDetailRequest = controller
   detailLoading.value = true
-  detailError.value = false
   selectedDetail.value = null
   try {
     const detail = await resource.get(props.rewardCode.id, redemptionId, {
@@ -315,13 +291,14 @@ async function loadRedemptionDetail(redemptionId: number) {
       return
     }
     selectedDetail.value = detail
-  } catch {
+  } catch (error) {
+    // 行内展开锚点已删除：失败只走 toast。
     if (
       !controller.signal.aborted &&
       epoch === detailRequestEpoch &&
       selectedRedemptionId.value === redemptionId
     ) {
-      detailError.value = true
+      feedback.redemptionDetailFailed(error)
     }
   } finally {
     if (
@@ -340,7 +317,6 @@ function clearExpansion() {
   selectedRedemptionId.value = null
   selectedDetail.value = null
   detailLoading.value = false
-  detailError.value = false
   expandedRows.value = {}
 }
 </script>

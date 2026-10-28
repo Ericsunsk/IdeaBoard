@@ -206,10 +206,7 @@ function selectOrganizationScope(): void {
     createScopeId.value = target.publicId
   }
 }
-watch(
-  isCreating,
-  (isBusy) => emits('busy', isBusy),
-)
+watch(isCreating, (isBusy) => emits('busy', isBusy))
 watch(isCreateDialogOpen, (isOpen) => {
   if (!isOpen) return
   createName.value = props.defaultName
@@ -249,7 +246,6 @@ async function submitCreateFromDialog(): Promise<void> {
       code != null
         ? `${t('workspace.switcher.createFailed')} (${code})`
         : t('workspace.switcher.createFailed')
-    createNameError.value = message
     toast.error(message)
   } finally {
     isCreating.value = false

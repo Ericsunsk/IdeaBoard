@@ -163,6 +163,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Refresh } from '@iconoir/vue'
 import ActionButton from '@/core/components/ActionButton.vue'
+import { useFailureToast } from '@/core/composables/useFailureToast'
 import { createUniqueId } from '@/core/utils/ids'
 import { AdminDialogShell } from '../../../shared'
 import { useAdminConfirm } from '../../../shared'
@@ -353,12 +354,9 @@ watch(
   },
   { immediate: true },
 )
-watch(walletError, (error) => {
-  if (error) feedback.walletLoadFailed(error)
-})
-watch(ledgerError, (error) => {
-  if (error) feedback.ledgerLoadFailed(error)
-})
+// 钱包/流水初载失败只走 toast（概览卡余额兜底 + 流水空态即恢复入口）。
+useFailureToast(walletError, feedback.walletLoadFailed, { shouldFireOnMount: false })
+useFailureToast(ledgerError, feedback.ledgerLoadFailed, { shouldFireOnMount: false })
 
 function resetLedger() {
   ledgerCursor.value = undefined

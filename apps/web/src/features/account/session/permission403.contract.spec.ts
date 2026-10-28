@@ -172,7 +172,8 @@ describe('Account permission-403', () => {
     await user.click(await screen.findByRole('button', { name: 'Pay now' }))
 
     await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(1))
-    expect(await screen.findByRole('alert')).toBeVisible()
+    // 403 只走 toast，不再写行内 alert；表单保持可重试。
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(navigate).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Pay now' })).toBeEnabled()
   })

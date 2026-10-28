@@ -26,16 +26,7 @@
       }}</span>
     </div>
 
-    <AdminAlert v-else-if="error" severity="error">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <span>{{ PAYMENT_ORDERS_MESSAGES.detailLoadFailed }}</span>
-        <ActionButton variant="outline" @click="$emit('retry')">
-          {{ PAYMENT_ORDERS_MESSAGES.retry }}
-        </ActionButton>
-      </div>
-    </AdminAlert>
-
-    <div v-else-if="detail" class="flex min-w-0 flex-col gap-5">
+    <div v-if="detail" class="flex min-w-0 flex-col gap-5">
       <section class="rounded-control border border-border p-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="min-w-0">
@@ -204,9 +195,6 @@
             {{ PAYMENT_ORDERS_MESSAGES.refundSubmit }}
           </ActionButton>
         </form>
-        <AdminAlert v-if="refundError" class="mt-3" severity="error">
-          {{ refundError }}
-        </AdminAlert>
       </section>
 
       <div v-if="detail.receiptUrl" class="flex justify-end">
@@ -225,7 +213,6 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { AdminAlert } from '../../../shared'
 import { StatusBadge } from '../../../shared'
 import { AdminButton } from '../../../shared'
 import ActionButton from '@/core/components/ActionButton.vue'
@@ -251,14 +238,11 @@ const props = defineProps<{
   visible: boolean
   detail: AdminPaymentOrderDetail | null
   loading: boolean
-  error: boolean
   refunding: boolean
-  refundError: string
 }>()
 
 const emit = defineEmits<{
   'update:visible': [visible: boolean]
-  retry: []
   refund: [ideaQuantity: number]
 }>()
 

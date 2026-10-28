@@ -175,7 +175,9 @@ describe('AdminBillingPricingPage model pools', () => {
     await user.click(screen.getByRole('button', { name: 'a/first4K分辨率已支持' }))
     await user.click(screen.getByRole('button', { name: '保存' }))
 
-    expect(await screen.findByText('pool unavailable')).toBeVisible()
+    // 池保存失败只走 toast（对话框保持打开可重试），不再写行内。
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('pool unavailable'))
+    expect(screen.queryByText('pool unavailable')).not.toBeInTheDocument()
     expect(screen.getByRole('dialog')).toBeVisible()
   })
 

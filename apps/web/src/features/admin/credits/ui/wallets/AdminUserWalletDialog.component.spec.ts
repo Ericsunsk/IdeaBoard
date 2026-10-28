@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { i18n } from '@/core/i18n'
 import { loadLocaleMessages } from '@/core/i18n/userLocale'
 import { renderWithUser, screen, waitFor } from '@/test/render'
+import { expectFeedbackSent } from '@/test/toast'
 import type { Ref } from 'vue'
 import type {
   AdminCreditLedgerTransaction,
@@ -132,8 +133,7 @@ describe('AdminUserWalletDialog load failures', () => {
 
     shared.current!.walletQuery.error.value = new Error('wallet unavailable')
 
-    await waitFor(() => expect(feedback.walletLoadFailed).toHaveBeenCalledTimes(1))
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await expectFeedbackSent(feedback.walletLoadFailed)
     expect(screen.getByText('500 Ideas')).toBeVisible()
   })
 
@@ -149,8 +149,7 @@ describe('AdminUserWalletDialog load failures', () => {
 
     shared.current!.ledgerQuery.error.value = new Error('ledger unavailable')
 
-    await waitFor(() => expect(feedback.ledgerLoadFailed).toHaveBeenCalledTimes(1))
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await expectFeedbackSent(feedback.ledgerLoadFailed)
   })
 
   it('uses the reviewed command snapshot even if the amount changes while confirming', async () => {

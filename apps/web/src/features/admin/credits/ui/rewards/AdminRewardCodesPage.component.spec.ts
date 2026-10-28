@@ -4,7 +4,7 @@ import { fireEvent } from '@testing-library/vue'
 import { i18n } from '@/core/i18n'
 import { loadLocaleMessages } from '@/core/i18n/userLocale'
 import { renderWithUser, screen, waitFor } from '@/test/render'
-import { mockAppToast, type AppToastMocks } from '@/test/toast'
+import { mockAppToast, expectToastFeedback, type AppToastMocks } from '@/test/toast'
 import AdminRewardCodesPage from './AdminRewardCodesPage.vue'
 import { REWARD_CODES_MESSAGES } from './messages'
 const resource = vi.hoisted(() => ({
@@ -218,12 +218,14 @@ describe('AdminRewardCodesPage', () => {
     expect(screen.queryByText('旧兑换码')).not.toBeInTheDocument()
   })
 
-  it('distinguishes initial errors from a failed background refresh and recovers', async () => {
+  it('routes an initial error to toast and recovers through the toolbar refresh', async () => {
     resource.search.mockRejectedValueOnce(new Error('network unavailable'))
     const { user } = renderPage()
-    expect(await screen.findByText('兑换码加载失败，请重试。')).toBeVisible()
+    // 初载行内锚点已删除：失败只走 toast，空态表格 + 工具栏刷新即重试入口。
+    await expectToastFeedback(toast, 'network unavailable', screen, ['兑换码加载失败，请重试。'])
+    expect(screen.queryByRole('table', { name: '兑换码列表' })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: '重试' }))
+    await user.click(screen.getByRole('button', { name: '刷新兑换码' }))
     expect(await screen.findByText('新用户奖励')).toBeVisible()
 
     resource.search.mockRejectedValueOnce(new Error('network unavailable'))
@@ -271,11 +273,9 @@ describe('AdminRewardCodesPage', () => {
       value: { writeText },
     })
     await user.click(screen.getByRole('button', { name: '复制' }))
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(REWARD_CODES_MESSAGES.plaintextCopyFailed),
-    )
-    expect(screen.queryByText(REWARD_CODES_MESSAGES.plaintextCopyFailed)).not.toBeInTheDocument()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await expectToastFeedback(toast, REWARD_CODES_MESSAGES.plaintextCopyFailed, screen, [
+      REWARD_CODES_MESSAGES.plaintextCopyFailed,
+    ])
     await user.click(screen.getByRole('button', { name: '复制' }))
     expect(screen.getByRole('button', { name: '已复制' })).toBeVisible()
     expect(screen.queryByText(REWARD_CODES_MESSAGES.plaintextCopyFailed)).not.toBeInTheDocument()
@@ -373,7 +373,7 @@ describe('AdminRewardCodesPage', () => {
     expect(screen.queryByText('NEWC-ODE1-WXYZ')).not.toBeInTheDocument()
   })
 
-  it('shows the error state when redemption history fails to load', async () => {
+  it('routes redemption history load failures to toast without an inline error', async () => {
     redemptionsResource.list.mockRejectedValueOnce(new Error('control unavailable'))
     const { user } = renderPage()
     await screen.findByText('新用户奖励')
@@ -382,7 +382,7 @@ describe('AdminRewardCodesPage', () => {
     await user.click(await screen.findByRole('button', { name: '兑换记录' }))
 
     expect(screen.getByRole('dialog', { name: '新用户奖励 · 兑换记录' })).toBeVisible()
-    expect(await screen.findByText('兑换记录加载失败，请重试。')).toBeVisible()
+    await expectToastFeedback(toast, 'control unavailable', screen, ['兑换记录加载失败，请重试。'])
     expect(screen.queryByText('用户 #23')).not.toBeInTheDocument()
   })
 
@@ -418,8 +418,12 @@ describe('AdminRewardCodesPage', () => {
     await user.type(screen.getByRole('textbox', { name: 'Code' }), 'NEWC-ODE1-WXYZ')
     await user.click(screen.getByRole('button', { name: '保存' }))
 
-    expect(await screen.findByText('更新冲突')).toBeVisible()
+    // 保存失败只走 toast（对话框保持打开可重试），不再写行内。
+    // 编辑框内常驻轮换 warning alert 与本次失败无关，这里只断言失败文案无行内残留。
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('更新冲突'))
+    expect(screen.queryByText('更新冲突')).not.toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: '编辑兑换码' })).toBeVisible()
+    expect(screen.getByRole('textbox', { name: '名称' })).toHaveValue('不会保存')
     expect(screen.getByText('新用户奖励')).toBeVisible()
     expect(screen.queryByRole('dialog', { name: '保存新 Code' })).not.toBeInTheDocument()
   })
@@ -457,7 +461,7 @@ describe('AdminRewardCodesPage', () => {
     expect(recoveredToggle).toBe(toggle)
     expect(recoveredToggle).toBeChecked()
     expect(screen.getByText('可兑换')).toBeVisible()
-    expect(toast.error).toHaveBeenCalledWith('network unavailable')
+    await expectToastFeedback(toast, 'network unavailable')
   })
 
   it('keeps the same Switch DOM node across a successful Toggle without remounting', async () => {

@@ -9,9 +9,9 @@
     @close="emit('update:visible', false)"
   >
     <div class="flex flex-col gap-4">
-      <!-- 错误警告提示 -->
-      <AdminAlert v-if="error || form.errors.value.base_url" severity="error">
-        {{ error || form.errors.value.base_url }}
+      <!-- 字段级校验提示保留（定位到具体输入）；加载/保存失败只走 toast。 -->
+      <AdminAlert v-if="form.errors.value.base_url" severity="error">
+        {{ form.errors.value.base_url }}
       </AdminAlert>
 
       <!-- 网关 Base URL -->
@@ -204,7 +204,6 @@ const probePath = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
-const error = ref('')
 const form = useForm({
   initialValues: { base_url: '', token: '', account_id: '', gateway_id: '' },
   schema: v.object({
@@ -231,7 +230,6 @@ watch(
 
 async function loadGatewayConfig() {
   loading.value = true
-  error.value = ''
   try {
     const data = await resource.value.get()
     summary.value = data
@@ -242,7 +240,7 @@ async function loadGatewayConfig() {
       gateway_id: data.gateway_id ?? '',
     })
   } catch (caughtError) {
-    error.value = formatAdminDisplayError(caughtError, MODELS_MESSAGES.gatewayLoadFailed)
+    feedback.loadFailed(caughtError)
   } finally {
     loading.value = false
   }
@@ -281,7 +279,6 @@ const handleTestConnection = form.handleSubmit(async (values) => {
 
 const handleSave = form.handleSubmit(async (values) => {
   saving.value = true
-  error.value = ''
 
   try {
     const finalBaseUrl = values.base_url.trim().replace(/\/+$/, '')
@@ -304,16 +301,17 @@ const handleSave = form.handleSubmit(async (values) => {
     await resource.value.update(payload)
 
     feedback.saved()
-    // saved 必须是服务端确认的真相：重读失败就报错、不关弹窗、不 emit。
+    // saved 必须是服务端确认的真相：重读失败就报错、不关弹窗、不 emit（toast 通知）。
     try {
       emit('saved', await resource.value.get())
     } catch (caughtError) {
-      error.value = formatAdminDisplayError(caughtError, MODELS_MESSAGES.gatewayRereadFailed)
+      feedback.rereadFailed(caughtError)
       return
     }
     emit('update:visible', false)
   } catch (caughtError) {
-    error.value = formatAdminDisplayError(caughtError, MODELS_MESSAGES.gatewaySaveFailed)
+    // 保存失败只走 toast，对话框保持打开可重试。
+    feedback.saveFailed(caughtError)
   } finally {
     saving.value = false
   }

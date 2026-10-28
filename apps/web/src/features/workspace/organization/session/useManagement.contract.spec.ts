@@ -193,7 +193,7 @@ describe('Organization management interface', () => {
     await management.revokeInvite(pending.id)
     expect(management.pendingInvites.value).toEqual([])
   })
-  it('keeps rename errors local and converges a successful rename', async () => {
+  it('routes rename server failure to toast and converges a successful rename', async () => {
     const { management } = harness()
     await ready(management)
     management.startRename()
@@ -202,7 +202,8 @@ describe('Organization management interface', () => {
     await management.commitRename()
     expect(management.organization.value?.name).toBe('Acme')
     expect(management.isRenaming.value).toBe(true)
-    expect(management.renameError.value).toBe(
+    expect(management.renameError.value).toBeNull()
+    expect(toast.error).toHaveBeenCalledWith(
       'Could not rename the organization. Please try again.',
     )
     await management.commitRename()
@@ -319,7 +320,9 @@ describe('Organization management interface', () => {
     expect(management.organization.value?.name).toBe('Acme')
     expect(getOrganizationScopeStore().scope.value.kind).toBe('organization')
     expect(onScopeExit).not.toHaveBeenCalled()
-    expect(management.closureError.value).toMatch(/unsettled tasks or funds/)
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('unsettled tasks or funds'),
+    )
   })
   it('hides old identity facts and does not apply an old identity mutation to the new viewer', async () => {
     let finish!: () => void

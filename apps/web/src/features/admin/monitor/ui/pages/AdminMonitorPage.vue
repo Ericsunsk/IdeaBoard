@@ -1,9 +1,5 @@
 <template>
   <div :class="adminDashboardRootClass">
-    <AdminAlert v-if="isMonitorError" severity="error">
-      {{ monitorErrorMessage }}
-    </AdminAlert>
-
     <AdminAlert v-if="isMonitorStale" severity="warning">
       <div class="flex flex-wrap items-center gap-2">
         <span>{{ MONITOR_MESSAGES.staleNotice }}</span>
@@ -40,12 +36,7 @@
       />
     </template>
 
-    <AdminAlert v-if="isTaskListError" severity="error">
-      {{ taskListErrorMessage }}
-    </AdminAlert>
-
     <TaskActivityTable
-      v-else
       :tasks="tasks"
       :loading="isTaskListLoading"
       :total-count="metricStatsSnapshot.total"
@@ -66,7 +57,6 @@
       :task-id="selectedDetailTaskID"
       :task="detailTask"
       :loading="isDetailLoading"
-      :error-message="detailErrorMessage"
       @retry="retryTaskDetail"
     />
   </div>
@@ -74,8 +64,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { formatDisplayErrorMessage } from '@/core/utils/errorMessages'
-import { useAdminTaskCancellationFeedback } from '../../session/useAdminMonitorFeedback'
+import {
+  useAdminTaskCancellationFeedback,
+  useAdminTaskLoadFeedback,
+} from '../../session/useAdminMonitorFeedback'
+import { useFailureToast } from '@/core/composables/useFailureToast'
 import AdminTaskResultDialog from '../AdminTaskResultDialog.vue'
 import { AdminAlert } from '../../../shared'
 import { AdminButton } from '../../../shared'
@@ -103,6 +96,7 @@ import { MONITOR_MESSAGES } from './messages'
 
 const adminConfirm = useAdminConfirm()
 const taskCancellationFeedback = useAdminTaskCancellationFeedback()
+const taskLoadFeedback = useAdminTaskLoadFeedback()
 const {
   isCancellableTask: canCancelTask,
   isCancellingTask,
@@ -125,11 +119,6 @@ const detailTask = computed(() => {
 })
 const isDetailLoading = computed(
   () => detailModalVisible.value && detailTask.value === null && !detailQuery.isError.value,
-)
-const detailErrorMessage = computed(() =>
-  detailQuery.isError.value
-    ? formatDisplayErrorMessage(detailQuery.error.value, MONITOR_MESSAGES.detailLoadFailed)
-    : '',
 )
 
 const {
@@ -207,12 +196,20 @@ const {
   retry: retryMonitorSnapshot,
 } = useAdminTaskRuntimeSnapshot()
 
-const taskListErrorMessage = computed(() =>
-  formatDisplayErrorMessage(taskListError.value, MONITOR_MESSAGES.listLoadFailed),
-)
-const monitorErrorMessage = computed(() =>
-  formatDisplayErrorMessage(monitorError.value, MONITOR_MESSAGES.snapshotLoadFailed),
-)
+// 页级/表级/详情行内错误文案已删除：失败只走 toast，表格与工具栏即恢复入口；
+// stale 提示保留（无 toast 覆盖的新鲜度信息）。
+useFailureToast(isMonitorError, taskLoadFeedback.snapshotLoadFailed, {
+  shouldFireOnMount: false,
+  resolveError: () => monitorError.value,
+})
+useFailureToast(isTaskListError, taskLoadFeedback.listLoadFailed, {
+  shouldFireOnMount: false,
+  resolveError: () => taskListError.value,
+})
+useFailureToast(() => detailQuery.isError.value, taskLoadFeedback.detailLoadFailed, {
+  shouldFireOnMount: false,
+  resolveError: () => detailQuery.error.value,
+})
 const chartsCollapsed = ref(false)
 
 function toggleFilterStatus(status: typeof filterStatus.value) {

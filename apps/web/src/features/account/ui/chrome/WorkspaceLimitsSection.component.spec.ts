@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { setUserLocale } from '../../../../core/i18n'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
-import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
+import { mockAppToast, expectToastFeedback, type AppToastMocks } from '../../../../test/toast'
 import WorkspaceLimitsSection from './WorkspaceLimitsSection.vue'
 import type { MemberQuotaSummary } from '../../session/quota/resource'
 
@@ -257,13 +257,13 @@ describe('WorkspaceLimitsSection', () => {
     expect(quotaTransport.update).not.toHaveBeenCalled()
   })
 
-  test('retries self quota after a load failure', async () => {
+  test('toasts self quota load failures with a neutral retry entry', async () => {
     quotaTransport.fetchSelf
       .mockRejectedValueOnce(new Error('down'))
       .mockResolvedValueOnce(dailyQuota())
     const view = renderSection()
 
-    expect(await screen.findByText('Could not load the quota.')).toBeVisible()
+    await expectToastFeedback(toast, 'Could not load the quota.')
     await view.user.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByText('25 / 100 Ideas used')).toBeVisible()
   })

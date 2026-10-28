@@ -1,14 +1,6 @@
 <template>
   <div :class="adminDashboardRootClass">
-    <AdminAlert v-if="isListError" severity="error">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <span>{{ MODELS_MESSAGES.listLoadFailed }}</span>
-        <ActionButton variant="outline" :disabled="isLoading" @click="refetchCatalog">
-          {{ MODELS_MESSAGES.retry }}
-        </ActionButton>
-      </div>
-    </AdminAlert>
-    <AdminAlert v-else-if="isListStale" severity="warning">
+    <AdminAlert v-if="isListStale" severity="warning">
       {{ MODELS_MESSAGES.listStale }}
     </AdminAlert>
 
@@ -238,7 +230,6 @@ import {
 } from '@iconoir/vue'
 import { AdminAlert } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
-import ActionButton from '@/core/components/ActionButton.vue'
 import { adminDashboardRootClass } from '../../../shared'
 import { adminToolbarButtonClass } from '../../../shared'
 import AdminModelAddDialog from '../dialog/AdminModelAddDialog.vue'
@@ -254,10 +245,7 @@ import { useAdminModelCatalogWorkspace } from '../../session/useAdminModelCatalo
 // Page 只做布局与绑定：目录用例编排归 workspace，query key 归 workspace 所有。
 const {
   allModels,
-  isLoading,
-  isListError,
   isListStale,
-  refetchCatalog,
   observedByModel,
   isObservedLoading,
   isSaving,

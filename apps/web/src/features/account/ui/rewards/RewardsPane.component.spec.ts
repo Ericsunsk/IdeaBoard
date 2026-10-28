@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../../test/render'
+import { mockAppToast, expectToastFeedback, type AppToastMocks } from '../../../../test/toast'
 import RewardsPane from './RewardsPane.vue'
 
 const redeemMock = vi.hoisted(() => vi.fn())
@@ -49,6 +50,8 @@ vi.mock('../../session/rewards/useRewardHistory', async () => {
   }
 })
 
+vi.mock('../../../../core/composables/useAppToast')
+
 function renderRewardsPane() {
   return renderWithUser(RewardsPane, {
     global: {
@@ -60,6 +63,8 @@ function renderRewardsPane() {
 }
 
 describe('RewardsPane', () => {
+  let toast: AppToastMocks
+
   beforeEach(() => {
     historyMock.redemptions = []
     historyMock.isInitialPending = false
@@ -69,6 +74,7 @@ describe('RewardsPane', () => {
     historyMock.isFetchingNextPage = false
     retryInitialMock.mockReset()
     loadMoreMock.mockReset()
+    toast = mockAppToast()
   })
 
   it('renders the redeem form and empty history state', () => {
@@ -161,11 +167,13 @@ describe('RewardsPane', () => {
     expect(screen.getByRole('button', { name: 'Load more' })).toBeVisible()
   })
 
-  it('provides recovery actions for initial and load-more errors', async () => {
+  it('toasts initial failures with a neutral retry entry and keeps load-more inline', async () => {
     historyMock.initialError = new Error('奖励服务暂不可用')
     const { unmount, user } = renderRewardsPane()
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Network error. Please try again.')
+    // 初载失败只走 toast；中性空态 + 重新加载按钮即恢复入口。
+    await expectToastFeedback(toast, 'Network error. Please try again.')
+    expect(screen.getByText('No redemptions yet')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Reload' }))
     expect(retryInitialMock).toHaveBeenCalledOnce()
 

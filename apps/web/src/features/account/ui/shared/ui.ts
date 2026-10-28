@@ -29,5 +29,19 @@ export const accountCardPanelClass =
 
 export const accountDataTableFrameClass = 'rounded-panel border border-border bg-card shadow-raised'
 
+export const accountEmptyStateClass =
+  'flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center'
+
+export const accountEmptyStateTallClass =
+  'flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center'
+
+export const accountInlineRetryClass = 'flex flex-col items-center justify-center gap-2 py-4'
+
+export const accountEmptyTitleClass = 'm-0 font-semibold text-foreground'
+
+export const accountEmptyDescriptionClass = 'mt-1 mb-0 text-admin-content text-muted-foreground'
+
+export const accountEmptyRetryClass = 'mt-3'
+
 export const accountPrimaryActionButtonClass =
   'inline-flex h-11 w-full items-center justify-center rounded-control border border-transparent bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-raised transition-[background-color,color,box-shadow] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:bg-primary-hover focus-visible:outline-none focus-visible:shadow-focus-ring disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none'

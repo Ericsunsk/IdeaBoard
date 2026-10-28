@@ -47,29 +47,14 @@
       <AdminAlert v-if="backgroundError" class="mx-4 mt-4" severity="secondary">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ CREDIT_HEALTH_MESSAGES.queueStaleNotice }}</span>
-          <AdminButton
-            variant="ghost"
-            size="sm"
-            :class="adminTextButtonClass"
-            :loading="loading"
-            @click="refreshFindings"
-          >
+          <AdminButton variant="ghost" size="sm" :disabled="loading" @click="refreshFindings">
             {{ CREDIT_HEALTH_MESSAGES.retryRefresh }}
           </AdminButton>
         </div>
       </AdminAlert>
 
-      <AdminAlert v-if="initialError" class="m-4" severity="error">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>{{ CREDIT_HEALTH_MESSAGES.queueLoadFailed }}</span>
-          <ActionButton variant="outline" :loading="loading" @click="refreshFindings">
-            {{ CREDIT_HEALTH_MESSAGES.queueReload }}
-          </ActionButton>
-        </div>
-      </AdminAlert>
-
       <AdminTable
-        v-else
+        v-if="!initialError"
         :value="findings"
         :loading="loading"
         data-key="id"
@@ -323,13 +308,13 @@ import { AdminAlert } from '../../../shared'
 import { StatusBadge } from '../../../shared'
 import { AdminButton } from '../../../shared'
 import { AdminMono } from '../../../shared'
-import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminColumn } from '../../../shared'
 import { AdminDrawer } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
 import { AdminPagerControls } from '../../../shared'
 import { AdminTable } from '../../../shared'
 import { useAdminCursorCollection } from '../../../shared'
+import { useFailureToast } from '@/core/composables/useFailureToast'
 import { adminPolling } from '@/core/query/queryDefaults'
 import {
   adminFramedIconButtonClass,
@@ -339,7 +324,6 @@ import {
   adminTableFrameClass,
   adminTableRowActionButtonClass,
   adminTableStyle,
-  adminTextButtonClass,
 } from '../../../shared'
 import { ADMIN_TABLE_MORE_COLUMN_WIDTH } from '../../../shared'
 import { formatAdminDateTimeWithSeconds } from '../../core/shared/format'
@@ -348,6 +332,7 @@ import {
   type AdminCreditFinding,
   type AdminCreditFindingStatus,
 } from '../../session/health/findingQueueResource'
+import { useCreditHealthFeedback } from '../../session/health/useCreditHealthFeedback'
 import {
   formatFindingDetailsEntries,
   getFindingRiskPresentation,
@@ -364,6 +349,7 @@ const status = ref<AdminCreditFindingStatus>('open')
 const selectedFinding = ref<AdminCreditFinding | null>(null)
 const drawerVisible = ref(false)
 const resource = createAdminCreditFindingQueueResource()
+const feedback = useCreditHealthFeedback()
 // TanStack Query owns the list lifecycle (same pattern as the orders pilot).
 // The previous recursive refresh timer folds into `refetchInterval`, which
 // follows the status cadence (5s open / 30s resolved) reactively.
@@ -376,6 +362,7 @@ const {
   initialError,
   backgroundError,
   refresh: refreshFindingList,
+  query: findingListQuery,
   pagination,
 } = useAdminCursorCollection({
   buildKey: (cursor) => [...FINDING_LIST_QUERY_ROOT, status.value, cursor] as const,
@@ -408,6 +395,10 @@ watch(status, () => {
   pagination.reset()
   drawerVisible.value = false
   selectedFinding.value = null
+})
+useFailureToast(initialError, feedback.queueLoadFailed, {
+  shouldFireOnMount: false,
+  resolveError: () => findingListQuery.error.value,
 })
 
 function refreshFindings() {

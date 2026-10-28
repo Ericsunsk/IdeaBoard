@@ -1,5 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
+import { useFailureToast } from '@/core/composables/useFailureToast'
 import { useAdminCursorCollection } from '../../../shared'
 import { useRewardCodesFeedback } from './useRewardCodesFeedback'
 import {
@@ -67,12 +68,9 @@ export function useRewardCodeList(options: { resource?: AdminRewardCodeResource 
     getNextCursor: (page) => page.nextBeforeId,
   })
 
-  // Matches the previous `onInitialError` toast; the error Message stays mounted
-  // for repeated failures while the toast fires on each new failure transition.
-  watch(initialError, (failed, wasFailed) => {
-    if (failed && !wasFailed) {
-      feedback.loadFailed(rewardCodeListQuery.error.value)
-    }
+  useFailureToast(initialError, feedback.loadFailed, {
+    shouldFireOnMount: false,
+    resolveError: () => rewardCodeListQuery.error.value,
   })
 
   const rewardCodes = computed(() => rewardCodePage.value?.rewardCodes ?? [])

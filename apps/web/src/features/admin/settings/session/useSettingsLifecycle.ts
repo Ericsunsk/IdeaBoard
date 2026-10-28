@@ -1,5 +1,6 @@
 import { computed, ref, toRaw, watch } from 'vue'
 import type { Ref } from 'vue'
+import { useFailureToast } from '@/core/composables/useFailureToast'
 
 type AdminSettingsFeedback = {
   loadFailed: (error: unknown) => void
@@ -63,9 +64,7 @@ export function useSettingsLifecycle<T>(options: AdminSettingsLifecycleOptions<T
   }
 
   watch(form, () => (validationError.value = ''), { deep: true, flush: 'sync' })
-  watch(options.loadError, (error) => {
-    if (error) options.feedback.loadFailed(error)
-  })
+  useFailureToast(options.loadError, options.feedback.loadFailed, { shouldFireOnMount: false })
   watch(
     options.source,
     (setting) => {

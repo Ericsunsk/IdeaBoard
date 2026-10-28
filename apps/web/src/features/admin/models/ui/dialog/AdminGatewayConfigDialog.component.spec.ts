@@ -128,6 +128,28 @@ describe('AdminGatewayConfigDialog', () => {
     expect(toast.success).toHaveBeenCalledWith('AI 网关配置已保存')
   })
 
+  it('routes save failures to toast without an inline error', async () => {
+    vi.mocked(mockResource.update).mockRejectedValueOnce(new Error('gateway down'))
+    const onUpdateVisible = vi.fn()
+    const { user } = renderDialog({ 'onUpdate:visible': onUpdateVisible })
+
+    await screen.findByPlaceholderText(/gateway/i)
+    await user.click(screen.getByRole('button', { name: '添加网关' }))
+
+    // 保存失败只走 toast，对话框保持打开可重试，不写行内。
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('gateway down'))
+    expect(screen.queryByText('保存网关配置失败')).not.toBeInTheDocument()
+    expect(onUpdateVisible).not.toHaveBeenCalledWith(false)
+  })
+
+  it('routes load failures to toast without an inline error', async () => {
+    vi.mocked(mockResource.get).mockRejectedValueOnce(new Error('gateway down'))
+    renderDialog()
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('gateway down'))
+    expect(screen.queryByText('读取网关配置失败')).not.toBeInTheDocument()
+  })
+
   it('validates invalid URL format', async () => {
     vi.mocked(mockResource.get).mockResolvedValue({
       token_configured: false,

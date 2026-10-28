@@ -19,9 +19,7 @@ describe('PurchaseCard', () => {
           refund_policy: { version: 'v1', url: '/refund-policy' },
         },
         pending: false,
-        error: null,
         checkoutPending: false,
-        checkoutError: null,
       },
     })
 
@@ -43,9 +41,7 @@ describe('PurchaseCard', () => {
           refund_policy: { version: 'v1', url: '/refund-policy' },
         },
         pending: false,
-        error: null,
         checkoutPending: false,
-        checkoutError: null,
       },
     })
 

@@ -77,13 +77,10 @@
       </DataTableColumn>
 
       <template #empty>
-        <LoadErrorPanel
+        <AccountEmptyRetry
           v-if="initialError"
-          class="min-h-40 justify-center"
-          align="center"
-          :message="t('account.errors.historyLoadFailed')"
+          :title="t('account.topUp.historyEmptyTitle')"
           :retry-label="t('account.reload')"
-          retry-variant="ghost"
           @retry="emit('retry')"
         />
         <div
@@ -91,7 +88,7 @@
           class="flex min-h-40 items-center justify-center px-6 py-10 text-center"
           role="status"
         >
-          <span class="font-semibold text-foreground">{{
+          <span :class="accountEmptyTitleClass">{{
             t('account.topUp.historyEmptyTitle')
           }}</span>
         </div>
@@ -137,6 +134,8 @@ import DataTableColumn from '../../../../core/components/DataTableColumn.vue'
 import { Skeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../core/components/DataTableFrame.vue'
 import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
+import AccountEmptyRetry from '../shared/AccountEmptyRetry.vue'
+import { accountEmptyTitleClass } from '../shared/ui'
 import { formatLocaleNumber } from '../../../../core/i18n/formatters'
 import { formatAccountRechargeDateTime } from '../../session/formatters'
 import { formatCurrencyMinor } from '../../session/money'

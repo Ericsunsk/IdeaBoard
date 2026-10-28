@@ -269,7 +269,9 @@ services:
       IMGPROXY_KEY: ${IMGPROXY_KEY:?Set IMGPROXY_KEY}
       IMGPROXY_SALT: ${IMGPROXY_SALT:?Set IMGPROXY_SALT}
       # API image responses use signed internal requests to this sidecar.
-      IMGPROXY_ALLOWED_SOURCES: ${IMGPROXY_ALLOWED_SOURCES:-local:///}
+      # The default also permits the DiceBear seed-avatar CDN so the API can
+      # proxy permanent seed avatars without the browser dialing it directly.
+      IMGPROXY_ALLOWED_SOURCES: ${IMGPROXY_ALLOWED_SOURCES:-local:///,https://api.dicebear.com/}
       # S3 sources require matching credentials, buckets, and allowed sources.
       IMGPROXY_USE_S3: ${IMGPROXY_USE_S3:-false}
       IMGPROXY_S3_ENDPOINT: ${IMGPROXY_S3_ENDPOINT:-}

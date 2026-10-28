@@ -155,11 +155,12 @@ describe('OAuthProviderSettingsDialog', () => {
     expect(resource.save).not.toHaveBeenCalled()
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
   })
-  it('renders a retryable load error and disables Save', async () => {
+  it('routes a load failure to toast while keeping the retryable anchor', async () => {
     vi.mocked(resource.get).mockRejectedValueOnce(new Error('auth unavailable'))
     renderDialog()
 
     const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('auth unavailable'))
     expect(await within(dialog).findByText('auth unavailable')).toBeVisible()
     expect(within(dialog).getByRole('button', { name: '重新加载' })).toBeEnabled()
     expect(within(dialog).getByRole('button', { name: '保存' })).toBeDisabled()

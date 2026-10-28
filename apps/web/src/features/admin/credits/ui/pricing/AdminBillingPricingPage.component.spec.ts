@@ -144,14 +144,16 @@ describe('AdminBillingPricingPage', () => {
     expect(await screen.findByText('暂无可定价功能')).toBeVisible()
   })
 
-  it('keeps load failures visible and retryable', async () => {
+  it('routes load failures to toast and recovers through the toolbar refresh', async () => {
     const state = createBillingCatalogMswState({ failFirst: 1 })
     useMswHandlers(...createBillingCatalogHandlers(state))
 
     const { user } = renderPricingPage()
 
-    expect(await screen.findByText('功能定价加载失败')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: '重新加载' }))
+    // 整页行内锚点已删除：失败只走 toast，工具栏刷新即重试入口。
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('功能定价加载失败'))
+    expect(screen.queryByText('功能定价加载失败')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '刷新功能定价' }))
     expect(await screen.findByText('inpaint')).toBeVisible()
   })
 
@@ -265,7 +267,9 @@ describe('AdminBillingPricingPage', () => {
     await user.type(screen.getByRole('spinbutton', { name: '1K' }), '3')
     await user.click(screen.getByRole('button', { name: '保存' }))
 
-    expect((await screen.findAllByText('publish unavailable')).length).toBeGreaterThan(0)
+    // 发布失败只走 toast（对话框保持打开可重试），不再写行内。
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('publish unavailable'))
+    expect(screen.queryByText('publish unavailable')).not.toBeInTheDocument()
     expect(screen.getByRole('dialog')).toBeVisible()
     await user.click(screen.getByRole('button', { name: '保存' }))
     expect(await screen.findByText('3')).toBeVisible()
@@ -288,7 +292,8 @@ describe('AdminBillingPricingPage', () => {
     await user.type(screen.getByRole('spinbutton', { name: '1K' }), '3')
     await user.click(screen.getByRole('button', { name: '保存' }))
 
-    expect(await screen.findByText('publish unavailable')).toBeVisible()
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('publish unavailable'))
+    expect(screen.queryByText('publish unavailable')).not.toBeInTheDocument()
     expect(screen.getByRole('dialog')).toBeVisible()
   })
 

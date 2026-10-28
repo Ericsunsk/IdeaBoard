@@ -1,7 +1,9 @@
 import { mediaDisplayFixture } from '../../../test/mediaDisplay'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { nextTick, ref, type Ref } from 'vue'
+import { beforeEach, describe, expect, it, test, vi } from 'vitest'
+import { computed, effectScope, nextTick, reactive, ref, type Ref } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import type { SearchResult, VisionReference } from '../core/models'
+import { mockAppToast } from '../../../test/toast'
 import { useSearchSession } from './useSearchSession'
 import {
   clearPendingSearchAuthAction,
@@ -25,11 +27,13 @@ const mocks = vi.hoisted(() => ({
   resumeAfterAuthentication: vi.fn(async () => undefined),
   references: { value: [] as VisionReference[] },
   feedResults: null as Ref<SearchResult[]> | null,
+  feedHasError: null as Ref<boolean> | null,
   state: { value: 'idle' as 'idle' | 'extracting' | 'ready' },
   error: { value: '' },
 }))
 
-vi.mock('vue-router', () => ({
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
   useRoute: () => mocks.route,
   useRouter: () => ({ replace: mocks.replace, push: mocks.push }),
 }))
@@ -38,6 +42,7 @@ vi.mock('./feed', () => ({
   createSearchFeed: () => ({
     load: mocks.load,
     results: mocks.feedResults!,
+    hasError: mocks.feedHasError,
     markSaved: mocks.markSaved,
     markSavedKey: mocks.markSavedKey,
     markUnsaved: mocks.markUnsaved,
@@ -48,7 +53,7 @@ vi.mock('./useVisionQueryLifecycle', () => ({
   useVisionQueryLifecycle: () => ({
     references: mocks.references,
     state: mocks.state,
-    error: mocks.error,
+    error: ref(mocks.error.value),
     clearReferences: mocks.clearReferences,
     resetExtraction: mocks.resetExtraction,
     refreshReferencePresentation: mocks.refreshReferencePresentation,
@@ -57,14 +62,19 @@ vi.mock('./useVisionQueryLifecycle', () => ({
   }),
 }))
 
+vi.mock('../../../core/composables/useAppToast')
+
 describe('useSearchSession', () => {
   beforeEach(() => {
     mocks.route.query = {}
     mocks.references.value = []
     mocks.feedResults = ref([])
+    mocks.feedHasError = ref(false)
     mocks.state.value = 'idle'
     clearPendingSearchAuthAction()
     vi.clearAllMocks()
+    mocks.load.mockReset().mockResolvedValue(undefined)
+    mockAppToast()
   })
 
   it('loads the route query into the feed', async () => {
@@ -98,6 +108,59 @@ describe('useSearchSession', () => {
     await session.submitQuery()
     expect(mocks.submit).toHaveBeenCalledOnce()
   })
+
+  test.each(['warm cafe', ''])(
+    'retries a failed query (%j) on resubmit and loads a changed query once',
+    async (query) => {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: '/user/search', component: { render: () => null } }],
+      })
+      await router.push({ path: '/user/search', query: query ? { q: query } : {} })
+      const route = reactive({
+        ...router.currentRoute.value,
+        query: computed(() => router.currentRoute.value.query),
+      })
+      const scope = effectScope()
+      mocks.load
+        .mockImplementationOnce(async () => {
+          mocks.feedHasError!.value = true
+        })
+        .mockImplementationOnce(async () => {
+          mocks.feedHasError!.value = false
+        })
+
+      try {
+        await scope.run(async () => {
+          const session = useSearchSession({
+            libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }),
+            route,
+            router,
+          })
+          await nextTick()
+          expect(mocks.load).toHaveBeenCalledTimes(1)
+          expect(session.feed.hasError.value).toBe(true)
+
+          await session.submitQuery()
+          await nextTick()
+
+          expect(mocks.load).toHaveBeenCalledTimes(2)
+          expect(session.feed.hasError.value).toBe(false)
+          expect(session.query.submittedQuery.value).toBe(query)
+
+          session.query.draftQuery.value = 'new search'
+          await session.submitQuery()
+          await nextTick()
+
+          expect(router.currentRoute.value.query.q).toBe('new search')
+          expect(session.query.submittedQuery.value).toBe('new search')
+          expect(mocks.load).toHaveBeenCalledTimes(3)
+        })
+      } finally {
+        scope.stop()
+      }
+    },
+  )
 
   it('clears references and reloads the empty query when the route is already clean', async () => {
     const session = useSearchSession({
@@ -239,6 +302,35 @@ describe('useSearchSession', () => {
     await nextTick()
 
     expect(mocks.submit).not.toHaveBeenCalled()
+  })
+
+  it('toasts empty-result feed failures without an inline channel', async () => {
+    const toast = mockAppToast()
+    useSearchSession({
+      libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }),
+    })
+    await nextTick()
+
+    mocks.feedResults!.value = []
+    mocks.feedHasError!.value = true
+    await nextTick()
+
+    expect(toast.error).toHaveBeenCalledWith('Unable to load inspiration feed. Please try again.')
+  })
+
+  it('skips the failure toast while cached results stay visible', async () => {
+    const toast = mockAppToast()
+    useSearchSession({
+      libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }),
+    })
+    await nextTick()
+
+    mocks.feedResults!.value = [{ id: 'photo-1' } as SearchResult]
+    mocks.feedHasError!.value = true
+    await nextTick()
+
+    // 有数据时的刷新失败保留行内次级提示，不进 toast。
+    expect(toast.error).not.toHaveBeenCalled()
   })
 })
 

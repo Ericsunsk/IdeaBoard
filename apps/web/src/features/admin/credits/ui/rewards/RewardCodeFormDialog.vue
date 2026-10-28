@@ -160,10 +160,6 @@
           />
         </div>
       </AdminFormField>
-
-      <AdminAlert v-if="errorMessage" severity="error">
-        {{ errorMessage }}
-      </AdminAlert>
     </form>
 
     <template #footer>
@@ -221,9 +217,8 @@ const props = withDefaults(
     visible: boolean
     rewardCode?: RewardCode | null
     pending?: boolean
-    errorMessage?: string
   }>(),
-  { rewardCode: null, pending: false, errorMessage: '' },
+  { rewardCode: null, pending: false },
 )
 const emit = defineEmits<{
   'update:visible': [visible: boolean]

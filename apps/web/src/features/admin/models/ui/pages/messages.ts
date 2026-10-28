@@ -6,7 +6,6 @@
 // filter-option and workspace copy stays in `application/` + `domain/`.
 
 export const MODELS_MESSAGES = {
-  listLoadFailed: '模型库加载失败，请重试。',
   retry: '重试',
   listStale: '模型库后台刷新失败，当前显示上次成功数据。',
   searchLabel: '搜索模型',
@@ -56,13 +55,7 @@ export const MODELS_MESSAGES = {
   gatewayProbeRequired: '测试连接需要填写 provider 与 path',
   gatewayBaseUrlRequired: '请输入网关 Base URL',
   gatewayBaseUrlScheme: '网关 Base URL 必须以 http:// 或 https:// 开头',
-  gatewayLoadFailed: '读取网关配置失败',
   gatewayTestFailed: '网关连接测试失败',
-  gatewaySaveTitle: '保存 AI 网关配置',
-  gatewaySaveMessage: '确定保存 AI 网关连接配置吗？该操作将记录操作人。',
-  gatewaySaveConfirm: '保存配置',
-  gatewayRereadFailed: '配置已保存，但重读网关状态失败，请重试',
-  gatewaySaveFailed: '保存网关配置失败',
   addHeader: '添加模型',
   addDescription: '勾选需要接入的模型后提交添加。',
   addProviderAll: '全部供应商',
@@ -81,7 +74,6 @@ export const MODELS_MESSAGES = {
   addPickedCount: (count: number) => `已选 ${count} 个模型`,
   addManual: '手动新增',
   addImport: (count: number) => (count > 0 ? `导入所选模型 (${count})` : '导入所选模型'),
-  addDetectFailed: '探测网关模型失败',
   addEmptyUnconfigured: '网关未配置任何 Provider',
   addEmptyNoneAvailable: (count: number) => `已配置 ${count} 家 Provider，社区目录中未发现可用模型`,
   addEmptyNone: '未探测到可用的网关模型',
@@ -180,16 +172,6 @@ export const MODELS_MESSAGES = {
   referenceMissAllowlist: '服务端未放行 models.dev，参照价不可用。',
   referenceMissDefault: '暂无该模型参照价。',
   cardCacheTitle: '支持 prompt caching',
-  selectDefaultAria: '选择模型',
-  selectDefaultPlaceholder: '选择配置的模型...',
-  selectSearchAria: (allowCustom: boolean) =>
-    allowCustom ? '搜索模型或输入自定义标识' : '搜索已入库模型',
-  selectSearchPlaceholder: (allowCustom: boolean) =>
-    allowCustom ? '搜索已入库模型或输入自定义标识...' : '搜索已入库模型...',
-  selectUseCustom: '使用自定义模型:',
-  selectEmpty: (allowCustom: boolean) =>
-    allowCustom ? MODELS_MESSAGES.emptyNoMatch : '未找到匹配的模型，请前往「模型管理」先入库',
-  selectManageModels: '前往「模型管理」添加或刷新模型',
   observedAria: '模型观测数据',
   observedTitle: '近 7 天观测',
   observedWindow: (days: number) => `${days} 天窗口`,

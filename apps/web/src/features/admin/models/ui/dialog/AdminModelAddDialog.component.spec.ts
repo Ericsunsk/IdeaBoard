@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, within } from '@testing-library/vue'
 import { renderWithUser, screen } from '@/test/render'
+import { mockAppToast, expectToastFeedback, type AppToastMocks } from '@/test/toast'
 import AdminModelAddDialog from './AdminModelAddDialog.vue'
 import type { AdminModelItem } from '../../core/catalogData'
 
 const gatewayFakes = vi.hoisted(() => ({
   detect: vi.fn(),
 }))
+
+let toast: AppToastMocks
 
 vi.mock('../../resource', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../resource')>()
@@ -17,6 +20,8 @@ vi.mock('../../resource', async (importOriginal) => {
     }),
   }
 })
+
+vi.mock('../../../../../core/composables/useAppToast')
 
 describe('AdminModelAddDialog', () => {
   const mockDetectedModels = [
@@ -40,6 +45,7 @@ describe('AdminModelAddDialog', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    toast = mockAppToast()
     gatewayFakes.detect.mockResolvedValue({
       models: mockDetectedModels,
       configured_providers: 3,
@@ -109,13 +115,14 @@ describe('AdminModelAddDialog', () => {
     expect(within(dialog).queryByText('未探测到可用的网关模型')).not.toBeInTheDocument()
   })
 
-  it('shows only the error alert without the empty state when detection fails', async () => {
+  it('routes detection failures to toast without an inline error', async () => {
     gatewayFakes.detect.mockRejectedValueOnce(new Error('unavailable'))
     renderDialog()
 
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByRole('button', { name: '重试' })).toBeVisible()
-    expect(within(dialog).queryByText('未探测到可用的网关模型')).not.toBeInTheDocument()
+    // 行内错误已删除：失败只走 toast，空态解释与重试入口见父页。
+    await expectToastFeedback(toast, 'unavailable', within(dialog), ['unavailable'])
+    expect(within(dialog).queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
   })
 
   it('disables checkbox for existing models and allows selecting new models for batch import', async () => {
@@ -186,16 +193,15 @@ describe('AdminModelAddDialog', () => {
     expect(within(dialog).queryByText('FLUX.1 Schnell 快速生图')).not.toBeInTheDocument()
   })
 
-  it('shows detection guidance when the control plane has no detection surface', async () => {
+  it('routes control-plane detection errors to toast without an inline error', async () => {
     const unavailable = new Error('模型探测暂不可用。') as Error & { code?: string }
     unavailable.code = 'gateway_unavailable'
     gatewayFakes.detect.mockRejectedValueOnce(unavailable)
     renderDialog()
 
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByRole('button', { name: '重试' })).toBeVisible()
-    expect(await within(dialog).findByText('模型探测暂不可用。')).toBeVisible()
-    expect(within(dialog).queryByText('未探测到可用的网关模型')).not.toBeInTheDocument()
+    await expectToastFeedback(toast, '模型探测暂不可用。', within(dialog))
+    expect(within(dialog).queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
   })
 
   it('filters models by provider selection', async () => {

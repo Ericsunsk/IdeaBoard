@@ -1,7 +1,8 @@
 import { cleanup } from '@testing-library/vue'
 import { defineComponent, nextTick, type Ref } from 'vue'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, within } from '../../../../test/render'
+import { mockAppToast, expectToastFeedback, type AppToastMocks } from '../../../../test/toast'
 import { setUserLocale } from '../../../../core/i18n'
 import UsagePane from './UsagePane.vue'
 
@@ -41,6 +42,8 @@ vi.mock('../../session/usage/useUsage', () => {
   }
 })
 
+vi.mock('../../../../core/composables/useAppToast')
+
 const ButtonStub = defineComponent({
   template: '<button type="button"><slot /></button>',
 })
@@ -63,6 +66,12 @@ function renderUsagePane() {
 }
 
 describe('UsagePane', () => {
+  let toast: AppToastMocks
+
+  beforeEach(() => {
+    toast = mockAppToast()
+  })
+
   afterEach(async () => {
     await setUserLocale('en')
   })
@@ -272,7 +281,7 @@ describe('UsagePane', () => {
     expect(table).toHaveTextContent('99 Ideas')
   })
 
-  it('shows an inline retry when loading fails', async () => {
+  it('toasts a loading failure with a neutral retry entry', async () => {
     usageState.usage.value = undefined
     usageState.isInitialPending.value = false
     usageState.error.value = new Error('网络异常')
@@ -280,7 +289,8 @@ describe('UsagePane', () => {
 
     const { user } = renderUsagePane()
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Please try again later.')
+    // 初载失败只走 toast，中性重试按钮即恢复入口。
+    await expectToastFeedback(toast, 'Please try again later.')
     await user.click(screen.getByRole('button', { name: 'Reload' }))
     expect(usageState.retry).toHaveBeenCalledOnce()
   })
@@ -310,7 +320,7 @@ describe('UsagePane', () => {
     usageState.isShared.value = false
   })
 
-  it('renders the restricted title for billing_account_forbidden', () => {
+  it('renders the restricted title as a neutral state without a toast', () => {
     usageState.usage.value = undefined
     usageState.isInitialPending.value = false
     const forbidden = new Error('forbidden') as Error & { code: string }
@@ -319,7 +329,10 @@ describe('UsagePane', () => {
 
     renderUsagePane()
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Access restricted')
+    // 403 是中性空态（status），不打扰 toast；重载按钮仍可恢复。
+    expect(screen.getByRole('status')).toHaveTextContent('Access restricted')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 
   it('renders a native segmented range switcher in the chart card header', async () => {

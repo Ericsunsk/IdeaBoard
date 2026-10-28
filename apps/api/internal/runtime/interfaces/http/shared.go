@@ -22,6 +22,7 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identityports "ideaboard/api/internal/identity/users/ports"
+	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
 
@@ -188,14 +189,14 @@ func V1PublicAvatarURL(storageUID string) string {
 
 // V1PublicAvatarURLForRow projects a stored users.avatar value to its
 // public route URL. Empty keys (no custom avatar) project to "" so
-// callers keep the omitted-avatar shape; external (non-key) URLs pass
-// through untouched.
+// callers keep the omitted-avatar shape. DiceBear seed URLs use the same
+// public route as stored objects; other external URLs pass through untouched.
 func V1PublicAvatarURLForRow(storageUID, avatarKey string) string {
 	key := strings.TrimSpace(avatarKey)
 	if key == "" {
 		return ""
 	}
-	if strings.HasPrefix(key, "/") || strings.Contains(key, "://") {
+	if !imgproxy.IsDicebearAvatarURL(key) && (strings.HasPrefix(key, "/") || strings.Contains(key, "://")) {
 		return key
 	}
 	if strings.TrimSpace(storageUID) == "" {

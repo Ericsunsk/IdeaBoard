@@ -1,7 +1,7 @@
 <template>
   <div :class="adminDashboardRootClass">
     <!-- 1. 顶栏操作与搜索过滤工具条 (1:1 复刻功能定价页规范) -->
-    <div v-if="!loadFailed || prompts.length > 0" class="flex w-full flex-col gap-3">
+    <div class="flex w-full flex-col gap-3">
       <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
         <!-- 左侧：搜索输入框与状态筛选器 -->
         <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -31,23 +31,9 @@
       </div>
     </div>
 
-    <!-- 2. 错误告警状态 -->
-    <div v-if="loadFailed && prompts.length === 0" :class="adminEmptyStateClass" role="alert">
-      <div class="text-admin-title font-semibold text-foreground">
-        {{ PROMPTS_MESSAGES.loadFailedTitle }}
-      </div>
-      <div class="mt-2 text-admin-meta text-muted-foreground">
-        {{ PROMPTS_MESSAGES.loadFailedHint }}
-      </div>
-      <AdminButton class="mt-4" variant="outline" :disabled="isLoading" @click="loadPrompts()">
-        <Refresh class="size-4" />
-        {{ PROMPTS_MESSAGES.reload }}
-      </AdminButton>
-    </div>
-
-    <!-- 3. 空状态提示 (无数据或过滤未命中) -->
+    <!-- 2. 空状态提示 (无数据或过滤未命中) -->
     <AdminEmptyState
-      v-else-if="filteredFeatureGroups.length === 0"
+      v-if="filteredFeatureGroups.length === 0"
       :title="!hasActiveFilter ? PROMPTS_MESSAGES.emptyNoConfig : PROMPTS_MESSAGES.emptyNoMatch"
       :description="
         !hasActiveFilter ? PROMPTS_MESSAGES.emptyNoConfigHint : PROMPTS_MESSAGES.emptyNoMatchHint
@@ -67,7 +53,7 @@
       </template>
     </AdminEmptyState>
 
-    <!-- 4. 分组表格视图 (按 Image / Prompt / Fusion 分组展示，1:1 对齐功能定价页 BillingPricingTable 规范) -->
+    <!-- 3. 分组表格视图 (按 Image / Prompt / Fusion 分组展示，1:1 对齐功能定价页 BillingPricingTable 规范) -->
     <div v-else class="flex flex-col gap-6">
       <section
         v-for="group in filteredFeatureGroups"
@@ -221,9 +207,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Refresh, Search, Spark, Xmark } from '@iconoir/vue'
+import { Search, Spark, Xmark } from '@iconoir/vue'
 import { usePromptConfigFeedback } from '../../session/usePromptConfigFeedback'
-import { AdminButton } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
 import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminTable } from '../../../shared'
@@ -237,7 +222,6 @@ import PromptConfigEditorDialog from '../editors/PromptConfigEditorDialog.vue'
 import { usePromptConfigFilters } from '../../core/filtering'
 import {
   adminDashboardRootClass,
-  adminEmptyStateClass,
   adminTableCardClass,
   adminTableClass,
   adminTableFrameClass,
@@ -267,7 +251,6 @@ const {
   getPromptVariables,
   getSavedPrompt,
   insertVariableIntoDraft,
-  loadFailed,
   loadPrompts,
   isLoading,
   promptMap,

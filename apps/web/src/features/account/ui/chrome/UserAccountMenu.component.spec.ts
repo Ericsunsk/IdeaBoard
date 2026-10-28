@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, test, vi } from 'vitest'
 import { defineComponent, ref } from 'vue'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import type { RenderOptions } from '@testing-library/vue'
@@ -636,6 +636,55 @@ describe('UserAccountMenu', () => {
       )
     })
 
+    test('reports an initial list failure once across the menu and settings dialog', async () => {
+      const workspace = workspaceControls({ status: 'error', errorMessage: 'List unavailable' })
+      const view = await openSettingsDialog(workspace)
+
+      expect(toast.error.mock.calls).toEqual([['List unavailable']])
+      await view.user.click(screen.getByRole('button', { name: 'Retry' }))
+      expect(workspace.onRetry).toHaveBeenCalledOnce()
+
+      await view.user.click(screen.getByRole('button', { name: 'Close' }))
+      await view.user.click(screen.getByRole('button', { name: 'Account menu' }))
+      await view.user.click(screen.getByRole('button', { name: 'Manage workspaces' }))
+      expect(await screen.findByRole('heading', { name: 'Workspaces' })).toBeVisible()
+      expect(toast.error.mock.calls).toEqual([['List unavailable']])
+    })
+
+    test('reports each new list failure once while settings is closed or open', async () => {
+      const workspace = workspaceControls()
+      const view = renderWithUser(UserAccountMenu, {
+        props: { items: profileItems, workspace },
+        global: { stubs: dialogStubs },
+      })
+      const failedWorkspace: UserAccountMenuWorkspace = {
+        ...workspace,
+        status: 'error',
+        errorMessage: 'List unavailable',
+      }
+
+      await view.rerender({ workspace: failedWorkspace })
+      expect(screen.queryByRole('heading', { name: 'Workspaces' })).not.toBeInTheDocument()
+      expect(toast.error.mock.calls).toEqual([['List unavailable']])
+
+      await view.rerender({ workspace })
+      await view.user.click(screen.getByRole('button', { name: 'Account menu' }))
+      await view.user.click(screen.getByRole('button', { name: 'Manage workspaces' }))
+      expect(await screen.findByRole('heading', { name: 'Workspaces' })).toBeVisible()
+      await view.rerender({ workspace: failedWorkspace })
+      expect(toast.error.mock.calls).toEqual([['List unavailable'], ['List unavailable']])
+
+      await view.user.click(screen.getByRole('button', { name: 'Retry' }))
+      expect(workspace.onRetry).toHaveBeenCalledOnce()
+      await view.rerender({ workspace })
+      await view.rerender({ workspace: failedWorkspace })
+      expect(toast.error.mock.calls).toEqual([
+        ['List unavailable'],
+        ['List unavailable'],
+        ['List unavailable'],
+      ])
+    })
+
     it('opens settings on gear click without opening the submenu', async () => {
       const view = await openMenuWithWorkspace(workspaceControls())
 
@@ -938,7 +987,7 @@ describe('UserAccountMenu', () => {
       )
     })
 
-    it('keeps the naming dialog open with an inline error when creation fails', async () => {
+    it('keeps the naming dialog open with a toast when creation fails', async () => {
       const workspace = workspaceControls({
         onCreate: vi.fn().mockRejectedValue(new Error('boom')),
       })
@@ -948,14 +997,16 @@ describe('UserAccountMenu', () => {
       await screen.findByLabelText('Workspace name')
       await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
 
-      expect(
-        await screen.findAllByText('Could not create the workspace. Please try again.'),
-      ).not.toHaveLength(0)
+      // Server-side creation failures go through toast only; the dialog
+      // stays open for retry without an inline copy.
       await waitFor(() =>
         expect(toast.error).toHaveBeenCalledWith(
           'Could not create the workspace. Please try again.',
         ),
       )
+      expect(
+        screen.queryByText('Could not create the workspace. Please try again.'),
+      ).not.toBeInTheDocument()
       expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
       expect(screen.getByRole('dialog', { name: 'New workspace' })).toBeVisible()
     })
@@ -1046,7 +1097,7 @@ describe('UserAccountMenu', () => {
       await waitFor(() => expect(workspace.onRename).toHaveBeenCalledWith('ws_team2', 'Renamed'))
     })
 
-    it('surfaces the server code when creation fails', async () => {
+    it('surfaces the server code in a toast when creation fails', async () => {
       const failure = Object.assign(new Error('request failed'), {
         code: 'workspace_default_conflict',
       })
@@ -1059,16 +1110,17 @@ describe('UserAccountMenu', () => {
       await screen.findByLabelText('Workspace name')
       await view.user.click(screen.getByRole('button', { name: 'Create workspace' }))
 
-      expect(
-        await screen.findAllByText(
-          'Could not create the workspace. Please try again. (workspace_default_conflict)',
-        ),
-      ).not.toHaveLength(0)
+      // Server code rides the toast only; no inline copy stays behind.
       await waitFor(() =>
         expect(toast.error).toHaveBeenCalledWith(
           'Could not create the workspace. Please try again. (workspace_default_conflict)',
         ),
       )
+      expect(
+        screen.queryByText(
+          'Could not create the workspace. Please try again. (workspace_default_conflict)',
+        ),
+      ).not.toBeInTheDocument()
       expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeVisible()
     })
 
@@ -1179,7 +1231,7 @@ describe('UserAccountMenu', () => {
       )
     })
 
-    it('keeps settings open with an inline code when deletion fails', async () => {
+    it('keeps settings open with a toast when deletion fails', async () => {
       const failure = Object.assign(new Error('request failed'), {
         code: 'workspace_default_protected',
       })
@@ -1195,10 +1247,10 @@ describe('UserAccountMenu', () => {
       await view.user.click(within(dialog).getByRole('button', { name: 'Delete' }))
 
       expect(
-        await screen.findByText(
+        screen.queryByText(
           'Could not delete the workspace. Please try again. (workspace_default_protected)',
         ),
-      ).toBeVisible()
+      ).not.toBeInTheDocument()
       await waitFor(() =>
         expect(toast.error).toHaveBeenCalledWith(
           'Could not delete the workspace. Please try again. (workspace_default_protected)',

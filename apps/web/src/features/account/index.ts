@@ -47,4 +47,14 @@ export { default as RechargePane } from './ui/recharge/RechargePane.vue'
 export { default as BillingPane } from './ui/billing/BillingPane.vue'
 export { default as RewardsPane } from './ui/rewards/RewardsPane.vue'
 export { default as UsagePane } from './ui/usage/UsagePane.vue'
-export * from './ui/shared/ui'
+export {
+  accountCardPanelClass,
+  accountCloseButtonClass,
+  accountContentPaneClass,
+  accountDataTableFrameClass,
+  accountDialogContentClass,
+  accountLogoutButtonClass,
+  accountMainContentClass,
+  accountNavTabClass,
+  accountPrimaryActionButtonClass,
+} from './ui/shared/ui'

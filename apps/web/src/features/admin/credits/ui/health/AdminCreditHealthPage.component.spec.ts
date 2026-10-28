@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '@/test/msw'
-import { mockAppToast, type AppToastMocks } from '@/test/toast'
+import { mockAppToast, expectToastFeedback, type AppToastMocks } from '@/test/toast'
 import { renderWithUser, screen, waitFor, within } from '@/test/render'
 import AdminCreditHealthPage from './AdminCreditHealthPage.vue'
 import {
@@ -124,7 +124,7 @@ describe('AdminCreditHealthPage', () => {
     expect(document.querySelector('canvas')).toBeNull()
   })
 
-  it('recovers from an initial load failure', async () => {
+  it('routes an initial load failure to toast without an inline error', async () => {
     const state = createCreditHealthMswState({
       healthError: {
         status: 503,
@@ -132,13 +132,11 @@ describe('AdminCreditHealthPage', () => {
       },
     })
     useMswHandlers(...createCreditHealthHandlers(state))
-    const { user } = renderPage()
+    renderPage()
 
-    expect(await screen.findByText('账本健康状态不可用')).toBeVisible()
-    state.healthError = null
-    await user.click(screen.getByRole('button', { name: '重新加载' }))
-
-    expect(await screen.findByText('账本健康')).toBeVisible()
+    // 整页行内文案已删除：失败只走 toast。
+    await expectToastFeedback(toastMocks, 'unavailable', screen, ['账本健康状态不可用'])
+    expect(screen.queryByRole('button', { name: '重新加载' })).not.toBeInTheDocument()
   })
 
   it('keeps cached health visible when a background refresh fails and offers recovery', async () => {
@@ -343,10 +341,11 @@ describe('AdminCreditHealthPage', () => {
     useMswHandlers(...createCreditHealthHandlers(createCreditHealthMswState()))
     const { user } = renderPage()
 
-    expect(await screen.findByText('异常队列加载失败。')).toBeVisible()
+    // 队列初载行内文案已删除：失败只走 toast，表格 + 工具栏刷新即恢复入口。
+    await expectToastFeedback(toastMocks, 'unavailable', screen, ['异常队列加载失败。'])
     findingsShouldFail = false
     findings = []
-    await user.click(screen.getByRole('button', { name: '重新加载异常队列' }))
+    await user.click(screen.getByRole('button', { name: '刷新异常队列' }))
     expect(await screen.findByText('暂无待处理异常')).toBeVisible()
   })
 })

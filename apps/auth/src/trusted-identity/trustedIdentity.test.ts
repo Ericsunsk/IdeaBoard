@@ -36,7 +36,17 @@ test('session identity adapter preserves fail-closed state for an untrusted clai
 
   assert.equal(identity.claim_identity_kind, 'untrusted')
   assert.equal(identity.claim_identity_verified, false)
-  assert.equal(identity.avatar, '')
+  assert.equal(identity.avatar, 'https://api.dicebear.com/9.x/big-ears-neutral/svg?seed=auth-2')
+})
+
+test('session identity adapter assigns a deterministic avatar to email users', () => {
+  const identity = sessionIdentityFromAuthUser({
+    id: 'auth-3',
+    email: 'alice@example.com',
+    emailVerified: true,
+    name: 'Alice',
+  })
+  assert.equal(identity.avatar, 'https://api.dicebear.com/9.x/big-ears-neutral/svg?seed=auth-3')
 })
 
 describe('TrustedIdentityProvisioner', () => {

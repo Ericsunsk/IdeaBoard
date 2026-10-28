@@ -42,20 +42,6 @@
         </button>
       </div>
 
-      <!-- 错误提示 -->
-      <AdminAlert v-if="error" severity="error">
-        <div class="flex items-center justify-between gap-2">
-          <span>{{ error }}</span>
-          <button
-            type="button"
-            class="text-xs font-semibold underline hover:no-underline cursor-pointer"
-            @click="loadDetectedModels"
-          >
-            {{ MODELS_MESSAGES.retry }}
-          </button>
-        </div>
-      </AdminAlert>
-
       <!-- 探测加载中：单行文案，避免与副标题重复造成“两个状态”观感 -->
       <div
         v-if="loading"
@@ -67,9 +53,9 @@
 
       <!-- 结果区与 loading 互斥：必须包在 template v-else 里 -->
       <template v-else>
-        <!-- 空结果提示：失败态只保留顶部 error alert（含重试），此处不再叠加 -->
+        <!-- 空结果提示：无可用模型时解释原因（未配置 / 已配置但社区无可用）；探测失败只走 toast。 -->
         <div
-          v-if="!error && filteredModels.length === 0"
+          v-if="filteredModels.length === 0"
           class="flex flex-col items-center justify-center py-14 text-muted-foreground text-center"
         >
           <Cube class="size-8 text-muted-foreground/60 mb-2" />
@@ -83,7 +69,7 @@
 
         <!-- 紧凑 Checkbox 列表表格 -->
         <div
-          v-else-if="!error"
+          v-else
           class="max-h-[380px] overflow-y-auto rounded-panel border border-border bg-card"
         >
           <table class="w-full text-left text-xs border-collapse">
@@ -234,12 +220,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Check, Cube, Refresh } from '@iconoir/vue'
-import { AdminAlert } from '../../../shared'
 import { AdminButton } from '../../../shared'
 import { AdminDialogShell } from '../../../shared'
 import { AdminSelect } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
 import { createAdminGatewayResource, type DetectedGatewayModel } from '../../resource'
+import { useAdminModelCatalogFeedback } from '../../session/useAdminModelCatalogFeedback'
 import { resolveModelBrandLogo } from '../../../shared'
 import type { AdminModelItem } from '../../core/catalogData'
 import { modelProviderBadgeClass } from '../../core/catalogData'
@@ -266,11 +252,11 @@ const emit = defineEmits<{
 }>()
 
 const catalogResource = createAdminGatewayResource().catalog
+const feedback = useAdminModelCatalogFeedback()
 
 const detectedModels = ref<DetectedGatewayModel[]>([])
 const loading = ref(false)
-const error = ref('')
-// 探测元信息：空结果时解释原因（未配置 / 已配置但社区无可用），失败走顶部 error alert。
+// 探测元信息：空结果时解释原因（未配置 / 已配置但社区无可用），失败只走 toast。
 const detectedMeta = ref<{ configured: number } | null>(null)
 const searchQuery = ref('')
 const selectedProvider = ref('all')
@@ -378,7 +364,6 @@ function toggleRowSelection(id: string) {
 // 自动探测逻辑
 async function loadDetectedModels() {
   loading.value = true
-  error.value = ''
   try {
     const detection = await catalogResource.detect()
     detectedModels.value = detection.models
@@ -386,8 +371,7 @@ async function loadDetectedModels() {
       configured: detection.configured_providers,
     }
   } catch (caughtError) {
-    error.value =
-      caughtError instanceof Error ? caughtError.message : MODELS_MESSAGES.addDetectFailed
+    feedback.detectFailed(caughtError)
   } finally {
     loading.value = false
   }

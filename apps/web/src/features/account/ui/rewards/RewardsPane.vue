@@ -18,11 +18,8 @@
             autocapitalize="characters"
             :spellcheck="false"
             :disabled="pending"
-            :class="[ibFormInputClass, redeemFailed ? ibFormInputErrorClass : '']"
-            :aria-invalid="redeemFailed || undefined"
-            :aria-describedby="redeemFailed ? 'account-reward-code-error' : undefined"
+            :class="ibFormInputClass"
             :placeholder="t('account.rewards.codePlaceholder')"
-            @update:model-value="redeemFailed = false"
           />
           <Button
             type="submit"
@@ -34,14 +31,6 @@
         </div>
         <p class="m-0 text-admin-meta text-muted-foreground" role="note">
           {{ t('account.rewards.beneficiaryNote') }}
-        </p>
-        <p
-          v-if="redeemFailed"
-          id="account-reward-code-error"
-          class="m-0 border-0 bg-transparent p-0 text-admin-meta font-semibold text-destructive"
-          role="alert"
-        >
-          {{ redeemErrorText }}
         </p>
       </form>
     </section>
@@ -118,23 +107,16 @@
         </DataTableColumn>
 
         <template #empty>
-          <LoadErrorPanel
+          <AccountEmptyRetry
             v-if="initialError"
-            class="min-h-40 justify-center"
-            align="center"
-            :message="t('account.rewards.loadFailed')"
-            :detail="errorMessage(initialError)"
+            :title="t('account.rewards.emptyTitle')"
+            :description="t('account.rewards.emptyDescription')"
             :retry-label="t('account.reload')"
-            retry-variant="ghost"
             @retry="retryInitial()"
           />
-          <div
-            v-else
-            class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
-            role="status"
-          >
-            <span class="font-semibold text-foreground">{{ t('account.rewards.emptyTitle') }}</span>
-            <span class="mt-1 text-admin-content text-muted-foreground">{{
+          <div v-else :class="accountEmptyStateClass" role="status">
+            <span :class="accountEmptyTitleClass">{{ t('account.rewards.emptyTitle') }}</span>
+            <span :class="accountEmptyDescriptionClass">{{
               t('account.rewards.emptyDescription')
             }}</span>
           </div>
@@ -183,9 +165,10 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../core/components/DataTableFrame.vue'
 import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
+import { useFailureToast } from '../../../../core/composables/useFailureToast'
 import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'
-import { ibFormInputClass, ibFormInputErrorClass } from '../../../../theme/formControls'
+import { ibFormInputClass } from '../../../../theme/formControls'
 import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
 import { useProfileFeedback } from '../../session/profile/useProfileFeedback'
 import { formatAccountShanghaiDateTime } from '../../session/formatters'
@@ -193,9 +176,13 @@ import { useRewardRedemption } from '../../session/rewards/useRewardRedemption'
 import { useRewardHistory } from '../../session/rewards/useRewardHistory'
 import type { RewardRedemptionItem } from '../../session/rewards/resource'
 import AccountPane from '../shared/AccountPane.vue'
+import AccountEmptyRetry from '../shared/AccountEmptyRetry.vue'
 import {
   accountCardPanelClass,
   accountDataTableFrameClass,
+  accountEmptyDescriptionClass,
+  accountEmptyStateClass,
+  accountEmptyTitleClass,
   accountPrimaryActionButtonClass,
 } from '../shared/ui'
 
@@ -215,11 +202,8 @@ const {
 } = useRewardHistory()
 const normalizedCode = computed(() => code.value.trim())
 const canSubmit = computed(() => normalizedCode.value.length > 0 && !pending.value)
-// Submit failures surface inline next to the control (the Admin invalid +
-// error-text contract), not only as a toast: the user needs to see which field
-// failed without hunting a transient message.
-const redeemFailed = ref(false)
-const redeemErrorText = ref('')
+
+useFailureToast(initialError, (error) => errorMessage(error))
 
 type RewardSkeletonRow = {
   id: string
@@ -256,14 +240,11 @@ function errorMessage(error: unknown): string {
 
 async function submitCode() {
   if (!canSubmit.value) return
-  redeemFailed.value = false
   try {
     const result = await redeem(normalizedCode.value)
     code.value = ''
     profileFeedback.rewardRedemptionSucceeded(result.credited_amount, result.replayed)
   } catch (error) {
-    redeemFailed.value = true
-    redeemErrorText.value = errorMessage(error)
     profileFeedback.rewardRedemptionFailed(error)
   }
 }

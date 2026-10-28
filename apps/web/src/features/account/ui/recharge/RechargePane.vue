@@ -14,7 +14,6 @@
       :error="pendingOrdersError"
       :action-pending="pendingOrderActionPending"
       :action-target="pendingOrderActionTarget"
-      :action-error="pendingOrderActionError"
       @retry="retryPendingOrders()"
       @continue="continuePending"
       @abandon="abandonPending"
@@ -22,9 +21,7 @@
     <PurchaseCard
       :options="purchaseOptions"
       :pending="optionsPending"
-      :error="optionsError"
       :checkout-pending="checkoutPending"
-      :checkout-error="checkoutError"
       @retry="retryOptions()"
       @checkout="checkout"
     />
@@ -45,6 +42,7 @@
 import { useI18n } from 'vue-i18n'
 import { toRef } from 'vue'
 import { useAppToast } from '../../../../core/composables/useAppToast'
+import { useFailureToast } from '../../../../core/composables/useFailureToast'
 import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import type { PaymentReturnContext } from '../../core/return'
 import { useRecharge } from '../../session/payments/useRecharge'
@@ -65,7 +63,6 @@ const {
   retryOptions,
   createCheckout,
   checkoutPending,
-  checkoutError,
   returnStatus,
   returnPending,
   returnError,
@@ -86,23 +83,27 @@ const {
   abandonPendingOrder,
   pendingOrderActionPending,
   pendingOrderActionTarget,
-  pendingOrderActionError,
 } = useRecharge(toRef(props, 'isActive'), toRef(props, 'paymentReturn'))
+
+function errorCopy(error: unknown, fallbackKey: string): string {
+  return userFacingErrorCopy(error, t(fallbackKey), ACCOUNT_GUIDANCE_COPY_KEYS)
+}
+
+// Read failures use toast feedback; pagination retains its inline hint.
+useFailureToast(optionsError, (error) => errorCopy(error, 'account.errors.optionsLoadFailed'))
+useFailureToast(pendingOrdersError, (error) =>
+  errorCopy(error, 'account.errors.pendingOrdersLoadFailed'),
+)
+useFailureToast(historyInitialError, (error) =>
+  errorCopy(error, 'account.errors.historyLoadFailed'),
+)
+useFailureToast(returnError, (error) => errorCopy(error, 'account.errors.orderStatusLoadFailed'))
 
 async function checkout(ideaQuantity: number) {
   try {
     await createCheckout(ideaQuantity)
   } catch (error) {
-    // Dual: useMutation retains the failure for the visible, retryable form
-    // error state (PurchaseCard inline alert as position anchor); toast
-    // surfaces it transiently for users who miss the inline bar.
-    toast.error(
-      userFacingErrorCopy(
-        error,
-        t('account.errors.checkoutCreateFailed'),
-        ACCOUNT_GUIDANCE_COPY_KEYS,
-      ),
-    )
+    toast.error(errorCopy(error, 'account.errors.checkoutCreateFailed'))
   }
 }
 
@@ -110,15 +111,7 @@ async function continuePending(publicToken: string) {
   try {
     await continuePendingOrder(publicToken)
   } catch (error) {
-    // Dual: the pending-order card retains a visible error and retry action;
-    // toast mirrors it transiently.
-    toast.error(
-      userFacingErrorCopy(
-        error,
-        t('account.errors.continuePaymentFailed'),
-        ACCOUNT_GUIDANCE_COPY_KEYS,
-      ),
-    )
+    toast.error(errorCopy(error, 'account.errors.continuePaymentFailed'))
   }
 }
 
@@ -126,15 +119,7 @@ async function abandonPending(publicToken: string) {
   try {
     await abandonPendingOrder(publicToken)
   } catch (error) {
-    // Dual: the pending-order card retains a visible error and retry action;
-    // toast mirrors it transiently.
-    toast.error(
-      userFacingErrorCopy(
-        error,
-        t('account.errors.abandonOrderFailed'),
-        ACCOUNT_GUIDANCE_COPY_KEYS,
-      ),
-    )
+    toast.error(errorCopy(error, 'account.errors.abandonOrderFailed'))
   }
 }
 </script>

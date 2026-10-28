@@ -1,33 +1,6 @@
 <template>
   <section
-    v-if="hasError && resultsCount === 0"
-    class="mt-8 flex min-h-[320px] flex-col items-center justify-center rounded-panel border border-dashed border-border/80 bg-muted/30 px-6 py-14 text-center backdrop-blur-sm"
-  >
-    <div class="flex max-w-sm flex-col items-center">
-      <div
-        class="mb-4 flex size-14 items-center justify-center rounded-panel bg-card text-destructive shadow-xs ring-1 ring-border/70"
-      >
-        <WarningTriangle class="size-6 stroke-[1.75]" aria-hidden="true" />
-      </div>
-      <h3 class="m-0 text-base font-semibold text-foreground tracking-tight">
-        {{ t('search.errors.unableToLoadInspiration') }}
-      </h3>
-      <p class="mt-2 mb-0 text-xs sm:text-admin-body text-muted-foreground leading-relaxed">
-        {{ t('search.errors.unableToLoadResults') }}
-      </p>
-      <div class="mt-6">
-        <Button
-          class="!h-9 !rounded-pill !border-0 !bg-primary !px-5 !text-xs !font-semibold !text-primary-foreground hover:!bg-primary-hover cursor-pointer shadow-xs"
-          @click="$emit('reload')"
-        >
-          {{ t('search.actions.retry') }}
-        </Button>
-      </div>
-    </div>
-  </section>
-
-  <section
-    v-else-if="resultsCount === 0"
+    v-if="resultsCount === 0"
     class="mt-8 flex min-h-[320px] flex-col items-center justify-center rounded-panel border border-dashed border-border/80 bg-muted/30 px-6 py-14 text-center backdrop-blur-sm"
   >
     <div class="flex max-w-sm flex-col items-center">
@@ -91,18 +64,15 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { Button } from '@/components/ui/button'
-import { Camera, Compass, Plus, Search, WarningTriangle, Xmark } from '@iconoir/vue'
+import { Camera, Compass, Plus, Search, Xmark } from '@iconoir/vue'
 
 defineProps<{
-  hasError: boolean
   resultsCount: number
   hasActiveSearch: boolean
   canAddReference: boolean
 }>()
 
 defineEmits<{
-  (e: 'reload'): void
   (e: 'clearSearch'): void
   (e: 'openFilePicker'): void
   (e: 'startCreating'): void

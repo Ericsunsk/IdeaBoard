@@ -1,4 +1,4 @@
-import { formatAdminDisplayError, type AdminToastPort, useAdminToast } from '../../shared'
+import { defineFeedback } from '../../shared'
 
 export type AdminUsersFeedback = {
   loadFailed: (error: unknown) => void
@@ -19,28 +19,28 @@ export type AdminUsersFeedback = {
   roleUpdateFailed: (error: unknown) => void
 }
 
-export function createAdminUsersFeedback(toast: AdminToastPort): AdminUsersFeedback {
-  return {
-    loadFailed: (error) => toast.error(formatAdminDisplayError(error, '加载用户失败')),
-    adminStatusChangeForbidden: () => toast.warning('管理员账号不可封禁或解封'),
-    unbanSucceeded: () => toast.success('已解除封禁'),
-    unbanFailed: (error) => toast.error(formatAdminDisplayError(error, '解封失败')),
-    banSucceeded: (displayName) => toast.success(`已高级封禁用户 ${displayName}`),
-    banFailed: (error) => toast.error(formatAdminDisplayError(error, '封禁失败')),
-    missingAuthUserForSessionRevoke: () => toast.warning('目标用户缺少 Auth 标识，无法吊销会话'),
-    revokeSessionsSucceeded: () => toast.success('已强制吊销所有会话'),
-    revokeSessionsFailed: (error) => toast.error(formatAdminDisplayError(error, '操作失败')),
-    missingAuthUserForImpersonation: () => toast.error('目标用户缺少 Auth 标识，无法伪装登录'),
-    impersonationStarted: (displayName) => toast.success(`正在以 ${displayName} 的身份登录...`),
-    impersonationFailed: (error) => toast.error(formatAdminDisplayError(error, '伪装失败')),
-    userDeleted: () => toast.success('用户已受控彻底注销'),
-    userDeleteFailed: (error) => toast.error(formatAdminDisplayError(error, '注销失败')),
-    roleUpdated: (nextRole) =>
-      toast.success(nextRole === 'admin' ? '已设为管理员' : '已取消管理员'),
-    roleUpdateFailed: (error) => toast.error(formatAdminDisplayError(error, '角色更新失败')),
-  }
+const ADMIN_USERS_COPY = {
+  loadFailed: { error: '加载用户失败' },
+  adminStatusChangeForbidden: { warning: '管理员账号不可封禁或解封' },
+  unbanSucceeded: { success: '已解除封禁' },
+  unbanFailed: { error: '解封失败' },
+  banSucceeded: { success: (displayName: string) => `已高级封禁用户 ${displayName}` },
+  banFailed: { error: '封禁失败' },
+  missingAuthUserForSessionRevoke: { warning: '目标用户缺少 Auth 标识，无法吊销会话' },
+  revokeSessionsSucceeded: { success: '已强制吊销所有会话' },
+  revokeSessionsFailed: { error: '操作失败' },
+  missingAuthUserForImpersonation: { errorText: '目标用户缺少 Auth 标识，无法伪装登录' },
+  impersonationStarted: { success: (displayName: string) => `正在以 ${displayName} 的身份登录...` },
+  impersonationFailed: { error: '伪装失败' },
+  userDeleted: { success: '用户已受控彻底注销' },
+  userDeleteFailed: { error: '注销失败' },
+  roleUpdated: {
+    success: (nextRole: 'admin' | 'user') =>
+      nextRole === 'admin' ? '已设为管理员' : '已取消管理员',
+  },
+  roleUpdateFailed: { error: '角色更新失败' },
 }
 
-export function useUsersFeedback() {
-  return createAdminUsersFeedback(useAdminToast())
+export function useUsersFeedback(): AdminUsersFeedback {
+  return defineFeedback<AdminUsersFeedback>(ADMIN_USERS_COPY)
 }

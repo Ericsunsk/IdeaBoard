@@ -16,6 +16,7 @@ export type AuthMigrationDependencies = {
   createOptions(environment: AuthEnvironment, database: MigrationDatabase): BetterAuthOptions
   getAdapter(options: BetterAuthOptions): Promise<{ id: string } | null>
   getMigrations(options: BetterAuthOptions): Promise<MigrationPlan>
+  ensureAccountIssuerRemoved(database: MigrationDatabase): Promise<void>
   ensureMailConfigSchema(database: MigrationDatabase): Promise<void>
   ensureSocialProviderSettingsSchema(database: MigrationDatabase): Promise<void>
   configureRuntimePrivileges(database: MigrationDatabase, runtimeUser: string): Promise<void>
@@ -60,6 +61,8 @@ export async function runAuthMigrations(
       dependencies.log('Better Auth migration: no changes needed')
     }
 
+    await dependencies.ensureAccountIssuerRemoved(database)
+    dependencies.log('Auth account issuer column removed (Better Auth 1.7 upgrade)')
     await dependencies.ensureMailConfigSchema(database)
     dependencies.log('Auth mail configuration schema ensured')
     await dependencies.ensureSocialProviderSettingsSchema(database)

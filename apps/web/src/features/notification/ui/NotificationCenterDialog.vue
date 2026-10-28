@@ -150,10 +150,8 @@
               <div
                 class="flex flex-col items-center justify-center gap-2 px-6 py-20 text-center"
                 data-testid="notification-center-error"
+                aria-live="polite"
               >
-                <p class="m-0 text-xs text-muted-foreground">
-                  {{ t('notification.modal.loadFailed') }}
-                </p>
                 <button
                   type="button"
                   class="inline-flex min-h-8 cursor-pointer items-center justify-center rounded-control px-3 text-xs font-medium text-primary transition-colors hover:bg-muted"
@@ -326,6 +324,7 @@ import UserConfirmDialog from '../../../core/components/UserConfirmDialog.vue'
 import type { NotificationDTO } from '@/api/generated-query/public/model'
 import NotificationItem from './NotificationItem.vue'
 import { useNotifications } from '../session/useNotifications'
+import { useFailureToast } from '../../../core/composables/useFailureToast'
 import { getTimelineGroup, type TimelineGroupKey } from './notificationCenter'
 import type { NotificationCenterTab } from '../session/readFilters'
 import { Button } from '@/components/ui/button'
@@ -408,6 +407,11 @@ const shouldShowDialogError = computed<boolean>(() => {
   return (
     !session.isLoading.value && session.isError.value && session.notifications.value.length === 0
   )
+})
+
+// Only initial-load failures toast; pagination retains its inline hint.
+useFailureToast(shouldShowDialogError, () => t('notification.modal.loadFailed'), {
+  shouldFireOnMount: false,
 })
 
 const groupedNotifications = computed<Record<TimelineGroupKey, NotificationDTO[]>>(() => {

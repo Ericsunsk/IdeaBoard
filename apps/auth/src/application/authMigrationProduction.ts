@@ -1,6 +1,7 @@
 import { getAdapter } from 'better-auth/db/adapter'
 import { getMigrations } from 'better-auth/db/migration'
 import type { Pool } from 'pg'
+import { ensureAccountIssuerRemoved } from '../infrastructure/authAccountSchema.js'
 import {
   configureSocialProviderSettingsRuntimePrivileges,
   ensureSocialProviderSettingsSchema,
@@ -26,6 +27,9 @@ const productionDependencies: AuthMigrationDependencies = {
   },
   getAdapter,
   getMigrations,
+  ensureAccountIssuerRemoved(database) {
+    return ensureAccountIssuerRemoved(database as Pool)
+  },
   ensureMailConfigSchema(database) {
     return ensureMailConfigSchema(database as Pool)
   },

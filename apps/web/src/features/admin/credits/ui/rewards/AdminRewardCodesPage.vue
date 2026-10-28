@@ -48,15 +48,7 @@
     </template>
 
     <template #alerts>
-      <AdminAlert v-if="initialError" severity="error" class="m-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>{{ REWARD_CODES_MESSAGES.initialError }}</span>
-          <ActionButton variant="outline" :disabled="loading" @click="refreshRewardCodes">
-            {{ REWARD_CODES_MESSAGES.retry }}
-          </ActionButton>
-        </div>
-      </AdminAlert>
-      <AdminAlert v-else-if="backgroundError" severity="warn" class="mx-4 mt-4">
+      <AdminAlert v-if="backgroundError" severity="warn" class="mx-4 mt-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ REWARD_CODES_MESSAGES.backgroundError }}</span>
           <ActionButton variant="outline" :disabled="loading" @click="refreshRewardCodes">
@@ -189,7 +181,6 @@
     v-model:visible="createDialogVisible"
     :reward-code="editingRewardCode"
     :pending="saving"
-    :error-message="saveError"
     @submit="saveRewardCode"
   />
   <RewardCodePlaintextDialog
@@ -223,7 +214,7 @@ import { AdminRowActionsPopover } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
 import { AdminEmptyState } from '../../../shared'
 import { AdminFilterPopover } from '../../../shared'
-import { formatAdminDisplayError, useAdminToast } from '../../../shared'
+import { useAdminToast } from '../../../shared'
 import {
   adminFramedIconButtonClass,
   adminTableClass,
@@ -243,6 +234,7 @@ import {
 } from '../../session/rewards/resource'
 import { useRewardCodeList } from '../../session/rewards/useRewardCodeList'
 import { useRewardCodeRowActions } from '../../session/rewards/useRewardCodeRowActions'
+import { useRewardCodesFeedback } from '../../session/rewards/useRewardCodesFeedback'
 import { useAdminConfirm } from '../../../shared'
 import { confirmSettingsSave } from '../../../shared'
 import { REWARD_CODES_MESSAGES } from './messages'
@@ -315,8 +307,8 @@ watch(
   { deep: true },
 )
 const toast = useAdminToast()
+const codesFeedback = useRewardCodesFeedback()
 const saving = ref(false)
-const saveError = ref('')
 const createDialogVisible = ref(false)
 const editingRewardCode = ref<RewardCode | null>(null)
 const plaintextDialogVisible = ref(false)
@@ -341,7 +333,6 @@ type ActionPopupPanel = { toggle: (event: Event) => void; hide?: () => void }
 function openCreateDialog() {
   if (saving.value) return
   editingRewardCode.value = null
-  saveError.value = ''
   createDialogVisible.value = true
 }
 
@@ -388,7 +379,6 @@ async function saveRewardCode(input: RewardCodeFormSubmit) {
     if (!isConfirmed) return
   }
   saving.value = true
-  saveError.value = ''
   try {
     await persistRewardCode(input, editing)
     createDialogVisible.value = false
@@ -398,12 +388,7 @@ async function saveRewardCode(input: RewardCodeFormSubmit) {
     pagination.reset()
     if (wasFirstPage) void rewardCodeListQuery.refetch()
   } catch (error) {
-    saveError.value = formatAdminDisplayError(
-      error,
-      editingRewardCode.value
-        ? REWARD_CODES_MESSAGES.updateFailed
-        : REWARD_CODES_MESSAGES.createFailed,
-    )
+    codesFeedback.saveFailed(error, Boolean(editingRewardCode.value))
   } finally {
     saving.value = false
   }
@@ -425,7 +410,6 @@ function selectAction(action: string) {
   }
   if (action === 'edit') {
     editingRewardCode.value = rewardCode
-    saveError.value = ''
     createDialogVisible.value = true
     return
   }

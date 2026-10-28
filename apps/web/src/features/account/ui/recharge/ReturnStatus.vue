@@ -4,7 +4,7 @@
     tabindex="-1"
     class="rounded-panel border px-4 py-3 focus-visible:outline-none focus-visible:shadow-focus-ring"
     :class="statusClass"
-    :role="showError ? 'alert' : 'status'"
+    role="status"
     aria-live="polite"
   >
     <template v-if="status?.status === 'credited'">
@@ -34,9 +34,6 @@
       </p>
     </template>
     <template v-else-if="error">
-      <p class="m-0 font-semibold text-destructive">
-        {{ t('account.errors.orderStatusLoadFailed') }}
-      </p>
       <Button variant="ghost" size="sm" class="mt-2" @click="emit('retry')">{{
         t('account.returnStatus.recheck')
       }}</Button>
@@ -87,13 +84,6 @@ const delayed = ref(false)
 useTimeoutFn(() => {
   delayed.value = true
 }, 60_000)
-const showError = computed(
-  () =>
-    props.status?.status !== 'credited' &&
-    props.source !== 'cancel' &&
-    props.error !== null &&
-    props.error !== undefined,
-)
 const statusClass = computed(() => {
   if (props.status?.status === 'credited') {
     return 'border-success/25 bg-card text-foreground'

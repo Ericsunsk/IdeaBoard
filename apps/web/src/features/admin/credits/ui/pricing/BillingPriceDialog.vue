@@ -38,10 +38,6 @@
             />
           </AdminFormField>
         </div>
-
-        <AdminAlert v-if="errorMessage" severity="error">
-          {{ errorMessage }}
-        </AdminAlert>
       </section>
 
       <!-- 2. 模型池设置 (同页平铺展示，无分割线) -->
@@ -56,7 +52,6 @@
           :catalog-models="poolCatalogModels"
           :catalog-loading="poolCatalogLoading"
           :pending="poolSavePending"
-          :error-message="poolSaveError"
           :stale="poolSaveStale"
           :save-disabled="poolSaveDisabled"
           :catalog-error="poolCatalogError"
@@ -81,7 +76,6 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { AdminAlert } from '../../../shared'
 import { AdminDialogActions } from '../../../shared'
 import { AdminDialogShell } from '../../../shared'
 import { AdminFormField } from '../../../shared'
@@ -103,12 +97,10 @@ const props = withDefaults(
     visible: boolean
     item?: AdminBillableItemCard | null
     pending?: boolean
-    errorMessage?: string
     poolEntries?: AdminModelPoolEntry[] | undefined
     poolCatalogModels?: AdminPoolCatalogModel[] | undefined
     poolCatalogLoading?: boolean | undefined
     poolSavePending?: boolean | undefined
-    poolSaveError?: string | undefined
     poolSaveStale?: boolean | undefined
     poolSaveDisabled?: boolean | undefined
     poolCatalogError?: string | undefined
@@ -116,12 +108,10 @@ const props = withDefaults(
   {
     item: null,
     pending: false,
-    errorMessage: '',
     poolEntries: () => [],
     poolCatalogModels: () => [],
     poolCatalogLoading: false,
     poolSavePending: false,
-    poolSaveError: '',
     poolSaveStale: false,
     poolSaveDisabled: false,
     poolCatalogError: '',

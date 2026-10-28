@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useAdminMailSettingsFeedback, useAdminSearchProviderFeedback } from './useSettingsFeedback'
+import {
+  useAdminAccessSettingsFeedback,
+  useAdminBrandingSettingsFeedback,
+  useAdminMailSettingsFeedback,
+  useAdminMediaUploadSettingsFeedback,
+  useAdminOutboundPolicyFeedback,
+  useAdminSearchProviderFeedback,
+  useAdminSupportChannelsFeedback,
+} from './useSettingsFeedback'
 
 const toast = vi.hoisted(() => ({
   success: vi.fn(),
@@ -82,4 +90,103 @@ describe('Admin search provider feedback', () => {
       '停用失败',
     ])
   })
+})
+
+describe('Admin branding settings feedback', () => {
+  it('covers save/logo pairs with safe fallbacks and validation passthrough', () => {
+    const feedback = useAdminBrandingSettingsFeedback()
+
+    feedback.saved()
+    feedback.logoUploaded()
+    expect(toast.success.mock.calls.map(([message]) => message)).toEqual([
+      '项目品牌已保存',
+      'Logo 已上传，保存后生效',
+    ])
+
+    feedback.validationFailed('品牌名称不能为空')
+    expect(toast.error).toHaveBeenCalledWith('品牌名称不能为空')
+
+    const internalError = new Error('dial tcp 127.0.0.1:5432: connection refused')
+    feedback.loadFailed(internalError)
+    feedback.saveFailed(internalError)
+    feedback.logoUploadFailed(internalError)
+    expect(toast.error.mock.calls.map(([message]) => message)).toEqual([
+      '品牌名称不能为空',
+      '加载系统设置失败',
+      '保存项目品牌失败',
+      '上传 Logo 失败',
+    ])
+  })
+})
+
+describe('Admin access settings feedback', () => {
+  it('covers rate-limit/login-lockout/registration pairs with safe fallbacks', () => {
+    const feedback = useAdminAccessSettingsFeedback()
+
+    feedback.rateLimitSaved()
+    feedback.loginLockoutSaved()
+    feedback.registrationUpdated(true)
+    feedback.registrationUpdated(false)
+    expect(toast.success.mock.calls.map(([message]) => message)).toEqual([
+      '访问限流已保存',
+      '登录锁定已保存',
+      '已开放注册',
+      '已关闭注册',
+    ])
+
+    feedback.rateLimitValidationFailed('窗口必须大于 0')
+    feedback.loginLockoutValidationFailed('阈值必须大于 0')
+    expect(toast.error.mock.calls.map(([message]) => message)).toEqual([
+      '窗口必须大于 0',
+      '阈值必须大于 0',
+    ])
+
+    const internalError = new Error('dial tcp 127.0.0.1:5432: connection refused')
+    feedback.loadFailed(internalError)
+    feedback.rateLimitSaveFailed(internalError)
+    feedback.loginLockoutSaveFailed(internalError)
+    feedback.registrationUpdateFailed(internalError)
+    expect(toast.error.mock.calls.map(([message]) => message)).toEqual([
+      '窗口必须大于 0',
+      '阈值必须大于 0',
+      '加载访问控制设置失败',
+      '保存失败',
+      '保存失败',
+      '更新注册状态失败',
+    ])
+  })
+})
+
+describe('Admin generic setting feedback', () => {
+  it.each([
+    ['media upload', useAdminMediaUploadSettingsFeedback, '加载上传设置失败', '上传设置已保存', '保存上传设置失败'],
+    [
+      'outbound policy',
+      useAdminOutboundPolicyFeedback,
+      '加载私有地址访问策略失败',
+      '私有地址访问策略已保存',
+      '保存私有地址访问策略失败',
+    ],
+    ['support channels', useAdminSupportChannelsFeedback, '读取客户支持失败', '客户支持已保存', '保存客户支持失败'],
+  ] as const)(
+    '%s covers load/save pairs with safe fallbacks',
+    (_label, useFeedback, loadFallback, savedMessage, saveFallback) => {
+      const feedback = useFeedback()
+
+      feedback.saved()
+      expect(toast.success).toHaveBeenCalledWith(savedMessage)
+
+      feedback.validationFailed('草稿无效')
+      expect(toast.error).toHaveBeenCalledWith('草稿无效')
+
+      const internalError = new Error('dial tcp 127.0.0.1:5432: connection refused')
+      feedback.loadFailed(internalError)
+      feedback.saveFailed(internalError)
+      expect(toast.error.mock.calls.map(([message]) => message)).toEqual([
+        '草稿无效',
+        loadFallback,
+        saveFallback,
+      ])
+    },
+  )
 })

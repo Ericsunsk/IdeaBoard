@@ -18,12 +18,10 @@
       <Skeleton height="1rem" width="68%" />
     </div>
 
-    <LoadErrorPanel
+    <AccountEmptyRetry
       v-else-if="error"
-      :message="t('account.errors.pendingOrdersLoadFailed')"
-      :detail="errorMessage(error)"
+      variant="compact"
       :retry-label="t('account.reload')"
-      retry-variant="ghost"
       @retry="emit('retry')"
     />
 
@@ -66,28 +64,6 @@
             >
           </div>
         </div>
-
-        <div
-          v-if="actionError && actionTarget?.publicToken === item.public_token"
-          class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-control border border-destructive/25 bg-muted px-3 py-2"
-          role="alert"
-        >
-          <span class="text-sm font-semibold text-destructive">{{
-            errorMessage(actionError)
-          }}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            class="!p-0"
-            :is-disabled="actionPending"
-            @click="retryAction(item.public_token)"
-            >{{
-              actionTarget?.kind === 'continue'
-                ? t('account.topUp.retryContinuePayment')
-                : t('account.topUp.retryAbandonOrder')
-            }}</Button
-          >
-        </div>
       </article>
     </div>
   </section>
@@ -99,11 +75,9 @@ import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
-import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
 import { formatAccountExpiryDateTime } from '../../session/formatters'
-import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
-import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'
 import { accountPrimaryActionButtonClass } from '../shared/ui'
+import AccountEmptyRetry from '../shared/AccountEmptyRetry.vue'
 import type { PendingPaymentOrder } from '../../session/payments/resource'
 
 type PendingOrderAction = { publicToken: string; kind: 'continue' | 'abandon' }
@@ -114,7 +88,6 @@ const props = defineProps<{
   error: unknown
   actionPending: boolean
   actionTarget: PendingOrderAction | null
-  actionError: unknown
 }>()
 const emit = defineEmits<{
   retry: []
@@ -132,14 +105,6 @@ function isActionPending(publicToken: string, kind: PendingOrderAction['kind']) 
     props.actionTarget?.publicToken === publicToken &&
     props.actionTarget.kind === kind
   )
-}
-
-function retryAction(publicToken: string) {
-  if (props.actionTarget?.kind === 'continue') {
-    emit('continue', publicToken)
-    return
-  }
-  emit('abandon', publicToken)
 }
 
 function statusText(item: PendingPaymentOrder) {
@@ -183,9 +148,5 @@ function expiryText(item: PendingPaymentOrder) {
   return item.status === 'expired'
     ? t('account.topUp.expiredAt', { time: formatted })
     : t('account.topUp.expiresAt', { time: formatted })
-}
-
-function errorMessage(error: unknown) {
-  return userFacingErrorCopy(error, t('account.errors.networkRetry'), ACCOUNT_GUIDANCE_COPY_KEYS)
 }
 </script>

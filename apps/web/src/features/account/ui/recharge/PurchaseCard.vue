@@ -13,15 +13,9 @@
       <Skeleton height="2.75rem" />
     </div>
 
-    <LoadErrorPanel
+    <AccountEmptyRetry
       v-else-if="!options"
-      id="recharge-purchase-heading"
-      class="min-h-40 justify-center"
-      align="center"
-      :message="t('account.errors.optionsLoadFailed')"
-      :detail="errorMessage(error)"
       :retry-label="t('account.reload')"
-      retry-variant="ghost"
       @retry="emit('retry')"
     />
 
@@ -129,13 +123,6 @@
             >{{ t('account.topUp.refundLink') }}</a
           >
         </p>
-        <p
-          v-if="checkoutError"
-          class="mt-2 mb-0 text-center text-admin-body font-semibold text-destructive"
-          role="alert"
-        >
-          {{ errorMessage(checkoutError) }}
-        </p>
       </div>
     </form>
   </section>
@@ -148,23 +135,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import IbFormField from '../../../../core/components/IbFormField.vue'
-import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
-import { userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
-import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'
 import { resolveInteractiveControlState } from '../../../../core/interaction/interactiveControlState'
 import { ibFormInputClass } from '../../../../theme/formControls'
 import { formatLocaleNumber } from '../../../../core/i18n/formatters'
 import { MIN_IDEA_QUANTITY, normalizeIdeaQuantity } from '../../core/money'
 import { formatUsdForIdeas } from '../../session/money'
 import type { PaymentPurchaseOptions } from '../../session/payments/resource'
+import AccountEmptyRetry from '../shared/AccountEmptyRetry.vue'
 import { accountCardPanelClass, accountPrimaryActionButtonClass } from '../shared/ui'
 
 const props = defineProps<{
   options?: PaymentPurchaseOptions | undefined
   pending: boolean
-  error: unknown
   checkoutPending: boolean
-  checkoutError: unknown
 }>()
 const emit = defineEmits<{
   retry: []
@@ -232,9 +215,5 @@ function unavailableMessage(reason?: PaymentPurchaseOptions['unavailable_reason'
     default:
       return t('account.topUp.reasonDefault')
   }
-}
-
-function errorMessage(error: unknown): string {
-  return userFacingErrorCopy(error, t('account.errors.networkRetry'), ACCOUNT_GUIDANCE_COPY_KEYS)
 }
 </script>

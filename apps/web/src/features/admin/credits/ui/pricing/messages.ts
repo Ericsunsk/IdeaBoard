@@ -11,13 +11,11 @@ export const BILLING_PRICING_MESSAGES = {
   refresh: '刷新功能定价',
   loadingAria: '加载功能定价中',
   loadFailedTitle: '功能定价加载失败',
-  reload: '重新加载',
   emptyNone: '暂无可定价功能',
   emptyNoMatch: '未找到匹配的计费功能',
   emptyNoneHint: '当前没有已注册的可计费功能 SKU。',
   emptyNoMatchHint: '未找到符合当前搜索条件的功能。请尝试调整关键词或清空搜索。',
   clearFilters: '清空搜索',
-  retryLater: '请稍后重试。',
   deleteTitle: '删除已归档功能',
   deleteMessage: (displayName: string) =>
     `确定彻底删除“${displayName}”及其价格配置吗？此操作不可撤销，且将记录操作人与原因。`,
@@ -30,10 +28,6 @@ export const BILLING_PRICING_MESSAGES = {
   publishConfirm: '发布价格',
   published: '价格已发布',
   publishFailed: '发布价格失败，请重试',
-  enableTitle: '启用功能',
-  disableTitle: '停用功能',
-  availabilityMessage: (enabled: boolean, displayName: string) =>
-    `确定${enabled ? '启用' : '停用'}“${displayName}”吗？该操作将记录操作人与原因。`,
   enable: '启用',
   disable: '停用',
   enabledToast: '功能已启用',
@@ -49,7 +43,6 @@ export const BILLING_PRICING_MESSAGES = {
     `确定保存“${displayName}”的价格与模型池配置吗？该操作将记录操作人与原因。`,
   saveAllConfirm: '保存配置',
   saveAllSuccess: '配置已保存',
-  saveAllFailed: '部分配置保存失败，请根据提示重试',
   pricePlaceholder: (required: boolean) => (required ? '必填' : '选填'),
   priceRequired: '请输入价格',
   priceRange: (max: string) => `价格必须是 0 到 ${max} 之间的整数`,
@@ -75,10 +68,6 @@ export const BILLING_PRICING_MESSAGES = {
   poolResolutionAria: (modelId: string, resolution: string, on: boolean) =>
     `${modelId}${resolution}分辨率${on ? '已支持' : '未支持'}`,
   poolEnabledWithoutResolution: '启用的模型至少需要一个分辨率',
-  poolSaveTitle: '保存模型池',
-  poolSaveMessage: (displayName: string) =>
-    `确定保存“${displayName}”的模型池吗？该操作将整体替换并记录操作人与原因。`,
-  poolSaveConfirm: '保存模型池',
   poolSaved: '模型池已保存',
   poolSaveFailed: '保存模型池失败，请重试',
   poolConflict: '模型池已被更新，请刷新后重试',

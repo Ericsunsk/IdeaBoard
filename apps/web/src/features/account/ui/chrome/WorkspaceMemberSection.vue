@@ -16,13 +16,21 @@
       </span>
     </div>
 
-    <!-- Error State -->
-    <LoadErrorPanel
+    <div
       v-else-if="section.hasLoadError.value"
-      :message="t('workspace.switcher.members.loadFailed')"
-      :retry-label="t('common.actions.retry')"
-      @retry="section.retryRoster()"
-    />
+      class="flex min-h-32 flex-col items-center justify-center gap-2"
+      aria-live="polite"
+    >
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        class="h-8 shrink-0 px-3"
+        @click="section.retryRoster()"
+      >
+        {{ t('common.actions.retry') }}
+      </Button>
+    </div>
 
     <!-- Loaded Content: Invite Bar & Roster List -->
     <template v-else>
@@ -44,10 +52,7 @@
               {{ section.collaboratorCount.value }} / 5
             </span>
           </div>
-          <p
-            v-if="section.isLimitReached.value"
-            class="m-0 text-xs text-muted-foreground"
-          >
+          <p v-if="section.isLimitReached.value" class="m-0 text-xs text-muted-foreground">
             {{ t('workspace.switcher.members.memberLimitReached') }}
           </p>
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -321,11 +326,7 @@
                       class="size-4 shrink-0"
                       aria-hidden="true"
                     />
-                    <Trash
-                      v-else
-                      class="size-4 shrink-0"
-                      aria-hidden="true"
-                    />
+                    <Trash v-else class="size-4 shrink-0" aria-hidden="true" />
                   </Button>
                 </template>
               </div>
@@ -441,8 +442,7 @@
     "
     @update:is-visible="section.cancelRemove()"
     @confirm="
-      section.confirmingRemoveId.value &&
-        section.confirmRemove(section.confirmingRemoveId.value)
+      section.confirmingRemoveId.value && section.confirmRemove(section.confirmingRemoveId.value)
     "
   />
 </template>
@@ -465,8 +465,8 @@ import {
 } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
 import UserConfirmDialog from '../../../../core/components/UserConfirmDialog.vue'
+import { useFailureToast } from '../../../../core/composables/useFailureToast'
 import { resolveMemberAvatar, resolveMemberInitial } from '../../../../core/media/avatarUrl'
 import { appOverlayMenuSideOffset } from '../../../../theme/appOverlayMenu'
 import { useUserStore } from '../../../auth'
@@ -500,8 +500,13 @@ const handover = useBillingTransferSection({
   currentUserId: () => props.currentUserId,
 })
 
-const outgoingLiveInvite = computed(() =>
-  handover.liveInvites.value.find((invite) => handover.canDecide(invite, 'cancel')) ?? null,
+const outgoingLiveInvite = computed(
+  () => handover.liveInvites.value.find((invite) => handover.canDecide(invite, 'cancel')) ?? null,
+)
+
+useFailureToast(
+  () => section.hasLoadError.value,
+  () => t('workspace.switcher.members.loadFailed'),
 )
 
 const handoverTitle = computed(() => {
@@ -529,7 +534,7 @@ const handoverMessage = computed(() => {
 
 const targetRemoveMember = computed(() => {
   const id = section.confirmingRemoveId.value
-  return id ? section.roster.value.find((entry) => entry.userId === id) ?? null : null
+  return id ? (section.roster.value.find((entry) => entry.userId === id) ?? null) : null
 })
 
 const removeDialogTitle = computed(() =>
@@ -539,7 +544,10 @@ const removeDialogTitle = computed(() =>
 )
 
 const removeDialogMessage = computed(() => {
-  if (section.confirmingRemoveId.value != null && section.confirmingRemoveId.value === props.currentUserId) {
+  if (
+    section.confirmingRemoveId.value != null &&
+    section.confirmingRemoveId.value === props.currentUserId
+  ) {
     return t('workspace.switcher.members.leaveConfirmNote')
   }
   const target = targetRemoveMember.value

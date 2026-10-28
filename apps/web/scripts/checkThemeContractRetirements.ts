@@ -30,7 +30,8 @@ import { NodeTypes, parse as parseTemplate } from '@vue/compiler-dom'
  *     retired PrimeVue select. BoardCard's row-action DropdownMenu is a
  *     different widget (command menu, correct) and out of scope: this rule
  *     reads BoardsPage.vue only.
- *   - Redeem: the input's `aria-describedby` binding points at
+ *   - Redeem: command failures may use feature feedback without marking the
+ *     input invalid. When inline validation is present, `aria-describedby` points at
  *     `account-reward-code-error` under the `redeemFailed` condition, and the
  *     element carrying that id also carries `role="alert"` in the same tag.
  *
@@ -174,7 +175,7 @@ export function validateBoardsSortSelect(source: string): string[] {
   return issues
 }
 
-/** Redeem input must wire its failure to the announced error-text element. */
+/** Inline redeem validation must wire its input to the announced error text. */
 export function validateRedeemErrorWiring(source: string): string[] {
   const issues: string[] = []
   const parsed = parseSfcTemplate(source)
@@ -186,6 +187,14 @@ export function validateRedeemErrorWiring(source: string): string[] {
   if (inputs.length !== 1)
     issues.push('Redeem source must contain exactly one Input with id="account-reward-code".')
   const redeemInput = inputs[0]
+  const errorNodes = nodes.filter((node) => staticProp(node, 'id') === 'account-reward-code-error')
+  if (
+    redeemInput &&
+    errorNodes.length === 0 &&
+    !boundProp(redeemInput, 'aria-describedby') &&
+    !boundProp(redeemInput, 'aria-invalid')
+  )
+    return issues
   if (
     normalizedExpression(boundProp(redeemInput ?? {}, 'aria-describedby')) !==
     "redeemFailed?'account-reward-code-error':undefined"
@@ -193,7 +202,6 @@ export function validateRedeemErrorWiring(source: string): string[] {
     issues.push(
       "Redeem input must bind aria-describedby to 'account-reward-code-error' under the redeemFailed condition.",
     )
-  const errorNodes = nodes.filter((node) => staticProp(node, 'id') === 'account-reward-code-error')
   if (errorNodes.length !== 1)
     issues.push('Redeem error text must render id="account-reward-code-error".')
   const errorNode = errorNodes[0]
@@ -292,6 +300,16 @@ const FIXTURES: Fixture[] = [
     false,
   ),
   redeemFixture('redeem canonical wiring passes', REDEEM_POSITIVE, true),
+  redeemFixture(
+    'redeem command feedback leaves the input neutral',
+    '<template><Input id="account-reward-code" /></template>',
+    true,
+  ),
+  redeemFixture(
+    'redeem invalid input without announced error fails',
+    '<template><Input id="account-reward-code" :aria-invalid="redeemFailed" /></template>',
+    false,
+  ),
   redeemFixture(
     'redeem missing describedby wiring fails',
     REDEEM_POSITIVE.replace(

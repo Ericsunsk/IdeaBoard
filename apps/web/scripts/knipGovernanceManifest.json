@@ -6381,12 +6381,6 @@
         "evidence": ["src/features/admin/users/session/resource.unit.spec.ts"]
       }
     },
-    "src/features/admin/users/session/useUsersFeedback.ts": {
-      "createAdminUsersFeedback": {
-        "kind": "test-contract",
-        "evidence": ["src/features/admin/users/session/useUsersFeedback.unit.spec.ts"]
-      }
-    },
     "src/features/auth/components/auth-fields/useAuthForm.ts": {
       "AUTH_DISPLAY_NAME_LIMIT": {
         "kind": "canonical-origin",

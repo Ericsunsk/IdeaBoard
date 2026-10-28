@@ -143,13 +143,12 @@
               </span>
             </div>
 
-            <!-- Error State -->
+            <!-- UserAccountMenu reports list failures; the dialog provides the retry action. -->
             <div
               v-else-if="props.loadError"
-              class="flex flex-col items-start gap-3 rounded-control border border-destructive/30 bg-destructive/10 p-4 text-sm text-foreground"
+              class="flex flex-col items-start gap-3 rounded-control border border-border bg-card p-4 text-sm text-foreground"
               aria-live="polite"
             >
-              <p class="m-0 text-sm leading-normal text-foreground">{{ props.loadError }}</p>
               <Button type="button" size="sm" @click="props.onRetry()">
                 {{ t('common.actions.retry') }}
               </Button>
@@ -301,13 +300,6 @@
                       {{ t('workspace.switcher.archiveAction') }}
                     </Button>
                   </div>
-                  <p
-                    v-if="deleteError"
-                    class="m-0 text-xs leading-normal text-destructive"
-                    role="alert"
-                  >
-                    {{ deleteError }}
-                  </p>
                 </section>
               </template>
             </div>
@@ -694,7 +686,6 @@ async function commitRename(item: UserAccountMenuWorkspaceItem) {
 
 const pendingDeleteItem = ref<UserAccountMenuWorkspaceItem | null>(null)
 const isDeleting = ref(false)
-const deleteError = ref<string | null>(null)
 const isDeleteDialogVisible = computed(() => pendingDeleteItem.value !== null)
 const pendingDeleteName = computed(() => pendingDeleteItem.value?.name ?? '')
 
@@ -702,12 +693,10 @@ function requestDelete(item: UserAccountMenuWorkspaceItem) {
   if (isDefaultWorkspaceItem(item) || isDeleting.value) return
   activeWorkspaceId.value = item.publicId
   pendingDeleteItem.value = { ...item }
-  deleteError.value = null
 }
 
 function closeDeleteDialog() {
   pendingDeleteItem.value = null
-  deleteError.value = null
 }
 
 // UserConfirmDialog 在 Busy 提交时已锁住全部关闭路径；页面只处理 idle
@@ -725,17 +714,16 @@ async function confirmDelete() {
     return
   }
   isDeleting.value = true
-  deleteError.value = null
   try {
     await props.onDelete(item.publicId)
     pendingDeleteItem.value = null
   } catch (error) {
     const code = userErrorCode(error)?.toLowerCase()
-    deleteError.value =
+    toast.error(
       code != null
         ? `${t('workspace.switcher.archiveFailed')} (${code})`
-        : t('workspace.switcher.archiveFailed')
-    toast.error(deleteError.value)
+        : t('workspace.switcher.archiveFailed'),
+    )
   } finally {
     isDeleting.value = false
   }

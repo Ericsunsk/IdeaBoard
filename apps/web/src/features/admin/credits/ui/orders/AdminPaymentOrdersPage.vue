@@ -66,16 +66,7 @@
     </template>
 
     <template #alerts>
-      <AdminAlert v-if="initialError" severity="error" class="m-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>{{ PAYMENT_ORDERS_MESSAGES.initialError }}</span>
-          <ActionButton variant="outline" :disabled="loading" @click="refreshOrders">
-            {{ PAYMENT_ORDERS_MESSAGES.retry }}
-          </ActionButton>
-        </div>
-      </AdminAlert>
-
-      <AdminAlert v-else-if="backgroundError" severity="warn" class="mx-4 mt-4">
+      <AdminAlert v-if="backgroundError" severity="warn" class="mx-4 mt-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ PAYMENT_ORDERS_MESSAGES.backgroundError }}</span>
           <ActionButton variant="outline" :disabled="loading" @click="refreshOrders">
@@ -100,10 +91,7 @@
     v-model:visible="detailVisible"
     :detail="detail"
     :loading="detailLoading"
-    :error="detailError"
     :refunding="refundLoading"
-    :refund-error="refundError"
-    @retry="retryDetail"
     @refund="requestRefund"
   />
 </template>
@@ -121,8 +109,8 @@ import { AdminSwitch } from '../../../shared'
 import { AdminFilterPopover } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
 import { useAdminConfirm } from '../../../shared'
-import { formatAdminDisplayError } from '../../../shared'
 import { usePaymentOrdersFeedback } from '../../session/orders/usePaymentOrdersFeedback'
+import { useFailureToast } from '@/core/composables/useFailureToast'
 import { adminFramedIconButtonClass } from '../../../shared'
 import { createUniqueId } from '@/core/utils/ids'
 import { formatLocaleNumber } from '@/core/i18n/formatters'
@@ -152,9 +140,7 @@ const detailVisible = ref(false)
 const selectedOrderNumber = ref('')
 const detail = ref<AdminPaymentOrderDetail | null>(null)
 const detailLoading = ref(false)
-const detailError = ref(false)
 const refundLoading = ref(false)
-const refundError = ref('')
 const adminConfirm = useAdminConfirm()
 const feedback = usePaymentOrdersFeedback()
 const refundIdempotencyKeys = new Map<string, string>()
@@ -171,6 +157,7 @@ const {
   initialError,
   backgroundError,
   refresh: refreshOrderList,
+  query: orderListQuery,
   pagination,
   previousPage,
   nextPage,
@@ -227,6 +214,13 @@ watch([statusFilter, anomalyOnly], () => {
   resetPaginationAndReload()
 })
 
+// 列表初载失败只走 toast（空态表格 + 工具栏刷新即重试入口）。
+// 与兑换码列表 useRewardCodeList 的 initialError toast 对齐。
+useFailureToast(initialError, feedback.loadFailed, {
+  shouldFireOnMount: false,
+  resolveError: () => orderListQuery.error.value,
+})
+
 watch(detailVisible, (visible) => {
   if (visible) return
   detailRequestEpoch += 1
@@ -234,9 +228,7 @@ watch(detailVisible, (visible) => {
   selectedOrderNumber.value = ''
   detail.value = null
   detailLoading.value = false
-  detailError.value = false
   refundLoading.value = false
-  refundError.value = ''
 })
 
 function refreshOrders() {
@@ -277,10 +269,6 @@ function openDetail(publicOrderNumber: string) {
   void loadDetail()
 }
 
-function retryDetail() {
-  void loadDetail()
-}
-
 async function requestRefund(ideaQuantity: number) {
   const publicOrderNumber = selectedOrderNumber.value
   if (!publicOrderNumber || refundLoading.value) return
@@ -306,7 +294,6 @@ async function executeRefund(publicOrderNumber: string, ideaQuantity: number) {
     refundIdempotencyKeys.set(key, idempotencyKey)
   }
   refundLoading.value = true
-  refundError.value = ''
   try {
     detail.value = await resource.refund(publicOrderNumber, {
       ideaQuantity,
@@ -316,7 +303,6 @@ async function executeRefund(publicOrderNumber: string, ideaQuantity: number) {
     feedback.refundSubmitted()
     refreshOrders()
   } catch (error) {
-    refundError.value = formatAdminDisplayError(error, PAYMENT_ORDERS_MESSAGES.refundFailed)
     feedback.refundFailed(error)
   } finally {
     refundLoading.value = false
@@ -332,7 +318,6 @@ async function loadDetail() {
   activeDetailRequest = controller
   detail.value = null
   detailLoading.value = true
-  detailError.value = false
   try {
     const result = await resource.get(publicOrderNumber, controller.signal)
     if (
@@ -343,8 +328,10 @@ async function loadDetail() {
       return
     }
     detail.value = result
-  } catch {
-    if (!controller.signal.aborted && epoch === detailRequestEpoch) detailError.value = true
+  } catch (error) {
+    if (!controller.signal.aborted && epoch === detailRequestEpoch) {
+      feedback.detailFailed(error)
+    }
   } finally {
     if (!controller.signal.aborted && epoch === detailRequestEpoch) detailLoading.value = false
   }

@@ -8,27 +8,6 @@
         />
       </div>
 
-      <div
-        v-else-if="loadError"
-        class="flex min-h-72 flex-col items-center justify-center px-6 py-12 text-center"
-      >
-        <XmarkCircle class="size-8 text-destructive" aria-hidden="true" />
-        <h2 class="mt-4 text-admin-title font-bold text-foreground">
-          {{ CREDIT_HEALTH_MESSAGES.unavailableTitle }}
-        </h2>
-        <p class="mt-2 text-admin-body text-muted-foreground">
-          {{ CREDIT_HEALTH_MESSAGES.loadFailedHint }}
-        </p>
-        <ActionButton
-          class="mt-5"
-          variant="outline"
-          :loading="resource.query.isFetching.value"
-          @click="resource.query.refetch()"
-        >
-          {{ CREDIT_HEALTH_MESSAGES.reload }}
-        </ActionButton>
-      </div>
-
       <div v-else-if="health && presentation" class="min-w-0">
         <div class="flex flex-col gap-6 px-6 py-6 lg:flex-row lg:items-start lg:justify-between">
           <div class="flex min-w-0 items-start gap-4">
@@ -179,6 +158,8 @@ import {
 import AdminCreditFindingQueue from './AdminCreditFindingQueue.vue'
 import AdminCreditRunHistoryDialog from './AdminCreditRunHistoryDialog.vue'
 import { useAdminCreditHealthResource } from '../../session/health/resource'
+import { useCreditHealthFeedback } from '../../session/health/useCreditHealthFeedback'
+import { useFailureToast } from '@/core/composables/useFailureToast'
 import { getCreditHealthPresentation } from '../../core/health/creditHealthPresentation'
 import type { AdminCreditRun } from '../../session/health/runHistoryResource'
 import {
@@ -190,6 +171,7 @@ import { CREDIT_HEALTH_MESSAGES } from './messages'
 
 const toast = useAdminToast()
 const resource = useAdminCreditHealthResource()
+const feedback = useCreditHealthFeedback()
 const historyDialogVisible = ref(false)
 const health = resource.health
 const showLoading = computed(() => resource.query.isLoading.value && !health.value)
@@ -197,6 +179,10 @@ const loadError = computed(() => resource.query.isError.value && !health.value)
 const presentation = computed(() =>
   health.value ? getCreditHealthPresentation(health.value.status) : null,
 )
+useFailureToast(loadError, feedback.healthLoadFailed, {
+  shouldFireOnMount: false,
+  resolveError: () => resource.query.error.value,
+})
 const facts = computed(() => {
   const value = health.value
   if (!value) return []

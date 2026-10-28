@@ -8,7 +8,7 @@ It does NOT own the Library gallery, Canvas, or auth overlay UI.
 | Term                         | Meaning                                                                                                                                                                                                                       |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Search Feed                  | Feed fact owner in `session/createSearchFeed`: `results`, `nextCursor`, `hasMore`, `loading`, `loadingMore`, `hasError`, `savedKeys`, `failedImages`; stale requests cancelled in order via `AbortController` + `generation`. |
-| Submitted Query              | `route.query.q`, the single source of truth for search; `useSearchSession` drives `feed.load(true)` through an `immediate` watcher.                                                                                           |
+| Submitted Query              | `route.query.q`, the single source of truth for search; `useSearchSession` loads changes through an `immediate` watcher and explicitly reloads when the same query is submitted again.                                        |
 | Vision Reference             | Image-search input reference: library asset ID or external reference plus optional `File`/`blob` preview; only the serializable part is persisted.                                                                            |
 | Library Bridge / Coordinator | Pure mapping between Feed and Library (`SearchResult`/`LibraryAssetView` <-> `VisionReference`) plus pub/sub that writes saved state back to the feed.                                                                        |
 | Auth Continuation            | Pending intent resumed after login for anonymous actions (search, save, open Library); `vision-search` intent stays memory-only, others may use `sessionStorage`.                                                             |
@@ -32,7 +32,7 @@ Provider IDs and recognition share the pure `core/contracts/externalImageProvide
 
 ## Invariants
 
-- `?q` is the single source of truth: draft is input-box only, submit writes the URL via `router.replace`, feed reacts only to the URL.
+- `?q` is the single source of truth: draft is input-box only, submit writes changed queries via `router.replace`; submitting the same query explicitly retries the URL-backed feed, including an empty query.
 - Never use `useQuery` for feed or server-derived state; `savedKeys` manual backfill must carry `savedMutationRevision` against stale overwrites.
 - Never cache the feed with `useQuery`; never leave pagination uncancelled.
 - Never treat draft as source of truth; never duplicate query refs.
@@ -40,7 +40,7 @@ Provider IDs and recognition share the pure `core/contracts/externalImageProvide
 - Feed snapshot has 30min TTL plus scroll position; snapshot writes defer to idle; SWR hydrates valid snapshots as first-screen skeleton. Expired or malformed display capabilities invalidate the snapshot.
 - Search cards, lightboxes, reference thumbnails and drag ghosts consume inline same-origin `display` variants through `core/media`; actual rendered longest side × DPR selects the shared bounded tier. Provider URLs remain provenance and import/Vision input facts, never a display fallback. Variant `max_side` is a rendering bound, not a `srcset` width.
 - Public display capabilities have explicit expiry. The Feed owns one pre-expiry collection refresh using its existing request cancellation/generation; reset, clear and disposal stop the timer. Failed refresh does not loop. The Vision Reference collection owns preview normalization, presentation-only refresh and serializable projection; the storage adapter validates shape and stores that projection. Persisted Vision input identity survives preview expiry with unavailable presentation; matching fresh results update presentation without resubmitting extraction or requesting another quote.
-- `savedKeys` rollback on error: with cache, roll back cursor/`hasMore` to keep one page consistent; empty results show the retry panel; `AbortError` is ignored.
+- `savedKeys` rollback on error: with cache, roll back cursor/`hasMore` to keep one page consistent; empty-result failures show a toast and can retry through query resubmission; `AbortError` is ignored.
 - Feed pagination: `idle` -> `load(reset)` aborts old requests -> `idle` (`hasMore = cursor`); `load(false)` with `hasMore && !loadingMore` -> `loadingMore` with bottom spinner.
 - Vision flow: `idle` -> `submit` (refs present + logged in, fingerprint dedup) -> `extracting` -> `ready` (extracted terms written back to `submittedQuery` and results loaded).
 - Vision failure (stillProcessing, empty result, throw) -> `idle + error` toast; deleting a ref -> `markStale` (keep results) or clearing all -> `reset` and write back `?q`.

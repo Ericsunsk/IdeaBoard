@@ -1,5 +1,6 @@
-import { vi } from 'vitest'
+import { expect, vi, type Mock } from 'vitest'
 import { useAppToast } from '../core/composables/useAppToast'
+import { screen, waitFor } from './render'
 
 // Converged `useAppToast` test double: the superset of every inline
 // `vi.mock(.../useAppToast)` shim (success/error/warning/info/loading/dismiss).
@@ -22,4 +23,30 @@ export function mockAppToast(): AppToastMocks {
   const mocks = createAppToastMocks()
   vi.mocked(useAppToast).mockReturnValue(mocks as unknown as ReturnType<typeof useAppToast>)
   return mocks
+}
+
+// Assert toast feedback without a duplicate inline error in the chosen scope.
+export async function expectToastFeedback(
+  toast: AppToastMocks,
+  message: string,
+  scope: {
+    queryByRole: (role: 'alert') => HTMLElement | null
+    queryByText: (text: string | RegExp) => HTMLElement | null
+  } = screen,
+  absentText: Array<string | RegExp> = [],
+): Promise<void> {
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message))
+  expect(scope.queryByRole('alert')).not.toBeInTheDocument()
+  for (const text of absentText) {
+    expect(scope.queryByText(text)).not.toBeInTheDocument()
+  }
+}
+
+// Feedback factories must be called once without a duplicate inline alert.
+export async function expectFeedbackSent(
+  feedbackFn: Mock,
+  scope: { queryByRole: (role: 'alert') => HTMLElement | null } = screen,
+): Promise<void> {
+  await waitFor(() => expect(feedbackFn).toHaveBeenCalledTimes(1))
+  expect(scope.queryByRole('alert')).not.toBeInTheDocument()
 }

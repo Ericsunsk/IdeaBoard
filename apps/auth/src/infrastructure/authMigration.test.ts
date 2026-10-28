@@ -45,6 +45,9 @@ describe('runAuthMigrations', () => {
           },
         }
       },
+      async ensureAccountIssuerRemoved() {
+        calls.push('account_issuer')
+      },
       async ensureMailConfigSchema() {
         calls.push('mail_schema')
       },
@@ -63,6 +66,7 @@ describe('runAuthMigrations', () => {
       'options',
       'adapter',
       'plan',
+      'account_issuer',
       'mail_schema',
       'provider_schema',
       'privileges:auth_runtime',

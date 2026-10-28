@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '@/test/render'
-import { mockAppToast, type AppToastMocks } from '@/test/toast'
+import { mockAppToast, expectToastFeedback, type AppToastMocks } from '@/test/toast'
 import AdminPaymentOrdersPage from './AdminPaymentOrdersPage.vue'
 
 const resource = vi.hoisted(() => ({
@@ -159,17 +159,15 @@ describe('AdminPaymentOrdersPage', () => {
     expect(resource.get).toHaveBeenCalledWith(orderNumber, expect.any(AbortSignal))
   })
 
-  it('recovers a failed detail request inside the focused dialog', async () => {
+  it('routes a failed detail request to toast without an inline error', async () => {
     resource.get.mockRejectedValueOnce(new Error('network unavailable'))
     const { user } = renderPage()
     await screen.findByText(orderNumber)
 
     await user.click(screen.getAllByRole('button', { name: `查看订单 ${orderNumber}` })[0]!)
-    expect(await screen.findByText('支付订单详情加载失败，请重试。')).toBeVisible()
-
-    await user.click(screen.getByRole('button', { name: '重试' }))
-    expect(await screen.findByText('acct…7890')).toBeVisible()
-    expect(resource.get).toHaveBeenCalledTimes(2)
+    // 行内锚点已删除：失败只走 toast，对话框保持打开。
+    await expectToastFeedback(toast, 'network unavailable', screen, ['支付订单详情加载失败，请重试。'])
+    expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
   })
 
   it('confirms an eligible partial refund and refreshes the payment read model', async () => {
@@ -219,7 +217,7 @@ describe('AdminPaymentOrdersPage', () => {
     expect(resource.search).toHaveBeenCalledTimes(2)
   })
 
-  it('mirrors a failed refund in a toast while keeping the inline error', async () => {
+  it('routes a failed refund to toast without an inline error', async () => {
     const eligibleDetail = {
       ...makeDetail(),
       status: 'credited',
@@ -239,18 +237,20 @@ describe('AdminPaymentOrdersPage', () => {
     await user.click(screen.getByRole('button', { name: '确认退款' }))
 
     await waitFor(() => expect(resource.refund).toHaveBeenCalledOnce())
-    // Dual: dialog inline AdminAlert stays as position anchor, toast mirrors it.
-    expect(await screen.findByText('refund boom')).toBeVisible()
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('refund boom'))
+    // 行内锚点已删除：失败只走 toast，对话框保持打开可重试。
+    await expectToastFeedback(toast, 'refund boom', screen, ['refund boom'])
+    expect(screen.getByRole('dialog', { name: `支付订单 · ${orderNumber}` })).toBeVisible()
     expect(toast.success).not.toHaveBeenCalled()
   })
 
-  it('distinguishes initial and background refresh errors, then recovers without dropping data', async () => {
+  it('routes an initial load failure to toast and recovers through the toolbar refresh', async () => {
     resource.search.mockRejectedValueOnce(new Error('network unavailable'))
     const { user } = renderPage()
 
-    expect(await screen.findByText('支付订单加载失败，请重试。')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: '重试' }))
+    // 初载行内锚点已删除：失败只走 toast，空态表格 + 工具栏刷新即重试入口。
+    await expectToastFeedback(toast, 'network unavailable', screen, ['支付订单加载失败，请重试。'])
+    expect(screen.queryByRole('table', { name: '支付订单列表' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '刷新支付订单' }))
     expect(await screen.findByText(orderNumber)).toBeVisible()
 
     resource.search.mockRejectedValueOnce(new Error('network unavailable'))

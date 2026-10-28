@@ -82,6 +82,11 @@ vi.mock('../../session/useAdminTaskCancel', () => ({
 
 vi.mock('../../session/useAdminMonitorFeedback', () => ({
   useAdminTaskCancellationFeedback: () => ({ taskCancelled: vi.fn(), cancelTaskFailed: vi.fn() }),
+  useAdminTaskLoadFeedback: () => ({
+    snapshotLoadFailed: vi.fn(),
+    listLoadFailed: vi.fn(),
+    detailLoadFailed: vi.fn(),
+  }),
 }))
 
 vi.mock('../../../shared/session/feedback/useAdminConfirm', () => ({

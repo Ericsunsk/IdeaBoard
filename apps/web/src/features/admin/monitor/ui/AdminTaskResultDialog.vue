@@ -65,15 +65,6 @@
       {{ MONITOR_MESSAGES.detailLoading }}
     </div>
 
-    <AdminAlert v-else-if="errorMessage" severity="error">
-      <div class="flex min-h-40 flex-col items-center justify-center gap-2.5 text-center">
-        <span class="text-xs font-semibold">{{ errorMessage }}</span>
-        <ActionButton variant="outline" @click="emit('retry')">
-          {{ MONITOR_MESSAGES.retry }}
-        </ActionButton>
-      </div>
-    </AdminAlert>
-
     <AdminEmptyState v-else-if="!detailTask" compact :title="MONITOR_MESSAGES.detailUnavailable" />
 
     <!-- 主信息单页极简流 -->
@@ -501,9 +492,7 @@ import {
 import { DialogTitle } from 'reka-ui'
 import { StatusBadge } from '../../shared'
 import { AdminButton } from '../../shared'
-import { AdminAlert } from '../../shared'
 import { AdminEmptyState } from '../../shared'
-import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminDialogShell } from '../../shared'
 import TaskResultStatusBanner from './TaskResultStatusBanner.vue'
 import { formatIdeaAmount } from '@/core/i18n/userIdeaCurrency'
@@ -533,12 +522,10 @@ const props = withDefaults(
     task: AdminMonitorDetailModel | null
     taskId?: string
     loading?: boolean
-    errorMessage?: string
   }>(),
   {
     taskId: '',
     loading: false,
-    errorMessage: '',
   },
 )
 

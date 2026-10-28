@@ -104,11 +104,6 @@
                 </span>
               </div>
               <template v-else-if="workspaceLoadError">
-                <div class="px-2.5 py-2" aria-live="polite">
-                  <p class="m-0 text-xs leading-normal text-destructive">
-                    {{ workspaceLoadError }}
-                  </p>
-                </div>
                 <DropdownMenuItem
                   :class="[appOverlayMenuItemClass, props.menuItemClass]"
                   @select="handleWorkspaceRetry"
@@ -316,6 +311,7 @@ import {
 } from '../../../../core/i18n/userLocale'
 import { LOCALE_MANIFEST } from '../../../../core/i18n/localeManifest'
 import type { SupportChannel } from '../../../../core/composables/useSupportChannels'
+import { useFailureToast } from '../../../../core/composables/useFailureToast'
 import SupportChannelQr from './SupportChannelQr.vue'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
 import WorkspaceSettingsDialog from './WorkspaceSettingsDialog.vue'
@@ -438,6 +434,8 @@ const workspaceLoadError = computed(() =>
     ? (props.workspace.errorMessage ?? t('workspace.switcher.loadFailed'))
     : null,
 )
+// Own the shared list failure feedback for both the dropdown and settings dialog.
+useFailureToast(workspaceLoadError, (message) => String(message ?? ''))
 const workspaceNameMaxLength = computed(
   () => props.workspace?.nameMaxLength ?? WORKSPACE_NAME_MAX_LENGTH_FALLBACK,
 )

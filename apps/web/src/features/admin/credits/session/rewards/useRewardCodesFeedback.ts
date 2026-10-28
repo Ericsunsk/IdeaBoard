@@ -1,7 +1,4 @@
-import { formatAdminDisplayError, type AdminToastPort, useAdminToast } from '../../../shared'
-
-// 反馈公约（admin，见 settings useSettingsFeedback 文件头）：领域文案收口到本文件
-// 的 feedback 工厂，调用方只表达意图，不直接拼 toast 文案。
+import { defineFeedback } from '../../../shared'
 
 export type RewardCodesFeedback = {
   loadFailed: (error: unknown) => void
@@ -9,19 +6,26 @@ export type RewardCodesFeedback = {
   toggleFailed: (error: unknown, enabled: boolean) => void
   deleted: () => void
   deleteFailed: (error: unknown) => void
+  saveFailed: (error: unknown, isEditing: boolean) => void
+  redemptionsLoadFailed: (error: unknown) => void
+  redemptionDetailFailed: (error: unknown) => void
 }
 
-function createRewardCodesFeedback(toast: AdminToastPort): RewardCodesFeedback {
-  return {
-    loadFailed: (error) => toast.error(formatAdminDisplayError(error, '兑换码加载失败')),
-    enabledToggled: (enabled) => toast.success(enabled ? '兑换码已启用' : '兑换码已停用'),
-    toggleFailed: (error, enabled) =>
-      toast.error(formatAdminDisplayError(error, enabled ? '启用兑换码失败' : '停用兑换码失败')),
-    deleted: () => toast.success('兑换码已删除'),
-    deleteFailed: (error) => toast.error(formatAdminDisplayError(error, '删除兑换码失败')),
-  }
+const REWARD_CODES_COPY = {
+  loadFailed: { error: '兑换码加载失败' },
+  enabledToggled: {
+    success: (isEnabled: boolean) => (isEnabled ? '兑换码已启用' : '兑换码已停用'),
+  },
+  toggleFailed: {
+    error: (isEnabled: boolean) => (isEnabled ? '启用兑换码失败' : '停用兑换码失败'),
+  },
+  deleted: { success: '兑换码已删除' },
+  deleteFailed: { error: '删除兑换码失败' },
+  saveFailed: { error: (isEditing: boolean) => (isEditing ? '更新兑换码失败' : '创建兑换码失败') },
+  redemptionsLoadFailed: { error: '兑换记录加载失败，请重试。' },
+  redemptionDetailFailed: { error: '兑换详情加载失败。' },
 }
 
-export function useRewardCodesFeedback() {
-  return createRewardCodesFeedback(useAdminToast())
+export function useRewardCodesFeedback(): RewardCodesFeedback {
+  return defineFeedback<RewardCodesFeedback>(REWARD_CODES_COPY)
 }

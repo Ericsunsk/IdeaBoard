@@ -76,29 +76,21 @@
       </DataTableColumn>
 
       <template #empty>
-        <div
+        <AccountEmptyRetry
           v-if="isForbidden"
-          class="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"
-          role="status"
-        >
-          <span class="font-semibold text-foreground">{{
-            t('account.billingRecords.forbiddenTitle')
-          }}</span>
-          <span class="mt-1 text-admin-content text-muted-foreground">{{
-            t('account.billingRecords.forbiddenDescription')
-          }}</span>
-          <Button variant="ghost" size="sm" class="mt-3" @click="retryInitial()">{{
-            t('account.reload')
-          }}</Button>
-        </div>
-        <LoadErrorPanel
-          v-else-if="initialError"
-          class="min-h-48 justify-center"
-          align="center"
-          :message="t('account.billingRecords.loadFailed')"
-          :detail="errorMessage(initialError)"
+          announce="status"
+          variant="tall"
+          :title="t('account.billingRecords.forbiddenTitle')"
+          :description="t('account.billingRecords.forbiddenDescription')"
           :retry-label="t('account.reload')"
-          retry-variant="ghost"
+          @retry="retryInitial()"
+        />
+        <AccountEmptyRetry
+          v-else-if="initialError"
+          variant="tall"
+          :title="t('account.billingRecords.emptyTitle')"
+          :description="t('account.billingRecords.emptyDescription')"
+          :retry-label="t('account.reload')"
           @retry="retryInitial()"
         />
         <div
@@ -106,10 +98,8 @@
           class="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"
           role="status"
         >
-          <span class="font-semibold text-foreground">{{
-            t('account.billingRecords.emptyTitle')
-          }}</span>
-          <span class="mt-1 text-admin-content text-muted-foreground">{{
+          <span :class="accountEmptyTitleClass">{{ t('account.billingRecords.emptyTitle') }}</span>
+          <span :class="accountEmptyDescriptionClass">{{
             t('account.billingRecords.emptyDescription')
           }}</span>
         </div>
@@ -156,6 +146,7 @@ import DataTableColumn from '../../../../core/components/DataTableColumn.vue'
 import { Skeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../core/components/DataTableFrame.vue'
 import LoadErrorPanel from '../../../../core/components/LoadErrorPanel.vue'
+import { useFailureToast } from '../../../../core/composables/useFailureToast'
 import { formatLocaleNumber } from '../../../../core/i18n/formatters'
 import { userErrorCode, userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../session/workspaceBilling'
@@ -163,7 +154,12 @@ import { formatAccountLocalDateTime } from '../../session/formatters'
 import type { BillingRecord } from '../../session/billing/resource'
 import { useBillingRecords } from '../../session/billing/useBillingRecords'
 import AccountPane from '../shared/AccountPane.vue'
-import { accountDataTableFrameClass } from '../shared/ui'
+import AccountEmptyRetry from '../shared/AccountEmptyRetry.vue'
+import {
+  accountDataTableFrameClass,
+  accountEmptyDescriptionClass,
+  accountEmptyTitleClass,
+} from '../shared/ui'
 
 type BillingSkeletonRow = {
   record_id: string
@@ -237,4 +233,9 @@ function formatLocalDateTime(value: string): string {
 function errorMessage(error: unknown): string {
   return userFacingErrorCopy(error, t('account.errors.networkRetry'), ACCOUNT_GUIDANCE_COPY_KEYS)
 }
+
+// Forbidden reads stay neutral; pagination retains its inline hint.
+useFailureToast(initialError, (error) => errorMessage(error), {
+  skip: (error) => userErrorCode(error) === 'billing_account_forbidden',
+})
 </script>

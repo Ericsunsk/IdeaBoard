@@ -8,6 +8,7 @@ import {
   normalizeDisplayName,
   type InternalUserShape,
 } from '../infrastructure/authUtils.js'
+import { buildEmailAvatarUrl } from './emailAvatar.js'
 import type { AuthRole } from '../generated/auth-internal/types.gen.js'
 
 export type TrustedIdentityAuthAPI = {
@@ -39,7 +40,8 @@ export function sessionIdentityFromAuthUser(user: InternalUserShape): VerifiedSe
     auth_user_id: user.id.trim(),
     email: claimIdentity,
     display_name: displayName,
-    avatar: normalizeAvatarURL(user.image),
+    // Keep provider pictures; otherwise use an avatar seeded by the internal user id.
+    avatar: normalizeAvatarURL(user.image) || buildEmailAvatarUrl(user.id),
     claim_identity: claimIdentity,
     claim_identity_kind: isTrustedClaimIdentity ? 'canonical_email' : 'untrusted',
     claim_identity_verified: isTrustedClaimIdentity,

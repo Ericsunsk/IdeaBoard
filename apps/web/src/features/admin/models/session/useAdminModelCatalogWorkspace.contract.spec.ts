@@ -167,6 +167,19 @@ describe('useAdminModelCatalogWorkspace refresh enrichment', () => {
 
     expect(saved.items).toHaveLength(0)
   })
+
+  it('toasts a failed initial catalog load while keeping the inline anchor state', async () => {
+    const { workspace } = mountWorkspace({
+      ...fakeCatalog([], []),
+      list: async () => {
+        throw new Error('catalog down')
+      },
+    })
+
+    await waitFor(() => expect(workspace.isListError.value).toBe(true))
+    // 目录行内文案已删除（isListError 仍为真），失败只走 toast。
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('catalog down'))
+  })
 })
 
 describe('useAdminModelCatalogWorkspace copy feedback contract', () => {

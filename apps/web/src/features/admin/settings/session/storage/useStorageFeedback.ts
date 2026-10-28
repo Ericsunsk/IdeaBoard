@@ -1,4 +1,4 @@
-import { formatAdminDisplayError, type AdminToastPort, useAdminToast } from '../../../shared/index'
+import { defineFeedback } from '../../../shared/index'
 
 export type AdminStorageFeedback = {
   loadProfilesFailed: (error: unknown) => void
@@ -20,62 +20,26 @@ export type AdminStorageFeedback = {
   deleteProfileFailed: (error: unknown) => void
 }
 
-function createAdminStorageFeedback(toast: AdminToastPort): AdminStorageFeedback {
-  return {
-    loadProfilesFailed(error) {
-      toast.error(formatAdminDisplayError(error, '加载存储配置失败'))
-    },
-    refreshFailed(error) {
-      toast.error(formatAdminDisplayError(error, '刷新存储配置失败'))
-    },
-    staleProfile() {
-      toast.warning('存储配置已变化，请刷新后重试')
-    },
-    unsupportedVendorPreset(label) {
-      toast.info(`${label} 暂未接入后端，当前先作为预设展示`)
-    },
-    noCreatableProviders() {
-      toast.warning('当前没有可新增的存储类型')
-    },
-    missingEditableTarget() {
-      toast.error('未找到可编辑的存储配置')
-    },
-    saveDraftSucceeded(message) {
-      toast.success(message || '保存成功')
-    },
-    saveDraftFailed(error) {
-      toast.error(formatAdminDisplayError(error, '保存失败'))
-    },
-    applyCurrentSucceeded(message) {
-      toast.success(message || '已设为当前存储')
-    },
-    applyCurrentFailed(error) {
-      toast.error(formatAdminDisplayError(error, '设为当前失败'))
-    },
-    testConnectionSucceeded(message) {
-      toast.success(message || '连接成功')
-    },
-    testConnectionFailed(error) {
-      toast.error(formatAdminDisplayError(error, '连接失败'))
-    },
-    bucketDomainsDetected(count) {
-      toast.success(`检测到 ${count} 个域名`)
-    },
-    bucketDomainsEmpty() {
-      toast.warning('未检测到绑定域名')
-    },
-    fetchBucketDomainsFailed(error) {
-      toast.error(formatAdminDisplayError(error, '获取失败'))
-    },
-    profileDeleted(message) {
-      toast.success(message || '删除成功')
-    },
-    deleteProfileFailed(error) {
-      toast.error(formatAdminDisplayError(error, '删除失败'))
-    },
-  }
+const ADMIN_STORAGE_COPY = {
+  loadProfilesFailed: { error: '加载存储配置失败' },
+  refreshFailed: { error: '刷新存储配置失败' },
+  staleProfile: { warning: '存储配置已变化，请刷新后重试' },
+  unsupportedVendorPreset: { info: (label: string) => `${label} 暂未接入后端，当前先作为预设展示` },
+  noCreatableProviders: { warning: '当前没有可新增的存储类型' },
+  missingEditableTarget: { errorText: '未找到可编辑的存储配置' },
+  saveDraftSucceeded: { successMessage: '保存成功' },
+  saveDraftFailed: { error: '保存失败' },
+  applyCurrentSucceeded: { successMessage: '已设为当前存储' },
+  applyCurrentFailed: { error: '设为当前失败' },
+  testConnectionSucceeded: { successMessage: '连接成功' },
+  testConnectionFailed: { error: '连接失败' },
+  bucketDomainsDetected: { success: (count: number) => `检测到 ${count} 个域名` },
+  bucketDomainsEmpty: { warning: '未检测到绑定域名' },
+  fetchBucketDomainsFailed: { error: '获取失败' },
+  profileDeleted: { successMessage: '删除成功' },
+  deleteProfileFailed: { error: '删除失败' },
 }
 
-export function useStorageFeedback() {
-  return createAdminStorageFeedback(useAdminToast())
+export function useStorageFeedback(): AdminStorageFeedback {
+  return defineFeedback<AdminStorageFeedback>(ADMIN_STORAGE_COPY)
 }

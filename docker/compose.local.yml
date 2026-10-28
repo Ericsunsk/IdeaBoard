@@ -74,7 +74,9 @@ services:
       IMGPROXY_KEY: ${IMGPROXY_KEY:?Set IMGPROXY_KEY in docker/.env}
       IMGPROXY_SALT: ${IMGPROXY_SALT:?Set IMGPROXY_SALT in docker/.env}
       # Bound source access, download time, bytes, and decoded image size.
-      IMGPROXY_ALLOWED_SOURCES: local:///
+      # dicebear joins local:/// so the API can proxy permanent seed avatars
+      # through signed imgproxy URLs without the browser dialing the CDN.
+      IMGPROXY_ALLOWED_SOURCES: local:///,https://api.dicebear.com/
       IMGPROXY_ALLOW_PRIVATE_SOURCE_ADDRESSES: "false"
       IMGPROXY_ALLOW_LOOPBACK_SOURCE_ADDRESSES: "false"
       IMGPROXY_ALLOW_LINK_LOCAL_SOURCE_ADDRESSES: "false"

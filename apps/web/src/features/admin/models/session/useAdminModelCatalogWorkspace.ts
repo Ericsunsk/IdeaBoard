@@ -1,9 +1,13 @@
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref, type ComputedRef } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAdminCollectionQuery } from '../../shared'
 import { useAdminConfirm } from '../../shared'
-import { useAdminModelCatalogFeedback } from './useAdminModelCatalogFeedback'
+import {
+  useAdminModelCatalogFeedback,
+  type AdminModelCatalogFeedback,
+} from './useAdminModelCatalogFeedback'
 import { useAppClipboard } from '@/core/composables/useAppClipboard'
+import { useFailureToast } from '@/core/composables/useFailureToast'
 import { createAdminGatewayResource, type AdminGatewayCatalog } from '../resource'
 import type { AdminModelItem, ModelObservedSnapshot } from '../core/catalogData'
 import { matchesModelKeyword, MODEL_HOSTING_OPTIONS } from '../core/catalogData'
@@ -16,6 +20,17 @@ function getAdminModelCatalogQueryKey() {
 // 观测 query key 同样归 workspace 所有：卡片观测区与目录列表共享同一失效节奏。
 function getAdminModelObservedQueryKey() {
   return ['admin', 'models', 'observed'] as const
+}
+
+function mirrorCatalogLoadFailure(
+  isListError: ComputedRef<boolean>,
+  getError: () => unknown,
+  feedback: AdminModelCatalogFeedback,
+) {
+  useFailureToast(isListError, feedback.listFailed, {
+    shouldFireOnMount: false,
+    resolveError: getError,
+  })
 }
 
 // 模型目录页的用例编排：collection query、筛选、refresh 富化、CRUD、复制。
@@ -35,11 +50,14 @@ export function useAdminModelCatalogWorkspace(
     initialError: isListError,
     backgroundError: isListStale,
     refresh: refetchCatalog,
+    query: catalogQuery,
   } = useAdminCollectionQuery({
     queryKey,
     queryFn: () => resource.list(),
   })
   const allModels = computed<AdminModelItem[]>(() => catalogData.value ?? [])
+
+  mirrorCatalogLoadFailure(isListError, () => catalogQuery.error.value, feedback)
 
   // 卡片观测区：7 天聚合只读透传，失败即空（卡片按暂无数据缺省，不抛错误横幅）。
   const { data: observedData, loading: isObservedLoading } = useAdminCollectionQuery({

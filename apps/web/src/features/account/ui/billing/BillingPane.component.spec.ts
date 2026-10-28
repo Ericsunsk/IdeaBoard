@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, within } from '../../../../test/render'
+import { mockAppToast, expectToastFeedback, type AppToastMocks } from '../../../../test/toast'
 import type { BillingRecord } from '../../session/billing/resource'
 import BillingPane from './BillingPane.vue'
 
@@ -9,6 +10,8 @@ const useBillingRecordsMock = vi.hoisted(() => vi.fn())
 vi.mock('../../session/billing/useBillingRecords', () => ({
   useBillingRecords: useBillingRecordsMock,
 }))
+
+vi.mock('../../../../core/composables/useAppToast')
 
 function makeRecord(overrides: Partial<BillingRecord> = {}): BillingRecord {
   return {
@@ -46,7 +49,12 @@ function renderPane() {
 }
 
 describe('BillingPane', () => {
-  beforeEach(() => useBillingRecordsMock.mockReset())
+  let toast: AppToastMocks
+
+  beforeEach(() => {
+    useBillingRecordsMock.mockReset()
+    toast = mockAppToast()
+  })
 
   it('renders the four-column final billing record table with stable amount semantics', () => {
     useBillingRecordsMock.mockReturnValue(
@@ -136,7 +144,7 @@ describe('BillingPane', () => {
     expect(screen.queryByText('Idea 充值')).not.toBeInTheDocument()
   })
 
-  it('recovers from an initial failure without removing the table header', async () => {
+  it('toasts an initial failure with a neutral retry entry without removing the table header', async () => {
     const retryInitial = vi.fn().mockResolvedValue(undefined)
     useBillingRecordsMock.mockReturnValue(
       makeBillingState({ initialError: ref(new Error('账单服务暂不可用')), retryInitial }),
@@ -145,10 +153,10 @@ describe('BillingPane', () => {
     const { user } = renderPane()
 
     expect(screen.getByRole('table', { name: 'Transactions table' })).toBeVisible()
-    const alert = screen.getByRole('alert')
-    expect(alert).toHaveTextContent('Could not load billing records.')
-    expect(alert).toHaveTextContent('Network error. Please try again.')
-    await user.click(within(alert).getByRole('button', { name: 'Reload' }))
+    // 初载失败只走 toast；中性空态 + 重新加载按钮即恢复入口。
+    await expectToastFeedback(toast, 'Network error. Please try again.')
+    expect(screen.getByText('No billing records yet')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Reload' }))
     expect(retryInitial).toHaveBeenCalledOnce()
   })
 
@@ -216,6 +224,7 @@ describe('BillingPane', () => {
         'Your current role cannot view these records. Contact a workspace or billing admin.',
       ),
     ).toBeVisible()
+    expect(toast.error).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Reload' }))
     expect(retryInitial).toHaveBeenCalledOnce()
   })

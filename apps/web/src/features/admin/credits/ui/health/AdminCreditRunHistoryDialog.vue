@@ -49,20 +49,6 @@
             severity="secondary"
             size="sm"
             variant="ghost"
-            :class="adminTextButtonClass"
-            :loading="runsLoading"
-            @click="refreshRuns"
-          />
-        </div>
-      </AdminAlert>
-
-      <AdminAlert v-if="initialError" class="m-5" severity="error">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>{{ CREDIT_HEALTH_MESSAGES.runHistoryLoadFailed }}</span>
-          <ActionButton
-            :label="CREDIT_HEALTH_MESSAGES.runHistoryReload"
-            severity="secondary"
-            variant="outline"
             :loading="runsLoading"
             @click="refreshRuns"
           />
@@ -70,7 +56,7 @@
       </AdminAlert>
 
       <AdminTable
-        v-else
+        v-if="!initialError"
         v-model:expanded-rows="expandedRows"
         :value="runs"
         data-key="id"
@@ -135,18 +121,6 @@
                 :aria-label="CREDIT_HEALTH_MESSAGES.runHistoryDetailLoadingAria"
               />
             </div>
-            <AdminAlert v-else-if="runDetailError && selectedRunId === data.id" severity="error">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <span>{{ CREDIT_HEALTH_MESSAGES.runHistoryDetailLoadFailed }}</span>
-                <AdminButton
-                  :label="CREDIT_HEALTH_MESSAGES.runHistoryDetailRetry"
-                  variant="ghost"
-                  :class="adminTextButtonClass"
-                  :loading="runDetailLoading"
-                  @click="runDetail.refresh()"
-                />
-              </div>
-            </AdminAlert>
             <dl
               v-else-if="selectedRunId === data.id && selectedRun"
               class="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-4"
@@ -214,7 +188,7 @@ import {
   getRunStatusLabel,
   getRunStatusTone,
 } from '../../core/shared/format'
-import { adminTableClass, adminTableFrameClass, adminTextButtonClass } from '../../../shared'
+import { adminTableClass, adminTableFrameClass } from '../../../shared'
 import { ADMIN_TABLE_EXPANDER_COLUMN_WIDTH } from '../../../shared'
 import {
   createAdminCreditRunHistoryResource,
@@ -226,11 +200,14 @@ import {
   getReconciliationTriggerLabel,
 } from '../../core/health/reconciliationRunPresentation'
 import { useCreditRunDetail } from '../../session/health/useCreditRunDetail'
+import { useCreditHealthFeedback } from '../../session/health/useCreditHealthFeedback'
+import { useFailureToast } from '@/core/composables/useFailureToast'
 import { CREDIT_HEALTH_MESSAGES } from './messages'
 
 const props = defineProps<{ visible: boolean }>()
 defineEmits<{ 'update:visible': [visible: boolean] }>()
 
+const feedback = useCreditHealthFeedback()
 const expandedRows = ref<Record<string, boolean>>({})
 const resource = createAdminCreditRunHistoryResource()
 const queryClient = useQueryClient()
@@ -244,6 +221,7 @@ const {
   initialError,
   backgroundError,
   refresh: refreshRunHistory,
+  query: runHistoryQuery,
   pagination,
 } = useAdminCursorCollection({
   buildKey: (beforeId) => [...RUN_HISTORY_QUERY_ROOT, beforeId] as const,
@@ -262,6 +240,17 @@ const currentPage = pagination.currentPage
 const knownPageCount = pagination.knownPageCount
 const canAdvance = pagination.canAdvance
 const canRetreat = pagination.canRetreat
+useFailureToast(initialError, feedback.runHistoryLoadFailed, {
+  shouldFireOnMount: false,
+  resolveError: () => runHistoryQuery.error.value,
+})
+useFailureToast(
+  runDetailError,
+  () => {
+    feedback.runDetailFailed(undefined)
+  },
+  { shouldFireOnMount: false },
+)
 
 watch(
   () => props.visible,

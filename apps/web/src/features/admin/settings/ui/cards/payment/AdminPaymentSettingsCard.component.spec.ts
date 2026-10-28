@@ -2,7 +2,7 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '@/test/msw'
 import { renderWithUser, screen, within } from '@/test/render'
-import { mockAppToast } from '@/test/toast'
+import { mockAppToast, expectToastFeedback } from '@/test/toast'
 import AdminPaymentSettingsCard from './AdminPaymentSettingsCard.vue'
 
 vi.mock('../../../../../../core/composables/useAppToast')
@@ -67,12 +67,9 @@ describe('AdminPaymentSettingsCard', () => {
     )
     renderCard()
 
-    await vi.waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('stripe down')),
-    )
-    expect(toast.success).not.toHaveBeenCalled()
     // 精简目标：底部 globalError AdminAlert 已删除，失败一律 toast；Status 列保留为真相源。
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await expectToastFeedback(toast, 'stripe down')
+    expect(toast.success).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
     expect(await screen.findByText('收款配置')).toBeVisible()
     expect(screen.getByText('Not configured')).toBeVisible()

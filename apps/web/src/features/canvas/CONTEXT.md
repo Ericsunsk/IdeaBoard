@@ -127,6 +127,7 @@ Graph specs cover snapshot roundtrips, transaction commit/cancel and dirty summa
 - After board attachment or execution lease expires, old async completions are rejected: no materialize, cancel, or projection into the new session.
 - `features/board` stays independent: `board/domain` owns only schema, node/connection model, registry, sizing, aspect ratio, fusion blend; `board` never depends on canvas runtimes, Vue Flow adapters, image tool sessions, or page shells; canvas hydrates/exports snapshots via the `board` public seam, never the reverse.
 - Dirty/retry/conflict state drives network/re-auth automatic recovery without a persistent autosave status block; actionable save failures surface via Toast.
+- Toast-only user feedback: operation success/failure/warning surfaces through the Toast single channel with no parallel inline alert/banner for the same outcome; retained are form field-level validation, verbatim server-data display, and staleness secondary hints (polling-flood risk). Reuse the domain `feedback.*` factory and existing messages/i18n; never add a second toast library.
 - The World Capture reflow type contract has zero 3D/Fabric/Vue dependencies; a future producer must enter through graph-editing intents (creation / media-input mutation), never by writing Vue Flow projections or `CanvasGraphStore` internals.
 
 ## Non-goals

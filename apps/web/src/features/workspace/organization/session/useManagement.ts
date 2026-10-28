@@ -130,7 +130,6 @@ export function useManagement(options: OrganizationManagementOptions) {
   const isRevokingInvite = ref(false)
   const isLeaving = ref(false)
   const isClosing = ref(false)
-  const closureError = ref<string | null>(null)
   const organizationName = ref('')
   const organizationError = ref<string | null>(null)
   const isCreatingOrganization = ref(false)
@@ -156,7 +155,6 @@ export function useManagement(options: OrganizationManagementOptions) {
       isRenamingBusy.value = false
       inviteEmail.value = ''
       inviteError.value = null
-      closureError.value = null
       organizationName.value = ''
       organizationError.value = null
       isRenaming.value = false
@@ -233,9 +231,7 @@ export function useManagement(options: OrganizationManagementOptions) {
       }
       await Promise.all([refresh(), refreshWorkspaces()])
     } catch {
-      if (scope.isVisible()) {
-        organizationError.value = t('workspace.switcher.organization.createFailed')
-      }
+      if (scope.isVisible()) toast.error(t('workspace.switcher.organization.createFailed'))
     } finally {
       if (scope.isVisible()) isCreatingOrganization.value = false
     }
@@ -271,7 +267,7 @@ export function useManagement(options: OrganizationManagementOptions) {
       if (scope.isVisible()) isRenaming.value = false
       await refresh()
     } catch {
-      if (scope.isVisible()) renameError.value = t('workspace.switcher.organization.renameFailed')
+      if (scope.isVisible()) toast.error(t('workspace.switcher.organization.renameFailed'))
     } finally {
       if (scope.isVisible()) isRenamingBusy.value = false
     }
@@ -382,7 +378,7 @@ export function useManagement(options: OrganizationManagementOptions) {
       await refresh()
       if (scope.isVisible()) toast.success(t('workspace.switcher.members.invited'))
     } catch (error) {
-      if (scope.isVisible()) inviteError.value = actionError(error)
+      if (scope.isVisible()) toast.error(actionError(error))
     } finally {
       if (scope.isVisible()) isSaving.value = false
     }
@@ -432,7 +428,6 @@ export function useManagement(options: OrganizationManagementOptions) {
     const scope = context()
     if (!scope || !canClose.value || isClosing.value) return false
     isClosing.value = true
-    closureError.value = null
     try {
       await closeOrganization(
         scope.org.publicId,
@@ -444,9 +439,11 @@ export function useManagement(options: OrganizationManagementOptions) {
       return true
     } catch (error) {
       if (scope.isVisible())
-        closureError.value = userErrorCode(error)?.includes('organization_closure_blocked')
-          ? t('workspace.management.closeBlocked')
-          : t('workspace.management.closeFailed')
+        toast.error(
+          userErrorCode(error)?.includes('organization_closure_blocked')
+            ? t('workspace.management.closeBlocked')
+            : t('workspace.management.closeFailed'),
+        )
       return false
     } finally {
       if (scope.isVisible()) isClosing.value = false
@@ -461,7 +458,6 @@ export function useManagement(options: OrganizationManagementOptions) {
     isRevokingInvite,
     isLeaving,
     isClosing,
-    closureError,
     organizationName,
     organizationError,
     isCreatingOrganization,

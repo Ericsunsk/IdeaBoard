@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "6bb1827be4c395a9165c40ee700d0b1c9d9afa1a",
+  "checkpointSha": "ffce04c119d2df3215bf38a392c866227f397ed7",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -6922,6 +6922,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/shared/AccountEmptyRetry.vue",
+          "to": "src/components/ui/button/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/usage/UsagePane.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
@@ -6968,11 +6973,6 @@
         },
         {
           "from": "src/features/notification/ui/NotificationCenterDialog.vue",
-          "to": "src/components/ui/button/index.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/ui/components/SearchEmptyState.vue",
           "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
@@ -8730,11 +8730,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/ui/health/AdminCreditFindingQueue.vue",
-          "to": "src/core/components/ActionButton.vue",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/credits/ui/health/AdminCreditHealthPage.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
@@ -8810,16 +8805,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/ui/pages/AdminModelsPage.vue",
-          "to": "src/core/components/ActionButton.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/monitor/ui/AdminTaskResultDialog.vue",
-          "to": "src/core/components/ActionButton.vue",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/prompts/ui/pages/AdminPromptConfigPage.vue",
           "to": "src/core/components/ActionButton.vue",
           "kind": "runtime"
@@ -8885,7 +8870,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 33,
+      "fanIn": 30,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/clsx/dist/clsx.js",
@@ -8919,7 +8904,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 33,
+      "targetFanIn": 30,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -9789,6 +9774,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/core/composables/useFailureToast.ts",
+          "to": "src/core/composables/useAppToast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/core/i18n/userLocale.ts",
           "to": "src/core/composables/useAppToast.ts",
           "kind": "runtime"
@@ -9929,7 +9919,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 30,
+      "fanIn": 31,
       "fanOut": 1,
       "fanOutTargets": ["node_modules/vue-sonner/lib/index.js"],
       "outboundEdges": [
@@ -9943,7 +9933,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 30,
+      "targetFanIn": 31,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -11257,16 +11247,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/account/ui/recharge/PendingOrders.vue",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/account/ui/recharge/RechargePane.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
@@ -11427,7 +11407,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 43,
+      "fanIn": 41,
       "fanOut": 1,
       "fanOutTargets": ["src/core/i18n/index.ts"],
       "outboundEdges": [
@@ -11441,7 +11421,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 43,
+      "targetFanIn": 41,
       "targetFanOut": 1,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -14745,17 +14725,7 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/ui/pages/AdminMonitorPage.vue",
-          "to": "src/core/utils/errorMessages.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/shared/session/feedback/toast.ts",
-          "to": "src/core/utils/errorMessages.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/statistics/ui/views/AdminStatisticsPage.vue",
           "to": "src/core/utils/errorMessages.ts",
           "kind": "runtime"
         },
@@ -14775,7 +14745,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 11,
+      "fanIn": 9,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -14783,7 +14753,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 11,
+      "targetFanIn": 9,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -15388,7 +15358,7 @@
         }
       ],
       "fanIn": 4,
-      "fanOut": 99,
+      "fanOut": 100,
       "fanOutTargets": [
         "fs",
         "node_modules/@iconoir/vue/dist/index.js",
@@ -15437,6 +15407,7 @@
         "src/core/components/dialogShell.ts",
         "src/core/composables/useAppToast.ts",
         "src/core/composables/useAsyncAction.ts",
+        "src/core/composables/useFailureToast.ts",
         "src/core/composables/useLogoutRedirect.ts",
         "src/core/composables/useMenuTriggerFocusRestore.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
@@ -16692,6 +16663,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/billing/BillingPane.component.spec.ts",
+          "to": "src/test/toast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
@@ -16724,6 +16700,11 @@
         {
           "from": "src/features/account/ui/billing/BillingPane.vue",
           "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/billing/BillingPane.vue",
+          "to": "src/core/composables/useFailureToast.ts",
           "kind": "runtime"
         },
         {
@@ -16854,6 +16835,11 @@
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/components/ui/spinner/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "to": "src/core/composables/useFailureToast.ts",
           "kind": "runtime"
         },
         {
@@ -16998,7 +16984,7 @@
         },
         {
           "from": "src/features/account/ui/chrome/WorkspaceLimitsSection.vue",
-          "to": "src/core/components/LoadErrorPanel.vue",
+          "to": "src/core/composables/useFailureToast.ts",
           "kind": "runtime"
         },
         {
@@ -17088,12 +17074,12 @@
         },
         {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
-          "to": "src/core/components/LoadErrorPanel.vue",
+          "to": "src/core/components/UserConfirmDialog.vue",
           "kind": "runtime"
         },
         {
           "from": "src/features/account/ui/chrome/WorkspaceMemberSection.vue",
-          "to": "src/core/components/UserConfirmDialog.vue",
+          "to": "src/core/composables/useFailureToast.ts",
           "kind": "runtime"
         },
         {
@@ -17548,16 +17534,6 @@
         },
         {
           "from": "src/features/account/ui/recharge/PendingOrders.vue",
-          "to": "src/core/components/LoadErrorPanel.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/recharge/PendingOrders.vue",
-          "to": "src/core/errors/errorCatalog.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/recharge/PendingOrders.vue",
           "to": "src/core/i18n/userIdeaCurrency.ts",
           "kind": "runtime"
         },
@@ -17599,16 +17575,6 @@
         {
           "from": "src/features/account/ui/recharge/PurchaseCard.vue",
           "to": "src/core/components/IbFormField.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
-          "to": "src/core/components/LoadErrorPanel.vue",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/account/ui/recharge/PurchaseCard.vue",
-          "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
         {
@@ -17668,6 +17634,11 @@
         },
         {
           "from": "src/features/account/ui/recharge/RechargePane.vue",
+          "to": "src/core/composables/useFailureToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/recharge/RechargePane.vue",
           "to": "src/core/errors/errorCatalog.ts",
           "kind": "runtime"
         },
@@ -17722,6 +17693,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/rewards/RewardsPane.component.spec.ts",
+          "to": "src/test/toast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
@@ -17759,6 +17735,11 @@
         {
           "from": "src/features/account/ui/rewards/RewardsPane.vue",
           "to": "src/core/components/LoadErrorPanel.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/rewards/RewardsPane.vue",
+          "to": "src/core/composables/useFailureToast.ts",
           "kind": "runtime"
         },
         {
@@ -17834,6 +17815,26 @@
         {
           "from": "src/features/account/ui/security/SecurityPane.vue",
           "to": "src/theme/formControls.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/shared/AccountEmptyRetry.component.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/shared/AccountEmptyRetry.component.spec.ts",
+          "to": "src/test/render.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/shared/AccountEmptyRetry.vue",
+          "to": "node_modules/vue/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/shared/AccountEmptyRetry.vue",
+          "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
@@ -17917,6 +17918,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/account/ui/usage/UsagePane.component.spec.ts",
+          "to": "src/test/toast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/account/ui/usage/UsagePane.vue",
           "to": "node_modules/vue-i18n/index.js",
           "kind": "runtime"
@@ -17934,6 +17940,11 @@
         {
           "from": "src/features/account/ui/usage/UsagePane.vue",
           "to": "src/core/components/RangedLineChartCard.vue",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/usage/UsagePane.vue",
+          "to": "src/core/composables/useFailureToast.ts",
           "kind": "runtime"
         },
         {
@@ -17957,7 +17968,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 4,
-      "targetFanOut": 99,
+      "targetFanOut": 100,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -18237,13 +18248,14 @@
         }
       ],
       "fanIn": 6,
-      "fanOut": 17,
+      "fanOut": 18,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/vue-i18n/index.js",
         "node_modules/vue/index.js",
         "src/components/ui/dropdown-menu/index.ts",
         "src/components/ui/spinner/index.ts",
+        "src/core/composables/useFailureToast.ts",
         "src/core/composables/useMenuTriggerFocusRestore.ts",
         "src/core/composables/useSupportChannels.ts",
         "src/core/i18n/localeManifest.ts",
@@ -18281,6 +18293,11 @@
         {
           "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
           "to": "src/components/ui/spinner/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/account/ui/chrome/UserAccountMenu.vue",
+          "to": "src/core/composables/useFailureToast.ts",
           "kind": "runtime"
         },
         {
@@ -18349,7 +18366,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 6,
-      "targetFanOut": 17,
+      "targetFanOut": 18,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -19213,6 +19230,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/credits/session/health/useCreditHealthFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/session/orders/paymentOrderApiAdapter.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -19223,17 +19245,17 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/credits/session/orders/usePaymentOrdersFeedback.unit.spec.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/credits/session/pricing/billableCatalogResource.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/admin/credits/session/pricing/modelPoolResource.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/pricing/useBillingPricingFeedback.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
         },
@@ -19653,11 +19675,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/settings/session/payment/useStripeSettingsFeedback.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/admin/settings/session/storage/resource.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -19793,6 +19810,11 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/statistics/session/useUsageStatisticsFeedback.ts",
+          "to": "src/features/admin/shared/index.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/statistics/ui/charts/usageStatisticsModelHealthCharts.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -19858,7 +19880,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 121,
+      "fanIn": 123,
       "fanOut": 58,
       "fanOutTargets": [
         "fs",
@@ -20203,6 +20225,11 @@
         },
         {
           "from": "src/features/admin/shared/session/feedback/confirmSettingsSave.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/feedback/defineFeedback.unit.spec.ts",
           "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
@@ -21186,7 +21213,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 121,
+      "targetFanIn": 123,
       "targetFanOut": 58,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -21777,6 +21804,26 @@
     "src/features/admin/shared/session/feedback/toast.ts": {
       "consumerEdges": [
         {
+          "from": "src/features/admin/credits/session/health/useCreditHealthFeedback.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/orders/usePaymentOrdersFeedback.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/pricing/useBillingPricingFeedback.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/credits/session/rewards/useRewardCodesFeedback.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/credits/ui/pricing/AdminBillingPricingPage.component.spec.ts",
           "to": "src/features/admin/shared/session/feedback/toast.ts",
           "kind": "runtime"
@@ -21788,6 +21835,11 @@
         },
         {
           "from": "src/features/admin/credits/ui/rewards/RewardCodePlaintextDialog.component.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/models/session/useAdminModelCatalogFeedback.unit.spec.ts",
           "to": "src/features/admin/shared/session/feedback/toast.ts",
           "kind": "runtime"
         },
@@ -21807,12 +21859,27 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/monitor/session/useAdminMonitorFeedback.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/prompts/session/usePromptConfigFeedback.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/prompts/ui/pages/AdminPromptConfigPage.component.spec.ts",
           "to": "src/features/admin/shared/session/feedback/toast.ts",
           "kind": "runtime"
         },
         {
           "from": "src/features/admin/settings/session/payment/useStripeSettingsFeedback.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/settings/session/storage/useStorageFeedback.unit.spec.ts",
           "to": "src/features/admin/shared/session/feedback/toast.ts",
           "kind": "runtime"
         },
@@ -21847,6 +21914,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/admin/shared/session/feedback/defineFeedback.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/shared/session/feedback/defineFeedback.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/admin/shared/ui/feedback/AdminConfirmDialog.component.spec.ts",
           "to": "src/features/admin/shared/session/feedback/toast.ts",
           "kind": "runtime"
@@ -21860,9 +21937,19 @@
           "from": "src/features/admin/shared/ui/popover/AdminLogoPickerPopover.vue",
           "to": "src/features/admin/shared/session/feedback/toast.ts",
           "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/statistics/session/useUsageStatisticsFeedback.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/admin/users/session/useUsersFeedback.unit.spec.ts",
+          "to": "src/features/admin/shared/session/feedback/toast.ts",
+          "kind": "runtime"
         }
       ],
-      "fanIn": 17,
+      "fanIn": 29,
       "fanOut": 2,
       "fanOutTargets": ["src/core/composables/useAppToast.ts", "src/core/utils/errorMessages.ts"],
       "outboundEdges": [
@@ -21881,7 +21968,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 17,
+      "targetFanIn": 29,
       "targetFanOut": 2,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -44043,7 +44130,7 @@
         }
       ],
       "fanIn": 2,
-      "fanOut": 48,
+      "fanOut": 49,
       "fanOutTargets": [
         "node_modules/@iconoir/vue/dist/index.js",
         "node_modules/@tanstack/vue-virtual/dist/cjs/index.cjs",
@@ -44066,6 +44153,7 @@
         "src/components/ui/popover/index.ts",
         "src/components/ui/spinner/index.ts",
         "src/core/composables/useAppToast.ts",
+        "src/core/composables/useFailureToast.ts",
         "src/core/config/runtimeUrls.ts",
         "src/core/contracts/externalImageProviders.ts",
         "src/core/errors/errorCatalog.ts",
@@ -44542,6 +44630,11 @@
         },
         {
           "from": "src/features/search/session/useSearchSession.ts",
+          "to": "src/core/composables/useFailureToast.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/useSearchSession.ts",
           "to": "src/core/i18n/index.ts",
           "kind": "runtime"
         },
@@ -44567,12 +44660,22 @@
         },
         {
           "from": "src/features/search/session/useSearchSession.unit.spec.ts",
+          "to": "node_modules/vue-router/index.cjs",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/useSearchSession.unit.spec.ts",
           "to": "node_modules/vue/index.js",
           "kind": "runtime"
         },
         {
           "from": "src/features/search/session/useSearchSession.unit.spec.ts",
           "to": "src/test/mediaDisplay.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/search/session/useSearchSession.unit.spec.ts",
+          "to": "src/test/toast.ts",
           "kind": "runtime"
         },
         {
@@ -44703,11 +44806,6 @@
         {
           "from": "src/features/search/ui/components/SearchEmptyState.vue",
           "to": "node_modules/vue-i18n/index.js",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/search/ui/components/SearchEmptyState.vue",
-          "to": "src/components/ui/button/index.ts",
           "kind": "runtime"
         },
         {
@@ -45001,7 +45099,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 2,
-      "targetFanOut": 48,
+      "targetFanOut": 49,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

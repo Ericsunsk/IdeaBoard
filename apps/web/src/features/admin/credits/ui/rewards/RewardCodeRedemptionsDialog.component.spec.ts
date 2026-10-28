@@ -1,6 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '@/test/render'
+import { mockAppToast, expectToastFeedback, type AppToastMocks } from '@/test/toast'
 import RewardCodeRedemptionsDialog from './RewardCodeRedemptionsDialog.vue'
 import type { RewardCode } from '../../session/rewards/resource'
 
@@ -11,6 +12,10 @@ const redemptionFakes = vi.hoisted(() => ({
   list: vi.fn(),
   get: vi.fn(),
 }))
+
+let toast: AppToastMocks
+
+vi.mock('../../../../../core/composables/useAppToast')
 
 vi.mock('../../session/rewards/rewardCodeRedemptionResource', async (importOriginal) => {
   const actual =
@@ -28,6 +33,7 @@ describe('RewardCodeRedemptionsDialog', () => {
   beforeEach(() => {
     redemptionFakes.list.mockReset()
     redemptionFakes.get.mockReset()
+    toast = mockAppToast()
   })
 
   it('loads a dense Redemption page through the feature resource seam', async () => {
@@ -76,7 +82,7 @@ describe('RewardCodeRedemptionsDialog', () => {
     expect(detailCalls).toEqual([{ rewardCodeId: 7, redemptionId: 51 }])
   })
 
-  it('retries a failed detail request through the same resource seam', async () => {
+  it('routes a failed detail request to toast without an inline error', async () => {
     let detailCalls = 0
     redemptionFakes.list.mockResolvedValue(viewPage([makeViewSummary()]))
     redemptionFakes.get.mockImplementation(async () => {
@@ -88,14 +94,12 @@ describe('RewardCodeRedemptionsDialog', () => {
     await screen.findByText('用户 #23')
 
     await user.click(screen.getByRole('button', { name: /详情/ }))
-    expect(await screen.findByText('兑换详情加载失败。')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: '重试兑换详情' }))
-
-    expect(await screen.findByText('Credits Transaction ID')).toBeVisible()
-    expect(detailCalls).toBe(2)
+    // 行内展开锚点已删除：失败只走 toast。
+    await expectToastFeedback(toast, 'detail unavailable', screen, ['兑换详情加载失败。'])
+    expect(detailCalls).toBe(1)
   })
 
-  it('distinguishes an initial resource error from empty and retries it in place', async () => {
+  it('routes an initial resource error to toast without an inline error', async () => {
     let calls = 0
     redemptionFakes.list.mockImplementation(async () => {
       calls += 1
@@ -104,9 +108,12 @@ describe('RewardCodeRedemptionsDialog', () => {
     })
     const { user } = renderDialog()
 
-    expect(await screen.findByText('兑换记录加载失败，请重试。')).toBeVisible()
-    expect(screen.queryByText('暂无兑换记录')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '重试加载兑换记录' }))
+    // 列表空态锚点已删除：失败只走 toast，表格隐藏 + 工具栏刷新即重试入口。
+    await expectToastFeedback(toast, 'list unavailable', screen, [
+      '兑换记录加载失败，请重试。',
+      '暂无兑换记录',
+    ])
+    await user.click(screen.getByRole('button', { name: '刷新兑换记录' }))
 
     expect(await screen.findByText('用户 #23')).toBeVisible()
     expect(calls).toBe(2)

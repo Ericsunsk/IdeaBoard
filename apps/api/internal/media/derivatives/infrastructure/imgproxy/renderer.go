@@ -61,6 +61,14 @@ func (r *Renderer) WorkspaceTier(ctx context.Context, storageKey, tier string) (
 }
 
 func (r *Renderer) Avatar(ctx context.Context, storageKey string, size int) (Image, error) {
+	if r == nil {
+		return Image{}, ErrUnavailable
+	}
+	if target, ok, err := r.config.ProxyDicebearAvatarURL(storageKey, size); err != nil {
+		return Image{}, ErrSource
+	} else if ok {
+		return r.fetch(ctx, target)
+	}
 	source, err := r.activeSource(ctx, storageKey)
 	if err != nil {
 		return Image{}, err

@@ -1,9 +1,5 @@
-import { formatAdminDisplayError, type AdminToastPort, useAdminToast } from '../../shared/index'
+import { defineFeedback, formatAdminDisplayError, useAdminToast } from '../../shared/index'
 import { unsupportedUploadImageMessage } from '@/core/utils/imageUploadSupport'
-
-// 反馈公约（admin）：领域文案收口到本文件的 feedback 工厂，调用方只表达意图
-// （saved/saveFailed/testPassed/…），不直接拼 toast 文案。`useAdminToast` 直调仅
-// 保留给无领域归属的一次性提示；新增领域提示先在这里加工厂方法。
 
 type AdminSettingFeedback = {
   loadFailed: (error: unknown) => void
@@ -52,101 +48,85 @@ export type AdminAccessSettingsFeedback = {
 export type AdminMediaUploadSettingsFeedback = AdminSettingFeedback
 export type AdminOutboundPolicyFeedback = AdminSettingFeedback
 
-function createAdminBrandingSettingsFeedback(toast: AdminToastPort): AdminBrandingSettingsFeedback {
-  return {
-    loadFailed: (error) => toast.error(formatAdminDisplayError(error, '加载系统设置失败')),
-    validationFailed: (message) => toast.error(message),
-    saved: () => toast.success('项目品牌已保存'),
-    saveFailed: (error) => toast.error(formatAdminDisplayError(error, '保存项目品牌失败')),
-    logoUploaded: () => toast.success('Logo 已上传，保存后生效'),
-    logoUploadFailed: (error) => toast.error(formatAdminDisplayError(error, '上传 Logo 失败')),
-  }
+const ADMIN_BRANDING_SETTINGS_COPY = {
+  loadFailed: { error: '加载系统设置失败' },
+  validationFailed: { errorText: (message: string) => message },
+  saved: { success: '项目品牌已保存' },
+  saveFailed: { error: '保存项目品牌失败' },
+  logoUploaded: { success: 'Logo 已上传，保存后生效' },
+  logoUploadFailed: { error: '上传 Logo 失败' },
 }
 
-function createAdminAccessSettingsFeedback(toast: AdminToastPort): AdminAccessSettingsFeedback {
-  return {
-    loadFailed: (error) => toast.error(formatAdminDisplayError(error, '加载访问控制设置失败')),
-    rateLimitValidationFailed: (message) => toast.error(message),
-    rateLimitSaved: () => toast.success('访问限流已保存'),
-    rateLimitSaveFailed: (error) => toast.error(formatAdminDisplayError(error, '保存失败')),
-    loginLockoutValidationFailed: (message) => toast.error(message),
-    loginLockoutSaved: () => toast.success('登录锁定已保存'),
-    loginLockoutSaveFailed: (error) => toast.error(formatAdminDisplayError(error, '保存失败')),
-    registrationUpdated: (enabled) => toast.success(enabled ? '已开放注册' : '已关闭注册'),
-    registrationUpdateFailed: (error) =>
-      toast.error(formatAdminDisplayError(error, '更新注册状态失败')),
-  }
+const ADMIN_ACCESS_SETTINGS_COPY = {
+  loadFailed: { error: '加载访问控制设置失败' },
+  rateLimitValidationFailed: { errorText: (message: string) => message },
+  rateLimitSaved: { success: '访问限流已保存' },
+  rateLimitSaveFailed: { error: '保存失败' },
+  loginLockoutValidationFailed: { errorText: (message: string) => message },
+  loginLockoutSaved: { success: '登录锁定已保存' },
+  loginLockoutSaveFailed: { error: '保存失败' },
+  registrationUpdated: {
+    success: (isEnabled: boolean) => (isEnabled ? '已开放注册' : '已关闭注册'),
+  },
+  registrationUpdateFailed: { error: '更新注册状态失败' },
 }
 
-function createAdminMediaUploadSettingsFeedback(
-  toast: AdminToastPort,
-): AdminMediaUploadSettingsFeedback {
-  return createAdminSettingFeedback(toast, '加载上传设置失败', '上传设置已保存', '保存上传设置失败')
+const ADMIN_MAIL_SETTINGS_COPY = {
+  loadFailed: { error: '加载邮件配置失败' },
+  saved: { success: '邮件配置已保存，请发送 Test Email' },
+  saveFailed: { error: '保存邮件配置失败' },
+  testSent: { success: 'Test Email 已发送' },
+  testFailed: { error: '发送 Test Email 失败' },
+  cleared: { success: '邮件配置已删除' },
+  clearFailed: { error: '删除邮件配置失败' },
 }
 
-function createAdminOutboundPolicyFeedback(toast: AdminToastPort): AdminOutboundPolicyFeedback {
-  return createAdminSettingFeedback(
-    toast,
+const ADMIN_SEARCH_PROVIDER_COPY = {
+  loadFailed: { error: '加载图片搜索供应商配置失败' },
+  keySaved: {
+    success: (providerLabel: string, wasEnabled: boolean) =>
+      wasEnabled
+        ? `${providerLabel} API Key 已保存并已停用，请测试连接后重新启用`
+        : `${providerLabel} API Key 已保存，请测试连接`,
+  },
+  saveFailed: { error: '保存 API Key 失败' },
+  testPassed: { success: (providerLabel: string) => `${providerLabel} 连接测试通过` },
+  testFailed: { error: '连接测试失败' },
+  toggled: {
+    success: (providerLabel: string, isEnabled: boolean) =>
+      isEnabled ? `${providerLabel} 已启用` : `${providerLabel} 已停用`,
+  },
+  toggleFailed: {
+    error: (isEnabled: boolean) => (isEnabled ? '启用失败' : '停用失败'),
+  },
+}
+
+export function useAdminBrandingSettingsFeedback(): AdminBrandingSettingsFeedback {
+  return defineFeedback<AdminBrandingSettingsFeedback>(ADMIN_BRANDING_SETTINGS_COPY)
+}
+
+export function useAdminAccessSettingsFeedback(): AdminAccessSettingsFeedback {
+  return defineFeedback<AdminAccessSettingsFeedback>(ADMIN_ACCESS_SETTINGS_COPY)
+}
+
+export function useAdminMediaUploadSettingsFeedback(): AdminMediaUploadSettingsFeedback {
+  return defineAdminSettingFeedback('加载上传设置失败', '上传设置已保存', '保存上传设置失败')
+}
+
+export function useAdminOutboundPolicyFeedback(): AdminOutboundPolicyFeedback {
+  return defineAdminSettingFeedback(
     '加载私有地址访问策略失败',
     '私有地址访问策略已保存',
     '保存私有地址访问策略失败',
   )
 }
 
-export function useAdminBrandingSettingsFeedback() {
-  return createAdminBrandingSettingsFeedback(useAdminToast())
+export function useAdminMailSettingsFeedback(): AdminMailSettingsFeedback {
+  return defineFeedback<AdminMailSettingsFeedback>(ADMIN_MAIL_SETTINGS_COPY)
 }
 
-export function useAdminAccessSettingsFeedback() {
-  return createAdminAccessSettingsFeedback(useAdminToast())
-}
-
-export function useAdminMediaUploadSettingsFeedback() {
-  return createAdminMediaUploadSettingsFeedback(useAdminToast())
-}
-
-export function useAdminOutboundPolicyFeedback() {
-  return createAdminOutboundPolicyFeedback(useAdminToast())
-}
-
-function createAdminMailSettingsFeedback(toast: AdminToastPort): AdminMailSettingsFeedback {
-  return {
-    loadFailed: (error) => toast.error(formatAdminDisplayError(error, '加载邮件配置失败')),
-    saved: () => toast.success('邮件配置已保存，请发送 Test Email'),
-    saveFailed: (error) => toast.error(formatAdminDisplayError(error, '保存邮件配置失败')),
-    testSent: () => toast.success('Test Email 已发送'),
-    testFailed: (error) => toast.error(formatAdminDisplayError(error, '发送 Test Email 失败')),
-    cleared: () => toast.success('邮件配置已删除'),
-    clearFailed: (error) => toast.error(formatAdminDisplayError(error, '删除邮件配置失败')),
-  }
-}
-
-function createAdminSearchProviderFeedback(toast: AdminToastPort): AdminSearchProviderFeedback {
-  return {
-    loadFailed: (error) =>
-      toast.error(formatAdminDisplayError(error, '加载图片搜索供应商配置失败')),
-    keySaved: (providerLabel, wasEnabled) =>
-      toast.success(
-        wasEnabled
-          ? `${providerLabel} API Key 已保存并已停用，请测试连接后重新启用`
-          : `${providerLabel} API Key 已保存，请测试连接`,
-      ),
-    saveFailed: (error) => toast.error(formatAdminDisplayError(error, '保存 API Key 失败')),
-    testPassed: (providerLabel) => toast.success(`${providerLabel} 连接测试通过`),
-    testFailed: (error) => toast.error(formatAdminDisplayError(error, '连接测试失败')),
-    toggled: (providerLabel, enabled) =>
-      toast.success(enabled ? `${providerLabel} 已启用` : `${providerLabel} 已停用`),
-    toggleFailed: (error, enabled) =>
-      toast.error(formatAdminDisplayError(error, enabled ? '启用失败' : '停用失败')),
-  }
-}
-
-export function useAdminMailSettingsFeedback() {
-  return createAdminMailSettingsFeedback(useAdminToast())
-}
-
-export function useAdminSearchProviderFeedback() {
-  return createAdminSearchProviderFeedback(useAdminToast())
+export function useAdminSearchProviderFeedback(): AdminSearchProviderFeedback {
+  return defineFeedback<AdminSearchProviderFeedback>(ADMIN_SEARCH_PROVIDER_COPY)
 }
 
 export function useAdminUnsupportedLogoFileFeedback() {
@@ -159,25 +139,19 @@ export function useAdminUnsupportedLogoFileFeedback() {
     )
 }
 
-export function useAdminSupportChannelsFeedback() {
-  return createAdminSettingFeedback(
-    useAdminToast(),
-    '读取客户支持失败',
-    '客户支持已保存',
-    '保存客户支持失败',
-  )
+export function useAdminSupportChannelsFeedback(): AdminSettingFeedback {
+  return defineAdminSettingFeedback('读取客户支持失败', '客户支持已保存', '保存客户支持失败')
 }
 
-function createAdminSettingFeedback(
-  toast: AdminToastPort,
+function defineAdminSettingFeedback(
   loadFallback: string,
   savedMessage: string,
   saveFallback: string,
 ): AdminSettingFeedback {
-  return {
-    loadFailed: (error) => toast.error(formatAdminDisplayError(error, loadFallback)),
-    validationFailed: (message) => toast.error(message),
-    saved: () => toast.success(savedMessage),
-    saveFailed: (error) => toast.error(formatAdminDisplayError(error, saveFallback)),
-  }
+  return defineFeedback<AdminSettingFeedback>({
+    loadFailed: { error: loadFallback },
+    validationFailed: { errorText: (message: string) => message },
+    saved: { success: savedMessage },
+    saveFailed: { error: saveFallback },
+  })
 }

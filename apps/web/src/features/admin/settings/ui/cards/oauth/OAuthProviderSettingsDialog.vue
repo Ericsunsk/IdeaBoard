@@ -306,7 +306,9 @@ async function load() {
     applySummary(state.summaries[selectedProvider.value] ?? state.firstSummary)
     applyProviderSummaries(state.summaries)
   } catch (error) {
+    // 初载失败走 toast；loadError 保留为 frame 状态真相源（可重试 + 禁用保存）。
     loadError.value = formatAdminDisplayError(error, OAUTH_MESSAGES.oauthLoadFailed)
+    toast.error(formatAdminDisplayError(error, OAUTH_MESSAGES.oauthLoadFailed))
   } finally {
     isLoading.value = false
   }
@@ -324,7 +326,9 @@ async function loadSelectedProvider(provider: OAuthProviderCode) {
     initialProviderEnabled[provider] = nextSummary.enabled
   } catch (error) {
     if (epoch === providerLoadEpoch) {
+      // provider 切换加载失败走 toast；行内 anchor 保留可重试 + 禁用保存。
       loadError.value = formatAdminDisplayError(error, OAUTH_MESSAGES.oauthLoadFailed)
+      toast.error(formatAdminDisplayError(error, OAUTH_MESSAGES.oauthLoadFailed))
     }
   } finally {
     if (epoch === providerLoadEpoch) providerSwitching.value = false

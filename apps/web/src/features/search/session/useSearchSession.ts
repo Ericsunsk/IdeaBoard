@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../workspace/routePaths'
 import { stringParam } from '../../../core/router/queryParams'
 import { useAppToast } from '../../../core/composables/useAppToast'
+import { useFailureToast } from '../../../core/composables/useFailureToast'
 import { i18n } from '../../../core/i18n'
 import { searchReferenceKey } from './adapters/libraryBridge'
 import type { LibrarySearchReference } from '../core/authAction'
@@ -238,6 +239,12 @@ export function useSearchSession(options: SearchSessionOptions) {
       return
     }
     vision.resetExtraction()
+    // Replacing the same URL does not trigger the query watcher. Resubmission
+    // explicitly retries the current URL-backed feed, including an empty query.
+    if (query === queryValue()) {
+      await feed.load(true)
+      return
+    }
     await router.replace({ path: USER_SEARCH_PATH, query: query ? { q: query } : {} })
   }
 
@@ -265,9 +272,14 @@ export function useSearchSession(options: SearchSessionOptions) {
     }
   })
 
-  watch(vision.error, (message) => {
-    if (message) toast.error(message)
-  })
+  useFailureToast(vision.error, (message) => String(message ?? ''), { shouldFireOnMount: false })
+
+  // Only empty-feed failures toast; retained results keep the inline hint.
+  useFailureToast(
+    () => feed.hasError.value && feed.results.value.length === 0,
+    () => i18n.global.t('search.errors.unableToLoadInspiration'),
+    { shouldFireOnMount: false },
+  )
 
   watch(
     () => route.query.q,

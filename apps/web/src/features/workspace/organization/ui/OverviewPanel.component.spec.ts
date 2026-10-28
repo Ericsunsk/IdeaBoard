@@ -17,9 +17,8 @@ vi.mock('../../selection/workspaceResource', async (load) => ({
   ...(await load<typeof import('../../selection/workspaceResource')>()),
   ...resource,
 }))
-vi.mock('../../../../core/composables/useAppToast', () => ({
-  useAppToast: () => ({ success: vi.fn(), error: vi.fn() }),
-}))
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+vi.mock('../../../../core/composables/useAppToast', () => ({ useAppToast: () => toast }))
 const DialogRootStub = defineComponent({
   props: { open: Boolean },
   template: '<div v-if="open"><slot /></div>',
@@ -92,7 +91,7 @@ describe('Organization overview presentation', () => {
     expect(screen.getByTitle('Admin')).toBeTruthy()
     expect(screen.queryByTestId('org-pending-invites')).toBeNull()
   })
-  it('focuses inline rename and preserves the draft after a failed Enter submission', async () => {
+  it('keeps the rename draft and reports a server rename failure through toast only', async () => {
     resource.renameOrganization.mockRejectedValue(new Error('network'))
     const { user } = renderManagement()
     await ready()
@@ -101,7 +100,12 @@ describe('Organization overview presentation', () => {
     await waitFor(() => expect(input).toHaveFocus())
     await user.clear(input)
     await user.type(input, 'Renamed{Enter}')
-    await screen.findByText('Could not rename the organization. Please try again.')
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        'Could not rename the organization. Please try again.',
+      ),
+    )
+    expect(screen.queryByRole('alert')).toBeNull()
     expect(input).toHaveValue('Renamed')
     expect(resource.renameOrganization).toHaveBeenCalledWith('org_team', { name: 'Renamed' })
   })
@@ -123,14 +127,19 @@ describe('Organization overview presentation', () => {
       { idempotencyKey: expect.any(String) },
     )
   })
-  it('shows closure rejection and never offers restoration', async () => {
+  it('reports closure rejection through toast only and never offers restoration', async () => {
     resource.closeOrganization.mockRejectedValue({ code: 'organization_closure_blocked' })
     const { user } = renderManagement()
     await ready()
     await user.click(screen.getByRole('button', { name: 'Close organization' }))
     await user.type(screen.getByPlaceholderText('Organization name'), 'Acme')
     await user.click(screen.getByRole('button', { name: 'Confirm closure' }))
-    await screen.findByText(/unsettled tasks or funds/)
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining('unsettled tasks or funds'),
+      ),
+    )
+    expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Restore organization' })).toBeNull()
   })
   it('requires removal confirmation from the member menu', async () => {

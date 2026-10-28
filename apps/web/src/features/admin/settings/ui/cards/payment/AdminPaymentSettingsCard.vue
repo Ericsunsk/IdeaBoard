@@ -40,14 +40,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import ActionButton from '@/core/components/ActionButton.vue'
+import { useFailureToast } from '@/core/composables/useFailureToast'
 import { AdminSpinner } from '../../../../shared/index'
 import { StatusBadge } from '../../../../shared/index'
 import StripeSettingsDialog from './StripeSettingsDialog.vue'
 import { createAdminStripeSettingsResource } from '../../../session/payment/resource'
-import { formatAdminDisplayError, useAdminToast } from '../../../../shared/index'
+import { formatAdminDisplayError } from '../../../../shared/index'
 import { PAYMENTS_MESSAGES } from '../../../session/payment/messages'
 import { SETTINGS_MESSAGES as M } from '../../pages/messages'
 import { SETTINGS_SECTIONS } from '../../pages/sections'
@@ -61,10 +62,11 @@ const query = useQuery({
 })
 
 // 加载失败一律走 toast（与 useSettingsLifecycle.loadFailed 同公约），不设内嵌 Alert。
-const toast = useAdminToast()
-watch(query.error, (error) => {
-  if (error) toast.error(formatAdminDisplayError(error, PAYMENTS_MESSAGES.stripeLoadFailed))
-})
+useFailureToast(
+  query.error,
+  (error) => formatAdminDisplayError(error, PAYMENTS_MESSAGES.stripeLoadFailed),
+  { shouldFireOnMount: false },
+)
 
 const summary = computed(() => query.data.value)
 // 方案 A：收款配置是配置态（占位/空态），走中性避免蹭健康色；

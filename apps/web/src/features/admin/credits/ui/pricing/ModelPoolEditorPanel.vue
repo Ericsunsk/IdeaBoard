@@ -79,9 +79,6 @@
         {{ BILLING_PRICING_MESSAGES.poolAddModel }}
       </ActionButton>
     </div>
-    <AdminAlert v-if="catalogError" severity="error">
-      {{ catalogError }}
-    </AdminAlert>
     <ActionButton
       v-if="catalogError"
       variant="outline"
@@ -95,9 +92,6 @@
       {{ BILLING_PRICING_MESSAGES.poolNoCatalogModels }}
     </p>
 
-    <AdminAlert v-if="errorMessage" severity="error">
-      {{ errorMessage }}
-    </AdminAlert>
     <ActionButton v-if="stale" variant="outline" :disabled="pending" @click="emit('reload')">
       <Refresh class="size-4" />
       {{ BILLING_PRICING_MESSAGES.poolReload }}
@@ -108,7 +102,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Refresh, Xmark } from '@iconoir/vue'
-import { AdminAlert } from '../../../shared'
 import { AdminSelect } from '../../../shared'
 import ActionButton from '@/core/components/ActionButton.vue'
 import { AdminSwitch } from '../../../shared'
@@ -126,7 +119,6 @@ const props = withDefaults(
     catalogModels?: AdminPoolCatalogModel[] | undefined
     catalogLoading?: boolean | undefined
     pending?: boolean | undefined
-    errorMessage?: string | undefined
     stale?: boolean | undefined
     saveDisabled?: boolean | undefined
     catalogError?: string | undefined
@@ -136,7 +128,6 @@ const props = withDefaults(
     catalogModels: () => [],
     catalogLoading: false,
     pending: false,
-    errorMessage: '',
     stale: false,
     saveDisabled: false,
     catalogError: '',

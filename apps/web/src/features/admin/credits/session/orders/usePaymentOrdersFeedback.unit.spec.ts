@@ -8,8 +8,8 @@ const toast = vi.hoisted(() => ({
   info: vi.fn(),
 }))
 
-vi.mock('../../../shared', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../shared')>()),
+vi.mock('../../../shared/session/feedback/toast', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../shared/session/feedback/toast')>()),
   useAdminToast: () => toast,
 }))
 
@@ -25,6 +25,23 @@ describe('PaymentOrders feedback', () => {
     expect(toast.error.mock.calls.map(([message]) => message)).toEqual([
       'refund boom',
       '发起退款失败，请稍后重试',
+    ])
+  })
+
+  it('routes list and detail load failures to toast with safe fallbacks', () => {
+    vi.clearAllMocks()
+    const feedback = usePaymentOrdersFeedback()
+
+    feedback.loadFailed(new Error('network unavailable'))
+    feedback.loadFailed(new Error('dial tcp 127.0.0.1:5432'))
+    feedback.detailFailed(new Error('request timeout'))
+    feedback.detailFailed(new Error('dial tcp 127.0.0.1:5432'))
+
+    expect(toast.error.mock.calls.map(([message]) => message)).toEqual([
+      'network unavailable',
+      '支付订单加载失败，请重试。',
+      'request timeout',
+      '支付订单详情加载失败，请重试。',
     ])
   })
 })

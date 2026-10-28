@@ -38,7 +38,6 @@ const TestHarness = defineComponent({
     catalogModels: { type: Array as () => AdminPoolCatalogModel[], default: () => catalogModels },
     catalogLoading: { type: Boolean, default: false },
     pending: { type: Boolean, default: false },
-    errorMessage: { type: String, default: '' },
     stale: { type: Boolean, default: false },
     saveDisabled: { type: Boolean, default: false },
     catalogError: { type: String, default: '' },
@@ -214,10 +213,11 @@ describe('ModelPoolEditorPanel', () => {
     expect(await screen.findByText('启用的模型至少需要一个分辨率')).toBeVisible()
   })
 
-  it('shows mutation errors and offers reload on stale versions', async () => {
-    renderPanel({ errorMessage: '保存模型池失败', stale: true })
+  it('keeps the stale reload entry without an inline error message', async () => {
+    renderPanel({ stale: true })
 
-    expect(await screen.findByText('保存模型池失败')).toBeVisible()
+    // 池保存失败只走 toast：面板内只保留冲突恢复入口，不再挂行内。
+    expect(screen.queryByText('保存模型池失败')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '重新加载' })).toBeVisible()
   })
 
@@ -227,7 +227,9 @@ describe('ModelPoolEditorPanel', () => {
       catalogError: '加载模型目录失败，请重试',
     })
 
-    expect(await screen.findByText('加载模型目录失败，请重试')).toBeVisible()
+    // 目录行内错误文案已删除：失败只走 toast，重载按钮保留为恢复入口。
+    expect(screen.queryByText('加载模型目录失败，请重试')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: '重新加载' }).length).toBeGreaterThan(0)
     await user.click(screen.getAllByRole('button', { name: '重新加载' })[0]!)
     expect(emitted().reloadCatalog).toHaveLength(1)
 

@@ -3106,6 +3106,7 @@
     "defineAdminChartPercentScale",
     "defineAdminChartPointClipStyle",
     "defineAdminChartTooltip",
+    "defineFeedback",
     "detectAdminBrandLogoKey",
     "emptyPlaceholder",
     "formatAdminApiError",

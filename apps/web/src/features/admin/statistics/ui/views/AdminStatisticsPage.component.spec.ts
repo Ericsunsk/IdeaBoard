@@ -1,9 +1,14 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '@/test/msw'
 import { renderWithUser, screen, waitFor, within } from '@/test/render'
+import { expectToastFeedback, mockAppToast, type AppToastMocks } from '@/test/toast'
 import type { AdminStatistics } from '../../session/resource'
 import AdminStatisticsPage from './AdminStatisticsPage.vue'
+
+vi.mock('../../../../../core/composables/useAppToast')
+
+let toast: AppToastMocks
 
 vi.mock('chart.js/auto', () => ({
   default: class {
@@ -13,6 +18,10 @@ vi.mock('chart.js/auto', () => ({
 }))
 
 describe('AdminStatisticsPage chart ranges', () => {
+  beforeEach(() => {
+    toast = mockAppToast()
+  })
+
   it('changes each chart period independently and reuses requests for matching periods', async () => {
     const requests: string[] = []
     useMswHandlers(
@@ -47,7 +56,7 @@ describe('AdminStatisticsPage chart ranges', () => {
     expect(requests).toEqual(['7d', '30d', '1y'])
   })
 
-  it('keeps the other chart and overview visible when one period fails to load', async () => {
+  it('routes a failed period to toast while keeping the other chart and overview visible', async () => {
     useMswHandlers(
       http.get('/api/control/v1/platform/statistics', ({ request }) => {
         if (new URL(request.url).searchParams.get('range') === '30d') {
@@ -63,7 +72,8 @@ describe('AdminStatisticsPage chart ranges', () => {
     const trend = screen.getByRole('radiogroup', { name: '调用量与消耗趋势' })
     const quality = screen.getByRole('radiogroup', { name: '服务质量趋势' })
     await user.click(within(trend).getByRole('radio', { name: '月' }))
-    expect(await screen.findByRole('alert')).toBeVisible()
+    // 行内错误已删除：失败只走 toast，其他图表与总览保持可见。
+    await expectToastFeedback(toast, '统计查询失败')
     expect(screen.getByText('今日调用')).toBeVisible()
     expect(screen.getByText('模型风险矩阵')).toBeVisible()
     expect(within(quality).getByRole('radio', { name: '周' })).toHaveAttribute(

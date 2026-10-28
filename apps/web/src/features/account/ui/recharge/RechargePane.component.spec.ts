@@ -1,7 +1,7 @@
 import { QueryClient, VueQueryPlugin, type QueryFilters } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
-import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
+import { expectToastFeedback, mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import type { PaymentReturnContext } from '../../core/return'
 import {
   paymentsContextKey,
@@ -421,7 +421,7 @@ describe('RechargePane', () => {
     expect(screen.getByText(/Expired at .*/)).toBeVisible()
   })
 
-  it('makes pending order failures visible and retryable', async () => {
+  it('toasts pending order failures and retries from the card action', async () => {
     const continuePendingOrder = vi
       .fn()
       .mockRejectedValueOnce(new Error('待支付订单已达到 3 笔上限，请先完成或放弃现有订单'))
@@ -452,18 +452,13 @@ describe('RechargePane', () => {
 
     const pendingOrder = await screen.findByTestId('pending-payment-order-open-order')
     await user.click(within(pendingOrder).getByRole('button', { name: 'Continue payment' }))
-    expect(await within(pendingOrder).findByRole('alert')).toHaveTextContent(
-      'Network error. Please try again.',
-    )
-    // Dual: inline alert stays as position anchor, toast mirrors it transiently.
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith('Could not continue this payment.'),
-    )
-    await user.click(within(pendingOrder).getByRole('button', { name: 'Retry continue payment' }))
+    // 失败只走 toast，不再写行内；订单卡片按钮即重试入口。
+    await expectToastFeedback(toast, 'Could not continue this payment.', within(pendingOrder))
+    await user.click(within(pendingOrder).getByRole('button', { name: 'Continue payment' }))
     await waitFor(() => expect(continuePendingOrder).toHaveBeenCalledTimes(2))
   })
 
-  it('mirrors abandon-order failures in a toast while keeping the inline retry', async () => {
+  it('toasts abandon-order failures and retries from the card action', async () => {
     const abandonPendingOrder = vi.fn().mockRejectedValueOnce(new Error('abandon failed'))
     const { user } = renderPane({
       resource: makeResource({
@@ -484,10 +479,9 @@ describe('RechargePane', () => {
 
     const pendingOrder = await screen.findByTestId('pending-payment-order-open-order')
     await user.click(within(pendingOrder).getByRole('button', { name: 'Abandon order' }))
-    expect(await within(pendingOrder).findByRole('alert')).toHaveTextContent(
-      'Network error. Please try again.',
-    )
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Could not abandon this order.'))
+    await expectToastFeedback(toast, 'Could not abandon this order.', within(pendingOrder))
+    await user.click(within(pendingOrder).getByRole('button', { name: 'Abandon order' }))
+    await waitFor(() => expect(abandonPendingOrder).toHaveBeenCalledTimes(2))
   })
 
   it('shows the backend-owned processing result after a Checkout return', async () => {
@@ -745,18 +739,14 @@ describe('RechargePane', () => {
     await waitFor(() => expect(listRecharges).toHaveBeenCalledTimes(2))
   })
 
-  it('keeps the form retryable when Checkout creation fails', async () => {
+  it('toasts Checkout creation failures and keeps the form retryable', async () => {
     const createCheckout = vi.fn().mockRejectedValue(new Error('暂时无法创建支付页面'))
     const navigate = vi.fn()
     const { user } = renderPane({ resource: makeResource({ createCheckout }), navigate })
 
     await user.click(await screen.findByRole('button', { name: 'Pay now' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Network error. Please try again.')
-    // Dual: PurchaseCard inline alert stays as position anchor, toast mirrors it.
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith('Could not open the payment page.'),
-    )
+    await expectToastFeedback(toast, 'Could not open the payment page.')
     expect(screen.getByRole('button', { name: 'Pay now' })).toBeEnabled()
     expect(navigate).not.toHaveBeenCalled()
   })

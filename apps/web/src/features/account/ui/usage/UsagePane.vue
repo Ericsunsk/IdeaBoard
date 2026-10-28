@@ -18,15 +18,18 @@
 
     <section
       v-else-if="!usage && error"
-      class="rounded-panel border border-destructive/25 bg-card p-5"
-      role="alert"
+      class="rounded-panel border border-border bg-card p-5"
+      :role="isForbidden ? 'status' : undefined"
+      aria-live="polite"
     >
-      <p class="m-0 font-semibold text-destructive">
-        {{ isForbidden ? t('account.usage.forbiddenTitle') : t('account.errors.usageLoadFailed') }}
-      </p>
-      <p class="mt-1 mb-0 text-admin-content text-muted-foreground">
-        {{ isForbidden ? t('account.usage.forbiddenDescription') : errorMessage(error) }}
-      </p>
+      <template v-if="isForbidden">
+        <p :class="accountEmptyTitleClass">
+          {{ t('account.usage.forbiddenTitle') }}
+        </p>
+        <p :class="accountEmptyDescriptionClass">
+          {{ t('account.usage.forbiddenDescription') }}
+        </p>
+      </template>
       <Button
         type="button"
         variant="ghost"
@@ -147,6 +150,7 @@ import { computed, markRaw, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import RangedLineChartCard from '../../../../core/components/RangedLineChartCard.vue'
+import { useFailureToast } from '../../../../core/composables/useFailureToast'
 import { formatIdeaAmount } from '../../../../core/i18n/userIdeaCurrency'
 import { formatLocaleNumber } from '../../../../core/i18n/formatters'
 import { userErrorCode, userFacingErrorCopy } from '../../../../core/errors/errorCatalog'
@@ -159,6 +163,7 @@ import {
   resolveUsageChartTheme,
 } from '../../session/chart'
 import AccountPane from '../shared/AccountPane.vue'
+import { accountEmptyDescriptionClass, accountEmptyTitleClass } from '../shared/ui'
 
 const props = defineProps<{ active: boolean }>()
 const { t, locale } = useI18n()
@@ -166,6 +171,11 @@ const selectedRange = ref<UsageRange>(DEFAULT_USAGE_RANGE)
 const { billingAccountId, usage, displayRange, isInitialPending, isSwitching, error, retry } =
   useUsage(selectedRange, () => props.active)
 const isForbidden = computed(() => userErrorCode(error.value) === 'billing_account_forbidden')
+
+// Retained data keeps its inline hint; forbidden reads stay neutral.
+useFailureToast(error, (value) => errorMessage(value), {
+  skip: (value) => userErrorCode(value) === 'billing_account_forbidden' || usage.value != null,
+})
 const summaryPanelClass = 'overflow-hidden rounded-panel border border-border bg-card shadow-raised'
 const summaryGridClass = 'grid grid-cols-2 sm:grid-cols-5'
 const summaryCellClass = 'min-h-[100px] min-w-0 p-4 sm:min-h-[108px] sm:p-5'

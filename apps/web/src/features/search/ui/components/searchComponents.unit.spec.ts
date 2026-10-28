@@ -82,24 +82,17 @@ describe('Search presentation subcomponents', () => {
   })
 
   describe('SearchEmptyState', () => {
-    it('renders error state and handles retry button click', async () => {
-      const user = userEvent.setup()
-      let reloadCalled = false
+    it('renders the neutral empty feed without an inline error panel', () => {
       render(SearchEmptyState, {
         props: {
-          hasError: true,
           resultsCount: 0,
           hasActiveSearch: false,
           canAddReference: true,
-          onReload: () => {
-            reloadCalled = true
-          },
         },
       })
-      const retryBtn = screen.getByRole('button', { name: /重试|Retry/i })
-      expect(retryBtn).toBeInTheDocument()
-      await user.click(retryBtn)
-      expect(reloadCalled).toBe(true)
+      // 初载失败只走 toast：空态保持中性，无行内错误面板与重试按钮。
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /重试|Retry/i })).not.toBeInTheDocument()
     })
 
     it('renders empty feed state and emits actions', async () => {
@@ -107,7 +100,6 @@ describe('Search presentation subcomponents', () => {
       let clearCalled = false
       render(SearchEmptyState, {
         props: {
-          hasError: false,
           resultsCount: 0,
           hasActiveSearch: true,
           canAddReference: true,

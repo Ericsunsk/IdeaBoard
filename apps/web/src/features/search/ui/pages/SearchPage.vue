@@ -219,11 +219,9 @@
 
       <SearchEmptyState
         v-else-if="results.length === 0"
-        :has-error="hasError"
         :results-count="results.length"
         :has-active-search="hasActiveSearch"
         :can-add-reference="canAddReference"
-        @reload="reload"
         @clear-search="handleClearSearch"
         @open-file-picker="openFilePicker"
         @start-creating="handleStartCreating"

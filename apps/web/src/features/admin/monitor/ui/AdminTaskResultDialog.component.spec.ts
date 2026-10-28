@@ -201,15 +201,13 @@ describe('AdminTaskResultDialog', () => {
     expect(screen.getByText('gemini')).toBeVisible()
   })
 
-  it('renders explicit loading, error, and empty trace states', async () => {
-    const retry = vi.fn()
-    const { rerender, user } = renderWithUser(AdminTaskResultDialog, {
+  it('renders explicit loading and empty trace states', async () => {
+    const { rerender } = renderWithUser(AdminTaskResultDialog, {
       props: {
         task: null,
         taskId: 'task_1',
         visible: true,
         loading: true,
-        onRetry: retry,
       },
       global: {
         stubs: { transition: false },
@@ -218,11 +216,11 @@ describe('AdminTaskResultDialog', () => {
 
     expect(await screen.findByText('正在加载任务详情…')).toBeVisible()
 
-    await rerender({ loading: false, errorMessage: '加载任务详情失败' })
-    await user.click(await screen.findByRole('button', { name: '重试' }))
-    expect(retry).toHaveBeenCalledOnce()
+    // 详情行内错误已删除：失败只走 toast（父页 watcher），此处直接回到空态。
+    await rerender({ loading: false })
+    expect(await screen.findByText('任务详情不可用')).toBeVisible()
 
-    await rerender({ task: makeTask(), errorMessage: '' })
+    await rerender({ task: makeTask() })
     expect(await screen.findByText('暂无执行记录')).toBeVisible()
   })
 })

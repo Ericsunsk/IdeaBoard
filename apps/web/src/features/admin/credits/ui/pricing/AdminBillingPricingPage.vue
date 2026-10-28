@@ -1,7 +1,7 @@
 <template>
   <div :class="adminDashboardRootClass">
     <!-- 1. 顶栏操作与搜索过滤工具条 (1:1 复刻模型管理页与系统提示词页规范) -->
-    <div v-if="!errorMessage" class="flex w-full flex-col gap-3">
+    <div class="flex w-full flex-col gap-3">
       <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
         <!-- 左侧：搜索输入框 -->
         <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -33,19 +33,7 @@
       <AdminSpinner class="size-9 text-primary" />
     </div>
 
-    <!-- 3. 错误告警状态 -->
-    <div v-else-if="errorMessage" :class="adminEmptyStateClass" role="alert">
-      <div class="text-admin-title font-semibold text-foreground">
-        {{ BILLING_PRICING_MESSAGES.loadFailedTitle }}
-      </div>
-      <div class="mt-2 text-admin-meta text-muted-foreground">{{ errorMessage }}</div>
-      <AdminButton class="mt-4" variant="outline" :disabled="isLoading" @click="loadCatalog">
-        <Refresh class="size-4" />
-        {{ BILLING_PRICING_MESSAGES.reload }}
-      </AdminButton>
-    </div>
-
-    <!-- 4. 空状态提示 (无数据或过滤未命中) -->
+    <!-- 3. 空状态提示 (无数据或过滤未命中) -->
     <AdminEmptyState
       v-else-if="filteredItems.length === 0"
       :title="
@@ -73,7 +61,7 @@
       </template>
     </AdminEmptyState>
 
-    <!-- 5. 分 namespace 定价表（Image / Other，ai-search 暂归 Other，对齐任务监控页事件表） -->
+    <!-- 4. 分 namespace 定价表（Image / Other，ai-search 暂归 Other，对齐任务监控页事件表） -->
     <div v-else class="flex flex-col gap-6">
       <BillingPricingTable
         v-for="section in pricedSections"
@@ -92,17 +80,15 @@
       </BillingPricingTable>
     </div>
 
-    <!-- 6. 统一服务设置弹窗（定价与模型池） -->
+    <!-- 5. 统一服务设置弹窗（定价与模型池） -->
     <BillingPriceDialog
       v-model:visible="priceDialogVisible"
       :item="selectedItem"
       :pending="publishPending"
-      :error-message="publishError"
       :pool-entries="poolEditEntries"
       :pool-catalog-models="poolCatalogModels"
       :pool-catalog-loading="poolCatalogLoading"
       :pool-save-pending="poolSavePending"
-      :pool-save-error="poolSaveError"
       :pool-save-stale="poolSaveStale"
       :pool-save-disabled="!poolEditReady"
       :pool-catalog-error="poolCatalogError"
@@ -115,17 +101,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Coins, Refresh, Search, Xmark } from '@iconoir/vue'
-import { AdminButton } from '../../../shared'
+import { Coins, Search, Xmark } from '@iconoir/vue'
 import { AdminEmptyState } from '../../../shared'
 import { AdminRefreshButton } from '../../../shared'
 import { AdminSpinner } from '../../../shared'
 import { AdminToolbarSearch } from '../../../shared'
-import {
-  getAdminServiceOrder,
-  adminDashboardRootClass,
-  adminEmptyStateClass,
-} from '../../../shared'
+import { getAdminServiceOrder, adminDashboardRootClass } from '../../../shared'
 import { formatAdminDisplayError, useAdminToast } from '../../../shared'
 import BillingPricingTable from './BillingPricingTable.vue'
 import BillingPriceDialog from './BillingPriceDialog.vue'
@@ -133,6 +114,7 @@ import { useAdminConfirm } from '../../../shared'
 import { confirmSettingsSave } from '../../../shared'
 import { createAdminBillableCatalogResource } from '../../session/pricing/billableCatalogResource'
 import { createAdminModelPoolResource } from '../../session/pricing/modelPoolResource'
+import { useBillingPricingFeedback } from '../../session/pricing/useBillingPricingFeedback'
 import { serviceOfSku } from '../../core/pricing/skuFeature'
 import {
   PRICING_NAMESPACE_TABLES,
@@ -148,9 +130,6 @@ import type {
   PricingVariant,
 } from '../../core/pricing/billableCatalogTypes'
 import { BILLING_PRICING_MESSAGES } from './messages'
-// 组合保存 toast 文案收口在此（不改 messages.ts 公共文件）：旧文案“请根据提示重试”
-// 已无 inline 提示可指，自洽文案只说“请重试”，失败明细直接拼在 toast 后缀里。
-const COMBINED_SAVE_FAILED_PREFIX = '部分配置保存失败，请重试'
 
 const resource = createAdminBillableCatalogResource()
 const poolResource = createAdminModelPoolResource()
@@ -170,19 +149,17 @@ const poolCatalogModels = ref<AdminPoolCatalogModel[]>([])
 const poolCatalogLoading = ref(false)
 const poolCatalogError = ref('')
 const poolSavePending = ref(false)
-const poolSaveError = ref('')
 const poolSaveStale = ref(false)
 
 const isLoading = ref(true)
-const errorMessage = ref('')
 const selectedItem = ref<AdminBillableItemCard | null>(null)
 const priceDialogVisible = ref(false)
 const publishPending = ref(false)
-const publishError = ref('')
 const availabilityPending = reactive<Record<string, boolean>>({})
 const deletePending = reactive<Record<string, boolean>>({})
 const toast = useAdminToast()
 const confirm = useAdminConfirm()
+const pricingFeedback = useBillingPricingFeedback()
 
 const searchKeyword = ref('')
 
@@ -233,13 +210,11 @@ const pricedSections = computed(() => {
 
 async function loadCatalog() {
   isLoading.value = true
-  errorMessage.value = ''
   try {
     items.value = await resource.list()
     await loadModelPools()
   } catch (error) {
-    errorMessage.value =
-      error instanceof Error && error.message ? error.message : BILLING_PRICING_MESSAGES.retryLater
+    toast.error(formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.loadFailedTitle))
   } finally {
     isLoading.value = false
   }
@@ -270,6 +245,8 @@ async function loadPoolCatalog() {
   } catch (error) {
     poolCatalogModels.value = []
     poolCatalogError.value = formatAdminDisplayError(error, '加载模型目录失败，请重试')
+    // 目录行内错误文案已删除：失败只走 toast，面板重载按钮保留为恢复入口。
+    toast.error(poolCatalogError.value)
   } finally {
     poolCatalogLoading.value = false
   }
@@ -280,7 +257,6 @@ async function reloadPool() {
   if (!item) return
   poolEditReady.value = false
   poolSavePending.value = true
-  poolSaveError.value = ''
   poolSaveStale.value = false
   try {
     const pool = await poolResource.get(item.sku)
@@ -295,8 +271,9 @@ async function reloadPool() {
     poolEditEntries.value = []
     savedPoolEntries.value = []
     poolEditReady.value = false
-    poolSaveError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.poolSaveFailed)
     poolSaveStale.value = true
+    // 冲突恢复入口（重新加载按钮）保留在面板内，失败明细只走 toast。
+    toast.error(formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.poolSaveFailed))
   } finally {
     poolSavePending.value = false
   }
@@ -319,7 +296,8 @@ function clonePoolEntries(entries: AdminModelPoolEntry[]): AdminModelPoolEntry[]
 }
 
 function handlePoolSaveError(error: unknown) {
-  poolSaveError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.poolSaveFailed)
+  // 409 冲突额外保留 stale 恢复入口（重新加载按钮）。
+  toast.error(formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.poolSaveFailed))
   poolSaveStale.value = error instanceof Error && (error as { code?: unknown }).code === 'conflict'
 }
 
@@ -328,7 +306,6 @@ async function savePool(entries: AdminModelPoolEntry[]) {
   if (!item || poolSavePending.value || !poolEditReady.value) return
 
   poolSavePending.value = true
-  poolSaveError.value = ''
   poolSaveStale.value = false
   try {
     const saved = await poolResource.replace(item.sku, { version: poolEditVersion.value, entries })
@@ -346,12 +323,10 @@ onMounted(loadCatalog)
 
 async function openPriceDialog(item: AdminBillableItemCard) {
   selectedItem.value = item
-  publishError.value = ''
   priceDialogVisible.value = true
   if (serviceOfSku(item.sku)) {
     poolEditItem.value = item
     poolEditReady.value = false
-    poolSaveError.value = ''
     poolSaveStale.value = false
     await reloadPool()
     if (poolCatalogModels.value.length === 0 && !poolCatalogLoading.value) {
@@ -407,14 +382,14 @@ async function publishPrice(prices: Record<PricingVariant, number | undefined>) 
   })
   if (!isConfirmed) return
   publishPending.value = true
-  publishError.value = ''
   try {
     const published = await resource.publishPrices(item.sku, prices)
     applyPricePublishSuccess(item, published)
     priceDialogVisible.value = false
     toast.success(BILLING_PRICING_MESSAGES.published)
   } catch (error) {
-    publishError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.publishFailed)
+    // 单定价发布失败只走 toast（对话框保持打开可重试），与组合保存一致。
+    toast.error(formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.publishFailed))
   } finally {
     publishPending.value = false
   }
@@ -464,8 +439,6 @@ async function saveCombinedSettings(
 
   publishPending.value = true
   poolSavePending.value = true
-  publishError.value = ''
-  poolSaveError.value = ''
   poolSaveStale.value = false
 
   const pricingChanged = isPricingChanged(item, prices)
@@ -516,10 +489,8 @@ async function saveCombinedSettings(
 
   if (failed) {
     // 组合保存部分失败仅 toast 命名失败部分，不写 inline，避免双通知重复；
-    // 单定价/单池路径仍走各自 inline。409（pool conflict）是例外：toast 已带
+    // 单定价/单池路径同样只走 toast。409（pool conflict）是例外：toast 已带
     // 明细，同时置 poolSaveStale 让对话框内出现“重新加载”入口，否则用户无处刷新。
-    publishError.value = ''
-    poolSaveError.value = ''
     poolSaveStale.value = poolConflicted
     const failedTabs: string[] = []
     const details: string[] = []
@@ -531,8 +502,7 @@ async function saveCombinedSettings(
       failedTabs.push(BILLING_PRICING_MESSAGES.tabModelPool)
       if (poolDetail) details.push(poolDetail)
     }
-    const suffix = details.length > 0 ? `：${details.join('；')}` : ''
-    toast.error(`${COMBINED_SAVE_FAILED_PREFIX}（${failedTabs.join('、')}）${suffix}`)
+    pricingFeedback.combinedSaveFailed(failedTabs, details)
   } else {
     priceDialogVisible.value = false
     toast.success(BILLING_PRICING_MESSAGES.saveAllSuccess)

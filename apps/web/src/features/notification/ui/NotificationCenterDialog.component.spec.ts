@@ -5,7 +5,7 @@ import { seedNotificationFacts } from '@/test/notificationFacts'
 import { createDeferred } from '@/test/deferred'
 import { fireEvent, render, screen, waitFor, within } from '@/test/render'
 import { http, HttpResponse, server } from '@/test/msw'
-import { mockAppToast } from '@/test/toast'
+import { expectToastFeedback, mockAppToast } from '@/test/toast'
 import type { NotificationDTO } from '@/api/generated-query/public/model'
 import NotificationCenterDialog from './NotificationCenterDialog.vue'
 
@@ -719,8 +719,9 @@ describe('NotificationCenterDialog', () => {
       expect(await screen.findByTestId('empty-all')).toBeInTheDocument()
     })
 
-    it('retries the notification facts after a failed request', async () => {
+    it('toasts the failed request and retries the notification facts', async () => {
       seedNotificationFacts([])
+      const toast = mockAppToast()
       let requests = 0
       server.use(
         http.get('*/api/v1/user/notifications', () => {
@@ -732,9 +733,9 @@ describe('NotificationCenterDialog', () => {
       )
       renderView({ props: { isOpen: true } })
 
-      expect(await screen.findByTestId('notification-center-error')).toHaveTextContent(
-        'Could not load notifications',
-      )
+      // 初载失败只走 toast；中性空态 + 重试按钮即恢复入口。
+      await expectToastFeedback(toast, 'Could not load notifications. Please try again.')
+      expect(screen.getByTestId('notification-center-error')).toBeInTheDocument()
       expect(screen.queryByTestId('empty-all')).toBeNull()
       await fireEvent.click(screen.getByTestId('notification-center-retry-btn'))
       expect(await screen.findByTestId('empty-all')).toBeInTheDocument()

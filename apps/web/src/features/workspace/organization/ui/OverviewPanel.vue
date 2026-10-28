@@ -399,10 +399,6 @@
             {{ t('workspace.management.closeAction') }}
           </Button>
         </div>
-
-        <p v-if="closureError" class="m-0 text-xs leading-normal text-destructive" role="alert">
-          {{ closureError }}
-        </p>
       </section>
     </template>
   </section>
@@ -492,7 +488,6 @@ const {
   isRevokingInvite,
   isLeaving,
   isClosing,
-  closureError,
   organizationName: creationName,
   organizationError,
   isCreatingOrganization,
