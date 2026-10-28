@@ -2522,6 +2522,11 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         },
         {
+          "from": "src/features/admin/monitor/ui/pages/AdminMonitorPage.polling.contract.spec.ts",
+          "to": "src/api/generated-query/control/model/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/admin/statistics/session/resource.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
@@ -2537,9 +2542,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "type-only"
         }
       ],
-      "measuredFanIn": 18,
+      "measuredFanIn": 19,
       "measuredFanOut": 173,
-      "targetFanIn": 18,
+      "targetFanIn": 19,
       "targetFanOut": 173,
       "ownershipScope": [
         "src/api/generated-query/control/model/index.ts"
@@ -5632,6 +5637,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.unit.spec.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/result-nodes/resultDisplay.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
@@ -5722,9 +5737,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 25,
+      "measuredFanIn": 27,
       "measuredFanOut": 4,
-      "targetFanIn": 25,
+      "targetFanIn": 27,
       "targetFanOut": 4,
       "ownershipScope": [
         "src/api/mediaAssetDelivery.ts"
@@ -6217,6 +6232,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.unit.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/notification/session/reads.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
@@ -6227,9 +6252,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 13,
+      "measuredFanIn": 15,
       "measuredFanOut": 4,
-      "targetFanIn": 13,
+      "targetFanIn": 15,
       "targetFanOut": 4,
       "ownershipScope": [
         "src/api/workspaceEventStream.ts"
@@ -15487,11 +15512,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/session/useAdminTaskList.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/admin/monitor/session/useAdminTaskRuntimeSnapshot.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -21300,9 +21320,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 31,
-      "measuredFanOut": 48,
+      "measuredFanOut": 49,
       "targetFanIn": 31,
-      "targetFanOut": 48,
+      "targetFanOut": 49,
       "ownershipScope": [
         "src/features/canvas/session/execution/"
       ],
@@ -21386,6 +21406,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/idempotencyKey.ts",
         "src/api/mediaAssetDelivery.ts",
         "src/api/upload.ts",
+        "src/api/workspaceEventStream.ts",
         "src/api/workspaceTaskContract.ts",
         "src/api/workspaceTaskTransport.ts",
         "src/api/workspaceTaskWaiter.ts",
@@ -25486,7 +25507,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts` | canonical | api | 1 | 2 → 2 | 0 → 0 |
 | `src/api/generated-query/control/model/controlStripeConfigRequest.ts` | canonical | api | 1 | 2 → 2 | 0 → 0 |
 | `src/api/generated-query/control/model/controlTaskEnvelope.ts` | canonical | api | 1 | 2 → 2 | 1 → 1 |
-| `src/api/generated-query/control/model/index.ts` | canonical | api | 173 | 18 → 18 | 173 → 173 |
+| `src/api/generated-query/control/model/index.ts` | canonical | api | 173 | 19 → 19 | 173 → 173 |
 | `src/api/generated-query/control/model/supportChannelKind.ts` | canonical | api | 1 | 3 → 3 | 0 → 0 |
 | `src/api/generated-query/control/model/supportChannelsSetting.ts` | canonical | api | 1 | 3 → 3 | 1 → 1 |
 | `src/api/generated-query/public/boards/boards.ts` | canonical | api | 102 | 2 → 2 | 4 → 4 |
@@ -25501,13 +25522,13 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/generated-query/public/workspace-search/workspace-search.ts` | canonical | api | 16 | 3 → 3 | 4 → 4 |
 | `src/api/generated-query/public/workspaces/workspaces.ts` | canonical | api | 40 | 3 → 3 | 4 → 4 |
 | `src/api/idempotencyKey.ts` | canonical | api | 18 | 19 → 19 | 0 → 0 |
-| `src/api/mediaAssetDelivery.ts` | canonical | api | 25 | 25 → 25 | 4 → 4 |
+| `src/api/mediaAssetDelivery.ts` | canonical | api | 25 | 27 → 27 | 4 → 4 |
 | `src/api/mediaWorkspaceScope.ts` | canonical | api | 3 | 7 → 7 | 0 → 0 |
 | `src/api/sessionUserType.ts` | canonical | api | 1 | 17 → 17 | 0 → 0 |
 | `src/api/stripUndefined.ts` | canonical | api | 2 | 12 → 12 | 0 → 0 |
 | `src/api/upload.ts` | canonical | api | 23 | 11 → 11 | 9 → 9 |
 | `src/api/userSession.ts` | canonical | api | 2 | 3 → 3 | 4 → 4 |
-| `src/api/workspaceEventStream.ts` | canonical | api | 24 | 13 → 13 | 4 → 4 |
+| `src/api/workspaceEventStream.ts` | canonical | api | 24 | 15 → 15 | 4 → 4 |
 | `src/api/workspaceTaskContract.ts` | canonical | api | 15 | 9 → 9 | 2 → 2 |
 | `src/api/workspaceTaskTransport.ts` | canonical | api | 7 | 7 → 7 | 6 → 6 |
 | `src/api/workspaceTaskWaiter.ts` | canonical | api | 2 | 4 → 4 | 6 → 6 |
@@ -25695,7 +25716,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/canvas/session/board-session/index.ts` | canonical | canvas | 14 | 10 → 10 | 20 → 20 |
 | `src/features/canvas/session/collaboration/index.ts` | canonical | canvas | 5 | 12 → 12 | 7 → 7 |
 | `src/features/canvas/session/execution/board-attachment/index.ts` | canonical | canvas | 2 | 13 → 13 | 0 → 0 |
-| `src/features/canvas/session/execution/index.ts` | canonical | canvas | 65 | 31 → 31 | 48 → 48 |
+| `src/features/canvas/session/execution/index.ts` | canonical | canvas | 65 | 31 → 31 | 49 → 49 |
 | `src/features/canvas/session/execution/pending-execution/core.ts` | canonical | canvas | 17 | 14 → 14 | 8 → 8 |
 | `src/features/canvas/session/flow-adapter/index.ts` | canonical | canvas | 70 | 63 → 63 | 32 → 32 |
 | `src/features/canvas/session/graph-editing/groupContracts.ts` | canonical | canvas | 1 | 2 → 2 | 1 → 1 |

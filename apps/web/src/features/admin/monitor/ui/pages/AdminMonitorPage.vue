@@ -76,20 +76,12 @@ import { adminDashboardRootClass, adminTextButtonClass } from '../../../shared'
 import TaskControlToolbar from '../components/TaskControlToolbar.vue'
 import TaskEventsCard from '../components/TaskEventsCard.vue'
 import TaskActivityTable from '../components/TaskActivityTable.vue'
-import {
-  type AdminTaskRow,
-  buildAdminTaskListParams,
-  useAdminTaskList,
-} from '../../session/useAdminTaskList'
+import { type AdminTaskRow, useAdminTaskList } from '../../session/useAdminTaskList'
 import { timeRangePresets } from '../../core/timeRange'
 import { useAdminTaskCancel } from '../../session/useAdminTaskCancel'
-import { useAdminTaskDetailResource, useAdminTaskListResource } from '../../resource'
+import { useAdminTaskDetailResource } from '../../resource'
 import { useAdminTaskRuntimeSnapshot } from '../../session/useAdminTaskRuntimeSnapshot'
 import { useAdminConfirm } from '../../../shared'
-import {
-  ADMIN_MONITOR_CHART_PAGE_SIZE,
-  ADMIN_MONITOR_REFRESH_INTERVAL_MS,
-} from '../../core/displayPolicy'
 import { useMonitorTimeline } from '../../session/useMonitorTimeline'
 import { monitorChartSpecs, type TaskMetricStatsSnapshot } from '../../../shared'
 import { MONITOR_MESSAGES } from './messages'
@@ -123,6 +115,7 @@ const isDetailLoading = computed(
 
 const {
   tasks,
+  chartRows,
   total,
   loading: isTaskListLoading,
   isError: isTaskListError,
@@ -131,29 +124,9 @@ const {
   taskStats,
   filterStatus,
   searchKeyword,
-  appliedSearchKeyword,
   loadTasks,
   handleSearch: handleTaskSearch,
 } = useAdminTaskList()
-
-// 图表专用全量行：与表格同过滤语义（status + 已应用 keyword），
-// 取最近 100 行做区间密度，表格分页行代表不了区间分布。
-const chartListParams = computed(() =>
-  buildAdminTaskListParams({
-    status: filterStatus.value,
-    keyword: appliedSearchKeyword.value,
-    page: 1,
-    pageSize: ADMIN_MONITOR_CHART_PAGE_SIZE,
-  }),
-)
-const chartListQuery = useAdminTaskListResource(chartListParams, {
-  query: {
-    refetchInterval: ADMIN_MONITOR_REFRESH_INTERVAL_MS,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: false,
-  },
-})
-const chartRows = computed(() => chartListQuery.data.value?.list ?? [])
 
 const {
   selectedTimeRangeKey,

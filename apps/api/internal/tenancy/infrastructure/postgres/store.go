@@ -294,9 +294,8 @@ func (s *Store) ListWorkspacesForUser(ctx context.Context, userID int64) ([]*ten
 		}
 		return mapped[i].CreatedAt.Before(mapped[j].CreatedAt)
 	})
-	// Closed Organizations suspend Workspace listing (#955): the
-	// Organization itself stays visible for restore, its Workspaces do
-	// not. Listed organization rows are open by query construction
+	// Closed Organizations stay visible for audit/history, but their Workspaces
+	// are excluded (#955). Listed organization rows are open by query construction
 	// (ListOrganizationsByUserID filters closed_at); only stale direct
 	// rows outside them need a fallback closed check.
 	closedByPublic := make(map[string]bool, len(orgs))
@@ -855,7 +854,7 @@ func (s *Store) GetWorkspaceRole(ctx context.Context, workspacePublicID string, 
 	}
 	// Closed Organizations suspend all Workspace content access (#955):
 	// every member, including Owner/Admin, reads as non-member while
-	// closed. Organization management (restore) stays on the org
+	// closed. Organization management stays on the org
 	// endpoints via GetOrganizationRole, which this gate never touches.
 	if !workspace.IsPersonal() && workspace.OrganizationID != nil {
 		organization, err := s.GetOrganization(ctx, *workspace.OrganizationID)

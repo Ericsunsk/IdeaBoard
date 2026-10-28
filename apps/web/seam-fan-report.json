@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "ffce04c119d2df3215bf38a392c866227f397ed7",
+  "checkpointSha": "cd595fc7ad4ab515f8837ea4b5922ee0f4da5688",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -1190,6 +1190,11 @@
           "kind": "type-only"
         },
         {
+          "from": "src/features/admin/monitor/ui/pages/AdminMonitorPage.polling.contract.spec.ts",
+          "to": "src/api/generated-query/control/model/index.ts",
+          "kind": "type-only"
+        },
+        {
           "from": "src/features/admin/statistics/session/resource.ts",
           "to": "src/api/generated-query/control/model/index.ts",
           "kind": "type-only"
@@ -1205,7 +1210,7 @@
           "kind": "type-only"
         }
       ],
-      "fanIn": 18,
+      "fanIn": 19,
       "fanOut": 173,
       "fanOutTargets": [
         "src/api/generated-query/control/model/auditRecord.ts",
@@ -2253,7 +2258,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 18,
+      "targetFanIn": 19,
       "targetFanOut": 173,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -5545,6 +5550,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.unit.spec.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/canvas/session/execution/result-nodes/resultDisplay.ts",
           "to": "src/api/mediaAssetDelivery.ts",
           "kind": "runtime"
@@ -5635,7 +5650,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 25,
+      "fanIn": 27,
       "fanOut": 4,
       "fanOutTargets": [
         "src/api/mediaAssetMetadata.ts",
@@ -5669,7 +5684,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 25,
+      "targetFanIn": 27,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -6146,6 +6161,16 @@
           "kind": "runtime"
         },
         {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.unit.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
           "from": "src/features/notification/session/reads.ts",
           "to": "src/api/workspaceEventStream.ts",
           "kind": "runtime"
@@ -6156,7 +6181,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 13,
+      "fanIn": 15,
       "fanOut": 4,
       "fanOutTargets": [
         "src/api/contractKernel.ts",
@@ -6190,7 +6215,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 13,
+      "targetFanIn": 15,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -19535,11 +19560,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/monitor/session/useAdminTaskList.ts",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "type-only"
-        },
-        {
           "from": "src/features/admin/monitor/session/useAdminTaskRuntimeSnapshot.ts",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -32409,7 +32429,7 @@
         }
       ],
       "fanIn": 31,
-      "fanOut": 48,
+      "fanOut": 49,
       "fanOutTargets": [
         "fs",
         "fs/promises",
@@ -32423,6 +32443,7 @@
         "src/api/idempotencyKey.ts",
         "src/api/mediaAssetDelivery.ts",
         "src/api/upload.ts",
+        "src/api/workspaceEventStream.ts",
         "src/api/workspaceTaskContract.ts",
         "src/api/workspaceTaskTransport.ts",
         "src/api/workspaceTaskWaiter.ts",
@@ -32845,6 +32866,31 @@
           "from": "src/features/canvas/session/execution/result-nodes/planning.ts",
           "to": "src/features/canvas/session/flow-adapter/index.ts",
           "kind": "type-only"
+        },
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.unit.spec.ts",
+          "to": "node_modules/vitest/dist/index.js",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.unit.spec.ts",
+          "to": "src/api/mediaAssetDelivery.ts",
+          "kind": "runtime"
+        },
+        {
+          "from": "src/features/canvas/session/execution/result-nodes/receiptDerivativeEvent.unit.spec.ts",
+          "to": "src/api/workspaceEventStream.ts",
+          "kind": "runtime"
         },
         {
           "from": "src/features/canvas/session/execution/result-nodes/resolvedTaskImageResult.ts",
@@ -33502,7 +33548,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 31,
-      "targetFanOut": 48,
+      "targetFanOut": 49,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

@@ -5,10 +5,10 @@ import AdminMonitorPage from './AdminMonitorPage.vue'
 
 const mocks = vi.hoisted(() => ({
   requestCancelTask: vi.fn(),
+  loadTasks: vi.fn(),
 }))
 
 const mockFilterStatus = ref<string | null>(null)
-
 const task = {
   task_id: 'task-running',
   user_public_id: '00000000-0000-0000-0000-000000000042',
@@ -27,6 +27,7 @@ const mockTasks = ref<Array<typeof task>>([task])
 vi.mock('../../session/useAdminTaskList', () => ({
   useAdminTaskList: () => ({
     tasks: mockTasks,
+    chartRows: ref([]),
     total: ref(1),
     loading: ref(false),
     isError: ref(false),
@@ -43,8 +44,7 @@ vi.mock('../../session/useAdminTaskList', () => ({
     taskStats: ref({ pending: 0, running: 1, completed: 0, failed: 0, cancelled: 0, other: 0 }),
     filterStatus: mockFilterStatus,
     searchKeyword: ref(''),
-    appliedSearchKeyword: ref(''),
-    loadTasks: vi.fn(),
+    loadTasks: mocks.loadTasks,
     handleSearch: vi.fn(),
   }),
 }))
@@ -66,9 +66,6 @@ vi.mock('../../resource', () => ({
     data: ref(undefined),
     isError: ref(false),
     refetch: vi.fn(),
-  }),
-  useAdminTaskListResource: () => ({
-    data: ref({ list: [] }),
   }),
 }))
 
@@ -118,12 +115,6 @@ const ToolbarStub = defineComponent({
   },
 })
 
-const DataTableStub = defineComponent({
-  setup(_, { slots }) {
-    return () => h('div', slots.default?.())
-  },
-})
-
 const ColumnStub = defineComponent({
   setup(_, { slots }) {
     return () => h('div', slots.body?.({ data: task }))
@@ -146,39 +137,42 @@ const ButtonStub = defineComponent({
   },
 })
 
+function renderMonitorPage() {
+  return renderWithUser(AdminMonitorPage, {
+    global: {
+      stubs: {
+        AdminChartCard: SlotStub,
+        AdminFilterPopover: SlotStub,
+        AdminPagerControls: SlotStub,
+        AdminResourceToolbar: ToolbarStub,
+        AdminSummaryCard: SlotStub,
+        AdminTablePanel: TablePanelStub,
+        AdminTaskResultDialog: SlotStub,
+        AdminToolbarSearch: SlotStub,
+        Button: ButtonStub,
+        Chart: SlotStub,
+        Column: ColumnStub,
+        DataTableFrame: SlotStub,
+        Eye: SlotStub,
+        InputNumber: SlotStub,
+        Message: SlotStub,
+        Refresh: SlotStub,
+        Tag: SlotStub,
+      },
+    },
+  })
+}
+
 describe('AdminMonitorPage', () => {
   beforeEach(() => {
     mockFilterStatus.value = null
     mockTasks.value = [task]
     mocks.requestCancelTask.mockClear()
+    mocks.loadTasks.mockClear()
   })
 
   it('shows one-row cancellation only for an active task and delegates to the cancel command', async () => {
-    mocks.requestCancelTask.mockClear()
-    mockFilterStatus.value = null
-    const view = renderWithUser(AdminMonitorPage, {
-      global: {
-        stubs: {
-          AdminChartCard: SlotStub,
-          AdminFilterPopover: SlotStub,
-          AdminPagerControls: SlotStub,
-          AdminResourceToolbar: ToolbarStub,
-          AdminSummaryCard: SlotStub,
-          AdminTablePanel: TablePanelStub,
-          AdminTaskResultDialog: SlotStub,
-          AdminToolbarSearch: SlotStub,
-          Button: ButtonStub,
-          Chart: SlotStub,
-          Column: ColumnStub,
-          DataTableFrame: DataTableStub,
-          Eye: SlotStub,
-          InputNumber: SlotStub,
-          Message: SlotStub,
-          Refresh: SlotStub,
-          Tag: SlotStub,
-        },
-      },
-    })
+    const view = renderMonitorPage()
 
     await view.user.click(screen.getByLabelText('取消任务'))
 
@@ -186,30 +180,7 @@ describe('AdminMonitorPage', () => {
   })
 
   it('filters task status when clicking observability status pills', async () => {
-    mockFilterStatus.value = null
-    const view = renderWithUser(AdminMonitorPage, {
-      global: {
-        stubs: {
-          AdminChartCard: SlotStub,
-          AdminFilterPopover: SlotStub,
-          AdminPagerControls: SlotStub,
-          AdminResourceToolbar: ToolbarStub,
-          AdminSummaryCard: SlotStub,
-          AdminTablePanel: TablePanelStub,
-          AdminTaskResultDialog: SlotStub,
-          AdminToolbarSearch: SlotStub,
-          Button: ButtonStub,
-          Chart: SlotStub,
-          Column: ColumnStub,
-          DataTableFrame: DataTableStub,
-          Eye: SlotStub,
-          InputNumber: SlotStub,
-          Message: SlotStub,
-          Refresh: SlotStub,
-          Tag: SlotStub,
-        },
-      },
-    })
+    const view = renderMonitorPage()
 
     await view.user.click(screen.getByTitle('Filter pending tasks'))
     expect(mockFilterStatus.value).toBe('pending')
@@ -237,29 +208,7 @@ describe('AdminMonitorPage', () => {
   })
 
   it('toggles chart visibility when clicking the collapse chart button', async () => {
-    const view = renderWithUser(AdminMonitorPage, {
-      global: {
-        stubs: {
-          AdminChartCard: SlotStub,
-          AdminFilterPopover: SlotStub,
-          AdminPagerControls: SlotStub,
-          AdminResourceToolbar: ToolbarStub,
-          AdminSummaryCard: SlotStub,
-          AdminTablePanel: TablePanelStub,
-          AdminTaskResultDialog: SlotStub,
-          AdminToolbarSearch: SlotStub,
-          Button: ButtonStub,
-          Chart: SlotStub,
-          Column: ColumnStub,
-          DataTableFrame: DataTableStub,
-          Eye: SlotStub,
-          InputNumber: SlotStub,
-          Message: SlotStub,
-          Refresh: SlotStub,
-          Tag: SlotStub,
-        },
-      },
-    })
+    const view = renderMonitorPage()
 
     const collapseButton = screen.getByLabelText('折叠图表')
     expect(collapseButton).toBeInTheDocument()
@@ -269,29 +218,7 @@ describe('AdminMonitorPage', () => {
   })
 
   it('renders the resolved time range on the picker trigger', () => {
-    renderWithUser(AdminMonitorPage, {
-      global: {
-        stubs: {
-          AdminChartCard: SlotStub,
-          AdminFilterPopover: SlotStub,
-          AdminPagerControls: SlotStub,
-          AdminResourceToolbar: ToolbarStub,
-          AdminSummaryCard: SlotStub,
-          AdminTablePanel: TablePanelStub,
-          AdminTaskResultDialog: SlotStub,
-          AdminToolbarSearch: SlotStub,
-          Button: ButtonStub,
-          Chart: SlotStub,
-          Column: ColumnStub,
-          DataTableFrame: DataTableStub,
-          Eye: SlotStub,
-          InputNumber: SlotStub,
-          Message: SlotStub,
-          Refresh: SlotStub,
-          Tag: SlotStub,
-        },
-      },
-    })
+    renderMonitorPage()
 
     // The picker is a real reka `Select`, whose option list renders into a portal
     // that only opens on real pointer input. jsdom therefore sees the trigger and
@@ -303,29 +230,7 @@ describe('AdminMonitorPage', () => {
   })
 
   it('renders table columns directly as the header without redundant Activity Log title', () => {
-    renderWithUser(AdminMonitorPage, {
-      global: {
-        stubs: {
-          AdminChartCard: SlotStub,
-          AdminFilterPopover: SlotStub,
-          AdminPagerControls: SlotStub,
-          AdminResourceToolbar: ToolbarStub,
-          AdminSummaryCard: SlotStub,
-          AdminTablePanel: TablePanelStub,
-          AdminTaskResultDialog: SlotStub,
-          AdminToolbarSearch: SlotStub,
-          Button: ButtonStub,
-          Chart: SlotStub,
-          Column: ColumnStub,
-          DataTableFrame: DataTableStub,
-          Eye: SlotStub,
-          InputNumber: SlotStub,
-          Message: SlotStub,
-          Refresh: SlotStub,
-          Tag: SlotStub,
-        },
-      },
-    })
+    renderMonitorPage()
 
     // 确认没有多余的 Activity Log 标题
     expect(screen.queryByText('Activity Log')).not.toBeInTheDocument()
@@ -344,30 +249,16 @@ describe('AdminMonitorPage', () => {
 
   it('renders the empty state when the task list is empty', async () => {
     mockTasks.value = []
-    renderWithUser(AdminMonitorPage, {
-      global: {
-        stubs: {
-          AdminChartCard: SlotStub,
-          AdminFilterPopover: SlotStub,
-          AdminPagerControls: SlotStub,
-          AdminResourceToolbar: ToolbarStub,
-          AdminSummaryCard: SlotStub,
-          AdminTablePanel: TablePanelStub,
-          AdminTaskResultDialog: SlotStub,
-          AdminToolbarSearch: SlotStub,
-          Button: ButtonStub,
-          Chart: SlotStub,
-          Column: ColumnStub,
-          DataTableFrame: DataTableStub,
-          Eye: SlotStub,
-          InputNumber: SlotStub,
-          Message: SlotStub,
-          Refresh: SlotStub,
-          Tag: SlotStub,
-        },
-      },
-    })
+    renderMonitorPage()
 
     expect(screen.getByText('暂无事件日志')).toBeInTheDocument()
+  })
+
+  it('delegates manual live refresh to the shared list/chart owner', async () => {
+    const view = renderMonitorPage()
+
+    await view.user.click(screen.getByRole('button', { name: /自动刷新|Auto Refresh/ }))
+
+    expect(mocks.loadTasks).toHaveBeenCalledTimes(1)
   })
 })

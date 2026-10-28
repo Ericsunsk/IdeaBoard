@@ -7,8 +7,10 @@ import {
   resolveFirstTaskImageResultDisplay,
   resolveTaskImageResultAtIndexDisplay,
   type ImageSizeLoader,
+  type ReceiptDerivativeWaiter,
   type ResolvedTaskImageResult,
 } from '../result-nodes/resultDisplay'
+import { waitForReceiptDerivativeReady } from '../result-nodes/receiptDerivativeEvent'
 
 export type TaskImageOutcome = {
   kind: 'completed' | 'cancelled'
@@ -43,13 +45,21 @@ export type TaskImageObserver = (
 export function createTaskImageObserver(
   waitForOutcome: TaskImageOutcomeWaiter,
   loadImageSize: ImageSizeLoader,
+  waitForReceiptDerivative: ReceiptDerivativeWaiter = waitForReceiptDerivativeReady,
 ): TaskImageObserver {
   return async (taskId, options) => {
     const observed = await waitForOutcome(taskId, options)
     const outcome = { kind: observed.kind, results: normalizeTaskImageResults(observed.results) }
     return {
       resolve: (resultIndex, fallbackRatio, { signal }) =>
-        resolveTaskImageOutcome(outcome, resultIndex, fallbackRatio, loadImageSize, signal),
+        resolveTaskImageOutcome(
+          outcome,
+          resultIndex,
+          fallbackRatio,
+          loadImageSize,
+          signal,
+          waitForReceiptDerivative,
+        ),
     }
   }
 }
@@ -61,6 +71,7 @@ async function resolveTaskImageOutcome(
   fallbackRatio: number,
   loadImageSize: ImageSizeLoader,
   signal?: AbortSignal,
+  waitForReceiptDerivative?: ReceiptDerivativeWaiter,
 ): Promise<ResolvedTaskImageOutcome> {
   const { results } = outcome
   const result =
@@ -70,13 +81,20 @@ async function resolveTaskImageOutcome(
   if (outcome.kind === 'cancelled' && !result) return { kind: 'cancelled', result: null }
   const resolved =
     resultIndex === undefined
-      ? await resolveFirstTaskImageResultDisplay(results, fallbackRatio, loadImageSize, signal)
+      ? await resolveFirstTaskImageResultDisplay(
+          results,
+          fallbackRatio,
+          loadImageSize,
+          signal,
+          waitForReceiptDerivative,
+        )
       : await resolveTaskImageResultAtIndexDisplay(
           results,
           resultIndex,
           fallbackRatio,
           loadImageSize,
           signal,
+          waitForReceiptDerivative,
         )
   return { kind: outcome.kind, result: resolved }
 }

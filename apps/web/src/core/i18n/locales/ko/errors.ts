@@ -39,6 +39,5 @@ export default {
   organization_limit_reached: '사용자당 최대 하나의 조직에만 가입하거나 생성할 수 있습니다.',
   organization_closed: '이 조직은 종료되었습니다.',
   organization_closure_blocked: '미결제 작업 또는 자금이 남아 있습니다. 정산 후 다시 시도하세요.',
-  organization_not_closed: '이 조직은 종료되지 않았습니다.',
   membership_transition_forbidden: '마지막 매니저는 제거하거나 강등할 수 없습니다.',
 } as const

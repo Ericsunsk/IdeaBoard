@@ -45,7 +45,6 @@ const USER_ERROR_CODE_COPY_KEY_MAP: Readonly<Record<string, string>> = {
   organization_limit_reached: 'errorCodes.organization_limit_reached',
   organization_closed: 'errorCodes.organization_closed',
   organization_closure_blocked: 'errorCodes.organization_closure_blocked',
-  organization_not_closed: 'errorCodes.organization_not_closed',
   membership_transition_forbidden: 'errorCodes.membership_transition_forbidden',
   checkout_request_rejected: 'errorCodes.checkout_request_rejected',
   checkout_session_expired: 'errorCodes.checkout_session_expired',

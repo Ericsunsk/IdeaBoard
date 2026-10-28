@@ -1,8 +1,6 @@
 import { computed, ref, watch } from 'vue'
-import type { TaskStatus } from '../../shared'
-import { usePagePagination } from '../../shared'
+import { type TaskStatus, usePagePagination, useQueryPolling } from '../../shared'
 import { stripUndefined } from '@/api/stripUndefined'
-import { useQueryPolling } from '../../shared'
 import {
   useAdminTaskListResource,
   type AdminMonitorListItemModel,
@@ -10,6 +8,7 @@ import {
 } from '../resource'
 import {
   ADMIN_MONITOR_PAGE_SIZE,
+  ADMIN_MONITOR_CHART_PAGE_SIZE,
   ADMIN_MONITOR_REFRESH_INTERVAL_MS,
   ADMIN_MONITOR_RESULT_PREVIEW_ENABLED,
 } from '../core/displayPolicy'
@@ -25,14 +24,14 @@ type TaskStatusStats = {
 
 export type AdminTaskRow = AdminMonitorListItemModel
 
-export type AdminTaskListParamsInput = {
+type AdminTaskListParamsInput = {
   status: TaskStatus | null
   keyword: string
   page: number
   pageSize: number
 }
 
-export function buildAdminTaskListParams(input: AdminTaskListParamsInput): ListAdminTasksParams {
+function buildAdminTaskListParams(input: AdminTaskListParamsInput): ListAdminTasksParams {
   const keyword = input.keyword.trim()
   const params: ListAdminTasksParams = stripUndefined({
     status: input.status || undefined,
@@ -71,13 +70,23 @@ export function useAdminTaskList() {
     isEnabled: () => hasActiveTasks.value,
   })
 
-  const tasksQuery = useAdminTaskListResource(computed(resolveParams), {
+  const queryOptions = {
     query: {
       refetchInterval: polling.refetchInterval,
       refetchIntervalInBackground: false,
       refetchOnWindowFocus: false,
     },
-  })
+  }
+  const tasksQuery = useAdminTaskListResource(computed(resolveParams), queryOptions)
+  const chartQuery = useAdminTaskListResource(
+    computed(() => ({
+      ...resolveParams(),
+      page: 1,
+      page_size: ADMIN_MONITOR_CHART_PAGE_SIZE,
+    })),
+    queryOptions,
+  )
+  const chartRows = computed(() => chartQuery.data.value?.list ?? [])
 
   const tasks = computed(() => tasksQuery.data.value?.list || [])
   const paginationTotalRecords = computed(() => tasksQuery.data.value?.total)
@@ -108,14 +117,16 @@ export function useAdminTaskList() {
 
   watch(
     () => {
-      const data = tasksQuery.data.value
-      if (!data) return true
-      return (data.pending_count ?? 0) > 0 || (data.running_count ?? 0) > 0
+      // Independent requests can finish out of order; stop only after both
+      // snapshots confirm idle, including a chart response that arrives late.
+      return [tasksQuery.data.value, chartQuery.data.value].some(
+        (data) => !data || (data.pending_count ?? 0) > 0 || (data.running_count ?? 0) > 0,
+      )
     },
     (nextHasActiveTasks) => {
       hasActiveTasks.value = nextHasActiveTasks
     },
-    { immediate: true },
+    { immediate: true, flush: 'sync' },
   )
 
   function handleSearch() {
@@ -139,16 +150,20 @@ export function useAdminTaskList() {
     { flush: 'sync' },
   )
 
+  // One visible-resume drive refreshes both independent snapshots.
   watch(polling.isPageVisible, (isVisible, wasVisible) => {
-    if (isVisible && !wasVisible && hasActiveTasks.value) void tasksQuery.refetch()
+    if (!isVisible || wasVisible || !hasActiveTasks.value) return
+    loadTasks()
   })
 
   function loadTasks() {
     void tasksQuery.refetch()
+    void chartQuery.refetch()
   }
 
   return {
     tasks,
+    chartRows,
     total,
     loading,
     isError,
@@ -159,7 +174,6 @@ export function useAdminTaskList() {
     taskStats,
     filterStatus,
     searchKeyword,
-    appliedSearchKeyword,
     loadTasks,
     handleSearch,
   }

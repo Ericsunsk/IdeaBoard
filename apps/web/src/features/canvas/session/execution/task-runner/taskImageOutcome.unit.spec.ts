@@ -1,18 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  getWorkspaceMediaAssetMetadata,
   resetMediaWorkspaceIdResolver,
   setMediaWorkspaceIdResolver,
 } from '../../../../../api/mediaAssetDelivery'
 import { extractWorkspaceTaskImageResults } from '../workspace/canvasTaskWaiting'
+import type { ReceiptDerivativeWaiter } from '../result-nodes/resultDisplay'
 import { createTaskImageObserver } from './taskImageOutcome'
+import { waitForReceiptDerivativeReady } from '../result-nodes/receiptDerivativeEvent'
 
-vi.mock('../../../../../api/mediaAssetDelivery', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../../api/mediaAssetDelivery')>()
-  return { ...actual, getWorkspaceMediaAssetMetadata: vi.fn() }
-})
+vi.mock('../result-nodes/receiptDerivativeEvent', () => ({
+  waitForReceiptDerivativeReady: vi.fn(async () => {}),
+}))
 
-const metadataMock = vi.mocked(getWorkspaceMediaAssetMetadata)
+const receiptDerivativeReadyMock = vi.mocked(waitForReceiptDerivativeReady)
+
 const workspaceId = 'ws_task123'
 const taskId = 'task_result123'
 const assetId = 'asset_result123'
@@ -24,12 +25,7 @@ function waitOptions() {
 
 describe('Task image observation Workspace identity', () => {
   beforeEach(() => {
-    metadataMock.mockReset()
-    metadataMock.mockResolvedValue({
-      asset_id: assetId,
-      status: 'ready',
-      derivatives: { preview: { status: 'ready', url } },
-    } as never)
+    receiptDerivativeReadyMock.mockClear()
   })
 
   afterEach(() => {
@@ -51,7 +47,11 @@ describe('Task image observation Workspace identity', () => {
         kind: 'completed',
         result: { url, mediaRef: { assetId, derivativeTier: 'preview' }, ratio: 0.5 },
       })
-      expect(metadataMock).toHaveBeenCalledWith(workspaceId, assetId, expect.any(Object))
+      expect(receiptDerivativeReadyMock).toHaveBeenCalledWith(
+        workspaceId,
+        assetId,
+        expect.any(Object),
+      )
       expect(loadImageSize).toHaveBeenCalledWith(url, undefined, expect.any(AbortSignal))
       expect(wait).toHaveBeenCalledTimes(1)
     },
@@ -75,7 +75,38 @@ describe('Task image observation Workspace identity', () => {
       result: { url, resultIndex: 1, mediaRef: { assetId, derivativeTier: 'preview' } },
     })
     expect(wait).toHaveBeenCalledTimes(1)
-    expect(metadataMock).toHaveBeenCalledTimes(1)
-    expect(metadataMock).toHaveBeenCalledWith(workspaceId, assetId, expect.any(Object))
+    expect(receiptDerivativeReadyMock).toHaveBeenCalledTimes(1)
+    expect(receiptDerivativeReadyMock).toHaveBeenCalledWith(
+      workspaceId,
+      assetId,
+      expect.any(Object),
+    )
+  })
+
+  it('threads an injected receipt waiter to the resolve seam', async () => {
+    setMediaWorkspaceIdResolver(() => null)
+    const results = extractWorkspaceTaskImageResults(workspaceId, [
+      { kind: 'asset', asset_id: assetId, role: 'image', result_index: 1 },
+    ])
+    const wait = vi.fn(async () => ({ kind: 'completed' as const, results }))
+    const loadImageSize = vi.fn(async () => ({ width: 400, height: 200 }))
+    const waitForReceiptDerivative: ReceiptDerivativeWaiter = vi.fn(async () => {})
+    const observation = await createTaskImageObserver(
+      wait,
+      loadImageSize,
+      waitForReceiptDerivative,
+    )(taskId, waitOptions())
+
+    await expect(observation.resolve(1, 1, waitOptions())).resolves.toMatchObject({
+      kind: 'completed',
+      result: { url, resultIndex: 1, mediaRef: { assetId, derivativeTier: 'preview' } },
+    })
+    expect(waitForReceiptDerivative).toHaveBeenCalledTimes(1)
+    expect(waitForReceiptDerivative).toHaveBeenCalledWith(
+      workspaceId,
+      assetId,
+      expect.any(AbortSignal),
+    )
+    expect(receiptDerivativeReadyMock).not.toHaveBeenCalled()
   })
 })

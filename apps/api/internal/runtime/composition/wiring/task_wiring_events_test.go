@@ -436,3 +436,86 @@ func TestSettlerEventBridgeToleratesNilPublisher(t *testing.T) {
 		t.Fatal("staged events must be drained even with a nil publisher")
 	}
 }
+
+func TestSettlerEventBridgeEmitsMediaAssetReadyPerAssetOutput(t *testing.T) {
+	stub := &bridgeStubSettler{}
+	log := events.NewWorkspaceEventLog()
+	bridge := newSettlerEventBridge(stub, nil, settlerEventDelivery{log: log})
+	outputs := []workspacetasks.OutputRef{
+		{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_readytest01", Role: "result", ResultIndex: 0},
+		{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_readytest02", Role: "result", ResultIndex: 1},
+		{Kind: workspacetasks.OutputKindRemote, URL: "https://cdn.example.com/o.png", ChecksumSHA256: "ab", ResultIndex: 2},
+		{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_readytest01", Role: "result", ResultIndex: 3},
+		{Kind: workspacetasks.OutputKindAsset, AssetID: "  ", Role: "result", ResultIndex: 4},
+	}
+	if _, err := bridge.Complete(t.Context(), "ws_bridge", "task_bridge_media", outputs); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	got, _, _ := log.ReplayAfter("ws_bridge", "evt_missing", events.WorkspaceEventFilter{})
+	if len(got) != 3 {
+		t.Fatalf("workspace events = %d, want task.completed + 2 media.asset_ready", len(got))
+	}
+	if got[0].Type != events.EventV1TaskCompleted {
+		t.Fatalf("first envelope type = %q, want task.completed before the asset hints", got[0].Type)
+	}
+	seen := make(map[string]bool, 2)
+	for _, envelope := range got[1:] {
+		if envelope.Type != events.EventV1MediaAssetReady {
+			t.Fatalf("envelope type = %q, want media.asset_ready", envelope.Type)
+		}
+		if err := events.ValidateV1Envelope(envelope); err != nil {
+			t.Fatalf("media envelope invalid: %v", err)
+		}
+		if envelope.Resource.Type != events.V1ResourceMediaAsset {
+			t.Fatalf("resource type = %q, want media_asset", envelope.Resource.Type)
+		}
+		var data events.V1MediaAssetReadyData
+		if err := json.Unmarshal(envelope.Data, &data); err != nil {
+			t.Fatal(err)
+		}
+		if data.AssetID == "" || data.AssetID != envelope.Resource.ID {
+			t.Fatalf("asset_id = %q, resource id = %q, want agreement", data.AssetID, envelope.Resource.ID)
+		}
+		if envelope.Actor.Type != events.V1ActorService {
+			t.Fatalf("actor type = %q, want the worker service actor", envelope.Actor.Type)
+		}
+		if envelope.WorkspaceID != "ws_bridge" {
+			t.Fatalf("workspace_id = %q, want the settled workspace", envelope.WorkspaceID)
+		}
+		wantID := events.StableEventID(data.AssetID, events.EventV1MediaAssetReady)
+		if envelope.ID != wantID {
+			t.Fatalf("envelope id = %q, want stable %q", envelope.ID, wantID)
+		}
+		if seen[data.AssetID] {
+			t.Fatalf("duplicate media.asset_ready for %q", data.AssetID)
+		}
+		seen[data.AssetID] = true
+	}
+	if !seen["asset_readytest01"] || !seen["asset_readytest02"] {
+		t.Fatalf("missing asset hints: %v", seen)
+	}
+}
+
+func TestSettlerEventBridgeEmitsNoMediaAssetReadyOnRollback(t *testing.T) {
+	rollback := errors.New("settlement rolled back")
+	stub := &bridgeStubSettler{completeErr: rollback}
+	log := events.NewWorkspaceEventLog()
+	bridge := newSettlerEventBridge(stub, nil, settlerEventDelivery{log: log})
+	outputs := []workspacetasks.OutputRef{
+		{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_readytest01", Role: "result", ResultIndex: 0},
+	}
+	if _, err := bridge.Complete(t.Context(), "ws_bridge", "task_bridge_rb", outputs); !errors.Is(err, rollback) {
+		t.Fatalf("Complete err = %v, want %v", err, rollback)
+	}
+	if got, _, _ := log.ReplayAfter("ws_bridge", "evt_missing", events.WorkspaceEventFilter{}); len(got) != 0 {
+		t.Fatalf("workspace events = %d, want none after rollback", len(got))
+	}
+	stub.completeErr = nil
+	if _, err := bridge.Complete(t.Context(), "ws_bridge", "task_bridge_rb", outputs); err != nil {
+		t.Fatalf("Complete after rollback: %v", err)
+	}
+	got, _, _ := log.ReplayAfter("ws_bridge", "evt_missing", events.WorkspaceEventFilter{})
+	if len(got) != 2 {
+		t.Fatalf("workspace events = %d, want task.completed + 1 media.asset_ready", len(got))
+	}
+}

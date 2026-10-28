@@ -198,6 +198,12 @@ describe('AdminBillingPricingPage', () => {
     expectTextOrder(['inpaint', 'upscale', 'cutout'])
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(publishRequests).toBe(1)
+    expect(confirmMock).toHaveBeenCalled()
+    const confirmMessage = String(
+      (confirmMock.mock.calls[0]?.[0] as { message?: unknown } | undefined)?.message ?? '',
+    )
+    expect(confirmMessage).toContain('局部重绘')
+    expect(confirmMessage).not.toMatch(/原因|操作人/)
   })
 
   it('disables and re-enables a priced feature from its card', async () => {
@@ -352,6 +358,11 @@ describe('AdminBillingPricingPage', () => {
     const { user } = renderPricingPage()
     await user.click(await screen.findByRole('button', { name: '删除' }))
     expect(confirmMock).toHaveBeenCalledOnce()
+    const confirmMessage = String(
+      (confirmMock.mock.calls[0]?.[0] as { message?: unknown } | undefined)?.message ?? '',
+    )
+    expect(confirmMessage).toContain('已移除功能')
+    expect(confirmMessage).not.toMatch(/原因|操作人/)
 
     await waitFor(() => {
       expect(screen.queryByText('legacy:removed')).not.toBeInTheDocument()

@@ -1,4 +1,4 @@
-import { computed, nextTick, ref, toValue, type MaybeRefOrGetter } from 'vue'
+import { computed, nextTick, ref, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TaskStatus } from '../../shared'
 import type {
@@ -20,6 +20,7 @@ const mockState = vi.hoisted(() => ({
   pollingOptions: [] as unknown[],
   streamReturn: undefined as unknown,
   taskListParams: undefined as MaybeRefOrGetter<ListAdminTasksParams> | undefined,
+  chartRefetch: vi.fn(),
 }))
 
 vi.mock('../resource', async (importOriginal) => {
@@ -27,6 +28,9 @@ vi.mock('../resource', async (importOriginal) => {
   return {
     ...original,
     useAdminTaskListResource: vi.fn((params: MaybeRefOrGetter<ListAdminTasksParams>) => {
+      if (toValue(params).page_size === 100) {
+        return { ...(mockState.listAdminTasksReturn as object), refetch: mockState.chartRefetch }
+      }
       mockState.taskListParams = params
       return mockState.listAdminTasksReturn
     }),
@@ -65,37 +69,99 @@ beforeEach(() => {
   mockState.pollingOptions = []
   mockState.streamReturn = undefined
   mockState.taskListParams = undefined
+  mockState.chartRefetch.mockClear()
 })
 
 describe('useMonitor polling', () => {
-  it('uses aggregate pending/running counts instead of current page rows', async () => {
-    const data = ref<ApiResponseAdminTaskListData>()
+  // Aggregate pending/running counts, never page rows, drive polling.
+  it.each([
+    {
+      name: 'pending only',
+      pending: 1,
+      running: 0,
+      rows: [makeTask(TaskStatus.completed, 1)],
+      isActive: true,
+    },
+    {
+      name: 'running only',
+      pending: 0,
+      running: 1,
+      rows: [makeTask(TaskStatus.completed, 1)],
+      isActive: true,
+    },
+    {
+      name: 'mixed pending and running',
+      pending: 2,
+      running: 3,
+      rows: [makeTask(TaskStatus.running, 2)],
+      isActive: true,
+    },
+    {
+      name: 'idle with a stale running row',
+      pending: 0,
+      running: 0,
+      rows: [makeTask(TaskStatus.running, 2)],
+      isActive: false,
+    },
+  ])(
+    'drives polling and the shared active-task gate from aggregate counts ($name)',
+    async ({ pending, running, rows, isActive }) => {
+      const data = ref<ApiResponseAdminTaskListData>()
+      mockState.listAdminTasksReturn = {
+        data,
+        error: ref(null),
+        isError: ref(false),
+        isLoading: ref(false),
+        refetch: vi.fn(),
+      }
+
+      useAdminTaskList()
+      const polling = mockState.pollingOptions[mockState.pollingOptions.length - 1] as {
+        isEnabled: () => boolean
+      }
+
+      data.value = makeTaskList(rows, { pending, running })
+      await nextTick()
+
+      expect(polling.isEnabled()).toBe(isActive)
+    },
+  )
+
+  it('resumes both snapshots through the single visible drive', async () => {
+    const data = ref<ApiResponseAdminTaskListData>(makeTaskList([], { pending: 1, running: 0 }, 0))
+    const refetch = vi.fn()
     mockState.listAdminTasksReturn = {
       data,
       error: ref(null),
       isError: ref(false),
       isLoading: ref(false),
-      refetch: vi.fn(),
+      refetch,
     }
 
     useAdminTaskList()
-    const polling = mockState.pollingOptions[0] as { isEnabled: () => boolean }
+    const isPageVisible = mockState.pageVisible as Ref<boolean>
 
-    data.value = makeTaskList([makeTask(TaskStatus.completed, 1)], {
-      pending: 1,
-      running: 0,
-    })
+    isPageVisible.value = false
+    await nextTick()
+    isPageVisible.value = true
     await nextTick()
 
-    expect(polling.isEnabled()).toBe(true)
+    expect(refetch).toHaveBeenCalledTimes(1)
+    expect(mockState.chartRefetch).toHaveBeenCalledTimes(1)
 
-    data.value = makeTaskList([makeTask(TaskStatus.running, 2)], {
-      pending: 0,
-      running: 0,
-    })
+    // Idle: the same drive stays silent for both snapshots.
+    data.value = makeTaskList([], { pending: 0, running: 0 }, 0)
+    await nextTick()
+    refetch.mockClear()
+    mockState.chartRefetch.mockClear()
+
+    isPageVisible.value = false
+    await nextTick()
+    isPageVisible.value = true
     await nextTick()
 
-    expect(polling.isEnabled()).toBe(false)
+    expect(refetch).not.toHaveBeenCalled()
+    expect(mockState.chartRefetch).not.toHaveBeenCalled()
   })
 
   it('exposes task list API errors so the page does not render them as an empty list', () => {

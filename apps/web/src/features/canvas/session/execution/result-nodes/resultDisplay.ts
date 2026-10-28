@@ -26,24 +26,26 @@ export type ImageSizeLoader = (
 
 export type { ResolvedTaskImageResult }
 
-const RECEIPT_DERIVATIVE_WAIT_MS = 10_000
+/** Shared receipt-derivative budget: event fast-path, hint wait, and poll fallback share one 10s budget. */
+export const RECEIPT_DERIVATIVE_BUDGET_MS = 10_000
 const RECEIPT_DERIVATIVE_POLL_MS = 500
 
-/**
- * Receipt/delivery reconciliation (issue #676): a `completed` task receipt
- * can arrive before the preview derivative finishes materializing. Wait a
- * bounded budget for the derivative to become servable before probing
- * dimensions, so result nodes bind a complete MediaRef instead of racing the
- * asset pipeline. Always resolves (never hangs): on timeout the display
- * layer's own delivery retry takes over.
- */
-async function awaitReceiptDerivativeReady(
+/** Wait for preview delivery; hints require a metadata read and abort propagates. */
+export type ReceiptDerivativeWaiter = (
   workspaceId: string,
   assetId: string,
   signal?: AbortSignal,
+) => Promise<void>
+
+/** Poll briefly before probing dimensions; display delivery retries handle timeout. */
+export async function awaitReceiptDerivativeReady(
+  workspaceId: string,
+  assetId: string,
+  signal?: AbortSignal,
+  budgetMs: number = RECEIPT_DERIVATIVE_BUDGET_MS,
 ): Promise<void> {
   const startedAt = Date.now()
-  while (Date.now() - startedAt < RECEIPT_DERIVATIVE_WAIT_MS) {
+  while (Date.now() - startedAt < Math.max(0, budgetMs)) {
     try {
       signal?.throwIfAborted()
       const metadata = await getWorkspaceMediaAssetMetadata(workspaceId, assetId, { signal })
@@ -75,10 +77,17 @@ export async function resolveFirstTaskImageResultDisplay(
   fallbackRatio: number,
   loadImageSize: ImageSizeLoader,
   signal?: AbortSignal,
+  waitForReceiptDerivative: ReceiptDerivativeWaiter = awaitReceiptDerivativeReady,
 ): Promise<ResolvedTaskImageResult> {
   const result = pickFirstValidImageResult(results)
   if (!result) throw new Error(noImageMessage())
-  const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSize, signal)
+  const resolved = await resolveTaskImageResultDisplay(
+    result,
+    fallbackRatio,
+    loadImageSize,
+    signal,
+    waitForReceiptDerivative,
+  )
   if (!resolved) throw new Error(noImageMessage())
   return resolved
 }
@@ -89,11 +98,18 @@ export async function resolveTaskImageResultAtIndexDisplay(
   fallbackRatio: number,
   loadImageSize: ImageSizeLoader,
   signal?: AbortSignal,
+  waitForReceiptDerivative: ReceiptDerivativeWaiter = awaitReceiptDerivativeReady,
 ): Promise<ResolvedTaskImageResult> {
   const normalized = normalizeTaskImageResults(results)
   const result = normalized.find((candidate) => candidate.resultIndex === resultIndex)
   if (!result) throw new Error(i18n.global.t('canvas.execution.taskCompletedNoImageAtIndex'))
-  const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSize, signal)
+  const resolved = await resolveTaskImageResultDisplay(
+    result,
+    fallbackRatio,
+    loadImageSize,
+    signal,
+    waitForReceiptDerivative,
+  )
   if (!resolved) throw new Error(i18n.global.t('canvas.execution.taskCompletedNoImageAtIndex'))
   return { ...resolved, resultIndex }
 }
@@ -103,6 +119,7 @@ export async function resolveTaskImageResultDisplay(
   fallbackRatio: number,
   loadImageSize: ImageSizeLoader,
   signal?: AbortSignal,
+  waitForReceiptDerivative: ReceiptDerivativeWaiter = awaitReceiptDerivativeReady,
 ): Promise<ResolvedTaskImageResult | null> {
   signal?.throwIfAborted()
   const normalized = normalizeTaskImageResult(result)
@@ -113,7 +130,16 @@ export async function resolveTaskImageResultDisplay(
     normalized.assetId,
     'preview',
   )
-  await awaitReceiptDerivativeReady(normalized.workspaceId, normalized.assetId, signal)
+  try {
+    await waitForReceiptDerivative(normalized.workspaceId, normalized.assetId, signal)
+  } catch (error) {
+    signal?.throwIfAborted()
+    console.warn('[canvas] failed to await receipt derivative readiness', {
+      assetId: normalized.assetId,
+      operation: 'awaitReceiptDerivativeReady',
+      error,
+    })
+  }
 
   let size = normalizeNaturalSize(Number(normalized.width), Number(normalized.height))
   if (!size) {

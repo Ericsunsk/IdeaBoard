@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   resolveTaskImageResultAtIndexDisplay,
   resolveTaskImageResultDisplay,
+  type ReceiptDerivativeWaiter,
 } from './resultDisplay'
 import {
   getWorkspaceMediaAssetMetadata,
@@ -35,7 +36,55 @@ describe('resultDisplay', () => {
     resetMediaWorkspaceIdResolver()
   })
 
-  it('waits for the preview derivative before binding the receipt', async () => {
+  it('resolves through an injected event waiter instead of polling', async () => {
+    const waitForReceiptDerivative: ReceiptDerivativeWaiter = vi.fn(async () => {})
+    const loadImageSize = vi.fn(async () => ({ width: 400, height: 200 }))
+
+    await expect(
+      resolveTaskImageResultDisplay(
+        { workspaceId: 'ws_test123', assetId: 'asset_1' },
+        1,
+        loadImageSize,
+        undefined,
+        waitForReceiptDerivative,
+      ),
+    ).resolves.toMatchObject({
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_1/derivatives/preview',
+      ratio: 0.5,
+    })
+    expect(waitForReceiptDerivative).toHaveBeenCalledTimes(1)
+    expect(waitForReceiptDerivative).toHaveBeenCalledWith('ws_test123', 'asset_1', undefined)
+    // The injected waiter owns readiness: no metadata GET happens inside resolve.
+    expect(metadataMock).not.toHaveBeenCalled()
+    expect(loadImageSize).toHaveBeenCalled()
+  })
+
+  it('warns and resolves when an injected waiter rejects without abort', async () => {
+    const failure = new Error('event wait unavailable')
+    const waitForReceiptDerivative: ReceiptDerivativeWaiter = vi.fn(async () => {
+      throw failure
+    })
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await expect(
+      resolveTaskImageResultDisplay(
+        { workspaceId: 'ws_test123', assetId: 'asset_1' },
+        1,
+        vi.fn(async () => ({ width: 400, height: 200 })),
+        undefined,
+        waitForReceiptDerivative,
+      ),
+    ).resolves.toMatchObject({ ratio: 0.5 })
+    expect(warnSpy).toHaveBeenCalledWith('[canvas] failed to await receipt derivative readiness', {
+      assetId: 'asset_1',
+      operation: 'awaitReceiptDerivativeReady',
+      error: failure,
+    })
+
+    warnSpy.mockRestore()
+  })
+
+  it('falls back to the bounded poll when no waiter is injected', async () => {
     metadataMock
       .mockResolvedValueOnce({
         asset_id: 'asset_1',

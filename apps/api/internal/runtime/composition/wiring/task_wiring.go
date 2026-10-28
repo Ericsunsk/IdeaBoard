@@ -633,12 +633,16 @@ func newSettlerEventBridge(inner settlerStager, publisher events.TaskStatusPubli
 	return &settlerEventBridge{inner: inner, publisher: publisher, delivery: delivery}
 }
 
-// Complete flips the task to completed, then publishes task.completed.
+// Complete publishes task.completed and distinct media.asset_ready hints
+// after successful settlement. Worker ingestion has no separate event seam.
 func (b *settlerEventBridge) Complete(ctx context.Context, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	completed, err := b.inner.Complete(ctx, workspaceID, taskID, outputs)
 	b.flush(ctx, err)
+	if err == nil {
+		b.emitMediaAssetReadyEvents(ctx, workspaceID, outputs)
+	}
 	return completed, err
 }
 
@@ -702,9 +706,6 @@ func (b *settlerEventBridge) flush(ctx context.Context, settleErr error) {
 // emitWorkspaceEvent maps the staged worker transition to the frozen v1
 // envelope contract. It runs only after settlement returned successfully.
 func (b *settlerEventBridge) emitWorkspaceEvent(ctx context.Context, event workspacetasks.TaskEvent) {
-	if b.delivery.log == nil && b.delivery.bus == nil && b.delivery.webhooks == nil {
-		return
-	}
 	// The frozen workspace event registry has no task.pending event. Pending
 	// is the internal status word used for a requeue; task.created is reserved
 	// for the original submit edge and must never be re-emitted by a retry.
@@ -715,16 +716,45 @@ func (b *settlerEventBridge) emitWorkspaceEvent(ctx context.Context, event works
 	if !ok {
 		return
 	}
-	envelope, err := events.MintV1EnvelopeWithID(
-		event.EventID,
-		typ,
-		event.WorkspaceID,
-		events.V1Actor{Type: events.V1ActorService, ID: "workspace-task-worker"},
+	b.deliverWorkspaceEnvelope(ctx, event.EventID, typ, event.WorkspaceID,
 		events.V1Resource{Type: events.V1ResourceTask, ID: event.TaskID},
-		workerWorkspaceEventData(typ, event),
-	)
+		workerWorkspaceEventData(typ, event))
+}
+
+// Stable per-asset event IDs let the sinks deduplicate redelivered hints.
+func (b *settlerEventBridge) emitMediaAssetReadyEvents(ctx context.Context, workspaceID string, outputs []workspacetasks.OutputRef) {
+	workspaceID = strings.TrimSpace(workspaceID)
+	seen := make(map[string]struct{}, len(outputs))
+	for _, ref := range outputs {
+		if strings.TrimSpace(ref.Kind) != workspacetasks.OutputKindAsset {
+			continue
+		}
+		assetID := strings.TrimSpace(ref.AssetID)
+		if assetID == "" {
+			continue
+		}
+		if _, dup := seen[assetID]; dup {
+			continue
+		}
+		seen[assetID] = struct{}{}
+		b.deliverWorkspaceEnvelope(ctx,
+			events.StableEventID(assetID, events.EventV1MediaAssetReady),
+			events.EventV1MediaAssetReady, workspaceID,
+			events.V1Resource{Type: events.V1ResourceMediaAsset, ID: assetID},
+			events.V1MediaAssetReadyData{AssetID: assetID})
+	}
+}
+
+// Mint only when a sink is attached; delivery failures never fail settlement.
+func (b *settlerEventBridge) deliverWorkspaceEnvelope(ctx context.Context, id, typ, workspaceID string, resource events.V1Resource, data any) {
+	if b.delivery.log == nil && b.delivery.bus == nil && b.delivery.webhooks == nil {
+		return
+	}
+	envelope, err := events.MintV1EnvelopeWithID(id, typ, workspaceID,
+		events.V1Actor{Type: events.V1ActorService, ID: "workspace-task-worker"}, resource, data)
 	if err != nil {
-		slog.Warn("mint worker workspace event failed", "task_id", event.TaskID, "status", event.Status, "err", err)
+		slog.Warn("mint worker workspace event failed", "id", id, "type", typ,
+			"resource_type", resource.Type, "resource_id", resource.ID, "err", err)
 		return
 	}
 	if b.delivery.log != nil {
@@ -732,7 +762,7 @@ func (b *settlerEventBridge) emitWorkspaceEvent(ctx context.Context, event works
 	}
 	if b.delivery.bus != nil {
 		if publishErr := b.delivery.bus.PublishWorkspaceEvent(ctx, envelope); publishErr != nil {
-			slog.Warn("publish worker workspace event failed", "id", envelope.ID, "type", typ, "err", publishErr)
+			slog.Warn("publish worker workspace event failed", "id", envelope.ID, "type", envelope.Type, "err", publishErr)
 		}
 	}
 	if b.delivery.webhooks != nil {

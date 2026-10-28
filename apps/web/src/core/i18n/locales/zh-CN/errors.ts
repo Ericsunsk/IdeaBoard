@@ -37,6 +37,5 @@ export default {
   organization_limit_reached: '每位用户最多加入或创建一个组织。',
   organization_closed: '该组织已关闭。',
   organization_closure_blocked: '组织仍有未结清的任务或资金，请结清后重试。',
-  organization_not_closed: '该组织未关闭。',
   membership_transition_forbidden: '最后一位管理者不能被移除或降级。',
 } as const

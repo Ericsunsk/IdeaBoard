@@ -43,6 +43,5 @@ export default {
   organization_closed: 'This organization is closed.',
   organization_closure_blocked:
     'The organization still has unsettled tasks or funds. Settle them and retry.',
-  organization_not_closed: 'This organization is not closed.',
   membership_transition_forbidden: 'The last manager cannot be removed or demoted.',
 } as const

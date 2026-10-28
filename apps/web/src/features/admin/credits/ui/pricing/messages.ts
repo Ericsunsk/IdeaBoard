@@ -18,13 +18,12 @@ export const BILLING_PRICING_MESSAGES = {
   clearFilters: '清空搜索',
   deleteTitle: '删除已归档功能',
   deleteMessage: (displayName: string) =>
-    `确定彻底删除“${displayName}”及其价格配置吗？此操作不可撤销，且将记录操作人与原因。`,
+    `确定彻底删除“${displayName}”及其价格配置吗？此操作不可撤销。`,
   deleteConfirm: '确认删除',
   deleted: '已归档功能已删除',
   deleteFailed: '删除已归档功能失败，请重试',
   publishTitle: '发布价格',
-  publishMessage: (displayName: string) =>
-    `确定发布“${displayName}”的价格配置吗？该操作将记录操作人与原因。`,
+  publishMessage: (displayName: string) => `确定发布“${displayName}”的价格配置吗？`,
   publishConfirm: '发布价格',
   published: '价格已发布',
   publishFailed: '发布价格失败，请重试',
@@ -39,8 +38,7 @@ export const BILLING_PRICING_MESSAGES = {
   priceDescription: '调整该计费项的价格配置后保存。',
   settingsDescription: '调整该计费项的价格配置与可用模型池后保存。',
   saveAllTitle: '保存配置',
-  saveAllMessage: (displayName: string) =>
-    `确定保存“${displayName}”的价格与模型池配置吗？该操作将记录操作人与原因。`,
+  saveAllMessage: (displayName: string) => `确定保存“${displayName}”的价格与模型池配置吗？`,
   saveAllConfirm: '保存配置',
   saveAllSuccess: '配置已保存',
   pricePlaceholder: (required: boolean) => (required ? '必填' : '选填'),

@@ -46,6 +46,5 @@ export default {
   organization_closed: 'Esta organización está cerrada.',
   organization_closure_blocked:
     'Aún hay tareas o fondos sin liquidar. Liquídalos e inténtalo de nuevo.',
-  organization_not_closed: 'Esta organización no está cerrada.',
   membership_transition_forbidden: 'El último gestor no se puede quitar ni degradar.',
 } as const
