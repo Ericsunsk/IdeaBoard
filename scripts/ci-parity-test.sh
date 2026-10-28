@@ -20,6 +20,12 @@ printf '\n' >>"${CI_PARITY_TEST_LOG}"
 if [[ "${1:-}" == "list" ]]; then
   printf '%s\n' example.test/pkg0 example.test/pkg1 example.test/pkg2 example.test/pkg3
 fi
+if [[ "${1:-}" == "test" && -n "${CI_PARITY_TEST_SELECTED:-}" ]]; then
+  [[ "${API_TEST_DATABASE_REQUIRED:-}" == 1 ]]
+  for arg in "${@:2}"; do
+    [[ "${arg}" == -* ]] || printf '%s\n' "${arg}" >>"${CI_PARITY_TEST_SELECTED}"
+  done
+fi
 if [[ "${1:-}" == "test" && -n "${CI_PARITY_TEST_GO_EXIT:-}" ]]; then
   exit "${CI_PARITY_TEST_GO_EXIT}"
 fi
@@ -71,13 +77,53 @@ if ! grep -Fq 'API_TEST_DATABASE_DSN is required' "${fixture_dir}/missing-dsn.ou
   exit 1
 fi
 
-: >"${log_file}"
-API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \
-  TEST_MODE=standard TEST_SHARD=1 TEST_SHARD_COUNT=2 \
-  run_parity api-test >"${fixture_dir}/standard.out"
-assert_contains 'go list ./...'
-assert_contains 'go test -p=4 -count=1 example.test/pkg1 example.test/pkg3'
-assert_file_contains "${fixture_dir}/standard.out" 'ci-parity: api-test passed mode=standard shard=1 shard_count=2 elapsed='
+printf '%s\n' example.test/pkg0 example.test/pkg1 example.test/pkg2 example.test/pkg3 >"${fixture_dir}/expected-packages"
+for mode in standard race; do
+  : >"${log_file}"
+  selected_file="${fixture_dir}/${mode}-packages"
+  : >"${selected_file}"
+  for shard in 0 1; do
+    API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \
+      API_TEST_DATABASE_REQUIRED=0 \
+      TEST_MODE="${mode}" TEST_SHARD="${shard}" TEST_SHARD_COUNT=2 \
+      CI_PARITY_TEST_SELECTED="${selected_file}" \
+      run_parity api-test >"${fixture_dir}/${mode}-${shard}.out"
+    assert_file_contains "${fixture_dir}/${mode}-${shard}.out" \
+      "ci-parity: api-test passed mode=${mode} shard=${shard} shard_count=2 elapsed="
+  done
+  # Compare the actual runner's package arguments without deduplicating them:
+  # omitted or repeated packages must both fail this exact-union assertion.
+  LC_ALL=C sort "${selected_file}" >"${selected_file}.sorted"
+  diff -u "${fixture_dir}/expected-packages" "${selected_file}.sorted"
+  [[ "$(grep -c '^go list ./\.\.\.$' "${log_file}")" == 2 ]]
+  [[ "$(grep -c '^go test ' "${log_file}")" == 2 ]]
+  test_flags='-p=4 -count=1'
+  [[ "${mode}" != race ]] || test_flags="-race ${test_flags}"
+  assert_contains "go test ${test_flags} example.test/pkg0 example.test/pkg2"
+  assert_contains "go test ${test_flags} example.test/pkg1 example.test/pkg3"
+done
+
+while IFS='|' read -r shard shard_count expected_error; do
+  : >"${log_file}"
+  if API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \
+    TEST_MODE=standard TEST_SHARD="${shard}" TEST_SHARD_COUNT="${shard_count}" \
+    run_parity api-test >"${fixture_dir}/invalid-shard.out" 2>&1; then
+    echo "api-test unexpectedly accepted shard ${shard}/${shard_count}" >&2
+    exit 1
+  fi
+  assert_file_contains "${fixture_dir}/invalid-shard.out" "${expected_error}"
+  if grep -q '^go test ' "${log_file}"; then
+    echo 'api-test executed tests for an invalid shard' >&2
+    exit 1
+  fi
+done <<'EOF'
+-1|2|TEST_SHARD must be a non-negative integer
+invalid|2|TEST_SHARD must be a non-negative integer
+0|invalid|TEST_SHARD_COUNT must be a non-negative integer
+0|0|TEST_SHARD_COUNT must be greater than zero
+2|2|TEST_SHARD must be less than TEST_SHARD_COUNT
+4|5|selected no packages
+EOF
 
 : >"${log_file}"
 API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' \

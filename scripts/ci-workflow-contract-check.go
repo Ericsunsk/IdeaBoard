@@ -28,6 +28,7 @@ func main() {
 	checkRelease(root, release)
 	checkDeployOnly(root)
 	checkActionPinning(root)
+	checkGoCaching(root)
 	checkLegacyWorkflows(root)
 
 	fmt.Println("CI workflow contract tests passed")
@@ -87,6 +88,7 @@ func checkCI(ci workflow) {
 	gate := object(jobs, "ci-gate")
 	requireEqual(gate["name"], "CI Gate", "Required check must remain CI Gate")
 	requireStringIn(gate, "needs", "changes", "CI Gate must depend on change classification")
+	requireStringIn(gate, "needs", "api", "CI Gate must depend on API verification")
 	requireStringIn(gate, "needs", "realtime", "CI Gate must depend on realtime")
 	requireStringIn(gate, "needs", "migration-integration", "CI Gate must depend on migration integration")
 	requireStringIn(gate, "needs", "media-contract", "CI Gate must depend on Media contract")
@@ -103,6 +105,8 @@ func checkCI(ci workflow) {
 	requireEqual(gateStep["run"], "./scripts/ci-gate.sh", "CI Gate must use the lane policy module")
 	requireEqual(gateStep["if"], "always()", "CI Gate policy must run after failed or skipped lanes")
 	gateEnv := object(gateStep, "env")
+	requireEqual(gateEnv["API_REQUIRED"], "${{ needs.changes.outputs.api }}", "CI Gate must receive the API required flag")
+	requireEqual(gateEnv["API_RESULT"], "${{ needs.api.result }}", "CI Gate must receive the aggregate API result")
 	requireEqual(gateEnv["MEDIA_CONTRACT_REQUIRED"], "true", "Media contract must always be a required CI lane")
 	requireEqual(gateEnv["MEDIA_CONTRACT_RESULT"], "${{ needs.media-contract.result }}", "CI Gate must receive the Media contract result")
 	requireEqual(gateEnv["REALTIME_REQUIRED"], "${{ needs.changes.outputs.realtime }}", "CI Gate must receive the Realtime required flag")
@@ -123,8 +127,7 @@ func checkReusableWorkflows(root string) {
 	rejectKey(object(api, "jobs"), "schema", "Schema semantics must run once in the migration gate")
 	rejectKey(object(object(object(api, "on"), "workflow_call"), "inputs"), "run_schema", "Schema verification must not require an optional input")
 	requireEqual(object(api, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "API workflow must not upload Docker build records")
-	apiTestStep := requireStep(object(object(api, "jobs"), "tests"), "Test race shard")
-	requireEqual(object(apiTestStep, "env")["TEST_MODE"], "race", "API tests must run in race mode")
+	checkAPIParallelTests(api)
 	migrationGate := object(object(api, "jobs"), "migration-gate")
 	rejectKey(migrationGate, "if", "API migration verification must run on every invocation")
 	installAPIAtlas := requireStep(migrationGate, "Install Atlas")
@@ -189,6 +192,57 @@ func checkReusableWorkflows(root string) {
 	manifestBytes, err := os.ReadFile(filepath.Join(root, "scripts", "run-all-self-tests.sh"))
 	failIf(err)
 	requireContains(string(manifestBytes), "*-test.sh", "Self-test manifest must glob scripts/*-test.sh")
+}
+
+func checkAPIParallelTests(api workflow) {
+	jobs := object(api, "jobs")
+	for _, test := range []struct{ job, mode string }{{"standard-tests", "standard"}, {"tests", "race"}} {
+		job := object(jobs, test.job)
+		rejectKey(job, "needs", test.job+" must run independently")
+		rejectKey(job, "if", test.job+" must always run")
+		rejectKey(job, "continue-on-error", test.job+" failures must fail API verification")
+		strategy := object(job, "strategy")
+		requireEqual(strategy["fail-fast"], false, test.job+" must complete both shards")
+		requireEqual(strategy["max-parallel"], 2, test.job+" must run two shards concurrently")
+		matrix := object(strategy, "matrix")
+		requireEqual(matrix["shard"], []any{0, 1}, test.job+" must cover shards 0 and 1")
+		rejectKey(matrix, "exclude", test.job+" must not exclude shards")
+		rejectKey(matrix, "include", test.job+" must not add duplicate shards")
+		postgres := object(object(job, "services"), "postgres")
+		requireEqual(postgres["image"], "postgres:17-alpine", test.job+" must have an isolated PostgreSQL 17 service")
+		requireContains(stringValue(postgres["options"]), "--health-cmd", test.job+" must wait for PostgreSQL health")
+		env := object(job, "env")
+		requireEqual(env["API_TEST_DATABASE_DSN"], "postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable", test.job+" must use its PostgreSQL service")
+		requireEqual(env["API_TEST_DATABASE_REQUIRED"], "1", test.job+" must require PostgreSQL tests")
+		step := requireStep(job, "Test "+test.mode+" shard")
+		requireEqual(step["run"], "./scripts/ci-parity.sh api-test", test.job+" must use the parity runner")
+		rejectKey(step, "if", test.job+" must execute its test shard")
+		rejectKey(step, "continue-on-error", test.job+" must propagate test failures")
+		testEnv := object(step, "env")
+		requireEqual(testEnv["TEST_MODE"], test.mode, test.job+" must select its test mode")
+		requireEqual(testEnv["TEST_SHARD"], "${{ matrix.shard }}", test.job+" must select its matrix shard")
+		requireEqual(testEnv["TEST_SHARD_COUNT"], "2", test.job+" must partition the suite into two shards")
+		setupCount := 0
+		for _, step := range steps(job) {
+			if step["uses"] == "./.github/actions/setup-go" {
+				setupCount++
+				requireEqual(object(step, "with")["build-cache-scope"], "api-"+test.mode+"-${{ matrix.shard }}", test.job+" must isolate compiled caches per mode and shard")
+			}
+		}
+		requireEqual(setupCount, 1, test.job+" must use the canonical Go setup")
+	}
+	quality := object(jobs, "quality")
+	rejectKey(quality, "needs", "Quality must run independently of API test shards")
+	requireStepRun(quality, "bash scripts/ci-parity-test.sh")
+	requireStep(quality, "Test nested test infrastructure modules")
+	requireStep(quality, "Go vulnerability check")
+	requireStepRun(quality, "go build ./...")
+	for _, step := range steps(quality) {
+		reject(step["run"] == "./scripts/ci-parity.sh api-test", "Quality must not repeat the standard test suite")
+	}
+	for _, dependency := range []string{"quality", "standard-tests", "tests"} {
+		requireStringIn(object(jobs, "image"), "needs", dependency, "API image must wait for "+dependency)
+	}
 }
 
 func checkMigrationGate(root string) {
@@ -339,6 +393,37 @@ func checkActionPinning(root string) {
 		reject(strings.Contains(text, "node-version:"), "Node version must come from .node-version")
 		return nil
 	}))
+}
+
+func checkGoCaching(root string) {
+	data, err := os.ReadFile(filepath.Join(root, ".github", "actions", "setup-go", "action.yml"))
+	failIf(err)
+	var action workflow
+	failIf(yaml.Unmarshal(data, &action))
+	run := object(action, "runs")
+	setup := requireStep(run, "Set up Go")
+	requireEqual(object(setup, "with")["cache"], false, "Built-in Go caching must not overlap the explicit caches")
+	modules := object(requireStep(run, "Cache Go modules"), "with")
+	build := object(requireStep(run, "Cache compiled Go packages"), "with")
+	reject(modules["path"] == build["path"], "Module and compiled package caches must have separate paths")
+	for _, key := range []string{"${{ runner.os }}", "${{ runner.arch }}", "${{ steps.go.outputs.go-version }}", "${{ hashFiles(inputs.cache-dependency-path) }}"} {
+		requireContains(stringValue(modules["key"]), key, "Module cache must include platform, Go and dependency identity")
+		requireContains(stringValue(build["key"]), key, "Build cache must include platform, Go and dependency identity")
+	}
+	requireContains(stringValue(build["key"]), "${{ inputs.build-cache-scope }}", "Build cache must isolate jobs and modes")
+	requireContains(stringValue(build["key"]), "${{ github.sha }}", "New commits must save updated compilation work")
+	restore := strings.TrimSpace(stringValue(build["restore-keys"]))
+	requireEqual(restore, strings.TrimSuffix(stringValue(build["key"]), "${{ github.sha }}"), "Build cache must restore only from the same platform, Go, dependency and job scope")
+
+	// Reusable workflows both name their job verify; they must not race to save one cache.
+	for workflowName, scope := range map[string]string{"ops.yml": "ops", "migration-integration.yml": "migration-integration"} {
+		job := object(object(loadWorkflow(root, workflowName), "jobs"), "verify")
+		for _, step := range steps(job) {
+			if step["uses"] == "./.github/actions/setup-go" {
+				requireEqual(object(step, "with")["build-cache-scope"], scope, "Reusable verify jobs must use distinct compilation caches")
+			}
+		}
+	}
 }
 
 func checkLegacyWorkflows(root string) {

@@ -47,6 +47,7 @@ jobs:
       - uses: ./.github/actions/setup-go
         with:
           cache-dependency-path: apps/api/go.sum
+          build-cache-scope: migration-integration
       - uses: ./.github/actions/npm-ci
         with:
           working-directory: apps/auth

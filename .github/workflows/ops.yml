@@ -23,6 +23,8 @@ jobs:
 
       - name: Set up Go
         uses: ./.github/actions/setup-go
+        with:
+          build-cache-scope: ops
 
       - name: Lint GitHub Actions workflows
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml

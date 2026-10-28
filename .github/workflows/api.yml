@@ -69,15 +69,6 @@ jobs:
           cache-dependency-path: apps/api/go.sum
       - name: Test CI parity entrypoint
         run: bash scripts/ci-parity-test.sh
-      # Fast lane: one unsharded standard run through the parity entrypoint.
-      # It fails closed when the database DSN is missing, so integration tests
-      # can never silently skip on a runner without PostgreSQL.
-      - name: Fast lane standard tests
-        env:
-          TEST_MODE: standard
-          TEST_SHARD: "0"
-          TEST_SHARD_COUNT: "1"
-        run: ./scripts/ci-parity.sh api-test
       - name: Test nested test infrastructure modules
         working-directory: apps/api
         run: |
@@ -93,10 +84,15 @@ jobs:
           CGO_ENABLED: "0"
         run: go build ./...
 
-  tests:
-    name: API Race
+  standard-tests:
+    name: API Standard (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard: [0, 1]
     services:
       postgres:
         image: postgres:17-alpine
@@ -110,18 +106,58 @@ jobs:
           --health-interval 10s --health-timeout 5s --health-retries 10
     env:
       API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
+      API_TEST_DATABASE_REQUIRED: "1"
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-go
-        with: { cache-dependency-path: apps/api/go.sum }
-      # Run the full suite under the race detector.
+        with:
+          cache-dependency-path: apps/api/go.sum
+          build-cache-scope: api-standard-${{ matrix.shard }}
+      - name: Test standard shard
+        env:
+          TEST_MODE: standard
+          TEST_SHARD: "${{ matrix.shard }}"
+          TEST_SHARD_COUNT: "2"
+        run: ./scripts/ci-parity.sh api-test
+
+  tests:
+    name: API Race (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard: [0, 1]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ideaboard_test
+          POSTGRES_USER: ideaboard
+          POSTGRES_PASSWORD: ideaboard_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U ideaboard -d ideaboard_test -h 127.0.0.1"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
+      API_TEST_DATABASE_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-dependency-path: apps/api/go.sum
+          build-cache-scope: api-race-${{ matrix.shard }}
       - name: Test race shard
         env:
           TEST_MODE: race
-          TEST_SHARD: "0"
-          TEST_SHARD_COUNT: "1"
+          TEST_SHARD: "${{ matrix.shard }}"
+          TEST_SHARD_COUNT: "2"
         run: ./scripts/ci-parity.sh api-test
 
   sqlc-diff:
@@ -377,7 +413,7 @@ jobs:
   image:
     name: API PR Image
     if: inputs.build_images
-    needs: [quality, tests]
+    needs: [quality, standard-tests, tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10

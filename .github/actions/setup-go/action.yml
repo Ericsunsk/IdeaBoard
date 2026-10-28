@@ -1,17 +1,41 @@
 name: Setup Go
-description: Configure the repository Go runtime and module cache
+description: Configure the repository Go runtime, module cache and incremental build cache
 
 inputs:
   cache-dependency-path:
     description: Path to go.sum used for the cache key
     required: false
     default: apps/api/go.sum
+  build-cache-scope:
+    description: Isolate compiled packages by job or test mode
+    required: false
+    default: ${{ github.job }}
 
 runs:
   using: composite
   steps:
     - name: Set up Go
+      id: go
       uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
       with:
         go-version-file: apps/api/go.mod
-        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+        cache: false
+    - name: Locate Go caches
+      id: cache-paths
+      shell: bash
+      run: |
+        printf 'modules=%s\n' "$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        printf 'build=%s\n' "$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+    - name: Cache Go modules
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      with:
+        path: ${{ steps.cache-paths.outputs.modules }}
+        key: go-modules-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ hashFiles(inputs.cache-dependency-path) }}
+    - name: Cache compiled Go packages
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      with:
+        path: ${{ steps.cache-paths.outputs.build }}
+        # A fresh key saves new compilation work even when go.sum is unchanged.
+        key: go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ inputs.build-cache-scope }}-${{ hashFiles(inputs.cache-dependency-path) }}-${{ github.sha }}
+        restore-keys: |
+          go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ inputs.build-cache-scope }}-${{ hashFiles(inputs.cache-dependency-path) }}-
