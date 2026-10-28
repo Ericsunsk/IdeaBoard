@@ -57,7 +57,10 @@ func (q *Queries) ArchiveMediaAsset(ctx context.Context, arg ArchiveMediaAssetPa
 const archiveUnreferencedMediaAsset = `-- name: ArchiveUnreferencedMediaAsset :execrows
 UPDATE media_assets AS m
 SET archived_at = COALESCE(m.archived_at, now())
-WHERE m.internal_id = $1
+FROM workspaces AS w
+WHERE m.workspace_id = w.internal_id
+AND w.public_id = $1
+AND m.internal_id = $2
 AND NOT EXISTS (SELECT 1 FROM task_outputs AS o WHERE o.media_asset_id = m.internal_id)
 AND NOT EXISTS (SELECT 1 FROM media_asset_task_origins AS o WHERE o.media_asset_id = m.internal_id)
 AND NOT EXISTS (SELECT 1 FROM board_document_media_refs AS r WHERE r.media_asset_id = m.internal_id)
@@ -65,8 +68,13 @@ AND NOT EXISTS (SELECT 1 FROM library_assets AS l WHERE l.media_asset_id = m.int
 AND NOT EXISTS (SELECT 1 FROM library_materializations AS l WHERE l.media_asset_id = m.internal_id)
 `
 
-func (q *Queries) ArchiveUnreferencedMediaAsset(ctx context.Context, internalID int64) (int64, error) {
-	result, err := q.db.Exec(ctx, archiveUnreferencedMediaAsset, internalID)
+type ArchiveUnreferencedMediaAssetParams struct {
+	WorkspacePublicID string `json:"workspace_public_id"`
+	InternalID        int64  `json:"internal_id"`
+}
+
+func (q *Queries) ArchiveUnreferencedMediaAsset(ctx context.Context, arg ArchiveUnreferencedMediaAssetParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveUnreferencedMediaAsset, arg.WorkspacePublicID, arg.InternalID)
 	if err != nil {
 		return 0, err
 	}

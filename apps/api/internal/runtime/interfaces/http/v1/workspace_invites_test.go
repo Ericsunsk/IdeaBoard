@@ -169,7 +169,7 @@ func TestV1WorkspaceMemberInvitesFlow(t *testing.T) {
 		return status, payload
 	}
 
-	status, payload = listInvitesCall(memberID, ws.PublicID)
+	status, _ = listInvitesCall(memberID, ws.PublicID)
 	if status != http.StatusForbidden {
 		t.Fatalf("member list invites = %d, want 403", status)
 	}
@@ -197,7 +197,7 @@ func TestV1WorkspaceMemberInvitesFlow(t *testing.T) {
 		return status, payload
 	}
 
-	status, payload = previewCall("unknown-token")
+	status, _ = previewCall("unknown-token")
 	if status != http.StatusNotFound {
 		t.Fatalf("unknown token preview = %d, want 404", status)
 	}

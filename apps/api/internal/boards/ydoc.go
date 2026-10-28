@@ -225,7 +225,7 @@ func stripYMap(raw any, strip func(string, any) (map[string]any, bool)) map[stri
 // nodes/edges maps (stripTransient whitelist, illegal fields and mismatched
 // entries dropped). It returns the sanitized envelope ready to persist.
 func SanitizeYCompactSnapshot(raw []byte) (int32, json.RawMessage, error) {
-	schemaVersion, payload, err := ValidateV1DocumentStrict(raw)
+	_, payload, err := ValidateV1DocumentStrict(raw)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -277,7 +277,7 @@ func SanitizeYCompactSnapshot(raw []byte) (int32, json.RawMessage, error) {
 			projection["connections"] = append(projection["connections"].([]any), data)
 		}
 	}
-	schemaVersion = 4
+	schemaVersion := int32(4)
 	sanitizedPayload, err := json.Marshal(projection)
 	if err != nil {
 		return 0, nil, ErrInvalidInput

@@ -342,16 +342,25 @@ fi
 grep -Fq 'history is immutable' "${fixture_dir}/cleanbreak-modified.out"
 git -C "${fixture_dir}" checkout -q -- apps/api/internal/db/migrations/20260818000000_initial.sql
 
-# 18. An added non-baseline migration alongside the rebaseline voids the exemption.
+# 18. Coalesced clean breaks allow tails only after the new baseline.
 cat >"${fixture_dir}/apps/api/internal/db/migrations/20260819020000_extra.sql" <<'EOF'
 ALTER TABLE cb_new ADD COLUMN extra text;
 EOF
-if check >"${fixture_dir}/cleanbreak-extra.out" 2>&1; then
-  echo 'non-baseline addition alongside clean break unexpectedly passed' >&2
+printf '%s\n' '20260819020000_extra.sql h1:fakeextra' >>"${fixture_dir}/apps/api/internal/db/migrations/atlas.sum"
+check >"${fixture_dir}/cleanbreak-extra.out" 2>&1
+grep -Fq 'clean-break rebaseline detected' "${fixture_dir}/cleanbreak-extra.out"
+sed -i.bak '/20260819020000_extra.sql/d' "${fixture_dir}/apps/api/internal/db/migrations/atlas.sum"
+rm "${fixture_dir}/apps/api/internal/db/migrations/atlas.sum.bak"
+rm "${fixture_dir}/apps/api/internal/db/migrations/20260819020000_extra.sql"
+cat >"${fixture_dir}/apps/api/internal/db/migrations/20260818040000_early.sql" <<'EOF'
+ALTER TABLE cb_new ADD COLUMN extra text;
+EOF
+if check >"${fixture_dir}/cleanbreak-early.out" 2>&1; then
+  echo 'out-of-order tail alongside clean break unexpectedly passed' >&2
   exit 1
 fi
-grep -Fq 'history is immutable' "${fixture_dir}/cleanbreak-extra.out"
-rm "${fixture_dir}/apps/api/internal/db/migrations/20260819020000_extra.sql"
+grep -Fq 'history is immutable' "${fixture_dir}/cleanbreak-early.out"
+rm "${fixture_dir}/apps/api/internal/db/migrations/20260818040000_early.sql"
 
 # 19. Rename blind spot: a staged rename reports status R (not A), so a
 # --diff-filter=A scan would miss the new path entirely. The destructive

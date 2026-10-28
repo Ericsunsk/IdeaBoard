@@ -24,6 +24,7 @@ func (s *Service) actorEmail(ctx context.Context, actorID int64) (string, error)
 	if err != nil {
 		// A bound invite can still identify its recipient during an Auth
 		// outage. The Store rejects an empty email without a matching user ID.
+		//nolint:nilerr // identity outage degrades to an empty email by contract, never an error
 		return "", nil
 	}
 	return tenancy.NormalizeMemberInviteEmail(email), nil
@@ -37,6 +38,7 @@ func (s *Service) inviteeID(ctx context.Context, email string) (int64, error) {
 	if err != nil || id <= 0 {
 		// Unknown users, provisioning gaps and lookup outages keep the
 		// email-addressed invitation path; they never invent a user binding.
+		//nolint:nilerr // identity outage degrades to an unbound invitee by contract, never an error
 		return 0, nil
 	}
 	return id, nil

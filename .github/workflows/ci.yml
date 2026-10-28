@@ -153,9 +153,8 @@ jobs:
       - name: Run handbook version and link contract
         run: ./scripts/handbook-version-contract.sh
   pr-size-guard:
-    # PR size gate: warn over 50 files, fail over 150; docs-only exempt.
-    # This always runs so oversized PRs cannot bypass reviewability via
-    # skipped lanes.
+    # Check PR review size, not the accumulated history in a push range.
+    # Keep the job present on every event for the required CI Gate.
     name: PR Size Guard
     needs: [changes]
     runs-on: ubuntu-latest
@@ -171,6 +170,10 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
+          if [[ "${EVENT_NAME}" == "push" ]]; then
+            echo 'pr-size-guard: skipped (the size gate applies to pull requests, not pushes)'
+            exit 0
+          fi
           if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
             printf '%s\n' .github/workflows/ci.yml > "${RUNNER_TEMP}/changed-paths.txt"
           elif [[ -z "${BASE_SHA}" || "${BASE_SHA}" =~ ^0+$ ]]; then

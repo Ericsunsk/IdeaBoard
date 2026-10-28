@@ -35,14 +35,15 @@ func TestHistoryCollectsStagedAndUntrackedAdditions(t *testing.T) {
 	}
 }
 
-func TestHistoryCleanBreakRequiresOneAdvancingBaselineAndNoOtherAdditions(t *testing.T) {
+func TestHistoryCleanBreakRequiresOneAdvancingBaselineAndHigherTails(t *testing.T) {
 	for _, test := range []struct {
 		name, baseline, extra string
 		valid                 bool
 	}{
 		{name: "atomic", baseline: "20260814000000_baseline.sql", valid: true},
-		{name: "untracked extra", baseline: "20260814000000_baseline.sql", extra: "20260815000000_extra.sql"},
+		{name: "tail after new baseline", baseline: "20260814000000_baseline.sql", extra: "20260815000000_extra.sql", valid: true},
 		{name: "second baseline", baseline: "20260814000000_baseline.sql", extra: "20260815000000_baseline.sql"},
+		{name: "tail not after new baseline", baseline: "20260814000000_baseline.sql", extra: "20260813000000_extra.sql"},
 		{name: "non advancing", baseline: "20260809000000_baseline.sql"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -61,6 +62,22 @@ func TestHistoryCleanBreakRequiresOneAdvancingBaselineAndNoOtherAdditions(t *tes
 				t.Fatalf("clean break=%v, want %v", history.CleanBreak, test.valid)
 			}
 		})
+	}
+}
+
+func TestHistoryCleanBreakAllowsTailsAfterNewBaseline(t *testing.T) {
+	fixture := newHistoryFixture(t)
+	fixture.git("rm", "internal/db/migrations/20260810000000_baseline.sql")
+	fixture.write("20260814000000_baseline.sql", "SELECT 1;\n")
+	fixture.write("20260815000000_first.sql", "SELECT 2;\n")
+	fixture.write("20260816000000_second.sql", "SELECT 3;\n")
+	fixture.git("add", ".")
+	history := fixture.inspect()
+	if err := history.Validate(); err != nil {
+		t.Fatalf("rebaseline with ordered tails rejected: %v (changes=%v)", err, history.changes)
+	}
+	if !history.CleanBreak {
+		t.Fatalf("clean break=false, want true (changes=%v)", history.changes)
 	}
 }
 

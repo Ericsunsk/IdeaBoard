@@ -109,3 +109,7 @@ $$\text{current\_active\_members} + \text{pending\_invites} \le 5$$
 - 严格保证 5 人配额不变量，将 pending 邀请计入配额消耗，防止超发配额产生超员故障。
 - 采用 SHA-256 单向哈希保护公开链接 Token，遵循现代安全最佳实践。
 - 完整保留邀请审计历史（创建人、受邀邮箱、最终决议时间与决议人），为团队管理提供清晰凭据。
+
+## Status
+
+Accepted

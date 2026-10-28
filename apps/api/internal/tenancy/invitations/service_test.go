@@ -3,7 +3,6 @@ package invitations
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -206,7 +205,7 @@ func TestNotificationDurableDedupePreservesRecipientState(t *testing.T) {
 	}
 	var count int
 	if err := f.db.QueryRow(t.Context(), "SELECT count(*) FROM user_notifications WHERE user_id=$1", f.target).Scan(&count); err != nil || count != 1 {
-		t.Fatal(fmt.Sprintf("duplicate replay: %d %v", count, err))
+		t.Fatalf("duplicate replay: %d %v", count, err)
 	}
 }
 

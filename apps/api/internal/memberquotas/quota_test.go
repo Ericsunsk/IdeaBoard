@@ -108,7 +108,7 @@ func TestCurrentBoundsWindows(t *testing.T) {
 		if !ok || start == nil || end == nil {
 			t.Fatalf("CurrentBounds(%q) = (%v, %v, %v), want a bounded window", period, start, end, ok)
 		}
-		if !(!start.After(now) && now.Before(*end)) {
+		if start.After(now) || !now.Before(*end) {
 			t.Fatalf("CurrentBounds(%q) window (%v, %v) does not contain now", period, start, end)
 		}
 	}

@@ -124,7 +124,7 @@ func newGatewayClient(cfg GatewayClientConfig, allowLoopbackForTest bool) (*Gate
 		return nil, fmt.Errorf("gateway base URL must be an http(s) URL with a host")
 	}
 	if !isCloudflareGatewayHost(parsed.Hostname()) {
-		if !(allowLoopbackForTest && isLoopbackHost(parsed.Hostname())) {
+		if !allowLoopbackForTest || !isLoopbackHost(parsed.Hostname()) {
 			return nil, fmt.Errorf("gateway base URL host %q is not the Cloudflare AI Gateway", parsed.Hostname())
 		}
 	}

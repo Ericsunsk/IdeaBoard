@@ -242,7 +242,13 @@ printf 'Deploy stack contract tests passed\n'
   grep -Fq -- '-fk' "$dx_case/log" && fail 'DOTENV_PRIVATE_KEY must win over key files without -fk'
   [[ "$ENV_FILE" != "$dx_case/enc.env" ]] || fail 'encrypted env must switch to the decrypted temp file'
   [[ "$(cat "$ENV_FILE")" == 'PUBLIC_ORIGIN=https://example.com' ]] || fail 'decrypted temp file has wrong content'
-  [[ "$(stat -f %Lp "$ENV_FILE" 2>/dev/null || stat -c %a "$ENV_FILE")" == 600 ]] || fail 'decrypted temp file must be mode 600'
+  # Select stat syntax explicitly: a failed GNU -f can still emit output.
+  if [[ "$(uname)" == Darwin ]]; then
+    decrypted_mode="$(stat -f %Lp "$ENV_FILE")"
+  else
+    decrypted_mode="$(stat -c %a "$ENV_FILE")"
+  fi
+  [[ "$decrypted_mode" == 600 ]] || fail 'decrypted temp file must be mode 600'
   rm -f -- "$ENV_FILE"
   RENDERED_SECRETS_ENV=""
 

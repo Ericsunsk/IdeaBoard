@@ -24,7 +24,7 @@ const WorkspaceMailKind = "workspace_invitation_mail"
 // duplicate delivery jobs for the same immutable invitation. Template facts are
 // captured at enqueue time so retries use the same provider idempotency payload.
 type WorkspaceMailArgs struct {
-	InviteID        string `json:"invite_id" river:"unique"`
+	InviteID        string `json:"invite_id"        river:"unique"`
 	Recipient       string `json:"recipient"`
 	WorkspaceName   string `json:"workspace_name"`
 	InviterName     string `json:"inviter_name"`

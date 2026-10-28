@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
-	openapi_types "github.com/oapi-codegen/runtime/types"
 	"ideaboard/api/internal/identity/auth/internalcontract"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // WorkspaceInvitationMail contains only the facts needed by Auth to render and

@@ -66,6 +66,23 @@ func (a *lifecycleAdapter) RemoveSharedBillingMemberships(ctx context.Context, u
 	return a.lifecycle.RemoveSharedBillingMemberships(ctx, userID)
 }
 
+// GetWallet reads the Wallet projection on the caller's transaction. The
+// field mapping mirrors Adapter.GetWallet so the borrowed replay path
+// observes the identical balance shape as the pool read it replaces.
+func (a *lifecycleAdapter) GetWallet(ctx context.Context, billingAccountID int64) (usersports.WalletDetails, error) {
+	wallet, err := a.lifecycle.GetWallet(ctx, billingAccountID)
+	if err != nil {
+		return usersports.WalletDetails{}, err
+	}
+	return usersports.WalletDetails{WalletBalance: usersports.WalletBalance{
+		BillingAccountID: wallet.BillingAccountID,
+		PublicID:         wallet.PublicID,
+		DisplayName:      wallet.DisplayName,
+		Available:        wallet.Available,
+		Reserved:         wallet.Reserved,
+	}}, nil
+}
+
 func (a *lifecycleAdapter) ClaimWelcomeGrant(
 	ctx context.Context,
 	fingerprint string,

@@ -20,6 +20,9 @@ jobs:
     name: Web ESLint Fast
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # Full-tree ESLint exceeds Node's default heap on CI.
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
@@ -91,6 +94,9 @@ jobs:
     name: Web Typecheck Node
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # The combined node/test typecheck exceeds Node's default heap on CI.
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
@@ -230,6 +236,8 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Match the shards' /github/workspace root so blob paths resolve on merge.
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:

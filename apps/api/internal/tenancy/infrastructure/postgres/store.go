@@ -9,6 +9,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -859,7 +860,7 @@ func (s *Store) GetWorkspaceRole(ctx context.Context, workspacePublicID string, 
 	if !workspace.IsPersonal() && workspace.OrganizationID != nil {
 		organization, err := s.GetOrganization(ctx, *workspace.OrganizationID)
 		if err != nil {
-			if err == tenancy.ErrNotFound {
+			if errors.Is(err, tenancy.ErrNotFound) {
 				return "", false, nil
 			}
 			return "", false, err
@@ -883,7 +884,7 @@ func (s *Store) GetWorkspaceRole(ctx context.Context, workspacePublicID string, 
 	if workspace.OrganizationID != nil {
 		if role, member, err := s.GetOrganizationRole(ctx, *workspace.OrganizationID, userID); err == nil {
 			orgRole, orgMember = role, member
-		} else if err != tenancy.ErrNotFound {
+		} else if !errors.Is(err, tenancy.ErrNotFound) {
 			return "", false, err
 		}
 	}

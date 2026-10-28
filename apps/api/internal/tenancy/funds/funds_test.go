@@ -4,8 +4,6 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"ideaboard/api/internal/tenancy"
 )
 
 // TestIdentityWireProjection pins the handler contract: the wire carries ba_
@@ -68,7 +66,6 @@ func TestResolveFundsRequiresStoreConfigured(t *testing.T) {
 func TestBillingAccountProjectionPreservesTenancyShape(t *testing.T) {
 	identity := Identity{BillingAccountID: 7, BillingAccountPublicID: "ba_abc", OwnerType: OwnerTypeOrganization, Shared: true}
 	projected := identity.ToBillingAccount()
-	var _ tenancy.BillingAccount = projected
 	if projected.OwnerType != OwnerTypeOrganization || !projected.Shared {
 		t.Fatalf("projection lost funds facts: %+v", projected)
 	}

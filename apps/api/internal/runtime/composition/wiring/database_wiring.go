@@ -80,9 +80,7 @@ func newPaymentStores(repo *paymentpostgres.Repository) *paymentStores {
 func OpenAppDatabases(ctx context.Context, cfg *config.Config) (AppDatabases, error) {
 	return openAppDatabasesWithOpeners(ctx, cfg, appDatabaseOpeners{
 		postgres: database.NewPostgres,
-		river: func(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
-			return workerriver.NewRiverPgxPool(ctx, dsn)
-		},
+		river:    workerriver.NewRiverPgxPool,
 	})
 }
 

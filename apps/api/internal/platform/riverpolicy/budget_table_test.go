@@ -22,10 +22,10 @@ func TestWorkspaceBudgetLayeringIsFrozen(t *testing.T) {
 	if RiverJobTimeoutDrawing != 17*time.Minute {
 		t.Fatalf("RiverJobTimeoutDrawing = %s, want 17m (900s MaxTimeout + 2min overhead)", RiverJobTimeoutDrawing)
 	}
-	if !(ports.GatewayDefaultTimeout < WorkspaceExecutionBudget()) {
+	if ports.GatewayDefaultTimeout >= WorkspaceExecutionBudget() {
 		t.Fatalf("layering broken: gateway %s must nest inside execution %s", ports.GatewayDefaultTimeout, WorkspaceExecutionBudget())
 	}
-	if !(WorkspaceExecutionBudget() < RiverJobTimeoutDrawing) {
+	if WorkspaceExecutionBudget() >= RiverJobTimeoutDrawing {
 		t.Fatalf("layering broken: execution %s must nest inside River %s", WorkspaceExecutionBudget(), RiverJobTimeoutDrawing)
 	}
 }

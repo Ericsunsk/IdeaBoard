@@ -136,7 +136,10 @@ FOR UPDATE OF m;
 -- name: ArchiveUnreferencedMediaAsset :execrows
 UPDATE media_assets AS m
 SET archived_at = COALESCE(m.archived_at, now())
-WHERE m.internal_id = sqlc.arg(internal_id)
+FROM workspaces AS w
+WHERE m.workspace_id = w.internal_id
+AND w.public_id = sqlc.arg(workspace_public_id)
+AND m.internal_id = sqlc.arg(internal_id)
 AND NOT EXISTS (SELECT 1 FROM task_outputs AS o WHERE o.media_asset_id = m.internal_id)
 AND NOT EXISTS (SELECT 1 FROM media_asset_task_origins AS o WHERE o.media_asset_id = m.internal_id)
 AND NOT EXISTS (SELECT 1 FROM board_document_media_refs AS r WHERE r.media_asset_id = m.internal_id)

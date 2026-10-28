@@ -17,10 +17,20 @@ scan_source() {
     printf '✗ %s: %s\n' "$label" "${file#"$repo_root"/}" >&2
     fail=1
   done < <(
-    rg -l -0 --glob '*.go' --glob '*.ts' --glob '*.tsx' \
-      --glob '!**/*_test.go' --glob '!**/*.spec.ts' --glob '!**/*.unit.spec.ts' \
-      --glob '!**/node_modules/**' --glob '!**/dist/**' \
-      -- "$pattern" "$@" 2>/dev/null || true
+    if command -v rg >/dev/null 2>&1; then
+      rg -l -0 --glob '*.go' --glob '*.ts' --glob '*.tsx' \
+        --glob '!**/*_test.go' --glob '!**/*.spec.ts' --glob '!**/*.unit.spec.ts' \
+        --glob '!**/node_modules/**' --glob '!**/dist/**' \
+        -- "$pattern" "$@" 2>/dev/null || true
+    else
+      # CI may lack rg. Match its source scope with grep rather than skip
+      # scanning; unlike rg -0, this fallback cannot preserve newline paths.
+      grep -rl \
+        --include='*.go' --include='*.ts' --include='*.tsx' \
+        --exclude='*_test.go' --exclude='*.spec.ts' --exclude='*.unit.spec.ts' \
+        --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git \
+        -e "$pattern" -- "$@" 2>/dev/null | tr '\n' '\0' || true
+    fi
   )
 }
 

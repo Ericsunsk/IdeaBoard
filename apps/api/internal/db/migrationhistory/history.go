@@ -152,16 +152,26 @@ func (history History) Validate() error {
 }
 
 func isCleanBreak(changes []change) bool {
+	// A Fresh-DB squash replaces one baseline and may delete its old tails.
+	// A coalesced CI range may also add tails strictly after the new baseline.
 	var added, deleted int64
 	var deletedCount int
+	var tails []int64
 	for _, item := range changes {
 		switch item.status {
 		case "A":
-			version, ok := baselineVersion(item.path)
-			if !ok || added != 0 {
-				return false
+			if version, ok := baselineVersion(item.path); ok {
+				if added != 0 {
+					return false
+				}
+				added = version
+			} else {
+				version, ok := migrationVersion(item.path)
+				if !ok {
+					return false
+				}
+				tails = append(tails, version)
 			}
-			added = version
 		case "D":
 			if version, ok := baselineVersion(item.path); ok {
 				deleted = version
@@ -171,7 +181,15 @@ func isCleanBreak(changes []change) bool {
 			return false
 		}
 	}
-	return added != 0 && deletedCount == 1 && added > deleted
+	if added == 0 || deletedCount != 1 || added <= deleted {
+		return false
+	}
+	for _, tail := range tails {
+		if tail <= added {
+			return false
+		}
+	}
+	return true
 }
 
 func baselineVersion(path string) (int64, bool) {
@@ -181,6 +199,25 @@ func baselineVersion(path string) (int64, bool) {
 		return 0, false
 	}
 	text := strings.TrimSuffix(name, suffix)
+	if len(text) != 14 {
+		return 0, false
+	}
+	for _, digit := range text {
+		if digit < '0' || digit > '9' {
+			return 0, false
+		}
+	}
+	version, err := strconv.ParseInt(text, 10, 64)
+	return version, err == nil
+}
+
+func migrationVersion(path string) (int64, bool) {
+	name := filepath.Base(path)
+	underscore := strings.Index(name, "_")
+	if underscore <= 0 {
+		return 0, false
+	}
+	text := name[:underscore]
 	if len(text) != 14 {
 		return 0, false
 	}

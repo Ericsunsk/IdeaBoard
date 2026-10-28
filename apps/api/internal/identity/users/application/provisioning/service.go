@@ -79,7 +79,7 @@ func (s *Service) ProvisionIdentity(ctx context.Context, identity ports.Verified
 		return nil, fmt.Errorf("begin identity lifecycle transaction: %w", err)
 	}
 	if !scope.Owned() {
-		user, grant, granted, err := s.provisionIdentityTx(ctx, scope.Tx(), identity, fingerprint)
+		user, grant, granted, _, err := s.provisionIdentityTx(ctx, scope.Tx(), identity, fingerprint)
 		if err != nil {
 			return nil, err
 		}
@@ -98,43 +98,26 @@ func (s *Service) ProvisionIdentity(ctx context.Context, identity ports.Verified
 		}
 	}()
 
-	user, grant, granted, err := s.provisionIdentityTx(ctx, tx, identity, fingerprint)
+	user, grant, granted, personalAccountID, err := s.provisionIdentityTx(ctx, tx, identity, fingerprint)
 	if err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit identity lifecycle transaction: %w", err)
 	}
-	wallet := grant
-	if !granted {
-		readTx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("begin provisioned wallet read: %w", err)
-		}
-		result, readErr := s.provisionResultWithoutGrant(ctx, readTx, user)
-		_ = readTx.Rollback(ctx)
-		if readErr != nil {
-			return nil, readErr
-		}
-		return result, nil
+	if granted {
+		return &ports.ProvisionResult{User: *user, Wallet: grant, WelcomeGranted: true}, nil
 	}
-	return &ports.ProvisionResult{User: *user, Wallet: wallet, WelcomeGranted: granted}, nil
-}
-
-// provisionResultWithoutGrant reads the already-settled wallet for a
-// replayed provisioning (the welcome fingerprint was claimed before, so
-// no new grant was minted). Account resolution joins the given transaction
-// (owned or borrowed); the wallet read runs on the pool against committed
-// state. Under a borrowed guard transaction the wallet row pre-exists in
-// every reachable replay shape (a fresh wallet plus an already-claimed
-// fingerprint would require a fingerprint collision), so the pool read
-// observes it.
-func (s *Service) provisionResultWithoutGrant(ctx context.Context, tx pgx.Tx, user *domain.User) (*ports.ProvisionResult, error) {
-	lifecycle := s.credits.LifecycleInTx(tx)
-	personalAccountID, err := lifecycle.ResolvePersonalAccount(ctx, user.ID)
-	if err != nil {
-		return nil, fmt.Errorf("resolve personal Billing Account: %w", err)
-	}
+	// Replay path: the Welcome Grant was already claimed, so read the
+	// settled wallet with pool statements while holding NO transaction.
+	// The previous shape opened a read tx (holding one pool connection)
+	// and then ran GetWallet on the pool (acquiring a second connection
+	// while the first was still held). With 8 concurrent provisions and
+	// the default pool size, every connection ends up pinned by a read
+	// tx whose owner waits for a GetWallet connection that can never
+	// free up: a permanent pool self-deadlock (hold-and-wait). The
+	// account ID was already resolved inside the committed transaction,
+	// so a single pool read is sufficient and cannot wedge the pool.
 	walletDetails, err := s.credits.GetWallet(ctx, personalAccountID)
 	if err != nil {
 		return nil, fmt.Errorf("read provisioned Credit Wallet: %w", err)
@@ -142,33 +125,54 @@ func (s *Service) provisionResultWithoutGrant(ctx context.Context, tx pgx.Tx, us
 	return &ports.ProvisionResult{User: *user, Wallet: walletDetails.WalletBalance, WelcomeGranted: false}, nil
 }
 
-func (s *Service) provisionIdentityTx(ctx context.Context, tx pgx.Tx, identity ports.VerifiedIdentity, fingerprint string) (*domain.User, ports.WalletBalance, bool, error) {
+// provisionResultWithoutGrant reads the already-settled wallet for a
+// replayed provisioning (the welcome fingerprint was claimed before, so
+// no new grant was minted). The read joins the caller's transaction, so
+// a borrowed guard path never acquires a pool connection while the guard
+// transaction is held (no hold-and-wait). Under a borrowed guard the
+// wallet row pre-exists in every reachable replay shape (a fresh wallet
+// plus an already-claimed fingerprint would require a fingerprint
+// collision), so the in-transaction read observes it.
+func (s *Service) provisionResultWithoutGrant(ctx context.Context, tx pgx.Tx, user *domain.User) (*ports.ProvisionResult, error) {
+	lifecycle := s.credits.LifecycleInTx(tx)
+	personalAccountID, err := lifecycle.ResolvePersonalAccount(ctx, user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("resolve personal Billing Account: %w", err)
+	}
+	walletDetails, err := lifecycle.GetWallet(ctx, personalAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("read provisioned Credit Wallet: %w", err)
+	}
+	return &ports.ProvisionResult{User: *user, Wallet: walletDetails.WalletBalance, WelcomeGranted: false}, nil
+}
+
+func (s *Service) provisionIdentityTx(ctx context.Context, tx pgx.Tx, identity ports.VerifiedIdentity, fingerprint string) (*domain.User, ports.WalletBalance, bool, int64, error) {
 	zeroWallet := ports.WalletBalance{}
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 5169813340854939127))`, identity.AuthUserID); err != nil {
-		return nil, zeroWallet, false, fmt.Errorf("lock identity provisioning: %w", err)
+		return nil, zeroWallet, false, 0, fmt.Errorf("lock identity provisioning: %w", err)
 	}
 	user, err := findOrCreateIdentityUser(ctx, tx, identity)
 	if err != nil {
-		return nil, zeroWallet, false, err
+		return nil, zeroWallet, false, 0, err
 	}
 	if err := ensureIdentityNotDeleting(ctx, tx, user.ID); err != nil {
-		return nil, zeroWallet, false, err
+		return nil, zeroWallet, false, 0, err
 	}
 	if identity.EnsureActive {
 		if err := activateIdentityUser(ctx, tx, user, identity); err != nil {
-			return nil, zeroWallet, false, err
+			return nil, zeroWallet, false, 0, err
 		}
 	}
 	lifecycle := s.credits.LifecycleInTx(tx)
 	if err := lifecycle.BindWelcomeIdentityKey(ctx, s.welcomeKeyFingerprint); err != nil {
-		return nil, zeroWallet, false, fmt.Errorf("verify permanently bound Welcome identity key: %w", err)
+		return nil, zeroWallet, false, 0, fmt.Errorf("verify permanently bound Welcome identity key: %w", err)
 	}
 	personalAccountID, err := lifecycle.ResolvePersonalAccount(ctx, user.ID)
 	if err != nil {
-		return nil, zeroWallet, false, fmt.Errorf("resolve personal Billing Account: %w", err)
+		return nil, zeroWallet, false, 0, fmt.Errorf("resolve personal Billing Account: %w", err)
 	}
 	if err := lifecycle.ProvisionAccountWallet(ctx, personalAccountID); err != nil {
-		return nil, zeroWallet, false, fmt.Errorf("provision Billing Account Wallet: %w", err)
+		return nil, zeroWallet, false, 0, fmt.Errorf("provision Billing Account Wallet: %w", err)
 	}
 	grant, granted, err := lifecycle.ClaimWelcomeGrant(ctx, fingerprint, user.ID, ports.WelcomeGrantCommand{
 		UserID:                user.ID,
@@ -183,12 +187,12 @@ func (s *Service) provisionIdentityTx(ctx context.Context, tx pgx.Tx, identity p
 		BusinessReferenceID:   fingerprint,
 	})
 	if err != nil {
-		return nil, zeroWallet, false, fmt.Errorf("claim Welcome Grant: %w", err)
+		return nil, zeroWallet, false, 0, fmt.Errorf("claim Welcome Grant: %w", err)
 	}
 	if err := lifecycle.SetAccountWalletFrozen(ctx, personalAccountID, user.Status != 1); err != nil {
-		return nil, zeroWallet, false, fmt.Errorf("align Billing Account Wallet status: %w", err)
+		return nil, zeroWallet, false, 0, fmt.Errorf("align Billing Account Wallet status: %w", err)
 	}
-	return user, grant.Wallet, granted, nil
+	return user, grant.Wallet, granted, personalAccountID, nil
 }
 
 func ensureIdentityNotDeleting(ctx context.Context, tx pgx.Tx, userID int64) error {

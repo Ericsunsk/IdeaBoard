@@ -150,8 +150,10 @@ func (s *Service) ArchiveUnreferencedAsset(ctx context.Context, workspaceID, ass
 	}
 	var archived *Asset
 	err := s.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
+		trimmedAsset := strings.TrimSpace(assetID)
+		trimmedWorkspace := strings.TrimSpace(workspaceID)
 		id, err := q.LockMediaAssetForCompensation(ctx, dbsqlc.LockMediaAssetForCompensationParams{
-			PublicID: strings.TrimSpace(assetID), WorkspacePublicID: strings.TrimSpace(workspaceID),
+			PublicID: trimmedAsset, WorkspacePublicID: trimmedWorkspace,
 		})
 		if database.IsNotFound(err) {
 			return ErrNotFound
@@ -159,7 +161,10 @@ func (s *Service) ArchiveUnreferencedAsset(ctx context.Context, workspaceID, ass
 		if err != nil {
 			return err
 		}
-		count, err := q.ArchiveUnreferencedMediaAsset(ctx, id)
+		count, err := q.ArchiveUnreferencedMediaAsset(ctx, dbsqlc.ArchiveUnreferencedMediaAssetParams{
+			WorkspacePublicID: trimmedWorkspace,
+			InternalID:        id,
+		})
 		if err != nil {
 			return err
 		}

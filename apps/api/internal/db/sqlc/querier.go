@@ -17,7 +17,7 @@ type Querier interface {
 	// the stored row so replays converge instead of 404ing.
 	ArchiveMediaAsset(ctx context.Context, arg ArchiveMediaAssetParams) (MediaAsset, error)
 	ArchiveNotification(ctx context.Context, arg ArchiveNotificationParams) (UserNotification, error)
-	ArchiveUnreferencedMediaAsset(ctx context.Context, internalID int64) (int64, error)
+	ArchiveUnreferencedMediaAsset(ctx context.Context, arg ArchiveUnreferencedMediaAssetParams) (int64, error)
 	ArchiveWorkspaceBoard(ctx context.Context, arg ArchiveWorkspaceBoardParams) (int64, error)
 	// BackfillDailyStatsByCreatedRange freezes one day of terminal workspace
 	// tasks into task_stat_events + task_daily_stats. started_at/ended_at

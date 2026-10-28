@@ -95,3 +95,7 @@ status: accepted
 - 彻底消除未经同意直接强加组织成员身份的安全与隐私风险。
 - 严格保证每个用户最多属于一个组织的系统不变量，并在受邀人接受时进行悲观锁排他校验。
 - 与现有 Workspace 邀请及 Notification Center 体验形成高度一致的交互标准。
+
+## Status
+
+Accepted

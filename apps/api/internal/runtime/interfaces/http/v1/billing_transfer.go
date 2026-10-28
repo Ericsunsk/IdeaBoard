@@ -279,10 +279,10 @@ func (h *contractV1BillingHandler) getTransferInvite(c *gin.Context) {
 	})
 }
 
-// acceptTransferInvite completes the handover: only the recipient may
-// accept a pending invite. Requires the Idempotency-Key header for
-// exactly-once acceptance under retry.
-func (h *contractV1BillingHandler) acceptTransferInvite(c *gin.Context) {
+// decideTransferInvite runs the shared accept/reject/cancel sequencing: only
+// the operation name and the store decision differ. Requires the
+// Idempotency-Key header for exactly-once decisions under retry.
+func (h *contractV1BillingHandler) decideTransferInvite(c *gin.Context, operation string, decide func(ctx context.Context, accountInternalID int64, inviteID string, actorUserID int64) (*tenancy.BillingTransferInvite, error)) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
 		if h.deps.BillingAccounts == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
@@ -306,9 +306,9 @@ func (h *contractV1BillingHandler) acceptTransferInvite(c *gin.Context) {
 			return
 		}
 		externalUser := tenancy.FormatUserPublicID(wctx.Principal.PublicID())
-		hash := contract.HashIdempotencyRequest("billing.account.transfer-accept", wctx.Workspace.PublicID, inviteID)
-		result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), contract.IdempotencyScope(externalUser, "billing.account.transfer-accept"), wctx.Principal.UserID(), key, hash, func() (any, error) {
-			return h.deps.BillingAccounts.AcceptBillingTransferInvite(c.Request.Context(), account.InternalID, inviteID, wctx.Principal.UserID())
+		hash := contract.HashIdempotencyRequest(operation, wctx.Workspace.PublicID, inviteID)
+		result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), contract.IdempotencyScope(externalUser, operation), wctx.Principal.UserID(), key, hash, func() (any, error) {
+			return decide(c.Request.Context(), account.InternalID, inviteID, wctx.Principal.UserID())
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
@@ -329,110 +329,31 @@ func (h *contractV1BillingHandler) acceptTransferInvite(c *gin.Context) {
 			return
 		}
 		contract.RenderSuccess(c, dto)
+	})
+}
+
+// acceptTransferInvite completes the handover: only the recipient may
+// accept a pending invite. Requires the Idempotency-Key header for
+// exactly-once acceptance under retry.
+func (h *contractV1BillingHandler) acceptTransferInvite(c *gin.Context) {
+	h.decideTransferInvite(c, "billing.account.transfer-accept", func(ctx context.Context, accountInternalID int64, inviteID string, actorUserID int64) (*tenancy.BillingTransferInvite, error) {
+		return h.deps.BillingAccounts.AcceptBillingTransferInvite(ctx, accountInternalID, inviteID, actorUserID)
 	})
 }
 
 // rejectTransferInvite declines a pending invite: only the recipient may
 // reject. Requires the Idempotency-Key header.
 func (h *contractV1BillingHandler) rejectTransferInvite(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
-		if h.deps.BillingAccounts == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-			c.Abort()
-			return
-		}
-		key, err := contract.IdempotencyKeyFromHeader(c)
-		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, runtimehttp.MsgIdempotencyKeyRequired2)
-			c.Abort()
-			return
-		}
-		inviteID := strings.TrimSpace(c.Param("invite_id"))
-		if !contract.IsBillingTransferInviteID(inviteID) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeBillingAccountNotFound, runtimehttp.MsgBillingAccountNotFound)
-			c.Abort()
-			return
-		}
-		account, resolved := h.billingAccountForWorkspace(c, wctx.Workspace)
-		if !resolved {
-			return
-		}
-		externalUser := tenancy.FormatUserPublicID(wctx.Principal.PublicID())
-		hash := contract.HashIdempotencyRequest("billing.account.transfer-reject", wctx.Workspace.PublicID, inviteID)
-		result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), contract.IdempotencyScope(externalUser, "billing.account.transfer-reject"), wctx.Principal.UserID(), key, hash, func() (any, error) {
-			return h.deps.BillingAccounts.RejectBillingTransferInvite(c.Request.Context(), account.InternalID, inviteID, wctx.Principal.UserID())
-		})
-		if doErr != nil {
-			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
-				c.Abort()
-				return
-			}
-			renderBillingAccountError(c, doErr)
-			return
-		}
-		decided, ok := result.(*tenancy.BillingTransferInvite)
-		if !ok || decided == nil {
-			renderBillingAccountError(c, errors.New("billing: transfer-invite type mismatch"))
-			return
-		}
-		dto, ok := h.toTransferInviteDTO(c, decided, account.PublicID)
-		if !ok {
-			return
-		}
-		contract.RenderSuccess(c, dto)
+	h.decideTransferInvite(c, "billing.account.transfer-reject", func(ctx context.Context, accountInternalID int64, inviteID string, actorUserID int64) (*tenancy.BillingTransferInvite, error) {
+		return h.deps.BillingAccounts.RejectBillingTransferInvite(ctx, accountInternalID, inviteID, actorUserID)
 	})
 }
 
 // cancelTransferInvite withdraws a pending invite: only the initiator may
 // cancel. Requires the Idempotency-Key header.
 func (h *contractV1BillingHandler) cancelTransferInvite(c *gin.Context) {
-	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
-		if h.deps.BillingAccounts == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, runtimehttp.MsgServiceUnavailable39)
-			c.Abort()
-			return
-		}
-		key, err := contract.IdempotencyKeyFromHeader(c)
-		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, runtimehttp.MsgIdempotencyKeyRequired2)
-			c.Abort()
-			return
-		}
-		inviteID := strings.TrimSpace(c.Param("invite_id"))
-		if !contract.IsBillingTransferInviteID(inviteID) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeBillingAccountNotFound, runtimehttp.MsgBillingAccountNotFound)
-			c.Abort()
-			return
-		}
-		account, resolved := h.billingAccountForWorkspace(c, wctx.Workspace)
-		if !resolved {
-			return
-		}
-		externalUser := tenancy.FormatUserPublicID(wctx.Principal.PublicID())
-		hash := contract.HashIdempotencyRequest("billing.account.transfer-cancel", wctx.Workspace.PublicID, inviteID)
-		result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), contract.IdempotencyScope(externalUser, "billing.account.transfer-cancel"), wctx.Principal.UserID(), key, hash, func() (any, error) {
-			return h.deps.BillingAccounts.CancelBillingTransferInvite(c.Request.Context(), account.InternalID, inviteID, wctx.Principal.UserID())
-		})
-		if doErr != nil {
-			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeBillingAccountConflict, runtimehttp.MsgBillingAccountConflict)
-				c.Abort()
-				return
-			}
-			renderBillingAccountError(c, doErr)
-			return
-		}
-		decided, ok := result.(*tenancy.BillingTransferInvite)
-		if !ok || decided == nil {
-			renderBillingAccountError(c, errors.New("billing: transfer-invite type mismatch"))
-			return
-		}
-		dto, ok := h.toTransferInviteDTO(c, decided, account.PublicID)
-		if !ok {
-			return
-		}
-		contract.RenderSuccess(c, dto)
+	h.decideTransferInvite(c, "billing.account.transfer-cancel", func(ctx context.Context, accountInternalID int64, inviteID string, actorUserID int64) (*tenancy.BillingTransferInvite, error) {
+		return h.deps.BillingAccounts.CancelBillingTransferInvite(ctx, accountInternalID, inviteID, actorUserID)
 	})
 }
 

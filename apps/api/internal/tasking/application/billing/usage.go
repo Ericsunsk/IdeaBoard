@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	creditsdomain "ideaboard/api/internal/credits/domain"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	creditsdomain "ideaboard/api/internal/credits/domain"
 )
 
 // UsageStore reads immutable Task Billing submission snapshots. Snapshot rows

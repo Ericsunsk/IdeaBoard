@@ -55,8 +55,8 @@ type postgresInviteTx struct {
 
 // findPendingInviteByEmailTx reports a live pending row for the email.
 // Table dispatch rides policy.Scope; per-scope error quirks are preserved:
-// workspace swallows lookup errors (treats as no pending), organization
-// propagates non-NotFound errors.
+// workspace treats a missing row as no pending and propagates other
+// failures, organization propagates non-NotFound errors.
 func findPendingInviteByEmailTx(ctx context.Context, q *dbsqlc.Queries, scope tenancy.InviteScope, scopeInternalID int64, email string) (publicID string, expiresAt time.Time, found bool, err error) {
 	switch scope {
 	case tenancy.InviteScopeWorkspace:
@@ -65,7 +65,10 @@ func findPendingInviteByEmailTx(ctx context.Context, q *dbsqlc.Queries, scope te
 			InviteeEmail: email,
 		})
 		if err != nil {
-			return "", time.Time{}, false, nil
+			if database.IsNotFound(err) {
+				return "", time.Time{}, false, nil
+			}
+			return "", time.Time{}, false, err
 		}
 		return existing.PublicID, existing.ExpiresAt.Time, true, nil
 	case tenancy.InviteScopeOrganization:

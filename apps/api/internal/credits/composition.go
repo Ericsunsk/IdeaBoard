@@ -58,7 +58,7 @@ func postgresBackends() postgresBackendsSet {
 			SetAccountWalletFrozen: postgres.SetAccountWalletFrozen, SetSoleOwnedWalletsFrozen: postgres.SetSoleOwnedWalletsFrozen,
 			RemoveSharedBillingMembership: postgres.RemoveSharedBillingMembership,
 			ClaimWelcome:                  postgres.ClaimWelcome, ExecuteGrant: postgres.ExecuteGrant,
-			RestrictWallet: postgres.RestrictWallet, ReleaseWallet: postgres.ReleaseWallet,
+			GetWallet: postgres.GetWalletInTx, RestrictWallet: postgres.RestrictWallet, ReleaseWallet: postgres.ReleaseWallet,
 		},
 		readmodel: readmodel.Backend{GetAvailableBalances: postgres.GetAvailableBalances, GetWallet: postgres.GetWallet, ListLedger: postgres.ListLedger},
 		health:    health.Backend{GetSnapshot: postgres.GetCreditHealthSnapshot},

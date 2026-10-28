@@ -151,3 +151,7 @@ Issue #958 明确要求建立统一的站内通知中心系统。为满足高性
 ### Compliance & Risks
 - **Prefix 规范**：新增 `notif_` 必须严格注册至 `platform/contract/identifiers.go` 与 `tenancy/identifiers.go`，并在数据库层设置 `chk_user_notifications_public_id` 校验约束。
 - **通知降噪**：上游业务在触发通知时需具备防重与合并机制（例如高频成员变动或短期重复充值），避免向用户轰炸过多琐碎通知。
+
+## Status
+
+Accepted

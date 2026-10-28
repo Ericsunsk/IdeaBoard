@@ -201,7 +201,7 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 
 Schema Release 的 `BASE_SHA` 按场景取值，不要混用：本地生成用 `BASE_SHA=HEAD`，只比 working tree 与 `HEAD` 的差集，避免把未合入的历史误判为 release 变更；CI/release check 用 `BASE_SHA="$(git merge-base HEAD origin/main)"`，比 PR 已合入范围加 working tree。`--base-sha` 缺省读 `BASE_SHA` env，`--head-sha` 缺省为 `HEAD`，`api.yml` 传 `--base-sha "${ATLAS_BASE_SHA:-HEAD}"` 与上述语义一致；`API_TEST_DATABASE_DSN` 必填，缺失即 fail-closed。`--write-artifact` 仍先跑完全部只读校验再发布 `schema.sql`，不是跳检直写。
 
-`internal/db/migrationhistory` 是 Git migration discovery、append-only 与原子 clean-break rebaseline 判定的唯一实现；Schema Release 直接使用，Atlas Shell gate 经 `cmd/migrationhistory` 调用。两者都覆盖 commit range、working tree 与 untracked SQL；风险 SQL lint、版本冲突、checksum 和 Fresh replay 门禁继续独立生效。
+`internal/db/migrationhistory` 是 Git migration discovery、append-only 与原子 clean-break rebaseline 判定的唯一实现；Schema Release 直接使用，Atlas Shell gate 经 `cmd/migrationhistory` 调用。两者都覆盖 commit range、working tree 与 untracked SQL；风险 SQL lint、版本冲突、checksum 和 Fresh replay 门禁继续独立生效。Clean-break 要求以更高版本替换一个 baseline，允许删除旧 chain；合并后的 CI 区间可附带严格高于新 baseline 的新增尾迁移，仍只走 Fresh 重放，拒绝第二 baseline、低版本新增和已有文件的修改或重命名。
 
 ### Frontend 工具与治理规则
 

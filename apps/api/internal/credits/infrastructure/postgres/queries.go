@@ -93,6 +93,25 @@ func GetWallet(ctx context.Context, pool *pgxpool.Pool, billingAccountID int64) 
 	if pool == nil {
 		return domain.WalletDetails{}, fmt.Errorf("credits service: database pool not configured")
 	}
+	return getWallet(ctx, pool, billingAccountID)
+}
+
+// GetWalletInTx reads the same Wallet projection as GetWallet but on the
+// caller's transaction instead of the pool. Borrowed participants (notably
+// identity provisioning replays) use it so a wallet read never acquires a
+// second pool connection while the caller-owned transaction is held.
+func GetWalletInTx(ctx context.Context, tx pgx.Tx, billingAccountID int64) (domain.WalletDetails, error) {
+	if tx == nil {
+		return domain.WalletDetails{}, fmt.Errorf("credits service: database transaction not configured")
+	}
+	return getWallet(ctx, tx, billingAccountID)
+}
+
+type walletQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func getWallet(ctx context.Context, q walletQuerier, billingAccountID int64) (domain.WalletDetails, error) {
 	if billingAccountID <= 0 {
 		return domain.WalletDetails{}, domain.ErrInvalidCommand
 	}
@@ -101,7 +120,7 @@ func GetWallet(ctx context.Context, pool *pgxpool.Pool, billingAccountID int64) 
 		ActiveRestrictions: make([]domain.WalletRestriction, 0),
 	}
 	var activeRestrictionsJSON []byte
-	err := pool.QueryRow(ctx, `
+	err := q.QueryRow(ctx, `
 	WITH wallet_balance AS (
 	  SELECT wallets.billing_account_id,
 	         wallets.status,

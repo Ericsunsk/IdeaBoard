@@ -188,6 +188,8 @@ type WalletLifecycle interface {
 	SetSoleOwnedWalletsFrozen(context.Context, int64, bool) error
 	RemoveSharedBillingMemberships(context.Context, int64) error
 	ClaimWelcomeGrant(context.Context, string, int64, WelcomeGrantCommand) (WelcomeGrantResult, bool, error)
+	// GetWallet reads the Wallet projection on the caller's transaction.
+	GetWallet(context.Context, int64) (WalletDetails, error)
 }
 
 type CreditWalletLifecycleService interface {

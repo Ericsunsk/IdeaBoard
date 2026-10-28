@@ -61,7 +61,8 @@ assert_file_contains() {
   fi
 }
 
-if run_parity api-test >"${fixture_dir}/missing-dsn.out" 2>&1; then
+# This negative case must not inherit the CI job's real DSN.
+if (unset API_TEST_DATABASE_DSN; run_parity api-test) >"${fixture_dir}/missing-dsn.out" 2>&1; then
   echo 'api-test unexpectedly accepted a missing API_TEST_DATABASE_DSN' >&2
   exit 1
 fi

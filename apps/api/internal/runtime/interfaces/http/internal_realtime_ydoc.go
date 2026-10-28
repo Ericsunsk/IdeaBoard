@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -190,14 +191,14 @@ func (h *internalRealtimeHandler) CompactYDocument(c *gin.Context) {
 // so ErrRevisionConflict cannot occur on this path; any such anomaly (and
 // any other store failure) shares the retryable 503 default.
 func renderYDocStoreError(c *gin.Context, err error) {
-	switch err {
-	case boards.ErrInvalidInput:
+	switch {
+	case errors.Is(err, boards.ErrInvalidInput):
 		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeBadRequest), "invalid request")
-	case boards.ErrNotFound:
+	case errors.Is(err, boards.ErrNotFound):
 		errorrender.Render(c, http.StatusNotFound, string(contract.CodeBoardNotFound), "board not found")
-	case boards.ErrPermissionDenied:
+	case errors.Is(err, boards.ErrPermissionDenied):
 		errorrender.Render(c, http.StatusForbidden, string(contract.CodeBoardForbidden), "forbidden")
-	case boards.ErrV1Archived:
+	case errors.Is(err, boards.ErrV1Archived):
 		errorrender.Render(c, http.StatusConflict, string(contract.CodeBoardArchived), "board is archived")
 	default:
 		response.InternalError(c, http.StatusServiceUnavailable, "board y-doc store unavailable", err)

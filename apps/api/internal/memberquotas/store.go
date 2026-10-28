@@ -319,19 +319,25 @@ func int64PtrOrNil(v pgtype.Int8) *int64 {
 // Organization backing billingAccountID (#953: Owner is always unlimited).
 // Personal accounts (no organization_id) never match; missing accounts or
 // memberships read as non-owner (the caller then applies the normal quota
-// row). Database failures fail closed.
+// row). Database failures fail closed via the returned error.
 func isOrganizationOwner(ctx context.Context, q consumptionread.Queryer, billingAccountID, userID int64) (bool, error) {
 	row := q.QueryRow(ctx, `SELECT organization_id FROM billing_accounts WHERE internal_id = $1`, billingAccountID)
 	var org pgtype.Int8
 	if err := row.Scan(&org); err != nil {
-		return false, nil
+		if database.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
 	}
 	if !org.Valid {
 		return false, nil
 	}
 	var role string
 	if err := q.QueryRow(ctx, `SELECT role FROM organization_memberships WHERE organization_id = $1 AND user_id = $2`, org.Int64, userID).Scan(&role); err != nil {
-		return false, nil
+		if database.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
 	}
 	return strings.TrimSpace(role) == tenancy.RoleOwner, nil
 }

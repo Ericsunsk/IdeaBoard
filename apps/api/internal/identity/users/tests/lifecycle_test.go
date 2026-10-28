@@ -3,8 +3,10 @@ package tests
 import (
 	"context"
 	"errors"
+	"fmt"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/db/dbutil"
 	"sync"
 	"testing"
 	"time"
@@ -93,52 +95,116 @@ func TestProvisionIdentityCreatesUserWalletAndWelcomeGrantAtomically(t *testing.
 }
 
 func TestProvisionIdentityConcurrentRetriesGrantWelcomeCreditsOnce(t *testing.T) {
+	for _, maxConnections := range []int32{1, 8} {
+		t.Run(fmt.Sprintf("connections_%d", maxConnections), func(t *testing.T) {
+			fixturePool := testdb.Open(t)
+			config := fixturePool.Config()
+			config.MaxConns = maxConnections
+			pool, err := pgxpool.NewWithConfig(t.Context(), config)
+			if err != nil {
+				t.Fatalf("open bounded provisioning pool: %v", err)
+			}
+			t.Cleanup(pool.Close)
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+			service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+			identity := VerifiedIdentity{
+				AuthUserID: "auth-concurrent-1", DisplayName: "concurrent-user",
+				ClaimIdentity: "concurrent-user@example.com", ClaimIdentityKind: "canonical_email",
+				ClaimIdentityVerified: true, Role: "user",
+			}
+
+			const attempts = 8
+			results := make(chan *ProvisionResult, attempts)
+			errors := make(chan error, attempts)
+			var waitGroup sync.WaitGroup
+			for range attempts {
+				waitGroup.Add(1)
+				go func() {
+					defer waitGroup.Done()
+					result, err := service.ProvisionIdentity(ctx, identity)
+					if err != nil {
+						errors <- err
+						return
+					}
+					results <- result
+				}()
+			}
+			// Every database call uses this deadline; wait for canceled workers to
+			// return before testdb closes the pool during cleanup.
+			waitGroup.Wait()
+			if err := ctx.Err(); err != nil {
+				t.Fatalf("concurrent ProvisionIdentity() did not finish before its deadline: %v", err)
+			}
+			close(results)
+			close(errors)
+			for err := range errors {
+				t.Fatalf("concurrent ProvisionIdentity() error = %v", err)
+			}
+
+			var userID int64
+			granted := 0
+			for result := range results {
+				if userID == 0 {
+					userID = result.User.ID
+				}
+				if result.User.ID != userID || result.Wallet.Available != 100 {
+					t.Fatalf("concurrent result = %+v", result)
+				}
+				if result.WelcomeGranted {
+					granted++
+				}
+			}
+			if granted != 1 {
+				t.Fatalf("WelcomeGranted count = %d, want 1", granted)
+			}
+		})
+	}
+}
+
+func TestProvisionIdentityBorrowedReplayReadsWalletWithoutPoolWait(t *testing.T) {
 	pool := testdb.Open(t)
 	service := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
 	identity := VerifiedIdentity{
-		AuthUserID: "auth-concurrent-1", DisplayName: "concurrent-user",
-		ClaimIdentity: "concurrent-user@example.com", ClaimIdentityKind: "canonical_email",
+		AuthUserID: "auth-borrowed-replay-1", DisplayName: "borrowed-replay",
+		ClaimIdentity: "borrowed-replay@example.com", ClaimIdentityKind: "canonical_email",
 		ClaimIdentityVerified: true, Role: "user",
 	}
 
-	const attempts = 8
-	results := make(chan *ProvisionResult, attempts)
-	errors := make(chan error, attempts)
-	var waitGroup sync.WaitGroup
-	for range attempts {
-		waitGroup.Add(1)
-		go func() {
-			defer waitGroup.Done()
-			result, err := service.ProvisionIdentity(context.Background(), identity)
-			if err != nil {
-				errors <- err
-				return
-			}
-			results <- result
-		}()
+	first, err := service.ProvisionIdentity(ctx, identity)
+	if err != nil {
+		t.Fatalf("ProvisionIdentity() error = %v", err)
 	}
-	waitGroup.Wait()
-	close(results)
-	close(errors)
-	for err := range errors {
-		t.Fatalf("concurrent ProvisionIdentity() error = %v", err)
+	if !first.WelcomeGranted || first.Wallet.Available != 100 {
+		t.Fatalf("first ProvisionIdentity() = %+v, want grant of 100", first)
 	}
 
-	var userID int64
-	granted := 0
-	for result := range results {
-		if userID == 0 {
-			userID = result.User.ID
-		}
-		if result.User.ID != userID || result.Wallet.Available != 100 {
-			t.Fatalf("concurrent result = %+v", result)
-		}
-		if result.WelcomeGranted {
-			granted++
-		}
+	// A borrowed replay must read through the guard transaction rather than
+	// acquiring another connection while the guard still holds its own.
+	guard, err := pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		t.Fatalf("begin guard transaction: %v", err)
 	}
-	if granted != 1 {
-		t.Fatalf("WelcomeGranted count = %d, want 1", granted)
+	defer func() { _ = guard.Rollback(ctx) }()
+	before := pool.Stat().AcquireCount()
+	replay, err := service.ProvisionIdentity(dbutil.ContextWithAmbientTx(ctx, guard), identity)
+	acquired := pool.Stat().AcquireCount() - before
+	if err != nil {
+		t.Fatalf("borrowed replay ProvisionIdentity() error = %v", err)
+	}
+	if replay.User.ID != first.User.ID || replay.WelcomeGranted {
+		t.Fatalf("borrowed replay = %+v, first = %+v", replay, first)
+	}
+	if replay.Wallet.Available != 100 || replay.Wallet.Reserved != 0 {
+		t.Fatalf("borrowed replay wallet = %+v, want available=100 reserved=0", replay.Wallet)
+	}
+	if acquired != 0 {
+		t.Fatalf("borrowed replay acquired %d pool connections, want 0 (tx-bound read)", acquired)
+	}
+	if err := guard.Commit(ctx); err != nil {
+		t.Fatalf("commit guard transaction: %v", err)
 	}
 }
 

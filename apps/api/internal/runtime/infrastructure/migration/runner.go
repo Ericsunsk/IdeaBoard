@@ -70,7 +70,7 @@ func (r *Runner) Finalize(ctx context.Context, cfg *config.Config) error {
 		return fmt.Errorf("database config is nil")
 	}
 	if r.migrateRiver == nil {
-		return fmt.Errorf("River migration is not configured")
+		return fmt.Errorf("river migration is not configured")
 	}
 	migrationConfig, err := separatedMigrationDatabaseConfig(cfg.Database)
 	if err != nil {

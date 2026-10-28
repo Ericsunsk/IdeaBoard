@@ -31,6 +31,7 @@ type Backend struct {
 	RemoveSharedBillingMembership func(context.Context, pgx.Tx, int64) error
 	ClaimWelcome                  func(context.Context, pgx.Tx, string, int64) (bool, error)
 	ExecuteGrant                  func(context.Context, pgx.Tx, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
+	GetWallet                     func(context.Context, pgx.Tx, int64) (domain.WalletDetails, error)
 	RestrictWallet                func(context.Context, pgx.Tx, ports.RestrictWalletCommand) (ports.WalletRestrictionChange, error)
 	ReleaseWallet                 func(context.Context, pgx.Tx, ports.ReleaseWalletRestrictionCommand) (ports.WalletRestrictionChange, error)
 }
@@ -49,6 +50,7 @@ func backendComplete(backend Backend) bool {
 	return backend.MapDatabaseError != nil && backend.ResolvePersonalAccount != nil && backend.ProvisionAccountWallet != nil &&
 		backend.BindIdentityKey != nil && backend.SetAccountWalletFrozen != nil && backend.SetSoleOwnedWalletsFrozen != nil &&
 		backend.RemoveSharedBillingMembership != nil && backend.ClaimWelcome != nil && backend.ExecuteGrant != nil &&
+		backend.GetWallet != nil &&
 		backend.RestrictWallet != nil && backend.ReleaseWallet != nil
 }
 
@@ -192,6 +194,20 @@ func (c *transactionLifecycle) ClaimWelcomeGrant(
 		return ports.CommandResult{}, false, err
 	}
 	return result, true, nil
+}
+
+// GetWallet reads the Wallet projection on the caller's transaction. It
+// returns the backend read unchanged (no command-error mapping), matching
+// the pool-owned read path, so ErrWalletNotFound and fail-closed behavior
+// are identical in both shapes.
+func (c *transactionLifecycle) GetWallet(ctx context.Context, billingAccountID int64) (domain.WalletDetails, error) {
+	if c == nil || c.tx == nil || billingAccountID <= 0 {
+		return domain.WalletDetails{}, domain.ErrInvalidCommand
+	}
+	if !backendComplete(c.backend) {
+		return domain.WalletDetails{}, fmt.Errorf("credits wallet: persistence backend not configured")
+	}
+	return c.backend.GetWallet(ctx, c.tx, billingAccountID)
 }
 
 func (c *transactionLifecycle) grantInTx(ctx context.Context, command ports.GrantCommand) (ports.CommandResult, error) {

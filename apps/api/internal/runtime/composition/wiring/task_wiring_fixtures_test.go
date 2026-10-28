@@ -8,21 +8,12 @@ import (
 
 	"ideaboard/api/internal/events"
 	eventnats "ideaboard/api/internal/events/nats"
-	"ideaboard/api/internal/platform/config"
 	eventinterfaces "ideaboard/api/internal/runtime/interfaces/events"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )
-
-func newTaskStatusEventPublisher(
-	ctx context.Context,
-	cfg config.EventBusConfig,
-	hub *taskservice.EventHub,
-) (events.TaskStatusPublisher, *eventnats.NATSJetStreamEventBus, error) {
-	return eventinterfaces.NewTaskStatusEventPublisher(ctx, cfg, hub, nil)
-}
 
 // newTestTaskStatusInstance builds one isolated publisher+hub pair against
 // the shared NATS test server. Test-only helper duplicated from

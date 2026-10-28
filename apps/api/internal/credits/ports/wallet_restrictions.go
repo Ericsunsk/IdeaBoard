@@ -47,6 +47,8 @@ type WalletLifecycle interface {
 	// that keep other managers.
 	RemoveSharedBillingMemberships(context.Context, int64) error
 	ClaimWelcomeGrant(context.Context, string, int64, GrantCommand) (CommandResult, bool, error)
+	// GetWallet reads the Wallet projection on the caller's transaction.
+	GetWallet(context.Context, int64) (domain.WalletDetails, error)
 }
 
 // merged from internal/credits/ports/wallet_reader.go (structural consolidation; symbols unchanged).
