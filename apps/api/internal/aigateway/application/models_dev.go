@@ -66,7 +66,9 @@ const brandLogoMaxBytes = 256 << 10
 // Retry-After respect match the gateway migration (#766). Per-call
 // Timeout/Target stay explicit so control-plane, Workers AI, community
 // catalog, reference catalog and brand logo remain separately observable.
-var detectOutbound = safehttp.NewClient(safehttp.Config{})
+var detectOutbound interface {
+	Do(context.Context, *http.Request, safehttp.RequestOptions) (*http.Response, error)
+} = safehttp.NewClient(safehttp.Config{})
 
 // modelsDevAllowlisted reports whether models.dev is explicitly in the
 // runtime egress allowlist. Entries are hostnames (optionally with

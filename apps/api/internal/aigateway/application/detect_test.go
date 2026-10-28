@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -40,14 +41,44 @@ func stubCommunityCatalog(t *testing.T, handler http.HandlerFunc) {
 	communityCache.Unlock()
 }
 
+const detectTestGatewayURL = "https://gateway.ai.cloudflare.com/v1/abcdef0123456789abcdef0123456789/detect-test"
+
+type detectOutboundFunc func(context.Context, *http.Request, safehttp.RequestOptions) (*http.Response, error)
+
+func (f detectOutboundFunc) Do(ctx context.Context, req *http.Request, opts safehttp.RequestOptions) (*http.Response, error) {
+	return f(ctx, req, opts)
+}
+
+// Keep the persisted gateway configuration valid; stub only its outbound
+// requests while catalogs continue through the standard safehttp client.
+func stubDetectGateway(t *testing.T, handler http.HandlerFunc) {
+	t.Helper()
+	previous := detectOutbound
+	detectOutbound = detectOutboundFunc(func(ctx context.Context, req *http.Request, opts safehttp.RequestOptions) (*http.Response, error) {
+		if req.URL.Hostname() != "gateway.ai.cloudflare.com" {
+			return previous.Do(ctx, req, opts)
+		}
+		if req.URL.String() != detectTestGatewayURL+"/workers-ai/models/search" {
+			t.Fatalf("unexpected gateway probe: %s", req.URL)
+		}
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, req)
+		return recorder.Result(), nil
+	})
+	t.Cleanup(func() { detectOutbound = previous })
+}
+
 func newDetectTestRepo(t *testing.T, token string) *ConfigRepository {
 	t.Helper()
+	stubDetectGateway(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
 	repo := NewConfigRepository(settings.NewSystemConfigRepository(db))
 	ctx := context.Background()
 	if err := repo.Update(ctx, UpdateInput{
-		BaseURL: "http://127.0.0.1:9",
+		BaseURL: detectTestGatewayURL,
 		Token:   &token,
 	}, 42); err != nil {
 		t.Fatalf("Update() error = %v", err)
@@ -83,6 +114,7 @@ func stubModelsDevCatalogFailure(t *testing.T) {
 func TestDetectModelsControlPlaneFailureFailsClosed(t *testing.T) {
 	// 网关不可达且 control plane 失败：fail-closed，直接返回 error，
 	// 不再回退全量连通性试探。
+	stubControlPlaneSlugs(t, nil, errors.New("control plane unavailable"))
 	repo := newDetectTestRepo(t, "detect-fail-closed-token")
 	if _, err := repo.DetectModels(context.Background(), ""); err == nil {
 		t.Fatal("DetectModels() = nil error, want control-plane failure")
@@ -330,12 +362,6 @@ func TestWorkersAIAvailableSignatures(t *testing.T) {
 func TestDetectModelsIncludesWorkersAIByAvailability(t *testing.T) {
 	// Workers AI 无 key 不进 control-plane 名单：网关上游存活即纳入，
 	// 不要求名单点名。
-	gatewayStub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"success":false,"errors":[{"code":9106}]}`))
-	}))
-	defer gatewayStub.Close()
-
 	stubControlPlaneSlugs(t, []string{"openai"}, nil)
 	stubCommunityCatalog(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -346,17 +372,12 @@ func TestDetectModelsIncludesWorkersAIByAvailability(t *testing.T) {
 	})
 	stubModelsDevCatalogFailure(t)
 
-	secretstest.EnableEncryption(t)
-	db := testdb.Open(t)
-	repo := NewConfigRepository(settings.NewSystemConfigRepository(db))
+	repo := newDetectTestRepo(t, "detect-workers-availability-token")
+	stubDetectGateway(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"success":false,"errors":[{"code":9106}]}`))
+	})
 	ctx := context.Background()
-	token := "detect-workers-availability-token"
-	if err := repo.Update(ctx, UpdateInput{
-		BaseURL: gatewayStub.URL,
-		Token:   &token,
-	}, 42); err != nil {
-		t.Fatalf("Update() error = %v", err)
-	}
 	detection, err := repo.DetectModels(ctx, "")
 	if err != nil {
 		t.Fatalf("DetectModels() error = %v", err)

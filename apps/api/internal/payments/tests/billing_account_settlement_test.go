@@ -30,6 +30,7 @@ import (
 	"ideaboard/api/internal/testsupport/secretstest"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // intentForAccount builds an order intent scoped to one payer account with
@@ -303,33 +304,54 @@ func TestBillingAccountDuplicateWebhookCreditsExactlyOnce(t *testing.T) {
 }
 
 func TestBillingAccountConcurrentSameQuantityKeepsOneUnpaidSlot(t *testing.T) {
-	secretstest.EnableEncryption(t)
-	pool := testdb.Open(t)
-	seedRechargeableWallet(t, pool, 42)
-	payer := paymentBillingAccount(t, pool, 42)
-	service := newConfiguredPurchaseService(t, pool, configuredFakeStripeGateway("acct_race", "prod_race"), &fakeCheckoutGateway{}, credits.NewService(pool))
+	for _, maxConnections := range []int32{1, 4} {
+		t.Run(fmt.Sprintf("connections_%d", maxConnections), func(t *testing.T) {
+			secretstest.EnableEncryption(t)
+			fixturePool := testdb.Open(t)
+			config := fixturePool.Config()
+			config.MaxConns = maxConnections
+			pool, err := pgxpool.NewWithConfig(t.Context(), config)
+			if err != nil {
+				t.Fatalf("open bounded checkout pool: %v", err)
+			}
+			t.Cleanup(pool.Close)
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+			seedRechargeableWallet(t, pool, 42)
+			payer := paymentBillingAccount(t, pool, 42)
+			service := newConfiguredPurchaseService(t, pool, configuredFakeStripeGateway("acct_race", "prod_race"), &fakeCheckoutGateway{}, credits.NewService(pool))
 
-	const racers = 4
-	results := make([]error, racers)
-	var wg sync.WaitGroup
-	for i := 0; i < racers; i++ {
-		wg.Add(1)
-		go func(index int) {
-			defer wg.Done()
-			_, err := service.CreateCheckout(t.Context(), checkoutCommandForAccount(payer, 42, "billing-race-"+string(rune('a'+index)), 1000))
-			results[index] = err
-		}(i)
-	}
-	wg.Wait()
-	var openCount, totalCount int
-	if err := pool.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE billing_account_id = $1 AND idea_quantity = 1000 AND status = 'checkout_open'`, payer).Scan(&openCount); err != nil {
-		t.Fatal(err)
-	}
-	if err := pool.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE billing_account_id = $1 AND idea_quantity = 1000`, payer).Scan(&totalCount); err != nil {
-		t.Fatal(err)
-	}
-	if openCount != 1 {
-		t.Fatalf("open orders = %d (total %d, errors %v), want exactly 1 unpaid slot", openCount, totalCount, results)
+			const racers = 4
+			results := make([]paymentcontracts.CheckoutResult, racers)
+			failures := make([]error, racers)
+			start := make(chan struct{})
+			var wg sync.WaitGroup
+			for i := 0; i < racers; i++ {
+				wg.Add(1)
+				go func(index int) {
+					defer wg.Done()
+					<-start
+					results[index], failures[index] = service.CreateCheckout(ctx, checkoutCommandForAccount(payer, 42, "billing-race-"+string(rune('a'+index)), 1000))
+				}(i)
+			}
+			close(start)
+			wg.Wait()
+			for index, err := range failures {
+				if err != nil {
+					t.Fatalf("checkout %d failed: %v", index, err)
+				}
+				if results[index].PublicToken == "" || results[index].PublicToken != results[0].PublicToken {
+					t.Fatalf("checkout tokens differ: %+v", results)
+				}
+			}
+			var openCount, totalCount int
+			if err := pool.QueryRow(ctx, `SELECT COUNT(*) FILTER (WHERE status = 'checkout_open'), COUNT(*) FROM payment_orders WHERE billing_account_id = $1 AND idea_quantity = 1000`, payer).Scan(&openCount, &totalCount); err != nil {
+				t.Fatal(err)
+			}
+			if openCount != 1 || totalCount != 1 {
+				t.Fatalf("open orders = %d (total %d), want exactly 1 reused unpaid slot", openCount, totalCount)
+			}
+		})
 	}
 }
 

@@ -49,7 +49,7 @@ func (r *Repository) Available() bool {
 }
 
 func (r *Repository) DBWithContext(ctx context.Context) ContextDB {
-	if connection, ok := AdvisoryConnection(ctx); ok {
+	if connection, ok := dbutil.ConnectionFromContext(ctx); ok {
 		return ContextDB{ctx: ctx, executor: connection, transactionStarter: connection}
 	}
 	return ContextDB{ctx: ctx, executor: r.db, transactionStarter: r.db}

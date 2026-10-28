@@ -87,7 +87,7 @@ if [[ "$(grep -cE 'add_header X-Accel-Buffering "no" always' "$output" || true)"
 fi
 
 # Realtime presence must passthrough the WebSocket upgrade.
-if ! grep -qF 'proxy_set_header Upgrade $http_upgrade;' "$output"; then
+if ! grep -qF "proxy_set_header Upgrade \$http_upgrade;" "$output"; then
   printf 'render-nginx-template-test: realtime route must passthrough Upgrade\n' >&2
   exit 2
 fi

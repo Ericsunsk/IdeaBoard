@@ -6,28 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"ideaboard/api/internal/db/dbutil"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-// advisoryConnectionContextKey keeps a session-bound connection available to
-// repository operations executed inside WithAdvisoryLock. The key is private
-// to the adapter so application packages cannot accidentally depend on its
-// representation.
-type advisoryConnectionContextKey struct{}
-
-// ContextWithAdvisoryConnection returns a context carrying the locked pgx
-// connection. Callers should use this only for work that must share the
-// advisory-lock session.
-func ContextWithAdvisoryConnection(ctx context.Context, connection *pgxpool.Conn) context.Context {
-	return context.WithValue(ctx, advisoryConnectionContextKey{}, connection)
-}
-
-// AdvisoryConnection returns the session-bound connection, if one was
-// installed by WithAdvisoryLock.
-func AdvisoryConnection(ctx context.Context) (*pgxpool.Conn, bool) {
-	connection, ok := ctx.Value(advisoryConnectionContextKey{}).(*pgxpool.Conn)
-	return connection, ok
-}
 
 // WithAdvisoryLock serializes work on one PostgreSQL session advisory lock.
 // The callback receives a context that uses the same *pgxpool.Conn, preserving
@@ -65,5 +47,5 @@ func WithAdvisoryLock(
 			resultErr = errors.Join(resultErr, fmt.Errorf("release advisory lock: %w", unlockErr))
 		}
 	}()
-	return run(ContextWithAdvisoryConnection(ctx, connection))
+	return run(dbutil.ContextWithConnection(ctx, connection))
 }

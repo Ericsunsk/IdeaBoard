@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	aigatewayports "ideaboard/api/internal/aigateway/ports"
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
 	runtimeports "ideaboard/api/internal/runtime/ports"
@@ -225,14 +226,14 @@ func newGatewayFastRetryClient(t *testing.T, server *httptest.Server) *GatewayCl
 
 func assertGatewayBaseHeaders(t *testing.T, capture *gatewayCapture, taskID, feature string) {
 	t.Helper()
-	if got := capture.header.Get(runtimeports.GatewayHeaderAuthorization); got != "Bearer test-token" {
+	if got := capture.header.Get(aigatewayports.GatewayHeaderAuthorization); got != "Bearer test-token" {
 		t.Fatalf("auth header = %q, want Bearer test-token", got)
 	}
-	if got := capture.header.Get(runtimeports.GatewayHeaderCollectLogPayload); got != "false" {
+	if got := capture.header.Get(aigatewayports.GatewayHeaderCollectLogPayload); got != "false" {
 		t.Fatalf("collect-log-payload = %q, want false", got)
 	}
 	var metadata map[string]string
-	if err := json.Unmarshal([]byte(capture.header.Get(runtimeports.GatewayHeaderMetadata)), &metadata); err != nil {
+	if err := json.Unmarshal([]byte(capture.header.Get(aigatewayports.GatewayHeaderMetadata)), &metadata); err != nil {
 		t.Fatalf("metadata header is not JSON: %v", err)
 	}
 	if metadata[runtimeports.GatewayMetadataTaskID] != taskID || metadata[runtimeports.GatewayMetadataFeature] != feature {
@@ -259,7 +260,7 @@ func TestGatewayClientForwardsExecutionTokenAsIdempotencyKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Do() error = %v", err)
 	}
-	if got := capture.header.Get(runtimeports.GatewayHeaderIdempotencyKey); got != "exec-123" {
+	if got := capture.header.Get(aigatewayports.GatewayHeaderIdempotencyKey); got != "exec-123" {
 		t.Fatalf("idempotency key = %q, want exec-123", got)
 	}
 
@@ -273,7 +274,7 @@ func TestGatewayClientForwardsExecutionTokenAsIdempotencyKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Do() error = %v", err)
 	}
-	if got := capture.header.Get(runtimeports.GatewayHeaderIdempotencyKey); got != "" {
+	if got := capture.header.Get(aigatewayports.GatewayHeaderIdempotencyKey); got != "" {
 		t.Fatalf("idempotency key = %q, want empty when no execution token", got)
 	}
 }
@@ -281,7 +282,7 @@ func TestGatewayClientForwardsExecutionTokenAsIdempotencyKey(t *testing.T) {
 func TestGatewayClientImageRequestSkipsCache(t *testing.T) {
 	var capture gatewayCapture
 	server := newGatewayCaptureServer(t, &capture, http.StatusOK,
-		map[string]string{runtimeports.GatewayHeaderCacheStatus: "MISS"}, `{"ok":true}`)
+		map[string]string{aigatewayports.GatewayHeaderCacheStatus: "MISS"}, `{"ok":true}`)
 	defer server.Close()
 
 	resp, err := newGatewayTestClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
@@ -301,7 +302,7 @@ func TestGatewayClientImageRequestSkipsCache(t *testing.T) {
 		t.Fatalf("request = %s %s, want POST /openai/v1/images/generations", capture.method, capture.path)
 	}
 	assertGatewayBaseHeaders(t, &capture, "task-1", "render")
-	if got := capture.header.Get(runtimeports.GatewayHeaderSkipCache); got != "true" {
+	if got := capture.header.Get(aigatewayports.GatewayHeaderSkipCache); got != "true" {
 		t.Fatalf("skip-cache = %q, want true", got)
 	}
 	if resp.Receipt.CacheHit {
@@ -330,13 +331,13 @@ func TestGatewayClientProbeIsSingleShot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Do() error = %v", err)
 	}
-	if got := capture.header.Get(runtimeports.GatewayHeaderMaxAttempts); got != "1" {
+	if got := capture.header.Get(aigatewayports.GatewayHeaderMaxAttempts); got != "1" {
 		t.Fatalf("max-attempts = %q, want 1", got)
 	}
 	if capture.method != http.MethodGet || capture.path != "/openai/v1/models" {
 		t.Fatalf("request = %s %s, want GET /openai/v1/models", capture.method, capture.path)
 	}
-	if got := capture.header.Get(runtimeports.GatewayHeaderSkipCache); got != "true" {
+	if got := capture.header.Get(aigatewayports.GatewayHeaderSkipCache); got != "true" {
 		t.Fatalf("skip-cache = %q, want true", got)
 	}
 }

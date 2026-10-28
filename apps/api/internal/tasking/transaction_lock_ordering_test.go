@@ -107,15 +107,15 @@ func TestTransactionLockOrdering(t *testing.T) {
 			"func (s *Service) createInTx", "func (s *Service) replayClaimedSubmission")
 		assertCallOrder(t, "settle_tx.go:createInTx", body, []string{
 			"s.acceptance.AuthorizeSubmission(ctx, tx, input)",
-			"txClaims.ClaimSubmissionInTx(ctx, tx, claim)",
-			"txAccounts.ResolveBillingAccountInTx(ctx, tx, claim.WorkspaceID)",
+			"s.submissionClaims.ClaimSubmissionInTx(ctx, tx, claim)",
+			"s.billingAccounts.ResolveBillingAccountInTx(ctx, tx, claim.WorkspaceID)",
 			"s.resolver.ResolveInTx(ctx, tx, kind, resolution)",
-			"txQuoter.QuoteInTx(ctx, tx, kind, resolution, quantity)",
-			"txHolder.HoldInTx(ctx, tx, billingAccountID, input.OwnerUserID",
-			"txStore.CreateTaskInTx(ctx, tx, task)",
+			"s.quoter.QuoteInTx(ctx, tx, kind, resolution, quantity)",
+			"s.holder.HoldInTx(ctx, tx, billingAccountID, input.OwnerUserID",
+			"s.taskLifecycle.CreateTaskInTx(ctx, tx, task)",
 			"s.saveSnapshot(ctx, tx, created.ID, routingSnap)",
 			"facts.CreateBillingFactsInTx(ctx, tx, created)",
-			"txQueue.EnqueueInTx(ctx, tx, created)",
+			"s.queue.EnqueueInTx(ctx, tx, created)",
 		})
 	})
 
@@ -123,17 +123,28 @@ func TestTransactionLockOrdering(t *testing.T) {
 		complete := sliceBetween(t, "settle_tx.go", settle,
 			"func (s *Service) completeInTx", "func (s *Service) failInTx")
 		assertCallOrder(t, "settle_tx.go:completeInTx", complete, []string{
-			"txStore.CompleteTaskInTx(ctx, tx, workspaceID, taskID, outputs)",
-			"txHolder.CaptureInTx(ctx, tx, completed.BillingAccountID, completed.OwnerUserID",
-			"txHolder.ReleaseInTx(ctx, tx, completed.BillingAccountID, completed.OwnerUserID",
+			"s.taskLifecycle.CompleteTaskInTx(ctx, tx, workspaceID, taskID, outputs)",
+			"s.holder.CaptureInTx(ctx, tx, completed.BillingAccountID, completed.OwnerUserID",
+			"s.holder.ReleaseInTx(ctx, tx, completed.BillingAccountID, completed.OwnerUserID",
 			"facts.SetBillingSettlementInTx(ctx, tx, taskID,",
 		})
 		failed := sliceBetween(t, "settle_tx.go", settle,
 			"func (s *Service) failInTx", "func (s *Service) cancelInTx")
 		assertCallOrder(t, "settle_tx.go:failInTx", failed, []string{
-			"txStore.FailTaskInTx(ctx, tx, workspaceID, taskID, errorMsg)",
-			"txHolder.ReleaseInTx(ctx, tx, failed.BillingAccountID, failed.OwnerUserID",
-			"facts.SetBillingSettlementInTx(ctx, tx, taskID,",
+			"s.taskLifecycle.FailTaskInTx(ctx, tx, workspaceID, taskID, errorMsg)",
+			"s.releaseTerminalInTx(ctx, tx, failed)",
+		})
+		cancelled := sliceBetween(t, "settle_tx.go", settle,
+			"func (s *Service) cancelInTx", "func (s *Service) retryInTx")
+		assertCallOrder(t, "settle_tx.go:cancelInTx", cancelled, []string{
+			"s.taskLifecycle.CancelTaskInTx(ctx, tx, workspaceID, taskID, actorUserID, reason)",
+			"s.releaseTerminalInTx(ctx, tx, flipped)",
+		})
+		release := sliceBetween(t, "settle_tx.go", settle,
+			"func (s *Service) releaseTerminalInTx", "func (s *Service) createInTx")
+		assertCallOrder(t, "settle_tx.go:releaseTerminalInTx", release, []string{
+			"s.holder.ReleaseInTx(ctx, tx, task.BillingAccountID, task.OwnerUserID",
+			"facts.SetBillingSettlementInTx(ctx, tx, task.ID,",
 		})
 	})
 

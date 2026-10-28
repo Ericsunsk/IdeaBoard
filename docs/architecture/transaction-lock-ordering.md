@@ -18,13 +18,15 @@
 
 ### 1. Settlement submit：Authorize（Workspace 守卫锁）→ Claim → Resolve → Quote → Hold → Task → Snapshot → Billing → Enqueue
 
-`internal/tasking/workspacetasks/settle_tx.go:createInTx`（约 243–363）：`AuthorizeSubmission`（`LockWorkspaceMemberships` 取 `workspaces FOR UPDATE`，守卫先行串行同 workspace 提交）→ `ClaimSubmissionInTx` → `txAccounts.ResolveBillingAccountInTx`（稳定账户，join 同一 tx）→ `resolver.ResolveInTx`（catalog pool lock + 读，`catalog.go:384`）→ `QuoteInTx`（纯 `SELECT`，`billing/infrastructure/postgres/store.go:195`，全文件无 `FOR UPDATE`）→ `HoldInTx`（`credits.Service.SettlementInTx(tx)`，`tasking/infrastructure/adapters/workspace_credits_adapter.go:178`）→ `CreateTaskInTx`（`tasking/infrastructure/postgres/store.go:310`）→ `saveSnapshot`（`generation/catalog/snapshot.go:61`，`UPDATE tasks SET routing_snapshot`）→ `CreateBillingFactsInTx`（`store.go:327`）→ `EnqueueInTx`（`client.InsertTx` join 同一 tx，`tasking/infrastructure/adapters/workspace_queue_adapter.go:116`）。Claim 仍在 Quote/Hold 之前，是并发 fence：重试在唯一约束上撞见赢家，直接 replay，永远到不了 Ledger；守卫锁在 Claim 之前，是升级死锁（claim FK 的 `FOR KEY SHARE` 再升 `FOR UPDATE`，并发 distinct-key 提交互锁 40P01，#917）唯一的入口串行点。
+`internal/tasking/workspacetasks/settle_tx.go:createInTx`（约 243–363）：`AuthorizeSubmission`（`LockWorkspaceMemberships` 取 `workspaces FOR UPDATE`，守卫先行串行同 workspace 提交）→ `ClaimSubmissionInTx` → `s.billingAccounts.ResolveBillingAccountInTx`（稳定账户，join 同一 tx）→ `resolver.ResolveInTx`（catalog pool lock + 读，`catalog.go:384`）→ `QuoteInTx`（纯 `SELECT`，`billing/infrastructure/postgres/store.go:195`，全文件无 `FOR UPDATE`）→ `HoldInTx`（`credits.Service.SettlementInTx(tx)`，`tasking/infrastructure/adapters/workspace_credits_adapter.go:178`）→ `CreateTaskInTx`（`tasking/infrastructure/postgres/store.go:310`）→ `saveSnapshot`（`generation/catalog/snapshot.go:61`，`UPDATE tasks SET routing_snapshot`）→ `CreateBillingFactsInTx`（`store.go:327`）→ `EnqueueInTx`（`client.InsertTx` join 同一 tx，`tasking/infrastructure/adapters/workspace_queue_adapter.go:116`）。Claim 仍在 Quote/Hold 之前，是并发 fence：重试在唯一约束上撞见赢家，直接 replay，永远到不了 Ledger；守卫锁在 Claim 之前，是升级死锁（claim FK 的 `FOR KEY SHARE` 再升 `FOR UPDATE`，并发 distinct-key 提交互锁 40P01，#917）唯一的入口串行点。
+
+Settlement 的参与者由 `Service` 的事务能力接口直接持有；`s.submissionClaims`、`s.billingAccounts`、`s.quoter`、`s.holder`、`s.taskLifecycle` 和 `s.queue` 都接收同一个显式 `tx`，不再通过局部类型断言获取第二套入口。
 
 稳定 Billing Account 的解析只读取已存在的身份，不隐式取得账户行锁。Workspace 删除与财务权限变更会显式按 Billing Account → Workspace 加锁；若解析在持有 Workspace 守卫锁后反向锁账户，会与删除形成等待环。组织池首次创建仍使用唯一约束收敛，不能将生命周期写入锁隐藏在通用解析函数中。真实 PostgreSQL 回归 `TestOrganizationBillingResolutionDoesNotDeadlockWorkspaceDeletion` 覆盖提交授权、账户解析与删除的交错执行。
 
 ### 2. Settlement terminal：Task 翻转 → Credits 收敛 → Billing settlement 行
 
-`settle_tx.go:completeInTx`（约 405–460）：`CompleteTaskInTx` → `CaptureInTx`/`ReleaseInTx` → `SetBillingSettlementInTx`（`store.go:415`）。`failInTx`/`cancelInTx` 同形：`FailTaskInTx`/`CancelTaskInTx` → `ReleaseInTx` → `SetBillingSettlementInTx`。与 submit 的区别是 terminal 先翻转 task 行（state-guard `UPDATE … WHERE status IN (…)` 零行即收敛），再动账；顺序固定，不可反转。
+`settle_tx.go:completeInTx`（约 405–460）：`CompleteTaskInTx` → `CaptureInTx`/`ReleaseInTx` → `SetBillingSettlementInTx`（`store.go:415`）。`failInTx`/`cancelInTx` 同形：`FailTaskInTx`/`CancelTaskInTx` → `releaseTerminalInTx`（`ReleaseInTx` → `SetBillingSettlementInTx`）。与 submit 的区别是 terminal 先翻转 task 行（state-guard `UPDATE … WHERE status IN (…)` 零行即收敛），再动账；顺序固定，不可反转。
 
 ### 3. Board accept（boards + media）：先锁 Workspace，再锁 Board，校验只读，引用收尾
 

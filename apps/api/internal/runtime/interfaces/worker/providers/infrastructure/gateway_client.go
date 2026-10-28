@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	aigatewayports "ideaboard/api/internal/aigateway/ports"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 
 	"ideaboard/api/internal/platform/safehttp"
@@ -260,26 +261,26 @@ func (c *GatewayClient) buildRequest(ctx context.Context, req runtimeports.Gatew
 		return nil, fmt.Errorf("gateway request build failed: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", contentType)
-	httpReq.Header.Set(runtimeports.GatewayHeaderAuthorization, "Bearer "+c.token)
+	httpReq.Header.Set(aigatewayports.GatewayHeaderAuthorization, "Bearer "+c.token)
 	// Payloads never persist in gateway logs; metadata (counts, model,
 	// status, cost, duration) still does.
-	httpReq.Header.Set(runtimeports.GatewayHeaderCollectLogPayload, "false")
+	httpReq.Header.Set(aigatewayports.GatewayHeaderCollectLogPayload, "false")
 	if metadata, err := gatewayRequestMetadata(req); err != nil {
 		return nil, err
 	} else if metadata != "" {
-		httpReq.Header.Set(runtimeports.GatewayHeaderMetadata, metadata)
+		httpReq.Header.Set(aigatewayports.GatewayHeaderMetadata, metadata)
 	}
 	// Cache bypass is a transport invariant, independent of request callers.
-	httpReq.Header.Set(runtimeports.GatewayHeaderSkipCache, "true")
+	httpReq.Header.Set(aigatewayports.GatewayHeaderSkipCache, "true")
 	if req.MaxAttempts > 0 {
-		httpReq.Header.Set(runtimeports.GatewayHeaderMaxAttempts, strconv.Itoa(req.MaxAttempts))
+		httpReq.Header.Set(aigatewayports.GatewayHeaderMaxAttempts, strconv.Itoa(req.MaxAttempts))
 	}
 	// Best-effort upstream idempotency: the execution token lets upstreams
 	// that understand it dedup retried sends; others ignore the header.
 	// Empty keeps the previous behavior (no header). Local settlement never
 	// depends on it.
 	if token := strings.TrimSpace(req.ExecutionToken); token != "" {
-		httpReq.Header.Set(runtimeports.GatewayHeaderIdempotencyKey, token)
+		httpReq.Header.Set(aigatewayports.GatewayHeaderIdempotencyKey, token)
 	}
 	return httpReq, nil
 }
@@ -330,12 +331,12 @@ func parseGatewayReceipt(resp *http.Response) runtimeports.GatewayReceipt {
 	}
 	header := resp.Header
 	receipt.StatusCode = resp.StatusCode
-	receipt.Model = header.Get(runtimeports.GatewayHeaderModel)
-	receipt.Provider = header.Get(runtimeports.GatewayHeaderProvider)
-	receipt.Step = header.Get(runtimeports.GatewayHeaderStep)
-	receipt.CacheStatus = header.Get(runtimeports.GatewayHeaderCacheStatus)
-	receipt.LogID = header.Get(runtimeports.GatewayHeaderLogID)
-	receipt.EventID = header.Get(runtimeports.GatewayHeaderEventID)
+	receipt.Model = header.Get(aigatewayports.GatewayHeaderModel)
+	receipt.Provider = header.Get(aigatewayports.GatewayHeaderProvider)
+	receipt.Step = header.Get(aigatewayports.GatewayHeaderStep)
+	receipt.CacheStatus = header.Get(aigatewayports.GatewayHeaderCacheStatus)
+	receipt.LogID = header.Get(aigatewayports.GatewayHeaderLogID)
+	receipt.EventID = header.Get(aigatewayports.GatewayHeaderEventID)
 	receipt.CacheHit = strings.EqualFold(strings.TrimSpace(receipt.CacheStatus), "HIT")
 	return receipt
 }

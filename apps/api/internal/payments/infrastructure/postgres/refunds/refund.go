@@ -264,7 +264,7 @@ func (s *Store) persistPendingRefund(ctx context.Context, tx pgx.Tx, order payme
 
 func (s *Store) MarkPaymentRefundProviderResult(ctx context.Context, refundID, stripeRefundID, stripeStatus string, now time.Time) (paymentsdomain.PaymentRefund, error) {
 	// Single auto-commit compare-and-set on the pending row. DBWithContext
-	// only borrows an AdvisoryConnection, never the ambient Control guard
+	// only borrows the session connection, never the ambient Control guard
 	// transaction, so the provider outcome lands on a fresh connection and
 	// always observes the committed reservation above.
 	var refund paymentsdomain.PaymentRefund

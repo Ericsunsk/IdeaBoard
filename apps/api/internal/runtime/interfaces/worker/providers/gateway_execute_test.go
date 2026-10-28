@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	aigatewayports "ideaboard/api/internal/aigateway/ports"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers/dialects"
 	providerinfra "ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
@@ -136,11 +137,11 @@ func TestCallGatewayAPIStoresParsedOutputEnvelope(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		gotBody, _ = io.ReadAll(r.Body)
-		w.Header().Set(runtimeports.GatewayHeaderModel, "openrouter/google/actual-image-model")
-		w.Header().Set(runtimeports.GatewayHeaderStep, "provider-1")
-		w.Header().Set(runtimeports.GatewayHeaderCacheStatus, "HIT")
-		w.Header().Set(runtimeports.GatewayHeaderLogID, "log-1")
-		w.Header().Set(runtimeports.GatewayHeaderEventID, "event-1")
+		w.Header().Set(aigatewayports.GatewayHeaderModel, "openrouter/google/actual-image-model")
+		w.Header().Set(aigatewayports.GatewayHeaderStep, "provider-1")
+		w.Header().Set(aigatewayports.GatewayHeaderCacheStatus, "HIT")
+		w.Header().Set(aigatewayports.GatewayHeaderLogID, "log-1")
+		w.Header().Set(aigatewayports.GatewayHeaderEventID, "event-1")
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"","images":[{"type":"image_url","image_url":{"url":"data:image/png;base64,` + rawImagePayload + `"}}]}}]}`))
 	}))

@@ -19,11 +19,13 @@ package webhook
 // them closed (see also TestWorkspaceWebhooksRejectProtectedSubscriptionsAndDeliveries).
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 
 	"ideaboard/api/internal/events"
@@ -54,25 +56,82 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
-// extractFrontendEventTypes parses WORKSPACE_EVENT_TYPES from the frontend
-// transport module. It asserts the declaration shape (array `as const`) so
-// a refactor that moves the vocabulary fails loudly instead of comparing
-// against an empty set.
-func extractFrontendEventTypes(t *testing.T, source string) []string {
-	t.Helper()
-	m := regexp.MustCompile(`(?s)export\s+const\s+WORKSPACE_EVENT_TYPES\s*=\s*\[(.*?)\]\s+as\s+const`).FindStringSubmatch(source)
-	if len(m) < 2 {
-		t.Fatal("WORKSPACE_EVENT_TYPES declaration not found in workspaceEventStream.ts")
+// parseFrontendEventTypes expands literal arrays and named spreads in the
+// frontend registry. Unsupported shapes fail closed rather than silently
+// omitting part of the vocabulary.
+func parseFrontendEventTypes(source string) ([]string, error) {
+	visiting := make(map[string]bool)
+	literal := regexp.MustCompile(`^'([^']+)'$`)
+	spread := regexp.MustCompile(`^\.\.\.([A-Z_][A-Z_0-9]*)$`)
+	var expand func(string) ([]string, error)
+	expand = func(name string) ([]string, error) {
+		if visiting[name] {
+			return nil, fmt.Errorf("cyclic event array spread: %s", name)
+		}
+		declaration := regexp.MustCompile(`(?s)export\s+const\s+` + regexp.QuoteMeta(name) + `\s*=\s*\[(.*?)\]\s+as\s+const`)
+		m := declaration.FindStringSubmatch(source)
+		if len(m) < 2 {
+			return nil, fmt.Errorf("%s literal array declaration not found", name)
+		}
+		visiting[name] = true
+		defer delete(visiting, name)
+		var out []string
+		items := strings.Split(strings.TrimSpace(m[1]), ",")
+		for i, item := range items {
+			item = strings.TrimSpace(item)
+			if item == "" && i == len(items)-1 {
+				continue // Empty array or trailing comma.
+			}
+			if value := literal.FindStringSubmatch(item); value != nil {
+				out = append(out, value[1])
+			} else if reference := spread.FindStringSubmatch(item); reference != nil {
+				values, err := expand(reference[1])
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, values...)
+			} else {
+				return nil, fmt.Errorf("unsupported %s event array element: %q", name, item)
+			}
+		}
+		return out, nil
 	}
-	ms := regexp.MustCompile(`'([^']+)'`).FindAllStringSubmatch(m[1], -1)
-	out := make([]string, 0, len(ms))
-	for _, x := range ms {
-		out = append(out, x[1])
+	out, err := expand("WORKSPACE_EVENT_TYPES")
+	if err != nil {
+		return nil, err
 	}
 	if len(out) == 0 {
-		t.Fatal("WORKSPACE_EVENT_TYPES parsed to an empty set")
+		return nil, fmt.Errorf("WORKSPACE_EVENT_TYPES parsed to an empty set")
 	}
-	return out
+	return out, nil
+}
+
+func TestParseFrontendEventTypes(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		source string
+		want   []string
+	}{
+		{"named spread", `export const HINTS = ['notification.created', 'notification.updated'] as const
+export const WORKSPACE_EVENT_TYPES = ['task.created', ...HINTS,] as const`, []string{"task.created", "notification.created", "notification.updated"}},
+		{"missing spread", `export const WORKSPACE_EVENT_TYPES = ['task.created', ...MISSING] as const`, nil},
+		{"cyclic spread", `export const WORKSPACE_EVENT_TYPES = [...WORKSPACE_EVENT_TYPES] as const`, nil},
+		{"unsupported expression", `export const WORKSPACE_EVENT_TYPES = ['task.created', makeTypes()] as const`, nil},
+		{"empty registry", `export const WORKSPACE_EVENT_TYPES = [] as const`, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseFrontendEventTypes(tc.source)
+			if tc.want == nil {
+				if err == nil {
+					t.Fatalf("parseFrontendEventTypes() = %v, want error", got)
+				}
+				return
+			}
+			if err != nil || !slices.Equal(got, tc.want) {
+				t.Fatalf("parseFrontendEventTypes() = %v, %v; want %v", got, err, tc.want)
+			}
+		})
+	}
 }
 
 func TestWorkspaceEventRegistryMatchesFrontend(t *testing.T) {
@@ -81,7 +140,10 @@ func TestWorkspaceEventRegistryMatchesFrontend(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read frontend event stream: %v", err)
 	}
-	frontend := extractFrontendEventTypes(t, string(raw))
+	frontend, err := parseFrontendEventTypes(string(raw))
+	if err != nil {
+		t.Fatalf("parse frontend event registry: %v", err)
+	}
 	backend := events.V1EventTypes()
 	if len(backend) != 12 {
 		t.Fatalf("backend registry has %d types, want 12 (update v1_envelope.go, workspaceEventStream.ts, and the webhook allowlist together)", len(backend))

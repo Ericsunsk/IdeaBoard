@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/consumptionread"
 	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/db/dbutil"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -92,6 +93,9 @@ ORDER BY requested.billing_account_id`, billingAccountIDs)
 func GetWallet(ctx context.Context, pool *pgxpool.Pool, billingAccountID int64) (domain.WalletDetails, error) {
 	if pool == nil {
 		return domain.WalletDetails{}, fmt.Errorf("credits service: database pool not configured")
+	}
+	if connection, ok := dbutil.ConnectionFromContext(ctx); ok {
+		return getWallet(ctx, connection, billingAccountID)
 	}
 	return getWallet(ctx, pool, billingAccountID)
 }

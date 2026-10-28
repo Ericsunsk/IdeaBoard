@@ -103,7 +103,9 @@ done
   source "$functions_file"
   log_file="$fixture_dir/log"
 
+  # shellcheck disable=SC2317 # Called by the sourced production functions.
   env_value() { printf /app; }
+  # shellcheck disable=SC2317 # Called by the sourced production functions.
   docker_compose() {
     if [[ "$1" == ps ]]; then
       [[ "$case_name" != fresh ]] || return 0
@@ -113,6 +115,7 @@ done
       [[ "$case_name" != stop-failed ]]
     fi
   }
+  # shellcheck disable=SC2317 # Called by the sourced production functions.
   docker() {
     printf 'docker %s\n' "$*" >> "$log_file"
     if [[ "$2" == -a ]]; then
@@ -207,6 +210,7 @@ printf 'Deploy stack contract tests passed\n'
     sed -n '/^dotenvx_encrypted_file() {/,/^}/p' "$deploy_script"
     sed -n '/^prepare_dotenvx_env() {/,/^}/p' "$deploy_script"
   } > "$functions_file"
+  # shellcheck disable=SC2317 # Called by the sourced production functions.
   die() { echo "Error: $*" >&2; exit 1; }
   # shellcheck source=/dev/null
   source "$functions_file"
@@ -220,6 +224,7 @@ printf 'Deploy stack contract tests passed\n'
   dotenvx_encrypted_file "$dx_case/missing.env" && fail 'missing env must not detect as dotenvx-encrypted'
   dotenvx_encrypted_file "$dx_case/enc.env" || fail 'encrypted env must detect as dotenvx-encrypted'
 
+  # shellcheck disable=SC2317 # Called by the sourced production functions.
   dotenvx() {
     printf 'dotenvx %s\n' "$*" >>"$dx_case/log"
     [[ "$1" == decrypt ]] || return 1
@@ -265,6 +270,7 @@ printf 'Deploy stack contract tests passed\n'
   # Decrypt can emit partial plaintext before failing. No file may survive
   # either key-selection path, including before the caller installs its trap.
   mkdir -p "$dx_case/failure-tmp"
+  # shellcheck disable=SC2317 # Called by the sourced production functions.
   dotenvx() { printf 'POSTGRES_PASSWORD=synthetic-partial-output\n'; return 1; }
   for key_source in environment file; do
     export DOTENV_KEYS_FILE="$dx_case/.env.keys"
@@ -330,6 +336,7 @@ printf 'Deploy stack dotenvx contract tests passed\n'
   [[ "$(env_value POSTGRES_PASSWORD)" == local-owner-password ]] || fail 'Cloud deployment must read owner credentials only from its local source'
   [[ "$(env_value API_PG_PASSWORD)" == cloud-runtime-password ]] || fail 'Cloud deployment must read runtime secrets only from injected values'
   export COMPOSE_FILE=compose.yml ROOT_DIR="$fixture_dir"
+  # shellcheck disable=SC2317 # Called by the sourced production functions.
   docker() {
     [[ "$POSTGRES_PASSWORD" == local-owner-password ]] || fail 'Compose must receive the local owner password'
     [[ "$API_PG_PASSWORD" == cloud-runtime-password ]] || fail 'Compose must receive Cloud runtime secrets'
@@ -350,6 +357,7 @@ printf 'Deploy stack image persistence and Cloud source tests passed\n'
   done
   # shellcheck source=/dev/null
   source "$fixture_dir/owner-functions.sh"
+  # shellcheck disable=SC2317 # Called by the sourced production functions.
   die() { echo "Error: $*" >&2; exit 1; }
   ENV_FILE="$fixture_dir/local-owner.env"
   export ENV_EXAMPLE="$repo_root/docker/.env.example"
@@ -366,6 +374,7 @@ printf 'Deploy stack image persistence and Cloud source tests passed\n'
   printf 'DOTENV_PUBLIC_KEY="abc"\nPOSTGRES_PASSWORD=encrypted:xyz\n' > "$ENV_FILE"
   frozen_hash="$(cksum < "$ENV_FILE")"
   export DOTENV_PRIVATE_KEY=synthetic-key
+  # shellcheck disable=SC2317 # Called by the sourced production functions.
   dotenvx() { printf 'POSTGRES_PASSWORD=frozen-owner-password\nAPI_PG_PASSWORD=offline-runtime-password\n'; }
   ensure_env_file >/dev/null
   [[ "$(env_value POSTGRES_PASSWORD)" == frozen-owner-password ]] || fail 'Cloud deployment must decrypt the local owner password'
