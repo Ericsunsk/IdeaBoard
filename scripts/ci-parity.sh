@@ -13,7 +13,7 @@ Usage: scripts/ci-parity.sh [all|api-test|web-smoke]
 Commands:
   all        Run unsharded standard API tests, then Web smoke in Linux geometry.
   api-test   Run the API test shard selected by TEST_MODE, TEST_SHARD, and
-             TEST_SHARD_COUNT. API_TEST_DATABASE_DSN is required.
+             TEST_SHARD_COUNT. PostgreSQL DSN and NATS URL are required.
   web-smoke  Run User route smoke directly on Linux or in a Playwright Linux
              container on other hosts.
 EOF
@@ -69,6 +69,8 @@ run_api_tests() {
 
   [[ -n "${API_TEST_DATABASE_DSN:-}" ]] || \
     fail 'API_TEST_DATABASE_DSN is required for parity API tests; integration tests must not be skipped'
+  [[ -n "${API_TEST_NATS_URL:-}" ]] || \
+    fail 'API_TEST_NATS_URL is required for parity API tests; NATS integration tests must not be skipped'
   [[ "${mode}" == "standard" || "${mode}" == "race" ]] || \
     fail 'TEST_MODE must be standard or race'
   require_non_negative_integer TEST_SHARD "${shard}"

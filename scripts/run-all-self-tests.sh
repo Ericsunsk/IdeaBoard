@@ -4,7 +4,7 @@
 # Manifest runner for every scripts/*-test.sh self-test. CI (ops.yml) invokes
 # this single entry point, so adding a new *-test.sh needs no workflow edit:
 # it is picked up by the sorted glob below. The bash -n and ShellCheck
-# static file lists in ops.yml stay explicit.
+# checks in ops.yml share the tracked scripts/*.sh inventory.
 #
 # Ordering: sorted-glob order is safe because every self-test was verified to
 # be side-effect free across tests — each runs in its own `bash` process (no

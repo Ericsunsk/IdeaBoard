@@ -84,52 +84,15 @@ jobs:
           CGO_ENABLED: "0"
         run: go build ./...
 
-  standard-tests:
-    name: API Standard (${{ matrix.shard }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        shard: [0, 1]
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_DB: ideaboard_test
-          POSTGRES_USER: ideaboard
-          POSTGRES_PASSWORD: ideaboard_test
-        ports: [5432:5432]
-        options: >-
-          --health-cmd "pg_isready -U ideaboard -d ideaboard_test -h 127.0.0.1"
-          --health-interval 10s --health-timeout 5s --health-retries 10
-    env:
-      API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
-      API_TEST_DATABASE_REQUIRED: "1"
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-go
-        with:
-          cache-dependency-path: apps/api/go.sum
-          build-cache-scope: api-standard-${{ matrix.shard }}
-      - name: Test standard shard
-        env:
-          TEST_MODE: standard
-          TEST_SHARD: "${{ matrix.shard }}"
-          TEST_SHARD_COUNT: "2"
-        run: ./scripts/ci-parity.sh api-test
-
   tests:
-    name: API Race (${{ matrix.shard }})
+    name: API Test (${{ matrix.mode }}, ${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: ${{ matrix.mode == 'race' && 30 || 20 }}
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 4
       matrix:
+        mode: [standard, race]
         shard: [0, 1]
     services:
       postgres:
@@ -145,6 +108,7 @@ jobs:
     env:
       API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
       API_TEST_DATABASE_REQUIRED: "1"
+      API_TEST_NATS_URL: nats://ideaboard:ideaboard_test@127.0.0.1:4222
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
@@ -152,13 +116,29 @@ jobs:
       - uses: ./.github/actions/setup-go
         with:
           cache-dependency-path: apps/api/go.sum
-          build-cache-scope: api-race-${{ matrix.shard }}
-      - name: Test race shard
+          build-cache-scope: api-${{ matrix.mode }}-${{ matrix.shard }}
+      - name: Start NATS with JetStream
+        run: |
+          docker run -d --name ideaboard-nats --network host nats:2.11-alpine \
+            -js -m 8222 --user ideaboard --pass ideaboard_test
+          nats_ready=0
+          for _ in $(seq 1 30); do
+            if wget --timeout=2 --spider -q http://127.0.0.1:8222/healthz; then
+              nats_ready=1
+              break
+            fi
+            sleep 1
+          done
+          [[ "${nats_ready}" == 1 ]] || { echo 'NATS JetStream did not become ready' >&2; exit 1; }
+      - name: Test API shard
         env:
-          TEST_MODE: race
+          TEST_MODE: "${{ matrix.mode }}"
           TEST_SHARD: "${{ matrix.shard }}"
           TEST_SHARD_COUNT: "2"
         run: ./scripts/ci-parity.sh api-test
+      - name: Tear down NATS
+        if: always()
+        run: docker rm -f ideaboard-nats >/dev/null 2>&1 || true
 
   sqlc-diff:
     name: sqlc Drift
@@ -242,10 +222,8 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U ideaboard -d ideaboard_test -h 127.0.0.1"
           --health-interval 10s --health-timeout 5s --health-retries 10
-    # Each job uses an ephemeral JetStream store to isolate test streams.
     env:
       API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
-      API_TEST_NATS_URL: nats://127.0.0.1:4222
       # Destructive-DDL review needs the added-migration diff; passed through
       # job env (never interpolated into shell source).
       ATLAS_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -257,18 +235,6 @@ jobs:
       - uses: ./.github/actions/setup-go
         with:
           cache-dependency-path: apps/api/go.sum
-      - name: Start NATS with JetStream
-        run: |
-          docker run -d --name ideaboard-nats --network host nats:2.11-alpine -js -m 8222
-          nats_ready=0
-          for _ in $(seq 1 30); do
-            if wget --spider -q http://127.0.0.1:8222/healthz; then
-              nats_ready=1
-              break
-            fi
-            sleep 1
-          done
-          [[ "${nats_ready}" == 1 ]] || { echo 'NATS JetStream did not become ready' >&2; exit 1; }
       - name: Install Atlas
         run: |
           atlas_arch="$(uname -m)"
@@ -353,17 +319,9 @@ jobs:
           APP_SECRETS_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           PUBLIC_ORIGIN: https://app.example.com
         run: go run ./cmd finalize-migrate
-      # Tests use isolated snapshot fixtures; migration semantics are checked above.
-      - name: Test snapshot fixtures and NATS integration
-        env:
-          TEST_MODE: standard
-          TEST_SHARD: "0"
-          TEST_SHARD_COUNT: "1"
-        run: ./scripts/ci-parity.sh api-test
       - name: Tear down migration databases
         if: always()
         run: |
-          docker rm -f ideaboard-nats >/dev/null 2>&1 || true
           postgres_container="$(docker ps --filter 'ancestor=postgres:17-alpine' --format '{{.ID}}' | head -n 1)"
           [[ -n "${postgres_container}" ]]
           for database in "${MIGRATION_VALIDATION_DB}" ideaboard_test; do
@@ -413,7 +371,7 @@ jobs:
   image:
     name: API PR Image
     if: inputs.build_images
-    needs: [quality, standard-tests, tests]
+    needs: [quality, tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10

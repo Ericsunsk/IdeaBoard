@@ -66,6 +66,7 @@ jobs:
           [[ -n "${atlas_version}" ]] || { echo 'ATLAS_VERSION pin missing from apps/api/Dockerfile' >&2; exit 1; }
           curl -fsSL "https://release.ariga.io/atlas/atlas-linux-${atlas_arch}-v${atlas_version}" -o /tmp/atlas
           chmod 0555 /tmp/atlas
+          printf 'ATLAS_BINARY=/tmp/atlas\n' >> "${GITHUB_ENV}"
       - name: Test migration integration entrypoint
         run: bash scripts/ci-migration-integration-test.sh
       - name: Prepare Atlas Fresh database
@@ -80,10 +81,7 @@ jobs:
             "${postgres_container}" \
             psql -v ON_ERROR_STOP=1 -U ideaboard -d ideaboard_test \
             -c "CREATE DATABASE ${validation_db}"
-          {
-            printf 'ATLAS_DEV_URL=postgres://ideaboard:ideaboard_test@127.0.0.1:5432/%s?sslmode=disable\n' "${validation_db}"
-            printf 'ATLAS_BINARY=/tmp/atlas\n'
-          } >> "${GITHUB_ENV}"
+          printf 'ATLAS_DEV_URL=postgres://ideaboard:ideaboard_test@127.0.0.1:5432/%s?sslmode=disable\n' "${validation_db}" >> "${GITHUB_ENV}"
       - name: Validate Atlas migrations on a Fresh database
         run: bash scripts/atlas-migration-check.sh
       - name: Smoke API then Auth migrations twice

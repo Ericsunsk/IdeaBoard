@@ -11,11 +11,15 @@ bin_dir="${fixture_dir}/bin"
 log_file="${fixture_dir}/commands.log"
 mkdir -p "${bin_dir}"
 
-for command_name in docker go npm atlas; do
+for command_name in docker go npm atlas curl; do
   command_path="${bin_dir}/${command_name}"
   sed "s/__COMMAND__/${command_name}/g" >"${command_path}" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ "$(basename "$0")" == curl ]]; then
+  echo 'migration integration must reuse the prepared Atlas binary' >&2
+  exit 99
+fi
 printf '__COMMAND__' >>"${CI_MIGRATION_TEST_LOG}"
 if [[ -n "${API_PG_USER:-}" ]]; then
   printf ' API_PG_USER=%q API_PG_PASSWORD=%q' "${API_PG_USER}" "${API_PG_PASSWORD:-}" >>"${CI_MIGRATION_TEST_LOG}"
@@ -33,7 +37,7 @@ atlas_binary="${bin_dir}/atlas"
 
 PATH="${bin_dir}:${PATH}" \
   CI_MIGRATION_TEST_LOG="${log_file}" \
-  CI_MIGRATION_ATLAS_BINARY="${atlas_binary}" \
+  ATLAS_BINARY="${atlas_binary}" \
   CI_MIGRATION_POSTGRES_CONTAINER="test-postgres" \
   "${repo_root}/scripts/ci-migration-integration.sh"
 
@@ -56,12 +60,22 @@ diff -u "${expected_order}" "${normalized_log}"
 
 if PATH="${bin_dir}:${PATH}" \
   CI_MIGRATION_TEST_LOG="${log_file}" \
-  CI_MIGRATION_ATLAS_BINARY="${atlas_binary}" \
+  ATLAS_BINARY="${atlas_binary}" \
   CI_MIGRATION_POSTGRES_IMAGE="missing-postgres" \
   "${repo_root}/scripts/ci-migration-integration.sh" >"${fixture_dir}/missing.out" 2>&1; then
   echo 'migration integration unexpectedly accepted a missing PostgreSQL container' >&2
   exit 1
 fi
 grep -Fq 'no running missing-postgres container found' "${fixture_dir}/missing.out"
+
+if PATH="${bin_dir}:${PATH}" \
+  CI_MIGRATION_TEST_LOG="${log_file}" \
+  ATLAS_BINARY="${bin_dir}/missing-atlas" \
+  CI_MIGRATION_POSTGRES_CONTAINER="test-postgres" \
+  "${repo_root}/scripts/ci-migration-integration.sh" >"${fixture_dir}/missing-atlas.out" 2>&1; then
+  echo 'migration integration unexpectedly accepted an unavailable Atlas binary' >&2
+  exit 1
+fi
+grep -Fq 'Atlas binary is unavailable' "${fixture_dir}/missing-atlas.out"
 
 echo 'CI migration integration contract tests passed'

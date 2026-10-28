@@ -35,66 +35,6 @@ jobs:
       - name: Check env schema and example drift
         run: bash scripts/env-schema-check.sh
 
-      - name: Check shell syntax
-        shell: bash
-        run: |
-          # scripts/ci-workflow-contract-check.go is Go, not bash — checked by `go vet`/build in CI Gate.
-          bash -n scripts/render-nginx-template.sh
-          bash -n scripts/render-nginx-template-test.sh
-          bash -n scripts/render-cloudflare-real-ip-conf.sh
-          bash -n scripts/uninstall-vps.sh
-          bash -n scripts/bootstrap-vps.sh
-          bash -n scripts/deploy-stack.sh
-          bash -n scripts/deploy-stack-test.sh
-          bash -n scripts/production-deploy-entrypoint.sh
-          bash -n scripts/production-deploy-entrypoint-test.sh
-          bash -n scripts/run-production-deploy.sh
-          bash -n scripts/ci-change-classifier.sh
-          bash -n scripts/ci-change-classifier-test.sh
-          bash -n scripts/ci-gate.sh
-          bash -n scripts/ci-gate-test.sh
-          bash -n scripts/ci-parity.sh
-          bash -n scripts/ci-parity-test.sh
-          bash -n scripts/ci-pr-size-guard.sh
-          bash -n scripts/ci-pr-size-guard-test.sh
-          bash -n scripts/ci-migration-integration.sh
-          bash -n scripts/ci-migration-integration-test.sh
-          bash -n scripts/atlas-migration-check.sh
-          bash -n scripts/atlas-migration-check-test.sh
-          bash -n scripts/openapi-breaking-check.sh
-          bash -n scripts/openapi-breaking-check-test.sh
-          bash -n scripts/csp-policy.sh
-          bash -n scripts/csp-policy-test.sh
-          bash -n scripts/qa-production-cleanup.sh
-          bash -n scripts/qa-production-cleanup-test.sh
-          bash -n scripts/ci-media-package-boundary.sh
-          bash -n scripts/ci-media-package-boundary-test.sh
-          bash -n scripts/ci-legacy-media-zero-scan.sh
-          bash -n scripts/ci-legacy-media-zero-scan-test.sh
-          bash -n scripts/ci-workflow-contract-test.sh
-          bash -n scripts/handbook-version-contract.sh
-          bash -n scripts/handbook-version-contract-test.sh
-          bash -n scripts/sql-workspace-scope-check.sh
-          bash -n scripts/sql-workspace-scope-check-test.sh
-          bash -n scripts/tasking-settlement-seam-check.sh
-          bash -n scripts/tasking-settlement-seam-check-test.sh
-          bash -n scripts/openapi-pattern-check.sh
-          bash -n scripts/openapi-pattern-check-test.sh
-          bash -n scripts/adr-template-check.sh
-          bash -n scripts/adr-template-check-test.sh
-          bash -n scripts/check-backend-copy.sh
-          bash -n scripts/check-backend-copy-test.sh
-          bash -n scripts/env-schema-check.sh
-          bash -n scripts/env-schema-check-test.sh
-          bash -n scripts/infisical-run.sh
-          bash -n scripts/infisical-drift-check.sh
-          bash -n scripts/infisical-drift-check-test.sh
-          bash -n scripts/web-frontend-env-check.sh
-          bash -n scripts/web-frontend-env-check-test.sh
-          bash -n scripts/run-all-self-tests.sh
-          bash -n scripts/lib/common.sh
-          bash -n scripts/lib/env-schema.sh
-
       - name: Install ShellCheck
         shell: bash
         run: |
@@ -104,66 +44,19 @@ jobs:
           fi
           shellcheck --version
 
-      - name: ShellCheck deployment scripts
+      - name: Check shell scripts
         shell: bash
         run: |
-          # scripts/ci-workflow-contract-check.go is Go, not bash — excluded from shellcheck.
-          shellcheck \
-            scripts/render-nginx-template.sh \
-            scripts/render-nginx-template-test.sh \
-            scripts/render-cloudflare-real-ip-conf.sh \
-            scripts/uninstall-vps.sh \
-            scripts/bootstrap-vps.sh \
-            scripts/deploy-stack.sh \
-            scripts/deploy-stack-test.sh \
-            scripts/production-deploy-entrypoint.sh \
-            scripts/production-deploy-entrypoint-test.sh \
-            scripts/run-production-deploy.sh \
-            scripts/ci-change-classifier.sh \
-            scripts/ci-change-classifier-test.sh \
-            scripts/ci-gate.sh \
-            scripts/ci-gate-test.sh \
-            scripts/ci-parity.sh \
-            scripts/ci-parity-test.sh \
-            scripts/ci-pr-size-guard.sh \
-            scripts/ci-pr-size-guard-test.sh \
-            scripts/ci-migration-integration.sh \
-            scripts/ci-migration-integration-test.sh \
-            scripts/atlas-migration-check.sh \
-            scripts/atlas-migration-check-test.sh \
-            scripts/openapi-breaking-check.sh \
-            scripts/openapi-breaking-check-test.sh \
-            scripts/csp-policy.sh \
-            scripts/csp-policy-test.sh \
-            scripts/qa-production-cleanup.sh \
-            scripts/qa-production-cleanup-test.sh \
-            scripts/ci-media-package-boundary.sh \
-            scripts/ci-media-package-boundary-test.sh \
-            scripts/ci-legacy-media-zero-scan.sh \
-            scripts/ci-legacy-media-zero-scan-test.sh \
-            scripts/ci-workflow-contract-test.sh \
-            scripts/handbook-version-contract.sh \
-            scripts/handbook-version-contract-test.sh \
-            scripts/sql-workspace-scope-check.sh \
-            scripts/sql-workspace-scope-check-test.sh \
-            scripts/tasking-settlement-seam-check.sh \
-            scripts/tasking-settlement-seam-check-test.sh \
-            scripts/openapi-pattern-check.sh \
-            scripts/openapi-pattern-check-test.sh \
-            scripts/adr-template-check.sh \
-            scripts/adr-template-check-test.sh \
-            scripts/check-backend-copy.sh \
-            scripts/check-backend-copy-test.sh \
-            scripts/env-schema-check.sh \
-            scripts/env-schema-check-test.sh \
-            scripts/infisical-run.sh \
-            scripts/infisical-drift-check.sh \
-            scripts/infisical-drift-check-test.sh \
-            scripts/web-frontend-env-check.sh \
-            scripts/web-frontend-env-check-test.sh \
-            scripts/run-all-self-tests.sh \
-            scripts/lib/common.sh \
-            scripts/lib/env-schema.sh
+          # Git is the canonical inventory; Go and Bats files are not Bash scripts.
+          shell_scripts=()
+          while IFS= read -r -d '' script; do
+            shell_scripts+=("$script")
+          done < <(git ls-files -z -- 'scripts/*.sh')
+          [[ "${#shell_scripts[@]}" -gt 0 ]]
+          for script in "${shell_scripts[@]}"; do
+            bash -n "$script"
+          done
+          shellcheck "${shell_scripts[@]}"
 
       - name: Lint Dockerfiles
         run: |
@@ -191,14 +84,6 @@ jobs:
             docker/compose.npm.yml \
             docker/compose.local.yml \
             .grype.yaml
-
-      - name: Verify manifest-only deployment contract
-        shell: bash
-        run: bash scripts/deploy-stack-test.sh
-
-      - name: Verify restricted Production deployment contract
-        shell: bash
-        run: bash scripts/production-deploy-entrypoint-test.sh
 
       - name: Validate nginx template rendering
         shell: bash

@@ -27,6 +27,7 @@ func main() {
 	checkMigrationGate(root)
 	checkRelease(root, release)
 	checkDeployOnly(root)
+	checkDeploymentAction(root)
 	checkActionPinning(root)
 	checkGoCaching(root)
 	checkLegacyWorkflows(root)
@@ -45,12 +46,63 @@ func checkDeployOnly(root string) {
 	jobs := object(workflow, "jobs")
 	deploy := object(jobs, "deploy-production")
 	requireEqual(deploy["environment"], "production", "Deploy-only workflow must target production environment")
-	step := requireStep(deploy, "Deploy existing immutable release")
-	requireEqual(step["run"], "./scripts/run-production-deploy.sh release-assets/release-manifest.json", "Deploy-only workflow must use the shared deploy client")
+	requireEqual(object(workflow, "concurrency")["group"], "production-deployment", "Deploy-only workflow must share the Production deployment lock")
+	requireEqual(object(workflow, "concurrency")["cancel-in-progress"], false, "Deploy-only workflow must not cancel a deployment")
+	checkDeploymentCaller(deploy, "${{ inputs.release_tag }}", "")
 
 	allText := scalarText(workflow)
 	reject(strings.Contains(allText, "docker/build-push-action"), "Deploy-only workflow must not build images")
 	reject(strings.Contains(allText, "cosign sign"), "Deploy-only workflow must not sign images")
+}
+
+func checkDeploymentCaller(deploy map[string]any, releaseTag, sourceCommit string) {
+	requireEqual(deploy["environment"], "production", "Deployment callers must retain the Production Environment gate")
+	requireEqual(object(deploy, "permissions")["contents"], "read", "Deployment callers need only read access")
+	step := requireStep(deploy, "Deploy immutable Production release")
+	requireEqual(step["uses"], "./.github/actions/deploy-production", "Deployment callers must use the shared action")
+	requireEqual(step["if"], "always()", "Deployment action must report prerequisite failures")
+	reject(step["continue-on-error"] == true, "Production deployment failures must fail the workflow")
+	inputs := object(step, "with")
+	requireEqual(inputs["prerequisite-status"], "${{ job.status }}", "Deployment must be blocked after prerequisite failure or cancellation")
+	requireEqual(inputs["manifest-path"], "release-assets/release-manifest.json", "Deployment must consume the downloaded immutable manifest")
+	requireEqual(inputs["release-tag"], releaseTag, "Deployment must bind the requested release tag")
+	if sourceCommit == "" {
+		rejectKey(inputs, "source-commit", "Existing releases must use the manifest's source commit")
+	} else {
+		requireEqual(inputs["source-commit"], sourceCommit, "New releases must bind the verified source commit")
+	}
+	for input, expected := range map[string]string{
+		"vps-host":               "${{ vars.VPS_HOST }}",
+		"vps-ssh-port":           "${{ vars.VPS_SSH_PORT }}",
+		"vps-deploy-user":        "${{ vars.VPS_DEPLOY_USER }}",
+		"vps-deploy-private-key": "${{ secrets.VPS_DEPLOY_PRIVATE_KEY }}",
+		"vps-known-hosts":        "${{ secrets.VPS_KNOWN_HOSTS }}",
+	} {
+		requireEqual(inputs[input], expected, "Deployment must consume Production connection input "+input)
+	}
+}
+
+func checkDeploymentAction(root string) {
+	data, err := os.ReadFile(filepath.Join(root, ".github", "actions", "deploy-production", "action.yml"))
+	failIf(err)
+	var action workflow
+	failIf(yaml.Unmarshal(data, &action))
+	runs := object(action, "runs")
+	requireEqual(runs["using"], "composite", "Production deployment must have one composite action")
+	validate := requireStep(runs, "Validate immutable release manifest")
+	requireEqual(object(validate, "env")["PREREQUISITE_STATUS"], "${{ inputs.prerequisite-status }}", "Deployment must consume the caller's prerequisite status")
+	requireContains(stringValue(validate["run"]), `[[ "${PREREQUISITE_STATUS}" == success ]]`, "Failed or cancelled prerequisites must never deploy")
+	requireEqual(object(validate, "env")["SOURCE_COMMIT"], "${{ inputs.source-commit }}", "Manifest validation must consume the preflight commit through env")
+	for _, required := range []string{".repository == $expected_repository", ".tag == $expected_tag", ".ref == $expected_ref", "$expected_commit == \"\" or .commit == $expected_commit"} {
+		requireContains(stringValue(validate["run"]), required, "Deployment manifest binding is missing "+required)
+	}
+	configure := requireStep(runs, "Configure restricted SSH transport")
+	requireContains(stringValue(configure["run"]), "ssh-keygen -F", "Deployment must verify the pinned endpoint before SSH")
+	stream := requireStep(runs, "Stream manifest to Production deploy entrypoint")
+	requireEqual(stream["run"], `./scripts/run-production-deploy.sh "${RELEASE_MANIFEST}"`, "Shared deployment action must use the sole transport client")
+	for _, name := range []string{"Remove SSH credentials", "Write Production deployment summary"} {
+		requireEqual(requireStep(runs, name)["if"], "always()", name+" must run after deployment failure")
+	}
 }
 
 func repositoryRoot() (string, error) {
@@ -127,7 +179,7 @@ func checkReusableWorkflows(root string) {
 	rejectKey(object(api, "jobs"), "schema", "Schema semantics must run once in the migration gate")
 	rejectKey(object(object(object(api, "on"), "workflow_call"), "inputs"), "run_schema", "Schema verification must not require an optional input")
 	requireEqual(object(api, "env")["DOCKER_BUILD_RECORD_UPLOAD"], "false", "API workflow must not upload Docker build records")
-	checkAPIParallelTests(api)
+	checkAPITestMatrix(api)
 	migrationGate := object(object(api, "jobs"), "migration-gate")
 	rejectKey(migrationGate, "if", "API migration verification must run on every invocation")
 	installAPIAtlas := requireStep(migrationGate, "Install Atlas")
@@ -138,7 +190,12 @@ func checkReusableWorkflows(root string) {
 	semanticCheck := requireStep(migrationGate, "Compare migration replay with schema snapshot")
 	requireEqual(semanticCheck["working-directory"], "apps/api", "Migration semantics must use the API project root")
 	requireContains(stringValue(semanticCheck["run"]), `go run ./cmd/schemarelease --base-sha "${ATLAS_BASE_SHA:-HEAD}"`, "Migration gate must compare migration replay and snapshot semantics")
-	requireStep(migrationGate, "Test snapshot fixtures and NATS integration")
+	requireStep(migrationGate, "Check destructive migrations and validate the chain")
+	requireStep(migrationGate, "Apply API migrations up")
+	requireStep(migrationGate, "Finalize migration (River schema and runtime privileges)")
+	for _, step := range steps(migrationGate) {
+		reject(strings.Contains(stringValue(step["run"]), "ci-parity.sh api-test"), "Migration gate must not repeat snapshot-backed API tests")
+	}
 	staticContracts := object(object(api, "jobs"), "static-contracts")
 	sqlScope := requireStep(staticContracts, "Check workspace SQL scope predicates")
 	requireEqual(stringValue(sqlScope["run"]), "bash scripts/sql-workspace-scope-check.sh", "API contracts must run the workspace scope guard")
@@ -194,43 +251,53 @@ func checkReusableWorkflows(root string) {
 	requireContains(string(manifestBytes), "*-test.sh", "Self-test manifest must glob scripts/*-test.sh")
 }
 
-func checkAPIParallelTests(api workflow) {
+func checkAPITestMatrix(api workflow) {
 	jobs := object(api, "jobs")
-	for _, test := range []struct{ job, mode string }{{"standard-tests", "standard"}, {"tests", "race"}} {
-		job := object(jobs, test.job)
-		rejectKey(job, "needs", test.job+" must run independently")
-		rejectKey(job, "if", test.job+" must always run")
-		rejectKey(job, "continue-on-error", test.job+" failures must fail API verification")
-		strategy := object(job, "strategy")
-		requireEqual(strategy["fail-fast"], false, test.job+" must complete both shards")
-		requireEqual(strategy["max-parallel"], 2, test.job+" must run two shards concurrently")
-		matrix := object(strategy, "matrix")
-		requireEqual(matrix["shard"], []any{0, 1}, test.job+" must cover shards 0 and 1")
-		rejectKey(matrix, "exclude", test.job+" must not exclude shards")
-		rejectKey(matrix, "include", test.job+" must not add duplicate shards")
-		postgres := object(object(job, "services"), "postgres")
-		requireEqual(postgres["image"], "postgres:17-alpine", test.job+" must have an isolated PostgreSQL 17 service")
-		requireContains(stringValue(postgres["options"]), "--health-cmd", test.job+" must wait for PostgreSQL health")
-		env := object(job, "env")
-		requireEqual(env["API_TEST_DATABASE_DSN"], "postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable", test.job+" must use its PostgreSQL service")
-		requireEqual(env["API_TEST_DATABASE_REQUIRED"], "1", test.job+" must require PostgreSQL tests")
-		step := requireStep(job, "Test "+test.mode+" shard")
-		requireEqual(step["run"], "./scripts/ci-parity.sh api-test", test.job+" must use the parity runner")
-		rejectKey(step, "if", test.job+" must execute its test shard")
-		rejectKey(step, "continue-on-error", test.job+" must propagate test failures")
-		testEnv := object(step, "env")
-		requireEqual(testEnv["TEST_MODE"], test.mode, test.job+" must select its test mode")
-		requireEqual(testEnv["TEST_SHARD"], "${{ matrix.shard }}", test.job+" must select its matrix shard")
-		requireEqual(testEnv["TEST_SHARD_COUNT"], "2", test.job+" must partition the suite into two shards")
-		setupCount := 0
-		for _, step := range steps(job) {
-			if step["uses"] == "./.github/actions/setup-go" {
-				setupCount++
-				requireEqual(object(step, "with")["build-cache-scope"], "api-"+test.mode+"-${{ matrix.shard }}", test.job+" must isolate compiled caches per mode and shard")
-			}
-		}
-		requireEqual(setupCount, 1, test.job+" must use the canonical Go setup")
+	rejectKey(jobs, "standard-tests", "API test modes must share one matrix")
+	job := object(jobs, "tests")
+	rejectKey(job, "needs", "API tests must run independently")
+	rejectKey(job, "if", "API tests must always run")
+	rejectKey(job, "continue-on-error", "API test failures must fail verification")
+	requireEqual(job["timeout-minutes"], "${{ matrix.mode == 'race' && 30 || 20 }}", "API tests must preserve the standard and race deadlines")
+	strategy := object(job, "strategy")
+	requireEqual(strategy["fail-fast"], false, "API tests must complete all mode/shard combinations")
+	requireEqual(strategy["max-parallel"], 4, "API tests must preserve four concurrent shards")
+	matrix := object(strategy, "matrix")
+	requireEqual(matrix["mode"], []any{"standard", "race"}, "API tests must cover standard and race modes")
+	requireEqual(matrix["shard"], []any{0, 1}, "API tests must cover shards 0 and 1")
+	rejectKey(matrix, "exclude", "API tests must not exclude mode/shard combinations")
+	rejectKey(matrix, "include", "API tests must not add duplicate mode/shard combinations")
+	postgres := object(object(job, "services"), "postgres")
+	requireEqual(postgres["image"], "postgres:17-alpine", "Each API test shard must have isolated PostgreSQL 17")
+	requireContains(stringValue(postgres["options"]), "--health-cmd", "API tests must wait for PostgreSQL health")
+	env := object(job, "env")
+	requireEqual(env["API_TEST_DATABASE_DSN"], "postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable", "API tests must use their PostgreSQL service")
+	requireEqual(env["API_TEST_DATABASE_REQUIRED"], "1", "API tests must require PostgreSQL integration")
+	requireEqual(env["API_TEST_NATS_URL"], "nats://ideaboard:ideaboard_test@127.0.0.1:4222", "API tests must require authenticated NATS integration")
+	nats := requireStep(job, "Start NATS with JetStream")
+	rejectKey(nats, "if", "API tests must always start NATS")
+	rejectKey(nats, "continue-on-error", "NATS readiness failures must fail API tests")
+	natsRun := stringValue(nats["run"])
+	for _, required := range []string{"nats:2.11-alpine", "-js", "--user ideaboard --pass ideaboard_test", "/healthz", `[[ "${nats_ready}" == 1 ]]`} {
+		requireContains(natsRun, required, "NATS setup contract is missing "+required)
 	}
+	requireEqual(requireStep(job, "Tear down NATS")["if"], "always()", "API tests must clean up NATS after failure")
+	step := requireStep(job, "Test API shard")
+	requireEqual(step["run"], "./scripts/ci-parity.sh api-test", "API tests must use the parity runner")
+	rejectKey(step, "if", "API tests must execute every shard")
+	rejectKey(step, "continue-on-error", "API tests must propagate shard failures")
+	testEnv := object(step, "env")
+	requireEqual(testEnv["TEST_MODE"], "${{ matrix.mode }}", "API tests must select their matrix mode")
+	requireEqual(testEnv["TEST_SHARD"], "${{ matrix.shard }}", "API tests must select their matrix shard")
+	requireEqual(testEnv["TEST_SHARD_COUNT"], "2", "API tests must partition each mode into two shards")
+	setupCount := 0
+	for _, step := range steps(job) {
+		if step["uses"] == "./.github/actions/setup-go" {
+			setupCount++
+			requireEqual(object(step, "with")["build-cache-scope"], "api-${{ matrix.mode }}-${{ matrix.shard }}", "API tests must isolate compiled caches per mode and shard")
+		}
+	}
+	requireEqual(setupCount, 1, "API tests must use the canonical Go setup")
 	quality := object(jobs, "quality")
 	rejectKey(quality, "needs", "Quality must run independently of API test shards")
 	requireStepRun(quality, "bash scripts/ci-parity-test.sh")
@@ -240,7 +307,7 @@ func checkAPIParallelTests(api workflow) {
 	for _, step := range steps(quality) {
 		reject(step["run"] == "./scripts/ci-parity.sh api-test", "Quality must not repeat the standard test suite")
 	}
-	for _, dependency := range []string{"quality", "standard-tests", "tests"} {
+	for _, dependency := range []string{"quality", "tests"} {
 		requireStringIn(object(jobs, "image"), "needs", dependency, "API image must wait for "+dependency)
 	}
 }
@@ -278,13 +345,14 @@ func checkMigrationGate(root string) {
 		requireContains(string(historyCommandBytes), required, "Migration history command must delegate to the Go policy: "+required)
 	}
 
-	// The pinned Atlas version is derived from apps/api/Dockerfile everywhere
-	// it is downloaded; no literal may drift from the pin.
+	// Workflows install the canonical Atlas pin once; the integration runner
+	// consumes that binary for both apply passes without another download.
 	integrationBytes, err := os.ReadFile(filepath.Join(root, "scripts", "ci-migration-integration.sh"))
 	failIf(err)
-	requireContains(string(integrationBytes), "apps/api/Dockerfile", "Migration integration must derive Atlas from the Dockerfile pin")
-	requireContains(string(integrationBytes), "ARG ATLAS_VERSION", "Migration integration must derive Atlas from the Dockerfile pin")
-	reject(strings.Contains(string(integrationBytes), "1.3.2"), "Migration integration must not hardcode the Atlas version")
+	integrationText := string(integrationBytes)
+	requireContains(integrationText, `atlas_binary="${ATLAS_BINARY:-atlas}"`, "Migration integration must consume the caller's Atlas binary")
+	requireContains(integrationText, `command -v "${atlas_binary}"`, "Migration integration must fail closed without Atlas")
+	reject(strings.Contains(integrationText, "release.ariga.io"), "Migration integration must not download Atlas again")
 
 	// Classifier must route migration SQL and atlas.sum to the migration lanes.
 	classifierBytes, err := os.ReadFile(filepath.Join(root, "scripts", "ci-change-classifier.sh"))
@@ -330,9 +398,8 @@ func checkRelease(root string, release workflow) {
 
 	deploy := object(jobs, "deploy-production")
 	requireEqual(object(deploy, "concurrency")["cancel-in-progress"], false, "Production deployments must not cancel in progress")
-	stream := requireStep(deploy, "Stream manifest to Production deploy entrypoint")
-	streamRun := stringValue(stream["run"])
-	requireContains(streamRun, "./scripts/run-production-deploy.sh release-assets/release-manifest.json", "Production deployment must use the shared deploy client")
+	requireEqual(object(deploy, "concurrency")["group"], "production-deployment", "New releases must share the Production deployment lock")
+	checkDeploymentCaller(deploy, "${{ github.ref_name }}", "${{ needs.preflight.outputs.source_commit }}")
 	clientBytes, err := os.ReadFile(filepath.Join(root, "scripts", "run-production-deploy.sh"))
 	failIf(err)
 	clientText := string(clientBytes)

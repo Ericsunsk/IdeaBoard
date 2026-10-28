@@ -22,6 +22,7 @@ if [[ "${1:-}" == "list" ]]; then
 fi
 if [[ "${1:-}" == "test" && -n "${CI_PARITY_TEST_SELECTED:-}" ]]; then
   [[ "${API_TEST_DATABASE_REQUIRED:-}" == 1 ]]
+  [[ -n "${API_TEST_NATS_URL:-}" ]]
   for arg in "${@:2}"; do
     [[ "${arg}" == -* ]] || printf '%s\n' "${arg}" >>"${CI_PARITY_TEST_SELECTED}"
   done
@@ -76,6 +77,16 @@ if ! grep -Fq 'API_TEST_DATABASE_DSN is required' "${fixture_dir}/missing-dsn.ou
   cat "${fixture_dir}/missing-dsn.out" >&2
   exit 1
 fi
+
+# A full parity run must execute the real NATS integration tests too.
+if (unset API_TEST_NATS_URL; API_TEST_DATABASE_DSN='postgres://test.invalid/ideaboard' run_parity api-test) >"${fixture_dir}/missing-nats.out" 2>&1; then
+  echo 'api-test unexpectedly accepted a missing API_TEST_NATS_URL' >&2
+  exit 1
+fi
+assert_file_contains "${fixture_dir}/missing-nats.out" 'API_TEST_NATS_URL is required'
+
+# All subsequent runs use mocks; never inherit the user's real NATS endpoint.
+export API_TEST_NATS_URL='nats://test.invalid:4222'
 
 printf '%s\n' example.test/pkg0 example.test/pkg1 example.test/pkg2 example.test/pkg3 >"${fixture_dir}/expected-packages"
 for mode in standard race; do

@@ -4,8 +4,6 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
-# shellcheck disable=SC1091 # Resolved at runtime via script_dir; scripts/lib/common.sh is linted directly in ops.yml.
-source "${script_dir}/lib/common.sh"
 
 postgres_image="${CI_MIGRATION_POSTGRES_IMAGE:-postgres:17-alpine}"
 postgres_container="${CI_MIGRATION_POSTGRES_CONTAINER:-}"
@@ -17,6 +15,13 @@ if [[ -z "${postgres_container}" ]]; then
   printf 'ci-migration-integration: no running %s container found\n' "${postgres_image}" >&2
   exit 2
 fi
+
+# The caller prepares the pinned Atlas toolchain once for validation and apply.
+atlas_binary="${ATLAS_BINARY:-atlas}"
+command -v "${atlas_binary}" >/dev/null 2>&1 || {
+  printf 'ci-migration-integration: Atlas binary is unavailable: %s\n' "${atlas_binary}" >&2
+  exit 2
+}
 
 export APP_ENV="${APP_ENV:-production}"
 export PG_HOST="${PG_HOST:-127.0.0.1}"
@@ -36,28 +41,6 @@ export BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-abcdef0123456789abcdef012345678
 export NODE_ENV="${NODE_ENV:-production}"
 
 (cd "${repo_root}/apps/auth" && npm run build)
-
-# Canonical Atlas pin lives in apps/api/Dockerfile (ARG ATLAS_VERSION).
-# ATLAS_VERSION env overrides it when set; never hardcode a literal here so
-# CI and images stay in lockstep with atlas-migration-check.sh callers.
-atlas_version="${ATLAS_VERSION:-}"
-if [[ -z "${atlas_version}" ]]; then
-  atlas_version="$(sed -n 's/^ARG ATLAS_VERSION=//p' "${repo_root}/apps/api/Dockerfile" | tr -d '[:space:]')"
-fi
-[[ -n "${atlas_version}" ]] || { printf 'ci-migration-integration: ATLAS_VERSION pin missing from apps/api/Dockerfile\n' >&2; exit 2; }
-atlas_arch="$(uname -m)"
-case "${atlas_arch}" in
-  x86_64) atlas_arch=amd64 ;;
-  aarch64|arm64) atlas_arch=arm64 ;;
-  *) printf 'ci-migration-integration: unsupported host architecture %s\n' "${atlas_arch}" >&2; exit 2 ;;
-esac
-atlas_binary="${CI_MIGRATION_ATLAS_BINARY:-}"
-if [[ -z "${atlas_binary}" ]]; then
-  atlas_binary="$(mktemp)"
-  cleanup_path "${atlas_binary}"
-  curl -fsSL "https://release.ariga.io/atlas/atlas-linux-${atlas_arch}-v${atlas_version}" -o "${atlas_binary}"
-  chmod 0555 "${atlas_binary}"
-fi
 
 atlas_url="postgres://${PG_MIGRATION_USER}:${PG_MIGRATION_PASSWORD}@${PG_HOST}:${PG_PORT}/${PG_DB}?sslmode=${PG_SSLMODE}"
 
