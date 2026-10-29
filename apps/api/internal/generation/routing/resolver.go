@@ -132,7 +132,10 @@ func (r *RoutingResolver) buildSnapshot(pool Pool, normalizedService string, req
 	eligible := make([]string, 0, len(pool.Entries))
 	for _, entry := range pool.Entries {
 		if entry.Supports(requested) {
-			eligible = append(eligible, entry.Model)
+			// Display form only (provider + "/" + bare model, both stored
+			// normalized): selection sorts it lexicographically, the
+			// snapshot pins it, and execution re-splits it strictly.
+			eligible = append(eligible, entry.DisplayModel())
 		}
 	}
 	if len(eligible) == 0 {

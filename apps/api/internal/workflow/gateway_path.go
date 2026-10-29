@@ -1,10 +1,9 @@
 package workflow
 
 import (
+	"errors"
 	"ideaboard/api/internal/platform/errorrender"
-	"net/http"
 	"strings"
-	"time"
 
 	"github.com/tidwall/gjson"
 )
@@ -175,45 +174,6 @@ func ResolveRoute(provider, model, pathOverride, customParamsJSON string) RouteR
 	}
 }
 
-// GatewayProbeTimeout bounds one gateway availability probe. Connection
-// diagnosis (ProbeGatewayConnection) keeps its own longer budget on purpose:
-// an operator staring at a dialog tolerates 8s, a detection sweep does not.
-const GatewayProbeTimeout = 5 * time.Second
-
-// Reachability is the shared vocabulary for "can we talk to it", distinct
-// from "is it configured". Reachable: the upstream answers and looks alive.
-// Unavailable: it answers but attests nothing usable (auth rejection or
-// unknown-provider signature). Unreachable: no usable answer at all
-// (transport failure or unrecognized response); callers decide whether that
-// fails the operation or just skips the candidate.
-type Reachability int
-
-const (
-	ReachabilityUnreachable Reachability = iota
-	ReachabilityUnavailable
-	ReachabilityReachable
-)
-
-// ClassifyGatewayResponse reads one gateway HTTP response through the
-// single Cloudflare signal table. 401/403/code-2008 mean "not configured
-// here"; 9106/7001/7003 (any spacing) or plain 200 mean "upstream alive".
-// Anything else is Unreachable: present but unrecognized. Transport errors
-// never reach this function; they are Unreachable by construction at the
-// call site.
-func ClassifyGatewayResponse(statusCode int, body string) Reachability {
-	if statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden ||
-		strings.Contains(body, `"code":2008`) || strings.Contains(body, `"code": 2008`) {
-		return ReachabilityUnavailable
-	}
-	if strings.Contains(body, `"code":9106`) || strings.Contains(body, `"code": 9106`) ||
-		strings.Contains(body, `"code":7001`) || strings.Contains(body, `"code": 7001`) ||
-		strings.Contains(body, `"code":7003`) || strings.Contains(body, `"code": 7003`) ||
-		statusCode == http.StatusOK {
-		return ReachabilityReachable
-	}
-	return ReachabilityUnreachable
-}
-
 // SplitModelIdentifier splits a "provider/model" identifier; without a slash
 // the provider falls back to the supplied default.
 func SplitModelIdentifier(rawID, fallbackProvider string) (provider, model string) {
@@ -222,4 +182,54 @@ func SplitModelIdentifier(rawID, fallbackProvider string) (provider, model strin
 		return strings.ToLower(parts[0]), parts[1]
 	}
 	return strings.ToLower(strings.TrimSpace(fallbackProvider)), rawID
+}
+
+// FormatPoolModel renders the canonical display form of one structured
+// pool entry: provider + "/" + bare model. Selection sorting, snapshot
+// pinning, and Admin display derive this string from the stored
+// provider/model columns; it is never stored, and execution re-splits it
+// strictly via SplitPoolDisplay/ParseExecutionModelRef.
+func FormatPoolModel(provider, model string) string {
+	return strings.ToLower(strings.TrimSpace(provider)) + "/" + strings.TrimSpace(model)
+}
+
+// SplitPoolDisplay splits a canonical provider/model display string back
+// into its structured fields. The provider is lowercased; the bare model
+// preserves case and may itself contain nested slashes (openrouter's
+// vendor/model). A display without a provider prefix (bare model) is
+// rejected: execution must fail closed, never infer a provider.
+func SplitPoolDisplay(display string) (provider, model string, err error) {
+	trimmed := strings.TrimSpace(display)
+	if !strings.Contains(trimmed, "/") {
+		return "", "", errors.New(errorrender.MsgSplitGatewayModel2)
+	}
+	parts := strings.SplitN(trimmed, "/", 2)
+	provider = strings.ToLower(strings.TrimSpace(parts[0]))
+	model = strings.TrimSpace(parts[1])
+	if provider == "" || model == "" || strings.ContainsAny(trimmed, " \t\n") {
+		return "", "", errors.New(errorrender.MsgSplitGatewayModel2)
+	}
+	return provider, model, nil
+}
+
+// ParseExecutionModelRef resolves one execution model reference in full:
+// the structured provider plus the bare model plus the optional @path
+// override. It is the execution-side truth over display strings pinned
+// in RoutingSnapshots (pool rows no longer store combined strings):
+// mapping @path always wins downstream, a missing provider fails closed,
+// and unknown provider slugs stay open (custom-<slug> namespace, never
+// vanished). Whitespace is rejected so pasted values fail fast.
+func ParseExecutionModelRef(raw string) (provider, model, pathOverride string, err error) {
+	rest := raw
+	if i := strings.Index(rest, "@"); i >= 0 {
+		rest, pathOverride = rest[:i], strings.TrimSpace(rest[i+1:])
+		if pathOverride == "" || strings.ContainsAny(pathOverride, " \t\n") {
+			return "", "", "", errors.New(errorrender.MsgSplitGatewayModel)
+		}
+	}
+	provider, model, err = SplitPoolDisplay(rest)
+	if err != nil {
+		return "", "", "", err
+	}
+	return provider, model, pathOverride, nil
 }

@@ -31,8 +31,18 @@
  */
 import type { ControlModelPoolEntryResolutionsItem } from './controlModelPoolEntryResolutionsItem'
 
+/**
+ * One Service Model Pool row. provider is the required registry slug (lowercased at the write boundary); unknown slugs are accepted and synthesize the default custom-<slug> gateway namespace at execution, never vanish. model_id is the required bare model name (no provider prefix, no @path, no whitespace; nested slashes inside the bare name are preserved). The provider/model display form is derived only for selection, snapshots, and Admin display.
+ */
 export interface ControlModelPoolEntry {
   /**
+   * Registry provider slug; unknown slugs synthesize custom-<slug> at execution.
+   * @minLength 1
+   * @maxLength 64
+   */
+  provider: string
+  /**
+   * Bare model name without provider prefix or @path.
    * @minLength 1
    * @maxLength 128
    */

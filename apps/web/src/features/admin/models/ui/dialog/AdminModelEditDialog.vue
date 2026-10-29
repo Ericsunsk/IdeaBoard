@@ -16,7 +16,6 @@
           v-model:model-provider="form.values.provider"
           v-model:model-description="form.values.description"
           :is-editing="isEditing"
-          :id-prefix-options="idPrefixOptions"
           :provider-options="providerOptions"
         />
 
@@ -42,15 +41,8 @@
       <div class="flex flex-col gap-4 lg:col-span-5">
         <CatalogPreviewCard
           :model="previewModel"
-          :model-id="form.values.id"
+          :model-id="previewDisplayId"
           :route-preview="gatewayRoutePreview"
-        />
-        <!-- models.dev 参照价：只读透传，不进目录保存 payload -->
-        <CatalogReferencePanel
-          :model-id="form.values.id"
-          :provider="form.values.provider"
-          :model-name="form.values.name"
-          :enabled="visible"
         />
       </div>
     </div>
@@ -75,6 +67,7 @@ import { AdminDialogActions } from '../../../shared'
 import { AdminDialogShell } from '../../../shared'
 import { createAdminGatewayResource, type GatewayProviderOption } from '../../resource'
 import { type AdminModelItem } from '../../core/catalogData'
+import { displayModelId } from '../../core/catalogData'
 import {
   blankModelForm,
   finalizeModelSubmit,
@@ -85,7 +78,6 @@ import { useForm, firstFormError } from '@/components/ui/form'
 import CatalogIdentityPanel from './components/CatalogIdentityPanel.vue'
 import CatalogSpecsPanel from './components/CatalogSpecsPanel.vue'
 import CatalogGatewayPanel from './components/CatalogGatewayPanel.vue'
-import CatalogReferencePanel from './components/CatalogReferencePanel.vue'
 import CatalogPreviewCard, {
   type GatewayRoutePreviewState,
 } from './components/CatalogPreviewCard.vue'
@@ -108,15 +100,8 @@ const isEditing = computed(() => Boolean(props.model))
 const capabilitiesDraft = ref('')
 const showAdvanced = ref(false)
 
-// 供应商 quick-pick 与 ID 前缀全部来自 Registry 接口
+// 供应商 quick-pick 全部来自 Registry 接口
 const providerOptions = ref<GatewayProviderOption[]>([])
-const idPrefixOptions = computed(() => {
-  const seen = new Set<string>()
-  for (const option of providerOptions.value) {
-    if (option.id_prefix) seen.add(option.id_prefix)
-  }
-  return [...seen]
-})
 
 async function loadProviderOptions() {
   if (providerOptions.value.length > 0) return
@@ -160,6 +145,11 @@ const previewModel = computed<AdminModelItem>(() => ({
   supportsPromptCaching: form.values.supportsPromptCaching,
 }))
 
+// 目录/池列表展示 provider/model 拼接仅做显示：存储保持 provider + 裸名分离。
+const previewDisplayId = computed(() =>
+  displayModelId({ id: form.values.id, provider: form.values.provider }),
+)
+
 // 路由透视
 const gatewayRoutePreview = ref<GatewayRoutePreviewState>({
   providerSlug: MODELS_MESSAGES.editRouteUnspecified,
@@ -184,6 +174,7 @@ async function refreshGatewayRoutePreview() {
   try {
     const preview = await catalogResource.previewRoute({
       modelId,
+      provider: form.values.provider.trim() || undefined,
       customPath: form.values.customPath?.trim() || undefined,
       customParams: form.values.customParams?.trim() || undefined,
     })
@@ -206,7 +197,7 @@ async function refreshGatewayRoutePreview() {
 }
 
 watchDebounced(
-  [() => form.values.id, () => form.values.customPath, () => form.values.customParams],
+  [() => form.values.id, () => form.values.provider, () => form.values.customPath, () => form.values.customParams],
   () => {
     void refreshGatewayRoutePreview()
   },

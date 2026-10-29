@@ -32,16 +32,30 @@ export interface AdminBillableItemCard {
 }
 
 // Service Model Pool shapes (#849, ADR-0012): one Service owns an
-// unordered set of {model, enabled, supported_resolutions} entries plus
-// a monotonic pool version pinned into routing snapshots. Entries carry
-// no priority, fallback, or weight — never add those fields here.
+// unordered set of {provider, model, enabled, supported_resolutions}
+// entries plus a monotonic pool version pinned into routing snapshots.
+// provider is the registry slug, model the bare model name; the two render
+// as provider/model for selection, snapshots, and display only. Entries
+// carry no priority, fallback, or weight — never add those fields here.
 // Resolutions alias the shared catalog values, never a local copy.
 export type PoolResolution = CatalogResolution
 
 export interface AdminModelPoolEntry {
+  provider: string
   modelId: string
   enabled: boolean
   resolutions: PoolResolution[]
+}
+
+// formatPoolModelId renders the canonical provider/model display form of
+// one pool entry. Display only: storage keeps provider and bare model
+// separate, execution re-splits this string strictly.
+export function formatPoolModelId(
+  entry: Pick<AdminModelPoolEntry, 'provider' | 'modelId'>,
+): string {
+  const provider = entry.provider.trim()
+  const model = entry.modelId.trim()
+  return provider ? `${provider}/${model}` : model
 }
 
 export interface AdminModelPool {
@@ -58,4 +72,5 @@ export interface AdminModelPoolSaveResult extends AdminModelPool {
 export interface AdminPoolCatalogModel {
   id: string
   name: string
+  provider: string
 }

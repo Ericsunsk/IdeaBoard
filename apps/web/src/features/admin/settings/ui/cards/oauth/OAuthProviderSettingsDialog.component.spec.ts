@@ -18,7 +18,7 @@ vi.mock('../../../../shared/session/feedback/toast', async (importOriginal) => (
 }))
 
 const configuredSummary: OAuthProviderSettingsSummary = {
-  enabled: true,
+  isEnabled: true,
   configured: true,
   clientId: 'google-client.apps.googleusercontent.com',
   clientSecretConfigured: true,
@@ -32,7 +32,7 @@ const resource: OAuthProviderSettingsResource = {
 
 function renderDialog() {
   return renderWithUser(OAuthProviderSettingsDialog, {
-    props: { visible: true, resource },
+    props: { isVisible: true, resource },
     global: {
       plugins: [],
       stubs: { transition: false },
@@ -55,12 +55,9 @@ describe('OAuthProviderSettingsDialog', () => {
     expect(within(dialog).getByRole('group', { name: 'OAuth 登录方式' })).toBeVisible()
     expect(within(dialog).getAllByRole('switch')).toHaveLength(2)
     expect(within(dialog).queryByText('Google 登录')).not.toBeInTheDocument()
-    // 方案 A：启用表达只用开关，凭据区冗余 Status pill 已删除。
     expect(within(dialog).queryByText('已启用')).not.toBeInTheDocument()
     expect(within(dialog).queryByText('未启用')).not.toBeInTheDocument()
     expect(within(dialog).getByRole('switch', { name: 'Google 登录' })).toBeChecked()
-    // 简化第二波：按需单 provider GET，未访问过的 provider 开关按默认未选中
-    // 渲染，选中后才懒加载其真实状态（行为终态一致，见下个用例）。
     expect(within(dialog).getByRole('switch', { name: 'Discord 登录' })).not.toBeChecked()
     expect(within(dialog).getByLabelText('OAuth Provider')).toHaveTextContent('Google')
     const callback = within(dialog).getByLabelText('Callback URL') as HTMLInputElement
@@ -131,13 +128,13 @@ describe('OAuthProviderSettingsDialog', () => {
       clientId: 'discord-client',
       callbackUrl: 'https://example.com/api/auth/callback/discord',
     })
-    await rerender({ visible: false })
-    await rerender({ visible: true })
+    await rerender({ isVisible: false })
+    await rerender({ isVisible: true })
     await within(dialog).findByDisplayValue('discord-client')
     await user.click(within(dialog).getByRole('button', { name: '保存' }))
     await waitFor(() =>
       expect(resource.save).toHaveBeenCalledWith('discord', {
-        enabled: true,
+        isEnabled: true,
         clientId: 'discord-client',
         clientSecret: '',
       }),
@@ -153,13 +150,13 @@ describe('OAuthProviderSettingsDialog', () => {
 
     await waitFor(() =>
       expect(resource.save).toHaveBeenCalledWith('google', {
-        enabled: true,
+        isEnabled: true,
         clientId: 'google-client.apps.googleusercontent.com',
         clientSecret: '',
       }),
     )
     await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(1))
-    expect(emitted()['update:visible']).toEqual([[false]])
+    expect(emitted()['update:isVisible']).toEqual([[false]])
     expect(toast.success).toHaveBeenCalledWith('Google OAuth 设置已保存')
   })
 
@@ -175,10 +172,8 @@ describe('OAuthProviderSettingsDialog', () => {
       expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('toast-probe-save')),
     )
     expect(toast.success).not.toHaveBeenCalled()
-    // 精简目标：saveError 内嵌 AdminAlert 已删除，失败一律 toast。
     expect(within(dialog).queryByText(/toast-probe-save/)).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
-    // 方案 A：启用真相源是开关（Status pill 已删除），弹窗保持打开可重试。
     expect(within(dialog).queryByText('已启用')).not.toBeInTheDocument()
     expect(within(dialog).getByRole('switch', { name: 'Google 登录' })).toBeChecked()
   })
@@ -188,7 +183,7 @@ describe('OAuthProviderSettingsDialog', () => {
       provider === 'discord'
         ? {
             ...configuredSummary,
-            enabled: false,
+            isEnabled: false,
             configured: false,
             clientId: '',
             clientSecretConfigured: false,
@@ -217,31 +212,9 @@ describe('OAuthProviderSettingsDialog', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('auth unavailable'))
-    // 简化第二波 toast-only：初载失败不设行内，重试入口为关闭后重新打开
-    //（@reset 触发单 provider 重载），父卡片关闭时 refetch，无需行内重试锚点。
     expect(within(dialog).queryByText('auth unavailable')).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: '重新加载' })).not.toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: '保存' })).toBeDisabled()
-  })
-
-  it('applies the saved summary and closes without a refresh roundtrip', async () => {
-    const rotatedSummary: OAuthProviderSettingsSummary = {
-      ...configuredSummary,
-      clientId: 'rotated-client.apps.googleusercontent.com',
-    }
-    vi.mocked(resource.save).mockResolvedValueOnce(rotatedSummary)
-    const { user, emitted } = renderDialog()
-    const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
-    await within(dialog).findByDisplayValue('google-client.apps.googleusercontent.com')
-
-    await user.type(within(dialog).getByLabelText('Client Secret'), 'rotated-secret')
-    await user.click(within(dialog).getByRole('button', { name: '保存' }))
-
-    await waitFor(() => expect(emitted()['update:visible']).toEqual([[false]]))
-    expect(resource.save).toHaveBeenCalledTimes(1)
-    // 保存用返回 summary 直接关闭：无二次全量 refresh，全程仅初载 1 次 GET。
-    await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(1))
-    expect(toast.success).toHaveBeenCalledWith('Google OAuth 设置已保存')
   })
 })

@@ -120,7 +120,7 @@ const anchorEl = ref<HTMLElement | null>(null)
 const currentCategory = ref<AdminBrandCategoryKey>(props.initialCategory)
 const isSaving = ref(false)
 
-// 品牌缩略图经后端透传 models.dev SVG：加载失败回落 Cube 占位，避免破图。
+// 品牌缩略图：站内资产直展，AI provider 为空回退 Cube 占位，避免破图。
 const failedLogoKeys = ref<Set<AdminBrandLogoKey>>(new Set())
 
 function markLogoFailed(key: AdminBrandLogoKey): void {

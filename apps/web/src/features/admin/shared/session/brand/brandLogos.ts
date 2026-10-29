@@ -1,11 +1,8 @@
 import { ref } from 'vue'
-import { resolveApiUrl } from '@/core/config/runtimeUrls'
-import { CONTROL_API_PREFIX } from '../../core/controlTransport'
-import { getGetControlAIGatewayBrandLogoUrl } from '@/api/generated-query/control/control-platform/control-platform'
 
-// Brand logo override vocabulary (issue #809). The legacy generated models
-// are gone; this module owns the scope/key sets its pickers and resources
-// share. Values mirror the backend override registry.
+// Brand logo override vocabulary (issue #809). This module owns the
+// scope/key sets its pickers and resources share. Values mirror the
+// backend override registry.
 const AdminBrandLogoOverrideScope = {
   'provider-endpoint': 'provider-endpoint',
   'storage-profile': 'storage-profile',
@@ -67,9 +64,8 @@ const AdminBrandLogoOverrideUpdateLogoKey = {
 type AdminBrandLogoOverrideUpdateLogoKey =
   (typeof AdminBrandLogoOverrideUpdateLogoKey)[keyof typeof AdminBrandLogoOverrideUpdateLogoKey]
 
-// Provider 品牌图走 Control 品牌图透传（GET /api/control/v1/platform/ai-gateway/brand-logo），
-// 前端不再 bundle 任何 provider SVG：上游缺失时后端回默认图，卡片不断图。
-// 存储与身份类目仍用站内现成资产（storage-vendors / oauth），不在本次迁移范围。
+// AI provider 品牌图无站内资产：logoSrc 为空，调用方回退 Cube 占位。
+// 存储/搜索/身份类目使用下方站内现成资产。
 import logoAmazonS3 from '../../ui/assets/storage-vendors/amazons3.svg'
 import logoAlibabaCloud from '../../ui/assets/storage-vendors/alibabacloud.svg'
 import logoCloudflareVendor from '../../ui/assets/storage-vendors/cloudflare.svg'
@@ -80,7 +76,7 @@ import logoTencentCloud from '../../ui/assets/storage-vendors/tencentcloud.ico'
 import logoGithub from '../../ui/assets/oauth/github.svg'
 import logoGoogleOAuth from '@/core/assets/oauth/google.svg'
 import logoDiscord from '@/core/assets/oauth/discord.svg'
-// 图片搜索供应商（站内现成资产，不走 models.dev：上游仅有通用占位图）
+// 图片搜索供应商（站内现成资产）
 import logoUnsplash from '../../ui/assets/search-providers/unsplash.svg'
 import logoPexels from '../../ui/assets/search-providers/pexels.svg'
 
@@ -101,28 +97,6 @@ export interface AdminBrandLogoItem {
 export type AdminBrandLogoScope = AdminBrandLogoOverrideScope
 export type AdminBrandLogoKey = AdminBrandLogoOverrideUpdateLogoKey
 
-// models.dev 上游 provider ID 与站内 logoKey 不一致时的别名（均经 /logos/{id}.svg 实测命中）。
-// 未列出的 key 按原样透传：上游命中即真图，未收录即回默认图（不断图），由 admin overrides 兜底。
-const MODELS_DEV_LOGO_ALIASES: Partial<Record<AdminBrandLogoKey, string>> = {
-  gemini: 'google',
-  zhipu: 'zhipuai',
-  moonshot: 'moonshotai',
-  aliyun: 'alibaba',
-  doubao: 'volcengine',
-  bedrock: 'amazon-bedrock',
-  together: 'togetherai',
-  fireworks: 'fireworks-ai',
-  novita: 'novita-ai',
-}
-
-export function adminBrandLogoProxyUrl(key: string): string {
-  const provider = MODELS_DEV_LOGO_ALIASES[key as AdminBrandLogoKey] ?? key
-  // Control brand-logo passthrough (binary SVG): the path comes from the
-  // generated Control hook URL builder (single source of truth, never
-  // hand-concatenated) mounted on the Control API prefix.
-  return resolveApiUrl(`${CONTROL_API_PREFIX}${getGetControlAIGatewayBrandLogoUrl({ provider })}`)
-}
-
 export const ADMIN_BRAND_CATEGORIES: AdminBrandCategory[] = [
   { key: 'all', label: '全部' },
   { key: 'image-gen', label: '生图' },
@@ -138,44 +112,44 @@ export const ALL_ADMIN_BRAND_LOGOS: AdminBrandLogoItem[] = [
   {
     key: 'flux',
     label: 'Flux (Black Forest Labs)',
-    logoSrc: adminBrandLogoProxyUrl('flux'),
+    logoSrc: '',
     category: 'image-gen',
   },
   {
     key: 'midjourney',
     label: 'Midjourney',
-    logoSrc: adminBrandLogoProxyUrl('midjourney'),
+    logoSrc: '',
     category: 'image-gen',
   },
   {
     key: 'stability',
     label: 'Stability AI',
-    logoSrc: adminBrandLogoProxyUrl('stability'),
+    logoSrc: '',
     category: 'image-gen',
   },
-  { key: 'fal', label: 'Fal.ai', logoSrc: adminBrandLogoProxyUrl('fal'), category: 'image-gen' },
+  { key: 'fal', label: 'Fal.ai', logoSrc: '', category: 'image-gen' },
   {
     key: 'replicate',
     label: 'Replicate',
-    logoSrc: adminBrandLogoProxyUrl('replicate'),
+    logoSrc: '',
     category: 'image-gen',
   },
   {
     key: 'ideogram',
     label: 'Ideogram',
-    logoSrc: adminBrandLogoProxyUrl('ideogram'),
+    logoSrc: '',
     category: 'image-gen',
   },
   {
     key: 'recraft',
     label: 'Recraft',
-    logoSrc: adminBrandLogoProxyUrl('recraft'),
+    logoSrc: '',
     category: 'image-gen',
   },
   {
     key: 'runway',
     label: 'Runway',
-    logoSrc: adminBrandLogoProxyUrl('runway'),
+    logoSrc: '',
     category: 'image-gen',
   },
 
@@ -183,49 +157,49 @@ export const ALL_ADMIN_BRAND_LOGOS: AdminBrandLogoItem[] = [
   {
     key: 'zhipu',
     label: '智谱 AI (GLM / CogView)',
-    logoSrc: adminBrandLogoProxyUrl('zhipu'),
+    logoSrc: '',
     category: 'china-ai',
   },
   {
     key: 'aliyun',
     label: '阿里云 / 百炼 (DashScope / 万相)',
-    logoSrc: adminBrandLogoProxyUrl('aliyun'),
+    logoSrc: '',
     category: 'china-ai',
   },
   {
     key: 'doubao',
     label: '火山引擎 / 豆包 (ByteDance)',
-    logoSrc: adminBrandLogoProxyUrl('doubao'),
+    logoSrc: '',
     category: 'china-ai',
   },
   {
     key: 'moonshot',
     label: '月之暗面 (Moonshot / Kimi)',
-    logoSrc: adminBrandLogoProxyUrl('moonshot'),
+    logoSrc: '',
     category: 'china-ai',
   },
   {
     key: 'minimax',
     label: 'MiniMax (海螺)',
-    logoSrc: adminBrandLogoProxyUrl('minimax'),
+    logoSrc: '',
     category: 'china-ai',
   },
   {
     key: 'baidu',
     label: '百度千帆 (文心一言)',
-    logoSrc: adminBrandLogoProxyUrl('baidu'),
+    logoSrc: '',
     category: 'china-ai',
   },
   {
     key: 'tencent',
     label: '腾讯混元 (Hunyuan)',
-    logoSrc: adminBrandLogoProxyUrl('tencent'),
+    logoSrc: '',
     category: 'china-ai',
   },
   {
     key: 'lingyi',
     label: '零一万物 (01.AI)',
-    logoSrc: adminBrandLogoProxyUrl('lingyi'),
+    logoSrc: '',
     category: 'china-ai',
   },
 
@@ -233,114 +207,114 @@ export const ALL_ADMIN_BRAND_LOGOS: AdminBrandLogoItem[] = [
   {
     key: 'openai',
     label: 'OpenAI',
-    logoSrc: adminBrandLogoProxyUrl('openai'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'gemini',
     label: 'Gemini',
-    logoSrc: adminBrandLogoProxyUrl('gemini'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'anthropic',
     label: 'Claude / Anthropic',
-    logoSrc: adminBrandLogoProxyUrl('anthropic'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'deepseek',
     label: 'DeepSeek',
-    logoSrc: adminBrandLogoProxyUrl('deepseek'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'cloudflare',
     label: 'Cloudflare Workers AI',
-    logoSrc: adminBrandLogoProxyUrl('cloudflare'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'siliconflow',
     label: 'SiliconFlow (硅基流动)',
-    logoSrc: adminBrandLogoProxyUrl('siliconflow'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'mistral',
     label: 'Mistral AI',
-    logoSrc: adminBrandLogoProxyUrl('mistral'),
+    logoSrc: '',
     category: 'global-ai',
   },
-  { key: 'groq', label: 'Groq', logoSrc: adminBrandLogoProxyUrl('groq'), category: 'global-ai' },
+  { key: 'groq', label: 'Groq', logoSrc: '', category: 'global-ai' },
   {
     key: 'together',
     label: 'Together AI',
-    logoSrc: adminBrandLogoProxyUrl('together'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'fireworks',
     label: 'Fireworks AI',
-    logoSrc: adminBrandLogoProxyUrl('fireworks'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'huggingface',
     label: 'Hugging Face',
-    logoSrc: adminBrandLogoProxyUrl('huggingface'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'perplexity',
     label: 'Perplexity AI',
-    logoSrc: adminBrandLogoProxyUrl('perplexity'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'cohere',
     label: 'Cohere',
-    logoSrc: adminBrandLogoProxyUrl('cohere'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'novita',
     label: 'Novita AI',
-    logoSrc: adminBrandLogoProxyUrl('novita'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'lepton',
     label: 'Lepton AI',
-    logoSrc: adminBrandLogoProxyUrl('lepton'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'google',
     label: 'Google Cloud / Vertex AI',
-    logoSrc: adminBrandLogoProxyUrl('google'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'azure',
     label: 'Microsoft Azure OpenAI',
-    logoSrc: adminBrandLogoProxyUrl('azure'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'bedrock',
     label: 'Amazon Bedrock / AWS',
-    logoSrc: adminBrandLogoProxyUrl('bedrock'),
+    logoSrc: '',
     category: 'global-ai',
   },
   {
     key: 'ollama',
     label: 'Ollama (本地部署)',
-    logoSrc: adminBrandLogoProxyUrl('ollama'),
+    logoSrc: '',
     category: 'global-ai',
   },
 
-  // 4. 对象存储（站内现成资产，不走 models.dev）
+  // 4. 对象存储（站内现成资产）
   { key: 'amazons3', label: 'Amazon S3', logoSrc: logoAmazonS3, category: 'storage' },
   {
     key: 'cloudflare-r2',
@@ -352,7 +326,7 @@ export const ALL_ADMIN_BRAND_LOGOS: AdminBrandLogoItem[] = [
   { key: 'tencent-cos', label: '腾讯云 COS', logoSrc: logoTencentCloud, category: 'storage' },
   { key: 'minio', label: 'MinIO', logoSrc: logoMinio, category: 'storage' },
 
-  // 5. 搜索素材库（站内现成资产，不走 models.dev）
+  // 5. 搜索素材库（站内现成资产）
   {
     key: 'unsplash',
     label: 'Unsplash',
@@ -366,7 +340,7 @@ export const ALL_ADMIN_BRAND_LOGOS: AdminBrandLogoItem[] = [
     category: 'search',
   },
 
-  // 6. 身份与登录源（站内现成资产，不走 models.dev）
+  // 6. 身份与登录源（站内现成资产）
   { key: 'github', label: 'GitHub', logoSrc: logoGithub, category: 'auth' },
   { key: 'google-oauth', label: 'Google 账号', logoSrc: logoGoogleOAuth, category: 'auth' },
   { key: 'discord', label: 'Discord', logoSrc: logoDiscord, category: 'auth' },
@@ -491,6 +465,11 @@ export function getAdminBrandLogo(
 
 const modelBrandLogoCache = new Map<string, string | undefined>()
 
+function lookupBrandLogo(key: string | undefined): string | undefined {
+  if (!key || !(key in adminBrandLogoMap)) return undefined
+  return adminBrandLogoMap[key]
+}
+
 export function resolveModelBrandLogo(model: {
   id?: string | undefined
   name?: string | undefined
@@ -503,9 +482,8 @@ export function resolveModelBrandLogo(model: {
   // 1. 优先根据模型 ID 和模型名称识别具体品牌 (例如 gemini, gpt, claude, deepseek, flux, sdxl 等)
   const specificText = `${model.id || ''} ${model.name || ''}`.trim()
   if (specificText) {
-    const key = detectAdminBrandLogoKey({ name: specificText })
-    if (key && adminBrandLogoMap[key]) {
-      const hit = adminBrandLogoMap[key]
+    const hit = lookupBrandLogo(detectAdminBrandLogoKey({ name: specificText }))
+    if (hit !== undefined) {
       modelBrandLogoCache.set(cacheKey, hit)
       return hit
     }
@@ -513,21 +491,21 @@ export function resolveModelBrandLogo(model: {
 
   // 2. 若模型名称未命中，尝试根据提供商名称识别 (例如 Fal AI, Cloudflare, OpenAI, 智谱 等)
   if (model.provider) {
-    const key = detectAdminBrandLogoKey({ provider: model.provider })
-    if (key && adminBrandLogoMap[key]) {
-      const hit = adminBrandLogoMap[key]
+    const hit = lookupBrandLogo(detectAdminBrandLogoKey({ provider: model.provider }))
+    if (hit !== undefined) {
       modelBrandLogoCache.set(cacheKey, hit)
       return hit
     }
   }
 
   // 3. 兜底尝试所有字段组合
-  const fallbackKey = detectAdminBrandLogoKey({
-    name: model.name,
-    endpoint: model.id,
-    provider: model.provider,
-  })
-  const fallback = fallbackKey ? adminBrandLogoMap[fallbackKey] : undefined
+  const fallback = lookupBrandLogo(
+    detectAdminBrandLogoKey({
+      name: model.name,
+      endpoint: model.id,
+      provider: model.provider,
+    }),
+  )
   modelBrandLogoCache.set(cacheKey, fallback)
   return fallback
 }

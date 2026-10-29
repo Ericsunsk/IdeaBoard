@@ -21,8 +21,7 @@ package control
 // generic codes.
 //
 // Protocol exceptions bypass translation via controlProxyRaw: the
-// ai-gateway brand-logo (binary image/svg+xml) and the monitor SSE stream
-// (text/event-stream) are never JSON envelopes.
+// monitor SSE stream (text/event-stream) is never a JSON envelope.
 
 import (
 	"bytes"

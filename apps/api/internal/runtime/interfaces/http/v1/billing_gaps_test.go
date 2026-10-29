@@ -911,10 +911,10 @@ func TestV1GapsBillingQuoteImagePoolGate(t *testing.T) {
 	// Services use the same canonical resolution variants.
 	seeded, seededWS := newImageFixture(map[string]routing.Pool{
 		"render": {Service: "render", Version: 1, Entries: []routing.ModelPoolEntry{
-			{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
+			{Provider: "a", Model: "first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
 		}},
 		"cutout": {Service: "cutout", Version: 1, Entries: []routing.ModelPoolEntry{
-			{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
+			{Provider: "a", Model: "first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
 		}},
 	}, true)
 	seededEngine := seeded.engine()
@@ -961,10 +961,10 @@ func TestV1GapsBillingQuoteExplicitDefaultForScalable(t *testing.T) {
 	fx := newGapsTestFixture()
 	fx.deps.PoolRouter = routing.NewRoutingResolver(&gapPoolStore{pools: map[string]routing.Pool{
 		"render": {Service: "render", Version: 1, Entries: []routing.ModelPoolEntry{
-			{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
+			{Provider: "a", Model: "first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
 		}},
 		"cutout": {Service: "cutout", Version: 1, Entries: []routing.ModelPoolEntry{
-			{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
+			{Provider: "a", Model: "first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
 		}},
 	}})
 	engine := fx.engine()

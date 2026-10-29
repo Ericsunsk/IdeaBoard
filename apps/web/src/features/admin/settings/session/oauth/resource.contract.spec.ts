@@ -16,7 +16,7 @@ const CONTROL_SUMMARY = {
 }
 
 const VIEW_SUMMARY = {
-  enabled: true,
+  isEnabled: true,
   configured: true,
   clientId: 'google-client.apps.googleusercontent.com',
   clientSecretConfigured: true,
@@ -48,11 +48,11 @@ describe('OAuth Provider settings resource', () => {
     )
 
     const saved = await createOAuthProviderSettingsResource().save('google', {
-      enabled: false,
+      isEnabled: false,
       clientId: 'google-client.apps.googleusercontent.com',
       clientSecret: '',
     })
-    expect(saved).toEqual({ ...VIEW_SUMMARY, enabled: false })
+    expect(saved).toEqual({ ...VIEW_SUMMARY, isEnabled: false })
     expect(body).toMatchObject({
       enabled: false,
       client_id: 'google-client.apps.googleusercontent.com',

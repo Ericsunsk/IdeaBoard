@@ -12,11 +12,11 @@
     <ul v-else class="flex min-w-0 flex-col gap-1">
       <li
         v-for="entry in props.pool.entries"
-        :key="entry.modelId"
+        :key="formatPoolModelId(entry)"
         class="flex min-w-0 items-center gap-1.5"
         :class="entry.enabled ? undefined : 'opacity-55'"
       >
-        <AdminMono class="truncate text-xs text-foreground">{{ entry.modelId }}</AdminMono>
+        <AdminMono class="truncate text-xs text-foreground">{{ formatPoolModelId(entry) }}</AdminMono>
         <span class="flex shrink-0 items-center gap-0.5">
           <AdminMono
             v-for="resolution in entry.resolutions"
@@ -34,6 +34,7 @@
 <script setup lang="ts">
 import { AdminMono } from '../../../shared'
 import type { AdminModelPool } from '../../core/pricing/billableCatalogTypes'
+import { formatPoolModelId } from '../../core/pricing/billableCatalogTypes'
 import { BILLING_PRICING_MESSAGES } from './messages'
 
 // Compact per-Service Model Pool summary: one row per Model with its

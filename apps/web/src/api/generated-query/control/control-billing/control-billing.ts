@@ -776,6 +776,7 @@ export const getReplaceControlCatalogModelPoolUrl = (sku: string) => {
 }
 
 /**
+ * Each entry carries a required provider (registry slug; unknown slugs are accepted and synthesize the default custom-<slug> gateway namespace at execution) plus the bare model name (no provider prefix, no @path). Native vendor/model segments are preserved, including OpenRouter names such as openai/gpt-5-image. Repeating the selected provider prefix is rejected.
  * @summary Replace the Service Model Pool atomically
  */
 export const replaceControlCatalogModelPool = async (

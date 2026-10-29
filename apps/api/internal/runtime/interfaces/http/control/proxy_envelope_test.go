@@ -22,6 +22,7 @@ import (
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/workflow"
 	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
 
 	"github.com/gin-gonic/gin"
@@ -153,12 +154,8 @@ func (proxyEnvelopeFakeGatewayStore) SaveCatalog(context.Context, []aigatewayapp
 	return nil
 }
 
-func (proxyEnvelopeFakeGatewayStore) DetectModels(context.Context, string) (aigatewayapplication.ModelDetection, error) {
-	return aigatewayapplication.ModelDetection{}, nil
-}
-
-func (proxyEnvelopeFakeGatewayStore) GetModelReference(context.Context, string, string, string, bool) (aigatewayapplication.ModelReference, error) {
-	return aigatewayapplication.ModelReference{}, nil
+func (proxyEnvelopeFakeGatewayStore) ListConfiguredProviders(context.Context) ([]workflow.ProviderEntry, error) {
+	return nil, nil
 }
 
 type proxyEnvelopeFakeStorage struct{}

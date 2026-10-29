@@ -821,6 +821,13 @@ paths:
       tags: [ControlBilling]
       operationId: replaceControlCatalogModelPool
       summary: Replace the Service Model Pool atomically
+      description: >-
+        Each entry carries a required provider (registry slug; unknown slugs
+        are accepted and synthesize the default custom-<slug> gateway
+        namespace at execution) plus the bare model name (no provider
+        prefix, no @path). Native vendor/model segments are preserved,
+        including OpenRouter names such as openai/gpt-5-image. Repeating
+        the selected provider prefix is rejected.
       x-capability: control:billing
       x-audit:
         operator: true
@@ -2414,7 +2421,7 @@ paths:
     get:
       tags: [ControlPlatform]
       operationId: listControlAIGatewayProviders
-      summary: List AI gateway providers
+      summary: List configured AI gateway providers
       x-capability: control:platform
       x-audit:
         operator: true
@@ -2430,134 +2437,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ControlObjectEnvelope'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-  /platform/ai-gateway/detect-models:
-    get:
-      tags: [ControlPlatform]
-      operationId: detectControlAIGatewayModels
-      summary: Probe the gateway for available models
-      x-capability: control:platform
-      x-audit:
-        operator: true
-        target: null
-        outcome: read
-      parameters:
-        - name: provider
-          in: query
-          required: false
-          description: Provider filter for detection.
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Model detection result (contract envelope).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ControlObjectEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-  /platform/ai-gateway/models-reference:
-    get:
-      tags: [ControlPlatform]
-      operationId: getControlAIGatewayModelReference
-      summary: Read-only models.dev reference lookup for one model
-      description: >-
-        Degraded outcomes (allowlist gap, upstream failure, miss) return
-        HTTP 200 with found=false and an explicit error_code inside the
-        payload, never an HTTP error: reference display must not block
-        catalog flows. Only invalid input (missing model identity) is a
-        400.
-      x-capability: control:platform
-      x-audit:
-        operator: true
-        target: null
-        outcome: read
-      parameters:
-        - name: model_id
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: provider
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: model
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: refresh
-          in: query
-          required: false
-          description: Truthy values bypass the reference cache.
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Model reference; found=false on degraded outcomes.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ControlObjectEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-  /platform/ai-gateway/brand-logo:
-    get:
-      tags: [ControlPlatform]
-      operationId: getControlAIGatewayBrandLogo
-      summary: Admin brand-logo passthrough (binary SVG)
-      description: >-
-        Serves the provider mark as image/svg+xml. Degraded outcomes
-        (allowlist gap, upstream failure, upstream miss) still return
-        HTTP 200 with the default mark and an X-Brand-Logo-Fallback
-        marker header so admin cards never break; only invalid input
-        (bad provider) is a 400. Binary response, never a JSON envelope.
-      x-capability: control:platform
-      x-audit:
-        operator: true
-        target: null
-        outcome: read
-      parameters:
-        - name: provider
-          in: query
-          required: false
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Brand logo SVG bytes (default mark plus fallback header on degraded outcomes).
-          headers:
-            X-Brand-Logo-Fallback:
-              description: Present (models-dev-default) when the default mark is served.
-              schema:
-                type: string
-          content:
-            image/svg+xml:
-              schema:
-                type: string
-                format: binary
-        '400':
-          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2658,7 +2537,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [base_url, provider, path]
+              required: [base_url]
               additionalProperties: false
               properties:
                 base_url:
@@ -2668,15 +2547,15 @@ paths:
                   type: string
                 provider:
                   type: string
-                  minLength: 1
                 model:
                   type: string
                 path:
                   type: string
-                  minLength: 1
                   description: >-
-                    provider-native path is required (#847: the model-mapping
-                    fallback is removed).
+                    Optional provider-native path. Leave provider and path
+                    both empty to probe the gateway root URL for liveness;
+                    filling both probes the provider route. Exactly one
+                    empty is rejected as ambiguous.
       responses:
         '200':
           description: Connection probe result (contract envelope).
@@ -4617,13 +4496,27 @@ components:
           type: boolean
     ControlModelPoolEntry:
       type: object
-      required: [model_id, enabled, resolutions]
+      required: [provider, model_id, enabled, resolutions]
       additionalProperties: false
+      description: >-
+        One Service Model Pool row. provider is the required registry slug
+        (lowercased at the write boundary); unknown slugs are accepted and
+        synthesize the default custom-<slug> gateway namespace at execution,
+        never vanish. model_id is the required bare model name (no provider
+        prefix, no @path, no whitespace; nested slashes inside the bare name
+        are preserved). The provider/model display form is derived only for
+        selection, snapshots, and Admin display.
       properties:
+        provider:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Registry provider slug; unknown slugs synthesize custom-<slug> at execution.
         model_id:
           type: string
           minLength: 1
           maxLength: 128
+          description: Bare model name without provider prefix or @path.
         enabled:
           type: boolean
         resolutions:

@@ -1,7 +1,5 @@
 import {
-  detectControlAIGatewayModels,
   getControlAIGateway,
-  getControlAIGatewayModelReference,
   listControlAIGatewayModelsObserved,
   listControlAIGatewayCatalog,
   listControlAIGatewayProviders,
@@ -22,7 +20,6 @@ import type {
   AdminModelItem,
   ModelObservedSkuMargin,
   ModelObservedSnapshot,
-  ModelReferenceSnapshot,
 } from './core/catalogData'
 import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from './core/catalogData'
 
@@ -53,25 +50,6 @@ type GatewayModelCatalogItem = {
   supports_prompt_caching?: boolean
 }
 
-export type DetectedGatewayModel = {
-  id: string
-  name: string
-  provider: string
-  mode?: string
-  description?: string
-  description_enriched?: boolean
-  context_or_resolution?: string
-  context_limit?: number
-  capabilities?: string[]
-  modalities?: { input?: string[]; output?: string[] }
-  supports_prompt_caching?: boolean
-}
-
-type GatewayModelDetection = {
-  models: DetectedGatewayModel[]
-  configured_providers: number
-}
-
 export type GatewayProviderOption = {
   slug: string
   display_name: string
@@ -100,21 +78,11 @@ export interface AdminGatewayCatalog {
   save: (items: AdminModelItem[], options?: GatewayMutationOptions) => Promise<void>
   previewRoute: (input: {
     modelId: string
+    provider?: string | undefined
     customPath?: string | undefined
     customParams?: string | undefined
   }) => Promise<GatewayRoutePreview>
-  detect: (provider?: string) => Promise<GatewayModelDetection>
   listProviders: () => Promise<GatewayProviderOption[]>
-  // models.dev 参照价（只读透传）：USD/MTok 单价、context limit、last_updated，
-  // 外加能力 booleans、modalities、knowledge、release_date、family、status
-  // enrichment（均为可选，缺失即未知）。description 永不透传。
-  // source 恒为 models.dev。found=false 为上游降级/miss，HTTP 仍 200，调用方按快照展示。
-  getReference: (input: {
-    modelId?: string | undefined
-    provider?: string | undefined
-    model?: string | undefined
-    refresh?: boolean | undefined
-  }) => Promise<ModelReferenceSnapshot>
   // 7 天观测（只读透传）：成功率/头号失败/cache 命中率（无终结 attempts 时 null），
   // 外加 SKU 在售标记与 margin 行（实际成本恒 null，未编造）。
   // 缺席接口的 model 调用方按暂无数据渲染。
@@ -128,9 +96,9 @@ export interface AdminGatewayConnection {
     input: {
       base_url: string
       token?: string | undefined
-      provider: string
+      provider?: string | undefined
       model?: string | undefined
-      path: string
+      path?: string | undefined
     },
     options?: GatewayMutationOptions,
   ) => Promise<{ success: boolean; latencyMs?: number; message?: string }>
@@ -150,9 +118,7 @@ export function createAdminGatewayResource(): AdminGatewayResource {
       list: listModelCatalog,
       save: saveModelCatalog,
       previewRoute: previewModelRoute,
-      detect: detectGatewayModels,
       listProviders: listGatewayProviders,
-      getReference: getModelReference,
       listObserved: listModelsObserved,
     },
     connection: {
@@ -193,95 +159,6 @@ function pickString(raw: Record<string, unknown>, key: string): string | undefin
 function pickNumber(raw: Record<string, unknown>, key: string): number | undefined {
   const value = raw[key]
   return typeof value === 'number' ? value : undefined
-}
-
-function pickBoolean(raw: Record<string, unknown>, key: string): boolean | undefined {
-  const value = raw[key]
-  return typeof value === 'boolean' ? value : undefined
-}
-
-function pickStringArray(raw: Record<string, unknown>, key: string): string[] | undefined {
-  const value = raw[key]
-  if (!Array.isArray(value)) return undefined
-  return value.filter((item): item is string => typeof item === 'string')
-}
-
-function pickModalities(
-  raw: Record<string, unknown>,
-): { input?: string[]; output?: string[] } | undefined {
-  const value = raw.modalities
-  if (!isRecord(value)) return undefined
-  const modalities: { input?: string[]; output?: string[] } = {}
-  const input = pickStringArray(value, 'input')
-  const output = pickStringArray(value, 'output')
-  if (input != null) modalities.input = input
-  if (output != null) modalities.output = output
-  return modalities
-}
-
-function toDetectedGatewayModel(raw: unknown): DetectedGatewayModel {
-  if (!isRecord(raw)) throw createControlError('control_failed', '模型探测失败')
-  const id = pickString(raw, 'id')
-  const name = pickString(raw, 'name')
-  const provider = pickString(raw, 'provider')
-  if (!id || !name || !provider) throw createControlError('control_failed', '模型探测失败')
-  const model: DetectedGatewayModel = { id, name, provider }
-  const mode = pickString(raw, 'mode')
-  if (mode != null) model.mode = mode
-  if (typeof raw.description === 'string') model.description = raw.description
-  const enriched = pickBoolean(raw, 'description_enriched')
-  if (enriched != null) model.description_enriched = enriched
-  const contextOrResolution = pickString(raw, 'context_or_resolution')
-  if (contextOrResolution != null) model.context_or_resolution = contextOrResolution
-  const contextLimit = pickNumber(raw, 'context_limit')
-  if (contextLimit != null) model.context_limit = contextLimit
-  const capabilities = pickStringArray(raw, 'capabilities')
-  if (capabilities != null) model.capabilities = capabilities
-  const modalities = pickModalities(raw)
-  if (modalities != null) model.modalities = modalities
-  const supportsPromptCaching = pickBoolean(raw, 'supports_prompt_caching')
-  if (supportsPromptCaching != null) model.supports_prompt_caching = supportsPromptCaching
-  return model
-}
-
-function toModelReferenceSnapshot(raw: Record<string, unknown>): ModelReferenceSnapshot {
-  const modelId = pickString(raw, 'model_id')
-  const source = pickString(raw, 'source')
-  const note = typeof raw.note === 'string' ? raw.note : ''
-  if (!modelId || !source) throw createControlError('control_failed', '参照价查询失败')
-  const snapshot: ModelReferenceSnapshot = { modelId, source, note, found: raw.found === true }
-  assignOptionalText(snapshot, raw, [
-    ['provider', 'provider'],
-    ['name', 'name'],
-    ['knowledge', 'knowledge'],
-    ['family', 'family'],
-    ['status', 'status'],
-    ['last_updated', 'lastUpdated'],
-    ['release_date', 'releaseDate'],
-    ['error_code', 'errorCode'],
-    ['message', 'message'],
-  ] as const)
-  assignOptionalNumbers(snapshot, raw, [
-    ['input_usd_per_mtok', 'inputUsdPerMtok'],
-    ['output_usd_per_mtok', 'outputUsdPerMtok'],
-    ['context_limit', 'contextLimit'],
-  ] as const)
-  for (const [snake, camel] of [
-    ['reasoning', 'reasoning'],
-    ['tool_call', 'toolCall'],
-    ['temperature', 'temperature'],
-    ['attachment', 'attachment'],
-    ['structured_output', 'structuredOutput'],
-    ['open_weights', 'openWeights'],
-  ] as const) {
-    const flag = pickBoolean(raw, snake)
-    if (flag != null) {
-      ;(snapshot as unknown as Record<string, unknown>)[camel] = flag
-    }
-  }
-  const modalities = pickModalities(raw)
-  if (modalities != null) snapshot.modalities = modalities
-  return snapshot
 }
 
 function assignOptionalText<T extends object>(
@@ -432,33 +309,21 @@ async function saveModelCatalog(
 
 async function previewModelRoute(input: {
   modelId: string
+  provider?: string | undefined
   customPath?: string | undefined
   customParams?: string | undefined
 }): Promise<GatewayRoutePreview> {
+  // 后端透视仍消费组合 model_id：裸名在此拼接 provider（仅传输，不存储）。
+  const bare = input.modelId.trim()
+  const provider = (input.provider ?? '').trim()
+  const combinedId = provider ? `${provider}/${bare}` : bare
   const payload: { model_id: string; custom_path?: string; custom_params?: string } = {
-    model_id: input.modelId,
+    model_id: combinedId,
   }
   if (input.customPath != null) payload.custom_path = input.customPath
   if (input.customParams != null) payload.custom_params = input.customParams
   const body = await previewControlAIGatewayRoute(payload)
   return requireContractData<GatewayRoutePreview>(body, '路由透视失败')
-}
-
-async function detectGatewayModels(provider?: string): Promise<GatewayModelDetection> {
-  const body = await detectControlAIGatewayModels(
-    provider?.trim() ? { provider: provider.trim() } : undefined,
-  )
-  const result = requireContractData<{ models: unknown; configured_providers: unknown }>(
-    body,
-    '模型探测失败',
-  )
-  if (!Array.isArray(result.models) || typeof result.configured_providers !== 'number') {
-    throw createControlError('control_failed', '模型探测失败')
-  }
-  return {
-    models: result.models.map(toDetectedGatewayModel),
-    configured_providers: result.configured_providers,
-  }
 }
 
 async function listGatewayProviders(): Promise<GatewayProviderOption[]> {
@@ -470,23 +335,6 @@ async function listGatewayProviders(): Promise<GatewayProviderOption[]> {
   } catch (error) {
     throw withControlCopy(error, '加载供应商列表失败')
   }
-}
-
-async function getModelReference(input: {
-  modelId?: string | undefined
-  provider?: string | undefined
-  model?: string | undefined
-  refresh?: boolean | undefined
-}): Promise<ModelReferenceSnapshot> {
-  const params: { model_id?: string; provider?: string; model?: string; refresh?: string } = {}
-  if (input.modelId?.trim()) params.model_id = input.modelId.trim()
-  if (input.provider?.trim()) params.provider = input.provider.trim()
-  if (input.model?.trim()) params.model = input.model.trim()
-  if (input.refresh != null) params.refresh = String(input.refresh)
-  const body = await getControlAIGatewayModelReference(params)
-  return toModelReferenceSnapshot(
-    requireContractData<Record<string, unknown>>(body, '参照价查询失败'),
-  )
 }
 
 async function listModelsObserved(): Promise<ModelObservedSnapshot[]> {
@@ -527,22 +375,22 @@ async function testGatewayConnection(
   input: {
     base_url: string
     token?: string | undefined
-    provider: string
+    provider?: string | undefined
     model?: string | undefined
-    path: string
+    path?: string | undefined
   },
   options: GatewayMutationOptions = {},
 ): Promise<{ success: boolean; latencyMs?: number; message?: string }> {
   const payload: {
     base_url: string
     token?: string
-    provider: string
+    provider?: string
     model?: string
-    path: string
+    path?: string
   } = {
     base_url: input.base_url,
-    provider: input.provider,
-    path: input.path,
+    provider: input.provider ?? '',
+    path: input.path ?? '',
   }
   if (input.token != null) payload.token = input.token
   if (input.model != null) payload.model = input.model

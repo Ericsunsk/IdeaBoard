@@ -45,14 +45,14 @@
             @click="handleRefresh"
           />
 
-          <!-- 新增网关按钮 -->
+          <!-- 网关设置按钮：单态常驻入口，点击打开 dialog -->
           <button
             type="button"
             :class="adminToolbarButtonClass"
             :aria-label="MODELS_MESSAGES.addGateway"
             @click="gatewayDialogVisible = true"
           >
-            <Globe class="size-3.5 text-muted-foreground" />
+            <Brain class="size-3.5 text-muted-foreground" />
             <span>{{ MODELS_MESSAGES.addGateway }}</span>
           </button>
 
@@ -89,14 +89,14 @@
     >
       <div
         v-for="model in filteredModels"
-        :key="model.id"
+        :key="modelIdentityKey(model)"
         class="group flex flex-col h-full overflow-hidden rounded-panel border border-border bg-card transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-primary-line-emphasis"
       >
         <!-- 卡片主体区域 (Upper Section，含近 7 天观测区) -->
         <AdminModelCardBody
           :model="model"
           hoverable
-          :observed="observedByModel.get(model.id)"
+          :observed="observedByModel.get(modelIdentityKey(model))"
           :observed-loading="isObservedLoading"
         />
         <!-- 卡片底栏 (1:1 复刻 Cloudflare ModelCard Secondary Footer: 条款/文档链接 + 复制 ID / 编辑 / 删除 按钮) -->
@@ -117,18 +117,24 @@
             </a>
           </div>
 
-          <!-- 右侧：复制 ID / 编辑 / 删除 按钮 -->
+          <!-- 右侧：复制 ID / 编辑 / 删除 按钮（复制 provider/model 拼接，仅显示） -->
           <div class="flex items-center gap-1">
             <button
               type="button"
               class="inline-flex items-center gap-1 rounded-control px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
-              :aria-label="MODELS_MESSAGES.copyIdAria(model.id)"
-              @click="copyModelId(model.id)"
+              :aria-label="MODELS_MESSAGES.copyIdAria(displayModelId(model))"
+              @click="copyModelId(displayModelId(model))"
             >
-              <Check v-if="copiedModelId === model.id" class="size-3.5 text-success" />
+              <Check v-if="copiedModelId === displayModelId(model)" class="size-3.5 text-success" />
               <Copy v-else class="size-3.5 text-muted-foreground" />
-              <span :class="copiedModelId === model.id ? 'text-success font-semibold' : ''">
-                {{ copiedModelId === model.id ? MODELS_MESSAGES.copied : MODELS_MESSAGES.copy }}
+              <span
+                :class="copiedModelId === displayModelId(model) ? 'text-success font-semibold' : ''"
+              >
+                {{
+                  copiedModelId === displayModelId(model)
+                    ? MODELS_MESSAGES.copied
+                    : MODELS_MESSAGES.copy
+                }}
               </span>
             </button>
 
@@ -193,7 +199,7 @@
       </template>
     </AdminEmptyState>
 
-    <!-- 4. 添加模型弹窗 (自动探测 + 极简多选入库) -->
+    <!-- 4. 添加模型弹窗 (手动入库) -->
     <AdminModelAddDialog
       v-model:visible="addDialogVisible"
       :existing-models="allModels"
@@ -217,11 +223,11 @@
 
 <script setup lang="ts">
 import {
+  Brain,
   Check,
   Copy,
   Cube,
   EditPencil,
-  Globe,
   OpenNewWindow,
   Plus,
   Search,
@@ -241,6 +247,7 @@ import { AdminToolbarSearch } from '../../../shared'
 import { AdminRefreshButton } from '../../../shared'
 import { MODELS_MESSAGES } from './messages'
 import { useAdminModelCatalogWorkspace } from '../../session/useAdminModelCatalogWorkspace'
+import { displayModelId, modelIdentityKey } from '../../core/catalogData'
 
 // Page 只做布局与绑定：目录用例编排归 workspace，query key 归 workspace 所有。
 const {

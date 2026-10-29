@@ -6,8 +6,9 @@
 //
 // Storage (fragments/modelpool.sql, queries/service_model_pool.sql):
 //
-//	service_model_pool_entry(id, service, model_id, enabled, ...)
-//	  UNIQUE(service, model_id)
+//	service_model_pool_entry(id, service, provider, model_id, enabled, ...)
+//	  UNIQUE(service, provider, model_id); provider is the registry slug,
+//	  model_id the bare model name (display provider/model is derived only).
 //	service_model_pool_resolution(pool_entry_id FK CASCADE, resolution)
 //	  UNIQUE(entry, resolution); capability values are 1k/2k/4k only.
 //	  `default` is never a pool entry capability (ADR-0012 rule 3).

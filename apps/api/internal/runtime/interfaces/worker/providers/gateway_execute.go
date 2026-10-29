@@ -40,7 +40,12 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	if model == "" {
 		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, errors.New(errorrender.MsgRuntimeInterfacesWorkerProvidersCallGatewayAPI))
 	}
-	provider, modelName, pathOverride, err := runtimeports.SplitGatewayModel(model)
+	// Execution-side truth over the pinned display string: the pool
+	// stores structured provider + bare model, the snapshot pins their
+	// display form, and this split (not string-prefix inference) sets
+	// the namespace, the URL path, and the native body model. A bare
+	// model without a provider fails closed here.
+	provider, modelName, pathOverride, err := workflow.ParseExecutionModelRef(model)
 	if err != nil {
 		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
 	}
@@ -48,7 +53,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	// A nil reader preserves mapping-only behavior (tests, minimal wiring).
 	customParams := ""
 	if pathOverride == "" && c != nil && c.modelRoutes != nil {
-		catalogPath, catalogParams, found, routeErr := c.modelRoutes.LookupRouteOverride(ctx, model)
+		catalogPath, catalogParams, found, routeErr := c.modelRoutes.LookupRouteOverride(ctx, provider, modelName)
 		if routeErr != nil {
 			return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryProviderError, fmt.Errorf(errorrender.MsgCallGatewayAPI2, routeErr))
 		}

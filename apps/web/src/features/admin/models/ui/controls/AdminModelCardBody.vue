@@ -112,8 +112,8 @@ const props = withDefaults(
 // 模板多处使用：一次解析，多处复用。
 const brandLogo = computed(() => resolveModelBrandLogo(props.model))
 
-// Provider 品牌图经后端透传 models.dev SVG：加载失败（404/断网）时回落 Cube
-// 占位，避免破图；模型切换后重置失败态。
+// 品牌 logo：站内现成资产直展，AI provider 无外部图时回落 Cube 占位；
+// 模型切换后重置失败态。
 const logoLoadFailed = ref(false)
 watch(brandLogo, () => {
   logoLoadFailed.value = false

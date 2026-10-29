@@ -59,7 +59,7 @@ export function createAdminModelPoolResource(
 
 async function defaultCatalogModelLister(): Promise<AdminPoolCatalogModel[]> {
   const items = await createAdminGatewayResource().catalog.list()
-  return items.map((item) => ({ id: item.id, name: item.name }))
+  return items.map((item) => ({ id: item.id, name: item.name, provider: item.provider }))
 }
 
 export async function fetchAdminModelPool(sku: string): Promise<AdminModelPool> {
@@ -82,6 +82,7 @@ export async function replaceAdminModelPool(
       {
         expected_version: input.version,
         entries: input.entries.map((entry) => ({
+          provider: entry.provider,
           model_id: entry.modelId,
           enabled: entry.enabled,
           resolutions: [...entry.resolutions],
@@ -103,6 +104,7 @@ type AdminModelPoolWire = {
   sku: string
   version: number
   entries: Array<{
+    provider: string
     model_id: string
     enabled: boolean
     resolutions: unknown
@@ -121,6 +123,7 @@ function normalizePool(wire: AdminModelPoolWire, fallbackSku: string): AdminMode
     sku: wire.sku || fallbackSku,
     version: wire.version,
     entries: (wire.entries ?? []).map((entry) => ({
+      provider: typeof entry.provider === 'string' ? entry.provider : '',
       modelId: entry.model_id,
       enabled: entry.enabled === true,
       resolutions: normalizeResolutions(entry.resolutions),

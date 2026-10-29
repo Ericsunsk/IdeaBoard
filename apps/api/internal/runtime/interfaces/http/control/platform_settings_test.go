@@ -213,9 +213,7 @@ func (f *fakeControlOAuth) UpdateSocialProviderSettings(_ context.Context, provi
 func TestControlExtendedAuthMatrix(t *testing.T) {
 	h := newControlHarness(t, nil)
 	reads := []controlCall{
-		{method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/detect-models"},
-		{method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/models-reference?model_id=openai/gpt-4o"},
-		{method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/brand-logo?provider=openai"},
+		{method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/providers"},
 		{method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/models-observed"},
 		{method: http.MethodGet, path: "/api/control/v1/platform/brand-logo-overrides"},
 		{method: http.MethodGet, path: "/api/control/v1/users/oauth/google"},
@@ -272,7 +270,7 @@ func TestControlExtendedAuthMatrix(t *testing.T) {
 		// scoped-cap admin passes every family (nil deps fail closed past
 		// the guard with 501/503, proving the guard itself passed).
 		status, _, _ := h.serve(controlCall{
-			method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/detect-models",
+			method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/providers",
 			userID: controlOperatorID, role: "admin", caps: []string{ControlCapabilityPlatform},
 		})
 		if status != http.StatusNotImplemented {
@@ -299,7 +297,7 @@ func TestControlExtendedAuthMatrix(t *testing.T) {
 			t.Fatalf("scoped rewards status = %d, want 501 (nil dep, guard passed)", status)
 		}
 		status, _, _ = h.serve(controlCall{
-			method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/detect-models",
+			method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/providers",
 			userID: controlOperatorID, role: "admin", caps: []string{ControlCapabilityCredits},
 		})
 		if status != http.StatusNotImplemented {
@@ -311,9 +309,7 @@ func TestControlExtendedAuthMatrix(t *testing.T) {
 func TestControlExtendedNilDepsFailClosed(t *testing.T) {
 	h := newControlHarness(t, nil)
 	cases := []controlCall{
-		{method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/detect-models"},
-		{method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/models-reference?model_id=x"},
-		{method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/brand-logo?provider=openai"},
+		{method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/providers"},
 		{method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/models-observed"},
 		{method: http.MethodGet, path: "/api/control/v1/platform/brand-logo-overrides"},
 		{method: http.MethodGet, path: "/api/control/v1/platform/monitor/stream"},

@@ -55,7 +55,7 @@ type allowAllPoolStore struct{}
 
 func (allowAllPoolStore) ListPool(_ context.Context, service string) (routing.Pool, error) {
 	return routing.Pool{Service: service, Version: 1, Entries: []routing.ModelPoolEntry{
-		{Model: "openrouter/test-model", Enabled: true, SupportedResolutions: []routing.Resolution{
+		{Provider: "openrouter", Model: "test-model", Enabled: true, SupportedResolutions: []routing.Resolution{
 			routing.Resolution1K, routing.Resolution2K, routing.Resolution4K,
 		}},
 	}}, nil
@@ -387,7 +387,8 @@ func routingPool(version uint64, entries ...routing.ModelPoolEntry) routing.Pool
 }
 
 func routingEntry(model string, enabled bool, resolutions ...routing.Resolution) routing.ModelPoolEntry {
-	return routing.ModelPoolEntry{Model: model, Enabled: enabled, SupportedResolutions: resolutions}
+	provider, bare, _ := strings.Cut(model, "/")
+	return routing.ModelPoolEntry{Provider: provider, Model: bare, Enabled: enabled, SupportedResolutions: resolutions}
 }
 
 type routingTestEnv struct {
@@ -513,7 +514,7 @@ func TestResolverPinsSnapshotAndSurvivesPoolEdits(t *testing.T) {
 	edited := pools["render"]
 	edited.Version = 4
 	for i := range edited.Entries {
-		if edited.Entries[i].Model == snap.SelectedModel {
+		if edited.Entries[i].DisplayModel() == snap.SelectedModel {
 			edited.Entries[i].Enabled = false
 		}
 	}

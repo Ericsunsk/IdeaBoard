@@ -20,14 +20,14 @@ const item: AdminBillableItemCard = {
 }
 
 const entries: AdminModelPoolEntry[] = [
-  { modelId: 'a/first', enabled: true, resolutions: ['1k', '2k'] },
-  { modelId: 'b/second', enabled: false, resolutions: [] },
+  { provider: 'a', modelId: 'first', enabled: true, resolutions: ['1k', '2k'] },
+  { provider: 'b', modelId: 'second', enabled: false, resolutions: [] },
 ]
 
 const catalogModels: AdminPoolCatalogModel[] = [
-  { id: 'a/first', name: 'First' },
-  { id: 'b/second', name: 'Second' },
-  { id: 'c/third', name: 'Third' },
+  { id: 'first', name: 'First', provider: 'a' },
+  { id: 'second', name: 'Second', provider: 'b' },
+  { id: 'third', name: 'Third', provider: 'c' },
 ]
 
 const TestHarness = defineComponent({
@@ -142,15 +142,15 @@ describe('ModelPoolEditorPanel', () => {
     expect(emitted().save).toHaveLength(1)
     expect(emitted().save![0]).toEqual([
       [
-        { modelId: 'a/first', enabled: true, resolutions: ['1k', '2k'] },
-        { modelId: 'b/second', enabled: false, resolutions: ['4k'] },
+        { provider: 'a', modelId: 'first', enabled: true, resolutions: ['1k', '2k'] },
+        { provider: 'b', modelId: 'second', enabled: false, resolutions: ['4k'] },
       ],
     ])
   })
 
   it('blocks save when an enabled model has no resolution', async () => {
     const { user, emitted } = renderPanel({
-      entries: [{ modelId: 'a/first', enabled: true, resolutions: [] }],
+      entries: [{ provider: 'a', modelId: 'first', enabled: true, resolutions: [] }],
     })
 
     await user.click(await screen.findByRole('button', { name: '保存' }))
@@ -193,15 +193,75 @@ describe('ModelPoolEditorPanel', () => {
     expect(emitted().save).toHaveLength(1)
     expect(emitted().save![0]).toEqual([
       [
-        { modelId: 'a/first', enabled: true, resolutions: ['1k', '2k'] },
-        { modelId: 'c/third', enabled: true, resolutions: ['1k'] },
+        { provider: 'a', modelId: 'first', enabled: true, resolutions: ['1k', '2k'] },
+        { provider: 'c', modelId: 'third', enabled: true, resolutions: ['1k'] },
+      ],
+    ])
+  })
+
+  it('preserves native vendor paths when adding a catalog model', async () => {
+    const { user, emitted } = renderPanel({
+      entries: [],
+      catalogModels: [{ id: 'google/gemini-flash', name: 'Gemini', provider: 'openrouter' }],
+    })
+
+    await user.selectOptions(
+      await screen.findByLabelText('选择模型'),
+      'openrouter/google/gemini-flash',
+    )
+    await user.click(screen.getByRole('button', { name: '添加模型' }))
+    expect(await screen.findByText('openrouter/google/gemini-flash')).toBeVisible()
+
+    await user.click(
+      screen.getByRole('button', { name: 'openrouter/google/gemini-flash1K分辨率未支持' }),
+    )
+    await user.click(screen.getByRole('button', { name: '保存' }))
+    expect(emitted().save).toHaveLength(1)
+    // 前缀裸名分离：目录的组合形态只做显示，池内存 provider + 裸名。
+    const savedRow = (emitted().save![0] as AdminModelPoolEntry[][])[0]![0]!
+    expect(savedRow.provider).toBe('openrouter')
+    expect(savedRow.modelId).toBe('google/gemini-flash')
+    expect(savedRow.enabled).toBe(true)
+    expect(savedRow.resolutions).toEqual(['1k'])
+  })
+
+  it('selects different providers with the same native model name independently', async () => {
+    const { user, emitted } = renderPanel({
+      entries: [],
+      catalogModels: [
+        { provider: 'openai', id: 'gpt-image-1', name: 'OpenAI' },
+        { provider: 'azureopenai', id: 'gpt-image-1', name: 'Azure' },
+      ],
+    })
+    const picker = await screen.findByLabelText('选择模型')
+    await user.selectOptions(
+      picker,
+      screen.getByRole('option', { name: 'azureopenai/gpt-image-1 · Azure' }),
+    )
+    await user.click(screen.getByRole('button', { name: '添加模型' }))
+    await user.click(
+      await screen.findByRole('button', { name: 'azureopenai/gpt-image-11K分辨率未支持' }),
+    )
+    await user.selectOptions(
+      picker,
+      screen.getByRole('option', { name: 'openai/gpt-image-1 · OpenAI' }),
+    )
+    await user.click(screen.getByRole('button', { name: '添加模型' }))
+    await user.click(
+      await screen.findByRole('button', { name: 'openai/gpt-image-11K分辨率未支持' }),
+    )
+    await user.click(screen.getByRole('button', { name: '保存' }))
+    expect(emitted().save?.[0]).toEqual([
+      [
+        { provider: 'azureopenai', modelId: 'gpt-image-1', enabled: true, resolutions: ['1k'] },
+        { provider: 'openai', modelId: 'gpt-image-1', enabled: true, resolutions: ['1k'] },
       ],
     ])
   })
 
   it('reserves one error line per row so validation cannot shift rows', async () => {
     const { user } = renderPanel({
-      entries: [{ modelId: 'a/first', enabled: true, resolutions: [] }],
+      entries: [{ provider: 'a', modelId: 'first', enabled: true, resolutions: [] }],
     })
 
     // 错误行恒占位：无错误时留空盒，校验出现只填文本、不增删节点。

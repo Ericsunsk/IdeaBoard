@@ -16,8 +16,7 @@ AIGateway is the operating context for the sole AI egress: gateway connection, m
 | Vision Mapping      | Vision-search-only mapping under the bare key `vision`, stored as `ai_gateway_vision_model`, isolated from Service routing                                                                                                                                                                             |
 | Route Preview       | Dry-run routing for a model ID plus custom params (namespace, path, source rule, chat judgment); shares `dialects.Resolve` (single resolve-then-shape seam) with execution so preview and execution never diverge                                                                                      |
 | Connection Probe    | Direct probe at the primary gateway (bypasses fallback topology), single-shot (`cf-aig-max-attempts: 1`), cache-skipped, results logged only                                                                                                                                                           |
-| Model Detection     | Union of control-plane configured providers with the LiteLLM community catalog and the models.dev catalog over one shared attribution; same keys dedupe with models.dev winning metadata, relay partitions never match; LiteLLM failure stays fail-closed, models.dev failure degrades to LiteLLM-only |
-| Configured Provider | Control-plane-attested provider slug; Workers AI carries no key so it never appears there — availability probing admits it when alive                                                                                                                                                                  |
+| Configured Provider | Control-plane-attested provider slug (provider_configs) plus the workers-ai first-party constant; model discovery is manual (provider dropdown + hand-filled model name), no community catalog, no models.dev, no availability probing |
 | Receipt             | Gateway acknowledgement headers (model, provider, step, cache status, log/event ID); operations observability and attempt facts only, never billing snapshots                                                                                                                                          |
 | Cache Bypass        | Gateway-global cache stays off; Gateway transport always sends `cf-aig-skip-cache: true`. Callers cannot opt into caching; cache receipt fields remain observability only.                                                                                                                             |
 
@@ -25,20 +24,19 @@ AIGateway is the operating context for the sole AI egress: gateway connection, m
 
 - `ConfigRepository.Resolve/Update` is the gateway connection seam; `ResolveVisionModel` reads only the Vision mapping. Task execution does not read a live Service mapping here.
 - `PreviewGatewayRoute` is the routing dry-run seam; `ProbeGatewayConnection` is the connectivity diagnostic seam.
+- Catalog identity is the case-insensitive pair `(provider, id)`: provider is an explicit registry slug; id is the provider-native name and preserves nested vendor/model segments. Same-name models at different providers are distinct. Vision mappings and routing overrides resolve that pair, never a bare id alone.
 - `ListCatalog/SaveCatalog/DefaultCatalog` is the model catalog seam; saving cleans up a stale Vision mapping in one transaction under a write lock with a single audit record. The catalog holds routing and display metadata only, never prices; SaveCatalog strictly rejects unknown fields (including the removed per-token price fields).
-- `DetectModels` is the model discovery seam; `ListProviders` is the provider display seam (display name, ID prefix, gateway namespace).
-- `GetModelReference` is the read-only models.dev reference seam (USD/MTok input/output, context limit, last_updated); results are display-only and degrade to an explicit error code on allowlist gaps or upstream failures.
+- `ListConfiguredProviders` is the provider display seam (control-plane configured set plus workers-ai first-party constant: display name, ID prefix, gateway namespace).
 - `ListModelsObserved` is the read-only 7-day first-party observation seam (per-model success rate, top failure_stage/category, cache hit rate, on-sale SKU UnitCredits margin rows); gateway actual cost has no receipt/log source so margin cost stays an explicit unavailable marker, never fabricated.
-- Billing charges solely on the billing SKU UnitCredits; no catalog or detection field ever feeds settlement (see ADR-0010).
+- Billing charges solely on the billing SKU UnitCredits; no catalog field ever feeds settlement (see ADR-0010).
 
 ## Invariants
 
 - Provider keys live in Cloudflare (BYOK); this repo holds only the gateway token; payloads never persist in gateway logs (`collect-log-payload: false`); metadata carries only `task_id` + `feature` (2 of the 5 allowed entries).
-- Community catalog IDs and display names stay verbatim; deprecated and malformed entries are skipped.
-- Unknown provider slugs synthesize a default display (community guess + `custom-` namespace) instead of silently vanishing.
+- Unknown provider slugs synthesize a default display (prettified name + `custom-` namespace) instead of silently vanishing.
 - All gateway calls use the provider-native surface with an explicit path; there is no OpenAI-compatible rewrite (chat-shaped payloads ride provider-native too, `IsChat` only drives dialect shaping).
 - Probes bypass the fallback topology; single-shot semantics verified empirically at implementation time.
-- Control-plane lists cache per token hash with short TTL and a bound; the catalog caches 24h; every failure surfaces.
+- Control-plane provider lists cache per token hash with short TTL and a bound; every failure surfaces fail-closed.
 
 ## Non-goals
 

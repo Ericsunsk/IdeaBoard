@@ -132,7 +132,6 @@ Deliberately NOT converged (context-specific, different code/state/scope — do 
 - `不能操作…` (admin self-operation guard) vs `不能模拟…` (impersonation): different semantics.
 - `需要管理员权限` (admin-required) vs `权限不足` (generic forbidden): different nuance.
 - `*不存在` / `*失败` / `*不能为空` / `*无效` with different subjects: entity-specific, keep the subject.
-- `社区模型目录*` (detect/fetch operation) vs `models.dev *` (reference-load operation): different operations.
 - Suffix-shared but cause-specific strings (`请联系管理员`, `请检查配置或稍后重试`, `请稍后重试` with different verbs/subjects).
 
 ## When To Expand A Context

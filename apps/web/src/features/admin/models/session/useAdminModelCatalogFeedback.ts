@@ -7,7 +7,6 @@ export type AdminModelCatalogFeedback = {
   importSkippedAsExisting: () => void
   imported: (count: number) => void
   addFailed: (error: unknown) => void
-  detectFailed: (error: unknown) => void
   deleted: (modelName: string) => void
   deleteFailed: (error: unknown) => void
   duplicateId: (modelId: string) => void
@@ -33,7 +32,6 @@ const ADMIN_MODEL_CATALOG_COPY = {
   importSkippedAsExisting: { info: '所选模型已全部存在于模型库中' },
   imported: { success: (count: number) => `已成功导入 ${count} 个模型到模型库` },
   addFailed: { error: '添加模型失败' },
-  detectFailed: { error: '探测网关模型失败' },
   deleted: { success: (modelName: string) => `已删除模型「${modelName}」` },
   deleteFailed: { error: '删除模型失败' },
   duplicateId: { errorText: (modelId: string) => `模型标识 ${modelId} 已存在，不能重复添加` },

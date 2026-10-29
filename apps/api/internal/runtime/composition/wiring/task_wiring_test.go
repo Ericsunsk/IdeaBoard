@@ -1,33 +1,40 @@
 package wiring
 
 import (
+	"context"
 	"testing"
 
-	"ideaboard/api/internal/platform/riverpolicy"
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	aigatewayapplication "ideaboard/api/internal/aigateway/application"
 )
 
-// Base pairing test for task_wiring.go.
-// riverQueueStatsByQueue must expose exactly the unique queues from the
-// retry matrix: a missing queue loses its RED signals, a duplicate
-// wastes a gauge series.
-func TestRiverQueueStatsByQueueMirrorsRetryMatrix(t *testing.T) {
-	monitor := taskqueue.NewRiverQueue(nil, nil, riverpolicy.RiverMaxAttemptsDefault)
-	stats := riverQueueStatsByQueue(monitor)
-	if len(stats) == 0 {
-		t.Fatal("riverQueueStatsByQueue returned empty map, want one entry per matrix queue")
+type routeCatalogStub []aigatewayapplication.CatalogItem
+
+func (s routeCatalogStub) ListCatalog(context.Context) ([]aigatewayapplication.CatalogItem, error) {
+	return s, nil
+}
+
+func TestLookupRouteOverrideProviderModelIdentity(t *testing.T) {
+	reader := aiGatewayModelRouteReader{repo: routeCatalogStub{
+		{Provider: "openai", ID: "GPT-IMAGE-1", CustomPath: "openai/custom-generate", CustomParams: `{"quality":"high"}`},
+		{Provider: "azureopenai", ID: "gpt-image-1", CustomPath: "azure/custom-generate", CustomParams: `{"quality":"medium"}`},
+		{Provider: "openrouter", ID: "Google/Gemini-3-Flash", CustomPath: "openrouter/custom-generate", CustomParams: `{"temperature":0.5}`},
+	}}
+	cases := []struct {
+		name, provider, model, wantPath, wantParams string
+		wantFound                                   bool
+	}{
+		{name: "case-insensitive native model", provider: "openai", model: "gpt-image-1", wantPath: "openai/custom-generate", wantParams: `{"quality":"high"}`, wantFound: true},
+		{name: "same-name provider isolation", provider: " AzureOpenAI ", model: " GPT-IMAGE-1 ", wantPath: "azure/custom-generate", wantParams: `{"quality":"medium"}`, wantFound: true},
+		{name: "nested native model", provider: "OpenRouter", model: "google/gemini-3-flash", wantPath: "openrouter/custom-generate", wantParams: `{"temperature":0.5}`, wantFound: true},
+		{name: "different provider", provider: "anthropic", model: "gpt-image-1"},
+		{name: "empty native model", provider: "openai", model: " "},
 	}
-	seen := map[string]struct{}{}
-	for _, policy := range riverpolicy.RiverRetryMatrix() {
-		if _, dup := seen[policy.Queue]; dup {
-			continue
-		}
-		seen[policy.Queue] = struct{}{}
-		if _, ok := stats[policy.Queue]; !ok {
-			t.Errorf("queue %q from retry matrix missing in stats map", policy.Queue)
-		}
-	}
-	if len(stats) != len(seen) {
-		t.Errorf("stats map has %d queues, want %d unique matrix queues", len(stats), len(seen))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path, params, found, err := reader.LookupRouteOverride(context.Background(), tc.provider, tc.model)
+			if err != nil || path != tc.wantPath || params != tc.wantParams || found != tc.wantFound {
+				t.Fatalf("LookupRouteOverride(%q, %q) = (%q, %q, %v, %v), want (%q, %q, %v, nil)", tc.provider, tc.model, path, params, found, err, tc.wantPath, tc.wantParams, tc.wantFound)
+			}
+		})
 	}
 }

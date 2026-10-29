@@ -331,12 +331,6 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 			controlRoute{Operation: "platform.save_ai_gateway_catalog", Route: "PUT /platform/ai-gateway/catalog", Mutation: true}, ControlCapabilityPlatform, gatewayAvailable, h.SaveCatalog))
 		control.GET("/platform/ai-gateway/providers", d.controlProxy(
 			controlRoute{Operation: "platform.list_ai_gateway_providers", Route: "GET /platform/ai-gateway/providers"}, ControlCapabilityPlatform, gatewayAvailable, h.ListProviders))
-		control.GET("/platform/ai-gateway/detect-models", d.controlProxy(
-			controlRoute{Operation: "platform.detect_ai_gateway_models", Route: "GET /platform/ai-gateway/detect-models"}, ControlCapabilityPlatform, gatewayAvailable, h.DetectModels))
-		control.GET("/platform/ai-gateway/models-reference", d.controlProxy(
-			controlRoute{Operation: "platform.get_ai_gateway_model_reference", Route: "GET /platform/ai-gateway/models-reference"}, ControlCapabilityPlatform, gatewayAvailable, h.GetModelReference))
-		control.GET("/platform/ai-gateway/brand-logo", d.controlProxyRaw(
-			controlRoute{Operation: "platform.get_ai_gateway_brand_logo", Route: "GET /platform/ai-gateway/brand-logo"}, ControlCapabilityPlatform, gatewayAvailable, h.GetBrandLogo))
 		control.GET("/platform/ai-gateway/models-observed", d.controlProxy(
 			controlRoute{Operation: "platform.list_ai_gateway_models_observed", Route: "GET /platform/ai-gateway/models-observed"}, ControlCapabilityPlatform, gatewayAvailable, h.ListModelsObserved))
 		// Route preview and connection test are pure routing/connectivity

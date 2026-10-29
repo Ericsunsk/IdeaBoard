@@ -22,8 +22,7 @@ type configStore interface {
 	Update(ctx context.Context, input UpdateInput, actorID int64) error
 	ListCatalog(ctx context.Context) ([]CatalogItem, error)
 	SaveCatalog(ctx context.Context, items []CatalogItem, actorID int64) error
-	DetectModels(ctx context.Context, provider string) (ModelDetection, error)
-	GetModelReference(ctx context.Context, modelID, provider, model string, refresh bool) (ModelReference, error)
+	ListConfiguredProviders(ctx context.Context) ([]workflow.ProviderEntry, error)
 }
 
 // Handler serves the Admin AI gateway settings endpoints.
@@ -135,8 +134,8 @@ func (h *Handler) TestConnection(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, errorrender.MsgAigatewayApplicationUpdate)
 		return
 	}
-	provider, model, path := strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model), strings.TrimSpace(req.Path)
-	if provider == "" || path == "" {
+	provider, model, path := strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model), strings.Trim(strings.TrimSpace(req.Path), "/")
+	if (provider == "") != (path == "") {
 		response.Error(c, http.StatusBadRequest, errorrender.MsgTestConnection)
 		return
 	}
@@ -162,9 +161,8 @@ type saveCatalogRequest struct {
 }
 
 // SaveCatalog updates the full model catalog in system settings.
-// Decoding is strict: unknown fields (including the removed per-token
-// price fields) are rejected instead of silently ignored, so legacy
-// writers fail loudly and migrate to the models.dev reference seam.
+// Decoding is strict: unknown fields are rejected instead of silently
+// ignored, so legacy writers fail loudly.
 // Authorization rides the outer Control Plane guard; the actor is resolved
 // from the request principal.
 func (h *Handler) SaveCatalog(c *gin.Context) {
@@ -201,10 +199,19 @@ type ProviderOption struct {
 	IDPrefix    string `json:"id_prefix"`
 }
 
-// ListProviders serves the registry without touching configuration. Pure
-// metadata read; authorization rides the outer Control Plane guard.
+// ListProviders serves the configured providers (control-plane
+// provider_configs plus the workers-ai first-party constant) for provider
+// quick-pick UIs: canonical slug, display name and the ID input hint.
+// Authorization rides the outer Control Plane guard.
 func (h *Handler) ListProviders(c *gin.Context) {
-	entries := workflow.ListProviders()
+	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
+		return
+	}
+	entries, err := h.store.ListConfiguredProviders(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	options := make([]ProviderOption, 0, len(entries))
 	for _, entry := range entries {
 		options = append(options, ProviderOption{
@@ -216,56 +223,6 @@ func (h *Handler) ListProviders(c *gin.Context) {
 	response.SuccessDTO(c, options)
 }
 
-// DetectModels probes the gateway for available models.
-// Authorization rides the outer Control Plane guard.
-func (h *Handler) DetectModels(c *gin.Context) {
-	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
-		return
-	}
-	provider := strings.TrimSpace(c.Query("provider"))
-	detection, err := h.store.DetectModels(c.Request.Context(), provider)
-	if err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
-	response.SuccessDTO(c, detection)
-}
-
-// GetModelReference serves the read-only models.dev reference lookup for
-// one model. Degraded outcomes (allowlist gap, upstream failure, miss)
-// return HTTP 200 with Found=false and an explicit error_code inside the
-// payload, never an HTTP error: reference display must not block catalog
-// flows. Only invalid input (missing model identity) is a 400.
-// Authorization rides the outer Control Plane guard.
-func (h *Handler) GetModelReference(c *gin.Context) {
-	if !platformhttp.RequireDependency(c, h != nil && h.store != nil, errorrender.MsgAigatewayApplicationGet) {
-		return
-	}
-	reference, err := h.store.GetModelReference(
-		c.Request.Context(),
-		strings.TrimSpace(c.Query("model_id")),
-		strings.TrimSpace(c.Query("provider")),
-		strings.TrimSpace(c.Query("model")),
-		parseRefreshParam(c.Query("refresh")),
-	)
-	if err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
-	response.SuccessDTO(c, reference)
-}
-
-// parseRefreshParam accepts truthy refresh values for cache bypass.
-func parseRefreshParam(raw string) bool {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "1", "true", "yes":
-		return true
-	default:
-		return false
-	}
-}
-
-// merged from internal/aigateway/application/observed_handler.go (structural consolidation; symbols unchanged).
 // SetObservedService attaches the read-only model observation service. It is
 // set once at composition time (same pattern as vision billing); a nil
 // service keeps the endpoint fail-closed with 503.

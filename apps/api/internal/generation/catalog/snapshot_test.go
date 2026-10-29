@@ -86,8 +86,8 @@ func seedPool(t *testing.T, db *pgxpool.Pool) {
 	t.Helper()
 	repo := NewRepository(db)
 	if _, err := repo.ReplacePool(context.Background(), "generation", 0, []PoolEntryInput{
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"1k", "2k"}},
-		{ModelID: "b/second", Enabled: true, Resolutions: []string{"2k", "4k"}},
+		{Provider: "a", Model: "first", Enabled: true, Resolutions: []string{"1k", "2k"}},
+		{Provider: "b", Model: "second", Enabled: true, Resolutions: []string{"2k", "4k"}},
 	}); err != nil {
 		t.Fatalf("seed pool failed: %v", err)
 	}

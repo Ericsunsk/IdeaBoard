@@ -8,11 +8,9 @@ import {
 
 // Admin brand logo override boundary (W2 transports, fail-closed). The
 // Control Plane has no brand-logo operations, so the override read and
-// save/remove fail closed with guidance instead of calling the deleted
-// `/api/admin/brand-logo-overrides*` routes. Local override hydration
-// stays (defaults render when nothing is stored). The models.dev logo
-// proxy URLs in `brandLogos.ts` are a separate backend gap (images fall
-// back to placeholders via onError). See the stream report.
+// save/remove fail closed with guidance (no remote call). Local override
+// hydration stays (defaults render when nothing is stored). AI provider
+// logos fall back to placeholders.
 type AdminBrandLogoOverrideDto = {
   scope: AdminBrandLogoScope
   target_key: string

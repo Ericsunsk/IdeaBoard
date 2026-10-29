@@ -21,17 +21,15 @@ beforeEach(() => {
 })
 
 describe('Admin model catalog feedback additions', () => {
-  it('routes catalog list and gateway detect failures to toast with safe fallbacks', () => {
+  it('routes catalog list failures to toast with safe fallbacks', () => {
     const feedback = useAdminModelCatalogFeedback()
 
     feedback.listFailed(new Error('catalog down'))
     feedback.listFailed(new Error('dial tcp 127.0.0.1:5432'))
-    feedback.detectFailed(new Error('dial tcp 127.0.0.1:5432'))
 
     expect(toast.error.mock.calls.map(([message]) => message)).toEqual([
       'catalog down',
       '加载模型目录失败',
-      '探测网关模型失败',
     ])
   })
 

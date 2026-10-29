@@ -39,7 +39,7 @@ type allowAllWorkerPoolStore struct{}
 
 func (allowAllWorkerPoolStore) ListPool(_ context.Context, service string) (routing.Pool, error) {
 	return routing.Pool{Service: service, Version: 1, Entries: []routing.ModelPoolEntry{
-		{Model: "openrouter/test-model", Enabled: true, SupportedResolutions: []routing.Resolution{
+		{Provider: "openrouter", Model: "test-model", Enabled: true, SupportedResolutions: []routing.Resolution{
 			routing.Resolution1K, routing.Resolution2K, routing.Resolution4K,
 		}},
 	}}, nil

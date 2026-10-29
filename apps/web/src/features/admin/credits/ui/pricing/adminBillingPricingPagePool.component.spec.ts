@@ -37,8 +37,8 @@ function poolHandlers(failSkus: string[] = []) {
           sku,
           version: 2,
           entries: [
-            { model_id: 'a/first', enabled: true, resolutions: ['1k', '2k', '4k'] },
-            { model_id: 'b/second', enabled: true, resolutions: ['2k', '4k'] },
+            { provider: 'a', model_id: 'first', enabled: true, resolutions: ['1k', '2k', '4k'] },
+            { provider: 'b', model_id: 'second', enabled: true, resolutions: ['2k', '4k'] },
           ],
         },
       })
@@ -50,9 +50,9 @@ function poolHandlers(failSkus: string[] = []) {
       HttpResponse.json({
         data: [
           {
-            id: 'a/first',
-            name: 'First',
-            provider: 'test',
+            id: 'third',
+            name: 'Third',
+            provider: 'c',
             description: '',
             context_or_resolution: '',
             capabilities: [],

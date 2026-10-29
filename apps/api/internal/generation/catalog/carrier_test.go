@@ -40,8 +40,8 @@ func beginCatalogCarrier(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 
 func carrierPoolInputs() []PoolEntryInput {
 	return []PoolEntryInput{
-		{ModelID: "b/second", Enabled: true, Resolutions: []string{"2k"}},
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"1k"}},
+		{Provider: "b", Model: "second", Enabled: true, Resolutions: []string{"2k"}},
+		{Provider: "a", Model: "first", Enabled: true, Resolutions: []string{"1k"}},
 	}
 }
 

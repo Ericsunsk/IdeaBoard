@@ -1,22 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, within } from '@testing-library/vue'
+import { within } from '@testing-library/vue'
 import { renderWithUser, screen } from '@/test/render'
-import { mockAppToast, expectToastFeedback, type AppToastMocks } from '@/test/toast'
+import { mockAppToast } from '@/test/toast'
 import AdminModelAddDialog from './AdminModelAddDialog.vue'
 import type { AdminModelItem } from '../../core/catalogData'
 
 const gatewayFakes = vi.hoisted(() => ({
-  detect: vi.fn(),
+  listProviders: vi.fn(),
 }))
-
-let toast: AppToastMocks
 
 vi.mock('../../resource', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../resource')>()
   return {
     ...actual,
     createAdminGatewayResource: () => ({
-      catalog: { detect: gatewayFakes.detect },
+      catalog: { listProviders: gatewayFakes.listProviders },
     }),
   }
 })
@@ -24,44 +22,26 @@ vi.mock('../../resource', async (importOriginal) => {
 vi.mock('../../../../../core/composables/useAppToast')
 
 describe('AdminModelAddDialog', () => {
-  const mockDetectedModels = [
-    {
-      id: '@cf/black-forest-labs/flux-1-schnell',
-      name: 'FLUX.1 Schnell 快速生图',
-      provider: 'Workers AI',
-    },
-    {
-      id: 'gpt-4o',
-      name: 'GPT-4o 旗舰多模态',
-      provider: 'OpenAI',
-      mode: 'chat',
-    },
-    {
-      id: 'fal-ai/birefnet',
-      name: 'BiRefNet 高清抠图',
-      provider: 'Fal AI',
-    },
+  const mockProviders = [
+    { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/' },
+    { slug: 'workers-ai', display_name: 'Workers AI', id_prefix: 'workers-ai/' },
   ]
 
   beforeEach(() => {
     vi.clearAllMocks()
-    toast = mockAppToast()
-    gatewayFakes.detect.mockResolvedValue({
-      models: mockDetectedModels,
-      configured_providers: 3,
-    })
+    mockAppToast()
+    gatewayFakes.listProviders.mockResolvedValue(mockProviders)
   })
 
   const existingModels: AdminModelItem[] = [
     {
-      id: '@cf/black-forest-labs/flux-1-schnell',
-      name: 'FLUX.1 Schnell 快速生图',
-      provider: 'Workers AI',
-      mode: 'image_generation',
-      description: 'Workers AI 官方简介',
+      id: 'gpt-4o',
+      name: 'GPT-4o',
+      provider: 'OpenAI',
+      description: '',
       contextOrResolution: '',
       capabilities: [],
-      hosting: 'Cloudflare 托管',
+      hosting: '第三方',
       termsUrl: '',
       docsUrl: '',
     },
@@ -89,129 +69,95 @@ describe('AdminModelAddDialog', () => {
     })
   }
 
-  it('automatically probes gateway models upon opening and displays them in checkbox table', async () => {
-    renderDialog()
+  it('loads configured providers on open', async () => {
+    renderDialog({ existingModels: [] })
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: '添加模型' })).toBeInTheDocument()
-
-    // 探测结果自动展示
-    expect(await within(dialog).findByText('FLUX.1 Schnell 快速生图')).toBeInTheDocument()
-    expect(within(dialog).getByText('GPT-4o 旗舰多模态')).toBeInTheDocument()
-    expect(within(dialog).getByText('BiRefNet 高清抠图')).toBeInTheDocument()
-
-    // 检查已在库中的状态
-    expect(within(dialog).getByText('已在库中')).toBeInTheDocument()
+    expect(gatewayFakes.listProviders).toHaveBeenCalled()
+    expect(await within(dialog).findByText('OpenAI')).toBeInTheDocument()
   })
 
-  it('shows a single detecting line while probing gateway models', async () => {
-    gatewayFakes.detect.mockReturnValueOnce(new Promise(() => {}))
-    renderDialog()
-
-    const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByText('正在比对社区模型目录...')).toBeVisible()
-    expect(within(dialog).queryByText('正在获取已连接供应商的模型列表...')).not.toBeInTheDocument()
-    // 加载中与空态互斥：结果未回来前不得出现空态块
-    expect(within(dialog).queryByText('未探测到可用的网关模型')).not.toBeInTheDocument()
-  })
-
-  it('routes detection failures to toast without an inline error', async () => {
-    gatewayFakes.detect.mockRejectedValueOnce(new Error('unavailable'))
-    renderDialog()
-
-    const dialog = await screen.findByRole('dialog')
-    // 行内错误已删除：失败只走 toast，空态解释与重试入口见父页。
-    await expectToastFeedback(toast, 'unavailable', within(dialog), ['unavailable'])
-    expect(within(dialog).queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
-  })
-
-  it('disables checkbox for existing models and allows selecting new models for batch import', async () => {
+  it('imports a hand-filled bare model id with the selected provider slug', async () => {
     const importSpy = vi.fn()
-    const { user } = renderDialog({
-      onImport: importSpy,
-    })
+    const { user } = renderDialog({ existingModels: [], onImport: importSpy })
 
     const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByText('OpenAI')
 
-    // 等待模型加载完成
-    await within(dialog).findByText('GPT-4o 旗舰多模态')
+    const input = within(dialog).getByPlaceholderText('例如: gpt-image-1（只需裸模型名）')
+    await user.type(input, 'gpt-image-1')
 
-    // 已在库中的模型 checkbox 禁用
-    const existingCheckbox = within(dialog).getByRole('checkbox', {
-      name: '选择 FLUX.1 Schnell 快速生图',
-    }) as HTMLInputElement
-    expect(existingCheckbox).toBeDisabled()
-
-    // 勾选未在库中的模型 GPT-4o
-    const gptCheckbox = within(dialog).getByRole('checkbox', {
-      name: '选择 GPT-4o 旗舰多模态',
-    }) as HTMLInputElement
-    expect(gptCheckbox).not.toBeDisabled()
-    expect(gptCheckbox).not.toBeChecked()
-
-    await user.click(gptCheckbox)
-    expect(gptCheckbox).toBeChecked()
-
-    // 底部导入按钮显示数量并可点击
-    const importBtn = within(dialog).getByRole('button', { name: '导入所选模型 (1)' })
-    expect(importBtn).not.toBeDisabled()
-
-    await user.click(importBtn)
+    await user.click(within(dialog).getByRole('button', { name: '导入模型' }))
 
     expect(importSpy).toHaveBeenCalledOnce()
     const imported = importSpy.mock.calls[0]?.[0] as AdminModelItem[]
     expect(imported).toHaveLength(1)
-    expect(imported[0]?.id).toBe('gpt-4o')
-    expect(imported[0]?.provider).toBe('OpenAI')
-    expect(imported[0]?.mode).toBe('chat')
+    expect(imported[0]?.id).toBe('gpt-image-1')
+    expect(imported[0]?.provider).toBe('openai')
   })
 
-  it('falls back to the placeholder icon when a row brand logo fails to load', async () => {
-    renderDialog()
+  it('rejects a repeated selected-provider prefix', async () => {
+    const importSpy = vi.fn()
+    const { user } = renderDialog({ existingModels: [], onImport: importSpy })
 
     const dialog = await screen.findByRole('dialog')
-    const openaiLogo = await within(dialog).findByRole('img', { name: 'OpenAI' })
-    await fireEvent.error(openaiLogo)
+    await within(dialog).findByText('OpenAI')
 
-    // 破图行回落占位，不再有可访问的品牌图；其他行不受影响。
-    expect(within(dialog).queryByRole('img', { name: 'OpenAI' })).not.toBeInTheDocument()
-    expect(within(dialog).getByRole('img', { name: 'Workers AI' })).toBeInTheDocument()
+    const input = within(dialog).getByPlaceholderText('例如: gpt-image-1（只需裸模型名）')
+    await user.type(input, 'openai/gpt-4o')
+
+    expect(await within(dialog).findByText('模型名称不要重复所选供应商前缀')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: '导入模型' })).toBeDisabled()
+    expect(importSpy).not.toHaveBeenCalled()
   })
 
-  it('filters models by search keyword', async () => {
-    const { user } = renderDialog()
-
+  it.each([
+    ['openrouter', 'google/gemini-3-flash'],
+    ['openrouter', 'openai/gpt-5-image'],
+    ['fal', 'fal-ai/flux-pro/v1.1'],
+  ])('imports native nested model names for %s', async (slug, id) => {
+    gatewayFakes.listProviders.mockResolvedValueOnce([
+      { slug, display_name: slug, id_prefix: `${slug}/` },
+    ])
+    const importSpy = vi.fn()
+    const { user } = renderDialog({ existingModels: [], onImport: importSpy })
     const dialog = await screen.findByRole('dialog')
-    await within(dialog).findByText('GPT-4o 旗舰多模态')
-
-    const searchInput = within(dialog).getByPlaceholderText('搜索模型名称或标识...')
-    await user.type(searchInput, 'birefnet')
-
-    // 过滤后只显示 BiRefNet
-    expect(within(dialog).getByText('BiRefNet 高清抠图')).toBeInTheDocument()
-    expect(within(dialog).queryByText('GPT-4o 旗舰多模态')).not.toBeInTheDocument()
-    expect(within(dialog).queryByText('FLUX.1 Schnell 快速生图')).not.toBeInTheDocument()
+    await within(dialog).findByText(slug)
+    await user.type(within(dialog).getByPlaceholderText('例如: gpt-image-1（只需裸模型名）'), id)
+    await user.click(within(dialog).getByRole('button', { name: '导入模型' }))
+    expect(importSpy).toHaveBeenCalledWith([expect.objectContaining({ provider: slug, id })])
   })
 
-  it('routes control-plane detection errors to toast without an inline error', async () => {
-    const unavailable = new Error('模型探测暂不可用。') as Error & { code?: string }
-    unavailable.code = 'gateway_unavailable'
-    gatewayFakes.detect.mockRejectedValueOnce(unavailable)
-    renderDialog()
+  it('blocks duplicate model ids already in the library', async () => {
+    const importSpy = vi.fn()
+    const { user } = renderDialog({ onImport: importSpy })
 
     const dialog = await screen.findByRole('dialog')
-    await expectToastFeedback(toast, '模型探测暂不可用。', within(dialog))
-    expect(within(dialog).queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
+    await within(dialog).findByText('OpenAI')
+
+    const input = within(dialog).getByPlaceholderText('例如: gpt-image-1（只需裸模型名）')
+    await user.type(input, 'gpt-4o')
+
+    expect(await within(dialog).findByText('该模型标识已在库中')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: '导入模型' })).toBeDisabled()
+    expect(importSpy).not.toHaveBeenCalled()
   })
 
-  it('filters models by provider selection', async () => {
-    renderDialog()
+  it('shows an empty state when no provider is configured', async () => {
+    gatewayFakes.listProviders.mockResolvedValueOnce([])
+    renderDialog({ existingModels: [] })
 
     const dialog = await screen.findByRole('dialog')
-    await within(dialog).findByText('GPT-4o 旗舰多模态')
+    expect(await within(dialog).findByText('网关未配置任何 Provider')).toBeInTheDocument()
+  })
 
-    // 默认展示全部供应商
-    expect(within(dialog).getByText('GPT-4o 旗舰多模态')).toBeInTheDocument()
-    expect(within(dialog).getByText('BiRefNet 高清抠图')).toBeInTheDocument()
+  it('retries when the provider list fails to load', async () => {
+    gatewayFakes.listProviders.mockRejectedValueOnce(new Error('unavailable'))
+    renderDialog({ existingModels: [] })
+
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByText('unavailable')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: '重试' })).toBeInTheDocument()
   })
 })

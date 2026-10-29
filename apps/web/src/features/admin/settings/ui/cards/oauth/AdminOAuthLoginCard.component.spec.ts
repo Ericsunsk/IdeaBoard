@@ -22,14 +22,14 @@ function renderCard(resource?: OAuthProviderSettingsResource) {
 
 const summaries = {
   google: {
-    enabled: true,
+    isEnabled: true,
     configured: true,
     clientId: 'google-client.apps.googleusercontent.com',
     clientSecretConfigured: true,
     callbackUrl: 'https://example.com/api/auth/callback/google',
   },
   discord: {
-    enabled: false,
+    isEnabled: false,
     configured: false,
     clientId: '',
     clientSecretConfigured: false,

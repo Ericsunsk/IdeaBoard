@@ -5,8 +5,11 @@ package control
 //
 // The pool is the relational Service Model Pool contract
 // (internal/generation/catalog): one Service owns an unordered set of
-// {model, enabled, supported_resolutions} entries plus a monotonic
-// pool version pinned into routing snapshots. This surface extends the
+// {provider, model, enabled, supported_resolutions} entries plus a
+// monotonic pool version pinned into routing snapshots. Provider is the
+// registry slug, model the bare model name; the two render as
+// provider/model for selection, snapshots, and display only. This
+// surface extends the
 // billing-catalog boundary (rows are addressed by billing SKU
 // `ai-image:<service>`); it never touches the retired single-value
 // `feature -> model` settings mapping.
@@ -49,6 +52,7 @@ type ControlModelPoolStore interface {
 }
 
 type controlModelPoolEntry struct {
+	Provider    string   `json:"provider"`
 	ModelID     string   `json:"model_id"`
 	Enabled     bool     `json:"enabled"`
 	Resolutions []string `json:"resolutions"`
@@ -69,6 +73,7 @@ type controlReplaceModelPoolResult struct {
 type controlReplaceModelPoolRequest struct {
 	ExpectedVersion *uint64 `json:"expected_version"`
 	Entries         *[]struct {
+		Provider    string   `json:"provider"`
 		ModelID     string   `json:"model_id"`
 		Enabled     bool     `json:"enabled"`
 		Resolutions []string `json:"resolutions"`
@@ -98,6 +103,7 @@ func renderControlModelPool(pool routing.Pool, sku string) controlModelPoolPaylo
 			resolutions = append(resolutions, string(res))
 		}
 		entries = append(entries, controlModelPoolEntry{
+			Provider:    entry.Provider,
 			ModelID:     entry.Model,
 			Enabled:     entry.Enabled,
 			Resolutions: resolutions,
@@ -166,7 +172,8 @@ func (d *ContractControlDeps) replaceControlModelPool(c *gin.Context, _ controlC
 	inputs := make([]catalog.PoolEntryInput, 0, len(*req.Entries))
 	for _, entry := range *req.Entries {
 		inputs = append(inputs, catalog.PoolEntryInput{
-			ModelID:     entry.ModelID,
+			Provider:    entry.Provider,
+			Model:       entry.ModelID,
 			Enabled:     entry.Enabled,
 			Resolutions: entry.Resolutions,
 		})

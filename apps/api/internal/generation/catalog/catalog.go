@@ -36,14 +36,18 @@ func (e *PoolVersionConflict) Error() string {
 	return fmt.Sprintf("catalog: service %q pool version conflict: expected %d, current %d", e.Service, e.Expected, e.Current)
 }
 
-// PoolEntryInput is one desired pool row for ReplacePool. ModelID is a
-// canonical catalog reference (provider/model[@gateway-path]), stored
-// trimmed and matched exactly. Resolutions lists scalable capabilities
-// (1k/2k/4k, case-insensitive); `default` is rejected here by
-// validation (ADR-0012 rule 3). Disabled entries may carry an empty
-// capability set; enabled entries must list at least one resolution.
+// PoolEntryInput is one desired pool row for ReplacePool. Provider is
+// the registry slug (lowercased at the write boundary; unknown slugs are
+// accepted and synthesize the default custom-<slug> namespace at
+// execution, never vanish) and Model is the bare model name (no provider
+// prefix, no @path, no whitespace; nested slashes inside the bare name
+// are preserved). Resolutions lists scalable capabilities (1k/2k/4k,
+// case-insensitive); `default` is rejected here by validation
+// (ADR-0012 rule 3). Disabled entries may carry an empty capability
+// set; enabled entries must list at least one resolution.
 type PoolEntryInput struct {
-	ModelID     string
+	Provider    string
+	Model       string
 	Enabled     bool
 	Resolutions []string
 }
@@ -90,49 +94,89 @@ func normalizeService(raw string) (string, error) {
 	return service, nil
 }
 
-// normalizeCapability canonicalizes one pool entry capability value.
-// Only the scalable resolutions are accepted; `default` is a
-// billing/requested-resolution variant, never a pool capability.
-func normalizeCapability(raw string) (routing.Resolution, error) {
-	res, err := routing.NormalizeResolution(raw)
-	if err != nil {
-		return "", err
-	}
-	return res, nil
-}
-
 // normalizedEntry is a validated, canonical ReplacePool row.
 type normalizedEntry struct {
-	modelID     string
+	provider    string
+	model       string
 	enabled     bool
 	resolutions []routing.Resolution
 }
 
+// normalizeProvider canonicalizes one pool entry provider: trimmed,
+// lowercased registry slug, 1..64 chars, no slashes, @paths, or
+// whitespace. Unknown slugs are accepted: they synthesize the default
+// custom-<slug> namespace at execution (documented in the Control API
+// contract), so writers never need a registry gate here.
+func normalizeProvider(raw string) (string, error) {
+	provider := strings.ToLower(strings.TrimSpace(raw))
+	if provider == "" {
+		return "", fmt.Errorf("%w: pool entry has a blank provider", ErrInvalidPoolInput)
+	}
+	if len(provider) > 64 {
+		return "", fmt.Errorf("%w: provider %q exceeds 64 characters", ErrInvalidPoolInput, raw)
+	}
+	if strings.ContainsAny(provider, "/@ \t\n") {
+		return "", fmt.Errorf("%w: provider %q must be a bare registry slug", ErrInvalidPoolInput, raw)
+	}
+	return provider, nil
+}
+
+// normalizePoolModel canonicalizes one pool entry bare model name against
+// its provider: trimmed, case preserved, 1..128 chars, no @paths or
+// whitespace; nested slashes inside the bare name (openrouter's
+// vendor/model) are preserved. A redundant provider prefix
+// (provider + "/" + ...) is rejected; native vendor segments are opaque
+// even when their name also happens to be a registered gateway provider.
+func normalizePoolModel(provider, raw string) (string, error) {
+	model := strings.TrimSpace(raw)
+	if model == "" {
+		return "", fmt.Errorf("%w: pool entry has a blank model", ErrInvalidPoolInput)
+	}
+	if len(model) > 128 {
+		return "", fmt.Errorf("%w: model %q exceeds 128 characters", ErrInvalidPoolInput, raw)
+	}
+	if strings.ContainsAny(model, "@ \t\n") {
+		return "", fmt.Errorf("%w: model %q must be a bare model name", ErrInvalidPoolInput, raw)
+	}
+	if strings.HasPrefix(model, "/") || strings.HasSuffix(model, "/") {
+		return "", fmt.Errorf("%w: model %q must be a bare model name", ErrInvalidPoolInput, raw)
+	}
+	if i := strings.Index(model, "/"); i > 0 {
+		first := strings.ToLower(model[:i])
+		if first == provider {
+			return "", fmt.Errorf("%w: model %q repeats its provider prefix; send the bare name", ErrInvalidPoolInput, raw)
+		}
+	}
+	return model, nil
+}
+
 // normalizeEntries validates and canonicalizes one ReplacePool input:
-// trimmed exact-match model ids (case-insensitive duplicate detection),
-// capability normalization with dedupe and sort, and the enabled-entry
-// non-empty capability rule.
+// trimmed/lowercased providers with bare model names (case-insensitive
+// duplicate detection on the provider/model pair), capability
+// normalization with dedupe and sort, and the enabled-entry non-empty
+// capability rule.
 func normalizeEntries(inputs []PoolEntryInput) ([]normalizedEntry, error) {
 	seen := make(map[string]struct{}, len(inputs))
 	entries := make([]normalizedEntry, 0, len(inputs))
 	for i, input := range inputs {
-		model := strings.TrimSpace(input.ModelID)
-		if model == "" {
-			return nil, fmt.Errorf("%w: entry %d has a blank model id", ErrInvalidPoolInput, i)
+		provider, err := normalizeProvider(input.Provider)
+		if err != nil {
+			return nil, fmt.Errorf("%w: entry %d: %w", ErrInvalidPoolInput, i, err)
 		}
-		if len(model) > 128 {
-			return nil, fmt.Errorf("%w: entry %d model id exceeds 128 characters", ErrInvalidPoolInput, i)
+		model, err := normalizePoolModel(provider, input.Model)
+		if err != nil {
+			return nil, fmt.Errorf("%w: entry %d: %w", ErrInvalidPoolInput, i, err)
 		}
-		lowered := strings.ToLower(model)
-		if _, dup := seen[lowered]; dup {
-			return nil, fmt.Errorf("%w: entry %d duplicates model %q", ErrInvalidPoolInput, i, model)
+		key := provider + "\x00" + strings.ToLower(model)
+		if _, dup := seen[key]; dup {
+			return nil, fmt.Errorf("%w: entry %d duplicates model %q", ErrInvalidPoolInput, i, workflow.FormatPoolModel(provider, model))
 		}
-		seen[lowered] = struct{}{}
+		seen[key] = struct{}{}
 		resSet := make(map[routing.Resolution]struct{}, len(input.Resolutions))
 		for _, raw := range input.Resolutions {
-			res, err := normalizeCapability(raw)
+			res, err := routing.NormalizeResolution(raw)
 			if err != nil {
-				return nil, fmt.Errorf("%w: entry %d model %q: %w", ErrInvalidPoolInput, i, model, err)
+				return nil, fmt.Errorf("%w: entry %d model %q: %w", ErrInvalidPoolInput, i, workflow.FormatPoolModel(provider, model), err)
 			}
 			resSet[res] = struct{}{}
 		}
@@ -142,11 +186,16 @@ func normalizeEntries(inputs []PoolEntryInput) ([]normalizedEntry, error) {
 		}
 		sort.Slice(resolutions, func(a, b int) bool { return resolutions[a] < resolutions[b] })
 		if input.Enabled && len(resolutions) == 0 {
-			return nil, fmt.Errorf("%w: entry %d model %q is enabled without resolutions", ErrInvalidPoolInput, i, model)
+			return nil, fmt.Errorf("%w: entry %d model %q is enabled without resolutions", ErrInvalidPoolInput, i, workflow.FormatPoolModel(provider, model))
 		}
-		entries = append(entries, normalizedEntry{modelID: model, enabled: input.Enabled, resolutions: resolutions})
+		entries = append(entries, normalizedEntry{provider: provider, model: model, enabled: input.Enabled, resolutions: resolutions})
 	}
-	sort.Slice(entries, func(a, b int) bool { return entries[a].modelID < entries[b].modelID })
+	sort.Slice(entries, func(a, b int) bool {
+		if entries[a].provider != entries[b].provider {
+			return entries[a].provider < entries[b].provider
+		}
+		return entries[a].model < entries[b].model
+	})
 	return entries, nil
 }
 
@@ -209,9 +258,10 @@ func (r *Repository) ReplacePool(ctx context.Context, service string, expectedVe
 		}
 		for _, entry := range desired {
 			row, err := q.InsertServiceModelPoolEntry(ctx, dbsqlc.InsertServiceModelPoolEntryParams{
-				Service: normalizedService,
-				ModelID: entry.modelID,
-				Enabled: entry.enabled,
+				Service:  normalizedService,
+				Provider: entry.provider,
+				ModelID:  entry.model,
+				Enabled:  entry.enabled,
 			})
 			if err != nil {
 				return fmt.Errorf("catalog: insert pool entry: %w", err)
@@ -250,7 +300,8 @@ func poolFromEntries(service string, version uint64, stored []normalizedEntry) r
 		resolutions := make([]routing.Resolution, len(entry.resolutions))
 		copy(resolutions, entry.resolutions)
 		entries = append(entries, routing.ModelPoolEntry{
-			Model:                entry.modelID,
+			Provider:             entry.provider,
+			Model:                entry.model,
 			Enabled:              entry.enabled,
 			SupportedResolutions: resolutions,
 		})
@@ -309,7 +360,8 @@ func loadEntries(ctx context.Context, q *dbsqlc.Queries, service string) ([]norm
 		resolutions := byEntry[row.ID]
 		sort.Slice(resolutions, func(a, b int) bool { return resolutions[a] < resolutions[b] })
 		entries = append(entries, normalizedEntry{
-			modelID:     row.ModelID,
+			provider:    row.Provider,
+			model:       row.ModelID,
 			enabled:     row.Enabled,
 			resolutions: resolutions,
 		})
@@ -318,13 +370,13 @@ func loadEntries(ctx context.Context, q *dbsqlc.Queries, service string) ([]norm
 }
 
 // entriesEqual compares stored rows against normalized desired input.
-// Both sides are sorted by model id with sorted resolution sets.
+// Both sides are sorted by (provider, model) with sorted resolution sets.
 func entriesEqual(stored, desired []normalizedEntry) bool {
 	if len(stored) != len(desired) {
 		return false
 	}
 	for i := range stored {
-		if stored[i].modelID != desired[i].modelID || stored[i].enabled != desired[i].enabled {
+		if stored[i].provider != desired[i].provider || stored[i].model != desired[i].model || stored[i].enabled != desired[i].enabled {
 			return false
 		}
 		if len(stored[i].resolutions) != len(desired[i].resolutions) {

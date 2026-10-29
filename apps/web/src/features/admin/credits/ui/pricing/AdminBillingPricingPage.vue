@@ -289,6 +289,7 @@ function applyPoolReplaceSuccess(item: AdminBillableItemCard, saved: AdminModelP
 
 function clonePoolEntries(entries: AdminModelPoolEntry[]): AdminModelPoolEntry[] {
   return entries.map((entry) => ({
+    provider: entry.provider,
     modelId: entry.modelId,
     enabled: entry.enabled,
     resolutions: [...entry.resolutions],

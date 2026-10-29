@@ -28,10 +28,10 @@ SET version = EXCLUDED.version,
 RETURNING version;
 
 -- name: ListServiceModelPoolEntries :many
-SELECT id, service, model_id, enabled, created_at, updated_at
+SELECT id, service, provider, model_id, enabled, created_at, updated_at
 FROM service_model_pool_entry
 WHERE service = sqlc.arg(service)
-ORDER BY model_id ASC, id ASC;
+ORDER BY provider ASC, model_id ASC, id ASC;
 
 -- name: ListServiceModelPoolResolutions :many
 SELECT r.pool_entry_id, r.resolution
@@ -41,9 +41,9 @@ WHERE e.service = sqlc.arg(service)
 ORDER BY r.pool_entry_id ASC, r.resolution ASC;
 
 -- name: InsertServiceModelPoolEntry :one
-INSERT INTO service_model_pool_entry (service, model_id, enabled)
-VALUES (sqlc.arg(service), sqlc.arg(model_id), sqlc.arg(enabled))
-RETURNING id, service, model_id, enabled, created_at, updated_at;
+INSERT INTO service_model_pool_entry (service, provider, model_id, enabled)
+VALUES (sqlc.arg(service), sqlc.arg(provider), sqlc.arg(model_id), sqlc.arg(enabled))
+RETURNING id, service, provider, model_id, enabled, created_at, updated_at;
 
 -- name: InsertServiceModelPoolResolution :exec
 INSERT INTO service_model_pool_resolution (pool_entry_id, resolution)

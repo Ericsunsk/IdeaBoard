@@ -857,6 +857,7 @@ type RewardRedemption struct {
 type ServiceModelPoolEntry struct {
 	ID        int64              `json:"id"`
 	Service   string             `json:"service"`
+	Provider  string             `json:"provider"`
 	ModelID   string             `json:"model_id"`
 	Enabled   bool               `json:"enabled"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`

@@ -1,24 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
+  modelIdentityKey,
+  displayModelId,
   formatObservedFailure,
   formatObservedMargin,
   formatObservedRate,
-  formatReferenceContext,
-  formatReferenceFreshness,
-  formatReferenceModalities,
-  formatReferencePricing,
-  formatReferenceReleaseKnowledge,
-  hasReferenceCapabilityData,
   isCloudflareHosted,
-  isFalReferenceModel,
   matchesModelKeyword,
   MODEL_HOSTING_CLOUDFLARE,
   MODEL_HOSTING_OPTIONS,
   MODEL_HOSTING_THIRD_PARTY,
-  modelProviderBadgeClass,
   observedOnSaleMargins,
-  referenceCapabilities,
-  referenceStatusKind,
   type AdminModelItem,
   type ModelObservedSnapshot,
 } from './catalogData'
@@ -33,12 +25,6 @@ describe('catalogData vocabulary', () => {
     expect(isCloudflareHosted('Fal AI')).toBe(false)
   })
 
-  it('badges known providers distinctly', () => {
-    expect(modelProviderBadgeClass('OpenAI')).not.toBe(modelProviderBadgeClass('Fal AI'))
-    expect(modelProviderBadgeClass('unknown-vendor')).toBe(
-      modelProviderBadgeClass('another-unknown'),
-    )
-  })
   it('matches keywords across name, id, provider, mode and description', () => {
     const model: AdminModelItem = {
       id: 'openai/gpt-image-1',
@@ -59,97 +45,15 @@ describe('catalogData vocabulary', () => {
     expect(matchesModelKeyword(model, 'non-existent-xyz')).toBe(false)
   })
 
-  it('formats models.dev reference pricing per 1M tokens and hides unknown', () => {
-    expect(formatReferencePricing({})).toBe('')
-    expect(formatReferencePricing({ inputUsdPerMtok: 0, outputUsdPerMtok: -1 })).toBe('')
-    expect(formatReferencePricing({ inputUsdPerMtok: 2.5, outputUsdPerMtok: 10 })).toBe(
-      '$2.5 in · $10 out /1M',
+  it('renders native nested names with their provider and keys same-name models separately', () => {
+    expect(displayModelId({ id: 'gpt-image-1', provider: 'openai' })).toBe('openai/gpt-image-1')
+    expect(displayModelId({ id: 'google/gemini-flash', provider: 'openrouter' })).toBe(
+      'openrouter/google/gemini-flash',
     )
-    expect(formatReferencePricing({ inputUsdPerMtok: 0.075 })).toBe('$0.075 in /1M')
-    expect(formatReferencePricing({ outputUsdPerMtok: 2 })).toBe('$2 out /1M')
-  })
-
-  it('formats reference context limits and hides unknown', () => {
-    expect(formatReferenceContext(undefined)).toBe('')
-    expect(formatReferenceContext(0)).toBe('')
-    expect(formatReferenceContext(128000)).toBe('128K')
-    expect(formatReferenceContext(200000)).toBe('200K')
-    expect(formatReferenceContext(9500)).toBe('9500')
-  })
-
-  it('detects fal models for graceful reference fallback without false positives', () => {
-    expect(isFalReferenceModel({ provider: 'Fal AI', modelId: 'fal_ai/flux-dev' })).toBe(true)
-    expect(isFalReferenceModel({ provider: 'fal', modelId: '' })).toBe(true)
-    expect(isFalReferenceModel({ provider: '', modelId: 'fal_ai/flux-dev' })).toBe(true)
-    expect(isFalReferenceModel({ provider: '', modelId: 'fal/flux-dev' })).toBe(true)
-    expect(isFalReferenceModel({ provider: 'OpenAI', modelId: 'openai/gpt-4o' })).toBe(false)
-    expect(isFalReferenceModel({ provider: 'Falcon AI', modelId: 'falcon/7b' })).toBe(false)
-    expect(isFalReferenceModel({})).toBe(false)
-  })
-
-  it('formats reference freshness relatively and hides unknown or future dates', () => {
-    const now = Date.parse('2026-09-22T00:00:00Z')
-    expect(formatReferenceFreshness(undefined, now)).toBe('')
-    expect(formatReferenceFreshness('not-a-date', now)).toBe('')
-    expect(formatReferenceFreshness('2026-09-23T00:00:00Z', now)).toBe('')
-    expect(formatReferenceFreshness('2026-09-22T00:00:00Z', now)).toBe('刚刚')
-    expect(formatReferenceFreshness('2026-09-21T23:20:00Z', now)).toBe('40 分钟前')
-    expect(formatReferenceFreshness('2026-09-21T21:00:00Z', now)).toBe('3 小时前')
-    expect(formatReferenceFreshness('2026-09-21T00:00:00Z', now)).toBe('1 天前')
-    expect(formatReferenceFreshness('2026-07-24T00:00:00Z', now)).toBe('2 个月前')
-    expect(formatReferenceFreshness('2025-09-22T00:00:00Z', now)).toBe('1 年前')
-  })
-
-  it('lists reference capabilities in fixed order and detects unknown-only snapshots', () => {
-    const capabilities = referenceCapabilities({
-      reasoning: true,
-      toolCall: false,
-      temperature: undefined,
-      attachment: true,
-      structuredOutput: false,
-      openWeights: undefined,
-    })
-    expect(capabilities.map((capability) => capability.key)).toEqual([
-      'reasoning',
-      'toolCall',
-      'temperature',
-      'attachment',
-      'structuredOutput',
-      'openWeights',
-    ])
-    expect(capabilities[0]).toMatchObject({ label: '推理', supported: true })
-    expect(capabilities[1]).toMatchObject({ label: '工具调用', supported: false })
-    expect(capabilities[2]).toMatchObject({ label: '温度参数', supported: undefined })
-    expect(hasReferenceCapabilityData({})).toBe(false)
-    expect(hasReferenceCapabilityData({ temperature: false })).toBe(true)
-  })
-
-  it('formats reference modalities and hides unknown sides', () => {
-    expect(formatReferenceModalities(undefined)).toBe('')
-    expect(formatReferenceModalities({})).toBe('')
-    expect(formatReferenceModalities({ input: ['text', 'image'], output: ['text'] })).toBe(
-      'text / image → text',
+    expect(modelIdentityKey({ id: ' GPT-IMAGE-1 ', provider: 'OpenAI' })).toBe('openai/gpt-image-1')
+    expect(modelIdentityKey({ id: 'gpt-image-1', provider: 'azureopenai' })).not.toBe(
+      modelIdentityKey({ id: 'gpt-image-1', provider: 'openai' }),
     )
-    expect(formatReferenceModalities({ output: ['text'] })).toBe('text')
-    expect(formatReferenceModalities({ input: ['text'] })).toBe('text')
-  })
-
-  it('formats reference release date and knowledge cutoff and hides unknown', () => {
-    expect(formatReferenceReleaseKnowledge(undefined, undefined)).toBe('')
-    expect(formatReferenceReleaseKnowledge('2025-08-07', '2024-05-30')).toBe(
-      '2025-08-07 / 截止 2024-05-30',
-    )
-    expect(formatReferenceReleaseKnowledge('2025-08-07', undefined)).toBe('2025-08-07')
-    expect(formatReferenceReleaseKnowledge(undefined, '2024-05-30')).toBe('截止 2024-05-30')
-  })
-
-  it('classifies reference status without false deprecated warnings', () => {
-    expect(referenceStatusKind(undefined)).toBe('unknown')
-    expect(referenceStatusKind('')).toBe('unknown')
-    expect(referenceStatusKind('deprecated')).toBe('deprecated')
-    expect(referenceStatusKind('Deprecated')).toBe('deprecated')
-    expect(referenceStatusKind('beta')).toBe('beta')
-    expect(referenceStatusKind('stable')).toBe('other')
   })
 
   it('formats observed rates as trimmed percents and hides unknown', () => {

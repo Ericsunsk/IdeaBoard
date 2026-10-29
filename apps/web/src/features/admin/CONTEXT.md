@@ -65,4 +65,5 @@ It does NOT own user-facing pages, domain ledger semantics (backend Credits Ledg
 - No retry without key; no double-submit guard alone.
 - No polling-only monitor; no snapshot as local state.
 - No ledger write semantics in frontend; frontend only assembles commands and idempotency keys.
+- Model catalog rows use the case-insensitive provider/native-model pair for CRUD, row keys and Model Pool selection. Native model names may contain vendor/model segments; no legacy prefixed-ID fallback is used.
 - No Provider Model as a price identity. Model Pool entries reference the model catalog; prices use Service SKUs and Output Resolutions.

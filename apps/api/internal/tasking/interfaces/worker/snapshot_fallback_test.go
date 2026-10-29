@@ -660,8 +660,8 @@ func TestWorkspaceTaskWorkerIgnoresPostAcceptPoolEdits(t *testing.T) {
 		Service: "generation",
 		Version: 3,
 		Entries: []routing.ModelPoolEntry{
-			{Model: "openrouter/model-a", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
-			{Model: "openrouter/model-b", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
+			{Provider: "openrouter", Model: "model-a", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
+			{Provider: "openrouter", Model: "model-b", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
 		},
 	}}
 	resolver := routing.NewRoutingResolver(pool)
@@ -675,8 +675,8 @@ func TestWorkspaceTaskWorkerIgnoresPostAcceptPoolEdits(t *testing.T) {
 		Service: "generation",
 		Version: 4,
 		Entries: []routing.ModelPoolEntry{
-			{Model: "openrouter/model-a", Enabled: false, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
-			{Model: "openrouter/model-c", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
+			{Provider: "openrouter", Model: "model-a", Enabled: false, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
+			{Provider: "openrouter", Model: "model-c", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
 		},
 	})
 	if err := snap.Verify(); err != nil {

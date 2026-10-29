@@ -44,34 +44,19 @@ describe('Admin gateway resource', () => {
     expect(body.items[0]).not.toHaveProperty('cache_creation_input_token_cost')
   })
 
-  it('reads pricing reference snapshots through control', async () => {
+  it.each([
+    ['openrouter', 'google/gemini-3-flash'],
+    ['fal', 'fal-ai/flux-pro/v1.1'],
+  ])('previews %s nested names with the explicit provider', async (provider, modelId) => {
+    let payload: unknown
     useMswHandlers(
-      http.get('/api/control/v1/platform/ai-gateway/models-reference', () =>
-        HttpResponse.json({
-          data: {
-            model_id: 'openai/gpt-4o',
-            provider: 'openai',
-            input_usd_per_mtok: 2.5,
-            output_usd_per_mtok: 10,
-            context_limit: 128000,
-            source: 'models.dev',
-            note: 'models.dev 参照价',
-            found: true,
-          },
-        }),
-      ),
+      http.post('/api/control/v1/platform/ai-gateway/route-preview', async ({ request }) => {
+        payload = await request.json()
+        return HttpResponse.json({ data: { provider_slug: provider } })
+      }),
     )
-
-    const snapshot = await createAdminGatewayResource().catalog.getReference({
-      modelId: 'openai/gpt-4o',
-    })
-    expect(snapshot).toMatchObject({
-      modelId: 'openai/gpt-4o',
-      inputUsdPerMtok: 2.5,
-      contextLimit: 128000,
-      source: 'models.dev',
-      found: true,
-    })
+    await createAdminGatewayResource().catalog.previewRoute({ provider, modelId })
+    expect(payload).toEqual({ model_id: `${provider}/${modelId}` })
   })
 
   it('reads observed snapshots through control', async () => {
@@ -110,7 +95,7 @@ describe('Admin gateway resource', () => {
     })
   })
 
-  it('previews routes, detects models, and probes connections through control', async () => {
+  it('previews routes, lists configured providers, and probes connections through control', async () => {
     const seen: Array<{ path: string; body: unknown }> = []
     useMswHandlers(
       http.post('/api/control/v1/platform/ai-gateway/route-preview', async ({ request }) => {
@@ -128,21 +113,12 @@ describe('Admin gateway resource', () => {
           },
         })
       }),
-      http.get('/api/control/v1/platform/ai-gateway/detect-models', () =>
+      http.get('/api/control/v1/platform/ai-gateway/providers', () =>
         HttpResponse.json({
-          data: {
-            models: [
-              {
-                id: 'openai/gpt-4o',
-                name: 'GPT-4o',
-                provider: 'openai',
-                description: '旗舰模型',
-                description_enriched: true,
-                context_or_resolution: '128K',
-              },
-            ],
-            configured_providers: 2,
-          },
+          data: [
+            { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/' },
+            { slug: 'workers-ai', display_name: 'Workers AI', id_prefix: 'workers-ai/' },
+          ],
         }),
       ),
       http.post('/api/control/v1/platform/ai-gateway/test-connection', async ({ request }) => {
@@ -163,10 +139,16 @@ describe('Admin gateway resource', () => {
     })
     expect(seen[0]?.body).toEqual({ model_id: 'm' })
 
-    await expect(resource.catalog.detect()).resolves.toMatchObject({
-      models: [{ id: 'openai/gpt-4o', description: '旗舰模型' }],
-      configured_providers: 2,
-    })
+    // 裸名在此拼接 provider（仅传输）：后端仍消费组合 model_id。
+    await expect(
+      resource.catalog.previewRoute({ modelId: 'gpt-image-1', provider: 'openai' }),
+    ).resolves.toMatchObject({ provider_slug: 'openai' })
+    expect(seen[1]?.body).toEqual({ model_id: 'openai/gpt-image-1' })
+
+    await expect(resource.catalog.listProviders()).resolves.toMatchObject([
+      { slug: 'openai', display_name: 'OpenAI' },
+      { slug: 'workers-ai', display_name: 'Workers AI' },
+    ])
 
     await expect(
       resource.connection.testConnection(
@@ -174,7 +156,7 @@ describe('Admin gateway resource', () => {
         options,
       ),
     ).resolves.toMatchObject({ success: true, latencyMs: 38, message: 'ok' })
-    expect(seen[1]?.body).toMatchObject({
+    expect(seen[2]?.body).toMatchObject({
       base_url: 'https://gateway.example.com',
       provider: 'openai',
       path: 'v1/models',

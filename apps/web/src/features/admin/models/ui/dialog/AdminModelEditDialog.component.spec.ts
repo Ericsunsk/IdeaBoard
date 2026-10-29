@@ -7,7 +7,6 @@ import type { AdminModelItem } from '../../core/catalogData'
 const gatewayFakes = vi.hoisted(() => ({
   previewRoute: vi.fn(),
   listProviders: vi.fn(),
-  getReference: vi.fn(),
 }))
 
 vi.mock('../../resource', async (importOriginal) => {
@@ -18,7 +17,6 @@ vi.mock('../../resource', async (importOriginal) => {
       catalog: {
         previewRoute: gatewayFakes.previewRoute,
         listProviders: gatewayFakes.listProviders,
-        getReference: gatewayFakes.getReference,
       },
     }),
   }
@@ -27,9 +25,8 @@ vi.mock('../../resource', async (importOriginal) => {
 describe('AdminModelEditDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    gatewayFakes.previewRoute.mockImplementation(async (input: { modelId: string }) => {
-      const modelId = input.modelId || ''
-      const provider = modelId.includes('/') ? modelId.split('/')[0] : ''
+    gatewayFakes.previewRoute.mockImplementation(async (input: { modelId: string; provider?: string }) => {
+      const provider = input.provider || ''
       return {
         provider_slug: provider || '未指定',
         is_first_party: provider === 'fal',
@@ -43,20 +40,13 @@ describe('AdminModelEditDialog', () => {
       { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/' },
       { slug: 'google-vertex-ai', display_name: 'Google Vertex AI', id_prefix: 'vertex_ai/' },
     ])
-    // 右侧参照价面板：默认 miss 降级，不阻塞表单主流程。
-    gatewayFakes.getReference.mockResolvedValue({
-      modelId: '',
-      source: 'models.dev',
-      note: '参照价，非结算依据',
-      found: false,
-      errorCode: 'not_found',
-    })
+
   })
 
   const sampleModel: AdminModelItem = {
-    id: 'openai/gpt-image-1',
+    id: 'gpt-image-1',
     name: 'GPT-Image-1 创意版',
-    provider: 'OpenAI',
+    provider: 'openai',
     mode: 'image_generation',
     description: '创意画风重绘',
     contextOrResolution: '4096×4096',
@@ -94,7 +84,7 @@ describe('AdminModelEditDialog', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: '新增模型' })).toBeInTheDocument()
 
-    // 检查左侧核心字段（任务类型概念已删除）
+    // 检查左侧核心字段
     expect(within(dialog).getByLabelText(/模型标识/)).toBeInTheDocument()
     expect(within(dialog).getByLabelText(/显示名称/)).toBeInTheDocument()
     expect(within(dialog).getByLabelText(/提供商 \(Provider\)/)).toBeInTheDocument()
@@ -114,7 +104,9 @@ describe('AdminModelEditDialog', () => {
     const nameInput = within(dialog).getByLabelText(/显示名称/)
     const descInput = within(dialog).getByLabelText(/功能说明与业务描述/)
 
-    await user.type(idInput, 'fal/birefnet')
+    // 模型标识只收裸名，供应商来自下拉真值，预览展示拼接。
+    await user.type(idInput, 'birefnet')
+    await user.click(await within(dialog).findByRole('button', { name: 'Fal AI' }))
     await user.type(nameInput, 'BiRefNet 高清抠图')
     await user.type(descInput, '发丝级边缘羽化抠图')
 
@@ -133,17 +125,17 @@ describe('AdminModelEditDialog', () => {
 
     const dialog = await screen.findByRole('dialog')
 
-    // 提供商预设来自 Registry 接口：旧硬编码的 ByteDance 不再出现。
+    // 提供商预设来自 Registry 接口，存 slug 真值（展示 display_name）。
     const falBtn = await within(dialog).findByRole('button', { name: 'Fal AI' })
     expect(within(dialog).getByRole('button', { name: 'Google Vertex AI' })).toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'ByteDance' })).not.toBeInTheDocument()
     await user.click(falBtn)
 
     const providerInput = within(dialog).getByLabelText(/提供商 \(Provider\)/) as HTMLInputElement
-    expect(providerInput.value).toBe('Fal AI')
-    // Registry 的 id_prefix（fal_ai/，非网关命名空间 fal/）预填标识框。
+    expect(providerInput.value).toBe('fal')
+    // 裸名输入不再接受 provider 前缀预填：标识框保持用户手填。
     const idInput = within(dialog).getByLabelText(/模型标识/) as HTMLInputElement
-    expect(idInput.value).toBe('fal_ai/')
+    expect(idInput.value).toBe('')
   })
 
   it('supports toggling hosting and adding capability presets', async () => {
@@ -173,10 +165,11 @@ describe('AdminModelEditDialog', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: '编辑模型' })).toBeInTheDocument()
 
-    // 标识在编辑模式下禁用
+    // 标识在编辑模式下禁用（存裸名，展示拼接）
     const idInput = within(dialog).getByLabelText(/模型标识/) as HTMLInputElement
     expect(idInput).toBeDisabled()
-    expect(idInput.value).toBe('openai/gpt-image-1')
+    expect(idInput.value).toBe('gpt-image-1')
+    expect(within(dialog).getByText('ID: openai/gpt-image-1')).toBeInTheDocument()
 
     // 修改名称
     const nameInput = within(dialog).getByLabelText(/显示名称/)
@@ -189,7 +182,8 @@ describe('AdminModelEditDialog', () => {
     expect(submitSpy).toHaveBeenCalledOnce()
     const submitted = submitSpy.mock.calls[0]?.[0] as AdminModelItem
     expect(submitted.name).toBe('GPT-Image-1 增强版')
-    expect(submitted.id).toBe('openai/gpt-image-1')
+    expect(submitted.id).toBe('gpt-image-1')
+    expect(submitted.provider).toBe('openai')
   })
 
   it('validates invalid custom JSON parameters before submission', async () => {
@@ -199,7 +193,7 @@ describe('AdminModelEditDialog', () => {
     })
 
     const dialog = await screen.findByRole('dialog')
-    await user.type(within(dialog).getByLabelText(/模型标识/), 'test/model')
+    await user.type(within(dialog).getByLabelText(/模型标识/), 'testmodel')
     await user.type(within(dialog).getByLabelText(/显示名称/), 'Test Model')
     await user.type(within(dialog).getByLabelText(/提供商 \(Provider\)/), 'Test')
 

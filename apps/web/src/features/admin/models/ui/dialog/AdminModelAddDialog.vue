@@ -3,213 +3,95 @@
     :visible="visible"
     :header="MODELS_MESSAGES.addHeader"
     :description="MODELS_MESSAGES.addDescription"
-    size="wide"
+    size="compact"
     @update:visible="emit('update:visible', $event)"
     @close="handleClose"
   >
     <div class="flex flex-col gap-4">
-      <!-- 顶部操作栏：供应商过滤 + 关键词搜索 + 重新探测 -->
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3.5">
-        <div class="flex flex-1 flex-wrap items-center gap-2.5">
-          <!-- 供应商筛选 -->
-          <div class="w-40 sm:w-44">
-            <AdminSelect
-              v-model="selectedProvider"
-              :options="providerOptions"
-              size="small"
-              :placeholder="MODELS_MESSAGES.addProviderAll"
-            />
-          </div>
-
-          <!-- 关键词搜索（共享搜索框：图标 + 清空 + 统一输入框 chrome） -->
-          <AdminToolbarSearch
-            v-model="searchQuery"
-            :input-label="MODELS_MESSAGES.addSearchLabel"
-            :placeholder="MODELS_MESSAGES.addSearchPlaceholder"
-            class="min-w-[200px] max-w-xs flex-1"
-          />
-        </div>
-
-        <!-- 重新探测按钮 -->
-        <button
-          type="button"
-          class="inline-flex h-8 items-center gap-1.5 rounded-control border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground shadow-raised transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted hover:text-foreground cursor-pointer disabled:opacity-50"
-          :disabled="loading"
-          @click="loadDetectedModels"
-        >
-          <Refresh class="size-3.5" :class="{ 'animate-spin': loading }" />
-          <span>{{ MODELS_MESSAGES.addRedetect }}</span>
-        </button>
-      </div>
-
-      <!-- 探测加载中：单行文案，避免与副标题重复造成“两个状态”观感 -->
       <div
         v-if="loading"
         class="flex flex-col items-center justify-center py-16 text-muted-foreground"
       >
         <Refresh class="size-6 animate-spin text-primary mb-2.5" />
-        <p class="text-xs font-medium text-muted-foreground">{{ MODELS_MESSAGES.addDetecting }}</p>
+        <p class="text-xs font-medium text-muted-foreground">
+          {{ MODELS_MESSAGES.addProviderLoading }}
+        </p>
       </div>
 
-      <!-- 结果区与 loading 互斥：必须包在 template v-else 里 -->
-      <template v-else>
-        <!-- 空结果提示：无可用模型时解释原因（未配置 / 已配置但社区无可用）；探测失败只走 toast。 -->
+      <div
+        v-else-if="loadError"
+        class="flex flex-col items-center justify-center gap-2 py-14 text-center text-muted-foreground"
+      >
+        <p class="text-xs font-medium text-destructive">{{ loadError }}</p>
+        <AdminButton variant="outline" @click="void loadProviders()">{{
+          MODELS_MESSAGES.retry
+        }}</AdminButton>
+      </div>
+
+      <div v-else class="flex flex-col gap-4">
         <div
-          v-if="filteredModels.length === 0"
-          class="flex flex-col items-center justify-center py-14 text-muted-foreground text-center"
+          v-if="providers.length === 0"
+          class="flex flex-col items-center justify-center py-14 text-center text-muted-foreground"
         >
           <Cube class="size-8 text-muted-foreground/60 mb-2" />
           <p class="text-xs font-medium text-muted-foreground">
-            {{ emptyDetectionTitle }}
+            {{ MODELS_MESSAGES.addProviderEmpty }}
           </p>
-          <p class="text-admin-caption text-muted-foreground mt-1 max-w-sm">
-            {{ emptyDetectionHint }}
-          </p>
+          <p class="text-admin-caption mt-1 max-w-sm">{{ MODELS_MESSAGES.addHintEnableFirst }}</p>
         </div>
 
-        <!-- 紧凑 Checkbox 列表表格 -->
-        <div
-          v-else
-          class="max-h-[380px] overflow-y-auto rounded-panel border border-border bg-card"
-        >
-          <table class="w-full text-left text-xs border-collapse">
-            <thead
-              class="sticky top-0 z-admin-sticky bg-muted/80 backdrop-blur-xs border-b border-border text-muted-foreground font-medium"
-            >
-              <tr>
-                <th class="w-10 px-3 py-2.5 text-center">
-                  <input
-                    type="checkbox"
-                    class="size-3.5 rounded-control border-input text-primary focus:ring-primary cursor-pointer"
-                    :checked="isAllSelected"
-                    :indeterminate="isIndeterminate"
-                    :disabled="availableFilteredCount === 0"
-                    :aria-label="MODELS_MESSAGES.addSelectAllAria"
-                    @change="toggleSelectAll"
-                  />
-                </th>
-                <th class="px-3 py-2.5">{{ MODELS_MESSAGES.addColumnInfo }}</th>
-                <th class="px-3 py-2.5 w-32">{{ MODELS_MESSAGES.addColumnProvider }}</th>
-                <th class="px-3 py-2.5 w-24 text-right">{{ MODELS_MESSAGES.addColumnStatus }}</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-border/60">
-              <tr
-                v-for="model in filteredModels"
-                :key="model.id"
-                class="transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-muted/40 cursor-pointer"
-                :class="{
-                  'bg-primary-faintest': selectedModelIds.has(model.id),
-                  'opacity-60 bg-muted/20 cursor-not-allowed': isModelExisting(model.id),
-                }"
-                @click="toggleRowSelection(model.id)"
-              >
-                <!-- Checkbox -->
-                <td class="w-10 px-3 py-2.5 text-center" @click.stop>
-                  <input
-                    type="checkbox"
-                    class="size-3.5 rounded-control border-input text-primary focus:ring-primary cursor-pointer disabled:cursor-not-allowed"
-                    :checked="selectedModelIds.has(model.id)"
-                    :disabled="isModelExisting(model.id)"
-                    :aria-label="MODELS_MESSAGES.addSelectAria(model.name || model.id)"
-                    @change="toggleModelSelection(model.id)"
-                  />
-                </td>
+        <template v-else>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-medium text-foreground" for="add-provider-select">
+              {{ MODELS_MESSAGES.addProviderLabel }}
+            </label>
+            <AdminSelect
+              id="add-provider-select"
+              v-model="selectedProviderSlug"
+              :options="providerOptions"
+              size="small"
+              :placeholder="MODELS_MESSAGES.addProviderPlaceholder"
+            />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-medium text-foreground" for="add-model-input">
+              {{ MODELS_MESSAGES.addModelLabel }}
+            </label>
+            <input
+              id="add-model-input"
+              v-model="modelId"
+              type="text"
+              class="h-8 rounded-control border border-input bg-card px-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              :placeholder="MODELS_MESSAGES.addModelPlaceholder"
+            />
+            <p class="text-admin-caption text-muted-foreground">
+              {{ MODELS_MESSAGES.addModelHint }}
+            </p>
+          </div>
 
-                <!-- 模型信息 -->
-                <td class="px-3 py-2.5">
-                  <div class="flex items-center gap-2.5 min-w-0">
-                    <div
-                      class="flex size-6 shrink-0 items-center justify-center rounded-control overflow-hidden"
-                      :class="
-                        rowBrandLogo(model)
-                          ? 'bg-muted/60 border border-border/60'
-                          : 'bg-primary-faint text-primary'
-                      "
-                    >
-                      <img
-                        v-if="rowBrandLogo(model)"
-                        :src="rowBrandLogo(model)"
-                        :alt="model.provider"
-                        class="size-3.5 object-contain"
-                        loading="lazy"
-                        @error="markBrandLogoFailed(model.id)"
-                      />
-                      <Cube v-else class="size-3.5" />
-                    </div>
-                    <div class="flex flex-col gap-0.5 min-w-0">
-                      <span class="font-medium text-foreground truncate">
-                        {{ model.name || model.id }}
-                      </span>
-                      <span class="font-mono text-admin-caption text-muted-foreground truncate">
-                        {{ model.id }}
-                      </span>
-                    </div>
-                  </div>
-                </td>
-
-                <!-- 供应商 -->
-                <td class="px-3 py-2.5">
-                  <span
-                    class="inline-flex items-center rounded-control px-1.5 py-0.5 text-admin-caption font-medium"
-                    :class="modelProviderBadgeClass(model.provider)"
-                  >
-                    {{ model.provider }}
-                  </span>
-                </td>
-
-                <!-- 状态 -->
-                <td class="px-3 py-2.5 text-right">
-                  <span
-                    v-if="isModelExisting(model.id)"
-                    class="inline-flex items-center gap-1 rounded-pill bg-muted px-2 py-0.5 text-admin-micro font-medium text-muted-foreground"
-                  >
-                    {{ MODELS_MESSAGES.addExisting }}
-                  </span>
-                  <span
-                    v-else-if="selectedModelIds.has(model.id)"
-                    class="inline-flex items-center gap-1 rounded-pill bg-primary-faint px-2 py-0.5 text-admin-micro font-medium text-primary"
-                  >
-                    <Check class="size-3" />
-                    {{ MODELS_MESSAGES.addSelected }}
-                  </span>
-                  <span
-                    v-else
-                    class="inline-flex items-center rounded-pill bg-muted/40 px-2 py-0.5 text-admin-micro font-medium text-muted-foreground"
-                  >
-                    {{ MODELS_MESSAGES.addNotAdded }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </template>
+          <div
+            v-if="providerPrefixError || duplicateError"
+            class="text-xs text-destructive"
+            role="alert"
+          >
+            {{ providerPrefixError || duplicateError }}
+          </div>
+        </template>
+      </div>
     </div>
 
-    <!-- 底部操作与导航 -->
     <template #footer>
       <div class="flex w-full items-center justify-between">
-        <div class="text-xs text-muted-foreground">
-          <span v-if="selectedCount > 0">{{ MODELS_MESSAGES.addPickedCount(selectedCount) }}</span>
-        </div>
-
+        <div class="text-xs text-muted-foreground" />
         <div class="flex items-center gap-2">
           <AdminButton variant="outline" :disabled="pending" @click="emit('create')">
             {{ MODELS_MESSAGES.addManual }}
           </AdminButton>
-
           <AdminButton variant="secondary" :disabled="pending" @click="handleClose">
             {{ MODELS_MESSAGES.cancel }}
           </AdminButton>
-
-          <AdminButton
-            variant="primary"
-            :disabled="selectedCount === 0 || pending"
-            :loading="pending"
-            @click="handleImportSelected"
-          >
-            {{ MODELS_MESSAGES.addImport(selectedCount) }}
+          <AdminButton variant="primary" :disabled="!canImport || pending" @click="handleImport">
+            {{ MODELS_MESSAGES.addImport }}
           </AdminButton>
         </div>
       </div>
@@ -219,17 +101,14 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Check, Cube, Refresh } from '@iconoir/vue'
+import { Cube, Refresh } from '@iconoir/vue'
 import { AdminButton } from '../../../shared'
 import { AdminDialogShell } from '../../../shared'
 import { AdminSelect } from '../../../shared'
-import { AdminToolbarSearch } from '../../../shared'
-import { createAdminGatewayResource, type DetectedGatewayModel } from '../../resource'
+import { createAdminGatewayResource, type GatewayProviderOption } from '../../resource'
 import { useAdminModelCatalogFeedback } from '../../session/useAdminModelCatalogFeedback'
-import { resolveModelBrandLogo } from '../../../shared'
-import type { AdminModelItem } from '../../core/catalogData'
-import { modelProviderBadgeClass } from '../../core/catalogData'
-import { buildModelItemFromDetected } from '../../core/modelForm'
+import { modelIdentityKey, type AdminModelItem } from '../../core/catalogData'
+import { buildModelItemFromManual, hasModelProviderPrefix } from '../../core/modelForm'
 import { MODELS_MESSAGES } from '../pages/messages'
 
 const props = withDefaults(
@@ -247,163 +126,83 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
   (e: 'import', items: AdminModelItem[]): void
-  // 手动新增：社区目录未覆盖的 Provider 走 EditDialog 空表单入库。
+  // 高级新增：空 EditDialog 表单入库（完整字段）。
   (e: 'create'): void
 }>()
 
 const catalogResource = createAdminGatewayResource().catalog
 const feedback = useAdminModelCatalogFeedback()
 
-const detectedModels = ref<DetectedGatewayModel[]>([])
+const providers = ref<GatewayProviderOption[]>([])
 const loading = ref(false)
-// 探测元信息：空结果时解释原因（未配置 / 已配置但社区无可用），失败只走 toast。
-const detectedMeta = ref<{ configured: number } | null>(null)
-const searchQuery = ref('')
-const selectedProvider = ref('all')
-const selectedModelIds = ref<Set<string>>(new Set())
+const loadError = ref('')
+const selectedProviderSlug = ref('')
+const modelId = ref('')
 
-// 已有模型集合
-const existingIdSet = computed(() => {
-  return new Set(props.existingModels.map((m) => m.id))
+const existingKeySet = computed(() => new Set(props.existingModels.map(modelIdentityKey)))
+
+const providerOptions = computed(() =>
+  providers.value.map((p) => ({ label: p.display_name, value: p.slug })),
+)
+
+const selectedProvider = computed(() =>
+  providers.value.find((p) => p.slug === selectedProviderSlug.value),
+)
+
+// 原生模型名可含 vendor/model；只拒绝重复的所选供应商前缀。
+const providerPrefixError = computed(() => {
+  const id = modelId.value.trim()
+  if (!hasModelProviderPrefix(selectedProviderSlug.value, id)) return ''
+  return MODELS_MESSAGES.addProviderPrefixError
 })
 
-function isModelExisting(modelId: string): boolean {
-  return existingIdSet.value.has(modelId)
-}
-
-// 品牌 logo 经后端透传 models.dev SVG：单行加载失败（404/断网）时回落 Cube
-// 占位，避免破图；失败态按模型标识记忆，不影响其他行。
-const failedBrandLogoIds = ref<Set<string>>(new Set())
-
-function rowBrandLogo(model: DetectedGatewayModel): string | undefined {
-  if (failedBrandLogoIds.value.has(model.id)) return undefined
-  return resolveModelBrandLogo(model)
-}
-
-function markBrandLogoFailed(modelId: string): void {
-  failedBrandLogoIds.value.add(modelId)
-}
-
-// 供应商下拉项
-const providerOptions = computed(() => {
-  const providers = Array.from(new Set(detectedModels.value.map((m) => m.provider))).filter(Boolean)
-  return [
-    { label: MODELS_MESSAGES.addProviderAll, value: 'all' },
-    ...providers.map((p) => ({ label: p, value: p })),
-  ]
+const duplicateError = computed(() => {
+  const id = modelId.value.trim()
+  if (!id || providerPrefixError.value) return ''
+  const key = modelIdentityKey({ provider: selectedProviderSlug.value, id })
+  if (existingKeySet.value.has(key)) return MODELS_MESSAGES.addDuplicate
+  return ''
 })
 
-// 过滤后的模型
-const filteredModels = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase()
-  return detectedModels.value.filter((model) => {
-    if (selectedProvider.value !== 'all' && model.provider !== selectedProvider.value) {
-      return false
-    }
-    if (query) {
-      const matchId = model.id.toLowerCase().includes(query)
-      const matchName = (model.name || '').toLowerCase().includes(query)
-      if (!matchId && !matchName) return false
-    }
-    return true
-  })
+const canImport = computed(() => {
+  if (loading.value || loadError.value) return false
+  if (!selectedProvider.value) return false
+  const id = modelId.value.trim()
+  if (!id) return false
+  return duplicateError.value === '' && providerPrefixError.value === ''
 })
 
-// 过滤后且不在现有库中的模型
-const availableFilteredModels = computed(() => {
-  return filteredModels.value.filter((m) => !isModelExisting(m.id))
-})
-
-const availableFilteredCount = computed(() => availableFilteredModels.value.length)
-
-const selectedCount = computed(() => {
-  return selectedModelIds.value.size
-})
-
-// 全选与半选状态
-const isAllSelected = computed(() => {
-  if (availableFilteredCount.value === 0) return false
-  return availableFilteredModels.value.every((m) => selectedModelIds.value.has(m.id))
-})
-
-const isIndeterminate = computed(() => {
-  if (availableFilteredCount.value === 0) return false
-  const count = availableFilteredModels.value.filter((m) => selectedModelIds.value.has(m.id)).length
-  return count > 0 && count < availableFilteredCount.value
-})
-
-function toggleSelectAll() {
-  const next = new Set(selectedModelIds.value)
-  if (isAllSelected.value) {
-    for (const m of availableFilteredModels.value) {
-      next.delete(m.id)
-    }
-  } else {
-    for (const m of availableFilteredModels.value) {
-      next.add(m.id)
-    }
-  }
-  selectedModelIds.value = next
-}
-
-function toggleModelSelection(id: string) {
-  if (isModelExisting(id)) return
-  const next = new Set(selectedModelIds.value)
-  if (next.has(id)) {
-    next.delete(id)
-  } else {
-    next.add(id)
-  }
-  selectedModelIds.value = next
-}
-
-function toggleRowSelection(id: string) {
-  toggleModelSelection(id)
-}
-
-// 自动探测逻辑
-async function loadDetectedModels() {
+async function loadProviders() {
   loading.value = true
+  loadError.value = ''
   try {
-    const detection = await catalogResource.detect()
-    detectedModels.value = detection.models
-    detectedMeta.value = {
-      configured: detection.configured_providers,
+    providers.value = await catalogResource.listProviders()
+    if (!selectedProviderSlug.value && providers.value.length > 0) {
+      selectedProviderSlug.value = providers.value[0]!.slug
     }
   } catch (caughtError) {
-    feedback.detectFailed(caughtError)
+    loadError.value =
+      caughtError instanceof Error ? caughtError.message : MODELS_MESSAGES.addProviderLoadFailed
+    try {
+      feedback.listFailed(caughtError)
+    } catch {
+      // feedback best-effort
+    }
   } finally {
     loading.value = false
   }
 }
 
-// 空结果文案：按后端元信息区分“未配置”与“扫过无可用”，不再统一显示空列表。
-const emptyDetectionTitle = computed(() => {
-  if (searchQuery.value.trim()) return MODELS_MESSAGES.emptyNoMatch
-  const meta = detectedMeta.value
-  if (meta && meta.configured === 0) return MODELS_MESSAGES.addEmptyUnconfigured
-  if (meta) return MODELS_MESSAGES.addEmptyNoneAvailable(meta.configured)
-  return MODELS_MESSAGES.addEmptyNone
-})
-
-const emptyDetectionHint = computed(() => {
-  const meta = detectedMeta.value
-  if (meta && meta.configured === 0 && !searchQuery.value.trim()) {
-    return MODELS_MESSAGES.addHintEnableFirst
-  }
-  return MODELS_MESSAGES.addHintCheckProviders
-})
-
-// 监听弹窗打开自动触发探测
 watch(
   () => props.visible,
   (visible) => {
     if (visible) {
-      searchQuery.value = ''
-      selectedProvider.value = 'all'
-      selectedModelIds.value = new Set()
-      if (detectedModels.value.length === 0) {
-        void loadDetectedModels()
+      modelId.value = ''
+      loadError.value = ''
+      if (providers.value.length === 0) {
+        void loadProviders()
+      } else if (!selectedProviderSlug.value && providers.value.length > 0) {
+        selectedProviderSlug.value = providers.value[0]!.slug
       }
     }
   },
@@ -414,16 +213,10 @@ function handleClose() {
   emit('update:visible', false)
 }
 
-// 批量导入
-function handleImportSelected() {
-  const toImport: AdminModelItem[] = []
-  for (const model of detectedModels.value) {
-    if (selectedModelIds.value.has(model.id) && !isModelExisting(model.id)) {
-      toImport.push(buildModelItemFromDetected(model))
-    }
-  }
-  if (toImport.length > 0) {
-    emit('import', toImport)
-  }
+function handleImport() {
+  const provider = selectedProvider.value
+  const id = modelId.value.trim()
+  if (!provider || !id || duplicateError.value || providerPrefixError.value) return
+  emit('import', [buildModelItemFromManual(provider, id)])
 }
 </script>

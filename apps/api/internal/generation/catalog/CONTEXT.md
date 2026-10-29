@@ -8,9 +8,9 @@ and immutable Routing Snapshots. Model catalog metadata belongs to AI Gateway.
 
 **Service**: An executable AI image capability defined by Workflow; Vision Search is separate.
 
-**Service Model Pool**: The unordered set of Models configured for one Service and their enabled intent and supported Output Resolutions.
+**Service Model Pool**: The unordered set of provider + bare-model entries configured for one Service and their enabled intent and supported Output Resolutions.
 
-**Model Pool Entry**: One Model's membership and capabilities in one Service Model Pool.
+**Model Pool Entry**: One provider + bare-model pair's membership and capabilities in one Service Model Pool. The provider/model display form is derived only (selection sorting, snapshots, Admin display), never stored.
 
 **Output Resolution**: The requested output-size class: `1k`, `2k`, or `4k`.
 _Avoid_: Default resolution as a fourth capability; Display Tier as a synonym.
@@ -22,7 +22,7 @@ _Avoid_: Live pool lookup as the meaning of an accepted Task's routing.
 
 ## Rules
 
-- Services are validated by `workflow.IsAIImageFeature`; `vision` is rejected. Pool entries have `UNIQUE(service, model_id)` and no priority, fallback, or weight fields.
+- Services are validated by `workflow.IsAIImageFeature`; `vision` is rejected. Pool entries have `UNIQUE(service, provider, model_id)` and no priority, fallback, or weight fields. Provider is the required registry slug (unknown slugs synthesize the default `custom-<slug>` namespace at execution); model is the required native model name (no repeated selected-provider prefix, no `@path`). Native vendor/model segments are opaque, including vendor names that match another registry slug.
 - Pool versions start at 1; read-model 0 means never written. `default` is not a request, price, or pool capability.
 - ReplacePool is the only pool writer: advisory-locked, OCC-guarded,
   fully replacing, single-transaction. No-op saves do not bump.

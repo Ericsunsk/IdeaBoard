@@ -28,7 +28,7 @@
             {{ MODELS_MESSAGES.observedSuccessLabel }}
           </div>
           <div class="font-semibold text-foreground">
-            {{ successText || MODELS_MESSAGES.referenceNoData }}
+            {{ successText || MODELS_MESSAGES.observedNoData }}
           </div>
         </div>
         <div class="rounded-control bg-card/70 px-2.5 py-1.5">
@@ -36,7 +36,7 @@
             {{ MODELS_MESSAGES.observedCacheLabel }}
           </div>
           <div class="font-semibold text-foreground">
-            {{ cacheHitText || MODELS_MESSAGES.referenceNoData }}
+            {{ cacheHitText || MODELS_MESSAGES.observedNoData }}
           </div>
         </div>
       </div>
@@ -46,7 +46,7 @@
           MODELS_MESSAGES.observedTopFailureLabel
         }}</span>
         <span class="truncate text-right font-medium text-foreground">
-          {{ failureText || MODELS_MESSAGES.referenceNoData }}
+          {{ failureText || MODELS_MESSAGES.observedNoData }}
         </span>
       </div>
 
@@ -55,7 +55,7 @@
           {{ MODELS_MESSAGES.observedSkuLabel }}
         </div>
         <div v-if="observed!.skuMargins.length === 0" class="font-medium text-muted-foreground">
-          {{ MODELS_MESSAGES.referenceNoData }}
+          {{ MODELS_MESSAGES.observedNoData }}
         </div>
         <div v-else class="flex flex-wrap gap-1">
           <!-- 在售 SKU 状态收口 StatusBadge：onSale→success，非在售→neutral；
@@ -81,7 +81,7 @@
         <span class="shrink-0 text-admin-micro text-muted-foreground">{{
           MODELS_MESSAGES.observedCostLabel
         }}</span>
-        <span class="font-medium text-muted-foreground">{{ MODELS_MESSAGES.referenceNoData }}</span>
+        <span class="font-medium text-muted-foreground">{{ MODELS_MESSAGES.observedNoData }}</span>
       </div>
     </div>
   </section>

@@ -22,6 +22,7 @@
             for="gateway-base-url-input"
           >
             {{ MODELS_MESSAGES.gatewayBaseUrlLabel }}
+            <span aria-hidden="true" class="text-destructive">*</span>
           </label>
           <span
             v-if="summary?.is_first_party"
@@ -72,9 +73,7 @@
           for="gateway-account-id-input"
         >
           Account ID
-          <span class="font-normal text-muted-foreground">{{
-            MODELS_MESSAGES.gatewayCustomDomainHint
-          }}</span>
+          <span v-if="isCustomDomain" aria-hidden="true" class="text-destructive">*</span>
         </label>
         <AdminInput
           id="gateway-account-id-input"
@@ -88,9 +87,7 @@
       <div class="flex flex-col gap-1.5">
         <label class="text-admin-caption font-semibold text-foreground" for="gateway-id-input">
           Gateway ID
-          <span class="font-normal text-muted-foreground">{{
-            MODELS_MESSAGES.gatewayCustomDomainHint
-          }}</span>
+          <span v-if="isCustomDomain" aria-hidden="true" class="text-destructive">*</span>
         </label>
         <AdminInput
           id="gateway-id-input"
@@ -101,50 +98,12 @@
           class="w-full font-mono"
         />
       </div>
-
-      <!-- 连接测试目标：provider + path（#847 起必填，后端不再回退模型映射） -->
-      <div class="grid grid-cols-2 gap-3">
-        <div class="flex flex-col gap-1.5">
-          <label
-            class="text-admin-caption font-semibold text-foreground"
-            for="gateway-probe-provider-input"
-          >
-            {{ MODELS_MESSAGES.gatewayProbeProviderLabel }}
-          </label>
-          <AdminInput
-            id="gateway-probe-provider-input"
-            v-model="probeProvider"
-            :placeholder="MODELS_MESSAGES.gatewayProbeProviderPlaceholder"
-            autocomplete="off"
-            :disabled="loading || saving || testing"
-            class="w-full font-mono"
-          />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label
-            class="text-admin-caption font-semibold text-foreground"
-            for="gateway-probe-path-input"
-          >
-            {{ MODELS_MESSAGES.gatewayProbePathLabel }}
-          </label>
-          <AdminInput
-            id="gateway-probe-path-input"
-            v-model="probePath"
-            :placeholder="MODELS_MESSAGES.gatewayProbePathPlaceholder"
-            autocomplete="off"
-            :disabled="loading || saving || testing"
-            :loading="testing"
-            class="w-full font-mono"
-          />
-        </div>
-      </div>
     </div>
 
-    <!-- 弹窗底栏：取消 + 第三动作（测试连接，经 extra-actions 位） + 保存 -->
     <template #footer>
       <AdminDialogActions
         :cancel-label="MODELS_MESSAGES.cancel"
-        :confirm-label="MODELS_MESSAGES.gatewayHeader"
+        :confirm-label="MODELS_MESSAGES.gatewaySave"
         :loading="saving"
         :disabled="loading || saving || testing"
         :cancel-disabled="saving || testing"
@@ -155,6 +114,7 @@
           <ActionButton
             variant="outline"
             :disabled="loading || saving || testing"
+            :loading="testing"
             @click="handleTestConnection"
           >
             {{ MODELS_MESSAGES.gatewayTest }}
@@ -210,8 +170,6 @@ function gatewayHostnameOf(raw: string): string {
 }
 
 const summary = ref<GatewayConnectionSummary | null>(null)
-const probeProvider = ref('')
-const probePath = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
@@ -228,6 +186,11 @@ const form = useForm({
 })
 
 const isTokenConfigured = computed(() => Boolean(summary.value?.token_configured))
+
+const isCustomDomain = computed(() => {
+  const host = gatewayHostnameOf(form.values.base_url ?? '')
+  return host !== '' && host !== DEFAULT_GATEWAY_HOST
+})
 
 watch(
   () => props.visible,
@@ -264,17 +227,12 @@ const handleTestConnection = form.handleSubmit(async (values) => {
     const finalBaseUrl = values.base_url.trim().replace(/\/+$/, '')
 
     // testConnection 是 connection interface 必需成员：直调服务端探活，无假成功回退。
-    const provider = probeProvider.value.trim()
-    const path = probePath.value.trim().replace(/^\/+/, '')
-    if (!provider || !path) {
-      feedback.testFailed(MODELS_MESSAGES.gatewayProbeRequired)
-      return
-    }
+    // 测试连接恒探网关根 URL（provider/path 恒传空）。
     const response = await resource.value.testConnection({
       base_url: finalBaseUrl,
       token: values.token.trim() || undefined,
-      provider,
-      path,
+      provider: '',
+      path: '',
     })
     if (response.success) {
       feedback.testPassed(response.message)
@@ -329,7 +287,6 @@ const handleSave = form.handleSubmit(async (values) => {
     }
     emit('update:visible', false)
   } catch (caughtError) {
-    // 保存失败只走 toast，对话框保持打开可重试。
     feedback.saveFailed(caughtError)
   } finally {
     saving.value = false

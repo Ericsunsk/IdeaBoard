@@ -58,23 +58,30 @@ func (q *Queries) GetTaskRoutingSnapshot(ctx context.Context, publicID string) (
 }
 
 const insertServiceModelPoolEntry = `-- name: InsertServiceModelPoolEntry :one
-INSERT INTO service_model_pool_entry (service, model_id, enabled)
-VALUES ($1, $2, $3)
-RETURNING id, service, model_id, enabled, created_at, updated_at
+INSERT INTO service_model_pool_entry (service, provider, model_id, enabled)
+VALUES ($1, $2, $3, $4)
+RETURNING id, service, provider, model_id, enabled, created_at, updated_at
 `
 
 type InsertServiceModelPoolEntryParams struct {
-	Service string `json:"service"`
-	ModelID string `json:"model_id"`
-	Enabled bool   `json:"enabled"`
+	Service  string `json:"service"`
+	Provider string `json:"provider"`
+	ModelID  string `json:"model_id"`
+	Enabled  bool   `json:"enabled"`
 }
 
 func (q *Queries) InsertServiceModelPoolEntry(ctx context.Context, arg InsertServiceModelPoolEntryParams) (ServiceModelPoolEntry, error) {
-	row := q.db.QueryRow(ctx, insertServiceModelPoolEntry, arg.Service, arg.ModelID, arg.Enabled)
+	row := q.db.QueryRow(ctx, insertServiceModelPoolEntry,
+		arg.Service,
+		arg.Provider,
+		arg.ModelID,
+		arg.Enabled,
+	)
 	var i ServiceModelPoolEntry
 	err := row.Scan(
 		&i.ID,
 		&i.Service,
+		&i.Provider,
 		&i.ModelID,
 		&i.Enabled,
 		&i.CreatedAt,
@@ -100,10 +107,10 @@ func (q *Queries) InsertServiceModelPoolResolution(ctx context.Context, arg Inse
 }
 
 const listServiceModelPoolEntries = `-- name: ListServiceModelPoolEntries :many
-SELECT id, service, model_id, enabled, created_at, updated_at
+SELECT id, service, provider, model_id, enabled, created_at, updated_at
 FROM service_model_pool_entry
 WHERE service = $1
-ORDER BY model_id ASC, id ASC
+ORDER BY provider ASC, model_id ASC, id ASC
 `
 
 func (q *Queries) ListServiceModelPoolEntries(ctx context.Context, service string) ([]ServiceModelPoolEntry, error) {
@@ -118,6 +125,7 @@ func (q *Queries) ListServiceModelPoolEntries(ctx context.Context, service strin
 		if err := rows.Scan(
 			&i.ID,
 			&i.Service,
+			&i.Provider,
 			&i.ModelID,
 			&i.Enabled,
 			&i.CreatedAt,

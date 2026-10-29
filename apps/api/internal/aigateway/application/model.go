@@ -86,22 +86,22 @@ type ConnectionProbeResult struct {
 	Message    string `json:"message"`
 }
 
-// gatewayProbeOutbound is the shared standard outbound client for
-// connection diagnosis: timeout cap and observability match the gateway
-// migration (#766). Probes stay single-shot end to end (MaxAttempts 1):
-// any HTTP status counts as reachable, only transport failures are
-// unreachable.
+// gatewayProbeOutbound is the shared outbound client for connection diagnosis.
 var gatewayProbeOutbound = safehttp.NewClient(safehttp.Config{})
 
 // gatewayProbeTarget names connection diagnosis in outbound logs/metrics.
 const gatewayProbeTarget = "ai-gateway-probe"
 
-// ProbeGatewayConnection probes one provider-native route with a bounded
+// ProbeGatewayConnection probes gateway reachability with a bounded
 // timeout. The provided token is used only for this probe and never persisted.
 // Purpose split (deliberate): this is transport diagnosis, not availability.
 // Any HTTP status counts as reachable (even 401/403 — they still prove
-// routing, DNS and TLS); only transport failures are unreachable. Model
-// availability questions go through workflow.ClassifyGatewayResponse.
+// routing, DNS and TLS); only transport failures are unreachable.
+//
+// Target selection: provider+path both empty probes the gateway root URL
+// directly (any HTTP status still proves DNS/TLS/routing; CF exposes no
+// unified health endpoint, so the root URL is the gateway-liveness probe).
+// Exactly one of provider/path empty is rejected as ambiguous (no guessing).
 func ProbeGatewayConnection(ctx context.Context, baseURL, token, provider, model, path string) ConnectionProbeResult {
 	const probeTimeout = 8 * time.Second
 
@@ -117,13 +117,17 @@ func ProbeGatewayConnection(ctx context.Context, baseURL, token, provider, model
 	provider = strings.TrimSpace(provider)
 	model = strings.TrimSpace(model)
 	path = strings.Trim(strings.TrimSpace(path), "/")
-	if provider == "" || path == "" {
+	onlyOneRoutePart := (provider == "") != (path == "")
+	if onlyOneRoutePart {
 		return ConnectionProbeResult{Message: errorrender.MsgProbeGatewayConnection3}
 	}
 	if strings.ContainsAny(provider+path, "?&#\r\n") {
 		return ConnectionProbeResult{Message: errorrender.MsgProbeGatewayConnection4}
 	}
-	probeURL := trimmed + "/" + workflow.GatewayProviderPath(provider) + "/" + path
+	probeURL := trimmed
+	if provider != "" {
+		probeURL = trimmed + "/" + workflow.GatewayProviderPath(provider) + "/" + path
+	}
 
 	start := time.Now()
 
@@ -196,8 +200,7 @@ const catalogConfigKey = "ai_gateway_model_catalog"
 
 // CatalogItem describes one model available in the AI gateway catalog.
 // The catalog carries routing and display metadata only: it holds no
-// prices. Billing charges solely on the billing SKU UnitCredits; reference
-// prices (if needed) come from the read-only models.dev seam, never from
+// prices. Billing charges solely on the billing SKU UnitCredits, never from
 // stored catalog data.
 type CatalogItem struct {
 	ID                  string   `json:"id"`
@@ -212,8 +215,8 @@ type CatalogItem struct {
 	DocsURL             string   `json:"docs_url"`
 	CustomPath          string   `json:"custom_path,omitempty"`
 	CustomParams        string   `json:"custom_params,omitempty"`
-	// DescriptionEnriched marks auto-filled detection descriptions: refresh
-	// enrichment may overwrite them, operator-written text is never touched.
+	// DescriptionEnriched distinguishes replaceable import text (true)
+	// from operator-written text (false, never overwritten).
 	DescriptionEnriched   bool `json:"description_enriched,omitempty"`
 	SupportsPromptCaching bool `json:"supports_prompt_caching,omitempty"`
 }
@@ -275,6 +278,52 @@ func validateCatalogItemBounds(index int, item CatalogItem) error {
 	return nil
 }
 
+// normalizeCatalogItems is the catalog write validation seam, independent of storage.
+func normalizeCatalogItems(items []CatalogItem) ([]CatalogItem, error) {
+	if len(items) > maxCatalogItems {
+		return nil, fmt.Errorf("model catalog exceeds %d items", maxCatalogItems)
+	}
+	seenModels := make(map[string]struct{}, len(items))
+	validated := make([]CatalogItem, 0, len(items))
+	for i := range items {
+		item := items[i]
+		item.ID = strings.TrimSpace(item.ID)
+		item.Name = strings.TrimSpace(item.Name)
+		item.Provider = strings.ToLower(strings.TrimSpace(item.Provider))
+		if item.ID == "" {
+			return nil, fmt.Errorf("item %d is missing ID", i)
+		}
+		if len(item.ID) > maxCatalogIDLength {
+			return nil, fmt.Errorf("item %d ID exceeds %d characters", i, maxCatalogIDLength)
+		}
+		if item.Provider == "" || strings.ContainsAny(item.Provider, "/@ \t\n") {
+			return nil, fmt.Errorf("item %d requires a provider slug", i)
+		}
+		key := item.Provider + "\x00" + strings.ToLower(item.ID)
+		if _, dup := seenModels[key]; dup {
+			return nil, fmt.Errorf("duplicate model %q", workflow.FormatPoolModel(item.Provider, item.ID))
+		}
+		seenModels[key] = struct{}{}
+		if item.Name == "" {
+			item.Name = item.ID
+		}
+		if err := validateCatalogItemBounds(i, item); err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(item.CustomParams) != "" {
+			var decoded any
+			if err := json.Unmarshal([]byte(item.CustomParams), &decoded); err != nil {
+				return nil, fmt.Errorf("item %d custom_params is not valid JSON: %w", i, err)
+			}
+			if _, ok := decoded.(map[string]any); !ok {
+				return nil, fmt.Errorf("item %d custom_params must be a JSON object", i)
+			}
+		}
+		validated = append(validated, item)
+	}
+	return validated, nil
+}
+
 func (r *ConfigRepository) SaveCatalog(ctx context.Context, items []CatalogItem, actorID int64) error {
 	if r == nil || r.settings == nil {
 		return errors.New("AI gateway config repository is unavailable")
@@ -282,50 +331,9 @@ func (r *ConfigRepository) SaveCatalog(ctx context.Context, items []CatalogItem,
 	if actorID <= 0 {
 		return errors.New("admin actor is required")
 	}
-	if len(items) > maxCatalogItems {
-		return fmt.Errorf("model catalog exceeds %d items", maxCatalogItems)
-	}
-	seenIDs := make(map[string]struct{}, len(items))
-	validated := make([]CatalogItem, 0, len(items))
-	for i := range items {
-		item := items[i]
-		item.ID = strings.TrimSpace(item.ID)
-		item.Name = strings.TrimSpace(item.Name)
-		item.Provider = strings.TrimSpace(item.Provider)
-		if item.ID == "" {
-			return fmt.Errorf("item %d is missing ID", i)
-		}
-		if len(item.ID) > maxCatalogIDLength {
-			return fmt.Errorf("item %d ID exceeds %d characters", i, maxCatalogIDLength)
-		}
-		loweredID := strings.ToLower(item.ID)
-		if _, dup := seenIDs[loweredID]; dup {
-			return fmt.Errorf("duplicate model ID %q", item.ID)
-		}
-		seenIDs[loweredID] = struct{}{}
-		if item.Name == "" {
-			item.Name = item.ID
-		}
-		if item.Provider == "" {
-			if strings.Contains(item.ID, "/") {
-				item.Provider = strings.SplitN(item.ID, "/", 2)[0]
-			} else {
-				item.Provider = "Custom"
-			}
-		}
-		if err := validateCatalogItemBounds(i, item); err != nil {
-			return err
-		}
-		if strings.TrimSpace(item.CustomParams) != "" {
-			var decoded any
-			if err := json.Unmarshal([]byte(item.CustomParams), &decoded); err != nil {
-				return fmt.Errorf("item %d custom_params is not valid JSON: %w", i, err)
-			}
-			if _, ok := decoded.(map[string]any); !ok {
-				return fmt.Errorf("item %d custom_params must be a JSON object", i)
-			}
-		}
-		validated = append(validated, item)
+	validated, err := normalizeCatalogItems(items)
+	if err != nil {
+		return err
 	}
 	copy(items, validated)
 	encoded, err := json.Marshal(items)
@@ -360,12 +368,10 @@ func (r *ConfigRepository) SaveCatalog(ctx context.Context, items []CatalogItem,
 // staleMappingKeysForRemovedModels returns storage keys that point at models
 // absent from the incoming catalog. Corrupt catalog JSON skips pruning so an
 // admin can replace it; database errors abort the transaction.
-// (#847: the single-value service mappings are removed, so only the isolated
-// vision key can go stale here.)
 func staleMappingKeysForRemovedModels(ctx context.Context, tx settings.SystemConfigWriteTx, items []CatalogItem) ([]string, error) {
 	keep := make(map[string]struct{}, len(items))
 	for _, item := range items {
-		keep[strings.TrimSpace(item.ID)] = struct{}{}
+		keep[strings.ToLower(workflow.FormatPoolModel(item.Provider, item.ID))] = struct{}{}
 	}
 	rawCatalog, err := tx.Get(ctx, catalogConfigKey)
 	oldItems := DefaultCatalog()
@@ -379,7 +385,7 @@ func staleMappingKeysForRemovedModels(ctx context.Context, tx settings.SystemCon
 	}
 	removed := make(map[string]struct{})
 	for _, item := range oldItems {
-		if id := strings.TrimSpace(item.ID); id != "" {
+		if id := strings.ToLower(workflow.FormatPoolModel(item.Provider, item.ID)); strings.TrimSpace(item.ID) != "" {
 			if _, ok := keep[id]; !ok {
 				removed[id] = struct{}{}
 			}
@@ -392,13 +398,10 @@ func staleMappingKeysForRemovedModels(ctx context.Context, tx settings.SystemCon
 	if err != nil && !database.IsNotFound(err) {
 		return nil, fmt.Errorf("load current vision mapping: %w", err)
 	}
-	if err == nil && isRemovedModel(removed, visionModel) {
-		return []string{visionMappingKey}, nil
+	if err == nil {
+		if _, ok := removed[strings.ToLower(strings.TrimSpace(visionModel))]; ok {
+			return []string{visionMappingKey}, nil
+		}
 	}
 	return nil, nil
-}
-
-func isRemovedModel(removed map[string]struct{}, model string) bool {
-	_, ok := removed[strings.TrimSpace(model)]
-	return ok
 }

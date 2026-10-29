@@ -39,9 +39,9 @@ func testPool() Pool {
 		Service: "generation",
 		Version: 7,
 		Entries: []ModelPoolEntry{
-			{Model: "prov-a/model-a", Enabled: true, SupportedResolutions: []Resolution{Resolution1K, Resolution2K, Resolution4K}},
-			{Model: "prov-b/model-b", Enabled: true, SupportedResolutions: []Resolution{Resolution2K, Resolution4K}},
-			{Model: "prov-c/model-c", Enabled: false, SupportedResolutions: []Resolution{Resolution1K}},
+			{Provider: "prov-a", Model: "model-a", Enabled: true, SupportedResolutions: []Resolution{Resolution1K, Resolution2K, Resolution4K}},
+			{Provider: "prov-b", Model: "model-b", Enabled: true, SupportedResolutions: []Resolution{Resolution2K, Resolution4K}},
+			{Provider: "prov-c", Model: "model-c", Enabled: false, SupportedResolutions: []Resolution{Resolution1K}},
 		},
 	}
 }
@@ -144,8 +144,8 @@ func TestResolveEmptyPoolSentinel(t *testing.T) {
 
 func TestResolveNoEligibleForResolution(t *testing.T) {
 	pool := Pool{Service: "upscale", Version: 3, Entries: []ModelPoolEntry{
-		{Model: "prov-a/model-a", Enabled: true, SupportedResolutions: []Resolution{Resolution1K}},
-		{Model: "prov-x/model-x", Enabled: false, SupportedResolutions: []Resolution{Resolution4K}},
+		{Provider: "prov-a", Model: "model-a", Enabled: true, SupportedResolutions: []Resolution{Resolution1K}},
+		{Provider: "prov-x", Model: "model-x", Enabled: false, SupportedResolutions: []Resolution{Resolution4K}},
 	}}
 	store := &fakePoolStore{pools: map[string]Pool{"upscale": pool}}
 	_, err := NewRoutingResolver(store).Resolve(context.Background(), "upscale", "4k")
@@ -306,7 +306,7 @@ func TestSnapshotPinningSurvivesPoolEdits(t *testing.T) {
 	edited := testPool()
 	edited.Version = 8
 	for i := range edited.Entries {
-		if edited.Entries[i].Model == snap.SelectedModel {
+		if edited.Entries[i].DisplayModel() == snap.SelectedModel {
 			edited.Entries[i].Enabled = false
 		}
 	}

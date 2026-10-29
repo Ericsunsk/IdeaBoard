@@ -864,19 +864,14 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/session/brand/brandLogos.ts",
-          "to": "src/api/generated-query/control/control-platform/control-platform.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/statistics/session/resource.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 14,
+      "measuredFanIn": 13,
       "measuredFanOut": 4,
-      "targetFanIn": 14,
+      "targetFanIn": 13,
       "targetFanOut": 4,
       "ownershipScope": [
         "src/api/generated-query/control/control-platform/control-platform.ts"
@@ -901,12 +896,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "DeleteControlStorageProfileMutationError",
         "DeleteControlStorageProfileMutationResult",
         "DeleteControlStorageProfileMutationVariables",
-        "DetectControlAIGatewayModelsQueryError",
-        "DetectControlAIGatewayModelsQueryResult",
-        "GetControlAIGatewayBrandLogoQueryError",
-        "GetControlAIGatewayBrandLogoQueryResult",
-        "GetControlAIGatewayModelReferenceQueryError",
-        "GetControlAIGatewayModelReferenceQueryResult",
         "GetControlAIGatewayQueryError",
         "GetControlAIGatewayQueryResult",
         "GetControlBrandingSettingQueryError",
@@ -1035,7 +1024,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "deleteControlBrandLogoOverride",
         "deleteControlMailSetting",
         "deleteControlStorageProfile",
-        "detectControlAIGatewayModels",
         "getApplyControlStorageProfileMutationKey",
         "getApplyControlStorageProfileMutationOptions",
         "getApplyControlStorageProfileUrl",
@@ -1043,8 +1031,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "getBackfillControlStatisticsMutationOptions",
         "getBackfillControlStatisticsUrl",
         "getControlAIGateway",
-        "getControlAIGatewayBrandLogo",
-        "getControlAIGatewayModelReference",
         "getControlBrandingSetting",
         "getControlFeaturePrompt",
         "getControlLoginLockoutSetting",
@@ -1069,15 +1055,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "getDeleteControlStorageProfileMutationKey",
         "getDeleteControlStorageProfileMutationOptions",
         "getDeleteControlStorageProfileUrl",
-        "getDetectControlAIGatewayModelsQueryKey",
-        "getDetectControlAIGatewayModelsQueryOptions",
-        "getDetectControlAIGatewayModelsUrl",
-        "getGetControlAIGatewayBrandLogoQueryKey",
-        "getGetControlAIGatewayBrandLogoQueryOptions",
-        "getGetControlAIGatewayBrandLogoUrl",
-        "getGetControlAIGatewayModelReferenceQueryKey",
-        "getGetControlAIGatewayModelReferenceQueryOptions",
-        "getGetControlAIGatewayModelReferenceUrl",
         "getGetControlAIGatewayQueryKey",
         "getGetControlAIGatewayQueryOptions",
         "getGetControlAIGatewayUrl",
@@ -1239,10 +1216,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "useDeleteControlBrandLogoOverride",
         "useDeleteControlMailSetting",
         "useDeleteControlStorageProfile",
-        "useDetectControlAIGatewayModels",
         "useGetControlAIGateway",
-        "useGetControlAIGatewayBrandLogo",
-        "useGetControlAIGatewayModelReference",
         "useGetControlBrandingSetting",
         "useGetControlFeaturePrompt",
         "useGetControlLoginLockoutSetting",
@@ -1794,7 +1768,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "deleteControlRewardCode",
         "deleteControlStorageProfile",
         "deleteControlUser",
-        "detectControlAIGatewayModels",
         "getAddControlWorkspaceMemberMutationKey",
         "getAddControlWorkspaceMemberMutationOptions",
         "getAddControlWorkspaceMemberUrl",
@@ -1811,8 +1784,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "getCancelControlTaskMutationOptions",
         "getCancelControlTaskUrl",
         "getControlAIGateway",
-        "getControlAIGatewayBrandLogo",
-        "getControlAIGatewayModelReference",
         "getControlBrandingSetting",
         "getControlCatalogModelPool",
         "getControlCreditHealth",
@@ -2543,9 +2514,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 19,
-      "measuredFanOut": 173,
+      "measuredFanOut": 170,
       "targetFanIn": 19,
-      "targetFanOut": 173,
+      "targetFanOut": 170,
       "ownershipScope": [
         "src/api/generated-query/control/model/index.ts"
       ],
@@ -2678,10 +2649,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "ControlWorkspaceMemberRoleRequestRole",
         "CreateControlStorageProfileBody",
         "CursorParameter",
-        "DetectControlAIGatewayModelsParams",
         "ForbiddenResponse",
-        "GetControlAIGatewayBrandLogoParams",
-        "GetControlAIGatewayModelReferenceParams",
         "GetControlStatisticsParams",
         "IdempotencyConflictResponse",
         "IdempotencyKeyParameter",
@@ -2853,10 +2821,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/api/generated-query/control/model/controlWorkspaceMemberRoleRequestRole.ts",
         "src/api/generated-query/control/model/createControlStorageProfileBody.ts",
         "src/api/generated-query/control/model/cursorParameter.ts",
-        "src/api/generated-query/control/model/detectControlAIGatewayModelsParams.ts",
         "src/api/generated-query/control/model/forbiddenResponse.ts",
-        "src/api/generated-query/control/model/getControlAIGatewayBrandLogoParams.ts",
-        "src/api/generated-query/control/model/getControlAIGatewayModelReferenceParams.ts",
         "src/api/generated-query/control/model/getControlStatisticsParams.ts",
         "src/api/generated-query/control/model/idempotencyConflictResponse.ts",
         "src/api/generated-query/control/model/idempotencyKeyParameter.ts",
@@ -9473,11 +9438,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/session/brand/brandLogos.ts",
-          "to": "src/core/config/runtimeUrls.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/auth/session/transport.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
@@ -9528,9 +9488,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 21,
+      "measuredFanIn": 20,
       "measuredFanOut": 0,
-      "targetFanIn": 21,
+      "targetFanIn": 20,
       "targetFanOut": 0,
       "ownershipScope": [
         "src/core/config/runtimeUrls.ts"
@@ -15769,11 +15729,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/ui/dialog/components/CatalogReferencePanel.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/models/ui/dialog/components/CatalogSpecsPanel.vue",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -16119,10 +16074,10 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
           "kind": "runtime"
         }
       ],
-      "measuredFanIn": 118,
-      "measuredFanOut": 60,
-      "targetFanIn": 118,
-      "targetFanOut": 60,
+      "measuredFanIn": 117,
+      "measuredFanOut": 58,
+      "targetFanIn": 117,
+      "targetFanOut": 58,
       "ownershipScope": [
         "src/features/admin/shared/core/",
         "src/features/admin/shared/index.ts",
@@ -16222,7 +16177,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "AdminToolbarSearch",
         "ApiResponseAdminBrandLogoOverrideList",
         "AppStatusTone",
-        "CONTROL_API_PREFIX",
         "ControlError",
         "ControlErrorMessages",
         "ControlMutationOptions",
@@ -16238,7 +16192,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "TaskStatus",
         "adminAnomalyPopoverClass",
         "adminBrandLogoMap",
-        "adminBrandLogoProxyUrl",
         "adminChartCanvasClass",
         "adminChartGridClass",
         "adminChartLegend",
@@ -16378,7 +16331,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "path",
         "scripts/checkTokenGraph.ts",
         "src/api/contractKernel.ts",
-        "src/api/generated-query/control/control-platform/control-platform.ts",
         "src/api/workspaceTaskContract.ts",
         "src/components/ui/badge/index.ts",
         "src/components/ui/button/index.ts",
@@ -16405,7 +16357,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "src/core/composables/useConfirmDialog.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/config/pagination.ts",
-        "src/core/config/runtimeUrls.ts",
         "src/core/contracts/imageServices.ts",
         "src/core/lib/chartPrimitives.ts",
         "src/core/lib/chartTheme.ts",
@@ -16504,9 +16455,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         }
       ],
       "measuredFanIn": 6,
-      "measuredFanOut": 14,
+      "measuredFanOut": 11,
       "targetFanIn": 6,
-      "targetFanOut": 14,
+      "targetFanOut": 11,
       "ownershipScope": [
         "src/features/admin/shared/session/brand/brandLogos.ts"
       ],
@@ -16519,7 +16470,6 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
         "AdminBrandLogoKey",
         "AdminBrandLogoScope",
         "adminBrandLogoMap",
-        "adminBrandLogoProxyUrl",
         "detectAdminBrandLogoKey",
         "getAdminBrandLogo",
         "getAdminBrandLogoOverride",
@@ -16528,11 +16478,8 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
       ],
       "targetFanOutTargets": [
         "node_modules/vue/index.js",
-        "src/api/generated-query/control/control-platform/control-platform.ts",
         "src/core/assets/oauth/discord.svg",
         "src/core/assets/oauth/google.svg",
-        "src/core/config/runtimeUrls.ts",
-        "src/features/admin/shared/core/controlTransport.ts",
         "src/features/admin/shared/ui/assets/oauth/github.svg",
         "src/features/admin/shared/ui/assets/search-providers/pexels.svg",
         "src/features/admin/shared/ui/assets/search-providers/unsplash.svg",
@@ -25656,16 +25603,16 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/api/generated-query/control/control-billing/control-billing.ts` | canonical | api | 63 | 4 → 4 | 4 → 4 |
 | `src/api/generated-query/control/control-credits/control-credits.ts` | canonical | api | 175 | 4 → 4 | 4 → 4 |
 | `src/api/generated-query/control/control-payments/control-payments.ts` | canonical | api | 39 | 3 → 3 | 4 → 4 |
-| `src/api/generated-query/control/control-platform/control-platform.ts` | canonical | api | 402 | 14 → 14 | 4 → 4 |
+| `src/api/generated-query/control/control-platform/control-platform.ts` | canonical | api | 381 | 13 → 13 | 4 → 4 |
 | `src/api/generated-query/control/control-tasks/control-tasks.ts` | canonical | api | 22 | 2 → 2 | 4 → 4 |
 | `src/api/generated-query/control/control-users/control-users.ts` | canonical | api | 80 | 4 → 4 | 4 → 4 |
-| `src/api/generated-query/control/index.ts` | cascading | api | 784 | 0 → 0 | 7 → 7 |
+| `src/api/generated-query/control/index.ts` | cascading | api | 781 | 0 → 0 | 7 → 7 |
 | `src/api/generated-query/control/model/controlMailConfigRequest.ts` | canonical | api | 1 | 2 → 2 | 0 → 0 |
 | `src/api/generated-query/control/model/controlOAuthProviderSummary.ts` | canonical | api | 1 | 3 → 3 | 0 → 0 |
 | `src/api/generated-query/control/model/controlOAuthProviderUpdateRequest.ts` | canonical | api | 1 | 2 → 2 | 0 → 0 |
 | `src/api/generated-query/control/model/controlStripeConfigRequest.ts` | canonical | api | 1 | 2 → 2 | 0 → 0 |
 | `src/api/generated-query/control/model/controlTaskEnvelope.ts` | canonical | api | 1 | 2 → 2 | 1 → 1 |
-| `src/api/generated-query/control/model/index.ts` | canonical | api | 173 | 19 → 19 | 173 → 173 |
+| `src/api/generated-query/control/model/index.ts` | canonical | api | 170 | 19 → 19 | 170 → 170 |
 | `src/api/generated-query/control/model/supportChannelKind.ts` | canonical | api | 1 | 3 → 3 | 0 → 0 |
 | `src/api/generated-query/control/model/supportChannelsSetting.ts` | canonical | api | 1 | 3 → 3 | 1 → 1 |
 | `src/api/generated-query/public/boards/boards.ts` | canonical | api | 102 | 2 → 2 | 4 → 4 |
@@ -25734,7 +25681,7 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/core/composables/useSiteBranding.ts` | canonical | core | 17 | 7 → 7 | 6 → 6 |
 | `src/core/composables/useSupportChannels.ts` | canonical | core | 4 | 9 → 9 | 6 → 6 |
 | `src/core/config/pagination.ts` | canonical | core | 2 | 14 → 14 | 0 → 0 |
-| `src/core/config/runtimeUrls.ts` | canonical | core | 8 | 21 → 21 | 0 → 0 |
+| `src/core/config/runtimeUrls.ts` | canonical | core | 8 | 20 → 20 | 0 → 0 |
 | `src/core/config/timing.ts` | canonical | core | 8 | 8 → 8 | 0 → 0 |
 | `src/core/constants/media.ts` | canonical | core | 5 | 5 → 5 | 0 → 0 |
 | `src/core/contracts/externalImageProviders.ts` | canonical | core | 4 | 11 → 11 | 0 → 0 |
@@ -25808,9 +25755,9 @@ Validation/fixtures：`cd apps/web && node --experimental-strip-types scripts/se
 | `src/features/admin/shared/core/tableColumns.ts` | canonical | admin | 2 | 2 → 2 | 0 → 0 |
 | `src/features/admin/shared/core/taskMetricTokens.ts` | canonical | admin | 7 | 3 → 3 | 1 → 1 |
 | `src/features/admin/shared/core/uiClasses.ts` | canonical | admin | 40 | 16 → 16 | 0 → 0 |
-| `src/features/admin/shared/index.ts` | canonical | admin | 229 | 118 → 118 | 60 → 60 |
+| `src/features/admin/shared/index.ts` | canonical | admin | 227 | 117 → 117 | 58 → 58 |
 | `src/features/admin/shared/session/anomalyRules.ts` | canonical | admin | 4 | 3 → 3 | 3 → 3 |
-| `src/features/admin/shared/session/brand/brandLogos.ts` | canonical | admin | 14 | 6 → 6 | 14 → 14 |
+| `src/features/admin/shared/session/brand/brandLogos.ts` | canonical | admin | 13 | 6 → 6 | 11 → 11 |
 | `src/features/admin/shared/session/brand/useBrandLogoOverrides.ts` | canonical | admin | 1 | 1 → 1 | 5 → 5 |
 | `src/features/admin/shared/session/collection/useAdminCollectionQuery.ts` | canonical | admin | 1 | 2 → 2 | 3 → 3 |
 | `src/features/admin/shared/session/collection/useAdminCursorCollection.ts` | canonical | admin | 1 | 1 → 1 | 4 → 4 |

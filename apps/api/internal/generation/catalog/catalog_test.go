@@ -23,7 +23,7 @@ func TestPoolInputErrorsPreserveRoutingCause(t *testing.T) {
 			return err
 		}},
 		{name: "resolution", run: func() error {
-			_, err := normalizeEntries([]PoolEntryInput{{ModelID: "openai/a", Resolutions: []string{"invalid"}}})
+			_, err := normalizeEntries([]PoolEntryInput{{Provider: "openai", Model: "a", Resolutions: []string{"invalid"}}})
 			return err
 		}},
 	} {
@@ -32,6 +32,27 @@ func TestPoolInputErrorsPreserveRoutingCause(t *testing.T) {
 			var cause *routing.InvalidRoutingInputError
 			if !errors.Is(err, ErrInvalidPoolInput) || !errors.As(err, &cause) {
 				t.Fatalf("error = %v; want pool classification and routing cause", err)
+			}
+		})
+	}
+}
+
+func TestNormalizeEntriesPreservesNativeVendorNames(t *testing.T) {
+	for _, tc := range []struct{ provider, model string }{
+		{"openrouter", "google/gemini-3-flash"},
+		{"openrouter", "openai/gpt-5-image"},
+		{"openrouter", "anthropic/claude-sonnet-4"},
+		{"fal", "fal-ai/flux-pro/v1.1"},
+	} {
+		t.Run(tc.provider+"/"+tc.model, func(t *testing.T) {
+			entries, err := normalizeEntries([]PoolEntryInput{{
+				Provider: tc.provider, Model: tc.model, Enabled: true, Resolutions: []string{"1k"},
+			}})
+			if err != nil {
+				t.Fatalf("normalize native model: %v", err)
+			}
+			if len(entries) != 1 || entries[0].provider != tc.provider || entries[0].model != tc.model {
+				t.Fatalf("entries = %+v; want unchanged native model", entries)
 			}
 		})
 	}
@@ -56,8 +77,8 @@ func TestReplacePoolCreateStartsAtVersionOne(t *testing.T) {
 	ctx := context.Background()
 
 	result := mustReplace(t, r, "generation", 0, []PoolEntryInput{
-		{ModelID: "b/second", Enabled: true, Resolutions: []string{"2K", "4k"}},
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"1k"}},
+		{Provider: "b", Model: "second", Enabled: true, Resolutions: []string{"2K", "4k"}},
+		{Provider: "a", Model: "first", Enabled: true, Resolutions: []string{"1k"}},
 	})
 	if result.Version != 1 || !result.Changed {
 		t.Fatalf("result = %+v, want {Version:1 Changed:true}", result)
@@ -78,7 +99,7 @@ func TestReplacePoolCreateStartsAtVersionOne(t *testing.T) {
 	if pool.Service != "generation" || pool.Version != 1 {
 		t.Fatalf("pool identity = %+v, want service generation version 1", pool)
 	}
-	if len(pool.Entries) != 2 || pool.Entries[0].Model != "a/first" || pool.Entries[1].Model != "b/second" {
+	if len(pool.Entries) != 2 || pool.Entries[0].DisplayModel() != "a/first" || pool.Entries[1].DisplayModel() != "b/second" {
 		t.Fatalf("entries = %+v, want sorted a/first, b/second", pool.Entries)
 	}
 	if len(pool.Entries[1].SupportedResolutions) != 2 ||
@@ -93,13 +114,13 @@ func TestReplacePoolNoOpSaveDoesNotBump(t *testing.T) {
 	r := newCatalogTestRepo(t)
 	ctx := context.Background()
 	inputs := []PoolEntryInput{
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"1k", "2k"}},
+		{Provider: "a", Model: "first", Enabled: true, Resolutions: []string{"1k", "2k"}},
 	}
 	mustReplace(t, r, "render", 0, inputs)
 
 	// Same effective content in different order/case must not bump.
 	result := mustReplace(t, r, "render", 1, []PoolEntryInput{
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"2K", "1K"}},
+		{Provider: "a", Model: "first", Enabled: true, Resolutions: []string{"2K", "1K"}},
 	})
 	if result.Version != 1 || result.Changed {
 		t.Fatalf("no-op result = %+v, want {Version:1 Changed:false}", result)
@@ -113,11 +134,11 @@ func TestReplacePoolVersionConflictWritesNothing(t *testing.T) {
 	r := newCatalogTestRepo(t)
 	ctx := context.Background()
 	mustReplace(t, r, "inpaint", 0, []PoolEntryInput{
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"1k"}},
+		{Provider: "a", Model: "first", Enabled: true, Resolutions: []string{"1k"}},
 	})
 
 	_, err := r.ReplacePool(ctx, "inpaint", 0, []PoolEntryInput{
-		{ModelID: "b/second", Enabled: true, Resolutions: []string{"1k"}},
+		{Provider: "b", Model: "second", Enabled: true, Resolutions: []string{"1k"}},
 	})
 	var conflict *PoolVersionConflict
 	if !errors.As(err, &conflict) {
@@ -131,7 +152,7 @@ func TestReplacePoolVersionConflictWritesNothing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListPool failed: %v", err)
 	}
-	if pool.Version != 1 || len(pool.Entries) != 1 || pool.Entries[0].Model != "a/first" {
+	if pool.Version != 1 || len(pool.Entries) != 1 || pool.Entries[0].DisplayModel() != "a/first" {
 		t.Fatalf("conflicted write leaked: %+v", pool)
 	}
 }
@@ -139,14 +160,14 @@ func TestReplacePoolVersionConflictWritesNothing(t *testing.T) {
 func TestReplacePoolEffectiveChangeBumps(t *testing.T) {
 	r := newCatalogTestRepo(t)
 	mustReplace(t, r, "variations", 0, []PoolEntryInput{
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"1k"}},
-		{ModelID: "b/second", Enabled: true, Resolutions: []string{"1k"}},
+		{Provider: "a", Model: "first", Enabled: true, Resolutions: []string{"1k"}},
+		{Provider: "b", Model: "second", Enabled: true, Resolutions: []string{"1k"}},
 	})
 
 	// Disabling one entry is an effective change: version 1 -> 2.
 	result := mustReplace(t, r, "variations", 1, []PoolEntryInput{
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"1k"}},
-		{ModelID: "b/second", Enabled: false, Resolutions: []string{"1k"}},
+		{Provider: "a", Model: "first", Enabled: true, Resolutions: []string{"1k"}},
+		{Provider: "b", Model: "second", Enabled: false, Resolutions: []string{"1k"}},
 	})
 	if result.Version != 2 || !result.Changed {
 		t.Fatalf("result = %+v, want {Version:2 Changed:true}", result)
@@ -163,7 +184,7 @@ func TestReplacePoolClearAndEmptyRead(t *testing.T) {
 	}
 
 	mustReplace(t, r, "cutout", 0, []PoolEntryInput{
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"1k"}},
+		{Provider: "a", Model: "first", Enabled: true, Resolutions: []string{"1k"}},
 	})
 	// Clearing a populated pool bumps: the service reads unavailable.
 	cleared = mustReplace(t, r, "cutout", 1, nil)
@@ -180,20 +201,25 @@ func TestReplacePoolValidation(t *testing.T) {
 		service string
 		inputs  []PoolEntryInput
 	}{
-		{"unknown service", "not-a-service", []PoolEntryInput{{ModelID: "a/x", Enabled: true, Resolutions: []string{"1k"}}}},
-		{"vision is rejected", "vision", []PoolEntryInput{{ModelID: "a/x", Enabled: true, Resolutions: []string{"1k"}}}},
-		{"blank service", "  ", []PoolEntryInput{{ModelID: "a/x", Enabled: true, Resolutions: []string{"1k"}}}},
-		{"blank model", "fusion", []PoolEntryInput{{ModelID: "  ", Enabled: true, Resolutions: []string{"1k"}}}},
-		{"default capability", "fusion", []PoolEntryInput{{ModelID: "a/x", Enabled: true, Resolutions: []string{"default"}}}},
-		{"unknown resolution", "fusion", []PoolEntryInput{{ModelID: "a/x", Enabled: true, Resolutions: []string{"8k"}}}},
-		{"enabled without resolutions", "fusion", []PoolEntryInput{{ModelID: "a/x", Enabled: true}}},
+		{"unknown service", "not-a-service", []PoolEntryInput{{Provider: "a", Model: "x", Enabled: true, Resolutions: []string{"1k"}}}},
+		{"vision is rejected", "vision", []PoolEntryInput{{Provider: "a", Model: "x", Enabled: true, Resolutions: []string{"1k"}}}},
+		{"blank service", "  ", []PoolEntryInput{{Provider: "a", Model: "x", Enabled: true, Resolutions: []string{"1k"}}}},
+		{"blank model", "fusion", []PoolEntryInput{{Provider: "a", Model: "  ", Enabled: true, Resolutions: []string{"1k"}}}},
+		{"blank provider", "fusion", []PoolEntryInput{{Provider: "  ", Model: "x", Enabled: true, Resolutions: []string{"1k"}}}},
+		{"provider with slash", "fusion", []PoolEntryInput{{Provider: "a/b", Model: "x", Enabled: true, Resolutions: []string{"1k"}}}},
+		{"model with at-path", "fusion", []PoolEntryInput{{Provider: "a", Model: "x@v1/custom", Enabled: true, Resolutions: []string{"1k"}}}},
+		// The explicit provider prefix is not part of a native model name.
+		{"model repeats provider prefix", "fusion", []PoolEntryInput{{Provider: "a", Model: "a/x", Enabled: true, Resolutions: []string{"1k"}}}},
+		{"default capability", "fusion", []PoolEntryInput{{Provider: "a", Model: "x", Enabled: true, Resolutions: []string{"default"}}}},
+		{"unknown resolution", "fusion", []PoolEntryInput{{Provider: "a", Model: "x", Enabled: true, Resolutions: []string{"8k"}}}},
+		{"enabled without resolutions", "fusion", []PoolEntryInput{{Provider: "a", Model: "x", Enabled: true}}},
 		{"exact duplicate model", "fusion", []PoolEntryInput{
-			{ModelID: "a/x", Enabled: true, Resolutions: []string{"1k"}},
-			{ModelID: "a/x", Enabled: true, Resolutions: []string{"2k"}},
+			{Provider: "a", Model: "x", Enabled: true, Resolutions: []string{"1k"}},
+			{Provider: "a", Model: "x", Enabled: true, Resolutions: []string{"2k"}},
 		}},
 		{"case-insensitive duplicate model", "fusion", []PoolEntryInput{
-			{ModelID: "A/x", Enabled: true, Resolutions: []string{"1k"}},
-			{ModelID: "a/X", Enabled: true, Resolutions: []string{"2k"}},
+			{Provider: "A", Model: "x", Enabled: true, Resolutions: []string{"1k"}},
+			{Provider: "a", Model: "X", Enabled: true, Resolutions: []string{"2k"}},
 		}},
 	}
 	for _, tc := range cases {
@@ -208,10 +234,33 @@ func TestReplacePoolValidation(t *testing.T) {
 	}
 }
 
+func TestReplacePoolAcceptsUnknownProviderSlug(t *testing.T) {
+	r := newCatalogTestRepo(t)
+	ctx := context.Background()
+	// Unknown slugs synthesize the default custom-<slug> namespace at
+	// execution (Control API contract); the pool write accepts them.
+	result := mustReplace(t, r, "fusion", 0, []PoolEntryInput{
+		{Provider: "myco", Model: "custom-model", Enabled: true, Resolutions: []string{"1k"}},
+	})
+	if result.Version != 1 || !result.Changed {
+		t.Fatalf("result = %+v, want {Version:1 Changed:true}", result)
+	}
+	pool, err := r.ListPool(ctx, "fusion")
+	if err != nil {
+		t.Fatalf("ListPool failed: %v", err)
+	}
+	if len(pool.Entries) != 1 || pool.Entries[0].Provider != "myco" || pool.Entries[0].Model != "custom-model" {
+		t.Fatalf("entries = %+v, want one myco/custom-model row", pool.Entries)
+	}
+	if got := pool.Entries[0].DisplayModel(); got != "myco/custom-model" {
+		t.Fatalf("DisplayModel = %q, want myco/custom-model", got)
+	}
+}
+
 func TestReplacePoolDisabledEntryMayOmitResolutions(t *testing.T) {
 	r := newCatalogTestRepo(t)
 	result := mustReplace(t, r, "upscale", 0, []PoolEntryInput{
-		{ModelID: "a/first", Enabled: false},
+		{Provider: "a", Model: "first", Enabled: false},
 	})
 	if result.Version != 1 || !result.Changed {
 		t.Fatalf("result = %+v, want {Version:1 Changed:true}", result)
@@ -237,13 +286,13 @@ func TestPoolVersionsArePerService(t *testing.T) {
 	r := newCatalogTestRepo(t)
 	ctx := context.Background()
 	mustReplace(t, r, "generation", 0, []PoolEntryInput{
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"1k"}},
+		{Provider: "a", Model: "first", Enabled: true, Resolutions: []string{"1k"}},
 	})
 	mustReplace(t, r, "generation", 1, []PoolEntryInput{
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"1k", "2k"}},
+		{Provider: "a", Model: "first", Enabled: true, Resolutions: []string{"1k", "2k"}},
 	})
 	mustReplace(t, r, "render", 0, []PoolEntryInput{
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"1k"}},
+		{Provider: "a", Model: "first", Enabled: true, Resolutions: []string{"1k"}},
 	})
 	genVersion, _ := r.GetVersion(ctx, "generation")
 	renderVersion, _ := r.GetVersion(ctx, "render")

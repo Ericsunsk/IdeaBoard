@@ -34,7 +34,7 @@ var providerRegistry = []ProviderEntry{
 	{Slug: "anthropic", DisplayName: "Anthropic", GatewayNamespace: "anthropic", CommunityProviders: []string{"anthropic"}},
 	{Slug: "cohere", DisplayName: "Cohere", GatewayNamespace: "cohere", CommunityPrefixes: []string{"cohere"}, CommunityProviders: []string{"cohere", "cohere_chat"}},
 	{Slug: "google-ai-studio", DisplayName: "Google AI Studio", GatewayNamespace: "google-ai-studio", Aliases: []string{"googleaistudio", "gemini"}, CommunityPrefixes: []string{"gemini"}, CommunityProviders: []string{"gemini"}},
-	{Slug: "workers-ai", DisplayName: "Workers AI", GatewayNamespace: "workers-ai", Aliases: []string{"workersai", "cf-workers-ai", "cloudflare"}, CommunityPrefixes: []string{"cloudflare"}, CommunityProviders: []string{"cloudflare"}},
+	{Slug: "workers-ai", DisplayName: "Workers AI", GatewayNamespace: "workers-ai", Aliases: []string{"workersai", "cf-workers-ai", "cloudflare"}, CommunityPrefixes: []string{"cloudflare"}, CommunityProviders: []string{"cloudflare", "cloudflare-workers-ai"}},
 	{Slug: "fal", DisplayName: "Fal AI", GatewayNamespace: "fal", Aliases: []string{"fal-ai", "fal_ai", "fal.ai"}, CommunityPrefixes: []string{"fal_ai"}, CommunityProviders: []string{"fal_ai"}},
 	{Slug: "replicate", DisplayName: "Replicate", GatewayNamespace: "replicate", CommunityPrefixes: []string{"replicate"}, CommunityProviders: []string{"replicate"}},
 	{Slug: "huggingface", DisplayName: "Hugging Face", GatewayNamespace: "huggingface", Aliases: []string{"hugging-face"}},

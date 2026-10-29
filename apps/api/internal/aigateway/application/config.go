@@ -244,7 +244,6 @@ func (r *ConfigRepository) Update(ctx context.Context, input UpdateInput, actorI
 	if r == nil || r.settings == nil {
 		return errors.New("AI gateway config repository is unavailable")
 	}
-	// Previous host for the audit record (host-level old→new).
 	stored, loadErr := r.GetSummary(ctx)
 	prevHost := ""
 	if loadErr == nil {

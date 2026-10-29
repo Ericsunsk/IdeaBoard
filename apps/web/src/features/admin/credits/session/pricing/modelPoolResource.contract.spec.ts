@@ -39,8 +39,8 @@ describe('Admin Model Pool resource', () => {
     const state = {
       version: 2,
       entries: [
-        { model_id: 'a/first', enabled: true, resolutions: ['1k', '2k'] },
-        { model_id: 'b/second', enabled: false, resolutions: [] },
+        { provider: 'a', model_id: 'first', enabled: true, resolutions: ['1k', '2k'] },
+        { provider: 'b', model_id: 'second', enabled: false, resolutions: [] },
       ],
     }
     useMswHandlers(...poolHandlers(state))
@@ -50,8 +50,8 @@ describe('Admin Model Pool resource', () => {
       sku,
       version: 2,
       entries: [
-        { modelId: 'a/first', enabled: true, resolutions: ['1k', '2k'] },
-        { modelId: 'b/second', enabled: false, resolutions: [] },
+        { provider: 'a', modelId: 'first', enabled: true, resolutions: ['1k', '2k'] },
+        { provider: 'b', modelId: 'second', enabled: false, resolutions: [] },
       ],
     })
   })
@@ -65,7 +65,7 @@ describe('Admin Model Pool resource', () => {
         sku,
         version: 3,
         changed: true,
-        entries: [{ model_id: 'a/first', enabled: true, resolutions: ['1k', '2k'] }],
+        entries: [{ provider: 'a', model_id: 'first', enabled: true, resolutions: ['1k', '2k'] }],
       },
       seen: {} as {
         body?: unknown
@@ -77,7 +77,7 @@ describe('Admin Model Pool resource', () => {
     await expect(
       replaceAdminModelPool(
         sku,
-        { version: 2, entries: [{ modelId: 'a/first', enabled: true, resolutions: ['1k', '2k'] }] },
+        { version: 2, entries: [{ provider: 'a', modelId: 'first', enabled: true, resolutions: ['1k', '2k'] }] },
         options,
       ),
     ).resolves.toEqual({
@@ -85,11 +85,11 @@ describe('Admin Model Pool resource', () => {
       sku,
       version: 3,
       changed: true,
-      entries: [{ modelId: 'a/first', enabled: true, resolutions: ['1k', '2k'] }],
+      entries: [{ provider: 'a', modelId: 'first', enabled: true, resolutions: ['1k', '2k'] }],
     })
     expect(state.seen.body).toEqual({
       expected_version: 2,
-      entries: [{ model_id: 'a/first', enabled: true, resolutions: ['1k', '2k'] }],
+      entries: [{ provider: 'a', model_id: 'first', enabled: true, resolutions: ['1k', '2k'] }],
     })
     expect(state.seen.idempotencyKey).toMatch(/.+/)
   })
@@ -142,7 +142,7 @@ describe('Admin Model Pool resource', () => {
   })
 
   it('lists catalog models through the injected lister', async () => {
-    const resource = createAdminModelPoolResource(async () => [{ id: 'a/first', name: 'First' }])
-    await expect(resource.listCatalogModels()).resolves.toEqual([{ id: 'a/first', name: 'First' }])
+    const resource = createAdminModelPoolResource(async () => [{ id: 'first', name: 'First', provider: 'a' }])
+    await expect(resource.listCatalogModels()).resolves.toEqual([{ id: 'first', name: 'First', provider: 'a' }])
   })
 })

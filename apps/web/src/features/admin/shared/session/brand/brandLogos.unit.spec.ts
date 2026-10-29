@@ -2,15 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   ADMIN_BRAND_CATEGORIES,
   ALL_ADMIN_BRAND_LOGOS,
-  adminBrandLogoProxyUrl,
   detectAdminBrandLogoKey,
   getAdminBrandLogo,
   getAdminBrandLogoOverride,
   replaceAdminBrandLogoOverrides,
   resolveModelBrandLogo,
 } from './brandLogos'
-
-const LOGO_ENDPOINT = '/api/control/v1/platform/ai-gateway/brand-logo'
 
 describe('adminBrandLogos', () => {
   it('defines all major brand categories', () => {
@@ -32,34 +29,21 @@ describe('adminBrandLogos', () => {
     expect(ALL_ADMIN_BRAND_LOGOS.some((l) => l.category === 'storage')).toBe(true)
   })
 
-  it('routes provider logos through the backend models.dev passthrough', () => {
-    expect(adminBrandLogoProxyUrl('openai')).toBe(`${LOGO_ENDPOINT}?provider=openai`)
-    expect(adminBrandLogoProxyUrl('fal')).toBe(`${LOGO_ENDPOINT}?provider=fal`)
-
+  it('falls back to the default mark for AI providers', () => {
     const openai = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'openai')
-    expect(openai?.logoSrc).toBe(`${LOGO_ENDPOINT}?provider=openai`)
+    expect(openai?.logoSrc).toBe('')
     const fal = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'fal')
-    expect(fal?.logoSrc).toBe(`${LOGO_ENDPOINT}?provider=fal`)
+    expect(fal?.logoSrc).toBe('')
 
-    // 存储与身份类目仍用站内现成资产，不走透传。
+    // 存储与身份类目仍用站内现成资产。
     const minio = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'minio')
-    expect(minio?.logoSrc).not.toContain(LOGO_ENDPOINT)
+    expect(minio?.logoSrc).not.toBe('')
     const github = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'github')
-    expect(github?.logoSrc).not.toContain(LOGO_ENDPOINT)
-    // 图片搜索类目同理：上游仅有通用占位图，用站内品牌标。
+    expect(github?.logoSrc).not.toBe('')
     const unsplash = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'unsplash')
-    expect(unsplash?.logoSrc).not.toContain(LOGO_ENDPOINT)
+    expect(unsplash?.logoSrc).not.toBe('')
     const pexels = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'pexels')
-    expect(pexels?.logoSrc).not.toContain(LOGO_ENDPOINT)
-  })
-
-  it('maps keys with divergent models.dev provider IDs to verified upstream IDs', () => {
-    expect(adminBrandLogoProxyUrl('zhipu')).toBe(`${LOGO_ENDPOINT}?provider=zhipuai`)
-    expect(adminBrandLogoProxyUrl('moonshot')).toBe(`${LOGO_ENDPOINT}?provider=moonshotai`)
-    expect(adminBrandLogoProxyUrl('aliyun')).toBe(`${LOGO_ENDPOINT}?provider=alibaba`)
-    expect(adminBrandLogoProxyUrl('doubao')).toBe(`${LOGO_ENDPOINT}?provider=volcengine`)
-    expect(adminBrandLogoProxyUrl('gemini')).toBe(`${LOGO_ENDPOINT}?provider=google`)
-    expect(adminBrandLogoProxyUrl('bedrock')).toBe(`${LOGO_ENDPOINT}?provider=amazon-bedrock`)
+    expect(pexels?.logoSrc).not.toBe('')
   })
 
   it('detects brand logos by keyword, domain, and endpoint patterns', () => {
@@ -115,15 +99,13 @@ describe('adminBrandLogos', () => {
   })
 
   it('resolves model brand logo URLs based on model name, id, and provider', () => {
-    const getLogo = (key: string) => ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === key)?.logoSrc
-
     // 1. 用户真实截图场景：模型名为 Google/Gemini，但提供商为 OpenRouter
     const geminiLogo = resolveModelBrandLogo({
       id: 'google/gemini-3.1-flash-lite-image',
       name: 'Google: Nano Banana 2 Lite (Gemini 3.1 Flash Lite Image)',
       provider: 'OpenRouter',
     })
-    expect(geminiLogo).toBe(getLogo('gemini'))
+    expect(geminiLogo).toBe('')
 
     // 2. OpenAI 模型
     const openaiLogo = resolveModelBrandLogo({
@@ -131,7 +113,7 @@ describe('adminBrandLogos', () => {
       name: 'GPT-4o Omnimodal',
       provider: 'OpenRouter',
     })
-    expect(openaiLogo).toBe(getLogo('openai'))
+    expect(openaiLogo).toBe('')
 
     // 3. Anthropic Claude 模型
     const claudeLogo = resolveModelBrandLogo({
@@ -139,15 +121,15 @@ describe('adminBrandLogos', () => {
       name: 'Claude 3.5 Sonnet',
       provider: 'Cloudflare',
     })
-    expect(claudeLogo).toBe(getLogo('anthropic'))
+    expect(claudeLogo).toBe('')
 
-    // 4. 模型名称为通用名，但提供商为 Fal AI -> 兜底为 Fal 透传地址（上游回默认图，不断图）
+    // 4. Fal AI 等 AI provider：一律回退默认图（空字符串，调用方渲染 Cube）
     const falLogo = resolveModelBrandLogo({
       id: 'fal-ai/birefnet',
       name: 'BiRefNet 高清智能抠图',
       provider: 'Fal AI',
     })
-    expect(falLogo).toBe(`${LOGO_ENDPOINT}?provider=fal`)
+    expect(falLogo).toBe('')
 
     // 5. 完全未知的自建模型 -> 返回 undefined (回退到 Cube 图标)
     const unknownLogo = resolveModelBrandLogo({

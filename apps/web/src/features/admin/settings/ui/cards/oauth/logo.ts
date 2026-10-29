@@ -4,7 +4,7 @@ import { adminBrandLogoMap, getAdminBrandLogoOverride } from '../../../../shared
 import type { OAuthProviderCode } from '@/core/auth/oauthProviders'
 
 // 登录源 logo 必须精确解析：模糊匹配会把 'google' 命中到 AI 模型的
-// google 品牌（models.dev 通用星星占位图），故只认 scope override，
+// google 品牌（已回退默认图），故只认 scope override，
 // 其余一律用站内品牌资产。
 export function resolveOAuthProviderLogo(provider: OAuthProviderCode): string {
   const override = getAdminBrandLogoOverride('oauth-provider', provider)

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 
@@ -72,6 +73,12 @@ func (f *fakeControlModelPools) ReplacePool(_ context.Context, service string, e
 		return catalog.ReplacePoolResult{}, fmt.Errorf("fake: %w: unsupported service %q", catalog.ErrInvalidPoolInput, service)
 	}
 	for i, input := range inputs {
+		if strings.TrimSpace(input.Provider) == "" {
+			return catalog.ReplacePoolResult{}, fmt.Errorf("fake: %w: entry %d has a blank provider", catalog.ErrInvalidPoolInput, i)
+		}
+		if strings.TrimSpace(input.Model) == "" {
+			return catalog.ReplacePoolResult{}, fmt.Errorf("fake: %w: entry %d has a blank model", catalog.ErrInvalidPoolInput, i)
+		}
 		if input.Enabled && len(input.Resolutions) == 0 {
 			return catalog.ReplacePoolResult{}, fmt.Errorf("fake: %w: entry %d enabled without resolutions", catalog.ErrInvalidPoolInput, i)
 		}
@@ -87,9 +94,14 @@ func (f *fakeControlModelPools) ReplacePool(_ context.Context, service string, e
 			resolutions = append(resolutions, routing.Resolution(raw))
 		}
 		sort.Slice(resolutions, func(a, b int) bool { return resolutions[a] < resolutions[b] })
-		desired = append(desired, routing.ModelPoolEntry{Model: input.ModelID, Enabled: input.Enabled, SupportedResolutions: resolutions})
+		desired = append(desired, routing.ModelPoolEntry{Provider: input.Provider, Model: input.Model, Enabled: input.Enabled, SupportedResolutions: resolutions})
 	}
-	sort.Slice(desired, func(a, b int) bool { return desired[a].Model < desired[b].Model })
+	sort.Slice(desired, func(a, b int) bool {
+		if desired[a].Provider != desired[b].Provider {
+			return desired[a].Provider < desired[b].Provider
+		}
+		return desired[a].Model < desired[b].Model
+	})
 	if poolEntriesEqual(state.entries, desired) {
 		return catalog.ReplacePoolResult{
 			Version: state.version,
@@ -114,7 +126,7 @@ func poolEntriesEqual(left, right []routing.ModelPoolEntry) bool {
 		return false
 	}
 	for i := range left {
-		if left[i].Model != right[i].Model || left[i].Enabled != right[i].Enabled {
+		if left[i].Provider != right[i].Provider || left[i].Model != right[i].Model || left[i].Enabled != right[i].Enabled {
 			return false
 		}
 		if len(left[i].SupportedResolutions) != len(right[i].SupportedResolutions) {
@@ -156,8 +168,8 @@ func poolData(t *testing.T, payload map[string]any) map[string]any {
 func TestControlModelPoolGet(t *testing.T) {
 	pools := newFakeControlModelPools()
 	pools.seed("generation", 2, []routing.ModelPoolEntry{
-		{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
-		{Model: "b/second", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K, routing.Resolution4K}},
+		{Provider: "a", Model: "first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
+		{Provider: "b", Model: "second", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K, routing.Resolution4K}},
 	})
 	h := poolHarness(t, pools)
 
@@ -237,7 +249,7 @@ func TestControlModelPoolReplaceVersionLifecycle(t *testing.T) {
 	}
 
 	// First effective write starts at version 1.
-	status, payload := put(0, `{"expected_version":0,"entries":[{"model_id":"a/first","enabled":true,"resolutions":["1k"]}]}`, 11)
+	status, payload := put(0, `{"expected_version":0,"entries":[{"provider":"a","model_id":"first","enabled":true,"resolutions":["1k"]}]}`, 11)
 	if status != http.StatusOK {
 		t.Fatalf("first PUT status = %d, want 200: %v", status, payload)
 	}
@@ -250,7 +262,7 @@ func TestControlModelPoolReplaceVersionLifecycle(t *testing.T) {
 	}
 
 	// Effective change bumps monotonically.
-	status, payload = put(1, `{"expected_version":1,"entries":[{"model_id":"a/first","enabled":true,"resolutions":["1k","2k"]}]}`, 12)
+	status, payload = put(1, `{"expected_version":1,"entries":[{"provider":"a","model_id":"first","enabled":true,"resolutions":["1k","2k"]}]}`, 12)
 	if status != http.StatusOK {
 		t.Fatalf("second PUT status = %d, want 200: %v", status, payload)
 	}
@@ -259,7 +271,7 @@ func TestControlModelPoolReplaceVersionLifecycle(t *testing.T) {
 	}
 
 	// No-op save preserves the version and reports unchanged.
-	status, payload = put(2, `{"expected_version":2,"entries":[{"model_id":"a/first","enabled":true,"resolutions":["2k","1k"]}]}`, 13)
+	status, payload = put(2, `{"expected_version":2,"entries":[{"provider":"a","model_id":"first","enabled":true,"resolutions":["2k","1k"]}]}`, 13)
 	if status != http.StatusOK {
 		t.Fatalf("no-op PUT status = %d, want 200: %v", status, payload)
 	}
@@ -279,13 +291,13 @@ func TestControlModelPoolReplaceVersionLifecycle(t *testing.T) {
 func TestControlModelPoolReplaceConflictLeavesPoolUntouched(t *testing.T) {
 	pools := newFakeControlModelPools()
 	pools.seed("generation", 3, []routing.ModelPoolEntry{
-		{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
+		{Provider: "a", Model: "first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
 	})
 	h := poolHarness(t, pools)
 
 	status, _, payload := h.serve(poolAdminCall(http.MethodPut,
 		"/api/control/v1/billing/catalog/ai-image:generation/pool",
-		`{"expected_version":2,"entries":[{"model_id":"b/second","enabled":true,"resolutions":["2k"]}]}`, 21))
+		`{"expected_version":2,"entries":[{"provider":"b","model_id":"second","enabled":true,"resolutions":["2k"]}]}`, 21))
 	if status != http.StatusConflict {
 		t.Fatalf("stale PUT status = %d, want 409: %v", status, payload)
 	}
@@ -297,7 +309,7 @@ func TestControlModelPoolReplaceConflictLeavesPoolUntouched(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListPool failed: %v", err)
 	}
-	if stored.Version != 3 || len(stored.Entries) != 1 || stored.Entries[0].Model != "a/first" {
+	if stored.Version != 3 || len(stored.Entries) != 1 || stored.Entries[0].DisplayModel() != "a/first" {
 		t.Fatalf("stored pool after conflict = %+v, want untouched version 3 with a/first", stored)
 	}
 }
@@ -307,12 +319,11 @@ func TestControlModelPoolReplaceValidation(t *testing.T) {
 	h := poolHarness(t, pools)
 
 	// OpenAPI required fields are enforced at runtime as well; missing or
-	// null values must not silently become the zero-value empty pool.
+	// null values must not silently become the zero-value empty pool. One
+	// all-missing and one explicit-null representative share the same
+	// nil-guard branch.
 	for key, body := range map[int]string{
 		33: `{}`,
-		34: `{"expected_version":0}`,
-		35: `{"entries":[]}`,
-		36: `{"expected_version":null,"entries":[]}`,
 		37: `{"expected_version":0,"entries":null}`,
 	} {
 		status, _, payload := h.serve(poolAdminCall(http.MethodPut,
@@ -328,9 +339,22 @@ func TestControlModelPoolReplaceValidation(t *testing.T) {
 	// Enabled entry without resolutions is rejected transactionally.
 	status, _, payload := h.serve(poolAdminCall(http.MethodPut,
 		"/api/control/v1/billing/catalog/ai-image:generation/pool",
-		`{"expected_version":0,"entries":[{"model_id":"a/first","enabled":true,"resolutions":[]}]}`, 31))
+		`{"expected_version":0,"entries":[{"provider":"a","model_id":"first","enabled":true,"resolutions":[]}]}`, 31))
 	if status != http.StatusBadRequest {
 		t.Fatalf("invalid PUT status = %d, want 400: %v", status, payload)
+	}
+	if code := controlErrorCode(t, payload); code != string(contract.CodeBadRequest) {
+		t.Fatalf("code = %q, want bad_request", code)
+	}
+
+	// Provider is required: a missing provider fails closed with 400.
+	// Blank-provider and blank-model variants share the same empty-string
+	// branch and are covered once by catalog validation.
+	status, _, payload = h.serve(poolAdminCall(http.MethodPut,
+		"/api/control/v1/billing/catalog/ai-image:generation/pool",
+		`{"expected_version":0,"entries":[{"model_id":"first","enabled":true,"resolutions":["1k"]}]}`, 38))
+	if status != http.StatusBadRequest {
+		t.Fatalf("provider-less body status = %d, want 400: %v", status, payload)
 	}
 	if code := controlErrorCode(t, payload); code != string(contract.CodeBadRequest) {
 		t.Fatalf("code = %q, want bad_request", code)

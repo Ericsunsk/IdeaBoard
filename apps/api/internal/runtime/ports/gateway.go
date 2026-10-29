@@ -2,9 +2,7 @@ package ports
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"ideaboard/api/internal/platform/errorrender"
 	"net/http"
 	"strings"
 	"time"
@@ -130,31 +128,13 @@ type GatewayClient interface {
 // without restarts; implementations fail closed when unconfigured.
 type GatewayClientFactory func(ctx context.Context) (GatewayClient, error)
 
-// SplitGatewayModel parses an admin mapping value of the form
-// provider/model[@gateway-path]. Providers stay open-ended on purpose:
-// hardcoding them would break zero-code supplier onboarding. The optional
-// @path overrides the default route and is required where no static route
-// exists. Whitespace is rejected so pasted values fail fast.
-func SplitGatewayModel(raw string) (provider, model, pathOverride string, err error) {
-	rest := raw
-	if i := strings.Index(rest, "@"); i >= 0 {
-		rest, pathOverride = rest[:i], strings.TrimSpace(rest[i+1:])
-		if pathOverride == "" || strings.ContainsAny(pathOverride, " \t\n") {
-			return "", "", "", errors.New(errorrender.MsgSplitGatewayModel)
-		}
-	}
-	parts := strings.SplitN(strings.TrimSpace(rest), "/", 2)
-	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" ||
-		strings.ContainsAny(rest, " \t\n") {
-		return "", "", "", errors.New(errorrender.MsgSplitGatewayModel2)
-	}
-	return strings.ToLower(strings.TrimSpace(parts[0])), strings.TrimSpace(parts[1]), pathOverride, nil
-}
-
 // ModelRouteOverrideReader resolves catalog-stored route overrides per
-// model ID (custom path/params operators set in the model library). The
-// mapping @path always wins; this only fills gaps. Implementations fail
-// the lookup (never silent defaults); a nil reader disables the lookup.
+// structured pool model (provider plus bare model, joined as the
+// provider/model display key): custom path/params operators set in the
+// model library. The mapping @path always wins; this only fills gaps.
+// Implementations fail the lookup (never silent defaults); a nil reader
+// disables the lookup. Bare models without a provider never reach here:
+// execution fails closed before the lookup.
 type ModelRouteOverrideReader interface {
-	LookupRouteOverride(ctx context.Context, modelID string) (pathOverride, customParams string, found bool, err error)
+	LookupRouteOverride(ctx context.Context, provider, model string) (pathOverride, customParams string, found bool, err error)
 }

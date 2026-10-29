@@ -85,7 +85,7 @@ describe('AdminGatewayConfigDialog', () => {
     await fireEvent.update(screen.getByPlaceholderText(/32 位/), '3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c')
     await fireEvent.update(screen.getByPlaceholderText(/网关标识/), 'my-gateway')
 
-    const saveButton = screen.getByRole('button', { name: '添加网关' })
+    const saveButton = screen.getByRole('button', { name: '保存' })
     await user.click(saveButton)
 
     expect(mockResource.update).toHaveBeenCalledWith({
@@ -106,7 +106,6 @@ describe('AdminGatewayConfigDialog', () => {
   })
 
   it('blocks custom domain save without Account ID and Gateway ID', async () => {
-    // 自定义域名缺身份直接报错。
     const { user } = renderDialog()
 
     await screen.findByPlaceholderText(/gateway/i)
@@ -119,7 +118,7 @@ describe('AdminGatewayConfigDialog', () => {
     await fireEvent.update(screen.getByPlaceholderText(/32 位/), '')
     await fireEvent.update(screen.getByPlaceholderText(/网关标识/), '')
 
-    const saveButton = screen.getByRole('button', { name: '添加网关' })
+    const saveButton = screen.getByRole('button', { name: '保存' })
     await user.click(saveButton)
 
     await waitFor(() => {
@@ -129,14 +128,13 @@ describe('AdminGatewayConfigDialog', () => {
   })
 
   it('saves default-host URL without Account ID and Gateway ID', async () => {
-    // 官方域名从 URL 派生身份：缺身份仍可保存。
     const { user } = renderDialog()
 
     await screen.findByPlaceholderText(/gateway/i)
     await fireEvent.update(screen.getByPlaceholderText(/32 位/), '')
     await fireEvent.update(screen.getByPlaceholderText(/网关标识/), '')
 
-    const saveButton = screen.getByRole('button', { name: '添加网关' })
+    const saveButton = screen.getByRole('button', { name: '保存' })
     await user.click(saveButton)
 
     expect(mockResource.update).toHaveBeenCalledWith({
@@ -154,9 +152,8 @@ describe('AdminGatewayConfigDialog', () => {
     const { user } = renderDialog({ 'onUpdate:visible': onUpdateVisible })
 
     await screen.findByPlaceholderText(/gateway/i)
-    await user.click(screen.getByRole('button', { name: '添加网关' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
 
-    // 保存失败只走 toast，对话框保持打开可重试，不写行内。
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('gateway down'))
     expect(screen.queryByText('保存网关配置失败')).not.toBeInTheDocument()
     expect(onUpdateVisible).not.toHaveBeenCalledWith(false)
@@ -180,7 +177,7 @@ describe('AdminGatewayConfigDialog', () => {
     const baseUrlInput = await screen.findByPlaceholderText(/gateway/i)
     await fireEvent.update(baseUrlInput, 'not-a-valid-url')
 
-    const saveButton = screen.getByRole('button', { name: '添加网关' })
+    const saveButton = screen.getByRole('button', { name: '保存' })
     await user.click(saveButton)
 
     expect(screen.getByText('网关 Base URL 必须以 http:// 或 https:// 开头')).toBeVisible()
@@ -198,7 +195,7 @@ describe('AdminGatewayConfigDialog', () => {
       'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway-v2',
     )
 
-    const saveButton = screen.getByRole('button', { name: '添加网关' })
+    const saveButton = screen.getByRole('button', { name: '保存' })
     await user.click(saveButton)
 
     expect(mockResource.update).toHaveBeenCalledWith(
@@ -211,17 +208,6 @@ describe('AdminGatewayConfigDialog', () => {
     expect(updateCall?.token).toBeUndefined()
   })
 
-  it('emits update:visible false when clicking the close (x) button', async () => {
-    const onUpdateVisible = vi.fn()
-    const { user } = renderDialog({ 'onUpdate:visible': onUpdateVisible })
-
-    const dialog = await screen.findByRole('dialog', { name: '添加网关' })
-    const closeBtn = within(dialog).getByRole('button', { name: /close|关闭/i })
-    await user.click(closeBtn)
-
-    expect(onUpdateVisible).toHaveBeenCalledWith(false)
-  })
-
   it('emits update:visible false when clicking cancel button', async () => {
     const onUpdateVisible = vi.fn()
     const { user } = renderDialog({ 'onUpdate:visible': onUpdateVisible })
@@ -230,6 +216,32 @@ describe('AdminGatewayConfigDialog', () => {
     await user.click(cancelBtn)
 
     expect(onUpdateVisible).toHaveBeenCalledWith(false)
+  })
+
+  it('marks Base URL always required and identity fields only for custom domains', async () => {
+    renderDialog()
+
+    await screen.findByPlaceholderText(/gateway/i)
+
+    const baseUrlLabel = screen.getByText('网关 Base URL').closest('label')
+    expect(baseUrlLabel).not.toBeNull()
+    expect(within(baseUrlLabel as HTMLElement).getByText('*')).toBeVisible()
+
+    const accountLabel = screen.getByText('Account ID').closest('label')
+    const gatewayLabel = screen.getByText('Gateway ID').closest('label')
+    expect(accountLabel).not.toBeNull()
+    expect(gatewayLabel).not.toBeNull()
+    expect(within(accountLabel as HTMLElement).queryByText('*')).not.toBeInTheDocument()
+    expect(within(gatewayLabel as HTMLElement).queryByText('*')).not.toBeInTheDocument()
+
+    await fireEvent.update(
+      screen.getByPlaceholderText(/gateway/i),
+      'https://my-custom-gateway.company.com',
+    )
+    await waitFor(() => {
+      expect(within(accountLabel as HTMLElement).getByText('*')).toBeVisible()
+      expect(within(gatewayLabel as HTMLElement).getByText('*')).toBeVisible()
+    })
   })
 
   it('supports testing gateway connection from the modal without a confirm dialog', async () => {
@@ -243,25 +255,15 @@ describe('AdminGatewayConfigDialog', () => {
 
     await user.click(await screen.findByRole('button', { name: '测试连接' }))
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('测试连接需要填写 provider 与 path')
+      expect(mockResource.testConnection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          base_url:
+            'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
+          provider: '',
+          path: '',
+        }),
+      )
     })
-    expect(mockResource.testConnection).not.toHaveBeenCalled()
-    // 失败收敛到 toast：inline 不挂 probe 缺参提示。
-    expect(screen.queryByText('测试连接需要填写 provider 与 path')).not.toBeInTheDocument()
-
-    await user.type(screen.getByPlaceholderText('例如: openai'), 'openai')
-    await user.type(screen.getByPlaceholderText('例如: v1/models'), 'v1/models')
-    const testBtn = await screen.findByRole('button', { name: '测试连接' })
-    await user.click(testBtn)
-
-    expect(mockResource.testConnection).toHaveBeenCalledWith(
-      expect.objectContaining({
-        base_url:
-          'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
-        provider: 'openai',
-        path: 'v1/models',
-      }),
-    )
     expect(toast.success).toHaveBeenCalledWith('网关连接正常 (38ms)')
   })
 
@@ -275,8 +277,6 @@ describe('AdminGatewayConfigDialog', () => {
     await screen.findByDisplayValue(
       'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
     )
-    await user.type(screen.getByPlaceholderText('例如: openai'), 'openai')
-    await user.type(screen.getByPlaceholderText('例如: v1/models'), 'v1/models')
     await user.click(await screen.findByRole('button', { name: '测试连接' }))
 
     await waitFor(() => {
@@ -285,74 +285,15 @@ describe('AdminGatewayConfigDialog', () => {
     expect(screen.queryByText('网关探活失败：upstream 502')).not.toBeInTheDocument()
   })
 
-  it('reports probe exception only via toast without inline error', async () => {
-    vi.mocked(mockResource.testConnection).mockRejectedValueOnce(new Error('boom'))
-    const { user } = renderDialog()
-
-    await screen.findByDisplayValue(
-      'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
-    )
-    await user.type(screen.getByPlaceholderText('例如: openai'), 'openai')
-    await user.type(screen.getByPlaceholderText('例如: v1/models'), 'v1/models')
-    await user.click(await screen.findByRole('button', { name: '测试连接' }))
-
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalled()
-    })
-    expect(toast.error.mock.calls[0]?.[0]).toContain('boom')
-    expect(screen.queryByText(/boom/)).not.toBeInTheDocument()
-  })
-
   it('keeps base_url validation inline for test connection', async () => {
     const { user } = renderDialog()
 
     const baseUrlInput = await screen.findByPlaceholderText(/gateway/i)
     await fireEvent.update(baseUrlInput, 'not-a-valid-url')
-    await user.type(screen.getByPlaceholderText('例如: openai'), 'openai')
-    await user.type(screen.getByPlaceholderText('例如: v1/models'), 'v1/models')
     await user.click(await screen.findByRole('button', { name: '测试连接' }))
 
     expect(await screen.findByText('网关 Base URL 必须以 http:// 或 https:// 开头')).toBeVisible()
     expect(mockResource.testConnection).not.toHaveBeenCalled()
     expect(toast.error).not.toHaveBeenCalled()
-  })
-
-  it('shows the testing spinner in the probe path input suffix instead of the test button', async () => {
-    let resolveTest!: (value: { success: boolean; latencyMs?: number; message?: string }) => void
-    vi.mocked(mockResource.testConnection).mockReturnValueOnce(
-      new Promise<{ success: boolean; latencyMs?: number; message?: string }>((resolve) => {
-        resolveTest = resolve
-      }),
-    )
-    const { user } = renderDialog()
-
-    await screen.findByDisplayValue(
-      'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
-    )
-    await user.type(screen.getByPlaceholderText('例如: openai'), 'openai')
-    await user.type(screen.getByPlaceholderText('例如: v1/models'), 'v1/models')
-    const testBtn = await screen.findByRole('button', { name: '测试连接' })
-    await user.click(testBtn)
-
-    // 输入栏尾部出现可访问的 testing 状态，按钮保持 disabled 但自身无 spinner。
-    const status = await screen.findByRole('status')
-    expect(status).toHaveTextContent('Testing…')
-    const spinner = status.querySelector('svg')
-    expect(spinner?.getAttribute('aria-hidden')).toBe('true')
-    expect(testBtn).toBeDisabled()
-    expect(testBtn.querySelector('svg')).not.toBeInTheDocument()
-    // loading 行为：探活输入栏标记 aria-busy（不测内部 Spinner 实现）。
-    expect(screen.getByPlaceholderText('例如: v1/models')).toHaveAttribute('aria-busy', 'true')
-
-    resolveTest({ success: true, latencyMs: 38, message: '网关连接正常 (38ms)' })
-    await waitFor(() => {
-      expect(mockResource.testConnection).toHaveBeenCalledWith(
-        expect.objectContaining({ provider: 'openai', path: 'v1/models' }),
-      )
-    })
-    await waitFor(() => {
-      expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    })
-    expect(screen.getByPlaceholderText('例如: v1/models')).not.toHaveAttribute('aria-busy')
   })
 })

@@ -61,123 +61,73 @@ function mountWorkspace(catalog: AdminGatewayCatalog) {
   }
 }
 
-describe('useAdminModelCatalogWorkspace refresh enrichment', () => {
+function fakeCatalog(
+  stored: AdminModelItem[],
+  saved: { items: AdminModelItem[][] } = { items: [] },
+): AdminGatewayCatalog {
+  return {
+    list: async () => stored.map((m) => ({ ...m })),
+    save: async (items: AdminModelItem[]) => {
+      saved.items.push(items)
+      stored.splice(0, stored.length, ...items.map((m) => ({ ...m })))
+    },
+    previewRoute: async () => {
+      throw new Error('not needed')
+    },
+    listProviders: async () => [],
+    listObserved: async () => [],
+  }
+}
+
+describe('useAdminModelCatalogWorkspace refresh', () => {
   beforeEach(() => {
     toast.success.mockReset()
     toast.error.mockReset()
   })
 
-  function fakeCatalog(
-    stored: AdminModelItem[],
-    detected: Array<{ id: string; description?: string; context_or_resolution?: string }>,
-    saved: { items: AdminModelItem[][] } = { items: [] },
-  ): AdminGatewayCatalog {
-    return {
-      list: async () => stored.map((m) => ({ ...m })),
-      save: async (items: AdminModelItem[]) => {
-        saved.items.push(items)
-        stored.splice(0, stored.length, ...items.map((m) => ({ ...m })))
-      },
-      previewRoute: async () => {
-        throw new Error('not needed')
-      },
-      listProviders: async () => [],
-      getReference: async () => {
-        throw new Error('not needed')
-      },
-      listObserved: async () => [],
-      detect: async () => ({
-        models: detected.map((d) => ({
-          id: d.id,
-          name: d.id,
-          provider: 'OpenAI',
-          // exactOptionalPropertyTypes：显式 undefined 不可写入可选属性，按有无展开。
-          ...(d.description !== undefined ? { description: d.description } : {}),
-          ...(d.context_or_resolution !== undefined
-            ? { context_or_resolution: d.context_or_resolution }
-            : {}),
-        })),
-        configured_providers: 1,
-      }),
-    }
-  }
-
-  it('overwrites bit-marked import text with fresher detection', async () => {
+  it('reloads the catalog list without local write-back', async () => {
     const saved = { items: [] as AdminModelItem[][] }
-    const stored = [
-      model({ id: 'openai/gpt-4o', description: '旧版官方简介', descriptionEnriched: true }),
-    ]
-    const { workspace } = mountWorkspace(
-      fakeCatalog(
-        stored,
-        [{ id: 'openai/gpt-4o', description: '实时官方简介', context_or_resolution: '128K' }],
-        saved,
-      ),
-    )
+    const stored = [model({ id: 'gpt-4o', description: '运营手写简介' })]
+    const catalog = fakeCatalog(stored, saved)
+    const list = vi.spyOn(catalog, 'list')
+    const { workspace } = mountWorkspace(catalog)
     await waitFor(() => expect(workspace.allModels.value).toHaveLength(1))
+    list.mockClear()
+    stored[0] = model({ id: 'gpt-4o', description: '更新的运营简介' })
 
     await workspace.handleRefresh()
 
-    await waitFor(() => expect(saved.items).toHaveLength(1))
-    expect(saved.items[0]![0]!.description).toBe('实时官方简介')
-    expect(saved.items[0]![0]!.contextOrResolution).toBe('128K')
-    expect(saved.items[0]![0]!.descriptionEnriched).toBe(true)
-  })
-
-  it('never touches operator-written descriptions', async () => {
-    const saved = { items: [] as AdminModelItem[][] }
-    const stored = [
-      model({ id: 'openai/gpt-4o', description: '运营手写简介', descriptionEnriched: false }),
-    ]
-    const { workspace } = mountWorkspace(
-      fakeCatalog(stored, [{ id: 'openai/gpt-4o', description: '实时官方简介' }], saved),
-    )
-    await waitFor(() => expect(workspace.allModels.value).toHaveLength(1))
-
-    await workspace.handleRefresh()
-
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('模型库已更新至最新'))
+    expect(list).toHaveBeenCalledTimes(1)
+    expect(workspace.allModels.value[0]?.description).toBe('更新的运营简介')
     expect(saved.items).toHaveLength(0)
-    expect(toast.success).toHaveBeenCalledWith('模型库已更新至最新')
   })
 
-  it('fills empty descriptions regardless of the bit', async () => {
-    const saved = { items: [] as AdminModelItem[][] }
-    const stored = [model({ id: 'openai/gpt-4o', description: '', descriptionEnriched: false })]
-    const { workspace } = mountWorkspace(
-      fakeCatalog(stored, [{ id: 'openai/gpt-4o', description: '官方简介' }], saved),
-    )
+  it('keeps the cached catalog and reports refresh failure without success feedback', async () => {
+    const catalog = fakeCatalog([model({ id: 'gpt-4o' })])
+    const list = vi.spyOn(catalog, 'list')
+    const { workspace } = mountWorkspace(catalog)
     await waitFor(() => expect(workspace.allModels.value).toHaveLength(1))
+    list.mockRejectedValueOnce(new Error('catalog refresh failed'))
 
     await workspace.handleRefresh()
 
-    await waitFor(() => expect(saved.items).toHaveLength(1))
-    expect(saved.items[0]![0]!.description).toBe('官方简介')
-  })
-
-  it('leaves bit-less operator text alone', async () => {
-    // 无位非空视为运营文本：占位文案传统已删除，不再有例外分支。
-    const saved = { items: [] as AdminModelItem[][] }
-    const stored = [model({ id: 'openai/gpt-4o', description: '运营手写简介' })]
-    const { workspace } = mountWorkspace(
-      fakeCatalog(stored, [{ id: 'openai/gpt-4o', description: '官方简介' }], saved),
-    )
-    await waitFor(() => expect(workspace.allModels.value).toHaveLength(1))
-
-    await workspace.handleRefresh()
-
-    expect(saved.items).toHaveLength(0)
+    expect(workspace.allModels.value[0]?.id).toBe('gpt-4o')
+    expect(workspace.isListStale.value).toBe(true)
+    expect(toast.error).toHaveBeenCalledWith('catalog refresh failed')
+    expect(toast.success).not.toHaveBeenCalled()
+    expect(workspace.isRefreshing.value).toBe(false)
   })
 
   it('toasts a failed initial catalog load while keeping the inline anchor state', async () => {
     const { workspace } = mountWorkspace({
-      ...fakeCatalog([], []),
+      ...fakeCatalog([]),
       list: async () => {
         throw new Error('catalog down')
       },
     })
 
     await waitFor(() => expect(workspace.isListError.value).toBe(true))
-    // 目录行内文案已删除（isListError 仍为真），失败只走 toast。
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('catalog down'))
   })
 })
@@ -198,11 +148,7 @@ describe('useAdminModelCatalogWorkspace copy feedback contract', () => {
         throw new Error('not needed')
       },
       listProviders: async () => [],
-      getReference: async () => {
-        throw new Error('not needed')
-      },
       listObserved: async () => [],
-      detect: async () => ({ models: [], configured_providers: 0 }),
     }
     return mountWorkspace(catalog)
   }
@@ -225,5 +171,49 @@ describe('useAdminModelCatalogWorkspace copy feedback contract', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('复制失败，请手动复制模型标识'))
     expect(workspace.copiedModelId.value).toBeNull()
+  })
+})
+
+describe('provider/model catalog identity', () => {
+  it('creates same-name models for different providers but rejects a duplicate pair', async () => {
+    const openai = model({ provider: 'openai', id: 'gpt-image-1', name: 'OpenAI' })
+    const azure = model({ provider: 'azureopenai', id: 'gpt-image-1', name: 'Azure' })
+    const saved = { items: [] as AdminModelItem[][] }
+    const { workspace } = mountWorkspace(fakeCatalog([openai], saved))
+    await waitFor(() => expect(workspace.allModels.value).toHaveLength(1))
+    workspace.handleCreateManualModel()
+    await workspace.handleSaveModel(azure)
+    expect(saved.items[0]).toEqual([azure, openai])
+    await waitFor(() => expect(workspace.allModels.value).toHaveLength(2))
+    workspace.handleCreateManualModel()
+    await workspace.handleSaveModel({ ...azure, provider: ' AzureOpenAI ', id: 'GPT-IMAGE-1' })
+    expect(saved.items).toHaveLength(1)
+  })
+
+  it('edits or moves exactly the original pair and prevents a conflicting provider change', async () => {
+    const openai = model({ provider: 'openai', id: 'gpt-image-1', name: 'OpenAI' })
+    const azure = model({ provider: 'azureopenai', id: 'gpt-image-1', name: 'Azure' })
+    const saved = { items: [] as AdminModelItem[][] }
+    const { workspace } = mountWorkspace(fakeCatalog([openai, azure], saved))
+    await waitFor(() => expect(workspace.allModels.value).toHaveLength(2))
+    workspace.handleEditModel(azure)
+    const moved = { ...azure, provider: 'custom', name: 'Custom' }
+    await workspace.handleSaveModel(moved)
+    expect(saved.items[0]).toEqual([openai, moved])
+    await waitFor(() => expect(workspace.allModels.value[1]?.provider).toBe('custom'))
+    workspace.handleEditModel(moved)
+    await workspace.handleSaveModel({ ...moved, provider: 'openai' })
+    expect(saved.items).toHaveLength(1)
+    expect(workspace.editDialogVisible.value).toBe(true)
+  })
+
+  it('deletes only the selected provider/model pair', async () => {
+    const openai = model({ provider: 'openai', id: 'gpt-image-1', name: 'OpenAI' })
+    const azure = model({ provider: 'azureopenai', id: 'gpt-image-1', name: 'Azure' })
+    const saved = { items: [] as AdminModelItem[][] }
+    const { workspace } = mountWorkspace(fakeCatalog([openai, azure], saved))
+    await waitFor(() => expect(workspace.allModels.value).toHaveLength(2))
+    await workspace.handleDeleteModel(azure)
+    expect(saved.items[0]).toEqual([openai])
   })
 })

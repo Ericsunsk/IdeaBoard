@@ -11,7 +11,7 @@ import { loadControlSetting } from '../../../shared/index'
 import { withControlCopy } from '../../../shared/index'
 
 export type OAuthProviderSettingsSummary = {
-  enabled: boolean
+  isEnabled: boolean
   configured: boolean
   clientId: string
   clientSecretConfigured: boolean
@@ -19,7 +19,7 @@ export type OAuthProviderSettingsSummary = {
 }
 
 type SaveOAuthProviderSettingsInput = {
-  enabled: boolean
+  isEnabled: boolean
   clientId: string
   clientSecret: string
 }
@@ -34,7 +34,7 @@ export interface OAuthProviderSettingsResource {
 
 function toSummary(data: ControlOAuthProviderSummary): OAuthProviderSettingsSummary {
   return {
-    enabled: data.enabled,
+    isEnabled: data.enabled,
     configured: data.configured,
     clientId: data.client_id,
     clientSecretConfigured: data.client_secret_configured,
@@ -61,7 +61,7 @@ async function saveOAuthProviderSettings(
     const body = await updateControlOAuthProvider(
       provider,
       {
-        enabled: input.enabled,
+        enabled: input.isEnabled,
         client_id: input.clientId,
         client_secret: input.clientSecret,
       } as ControlOAuthProviderUpdateRequest,

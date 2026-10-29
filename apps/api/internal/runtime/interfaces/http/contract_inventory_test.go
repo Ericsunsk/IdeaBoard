@@ -227,17 +227,13 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			"operationId: getControlMailSetting",
 			"operationId: updateControlMailSetting",
 			// Control gap batch (#809-close): OAuth provider channels,
-			// branding logo upload, AI gateway extras (detect, model
-			// reference, brand logo, observed, route preview, test
+			// branding logo upload, AI gateway extras (observed, route preview, test
 			// connection), brand-logo overrides, reward-code
 			// administration plus admin redemption reads, and the
 			// monitor SSE stream.
 			"operationId: getControlOAuthProvider",
 			"operationId: updateControlOAuthProvider",
 			"operationId: uploadControlBrandingLogo",
-			"operationId: detectControlAIGatewayModels",
-			"operationId: getControlAIGatewayModelReference",
-			"operationId: getControlAIGatewayBrandLogo",
 			"operationId: listControlAIGatewayModelsObserved",
 			"operationId: previewControlAIGatewayRoute",
 			"operationId: testControlAIGatewayConnection",
@@ -378,9 +374,9 @@ func TestContractV1EnvelopeUnification(t *testing.T) {
 // control route renders the platform/contract envelope, so
 // openapi.control.yaml must not carry x-control-envelope markers anymore
 // (any reintroduced marker is a hard CI failure). The only non-JSON
-// control responses are the two documented protocol exceptions, which
-// bypass translation via controlProxyRaw: the binary brand-logo
-// (image/svg+xml) and the SSE monitor stream (text/event-stream).
+// control response is the documented protocol exception, which
+// bypasses translation via controlProxyRaw: the SSE monitor stream
+// (text/event-stream).
 //
 // Plane split: control routes live in control/routes.go;
 // the definition lives in control/proxy_envelope.go.
@@ -397,15 +393,14 @@ func TestContractControlEnvelopeUnification(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read control/routes.go: %v", err)
 	}
-	// Exactly the two documented exception call sites; every other
+	// Exactly the documented exception call site; every other
 	// proxied route translates via controlProxy (the controlProxyRaw
 	// definition itself lives in control/proxy_envelope.go).
-	if got := strings.Count(string(routesRaw), "controlProxyRaw("); got != 2 {
-		t.Errorf("controlProxyRaw definition + call sites = %d, want 2 (brand-logo + monitor stream)", got)
+	if got := strings.Count(string(routesRaw), "controlProxyRaw("); got != 1 {
+		t.Errorf("controlProxyRaw definition + call sites = %d, want 1 (monitor stream)", got)
 	}
 	allowed := map[string]bool{
-		"platform.get_ai_gateway_brand_logo": false,
-		"platform.stream_monitor":            false,
+		"platform.stream_monitor": false,
 	}
 	rest := string(routesRaw)
 	for {
@@ -426,7 +421,7 @@ func TestContractControlEnvelopeUnification(t *testing.T) {
 		}
 		if !matched {
 			t.Errorf("controlProxyRaw call site outside the documented protocol exceptions " +
-				"(brand-logo binary, monitor SSE stream)")
+				"(monitor SSE stream)")
 		}
 		rest = rest[idx+len("d.controlProxyRaw("):]
 	}

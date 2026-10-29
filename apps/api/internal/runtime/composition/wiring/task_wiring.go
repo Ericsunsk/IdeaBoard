@@ -791,20 +791,22 @@ func workerWorkspaceEventData(typ string, event workspacetasks.TaskEvent) any {
 	}
 }
 
-// aiGatewayModelRouteReader adapts the admin model catalog to the worker's
-// route-override seam. It lives in composition (the sole assembly root) so
-// runtime never imports the aigateway business context.
+// aiGatewayModelRouteReader adapts catalog route overrides by provider and native
+// model name. Runtime stays independent of the AIGateway business context.
 type aiGatewayModelRouteReader struct {
-	repo *aigatewayapplication.ConfigRepository
+	repo interface {
+		ListCatalog(context.Context) ([]aigatewayapplication.CatalogItem, error)
+	}
 }
 
-func (a aiGatewayModelRouteReader) LookupRouteOverride(ctx context.Context, modelID string) (string, string, bool, error) {
+func (a aiGatewayModelRouteReader) LookupRouteOverride(ctx context.Context, provider, model string) (string, string, bool, error) {
 	items, err := a.repo.ListCatalog(ctx)
 	if err != nil {
 		return "", "", false, err
 	}
 	for _, item := range items {
-		if item.ID == modelID {
+		if strings.EqualFold(strings.TrimSpace(item.Provider), strings.TrimSpace(provider)) &&
+			strings.TrimSpace(item.ID) != "" && strings.EqualFold(strings.TrimSpace(item.ID), strings.TrimSpace(model)) {
 			return item.CustomPath, item.CustomParams, true, nil
 		}
 	}

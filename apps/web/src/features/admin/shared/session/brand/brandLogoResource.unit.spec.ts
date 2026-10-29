@@ -32,8 +32,7 @@ function override(
 }
 
 // Brand logo overrides have no Control Plane equivalent: save/remove fail
-// closed with guidance instead of calling the deleted
-// `/api/admin/brand-logo-overrides*` routes. Local hydration stays.
+// closed with guidance (no remote call). Local hydration stays.
 describe('adminBrandLogoResource', () => {
   beforeEach(() => {
     transport.request.mockReset()

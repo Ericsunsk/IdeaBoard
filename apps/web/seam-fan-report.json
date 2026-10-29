@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "checkpointSha": "b3a12c7eb75e4211073f8695565fc9ba5f3d39e3",
+  "checkpointSha": "844932a70226047d5a7798d879f172dc35c95f74",
   "scanScope": "all src modules including tests; external means outside ownershipScope; fan-out includes direct local/package/core dependencies, never package internals",
   "inventoryGate": "strict all Seams; all cruiser/Board errors remain blocking",
   "cruiserConfig": ".dependency-cruiser.cjs",
@@ -654,17 +654,12 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/session/brand/brandLogos.ts",
-          "to": "src/api/generated-query/control/control-platform/control-platform.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/statistics/session/resource.ts",
           "to": "src/api/generated-query/control/control-platform/control-platform.ts",
           "kind": "runtime"
         }
       ],
-      "fanIn": 14,
+      "fanIn": 13,
       "fanOut": 4,
       "fanOutTargets": [
         "node_modules/@tanstack/vue-query/build/legacy/index.cjs",
@@ -708,7 +703,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 14,
+      "targetFanIn": 13,
       "targetFanOut": 4,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -1211,7 +1206,7 @@
         }
       ],
       "fanIn": 19,
-      "fanOut": 173,
+      "fanOut": 170,
       "fanOutTargets": [
         "src/api/generated-query/control/model/auditRecord.ts",
         "src/api/generated-query/control/model/auditRecordOperator.ts",
@@ -1341,10 +1336,7 @@
         "src/api/generated-query/control/model/controlWorkspaceMemberRoleRequestRole.ts",
         "src/api/generated-query/control/model/createControlStorageProfileBody.ts",
         "src/api/generated-query/control/model/cursorParameter.ts",
-        "src/api/generated-query/control/model/detectControlAIGatewayModelsParams.ts",
         "src/api/generated-query/control/model/forbiddenResponse.ts",
-        "src/api/generated-query/control/model/getControlAIGatewayBrandLogoParams.ts",
-        "src/api/generated-query/control/model/getControlAIGatewayModelReferenceParams.ts",
         "src/api/generated-query/control/model/getControlStatisticsParams.ts",
         "src/api/generated-query/control/model/idempotencyConflictResponse.ts",
         "src/api/generated-query/control/model/idempotencyKeyParameter.ts",
@@ -2030,22 +2022,7 @@
         },
         {
           "from": "src/api/generated-query/control/model/index.ts",
-          "to": "src/api/generated-query/control/model/detectControlAIGatewayModelsParams.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/control/model/index.ts",
           "to": "src/api/generated-query/control/model/forbiddenResponse.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/control/model/index.ts",
-          "to": "src/api/generated-query/control/model/getControlAIGatewayBrandLogoParams.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/api/generated-query/control/model/index.ts",
-          "to": "src/api/generated-query/control/model/getControlAIGatewayModelReferenceParams.ts",
           "kind": "runtime"
         },
         {
@@ -2259,7 +2236,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 19,
-      "targetFanOut": 173,
+      "targetFanOut": 170,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -10751,11 +10728,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/shared/session/brand/brandLogos.ts",
-          "to": "src/core/config/runtimeUrls.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/auth/session/transport.ts",
           "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
@@ -10806,7 +10778,7 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 21,
+      "fanIn": 20,
       "fanOut": 0,
       "fanOutTargets": [],
       "outboundEdges": [],
@@ -10814,7 +10786,7 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 21,
+      "targetFanIn": 20,
       "targetFanOut": 0,
       "advisories": {
         "fanInTargetMismatch": false,
@@ -19885,11 +19857,6 @@
           "kind": "runtime"
         },
         {
-          "from": "src/features/admin/models/ui/dialog/components/CatalogReferencePanel.vue",
-          "to": "src/features/admin/shared/index.ts",
-          "kind": "runtime"
-        },
-        {
           "from": "src/features/admin/models/ui/dialog/components/CatalogSpecsPanel.vue",
           "to": "src/features/admin/shared/index.ts",
           "kind": "runtime"
@@ -20235,8 +20202,8 @@
           "kind": "runtime"
         }
       ],
-      "fanIn": 118,
-      "fanOut": 60,
+      "fanIn": 117,
+      "fanOut": 58,
       "fanOutTargets": [
         "fs",
         "node_modules/@iconoir/vue/dist/index.js",
@@ -20255,7 +20222,6 @@
         "path",
         "scripts/checkTokenGraph.ts",
         "src/api/contractKernel.ts",
-        "src/api/generated-query/control/control-platform/control-platform.ts",
         "src/api/workspaceTaskContract.ts",
         "src/components/ui/badge/index.ts",
         "src/components/ui/button/index.ts",
@@ -20282,7 +20248,6 @@
         "src/core/composables/useConfirmDialog.ts",
         "src/core/composables/useOverlayInteractionLifecycle.ts",
         "src/core/config/pagination.ts",
-        "src/core/config/runtimeUrls.ts",
         "src/core/contracts/imageServices.ts",
         "src/core/lib/chartPrimitives.ts",
         "src/core/lib/chartTheme.ts",
@@ -20328,11 +20293,6 @@
         {
           "from": "src/features/admin/shared/core/controlResource.ts",
           "to": "src/api/contractKernel.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/core/controlTransport.unit.spec.ts",
-          "to": "node_modules/vitest/dist/index.js",
           "kind": "runtime"
         },
         {
@@ -20452,22 +20412,12 @@
         },
         {
           "from": "src/features/admin/shared/session/brand/brandLogos.ts",
-          "to": "src/api/generated-query/control/control-platform/control-platform.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/brand/brandLogos.ts",
           "to": "src/core/assets/oauth/discord.svg",
           "kind": "runtime"
         },
         {
           "from": "src/features/admin/shared/session/brand/brandLogos.ts",
           "to": "src/core/assets/oauth/google.svg",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/brand/brandLogos.ts",
-          "to": "src/core/config/runtimeUrls.ts",
           "kind": "runtime"
         },
         {
@@ -21550,8 +21500,8 @@
       "missingConsumers": [],
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
-      "targetFanIn": 118,
-      "targetFanOut": 60,
+      "targetFanIn": 117,
+      "targetFanOut": 58,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,
@@ -21659,14 +21609,11 @@
         }
       ],
       "fanIn": 6,
-      "fanOut": 14,
+      "fanOut": 11,
       "fanOutTargets": [
         "node_modules/vue/index.js",
-        "src/api/generated-query/control/control-platform/control-platform.ts",
         "src/core/assets/oauth/discord.svg",
         "src/core/assets/oauth/google.svg",
-        "src/core/config/runtimeUrls.ts",
-        "src/features/admin/shared/core/controlTransport.ts",
         "src/features/admin/shared/ui/assets/oauth/github.svg",
         "src/features/admin/shared/ui/assets/search-providers/pexels.svg",
         "src/features/admin/shared/ui/assets/search-providers/unsplash.svg",
@@ -21684,27 +21631,12 @@
         },
         {
           "from": "src/features/admin/shared/session/brand/brandLogos.ts",
-          "to": "src/api/generated-query/control/control-platform/control-platform.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/brand/brandLogos.ts",
           "to": "src/core/assets/oauth/discord.svg",
           "kind": "runtime"
         },
         {
           "from": "src/features/admin/shared/session/brand/brandLogos.ts",
           "to": "src/core/assets/oauth/google.svg",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/brand/brandLogos.ts",
-          "to": "src/core/config/runtimeUrls.ts",
-          "kind": "runtime"
-        },
-        {
-          "from": "src/features/admin/shared/session/brand/brandLogos.ts",
-          "to": "src/features/admin/shared/core/controlTransport.ts",
           "kind": "runtime"
         },
         {
@@ -21753,7 +21685,7 @@
       "undeclaredDeepImports": [],
       "missingDeepImports": [],
       "targetFanIn": 6,
-      "targetFanOut": 14,
+      "targetFanOut": 11,
       "advisories": {
         "fanInTargetMismatch": false,
         "fanOutTargetMismatch": false,

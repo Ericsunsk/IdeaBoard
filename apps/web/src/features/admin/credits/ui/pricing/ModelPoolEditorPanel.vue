@@ -7,23 +7,23 @@
     <ul v-if="draft.length > 0" class="flex flex-col gap-2">
       <li
         v-for="(entry, index) in draft"
-        :key="entry.modelId"
+        :key="displayId(entry)"
         class="flex flex-col gap-2 rounded-panel border border-border p-3"
       >
         <div class="flex min-w-0 items-center gap-2">
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
-            {{ entry.modelId }}
+            {{ displayId(entry) }}
           </span>
           <AdminSwitch
             :model-value="entry.enabled"
             :disabled="pending"
-            :aria-label="BILLING_PRICING_MESSAGES.poolEnabledAria(entry.modelId)"
+            :aria-label="BILLING_PRICING_MESSAGES.poolEnabledAria(displayId(entry))"
             @update:model-value="setEnabled(index, $event)"
           />
           <ActionButton
             variant="outline"
             :disabled="pending"
-            :aria-label="BILLING_PRICING_MESSAGES.poolRemoveAria(entry.modelId)"
+            :aria-label="BILLING_PRICING_MESSAGES.poolRemoveAria(displayId(entry))"
             @click="removeEntry(index)"
           >
             <Xmark class="size-3.5" />
@@ -38,7 +38,7 @@
             :aria-pressed="entry.resolutions.includes(resolution)"
             :aria-label="
               BILLING_PRICING_MESSAGES.poolResolutionAria(
-                entry.modelId,
+                displayId(entry),
                 resolution.toUpperCase(),
                 entry.resolutions.includes(resolution),
               )
@@ -63,7 +63,7 @@
 
     <div class="flex items-center gap-2">
       <AdminSelect
-        v-model="selectedCatalogId"
+        v-model="selectedCatalogKey"
         :options="catalogSelectOptions"
         :placeholder="BILLING_PRICING_MESSAGES.poolAddPlaceholder"
         :aria-label="BILLING_PRICING_MESSAGES.poolAddPlaceholder"
@@ -73,7 +73,7 @@
       />
       <ActionButton
         variant="outline"
-        :disabled="pending || !selectedCatalogId"
+        :disabled="pending || !selectedCatalogKey"
         @click="addSelected"
       >
         {{ BILLING_PRICING_MESSAGES.poolAddModel }}
@@ -111,6 +111,7 @@ import type {
   AdminPoolCatalogModel,
   PoolResolution,
 } from '../../core/pricing/billableCatalogTypes'
+import { formatPoolModelId as displayId } from '../../core/pricing/billableCatalogTypes'
 import { BILLING_PRICING_MESSAGES } from './messages'
 
 const props = withDefaults(
@@ -142,35 +143,49 @@ const emit = defineEmits<{
 const POOL_RESOLUTIONS: readonly PoolResolution[] = OUTPUT_RESOLUTION_OPTIONS
 
 const draft = ref<AdminModelPoolEntry[]>([])
-const selectedCatalogId = ref('')
+const selectedCatalogKey = ref('')
 const showError = ref(false)
 
 watch(
   () => props.entries,
   (entries) => {
     draft.value = (entries ?? []).map((entry) => ({
+      provider: entry.provider,
       modelId: entry.modelId,
       enabled: entry.enabled,
       resolutions: [...entry.resolutions],
     }))
-    selectedCatalogId.value = ''
+    selectedCatalogKey.value = ''
     showError.value = false
   },
   { immediate: true, deep: true },
 )
 
+function entryKey(provider: string, modelId: string): string {
+  return `${provider.trim().toLowerCase()}/${modelId.trim().toLowerCase()}`
+}
+
+function catalogDisplayId(item: Pick<AdminPoolCatalogModel, 'id' | 'provider'>): string {
+  return displayId({ provider: item.provider, modelId: item.id })
+}
+
 const availableCatalogModels = computed(() => {
-  const taken = new Set(draft.value.map((entry) => entry.modelId.toLowerCase()))
-  return (props.catalogModels ?? []).filter((model) => !taken.has(model.id.toLowerCase()))
+  const taken = new Set(draft.value.map((entry) => entryKey(entry.provider, entry.modelId)))
+  return (props.catalogModels ?? []).filter(
+    (model) => !taken.has(entryKey(model.provider, model.id)),
+  )
 })
 
 // AdminSelect 取 label/value 结构：保留原生 select 的 `name || id` 回退，
-// 空 name 的目录项仍显示可辨识的 id。
+// 目录拼接（provider/model）优先展示，名称不同时附带。
 const catalogSelectOptions = computed(() =>
-  availableCatalogModels.value.map((model) => ({
-    label: model.name || model.id,
-    value: model.id,
-  })),
+  availableCatalogModels.value.map((model) => {
+    const display = catalogDisplayId(model)
+    return {
+      label: model.name && model.name !== display ? `${display} · ${model.name}` : display,
+      value: entryKey(model.provider, model.id),
+    }
+  }),
 )
 
 function setEnabled(index: number, enabled: boolean) {
@@ -196,11 +211,17 @@ function removeEntry(index: number) {
 }
 
 function addSelected() {
-  const id = selectedCatalogId.value.trim()
-  if (!id) return
-  if (draft.value.some((entry) => entry.modelId.toLowerCase() === id.toLowerCase())) return
-  draft.value.push({ modelId: id, enabled: true, resolutions: [] })
-  selectedCatalogId.value = ''
+  const item = availableCatalogModels.value.find(
+    (model) => entryKey(model.provider, model.id) === selectedCatalogKey.value,
+  )
+  if (!item) return
+  draft.value.push({
+    provider: item.provider,
+    modelId: item.id.trim(),
+    enabled: true,
+    resolutions: [],
+  })
+  selectedCatalogKey.value = ''
 }
 
 function resolutionBadgeClass(on: boolean): string {
@@ -218,6 +239,7 @@ function checkPoolValidity(): boolean {
 
 function getDraftEntries(): AdminModelPoolEntry[] {
   return draft.value.map((entry) => ({
+    provider: entry.provider,
     modelId: entry.modelId,
     enabled: entry.enabled,
     resolutions: [...entry.resolutions],

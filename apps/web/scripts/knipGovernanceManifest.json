@@ -5956,12 +5956,6 @@
           "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#adminBrandLogoMap"
         ]
       },
-      "adminBrandLogoProxyUrl": {
-        "kind": "canonical-public",
-        "evidence": [
-          "docs/frontend-seam-inventory.md: src/features/admin/shared/session/brand/brandLogos.ts#adminBrandLogoProxyUrl"
-        ]
-      },
       "detectAdminBrandLogoKey": {
         "kind": "canonical-public",
         "evidence": [
@@ -14426,7 +14420,7 @@
   },
   "generated": {
     "src/api/generated-query/control/control-billing/control-billing.ts": {
-      "sha256": "316722367218928be9771a7f292304800ae4bccef468faaf3c2c60f9c5804b35",
+      "sha256": "4827902f97358f0a7c6710d339fb8f26611cf68d0a24d75e4783df8b042e8d46",
       "exports": [
         "DeleteControlCatalogItemMutationError",
         "DeleteControlCatalogItemMutationResult",
@@ -14718,7 +14712,7 @@
       ]
     },
     "src/api/generated-query/control/control-platform/control-platform.ts": {
-      "sha256": "d2730970e1e545321403070efe0147e21376883ce7f9f960be75820864e83599",
+      "sha256": "f9be2437bcb8c2c5909b31f552bf4d8fd4342f6ec51b7c5486235ba8a22b03d5",
       "exports": [
         "ApplyControlStorageProfileMutationError",
         "ApplyControlStorageProfileMutationResult",
@@ -14739,12 +14733,6 @@
         "DeleteControlStorageProfileMutationError",
         "DeleteControlStorageProfileMutationResult",
         "DeleteControlStorageProfileMutationVariables",
-        "DetectControlAIGatewayModelsQueryError",
-        "DetectControlAIGatewayModelsQueryResult",
-        "GetControlAIGatewayBrandLogoQueryError",
-        "GetControlAIGatewayBrandLogoQueryResult",
-        "GetControlAIGatewayModelReferenceQueryError",
-        "GetControlAIGatewayModelReferenceQueryResult",
         "GetControlAIGatewayQueryError",
         "GetControlAIGatewayQueryResult",
         "GetControlBrandingSettingQueryError",
@@ -14873,7 +14861,6 @@
         "deleteControlBrandLogoOverride",
         "deleteControlMailSetting",
         "deleteControlStorageProfile",
-        "detectControlAIGatewayModels",
         "getApplyControlStorageProfileMutationKey",
         "getApplyControlStorageProfileMutationOptions",
         "getApplyControlStorageProfileUrl",
@@ -14881,8 +14868,6 @@
         "getBackfillControlStatisticsMutationOptions",
         "getBackfillControlStatisticsUrl",
         "getControlAIGateway",
-        "getControlAIGatewayBrandLogo",
-        "getControlAIGatewayModelReference",
         "getControlBrandingSetting",
         "getControlFeaturePrompt",
         "getControlLoginLockoutSetting",
@@ -14907,15 +14892,6 @@
         "getDeleteControlStorageProfileMutationKey",
         "getDeleteControlStorageProfileMutationOptions",
         "getDeleteControlStorageProfileUrl",
-        "getDetectControlAIGatewayModelsQueryKey",
-        "getDetectControlAIGatewayModelsQueryOptions",
-        "getDetectControlAIGatewayModelsUrl",
-        "getGetControlAIGatewayBrandLogoQueryKey",
-        "getGetControlAIGatewayBrandLogoQueryOptions",
-        "getGetControlAIGatewayBrandLogoUrl",
-        "getGetControlAIGatewayModelReferenceQueryKey",
-        "getGetControlAIGatewayModelReferenceQueryOptions",
-        "getGetControlAIGatewayModelReferenceUrl",
         "getGetControlAIGatewayQueryKey",
         "getGetControlAIGatewayQueryOptions",
         "getGetControlAIGatewayUrl",
@@ -15077,10 +15053,7 @@
         "useDeleteControlBrandLogoOverride",
         "useDeleteControlMailSetting",
         "useDeleteControlStorageProfile",
-        "useDetectControlAIGatewayModels",
         "useGetControlAIGateway",
-        "useGetControlAIGatewayBrandLogo",
-        "useGetControlAIGatewayModelReference",
         "useGetControlBrandingSetting",
         "useGetControlFeaturePrompt",
         "useGetControlLoginLockoutSetting",
@@ -15522,7 +15495,7 @@
       "exports": ["ControlMailTestRequest"]
     },
     "src/api/generated-query/control/model/controlModelPoolEntry.ts": {
-      "sha256": "3ce9c9581d72c4159d408cdca33b1ee9e2209d36b76e3b8da88f45ba1f4392a8",
+      "sha256": "a97f3f55679dc6f6b778923e3603136c813cdacd5d6d8c90b38e46c95a44e407",
       "exports": ["ControlModelPoolEntry"]
     },
     "src/api/generated-query/control/model/controlModelPoolEntryResolutionsItem.ts": {
@@ -15797,21 +15770,9 @@
       "sha256": "9255939846df25b259049e35ddd6e83e9924dd30c38e2a230845c9011c9dfea6",
       "exports": ["CursorParameter"]
     },
-    "src/api/generated-query/control/model/detectControlAIGatewayModelsParams.ts": {
-      "sha256": "f4a1be471d0dd6da0363599d267c6734d22155002205ea4ad8eb8a5a5ec4be7d",
-      "exports": ["DetectControlAIGatewayModelsParams"]
-    },
     "src/api/generated-query/control/model/forbiddenResponse.ts": {
       "sha256": "94c0f351271d76f312d6c0604cef48dfde2872eccb3f0384d45b5508e9c8bb77",
       "exports": ["ForbiddenResponse"]
-    },
-    "src/api/generated-query/control/model/getControlAIGatewayBrandLogoParams.ts": {
-      "sha256": "b2fa0902f08bb5e93f0a95daf333a97dbda28a5d49b9f866b22e8ae73963370c",
-      "exports": ["GetControlAIGatewayBrandLogoParams"]
-    },
-    "src/api/generated-query/control/model/getControlAIGatewayModelReferenceParams.ts": {
-      "sha256": "e33c86b3ddbca2fa80e9910cee0dd0ed99666a2402132dee418339ccd67c6d5d",
-      "exports": ["GetControlAIGatewayModelReferenceParams"]
     },
     "src/api/generated-query/control/model/getControlStatisticsParams.ts": {
       "sha256": "a963bff1fca3d8f4e8dfa17e513600d98e5a86c7d3606c158d31fa740c989e6d",
@@ -15826,7 +15787,7 @@
       "exports": ["IdempotencyKeyParameter"]
     },
     "src/api/generated-query/control/model/index.ts": {
-      "sha256": "2e6ae240273a99abcfca4663cf70cb710eac2583b00f547d49d547bde4caf196",
+      "sha256": "6fd803dbef17d9bcf1d3e69542bb9ea036f9bba4849374166b6d04d0ca6720de",
       "exports": []
     },
     "src/api/generated-query/control/model/listControlBillingAccountLedgerParams.ts": {
@@ -15934,7 +15895,7 @@
       "exports": ["SupportChannelsSettingEnvelope"]
     },
     "src/api/generated-query/control/model/testControlAIGatewayConnectionBody.ts": {
-      "sha256": "45fc1df33cbef2be0a876238ebb73ea79dd6d1246cd7e6044ac3804fabfb16ac",
+      "sha256": "a8c67f0a7d8e770905ed9e07dbe46f7206842e4f74aa1a82770ef05c6a0dda2c",
       "exports": ["TestControlAIGatewayConnectionBody"]
     },
     "src/api/generated-query/control/model/unauthorizedResponse.ts": {
@@ -15982,7 +15943,7 @@
       "exports": ["UploadControlBrandingLogoBody"]
     },
     "src/api/generated-query/public/boards/boards.ts": {
-      "sha256": "8adec9d55f81f94daa24c8213345eb0d3e791b6e896364e5500f4519505d7851",
+      "sha256": "c405535f4a4798d4c7ab958aa73016355b5ef0608f64aab659562afcf2ad0d1f",
       "exports": [
         "ArchiveBoardMutationError",
         "ArchiveBoardMutationResult",
@@ -18000,7 +17961,7 @@
       ]
     },
     "src/api/generated-query/public/workspace-media/workspace-media.ts": {
-      "sha256": "3bbb33ac2237d7d26f5c937fe6fe67ca4641967f610f6315fa25ce8fd5f4311c",
+      "sha256": "c7e9536a804d44a2458233a080dd99a930493c3a2dbf6c1e8804ced69dd4f2db",
       "exports": [
         "ArchiveWorkspaceMediaAssetMutationError",
         "ArchiveWorkspaceMediaAssetMutationResult",

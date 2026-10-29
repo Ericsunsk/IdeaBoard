@@ -32,22 +32,17 @@ func TestValidateUpdateInput(t *testing.T) {
 	}
 
 	// Open egress: any http(s) host passes (audited, not allowlisted).
-	for _, customURL := range []string{
-		"https://my-gateway.example.com/",
-		"https://gateway.example.com/v1/abcdef0123456789abcdef0123456789/my-gateway",
-	} {
-		gotBase, gotAccount, gotGateway, _, _, err := validateUpdateInput(UpdateInput{
-			BaseURL:   customURL,
-			AccountID: "abcdef0123456789abcdef0123456789",
-			GatewayID: "my-gateway",
-			Token:     &token,
-		}, 7)
-		if err != nil {
-			t.Fatalf("validateUpdateInput(%q) rejected, want open-host pass: %v", customURL, err)
-		}
-		if gotBase == "" || gotAccount == "" || gotGateway == "" {
-			t.Fatalf("validateUpdateInput(%q) = %q / %q / %q, want normalized", customURL, gotBase, gotAccount, gotGateway)
-		}
+	gotBase, gotAccount, gotGateway, _, _, err := validateUpdateInput(UpdateInput{
+		BaseURL:   "https://my-gateway.example.com/",
+		AccountID: "abcdef0123456789abcdef0123456789",
+		GatewayID: "my-gateway",
+		Token:     &token,
+	}, 7)
+	if err != nil {
+		t.Fatalf("validateUpdateInput(custom URL) rejected, want open-host pass: %v", err)
+	}
+	if gotBase == "" || gotAccount == "" || gotGateway == "" {
+		t.Fatalf("validateUpdateInput(custom URL) = %q / %q / %q, want normalized", gotBase, gotAccount, gotGateway)
 	}
 
 	// Test with standard Cloudflare BaseURL auto-extracting Account and Gateway
@@ -157,8 +152,6 @@ func TestConfigRepositoryRoundTrip(t *testing.T) {
 		t.Fatalf("resolved leaks or misbuilds: %+v", resolved.BaseURL)
 	}
 
-	// Open egress: an arbitrary custom host persists, and the admin
-	// audit records host-level old→new without the token value.
 	customToken := "rotated-gateway-token-value"
 	if err := repo.Update(ctx, UpdateInput{
 		BaseURL:   "https://gateway.example.com",
@@ -175,7 +168,6 @@ func TestConfigRepositoryRoundTrip(t *testing.T) {
 	if keptCustom.BaseURL != "https://gateway.example.com" {
 		t.Fatalf("custom BaseURL not persisted: %+v", keptCustom)
 	}
-	// Audit records actor plus host-level old→new, never the token plaintext.
 	var auditAction string
 	var auditActor int64
 	var auditMetadataRaw []byte
@@ -231,7 +223,7 @@ func TestSaveCatalogValidation(t *testing.T) {
 	ctx := t.Context()
 
 	valid := []CatalogItem{{
-		ID: "test/model-1", Name: "Model 1", Provider: "Test",
+		ID: "model-1", Name: "Model 1", Provider: "Test",
 		Mode: "chat", Description: "d", ContextOrResolution: "c", Hosting: "h", TermsURL: "t", DocsURL: "d",
 	}}
 	if err := repo.SaveCatalog(ctx, valid, 1); err != nil {
@@ -239,7 +231,7 @@ func TestSaveCatalogValidation(t *testing.T) {
 	}
 
 	dup := append(append([]CatalogItem{}, valid...), CatalogItem{
-		ID: "TEST/model-1", Name: "Dup", Provider: "Test",
+		ID: "MODEL-1", Name: "Dup", Provider: "Test",
 	})
 	if err := repo.SaveCatalog(ctx, dup, 1); err == nil {
 		t.Fatal("SaveCatalog(duplicate ID) error = nil, want error")

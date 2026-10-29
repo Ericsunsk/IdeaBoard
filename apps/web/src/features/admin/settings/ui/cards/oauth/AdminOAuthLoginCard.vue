@@ -52,7 +52,7 @@
       </template>
     </div>
 
-    <OAuthProviderSettingsDialog v-model:visible="visible" :resource="resource" />
+    <OAuthProviderSettingsDialog v-model:is-visible="visible" :resource="resource" />
   </div>
 </template>
 
@@ -102,14 +102,13 @@ const providers = computed(() =>
     label: getOAuthProviderLabel(code),
     logo: resolveOAuthProviderLogo(code),
     enabled:
-      (code === 'google' ? query.data.value?.google : query.data.value?.discord)?.enabled ?? false,
+      (code === 'google' ? query.data.value?.google : query.data.value?.discord)?.isEnabled ??
+      false,
   })),
 )
 
-// 弹窗内保存后关闭时刷新摘要，保持板块状态与弹窗一致。
 useRefetchOnClose(visible, () => query.refetch())
 
-// 加载失败走 toast，Status 胶囊保留为真相源。
 watch(
   () => query.error.value,
   (error) => {

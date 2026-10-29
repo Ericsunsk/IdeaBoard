@@ -51,7 +51,7 @@ type allowAllV1PoolStore struct{}
 
 func (allowAllV1PoolStore) ListPool(_ context.Context, service string) (routing.Pool, error) {
 	return routing.Pool{Service: service, Version: 1, Entries: []routing.ModelPoolEntry{
-		{Model: "openrouter/test-model", Enabled: true, SupportedResolutions: []routing.Resolution{
+		{Provider: "openrouter", Model: "test-model", Enabled: true, SupportedResolutions: []routing.Resolution{
 			routing.Resolution1K, routing.Resolution2K, routing.Resolution4K,
 		}},
 	}}, nil
@@ -1138,8 +1138,8 @@ func TestV1TaskSubmitResolutionAgreement(t *testing.T) {
 	pools := map[string]routing.Pool{"render": {
 		Service: "render", Version: 5,
 		Entries: []routing.ModelPoolEntry{
-			{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
-			{Model: "b/second", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K, routing.Resolution4K}},
+			{Provider: "a", Model: "first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
+			{Provider: "b", Model: "second", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K, routing.Resolution4K}},
 		},
 	}}
 	fx := newV1TaskRoutingFixture(t, pools)
@@ -1280,7 +1280,7 @@ func TestV1TaskSubmitExplicitDefaultForScalable(t *testing.T) {
 	pools := map[string]routing.Pool{"render": {
 		Service: "render", Version: 5,
 		Entries: []routing.ModelPoolEntry{
-			{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
+			{Provider: "a", Model: "first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
 		},
 	}}
 	fx := newV1TaskRoutingFixture(t, pools)
@@ -1311,8 +1311,8 @@ func TestV1TaskResolverPinsSnapshotAndPreservesIdempotency(t *testing.T) {
 	pools := map[string]routing.Pool{"render": {
 		Service: "render", Version: 5,
 		Entries: []routing.ModelPoolEntry{
-			{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
-			{Model: "b/second", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K, routing.Resolution4K}},
+			{Provider: "a", Model: "first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
+			{Provider: "b", Model: "second", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K, routing.Resolution4K}},
 		},
 	}}
 	fx := newV1TaskRoutingFixture(t, pools)

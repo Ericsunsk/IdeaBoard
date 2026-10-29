@@ -79,7 +79,7 @@ type allowAllAtomicPoolStore struct{}
 
 func (allowAllAtomicPoolStore) ListPool(_ context.Context, service string) (routing.Pool, error) {
 	return routing.Pool{Service: service, Version: 1, Entries: []routing.ModelPoolEntry{
-		{Model: "openrouter/test-model", Enabled: true, SupportedResolutions: []routing.Resolution{
+		{Provider: "openrouter", Model: "test-model", Enabled: true, SupportedResolutions: []routing.Resolution{
 			routing.Resolution1K, routing.Resolution2K, routing.Resolution4K,
 		}},
 	}}, nil
@@ -825,7 +825,7 @@ func openRoutingAtomicEnv(t *testing.T) *atomicEnv {
 
 	poolRepo := catalog.NewRepository(env.pool)
 	if _, err := poolRepo.ReplacePool(ctx, "render", 0, []catalog.PoolEntryInput{
-		{ModelID: "atomic-test/model", Enabled: true, Resolutions: []string{"1k"}},
+		{Provider: "atomic-test", Model: "model", Enabled: true, Resolutions: []string{"1k"}},
 	}); err != nil {
 		t.Fatalf("seed atomic routing pool: %v", err)
 	}
@@ -951,7 +951,7 @@ func TestAtomicRoutingSnapshotSurvivesPoolEdits(t *testing.T) {
 		t.Fatalf("pool version: %v", err)
 	}
 	if _, err := poolRepo.ReplacePool(ctx, "render", version, []catalog.PoolEntryInput{
-		{ModelID: "atomic-test/other", Enabled: true, Resolutions: []string{"2k", "4k"}},
+		{Provider: "atomic-test", Model: "other", Enabled: true, Resolutions: []string{"2k", "4k"}},
 	}); err != nil {
 		t.Fatalf("edit atomic routing pool: %v", err)
 	}

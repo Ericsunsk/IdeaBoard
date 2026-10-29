@@ -8,12 +8,21 @@ import (
 )
 
 // ModelPoolEntry is one service pool row as seen by routing (ADR-0012
-// rule 2). Model is an opaque catalog reference
-// (provider/model[@gateway-path]); routing sorts it lexicographically
-// and never parses it. Entries carry no priority, fallback, or weight
-// (ADR-0012 rule 5).
+// rule 2). Provider is the registry slug (lowercased at the write
+// boundary; unknown slugs synthesize the default custom-<slug> namespace
+// at execution, never vanish) and Model is the bare model name (no
+// provider prefix, no @path; nested slashes inside the bare name, e.g.
+// openrouter's vendor/model, are preserved). Entries carry no priority,
+// fallback, or weight (ADR-0012 rule 5).
+//
+// The canonical display form provider + "/" + model is derived only for
+// selection sorting, snapshot pinning, and Admin display (see
+// DisplayModel): it is never stored, and execution re-splits it
+// strictly (bare models without a provider fail closed).
 type ModelPoolEntry struct {
-	// Model is the canonical catalog reference of the candidate model.
+	// Provider is the registry slug of the candidate model.
+	Provider string
+	// Model is the bare model name of the candidate model.
 	Model string
 	// Enabled gates visibility: disabled entries are invisible to
 	// routing but stay editable/displayable in Admin.
@@ -22,6 +31,14 @@ type ModelPoolEntry struct {
 	// can serve. It never contains "default" (ADR-0012 rule 3); an
 	// enabled entry must list at least one resolution.
 	SupportedResolutions []Resolution
+}
+
+// DisplayModel renders the canonical provider/model display form of one
+// entry: provider + "/" + bare model. Selection sorting, snapshot
+// pinning, and Admin display derive this string from the stored columns;
+// it is never stored, and execution re-splits it strictly.
+func (e ModelPoolEntry) DisplayModel() string {
+	return e.Provider + "/" + e.Model
 }
 
 // Supports reports whether the entry serves the requested canonical

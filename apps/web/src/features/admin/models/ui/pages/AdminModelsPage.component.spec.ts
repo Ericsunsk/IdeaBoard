@@ -8,7 +8,7 @@ import AdminModelsPage from './AdminModelsPage.vue'
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
 const gatewayFakes = vi.hoisted(() => ({
-  detect: vi.fn(),
+  listProviders: vi.fn(),
   listObserved: vi.fn(),
   previewRoute: vi.fn(),
 }))
@@ -17,10 +17,10 @@ vi.mock('@/core/composables/useConfirmDialog', () => ({
   useConfirm: () => ({ confirm: confirmMock }),
 }))
 
-// Detect/observed/route-preview have no control equivalent (fail-closed in
+// Observed/route-preview have no control equivalent (fail-closed in
 // the resource); page UX keeps coverage through fakes while the resource
-// spec pins the fail-closed contract. Everything else rides the real
-// resource over MSW control handlers.
+// spec pins the fail-closed contract. Providers ride the real resource
+// over MSW control handlers. Everything else rides the real resource.
 vi.mock('../../resource', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../resource')>()
   return {
@@ -31,7 +31,7 @@ vi.mock('../../resource', async (importOriginal) => {
         ...real,
         catalog: {
           ...real.catalog,
-          detect: gatewayFakes.detect,
+          listProviders: gatewayFakes.listProviders,
           listObserved: gatewayFakes.listObserved,
           previewRoute: gatewayFakes.previewRoute,
         },
@@ -56,19 +56,13 @@ describe('AdminModelsPage', () => {
     toast.warning.mockReset()
     toast.error.mockReset()
     storedCatalog = wireCatalogModels()
-    gatewayFakes.detect.mockReset()
+    gatewayFakes.listProviders.mockReset()
     gatewayFakes.listObserved.mockReset()
     gatewayFakes.previewRoute.mockReset()
-    gatewayFakes.detect.mockResolvedValue({
-      models: [
-        {
-          id: 'anthropic/claude-image-v1',
-          name: 'Claude Image V1',
-          provider: 'Anthropic',
-        },
-      ],
-      configured_providers: 1,
-    })
+    gatewayFakes.listProviders.mockResolvedValue([
+      { slug: 'anthropic', display_name: 'Anthropic', id_prefix: 'anthropic/' },
+      { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/' },
+    ])
     gatewayFakes.listObserved.mockResolvedValue([makeObservedSnapshot()])
     gatewayFakes.previewRoute.mockResolvedValue({
       provider_slug: 'custom-test',
@@ -115,7 +109,7 @@ describe('AdminModelsPage', () => {
     expect(screen.getByRole('combobox', { name: '筛选提供商' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '筛选托管方式' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '刷新模型' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '新增网关' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '网关设置' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '添加模型' })).toBeInTheDocument()
 
     expect(await screen.findByText('我们找到了 2 个模型')).toBeInTheDocument()
@@ -123,28 +117,15 @@ describe('AdminModelsPage', () => {
     expect(screen.getByText('gpt-image-1')).toBeInTheDocument()
   })
 
-  it('renders brand logos for recognized models and shows community mode tag', async () => {
+  it('falls back to the default mark for AI providers and shows mode tag', async () => {
     renderModelsPage()
     await screen.findByText('我们找到了 2 个模型')
 
-    // 验证 OpenAI 模型卡片渲染了对应品牌 Logo
-    const openaiImg = screen.getByRole('img', { name: 'OpenAI' })
-    expect(openaiImg).toBeInTheDocument()
+    // AI provider 一律回退 Cube 占位，不再请求外部品牌图。
+    expect(screen.queryByRole('img', { name: 'OpenAI' })).not.toBeInTheDocument()
 
     // mode 原样透传展示（无站内分类体系）
     expect(screen.getAllByText('image_generation')).toHaveLength(2)
-  })
-
-  it('hides a broken brand logo instead of showing a broken image', async () => {
-    renderModelsPage()
-    await screen.findByText('我们找到了 2 个模型')
-
-    const openaiImg = screen.getByRole('img', { name: 'OpenAI' })
-    expect(openaiImg).toBeInTheDocument()
-    await fireEvent.error(openaiImg)
-
-    // 卡片品牌图加载失败即隐藏，回落 Cube 占位。
-    expect(screen.queryByRole('img', { name: 'OpenAI' })).not.toBeInTheDocument()
   })
 
   it('filters models dynamically based on keyword and can clear filters', async () => {
@@ -192,7 +173,7 @@ describe('AdminModelsPage', () => {
     expect(await screen.findByText('已复制')).toBeInTheDocument()
   })
 
-  it('opens add model dialog and successfully imports a detected model', async () => {
+  it('opens add model dialog and successfully imports a hand-filled model', async () => {
     let savedList: unknown = null
     useMswHandlers(
       http.put('/api/control/v1/platform/ai-gateway/catalog', async ({ request }) => {
@@ -207,23 +188,16 @@ describe('AdminModelsPage', () => {
 
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: '添加模型' })).toBeInTheDocument()
-    await waitFor(() => expect(dialog.textContent).toMatch(/Claude/))
-    console.log(
-      'CLAUDE-HTML:',
-      JSON.stringify(dialog.innerHTML?.match(/.{0,400}Claude Image V1.{0,200}/s)?.[0]),
-    )
+    await within(dialog).findByText('Anthropic')
 
-    // 自动探测出模型并展示（行内文本经 Portal 渲染，用角色查询代替文本匹配）
-    const claudeCheckbox = await within(dialog).findByRole('checkbox', {
-      name: '选择 Claude Image V1',
-    })
-    await user.click(claudeCheckbox)
+    const input = within(dialog).getByPlaceholderText('例如: gpt-image-1（只需裸模型名）')
+    await user.type(input, 'claude-image-v1')
 
-    await user.click(within(dialog).getByRole('button', { name: /导入所选模型/ }))
+    await user.click(within(dialog).getByRole('button', { name: '导入模型' }))
 
     await waitFor(() => expect(savedList).not.toBeNull())
     expect(toast.success).toHaveBeenCalledWith('已成功导入 1 个模型到模型库')
-    expect(screen.getByText('Claude Image V1')).toBeInTheDocument()
+    expect(screen.getByText('claude-image-v1')).toBeInTheDocument()
   })
 
   it('opens an empty edit dialog for manual entry from the add dialog', async () => {
@@ -232,9 +206,9 @@ describe('AdminModelsPage', () => {
 
     const addDialog = screen.getByRole('dialog')
     expect(within(addDialog).getByRole('heading', { name: '添加模型' })).toBeInTheDocument()
-    await user.click(within(addDialog).getByRole('button', { name: '手动新增' }))
+    await user.click(within(addDialog).getByRole('button', { name: '高级新增' }))
 
-    // 手动新增打开 EditDialog 空表单（探测不到的 Provider 在此入库）
+    // 高级新增打开 EditDialog 空表单（完整字段在此入库）
     const editDialog = await screen.findByRole('dialog')
     expect(within(editDialog).getByRole('heading', { name: '新增模型' })).toBeInTheDocument()
   })
@@ -300,15 +274,82 @@ describe('AdminModelsPage', () => {
     expect(screen.getByText(/暂无 7 天观测数据/)).toBeInTheDocument()
   })
 
-  it('opens add gateway dialog when clicking 新增网关 button', async () => {
+  it('keeps observed stats distinct for same-name models at different providers', async () => {
+    const base = wireCatalogModels()[1]!
+    storedCatalog = [
+      { ...base, name: 'OpenAI Image', provider: 'openai' },
+      { ...base, name: 'Azure Image', provider: 'azureopenai' },
+    ]
+    gatewayFakes.listObserved.mockResolvedValue([
+      makeObservedSnapshot(),
+      {
+        ...makeObservedSnapshot(),
+        model: 'azureopenai/gpt-image-1',
+        provider: 'azureopenai',
+        successRate: 0.11,
+      },
+    ])
+    renderModelsPage()
+    expect(await screen.findByText('92%')).toBeInTheDocument()
+    expect(await screen.findByText('11%')).toBeInTheDocument()
+  })
+
+  it('opens gateway dialog when clicking 网关设置 button', async () => {
     const { user } = renderModelsPage()
-    const addGatewayBtn = screen.getByRole('button', { name: '新增网关' })
-    await user.click(addGatewayBtn)
+    const gatewayBtn = screen.getByRole('button', { name: '网关设置' })
+    await user.click(gatewayBtn)
 
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByRole('heading', { name: '添加网关' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: '网关设置' })).toBeInTheDocument()
     expect(within(dialog).getByLabelText(/网关 Base URL/)).toBeInTheDocument()
     expect(within(dialog).getByLabelText(/API 密钥/)).toBeInTheDocument()
+  })
+
+  it('keeps single 网关设置 button even when gateway base_url is present and still opens dialog on click', async () => {
+    useMswHandlers(
+      http.get('/api/control/v1/platform/ai-gateway', () => {
+        return HttpResponse.json({
+          data: {
+            base_url: 'https://gateway.ai.cloudflare.com/v1/cf-acc-1/gw-1',
+            account_id: 'cf-acc-1',
+            gateway_id: 'gw-1',
+            token_configured: true,
+          },
+        })
+      }),
+    )
+
+    const { user } = renderModelsPage()
+
+    const settingsBtn = await screen.findByRole('button', { name: '网关设置' })
+    expect(settingsBtn).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '新增网关' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '已配置' })).not.toBeInTheDocument()
+
+    await user.click(settingsBtn)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: '网关设置' })).toBeInTheDocument()
+  })
+
+  it('keeps 网关设置 silently when gateway connection load fails', async () => {
+    useMswHandlers(
+      http.get('/api/control/v1/platform/ai-gateway', () => {
+        return HttpResponse.json(
+          { error: { code: 'not_found', message: 'AI 网关配置不存在' } },
+          { status: 404 },
+        )
+      }),
+    )
+
+    renderModelsPage()
+
+    await screen.findByText('我们找到了 2 个模型')
+    // 单态按钮不依赖初始网关读取：加载失败也不影响入口，且不弹 toast 噪音。
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '网关设置' })).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('button', { name: '已配置' })).not.toBeInTheDocument()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 })
 
@@ -376,7 +417,7 @@ function wireCatalogModels() {
       docs_url: '',
     },
     {
-      id: 'openai/gpt-image-1',
+      id: 'gpt-image-1',
       name: 'gpt-image-1',
       provider: 'OpenAI',
       mode: 'image_generation',

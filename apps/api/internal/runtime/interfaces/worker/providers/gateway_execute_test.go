@@ -35,10 +35,15 @@ type stubRouteOverrideReader struct {
 	found  bool
 	err    error
 	called bool
+	// last lookup key: the structured pool model (provider plus bare
+	// model), never a combined-string inference.
+	gotProvider string
+	gotModel    string
 }
 
-func (s *stubRouteOverrideReader) LookupRouteOverride(_ context.Context, _ string) (string, string, bool, error) {
+func (s *stubRouteOverrideReader) LookupRouteOverride(_ context.Context, provider, model string) (string, string, bool, error) {
 	s.called = true
+	s.gotProvider, s.gotModel = provider, model
 	return s.path, s.params, s.found, s.err
 }
 
@@ -92,6 +97,9 @@ func TestCallGatewayAPIAppliesCatalogRouteOverride(t *testing.T) {
 	}
 	if !reader.called {
 		t.Fatal("catalog route override reader was not consulted")
+	}
+	if reader.gotProvider != "openai" || reader.gotModel != "dall-e-3" {
+		t.Fatalf("override lookup key = %q/%q, want structured openai/dall-e-3", reader.gotProvider, reader.gotModel)
 	}
 	if gotPath != "/openai/custom/endpoint/v2" {
 		t.Fatalf("gateway path = %q, want catalog override route", gotPath)
@@ -341,6 +349,60 @@ func TestCallGatewayAPIRejectsUnknownModel(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("unqualified model accepted, want error")
+	}
+}
+
+func TestCallGatewayAPIUnknownSlugUsesCustomNamespace(t *testing.T) {
+	// Unknown registry slugs keep the synthetic custom-<slug> namespace
+	// (Control API contract); the native body carries the bare model.
+	rawImagePayload := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
+	var gotPath string
+	var gotBody struct {
+		Model string `json:"model"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &gotBody)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"","images":[{"type":"image_url","image_url":{"url":"data:image/png;base64,` + rawImagePayload + `"}}]}}]}`))
+	}))
+	defer server.Close()
+
+	executor := &ProviderExecutor{
+		resultMaterializer: &captureResultMaterializer{
+			remoteResult: taskmedia.MaterializedResults{
+				Items: []taskmedia.MaterializedResult{{
+					ImageURL: "/uploads/tasks/42/task-custom/result.png",
+					Output: tasks.TaskOutput{
+						TaskID: "task-custom",
+						Role:   "image",
+						URL:    "/uploads/tasks/42/task-custom/result.png",
+					},
+				}},
+			},
+		},
+		gatewayFactory: gatewayTestFactory(server.URL),
+	}
+	task := &tasks.TaskPayload{
+		TaskID: "task-custom",
+		UserID: 42,
+		Prompt: "unknown provider model",
+		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
+			SchemaVersion: tasks.CurrentParamsSchemaVersion,
+			Service:       workflow.FeatureSlugGeneration,
+		}),
+	}
+	if _, err := executor.CallGatewayAPI(context.Background(), runtimeports.GatewayCallInput{
+		Task: task, Model: "myco/custom-model", ExecutionToken: "tok-custom", AttemptNo: 1,
+	}); err != nil {
+		t.Fatalf("CallGatewayAPI returned error: %v", err)
+	}
+	if gotPath != "/custom-myco/v1/images/generations" {
+		t.Fatalf("gateway path = %q, want /custom-myco/v1/images/generations", gotPath)
+	}
+	if gotBody.Model != "custom-model" {
+		t.Fatalf("native body model = %q, want bare custom-model", gotBody.Model)
 	}
 }
 
